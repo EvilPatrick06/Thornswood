@@ -39,9 +39,12 @@
 # and Build-Server.ps1 would have (scripts\release\ForkEngineBuild.ps1 says
 # which build counts and what is held). The records are then made from it as
 # from any build, with -BuiltBy naming the fork's run, and the compile steps
-# are skipped. The engine is built here, hosted first and then on the box,
+# are skipped. The engine is compiled here, on GitHub's hosted runner alone,
 # only when the fork has no build of the commit (a commit from before fork
-# #79, or one whose artifact's 90 days are over). A fork build still running,
+# #79, one whose artifact's 90 days are over, or one that was never a head of
+# thornswood/engine-changes). The box never compiles it (THE BOX TAKES THE
+# FORK'S BUILD, below), so a pin names a commit the fork built: a head of
+# thornswood/engine-changes. A fork build still running,
 # or one that ended red, stops this run with its link instead: the first
 # would build twice what GitHub builds free, and the second is a red engine.
 # The fork's artifacts are read with this run's own token (GitHub serves a
@@ -52,9 +55,10 @@
 # WHERE IT RUNS (Patrick's decision on #459, 15 Oct: C, then B): "just like
 # everything else GitHub runner are always used for everything first than if
 # it fails due to billing issues than it goes to the VPS runners". So the job
-# "engine", GitHub's hosted windows-2022, goes first, and "engine-vps" builds
-# it on the box only when that did not succeed, the way build.yml's
-# "Launcher builds" falls back (#2407):
+# "engine", GitHub's hosted windows-2022, goes first, and "engine-vps" makes
+# the records on the box only when that did not succeed, the way build.yml's
+# "Launcher builds" falls back (#2407), from the fork's build alone (THE BOX
+# TAKES THE FORK'S BUILD, below):
 #   - the repository variable BUILD_RUNNER is vps, which skips the hosted job
 #     outright (set since 12 Oct, measured 16 Oct), or
 #   - a manual run asked for runner: vps, or
@@ -65,13 +69,25 @@
 # stops any generator but "Visual Studio 17 2022" (CMakeLists.txt:78-83), and
 # windows-2022 is the image the fork's own pull request build uses.
 #
-# WHAT THE BOX NEEDS FOR THE FALLBACK. Measured on 16 Oct, read only: the
-# four runners' box has MSBuild from the Build Tools (#498) but no C++
-# compiler, no CMake and no yarn, 16 GB of memory (8.7 GB free) and 6 cores,
-# and 117 GB free on C:. Until
+# THE BOX TAKES THE FORK'S BUILD, IT COMPILES NOTHING (#3014; Patrick's A,
+# 22 Oct). The runner accounts reach GitHub's addresses and nothing else
+# (#2161, Install-Runner.ps1 "WHAT A PULL REQUEST JOB MAY REACH"), and a
+# compile needs more. The one compile on the box, run 39364911234 on 20 Oct
+# before the limits went on, fetched from eight hosts that are not GitHub
+# (mirror.msys2.org, cef-builds.spotifycdn.com and six more, #3014). And
+# vcpkg downloads over Windows' TLS, which checks each certificate with its
+# authority's servers, so even GitHub's own release downloads need
+# Let's Encrypt's lencr.org: run 39727871475, on 22 Oct with the limits on,
+# stopped at its first download (vcpkg's own cmake, from GitHub) with
+# Schannel's 0x80092013, the revocation server unreachable, in the same
+# second, from an account whose block rules hold all ten of lencr.org's
+# addresses. So on the box "Look for the fork's build" stops, before
+# anything is compiled, when the fork has no build of the commit, and says
+# the two ways that remain: the hosted job when there are minutes, or One.
+# What the box still needs is yarn, for the fork build's server packages:
 #   .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'
-# has put them there, the fallback stops at Build-Engine.ps1's tool check,
-# naming what is missing, and builds nothing.
+# puts it there (with the C++ half of the Build Tools and CMake, which the box
+# no longer uses).
 #
 # THE TWO TRAPS ONE HAS, AND WHY A RUNNER DOES NOT. (1) vcpkg runs its
 # applocal.ps1 through the PowerShell the configure found (#2562): Build-Engine
@@ -91,20 +107,19 @@
 # in a files cache, VCPKG_BINARY_SOURCES, in the runner workspace beside the
 # checkout: on GitHub's runner that folder goes into the Actions cache, keyed
 # on the fork's vcpkg commit and its manifest and overlays; on the box it
-# simply stays, one per runner. On the box the fork's checkout and its build
-# folder are then removed, whatever the run did, because every runner
-# keeping a build folder of their own would take most of the disk the game
-# servers write to. So a build on the box compiles the engine itself every
-# time, and the libraries only the first time on each runner.
+# would stay, but the box compiles nothing (above). On the box the fork's
+# checkout and the fork's build put in its build folder are removed, whatever
+# the run did, because every runner keeping a build folder of their own would
+# take most of the disk the game servers write to.
 #
 # HOW LONG. The fork's own pull request build on GitHub's runner took 30
 # minutes on 16 Oct with its libraries cached (run 38863283694), and its first
 # build 96, of which 43 were a coverage run this does not do (fork workflow
 # thornswood-pr-windows.yml). Those runners have four cores; this repository's
 # private hosted runner has two, so the hosted job gets 300 minutes. The box
-# is shared with both game servers, which run at High priority above it
-# (#2491), and its first build on each runner builds every library, so the
-# fallback gets 360. Past either it is stuck, not slow.
+# only takes the fork's build: the four box runs of 21 Oct that did took 38 to
+# 62 seconds each, so the fallback gets 30. Past either it is stuck, not
+# slow.
 #
 # WHEN. A manual run, from the Actions tab or
 #   gh workflow run engine.yml --ref main -f commit=<fork commit>
@@ -146,7 +161,7 @@ jobs:
     # A build like the build check's, so it takes one of the box's build
     # slots too (thornswood-build, records/build-runners.json, #2994).
     runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
-    timeout-minutes: 360
+    timeout-minutes: 30
     steps: &engine
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -237,10 +252,12 @@ jobs:
         env:
           COMMIT: ${{ steps.which.outputs.commit }}
           GH_TOKEN: ${{ github.token }}
+          RUNNER_KIND: ${{ runner.environment }}
         run: |
           # Header, THE FORK'S OWN BUILD FIRST. found=true puts the fork's
           # build in engine\skymp\build and the compile steps are skipped;
-          # found=false builds it here; a fork build still running or red
+          # found=false builds it here, on GitHub's runner only (header, THE
+          # BOX TAKES THE FORK'S BUILD); a fork build still running or red
           # stops the run. A lookup or download that fails stops it too: that
           # is not a fork with no build.
           . .\scripts\release\ForkEngineBuild.ps1
@@ -250,6 +267,10 @@ jobs:
           $f = Find-ForkEngineBuild $env:COMMIT $get
           Write-Host $f.Why
           if ($f.State -eq 'stop') { Write-Host "::error::$($f.Why)"; exit 1 }
+          if ($f.State -ne 'found' -and $env:RUNNER_KIND -eq 'self-hosted') {
+            Write-Host "::error::the fork has no build of $env:COMMIT, and the box cannot compile the engine: its runner accounts reach GitHub alone, and a compile needs certificate checks and download hosts outside it (#3014). Pin a commit the fork built (a head of thornswood/engine-changes), or build this one on GitHub's runner when there are minutes (runner: hosted) or on One."
+            exit 1
+          }
           if ($f.State -ne 'found') { Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value 'found=false'; exit 0 }
           $zip = Join-Path $env:RUNNER_TEMP 'fork-build.zip'
           $scratch = Join-Path $env:RUNNER_TEMP 'fork-build'
@@ -431,7 +452,7 @@ jobs:
 
   # GitHub's hosted runner, first (header, WHERE IT RUNS). Skipped when
   # BUILD_RUNNER is vps or a manual run asked for the box, and then the
-  # fallback above builds it.
+  # fallback above takes the fork's build.
   engine:
     name: Engine build
     if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
