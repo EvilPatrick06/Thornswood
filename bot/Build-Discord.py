@@ -1427,6 +1427,51 @@ def role_order(guild, out, new=()):
     return order
 
 
+def _manager(r):
+    """Who manages a role, in words: a bot, an integration, server boosting,
+       or nothing."""
+    tags = getattr(r, 'tags', None)
+    if tags is None:
+        return 'none' if not getattr(r, 'managed', False) else 'managed'
+    if getattr(tags, 'bot_id', None):
+        return 'bot %s' % tags.bot_id
+    if getattr(tags, 'integration_id', None):
+        return 'integration %s' % tags.integration_id
+    if tags.is_premium_subscriber():
+        return 'server boosting'
+    if getattr(tags, 'subscription_listing_id', None):
+        return 'server subscription %s' % tags.subscription_listing_id
+    if tags.is_guild_connection():
+        return 'linked role'
+    return 'managed' if getattr(r, 'managed', False) else 'none'
+
+
+def role_numbers(guild):
+    """Lines that say every role's position as Discord gives it, who manages
+       it, which positions two roles share, and the positions role_order
+       would ask for: what the one order request is made of (#3317). Read
+       only."""
+    me = getattr(guild, 'me', None)
+    top = getattr(me, 'top_role', None)
+    pos = getattr(top, 'position', None)
+    out = ['the bot\'s highest role is %s, at position %s' % (getattr(top, 'name', '?'), pos)]
+    roles = sorted(guild.roles, key=lambda r: (r.position, r.id), reverse=True)
+    for r in roles:
+        out.append('%4d  %s  (%s%s)' % (r.position, r.name, _manager(r),
+                                        ', above the bot' if pos is not None and r.position >= pos
+                                        and r is not top else ''))
+    seen = {}
+    for r in roles:
+        seen.setdefault(r.position, []).append(r.name)
+    for p, names in sorted(seen.items(), reverse=True):
+        if len(names) > 1:
+            out.append('position %d is held by %d roles: %s' % (p, len(names), ', '.join(names)))
+    below = [r for r in roles if pos is not None and r.position < pos and r is not guild.default_role]
+    out.append('%d roles sit under the bot\'s highest role, %d of them a bot\'s own'
+               % (len(below), sum(1 for r in below if _bots_role(r))))
+    return out
+
+
 def _bots_role(r):
     """Discord's own role for a bot, this one or another: never moved."""
     try:
@@ -2652,6 +2697,19 @@ async def audit(guild):
     print('\n  Role order against the plan', flush=True)
     for hi, lo in order_slips(have):
         off('role %s sits below %s; the plan has it above' % (hi, lo))
+
+    # How Discord numbers the roles, as it is (#3317). The build of 22 Oct
+    # asked for the plan's order in one request and Discord refused it with
+    # Missing Permissions; these are the numbers that request is made of.
+    print('\n  How Discord numbers the roles', flush=True)
+    for w in role_numbers(guild):
+        line(w)
+    order = role_order(guild, roles)
+    if order is None:
+        line('a build would ask for no role to move')
+    else:
+        line('a build would ask for positions 1 to %d, top first: %s'
+             % (len(order), ', '.join(r.name for r in order)))
 
     print('\n  Categories and channels against the plan', flush=True)
     ours = set()
