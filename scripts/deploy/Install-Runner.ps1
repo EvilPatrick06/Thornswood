@@ -111,7 +111,7 @@
   harness step took 34 to 39 minutes and the 40-minute limit cancelled
   builds that were passing. The heavy jobs ask for a second label,
   thornswood-build, which only the runners records\build-runners.json lists
-  carry (1 to 4). This install registers a listed runner with it;
+  carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
 
   WHAT IT DOES ON THE BOX, in order:
@@ -136,6 +136,21 @@
        PRIORITY TASK, below).
     6. Tells Windows Defender to skip the runner's own folder, so the few
        hundred processes a check starts are not each scanned on the way in.
+    7. Writes the runner's .env so its jobs keep their temp files in its own
+       folder (TEMP IN ITS OWN FOLDER, below).
+
+  TEMP IN ITS OWN FOLDER (#3117). A job's TEMP and TMP were the runner
+  account's own, C:\Users\thornswood-runnerN\AppData\Local\Temp, outside the
+  folder step 6 has Defender skip and outside the job temp folder
+  (_work\_temp) actions/runner empties for every job. Measured on the box on
+  21 October 2026 with four builds running: the box at 80% CPU on average and
+  99.7% at the top, Defender 15 to 31% of it, and 26,214 to 28,472 entries
+  left in each build runner's temp folder, the oldest from 4 October. Each
+  runner's .env (actions/runner reads it when its service starts) now sets
+  TEMP and TMP to its _work\_temp, so what the tests write there is not
+  scanned and is gone after the job. The install writes it before the
+  service first starts; -Lock writes it for every runner on the box and says
+  which runners take it only at their next start.
 
   It needs gh on this machine, signed in as somebody who can administer the
   repository (Patrick): the registration token comes from
@@ -157,8 +172,9 @@
   every runner service there, it locks the runner's folder, and shuts its
   account out of every C:\Thornswood-* folder but its own and Dumps, saying
   which it had to close, takes off a deny an earlier install put on Dumps
-  for it, and it takes off every priority watcher task left on the box. No
-  service is stopped and no job is touched. An install ends by doing the
+  for it, it takes off every priority watcher task left on the box, and it
+  writes each runner's .env (TEMP IN ITS OWN FOLDER). No service is stopped
+  and no job is touched. An install ends by doing the
   same for every runner, so adding one leaves all of them locked.
 
   CRASH DUMPS (#2127, #2488). Patrick decided on 11 October 2026 (#2127)
@@ -204,6 +220,23 @@
   12 Oct 2026 the game servers and voice run High, above every build:
   Patrick's decision, "we need to fix it so the servers run on high
   priority" (#2491, Install-ThornswoodServer.ps1 and Install-Voice.ps1).
+
+  A REMOVED ACCOUNT'S PROFILE (#3119). Removing an account leaves its
+  profile, C:\Users\<account>, and Windows gives a later account of the same
+  name C:\Users\<account>.<computer> beside it. A runner's account is a
+  service's, and Windows keeps a service account's registry loaded until the
+  box restarts, even after the service stops and the account is gone; while
+  it is loaded the profile cannot be taken off. Measured on the VPS on 22 Oct
+  2026: removed runners 4 to 8 had their registry loaded hours later, with no
+  logon session and nothing running as them, reg unload was refused, and
+  stopping the Program Compatibility Assistant changed nothing; a new
+  runner 3's registry was still loaded 60 seconds after its service stopped;
+  the restart at 8:45 PM let go of every one. So -Remove, -Lock and the next
+  install of that name take off each profile under a runner account's name
+  whose account is gone, once Windows has let go of it, and say LEFT for one
+  still loaded, until a restart. An install makes no new account while a
+  profile of its name is LEFT, so it never makes a second one; restart the
+  box (scripts\vps\Set-TimeWait.ps1 -Restart) and run it again.
 
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
@@ -399,6 +432,26 @@ $service = 'actions.runner.' + $Repo.Replace('/', '-') + '.' + $RunnerName
 # icacls by its exit code (#941).
 $lockLib = @'
 $broadSids = @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0')
+# The header's TEMP IN ITS OWN FOLDER (#3117): the runner's .env sends its
+# jobs' TEMP and TMP to the job temp folder actions/runner empties for every
+# job, inside the folder Defender skips. Lines of the runner's own are kept.
+# It is read when the runner's service starts, so one written while the
+# runner runs is said, and waits for its next start.
+function Set-RunnerTemp([string]$root, [string]$svcName) {
+  $file = Join-Path $root '.env'
+  $temp = Join-Path $root '_work\_temp'
+  $want = @(('TEMP=' + $temp), ('TMP=' + $temp))
+  $had = @()
+  if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
+  $keep = @($had | Where-Object { $_ -notmatch '^(TEMP|TMP)=' })
+  $new = @($keep) + $want
+  if (($had -join "`n") -eq ($new -join "`n")) { return ($root + ' sends its jobs'' temp files to ' + $temp + ' already') }
+  [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
+  $line = $root + ' now sends its jobs'' temp files to ' + $temp
+  $svc = Get-CimInstance Win32_Service -Filter ("Name='" + $svcName + "'") -EA SilentlyContinue
+  if ($svc -and $svc.State -eq 'Running') { $line += '; its runner is running, so this takes effect when ' + $svcName + ' next starts' }
+  return $line
+}
 function Lock-RunnerRoot([string]$root, [string]$acct) {
   $ErrorActionPreference = 'Continue'
   $out = & icacls.exe $root /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' ($acct + ':(OI)(CI)M') /C /Q 2>&1
@@ -483,6 +536,39 @@ function Show-LeftFolders([string]$parent = 'C:\', [string[]]$leave = @()) {
     $broad = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $broadSids -contains $_.IdentityReference.Value })
     if ($broad.Count) { $p + ' is left to Lock-VpsFolders.ps1 (#2127), and USERS STILL REACH IT, so every runner may read it: run .\scripts\vps\Remote.ps1 -File .\scripts\vps\Lock-VpsFolders.ps1 from the repository' }
     else { $p + ' is left to Lock-VpsFolders.ps1 (#2127): no deny from here, and Users do not reach it' }
+  }
+}
+# The profile a removed runner account leaves (#3119, the header's A REMOVED
+# ACCOUNT'S PROFILE). $like is the folder names under C:\Users to look at
+# ('thornswood-runner3' and 'thornswood-runner3.*' for one account,
+# 'thornswood-runner*' for the box). A profile whose SID still names an
+# account is that account's and is left alone. One whose account is gone is
+# taken off once Windows has let go of its registry, and said LEFT while it
+# has not; a folder of that name no profile owns goes too. Each line it says
+# that starts LEFT names one still there and why. Test-RunnerSidAlive is its
+# own function so tests\test-runner-lock.ps1 can stand in for it off Windows.
+function Test-RunnerSidAlive([string]$sid) {
+  if (Get-LocalUser -SID $sid -EA SilentlyContinue) { return $true }
+  try { $null = (New-Object Security.Principal.SecurityIdentifier($sid)).Translate([Security.Principal.NTAccount]); $true } catch { $false }
+}
+function Remove-LeftProfiles([string[]]$like, [string]$users = 'C:\Users') {
+  $ErrorActionPreference = 'Continue'
+  $owned = @{}
+  foreach ($p in @(Get-CimInstance Win32_UserProfile -EA SilentlyContinue)) {
+    $path = '' + $p.LocalPath
+    $leaf = Split-Path -Leaf $path
+    if (-not @($like | Where-Object { $leaf -like $_ }).Count) { continue }
+    $owned[$leaf.ToLowerInvariant()] = $true
+    if (Test-RunnerSidAlive $p.SID) { continue }
+    if ($p.Loaded) { 'LEFT ' + $path + ': its account is gone and Windows keeps its registry loaded until the box restarts; the next -Lock or install after a restart takes it off'; continue }
+    try { $p | Remove-CimInstance -EA Stop; 'took off ' + $path + ', the profile of a removed account (#3119)' }
+    catch { 'LEFT ' + $path + ': its account is gone and it could not be taken off: ' + $_.Exception.Message }
+  }
+  foreach ($d in @(Get-ChildItem -LiteralPath $users -Directory -EA SilentlyContinue)) {
+    if ($owned.ContainsKey($d.Name.ToLowerInvariant()) -or -not @($like | Where-Object { $d.Name -like $_ }).Count) { continue }
+    Remove-Item -LiteralPath $d.FullName -Recurse -Force -EA SilentlyContinue
+    if (Test-Path -LiteralPath $d.FullName) { 'LEFT ' + $d.FullName + ': no profile owns it and something holds a file in it' }
+    else { 'took off ' + $d.FullName + ', a profile folder no account owned (#3119)' }
   }
 }
 '@
@@ -651,7 +737,8 @@ function Get-GuardBlocks {
 # Every runner service on the box, by what Windows says it is: its folder is
 # the one its RunnerService.exe is in, its account the one it runs as. Then
 # the old priority watchers, which belong to no one runner.
-$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n" + @'
+$profileLike = $(if ($OffBox) { 'thornswood-pr*' } else { 'thornswood-runner*' })
+$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n`$profileLike = '" + $profileLike + "'`n" + @'
 
 $ErrorActionPreference = 'Continue'
 $bad = 0
@@ -668,8 +755,12 @@ foreach ($svc in $services) {
     Lock-RunnerRoot $root $acct
     Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny $leave
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  try { Set-RunnerTemp $root $svc.Name } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
 }
 Show-LeftFolders 'C:\' $leave
+# A removed runner's profile is not a lock, so one still left is said and
+# does not fail the lock (A REMOVED ACCOUNT'S PROFILE).
+Remove-LeftProfiles @($profileLike)
 if ($bad) { exit 1 }
 '@
 
@@ -738,7 +829,7 @@ if ($Remove) {
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
   # The removal token goes on ssh's standard input and reaches config.cmd in
   # its environment, never on a command line (Send-Secret.ps1, issue #451).
-  Send-WithSecret ([string]$tok) ($watcherLib + "`n" + @"
+  Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if ((Test-Path '$Root\config.cmd') -and `$t) {
@@ -760,18 +851,12 @@ $(if ($OffBox) { Get-GuardScript 'remove' } else { Get-GuardScript 'network-remo
 # profile, which Remove-LocalUser leaves (a later account of the same name
 # then gets a <name>.<computer> profile beside it). Measured on the VPS on
 # 20 Oct 2026: C:\Users\thornswood-runner5 and 6 left from removed runners.
+# The profile goes once the account has (A REMOVED ACCOUNT'S PROFILE).
 if (@((Get-MpPreference -EA SilentlyContinue).ExclusionPath) -contains '$Root') {
   try { Remove-MpPreference -ExclusionPath '$Root' -EA Stop; 'Defender scans $Root again' } catch { 'COULD NOT take off the Defender skip for $Root' + ': ' + `$_.Exception.Message }
 }
-`$sid = ''
-`$u = Get-LocalUser -Name '$Account' -EA SilentlyContinue
-if (`$u) { `$sid = `$u.SID.Value }
 Remove-LocalUser -Name '$Account' -EA SilentlyContinue
-if (`$sid) {
-  foreach (`$p in @(Get-CimInstance Win32_UserProfile -Filter "SID='`$sid'" -EA SilentlyContinue)) {
-    try { `$p | Remove-CimInstance -EA Stop; 'profile ' + `$p.LocalPath + ' removed' } catch { 'COULD NOT remove the profile ' + `$p.LocalPath + ': ' + `$_.Exception.Message }
-  }
-}
+Remove-LeftProfiles @('$Account', '$Account.*')
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
 "@) | ForEach-Object { Say "  $_" }
@@ -883,6 +968,12 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
   Set-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires `$true
   'account ' + `$acct + ' was there, new password set'
 } else {
+  # A profile an earlier account of this name left would make Windows give
+  # this one <name>.<computer> (A REMOVED ACCOUNT'S PROFILE), so it goes
+  # first, and the account is not made while one is still there.
+  `$left = @(Remove-LeftProfiles @(`$acct, (`$acct + '.*')))
+  `$left
+  if (@(`$left | Where-Object { "`$_" -like 'LEFT *' }).Count) { throw ('Nothing was installed: a new ' + `$acct + ' would get a second profile beside the one above. Restart the box (scripts\vps\Set-TimeWait.ps1 -Restart) and run this again.') }
   New-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires -UserMayNotChangePassword -Description 'Thornswood build check runner' | Out-Null
   Add-LocalGroupMember -Group 'Users' -Member `$acct -EA SilentlyContinue
   'account ' + `$acct + ' made'
@@ -910,6 +1001,8 @@ if (Test-Path (Join-Path `$root '.runner')) {
 if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force | Out-Null }
 # Locked before config.cmd writes GitHub's credentials into it.
 Lock-RunnerRoot `$root `$acct
+# Before the service first starts, so its first job already has it (#3117).
+Set-RunnerTemp `$root '$service'
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {

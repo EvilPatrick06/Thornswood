@@ -362,20 +362,26 @@ const kbox = {
 kbox.globalThis = kbox;
 vm.runInNewContext(spoilsBlock, kbox, { filename: 'gamemode.js spoils' });
 const spoils = kbox.__thornswoodSpoils;
-yes('K1 the spoils block knows every jail key and no other key',
-    Object.keys(JAIL_KEY).every(function (k) { return spoils.isJailKey(idOf(k)); }) && !spoils.isJailKey(KEY_HOUSE));
+// The world hands no jail key out, so the spoils block keeps no list of them:
+// no chest holds one the world put there (#3078) and none lies on the floor
+// (#3077). The keys stay in JAIL_KEY for the doors.
+yes('K1 the spoils block keeps no jail key list, because nothing in the world hands one out',
+    spoils.isJailKey === undefined && !/JAIL_KEY/.test(spoilsBlock) && Object.keys(JAIL_KEY).length > 0);
 // No jail key lies where the game put it: Thornswood-Last.esp switches every
 // placed item off (#3077), so the block answers no press on a floor key.
 yes('K2 a press on a key is never refused by the spoils block, a jail key or any other (#3077)',
     spoils.activate(PRISONER.a, 0x000f1228, '5aec4:Skyrim.esm') === null &&
     spoils.activate(PRISONER.a, 0x000f2000, '1234:Skyrim.esm') === null &&
     !/belonged to the old jail/.test(spoilsBlock));
-spoils.strip(CHEST);
+// #3078: the engine puts nothing of a container's record in it
+// (forbiddenBaseContainer), so a jail key in a chest is one a person put
+// there, and the press leaves the chest as it is.
+spoils.activate(PRISONER.a, CHEST, 'c2cdb:Skyrim.esm');
 const left = refs[CHEST].inventory.entries.map(function (e) { return e.baseId; });
-yes('K5 a chest gives up its jail key with the sword, and keeps the other key',
-    left.length === 1 && left[0] === KEY_HOUSE);
+yes('K5 a press takes nothing out of a chest, jail key, sword or other key',
+    left.length === 3 && left[0] === KEY_W && left[1] === SWORD && left[2] === KEY_HOUSE);
 const onAct = slice(gm, '\n  const spoils = globalThis.__thornswoodSpoils;\n  if (spoils && spoils.activate)', '\n  }\n');
-yes('K6 onActivate lets the spoils block empty a container before anything else answers a press',
+yes('K6 onActivate lets the spoils block see a press before anything else answers it',
     !!onAct && /spoils\.activate\(/.test(onAct) && gm.indexOf(onAct) < gm.indexOf('const quests = globalThis.__thornswoodQuests;'));
 
 // ------------------------------------------------------------- D. a death

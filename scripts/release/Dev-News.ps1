@@ -173,6 +173,24 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     # Holds asks it of any commit; Is-Published asks it of main's, which only
     # a release built with nothing uncommitted can speak for.
     $script:holdsSeen = @{}
+    # Every commit a target holds as an ancestor, from one rev-list for each
+    # target, in place of a merge-base --is-ancestor for every pair (#3168):
+    # tests\test-2401-legacy-dev-marks.ps1 started 382 of those, nearly
+    # 2,000 processes on the box with the rest. $null when git cannot list
+    # it, and then each pair is asked the old way.
+    $script:ancestorsOf = @{}
+    function Ancestors-Of([string]$target) {
+        if (-not $script:ancestorsOf.ContainsKey($target)) {
+            $list = Invoke-ReleaseGit $sourceRepo @('rev-list', $target)
+            $set = $null
+            if ($list.Code -eq 0) {
+                $set = New-Object 'System.Collections.Generic.HashSet[string]'
+                foreach ($l in $list.Lines) { [void]$set.Add(([string]$l).Trim()) }
+            }
+            $script:ancestorsOf[$target] = $set
+        }
+        return ,$script:ancestorsOf[$target]
+    }
     function Holds([string]$commit, [string]$target) {
         if ($commit -notmatch '^[0-9a-f]{40}$' -or $target -notmatch '^[0-9a-f]{40}$') { return $false }
         $key = $commit + ' ' + $target
@@ -184,8 +202,10 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
         $was = if ($hadCode) { $global:LASTEXITCODE } else { 0 }
         $yes = $false
         try {
-            if ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $target)).Code -eq 0) { $yes = $true }
-            else {
+            $before = Ancestors-Of $target
+            if ($null -ne $before) { $yes = $before.Contains($commit) }
+            elseif ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $target)).Code -eq 0) { $yes = $true }
+            if (-not $yes) {
                 $base = Invoke-ReleaseGit $sourceRepo @('merge-base', $commit, $target)
                 if ($base.Code -eq 0 -and $base.First -match '^[0-9a-f]{40}$') {
                     $files = @((Invoke-ReleaseGit $sourceRepo @('diff', '--name-only', $base.First, $commit)).Lines |

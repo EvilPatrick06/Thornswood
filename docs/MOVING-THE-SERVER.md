@@ -305,14 +305,22 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     `.\scripts\release\Publish-Installer.ps1` puts the installer from the last
     package build back on the site.
 18. **The name:** in Patrick's Cloudflare login, point the A records for
-    `thornswood.net` and `www` at the new address, not proxied (Watch-Outside's
-    dns check expects them straight at the box). When the name resolves there,
-    `.\scripts\deploy\Setup-Domain.ps1`. It refuses until it does, then
-    installs Caddy and the `Thornswood Web` task, sends
-    `scripts\deploy\Caddyfile` (the restored one is kept beside it as
-    `Caddyfile.before-<date>`), moves the site onto loopback and asks for the
-    certificate. Discord sign in needs nothing: the site builds its redirect
-    from the name, not the address.
+    `thornswood.net` and `www` at the new address. Leave them Proxied when
+    Caddy's certificate came back with the restore (`C:\Thornswood-Caddy\data`
+    holds `certificates`); otherwise set them to DNS only for now, because with
+    SSL/TLS on Full (strict) Cloudflare refuses a box with no certificate yet,
+    and Let's Encrypt asks through Cloudflare. Then
+    `.\scripts\deploy\Setup-Domain.ps1`. It refuses until the name resolves
+    to the box or to Cloudflare, then installs Caddy and the `Thornswood Web`
+    task, sends `scripts\deploy\Caddyfile` (the restored one is kept beside
+    it as `Caddyfile.before-<date>`), opens 80 and 443, moves the site onto
+    loopback and asks for the certificate. Once the certificate is there, set
+    the records back to Proxied, wait five minutes for the old answer to run
+    out, and `.\scripts\vps\Set-WebFirewall.ps1`: the box then takes 80 and
+    443 only from Cloudflare (#2995), so forged SYNs from anywhere else get no
+    answer. It refuses while the name still points straight at the box.
+    Discord sign in needs nothing: the site builds its redirect from the
+    name, not the address.
 19. **Check it from outside:** `.\scripts\vps\Check-Site.ps1 -NoSsh -NoPause`,
     and `https://thornswood.net/voice/health` and `/voice-dev/health` answer.
     Wait for the certificate before telling anybody, or the site shows a
@@ -337,14 +345,22 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     machine's passphrase from step 13; on a box without one, Install-Backup
     sends this machine's copy up rather than making a new one.
 24. **The build runners:** `.\scripts\deploy\Install-Runner.ps1`, then
-    `.\scripts\deploy\Install-Runner.ps1 -Number 2` and up for as many as the
-    old box had (the repository's Settings, Actions, Runners lists them). Each
-    replaces the runner of that name the old box registered, so
-    `Launcher builds` runs on the new box from the next pull request.
+    `.\scripts\deploy\Install-Runner.ps1 -Number 2` and `-Number 3`. Since 22
+    Oct 2026 the box has three (Patrick, #3114): 1 and 2 take the builds, as
+    records\build-runners.json lists them, and 3 takes the light jobs (board
+    cards, dropped claims, staff notices, the release jobs), so its install
+    gives it the VPS label alone. Each replaces the runner of that name the
+    old box registered, so `Launcher builds` runs on the new box from the next
+    pull request. Then `.\scripts\deploy\Install-Runner.ps1 -NetworkOnly -Number N
+    -AllowHost pypi.org,files.pythonhosted.org,registry.npmjs.org` for each
+    of the three (docs\RUNNER-ISOLATION.md section 6). Then
+    `.\scripts\vps\Keep-RunnerLogs.ps1 -Install`, the daily task that removes
+    the runners' own logs once they are two weeks old (#3184).
 25. **Close it to all but ssh with a key**, once every machine that deploys
     has passed `.\scripts\vps\Setup-SshKey.ps1 -Test` against it:
     `.\scripts\vps\Harden-VPS.ps1`. It proves key login first, then turns ssh
-    password login and Remote Desktop off (issue #450). The provider's console
+    password login and Remote Desktop off (issue #450), and the Windows
+    services the box never uses, the print spooler among them (#3186). The provider's console
     and the Administrator password stay the way back. If the old box had port
     22 limited to a list of addresses, set the same list on the new one:
     `.\scripts\vps\Set-SshScope.ps1 -From <the list>` (issue #2182).

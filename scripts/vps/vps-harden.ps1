@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off and turns Remote Desktop off, leaving ssh on port 22 alone.
+  Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off, turns Remote Desktop off and the Windows services the box never uses, leaving ssh on port 22 alone.
 
 .DESCRIPTION
   Do not run this by hand. Harden-VPS.ps1 proves key login works first, from
@@ -15,6 +15,11 @@
                      off, and the Remote Desktop service stopped and set to
                      Disabled. A rule that also covers port 22 is never
                      touched, and neither are the rules that allow ssh.
+    services         the Windows services in $IdleServices below, which a
+                     box that runs game servers, a site, a bot and build
+                     runners with nobody signed in never uses, each stopped
+                     and set to Disabled, with the reason beside it (#3186).
+                     One that is not installed is said and left.
     sshd_config      PasswordAuthentication no and KbdInteractiveAuthentication
                      no, as the first setting of each (sshd takes the first
                      one it reads) and above the Match block, where a global
@@ -62,6 +67,26 @@ $ProgressPreference = 'SilentlyContinue'
 $RdpGroup = '@FirewallAPI.dll,-28752'
 $TsKey = 'HKLM:\System\CurrentControlSet\Control\Terminal Server'
 $RestartTask = 'Thornswood sshd restart'
+
+# Windows services the box runs and never uses (#3186). Found running and
+# set to start on their own on 21 Oct 2026. The box is a server nobody signs
+# in to: it prints nothing, has no desktop, no devices plugged in, nobody to
+# notify and no files linked across machines. All 45 svchost processes
+# together used about 0.03 of a core, so each of these is a little memory
+# and processor time, and the print spooler is attack surface with a history
+# (PrintNightmare). Microsoft Edge's update tasks stay: the same updater
+# keeps the WebView2 runtime patched, and an Edge left unpatched on the box
+# is worse than a few seconds an hour.
+$IdleServices = @(
+    @{ Name = 'Spooler'; Why = 'print spooler: nothing prints from the box, and it is the PrintNightmare service' },
+    @{ Name = 'DiagTrack'; Why = 'Connected User Experiences and Telemetry: sends usage data to Microsoft' },
+    @{ Name = 'SysMain'; Why = 'SysMain (Superfetch): preloads programs a person opens; the box keeps its own running' },
+    @{ Name = 'Themes'; Why = 'Themes: the desktop''s look, and nobody signs in to a desktop' },
+    @{ Name = 'ShellHWDetection'; Why = 'Shell Hardware Detection: AutoPlay for discs and sticks put in' },
+    @{ Name = 'CDPSvc'; Why = 'Connected Devices Platform: phones and PCs paired to a signed in person' },
+    @{ Name = 'WpnService'; Why = 'Windows Push Notifications: toasts for a signed in person' },
+    @{ Name = 'TrkWks'; Why = 'Distributed Link Tracking Client: follows shortcuts to files moved across machines' }
+)
 $RollbackTask = 'Thornswood harden rollback'
 
 # ---------------------------------------------------------------- the layer ---
@@ -94,6 +119,14 @@ function Get-TermService {
 }
 function Stop-TermService { Stop-Service -Name TermService -Force }
 function Disable-TermService { Set-Service -Name TermService -StartupType Disabled }
+
+function Get-IdleService([string]$Name) {
+    $s = Get-Service -Name $Name -ErrorAction SilentlyContinue
+    if (-not $s) { return $null }
+    return [pscustomobject]@{ Status = [string]$s.Status; StartType = [string]$s.StartType }
+}
+function Stop-IdleService([string]$Name) { Stop-Service -Name $Name -Force }
+function Disable-IdleService([string]$Name) { Set-Service -Name $Name -StartupType Disabled }
 
 function Test-SshdFile([string]$Path) {
     $old = $ErrorActionPreference
@@ -236,6 +269,20 @@ function Invoke-Harden {
             if (-not $DryRun) { Disable-TermService }
             Change ('Remote Desktop service set to Disabled (was ' + $ts.StartType + ')')
         } else { Say 'ALREADY' 'Remote Desktop service Disabled' }
+    }
+
+    # ---------------------------------------------- services it never uses ---
+    foreach ($svc in $IdleServices) {
+        $st = Get-IdleService $svc.Name
+        if (-not $st) { Say 'ALREADY' ($svc.Name + ' is not installed (' + $svc.Why + ')'); continue }
+        if ($st.Status -ne 'Stopped') {
+            if (-not $DryRun) { Stop-IdleService $svc.Name }
+            Change ($svc.Name + ' stopped (was ' + $st.Status + '): ' + $svc.Why)
+        } else { Say 'ALREADY' ($svc.Name + ' stopped') }
+        if ($st.StartType -ne 'Disabled') {
+            if (-not $DryRun) { Disable-IdleService $svc.Name }
+            Change ($svc.Name + ' set to Disabled (was ' + $st.StartType + ')')
+        } else { Say 'ALREADY' ($svc.Name + ' Disabled') }
     }
 
     # ------------------------------------------------------- sshd_config ---

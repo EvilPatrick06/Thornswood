@@ -1755,6 +1755,9 @@ function mintedBy(owner, test) {
 }
 
 function mintedEntry(entry) {
+  // Inherited NPC gear is owned for combat, not an ordinary stock/reward
+  // stack. Explicit grants of the same item must remain separate from it.
+  if (entry && entry.npcEquipment === true) { return true; }
   const tests = globalThis.__thornswoodMinted;
   if (!entry || !tests || typeof tests !== 'object') { return false; }
   for (const owner of Object.keys(tests)) {
@@ -28043,6 +28046,144 @@ function handEnchantSlots(actorId, state) {
   }
 }
 
+/*
+  WHAT SOMEBODY CANNOT MAKE IS NOT LISTED (#613).
+
+  Patrick, reporting the forge on 25 September: "It should only show if you
+  can craft it with your level+half+race". The crafting menu is Skyrim's own
+  (SkyUI draws it), and it lists every recipe whose workbench keyword is the
+  bench's and whose own conditions pass, on the machine in front of the
+  person. Nothing about a profession, a half, a rank, a roll or a race is on
+  that machine, so the menu listed every row of RECIPES_BY_ID to everybody
+  and craftAnswer refused most of them once picked: a list made mostly of
+  things the person would be told no to.
+
+  THE ANSWER IS THE GATE'S, ASKED AHEAD. For every row craftAnswer refuses
+  this person, the client takes that recipe's workbench keyword off the
+  record in its own game (SKSE's ConstructibleObject.SetWorkbenchKeyword), so
+  no bench lists it, and puts the keyword back when the answer changes. One
+  question decides both what is listed and what is made, so the two cannot
+  disagree. The server's records are untouched and the craft gate is still
+  the gate: a client that listed everything is refused exactly as before.
+
+  Asked whenever the character is written (writeState: a profession, a half,
+  a rank, a Master taking somebody on or letting them go), at spawn, and when
+  somebody goes onto or off a roll. A recipe nobody owns is not in the table
+  and stays listed for everybody.
+
+  The value is { at, files: { plugin: 'hex,hex,...' } }, the refused rows by
+  plugin, and it is written only when the list changes. updateOwner runs
+  every frame, so the script acts on a new stamp only, and spreads the
+  records over frames (RECIPES_PER_FRAME): a character with no profession is
+  refused every owned row, and two thousand records in one frame is a stall.
+*/
+var RECIPES_HIDDEN_PROPERTY = 'thornswoodRecipesHidden';
+var RECIPES_PER_FRAME = 150;
+
+function recipesHiddenScript() {
+  return [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    var st = ctx.state;',
+    '    if (!st || !v || typeof v !== "object" || !v.files) { return; }',
+    '    var sp = ctx.sp;',
+    '    var own = Object.prototype.hasOwnProperty;',
+    // What each hidden recipe's keyword was, by "hex:plugin", so it can go back.
+    '    if (!st.thornswoodRecipesBench) { st.thornswoodRecipesBench = {}; }',
+    '    var put = st.thornswoodRecipesBench;',
+    '    if (st.thornswoodRecipesAt !== v.at) {',
+    '      st.thornswoodRecipesAt = v.at;',
+    '      var want = {};',
+    '      for (var f in v.files) {',
+    '        if (!own.call(v.files, f)) { continue; }',
+    '        var ids = String(v.files[f] || "").split(",");',
+    '        for (var i = 0; i < ids.length; i++) { if (ids[i]) { want[ids[i] + ":" + f] = true; } }',
+    '      }',
+    '      var todo = [];',
+    '      for (var k in want) { if (!own.call(put, k)) { todo.push(k); } }',
+    '      for (var h in put) { if (own.call(put, h) && !want[h]) { todo.push(h); } }',
+    '      st.thornswoodRecipesWant = want;',
+    '      st.thornswoodRecipesTodo = todo;',
+    '    }',
+    '    var queue = st.thornswoodRecipesTodo;',
+    '    if (!queue || !queue.length) { return; }',
+    '    var wanted = st.thornswoodRecipesWant || {};',
+    '    for (var n = 0; queue.length && n < ' + RECIPES_PER_FRAME + '; n++) {',
+    '      var key = queue.pop();',
+    '      var at = key.indexOf(":");',
+    '      var cobj = null;',
+    '      try { cobj = sp.ConstructibleObject.from(sp.Game.getFormFromFile(parseInt(key.slice(0, at), 16), key.slice(at + 1))); } catch (e) { cobj = null; }',
+    // A plugin this game does not have lists nothing, so there is nothing to hide.
+    '      if (!cobj) { continue; }',
+    '      if (wanted[key] && !own.call(put, key)) {',
+    '        var kw = cobj.getWorkbenchKeyword();',
+    '        put[key] = kw ? kw.getFormID() : 0;',
+    '        cobj.setWorkbenchKeyword(null);',
+    '      } else if (!wanted[key] && own.call(put, key)) {',
+    '        var was = put[key];',
+    '        cobj.setWorkbenchKeyword(was ? sp.Keyword.from(sp.Game.getFormEx(was)) : null);',
+    '        delete put[key];',
+    '      }',
+    '    }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+}
+
+try {
+  mp.makeProperty(RECIPES_HIDDEN_PROPERTY, {
+    isVisibleByOwner: true,
+    isVisibleByNeighbors: false,
+    updateOwner: recipesHiddenScript(),
+    updateNeighbor: ''
+  });
+} catch (e) {
+  // Made by a previous load. makeProperty cannot change a property already
+  // made, so a changed script needs a restart, which a deploy is.
+}
+
+/**
+ * Every row of the recipe table that craftAnswer refuses this person, by
+ * plugin: { 'Skyrim.esm': 'f6f2a,dd97a', ... }. The kept dwarven smelt is a
+ * row too (craftRow), so it is asked with the rest.
+ */
+function recipesRefused(actorId) {
+  var lists = {};
+  var tables = [RECIPES_BY_ID, KEPT_SMELT];
+  for (var t = 0; t < tables.length; t++) {
+    var table = tables[t];
+    for (var desc in table) {
+      if (!Object.prototype.hasOwnProperty.call(table, desc)) { continue; }
+      var row = table[desc];
+      if (!row || typeof row !== 'object') { continue; }
+      var at = desc.indexOf(':');
+      if (at <= 0) { continue; }
+      if (!craftAnswer(actorId, row).refusal) { continue; }
+      var file = desc.slice(at + 1);
+      (lists[file] = lists[file] || []).push(desc.slice(0, at));
+    }
+  }
+  var files = {};
+  for (var f in lists) {
+    if (Object.prototype.hasOwnProperty.call(lists, f)) { files[f] = lists[f].join(','); }
+  }
+  return files;
+}
+
+/** Hand the owner the recipes they cannot make, when the list has changed. */
+function handRecipesHidden(actorId) {
+  var files = recipesRefused(actorId);
+  var had = null;
+  try { had = mp.get(actorId, RECIPES_HIDDEN_PROPERTY); } catch (e) { had = null; }
+  if (had && typeof had === 'object' && JSON.stringify(had.files) === JSON.stringify(files)) { return; }
+  try {
+    mp.set(actorId, RECIPES_HIDDEN_PROPERTY, { at: Date.now(), files: files });
+  } catch (e) {
+    log(actorId.toString(16), 'was not handed the recipes they cannot make:', e);
+  }
+}
+
 function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
   /*
     WHAT MADE IT, NOT WHAT IT IS.
@@ -45725,7 +45866,18 @@ module.exports = {
       elog('could not write', file + ':', e);
       return false;
     }
+    var was = reg[roll];
     reg = next;
+    /*
+      A roll's gear is listed in the crafting menu only for somebody on that
+      roll (#613), so whoever went on or came off is handed the list again.
+    */
+    if (typeof handRecipesHidden === 'function') {
+      var moved = was.concat(list).map(function (r) { return r.actor; }).filter(function (a, i, all) {
+        return all.indexOf(a) === i && !rowIn(was, a) !== !rowIn(list, a);
+      });
+      for (var m = 0; m < moved.length; m++) { handRecipesHidden(moved[m]); }
+    }
     return true;
   }
 
@@ -46632,19 +46784,17 @@ module.exports = {
   every piece of armour in 101 plugins, in a gamemode that is already 1.4MB. The
   answers are memoed, so a form is looked up once for the life of the process.
 
-  A CONTAINER IS EMPTIED ONCE AND NEVER AGAIN, and that is the whole design.
-
-  A chest the server has never opened is still holding what Bethesda put there.
-  A chest it has opened is holding what people have put there since. So the first
-  press strips it and writes that down on the reference, and no press after that
-  touches it. Without that, a smith who stored their own swords in a chest would
-  come back to an empty chest, which is the opposite of the rule: the rule is
-  that nothing is spawned, not that nothing may be kept.
-
-  That is the same shape the farming block uses for a plot the server has never
-  written to, and for the same reason. The mark is a property on the reference,
-  so it survives a restart; a mark that did not would eat somebody's swords the
-  first time the server came back up.
+  A CONTAINER HOLDS NOTHING THE WORLD PUT THERE, and nothing in here takes it
+  out (#3078). Patrick, 21 October 2026: "not fill them with anything vanilla
+  only our special ones for the caves with our items and refill times, and dont
+  fill any storages that shouldnt be filled". The engine copied a container's
+  plugin contents in on the first press (MpObjectReference::
+  EnsureBaseContainerAdded), after this block's hook had run, so this block
+  used to take part of it back out with a timer. Now the server settings name
+  CONT in forbiddenBaseContainer (scripts\deploy\Deploy-Gamemode.ps1, and
+  Deploy-DevGamemode.ps1 for dev) and the engine never puts a record's contents
+  in. Every chest, barrel, sack and cupboard starts empty and holds only what a
+  person put in it, or the pile the dungeon loot block pays a dungeon chest.
 
   THE FLOOR IS NOT IN HERE AT ALL (#3077). Patrick, 21 October 2026: "don't
   spawn floor items anymore at all no matter what they are". Every item and
@@ -46668,35 +46818,11 @@ module.exports = {
     console.log(a.join(' '));
   }
 
-  /*
-    The record types the world may not hand over.
-
-    WEAP is every weapon. ARMO is every piece of armour and every shield, because
-    a shield is an ARMO with a keyword rather than a type of its own. AMMO is
-    arrows and bolts, which are the ammunition half of a weapon and would be a
-    strange thing to leave lying about when the bow is not.
-
-    Everything else stays in a container. Food, ingredients, ore, potions,
-    books, clutter and keys are all things the world is meant to have in it,
-    and stripping them would empty Skyrim rather than close the economy.
-  */
-  var SPOIL_TYPES = { WEAP: true, ARMO: true, AMMO: true };
-
   /* Gold001. The one form id in this file that is not a descriptor, because it
      is the same number in every load order there has ever been. */
   var GOLD = 0x0000000F;
 
-  /* Where 'this container has been emptied' is written. On the reference, so it
-     survives a restart; see the block comment for why that matters. */
-  var STRIPPED_PROPERTY = 'thornswoodStripped';
-
   function ready() {
-    try {
-      mp.makeProperty(STRIPPED_PROPERTY, {
-        isVisibleByOwner: false, isVisibleByNeighbors: false,
-        updateOwner: '', updateNeighbor: ''
-      });
-    } catch (e) { /* already made by a previous load. harmless. */ }
     try {
       mp.makeProperty(PURSE_PROPERTY, {
         isVisibleByOwner: false, isVisibleByNeighbors: false,
@@ -46710,8 +46836,8 @@ module.exports = {
 
     An answer of '' is 'the engine could not say', and every caller treats that
     as 'leave it alone'. Not knowing what a thing is has to mean not touching it:
-    the other way round, one unreadable record would quietly empty every chest
-    that held one.
+    the other way round, one unreadable record would quietly refuse every one
+    of it in the world.
   */
   var kinds = {};
   function kindOf(baseId) {
@@ -46734,8 +46860,8 @@ module.exports = {
     TOOLS in the outer file already lists them, accept lists and all, because the
     tool gate had to know that Skyrim has two shovels and six pickaxes. This is
     the same six and the same two, read off that table rather than written down
-    again, so a tool added there is a tool taken out of the world here without
-    anybody remembering to do both.
+    again, so a tool added there is known here without anybody remembering to
+    do both.
   */
   var toolIds = null;
   function isTool(baseId) {
@@ -46753,181 +46879,17 @@ module.exports = {
     return Object.prototype.hasOwnProperty.call(toolIds, baseId);
   }
 
-  /** True when the world must not hand this over. */
-  var CUT_OUTS = ["3ada4:Skyrim.esm","bff20:Playable Rieklings.esp","bff21:Playable Rieklings.esp"];
-  var cutOutIds = null;
-  function isCutOut(baseId) {
-    if (!cutOutIds) {
-      cutOutIds = {};
-      var pending = false;
-      for (var i = 0; i < CUT_OUTS.length; i++) {
-        var id = idOf(CUT_OUTS[i]);
-        if (id) { cutOutIds[id] = true; }
-        else { pending = true; }
-      }
-      if (pending) { cutOutIds = null; return false; }
-    }
-    return !!cutOutIds[baseId];
-  }
-
   /*
-    THE GAME'S JAIL KEYS (#502). Patrick, 12 October: the game's jail keys
-    open nothing. A key in somebody's pack opens its cell door in their own
-    game whoever locked it, so the world does not hand one out: the property
-    block's JAIL_KEY, read out of the world with the cells, is every key the
-    game made for a cell door. Resolved once every one of them has an id,
-    the way isCutOut waits for the load order.
-  */
-  var jailKeyIds = null;
-  function isJailKey(baseId) {
-    if (!baseId) { return false; }
-    if (!jailKeyIds) {
-      var prop = g.__thornswoodProperty;
-      var table = (prop && prop.JAIL_KEY) || null;
-      if (!table) { return false; }
-      var found = {}, pending = false;
-      for (var k in table) {
-        if (!Object.prototype.hasOwnProperty.call(table, k)) { continue; }
-        var id = idOf(k);
-        if (id) { found[id] = true; } else { pending = true; }
-      }
-      if (pending) { return !!found[baseId]; }
-      jailKeyIds = found;
-    }
-    return !!jailKeyIds[baseId];
-  }
-
-  function isSpoil(baseId) {
-    if (!baseId) { return false; }
-    if (baseId === GOLD) { return true; }
-    if (isTool(baseId)) { return true; }
-    // #2479: the cut rows (#1511) are held back the way a sword is.
-    if (isCutOut(baseId)) { return true; }
-    return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
-  }
-
-  /** Has this container been emptied already. */
-  function alreadyStripped(refrId) {
-    try {
-      return !!mp.get(refrId, STRIPPED_PROPERTY);
-    } catch (e) {
-      // A reference the server cannot answer about is one this must not touch.
-      // Saying yes here means leaving it exactly as it is.
-      return true;
-    }
-  }
-
-  /*
-    Take the spoils out of a container, once.
-
-    Returns the number of entries removed, or -1 when it did nothing at all. The
-    write happens before the mark, so a write that throws leaves the container
-    unmarked and it is tried again next time. The other order would mark a chest
-    as done and leave the swords in it.
-  */
-  function strip(refrId) {
-    if (alreadyStripped(refrId)) { return -1; }
-    var inv = null;
-    try { inv = mp.get(refrId, 'inventory'); } catch (e) { return -1; }
-    var entries = (inv && inv.entries) || [];
-
-    /*
-      AN EMPTY CHEST IS NOT AN EMPTIED CHEST, and mistaking one for the other
-      is why gold and armour were still in every container in the world.
-
-      A container's contents come out of the plugin LAZILY:
-      MpObjectReference::EnsureBaseContainerAdded copies them in the first time
-      something needs them, and sets baseContainerAdded so it never runs twice.
-      This runs on the press, which is often BEFORE that has happened, so the
-      inventory read back was empty. Nothing was taken, the chest was marked
-      emptied, and a moment later the engine filled it with everything the
-      plugin said was in it. The mark meant it was never looked at again.
-
-      Patrick, 21 September, after playing it: "Gold, Weapoms, and Armor can
-      still be found in storages and looted the on the ground system works
-      though." The ground works because a placed item is its own reference and
-      was never empty.
-
-      So an empty read is not recorded. The next press reads it again, by which
-      time the engine has filled it, and that is the one that empties it.
-    */
-    if (!entries.length) { return 0; }
-
-    var keep = [], took = 0;
-    for (var i = 0; i < entries.length; i++) {
-      var e = entries[i];
-      if (e && (isSpoil(e.baseId) || isJailKey(e.baseId))) { took++; continue; }
-      keep.push(e);
-    }
-    if (took) {
-      try {
-        mp.set(refrId, 'inventory', { entries: keep });
-      } catch (e2) {
-        slog('could not empty', refrId.toString(16) + ':', e2);
-        return -1;
-      }
-    }
-    try {
-      mp.set(refrId, STRIPPED_PROPERTY, 1);
-    } catch (e3) {
-      // The contents are gone and the mark is not written, so this runs again
-      // next time and finds nothing left to take. Harmless either way round.
-      slog('could not mark', refrId.toString(16), 'as emptied:', e3);
-    }
-    if (took) { slog('took', took, 'thing(s) out of', refrId.toString(16)); }
-    return took;
-  }
-
-  /*
-    A press. It refuses nothing and always answers null. A container is
-    emptied and then opens as it always did, because the point is what is
-    inside it rather than whether it opens. Anything else is left to the
-    engine: nothing a plugin placed lies on the floor any more (#3077, see the
+    A press. It refuses nothing and always answers null. A container opens
+    as it always did, empty of anything the world put there (the block
+    comment), and a dungeon chest pays its pile. Anything else is left to the
+    engine: nothing a plugin placed lies on the floor any more (#3077, the
     block comment), and a thing a person dropped is theirs to pick up.
   */
   function activate(actorId, refrId, baseDesc) {
     var baseId = idOf(baseDesc);
     if (!baseId) { return null; }
     if (kindOf(baseId) === 'CONT') {
-      /*
-        AND IF IT READ EMPTY, COME BACK IN A MOMENT, because otherwise the
-        first person to open any chest in Skyrim loots it.
-
-        Patrick, 22 September: "goldf, weaops, and armor are propley not able
-        to be picked up off the ground but are still found in chests and able
-        to be looted when they shouoldnt be."
-
-        The note over strip() had half of this already: a container's contents
-        are copied out of the plugin lazily, so the read here often comes back
-        empty and nothing is taken. What it then says is "the next press reads
-        it again, by which time the engine has filled it, and that is the one
-        that empties it". THERE IS NO SECOND PRESS. Read the engine's own
-        handler, MpObjectReference::Activate:
-
-            } else if (t == espm::CONT::kType && actorActivator) {
-              EnsureBaseContainerAdded(loader);
-
-        That runs AFTER this hook, on the same press, and then the container
-        opens with everything Bethesda put in it on the screen. Nobody presses
-        a chest, closes it and presses it again; they take the sword. The
-        second press only ever emptied a chest that had already been looted.
-
-        So an empty read schedules another one. The engine fills the container
-        synchronously inside the same Activate, so a timer of zero lands after
-        it with the contents there. The second at a quarter of a second is for
-        a fill that went round the event loop, and it costs one property read
-        on a chest that is already marked.
-
-        THE MARK STILL ONLY GOES ON A REAL READ, which is what stops this
-        eating somebody's own chest: strip() writes nothing when the inventory
-        comes back empty, so a chest that is genuinely empty is looked at
-        again next time rather than being recorded as done.
-      */
-      if (strip(refrId) === 0) {
-        var again = function () { try { strip(refrId); } catch (e) { } };
-        try { setTimeout(again, 0); } catch (e) { }
-        try { setTimeout(again, 250); } catch (e) { }
-      }
       try {
         var dungeonLoot = g.__thornswoodDungeonLoot;
         if (dungeonLoot && dungeonLoot.onChest) { dungeonLoot.onChest(actorId, refrId); }
@@ -47013,9 +46975,7 @@ module.exports = {
   ready();
   g.__thornswoodSpoils = {
     purse: purse, PURSE: PURSE, PURSE_PROPERTY: PURSE_PROPERTY,
-    activate: activate, strip: strip, isSpoil: isSpoil, isJailKey: isJailKey, kindOf: kindOf,
-    isTool: isTool, alreadyStripped: alreadyStripped,
-    SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD, STRIPPED_PROPERTY: STRIPPED_PROPERTY
+    activate: activate, kindOf: kindOf, isTool: isTool, GOLD: GOLD
   };
   slog('ready');
 })();
@@ -47024,8 +46984,8 @@ module.exports = {
 /*
   A CHEST IN A DUNGEON PAYS FROM THE PLACE'S TIER.
 
-  The world's own coin, weapons and armour are still stripped. This is a
-  different door: the server creates a small pile when somebody opens a
+  Every other container holds nothing the world put there (the spoils
+  block, #3078). This is the one door: the server creates a small pile when somebody opens a
   chest, an urn, a coffin or a safe in a dungeon, a cave or a sewer. The
   same container does not pay again until that tier's rest has passed,
   which is the same rest the population catalogue uses: 30, 45, 60 and 90
@@ -47490,9 +47450,8 @@ module.exports = {
 
   /*
     Found in a dungeon and nowhere else on this table. Not the ordinary
-    weapon pile above, and not a company ware. The world's own spawned
-    weapons, armour and coin are still stripped. What this list creates
-    is the burial set.
+    weapon pile above, and not a company ware. The world puts nothing
+    in a container (#3078). What this list creates is the burial set.
   */
   var EXCLUSIVE = [
     { desc: 'cc842:Skyrim.esm', name: 'Ancient Nord Amulet', tier: 1, weight: 8 },
@@ -47711,9 +47670,10 @@ module.exports = {
   }
 
   /*
-    Called when a container is opened, after the world's own spoils are
-    scheduled to leave it. The pile goes into the pack, not back into the
-    container, so the stripper cannot take the gold out again.
+    Called when a container is opened. The container itself holds nothing
+    the world put there (#3078). The pile goes into the pack of the person
+    who opened it, not into the container, because it pays once and to
+    them (docs\systems\dungeon-loot.md, What opens).
   */
   function onChest(actorId, refrId) {
     if(!active || !ledger) return null;
@@ -50452,6 +50412,8 @@ return module.exports;
     // Twin Souls is a second enchantment slot in the menu (#1389). It lives
     // beside the craft gate, outside this block, the way spellOn does.
     if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
+    // And what the crafting menu lists, from the same answer the craft gate gives (#613).
+    if (typeof handRecipesHidden === 'function') { handRecipesHidden(actorId); }
     return s;
   }
 
@@ -50697,6 +50659,9 @@ return module.exports;
     // And the second enchantment slot Twin Souls gives (#1389): a session
     // starts from a save with no perks on it.
     if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
+    // And the recipes the crafting menu leaves out (#613): a session starts
+    // from a game whose records list every one.
+    if (typeof handRecipesHidden === 'function') { handRecipesHidden(actorId); }
     return n;
   }
 
@@ -59286,6 +59251,118 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   console.log('[thornswood] chat commands running:', WORDS.join(', '));
 })();
 // ==== end thornswood chat commands ====
+// CPU PROFILE ON REQUEST BEGIN
+/*
+  A CPU PROFILE OF THIS SERVER, WHEN THE BOX ASKS FOR ONE (#3181).
+
+  Each game server used about a ninth of a core all day with nobody on, and
+  nothing said where it went: the NPC activity, the saves it caused, or the
+  engine's own loop. scripts\vps\Profile-GameServer.ps1 drops profile.json in
+  the data folder over ssh, as Request-Restart.ps1 drops restart.json; this
+  picks it up within five seconds, deletes it, and samples this process with
+  node's own profiler for the seconds it asks (120 unless it says, 1 to
+  600), once a millisecond. Then it writes two files beside it in
+  profiles\: the whole profile (newest.cpuprofile, which Chrome's DevTools and
+  VS Code open) and newest.txt, where the time went by function and by file.
+  Each run replaces the last one's, so the folder never grows.
+
+  In this process, through an inspector session of its own: no port is
+  opened, nothing restarts, and nobody on the server notices more than the
+  sampling, a few percent of one core while it runs.
+*/
+(function () {
+  var fs = require('fs'), path = require('path');
+  var dir = 'data';
+  try {
+    var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+    if (cfg && cfg.dataDir) { dir = String(cfg.dataDir); }
+  } catch (e) { log('cpu profile: server-settings.json not read, so the request is looked for in data:', e); }
+  var REQUEST = path.join(dir, 'profile.json'), OUT = path.join(dir, 'profiles');
+  var running = false;
+
+  // Self time by function and by file, from the samples' own time deltas.
+  function summary(profile, secs, at) {
+    var byNode = {}, nodes = profile.nodes || [], i;
+    for (i = 0; i < nodes.length; i++) { byNode[nodes[i].id] = nodes[i]; }
+    var self = {}, total = 0, samples = profile.samples || [], deltas = profile.timeDeltas || [];
+    for (i = 0; i < samples.length; i++) {
+      var us = deltas[i + 1] !== undefined ? deltas[i + 1] : 0;
+      self[samples[i]] = (self[samples[i]] || 0) + us;
+      total += us;
+    }
+    var fns = {}, files = {};
+    Object.keys(self).forEach(function (id) {
+      var n = byNode[id], f = n && n.callFrame;
+      if (!f) { return; }
+      // (idle), (program) and (garbage collector) name themselves; a frame
+      // with no file is the engine's own code, the native addon among it.
+      var file = f.url ? f.url.replace(/^.*[\\/]/, '') :
+        (/^\(.*\)$/.test(f.functionName) ? f.functionName : '(native)');
+      var fn = (f.functionName || '(anonymous)') + '  ' + file + (f.url ? ':' + (f.lineNumber + 1) : '');
+      fns[fn] = (fns[fn] || 0) + self[id];
+      files[file] = (files[file] || 0) + self[id];
+    });
+    function top(map, n) {
+      return Object.keys(map).sort(function (a, b) { return map[b] - map[a]; }).slice(0, n).map(function (k) {
+        return ('     ' + (100 * map[k] / Math.max(total, 1)).toFixed(1)).slice(-6) + '%  ' + (map[k] / 1000).toFixed(0) + ' ms  ' + k;
+      });
+    }
+    var idle = (files['(idle)'] || 0), busy = total - idle;
+    return ['cpu profile of ' + secs + ' s, taken ' + at,
+      'sampled ' + (total / 1e6).toFixed(1) + ' s; busy ' + (busy / 1e6).toFixed(2) + ' s, ' +
+        (busy / Math.max(total, 1)).toFixed(3) + ' of a core on the JavaScript thread',
+      '', 'by file:'].concat(top(files, 25), ['', 'by function:'], top(fns, 60)).join('\r\n') + '\r\n';
+  }
+
+  function take(secs) {
+    var inspector = require('inspector'), s = new inspector.Session(), at = new Date().toISOString();
+    s.connect();
+    function fail(where, err) { running = false; log('cpu profile failed at ' + where + ':', err); try { s.disconnect(); } catch (e) { log('cpu profile: the session did not close:', e); } }
+    s.post('Profiler.enable', function (err) {
+      if (err) { return fail('enable', err); }
+      s.post('Profiler.setSamplingInterval', { interval: 1000 }, function (err2) {
+        if (err2) { return fail('interval', err2); }
+        s.post('Profiler.start', function (err3) {
+          if (err3) { return fail('start', err3); }
+          log('cpu profile: sampling for ' + secs + ' s');
+          setTimeout(function () {
+            s.post('Profiler.stop', function (err4, r) {
+              if (err4) { return fail('stop', err4); }
+              try {
+                fs.mkdirSync(OUT, { recursive: true });
+                fs.writeFileSync(path.join(OUT, 'newest.cpuprofile'), JSON.stringify(r.profile));
+                fs.writeFileSync(path.join(OUT, 'newest.txt'), summary(r.profile, secs, at));
+                log('cpu profile: written to ' + path.join(OUT, 'newest.txt'));
+              } catch (e) { log('cpu profile: could not write it:', e); }
+              running = false;
+              s.disconnect();
+            });
+          }, secs * 1000);
+        });
+      });
+    });
+  }
+
+  function check() {
+    if (running || !fs.existsSync(REQUEST)) { return; }
+    var raw = fs.readFileSync(REQUEST, 'utf8');
+    // Deleted before it is acted on, so one left by a crash never fires twice.
+    fs.unlinkSync(REQUEST);
+    var req = {};
+    try { req = JSON.parse(raw) || {}; } catch (e) { log('cpu profile request was not readable:', raw); return; }
+    var secs = Math.round(Number(req.seconds) || 120);
+    secs = Math.max(1, Math.min(600, secs));
+    running = true;
+    take(secs);
+  }
+
+  // Stored so a hot reload replaces it rather than adding another.
+  if (globalThis.__thornswoodProfileTimer) { clearInterval(globalThis.__thornswoodProfileTimer); }
+  globalThis.__thornswoodProfileTimer = setInterval(function () {
+    try { check(); } catch (e) { running = false; log('cpu profile request threw:', e); }
+  }, 5000);
+})();
+// CPU PROFILE ON REQUEST END
 
 
 /*
@@ -73513,7 +73590,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     const a={id,cell:state.cellOrWorld,pos:state.pos.slice(),state,node:near.node,
       lift:near.pos[2]-npcSurface(near.node,near.pos),bank,approach:near.pos.slice(),
       path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
-      mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
+      mode:'ambient',savedMode:'ambient',target:0,policy:policies.get(id)};
     actors.set(id,a);order.push(id);indexActor(a);
     nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
   }
@@ -73581,7 +73658,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         const surface=npcSurface(node,state.pos),lift=state.pos[2]-surface;
         const a={id,cell:state.cellOrWorld,pos:state.pos.slice(),state,node,lift,bank,
           path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
-          mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
+          mode:'ambient',savedMode:'ambient',target:0,policy:policies.get(id)};
         actors.set(id,a);order.push(id);indexActor(a);
         nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
       } catch(e) { reject(id,e); }
@@ -73857,8 +73934,14 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     nativeCall('updateNpcMovement',a.id,pos,rot,speed);
     if(speed) moved++;
     a.pos=pos;a.node=node;indexActor(a);
-    if(at-a.lastSaved>=30000) {
-      nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
+    // Written when it means something, a fight or a flight starting or
+    // ending, not as it wanders (#3180). Each write saves the actor's whole
+    // record durably, and until 22 Oct 2026 every NPC was written every 30
+    // seconds: about 5,000 files every 32 seconds on each server, 640 KB/s,
+    // with nobody on. An NPC that only wanders starts after a restart where
+    // it was last written, inside its home.
+    if(a.mode!==a.savedMode) {
+      nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.savedMode=a.mode;
     }
   }
   function step(id) {

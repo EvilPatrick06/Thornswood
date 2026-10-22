@@ -64,7 +64,7 @@
   voice's log and roller; writes nothing else.
 #>
 [CmdletBinding()]
-param([string]$DeployDocs, [string]$InstallVoice, [string]$SetupDomain)
+param([string]$DeployDocs, [string]$InstallVoice, [string]$SetupDomain, [string]$WatchServices)
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
 $env:THORNSWOOD_HARNESS = '1'
 
@@ -77,6 +77,7 @@ $deploy = [IO.Path]::Combine($Repo, 'scripts', 'deploy')
 if (-not $DeployDocs) { $DeployDocs = [IO.Path]::Combine($deploy, 'Deploy-Docs.ps1') }
 if (-not $InstallVoice) { $InstallVoice = [IO.Path]::Combine($deploy, 'Install-Voice.ps1') }
 if (-not $SetupDomain) { $SetupDomain = [IO.Path]::Combine($deploy, 'Setup-Domain.ps1') }
+if (-not $WatchServices) { $WatchServices = [IO.Path]::Combine($Repo, 'scripts', 'vps', 'Watch-Services.ps1') }
 
 $script:pass = 0
 $script:fail = 0
@@ -97,6 +98,7 @@ $installers = @(
     [pscustomobject]@{ Name = 'Deploy-Docs.ps1'; Path = $DeployDocs; Task = 'Thornswood Docs'; Program = 'node, started by the task'; Child = $false; High = $false }
     [pscustomobject]@{ Name = 'Install-Voice.ps1'; Path = $InstallVoice; Task = 'Thornswood Voice'; Program = 'node, started by the task''s cmd.exe'; Child = $true; High = $true }
     [pscustomobject]@{ Name = 'Setup-Domain.ps1'; Path = $SetupDomain; Task = 'Thornswood Web'; Program = 'caddy.exe, started by the task'; Child = $false; High = $false }
+    [pscustomobject]@{ Name = 'Watch-Services.ps1'; Path = $WatchServices; Task = 'Thornswood Watch'; Program = 'Windows PowerShell, started by the task'; Child = $false; High = $false }
 )
 
 # ---- 1. read, not run ------------------------------------------------------------

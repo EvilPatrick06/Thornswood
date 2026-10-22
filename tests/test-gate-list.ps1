@@ -24,7 +24,8 @@
        and this harness among them;
     3. build.yml's gate step, parsed with the PowerShell parser the runner
        uses: it calls Gate-Harnesses.ps1, stops when that fails, runs what it
-       returns, and names no harness itself, since a name there is a second
+       returns through Nightly-Harnesses.ps1 and fails when that does, and
+       names no harness itself, since a name there is a second
        list that grows by appending.
 
   Read only, apart from the planted folders under TEMP, which it removes.
@@ -152,7 +153,8 @@ $ast = [System.Management.Automation.Language.Parser]::ParseInput($gate, [ref]$t
 Yes 'the gate step parses' (@($errors).Count -eq 0)
 Yes 'it takes its list from Gate-Harnesses.ps1' ($gate -match '(?m)^\$gate = @\(& \.\\scripts\\dev\\Gate-Harnesses\.ps1\)\s*$')
 Yes 'and stops when that fails, before running any' ($gate -match '(?m)^\$gate = @\(.*\r?\nif \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}')
-Yes 'and runs each one it returns' ($gate -match '(?m)^foreach \(\$n in \$gate\) \{')
+Yes 'and runs each one it returns, through Nightly-Harnesses.ps1 (#3114)' ($gate -match "(?m)^\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only \(\`$gate -join ' '\) -Throttle [1-9]\d* -Share \`$share -BudgetSeconds \d+\s*$" -and $gate -match '(?m)^\$share = .*\[Environment\]::ProcessorCount / .*\$builds' -and $gate -match 'records\\build-runners\.json')
+Yes '  and fails when that does' ($gate -match '(?m)^\.\\scripts\\dev\\Nightly-Harnesses\.ps1 .*\r?\nexit \$LASTEXITCODE\s*$')
 $named = @($ast.FindAll({
     param($n)
     $n -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $n.Value -match 'test-[\w.-]+\.(js|ps1)'

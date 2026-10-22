@@ -36,10 +36,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`d39a9a93`](https://github.com/EvilPatrick06/skymp/tree/d39a9a935359a530c51f885f42e279e873aa2544).
+[`e1127af4`](https://github.com/EvilPatrick06/skymp/tree/e1127af401d17ed79ac54f4864a8ecf8a17a83c4).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...d39a9a93)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...e1127af4)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -69,6 +69,12 @@ the same public branch:
 
 Each licence is the `LICENSE` file in that folder of the repository.
 
+SkyMP's in-game interface, `build.js` with the fonts, pictures and sounds
+beside it, is built from the same public copy too: from its `skymp5-front`
+folder, under the GNU GPL version 3, at the commit of the six client files
+of the same release. Releases made since 20 October 2026 carry that build. The
+public channel's releases from before then carry an older one, below.
+
 ### SkyMP files Thornswood did not build
 
 The installer carries these too, and the launcher's updates can. Thornswood
@@ -78,15 +84,17 @@ so no commit is named for them here. Their source is SkyMP's own, at
 
 | File | What it is | Its folder in SkyMP, and that folder's licence |
 |---|---|---|
-| `build.js`, with the fonts, pictures and sounds it loads | SkyMP's in-game interface | `skymp5-front`, GNU GPL version 3 |
+| `build.js` in releases made before 20 October 2026, with the fonts, pictures and sounds it loads | SkyMP's in-game interface | `skymp5-front`, GNU GPL version 3 |
 | `skyrimPlatform.ts` | Skyrim Platform's type declarations | `skyrim-platform`, GNU GPL version 3 |
 | `MpClientPlugin.pex` | A compiled Papyrus script | `client-deps`, which has no `LICENSE` file and keeps no source for it |
 
-One more SkyMP file reaches you through Nexus Mods instead, in the Thornswood
-Client Runtime (below): `___systemPolyfill.js`, a small Skyrim Platform
-script, from `skyrim-platform` under the GNU GPL version 3. It is the last
-version SkyMP had before it removed the script in June 2026, so its source is
-in SkyMP's history rather than its current code:
+One more SkyMP file reached people through Nexus Mods instead, in version
+1.0.0 of the Thornswood Client Runtime (below), which the collection's first
+two revisions still install: `___systemPolyfill.js`, a small Skyrim Platform
+script, from `skyrim-platform` under the GNU GPL version 3. Version 1.0.1,
+which the collection installs since its third revision, leaves it out. It is
+the last version SkyMP had before it removed the script in June 2026, so its
+source is in SkyMP's history rather than its current code:
 [the change that removed it](https://github.com/skyrim-multiplayer/skymp/pull/2711)
 shows every line of it.
 
@@ -101,14 +109,14 @@ for them is at the bottom of this page.
 the collection installs it for you. It is the browser and script engine Skyrim
 Platform runs on, and Thornswood wrote none of it but the README: the Chromium
 Embedded Framework and Chromium 108, ANGLE and ICU's data (BSD and Unicode
-licences), Node.js 23.2.0 (MIT), Microsoft's Direct3D shader compiler, and the
-one SkyMP script above. The licence texts come with it, in
-`Data\Docs\Thornswood Client Runtime`. The shader compiler,
+licences), Node.js 23.2.0 (MIT) and Microsoft's Direct3D shader compiler
+(version 1.0.0 also had the one SkyMP script above). The licence texts come
+with it, in `Data\Docs\Thornswood Client Runtime`. The shader compiler,
 `d3dcompiler_47.dll`, is Microsoft's, unmodified and signed by Microsoft. It is
 on the Windows SDK's list of files that may be handed on with a Windows
 program ([Windows SDK redist lists](https://learn.microsoft.com/en-us/legal/windows-sdk/redist)),
 under the Windows SDK's licence terms for that code, and it remains
-Microsoft's property.
+Microsoft's property. The mod's README says what those terms ask of you.
 
 **The main menu's interface file**, `Data\Interface\startmenu.swf`, is
 Skyrim's own, edited so the menu shows no logo and no button list. The notice
@@ -128,12 +136,17 @@ with SkyMP.
 **Bankir-Retro**, the font SkyMP's in-game interface draws its buttons and
 text boxes in, is by Gophmann A.L. (2006). **icomoon**, the small icon font
 that interface draws the dots of a hidden password with, was made with
-IcoMoon. Both come with SkyMP, in its `skymp5-front`.
+IcoMoon. Both come with SkyMP, in its `skymp5-front`. **Barlow SemiBold**, the
+font that interface draws the rest of its text in since 20 October 2026, is by
+Jeremy Tribby and the Barlow Project Authors, under the SIL Open Font License,
+version 1.1.
 
 **This site** is set in Cinzel, by the Cinzel Project Authors, and Spectral,
 by the Spectral Project Authors, both under the SIL Open Font License. It
 draws its written pages with marked, by Christopher Jeffrey, under the MIT
-licence. All three are served from here.
+licence. All three are served from here, and so are their licences:
+[marked's](/marked-LICENSE.txt), [Cinzel's](/cinzel-OFL.txt) and
+[Spectral's](/spectral-OFL.txt).
 
 ## Microsoft WebView2 SDK licence
 

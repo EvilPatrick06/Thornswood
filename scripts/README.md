@@ -26,6 +26,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | Script | What it is for |
 | --- | --- |
 | [deploy/Artifact.ps1](deploy/Artifact.ps1) | What a deploy sends, built from a commit rather than copied off a working tree, and what the box keeps to say which commit each part runs. |
+| [deploy/CloudflareRanges.ps1](deploy/CloudflareRanges.ps1) | Dot-sourced. Reads scripts\deploy\cloudflare-ranges.txt, the addresses Cloudflare's proxy reaches the box from, and says whether an address is inside them (#2995). |
 | [deploy/CollectionPlugins.ps1](deploy/CollectionPlugins.ps1) | Holds the plugins a deploy sends to the collection's own bytes (#2019). |
 | [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS and restarts only that server. |
 | [deploy/Deploy-Docs.ps1](deploy/Deploy-Docs.ps1) | Puts the Thornswood docs site on the VPS and keeps it running. |
@@ -79,13 +80,16 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Gate-Harnesses.ps1](dev/Gate-Harnesses.ps1) | Prints the harnesses the build check runs on every pull request: every tests\test-*.js and tests\test-*.ps1 that tests\gate-excluded.txt does not name, one a line, in name order. |
 | [dev/Install-Serena.ps1](dev/Install-Serena.ps1) | Installs Serena once, at the version in scripts\dev\serena-version.txt, and points Claude Code on this machine at the installed program, so a session start runs Serena straight away instead of resolving it first. |
 | [dev/Install-Thornswood.ps1](dev/Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
+| [dev/Lint.ps1](dev/Lint.ps1) | Reports ruff, eslint and PSScriptAnalyzer findings, warnings only, over the files it is given or the whole tree, with each pinned tool fetched once per machine. |
 | [dev/Measure-Reclaim.ps1](dev/Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |
 | [dev/New-ScriptIndex.ps1](dev/New-ScriptIndex.ps1) | Writes scripts\README.md, the list of every PowerShell script under scripts\ and the one line that says what each one is for. |
-| [dev/Nightly-Harnesses.ps1](dev/Nightly-Harnesses.ps1) | Runs one share of the test harnesses for the nightly checks, one at a time and each on a clock, and always ends by naming every harness that failed and the ten slowest, inside the time it is given. |
+| [dev/Nightly-Harnesses.ps1](dev/Nightly-Harnesses.ps1) | Runs one share of the test harnesses for the nightly checks, or the ones it is named, one at a time or a few side by side, each on a clock, and always ends by naming every harness that failed and the ten slowest, inside the time it is given. |
 | [dev/Nightly-Issue.ps1](dev/Nightly-Issue.ps1) | Keeps one issue on the board for a failing nightly, and closes it the night the checks pass. |
 | [dev/Nightly-Stray.ps1](dev/Nightly-Stray.ps1) | Names every pull request open more than two days and every branch other than main with no open pull request, reading every page GitHub has. |
 | [dev/OwnPlugins.ps1](dev/OwnPlugins.ps1) | Where a builder reads a plugin of the load order from (#2923). |
 | [dev/Start-Thornswood.ps1](dev/Start-Thornswood.ps1) | Launches the game the way the launcher's Play() does, without the launcher. |
+| [dev/Trace-Gate-Box.ps1](dev/Trace-Gate-Box.ps1) | The part of a gate trace that runs on the VPS, as an administrator: an ETW session that sees every file each gate harness opens, and the reading of it into one list of paths a harness (#3114). |
+| [dev/Trace-Gate.ps1](dev/Trace-Gate.ps1) | Traces one run of the pull request gate on the VPS: which files every gate harness opens, on the box, as the build runner runs it (#3114). |
 | [dev/Watch-Foreground.ps1](dev/Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
 | [mods/Add-Accuracy.ps1](mods/Add-Accuracy.ps1) | RETIRED. DO NOT RUN. Issue #1179: hand-installed Core Impact Framework and Accuracy, then Ships. |
 | [mods/Add-Bodies.ps1](mods/Add-Bodies.ps1) | RETIRED. DO NOT RUN. Issue #405: every run poured the nude CBBE and 3BA female body (femalebody_0.nif and _1.nif, shapes 3BA, 3BA_Vagina and 3BA_Anus, no Bra or Panty) back over Game\Data, whatever body had been put there since. |
@@ -116,7 +120,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Rebuild-ContentTables.ps1](mods/Rebuild-ContentTables.ps1) | Rebuilds every table that is read out of the plugins of the load order, in the order they read each other, after a change to one of Thornswood's own plugins in game\content, and says what changed. |
 | [mods/Remove-DeadRecords.ps1](mods/Remove-DeadRecords.ps1) | Deletes records from Thornswood-Content.esp that nothing uses any more, and refuses to delete one that anything still points at. |
 | [mods/Remove-Plugin.ps1](mods/Remove-Plugin.ps1) | RETIRED. DO NOT RUN. Issue #1179: took one plugin out of the build by hand. |
-| [mods/Run-OnBox.ps1](mods/Run-OnBox.ps1) | Runs one of the repository's Python tools on the VPS box, against the game plugins a game server there already holds, and brings back what the tool wrote into the repository's game\ and records\ folders. |
+| [mods/Run-OnBox.ps1](mods/Run-OnBox.ps1) | Runs one of the repository's content tools on the VPS box, against the game plugins a game server there already holds, and brings back what the tool wrote into the repository's game\, records\ and docs\systems\ folders. |
 | [mods/Send-GameArchives.ps1](mods/Send-GameArchives.ps1) | Puts Skyrim's own archives that the content tools read on the VPS box, in C:\Thornswood-GameData, each checked against records\skyrim-files.json on this machine before it goes and on the box after it lands, and the loose string tables records\game-strings.json names, held to that record the same way. |
 | [mods/Set-UnboundMenu.ps1](mods/Set-UnboundMenu.ps1) | RETIRED. DO NOT RUN. Issue #1179: swapped Skyrim Unbound's MCM script by hand. |
 | [mods/Show-EslCascade.ps1](mods/Show-EslCascade.ps1) | Answers one question: if the server load order drops every ESL-flagged plugin, how much else has to go with it? |
@@ -130,6 +134,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [ops/New-Character.ps1](ops/New-Character.ps1) | Throws the test character away so the next connect builds a fresh one. |
 | [ops/Publish-Discord.ps1](ops/Publish-Discord.ps1) | Posts the newest release into the Discord #news channel. |
 | [ops/Publish-News.ps1](ops/Publish-News.ps1) | Copies the launcher's news feed onto the docs site, so the News page there is the same list of changes people see in the launcher rather than a second one written by hand that immediately falls behind. |
+| [ops/Read-Board.ps1](ops/Read-Board.ps1) | Reads the whole board, every card's Status and Order, into board.json, from a machine that has gh and no board token: a cloud Claude thread (#3192). |
 | [ops/Release-List.ps1](ops/Release-List.ps1) | The release list a game server lets go of at its next start (#2351), as Reset-Character.ps1, Wipe-Saves.ps1 (#2668) and New-Character.ps1 (#2673) write it. |
 | [ops/Reset-Appearance.ps1](ops/Reset-Appearance.ps1) | Puts a character back into the race menu without deleting them. |
 | [ops/Reset-Character.ps1](ops/Reset-Character.ps1) | Throws away the character on the server so the next launch runs creation from the top. |
@@ -233,9 +238,11 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Get-RunnerFacts.ps1](vps/Get-RunnerFacts.ps1) | Runs ON THE VPS, read-only: prints what each GitHub Actions runner account can reach (groups, rights on production paths, leftovers in its work folders, firewall rules, setting names) as JSON for Check-RunnerIsolation.ps1, never a secret value (issue #2161). |
 | [vps/Get-RunnerJobs.ps1](vps/Get-RunnerJobs.ps1) | Lists the GitHub Actions jobs one runner started after a given time, with how each ended and which step failed, and says whether one of them passed; read-only (issue #2161). |
 | [vps/Grant-BoxAccess.ps1](vps/Grant-BoxAccess.ps1) | Gives one person, or one machine, its own way into the box, or takes it away, and touches nobody else's (#2891). |
-| [vps/Harden-VPS.ps1](vps/Harden-VPS.ps1) | Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off. |
+| [vps/Harden-VPS.ps1](vps/Harden-VPS.ps1) | Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off, and the Windows services the box never uses. |
+| [vps/Keep-RunnerLogs.ps1](vps/Keep-RunnerLogs.ps1) | The build runners on the box keep every log they write in their _diag folders and nothing ever removed one: 1.6 GB and about 4,000 files on 21 Oct 2026, the oldest from 25 Sep (#3184). -Install puts vps-runner-logs.ps1 on the box as C:\Thornswood-Watch\runner-logs.ps1 and a task that runs it at 4:30 AM every day as SYSTEM, which removes the runner and worker logs older than 14 days. vps-runner-logs.ps1 says exactly what it removes. |
 | [vps/Lock-Folder.ps1](vps/Lock-Folder.ps1) | The one place the creators of the VPS service folders get their lock from (follow-up to issues #1183 and #1691): Watch-Services.ps1 and Watch-Load.ps1 for C:\Thornswood-Watch, Setup-Domain.ps1 for C:\Thornswood-Caddy, and Artifact.ps1 and Swap.ps1 for C:\Thornswood-Deploys, and Grant-BoxAccess.ps1 for the copies it keeps in C:\ProgramData\ssh\box-access-before (#3034). |
 | [vps/Lock-VpsFolders.ps1](vps/Lock-VpsFolders.ps1) | Takes the rule that lets every account on the box read them off the game servers', the voice services' and the backups' folders, now rather than at each one's next install (issues #1105 and #1173). |
+| [vps/Profile-GameServer.ps1](vps/Profile-GameServer.ps1) | Where a game server's processor time goes (#3181). |
 | [vps/Prove-SecretOffCommandLines.ps1](vps/Prove-SecretOffCommandLines.ps1) | Proves, on one real run, that a secret-sending script keeps the value off every command line on the VPS (issue #1212, the person check of #451). |
 | [vps/Read-Availability.ps1](vps/Read-Availability.ps1) | Says how many minutes each service was down over a window, and what share of the window it was up, from the down and back lines the watchdog writes into alerts.jsonl. |
 | [vps/Read-Load.ps1](vps/Read-Load.ps1) | Says which service is using the box, from the record vps-load.ps1 keeps on it. |
@@ -251,20 +258,23 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Set-SshScope.ps1](vps/Set-SshScope.ps1) | Limits which addresses may reach ssh on the VPS (port 22), after proving key login, refusing a list that leaves this machine out, and with a put back the box runs by itself if the new login fails. |
 | [vps/Set-TimeWait.ps1](vps/Set-TimeWait.ps1) | Sets TcpTimedWaitDelay to 30 seconds on the VPS, so the box stops dropping connections from the cloud before TLS (#2946), and restarts the box for it when asked and nobody is on either server. |
 | [vps/Set-Vps.ps1](vps/Set-Vps.ps1) | Points everything at a different server box. |
+| [vps/Set-WebFirewall.ps1](vps/Set-WebFirewall.ps1) | Lets the box take TCP 80 and 443 only from Cloudflare's ranges, so a forged SYN from anywhere else gets no SYN-ACK back (#2995). -Open puts both back to any address. |
 | [vps/Setup-CloudSsh.ps1](vps/Setup-CloudSsh.ps1) | Sets up ssh to the box from a cloud Claude thread (#2753). |
 | [vps/Setup-SshKey.ps1](vps/Setup-SshKey.ps1) | Sets a PC up to reach the box over ssh, through the bridge, with a key and a token of its own (#2891). |
 | [vps/Show-BotLog.ps1](vps/Show-BotLog.ps1) | What the bot has been saying, without redeploying it to find out. |
 | [vps/vps-capture-443.ps1](vps/vps-capture-443.ps1) | Captures the SYN and RST packets on port 443 at the box's network card for a set time, so #2946 can see whether the TLS connects from a cloud session that stall and then reset ever reach the box, and whether the box answers them. |
 | [vps/vps-dev-instance.ps1](vps/vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks and firewall rules. |
 | [vps/vps-freeze.ps1](vps/vps-freeze.ps1) | Runs ON the old VPS on the day the server moves: stops everything that writes what a backup takes, then takes the last backup. |
-| [vps/vps-harden.ps1](vps/vps-harden.ps1) | Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off and turns Remote Desktop off, leaving ssh on port 22 alone. |
+| [vps/vps-harden.ps1](vps/vps-harden.ps1) | Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off, turns Remote Desktop off and the Windows services the box never uses, leaving ssh on port 22 alone. |
 | [vps/vps-load.ps1](vps/vps-load.ps1) | Runs ON the VPS, every five minutes, as the scheduled task that Watch-Load.ps1 -Install puts there. |
 | [vps/vps-nightly-backup.ps1](vps/vps-nightly-backup.ps1) | Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1 puts there. |
 | [vps/vps-restore-services.ps1](vps/vps-restore-services.ps1) | Runs ON the VPS, sent there by Restore-Box.ps1: puts the site's, the bot's and Caddy's half of an unpacked nightly backup back into their folders. |
+| [vps/vps-runner-logs.ps1](vps/vps-runner-logs.ps1) | Runs ON the VPS, once a day, as the scheduled task that Keep-RunnerLogs.ps1 -Install puts there (C:\Thornswood-Watch\runner-logs.ps1). |
 | [vps/vps-say-staff.ps1](vps/vps-say-staff.ps1) | Puts one staff notice from an agent into the watchdog's outbox, alerts.jsonl, which the bot says in #staff-updates within a minute, or the watchdog through its #staff-updates webhook when the bot is down (#447). |
 | [vps/vps-ssh-scope.ps1](vps/vps-ssh-scope.ps1) | Runs ON THE VPS, sent there by Set-SshScope.ps1: limits who may reach ssh on port 22 to a list of addresses, refusing a list that leaves out the machine running it, and arms a ten minute put back. |
 | [vps/vps-syn-flood.ps1](vps/vps-syn-flood.ps1) | Measures the forged SYN flood on the box's port 443 (#2995) and what it costs the box, over a short window. |
 | [vps/vps-time-wait.ps1](vps/vps-time-wait.ps1) | Runs ON the VPS, sent there by Set-TimeWait.ps1: holds a connection the box closed in TIME_WAIT for 30 seconds instead of Windows' 120, and restarts the box for it when asked and nobody is on either server. |
+| [vps/vps-web-firewall.ps1](vps/vps-web-firewall.ps1) | Runs ON THE VPS, sent there by Set-WebFirewall.ps1: lets TCP 80 and 443 in only from Cloudflare's ranges, so a forged SYN from anywhere else gets no answer (#2995). -Open puts both back to any address. |
 | [vps/Vps.ps1](vps/Vps.ps1) | The one place every script gets the VPS address, user, and ports from. |
 | [vps/Watch-Load.ps1](vps/Watch-Load.ps1) | The website, the game server, the voice service and the bot share one five core box, and nothing kept a number for any of them. |
 | [vps/Watch-Outside.ps1](vps/Watch-Outside.ps1) | Watches, from outside the VPS, the things the project needs that the VPS cannot watch for itself, and tells staff in Discord when one breaks and again when it is fixed. |

@@ -4,17 +4,18 @@
 
   #2479. The spoils block's cut-out list (Dragon Bone and the two Riekling
   spear spell tomes, cut by #1511) was never read: isCutOut had no caller, so
-  a chest and the floor both handed all three out. isSpoil now asks it for a
-  chest; the floor holds none of them since #3077.
+  a chest and the floor both handed all three out. The world now hands
+  nothing out at all, so the list went with the rest of the spoil sorting:
+  no chest holds what the world put there (forbiddenBaseContainer, #3078) and
+  nothing the world placed lies on the floor (Thornswood-Last.esp, #3077).
 
-  Drives the REAL spoils block out of gamemode.js over a fake mp, the way
-  test-spoils.js does, and checks:
-    - each of the three is a spoil, with no record kind that would make it one;
-    - each is taken out of a chest the world filled, beside bread that stays;
-    - a press on one is never refused here: nothing lies on the floor (#3077);
-    - while the load order is still coming in, nothing is refused by mistake,
-      and once it is in, the cut rows are;
-    - isCutOut has a caller in the block, so it cannot sit unread again.
+  Checks, reading the real files and driving the real spoils block over a
+  fake mp the way test-spoils.js does:
+    - the world fills no container, on live and on dev;
+    - Dragon Bone is a MISC and the tomes are BOOKs, and both are types
+      Thornswood-Last.esp switches off on the floor;
+    - the spoils block keeps no cut-out list, which nothing would read;
+    - a press on one is never refused here, placed or dropped.
 
   Read only.
 */
@@ -45,14 +46,16 @@ yes('the spoils block is in the gamemode', block !== null);
 if (!block) { done(); }
 
 const CUTS = ['3ada4:Skyrim.esm', 'bff20:Playable Rieklings.esp', 'bff21:Playable Rieklings.esp'];
-const m = /var CUT_OUTS = (\[[^\]]*\]);/.exec(block);
-let listed = null;
-try { listed = m ? JSON.parse(m[1]) : null; } catch (e) { listed = null; }
-yes('the cut-out list is Dragon Bone and the two Riekling tomes',
-    !!listed && JSON.stringify(listed.slice().sort()) === JSON.stringify(CUTS.slice().sort()));
-
-const calls = block.split('isCutOut(').length - 1;
-yes('isCutOut is called, not only defined (' + (calls - 1) + ' caller(s))', calls >= 2);
+const read = function (rel) { return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8'); };
+['Deploy-Gamemode.ps1', 'Deploy-DevGamemode.ps1'].forEach(function (n) {
+  yes('W1 ' + n + ' has the engine fill no container (forbiddenBaseContainer CONT)',
+      /forbiddenBaseContainer -NotePropertyValue @\('CONT'\)/.test(read(path.join('scripts', 'deploy', n))));
+});
+const types = (/FLOOR_TYPES = \(([^)]*)\)/.exec(read(path.join('scripts', 'mods', 'Build-LastPlugin.py'))) || ['', ''])[1];
+yes('W2 Thornswood-Last.esp switches off every MISC and BOOK on the floor, Dragon Bone\'s and the tomes\' kinds',
+    types.indexOf("b'MISC'") >= 0 && types.indexOf("b'BOOK'") >= 0);
+yes('W3 the spoils block keeps no cut-out list that nothing would read',
+    !/CUT_OUTS|isCutOut/.test(block));
 
 /** The block over a fake mp. ready() says whether a descriptor has an id yet. */
 function rig(ready) {
@@ -94,34 +97,6 @@ function rig(ready) {
   return api;
 }
 
-// ------------------------------------------------------------ what counts
-{
-  const g = rig();
-  // A misc item and two books: no record kind makes any of them a spoil.
-  const ids = [g.kind(CUTS[0], 'MISC'), g.kind(CUTS[1], 'BOOK'), g.kind(CUTS[2], 'BOOK')];
-  const bread = g.kind('bread:Skyrim.esm', 'FOOD');
-  const book = g.kind('book:Skyrim.esm', 'BOOK');
-  yes('C1 Dragon Bone is a spoil', g.isSpoil(ids[0]));
-  yes('C2 the first Riekling tome is a spoil', g.isSpoil(ids[1]));
-  yes('C3 the second Riekling tome is a spoil', g.isSpoil(ids[2]));
-  yes('C4 bread still is not', !g.isSpoil(bread));
-  yes('C5 nor is any other book', !g.isSpoil(book));
-}
-
-// ------------------------------------------------------------ the chest
-{
-  const g = rig();
-  g.kind('chest:Skyrim.esm', 'CONT');
-  const ids = [g.kind(CUTS[0], 'MISC'), g.kind(CUTS[1], 'BOOK'), g.kind(CUTS[2], 'BOOK')];
-  const bread = g.kind('bread:Skyrim.esm', 'FOOD');
-  const chest = 0x00055555;
-  g.put(chest, ids.map(function (id) { return { baseId: id, count: 1 }; }).concat([{ baseId: bread, count: 2 }]));
-  g.activate(1, chest, 'chest:Skyrim.esm');
-  const left = g.inv(chest).map(function (e) { return e.baseId; });
-  yes('K1 a chest the world filled gives up none of the three', ids.every(function (id) { return left.indexOf(id) < 0; }));
-  yes('K2 and keeps its bread', left.length === 1 && left[0] === bread);
-}
-
 // ------------------------------------------------------------ the floor
 // None of the three is refused off the floor any more, because none lies
 // there: Thornswood-Last.esp switches every placed item off (#3077,
@@ -131,19 +106,6 @@ function rig(ready) {
   CUTS.forEach(function (d) { g.kind(d, d.indexOf('3ada4') === 0 ? 'MISC' : 'BOOK'); });
   yes('F1 a press on one is never refused here, placed or dropped',
       g.activate(1, 0x00012345, CUTS[0]) === null && g.activate(1, 0xff000123, CUTS[0]) === null);
-}
-
-// ------------------------------------------------------------ load order
-{
-  let rieklingsIn = false;
-  const g = rig(function (d) { return rieklingsIn || d.indexOf('Rieklings') < 0; });
-  const bone = g.kind(CUTS[0], 'MISC');
-  const bread = g.kind('bread:Skyrim.esm', 'FOOD');
-  yes('L1 before the load order is in, bread is still not a spoil', !g.isSpoil(bread));
-  rieklingsIn = true;
-  const tome = g.kind(CUTS[1], 'BOOK');
-  yes('L2 once it is in, Dragon Bone is', g.isSpoil(bone));
-  yes('L3 and so is the Riekling tome', g.isSpoil(tome));
 }
 
 done();

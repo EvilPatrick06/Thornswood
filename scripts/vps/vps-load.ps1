@@ -51,8 +51,8 @@
   from their own folders (Install-ThornswoodServer.ps1 writes that and
   vps-dev-instance.ps1 copies the same arguments), so the two command lines
   are identical and only the port tells them apart. Caddy is found by name and
-  the bot by the folder in its command line, because neither of those has a
-  port of its own to ask.
+  the bot as the python its ThornswoodBot service started (#3189), because
+  neither of those has a port of its own to ask.
 
   CHEAP, AND NEVER LOUD. One process query, one listener query and a few small
   reads, about a second. Each part is its own try, so a part that fails leaves
@@ -107,7 +107,7 @@ $services = @(
   @{ Name = 'website';  Port = 3001 },
   @{ Name = 'game';     Port = 3000 },
   @{ Name = 'voice';    Port = 7778 },
-  @{ Name = 'bot';      Exe  = 'python.exe'; Match = 'Thornswood-Bot' },
+  @{ Name = 'bot';      Exe  = 'python.exe'; Service = 'ThornswoodBot' },
   @{ Name = 'devgame';  Port = 7788 },
   @{ Name = 'devvoice'; Port = 7789 }
 )
@@ -219,10 +219,17 @@ try {
     $ids = @()
     if ($s.ContainsKey('Port')) {
       if ($listen.ContainsKey($s.Port)) { $ids = @($listen[$s.Port]) }
-    } elseif ($s.ContainsKey('Match')) {
+    } elseif ($s.ContainsKey('Service')) {
+      # The bot is the python its service started, nothing else (#3189). Any
+      # python with Thornswood-Bot in its command line used to count, so a
+      # harness's stand-in bot on a runner turned up as a second bot process
+      # and every one was read as a restart: 48 in ten days, with none.
       try {
-        foreach ($p in @(Get-CimInstance Win32_Process -EA Stop -Filter ("Name='" + $s.Exe + "'") -Property ProcessId, CommandLine)) {
-          if ("$($p.CommandLine)" -like ('*' + $s.Match + '*')) { $ids += [int]$p.ProcessId }
+        $svc = Get-CimInstance Win32_Service -EA Stop -Filter ("Name='" + $s.Service + "'") -Property ProcessId
+        if ($svc -and $svc.ProcessId) {
+          foreach ($p in @(Get-CimInstance Win32_Process -EA Stop -Filter ("Name='" + $s.Exe + "' AND ParentProcessId=" + [int]$svc.ProcessId) -Property ProcessId)) {
+            $ids += [int]$p.ProcessId
+          }
         }
       } catch { Note ('could not look for ' + $s.Name + ': ' + $_.Exception.Message) }
     } else {

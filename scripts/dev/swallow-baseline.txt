@@ -200,7 +200,7 @@ scripts\vps\vps-nightly-backup.ps1 2
 scripts\vps\vps-restore-services.ps1 1
 scripts\vps\Vps.ps1 1
 scripts\vps\Watch-Outside.ps1 4
-scripts\vps\Watch-Services.ps1 9
+scripts\vps\Watch-Services.ps1 7
 scripts\vps\Write-BotToken.ps1 1
 #
 # THE SITE, VOICE AND THE BOT, since #2736 (18 Oct). Check-Swallow.ps1 reads
