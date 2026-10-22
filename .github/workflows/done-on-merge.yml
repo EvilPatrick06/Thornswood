@@ -70,7 +70,10 @@ jobs:
           $shas = @($env:COMMITS | ConvertFrom-Json)
           $prs = @{}
           foreach ($sha in $shas) {
-            foreach ($p in @(Invoke-RestMethod -Method Get -Uri "$api/commits/$sha/pulls" -Headers $h)) {
+            # Through ForEach-Object so the list is one pull request per item:
+            # Invoke-RestMethod hands a JSON array on as one object, and @() alone
+            # kept the whole list as a single item (#2798, #3273).
+            foreach ($p in @(Invoke-RestMethod -Method Get -Uri "$api/commits/$sha/pulls" -Headers $h | ForEach-Object { $_ })) {
               if ((Has $p 'merged_at') -and [string]$p.base.ref -eq 'main') { $prs[[int]$p.number] = $p }
             }
           }

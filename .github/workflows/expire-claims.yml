@@ -55,7 +55,10 @@ jobs:
           function All([string]$u) {
             $out = @(); $page = 1
             do {
-              $got = @(Invoke-RestMethod -Method Get -Uri ($u + '&page=' + $page) -Headers $h)
+              # Through ForEach-Object so a page is one item per entry: Invoke-RestMethod
+              # hands a JSON array on as one object, and @() alone kept the whole page
+              # as a single item (#2798).
+              $got = @(Invoke-RestMethod -Method Get -Uri ($u + '&page=' + $page) -Headers $h | ForEach-Object { $_ })
               $out += $got; $page++
             } while ($got.Count -eq 100)
             return $out

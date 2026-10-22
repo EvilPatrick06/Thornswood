@@ -74,7 +74,10 @@ jobs:
           if ($env:EVENT -eq 'workflow_dispatch') {
             $page = 1
             do {
-              $got = @(Invoke-RestMethod -Method Get -Uri ("$api/issues?state=open&per_page=100&page=" + $page) -Headers $h)
+              # Through ForEach-Object so a page is one issue per item: Invoke-RestMethod
+              # hands a JSON array on as one object, and @() alone kept the whole page
+              # as a single item (#2798).
+              $got = @(Invoke-RestMethod -Method Get -Uri ("$api/issues?state=open&per_page=100&page=" + $page) -Headers $h | ForEach-Object { $_ })
               $todo += @($got | Where-Object { -not (Has $_ 'pull_request') -and @($_.labels | Where-Object { $_.name -like 'area:*' }).Count -eq 0 } | ForEach-Object { [pscustomobject]@{ n = [int]$_.number; t = [string]$_.title } })
               $page++
             } while ($got.Count -eq 100)
