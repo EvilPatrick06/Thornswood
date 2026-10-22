@@ -80,7 +80,7 @@ ATTACH_FILES = 1 << 15
 RESTRICTED = ('read', 'open', 'membersread', 'testersread', 'hold', 'holdread',
               'holdcourt', 'holdguard', 'staff', 'staffread', 'council',
               'pathfind', 'space', 'spaceread', 'spacerules', 'faction',
-              'factionread', 'factioncourt', 'factionseats')
+              'factionread', 'factionlead', 'factionseats')
 # The hold a hold mode is asked about, where one is needed, and the staff
 # space a space mode is asked about (#3317).
 HOLD = 'Whiterun'

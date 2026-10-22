@@ -2,12 +2,12 @@
 
 - **Issue / PR:** #3317, the pull request this note came in with.
 - **Where:** the live Discord (Setup-Discord -OnBox), then the bot on the box (Install-Bot -CodeOnly). No Ship, no game, no site.
-- **Needs first:** Patrick's answer on page card q-3317-faction-category. A is what this note builds; if he picks another, the #3317 thread changes the plan first and rewrites this note, so no faction channel or role is made twice. Step 6 (-Prune) also waits on his yes on the page, after step 5 says what it would delete.
+- **Needs first:** nothing for steps 1 to 5: Patrick answered page card q-3317-faction-category with C on 22 Oct, and the pull request that carried this version of the note built it. Step 6 (-Prune) waits on his yes on the page, after step 5 says what it would delete.
 - **Staff notice:** yes, after step 4, because where staff answer tickets changes (step 4 has the line).
 
 What it does, all from the plan in `bot/Build-Discord.py` (docs/systems/discord.md is the plan in words):
 
-- **A category per faction** (Patrick, 22 Oct; page card q-3317-faction-category, A, built while it waits): each of the 16 factions gets a category named after it with `#<faction>-announcements`, its chat (moved from Factions by name), `#<faction>-court`, `#<faction>-seats` and its voice room (moved from Factions). 32 new roles: `<short> Court` and `Steward of <short>` per faction. The Leader's panel goes in each `#<faction>-seats`, with Add and Remove for members, Court and Steward. The shared #seats and the Factions category are retired.
+- **A category per faction** (Patrick, 22 Oct; page card q-3317-faction-category, C): each of the 16 factions gets a category named after it with `#<faction>-announcements`, its chat (moved from Factions by name), `#<faction>-leadership`, `#<faction>-seats` and its voice room (moved from Factions). 16 new roles: `<short> Officer` per faction. The Leader's panel goes in each `#<faction>-seats`, with Add and Remove for members and Officers. The shared #seats and the Factions category are retired.
 - **The ticket split** (page card q-3317-ticket-split, A): a Tickets category under Start Here with #get-help and #report-someone, and #apply-to-playtest, #apply-for-a-seat and #apply-for-staff in Applications, each with its own panel. #tickets-and-applications and the old #tickets are retired. #ticket-log stays.
 - **The Voice category goes** (q-3317-discord-order, A): General, AFK and the jukebox to Out of Character, Help Voice becomes Support in the Support category, Support Voice becomes Support Staff, and each hold gets a `<Hold> Court` voice.
 - **The sidebar order** is set every run, and **the role order** in one request, Patreon and Server Booster included, which fixes the seven role-order differences the audit listed.
@@ -20,7 +20,7 @@ What it does, all from the plan in `bot/Build-Discord.py` (docs/systems/discord.
 
        pwsh scripts/deploy/Setup-Discord.ps1 -OnBox -Check
 
-   It should list the 16 faction categories and their channels as would make, each faction's chat and voice as would move from Factions, the Tickets category, the three apply channels, the 32 Court and Steward roles as would make, and "would move" for the role and channel order. It should print no failed line. If it does, stop and put the output on #3317.
+   It should list the 16 faction categories and their channels as would make, each faction's chat and voice as would move from Factions, the Tickets category, the three apply channels, the 16 Officer roles as would make, and "would move" for the role and channel order. It should print no failed line. If it does, stop and put the output on #3317.
 
 2. **Build it, with the read-only posts.**
 
@@ -36,7 +36,7 @@ What it does, all from the plan in `bot/Build-Discord.py` (docs/systems/discord.
 
 4. **Tell staff where tickets are now.**
 
-       pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Tickets have moved. Help tickets open from #get-help and reports from #report-someone, in the new Tickets category under Start Here. Applications open from #apply-to-playtest, #apply-for-a-seat and #apply-for-staff. Closed tickets still go to #ticket-log. Each faction now has its own category, and its Leader gives members, Court and Steward from the faction's seats channel. Open tickets in the old channel stay where they are until they are closed. <the pull request's link>"
+       pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Tickets have moved. Help tickets open from #get-help and reports from #report-someone, in the new Tickets category under Start Here. Applications open from #apply-to-playtest, #apply-for-a-seat and #apply-for-staff. Closed tickets still go to #ticket-log. Each faction now has its own category, and its Leader adds members and Officers from the faction's seats channel. Open tickets in the old channel stay where they are until they are closed. <the pull request's link>"
 
    It prints the notice's id. `pwsh scripts/ops/Say-Staff.ps1 -Check <id>` should exit 0.
 
@@ -55,8 +55,9 @@ What it does, all from the plan in `bot/Build-Discord.py` (docs/systems/discord.
 
 ## Check afterwards
 
-- As somebody with only a faction's member role: the faction's category shows announcements (read only), its chat and its voice, and not its court or seats channel. Another faction's category does not show.
-- As that faction's Leader: the seats channel shows the panel with six buttons, and Add to Court refuses somebody who is not a member.
+- As somebody with only a faction's member role: the faction's category shows announcements (read only), its chat and its voice, and not its leadership or seats channel. Another faction's category does not show.
+- As that faction's Leader: the seats channel shows the panel with four buttons, and Add Officer refuses somebody who is not a member.
+- As an Officer: the faction's leadership channel shows, and they can post in its announcements.
 - As somebody who just joined: Start Here, Tickets and Applications show, and each ticket channel has only its own kinds of ticket.
 
 ## Risks
