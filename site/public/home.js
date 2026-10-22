@@ -37,7 +37,8 @@ if (bannerVideo && bannerMotion) {
 }
 
 var burger = document.getElementById('burger'), nav = document.getElementById('nav');
-function narrow(){ return window.matchMedia('(max-width:900px)').matches; }
+// The same width home.css folds the menu at (#3293).
+function narrow(){ return window.matchMedia('(max-width:1080px)').matches; }
 function shut(){ if (narrow()) { nav.hidden = true; burger.setAttribute('aria-expanded','false'); burger.setAttribute('aria-label','Open menu'); } else { nav.hidden = false; } }
 shut();
 window.addEventListener('resize', shut);
