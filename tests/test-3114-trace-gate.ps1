@@ -83,7 +83,8 @@ namespace TraceStub {
   public class EventRecord : IDisposable { public int Id { get { return 0; } } public byte? Version { get { return 0; } } public DateTime? TimeCreated { get { return null; } } public Guid? ProviderId { get { return null; } } public int? ProcessId { get { return null; } } public IList<EventProperty> Properties { get { return null; } } public void Dispose() {} }
   public class EventLogReader : IDisposable { public EventLogReader(EventLogQuery q) {} public EventRecord ReadEvent() { return null; } public void Dispose() {} }
   public class EventKeyword { public string Name { get { return null; } } public long Value { get { return 0; } } }
-  public class EventMetadata { public long Id { get { return 0; } } public byte Version { get { return 0; } } public string Template { get { return null; } } }
+  public class EventTaskInfo { public string Name { get { return null; } } }
+  public class EventMetadata { public long Id { get { return 0; } } public byte Version { get { return 0; } } public string Template { get { return null; } } public EventTaskInfo Task { get { return null; } } public IEnumerable<EventKeyword> Keywords { get { return null; } } }
   public class ProviderMetadata { public ProviderMetadata(string n) {} public Guid Id { get { return Guid.Empty; } } public IList<EventKeyword> Keywords { get { return null; } } public IEnumerable<EventMetadata> Events { get { return null; } } }
 }
 '@
@@ -95,7 +96,7 @@ if ($cs) {
 Yes ('  its C# compiles as C# 5' + $(if ($compiled) { ': ' + $compiled.Substring(0, [Math]::Min(300, $compiled.Length)) } else { '' })) (-not $compiled)
 Yes '  the trace folder is closed to all but administrators and the system' ($x -match [regex]::Escape("icacls.exe `$traceRoot /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'"))
 Yes '  a trace that lost events is refused' ($x -match "(?s)'stop' \{\s*Stop-TraceSession \`$sessionName\s*if \(\`$script:lost\) \{ 'REFUSED: '.*?exit 1 \}")
-Yes '  the trace is deleted once read, and only paths in the checkout leave' ($x -match "(?s)'END'\s*Remove-Item -LiteralPath \`$etl, \(\`$etl \+ '\.procs'\) -Force" -and $x -match 'if \(!inside\) continue;')
+Yes '  the trace is deleted once read, and only paths in the checkout leave' ($x -match "(?s)'END'\s*Remove-Item -LiteralPath \`$etl, \(\`$etl \+ '\.procs'\) -Force" -and $x -match 'if \(!inside\) \{ if \(objO != null\) objects\.Remove\(Address\(objO\)\); continue; \}')
 Yes '  every mode Trace-Gate.ps1 asks for is there' (@('selftest', 'start', 'stop', 'read', 'clean' | Where-Object { $x -notmatch ("(?m)^    '" + $_ + "' \{") }).Count -eq 0)
 
 # ---- 4. the push, for real -------------------------------------------------------
@@ -138,7 +139,7 @@ if ($fn) {
             if ($died) { $same = $false; break }
             $tmp = Join-Path $scratch ('want-' + $k)
             [IO.File]::WriteAllBytes($tmp, $want[$k])
-            if (((GitOk --git-dir $bare rev-parse ('claude/3114-trace-7:' + $k)) -join '') -ne ((GitOk hash-object $tmp) -join '')) { $same = $false }
+            if (((GitOk --git-dir $bare rev-parse ('claude/3114-trace-7:' + $k)) -join '') -ne ((GitOk --git-dir $bare hash-object $tmp) -join '')) { $same = $false }
         }
         Yes '  with the four files byte for byte, and only those' ($same -and @(GitOk --git-dir $bare ls-tree --name-only claude/3114-trace-7).Count -eq 4)
         Yes '  and the checkout it ran in has its own HEAD, index and files as they were' (((GitOk -C $RepoRoot rev-parse HEAD) -join '') -eq $headBefore -and (Get-FileHash -LiteralPath (Join-Path $RepoRoot '.git/index')).Hash -eq $indexBefore -and ((GitOk -C $RepoRoot status --porcelain) -join '') -eq '' -and -not (Test-Path Env:\GIT_INDEX_FILE))
