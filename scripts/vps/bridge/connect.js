@@ -137,9 +137,13 @@ async function open() {
     });
   }
   const key = crypto.randomBytes(16).toString('base64');
+  // A User-Agent of its own: Cloudflare carries this to the box since #2995,
+  // and its browser check challenges a request that names no client, which
+  // an upgrade cannot answer.
   const lines = [
     'GET ' + (where.pathname || '/') + ' HTTP/1.1',
     'Host: ' + where.host,
+    'User-Agent: Thornswood-Bridge',
     'Upgrade: websocket',
     'Connection: Upgrade',
     'Sec-WebSocket-Key: ' + key,

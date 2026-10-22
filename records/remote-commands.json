@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  65,
-    "callCount":  267,
+    "scriptCount":  66,
+    "callCount":  268,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2093,6 +2093,15 @@
                       "does":  "runs vps-time-wait.ps1, sent on standard input (#3035), which sets TcpTimedWaitDelay and, with -Restart, restarts the box",
                       "class":  "admin",
                       "reason":  "sets a TCP/IP registry value and restarts the box (#2946)"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-WebFirewall.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs vps-web-firewall.ps1, sent on standard input (#3035), which reads or sets the remote addresses of the Thornswood Web 80 and 443 rules",
+                      "class":  "admin",
+                      "reason":  "firewall change for ports 80 and 443 (#2995)"
                   },
                   {
                       "script":  "scripts/vps/Setup-CloudSsh.ps1",

@@ -46,6 +46,18 @@ Caddy holds 443. The site itself answers on loopback 3001 and nobody outside
 can reach it directly, so **node being up tells you nothing** about whether
 anybody can see the site.
 
+Cloudflare's proxy stands in front of Caddy (#2995), and the box takes 80 and
+443 only from Cloudflare's ranges. A Cloudflare error page says which side is
+wrong: 521 and 522 are Cloudflare not reaching the box (Caddy down, or the
+firewall not taking Cloudflare: `.\scripts\vps\Set-WebFirewall.ps1 -Check`),
+525 and 526 are Caddy's certificate (Watch-Services' cert check says when it
+runs short). The ssh bridge comes in through Cloudflare too, so while
+Cloudflare itself is down the way in is the VNC console in the BisectHosting
+panel. The way back from Cloudflare altogether is in this order:
+`.\scripts\vps\Set-WebFirewall.ps1 -Open` while ssh still works (or, from
+the console, `Set-NetFirewallRule -DisplayName 'Thornswood Web 80','Thornswood Web 443' -RemoteAddress Any`),
+then the two records set to DNS only in Cloudflare.
+
 ```powershell
 ssh Administrator@192.135.112.23 'tasklist /fi "imagename eq caddy.exe"'
 ```
@@ -70,8 +82,10 @@ that trigger is gone and `scripts\deploy\Setup-Domain.ps1 -TaskOnly` puts it bac
 
 About a hundred half-open connections on 443, most inbound connects failing
 and a retransmit share near 20% are not the site going down. They are a
-forged SYN flood that uses the box as a reflector (#2995), and it costs the
-box next to nothing. This measures it and says FLOOD or QUIET:
+forged SYN flood that used the box as a reflector (#2995). With 443 taking
+only Cloudflare the box answers none of it, so FLOOD here means the scope is
+off: `.\scripts\vps\Set-WebFirewall.ps1 -Check` says how the rules stand.
+This measures it and says FLOOD or QUIET:
 
 ```powershell
 .\scripts\vps\Remote.ps1 -File .\scripts\vps\vps-syn-flood.ps1
