@@ -13,7 +13,10 @@
   data named for the commit. A machine that records {"ci": true} as its
   engine build (Setup-ShipMachine.ps1 -EngineBuild ci) reads ClientDist and
   ServerDist there, so a pin move needs a fetch here and no engine build.
-  EngineArtifact.ps1 says which artifact is taken and what is held.
+  EngineArtifact.ps1 says which artifact is taken and what is held: when
+  engine.yml keeps more than one for the pin, each is fetched and held in
+  turn, newest first, and the first whose records are the checkout's is
+  taken.
 
   Sync-Client.ps1 runs this when it needs the client from that folder and the
   folder is not there yet, so a Ship and Go do not need it run by hand.
@@ -95,13 +98,30 @@ if ($Check) {
   exit 2
 }
 
+# Every green run of the pin keeps its own artifact, and only the one that
+# made this checkout's records holds the same record text (EngineArtifact.ps1,
+# WHICH ARTIFACT). So each is held in turn, newest first, and the first that
+# passes is taken; the ones passed over are named with why.
 $scratch = [string](& (Join-Path $PSScriptRoot 'Get-ScratchDir.ps1') ('Thornswood-engine-artifact-' + [Guid]::NewGuid().ToString('N')))
 try {
   $null = New-Item -ItemType Directory -Force -Path $scratch
-  $dl = Join-Path $scratch $name
-  try { $null = Invoke-Gh @('run', 'download', [string]$f.Run.id, '--name', $name, '--dir', $dl, '--repo', $EngineArtifactRepo) }
-  catch { Stop-Here ("$name could not be fetched: " + $_.Exception.Message) }
-  try { $stamp = Install-EngineArtifact -From $dl -Repo $RepoDir -Into $into -Run $f.Run -Artifact $f.Artifact }
+  $taken = $null; $passedOver = @(); $n = 0
+  foreach ($c in @($f.Candidates)) {
+    $n++
+    $dl = Join-Path $scratch ([string]$n)
+    try { $null = Invoke-Gh @('run', 'download', [string]$c.Run.id, '--name', $name, '--dir', $dl, '--repo', $EngineArtifactRepo) }
+    catch { Stop-Here ("$name of run $($c.Run.id) could not be fetched: " + $_.Exception.Message) }
+    $why = @(Get-EngineArtifactProblems $dl $RepoDir)
+    if (-not $why.Count) { $taken = $c; break }
+    $passedOver += ("run {0}: {1}" -f $c.Run.id, ($why -join '; '))
+    Say ("  run {0}'s {1} is not CI's build of what this checkout records ({2}), so it is passed over" -f $c.Run.id, $name, ($why -join '; ')) 'Yellow'
+    Remove-Item -LiteralPath $dl -Recurse -Force
+  }
+  if (-not $taken) {
+    Stop-Here ("no $name engine.yml keeps is CI's build of what this checkout records, and nothing was put in place. " + ($passedOver -join ' | ') + ". The run that made the checkout's records keeps it no longer (#3243 says why a new run does not match them).")
+  }
+  if ($n -gt 1) { Say ("  run {0}'s {1} is this checkout's" -f $taken.Run.id, $name) 'Gray' }
+  try { $stamp = Install-EngineArtifact -From $dl -Repo $RepoDir -Into $into -Run $taken.Run -Artifact $taken.Artifact }
   catch { Stop-Here $_.Exception.Message }
 } finally {
   if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue }

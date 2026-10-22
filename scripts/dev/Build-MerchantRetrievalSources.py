@@ -14,6 +14,7 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).parent))
+import own_plugins
 spec = importlib.util.spec_from_file_location('retrieval_population', ROOT / 'scripts/dev/Build-NpcPopulation.py')
 P = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(P)
@@ -32,6 +33,10 @@ TERMS = [
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
+
+def pinned_order(order):
+    # Own plugins by name only, the same digest as MerchantLoadOrderPin.js (#613).
+    return [{'name': row['name'], 'sha256': '' if own_plugins.is_own(row['name']) else row['sha256']} for row in order]
 
 def verify_plugin_sha(name, actual, pinned):
     # Only the authored Content prerequisite has intentionally newer bytes.
@@ -128,7 +133,7 @@ def build(data):
             'role': role, 'hold': hold, 'destinationHold': destination['bookHold'],
             'gold': gold, 'hours': hours, 'provenance': proof})
     content = (ROOT / 'game/content/Thornswood-Content.esp').read_bytes()
-    return {'version': 1, 'loadOrderSha256': digest(population['loadOrder']),
+    return {'version': 1, 'loadOrderSha256': digest(pinned_order(population['loadOrder'])),
         'contentSha256': hashlib.sha256(content).hexdigest(), 'sources': rows}, fixtures
 
 def main():

@@ -21,12 +21,10 @@
 //     to churn() and leaves a door, a living cow and the mammoth cheese bowl
 //     exactly as they were: undefined, which lets the engine go ahead. A
 //     non-null answer there would block that press for everybody.
-//   - every churn press onActivate answers puts the churn back on the client,
-//     a Butter as much as a refusal, the same line the plants have. The client
-//     empties a FLOR on its own before the server hears of it, and the server
-//     never empties it because onActivate answers false (see PUTBACK_PROPERTY
-//     and the comment on the churn branch). Nothing else is put back: not a
-//     door, not a living cow, not the cheese.
+//   - nothing is put back for any press (#3080). The fork's client blocks
+//     activation on a FLOR now, so a press never empties the churn on the
+//     presser's machine and there is nothing to undo; the churn is never
+//     shown spent either (showsPick, test-3080-flora-blocked.js).
 //   - the churn and the cheese are in none of the generated tables, so the
 //     branch order cannot hand either one to another class.
 //   - the note over CHURNS says what holds milk the way the entry does: a goat
@@ -296,8 +294,8 @@ function world(opts) {
     const said = w.rec.told[w.rec.told.length - 1];
     yes('with HearthFires missing from the load order the farmer is told so, not given a wait',
         r === false && /nothing in this load order/.test(said || '') && /dev channel/.test(said || ''));
-    yes('that press is put back and nothing is counted',
-        w.rec.putBack.length === 1 && w.rec.putBack[0].refrId === 0x9003 && w.rec.credited.length === 0);
+    yes('nothing is put back and nothing is counted',
+        w.rec.putBack.length === 0 && w.rec.credited.length === 0);
     on(0x9003, FARMER);
     yes('and no wait was started by it',
         /nothing in this load order/.test(w.rec.told[w.rec.told.length - 1] || ''));
@@ -330,24 +328,22 @@ function world(opts) {
     yes('and it was churn() that answered, not the plants and not loot()',
         w.rec.branch.length === 0 && w.rec.given.length === 1 && w.rec.given[0].desc === BUTTER);
     yes('and the farmer is told what they got', w.rec.told.indexOf('You churn 1 Butter.') !== -1);
-    yes('and the churn they were given Butter from is put back once, because only their machine emptied it',
-        w.rec.putBack.length === 1 &&
-        w.rec.putBack[0].actorId === FARMER && w.rec.putBack[0].refrId === CHURN_REF);
+    yes('and the churn is not put back: the press never emptied it (#3080)',
+        w.rec.putBack.length === 0);
 
     const told0 = w.rec.told.length;
     const r2 = on(CHURN_REF, GATHERER);
     yes('a gatherer pressing the churn is refused and the engine does not hand it over either',
         r2 === false && w.rec.given.length === 1);
     yes('they are told the farm verb\'s sentence', w.rec.told[told0] === FARM_NO);
-    yes('and their press is put back once', w.rec.putBack.length === 2 &&
-        w.rec.putBack[1].actorId === GATHERER && w.rec.putBack[1].refrId === CHURN_REF);
+    yes('and nothing is put back for their press', w.rec.putBack.length === 0);
 
     w.clock.now += 60000;
     const r3 = on(CHURN_REF, FARMER);
-    yes('the farmer pressing again inside the wait is told so, given nothing, and put back',
+    yes('the farmer pressing again inside the wait is told so and given nothing',
         r3 === false && w.rec.given.length === 1 &&
         /^You have worked this churn for now\. /.test(w.rec.told[w.rec.told.length - 1] || '') &&
-        w.rec.putBack.length === 3 && w.rec.putBack[2].actorId === FARMER);
+        w.rec.putBack.length === 0);
 
     // Everybody else's presses, with the churn branch in the chain.
     const gates0 = w.rec.gates.length, put0 = w.rec.putBack.length, told1 = w.rec.told.length;
@@ -370,8 +366,7 @@ function world(opts) {
     const put1 = w.rec.putBack.length;
     yes('a flower still goes to harvest()', on(FLOWER, GATHERER) === false &&
         w.rec.branch[w.rec.branch.length - 1] === 'harvest');
-    yes('and a non-hand-over answer (stub harvest toast) is still put back',
-        w.rec.putBack.length === put1 + 1 && w.rec.putBack[put1].refrId === FLOWER);
+    yes('and a refused flower is not put back either', w.rec.putBack.length === put1);
     yes('a press with nobody behind it is dropped before anything is asked',
         on(CHURN_REF, 0) === undefined);
   }

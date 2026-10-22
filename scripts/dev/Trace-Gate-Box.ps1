@@ -26,13 +26,29 @@
 
   WHAT IS SEEN. Microsoft-Windows-Kernel-File's create events: every open of
   a file or folder, whether it is there or not, which on Windows is also how
-  a file's attributes are read and a folder is listed. And
+  a file's attributes are read. Its directory enumerations (DirEnum), each
+  with the folder's open and the pattern asked for: a folder is listed only
+  when it is enumerated with a wildcard or none, and one name asked for
+  (cmd's if exist, FindFirstFile on a plain name) is a look at that name.
+  Every process opens folders it never lists (its own, a script's), so
+  without these a change beside any file a harness ran reran it (the second
+  gate trace, run 39740245070: every harness opened tests and the checkout's
+  top). Only those event ids are kept (an event id filter), since the
+  keyword that carries DirEnum carries far more. And
   Microsoft-Windows-Kernel-Process's starts and stops, so each open is put on
   the process that made it, and each process on the harness whose process
   started it, however deep: the harness's own process is the one with the id
   and start time the start log gives. Only paths inside the run's checkout
   are kept. The trace itself, which sees the whole box, never leaves C:\Thornswood-Trace,
   a folder only administrators can read, and is deleted once read.
+
+  A process that was already running when the session started has no start
+  event in it, so the session's start also writes down every process then
+  running, its id and its name, beside the trace (gate.etl.procs). Without
+  that, such a process came out as a bare id and could not be matched to
+  the readers below, so its opens counted as strays (the first gate trace,
+  run 39731778532 on 22 Oct: 136 opens of scripts the harnesses ran, all by
+  one such id).
 
   WHAT MAKES A HARNESS ALWAYS RUN. A process that is no harness's (not
   Defender's or the indexer's, which read files without acting on them)
@@ -107,9 +123,11 @@ public static class ThornswoodTrace {
         return all;
     }
 
-    // Starts a session writing to etl, with each provider at its keywords.
-    // Returns 0, or the Windows error.
-    public static int Start(string name, string etl, Guid[] providers, ulong[] keywords) {
+    // Starts a session writing to etl, with each provider at its keywords
+    // and, where ids[i] is not null, only the events with those ids (an
+    // EVENT_FILTER_TYPE_EVENT_ID filter, so a keyword that also carries
+    // events nobody reads costs nothing). Returns 0, or the Windows error.
+    public static int Start(string name, string etl, Guid[] providers, ulong[] keywords, int[][] ids) {
         IntPtr p = Props(etl);
         try {
             ulong h;
@@ -117,11 +135,60 @@ public static class ThornswoodTrace {
             if (e != 0) return e;
             for (int i = 0; i < providers.Length; i++) {
                 Guid g = providers[i];
-                e = EnableTraceEx2(h, ref g, 1, 5, keywords[i], 0, 0, IntPtr.Zero);
+                IntPtr param = IntPtr.Zero, filter = IntPtr.Zero, desc = IntPtr.Zero;
+                try {
+                    if (ids[i] != null) {
+                        // EVENT_FILTER_EVENT_ID: FilterIn, Reserved, Count, then the ids.
+                        int size = 4 + 2 * ids[i].Length;
+                        filter = Marshal.AllocHGlobal(size);
+                        Marshal.WriteByte(filter, 0, 1);
+                        Marshal.WriteByte(filter, 1, 0);
+                        Marshal.WriteInt16(filter, 2, (short)ids[i].Length);
+                        for (int j = 0; j < ids[i].Length; j++) Marshal.WriteInt16(filter, 4 + 2 * j, (short)ids[i][j]);
+                        // EVENT_FILTER_DESCRIPTOR: Ptr, Size, Type.
+                        desc = Marshal.AllocHGlobal(16);
+                        Marshal.WriteInt64(desc, 0, filter.ToInt64());
+                        Marshal.WriteInt32(desc, 8, size);
+                        Marshal.WriteInt32(desc, 12, unchecked((int)0x80000200));
+                        // ENABLE_TRACE_PARAMETERS, version 2: the filter at 32, its count at 40.
+                        param = Marshal.AllocHGlobal(48);
+                        for (int j = 0; j < 48; j++) Marshal.WriteByte(param, j, 0);
+                        Marshal.WriteInt32(param, 0, 2);
+                        Marshal.WriteInt64(param, 32, desc.ToInt64());
+                        Marshal.WriteInt32(param, 40, 1);
+                    }
+                    e = EnableTraceEx2(h, ref g, 1, 5, keywords[i], 0, 0, param);
+                } finally {
+                    if (param != IntPtr.Zero) Marshal.FreeHGlobal(param);
+                    if (desc != IntPtr.Zero) Marshal.FreeHGlobal(desc);
+                    if (filter != IntPtr.Zero) Marshal.FreeHGlobal(filter);
+                }
                 if (e != 0) { Stop(name); return e; }
             }
             return 0;
         } finally { Marshal.FreeHGlobal(p); }
+    }
+
+    // The ids of a provider's events whose task is named by the pattern, or
+    // that carry one of the keywords, and the keywords those events carry.
+    public static int[] EventIds(string provider, string task, ulong keywords, out ulong carried) {
+        SortedSet<int> o = new SortedSet<int>();
+        carried = 0;
+        // PowerShell hands a $null string over as "", which as a pattern would
+        // match every task.
+        Regex re = string.IsNullOrEmpty(task) ? null : new Regex(task);
+        foreach (EventMetadata m in new ProviderMetadata(provider).Events) {
+            ulong k = 0;
+            if (m.Keywords != null) foreach (EventKeyword w in m.Keywords) k |= (ulong)w.Value;
+            bool byTask = re != null && m.Task != null && m.Task.Name != null && re.IsMatch(m.Task.Name);
+            if (byTask || (k & keywords) != 0) { o.Add((int)m.Id); if (byTask) carried |= k; }
+        }
+        int[] a = new int[o.Count]; o.CopyTo(a); return a;
+    }
+    public static string TaskNames(string provider) {
+        SortedSet<string> o = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (EventMetadata m in new ProviderMetadata(provider).Events) o.Add(m.Id + " " + (m.Task != null ? m.Task.Name : "?"));
+        return string.Join(", ", new List<string>(o).ToArray());
     }
 
     // Stops a session: { Windows error, events lost, buffers written,
@@ -175,6 +242,13 @@ public static class ThornswoodTrace {
         foreach (KeyValuePair<string, string[]> kv in Fields(provider)) if (kv.Key.StartsWith(id + "/")) o.Add("v" + kv.Key.Substring(kv.Key.IndexOf('/') + 1) + " " + string.Join(" ", kv.Value));
         return string.Join("; ", o.ToArray());
     }
+    // A pointer field, as the reader hands it over.
+    static ulong Address(object o) {
+        if (o is IntPtr) return unchecked((ulong)((IntPtr)o).ToInt64());
+        string x = o as string;
+        if (x != null) return x.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? Convert.ToUInt64(x.Substring(2), 16) : Convert.ToUInt64(x);
+        return Convert.ToUInt64(o);
+    }
     static object Field(EventRecord r, Dictionary<string, string[]> fields, string name) {
         string[] names;
         if (!fields.TryGetValue(r.Id + "/" + r.Version, out names)) return null;
@@ -206,7 +280,15 @@ public static class ThornswoodTrace {
     // Reads an ETL against the harnesses' roots. workspace is the checkout;
     // strays gets one line for each process outside the harnesses that
     // opened something in it while a harness ran.
-    public static Dictionary<string, Harness> Read(string etl, string workspace, List<Harness> roots, List<string> strays, List<string> notes) {
+    // running: the processes running as the session started, id to name,
+    // since those have no start event in it.
+    // enumIds: the ids of the provider's directory enumeration events
+    // (DirEnum), whose FileName is the pattern asked for and whose FileObject
+    // names the folder's open. A folder enumerated with a wildcard, or with
+    // no pattern, is listed ("list"); one asked for a single name is a look
+    // at that name ("read"); a folder only opened is neither listed nor
+    // looked into, and stays "read".
+    public static Dictionary<string, Harness> Read(string etl, string workspace, List<Harness> roots, Dictionary<int, string> running, int[] enumIds, List<string> strays, List<string> notes) {
         Dictionary<string, string> devices = Devices();
         Dictionary<string, string[]> fileFields = Fields("Microsoft-Windows-Kernel-File");
         Dictionary<string, string[]> procFields = Fields("Microsoft-Windows-Kernel-Process");
@@ -226,13 +308,24 @@ public static class ThornswoodTrace {
             if (h.End > last || last == DateTime.MinValue) last = h.End;
         }
         Dictionary<int, List<Inst>> insts = new Dictionary<int, List<Inst>>();
+        foreach (KeyValuePair<int, string> kv in running) {
+            Inst n = new Inst();
+            n.Pid = kv.Key; n.Start = DateTime.MinValue; n.Image = kv.Value;
+            insts[kv.Key] = new List<Inst> { n };
+        }
         Func<int, DateTime, Inst> at = (pid, t) => {
             List<Inst> l;
             if (!insts.TryGetValue(pid, out l)) return null;
             for (int i = l.Count - 1; i >= 0; i--) if (l[i].Start <= t) return l[i].End >= t.AddSeconds(-1) ? l[i] : null;
             return null;
         };
-        long events = 0, opens = 0, kept = 0;
+        // The newest open of each file object inside the checkout, by address;
+        // an address opened outside it is taken out, since it may be reused.
+        Dictionary<ulong, string> objects = new Dictionary<ulong, string>();
+        // The newest process started from each image, by its full path, for
+        // csrss's look at <image>.Config or .Manifest as that image starts.
+        Dictionary<string, Inst> started = new Dictionary<string, Inst>(StringComparer.OrdinalIgnoreCase);
+        long events = 0, opens = 0, kept = 0, enums = 0, listed = 0;
         using (EventLogReader reader = new EventLogReader(new EventLogQuery(etl, PathType.FilePath))) {
             EventRecord r;
             while ((r = reader.ReadEvent()) != null) {
@@ -256,6 +349,8 @@ public static class ThornswoodTrace {
                             }
                             if (n.Harness == null && n.Parent != null) n.Harness = n.Parent.Harness;
                             if (n.Harness != null) byName[n.Harness].Images.Add(Leaf(n.Image));
+                            string ip = DosPath(n.Image, devices);
+                            if (ip != null) started[ip] = n;
                             List<Inst> l;
                             if (!insts.TryGetValue(pid, out l)) { l = new List<Inst>(); insts[pid] = l; }
                             l.Add(n);
@@ -267,23 +362,48 @@ public static class ThornswoodTrace {
                     }
                     if (r.ProviderId.Value != fileId) continue;
                     object nameO = Field(r, fileFields, "FileName");
+                    object objO = Field(r, fileFields, "FileObject");
+                    int ppid = r.ProcessId.HasValue ? r.ProcessId.Value : -1;
+                    Inst who = at(ppid, t);
+                    if (Array.IndexOf(enumIds, r.Id) >= 0) {
+                        enums++;
+                        string folder;
+                        if (objO == null || !objects.TryGetValue(Address(objO), out folder)) continue;
+                        string pat = nameO == null ? "" : Convert.ToString(nameO);
+                        bool wild = pat.Length == 0 || pat.IndexOfAny(new char[] { '*', '?', '<', '>', '"' }) >= 0;
+                        string what = wild ? folder : (folder == "." ? "" : folder + "/") + pat;
+                        if (who != null && who.Harness != null) {
+                            Harness h = byName[who.Harness];
+                            if (wild) { h.Paths[what] = "list"; listed++; }
+                            else if (!h.Paths.ContainsKey(what)) h.Paths[what] = "read";
+                            continue;
+                        }
+                        Stray(who, ppid, t, first, last, what, wild ? "listed" : "looked for", roots, strays);
+                        continue;
+                    }
                     if (nameO == null) continue;
                     opens++;
                     string p = DosPath(Convert.ToString(nameO), devices);
-                    if (p == null) continue;
+                    if (p == null) { if (objO != null) objects.Remove(Address(objO)); continue; }
                     string low = p.ToLowerInvariant();
                     bool inside = low == wsLow.TrimEnd('\\') || low.StartsWith(wsLow);
                     if (!inside && low.IndexOf('~') >= 0) {
                         sb.Length = 0;
                         if (GetLongPathNameW(p, sb, 1024) > 0) { string lp = sb.ToString(); string ll = lp.ToLowerInvariant(); if (ll.StartsWith(wsLow)) { p = lp; low = ll; inside = true; } }
                     }
-                    if (!inside) continue;
+                    if (!inside) { if (objO != null) objects.Remove(Address(objO)); continue; }
                     // A folder opened for a lookup by pattern comes with its
                     // separator: sub\ is the folder sub.
                     string rel = low.Length <= wsLow.Length ? "." : p.Substring(wsLow.Length).Replace('\\', '/').TrimEnd('/');
                     if (rel.Length == 0) rel = ".";
-                    int ppid = r.ProcessId.HasValue ? r.ProcessId.Value : -1;
-                    Inst who = at(ppid, t);
+                    if (objO != null) objects[Address(objO)] = rel;
+                    // csrss looks at <image>.Config and .Manifest for a process
+                    // as it starts: that look is the starting process's own.
+                    if (who != null && who.Harness == null && Leaf(who.Image) == "csrss.exe") {
+                        Inst st;
+                        string img = Regex.Replace(p, "\\.(config|manifest|local)$", "", RegexOptions.IgnoreCase);
+                        if (img != p && started.TryGetValue(img, out st) && st.Harness != null && (t - st.Start).TotalSeconds < 60) who = st;
+                    }
                     if (who != null && who.Harness != null) {
                         Harness h = byName[who.Harness];
                         if (rel.IndexOf('~') >= 0) {
@@ -291,23 +411,30 @@ public static class ThornswoodTrace {
                             if (GetLongPathNameW(p, sb, 1024) > 0 && sb.ToString().ToLowerInvariant().StartsWith(wsLow)) rel = sb.ToString().Substring(wsLow.Length).Replace('\\', '/');
                             else if (h.Always == null) h.Always = "opened a short name in the checkout that no longer resolves (" + rel + ")";
                         }
-                        h.Paths[rel] = "read";
+                        if (!h.Paths.ContainsKey(rel)) h.Paths[rel] = "read";
                         kept++;
                         continue;
                     }
-                    if (who != null && who.Driver) continue;
-                    string img = who != null ? Leaf(who.Image) : (ppid == 4 ? "system" : "pid " + ppid);
-                    if (Array.IndexOf(Readers, img) >= 0) continue;
-                    if (t < first || t > last) continue;
-                    strays.Add(t.ToString("o") + " " + img + " " + rel);
-                    foreach (Harness h in roots) {
-                        if (h.Start <= t && t <= h.End && h.Always == null) h.Always = "another process (" + img + ") opened " + rel + " in the checkout while it ran";
-                    }
+                    Stray(who, ppid, t, first, last, rel, "opened", roots, strays);
                 }
             }
         }
         notes.Add(events + " events, " + opens + " opens, " + kept + " in the checkout by a harness, " + strays.Count + " by something else");
+        notes.Add(enums + " directory enumerations, " + listed + " of them a listing in the checkout by a harness");
         return byName;
+    }
+
+    // Something no harness started, in the checkout while a harness ran:
+    // every harness running then always runs.
+    static void Stray(Inst who, int ppid, DateTime t, DateTime first, DateTime last, string rel, string did, List<Harness> roots, List<string> strays) {
+        if (who != null && who.Driver) return;
+        string img = who != null ? Leaf(who.Image) : (ppid == 4 ? "system" : "pid " + ppid);
+        if (Array.IndexOf(Readers, img) >= 0) return;
+        if (t < first || t > last) return;
+        strays.Add(t.ToString("o") + " " + img + " " + rel);
+        foreach (Harness h in roots) {
+            if (h.Start <= t && t <= h.End && h.Always == null) h.Always = "another process (" + img + ") " + did + " " + rel + " in the checkout while it ran";
+        }
     }
 
     static string Q(string s) {
@@ -322,7 +449,7 @@ public static class ThornswoodTrace {
     // One line of JSON a harness, in the shape Trace-HarnessReads.js writes.
     public static string Json(Harness h) {
         StringBuilder b = new StringBuilder();
-        b.Append("{\"harness\":").Append(Q(h.Name)).Append(",\"platform\":\"windows\"");
+        b.Append("{\"harness\":").Append(Q(h.Name)).Append(",\"platform\":\"windows\",\"listings\":\"enumerated\"");
         b.Append(",\"exit\":").Append(h.Ended ? h.Code : -1);
         b.Append(",\"seconds\":").Append(h.Secs.ToString(System.Globalization.CultureInfo.InvariantCulture));
         b.Append(",\"skipped\":").Append(h.Skipped ? "true" : "false");
@@ -351,20 +478,42 @@ function Get-TraceProviders {
     $fileNames = New-Object 'System.Collections.Generic.List[string]'
     $procNames = New-Object 'System.Collections.Generic.List[string]'
     $fk = [ThornswoodTrace]::Keywords('Microsoft-Windows-Kernel-File', '^KERNEL_FILE_KEYWORD_(CREATE|CREATE_NEW_FILE)$', $fileNames)
+    # The opens, by their keywords, and the directory enumerations, by their
+    # task, with the keyword that carries them; only those ids are kept.
+    $carried = [UInt64]0
+    $script:enumIds = [ThornswoodTrace]::EventIds('Microsoft-Windows-Kernel-File', '^DirEnum$', 0, [ref]$carried)
+    if (-not $script:enumIds.Count) { throw ('Microsoft-Windows-Kernel-File has no event whose task is DirEnum; its events: ' + [ThornswoodTrace]::TaskNames('Microsoft-Windows-Kernel-File')) }
+    $none = [UInt64]0
+    $openIds = [ThornswoodTrace]::EventIds('Microsoft-Windows-Kernel-File', $null, $fk, [ref]$none)
+    $fileIds = [int[]](@($openIds) + @($script:enumIds) | Sort-Object -Unique)
     $pk = [ThornswoodTrace]::Keywords('Microsoft-Windows-Kernel-Process', '^WINEVENT_KEYWORD_PROCESS$', $procNames)
     if (-not $fk) { throw ('Microsoft-Windows-Kernel-File has no create keyword by the name this looks for; it has: ' + ([ThornswoodTrace]::KeywordNames('Microsoft-Windows-Kernel-File') -join ', ')) }
     if (-not $pk) { throw ('Microsoft-Windows-Kernel-Process has no process keyword by the name this looks for; it has: ' + ([ThornswoodTrace]::KeywordNames('Microsoft-Windows-Kernel-Process') -join ', ')) }
-    'keywords: Kernel-File ' + ($fileNames -join ' ') + '; Kernel-Process ' + ($procNames -join ' ')
+    'keywords: Kernel-File ' + ($fileNames -join ' ') + ' and 0x' + $carried.ToString('x') + ' for DirEnum; Kernel-Process ' + ($procNames -join ' ')
+    'Kernel-File events kept: opens ' + (@($openIds) -join ' ') + ', enumerations ' + (@($script:enumIds) -join ' ')
     $script:providers = [Guid[]]@([ThornswoodTrace]::ProviderId('Microsoft-Windows-Kernel-File'), [ThornswoodTrace]::ProviderId('Microsoft-Windows-Kernel-Process'))
-    $script:keywords = [UInt64[]]@($fk, $pk)
+    $script:keywords = [UInt64[]]@(($fk -bor $carried), $pk)
+    $script:ids = New-Object 'int[][]' 2
+    $script:ids[0] = $fileIds
 }
 
 function Start-TraceSession([string]$name, [string]$etl) {
     $null = [ThornswoodTrace]::Stop($name)
     Remove-Item -LiteralPath $etl -Force -ErrorAction SilentlyContinue
-    $e = [ThornswoodTrace]::Start($name, $etl, $script:providers, $script:keywords)
+    $e = [ThornswoodTrace]::Start($name, $etl, $script:providers, $script:keywords, $script:ids)
     if ($e -ne 0) { throw ('could not start the trace session ' + $name + ' (Windows error ' + $e + ')') }
-    'session ' + $name + ' started, writing ' + $etl
+    # After the start, so a process is in the trace or in this list or both.
+    $procs = @(Get-CimInstance Win32_Process | ForEach-Object { [string]$_.ProcessId + "`t" + $_.Name })
+    [IO.File]::WriteAllLines($etl + '.procs', [string[]]$procs)
+    'session ' + $name + ' started, writing ' + $etl + ', with the ' + $procs.Count + ' processes running then'
+}
+function Read-Running([string]$etl) {
+    $running = New-Object 'System.Collections.Generic.Dictionary[int,string]'
+    foreach ($line in [IO.File]::ReadAllLines($etl + '.procs')) {
+        $f = $line.Split("`t")
+        $running[[int]$f[0]] = $f[1]
+    }
+    return ,$running
 }
 function Stop-TraceSession([string]$name) {
     $s = [ThornswoodTrace]::Stop($name)
@@ -393,11 +542,18 @@ switch ($TraceMode) {
         $fail = 0
         function Check([string]$what, [bool]$ok) { if ($ok) { 'PASS  ' + $what } else { 'FAIL  ' + $what; $script:fail++ } }
         $probe = Join-Path $traceRoot ('probe-' + [Guid]::NewGuid().ToString('N'))
-        $null = New-Item -ItemType Directory -Path (Join-Path $probe 'sub'), (Join-Path $probe 'look')
+        $null = New-Item -ItemType Directory -Path (Join-Path $probe 'sub'), (Join-Path $probe 'look'), (Join-Path $probe 'only')
         [IO.File]::WriteAllText((Join-Path $probe 'a.txt'), 'a')
         [IO.File]::WriteAllText((Join-Path $probe 'sub\b.txt'), 'b')
         [IO.File]::WriteAllText((Join-Path $probe 'other.txt'), 'o')
         $etl = Join-Path $traceRoot 'selftest.etl'
+        # Something already running when the session starts, which opens a
+        # file in the probe's folder once the probe has started: the read must
+        # name it by its name, from the list of what was running.
+        [IO.File]::WriteAllText((Join-Path $probe 'early.txt'), 'e')
+        $go = Join-Path $probe 'go'
+        $early = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-Command', ("for (`$i = 0; `$i -lt 300 -and -not [IO.File]::Exists('" + $go + "'); `$i++) { Start-Sleep -Milliseconds 100 }; `$null = [IO.File]::ReadAllText('" + (Join-Path $probe 'early.txt') + "')")) -PassThru -WindowStyle Hidden
+        $null = $early.Handle
         Start-TraceSession 'thornswood-trace-selftest' $etl
         Start-Sleep -Seconds 2
         # The probe: a file read, a file's attributes read, a file that is not
@@ -414,6 +570,7 @@ Set-Location -LiteralPath '$probe'
 `$null = [IO.File]::GetAttributes('stat.txt')
 `$null = [IO.File]::Exists('missing.txt')
 `$null = @(Get-ChildItem -LiteralPath 'sub')
+`$null = [IO.Directory]::Exists('only')
 & cmd.exe /c "type sub\b.txt > nul & if exist look\c-missing.txt echo no"
 $(if ($node) { "& '" + $node.Source + "' -e `"const fs=require('fs');fs.statSync('node-stat.txt');try{fs.statSync('node-missing.txt')}catch(e){};fs.readdirSync('sub')`"" })
 exit 0
@@ -422,7 +579,9 @@ exit 0
         [IO.File]::WriteAllText($probeFile, $probeScript)
         $p = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $probeFile + '"')) -PassThru -WindowStyle Hidden
         $null = $p.Handle
+        [IO.File]::WriteAllText($go, 'go')
         $p.WaitForExit()
+        $early.WaitForExit()
         $began = $p.StartTime.ToUniversalTime()
         # Something no harness started, opening a file in the probe's folder
         # while the probe "runs": the read must name it as a stray.
@@ -437,7 +596,7 @@ exit 0
         $roots.Add($root)
         $strays = New-Object 'System.Collections.Generic.List[string]'
         $notes = New-Object 'System.Collections.Generic.List[string]'
-        $read = [ThornswoodTrace]::Read($etl, $probe, $roots, $strays, $notes)
+        $read = [ThornswoodTrace]::Read($etl, $probe, $roots, (Read-Running $etl), $script:enumIds, $strays, $notes)
         $notes
         $got = @($read['probe'].Paths.Keys)
         'the probe opened: ' + ($got -join ', ')
@@ -445,19 +604,24 @@ exit 0
         'Kernel-File create fields: ' + [ThornswoodTrace]::FieldNames('Microsoft-Windows-Kernel-File', 12)
         'Kernel-Process start fields: ' + [ThornswoodTrace]::FieldNames('Microsoft-Windows-Kernel-Process', 1)
         'Kernel-Process stop fields: ' + [ThornswoodTrace]::FieldNames('Microsoft-Windows-Kernel-Process', 2)
-        # cmd's if exist looks a name up by pattern in its folder, so what
-        # is seen is the folder, look, and never the name: a folder's open is
-        # a listing of it (Affected-Harnesses.js).
-        $wants = @('a.txt', 'stat.txt', 'missing.txt', 'sub', 'sub/b.txt', 'look')
+        # cmd's if exist opens the folder, look, and asks it for the one name
+        # (a directory enumeration with that name as its pattern), so the
+        # name is a look at look/c-missing.txt and the folder is no listing.
+        $wants = @('a.txt', 'stat.txt', 'missing.txt', 'sub', 'sub/b.txt', 'look', 'look/c-missing.txt', 'only')
         if ($node) { $wants += @('node-stat.txt', 'node-missing.txt') } else { 'no node on this box, so the probe did not run it' }
         foreach ($want in $wants) {
             Check ('the probe''s ' + $want + ' is in its list') ($got -contains $want)
         }
+        $kinds = $read['probe'].Paths
+        Check ('the folder it listed is a listing (sub: ' + $kinds['sub'] + ')') ($kinds['sub'] -eq 'list')
+        Check ('a folder it only looked at is not (only: ' + $kinds['only'] + ')') ($kinds['only'] -eq 'read')
+        Check ('nor the folder cmd looked one name up in (look: ' + $kinds['look'] + ')') ($kinds['look'] -eq 'read')
         Check 'the child process it started is its own (cmd.exe)' (@($read['probe'].Images) -contains 'cmd.exe')
         if ($node) { Check '  and so is node' (@($read['probe'].Images) -contains 'node.exe') }
         Check ('what no harness started is named as a stray (' + ($strays -join '; ') + ')') (@($strays | Where-Object { $_ -match ' cmd\.exe other\.txt$' }).Count -ge 1)
         Check 'and not put on the probe' ($got -notcontains 'other.txt')
-        Remove-Item -LiteralPath $etl, $probe, $probeFile -Recurse -Force -ErrorAction SilentlyContinue
+        Check ('what was running before the session is named as a stray by its name (powershell.exe early.txt)') (@($strays | Where-Object { $_ -match ' powershell\.exe early\.txt$' }).Count -ge 1)
+        Remove-Item -LiteralPath $etl, ($etl + '.procs'), $probe, $probeFile -Recurse -Force -ErrorAction SilentlyContinue
         if ($fail) { 'the self-test FAILED: no gate trace from this box can be trusted until it passes'; exit 1 }
         'the self-test passed'
         exit 0
@@ -492,7 +656,7 @@ exit 0
         if (-not $roots.Count) { throw 'the start log names no harness' }
         $strays = New-Object 'System.Collections.Generic.List[string]'
         $notes = New-Object 'System.Collections.Generic.List[string]'
-        $read = [ThornswoodTrace]::Read($etl, $TraceWorkspace, $roots, $strays, $notes)
+        $read = [ThornswoodTrace]::Read($etl, $TraceWorkspace, $roots, (Read-Running $etl), $script:enumIds, $strays, $notes)
         $notes
         if ($strays.Count) { 'strays (first 20): ' + (@($strays | Select-Object -First 20) -join '; ') }
         $sb = New-Object Text.StringBuilder
@@ -506,7 +670,7 @@ exit 0
         'BEGIN'
         for ($i = 0; $i -lt $b64.Length; $i += 1000) { $b64.Substring($i, [Math]::Min(1000, $b64.Length - $i)) }
         'END'
-        Remove-Item -LiteralPath $etl -Force
+        Remove-Item -LiteralPath $etl, ($etl + '.procs') -Force
         exit 0
     }
     'clean' {
