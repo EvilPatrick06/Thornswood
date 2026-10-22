@@ -572,8 +572,9 @@ if (block !== null) {
     .replace(/\/\/[^\n]*/g, ' ');
   yes('onCraft takes the workbench the fork sends',
       /function \(actorId, craftedItemBaseId, count, recipeId, workbenchId, effects\)/.test(code));
+  // One set in each game (#613) is named first and goes on as its recipe.
   yes('and a craft with no recipe goes to the gate',
-      /if \(!recipeId\) \{/.test(code) &&
+      /if \(!recipeId && !desc\) \{/.test(code) &&
       /return recipelessCraft\(actorId, craftedItemBaseId, workbenchId, effects\);/.test(code));
   yes('the runtime line is what splits made-from-nothing from tempering',
       /0xff000000/.test(code) && /madeFromNothing/.test(code));
