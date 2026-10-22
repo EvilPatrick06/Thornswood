@@ -41,15 +41,12 @@ jobs:
         shell: pwsh
         run: |
           # build.yml's gate step, with -StartLog: the gate's list, its share
-          # of the cores and its budget.
-          $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          $builds = @((Get-Content -LiteralPath records\build-runners.json -Raw | ConvertFrom-Json).runners).Count
-          $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
+          # of the cores and its budget, all of it, since a dispatch is
+          # neither a pull request nor a push to main.
           $keep = Join-Path $env:RUNNER_TEMP 'gate-trace'
           $null = New-Item -ItemType Directory -Force -Path $keep
           [ordered]@{ commit = $env:GITHUB_SHA; workspace = (Get-Location).Path } | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $keep 'run.json')
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 6 -Share $share -BudgetSeconds 1800 -StartLog (Join-Path $keep 'starts.jsonl')
+          .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800 -StartLog (Join-Path $keep 'starts.jsonl')
           exit $LASTEXITCODE
 
       - name: Keep the start log

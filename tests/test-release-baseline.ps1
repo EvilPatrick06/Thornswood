@@ -363,11 +363,11 @@ try {
                    'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
                    'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1', 'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-OnGitHub.ps1', 'scripts\release\Assert-PublishSigned.ps1', 'scripts\release\ShippedBytes.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\ui-gone.json',
+                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json') {
         $to = Join-Path $fake $f
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
-        if (Test-Path -LiteralPath (Join-Path $repo $f)) { Copy-Item -LiteralPath (Join-Path $repo $f) -Destination $to -Force }
+        if (Test-Path -LiteralPath (Join-Path $repo $f)) { Copy-Item -LiteralPath (Join-Path $repo $f) -Destination $to -Force -Recurse }
     }
     $reqFrom = Join-Path $repo 'game\required-data'
     if (Test-Path -LiteralPath $reqFrom) {

@@ -138,7 +138,19 @@ async function ask(o, tree) { return T.find({ tree: tree || TREE, repo: REPO_NAM
   const last2 = steps.slice(-2).join('\n');
   yes('the note is the last two steps of the checks', /- name: Write down the tree these checks passed on\n/.test(steps[steps.length - 2] || '') &&
       (steps[steps.length - 1] || '').indexOf('- name: ' + T.STEP + '\n') >= 0);
-  yes('  both on a pull request only', (last2.match(/\n        if: github\.event_name == 'pull_request'\n/g) || []).length === 2);
+  yes('  both on a pull request only, and only when its gate step ran the whole gate (#3114)',
+      (last2.match(/\n        if: github\.event_name == 'pull_request' && steps\.gate\.outputs\.whole == 'true'\n/g) || []).length === 2);
+  // #3114: a pull request built on the VPS may run only the gate harnesses
+  // its change can reach. Its tree is then not tested in full, so it keeps
+  // no note and main builds it in full (and is traced). Run-Gate.ps1 says
+  // whole=true only when it ran every gate harness.
+  const gateStep = steps.find(x => /^      - name: Run the gate harnesses\n/.test(x)) || '';
+  const rg = read(path.join(REPO, 'scripts', 'dev', 'Run-Gate.ps1'));
+  yes('the gate step is "gate", and runs Run-Gate.ps1', /\n        id: gate\n/.test(gateStep) && /\.\\scripts\\dev\\Run-Gate\.ps1 /.test(gateStep));
+  yes('  which says whole=true only when it ran every gate harness',
+      (rg.match(/Set-StepOutput 'whole'/g) || []).length === 1 && /\nif \(\$whole\) \{ Set-StepOutput 'whole' 'true' \}\n/.test(rg) &&
+      /\n\$run = \$gate\n\$whole = \$true\n/.test(rg) && (rg.match(/\$whole = \$false/g) || []).length === 1 &&
+      /\{ \$run = \$picked; \$whole = \$false \}/.test(rg) && /if \(\$picked\.Count -ge \$gate\.Count\) \{ return \$null \}/.test(rg));
   yes('  under the name the script looks for', last2.indexOf('name: ' + T.PREFIX + '${{ steps.tree.outputs.tree }}') >= 0);
   yes('  writing the tree git gives for HEAD', /git rev-parse 'HEAD\^\{tree\}'/.test(last2));
   yes('  kept seven days, replaced on a rerun', /retention-days: 7\n/.test(last2) && /overwrite: true/.test(last2));
@@ -164,7 +176,9 @@ async function ask(o, tree) { return T.find({ tree: tree || TREE, repo: REPO_NAM
   // only where named here, each with why it is not a check of a build.
   const ALLOWED = {
     'scripts/release/Resolve-ReleaseTag.ps1': 'release.yml\'s tag step, which no check runs: tests/test-release-tag.ps1 gives it the values itself',
-    'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process'
+    'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process',
+    'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
+    'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event'
   };
   const ENVREAD = /\b(GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR))\b/;
   const found = [];

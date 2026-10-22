@@ -156,7 +156,10 @@ yes('P3 and they are the ones it says: their ids hash to its refsSha256', !!fl &
 // ---------------------------------------------------------------- N
 // Nothing is copied out of a plugin Patrick rules is never handed on
 // (notCopiedFrom in the policy: Immersive Armors, 17 Oct 2026, #2454), but
-// the records its row carries, which he allowed on 21 Oct 2026 (#3077).
+// the records its row carries. Immersive Armors carries none (Patrick, 22 Oct
+// 2026, q-613-ia-recipes: its 6 floor items and their cell headers were never
+// his to carry); the server holds those floor items off instead
+// (tests/test-613-set-in-game.js).
 const policy = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'last-plugin-policy.json'), 'utf8'));
 const rows = policy.notCopiedFrom || [];
 const never = rows.map((r) => r.plugin);

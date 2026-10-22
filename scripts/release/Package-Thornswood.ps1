@@ -333,6 +333,8 @@ if ($optionalPrefixes.Count) {
 # hashes Ship-Rules just loaded from the checkout, so Test-ShipClientRecorded
 # answers the packed launcher's record and not the checkout's.
 . (Join-Path $Here 'Package-ClientRecord.ps1')
+# Get-ClientLicences and Get-ClientLicenceLines, the same as the feed's (#3099).
+. (Join-Path $Here 'Source-Notice.ps1')
 $checkoutClientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
 $resolvedClient = Resolve-PackageClientRecord -LauncherExe (Get-LauncherExe $LaunchDir) -FeedVersion $vLive -CheckoutRecord $checkoutClientRecord
 if (-not $resolvedClient) {
@@ -341,8 +343,13 @@ if (-not $resolvedClient) {
          'Neither could be read, and records\client-build.json in this checkout is not that client, so nothing was packaged.')
 }
 Apply-PackageClientRecord $resolvedClient.Record
-$clientRecordPath = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-package-client-' + [Guid]::NewGuid().ToString('N') + '.json')
+# The record, and beside it the licences of the libraries inside its files
+# (#3099), which Source-Notice.ps1 reads from the record's folder.
+$clientRecordDir = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-package-client-' + [Guid]::NewGuid().ToString('N'))
+$clientRecordPath = Join-Path $clientRecordDir 'client-build.json'
 Save-PackageClientRecord $resolvedClient $clientRecordPath
+try { $licencesFrom = Save-PackageClientLicences ([string]$resolvedClient.Record.forkCommit) (Join-Path $PSScriptRoot '..\..') $clientRecordDir }
+catch { Die ($_.Exception.Message + '. Nothing was packaged.') }
 $clientFork = [string]$resolvedClient.Record.forkCommit
 if ($resolvedClient.Source -eq 'launcher') {
     Say ("  {0} client runtime file(s) held to the record embedded in the launcher this installer packs ({1})" -f $shipClientFiles.Count, $clientFork) 'Green'
@@ -723,7 +730,7 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 # "All of it is built from" the fork, which was false for build.js, so the
 # note now lists whichever of them the payload holds as their own group, with
 # the gap said and upstream named, rather than claiming a commit for them.
-function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]$PayloadDir, [string]$FrontRecord) {
+function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]$PayloadDir, [string]$FrontRecord, $Licences) {
     # A file the record gains that is not here stops the package, because a
     # person has to look at where it comes from before a notice names it.
     $from = @{
@@ -856,7 +863,8 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
         '  GPL-3.0.txt             GNU GPL version 3 (skymp5-client, skyrim-platform, skymp5-front)',
         '  AGPL-3.0.txt            GNU AGPL version 3 (MpClientPlugin.dll, the server)',
         '  WebView2-LICENSE.txt    Microsoft WebView2 SDK (inside the launcher)',
-        '',
+        ''
+    ) + (Get-ClientLicenceLines $Licences) + @(
         'The launcher''s updates can bring newer builds of these files, so this note',
         'names the build this installer brought. https://thornswood.net/credits',
         'names the build in the current release.',
@@ -866,10 +874,17 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
 }
 $srcNote = Join-Path $stage 'SOURCE CODE.txt'
 try {
-    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir
+    # Every library inside the six, with its text (#3099).
+    $clientLicences = @(Get-ClientLicences $clientRecordPath @($resolvedClient.Record.files.PSObject.Properties.Name))
+    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir -Licences $clientLicences
     [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
-    Remove-Item -LiteralPath $clientRecordPath -Force -ErrorAction SilentlyContinue
+    $libDir = Join-Path $stage 'licences'
+    if (Test-Path -LiteralPath $libDir) { Remove-Item -LiteralPath $libDir -Recurse -Force }
+    $null = New-Item -ItemType Directory -Force -Path $libDir
+    foreach ($x in $clientLicences) { [IO.File]::WriteAllBytes((Join-Path $libDir ($x.Port + '.txt')), $x.Bytes) }
+    Remove-Item -LiteralPath $clientRecordDir -Recurse -Force -ErrorAction SilentlyContinue
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
+    Say ("  licences\ holds the texts of the {0} libraries inside the client files ({1})" -f $clientLicences.Count, $(if ($licencesFrom -eq 'checkout') { 'this checkout''s record' } else { 'the record committed at ' + $licencesFrom.Substring(0, 8) })) 'Green'
 } catch {
     Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
 }

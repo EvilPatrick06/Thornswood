@@ -87,6 +87,22 @@ function Write-ThornswoodFrontZip([string]$Folder, [string]$Zip) {
     } finally { $z.Dispose() }
 }
 
+function Get-ThornswoodFullPath([string]$Path) {
+    return [IO.Path]::GetFullPath(($Path -replace '[\\/]', [IO.Path]::DirectorySeparatorChar)).TrimEnd([char]'\', [char]'/')
+}
+
+# Whether $Fork is a clone of its own. An engine\skymp submodule that was
+# never fetched, which is how a cloud checkout starts, is an empty folder, and
+# git run in it answers for the checkout around it: until 22 Oct Build-Front
+# then said the fork "does not have" the pinned commit and named a fetch that
+# changed nothing (the cloud Desk's first dev Ship, #3315).
+function Test-ThornswoodForkClone([string]$Fork) {
+    if (-not $Fork -or -not (Test-Path -LiteralPath $Fork -PathType Container)) { return $false }
+    $top = (& git -C $Fork rev-parse --show-toplevel 2>$null)
+    if ($LASTEXITCODE -ne 0 -or -not $top) { return $false }
+    return [string]::Equals((Get-ThornswoodFullPath "$top".Trim()), (Get-ThornswoodFullPath $Fork), [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Read-ThornswoodFrontRecord([string]$Path = $ThornswoodFrontRecordPath) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "there is no front build record at $Path" }
     return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8).TrimStart([char]0xFEFF) | ConvertFrom-Json

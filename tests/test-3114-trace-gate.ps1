@@ -11,7 +11,8 @@
     1. .github\workflows\trace-gate.yml starts only by dispatch, reads the
        repository and nothing more, runs on a build runner, and runs the gate
        with the same list, share, throttle and budget as build.yml's gate
-       step, with -StartLog, keeping the start log as the artifact
+       step (scripts\dev\Run-Gate.ps1), with -StartLog, keeping the start
+       log as the artifact
        Trace-Gate.ps1 downloads;
     2. Trace-Gate.ps1 runs the self-test first, stops the session in a
        finally, deletes a trace that was refused or not read, and pushes
@@ -46,11 +47,9 @@ $b = Text '.github\workflows\build.yml'
 Yes 'trace-gate.yml starts only by dispatch' ($y -match '(?m)^on:\s*\r?\n  workflow_dispatch:\s*$' -and $y -notmatch '(?m)^  (push|pull_request|pull_request_target|schedule|workflow_run):')
 Yes '  reads the repository and nothing more' ($y -match '(?m)^permissions:\s*\r?\n  contents: read\s*$' -and $y -notmatch '(?m)^\s+permissions:')
 Yes '  on a build runner, as the gate runs' ($y -match '(?m)^\s+runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\s*$')
-$want = [regex]::Match($b, '(?m)^\s+\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only \(\$gate -join '' ''\) -Throttle \d+ -Share \$share -BudgetSeconds \d+\s*$').Value.Trim()
-$got = [regex]::Match($y, '(?m)^\s+\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only .*$').Value.Trim()
-Yes ('  the gate step''s own run, with -StartLog (' + $got + ')') ($want -and $got.StartsWith($want + ' -StartLog '))
-$share = '$share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))'
-Yes '  the same share of the cores' ($b.Contains($share) -and $y.Contains($share) -and $y.Contains('$gate = @(& .\scripts\dev\Gate-Harnesses.ps1)'))
+$want = [regex]::Match($b, '(?m)^\s+\.\\scripts\\dev\\Run-Gate\.ps1 -Throttle \d+ -BudgetSeconds \d+\s*$').Value.Trim()
+$got = [regex]::Match($y, '(?m)^\s+\.\\scripts\\dev\\Run-Gate\.ps1 .*$').Value.Trim()
+Yes ('  the gate step''s own run, its list, share and budget, with -StartLog (' + $got + ')') ($want -and $got.StartsWith($want + ' -StartLog '))
 Yes '  every tracked file checked out again first, as build.yml does' ($y -match 'git rm -r -q --cached \.' -and $y -match 'git reset -q --hard HEAD')
 Yes '  and the start log kept, even when a harness fails, as gate-trace' ($y -match '(?ms)- name: Keep the start log\s*\r?\n\s+if: always\(\)\s*\r?\n\s+uses: actions/upload-artifact@[0-9a-f]{40} # v\d+\s*\r?\n\s+with:\s*\r?\n\s+name: gate-trace\s*$')
 
@@ -96,8 +95,8 @@ if ($cs) {
 Yes ('  its C# compiles as C# 5' + $(if ($compiled) { ': ' + $compiled.Substring(0, [Math]::Min(300, $compiled.Length)) } else { '' })) (-not $compiled)
 Yes '  the trace folder is closed to all but administrators and the system' ($x -match [regex]::Escape("icacls.exe `$traceRoot /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F'"))
 Yes '  a trace that lost events is refused' ($x -match "(?s)'stop' \{\s*Stop-TraceSession \`$sessionName\s*if \(\`$script:lost\) \{ 'REFUSED: '.*?exit 1 \}")
-Yes '  the trace is deleted once read, and only paths in the checkout leave' ($x -match "(?s)'END'\s*Remove-Item -LiteralPath \`$etl, \(\`$etl \+ '\.procs'\) -Force" -and $x -match 'if \(!inside\) \{ if \(objO != null\) objects\.Remove\(Address\(objO\)\); continue; \}')
-Yes '  every mode Trace-Gate.ps1 asks for is there' (@('selftest', 'start', 'stop', 'read', 'clean' | Where-Object { $x -notmatch ("(?m)^    '" + $_ + "' \{") }).Count -eq 0)
+Yes '  the trace is deleted once read, and only paths in the checkout leave' ($x -match "(?s)'END'\s*Remove-Item -LiteralPath \(Join-Path \`$traceRoot 'gate\.etl'\), \(Join-Path \`$traceRoot 'gate\.etl\.procs'\) -Force" -and $x -match 'if \(!inside\) \{ if \(objO != null\) objects\.Remove\(Address\(objO\)\); continue; \}')
+Yes '  every mode Trace-Gate.ps1 asks for is there' (@('selftest', 'start', 'stop', 'read', 'clean', 'install', 'status', 'uninstall' | Where-Object { $x -notmatch ("(?m)^    '" + $_ + "' \{") }).Count -eq 0)
 
 # ---- 4. the push, for real -------------------------------------------------------
 $fn = [Management.Automation.Language.Parser]::ParseInput($t, [ref]$null, [ref]$null).FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Push-Trace' }, $true) | Select-Object -First 1

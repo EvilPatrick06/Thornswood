@@ -1461,9 +1461,8 @@ try {
                 foreach ($m in $missingClient) { Say "  client runtime file missing from the build: $m" 'Red' }
                 Die 'The client runtime is incomplete in the game folder, so it was not published. Run scripts\release\Sync-Client.ps1 and ship again.'
             }
-            foreach ($sn in @(Get-SourceNoticeEntries $cbPath $names 'runtime' $sourceLicences)) {
-                [IO.File]::WriteAllBytes((Join-Path $stage $sn.Name), $sn.Bytes)
-            }
+            # The note, the GPL and AGPL texts, and licences\ (#3099).
+            Write-SourceNoticeToFolder $stage (Get-SourceNoticeEntries $cbPath $names 'runtime' $sourceLicences)
             $clientZip = Join-Path $DistDir ("client-runtime-" + $cbCommit + ".zip")
             if (Test-Path -LiteralPath $clientZip) { Remove-Item -LiteralPath $clientZip -Force }
             Add-Type -AssemblyName System.IO.Compression.FileSystem

@@ -169,6 +169,21 @@ link, and the old line goes.
 
 ## The box
 
+- **The site's contact is Discord only.** It names no street address,
+  business email or company, and nothing is invented to fill one. 27 Sep 2026,
+  [#718](https://github.com/EvilPatrick06/Thornswood/issues/718).
+- **No cookie banner and no GDPR claim.** The site sets only the cookies it
+  needs to work and names them on the privacy page. 27 Sep 2026,
+  [#718](https://github.com/EvilPatrick06/Thornswood/issues/718).
+- **No refund policy;** nothing is sold on the site. 27 Sep 2026,
+  [#718](https://github.com/EvilPatrick06/Thornswood/issues/718).
+- **The alpha takes 25 people at once plus 5 staff seats**, the seats filled
+  only by the Discord staff roles; when it is full, people wait in line at
+  the main menu. 29 Sep 2026,
+  [#481](https://github.com/EvilPatrick06/Thornswood/issues/481).
+- **Dev is never rolled back;** a fault on dev is fixed forward. Only main is
+  rolled back, then fixed. 29 Sep 2026,
+  [#1158](https://github.com/EvilPatrick06/Thornswood/issues/1158).
 - **Builds stay on the game box**, and each build's cost comes down; a
   second box or a public repository is a new question only if the box still
   runs above 60% busy on a day of pull requests. 22 Oct 2026,
@@ -316,6 +331,11 @@ link, and the old line goes.
 - **A Claude rewrites the Developer Guide's build check section** from
   build.yml and build-pr.yml, naming both checks. 22 Oct 2026,
   [#2799](https://github.com/EvilPatrick06/Thornswood/issues/2799#issuecomment-6335265658).
+- **Dev test tasks are checks only a dev can do and may stay while the fix
+  is on main; Main test tasks are ordinary playtester checks, posted only
+  once main carries the fix; #known-issues holds only findings nothing has
+  been done about; one post per issue per forum; test tasks never on the
+  report page.** 22 Oct 2026, Patrick in the project chat.
 - **Closes for a change nobody would notice, Refs plus a Test task for the
   rest.** One line in the pull request template, the lane instructions and
   the Developer Guide. 22 Oct 2026,

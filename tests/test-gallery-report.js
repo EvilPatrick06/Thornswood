@@ -125,7 +125,7 @@ yes('Report posts to /api/gallery/report with ticket',
     /"\/api\/gallery\/report\?ticket="/.test(report) &&
     /Uri\.EscapeDataString\(Discord\.Ticket\)/.test(report));
 
-const submit = body(GALLERY, 'public static string Submit(string path, string by, string note)');
+const submit = body(GALLERY, 'public static string Submit(string path, string by, string note, out string copies)');
 yes('Gallery.Submit is there', submit.length > 0);
 yes('Submit posts to /api/gallery/submit with ticket',
     /"\/api\/gallery\/submit\?ticket="/.test(submit));
@@ -217,8 +217,9 @@ yes('Choose wires to GalleryChooseFile',
     /btnGalleryChoose\.Click \+= delegate \{ GalleryChooseFile\(\); \}/.test(SHELL));
 yes('Send wires to GallerySendChosen',
     /btnGallerySend\.Click \+= delegate \{ GallerySendChosen\(\); \}/.test(SHELL));
-yes('Accept calls Gallery.Approve',
-    /Gallery\.Approve\(name\)/.test(SHELL));
+yes('Accept calls Gallery.Approve with the copies the card showed',
+    /Gallery\.Approve\(name, shown\)/.test(SHELL) &&
+    /accept\.Click \+= delegate \{ GalleryAccept\(name, copies\); \}/.test(SHELL));
 yes('Delete calls Gallery.TakeDown',
     /Gallery\.TakeDown\(name\)/.test(SHELL));
 yes('Delete pending still uses Gallery.Reject API under Delete',
