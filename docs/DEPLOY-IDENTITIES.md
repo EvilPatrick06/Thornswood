@@ -27,7 +27,7 @@ Runbooks do the same by hand (`docs\IT-IS-DOWN.md`, `docs\RESTORING.md`,
 | Which keys are used | Last 400 OpenSSH events: every accepted login is Administrator, one key, one source address. The other four keys showed no login in that window |
 | Firewall for 22 | `OpenSSH-Server-In-TCP` and two more inbound rules on 22, RemoteAddress `Any` |
 | Local admins | `Administrator`, `cloudbase-init` (the provider's first-boot agent account, enabled) |
-| Other accounts | `thornswood-runner`, `-runner2`, `-runner3`, `-runner4`: Users plus their GitHub runner groups, not admins; run the four `actions.runner.*` services |
+| Other accounts | `thornswood-runner`, `-runner2`, `-runner3`: Users plus their GitHub runner groups, not admins; run the three `actions.runner.*` services (four when this was read; three since 21 Oct 2026, #3108, #3219) |
 | Services | `sshd` LocalSystem; `ThornswoodBot` as `NT SERVICE\ThornswoodBot` |
 | Tasks | Thornswood Server, Dev Server, Voice, Dev Voice, Web (#2578) and Backup (#2612): LOCAL SERVICE, Limited, each with a SID of its own. Load, Watch, Maint Update, Dev Crash Capture: SYSTEM, Highest. Thornswood Docs: LOCAL SERVICE, Limited. The one-shot sshd restart and rollback tasks of vps-harden.ps1 and vps-ssh-scope.ps1 stay SYSTEM: they need administrator and must outlive the session they cut (#2612) |
 
