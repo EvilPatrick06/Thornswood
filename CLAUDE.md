@@ -38,7 +38,10 @@ shipping machine, list that folder and run each note: dev ones when they are
 ready, a Main Ship or a live server run when Patrick says so. Afterwards put
 what ran, when, what it printed and the health check on the issue and in
 `wiki/status.md`, and delete the note. A note that cannot run keeps the
-reason written into it.
+reason written into it. The run that finishes an issue also closes it, with
+its `Test task:` comment when people would notice the fix, or moves it to
+Done (`board: Done`) when its fix still waits on main (#3192: issues sat
+open after their runs finished because nobody owned the close).
 
 ## What a Claude here does itself and what the person does
 
@@ -232,8 +235,8 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   (`wiki/status.md` for what is true now, rewritten in place). Anything a
   session changes about tips, standing orders or what waits on Patrick goes
   there as well as on the board.
-- Merge only once `Launcher builds` (the VPS runner) says pass and you are
-  confident in the change. Nothing on GitHub enforces it; see Developer-Guide.md.
+- Merge only once the build check passes, `Launcher builds` or `Launcher
+  builds (VPS fallback)`, and you are confident in the change. Nothing on GitHub enforces it; see Developer-Guide.md.
 
 ## Where things are
 
