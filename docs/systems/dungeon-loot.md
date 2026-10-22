@@ -8,9 +8,10 @@ carries a little on the body instead.
 
 No container in the world holds anything the world put there. A
 chest, a barrel, a sack, or a cupboard starts empty, and holds only
-what a person puts in it. What this pays is created by the server,
-the same way a scene quest creates its reward, and goes into the pack
-of the person who opened the chest. See [Gold](gold.md).
+what a person puts in it. Nothing the world placed lies on the floor
+of a dungeon or anywhere else. What this pays is created by the
+server, the same way a scene quest creates its reward, and goes into
+the pack of the person who opened the chest. See [Gold](gold.md).
 
 ## What opens
 

@@ -42,12 +42,6 @@ failed=true;
 assert.equal(ctx.moveById(1,2,[[12,1]]),false,'failed native identities refuse ordinary transfers too');
 assert.equal(writes,0);
 {
- const spoil=source.match(/^  function isSpoil\([^\n]*\)[\s\S]*?^  \}/m)[0];
- const model={GOLD:15,isPurse:()=>false,isTool:()=>false,isCutOut:()=>false,SPOIL_TYPES:{WEAP:true,ARMO:true},kindOf:()=> 'MISC'};
- vm.createContext(model);vm.runInContext(spoil,model);
- ids.forEach(id=>assert.equal(model.isSpoil(id),false,'bound MISC tokens are not death/container spoils'));
-}
-{
  const helper=source.match(/^function questItemBlocked\([^\n]*\)[\s\S]*?^\}/m)[0];
  const missing={};vm.createContext(missing);vm.runInContext('var QUEST_ITEM_POLICY;\n'+helper,missing);
  assert.equal(missing.questItemBlocked(12),true,'partial bootstrap cannot allow transfers before its native policy exists');

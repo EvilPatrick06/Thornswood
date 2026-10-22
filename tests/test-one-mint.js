@@ -991,9 +991,15 @@ if (tradeBlock !== null) {
 yes('the gamemode never asks Papyrus to AddItem', !/(['"])AddItem\1/.test(code));
 
 {
-  const spoil = bodyOf('spoils/isSpoil');
-  yes('and the world does not hand gold over: it is the first thing isSpoil refuses',
-      spoil !== null && /if \(baseId === GOLD\) \{ return true; \}/.test(spoil));
+  // The world hands no gold over, and nothing in the gamemode has to refuse
+  // it: no container holds what the world put there (forbiddenBaseContainer,
+  // #3078), and Thornswood-Last.esp switches off every placed MISC, which
+  // Gold001 is, and every coin purse (#3077).
+  const builder = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Build-LastPlugin.py'), 'utf8');
+  const deploy = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'deploy', 'Deploy-Gamemode.ps1'), 'utf8');
+  yes('and the world does not hand gold over: no container is filled, and no coin or coin purse lies on the floor',
+      /forbiddenBaseContainer -NotePropertyValue @\('CONT'\)/.test(deploy) &&
+      /FLOOR_TYPES = \([^)]*b'MISC'/.test(builder) && /COIN_PURSES = \(/.test(builder));
 }
 
 console.log('');
