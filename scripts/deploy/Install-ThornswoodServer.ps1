@@ -601,19 +601,16 @@ public static class ThornswoodHandles {
   [DllImport("kernel32.dll")] static extern uint GetFileType(IntPtr h);
   [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern uint GetFinalPathNameByHandle(IntPtr h, StringBuilder sb, uint len, uint flags);
   static string found;
-  public static string Under(string path) { return Under(path, false); }
-  // Exact: only handles on path itself, not under it.
-  public static string Under(string path, bool exact) {
+  public static string Under(string path) {
     found = null;
-    Thread t = new Thread(delegate() { found = Look(path, exact); });
+    Thread t = new Thread(delegate() { found = Look(path); });
     t.IsBackground = true;
     t.Start();
     if (!t.Join(20000)) return "the handle list did not finish in 20 seconds";
     return found;
   }
-  static string Look(string path, bool exact) {
+  static string Look(string path) {
     string under = path.TrimEnd('\\');
-    if (exact && under.Length == 2 && under[1] == ':') under += @"\";
     int len = 1 << 22, ret, st;
     IntPtr buf;
     while (true) {
@@ -654,7 +651,7 @@ public static class ThornswoodHandles {
           if (n == 0 || n >= 1024) continue;
           string at = sb.ToString();
           if (at.StartsWith(@"\\?\")) at = at.Substring(4);
-          if (!at.Equals(under, StringComparison.OrdinalIgnoreCase) && (exact || !at.StartsWith(under + @"\", StringComparison.OrdinalIgnoreCase))) continue;
+          if (!at.Equals(under, StringComparison.OrdinalIgnoreCase) && !at.StartsWith(under + @"\", StringComparison.OrdinalIgnoreCase)) continue;
           if (!held.ContainsKey(pid)) held[pid] = new List<string>();
           held[pid].Add(at + " (access 0x" + e.Access.ToString("X") + ")");
         } finally { CloseHandle(d); }
@@ -867,11 +864,11 @@ function Get-ThornswoodPathHandles([string]$Path) {
 #
 # A folder is opened for the rename and then renamed through that handle,
 # which is what MoveFile does, so a refusal says which of the two it was
-# (#3262). The open is refused (error 32) when a process has the folder
-# itself open without delete sharing, a current directory there the usual
-# one; the rename is refused when the folder it goes into will not take it,
-# and for error 32 that is a process with that folder open without write
-# sharing. Each is looked at the moment it is refused.
+# (#3262). Measured on a box runner on 22 Oct 2026: the open is refused with
+# error 32 when a process has the folder itself open without delete sharing,
+# a current directory there the usual one; it opens, and the rename is
+# refused with error 5, when a file under it is open. Each is looked at the
+# moment it is refused.
 $ThornswoodMoveWhy = ''
 function Move-ThornswoodPath([string]$From, [string]$To) {
   $script:ThornswoodMoveWhy = ''
@@ -892,17 +889,9 @@ function Move-ThornswoodPath([string]$From, [string]$To) {
   $err = [ThornswoodRename]::Move($full, $into)
   if ($err -eq 0) { return $true }
   $step = [ThornswoodRename]::Step
-  $parent = [IO.Path]::GetDirectoryName($into)
-  # The folder it goes into first, when that was the half refused: it is
-  # the quicker look, and the one that can let go first.
-  $atParent = ''
-  if ($step -eq 'rename') {
-    $p = Get-ThornswoodPathOpeners $parent
-    $atParent = '; ' + $parent + ' itself open in: ' + $p.Said + '; handles on ' + $parent + ' itself: ' + [ThornswoodHandles]::Under($parent, $true)
-  }
-  $what = if ($step -eq 'open') { 'the folder would not open to be renamed' } else { 'the folder opened, and ' + $parent + ' would not take it' }
+  $what = if ($step -eq 'open') { 'the folder would not open to be renamed' } else { 'the folder opened, and the rename was refused' }
   $msg = (New-Object ComponentModel.Win32Exception($err)).Message
-  $script:ThornswoodMoveWhy = ('{0}: {1} (0x{2:X8}){3}; open under it then: {4}' -f $what, $msg, (0x80070000 -bor $err), $atParent, (Get-ThornswoodPathHolders $From))
+  $script:ThornswoodMoveWhy = ('{0}: {1} (0x{2:X8}); open under it then: {3}' -f $what, $msg, (0x80070000 -bor $err), (Get-ThornswoodPathHolders $From))
   return $false
 }
 # ---- end StopAndMove.ps1 ----
