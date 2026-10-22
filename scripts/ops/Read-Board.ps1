@@ -101,17 +101,19 @@ $art = @((Get-GitHub "$runPath/artifacts").artifacts | Where-Object { $_.name -e
 if ($art.Count -ne 1) { Die ('the run left no artifact named board: ' + $r.html_url) }
 if ($art[0].expired) { Die ("run $id's board artifact has expired (they are kept 3 days). Read the board again: pwsh scripts/ops/Read-Board.ps1") }
 
-# The zip is bytes, so gh writes it straight to a file rather than through a
-# PowerShell pipe.
+# gh run download fetches and unpacks the artifact itself. Measured 22 Oct
+# 2026 on the first real read: Start-Process, redirecting gh's output, reads the
+# child's output as text and writes it back out, so the zip that way came out
+# changed and Expand-Archive refused it ("Offset to Central Directory cannot
+# be held in an Int64").
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-board-read-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 try {
-    $zip = Join-Path $work 'board.zip'
-    $err = Join-Path $work 'gh.err'
-    $p = Start-Process -FilePath (Get-Command gh).Source -ArgumentList @('api', ("repos/$GitHubRepo/actions/artifacts/" + $art[0].id + '/zip')) `
-        -RedirectStandardOutput $zip -RedirectStandardError $err -NoNewWindow -Wait -PassThru
-    if ($p.ExitCode -ne 0) { Die ('GitHub did not hand over the board artifact: ' + ([IO.File]::ReadAllText($err).Trim())) }
-    Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $work 'x') -Force
+    # gh's own lines on stderr are not a failure; its exit code says.
+    $ErrorActionPreference = 'Continue'
+    $said = & gh run download $id -R $GitHubRepo -n board -D (Join-Path $work 'x') 2>&1
+    $ErrorActionPreference = 'Stop'
+    if ($LASTEXITCODE -ne 0) { Die ('GitHub did not hand over the board artifact: ' + ((@($said) | Out-String).Trim())) }
     $json = Join-Path (Join-Path $work 'x') 'board.json'
     if (-not (Test-Path -LiteralPath $json)) { Die ('the board artifact holds no board.json: ' + $r.html_url) }
     $board = [IO.File]::ReadAllText($json) | ConvertFrom-Json
