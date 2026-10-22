@@ -99,6 +99,18 @@ WHAT IT PUTS IN THE PLUGIN
      WorldState::LoadForm applies it), and the reader never makes an
      initially disabled one.
 
+  6. The forge recipes game/data/recost.json re-costs (Patrick, 21 October
+     2026, A on #613, and B on #3115): each is the winning record with only
+     its input counts changed to the ones the table gives, and an input the
+     table takes to 0 (gold coins) taken out, so the same output, bench and
+     conditions. scripts/dev/Build-Recost.py writes the table from
+     game/data/recipes.json; a winning record whose inputs are not the ones
+     the table measured stops the build, because the counts were worked out
+     for those inputs and no others. A recipe of a plugin the policy never
+     copies from (notCopiedFrom) is not in the table's recipes but its
+     notCopied, and one that reached the recipes stops the build like any
+     other record of such a plugin (6).
+
   A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
   them, form ids moved into this plugin's numbering. A quest and a location
@@ -218,6 +230,7 @@ DATA_DIR = 'C:\\Thornswood\\Game\\Data'
 CATALOGUE = os.path.join(ROOT, 'game', 'data', 'npc-population.json')
 POLICY = os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')
 MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
+RECOST = os.path.join(ROOT, 'game', 'data', 'recost.json')
 OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
 
 COMPRESSED = 0x00040000
@@ -235,7 +248,7 @@ NEVER_TRUE = struct.pack('<B3sfHHIIIIi', 4 << 5, b'\x00\x00\x00', 0.0, 47, 0,
                          0x0000000F, 0, 0, 0, -1)
 
 # The order Skyrim writes its top groups in.
-GROUP_ORDER = [b'CELL', b'WRLD', b'QUST', b'LCTN']
+GROUP_ORDER = [b'COBJ', b'CELL', b'WRLD', b'QUST', b'LCTN']
 
 # The subrecords of a cell that come before its location (XLCN), in the
 # order Skyrim.esm writes a cell; a location set on a cell that had none goes
@@ -645,6 +658,15 @@ FIELDS = {
                   b'CIS1', b'CIS2', b'QOBJ', b'QSTA', b'SCHR', b'SCTX', b'SCDA'},
         'strings': {b'FULL', b'NNAM'},
         'dlstrings': {b'CNAM'},
+        'drop': set(),
+    },
+    # A recipe (#613). Its inputs (CNTO) are moved by copy_record itself; an
+    # extra data entry on an input (COED) names an owner and stops the build.
+    b'COBJ': {
+        'fid': {b'CNAM', b'BNAM'},
+        'array': set(),
+        'plain': {b'EDID', b'COCT', b'NAM1', b'CITC', b'CIS1', b'CIS2'},
+        'strings': set(),
         'drop': set(),
     },
     # A location's lists of the references, actors and cells in it. Each
@@ -1057,7 +1079,7 @@ def build(data_dir):
     catalogue = json.load(open(CATALOGUE, encoding='utf-8'))
     policy = json.load(open(POLICY, encoding='utf-8'))
     order, canon, plugins = load(data_dir, catalogue)
-    win = winners(plugins, {b'ACHR', b'REFR', b'CELL', b'WRLD', b'QUST', b'LCTN', b'FLOR'} | set(FLOOR_TYPES))
+    win = winners(plugins, {b'ACHR', b'REFR', b'CELL', b'WRLD', b'QUST', b'LCTN', b'FLOR', b'COBJ'} | set(FLOOR_TYPES))
     tables = {}
 
     def strings(src, kind):
@@ -1271,14 +1293,25 @@ def build(data_dir):
         cells[g] = e
     floor_cells -= set(hold_cells)
 
+    # 5. The re-costed smith recipes (#613).
+    recipes = recost_entries(json.load(open(RECOST, encoding='utf-8')), plugins, win)
+
     # 6. Nothing is copied out of a plugin the policy never copies from
     # (notCopiedFrom, above) but what it carries; anything else it would
     # contribute stops the build, and so does a carried record not needed.
+    # A re-costed recipe is a copy of its record too, so one that is a
+    # never-copied plugin's own, or won by one, stops it unless carried
+    # (Build-Recost.py lists those under notCopied instead).
     held = sorted('%s %s (won by %s)%s' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon),
                                            plugins[e.pi].name, placed(e))
                   for e in actors + gates + qentries +
                   [e for e, _, _ in hold_locs]
                   if plugins[e.pi].name.lower() in blocked)
+    for e, row in recipes:
+        g = plugins[e.pi].gid(e.fid)
+        if (plugins[e.pi].name.lower() in blocked or row['recipe'].split(':', 1)[1].lower() in blocked) \
+                and not carries(b'COBJ', g):
+            held.append('COBJ %s (re-costed by recost.json, won by %s)' % (desc_of(g, canon), plugins[e.pi].name))
     swapped = []
     for kind, table in ((b'CELL', cells), (b'WRLD', worlds)):
         for g, e in list(table.items()):
@@ -1297,7 +1330,7 @@ def build(data_dir):
     rn = Renumber()
 
     def copies():
-        out = {'achr': [], 'refr': [], 'cell': {}, 'wrld': {}, 'qust': [], 'lctn': []}
+        out = {'achr': [], 'refr': [], 'cell': {}, 'wrld': {}, 'qust': [], 'lctn': [], 'cobj': []}
         for e in gates:
             src = plugins[e.pi]
             what = '%s REFR 0x%08X' % (src.name, e.fid)
@@ -1374,6 +1407,12 @@ def build(data_dir):
             pairs = stop_quest(pairs, what)
             out['qust'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
+        for e, row in recipes:
+            src = plugins[e.pi]
+            what = '%s COBJ 0x%08X' % (src.name, e.fid)
+            pairs = recount(copy_record(src, e, rn, strings, what), row)
+            out['cobj'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
+                                pack_subrecords(pairs), e))
         return out
 
     copies()
@@ -1427,7 +1466,8 @@ def build(data_dir):
                    'worlds': len(made['wrld']), 'questsStopped': len(quests_cut),
                    'modQuestsStopped': len(mod_stopped),
                    'questsKept': len(quests_kept), 'gatesUnlocked': len(gates),
-                   'placeLocations': len(made['lctn']), 'placeRooms': len(hold_cells)},
+                   'placeLocations': len(made['lctn']), 'placeRooms': len(hold_cells),
+                   'recipesRecosted': len(made['cobj'])},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
         'gatesUnlocked': [desc_of(g, canon) for g in GATES],
         'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
@@ -1436,6 +1476,11 @@ def build(data_dir):
         'placeHolds': {'locations': [row for _, _, row in hold_locs],
                        'rooms': [hold_cells[g][2] for g in sorted(hold_cells)]},
         'arrivalTalk': arrival_talk(plugins, canon),
+        # The smith recipes re-costed from game/data/recost.json (#613), each
+        # input as [item, count it had, count it has here].
+        'recost': [{'recipe': row['recipe'], 'editorId': row['editorId'],
+                    'inputs': [[i['item'], i['count'], i['to']] for i in row['inputs']]}
+                   for _, row in recipes],
         # The floor items switched off (#3077), counted rather than listed
         # (there are tens of thousands); refsSha256 is the sha256 of every one,
         # 'object id:plugin' sorted and joined by newlines, which
@@ -1464,6 +1509,61 @@ def build(data_dir):
         'carried': sorted(carried[k] for k in used),
     }
     return plugin, manifest
+
+
+def recost_entries(table, plugins, win):
+    """(winning entry, row) for every recipe recost.json re-costs, each
+    checked to be the record the table measured: its editor id, and its
+    inputs, item by item and count by count, in order."""
+    out = []
+    for row in table.get('recipes', []):
+        e = win.get((b'COBJ', ref_key(row['recipe'])))
+        if e is None:
+            raise SystemExit('STOP. recost.json re-costs %s %s and no plugin has it. Rebuild recipes.json, '
+                             'then scripts/dev/Build-Recost.py. Nothing was written.'
+                             % (row['recipe'], row['editorId']))
+        src = plugins[e.pi]
+        pairs = subrecords(src.data(e))
+        edid = dict(pairs).get(b'EDID', b'').rstrip(b'\x00').decode('latin1')
+        have = [(src.gid(struct.unpack_from('<I', b, 0)[0]), struct.unpack_from('<i', b, 4)[0])
+                for t, b in pairs if t == b'CNTO']
+        want = [(ref_key(i['item']), i['count']) for i in row['inputs']]
+        if edid != row['editorId'] or have != want:
+            raise SystemExit('STOP. %s in %s is not the recipe recost.json measured (%s, %d inputs). Rebuild '
+                             'recipes.json, then scripts/dev/Build-Recost.py. Nothing was written.'
+                             % (row['recipe'], src.name, row['editorId'], len(want)))
+        out.append((e, row))
+    return out
+
+
+def recount(pairs, row):
+    """The recipe with each input's count set to the table's, in order. An
+    input the table takes to 0 is taken out, and COCT says how many are left
+    (Patrick, 21 Oct, q-3115 B: a forge recipe charges no gold coins)."""
+    to = [i['to'] for i in row['inputs']]
+    if not any(to):
+        raise SystemExit('STOP. recost.json takes every input out of %s. Nothing was written.' % row['recipe'])
+    out, n, coct = [], 0, None
+    for t, b in pairs:
+        if t == b'CNTO':
+            if n >= len(to):
+                n += 1
+                continue
+            keep = to[n]
+            n += 1
+            if keep == 0:
+                continue
+            b = b[:4] + struct.pack('<i', keep) + b[8:]
+        if t == b'COCT':
+            coct = len(out)
+        out.append((t, b))
+    if n != len(to):
+        raise SystemExit('STOP. %s has %d inputs and recost.json %d. Nothing was written.'
+                         % (row['recipe'], n, len(to)))
+    if coct is None:
+        raise SystemExit('STOP. %s has no COCT. Nothing was written.' % row['recipe'])
+    out[coct] = (b'COCT', struct.pack('<I', sum(1 for c in to if c)))
+    return out
 
 
 def stop_quest(pairs, what):
@@ -1572,6 +1672,9 @@ def write_plugin(made, masters, plugins, rn):
     if made['lctn']:
         out[b'LCTN'] = g(b'LCTN', 0, b''.join(r(b'LCTN', f, i, d)
                                               for i, f, d, e in sorted(made['lctn'], key=lambda x: x[0])))
+    if made['cobj']:
+        out[b'COBJ'] = g(b'COBJ', 0, b''.join(r(b'COBJ', f, i, d)
+                                              for i, f, d, e in sorted(made['cobj'], key=lambda x: x[0])))
 
     head = [(b'HEDR', struct.pack('<fiI', 1.71, count, 0x800)),
             (b'CNAM', b'Thornswood\x00'),
@@ -1610,8 +1713,16 @@ def verify(data_dir, plugin_bytes, manifest):
     if not last.hflags & LIGHT:
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
-    win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL', b'FLOR'} | set(FLOOR_TYPES))
+    win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL', b'FLOR', b'COBJ'} | set(FLOOR_TYPES))
     fails = []
+    # Every re-costed recipe (#613) wins here, asking the counts the manifest says.
+    for row in manifest.get('recost', []):
+        e = win.get((b'COBJ', ref_key(row['recipe'])))
+        pairs = subrecords(plugins[e.pi].data(e)) if e else []
+        have = [(plugins[e.pi].gid(struct.unpack_from('<I', b, 0)[0]), struct.unpack_from('<i', b, 4)[0])
+                for t, b in pairs if t == b'CNTO'] if e else []
+        if e is None or e.pi != last.index or have != [(ref_key(i[0]), i[2]) for i in row['inputs'] if i[2]]:
+            fails.append('recipe %s %s does not ask the re-costed counts' % (row['recipe'], row['editorId']))
     for desc in manifest.get('gatesUnlocked', []):
         e = win.get((b'REFR', ref_key(desc)))
         tags = [t for t, _ in subrecords(plugins[e.pi].data(e))] if e else []
@@ -1716,6 +1827,7 @@ def main():
               % (c['actorsOff'], c['questsStopped'], c['questsKept'], c['modQuestsStopped']))
         print('  ok    %d locations and %d rooms are in the hold the policy gives them'
               % (c.get('placeLocations', 0), c.get('placeRooms', 0)))
+        print('  ok    %d smith recipes ask the counts recost.json gives' % c.get('recipesRecosted', 0))
         print('  ok    %d floor items are off and nothing can switch them on' % c.get('floorItemsOff', 0))
         return 0
 
@@ -1735,6 +1847,7 @@ def main():
                                                     row['parent'], row['hold']))
     for row in manifest['placeHolds']['rooms']:
         print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
+    print('  %d smith recipes re-costed (recost.json, #613)' % c['recipesRecosted'])
     for row in manifest['notCopiedFrom']['takenFromBelow']:
         print('  never copied from: %s' % row)
     for row in manifest['notCopiedFrom']['carried']:
