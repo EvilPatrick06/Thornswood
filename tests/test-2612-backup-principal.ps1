@@ -16,7 +16,12 @@
       only SYSTEM may read;
     - every other SYSTEM, Highest principal under scripts\ is on the list
       below with the reason it needs SYSTEM, so a new one copied in fails
-      here until someone says why.
+      here until someone says why. That covers schtasks /ru SYSTEM /rl
+      HIGHEST as well as Register-ScheduledTask: three watch tasks were made
+      that way and the list never saw them (#2578). Patrick, 22 Oct 2026:
+      the tasks that watch, keep or repair the box stay SYSTEM by design;
+      only the services that run code we deploy get accounts of their own
+      (docs\DEPLOY-IDENTITIES.md section 8).
   Windows only. Under a minute.
 #>
 $ErrorActionPreference = 'Stop'
@@ -27,7 +32,7 @@ function Yes([string]$what, [bool]$ok) {
 }
 . (Join-Path $Repo 'scripts\deploy\ServiceAccount.ps1')  # Set-ThornswoodServiceAcl, for Windows PowerShell and pwsh
 function Text([string]$p) { return [IO.File]::ReadAllText((Join-Path $Repo $p)) }
-$sysRe = "-UserId\s+'SYSTEM'|-User\s+'SYSTEM'|-RunLevel\s+Highest"
+$sysRe = "-UserId\s+'SYSTEM'|-User\s+'SYSTEM'|-RunLevel\s+Highest|/ru\s+SYSTEM|/rl\s+HIGHEST"
 
 # ---- the installer -------------------------------------------------------------
 $inst = Text 'scripts\deploy\Install-Backup.ps1'
@@ -132,7 +137,10 @@ $allowed = @(
     @('scripts/vps/vps-ssh-scope.ps1', "-UserId 'SYSTEM'", 'one-shot firewall rollback: sets rules'' remote addresses, which needs administrator, and must outlive a session the change may lock out (#2612)'),
     @('scripts/vps/Grant-BoxAccess.ps1', "-UserId 'SYSTEM'", 'one-shot put back of the ssh key file and the bridge tokens: rewrites ProgramData\ssh\administrators_authorized_keys, which needs administrator, and must outlive a session the change may lock out (#2891); inline, removes itself, tests\test-2891-box-access.ps1 holds it'),
     @('scripts/vps/Watch-Services.ps1', "-UserId 'SYSTEM'", 'the watchdog: restarts the other services (Restart-Service, schtasks /run of tasks run by other accounts) and reads every service, task and folder it checks, which need administrator; it was SYSTEM through schtasks /ru SYSTEM until it took Register-ScheduledTask for its priority (#3212)'),
-    @('scripts/vps/vps-capture-443.ps1', "-UserId 'SYSTEM'", 'one-shot end of the #2946 packet capture: pktmon stop, filter remove and etl2txt need administrator, and the end must come at its time with no ssh session held open over the path that resets (#2970); inline cmd.exe line, deletes itself, tests\test-capture-443.ps1 holds it')
+    @('scripts/vps/vps-capture-443.ps1', "-UserId 'SYSTEM'", 'one-shot end of the #2946 packet capture: pktmon stop, filter remove and etl2txt need administrator, and the end must come at its time with no ssh session held open over the path that resets (#2970); inline cmd.exe line, deletes itself, tests\test-capture-443.ps1 holds it'),
+    @('scripts/vps/Watch-Load.ps1', '/ru SYSTEM /rl HIGHEST', 'the load record (Thornswood Load): reads the processor time, memory and I/O of every service''s processes, each under an account of its own, and writes beside the watchdog in C:\Thornswood-Watch; SYSTEM by design (#2578)'),
+    @('scripts/vps/Forecast-Storage.ps1', '/ru SYSTEM /rl HIGHEST', 'the disk history (Thornswood Disk History): writes its history and alerts into the watchdog''s folder and outbox, C:\Thornswood-Watch, which only SYSTEM and Administrators may write; SYSTEM by design (#2578)'),
+    @('scripts/vps/Keep-RunnerLogs.ps1', '/ru SYSTEM /rl HIGHEST', 'the runner log keeper (Thornswood Runner Logs): removes old logs from the _diag folder of every runner, each under its own runner account; SYSTEM by design (#2578)')
 )
 $names = @($allowed | ForEach-Object { $_[0] })
 $found = @()

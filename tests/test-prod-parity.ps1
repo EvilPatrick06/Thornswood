@@ -50,12 +50,13 @@ function Facts { [ordered]@{
         @{ proto = 'tcp'; address = '::'; port = 445; process = 'System' }, @{ proto = 'udp'; address = '0.0.0.0'; port = 123; process = 'svchost' },
         @{ proto = 'udp'; address = '0.0.0.0'; port = 5353; process = 'svchost' }, @{ proto = 'udp'; address = '::'; port = 5355; process = 'svchost' })
     tasks = @(
-        @{ name = 'Thornswood Server'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Dev Server'; user = 'SYSTEM'; triggers = @('Boot') },
-        @{ name = 'Thornswood Voice'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Dev Voice'; user = 'SYSTEM'; triggers = @('Boot') },
-        @{ name = 'Thornswood Docs'; user = 'NT AUTHORITY\LOCAL SERVICE'; triggers = @('Boot') }, @{ name = 'Thornswood Web'; user = 'SYSTEM'; triggers = @('Boot', 'Time') },
-        @{ name = 'Thornswood Watch'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Backup'; user = 'SYSTEM'; triggers = @('Daily') },
+        @{ name = 'Thornswood Server'; user = 'LOCAL SERVICE'; triggers = @('Boot') }, @{ name = 'Thornswood Dev Server'; user = 'LOCAL SERVICE'; triggers = @('Boot') },
+        @{ name = 'Thornswood Voice'; user = 'LOCAL SERVICE'; triggers = @('Boot') }, @{ name = 'Thornswood Dev Voice'; user = 'LOCAL SERVICE'; triggers = @('Boot') },
+        @{ name = 'Thornswood Docs'; user = 'NT AUTHORITY\LOCAL SERVICE'; triggers = @('Boot') }, @{ name = 'Thornswood Web'; user = 'LOCAL SERVICE'; triggers = @('Boot', 'Time') },
+        @{ name = 'Thornswood Watch'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Backup'; user = 'LOCAL SERVICE'; triggers = @('Daily') },
         @{ name = 'Thornswood Load'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Maint Update'; user = 'SYSTEM'; triggers = @('Daily') },
-        @{ name = 'Thornswood Dev Crash Capture'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Disk History'; user = 'SYSTEM'; triggers = @('Daily') })
+        @{ name = 'Thornswood Dev Crash Capture'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Disk History'; user = 'SYSTEM'; triggers = @('Daily') },
+        @{ name = 'Thornswood Runner Logs'; user = 'SYSTEM'; triggers = @('Daily') }, @{ name = 'Thornswood Bridge'; user = 'LOCAL SERVICE'; triggers = @('Boot') })
     services = @(
         @{ name = 'sshd'; account = 'LocalSystem'; state = 'Running' }, @{ name = 'ThornswoodBot'; account = 'NT SERVICE\ThornswoodBot'; state = 'Running' },
         @{ name = 'actions.runner.X.thornswood-vps'; account = '.\thornswood-runner'; state = 'Running' })

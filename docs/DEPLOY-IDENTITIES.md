@@ -5,7 +5,8 @@ no key was added, removed or rotated, no access was disabled, no account or
 task was created, and nothing was tried against production. Every fact in
 section 1 was read on the box over ssh, read-only, on 11 Oct 2026. Section 6
 sets doing nothing beside each change (16 Oct). Decisions Patrick made are in
-section 7.
+section 7. Section 8 lists the tasks that stay SYSTEM by design, and why
+(22 Oct).
 
 ## 1. What access looks like now (evidence)
 
@@ -29,7 +30,7 @@ Runbooks do the same by hand (`docs\IT-IS-DOWN.md`, `docs\RESTORING.md`,
 | Local admins | `Administrator`, `cloudbase-init` (the provider's first-boot agent account, enabled) |
 | Other accounts | `thornswood-runner`, `-runner2`, `-runner3`: Users plus their GitHub runner groups, not admins; run the three `actions.runner.*` services (four when this was read; three since 21 Oct 2026, #3108, #3219) |
 | Services | `sshd` LocalSystem; `ThornswoodBot` as `NT SERVICE\ThornswoodBot` |
-| Tasks | Thornswood Server, Dev Server, Voice, Dev Voice, Web (#2578) and Backup (#2612): LOCAL SERVICE, Limited, each with a SID of its own. Load, Watch, Maint Update, Dev Crash Capture: SYSTEM, Highest. Thornswood Docs: LOCAL SERVICE, Limited. The one-shot sshd restart and rollback tasks of vps-harden.ps1 and vps-ssh-scope.ps1 stay SYSTEM: they need administrator and must outlive the session they cut (#2612) |
+| Tasks | Dev Server, Voice, Dev Voice, Web (#2578), Backup (#2612, #2836) and Bridge (#2891): LOCAL SERVICE, Limited, each with a SID of its own. Thornswood Server's installer does the same; the live task was still SYSTEM, Highest when read on 19 Oct and moves with the first live Publish-Server since (#2578). Watch, Load, Disk History, Runner Logs, Maint Update, Dev Crash Capture: SYSTEM, Highest, by design (section 8). Thornswood Docs: LOCAL SERVICE, Limited. The one-shot sshd restart and rollback tasks of vps-harden.ps1 and vps-ssh-scope.ps1 stay SYSTEM: they need administrator and must outlive the session they cut (#2612) |
 
 So: one identity, full admin, reachable from anywhere on port 22 with any of
 five keys, used for everything from a site file copy to a firewall change.
@@ -106,9 +107,10 @@ not decided the deploy identity (section 7.4), so nothing here changes that.
 2. `Administrator` stays, as break glass and for install-time work only.
    Its keys get `from="<addresses>"` once section 7 settles the addresses,
    and the keys nobody claims are removed (decision, not done here).
-3. The runtime identities stay as they are (SYSTEM tasks, LOCAL SERVICE
-   site, ThornswoodBot, runners). Moving the SYSTEM tasks to virtual
-   accounts is a separate change, under "Later".
+3. The runtime identities stay as they are (LOCAL SERVICE tasks with SIDs
+   of their own for the services that run code we deploy, ThornswoodBot,
+   runners, and the SYSTEM tasks of section 8). Moving the services off
+   SYSTEM was its own change, under "Later".
 
 Scripts change by taking `-As deploy|admin` in `Remote.ps1`, defaulting to
 deploy once the gate exists, and failing with a clear sentence when a deploy
@@ -293,10 +295,50 @@ Order on the box (Claude only, from the vault note): confirm the console
 login, save `administrators_authorized_keys`, remove the two keys, then
 narrow port 22. No lane makes any of these changes.
 
+## 8. What stays SYSTEM, by design (Patrick, 22 Oct 2026)
+
+Decided on his report page at 1:23 AM (#2578): only the services that run
+code we deploy get accounts of their own. The tasks that watch, keep or
+repair the box stay SYSTEM, Highest, on purpose. Each one, and what it does
+that needs that much:
+
+| Task | Made by | Why SYSTEM |
+| --- | --- | --- |
+| Thornswood Watch, every five minutes | `Watch-Services.ps1 -Install` | Restarts the other services and tasks, each under an account of its own, and reads every service, task and folder it checks (#3212) |
+| Thornswood Load, every five minutes | `Watch-Load.ps1 -Install` | Reads the processor time, memory and I/O of every service's processes, each under another account, and writes beside the watchdog in `C:\Thornswood-Watch` (#2061) |
+| Thornswood Disk History, daily | `Forecast-Storage.ps1 -Install` | Writes its history and alerts into the watchdog's folder and outbox, `C:\Thornswood-Watch`, which only SYSTEM and Administrators may write (#2178) |
+| Thornswood Runner Logs, daily | `Keep-RunnerLogs.ps1 -Install` | Removes old logs from the `_diag` folder of every runner, each under its own runner account (#3184) |
+| Thornswood Maint Update, daily | Nothing in the repository (#3288) | Found on the box on 11 Oct; runs `C:\Thornswood-Maint\update.ps1` (`Lock-VpsFolders.ps1`) |
+| Thornswood Dev Crash Capture, at boot | Nothing in the repository (#3288) | Found on the box on 11 Oct |
+| The one-shot put backs of `vps-harden.ps1`, `vps-ssh-scope.ps1`, `Grant-BoxAccess.ps1` and `vps-capture-443.ps1` | Those scripts | Rewrite sshd's files, firewall rules or the capture, which need administrator, and must outlive the ssh session they may cut. Each runs once and removes itself (#2612, #2891, #2970) |
+
+What keeps these safe while they run as SYSTEM: their scripts sit in
+`C:\Thornswood-Watch` and `C:\Thornswood-Maint`, which
+`Lock-VpsFolders.ps1` keeps to SYSTEM and Administrators (the bot reads
+Watch and may write one file there, `alerts-sent-bot.txt`, by
+`Bot-Service.ps1`'s rules), and every service on its own account is checked against them before
+it is moved (`ServiceAccount.ps1`, `Get-ThornswoodServiceNeverReach`). So no
+code we deploy can change what these tasks run.
+
+What keeps this list true:
+
+- `tests\test-2612-backup-principal.ps1` fails on any SYSTEM or Highest
+  principal under `scripts\`, from `Register-ScheduledTask` or from
+  `schtasks /ru SYSTEM /rl HIGHEST`, that is not on its list with a reason.
+  Until 22 Oct it read only the first form, so Load, Disk History and
+  Runner Logs were never on it.
+- `records\prod-parity.json` names each task's account, so
+  `Check-ProdParity.ps1` shows a task on the wrong one, or one nobody wrote
+  down, as a difference to review.
+- Maint Update and Dev Crash Capture are outside both until #3288 gives them
+  a script here or takes them off the box.
+
 ## Later, not in this issue
 
 Moving the SYSTEM tasks (game servers, voice, web, backup) to per-service
 virtual accounts with only the folders they need, the way the site and bot
 already run. Its own issue since 16 Oct, #2578, because section 6 found the
 deploy identity buys little until it is done. Done for the game servers,
-voice and web by #2578 and for the backup by #2612.
+voice and web by #2578 and for the backup by #2612 and #2836. The live game
+server's task moves with the first live Publish-Server since #2578. What
+stays SYSTEM is section 8.
