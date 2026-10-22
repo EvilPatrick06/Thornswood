@@ -28960,7 +28960,7 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     output, bench and exact new counts, and goes on as that recipe.
   */
   let desc = null;
-  if (!recipeId) {
+  if (!recipeId && typeof recipeSetInGame === 'function') {
     desc = recipeSetInGame(craftedItemBaseId, workbenchId, arguments[6]);
   }
   if (!recipeId && !desc) {
@@ -29004,7 +29004,7 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     }
     // The mod's own counts for a recipe set in each game: this game has not
     // set the new ones yet (#613), and they are what the craft costs.
-    if (Object.prototype.hasOwnProperty.call(RECIPES_SET_IN_GAME, desc)) {
+    if (typeof RECIPES_SET_IN_GAME === 'object' && Object.prototype.hasOwnProperty.call(RECIPES_SET_IN_GAME, desc)) {
       const asks = RECIPES_SET_IN_GAME[desc];
       const no = 'The ' + asks.name.trim() + ' takes different materials here than that bench listed. ' +
                  'Leave the bench and use it again to see what it takes.';

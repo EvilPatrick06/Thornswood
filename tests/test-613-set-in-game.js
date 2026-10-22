@@ -210,10 +210,10 @@ yes('S5 handRecipeCounts hands every recipe\'s inputs once a load, and not again
 // ------------------------------------------------------------- the wiring --
 const onCraft = take('mp.onCraft = guard(\'onCraft\', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {', '\n});\n') || '';
 yes('W1 onCraft names a craft with no recipe id from the table first, and goes on with it as that recipe',
-    /if \(!recipeId\) \{\s*desc = recipeSetInGame\(craftedItemBaseId, workbenchId, arguments\[6\]\);/.test(onCraft) &&
+    /if \(!recipeId && typeof recipeSetInGame === 'function'\) \{\s*desc = recipeSetInGame\(craftedItemBaseId, workbenchId, arguments\[6\]\);/.test(onCraft) &&
     /if \(!recipeId && !desc\) \{/.test(onCraft) && /const row = craftRow\(desc\);/.test(onCraft));
 yes('W2 and refuses a recipe of the table at the mod\'s own counts, before anything is taken',
-    /hasOwnProperty\.call\(RECIPES_SET_IN_GAME, desc\)\) \{[\s\S]*?return false;/.test(onCraft) &&
+    /typeof RECIPES_SET_IN_GAME === 'object' && Object\.prototype\.hasOwnProperty\.call\(RECIPES_SET_IN_GAME, desc\)\) \{[\s\S]*?return false;/.test(onCraft) &&
     onCraft.indexOf('RECIPES_SET_IN_GAME, desc') < onCraft.indexOf('const row = craftRow(desc);'));
 yes('W3 the counts are handed at spawn, beside the recipes the menu leaves out',
     /handRecipesHidden\(actorId\); \}\n\s*\/\/ And the counts set in each game[\s\S]{0,200}handRecipeCounts\(actorId\);/.test(src));
