@@ -25,8 +25,9 @@
 //      record that keeps it out, which holds what the entry says: a set in
 //      records\ui-gone.json, or a list in Ship-Rules.ps1 that holds every
 //      path the entry names (the five files nothing uses, #2177); a file the
-//      launcher makes from the person's own game names the Ship-Rules.ps1
-//      list that keeps it out of every pack the same way (#2827);
+//      launcher makes from the person's own game, or from their own copy of
+//      the collection's mods, names the Ship-Rules.ps1 list that keeps it out
+//      of every pack the same way (#2827, #3113);
 //   5. no permission is copied in: no email address anywhere in it;
 //   6. it stays operator only: nothing that builds a pack, the installer, the
 //      launcher or the site names it, and it is not under site\public;
@@ -107,7 +108,7 @@ function audit(reg, files, hash, uiGone, shipRules) {
     if (statuses.indexOf(a.status) < 0) bad.push(name + ': status "' + a.status + '" is not one the register defines');
     if (NEEDS_ASK.indexOf(a.status) >= 0 && !(typeof a.ask === 'string' && /^[^:]{2,}: \S/.test(a.ask))) bad.push(name + ': ' + a.status + ' with no ask naming who can answer ("Who: what")');
     if (a.status === 'no-licence-found' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': no licence found, and no issue that carries it');
-    if (a.status === 'withheld' || a.status === 'made-from-game') {
+    if (a.status === 'withheld' || a.status === 'made-from-game' || a.status === 'made-from-mods') {
       const m = /^records\/ui-gone\.json#(\w+)$/.exec(a.record || '');
       const r = /^scripts\/release\/Ship-Rules\.ps1#(\w+)$/.exec(a.record || '');
       if (r) {
@@ -116,8 +117,8 @@ function audit(reg, files, hash, uiGone, shipRules) {
         const out = paths.filter((x) => list.indexOf(x) < 0);
         if (!list.length || !paths.length) bad.push(name + ': ' + a.status + ' by Ship-Rules.ps1 $' + r[1] + ', but that list or the entry\'s paths are empty');
         else if (out.length) bad.push(name + ': ' + a.status + ' by Ship-Rules.ps1 $' + r[1] + ', which does not hold ' + out.join(', '));
-      } else if (a.status === 'made-from-game') {
-        bad.push(name + ': made from the game, but names no Ship-Rules.ps1 list that keeps it out of packs');
+      } else if (a.status === 'made-from-game' || a.status === 'made-from-mods') {
+        bad.push(name + ': made from the ' + (a.status === 'made-from-game' ? 'game' : 'mods') + ', but names no Ship-Rules.ps1 list that keeps it out of packs');
       } else {
         const held = m && uiGone ? uiGone[m[1]] : null;
         const n = held ? (Array.isArray(held) ? held.length : Object.keys(held).length) : 0;
@@ -177,6 +178,10 @@ if (reg) {
     (reg.notInRepo || []).filter((a) => a.status === 'made-from-game' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromGame')
       .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 3 &&
     shipList(shipRules, 'ShipMadeFromGame').length === 3);
+  yes('the five menus the launcher makes from the collection\'s mods are registered, held out by the Ship-Rules.ps1 list (#3113)',
+    (reg.notInRepo || []).filter((a) => a.status === 'made-from-mods' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromMods')
+      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 5 &&
+    shipList(shipRules, 'ShipMadeFromMods').length === 5);
   yes('community uploads and the collection\'s mods are dispositioned', (reg.dispositions || []).length >= 2 && (reg.dispositions || []).some((d) => /gallery/i.test(d.what)) && (reg.dispositions || []).some((d) => /collection/i.test(d.what)));
 }
 

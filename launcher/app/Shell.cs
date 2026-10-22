@@ -422,13 +422,6 @@ namespace Thornswood
             {
                 string res = Display.MatchScreen();
                 if (res != null) Log("Set the game to " + res + " to match your screen.");
-
-                // Same idea, one layer up: the menus themselves are sized in
-                // pixels, so a tall screen makes the inventory small and the
-                // category icons squeeze together.
-                string menus = Display.ScaleMenus();
-                if (menus != null && menus != "1") Log("Sized the menus up " + menus + "x for this screen.");
-
             }
 
             // The shortcut points at whatever icon file the last build wrote,

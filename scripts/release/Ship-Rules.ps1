@@ -815,6 +815,34 @@ function Test-ShipMadeFromGame([string]$rel) {
     return $false
 }
 
+# MADE FROM THE COLLECTION'S MODS ON EACH MACHINE, NEVER SHIPPED (#3113).
+#
+# An item on Thornswood has no gold price, and three of the collection's mods
+# draw one: SkyUI's item lists and item card, SkyHUD's line under an item
+# somebody looks at, and moreHUD's value to weight. The launcher makes these
+# five from each machine's own copy of those mods, out of their archives
+# (launcher\app\FromGameModMenus.cs, written by scripts\mods\Build-ModMenus.py),
+# the same way and at the same times as the three above. They are their
+# authors' files edited, so none of them may leave the machine either, and none
+# is listed as removed: a delete.txt line would take one away until the next
+# Play made it again. Not Bethesda's, so Test-ShipBethesda does not ask this;
+# Test-ShipMachine does. The launcher's list is FromGame.Files after the three
+# above; tests\test-2827-from-game.ps1 holds the two to each other.
+$ShipMadeFromMods = @(
+    'Data\Interface\skyui\config.txt',
+    'Data\Interface\skyui\itemcard.swf',
+    'Data\Interface\hudmenu.swf',
+    'Data\Interface\AHZHudInfo.swf',
+    'Data\Interface\exported\AHZHudInfo.swf'
+)
+
+function Test-ShipMadeFromMods([string]$rel) {
+    foreach ($f in $ShipMadeFromMods) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
 # A mod Thornswood has taken out. Never shipped, and never listed as removed:
 # the launcher takes these out of its own game folder itself (OwnGame.Retired,
 # rules 7), so a pack has nothing to delete and no Vortex file in the Steam
@@ -1110,8 +1138,10 @@ function Test-ShipMachine([string]$rel) {
     if (Test-ShipVanilla $rel) { return $true }
     if (Test-ShipForeignFramework $rel) { return $true }
     if (Test-ShipBethesdaLeftAlone $rel) { return $true }
-    # Made on each machine from its own game (#2827).
+    # Made on each machine from its own game (#2827) and its own copy of the
+    # collection's mods (#3113).
     if (Test-ShipMadeFromGame $rel) { return $true }
+    if (Test-ShipMadeFromMods $rel) { return $true }
     # One machine's own by kind (#1239), the named files and Vortex's records
     # among them. The runtime folders are the one kind left to Test-ShipRuntime,
     # which lists them as removed when a baseline once had them.
@@ -1288,8 +1318,9 @@ $ShipOursFiles = @(
     # The SkyMP client's compiled script, from the engine fork.
     'Data\Scripts\MpClientPlugin.pex',
     # An empty loading spinner (Checks.cs, since 16 September) and the menu
-    # music's silent stand in for the game's theme. Go.ps1 writes these
-    # three from game\ours ($oursMenuFiles there; change the two together).
+    # music's silent stand in for the game's theme. Go.ps1 writes these two,
+    # skyhud.txt and QuickLootIE.json below from game\ours ($oursMenuFiles
+    # there; change the two together).
     # The main menu itself, with no Bethesda logo, is made on each machine
     # from the game's own since #2827 ($ShipMadeFromGame).
     'Data\Interface\loadwaitspinner.swf',
@@ -1299,7 +1330,11 @@ $ShipOursFiles = @(
     # were Daedric Online's by their own first lines and are one machine's
     # (#1239); TrueHUD\RP_Bosses.ini is Daedric Online's boss list (#1253), so
     # neither is named here.
-    'Data\Interface\skyhud\skyhud.txt'
+    'Data\Interface\skyhud\skyhud.txt',
+    # QuickLoot IE's settings file with its loot menu's columns weight only,
+    # no gold value (#3113). QuickLoot IE is GPL 3, so its file may go out
+    # changed, saying so.
+    'Data\SKSE\Plugins\QuickLootIE.json'
 )
 
 # NEMESIS'S OUTPUT IS OURS, because we generate it from the collection.

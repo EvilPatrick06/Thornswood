@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Makes the main menu and the notice board's two meshes from a game's own archives the way the launcher does, and says whether each came out byte for byte (#2827).
+  Makes the main menu, the notice board's two meshes and the collection's menus with no gold values from a game's own archives the way the launcher does, and says whether each came out byte for byte (#2827, #3113).
 
 .DESCRIPTION
   Since #2827 Thornswood ships none of Data\Interface\startmenu.swf,
@@ -14,21 +14,27 @@
   machine with the game proves a recipe before it is merged, and how anybody
   finds out why their launcher says it could not make one.
 
+  The same goes for the five files of the collection's mods made with no gold
+  values since #3113 (SkyUI's config.txt and itemcard.swf, SkyHUD's
+  hudmenu.swf, moreHUD's AHZHudInfo.swf twice, from the recipes in
+  FromGameModMenus.cs that scripts\mods\Build-ModMenus.py writes): they are
+  their authors' files, made from the mods' own archives in -Data.
+
   Reads the archives and writes nothing, unless -Out names a folder to write
-  the three into, to look at. -Out may not be inside the repository: the files
-  are Bethesda's and are not to be committed.
+  them into, to look at. -Out may not be inside the repository: the files
+  are Bethesda's and the mods' authors', and are not to be committed.
 
 .PARAMETER Data
   The game's Data folder, whose Skyrim - Interface.bsa and Skyrim - Meshes0.bsa
-  and Meshes1.bsa are read. Default Game\Data in the install Where.ps1
+  and Meshes1.bsa are read, and SkyUI_SE.bsa, SkyHUD.bsa and AHZmoreHUD.bsa. Default Game\Data in the install Where.ps1
   Install finds (C:\Thornswood on most machines).
 
 .PARAMETER Out
-  A folder to write the three into, under their game folder paths. Optional.
+  A folder to write them into, under their game folder paths. Optional.
 
 .EXAMPLE
   pwsh -NoProfile -File .\scripts\mods\Check-FromGame.ps1
-  Exit 0 when all three come out byte for byte, 1 when one does not.
+  Exit 0 when every one comes out byte for byte, 1 when one does not.
 #>
 [CmdletBinding()]
 param(
@@ -40,7 +46,7 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 if ($Out) {
   $full = [IO.Path]::GetFullPath($Out)
   if ($full.StartsWith($repo + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
-    Write-Host 'STOP. -Out is inside the repository; the three are Bethesda''s files and are not to be committed (#2827).'
+    Write-Host 'STOP. -Out is inside the repository; these are Bethesda''s and the mods'' authors'' files and are not to be committed (#2827, #3113).'
     exit 1
   }
 }
