@@ -8,7 +8,7 @@
 
   On 28 Sep the dev door list went from 46 profiles to 28 after Set-Door
   pointed the dev server at https://thornswood.net/dev, which is the design
-  (docs\SYSTEM.md, "The door"; site\server.js, /dev/api/allowed lists only the
+  (docs\SERVER.md, "The door"; site\server.js, /dev/api/allowed lists only the
   people with the dev role). The 46 was the live list: Set-Door -Connect aimed
   at the dev root wrote the live address unless -Site was given. And
   Publish-Server.ps1's step that was meant to give dev the live roster was

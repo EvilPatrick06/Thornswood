@@ -606,7 +606,7 @@
       "from": "bot/invite-splash-1920x1080.jpg"
     },
     {
-      "path": "docs/guide/launcher-play-dev.png",
+      "path": "docs/launcher-play-dev.png",
       "sha256": "fcf51dc085b68383d0db6719e45f1909be2926b791b6de2b0414dc53427894f0",
       "what": "A screenshot of the launcher's Play page for Developer-Guide.md.",
       "published": "nowhere: the guide is in this private repository",
