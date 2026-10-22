@@ -73492,12 +73492,15 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // everybody's sight, or for an ambush once somebody comes near.
   const held = new Map(), AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
   // An NPC nobody can see that only wanders is stepped once in this long
-  // (the first time at once), the longest step update() takes (#3181, Patrick's C on 22 Oct 2026: NPCs
+  // (the first time at once) (#3181, Patrick's C on 22 Oct 2026: NPCs
   // nobody can see are updated less often, never paused). Before, every pass
-  // over the cast stepped each of them (up to 64 steps every 20 ms): with
-  // nobody on, dev's 4,821 reported about 57,000 moving steps a minute on
-  // 22 Oct, and that runtime was nearly all of the 0.187 of a core dev's
-  // JavaScript thread was busy on 21 Oct.
+  // over the cast stepped each of them as fast as its 4 ms a turn allowed,
+  // about every 5 s: with nobody on, dev's 4,820 took about 59,000 moving
+  // steps a minute on 22 Oct, and those steps (a native state read, a look
+  // for a fight, a native move) were most of the 0.18 of a core dev's
+  // JavaScript thread was busy. A 4 s turn, the first try, was no fewer.
+  // Such a step covers up to UNSEEN_EVERY of walking, still no further than
+  // the next point of its path; one somebody can see covers up to SEEN_STEP.
   // A fight or a flight nobody can see is stepped every BUSY_EVERY, as often
   // as nearTick steps one somebody can see. An NPC somebody can see is
   // stepped by nearTick, and looked at here again NEAR_RECHECK later.
@@ -73507,7 +73510,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // dev profile on 22 Oct, a pass walked the whole cast in order and skipped
   // whoever was not due, so with 4,820 NPCs most of backgroundTick's 1,984
   // ms in 120 s went on looking at NPCs it then passed over.
-  const UNSEEN_EVERY = 4000, BUSY_EVERY = 100, NEAR_RECHECK = 1000;
+  const UNSEEN_EVERY = 15000, SEEN_STEP = 4000, BUSY_EVERY = 100, NEAR_RECHECK = 1000;
   const due = [];
   function queue(a,at) {
     let i=due.length;due.push(null);
@@ -73865,8 +73868,8 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       }
     }
   }
-  function update(a) {
-    const at=now(),elapsed=Math.min(UNSEEN_EVERY,Math.max(0,at-a.last));a.last=at;
+  function update(a,longest) {
+    const at=now(),elapsed=Math.min(longest,Math.max(0,at-a.last));a.last=at;
     const s=swimming(factionData(nativeCall('getNpcAIState',a.id)),a.policy);
     if(!validState(s)) throw new Error('Invalid live state');
     a.state=s;
@@ -74020,10 +74023,10 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.savedMode=a.mode;
     }
   }
-  function step(id) {
+  function step(id,longest=SEEN_STEP) {
     const a=actors.get(id);
     if(!a) return;
-    try {update(a);} catch(e) {
+    try {update(a,longest);} catch(e) {
       reject(id,e);actors.delete(id);
       if(a.tile && npcTiles.has(a.tile)) npcTiles.get(a.tile).delete(id);
     }
@@ -74040,7 +74043,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       if(near.has(id) || Array.from(humans.values()).some(s=>s.cellOrWorld===a.cell && distance(s.pos,a.pos)<=4096)) {
         queue(a,at+NEAR_RECHECK);continue;
       }
-      step(id);moves++;background++;
+      step(id,a.mode==='ambient' ? UNSEEN_EVERY : SEEN_STEP);moves++;background++;
       if(actors.get(id)===a) queue(a,now()+(a.mode==='ambient' ? UNSEEN_EVERY : BUSY_EVERY));
     }
     if(now()-lastReport>=60000) {
