@@ -396,6 +396,34 @@ try:
     yes('  without -Posts it never says would write, and says the posts are left alone',
         'would write' not in out and 'left alone' in out and '-Posts rewrites them' in out)
     yes('  and writes down no webhook, though one is there', not os.path.exists(B.WEBHOOK_OUT))
+    # The server as the layout run of 22 Oct found it: the faction chats
+    # and voices in one Factions category, and no category per faction yet.
+    # -Check said "would make" for each; the build moved them (#3317).
+    g = live_server()
+    comp = [c for c in g.categories if c.name == 'The Companions'][0]
+    old = Channel(g, 'Factions', 'category')
+    g.categories.append(old)
+    g.channels.append(old)
+    g.categories.remove(comp)
+    g.channels.remove(comp)
+    for ch in list(comp.channels):
+        if ch.name in ('companions', 'The Companions'):
+            ch.category = old
+            old.channels.append(ch)
+        else:
+            g.channels.remove(ch)
+    out = run(g, check=True)
+    lines = [ln.strip() for ln in out.splitlines()]
+    yes('-Check of a faction category not made yet says it would make the category',
+        'category The Companions' in out and g.calls == [])
+    yes('  and that it would move the faction\'s chat and voice in from Factions, by their was lines',
+        '#companions in Factions becomes #companions in The Companions' in out
+        and '#The Companions in Factions becomes #The Companions in The Companions' in out)
+    yes('  and not that it would make them',
+        not any(ln.endswith('#companions') and 'would make' in ln for ln in lines)
+        and not any(ln.endswith('voice The Companions') for ln in lines))
+    yes('  and still that it would make the channels that are new',
+        any(ln.endswith('#companions-leadership') and 'would make' in ln for ln in lines))
     out = run(live_server(), check=True, posts=True)
     yes('-Check with -Posts says would write', 'would write' in out)
 

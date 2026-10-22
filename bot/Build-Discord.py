@@ -60,6 +60,7 @@
 import asyncio
 import os
 import sys
+import types
 
 # ----------------------------------------------------- the running set --
 # What bot.py does once the build is over, and nothing more. Each one is
@@ -2956,11 +2957,18 @@ async def on_ready():
                     # -Check makes nothing, a category included (#2519: the
                     # -Check of 22 Oct, 3:59 AM, made Gamemasters).
                     say('would make', 'category ' + catname)
+                    # A channel with a was line is moved into the new
+                    # category, not made: the -Check of 22 Oct said "would
+                    # make" for the sixteen faction chats the build then
+                    # moved with their history (#3317).
+                    planned = types.SimpleNamespace(name=catname)
                     for spec in specs:
+                        want = (spec['name'] if spec['kind'] == 'voice' else
+                                spec['name'].lower().replace(' ', '-'))
+                        if await bring_back(guild, planned, spec, want) is False:
+                            continue
                         if spec.get('make', True):
-                            say('would make', ('voice ' if spec['kind'] == 'voice' else '#') +
-                                (spec['name'] if spec['kind'] == 'voice' else
-                                 spec['name'].lower().replace(' ', '-')))
+                            say('would make', ('voice ' if spec['kind'] == 'voice' else '#') + want)
                     continue
                 if cat is None:
                     cat = await guild.create_category(
