@@ -100,7 +100,9 @@ WHAT IT PUTS IN THE PLUGIN
      initially disabled one. A floor item placed by a plugin the policy
      never copies from (notCopiedFrom: Immersive Armors, #2454) has no
      record below it to switch off, and its own is not copied (Patrick,
-     22 Oct 2026, q-613-ia-recipes): it is listed in the manifest
+     22 Oct 2026, q-613-ia-recipes); one standing in a cell or world such a
+     plugin wins would need that plugin's record of the place copied, or
+     its edit of it undone. Each of those is listed in the manifest
      (floorItems.heldByServer) and in the FLOOR_HELD_BY_SERVER block this
      writes into game/gamemode.js, and the server holds it disabled
      itself, the way it holds the three chopping blocks (#495).
@@ -1262,6 +1264,17 @@ def build(data_dir):
     # plugin deleted, and one already off with no enable parent.
     bases = floor_bases(plugins, win, canon)
     found, parents = floor_scan(plugins, win, bases)
+
+    def in_blocked_place(e):
+        """Whether e stands in a cell or world a never-copied plugin wins."""
+        src = plugins[e.pi]
+        world, cell = e.ctx[0], e.ctx[1]
+        for tag, fid in ((b'CELL', cell), (b'WRLD', world)):
+            w = win.get((tag, src.gid(fid))) if fid is not None else None
+            if w is not None and plugins[w.pi].name.lower() in blocked and not carries(tag, src.gid(fid)):
+                return True
+        return False
+
     floor, floor_rows, by_server = [], {'deleted': [], 'alreadyOff': []}, []
     for g in sorted(found, key=lambda g: (canon[g[0]].lower(), g[1])):
         e, kind = found[g]
@@ -1278,6 +1291,12 @@ def build(data_dir):
         # here, without the script.
         elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             floor_rows['alreadyOff'].append(desc_of(g, canon))
+        elif in_blocked_place(e):
+            # It stands in a cell or world a never-copied plugin wins, so
+            # switching it off here would copy that plugin's record of the
+            # place, or undo its edit with the one below. The server holds
+            # it off instead.
+            by_server.append((g, kind))
         elif src.name.lower() in blocked and not carries(b'REFR', g):
             if under(e, b'REFR', g) is not None:
                 floor.append((g, under(e, b'REFR', g), kind))
@@ -1917,7 +1936,7 @@ def verify(data_dir, plugin_bytes, manifest):
         tags = [t for t, _ in subrecords(plugins[e.pi].data(e))]
         if e.flags & DELETED:
             continue
-        if desc_of(g, canon) in by_server and plugins[e.pi].name.lower() in blocked:
+        if desc_of(g, canon) in by_server:
             continue
         if e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             here += e.pi == last.index
