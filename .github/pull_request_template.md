@@ -4,8 +4,9 @@
 Then what caused it and how that was measured: the log line, the file, the steps.
 Closes #N when it finishes an issue nobody would notice. A fix people would notice
 says Refs #N and carries its test task, which moves the issue to Done on merge.
-That issue stays open until a main Ship puts the fix on the main server; never
-close it at the merge, or testers are sent to look for a fix main lacks:
+That issue stays open until a main Ship puts the fix on the main server, and that
+Ship closes it with this test task; never close it at the merge, or testers are
+sent to look for a fix main lacks:
 Test task for #N: <title, at most 45 characters>
 Server: Main
 1. Plain steps, then what should happen. -->

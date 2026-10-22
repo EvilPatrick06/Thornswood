@@ -2707,6 +2707,30 @@ if (-not $DryRun -and $global:ThornswoodPublishedRelease) {
 }
 # ==== end thornswood release tag ====
 
+# THE DONE ISSUES THIS RELEASE CARRIES ARE CLOSED (#3279). A fix people would
+# notice stays open in Done after its merge, with its test task written on it
+# by done-on-merge.yml, until a main Ship puts it on the main server; this is
+# that Ship. Close-ShippedIssues.ps1 reads the board, closes each open issue in
+# Done whose merge the commit this release was built from contains, with its
+# test task as the closing comment, and names the ones that stay open. Main
+# only: dev is where the team checks nothing breaks, not where testers test.
+# After the tag, because it needs the commit the release record names, and
+# like the follow-ons above it cannot fail the release.
+if (-not $DryRun -and -not $Dev -and $global:ThornswoodPublishedRelease) {
+    Head 'The Done issues it carries'
+    if ($tagged.Commit) {
+        Invoke-PostShip 'closing the Done issues it carries' 'Close-ShippedIssues.ps1' @{ Commit = $tagged.Commit; RepoDir = $RepoDir; NoPause = $true } `
+            ".\scripts\release\Close-ShippedIssues.ps1 -Commit $($tagged.Commit)"
+    } else {
+        # The tag step said why the record named no commit.
+        Say '  not closed: the release record names no commit, so what this release carries is not known' 'Red'
+        $script:PostShipFailed += [pscustomobject]@{
+            What     = 'the Done issues it carries were not closed'
+            PutRight = '.\scripts\release\Close-ShippedIssues.ps1 -Commit (git rev-parse HEAD)'
+        }
+    }
+}
+
 Head 'Done'
 # Repeated here on purpose. A red line in the middle of a release log is a line
 # nobody reads: the last screen is the one that gets looked at.
