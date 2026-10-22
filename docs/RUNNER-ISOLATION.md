@@ -145,6 +145,13 @@ outbound limit as residual risk.
    reads that off GitHub (every runner carries the same labels, so a build
    cannot be sent to one of them); `-NetworkOnly -Remove` for that one
    account is the way back.
+   The signing runner (records\sign-runners.json, runner 3 since #3312)
+   also reaches the Microsoft hosts release.yml's sign steps need, each
+   held by an Azure service tag in Microsoft's published Service Tags file,
+   which that record names; on 22 Oct its rules without them stopped the
+   first VPS signing run at api.nuget.org (release.yml run 39838728417).
+   Since then every list is read on the box, so a cloud session can run
+   `-NetworkOnly` too.
 2. GitHub-hosted runners are the default for builds. The VPS runners are a
    backup only: used by hand, or automatically when a hosted run fails
    because the account's Actions minutes or usage ran out. Patrick confirmed
