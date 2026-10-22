@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  69,
-    "callCount":  272,
+    "callCount":  273,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -194,6 +194,15 @@
                       "does":  "swaps the stage in, or puts back with -PutBack",
                       "class":  "swap",
                       "reason":  "swap block; StopOurs kills the server pid with Stop-Process"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$reloadOut = @(Remote ((ReloadVars $Root $Task $stageName $prevName $Wait $hashes $newBlob) + $reloadBlock) |",
+                      "does":  "puts a gamemode-only stage in while the dev server runs and confirms the load from server.log, or puts the old one back (#3196)",
+                      "class":  "swap",
+                      "reason":  "reload block; replaces gamemode.js and the stamp in the server folder, stops nothing"
                   },
                   {
                       "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
