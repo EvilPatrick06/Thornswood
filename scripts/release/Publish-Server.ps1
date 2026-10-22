@@ -107,6 +107,12 @@
   A build CI made and the store does not hold yet goes there first, held to
   the record here and again on the box:
       .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <engine.yml's server-<...>.zip>
+  A machine that takes CI's engine build (Setup-ShipMachine.ps1 -EngineBuild
+  ci, #3047) has no built server to pack, only the files the record names
+  and the zip they came in, so there a publish that names no -Dist does this
+  by itself, with the zip from Where.ps1 EngineArtifact's artifact\server,
+  fetching CI's build of the pin first when it is not there (#3262):
+      .\scripts\release\Publish-Server.ps1 -Channel dev
 
   A LOAD ORDER THAT DROPS PLUGINS (#2320). The installer refuses, before
   anything is stopped, a payload whose load order leaves out a plugin the
@@ -247,6 +253,24 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # empty in an advanced script's defaults (#2229). $DistGiven says whether the
 # person named the build, for the refusal below.
 $DistGiven = [bool]$Dist
+# A machine that takes CI's engine build (Setup-ShipMachine.ps1 -EngineBuild
+# ci, #3047) has no built server to pack: CI's artifact holds the server
+# files the record names and the zip they came in, never a
+# server-settings.json, a load order or a gamemode. So there a publish that
+# names no build is one from the store, sending that zip to the store first
+# (FROM THE STORE above). On 22 Oct 2026 at 5:37 AM the plain dev publish
+# stopped on such a machine, saying engine-ci\670ae74faca5\build\dist\server
+# holds no server-settings.json, and was run again by hand with -FromStore
+# -ServerBuild and the artifact's zip (#3262). -PutBack and -TaskOnly send
+# no build, so they are left as they are.
+$CiFromStore = $false
+if (-not $DistGiven -and -not $FromStore -and -not $PutBack -and -not $TaskOnly) {
+    $buildsFile = & (Join-Path $Here 'Where.ps1') EngineBuilds
+    if (Test-Path -LiteralPath $buildsFile) {
+        $buildsRec = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($buildsFile)) $buildsFile
+        if ($buildsRec -and $buildsRec.PSObject.Properties['ci'] -and $buildsRec.ci -eq $true) { $CiFromStore = $true; $FromStore = $true }
+    }
+}
 # -FromStore packs no build, so it never asks this machine for one (#459).
 if (-not $Dist -and -not $FromStore) { $Dist = & (Join-Path $Here 'Where.ps1') ServerDist }
 if (-not $Zip)  { $Zip  = & (Join-Path $Here 'Where.ps1') ServerZip }
@@ -257,6 +281,27 @@ if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+# CI's engine build (above): its server zip, fetched first when this machine
+# does not have the pin's build yet, the way Sync-Client.ps1 fetches its client.
+if ($CiFromStore) {
+    $ciDir = & (Join-Path $Here 'Where.ps1') EngineArtifact
+    $ciStamp = Join-Path $ciDir 'engine-artifact.json'
+    if (-not (Test-Path -LiteralPath $ciStamp)) {
+        Say ("this machine takes CI's engine build, and the pin's is not at $ciDir yet, so Get-EngineArtifact.ps1 fetches it") 'Cyan'
+        & (Join-Path $Here 'Get-EngineArtifact.ps1') -NoPause
+        if ($LASTEXITCODE -ne 0) { Die ("Get-EngineArtifact.ps1 could not fetch CI's engine build of the pin (exit $LASTEXITCODE); its lines above say why. Nothing was sent.") }
+    }
+    $ciInfo = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($ciStamp)) $ciStamp
+    $ciZipName = if ($ciInfo.PSObject.Properties['serverZip']) { [string]$ciInfo.serverZip } else { '' }
+    $ciZip = Join-Path (Join-Path (Join-Path $ciDir 'artifact') 'server') $ciZipName
+    if (-not $ciZipName -or -not (Test-Path -LiteralPath $ciZip -PathType Leaf)) {
+        Die ("$ciStamp names " + $(if ($ciZipName) { $ciZipName } else { 'no server zip' }) + ", and there is none at $ciZip, so CI's server build is not here to send. " +
+             "Remove $ciDir and run .\scripts\release\Get-EngineArtifact.ps1 to put it back whole. Nothing was sent.")
+    }
+    if (-not $ServerBuild) { $ServerBuild = $ciZip }
+    Say ('{0,-22} {1}' -f 'engine build', ("CI's, at $ciDir, which has no built server to pack, so this publishes from the store and sends " + $ServerBuild + ' there first')) 'DarkGray'
+}
 
 # A put-back sets no setting: the installer puts the previous folder back
 # with the running server's own (#1804). Refused before anything is built,
