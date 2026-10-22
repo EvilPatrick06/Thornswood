@@ -99,7 +99,7 @@ function build(from, root, commitArg) {
   const commit = got.commit;
   if (!/^[0-9a-f]{40}$/.test(commit || '')) { throw new Error('the traces name no full commit (' + commit + ')'); }
   const harnesses = {};
-  let windows = false;
+  let windows = false, enumerated = true;
   const codeCache = new Map();
   function platformLine(rel) {
     if (codeCache.has(rel)) { return codeCache.get(rel); }
@@ -117,7 +117,7 @@ function build(from, root, commitArg) {
   }
   for (const t of got.traces) {
     const onWindows = t.platform === 'windows';
-    if (onWindows) { windows = true; }
+    if (onWindows) { windows = true; if (t.listings !== 'enumerated') { enumerated = false; } }
     const reads = [], lists = [];
     let why = onWindows && t.always ? t.always : '';
     for (const [p, kinds] of Object.entries(t.paths)) {
@@ -156,6 +156,9 @@ function build(from, root, commitArg) {
   }
   const map = { format: 1, commit: commit, tracer: windows ? 'ETW on the VPS, scripts/dev/Trace-Gate.ps1' : 'strace on Linux, scripts/dev/Trace-HarnessReads.js', harnesses: harnesses };
   if (windows) { map.platform = 'windows'; }
+  // The box read each folder's enumerations, so a folder in lists was
+  // listed and one only in reads was opened and never listed.
+  if (windows && enumerated) { map.listings = 'enumerated'; }
   return map;
 }
 
@@ -191,10 +194,10 @@ function select(opts) {
   const baseDirs = new Set([...dirsOf(opts.baseFiles)].map(lower)), headDirs = new Set([...dirsOf(opts.headFiles)].map(lower));
   const touched = new Set(); // paths whose answer to open or stat differs
   const relisted = new Set(); // folders whose listing differs
-  // On Windows a folder's listing carries each entry's size and times, and
-  // a lookup by pattern (cmd's if exist, a -Filter) is seen only as an open
-  // of its folder, so a file changed in place changes what a harness that
-  // opened its folder was told.
+  // On Windows a folder's listing carries each entry's size and times, so a
+  // file changed in place changes what a harness that listed its folder was
+  // told. A map whose trace saw no enumerations has to take every folder
+  // opened as listed.
   const restated = new Map(); // folder to a file in it changed in place
   for (const c of changes) {
     const p = lower(c.path);
@@ -229,18 +232,24 @@ function select(opts) {
       if (touched.has(l)) { hit = 'reads ' + r; break; }
     }
     // A folder it listed gains or loses an entry. With dirStat 'listing' (the
-    // default) a folder it only opened or looked at counts the same, since a
-    // folder's size and link count move with its entries.
-    const folders = opts.dirStat === 'existence' ? h.lists : h.reads;
+    // default) a folder it only opened or looked at counts the same, since on
+    // Linux a folder's size and link count move with its entries. Not on a
+    // Windows map that saw the enumerations: there a folder only opened tells
+    // nothing of its entries (NTFS gives a folder size 0 and one link,
+    // whatever it holds), and its times move on every checkout anyway, since
+    // the runner writes every file again (#3029), so no result can lean on
+    // them.
+    const enumerated = map.platform === 'windows' && map.listings === 'enumerated';
+    const folders = enumerated || opts.dirStat === 'existence' ? h.lists : h.reads;
     for (const r of folders) {
       if (hit) { break; }
       if (relisted.has(lower(r))) { hit = 'looks at the folder ' + r + ', which gains or loses an entry'; }
     }
     if (map.platform === 'windows') {
-      for (const r of h.reads) {
+      for (const r of enumerated ? h.lists : h.reads) {
         if (hit) { break; }
         const f = restated.get(lower(r));
-        if (f) { hit = 'opened the folder ' + r + ', whose listing gives ' + f + '\'s size and times'; }
+        if (f) { hit = (enumerated ? 'listed' : 'opened') + ' the folder ' + r + ', whose listing gives ' + f + '\'s size and times'; }
       }
     }
     if (hit) { out.run.push(n); out.why[n] = hit; } else { out.skipped.push(n); }
