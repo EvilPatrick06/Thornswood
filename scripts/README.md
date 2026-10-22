@@ -139,7 +139,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [ops/Release-List.ps1](ops/Release-List.ps1) | The release list a game server lets go of at its next start (#2351), as Reset-Character.ps1, Wipe-Saves.ps1 (#2668) and New-Character.ps1 (#2673) write it. |
 | [ops/Reset-Appearance.ps1](ops/Reset-Appearance.ps1) | Puts a character back into the race menu without deleting them. |
 | [ops/Reset-Character.ps1](ops/Reset-Character.ps1) | Throws away the character on the server so the next launch runs creation from the top. |
-| [ops/Say-Staff.ps1](ops/Say-Staff.ps1) | Posts one staff notice in #staff-updates through the bot, from One, a developer's PC or a cloud thread: a line before an edit to one of the six shared files, taking the dev feed, what was merged or published. |
+| [ops/Say-Staff.ps1](ops/Say-Staff.ps1) | Posts one staff notice in #staff-updates through the bot, from One, a developer's PC or a cloud thread: only when staff must act: something staff must act on, a server restart or outage staff will see, or a change to how staff do their job. Never for releases, merges, progress, pull requests, issues, test tasks or routine deploys. |
 | [ops/Set-Collection.ps1](ops/Set-Collection.ps1) | Asks for the collection address and publishes it, in the two places that decide it, the same two Set-Server.ps1 uses. |
 | [ops/Set-DevNews.ps1](ops/Set-DevNews.ps1) | Points dev releases at the Discord channel for dev build updates, so they stop being something only the dev launcher ever mentions and stay out of #news, where everybody reads about the build they actually play. |
 | [ops/Set-Door.ps1](ops/Set-Door.ps1) | Turns the game server's door on, off, or tells you what it has been seeing. |
