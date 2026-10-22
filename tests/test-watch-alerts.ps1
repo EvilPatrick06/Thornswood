@@ -99,7 +99,7 @@ Yes '-SetWebhook sends the address on standard input, never on the command line'
 
 # The watcher as it runs, without the probes that touch the world. The fakes
 # below stand in for those, and $root is a scratch folder.
-$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'OffBoxProblem', 'PostWebhook', 'DiskNow')
+$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'OffBoxProblem', 'CertProblem', 'PostWebhook', 'DiskNow')
 $body = @()
 foreach ($s in $inner.EndBlock.Statements) {
     if ($s -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $fake -contains $s.Name) { continue }
@@ -133,6 +133,7 @@ function Box([string]$name, [switch]$NoHook, [string]$Hook) {
     }
     $script:backupWhy = ''
     $script:offboxWhy = ''
+    $script:certWhy = ''
     $script:runnerWhy = ''
     $script:diskPct = 50.0
     $script:hookAnswer = ''
@@ -179,6 +180,7 @@ function HealthProblem($url) {
 function ServiceProblem($name) { return $script:runnerWhy }
 function BackupProblem($task, $folder, $hours) { return $script:backupWhy }
 function OffBoxProblem($file, $hours) { $script:offboxFile = $file; return $script:offboxWhy }
+function CertProblem($url, $days) { $script:certAsked = $url; return $script:certWhy }
 function DiskNow() { return @{ Free = 80GB * $script:diskPct / 100.0; Size = 80GB } }
 function PostWebhook($url, $text) {
     $script:hookTries++
@@ -464,6 +466,32 @@ try {
     Yes 'OffBoxProblem: one taken this morning is fine' ((& $ob $obFile $obNow) -eq '')
     Set-Content -LiteralPath $obFile -Value 'thornswood-20260927-110000.zip' -Encoding ASCII
     Yes 'OffBoxProblem: 25 hours is inside the line, and a plain .zip counts' ((& $ob $obFile $obNow) -eq '')
+    # Caddy's own certificate (#2995): from outside, Cloudflare's shows, so
+    # the box asks its own 443 for Caddy's.
+    Box 'cert'
+    $script:certWhy = 'it runs out on 30 September 2026 03:00, in 1 day, and the line is 14'
+    Step 1
+    Yes 'Caddy''s certificate running out is told once, in words' ((Said '^\*\*The certificate Caddy holds for thornswood\.net needs a look\.\*\* It runs out on 30 September 2026 03:00, in 1 day') -eq 1)
+    Yes '  saying where to look, and that 443 must still take Cloudflare' ("$($script:said[0].Text)" -match 'Caddy''s log in C:\\Thornswood-Caddy' -and "$($script:said[0].Text)" -match 'Set-WebFirewall\.ps1 -Check')
+    Yes '  asking about the site''s own name' ($script:certAsked -eq 'https://thornswood.net/')
+    Yes '  and restarting nothing for it' ($script:runs.Count -eq 0)
+    $script:certWhy = ''
+    Step 2
+    Yes '  fine again is said once' ((Said 'The certificate Caddy holds for thornswood\.net is fine again') -eq 1 -and $script:said.Count -eq 2)
+    # The real CertProblem and SiteAnswers, with what Caddy's 443 said stood in.
+    $cp = [scriptblock]::Create('param($ans, $n) $now = $n; function AskCaddy($url) { return $ans }' + "`n" + $fns['CertProblem'].Extent.Text + "`n" + 'CertProblem ''https://thornswood.net/'' 14')
+    $sa = [scriptblock]::Create('param($ans) function AskCaddy($url) { return $ans }' + "`n" + $fns['SiteAnswers'].Extent.Text + "`n" + 'SiteAnswers ''https://thornswood.net/''')
+    $cpNow = New-Object DateTime (2026, 9, 28, 12, 0, 0)
+    Yes 'CertProblem: 60 days left is fine' ((& $cp @{ Status = 200; NotAfter = $cpNow.AddDays(60); Problems = 'None'; Error = '' } $cpNow) -eq '')
+    Yes 'CertProblem: 10 days left says when, and the line' ((& $cp @{ Status = 200; NotAfter = $cpNow.AddDays(10); Problems = 'None'; Error = '' } $cpNow) -eq 'it runs out on 8 October 2026 12:00, in 10 days, and the line is 14')
+    Yes 'CertProblem: one that ran out says Cloudflare refuses the site' ((& $cp @{ Status = 200; NotAfter = $cpNow.AddDays(-1); Problems = 'None'; Error = '' } $cpNow) -match '^it ran out on 27 September 2026 12:00, so Cloudflare refuses')
+    Yes 'CertProblem: one the trust store refuses says why' ((& $cp @{ Status = 200; NotAfter = $cpNow.AddDays(60); Problems = 'RemoteCertificateNameMismatch'; Error = '' } $cpNow) -match '^it is not accepted \(RemoteCertificateNameMismatch\)')
+    Yes 'CertProblem: no handshake at all is the caddy check''s, so nothing here' ((& $cp @{ Status = 0; NotAfter = $null; Problems = ''; Error = 'nothing took a connection on 443' } $cpNow) -eq '')
+    Yes 'SiteAnswers: a 502 from Caddy counts as Caddy up' ((& $sa @{ Status = 502; NotAfter = $cpNow; Problems = 'None'; Error = '' }) -eq $true)
+    Yes 'SiteAnswers: nothing on 443 is Caddy down' ((& $sa @{ Status = 0; NotAfter = $null; Problems = ''; Error = 'nothing took a connection on 443' }) -eq $false)
+    Yes 'SiteAnswers: a certificate a browser refuses is Caddy down, as it was with Invoke-WebRequest' ((& $sa @{ Status = 200; NotAfter = $cpNow; Problems = 'RemoteCertificateChainErrors'; Error = '' }) -eq $false)
+    $ak = $fns['AskCaddy'].Extent.Text
+    Yes 'AskCaddy asks this box''s own 443 with the name, not the name''s address (#2995)' ($ak -match "BeginConnect\('127\.0\.0\.1', 443" -and $ak -match 'AuthenticateAsClient\(\$u\.Host\)' -and $ak -match "Host: "" \+ \`$u\.Host" -and $ak -notmatch 'Invoke-WebRequest')
     Box 'runner'
     $script:runnerWhy = 'its Windows service is Stopped'
     Step 3

@@ -3,10 +3,11 @@
 
   Puts thornswood.net in front of the docs site, with a real certificate.
 
-  Run this AFTER the domain is bought and its DNS A record points at the VPS.
-  It checks that first and stops if it does not, because a certificate request
-  against a name that does not resolve here gets you rate limited by Let's
-  Encrypt rather than a certificate.
+  Run this AFTER the domain is bought and its DNS A record points at the VPS,
+  or at Cloudflare's proxy in front of it (#2995). It checks that first and
+  stops if it does not, because a certificate request against a name that
+  does not resolve here gets you rate limited by Let's Encrypt rather than a
+  certificate.
 
     .\Setup-Domain.ps1
     .\Setup-Domain.ps1 -Domain thornswood.net -Email you@example.com
@@ -19,6 +20,15 @@
 
   The docs site is also moved onto loopback by this, so port 3001 stops being
   a way around the certificate.
+
+  BEHIND CLOUDFLARE (#2995, Patrick's A, 21 Oct 2026). The live name is
+  proxied by Cloudflare, and the box takes 80 and 443 only from Cloudflare's
+  ranges (Set-WebFirewall.ps1). This opens the two rules to any address only
+  when it makes them, on a fresh box, where the name still points straight
+  at the box until its proxy goes on; an existing rule is left as it is, so
+  running this again never undoes the scope. Caddy still gets its own
+  certificate: Let's Encrypt asks through Cloudflare, and Cloudflare, set to
+  Full (strict), reaches Caddy on 443, where Caddy answers the challenge.
 #>
 [CmdletBinding()]
 param(
@@ -76,6 +86,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Lock-Folder.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+. (Join-Path $Here 'CloudflareRanges.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
@@ -97,10 +108,17 @@ if (-not $SkipDnsCheck -and -not $TaskOnly) {
     throw ("$Domain does not resolve yet" + $(if ($dnsSaid.Count) { " (" + ($dnsSaid -join ' | ') + ")" } else { "" }) + ". Add an A record for @ and www pointing at $Vps, then wait for it to spread. Minutes usually, up to an hour.")
   }
   foreach ($d in $dnsSaid) { Write-Host ("  " + $d) -ForegroundColor Yellow }
-  if ($ips -notcontains $Vps) {
-    throw "$Domain resolves to $($ips -join ', ') and not $Vps. Fix the A record first."
+  # Straight at the box, or only into Cloudflare's ranges with its proxy on
+  # (#2995). Anything else is a record pointing somewhere this is not.
+  $front = Read-ThornswoodCloudflareRanges
+  $behind = @($ips | Where-Object { Test-ThornswoodInRanges $_ $front })
+  if ($ips -contains $Vps) {
+    Write-Host "  points at $Vps" -ForegroundColor Green
+  } elseif ($behind.Count -eq @($ips).Count) {
+    Write-Host ("  points at Cloudflare's proxy (" + ($ips -join ', ') + ')') -ForegroundColor Green
+  } else {
+    throw "$Domain resolves to $($ips -join ', '), which is neither $Vps nor Cloudflare's proxy. Fix the A record first."
   }
-  Write-Host "  points at $Vps" -ForegroundColor Green
 }
 
 # ----------------------------------------------------------------- caddy --
@@ -186,7 +204,7 @@ foreach (`$p in 80,443) {
   if (-not (Get-NetFirewallRule -DisplayName `$n -EA SilentlyContinue)) {
     New-NetFirewallRule -DisplayName `$n -Direction Inbound -Protocol TCP ``
       -LocalPort `$p -Action Allow | Out-Null
-    'opened ' + `$p
+    'opened ' + `$p + ' to any address. Once the name is behind Cloudflare, Set-WebFirewall.ps1 takes it to Cloudflare''s ranges only (#2995)'
   }
 }
 "@ | ForEach-Object { "  $_" }
