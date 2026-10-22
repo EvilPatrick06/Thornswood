@@ -183,6 +183,7 @@ try {
     $busy = Join-Path $work 'busy.txt'
     [IO.File]::WriteAllText($busy, '0')
     $r = Run $d @('-Throttle', '3', '-BusyFrom', $busy)
+    $side = $r
     $ran = @(Ran $r.Said)
     $saw = @([regex]::Matches($r.Said, '(?m)^SAW (\d+)') | ForEach-Object { [int]$_.Groups[1].Value })
     $wall = [regex]::Match($r.Said, '(?m)^all of them, added up: (\d+)s, in (\d+)s')
@@ -208,9 +209,9 @@ try {
     $r = Run $d @('-Throttle', '3', '-Share', '4')
     Yes "  a share past -Throttle is refused before anything runs (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count)
     if ($OnWindows) {
-        $g = [regex]::Match($r.Said, '(?m)^--- test-g-children\.js  \([0-9.]+s, ([0-9.]+)s of processor in (\d+) process\(es\)\)')
+        $g = [regex]::Match($side.Said, '(?m)^--- test-g-children\.js  \([0-9.]+s, ([0-9.]+)s of processor in (\d+) process\(es\)\)')
         Yes ('  each harness says the processor its job counted, children included (' + $g.Value + ')') ($g.Success -and [int]$g.Groups[2].Value -eq 4 -and [double]$g.Groups[1].Value -gt 0)
-        Yes '  and the summary adds them up' ($r.Said -match '(?m)^processor used by all of them: \d+s in \d+ processes')
+        Yes '  and the summary adds them up' ($side.Said -match '(?m)^processor used by all of them: \d+s in \d+ processes')
     }
     $r = Run $d @('-Throttle', '0')
     Yes "  a throttle that is not 1 to 16 is refused before anything runs (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count)
