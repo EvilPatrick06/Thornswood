@@ -97,17 +97,18 @@ function Invoke-ThornswoodRemote {
     # from this and never from thornswood.net.
     $runner = Join-Path $work 'run.ps1'
     [IO.File]::WriteAllText($runner, @"
-param([string]`$Pass, [string]`$Only)
+param([string]`$Pass, [string]`$Only, [string]`$Give)
 function Invoke-RestMethod { [pscustomobject]@{ open = `$false } }
 `$s = @{}; foreach (`$p in (`$Pass -split ',')) { if (`$p) { `$s[`$p] = `$true } }
 if (`$Only) { `$s['Only'] = @(`$Only -split ';') }
+if (`$Give) { `$s['Give'] = @(`$Give -split '\|') }
 & '$((Join-Path $dep 'Setup-Discord.ps1').Replace("'", "''"))' -OnBox @s
 exit `$LASTEXITCODE
 "@)
-    function Run-Setup([string[]]$pass, [string[]]$only = @()) {
+    function Run-Setup([string[]]$pass, [string[]]$only = @(), [string[]]$give = @()) {
         Remove-Item -LiteralPath $sent -Force -ErrorAction SilentlyContinue
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner -Pass ($pass -join ',') -Only ($only -join ';') 2>&1 | Out-String; $code = $LASTEXITCODE }
+        try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner -Pass ($pass -join ',') -Only ($only -join ';') -Give ($give -join '|') 2>&1 | Out-String; $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $old }
         $text = ''
         if (Test-Path -LiteralPath $sent) { $text = [IO.File]::ReadAllText($sent) }
@@ -142,6 +143,11 @@ exit `$LASTEXITCODE
     Yes '  -Only goes through as DISCORD_ONLY, the names comma separated (#2519)' ($r3.Code -eq 0 -and $r3.Sent -match "(?m)^\s*\`$env:DISCORD_ONLY = 'Gamemasters,welcome-travelers'")
     $r4 = Run-Setup @('Check') @("Gamemasters'; Remove-Item x")
     Yes '  and a name that is not a plain name is refused before anything is sent' ($r4.Code -ne 0 -and $r4.Sent.Length -eq 0 -and $r4.Out -match '-Only takes')
+    Yes '  and no DISCORD_GIVE when -Give is not given' ($s -notmatch 'DISCORD_GIVE')
+    $r5 = Run-Setup @('Check') @() @('Co-Owner=WiccanDjinn', 'Lead Dev=Patrick Thornwood')
+    Yes '  -Give goes through as DISCORD_GIVE, each rank=member, semicolon separated (#3317)' ($r5.Code -eq 0 -and $r5.Sent -match "(?m)^\s*\`$env:DISCORD_GIVE = 'Co-Owner=WiccanDjinn;Lead Dev=Patrick Thornwood'")
+    $r6 = Run-Setup @('Check') @() @("Co-Owner=x'; Remove-Item y")
+    Yes '  and a give that is not rank=member in plain words is refused before anything is sent' ($r6.Code -ne 0 -and $r6.Sent.Length -eq 0 -and $r6.Out -match '-Give takes')
 
     # ---- 3. the token --------------------------------------------------------
     Yes 'it reads the token from bot.env.json on the box' ($s -match [regex]::Escape("'C:\Thornswood-Bot'") -and $s -match [regex]::Escape("'bot.env.json'") -and $s -match 'DISCORD_TOKEN = \[string\]\$cfg\.DISCORD_TOKEN')

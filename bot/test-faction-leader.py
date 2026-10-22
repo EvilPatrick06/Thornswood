@@ -11,7 +11,8 @@ Holds:
 
   the faction pick and Other on the form
   a submit-time recheck that a tampered pick is flagged and Other is not
-  the staff flag on both Faction Leader and Jarl
+  the seat rule on both Faction Leader and Jarl: staff are refused (#3317)
+  only the open seats offered
   typed Other text out of the pinging opening line and Asking for
   Faction Leader routing to Owner and UPPER_STAFF_ROLES only
   /close on those threads for UPPER_STAFF_ROLES IDs, without changing is_staff
@@ -242,11 +243,12 @@ def send_faction(guild, who, pick, other='', answers=None):
     return i, m
 
 
-def send_jarl(guild, who):
+def send_jarl(guild, who, hold='Whiterun'):
     lab = dict((a, b) for a, b, _ in bot.KINDS)['jarl']
-    m = bot.TicketModal('jarl', lab)
+    m = bot.TicketModal('jarl', lab, guild)
+    m.hold_select._values = [hold]
     for f in m.fields:
-        f._value = 'Whiterun'
+        f._value = 'yes'
     bot._last_ticket.clear()
     i = Interaction(guild, who)
     asyncio.run(m.on_submit(i))
@@ -311,9 +313,14 @@ try:
     yes('Asking for does not name a faction',
         bot.ROLE_FOR['faction'] == 'Faction Lead of the faction named below')
 
-    yes('a named pick still lists every faction, including one that will be filled later',
-        [o.value for o in form.faction_select.options]
-        == bot.faction_names() + [bot.FACTION_OTHER])
+    # #3317: only the seats nobody holds are offered, Other always.
+    held = Role('Companions Leader', [Person(150, 'Kodlak')], rid=150)
+    G.roles.append(held)
+    seen = bot.TicketModal('faction', lab, G)
+    yes('a held faction seat is not offered; the open ones and Other are',
+        [o.value for o in seen.faction_select.options]
+        == [f for f in bot.faction_names() if f != 'The Companions'] + [bot.FACTION_OTHER])
+    G.roles.remove(held)
 
     # ---------------------------------------------- a named pick, no flags
     sent, _m = send_faction(G, ada, 'The Companions',
@@ -384,7 +391,7 @@ try:
         and not bot.faction_pick_is_known('Not A Faction')
         and not bot.faction_pick_is_known(''))
 
-    # ----------------------------------------------- staff flag, both forms
+    # ------------------------------------- the seat rule, both forms (#3317)
     gm = Person(201, 'Gwen', [Role('Gamemaster')])
     lead = Person(202, 'Lee', [Role('Lead Gamemaster')])
     trial = Person(203, 'Ty', [Role('Trial Gamemaster')])
@@ -394,41 +401,41 @@ try:
     G.roles.append(Role('Trial Gamemaster', [trial]))
     G.roles.append(Role('Content Creator', [creator]))
 
-    bot._last_ticket.clear()
-    send_faction(G, gm, 'The Companions', answers=['A', 'B', 'C'])
-    gm_body = CH.made[-1].body()
-    yes('a Gamemaster on Faction Leader is flagged, and the ticket opens',
-        '**CHECK THIS ONE.** Holds a staff role (Gamemaster); staff cannot '
-        'hold a Jarl seat or a faction lead.' in gm_body)
+    def refused(i, n, role):
+        return (len(CH.made) == n and i.response.said
+                and ('You hold a staff role (%s)' % role) in i.response.said[0][0]
+                and i.response.said[0][1] is True)
+
+    n = len(CH.made)
+    i, _m = send_faction(G, gm, 'The Companions', answers=['A', 'B', 'C'])
+    yes('a Gamemaster on Faction Leader is refused, and no ticket opens',
+        refused(i, n, 'Gamemaster'))
     # Every lead is on the council and staff since #3317 (Patrick, 22 Oct);
-    # a Trial Gamemaster still is not.
+    # a Trial Gamemaster is not staff for /close.
     yes('is_staff: a Lead Gamemaster is staff (the council), a Trial Gamemaster is not',
         bot.is_staff(lead) and not bot.is_staff(trial)
         and bot.is_staff(gm) and bot.is_staff(mo))
 
-    send_faction(G, lead, 'The Companions', answers=['A', 'B', 'C'])
-    yes('a Lead Gamemaster on Faction Leader is flagged anyway',
-        'Lead Gamemaster' in CH.made[-1].body()
-        and 'CHECK THIS ONE' in CH.made[-1].body())
+    i, _m = send_faction(G, lead, 'The Companions', answers=['A', 'B', 'C'])
+    yes('a Lead Gamemaster on Faction Leader is refused anyway',
+        refused(i, n, 'Lead Gamemaster'))
 
-    send_jarl(G, trial)
-    yes('a Trial Gamemaster on Jarl is flagged the same way',
-        'Trial Gamemaster' in CH.made[-1].body()
-        and 'staff cannot hold a Jarl seat or a faction lead' in CH.made[-1].body())
+    i = send_jarl(G, trial)
+    yes('a Trial Gamemaster on Jarl is refused the same way',
+        refused(i, n, 'Trial Gamemaster'))
 
-    send_jarl(G, gm)
-    yes('a Gamemaster on Jarl is flagged',
-        'Holds a staff role (Gamemaster)' in CH.made[-1].body())
+    i = send_jarl(G, gm)
+    yes('a Gamemaster on Jarl is refused', refused(i, n, 'Gamemaster'))
 
-    n = len(CH.made)
-    send_faction(G, creator, 'The Companions', answers=['A', 'B', 'C'])
-    yes('a Content Creator is not flagged: that role is not staff',
-        'CHECK THIS ONE' not in CH.made[-1].body()
-        and len(CH.made) == n + 1)
+    i, _m = send_faction(G, creator, 'The Companions', answers=['A', 'B', 'C'])
+    yes('a Content Creator is refused too: any staff role (Patrick, 22 Oct)',
+        refused(i, n, 'Content Creator'))
 
-    send_jarl(G, ada)
-    yes('somebody with no staff role on Jarl is not flagged',
-        'Holds a staff role' not in CH.made[-1].body())
+    send_jarl(G, Person(205, 'Eda'))
+    yes('somebody with no staff role on Jarl gets a ticket, with the hold in it',
+        len(CH.made) == n + 1
+        and '**Which hold?**\nWhiterun' in CH.made[-1].body()
+        and 'CHECK THIS ONE' not in CH.made[-1].body())
 
     # ------------------------------------------------- routing
     ids, ignored = bot.upper_staff_ids(['Owner', '10', 'Lead Gamemaster', '88'])

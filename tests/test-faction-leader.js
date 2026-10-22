@@ -109,9 +109,13 @@ yes('F6 Build-Discord still makes Trading Company, and a Leader role for each fa
     /FACTION_LEADERS = tuple\(FACTION_SHORT\.get\(f, f\) \+ ' Leader' for f in FACTIONS\)/.test(build) &&
     /'factions\.json'/.test(build));
 
-yes('F7 is_staff still leaves Lead and Trial Gamemaster out, and the flag list includes them',
+// #3317 (Patrick, 22 Oct, 11:03 AM, and page card q-3317-seat-rule-check, A):
+// every staff role counts for the seat rule, and the bot refuses rather than
+// flags. bot/test-3317-seats.py runs it.
+yes('F7 is_staff still leaves Trial Gamemaster out, and the seat rule counts every staff role and refuses',
     /Lead Gamemaster and Trial Gamemaster carry Manage Threads/.test(bot) &&
-    /LEADERSHIP_EXTRA = \('Lead Gamemaster', 'Trial Gamemaster'\)/.test(bot) &&
+    /SEAT_RULE_STAFF = \('Owner', 'Co-Owner',/.test(bot) && /'Trial Gamemaster'/.test(bot) &&
+    /def seat_refusal\(kind, who, guild\):/.test(bot) &&
     /LEADERSHIP_KINDS = \('jarl', 'faction'\)/.test(bot) &&
     /def is_staff\(who\):/.test(bot) &&
     /The one gate on \/close, the Close ticket button/.test(bot));
