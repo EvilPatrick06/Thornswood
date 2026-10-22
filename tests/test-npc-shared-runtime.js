@@ -492,7 +492,8 @@ test('A displaced actor loses unsafe movement while retaining server ownership',
   assert.ok(f.moved.has(1),'The displaced actor must have published walking movement first');
   f.states.get(1).pos = [1000,1000,0];
   const count = f.moves.length;
-  f.advance(3000);
+  // Nobody sees either, so each is stepped once every 4 seconds (#3181).
+  f.advance(5000);
   assert.ok(f.controlled.has(1),'Movement failure cannot return authority to clients');
   assert.ok(!f.moves.slice(count).some(move => move.id === 1));
   assert.ok(f.moves.slice(count).some(move => move.id === 2));
@@ -570,7 +571,8 @@ test('A moving NPC becoming immobile publishes a reliable stop and resumes safel
   assert.ok(f.moved.has(1));
   const position = f.states.get(1).pos.slice(),count = f.moves.length;
   f.states.get(1).immobile = true;
-  f.advance(1000);
+  // Nobody sees it, so its next step, the one that stops it, is within 4 seconds (#3181).
+  f.advance(5000);
   assert.ok(f.controlled.has(1));
   assert.deepEqual(f.states.get(1).pos,position,'An immobile actor cannot translate');
   assert.equal(f.moves.length,count,'An immobile actor cannot submit walking updates');
@@ -999,6 +1001,45 @@ test('A fight starting is written, with its mode, and the walk around it is not'
   const own = f.writes.filter(w => w.id === 1 && w.prop === 'thornswoodNpcActivity');
   assert.ok(own.some(w => w.value.mode === 'combat'), 'The fight starting is written');
   for (let i = 1; i < own.length; i++) assert.notEqual(own[i].value.mode, own[i-1].value.mode, 'Each write is a change of mode');
+  f.stop();
+});
+
+// #3181, Patrick's C on his report page (22 Oct 2026): NPCs nobody can see
+// are updated less often, never paused. On 21 Oct, with nobody on dev, the
+// JavaScript thread was busy 0.187 of a core, nearly all of it this runtime
+// stepping NPCs nobody was near, each on every pass over the cast.
+function gaps(moves, id) {
+  const at = moves.filter(m => m.id === id).map(m => m.at), out = [];
+  for (let i = 1; i < at.length; i++) out.push(at[i] - at[i-1]);
+  return out;
+}
+test('An NPC nobody can see that only wanders is stepped once every 4 seconds, and keeps walking', () => {
+  const f = fixture({count:40});
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  const from = f.moves.length;
+  for (let i = 0; i < 12; i++) f.advance(10000);
+  const later = f.moves.slice(from);
+  for (const id of f.ids) {
+    const g = gaps(later, id);
+    assert.ok(g.length >= 20, id + ' is still stepped: ' + g.length + ' steps in two minutes');
+    assert.ok(Math.min(...g) >= 4000, id + ' is stepped at most once every 4 seconds: ' + Math.min(...g) + ' ms');
+    assert.ok(later.some(m => m.id === id && m.speed > 0), id + ' still walks');
+  }
+  assert.ok(f.logs.some(l => /background steps/.test(l)), 'The minute report counts the background steps');
+  f.stop();
+});
+test('An NPC somebody can see is stepped as often as before', () => {
+  const f = fixture({count:1, humans:[100], human:{100:{pos:[500,500,0], aggression:0}}});
+  f.advance(30000);
+  const g = gaps(f.moves.slice(5), 1);
+  assert.ok(g.length > 50 && Math.max(...g) <= 1000, 'Stepped on every near pass: ' + g.length + ' steps, longest gap ' + Math.max(...g));
+  f.stop();
+});
+test('A fight nobody can see keeps its pace: the less frequent steps are for wandering only', () => {
+  const f = fixture({count:2, npc:{1:{aggression:3, pos:[100,100,0]}, 2:{aggression:0, pos:[150,150,0]}}});
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  const hits = f.attacks.filter(a => a.id === 1);
+  assert.ok(hits.length > 15, 'Unseen, 1 still attacks 2 at its usual pace: ' + hits.length + ' attacks in a minute');
   f.stop();
 });
 
