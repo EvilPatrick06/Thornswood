@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  70,
-    "callCount":  281,
+    "callCount":  282,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1713,6 +1713,15 @@
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
                       "does":  "checks a catalog signed on GitHub against release.json and the signer, in a temp folder of its own that it removes",
+                      "class":  "read-status",
+                      "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
+                  },
+                  {
+                      "script":  "scripts/release/Sign-OnGitHub.ps1",
+                      "scope":  "Get-SignedFileRefusal",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
+                      "does":  "checks a launcher built and signed on GitHub against the signer and the launcher\u0027s own check, in a temp folder of its own that it removes",
                       "class":  "read-status",
                       "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },

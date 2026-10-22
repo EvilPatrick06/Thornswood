@@ -1,13 +1,17 @@
 # Signed releases and artifact provenance (issue #2163)
 
-Status: DESIGN AND PILOT, with the release.yml move in and its switch-over
-the last step (#2163, #498). release.yml has a job that builds on GitHub's
-hosted Windows runner with MSBuild and signs the launcher there, and a job
-that checks that signed draft on a second machine. Until the switch-over the
-VPS still builds every release, unsigned, and Ship signs it on One as
-before; the hosted job runs only on a manual run that asks for it (section
-7 says why and what the switch-over waits on). Ship, Publish-Installer, the
-feed and every checksum check stay as they are. Patrick's answers are in
+Status: DESIGN AND PILOT, switched over on 22 Oct 2026 (#3312, Patrick:
+"it needs to work like the VPS runners where VPS is the fallback and the
+GitHub runner is first", and "for signing it will use runner 3").
+release.yml builds and signs the launcher on GitHub's hosted Windows runner
+first; when GitHub refuses the job (no minutes) or it fails, the VPS job
+builds it and signs it on runner 3 alone (the `thornswood-sign` label,
+`records\sign-runners.json`) through the same federated identity, with no
+Azure CLI and nothing kept on the box. A build runner, never runner 3,
+checks the signed draft, and for a release from the feed the engine fork
+checks the launcher again on GitHub's runner before it signs the release
+(section 7, "#3312"). Ship, Publish-Installer, the feed and every checksum
+check stay as they are. Patrick's answers are in
 section 8, "Decisions", and none is pending. Section 9 sets doing nothing
 beside the change (Patrick, 15 Oct, #2168 A).
 
@@ -314,6 +318,42 @@ checks in `tests\test-release-workflow.ps1` change to match. While
 `BUILD_RUNNER` is `vps` (set 12 Oct for #2393) releases stay on the box even
 after it, so taking `BUILD_RUNNER` off `vps` moves pull request builds and
 releases together.
+
+### #3312: hosted first, the box signs on runner 3, 22 Oct 2026
+
+The switch-over above is in: the hosted job's `if` is
+`${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}` and the runner
+input defaults to `hosted`. What it adds, so that a Ship from the cloud can
+carry a new launcher with no One in the chain:
+
+- The VPS job has the `release` environment and `id-token: write` on a v
+  tag, the way the hosted job does. The federated credential names the
+  environment, not the runner, so the subject it presents is the one above.
+  The sign step asks GitHub for the token itself and hands it to Microsoft's
+  signing client as a workload identity file under RUNNER_TEMP for one
+  signtool call (no `azure/login`, so no Azure CLI sign in stays in the
+  runner account's profile). It runs on runner 3 only; runner 3 needs the
+  label (`pwsh scripts/deploy/Set-BuildRunners.ps1`, #3107), the
+  Windows SDK's signtool, and its outbound rules to let the signing hosts
+  through (`ops\claude-queue\3312-sign-runner.md`).
+- The `verify` job runs after whichever job signed, on a build runner, so
+  it is never the runner that signed.
+- A `v<a.b.c.d>` tag is a dev number: release.yml writes it into
+  Updater.cs the way a dev Ship does. A `v<a.b.c>` tag must be the number
+  Updater.cs already says.
+- `release-tag.yml` makes the tag on main's commit and starts release.yml on
+  it, since a cloud session can push no tag (measured on #3312).
+- `Ship.ps1 -FromFeed` asks for it (`Invoke-ReleaseLauncherOnGitHub`, in
+  Sign-OnGitHub.ps1), takes the draft held to its `SHA256SUMS` and to the
+  launcher's own check (here on Windows, on the box anywhere else), and
+  publishes; the engine fork's manifest job fetches the launcher the release
+  names from the site and runs the launcher's own check on it, in a job with
+  no Azure token, before it signs the release.
+
+Measured on #3312 before choosing this: a cloud session may not create,
+edit or delete a release, nor send a request body that is not JSON, so the
+fork could not be handed the unsigned exe in a private draft (Patrick's
+first choice, C).
 
 ## 8. Decisions (Patrick)
 

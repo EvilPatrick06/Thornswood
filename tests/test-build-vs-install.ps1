@@ -392,7 +392,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $shipTools
         $sb = [scriptblock]::Create(
             'param($Root, $Here) ' +
-            '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
+            '$ModsOnly = $false; $FromFeed = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
             'function Say($m, $c) { }; function Head($m) { }; ' +
             'function Die($m) { throw ("DIE: " + $m) }; ' +
             'function Unbump([string]$why) { Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ("unbump|" + $why) }; ' +
