@@ -1,5 +1,5 @@
 <#
-  test-3216-secret-stdin.ps1
+  test-3216-ask-from-stdin.ps1
 
   Read-ThornswoodSecret (scripts\vps\Send-Secret.ps1) takes the value from one
   line of standard input when there is no keyboard, so a cloud Desk can run
@@ -17,7 +17,7 @@
   standard input and its arguments: the value must arrive there, as the wire
   form, and on no argument. Nothing connects anywhere.
 
-    pwsh -File tests\test-3216-secret-stdin.ps1
+    pwsh -File tests\test-3216-ask-from-stdin.ps1
 #>
 [CmdletBinding()]
 param()
