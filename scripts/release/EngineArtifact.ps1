@@ -46,8 +46,10 @@
   bytes:
     - SHA256SUMS names every file in the artifact and each one hashes to it,
       and no file is there that it does not name;
-    - its records\client-build.json and records\server-build.json are the
-      checkout's own, line endings aside (a runner writes CR LF);
+    - its records\client-build.json, records\server-build.json and
+      records\client-licences.json are the checkout's own, line endings
+      aside (a runner writes CR LF), and its records\client-licences\ holds
+      the checkout's texts byte for byte and no other (#3099);
     - each client file the checkout's client record names is under client\
       with that size and sha256, and no other file is;
     - the one server zip for the commit is held to the checkout's server
@@ -189,13 +191,22 @@ function Get-EngineArtifactProblems([string]$From, [string]$Repo) {
         if ($rel -ne 'SHA256SUMS' -and -not $named.ContainsKey($rel)) { $why += "$rel is in the artifact and SHA256SUMS does not name it" }
     }
 
-    foreach ($r in 'client-build.json', 'server-build.json') {
+    foreach ($r in 'client-build.json', 'server-build.json', 'client-licences.json') {
         $theirs = Join-Path $From ('records\' + $r)
         if (-not (Test-Path -LiteralPath $theirs)) { $why += "the artifact has no records\$r"; continue }
         if ((Get-EngineArtifactRecordText $theirs) -ne (Get-EngineArtifactRecordText (Join-Path $Repo ('records\' + $r)))) {
             $why += "the artifact's records\$r is not this checkout's, so it is CI's build of another record"
         }
     }
+
+    $theirTexts = Join-Path $From 'records\client-licences'
+    $myTexts = Join-Path $Repo 'records\client-licences'
+    $mine = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $myTexts -File -ErrorAction SilentlyContinue)) { $mine[$f.Name] = Get-EngineArtifactSha256 $f.FullName }
+    $theirs = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $theirTexts -File -ErrorAction SilentlyContinue)) { $theirs[$f.Name] = Get-EngineArtifactSha256 $f.FullName }
+    foreach ($n in $mine.Keys) { if (-not $theirs.ContainsKey($n)) { $why += "records\client-licences\$n is not in the artifact" } elseif ($theirs[$n] -ne $mine[$n]) { $why += "records\client-licences\$n in the artifact is not this checkout's" } }
+    foreach ($n in $theirs.Keys) { if (-not $mine.ContainsKey($n)) { $why += "records\client-licences\$n is in the artifact and not in this checkout" } }
 
     $rec = (Get-EngineArtifactRecordText (Join-Path $Repo 'records\client-build.json')) | ConvertFrom-Json
     $want = @{}

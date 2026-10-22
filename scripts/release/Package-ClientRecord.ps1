@@ -235,6 +235,53 @@ function Save-PackageClientRecord($Resolved, [string]$Path) {
     [IO.File]::WriteAllText($Path, $json, (New-Object System.Text.UTF8Encoding $false))
 }
 
+<#
+  The licence record of the vcpkg libraries in the client this installer
+  packs, and their texts (#3099), copied into $IntoDir beside the client
+  record saved there: client-licences.json and client-licences\. The
+  checkout's own when it is of $ForkCommit. Between main Ships the launcher
+  being packed can carry an older client than the checkout records (#1243,
+  above), and then it is the one the checkout's history committed for that
+  client, taken with git archive, which writes the texts as committed
+  (records/client-licences/** is -text). Throws a sentence when no commit of
+  the checkout has one: the texts are owed with those files.
+#>
+function Save-PackageClientLicences([string]$ForkCommit, [string]$Repo, [string]$IntoDir) {
+    $want = $ForkCommit.ToLowerInvariant()
+    $null = New-Item -ItemType Directory -Force -Path $IntoDir
+    $mine = Join-Path $Repo 'records\client-licences.json'
+    if (Test-Path -LiteralPath $mine) {
+        $read = Read-JsonFile $mine
+        if ($read -and ([string](Get-Prop $read.Doc 'forkCommit')).ToLowerInvariant() -eq $want) {
+            Copy-Item -LiteralPath $mine -Destination (Join-Path $IntoDir 'client-licences.json')
+            Copy-Item -LiteralPath (Join-Path $Repo 'records\client-licences') -Destination (Join-Path $IntoDir 'client-licences') -Recurse
+            return 'checkout'
+        }
+    }
+    $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        $revs = @(& git -C $Repo log --format=%H -- records/client-licences.json 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+        foreach ($rev in $revs) {
+            $text = (@(& git -C $Repo show ($rev + ':records/client-licences.json') 2>$null) -join "`n")
+            if ($LASTEXITCODE -ne 0 -or -not $text) { continue }
+            $doc = $null
+            try { $doc = $text | ConvertFrom-Json } catch { continue }
+            if (([string](Get-Prop $doc 'forkCommit')).ToLowerInvariant() -ne $want) { continue }
+            $zip = Join-Path $IntoDir 'client-licences.zip'
+            & git -C $Repo archive --format=zip -o $zip $rev -- records/client-licences.json records/client-licences 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "git archive of records\client-licences at $rev exited $LASTEXITCODE" }
+            $x = Join-Path $IntoDir 'x'
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            [IO.Compression.ZipFile]::ExtractToDirectory($zip, $x)
+            Move-Item -LiteralPath (Join-Path $x 'records\client-licences.json') -Destination (Join-Path $IntoDir 'client-licences.json')
+            Move-Item -LiteralPath (Join-Path $x 'records\client-licences') -Destination (Join-Path $IntoDir 'client-licences')
+            Remove-Item -LiteralPath $zip, $x -Recurse -Force
+            return $rev
+        }
+    } finally { $ErrorActionPreference = $eap }
+    throw "no commit of this checkout records the licences of client $ForkCommit (records\client-licences.json), and the texts of the libraries inside its files have to go with them (#3099)"
+}
+
 function Test-ClientRecordMatch($Record, [string]$Rel, [string]$Full) {
     $files = Get-Prop $Record 'files'
     if ($null -eq $files -or -not $Full -or -not (Test-Path -LiteralPath $Full -PathType Leaf)) { return $false }

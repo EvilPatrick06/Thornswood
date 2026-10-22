@@ -31,8 +31,10 @@
   -Record writes records\front-build.json from this build instead of
   comparing, for when the pin moved: commit it with the pin.
 
-  Read only except for the zip, the record with -Record, and its own scratch
-  folder, which it removes. Never talks to the VPS.
+  Read only except for the zip, the record with -Record, its own scratch
+  folder, which it removes, and engine\skymp when this checkout never
+  fetched it (a cloud checkout): then it fetches the pinned commit there with
+  git submodule update --init --depth 1. Never talks to the VPS.
 
 .EXAMPLE
   .\scripts\release\Build-Front.ps1
@@ -74,7 +76,15 @@ if (-not $Commit) {
     if (-not $pinned) { throw 'this checkout pins no engine\skymp commit (git ls-tree HEAD engine/skymp), so there is no front to build. Nothing was written.' }
     $Commit = $pinned
 }
-if (-not (Test-Path -LiteralPath $Fork)) { throw "there is no fork clone at $Fork. git submodule update --init engine/skymp fetches it, or give -Fork. Nothing was written." }
+if (-not (Test-ThornswoodForkClone $Fork)) {
+    $sub = Join-Path (Join-Path $repo 'engine') 'skymp'
+    if ((Get-ThornswoodFullPath $Fork) -ne (Get-ThornswoodFullPath $sub)) { throw "there is no clone of the fork at $Fork. Give -Fork a clone of EvilPatrick06/skymp. Nothing was written." }
+    # This checkout's own engine\skymp, never fetched (a cloud checkout):
+    # the pin says which commit, so it is fetched here at that commit alone.
+    Say "  engine\skymp is not fetched in this checkout, fetching the pinned commit"
+    $null = Invoke-Native 'git submodule update --init --depth 1 engine/skymp' { & git -C $repo submodule update --init --depth 1 engine/skymp }
+    if (-not (Test-ThornswoodForkClone $Fork)) { throw "engine\skymp is still not a clone of the fork after git submodule update. Nothing was written." }
+}
 $full = (& git -C $Fork rev-parse --verify --quiet ($Commit + '^{commit}') 2>$null)
 if ($LASTEXITCODE -ne 0 -or -not $full) { throw "the fork clone at $Fork does not have $Commit. Fetch it there (git -C $Fork fetch origin thornswood/engine-changes). Nothing was written." }
 $full = "$full".Trim()

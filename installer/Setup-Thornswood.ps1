@@ -733,6 +733,16 @@ foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'WebView2-LICENSE.txt')) {
     if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $Root -Force }
 }
 
+# The licence texts of the libraries inside the SkyMP files, which SOURCE
+# CODE.txt lists (#3099). The folder is replaced whole, so a text of a
+# library an older client had does not stay behind; Uninstall.cs names it.
+$libFrom = Join-Path $Here 'licences'
+if (Test-Path -LiteralPath $libFrom) {
+    $libTo = Join-Path $Root 'licences'
+    if (Test-Path -LiteralPath $libTo) { Remove-Item -LiteralPath $libTo -Recurse -Force }
+    Copy-Item -LiteralPath $libFrom -Destination $libTo -Recurse -Force
+}
+
 $s = Join-Path $Here 'Thornswood.exe'
 if (Test-Path $s) { Copy-Item $s $LaunchDir -Force }
 
