@@ -49,7 +49,8 @@ def yes(what, cond):
 # ---- 1. which channels
 kept = ['rules', 'game-rules', 'gm-rules', 'known-issues', 'Test-Tasks', 'dev-test-tasks',
         'test-tasks-archive', 'welcome', 'start-here', 'faq', 'lore', 'tickets-and-applications',
-        'choose-your-hold', 'server-instructions', 'documentation', '📜┃rules']
+        'choose-your-hold', 'server-instructions', 'documentation', '📜┃rules',
+        'lore-rules', 'mod-rules', 'content-rules', 'support-rules', 'dev-rules', 'playtester-rules']
 for n in kept:
     yes('#%s is kept' % n, wipe.why_kept(n) != '')
 gone = ['news', 'updates', 'staff-updates', 'staff-general', 'general-chat', 'suggestions',
@@ -58,6 +59,7 @@ gone = ['news', 'updates', 'staff-updates', 'staff-general', 'general-chat', 'su
 for n in gone:
     yes('#%s goes' % n, wipe.why_kept(n) == '')
 yes('the records stay unless --wipe-records', wipe.why_kept('tickets') != '' and wipe.why_kept('gm-discipline') != ''
+    and wipe.why_kept('ticket-log') != '' and wipe.why_kept('ticket-log', wipe_records=True) == ''
     and wipe.why_kept('tickets', wipe_records=True) == '' and wipe.why_kept('gm-discipline', wipe_records=True) == '')
 yes('--keep keeps a channel', wipe.why_kept('media', keep=['media']) != '')
 

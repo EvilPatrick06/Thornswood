@@ -25,8 +25,8 @@ KEPT, whole, threads and all:
   - the channels that are the instructions and documentation: #welcome,
     #start-here, #faq, #lore, the ticket panel's channel
     (#tickets-and-applications, #applications) and #choose-your-hold;
-  - the records, unless --wipe-records: the staff #tickets log of closed
-    tickets and #gm-discipline. A ticket is a private thread off the panel's
+  - the records, unless --wipe-records: the staff log of closed tickets
+    (#tickets, #ticket-log in the #3317 layout) and #gm-discipline. A ticket is a private thread off the panel's
     channel, so open applications and the closed tickets the privacy page
     keeps for 365 days stay with it;
   - --keep NAME, as many as wanted, for anything else.
@@ -72,7 +72,7 @@ KEEP_NAMES = frozenset(('welcome', 'start-here', 'faq', 'lore',
                         'tickets-and-applications', 'applications',
                         'choose-your-hold'))
 # Kept unless --wipe-records: what staff keep about people.
-RECORD_NAMES = frozenset(('tickets', 'gm-discipline'))
+RECORD_NAMES = frozenset(('tickets', 'ticket-log', 'gm-discipline'))
 
 
 def plain(name):
