@@ -31,7 +31,8 @@
     - the repository: an annotated tag, release/main/<id> or release/dev/<id>,
       on the commit that release was built from, made and pushed by Ship only
       after the publisher has sent the feed (Add-ReleaseTag). Never v<...>, so
-      it cannot start the launcher build in release.yml.
+      it cannot start the launcher build in release.yml. In a cloud session,
+      whose git cannot push a tag, GitHub makes it (Set-Ref.ps1, #3314).
 
       git tag -l 'release/dev/*'         every dev release
       git show release/main/<id>         what it shipped and where to find it
@@ -265,7 +266,7 @@ function Get-ReleaseTagMessage($r, [string]$FeedUrl) {
 }
 
 # Tags the commit the release in $VersionFile was built from and pushes the
-# tag. Ship calls it only after the publisher has sent the feed, and passes the
+# tag, or in a cloud session has GitHub make it (Set-Ref.ps1). Ship calls it only after the publisher has sent the feed, and passes the
 # id the publisher said it sent ($PublishedId); anything else tags nothing.
 # Returns { Tag, Commit, Why, PutRight }: Why is '' when the tag is on the
 # remote, and PutRight is what a person runs to finish it, '' when there is
@@ -308,6 +309,28 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
         $has = (Invoke-ReleaseGit $RepoDir @('rev-parse', '--verify', '--quiet', ('refs/tags/' + $o.Tag + '^{commit}'))).First
         if ($has -and $has -ne $o.Commit) {
             $o.Why = "$($o.Tag) already names commit $has, not $($o.Commit); it was left alone"
+            return $o
+        }
+        # A cloud session's git cannot write refs: the cloud environment's
+        # proxy refuses a tag push (#3314, measured 22 Oct 2026). There GitHub
+        # makes the tag, from the same message, in git-ref.yml (Set-Ref.ps1),
+        # and nothing is tagged in the session's own checkout, so the tag on
+        # GitHub is the only one.
+        if ($env:CLAUDE_CODE_REMOTE -eq 'true') {
+            $setRef = Join-Path $RepoDir 'scripts/ops/Set-Ref.ps1'
+            $again = "pwsh scripts/ops/Set-Ref.ps1 -Tag $($o.Tag) -Commit $($o.Commit) -Message ""Thornswood $(Get-ReleaseField $r 'channel') release $id"""
+            if (-not (Test-Path -LiteralPath $setRef -PathType Leaf)) {
+                $o.Why = "this checkout has no scripts/ops/Set-Ref.ps1, which a cloud session needs to put $($o.Tag) on GitHub"
+                $o.PutRight = $again
+                return $o
+            }
+            & $setRef -Tag $o.Tag -Commit $o.Commit -MessageFile $msgFile
+            $rc = $LASTEXITCODE
+            if ($rc -eq 2) { $o.Why = "GitHub was asked to make $($o.Tag) and its run had not ended; it still makes the tag, and the line above reads its answer"; return $o }
+            if ($rc -ne 0) {
+                $o.Why = "GitHub did not put $($o.Tag) on (Set-Ref.ps1 exit $rc); the lines above say why"
+                $o.PutRight = $again
+            }
             return $o
         }
         if (-not $has) {

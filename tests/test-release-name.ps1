@@ -47,6 +47,10 @@
 $env:THORNSWOOD_HARNESS = '1'
 # Publish-Update takes no -Vps; its box here is this machine's stand-in.
 $env:THORNSWOOD_VPS = '127.0.0.1'
+# The tag goes to the bare origin below with git, as on One. In a cloud
+# session Add-ReleaseTag asks GitHub instead (#3314), which
+# tests\test-3107-set-ref.ps1 holds.
+Remove-Item Env:CLAUDE_CODE_REMOTE -ErrorAction SilentlyContinue
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
