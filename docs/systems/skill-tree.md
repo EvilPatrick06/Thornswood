@@ -133,7 +133,7 @@ not left on you (issue #1642).
 
 | Perk | Fires | What is not in the game yet |
 | --- | --- | --- |
-| Cheat Death | No | All of it. The engine ends you the moment health reaches nothing, and sends the death before the server is asked. The engine has to ask first (issue #1626). The once-a-day clock is in the server, waiting for that |
+| Cheat Death | Yes. The engine asks the server before a blow that takes your health to nothing kills you, before anything is sent, and the server keeps you at 1 health of the most your bar shows (issue #1626). Health from gear or a potion the server cannot see is not counted in that most, so with one running you are left a little over 1 | |
 | Troll's Blood | Yes. A fight is a hit landed or taken, or health falling, in the last 15 seconds | |
 | Devastating Blow | Yes. With a warrior's Heavy on the same blow, each adds its share to what the blow took before it | |
 | Unshakeable | Yes, on your own machine. A stagger is played there, so the front plugin refuses it while your block is up, by the game's own IsBlocking. The server refuses its own Break and Wreck on you the same way | |
