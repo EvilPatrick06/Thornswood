@@ -46826,19 +46826,17 @@ module.exports = {
   every piece of armour in 101 plugins, in a gamemode that is already 1.4MB. The
   answers are memoed, so a form is looked up once for the life of the process.
 
-  A CONTAINER IS EMPTIED ONCE AND NEVER AGAIN, and that is the whole design.
-
-  A chest the server has never opened is still holding what Bethesda put there.
-  A chest it has opened is holding what people have put there since. So the first
-  press strips it and writes that down on the reference, and no press after that
-  touches it. Without that, a smith who stored their own swords in a chest would
-  come back to an empty chest, which is the opposite of the rule: the rule is
-  that nothing is spawned, not that nothing may be kept.
-
-  That is the same shape the farming block uses for a plot the server has never
-  written to, and for the same reason. The mark is a property on the reference,
-  so it survives a restart; a mark that did not would eat somebody's swords the
-  first time the server came back up.
+  A CONTAINER HOLDS NOTHING THE WORLD PUT THERE, and nothing in here takes it
+  out (#3078). Patrick, 21 October 2026: "not fill them with anything vanilla
+  only our special ones for the caves with our items and refill times, and dont
+  fill any storages that shouldnt be filled". The engine copied a container's
+  plugin contents in on the first press (MpObjectReference::
+  EnsureBaseContainerAdded), after this block's hook had run, so this block
+  used to take part of it back out with a timer. Now the server settings name
+  CONT in forbiddenBaseContainer (scripts\deploy\Deploy-Gamemode.ps1, and
+  Deploy-DevGamemode.ps1 for dev) and the engine never puts a record's contents
+  in. Every chest, barrel, sack and cupboard starts empty and holds only what a
+  person put in it, or the pile the dungeon loot block pays a dungeon chest.
 
   AND THE GROUND IS TOLD APART FROM A DROPPED THING BY ITS FORM ID. MpForm's
   IsEspmForm is id < 0xff000000, so a reference below that line was placed by a
@@ -46879,17 +46877,7 @@ module.exports = {
      is the same number in every load order there has ever been. */
   var GOLD = 0x0000000F;
 
-  /* Where 'this container has been emptied' is written. On the reference, so it
-     survives a restart; see the block comment for why that matters. */
-  var STRIPPED_PROPERTY = 'thornswoodStripped';
-
   function ready() {
-    try {
-      mp.makeProperty(STRIPPED_PROPERTY, {
-        isVisibleByOwner: false, isVisibleByNeighbors: false,
-        updateOwner: '', updateNeighbor: ''
-      });
-    } catch (e) { /* already made by a previous load. harmless. */ }
     try {
       mp.makeProperty(PURSE_PROPERTY, {
         isVisibleByOwner: false, isVisibleByNeighbors: false,
@@ -46903,8 +46891,8 @@ module.exports = {
 
     An answer of '' is 'the engine could not say', and every caller treats that
     as 'leave it alone'. Not knowing what a thing is has to mean not touching it:
-    the other way round, one unreadable record would quietly empty every chest
-    that held one.
+    the other way round, one unreadable record would quietly refuse every one
+    of it in the world.
   */
   var kinds = {};
   function kindOf(baseId) {
@@ -47056,130 +47044,19 @@ module.exports = {
     return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
   }
 
-  /** Has this container been emptied already. */
-  function alreadyStripped(refrId) {
-    try {
-      return !!mp.get(refrId, STRIPPED_PROPERTY);
-    } catch (e) {
-      // A reference the server cannot answer about is one this must not touch.
-      // Saying yes here means leaving it exactly as it is.
-      return true;
-    }
-  }
-
-  /*
-    Take the spoils out of a container, once.
-
-    Returns the number of entries removed, or -1 when it did nothing at all. The
-    write happens before the mark, so a write that throws leaves the container
-    unmarked and it is tried again next time. The other order would mark a chest
-    as done and leave the swords in it.
-  */
-  function strip(refrId) {
-    if (alreadyStripped(refrId)) { return -1; }
-    var inv = null;
-    try { inv = mp.get(refrId, 'inventory'); } catch (e) { return -1; }
-    var entries = (inv && inv.entries) || [];
-
-    /*
-      AN EMPTY CHEST IS NOT AN EMPTIED CHEST, and mistaking one for the other
-      is why gold and armour were still in every container in the world.
-
-      A container's contents come out of the plugin LAZILY:
-      MpObjectReference::EnsureBaseContainerAdded copies them in the first time
-      something needs them, and sets baseContainerAdded so it never runs twice.
-      This runs on the press, which is often BEFORE that has happened, so the
-      inventory read back was empty. Nothing was taken, the chest was marked
-      emptied, and a moment later the engine filled it with everything the
-      plugin said was in it. The mark meant it was never looked at again.
-
-      Patrick, 21 September, after playing it: "Gold, Weapoms, and Armor can
-      still be found in storages and looted the on the ground system works
-      though." The ground works because a placed item is its own reference and
-      was never empty.
-
-      So an empty read is not recorded. The next press reads it again, by which
-      time the engine has filled it, and that is the one that empties it.
-    */
-    if (!entries.length) { return 0; }
-
-    var keep = [], took = 0;
-    for (var i = 0; i < entries.length; i++) {
-      var e = entries[i];
-      if (e && (isSpoil(e.baseId) || isJailKey(e.baseId))) { took++; continue; }
-      keep.push(e);
-    }
-    if (took) {
-      try {
-        mp.set(refrId, 'inventory', { entries: keep });
-      } catch (e2) {
-        slog('could not empty', refrId.toString(16) + ':', e2);
-        return -1;
-      }
-    }
-    try {
-      mp.set(refrId, STRIPPED_PROPERTY, 1);
-    } catch (e3) {
-      // The contents are gone and the mark is not written, so this runs again
-      // next time and finds nothing left to take. Harmless either way round.
-      slog('could not mark', refrId.toString(16), 'as emptied:', e3);
-    }
-    if (took) { slog('took', took, 'thing(s) out of', refrId.toString(16)); }
-    return took;
-  }
-
   /*
     The answer to a press, or null when this block has nothing to say.
 
-    Three cases and only the third refuses. A container is emptied and then
-    opens as it always did, because the point is what is inside it rather than
-    whether it opens. A dropped thing is somebody's and is left alone. A thing a
-    plugin placed, that is a weapon, a piece of armour, ammunition, a tool or a
-    coin, does not come up off the floor.
+    Three cases and only the third refuses. A container opens as it always did,
+    empty of anything the world put there (the block comment), and a dungeon
+    chest pays its pile. A dropped thing is somebody's and is left alone. A
+    thing a plugin placed, that is a weapon, a piece of armour, ammunition, a
+    tool or a coin, does not come up off the floor.
   */
   function activate(actorId, refrId, baseDesc) {
     var baseId = idOf(baseDesc);
     if (!baseId) { return null; }
     if (kindOf(baseId) === 'CONT') {
-      /*
-        AND IF IT READ EMPTY, COME BACK IN A MOMENT, because otherwise the
-        first person to open any chest in Skyrim loots it.
-
-        Patrick, 22 September: "goldf, weaops, and armor are propley not able
-        to be picked up off the ground but are still found in chests and able
-        to be looted when they shouoldnt be."
-
-        The note over strip() had half of this already: a container's contents
-        are copied out of the plugin lazily, so the read here often comes back
-        empty and nothing is taken. What it then says is "the next press reads
-        it again, by which time the engine has filled it, and that is the one
-        that empties it". THERE IS NO SECOND PRESS. Read the engine's own
-        handler, MpObjectReference::Activate:
-
-            } else if (t == espm::CONT::kType && actorActivator) {
-              EnsureBaseContainerAdded(loader);
-
-        That runs AFTER this hook, on the same press, and then the container
-        opens with everything Bethesda put in it on the screen. Nobody presses
-        a chest, closes it and presses it again; they take the sword. The
-        second press only ever emptied a chest that had already been looted.
-
-        So an empty read schedules another one. The engine fills the container
-        synchronously inside the same Activate, so a timer of zero lands after
-        it with the contents there. The second at a quarter of a second is for
-        a fill that went round the event loop, and it costs one property read
-        on a chest that is already marked.
-
-        THE MARK STILL ONLY GOES ON A REAL READ, which is what stops this
-        eating somebody's own chest: strip() writes nothing when the inventory
-        comes back empty, so a chest that is genuinely empty is looked at
-        again next time rather than being recorded as done.
-      */
-      if (strip(refrId) === 0) {
-        var again = function () { try { strip(refrId); } catch (e) { } };
-        try { setTimeout(again, 0); } catch (e) { }
-        try { setTimeout(again, 250); } catch (e) { }
-      }
       try {
         var dungeonLoot = g.__thornswoodDungeonLoot;
         if (dungeonLoot && dungeonLoot.onChest) { dungeonLoot.onChest(actorId, refrId); }
@@ -47296,9 +47173,9 @@ module.exports = {
   ready();
   g.__thornswoodSpoils = {
     purse: purse, PURSE: PURSE, PURSE_PROPERTY: PURSE_PROPERTY,
-    activate: activate, strip: strip, isSpoil: isSpoil, isJailKey: isJailKey, kindOf: kindOf,
-    isTool: isTool, isPurse: isPurse, PURSES: PURSES, alreadyStripped: alreadyStripped,
-    SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD, STRIPPED_PROPERTY: STRIPPED_PROPERTY
+    activate: activate, isSpoil: isSpoil, isJailKey: isJailKey, kindOf: kindOf,
+    isTool: isTool, isPurse: isPurse, PURSES: PURSES,
+    SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD
   };
   slog('ready');
 })();
@@ -47307,8 +47184,8 @@ module.exports = {
 /*
   A CHEST IN A DUNGEON PAYS FROM THE PLACE'S TIER.
 
-  The world's own coin, weapons and armour are still stripped. This is a
-  different door: the server creates a small pile when somebody opens a
+  Every other container holds nothing the world put there (the spoils
+  block, #3078). This is the one door: the server creates a small pile when somebody opens a
   chest, an urn, a coffin or a safe in a dungeon, a cave or a sewer. The
   same container does not pay again until that tier's rest has passed,
   which is the same rest the population catalogue uses: 30, 45, 60 and 90
@@ -47773,9 +47650,8 @@ module.exports = {
 
   /*
     Found in a dungeon and nowhere else on this table. Not the ordinary
-    weapon pile above, and not a company ware. The world's own spawned
-    weapons, armour and coin are still stripped. What this list creates
-    is the burial set.
+    weapon pile above, and not a company ware. The world puts nothing
+    in a container (#3078). What this list creates is the burial set.
   */
   var EXCLUSIVE = [
     { desc: 'cc842:Skyrim.esm', name: 'Ancient Nord Amulet', tier: 1, weight: 8 },
@@ -47994,9 +47870,10 @@ module.exports = {
   }
 
   /*
-    Called when a container is opened, after the world's own spoils are
-    scheduled to leave it. The pile goes into the pack, not back into the
-    container, so the stripper cannot take the gold out again.
+    Called when a container is opened. The container itself holds nothing
+    the world put there (#3078). The pile goes into the pack of the person
+    who opened it, not into the container, because it pays once and to
+    them (docs\systems\dungeon-loot.md, What opens).
   */
   function onChest(actorId, refrId) {
     if(!active || !ledger) return null;

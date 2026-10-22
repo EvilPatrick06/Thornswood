@@ -11,16 +11,13 @@
 // propley not able to be picked up off the ground but are still found in chests
 // and able to be looted when they shouoldnt be."
 //
-// THE GROUND HALF ALWAYS WORKED AND THE CHEST HALF NEVER DID, for a reason
-// that is invisible from the JavaScript: a container's contents are copied out
-// of the plugin lazily, by EnsureBaseContainerAdded, and the engine's own
-// Activate calls that AFTER this hook has run and returned. So the read came
-// back empty every time, nothing was taken, and the chest then opened with
-// everything Bethesda put in it.
-//
-// So the thing this file checks hardest is the SHAPE OF THE PRESS, not the
-// classification: what happens when the inventory is empty at the moment of
-// the press and full a moment later, which is every chest in Skyrim.
+// THE GROUND HALF ALWAYS WORKED AND THE CHEST HALF NEVER DID, because a
+// container's contents were copied out of the plugin by the engine
+// (EnsureBaseContainerAdded) after this block's hook had run. The gamemode
+// chased that with timers. Now the engine never puts a record's contents in a
+// container (forbiddenBaseContainer, #3078), so this block does not touch a
+// container at all, and this file checks that it does not: no write, no mark,
+// no timer. tests\test-3078-containers-empty.js checks the setting itself.
 //
 // It drives the REAL spoils block out of gamemode.js over a fake mp and a fake
 // clock, the way test-needs.js does.
@@ -281,83 +278,40 @@ if (block) {
   }
 
   /*
-    ------------------------------------------------------ THE CHEST
+    ------------------------------------------------------ THE CHEST (#3078)
 
-    This is the one that was wrong, and the shape is the whole of it. On the
-    press the container is EMPTY, because the engine has not copied the
-    plugin's contents in yet. It does that immediately afterwards, inside its
-    own Activate, and then the chest opens on somebody's screen.
+    The engine puts nothing of a container's record in it, so whatever is in
+    a chest at the press is somebody's, and the press leaves it exactly as it
+    is: no write, no mark, no timer.
   */
   {
     const chest = 0x00055555;
     const g2 = rig();
-    const C = g2.kind('chest:Skyrim.esm', 'CONT');
+    g2.kind('chest:Skyrim.esm', 'CONT');
     g2.kind('sword:Skyrim.esm', 'WEAP');
     g2.kind('bread:Skyrim.esm', 'FOOD');
     const sword = g2.idOf('sword:Skyrim.esm'), bread = g2.idOf('bread:Skyrim.esm');
-
-    g2.put(chest, []);                       // empty at the moment of the press
-    g2.activate(1, chest, 'chest:Skyrim.esm');
-
-    yes('an empty read takes nothing and records nothing',
-        g2.inv(chest).length === 0 && !g2.alreadyStripped(chest));
-    yes('but it asks to be looked at again', g2.timers.length >= 1);
-    yes('and the first of those is immediate, not a quarter of a second later',
-        g2.timers.some(t => t.ms === 0));
-
-    // The engine fills it, the way EnsureBaseContainerAdded does.
-    g2.put(chest, [
-      { baseId: sword, count: 1 },
+    const stored = [
+      { baseId: sword, count: 3 },
       { baseId: g2.GOLD, count: 60 },
       { baseId: bread, count: 2 }
-    ]);
-    g2.fire(0);
-
-    const left = g2.inv(chest);
-    yes('the second look empties it, on the same press',
-        left.length === 1 && left[0].baseId === bread);
-    yes('and the chest is marked so nobody comes back to it', g2.alreadyStripped(chest));
+    ];
+    g2.put(chest, stored.slice());
+    const answer = g2.activate(1, chest, 'chest:Skyrim.esm');
+    yes('a chest opens as it always did', answer === null);
+    yes('and what a person stored in it stays, sword and gold included',
+        JSON.stringify(g2.inv(chest)) === JSON.stringify(stored));
+    yes('nothing is written on the chest', Object.keys(g2.store[chest]).join() === 'inventory');
+    yes('and no timer is set to come back to it', g2.timers.length === 0);
   }
 
-  // A chest somebody has since put their own swords in is theirs.
+  // Nothing in the block reads or empties a container any more.
   {
-    const chest = 0x00066666;
-    const g3 = rig();
-    g3.kind('chest:Skyrim.esm', 'CONT');
-    g3.kind('sword:Skyrim.esm', 'WEAP');
-    const sword = g3.idOf('sword:Skyrim.esm');
-    g3.put(chest, [{ baseId: sword, count: 1 }]);
-    g3.activate(1, chest, 'chest:Skyrim.esm');
-    yes('the first press empties a chest that was already full', g3.inv(chest).length === 0);
-    // Now somebody stores their own work in it.
-    g3.put(chest, [{ baseId: sword, count: 3 }]);
-    g3.activate(1, chest, 'chest:Skyrim.esm');
-    g3.fire(1000);
-    yes('and a smith who stores their own swords in it keeps them',
-        g3.inv(chest).length === 1 && g3.inv(chest)[0].count === 3);
-  }
-
-  // A chest that is genuinely empty is never recorded as done, or the first
-  // empty chest anybody opened would become a chest nobody could ever be
-  // stopped from filling with Bethesda's loot later.
-  {
-    const chest = 0x00077777;
-    const g4 = rig();
-    g4.kind('chest:Skyrim.esm', 'CONT');
-    g4.activate(1, chest, 'chest:Skyrim.esm');
-    g4.fire(1000);
-    yes('an empty chest is still not marked after the second look',
-        !g4.alreadyStripped(chest));
-  }
-
-  // The timers are the fix. A change that removes them puts the hole back.
-  {
-    const act = src.slice(src.indexOf('function activate(actorId, refrId, baseDesc)'),
-                          src.indexOf('// ------------------------------------------------- where gold comes from --'));
-    yes('the empty read is followed up rather than left to a second press',
-        /strip\(refrId\) === 0/.test(act) && /setTimeout\(again, 0\)/.test(act));
-    yes('and the reason is written next to it',
-        /EnsureBaseContainerAdded/.test(act));
+    yes('there is no strip, no emptied mark and no timer in the spoils block',
+        !/function strip\(/.test(block) && !/thornswoodStripped/.test(block) &&
+        !/STRIPPED_PROPERTY/.test(block) && !/setTimeout/.test(block));
+    yes('and the reason is written in it',
+        /forbiddenBaseContainer/.test(block) && /#3078/.test(block));
   }
 }
 

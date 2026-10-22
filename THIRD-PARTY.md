@@ -258,8 +258,8 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`c214eea1`, the commit the client record names (the same 68 files as at
-`d39a9a93`, which changed nothing in `skymp5-front`). Read on 21 October (#421):
+`c214eea1`, the commit the client record names (the same 68 files, byte for
+byte, as at `d39a9a93`, which changed nothing in `skymp5-front`). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
 bytes, sha256
 `d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae`, and every
@@ -784,7 +784,8 @@ with.
   `d9bee9ea` the engine's AddItems keeps every entry after one that joins a
   stack (#3069), since `d39a9a93` it refuses a stack past 4,294,967,295
   before anything moves (#3074), since `e1127af4` a container starts with
-  none of its plugin contents (#3078), and since `c214eea1` a plant, a tree
+  none of its plugin record's contents when the server settings name its
+  type in `forbiddenBaseContainer` (#3078), and since `c214eea1` a plant, a tree
   or a crafting bench goes through the server before the game starts it
   (#3080). The server module's SHA256
   is `be81dca0510508e0288fd21fe91e455d1504e81f1a521815c8f372cc589952e5`, built

@@ -9,7 +9,8 @@
   Drives the REAL spoils block out of gamemode.js over a fake mp, the way
   test-spoils.js does, and checks:
     - each of the three is a spoil, with no record kind that would make it one;
-    - each is taken out of a chest the world filled, beside bread that stays;
+    - a chest holds none of them, because the world fills no chest
+      (forbiddenBaseContainer, #3078; tests\test-spoils.js);
     - each placed by the world on the floor is refused;
     - one a person dropped is left alone, like any spoil;
     - while the load order is still coming in, nothing is refused by mistake,
@@ -106,20 +107,6 @@ function rig(ready) {
   yes('C3 the second Riekling tome is a spoil', g.isSpoil(ids[2]));
   yes('C4 bread still is not', !g.isSpoil(bread));
   yes('C5 nor is any other book', !g.isSpoil(book));
-}
-
-// ------------------------------------------------------------ the chest
-{
-  const g = rig();
-  g.kind('chest:Skyrim.esm', 'CONT');
-  const ids = [g.kind(CUTS[0], 'MISC'), g.kind(CUTS[1], 'BOOK'), g.kind(CUTS[2], 'BOOK')];
-  const bread = g.kind('bread:Skyrim.esm', 'FOOD');
-  const chest = 0x00055555;
-  g.put(chest, ids.map(function (id) { return { baseId: id, count: 1 }; }).concat([{ baseId: bread, count: 2 }]));
-  g.activate(1, chest, 'chest:Skyrim.esm');
-  const left = g.inv(chest).map(function (e) { return e.baseId; });
-  yes('K1 a chest the world filled gives up none of the three', ids.every(function (id) { return left.indexOf(id) < 0; }));
-  yes('K2 and keeps its bread', left.length === 1 && left[0] === bread);
 }
 
 // ------------------------------------------------------------ the floor

@@ -17,17 +17,19 @@ It is not a wage, and it is not paid again on a later login.
 
 The record is the base game's gold, form `0xF`.
 
-The world does not mint the rest by leaving coin where it grew. A sack, a chest, a draugr, a purse growing in the
-world: the gold in those is stripped. The six coin purses the world
-can hand you are refused and put back. Weapons and armour left by the
-world are stripped the same way. What a person made, traded, or was
-given by another person stays.
+The world does not mint the rest by leaving coin where it grew. A
+chest, a barrel, a sack, or any other container starts empty: the
+world puts nothing in it, coin or anything else. A draugr's gold is
+stripped. The six coin purses the world can hand you are refused and
+put back. Weapons and armour left by the world are refused the same
+way. What a person made, traded, or was given by another person
+stays, in a pack or in a container.
 
 A chest in a dungeon, a cave, or a sewer is a different door. Opening
 one creates a small sum, on that place's tier, and the same chest
 does not pay again until the place has rested. That is the same kind
-of mint as a scene quest's reward. The coin that was sitting in the
-chest is still stripped. A dead body can also create a little coin,
+of mint as a scene quest's reward. There is no other coin in the
+chest. A dead body can also create a little coin,
 much less than a chest, and most bodies create none. See [Dungeon loot](dungeon-loot.md).
 
 ## What counts as gold
