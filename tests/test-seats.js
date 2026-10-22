@@ -666,8 +666,9 @@ async function join(standing, status, channel) {
   yes('the dev build (staff only) never waits', !!got.obj && got.obj.ok === true && got.obj.wait === false);
 
   // ------------------------------------------------------------ the home page
-  const START = "    var dot = document.getElementById('dot'), t = document.getElementById('livetext');";
-  const END = "        t.textContent = 'Server offline';\n      }\n    }\n";
+  // paintStatus in home.js (#3218).
+  const START = "  var dot = document.getElementById('dot'), t = document.getElementById('livetext');";
+  const END = "      if (gone) gone.hidden = true;\n    }\n  }\n";
   const ha = home.indexOf(START);
   const hb = ha < 0 ? -1 : home.indexOf(END, ha);
   const hblock = (ha >= 0 && hb >= 0) ? home.slice(ha, hb + END.length) : null;

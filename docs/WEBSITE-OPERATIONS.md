@@ -13,7 +13,10 @@ UK and EU audiences are not knowingly targeted or served. Contact remains
 the Discord and private support tickets. Do not publish a personal address
 or invent a business identity, email, registration or LocalBusiness schema.
 
-The website has no advertising or analytics tags. Its cookies support
+The website has no advertising tag. Its one analytics is Cloudflare Web
+Analytics, which Cloudflare writes into each page on the way out and which
+stores nothing in the browser; the content rules allow it and the privacy
+page names it (Patrick, 22 Oct 2026, #3218). Its cookies support
 authentication, sign-in security and the self-declared age notice. That
 notice records a statement; it does not verify age. Public images and
 recordings require moderation before publication. Existing rules prohibit
