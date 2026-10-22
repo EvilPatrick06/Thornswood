@@ -680,6 +680,10 @@ that fails is drawn amber instead. The rows live in `StatusList` on the
 Diagnostics page now (#607); the Play page shows a one line summary of them
 (`DrawStatus.UpdateReadySummary`), and both are updated in place rather than
 torn down and rebuilt, so an unchanged pass does not flash or re-say itself.
+A failing summary names the problem in a few words, the first blocking row's
+`Check.Problem` and how many more ("Steam not running", "Wrong Skyrim build and
+2 more"), with every one listed on hover (#3203); each row that can block sets
+its `Problem` where `Checks.cs` makes it.
 `DrawStatus.StatusRow` builds a row once and `DrawStatus.FillStatusRow` fills
 it. Then it sets
 `Shell.cs:2963 btnPlay.IsEnabled`, which turns the button on only when no row
