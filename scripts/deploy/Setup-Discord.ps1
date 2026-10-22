@@ -15,6 +15,9 @@
     .\Setup-Discord.ps1 -Check     changes nothing at all, just says what it
                                     would do
     .\Setup-Discord.ps1 -Prune     also deletes channels this no longer wants
+    .\Setup-Discord.ps1 -OnBox     runs the build on the VPS with the token the
+                                    running bot already holds, and asks for
+                                    nothing. Goes with -Check, -Posts and -Prune
 
   First time only, before running it:
 
@@ -42,6 +45,21 @@
 
   It asks for the token rather than taking it on the command line, so it stays
   out of your history. Nothing writes it to disk.
+
+  -OnBox asks for nothing (#2519, #2341). The token is the bot's own, in
+  C:\Thornswood-Bot\bot.env.json on the VPS, so a machine with the VPS key
+  and no token, or a run with nobody at a prompt, can still build, and the
+  token never leaves the box. Build-Discord.py, content.py and
+  staff-channel.txt go up inside the run's script as the commit holds them
+  (an uncommitted change to any of them stops the run before the box is
+  asked anything), into a folder of the run's own under C:\Windows\Temp.
+  There the box's Python runs the build with the bot's own libraries
+  (py-libs), the token is read from bot.env.json into that one process's
+  environment, and the folder is removed when the build ends. The build may
+  write the news webhook into that folder; it goes with the folder, because
+  the box already keeps the webhook (Discord-Hook.ps1). The running bot holds
+  the smaller permission set, not Administrator, so anything that needs
+  Administrator is named under "did not manage".
 #>
 [CmdletBinding()]
 param(
@@ -57,7 +75,9 @@ param(
   # flashing.
   [switch]$Posts,
   # Touches nothing. Says what it would make, remove and rewrite, then stops.
-  [switch]$Check
+  [switch]$Check,
+  # Builds on the VPS with the token the bot holds there. Asks for nothing.
+  [switch]$OnBox
 )
 
 $ErrorActionPreference = 'Stop'
@@ -65,6 +85,88 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $app = Join-Path $Here '..\..\bot\Build-Discord.py'
 if (-not (Test-Path -LiteralPath $app)) { throw "not found: $app" }
+
+# The one switch (#428): the site's "open", read off its public page so the
+# posts say the same as the site. Anything that goes wrong is the alpha
+# wording, which is what is true until somebody flips it.
+$open = $false
+try {
+  $pub = Invoke-RestMethod -Uri 'https://thornswood.net/api/public' -TimeoutSec 15
+  $open = ($pub.open -eq $true)
+} catch {
+  Write-Host ('  Could not ask the site whether the world is open (' + $_.Exception.Message + '), so the posts use the alpha wording.') -ForegroundColor Yellow
+}
+if ($Posts) {
+  if ($open) { Write-Host '  The site says the world is open to everybody, so the posts say so.' }
+  else { Write-Host '  The site says the world is in alpha, open by application, so the posts say so.' }
+}
+
+if ($OnBox) {
+  . (Join-Path $Here '..\vps\Vps.ps1')
+  . (Join-Path $Here '..\vps\Send-Script.ps1')
+  $Repo = Split-Path -Parent (Split-Path -Parent $Here)
+  $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt')
+  # The commit, never the working tree, so what ran is a commit anyone can name.
+  $dirty = @(& git -C $Repo status --porcelain -- @send 2>$null)
+  if ($LASTEXITCODE -ne 0) { throw 'git could not say whether the build''s files are committed. Nothing was sent.' }
+  if ($dirty.Count) { throw ('Commit these first, nothing was sent: ' + (($dirty | ForEach-Object { "$_".Trim() }) -join ', ')) }
+  $commit = "$(& git -C $Repo rev-parse --short=12 HEAD)".Trim()
+  $files = ''
+  foreach ($rel in $send) {
+    $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Repo $rel)))
+    $files += "  '" + (Split-Path -Leaf $rel) + "' = '" + $b64 + "'`r`n"
+  }
+  $flags = "`$env:THORNSWOOD_OPEN = '" + $(if ($open) { '1' } else { '0' }) + "'`r`n"
+  if ($Guild) { $flags += "`$env:DISCORD_GUILD = '" + ($Guild -replace '[^0-9]', '') + "'`r`n" }
+  if ($Prune) { $flags += "`$env:DISCORD_PRUNE = '1'`r`n" }
+  if ($Posts) { $flags += "`$env:DISCORD_POSTS = '1'`r`n" }
+  if ($Check) { $flags += "`$env:DISCORD_CHECK = '1'`r`n" }
+  # What runs on the box. The token is read there and set for the one Python
+  # process; the folder goes when the build ends, however it ends.
+  $far = @"
+`$ErrorActionPreference = 'Stop'
+`$ProgressPreference = 'SilentlyContinue'
+# sshd's sessions carry the PATH from before Python was installed (Install-Bot.ps1).
+`$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
+`$botRoot = 'C:\Thornswood-Bot'
+# The box's own temp folder, where OnBox.ps1 keeps its runs too.
+`$top = 'C:\Windows\Temp'
+`$dir = Join-Path `$top ('thornswood-discord-' + [Guid]::NewGuid().ToString('N'))
+`$code = 1
+New-Item -ItemType Directory -Force -Path `$dir | Out-Null
+try {
+  `$files = @{
+$files  }
+  foreach (`$k in `$files.Keys) { [IO.File]::WriteAllBytes((Join-Path `$dir `$k), [Convert]::FromBase64String(`$files[`$k])) }
+  `$cfg = Get-Content -LiteralPath (Join-Path `$botRoot 'bot.env.json') -Raw | ConvertFrom-Json
+  if (-not `$cfg.DISCORD_TOKEN) { 'NO TOKEN: C:\Thornswood-Bot\bot.env.json holds no DISCORD_TOKEN. Nothing was built.'; exit 3 }
+  `$env:DISCORD_TOKEN = [string]`$cfg.DISCORD_TOKEN
+  `$cfg = `$null
+  `$env:PYTHONPATH = Join-Path `$botRoot 'py-libs'
+  `$env:PYTHONIOENCODING = 'utf-8'
+$flags  `$ErrorActionPreference = 'Continue'
+  & python (Join-Path `$dir 'Build-Discord.py') 2>&1 | ForEach-Object { "`$_" }
+  `$code = `$LASTEXITCODE
+} finally {
+  `$env:DISCORD_TOKEN = `$null
+  Remove-Item -LiteralPath `$dir -Recurse -Force -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath `$dir) { 'LEFT BEHIND: ' + `$dir + ' could not be removed' }
+}
+exit `$code
+"@
+  $User = Get-ThornswoodVpsUser
+  $Vps = Get-ThornswoodVpsAddress
+  $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
+  Write-Host ("Building on the VPS from commit {0}, with the token the bot holds there..." -f $commit)
+  $out = Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $far
+  $code = $LASTEXITCODE
+  foreach ($l in @($out)) { Write-Host "$l" }
+  if ($code -ne 0) {
+    Write-Host ''
+    Write-Host ("  The build on the VPS ended with exit {0}. Fix what it said above and run it again." -f $code) -ForegroundColor Yellow
+  }
+  exit $code
+}
 
 # The bot's Python is 3.12. Plain python is whichever is first on PATH, which
 # on a PC with more than one can be too old (on One it is 3.9, #2276), so the
@@ -106,22 +208,7 @@ if ($Prune) { $env:DISCORD_PRUNE = '1' }
 if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
 $tok = $null
-
-# The one switch (#428): the site's "open", read off its public page so the
-# posts say the same as the site. Anything that goes wrong is the alpha
-# wording, which is what is true until somebody flips it.
-$open = $false
-try {
-  $pub = Invoke-RestMethod -Uri 'https://thornswood.net/api/public' -TimeoutSec 15
-  $open = ($pub.open -eq $true)
-} catch {
-  Write-Host ('  Could not ask the site whether the world is open (' + $_.Exception.Message + '), so the posts use the alpha wording.') -ForegroundColor Yellow
-}
 $env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
-if ($Posts) {
-  if ($open) { Write-Host '  The site says the world is open to everybody, so the posts say so.' }
-  else { Write-Host '  The site says the world is in alpha, open by application, so the posts say so.' }
-}
 
 try {
   & $py @pyArgs $app
