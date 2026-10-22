@@ -794,7 +794,7 @@ git switch main
 git pull
 ```
 
-When `Launcher builds` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
+When `Launcher builds` says pass, and you are confident in the change, merge it yourself. Say what you merged in #staff-updates. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -1034,7 +1034,8 @@ How to use it:
   Order on a VPS runner and changes nothing, and writes them to board.json
   (#3192).
 - A pull request that finishes an issue says `Closes #N`, so merging closes
-  it and the board moves it to Done. Say in the pull request which issues moved.
+  it and the board moves it to Done. Say in the pull request, or in #staff-updates,
+  which issues moved.
 - A fix people would notice is the exception: its pull request says `Refs #N`,
   and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
   is where the team checks that nothing breaks the game, and main is where
@@ -1367,8 +1368,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   says which.
 - The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
-  There is one dev feed and the last dev Ship wins; a release gets no
-  #staff-updates line (Patrick, 22 Oct). A main Ship leaves the Dev feed and baseline unchanged, apart
+  Say in #staff-updates when you take it, because there is one dev feed and the last
+  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged, apart
   from which dev notes are marked DEV (see Mark the dev notes again).
 - Every release note has a title and details, dev included. Patrick, 25 Sep,
   after two dev posts went out as "The scroll glows" and "Dev build: ...":
@@ -1535,7 +1536,8 @@ this is the long form.
   reviews is 0; the code owner review is off. The build check,
   `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
   request on the VPS runner, and the rule is ours rather than a setting:
-  merge your own pull request once it is green, and you are confident in the change. Nothing merges by itself: auto-merge is off on the repository, so
+  merge your own pull request once it is green, you are confident in the change, and you have said so in
+  #staff-updates. Nothing merges by itself: auto-merge is off on the repository, so
   somebody presses merge or runs `gh pr merge --squash`. Each of us merges
   our own. Somebody else on the team reading a pull request first is a habit,
   not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when
@@ -1550,7 +1552,8 @@ this is the long form.
   push means pull first; never `--force`.
 - **The dev channel is for trying.** `.\scripts\release\Ship.ps1 -Channel dev "..."`
   runs from any branch on any machine and puts that build on the dev
-  server. There is one dev feed and the last dev Ship wins. A main Ship preserves the Dev feed and baseline.
+  server. There is one dev feed and the last dev Ship wins, so say in #staff-updates
+  when you take it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
   client built from the fork and recorded, the launcher build (MSBuild from
@@ -1590,7 +1593,7 @@ this is the long form.
 
 ## 3. How to release to dev
 
-Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins.
+Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins. Say what you are about to publish in #staff-updates first.
 
 The machine that runs `Ship.ps1` still has to sign the build. [Setting up a machine](#setting-up-a-machine) and [Shipping from another machine](#shipping-from-another-machine) are how a PC gets there.
 
@@ -1656,7 +1659,7 @@ Ship already posts the note. These commands send nothing. They show what a secon
 
 ### What any developer may do
 
-Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Say what you are about to publish in #staff-updates first. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
 The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, in First Time Setup, says which Azure sign-in can sign.
 
@@ -1690,7 +1693,7 @@ To post the current feed again:
 
 ## 4. How to release to main
 
-A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign. A release gets no #staff-updates line; the update channel, the app and site News tabs and GitHub say it. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
+A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign, then say so in #staff-updates. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
 
 ### Move the version first
 
@@ -1759,7 +1762,8 @@ dev feed and the dev baseline (`feed-dev` in the VPS store), the dev ports,
 and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
-never #news. There is one dev feed and the last dev Ship wins. Main and Dev have independent feeds and baselines. A Main
+never #news. There is one dev feed and the last dev Ship wins, so say in #staff-updates
+when you take it. Main and Dev have independent feeds and baselines. A Main
 Ship leaves Dev's release unchanged; advance Dev through its own Ship. What a
 Main Ship does change on the dev feed is which notes are marked DEV and its
 `mainVersion`, right after main's feed is out (`Refresh-DevNews.ps1`, which
