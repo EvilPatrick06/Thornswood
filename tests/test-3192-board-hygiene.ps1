@@ -10,7 +10,8 @@
   Refs fixes left in In Progress after they merged, and issues with no area
   at all. Patrick approved a cause fix for each on the review page.
 
-  What it checks, for each workflow:
+  First, that the real Invoke-RestMethod hands a JSON array on as one object,
+  as the stand-in below does (#2798). Then, for each workflow:
     1. what starts it, its token's grants, the VPS runners, a timeout, no
        action and nothing checked out, and no ${{ }} inside its script;
     2. its script, lifted out and run in a child PowerShell with a stand-in
@@ -94,10 +95,47 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-board-hygiene-' + [Guid]::NewG
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 $calls = Join-Path $work 'calls.txt'
 $routes = Join-Path $work 'routes.json'
+# The real Invoke-RestMethod hands a JSON array on as ONE object, not an item
+# at a time, so @(Invoke-RestMethod ...) is a list of one whatever the page
+# holds. The stand-in below has to answer the same way, or a script that
+# reads a page wrong passes here and fails on the runner: area-label.yml
+# started by hand found "0 issue(s) with no area label" with 145 open, and
+# done-on-merge.yml found no pull request behind any merge (#2798, #3273).
+# So the real one is asked once, of a server on this machine, and the
+# stand-in is held to what it does.
+# A plain TCP listener on a port the system picks, so it needs no URL
+# reservation on Windows and never meets a port already taken.
+$listen = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$listen.Start()
+$port = $listen.LocalEndpoint.Port
+try {
+    $serve = Start-ThreadJob -ArgumentList $listen -ScriptBlock {
+        param($l)
+        foreach ($answer in @('[{"number":1},{"number":2}]', '[]')) {
+            $c = $l.AcceptTcpClient()
+            $s = $c.GetStream()
+            $r = [IO.StreamReader]::new($s)
+            while ($r.ReadLine()) { }
+            $b = [Text.Encoding]::UTF8.GetBytes($answer)
+            $head = [Text.Encoding]::ASCII.GetBytes("HTTP/1.1 200 OK`r`nContent-Type: application/json`r`nContent-Length: $($b.Length)`r`nConnection: close`r`n`r`n")
+            $s.Write($head, 0, $head.Length)
+            $s.Write($b, 0, $b.Length)
+            $s.Flush()
+            $c.Close()
+        }
+    }
+    $two = @(Microsoft.PowerShell.Utility\Invoke-RestMethod -Uri "http://127.0.0.1:$port/two" -NoProxy -TimeoutSec 10)
+    $none = @(Microsoft.PowerShell.Utility\Invoke-RestMethod -Uri "http://127.0.0.1:$port/none" -NoProxy -TimeoutSec 10)
+    $serve | Wait-Job -Timeout 10 | Remove-Job -Force
+} finally { $listen.Stop() }
+Yes ('the real Invoke-RestMethod hands a JSON array of two on as one object, so @() of it holds {0}' -f $two.Count) ($two.Count -eq 1 -and $two[0] -is [array] -and $two[0].Count -eq 2)
+Yes '  and an empty one the same way' ($none.Count -eq 1 -and $none[0] -is [array] -and $none[0].Count -eq 0)
+
 # Defined before the script, so the script's Invoke-RestMethod is this one.
 # It answers a GET from the table by its address (everything after the
 # repository), 404 for an address the table marks so, and an empty list for
-# anything else; it writes down every call, with its token and body.
+# anything else; a list goes back as one object, the way the real one does
+# (checked above). It writes down every call, with its token and body.
 $standIn = @'
 function Invoke-RestMethod {
     param([string]$Method = 'Get', [string]$Uri, [hashtable]$Headers, $Body, [string]$ContentType)
@@ -109,7 +147,7 @@ function Invoke-RestMethod {
         $res = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
         throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Response status code does not indicate success.', $res)
     }
-    if ($t.PSObject.Properties[$key]) { return $t.$key }
+    if ($t.PSObject.Properties[$key]) { $v = $t.$key; if ($v -is [array]) { return ,$v }; return $v }
     if ($Method -eq 'Get') { return ,@() }
     return [pscustomobject]@{}
 }
