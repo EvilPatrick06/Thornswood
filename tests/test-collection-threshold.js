@@ -75,7 +75,9 @@ const noneRe = /if \(Checks\.EnabledPlugins\(\) (<=|>=|<|>) Checks\.MostPluginsW
 // same question as an if that returns the red row, then the green one. Either
 // way the test below runs the comparison it actually makes.
 const modsRe = /new Check\("Mods", plugins (<=|>=|<|>) MostPluginsWithoutCollection, plugins \+ " plugins"\)/;
-const modsIfRe = /if \(plugins (<=|>=|<|>) MostPluginsWithoutCollection\)\s*return new Check\("Mods", (true|false), plugins \+ " plugins"\);\s*return new Check\("Mods", (true|false), plugins \+ " plugins"\);/;
+// Either return may carry an initializer ({ Problem = "Mods not installed" },
+// the Ready card's words, #3203) before its semicolon.
+const modsIfRe = /if \(plugins (<=|>=|<|>) MostPluginsWithoutCollection\)\s*return new Check\("Mods", (true|false), plugins \+ " plugins"\)(?:\s*\{[^}]*\})?;\s*return new Check\("Mods", (true|false), plugins \+ " plugins"\)(?:\s*\{[^}]*\})?;/;
 const noneM = noneRe.exec(SHELL);
 const modsOne = modsRe.exec(CHECKS);
 const modsIf = modsOne ? null : modsIfRe.exec(CHECKS);

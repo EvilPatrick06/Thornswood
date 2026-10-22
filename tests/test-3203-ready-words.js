@@ -134,7 +134,7 @@ yes('the Diagnostics button beside the card still shows on a failure',
 
 // ============================================== C. the Steam row
 yes('the Steam row says "not running" when Steam is not running',
-    !!all && /new Check\("Steam", steam, steam \? "running" : "not running"\)/.test(all));
+    !!all && /new Check\(SteamRow, steam, steam \? "running" : "not running"\)/.test(all));
 yes('and asks once, so the dot and the words cannot disagree',
     !!all && (all.match(/SteamRunning\(\)/g) || []).length === 1);
 

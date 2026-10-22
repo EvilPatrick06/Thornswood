@@ -768,6 +768,10 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                       </Grid.ColumnDefinitions>
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                      </Grid.RowDefinitions>
                       <Ellipse x:Name="DotReady" Grid.Column="0" Width="8" Height="8" Fill="{DynamicResource Faint}"
                                VerticalAlignment="Center" Margin="0,0,10,0"/>
                       <TextBlock x:Name="TxtReadyTitle" Grid.Column="1" Text="Checking..."
@@ -778,6 +782,12 @@
                       <Button x:Name="BtnCheckDiagnostics" Grid.Column="2" Style="{StaticResource Ghost}"
                               Content="Diagnostics" Margin="8,0,0,0" VerticalAlignment="Center" Padding="8,4"
                               Visibility="Collapsed"/>
+                      <!-- Shown while Steam is not running (#3204). Its own row
+                           under the words: beside Diagnostics in a 250 wide
+                           column it would leave the words no room. -->
+                      <Button x:Name="BtnOpenSteam" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                              Style="{StaticResource Ghost}" Content="Open Steam" Margin="0,8,0,0"
+                              HorizontalAlignment="Left" Padding="8,4" Visibility="Collapsed"/>
                     </Grid>
                   </Border>
 
