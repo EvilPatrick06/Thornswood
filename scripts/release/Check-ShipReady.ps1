@@ -692,7 +692,7 @@ if ($verdict.Ready) {
   Write-Host ''
   if ($Dev) {
     Say '      .\scripts\release\Ship.ps1 -Channel dev "what changed"' 'White'
-    Say '  Say in #staff-updates when you take the dev feed: there is one, and the last dev Ship wins.' 'DarkGray'
+    Say '  There is one dev feed, and the last dev Ship wins.' 'DarkGray'
   } else {
     Say '      .\scripts\release\Ship.ps1 "what changed"' 'White'
     Say '  That publishes to everybody. Only run it from main, with the pull done.' 'DarkGray'
