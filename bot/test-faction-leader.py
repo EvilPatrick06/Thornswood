@@ -400,8 +400,10 @@ try:
     yes('a Gamemaster on Faction Leader is flagged, and the ticket opens',
         '**CHECK THIS ONE.** Holds a staff role (Gamemaster); staff cannot '
         'hold a Jarl seat or a faction lead.' in gm_body)
-    yes('is_staff itself is unchanged: a Lead Gamemaster is still not staff',
-        not bot.is_staff(lead) and not bot.is_staff(trial)
+    # Every lead is on the council and staff since #3317 (Patrick, 22 Oct);
+    # a Trial Gamemaster still is not.
+    yes('is_staff: a Lead Gamemaster is staff (the council), a Trial Gamemaster is not',
+        bot.is_staff(lead) and not bot.is_staff(trial)
         and bot.is_staff(gm) and bot.is_staff(mo))
 
     send_faction(G, lead, 'The Companions', answers=['A', 'B', 'C'])
@@ -559,14 +561,14 @@ try:
         lead_role = Role('Lead Gamemaster', [lead], rid=20)
         G.roles.append(lead_role)
         bot.UPPER_STAFF_IDS = {10}
-        ask = CloseAsk(lead, fac)
+        ask = CloseAsk(trial, fac)
         asyncio.run(bot.close_here(ask))
-        yes('Lead Gamemaster without an UPPER_STAFF_ROLES id cannot close a '
+        yes('a Trial Gamemaster without an UPPER_STAFF_ROLES id cannot close a '
             'Faction Leader ticket',
             ask.response.said
             and 'Staff close these' in ask.response.said[0][0]
             and not fac.edited
-            and not bot.is_staff(lead))
+            and not bot.is_staff(trial))
 
         ask = CloseAsk(pat, fac)
         asyncio.run(bot.close_here(ask))

@@ -80,6 +80,11 @@ written with its buttons from the start.
 
 ## A person arrives
 
+[The Discord layout](systems/discord.md). Every role, category and channel
+of the Discord, who sees each one, and the staff council. Joining makes a
+Member, who reads the welcome and the rules; Playtester opens the rest.
+Made from the plan the build runs, so it never drifts from it.
+
 [Creation](systems/creation.md). A new character is made in a stone hall.
 The face is the game's. The town is required before they leave. Class and
 profession can wait. They start with 40 gold, a tunic and boots, and a tool

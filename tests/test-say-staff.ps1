@@ -108,10 +108,12 @@ $tmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-say-' + [Guid]::NewGuid
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $root = Join-Path $tmp 'Thornswood-Watch'
 $alerts = Join-Path $root 'alerts.jsonl'
+# The bot's data folder, where it writes what it took back (#3328).
+$botData = Join-Path $tmp 'Thornswood-Bot-data'
 
 # The box half as sshd runs it: its own process, the line on its input.
 function Box([string]$from, [string[]]$in, [string]$at = $root) {
-    $args2 = @('-NoProfile', '-NonInteractive', '-File', $box, '-From', $from, '-Root', $at)
+    $args2 = @('-NoProfile', '-NonInteractive', '-File', $box, '-From', $from, '-Root', $at, '-BotData', $botData)
     $out = @($in | & $shell @args2 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
     return [pscustomobject]@{ Out = $out; Code = $LASTEXITCODE; Last = ($out | Select-Object -Last 1) }
 }
@@ -206,6 +208,26 @@ try {
     Yes 'check: no such notice' ((Box 'a' @('check agent-a-9')).Last -eq 'NOT FOUND')
     Yes 'check: only an agent notice''s id is asked about' ((Box 'a' @('check outside-20261020-caddy-down')).Last -like 'REFUSED*')
 
+    # Taking a notice back (#3328): the ask goes in alerts-unsay.txt for the
+    # bot, only for the sender's own notice, once; a check reads what the bot
+    # wrote in its data folder.
+    $unsayFile = Join-Path $root 'alerts-unsay.txt'
+    [IO.File]::AppendAllText($alerts, ((ConvertTo-Json @{ id = 'outside-x-down'; at = $now; service = 'caddy'; kind = 'down'; text = 't' } -Compress) + "`r`n"), $enc)
+    $r = Box 'a' @('unsay agent-a-1')
+    Yes 'unsay: the sender''s own notice is asked for, UNSAY QUEUED <id>, exit 0' ($r.Last -eq 'UNSAY QUEUED agent-a-1' -and $r.Code -eq 0 -and @([IO.File]::ReadAllLines($unsayFile)) -contains 'agent-a-1')
+    $r = Box 'a' @('unsay agent-a-1')
+    Yes '  asked twice, written once' ($r.Last -eq 'UNSAY QUEUED agent-a-1' -and @([IO.File]::ReadAllLines($unsayFile) | Where-Object { $_ -eq 'agent-a-1' }).Count -eq 1)
+    $r = Box 'b' @('unsay agent-a-2')
+    Yes '  another sender''s notice is refused, nothing written' ($r.Last -like 'REFUSED*not a notice from b*' -and $r.Code -eq 1 -and @([IO.File]::ReadAllLines($unsayFile)) -notcontains 'agent-a-2')
+    Yes '  so is the watchdog''s own message, and an id not in the outbox' (
+        (Box 'a' @('unsay outside-x-down')).Last -like 'REFUSED*' -and (Box 'a' @('unsay agent-a-9')).Last -eq 'NOT FOUND')
+    $r = Box 'a' @('check agent-a-1')
+    Yes 'check: asked to be taken back, the bot not there yet: UNSAY WAITING, exit 0' ($r.Last -eq 'UNSAY WAITING' -and $r.Code -eq 0)
+    New-Item -ItemType Directory -Path $botData -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $botData 'staff-unsaid.txt'), "agent-a-1`tfailed Forbidden`nagent-a-1`tdeleted`n", $enc)
+    $r = Box 'a' @('check agent-a-1')
+    Yes 'check: what the bot did last with it, UNSAID deleted, exit 0' ($r.Last -eq 'UNSAID deleted' -and $r.Code -eq 0)
+
     # ---- 3. the bot's reader takes it ----------------------------------------
     Fresh
     $r = Box 'cloud' @((SayLine 'for the bot'))
@@ -267,7 +289,7 @@ const m = /-From ([a-z0-9-]+)`$/i.exec(cmd);
 const from = m ? m[1] : '';
 const lines = fs.readFileSync(0, 'utf8').split(/\r?\n/).filter(l => l);
 fs.writeFileSync($(Js "$argsFile.in"), lines.map(l => l + os.EOL).join(''));
-const r = cp.spawnSync($(Js $shell), ['-NoProfile', '-NonInteractive', '-File', $(Js $box), '-From', from, '-Root', $(Js $root)],
+const r = cp.spawnSync($(Js $shell), ['-NoProfile', '-NonInteractive', '-File', $(Js $box), '-From', from, '-Root', $(Js $root), '-BotData', $(Js $botData)],
   { input: lines.map(l => l + os.EOL).join(''), stdio: ['pipe', 'inherit', 'inherit'] });
 process.exit(r.status === null ? 1 : r.status);
 "@
@@ -299,6 +321,17 @@ process.exit(r.status === null ? 1 : r.status);
     [IO.File]::WriteAllText((Join-Path $root 'alerts-sent-bot.txt'), "$id`r`n")
     $s = SayStaff @('-Check', $id)
     Yes '  and said by the bot is exit 0' ($s.Code -eq 0 -and $s.Out -match 'posted in #staff-updates, by the bot')
+    $s = SayStaff @('-From', 'claude', '-Unsay', $id)
+    Yes 'Say-Staff.ps1 -Unsay: asked, exit 0, and the ask is on the box' ($s.Code -eq 0 -and $s.Out -match ('asked the bot to take ' + $id + ' back') -and @([IO.File]::ReadAllLines((Join-Path $root 'alerts-unsay.txt'))) -contains $id)
+    $s = SayStaff @('-Check', $id)
+    Yes '  -Check while the bot has not done it is exit 2' ($s.Code -eq 2 -and $s.Out -match 'not done it yet')
+    New-Item -ItemType Directory -Path $botData -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $botData 'staff-unsaid.txt'), "$id`twebhook`n", $enc)
+    $s = SayStaff @('-Check', $id)
+    Yes '  and one the webhook said is exit 1, saying a person deletes it' ($s.Code -eq 1 -and $s.Out -match 'Manage Messages')
+    [IO.File]::WriteAllText((Join-Path $botData 'staff-unsaid.txt'), "$id`twithheld`n", $enc)
+    $s = SayStaff @('-Check', $id)
+    Yes '  and one never said is exit 0' ($s.Code -eq 0 -and $s.Out -match 'never posted')
 
     Remove-Item -LiteralPath $argsFile -ErrorAction SilentlyContinue
     $s = SayStaff @('-From', 'claude', '-Text', ('y' * 1801))
