@@ -491,14 +491,166 @@ function Stop-ThornswoodProcessHeld($Held) {
   }
 }
 
-# What has $Path or anything under it open right now: what the Restart
-# Manager says, then every handle on the box that names it. Both, because the
-# Restart Manager is asked about files only. A process whose current
-# directory is in the folder, or that has a folder in it open, holds a handle
-# on a folder, which it cannot see; that is the sharing violation (0x80070020)
-# a dev publish was refused with on 21 Oct 2026 while it named nothing (#3131).
+# What has $Path or anything under it open right now, quickest first, because
+# a holder that exits a moment after the refusal is gone from anything asked
+# later (#3262). On 22 Oct 2026 a dev publish was refused with 0x80070020
+# and named nothing: the Restart Manager, asked first, took 41 s over the dev
+# server's 12,424 files, and only then were the handles listed.
+#
+#   1. Which processes have the path itself open, asked of Windows directly
+#      (FileProcessIdsUsingFileInformation). For a folder that is exactly
+#      the sharing violation: a handle on the folder, such as a process's
+#      current directory, opened without delete sharing. It names protected
+#      processes, Windows Defender among them, which nothing else here can
+#      look into. With it, every process running at that instant: name,
+#      parent and start time, so an id named anywhere below is still named
+#      once it has gone.
+#   2. Every handle on the box under the path (Get-ThornswoodPathHandles):
+#      files and folders inside it, which the first does not see.
+#   3. The command line of each process named, while it still runs.
+#   4. What the Restart Manager says has a file under it open, last.
 function Get-ThornswoodPathHolders([string]$Path) {
-  return (Get-ThornswoodFileHolders $Path) + '; handles: ' + (Get-ThornswoodPathHandles $Path)
+  $snap = Get-ThornswoodPathOpeners $Path
+  $handles = Get-ThornswoodPathHandles $Path
+  $said = 'open itself in: ' + $snap.Said + '; handles: ' + $handles
+  $ids = @()
+  foreach ($m in [regex]::Matches($snap.Said + ' ' + $handles, '(?:pid |into |, |among them )(\d+) (?!processes)')) { $ids += [int]$m.Groups[1].Value }
+  $now = Get-Date
+  $recent = @()
+  foreach ($k in @($snap.Procs.Keys)) {
+    $p = $snap.Procs[$k]
+    if ($p.Started -and ($now - $p.Started).TotalSeconds -le 120 -and $k -ne $PID) { $recent += $k }
+  }
+  $who = @()
+  $lines = @{}
+  $noLines = ''
+  $named = @($ids + $recent | Sort-Object -Unique)
+  if ($named.Count) {
+    try { foreach ($w in @(Get-CimInstance Win32_Process -ErrorAction Stop)) { if ($named -contains [int]$w.ProcessId) { $lines[[int]$w.ProcessId] = $w.CommandLine } } }
+    catch { $noLines = '; the command lines could not be read: ' + $_.Exception.Message }
+  }
+  foreach ($id in $named) {
+    $line = 'pid ' + $id + ' ' + (Get-ThornswoodProcessWords $snap.Procs $id)
+    if ($lines.ContainsKey($id) -and $lines[$id]) { $line += ', command line ' + $lines[$id] }
+    elseif (-not (Get-Process -Id $id -ErrorAction SilentlyContinue)) { $line += ', gone by the time its command line was asked' }
+    $who += $line
+  }
+  if ($ids.Count) { $said += '; who they are: ' + ((@($who | Where-Object { $ids -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })) -join '; ') }
+  $new = @($who | Where-Object { $recent -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })
+  $said += '; started in the 2 minutes before: ' + $(if ($new.Count) { $new -join '; ' } else { 'nothing' }) + $noLines
+  return $said + '; Restart Manager: ' + (Get-ThornswoodFileHolders $Path)
+}
+
+# How one process from Get-ThornswoodPathOpeners's snapshot reads: its name,
+# its parent's id and name, and when it started, or that it was not running.
+function Get-ThornswoodProcessWords($Procs, [int]$Id) {
+  if (-not $Procs.ContainsKey($Id)) { return '(not running when the refusal was looked at)' }
+  $p = $Procs[$Id]
+  $parent = 'parent ' + $p.Parent + ' ' + $(if ($Procs.ContainsKey($p.Parent)) { $Procs[$p.Parent].Name } else { '(not running)' })
+  $at = if ($p.Started) { 'started ' + $p.Started.ToString('yyyy-MM-dd h:mm:ss.fff tt') } else { 'start time not given' }
+  return ($p.Name + ' (' + $parent + ', ' + $at + ')')
+}
+
+# Which processes have $Path itself open, and every process running at that
+# instant, in one look that opens nothing but $Path. Returns Said, the
+# openers as "pid name" words or why they could not be asked, and Procs, by
+# id, each with Name, Parent and Started (local time). This process's own
+# look at the path is left out of the openers.
+function Get-ThornswoodPathOpeners([string]$Path) {
+  if (-not ('ThornswoodOpeners' -as [type])) {
+    try {
+      Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class ThornswoodOpeners {
+  [StructLayout(LayoutKind.Sequential)] struct IOSB { public IntPtr Status; public IntPtr Info; }
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr template);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+  [DllImport("ntdll.dll")] static extern int NtQueryInformationFile(IntPtr h, out IOSB iosb, IntPtr buf, int len, int cls);
+  [DllImport("ntdll.dll")] static extern int NtQuerySystemInformation(int cls, IntPtr buf, int len, out int ret);
+  public static string Error;
+  // The ids with the path open, or null with why in Error.
+  public static long[] Of(string path) {
+    Error = null;
+    // Attributes only, sharing everything: asked alongside any holder.
+    IntPtr h = CreateFile(path, 0x80, 7, IntPtr.Zero, 3, 0x02000000 | 0x00200000, IntPtr.Zero);
+    if (h == new IntPtr(-1)) { Error = "the path could not be opened to ask (Windows error " + Marshal.GetLastWin32Error() + ")"; return null; }
+    try {
+      int len = 1 << 16;
+      while (true) {
+        IntPtr buf = Marshal.AllocHGlobal(len);
+        try {
+          IOSB io;
+          int st = NtQueryInformationFile(h, out io, buf, len, 47);
+          if (st == unchecked((int)0xC0000004)) { len *= 4; if (len > (1 << 24)) { Error = "too many to list"; return null; } continue; }
+          if (st != 0) { Error = "Windows would not say (0x" + st.ToString("X8") + ")"; return null; }
+          int n = Marshal.ReadInt32(buf);
+          long[] ids = new long[n];
+          for (int i = 0; i < n; i++) ids[i] = Marshal.ReadIntPtr(buf, IntPtr.Size + i * IntPtr.Size).ToInt64();
+          return ids;
+        } finally { Marshal.FreeHGlobal(buf); }
+      }
+    } finally { CloseHandle(h); }
+  }
+  // Every process running: id, parent id, start (FILETIME, UTC) and name.
+  public static List<object[]> Running() {
+    int len = 1 << 20, ret, st;
+    IntPtr buf;
+    while (true) {
+      buf = Marshal.AllocHGlobal(len);
+      st = NtQuerySystemInformation(5, buf, len, out ret);
+      if (st == 0) break;
+      Marshal.FreeHGlobal(buf);
+      if (len >= (1 << 28)) throw new Exception("the processes could not be listed (0x" + st.ToString("X8") + ")");
+      len *= 2;
+    }
+    List<object[]> all = new List<object[]>();
+    try {
+      // SYSTEM_PROCESS_INFORMATION: CreateTime at 32, ImageName at 56, then
+      // BasePriority, then the process's and its parent's ids, each aligned
+      // to a pointer.
+      int us = IntPtr.Size == 8 ? 16 : 8;
+      int idAt = 56 + us + 4;
+      if (idAt % IntPtr.Size != 0) idAt += IntPtr.Size - idAt % IntPtr.Size;
+      long at = buf.ToInt64();
+      while (true) {
+        IntPtr e = new IntPtr(at);
+        long id = Marshal.ReadIntPtr(e, idAt).ToInt64();
+        long parent = Marshal.ReadIntPtr(e, idAt + IntPtr.Size).ToInt64();
+        long created = Marshal.ReadInt64(e, 32);
+        int nameLen = Marshal.ReadInt16(e, 56) & 0xFFFF;
+        IntPtr nameAt = Marshal.ReadIntPtr(e, 56 + IntPtr.Size);
+        string name = (nameAt == IntPtr.Zero || nameLen == 0) ? (id == 0 ? "Idle" : "System") : Marshal.PtrToStringUni(nameAt, nameLen / 2);
+        all.Add(new object[] { id, parent, created, name });
+        int next = Marshal.ReadInt32(e);
+        if (next == 0) break;
+        at += next;
+      }
+    } finally { Marshal.FreeHGlobal(buf); }
+    return all;
+  }
+}
+'@
+    } catch { return @{ Said = 'Windows could not be asked: ' + $_.Exception.Message; Procs = @{} } }
+  }
+  $ids = $null
+  $why = ''
+  try { $ids = [ThornswoodOpeners]::Of([IO.Path]::GetFullPath($Path)); if ($null -eq $ids) { $why = [ThornswoodOpeners]::Error } }
+  catch { $why = 'Windows could not be asked: ' + $_.Exception.Message }
+  $procs = @{}
+  try {
+    foreach ($r in [ThornswoodOpeners]::Running()) {
+      $started = $null
+      if ([long]$r[2] -gt 0) { $started = [DateTime]::FromFileTimeUtc([long]$r[2]).ToLocalTime() }
+      $procs[[int]$r[0]] = @{ Name = [string]$r[3]; Parent = [int]$r[1]; Started = $started }
+    }
+  } catch { $why += $(if ($why) { '; ' } else { '' }) + $_.Exception.Message }
+  if ($why) { return @{ Said = $why; Procs = $procs } }
+  $others = @($ids | Where-Object { [int]$_ -ne $PID })
+  if (-not $others.Count) { return @{ Said = 'no process but this one, asking'; Procs = $procs } }
+  $words = @($others | ForEach-Object { 'pid ' + $_ + ' ' + $(if ($procs.ContainsKey([int]$_)) { $procs[[int]$_].Name } else { '(gone)' }) })
+  return @{ Said = ($words -join ', '); Procs = $procs }
 }
 
 # What the Restart Manager says has a file at or under $Path open right now,
