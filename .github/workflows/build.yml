@@ -115,6 +115,15 @@ jobs:
       run: ${{ steps.look.outputs.run }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Every self-hosted checkout is written again (#3029), as below.
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Look for a green pull request build of this tree
         id: look
         shell: pwsh
