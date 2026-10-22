@@ -1,0 +1,57 @@
+{
+ "about": "Scripts the load order's records attach that no archive and no loose file in the game's Data folder carries: the mod or the DLC names a script it never shipped. The game skips them, so they do nothing. scripts/dev/Build-CrimeTable.py stops when a folder lacks any other attached script, because a folder missing scripts (the box with some archives and not the rest) would call each one it lacks one that cannot run (#3105). When the load order changes, measure again on a PC with the game: python scripts/dev/Audit-PapyrusEvents.py --json <file>, then every plugin's missingScripts.",
+ "measured": "21 Oct 2026, 10:50 PM, the Releases desk on One, Audit-PapyrusEvents.py from main against C:\\Thornswood\\Game\\Data: 35 (#3105, issuecomment-6332977859).",
+ "missing": {
+  "Dawnguard.esm": [
+   "DLC01SoulCairnSkullPuzzleScript",
+   "DLC1TestPhilAtronach",
+   "DLC1testPhilVortexSCRIPT",
+   "LokirsDraugrResurrection",
+   "dlc1testPhilVortexTrigSCRIPT"
+  ],
+  "Dragonborn.esm": [
+   "DLC2BenthicLurkerFXSCRIPT"
+  ],
+  "North Keep.esp": [
+   "QF_NKPQuest01_05035847",
+   "QF_NKPQuest02_05035848",
+   "TIF__050DD6F5",
+   "TIF__050DD6F6",
+   "TIF__050DD701",
+   "TIF__050DD702",
+   "TIF__050E280D",
+   "TIF__050E280E",
+   "TIF__050E2810",
+   "TIF__050E2811",
+   "TIF__050E2813",
+   "TIF__050E2817",
+   "TIF__050E281D",
+   "TIF__050E2821",
+   "TIF__050E2827",
+   "TIF__050E2828",
+   "TIF__050E282E",
+   "TIF__050E7937"
+  ],
+  "Playable Rieklings.esp": [
+   "RieklingRaceController"
+  ],
+  "RaceMenuMorphsHIMBO.esp": [
+   "_RaceMenuMorphsHIMBO"
+  ],
+  "Riften Expansion.esp": [
+   "RTRoggvarSearchRatwayTriggerScript",
+   "TIF__0924F596",
+   "TIF__09254698",
+   "TIF__0925469A",
+   "TIF__0925E8A2",
+   "TIF__0925E8A4"
+  ],
+  "WindhelmSSE.esp": [
+   "PF_0WHNewDockWorksAtDock8x12_051014DE",
+   "aaasurtestalduinduplicate"
+  ],
+  "XPMSE.esp": [
+   "RaceMenuPluginSoS"
+  ]
+ }
+}
