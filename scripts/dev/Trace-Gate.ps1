@@ -135,16 +135,19 @@ function Push-Trace([string]$runId, [string]$work) {
     $env:GIT_INDEX_FILE = $index
     try {
         foreach ($f in 'traces.jsonl.gz', 'starts.jsonl', 'run.json', 'summary.txt') {
-            $sha = (& git -C $RepoRoot hash-object -w (Join-Path $work $f)).Trim()
+            $sha = & git -C $RepoRoot hash-object -w (Join-Path $work $f)
             if ($LASTEXITCODE -ne 0) { Die "git could not store $f" }
+            $sha = ([string]$sha).Trim()
             & git -C $RepoRoot update-index --add --cacheinfo ('100644,' + $sha + ',' + $f)
             if ($LASTEXITCODE -ne 0) { Die "git could not put $f in the tree" }
         }
-        $tree = (& git -C $RepoRoot write-tree).Trim()
+        $tree = & git -C $RepoRoot write-tree
         if ($LASTEXITCODE -ne 0) { Die 'git could not make the tree' }
+        $tree = ([string]$tree).Trim()
     } finally { Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue }
-    $commit = (& git -C $RepoRoot commit-tree $tree -m ("Gate trace of " + ([string]$meta.commit).Substring(0, 8) + ", run " + $runId + " (#3114)")).Trim()
-    if ($LASTEXITCODE -ne 0) { Die 'git could not make the commit' }
+    $commit = & git -C $RepoRoot commit-tree $tree -m ("Gate trace of " + ([string]$meta.commit).Substring(0, 8) + ", run " + $runId + " (#3114)")
+    if ($LASTEXITCODE -ne 0) { Die 'git could not make the commit (git says why above; a checkout with no user.name and user.email cannot)' }
+    $commit = ([string]$commit).Trim()
     & git -C $RepoRoot push origin ($commit + ':refs/heads/' + $branch)
     $pushed = $LASTEXITCODE
     $ErrorActionPreference = $old

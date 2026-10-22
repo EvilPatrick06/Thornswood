@@ -111,7 +111,11 @@ if ($fn) {
         $null = GitOk init -q $RepoRoot
         [IO.File]::WriteAllText((Join-Path $RepoRoot 'kept.txt'), "as it was`n")
         $null = GitOk -C $RepoRoot add kept.txt
-        $null = GitOk -C $RepoRoot -c user.name=t -c user.email=t@t commit -q -m one
+        # A name to commit as, as the shipping machine's checkout has; a build
+        # runner has none of its own.
+        $null = GitOk -C $RepoRoot config user.name 'Trace test'
+        $null = GitOk -C $RepoRoot config user.email 'trace-test@example.invalid'
+        $null = GitOk -C $RepoRoot commit -q -m one
         $null = GitOk -C $RepoRoot remote add origin $bare
         $headBefore = (GitOk -C $RepoRoot rev-parse HEAD) -join ''
         $indexBefore = (Get-FileHash -LiteralPath (Join-Path $RepoRoot '.git/index')).Hash
