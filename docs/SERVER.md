@@ -170,6 +170,18 @@ when its check fails, three times an hour at most
 | Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:$Root = 'C:\Thornswood-Watch'`, `Watch-Services.ps1:$Task = 'Thornswood Watch'`, `Watch-Services.ps1:-RepetitionInterval (New-TimeSpan -Minutes 5)`, `Watch-Services.ps1:New-ScheduledTaskPrincipal -UserId 'SYSTEM'` |
 | Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 08:15 UTC | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:$Root = 'C:\Thornswood-Backup'`, `Install-Backup.ps1:$keyFile = Join-Path $Root 'key.txt'`, `Install-Backup.ps1:$TaskName = 'Thornswood Backup'`, `Install-Backup.ps1:$At = '08:15Z'`, `Install-Backup.ps1:New-ScheduledTaskTrigger -Daily`, `vps-nightly-backup.ps1:$KeyFile = 'C:\Thornswood-Backup\key.txt'` |
 
+Which account each one runs as: the game servers, voice, Caddy and the
+nightly backup run as LOCAL SERVICE, Limited, each with a SID of its own
+(`NT TASK\<task name>`) and rights on its own folders only, given by its
+installer (`ServiceAccount.ps1:New-ThornswoodServicePrincipal`, issues #2578
+and #2612). The live game server's task moves at the first live
+`Publish-Server.ps1` since #2578. The site runs as LOCAL SERVICE and the bot
+as `NT SERVICE\ThornswoodBot`. The watchdog and the tasks that keep or repair
+the box stay SYSTEM by design (Patrick, 22 Oct 2026):
+`docs\DEPLOY-IDENTITIES.md` section 8 lists each and why.
+`records\prod-parity.json` names every task's account, and
+`Check-ProdParity.ps1` checks the box against it.
+
 What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 3000, 7778, 7788 and 7789, and a python process with `Thornswood-Bot` in its
 command line for the bot (`Watch-Services.ps1:$checks`,

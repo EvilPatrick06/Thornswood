@@ -117,19 +117,23 @@
   "tasks": [
     {
       "name": "Thornswood Server",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "Install-ThornswoodServer.ps1, LOCAL SERVICE, Limited, with a SID of its own (#2578, ServiceAccount.ps1); the live task moves with the first live Publish-Server since #2578"
     },
     {
       "name": "Thornswood Dev Server",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "vps-dev-instance.ps1 and Publish-Server.ps1 -Channel dev, LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Voice",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "Install-Voice.ps1, LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Dev Voice",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "Install-Voice.ps1 -TaskName 'Thornswood Dev Voice', LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Docs",
@@ -137,26 +141,29 @@
     },
     {
       "name": "Thornswood Web",
-      "user": "SYSTEM",
+      "user": "LOCAL SERVICE",
       "triggers": [
         "Boot"
-      ]
+      ],
+      "why": "Setup-Domain.ps1, Caddy as LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Watch",
-      "user": "SYSTEM"
+      "user": "SYSTEM",
+      "why": "Watch-Services.ps1 -Install, every five minutes as SYSTEM, by design: it restarts and reads services and tasks of every other account (#2578, docs/DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Backup",
-      "user": "SYSTEM",
+      "user": "LOCAL SERVICE",
       "triggers": [
         "Daily"
-      ]
+      ],
+      "why": "Install-Backup.ps1, LOCAL SERVICE, Limited, with a SID of its own, read on the folders it backs up (#2612, #2836)"
     },
     {
       "name": "Thornswood Load",
       "user": "SYSTEM",
-      "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061)"
+      "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061), by design: it reads the processes of every other account (docs/DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Disk History",
@@ -164,17 +171,33 @@
       "triggers": [
         "Daily"
       ],
-      "why": "scripts/vps/Forecast-Storage.ps1 -Install, one disk sample a day at 04:00 as SYSTEM, and the forecast told to staff when it turns (#2178)"
+      "why": "scripts/vps/Forecast-Storage.ps1 -Install, one disk sample a day at 04:00 as SYSTEM, and the forecast told to staff when it turns (#2178), by design: it writes into the watchdog's folder and outbox (docs/DEPLOY-IDENTITIES.md section 8)"
+    },
+    {
+      "name": "Thornswood Runner Logs",
+      "user": "SYSTEM",
+      "triggers": [
+        "Daily"
+      ],
+      "why": "scripts/vps/Keep-RunnerLogs.ps1 -Install, daily at 4:30 AM as SYSTEM (#3184), by design: it removes old logs from every runner account's _diag folder (docs/DEPLOY-IDENTITIES.md section 8)"
+    },
+    {
+      "name": "Thornswood Bridge",
+      "user": "LOCAL SERVICE",
+      "triggers": [
+        "Boot"
+      ],
+      "why": "scripts/deploy/Install-Bridge.ps1, the box's end of ssh, LOCAL SERVICE, Limited, with a SID of its own (#2891, #2578)"
     },
     {
       "name": "Thornswood Maint Update",
       "user": "SYSTEM",
-      "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1"
+      "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (docs/DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Dev Crash Capture",
       "user": "SYSTEM",
-      "why": "dev crash capture task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1"
+      "why": "dev crash capture task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (docs/DEPLOY-IDENTITIES.md section 8)"
     }
   ],
   "services": [
