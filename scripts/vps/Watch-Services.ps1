@@ -410,10 +410,26 @@ function HealthProblem($url) {
 
 # '' when every service matching the name is running, else why not. Where
 # the name matches several, the build runners, it says which are not.
+#
+# A service set to start "Automatic (Delayed Start)", as the build runners
+# are, is Stopped for the first minutes after a boot: Windows starts those one
+# by one after the automatic ones, and on this box the last runner came up
+# about ten minutes after a start (21 Oct 2026). Until the box has been up
+# $delayedGrace seconds such a service is still starting, not down (#3217:
+# every restart told staff the runners needed a person, 1 min 40 s after it).
+$delayedGrace = 15 * 60
+function StillStarting($svc) {
+  if ("$($svc.Status)" -ne 'Stopped' -and "$($svc.Status)" -ne 'StartPending') { return $false }
+  if ("$($svc.StartType)" -ne 'Automatic') { return $false }
+  $d = Get-ItemProperty -LiteralPath ('HKLM:\SYSTEM\CurrentControlSet\Services\' + $svc.Name) -Name DelayedAutostart -EA SilentlyContinue
+  if (-not $d -or [int]$d.DelayedAutostart -ne 1) { return $false }
+  $up = ((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds
+  return ($up -lt $delayedGrace)
+}
 function ServiceProblem($name) {
   $s = @(Get-Service -Name $name -EA SilentlyContinue)
   if ($s.Count -eq 0) { return 'its Windows service is not installed' }
-  $down = @($s | Where-Object { "$($_.Status)" -ne 'Running' })
+  $down = @($s | Where-Object { "$($_.Status)" -ne 'Running' -and -not (StillStarting $_) })
   if (-not $down.Count) { return '' }
   if ($s.Count -eq 1) { return ('its Windows service is ' + $down[0].Status) }
   return ('of its ' + $s.Count + ' Windows services, ' + (@($down | ForEach-Object { $_.Name + ' is ' + $_.Status }) -join ', '))
@@ -1014,10 +1030,23 @@ $(Get-ThornswoodLockedFolderScript $Root)
 'wrote     $Root\say-staff.ps1  ' + (Get-Item '$Root\say-staff.ps1').Length + ' bytes, for staff notices from agents'
 
 # Every five minutes, as SYSTEM, so it keeps going when nobody is logged in.
-# The path has no spaces in it, so the command needs no quotes inside the
-# quotes, which is the usual way this line goes wrong.
-`$null = & schtasks /create /tn '$Task' /sc minute /mo 5 /ru SYSTEM /rl HIGHEST /f /tr 'powershell -NoProfile -ExecutionPolicy Bypass -File $Root\watch.ps1' 2>&1
-if (`$LASTEXITCODE -eq 0) { 'made      the task, every five minutes' } else { 'FAILED    schtasks exited with ' + `$LASTEXITCODE }
+#
+# PRIORITY 4, normal, like the services it watches (#1968, #3212). Until
+# 21 Oct 2026 this was schtasks /create with no priority, so Task Scheduler's
+# default of 7: Below Normal, I/O priority 1 (low), memory priority 2. With
+# the build runners at Normal filling the box, that run took a minute to
+# reach its first check, a three-second connect to a server that was up the
+# whole time timed out, and staff were told the dev server and the site were
+# down (6:43 and 6:57 PM). No time limit, and IgnoreNew so a slow run is not
+# joined by a second one.
+`$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File $Root\watch.ps1'
+`$tr = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
+`$s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew -Priority 4
+`$p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+try {
+  Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$tr -Settings `$s -Principal `$p -Force -ErrorAction Stop | Out-Null
+  'made      the task, every five minutes, at priority ' + (Get-ScheduledTask -TaskName '$Task').Settings.Priority
+} catch { 'FAILED    the task could not be registered: ' + `$_.Exception.Message }
 
 # Run it once now so the log has something in it and any problem shows up
 # here rather than in five minutes when nobody is watching.
