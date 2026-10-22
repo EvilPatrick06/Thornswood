@@ -62,8 +62,9 @@
   -OnBox asks for nothing (#2519, #2341). The token is the bot's own, in
   C:\Thornswood-Bot\bot.env.json on the VPS, so a machine with the VPS key
   and no token, or a run with nobody at a prompt, can still build, and the
-  token never leaves the box. Build-Discord.py, content.py and
-  staff-channel.txt go up inside the run's script as the commit holds them,
+  token never leaves the box. Build-Discord.py, content.py,
+  staff-channel.txt and factions.json go up inside the run's script as the
+  commit holds them,
   with the two site pages content.py reads its words from (join.md and
   rules.md), each at its place in the repository, because content.py finds
   them by its own folder (..\site\data\site). An uncommitted change to any
@@ -132,9 +133,13 @@ if ($OnBox) {
   # reads join.md and rules.md through ..\site\data\site from its own folder,
   # and a run that sent only the bot's files stopped on the box with
   # FileNotFoundError for join.md (22 Oct 2026). tests\test-2519-setup-discord-onbox.ps1
-  # imports content.py from a folder holding only these.
+  # imports content.py from a folder holding only these. Build-Discord.py
+  # reads factions.json from its own folder when it loads (#3317), and the
+  # first -OnBox run after that stopped with FileNotFoundError for it; the
+  # same test imports Build-Discord.py there too, where a python with
+  # discord.py is.
   $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt',
-    'site/data/site/join.md', 'site/data/site/rules.md')
+    'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md')
   # The commit, never the working tree, so what ran is a commit anyone can name.
   $dirty = @(& git -C $Repo status --porcelain -- @send 2>$null)
   if ($LASTEXITCODE -ne 0) { throw 'git could not say whether the build''s files are committed. Nothing was sent.' }
