@@ -11,7 +11,8 @@ Steward and the guards apart (q-3317-hold-office-access, A), and Raven Rock the
 same as the nine (q-3317-raven-rock, A). This proves:
 
   H1 every hold, Raven Rock last, is a category of its own with its
-     announcements, its hall, its court and its guard channel, in that order
+     announcements, its hall, its court and its guard channel, in that order,
+     then its Court voice; the holds sit after In Character and Factions
   H2 the hall is today's hold channel, moved out of The Holds by name, and
      The Holds is retired; #choose-your-hold moved to In Character
   H3 the hall: its Citizen, Jarl and officers talk; another hold's citizen
@@ -90,12 +91,16 @@ yes('H1 Raven Rock is a hold, the last one',
 for h in B.HOLDS:
     slug = B.hold_slug(h)
     got = [(s['name'], s.get('mode'), s.get('hold')) for s in plan.get(h, [])]
-    yes('H1 %s is a category: announcements, hall, court, guard' % h,
+    yes('H1 %s is a category: announcements, hall, court, guard, then the Court voice' % h,
         got == [(slug + '-announcements', 'holdread', h), (slug, 'hold', h),
-                (slug + '-court', 'holdcourt', h), (slug + '-guard', 'holdguard', h)])
+                (slug + '-court', 'holdcourt', h), (slug + '-guard', 'holdguard', h),
+                (h + ' Court', 'holdcourt', h)]
+        and plan[h][-1]['kind'] == 'voice')
 cats = [c for c, _ in B.PLAN]
-yes('H1 the hold categories sit together, after In Character, then Factions',
-    cats[cats.index('In Character') + 1:cats.index('Factions')] == B.HOLDS)
+last = cats.index(B.FACTIONS[-1])
+yes('H1 the hold categories sit together, after In Character and the factions',
+    cats[last + 1:last + 1 + len(B.HOLDS)] == B.HOLDS
+    and cats.index('In Character') + 1 == cats.index(B.FACTIONS[0]))
 
 # ------------------------------------------------------------------ H2 --
 yes('H2 every hall is moved out of The Holds by its name',

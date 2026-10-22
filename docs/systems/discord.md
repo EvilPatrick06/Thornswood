@@ -140,6 +140,38 @@ Holders of Moderator also talk in the Gamemasters space.
 | Khajiit Caravans | #B08D57 | no | nothing of its own | the build | A member of Khajiit Caravans. Its Leader gives and takes it. |
 | Blades | #B08D57 | no | nothing of its own | the build | A member of Blades. Its Leader gives and takes it. |
 | Volkihar Clan | #B08D57 | no | nothing of its own | the build | A member of Volkihar Clan. Its Leader gives and takes it. |
+| Imperial Embassy Court | #A08560 | no | nothing of its own | the build | The court of Imperial Embassy. Its Leader gives and takes it, to a member. |
+| Steward of Imperial Embassy | #A08560 | no | nothing of its own | the build | The Steward of Imperial Embassy. Its Leader gives and takes it, to a member. |
+| Thalmor Court | #A08560 | no | nothing of its own | the build | The court of Thalmor Remnant. Its Leader gives and takes it, to a member. |
+| Steward of Thalmor | #A08560 | no | nothing of its own | the build | The Steward of Thalmor Remnant. Its Leader gives and takes it, to a member. |
+| Free Skyrim Trading Company Court | #A08560 | no | nothing of its own | the build | The court of Free Skyrim Trading Company. Its Leader gives and takes it, to a member. |
+| Steward of Free Skyrim Trading Company | #A08560 | no | nothing of its own | the build | The Steward of Free Skyrim Trading Company. Its Leader gives and takes it, to a member. |
+| Companions Court | #A08560 | no | nothing of its own | the build | The court of The Companions. Its Leader gives and takes it, to a member. |
+| Steward of Companions | #A08560 | no | nothing of its own | the build | The Steward of The Companions. Its Leader gives and takes it, to a member. |
+| College of Winterhold Court | #A08560 | no | nothing of its own | the build | The court of College of Winterhold. Its Leader gives and takes it, to a member. |
+| Steward of College of Winterhold | #A08560 | no | nothing of its own | the build | The Steward of College of Winterhold. Its Leader gives and takes it, to a member. |
+| Bards College Court | #A08560 | no | nothing of its own | the build | The court of Bards College. Its Leader gives and takes it, to a member. |
+| Steward of Bards College | #A08560 | no | nothing of its own | the build | The Steward of Bards College. Its Leader gives and takes it, to a member. |
+| Thieves Guild Court | #A08560 | no | nothing of its own | the build | The court of Thieves Guild. Its Leader gives and takes it, to a member. |
+| Steward of Thieves Guild | #A08560 | no | nothing of its own | the build | The Steward of Thieves Guild. Its Leader gives and takes it, to a member. |
+| Dark Brotherhood Court | #A08560 | no | nothing of its own | the build | The court of Dark Brotherhood. Its Leader gives and takes it, to a member. |
+| Steward of Dark Brotherhood | #A08560 | no | nothing of its own | the build | The Steward of Dark Brotherhood. Its Leader gives and takes it, to a member. |
+| Vigilants of Stendarr Court | #A08560 | no | nothing of its own | the build | The court of Vigilants of Stendarr. Its Leader gives and takes it, to a member. |
+| Steward of Vigilants of Stendarr | #A08560 | no | nothing of its own | the build | The Steward of Vigilants of Stendarr. Its Leader gives and takes it, to a member. |
+| Dawnguard Court | #A08560 | no | nothing of its own | the build | The court of Dawnguard. Its Leader gives and takes it, to a member. |
+| Steward of Dawnguard | #A08560 | no | nothing of its own | the build | The Steward of Dawnguard. Its Leader gives and takes it, to a member. |
+| Silver Hand Court | #A08560 | no | nothing of its own | the build | The court of Silver Hand. Its Leader gives and takes it, to a member. |
+| Steward of Silver Hand | #A08560 | no | nothing of its own | the build | The Steward of Silver Hand. Its Leader gives and takes it, to a member. |
+| Forsworn Court | #A08560 | no | nothing of its own | the build | The court of Forsworn. Its Leader gives and takes it, to a member. |
+| Steward of Forsworn | #A08560 | no | nothing of its own | the build | The Steward of Forsworn. Its Leader gives and takes it, to a member. |
+| Orc Strongholds Court | #A08560 | no | nothing of its own | the build | The court of Orc Strongholds. Its Leader gives and takes it, to a member. |
+| Steward of Orc Strongholds | #A08560 | no | nothing of its own | the build | The Steward of Orc Strongholds. Its Leader gives and takes it, to a member. |
+| Khajiit Caravans Court | #A08560 | no | nothing of its own | the build | The court of Khajiit Caravans. Its Leader gives and takes it, to a member. |
+| Steward of Khajiit Caravans | #A08560 | no | nothing of its own | the build | The Steward of Khajiit Caravans. Its Leader gives and takes it, to a member. |
+| Blades Court | #A08560 | no | nothing of its own | the build | The court of Blades. Its Leader gives and takes it, to a member. |
+| Steward of Blades | #A08560 | no | nothing of its own | the build | The Steward of Blades. Its Leader gives and takes it, to a member. |
+| Volkihar Clan Court | #A08560 | no | nothing of its own | the build | The court of Volkihar Clan. Its Leader gives and takes it, to a member. |
+| Steward of Volkihar Clan | #A08560 | no | nothing of its own | the build | The Steward of Volkihar Clan. Its Leader gives and takes it, to a member. |
 | Business Owner | #A08C6A | no | nothing of its own | the build | Owns a business book in the game. Support gives it. |
 | Member | #8D9682 | no | nothing of its own | the build | Joined and answered the rules and age questions. Sees Start Here, Applications and Information. |
 | Banned | #4A4A4A | no | nothing of its own | the build | Takes the site and the game away (site/server.js, access.banned). |
@@ -149,6 +181,11 @@ Holders of Moderator also talk in the Gamemasters space.
 @everyone keeps what the server gives it; the build does not change it,
 and the audit prints it. Every other role opens exactly the channels
 below that name it.
+
+The bot's own role keeps Administrator, for a build and the rest of the
+time (Patrick, 22 Oct 2026: "the bot will keep admin"). The audit counts
+it holding Administrator as planned, and its going without as a
+difference. What the running bot itself uses is RUN_BITS in the builder.
 
 ### The permission sets
 
@@ -175,9 +212,11 @@ tidies there. A staff space mode is said for the space it names.
 | staff | everybody on staff | everybody on staff | - |
 | staffread | everybody on staff | the council | the council |
 | council | the council | the council | - |
-| seats | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | - |
 | hold (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | - |
-| faction (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | - |
+| faction (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader, Steward of Companions, Companions Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader, Steward of Companions, Companions Court | - |
+| factionread (The Companions) | the council, Companions, Gamemaster, Trial Gamemaster, Loremaster, Companions Leader, Steward of Companions, Companions Court | the council, Companions Leader, Steward of Companions, Companions Court | the council, Companions Leader, Steward of Companions, Companions Court |
+| factioncourt (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions Leader, Steward of Companions, Companions Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions Leader, Steward of Companions, Companions Court | - |
+| factionseats (The Companions) | the council, Companions Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | the council |
 | space (Lore) | the council, Loremaster | the council, Loremaster | - |
 | spaceread (Lore) | the council, Loremaster | the council | the council |
 | spacerules (Lore) | the council, Loremaster | Owner and Co-Owner, Lead Loremaster | Owner and Co-Owner, Lead Loremaster |
@@ -195,13 +234,14 @@ Category mode: public.
 | #start-here | text | read | everybody | the council | posts: the council; written by the build from content.py START, with its Changelog thread; topic: How to actually get in and play. |
 | #say-hello | text | public | everybody | everybody | posts: everybody; topic: New here? Say hi and tell us a little about yourself. Slowmode is on. |
 
-### Applications
+### Tickets
 
 Category mode: public.
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
-| #tickets-and-applications | text | read | everybody | the council | posts: the council |
+| #get-help | text | read | everybody | the council | posts: the council; topic: It will not install, start or connect. Open a ticket below. |
+| #report-someone | text | read | everybody | the council | posts: the council; topic: Something happened and it should not have. Only you and staff see it. |
 
 ### Information
 
@@ -221,6 +261,17 @@ Category mode: testersread.
 |---|---|---|---|---|---|
 | #game-rules | text | testersread | everybody on staff, Playtester | the council | posts: the council; written by the build from content.py GAMERULES, with its Changelog thread; was #game-rules in Thornswood; was #game-rules in In Character; topic: How roleplay works here. Nine rules, and what we let slide. |
 | #lore | text | testersread | everybody on staff, Playtester | the council | posts: the council; written by the build from content.py LORE, with its Changelog thread; was #lore in In Character; topic: 4E 252. What happened and who you can be. |
+| #factions | text | testersread | everybody on staff, Playtester | the council | posts: the council; written by the build from content.py FACTIONS, with its Changelog thread; topic: The sixteen factions of 4E 252: who they are, where they keep, who leads them. |
+
+### Applications
+
+Category mode: public.
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #apply-to-playtest | text | read | everybody | the council | posts: the council; topic: How you get into the world. Pick the application below. |
+| #apply-for-a-seat | text | read | everybody | the council | posts: the council; topic: Jarl and Faction Leader, answered in character. Only open seats are listed. |
+| #apply-for-staff | text | read | everybody | the council | posts: the council; topic: Gamemaster, Loremaster, Moderator, Dev and Content Creator. |
 
 ### Out of Character
 
@@ -228,11 +279,14 @@ Category mode: open. It was Thornswood.
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
+| #welcome-travelers | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #welcome-travelers in Thornswood |
 | #general-chat | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #general-chat in Thornswood |
 | #media | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #media in Thornswood; topic: Screenshots and clips. Talk about one in a thread under it. |
-| #welcome-travelers | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #welcome-travelers in Thornswood |
 | #server-progression-and-economy | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #server-progression-and-economy in Thornswood |
 | #suggestions | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | was #suggestions in Help; topic: Mods and features you want. Nexus link if it's a mod, because whether it works here depends on how it's built. |
+| #jukebox | text | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build; was #jukebox in Voice |
+| General | voice | open | everybody on staff, Playtester | everybody on staff, Playtester | was General in Voice |
+| AFK | voice | open | everybody on staff, Playtester | everybody on staff, Playtester | was AFK in Voice |
 | #bugs | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build; topic: One post per problem. Logs and screenshots welcome. |
 | #logs-and-crashes | text | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build; topic: Drag the log in. Explain it after. |
 
@@ -248,6 +302,198 @@ Category mode: open.
 | #rp-appreciation | text | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: Somebody played a blinder. Say so. |
 | #graveyard | text | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: They had it coming. Probably. |
 
+### Imperial Embassy
+
+Category mode: faction (Imperial Embassy).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #imperial-embassy-announcements | text | factionread (Imperial Embassy) | the council, Imperial Embassy, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | the council, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | posts: the council, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court; topic: What the Leader and the court of Imperial Embassy want every member to know. In character. |
+| #imperial-embassy | text | faction (Imperial Embassy) | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | was #imperial-embassy in Factions; topic: Imperial Embassy: its members and its Leader. In character. |
+| #imperial-embassy-court | text | factioncourt (Imperial Embassy) | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | topic: The Leader, the Steward and the court of Imperial Embassy. In character. |
+| #imperial-embassy-seats | text | factionseats (Imperial Embassy) | the council, Imperial Embassy Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Imperial Embassy gives and takes its members, Court and Steward here. |
+| Imperial Embassy | voice | faction (Imperial Embassy) | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader, Steward of Imperial Embassy, Imperial Embassy Court | was Imperial Embassy in Factions |
+
+### Thalmor Remnant
+
+Category mode: faction (Thalmor Remnant).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #thalmor-announcements | text | factionread (Thalmor Remnant) | the council, Thalmor, Gamemaster, Trial Gamemaster, Loremaster, Thalmor Leader, Steward of Thalmor, Thalmor Court | the council, Thalmor Leader, Steward of Thalmor, Thalmor Court | posts: the council, Thalmor Leader, Steward of Thalmor, Thalmor Court; topic: What the Leader and the court of Thalmor Remnant want every member to know. In character. |
+| #thalmor | text | faction (Thalmor Remnant) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader, Steward of Thalmor, Thalmor Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader, Steward of Thalmor, Thalmor Court | was #thalmor in Factions; topic: Thalmor Remnant: its members and its Leader. In character. |
+| #thalmor-court | text | factioncourt (Thalmor Remnant) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor Leader, Steward of Thalmor, Thalmor Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor Leader, Steward of Thalmor, Thalmor Court | topic: The Leader, the Steward and the court of Thalmor Remnant. In character. |
+| #thalmor-seats | text | factionseats (Thalmor Remnant) | the council, Thalmor Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Thalmor Remnant gives and takes its members, Court and Steward here. |
+| Thalmor Remnant | voice | faction (Thalmor Remnant) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader, Steward of Thalmor, Thalmor Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader, Steward of Thalmor, Thalmor Court | was Thalmor Remnant in Factions |
+
+### Free Skyrim Trading Company
+
+Category mode: faction (Free Skyrim Trading Company).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #free-skyrim-trading-company-announcements | text | factionread (Free Skyrim Trading Company) | the council, Free Skyrim Trading Company, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | the council, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | posts: the council, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court; topic: What the Leader and the court of Free Skyrim Trading Company want every member to know. In character. |
+| #free-skyrim-trading-company | text | faction (Free Skyrim Trading Company) | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | was #free-skyrim-trading-company in Factions; topic: Free Skyrim Trading Company: its members and its Leader. In character. |
+| #free-skyrim-trading-company-court | text | factioncourt (Free Skyrim Trading Company) | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | topic: The Leader, the Steward and the court of Free Skyrim Trading Company. In character. |
+| #free-skyrim-trading-company-seats | text | factionseats (Free Skyrim Trading Company) | the council, Free Skyrim Trading Company Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Free Skyrim Trading Company gives and takes its members, Court and Steward here. |
+| Free Skyrim Trading Company | voice | faction (Free Skyrim Trading Company) | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader, Steward of Free Skyrim Trading Company, Free Skyrim Trading Company Court | was Free Skyrim Trading Company in Factions |
+
+### The Companions
+
+Category mode: faction (The Companions).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #companions-announcements | text | factionread (The Companions) | the council, Companions, Gamemaster, Trial Gamemaster, Loremaster, Companions Leader, Steward of Companions, Companions Court | the council, Companions Leader, Steward of Companions, Companions Court | posts: the council, Companions Leader, Steward of Companions, Companions Court; topic: What the Leader and the court of The Companions want every member to know. In character. |
+| #companions | text | faction (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader, Steward of Companions, Companions Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader, Steward of Companions, Companions Court | was #companions in Factions; topic: The Companions: its members and its Leader. In character. |
+| #companions-court | text | factioncourt (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions Leader, Steward of Companions, Companions Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions Leader, Steward of Companions, Companions Court | topic: The Leader, the Steward and the court of The Companions. In character. |
+| #companions-seats | text | factionseats (The Companions) | the council, Companions Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of The Companions gives and takes its members, Court and Steward here. |
+| The Companions | voice | faction (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader, Steward of Companions, Companions Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader, Steward of Companions, Companions Court | was The Companions in Factions |
+
+### College of Winterhold
+
+Category mode: faction (College of Winterhold).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #college-of-winterhold-announcements | text | factionread (College of Winterhold) | the council, College of Winterhold, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | the council, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | posts: the council, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court; topic: What the Leader and the court of College of Winterhold want every member to know. In character. |
+| #college-of-winterhold | text | faction (College of Winterhold) | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | was #college-of-winterhold in Factions; topic: College of Winterhold: its members and its Leader. In character. |
+| #college-of-winterhold-court | text | factioncourt (College of Winterhold) | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | topic: The Leader, the Steward and the court of College of Winterhold. In character. |
+| #college-of-winterhold-seats | text | factionseats (College of Winterhold) | the council, College of Winterhold Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of College of Winterhold gives and takes its members, Court and Steward here. |
+| College of Winterhold | voice | faction (College of Winterhold) | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader, Steward of College of Winterhold, College of Winterhold Court | was College of Winterhold in Factions |
+
+### Bards College
+
+Category mode: faction (Bards College).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #bards-college-announcements | text | factionread (Bards College) | the council, Bards College, Gamemaster, Trial Gamemaster, Loremaster, Bards College Leader, Steward of Bards College, Bards College Court | the council, Bards College Leader, Steward of Bards College, Bards College Court | posts: the council, Bards College Leader, Steward of Bards College, Bards College Court; topic: What the Leader and the court of Bards College want every member to know. In character. |
+| #bards-college | text | faction (Bards College) | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader, Steward of Bards College, Bards College Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader, Steward of Bards College, Bards College Court | was #bards-college in Factions; topic: Bards College: its members and its Leader. In character. |
+| #bards-college-court | text | factioncourt (Bards College) | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College Leader, Steward of Bards College, Bards College Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College Leader, Steward of Bards College, Bards College Court | topic: The Leader, the Steward and the court of Bards College. In character. |
+| #bards-college-seats | text | factionseats (Bards College) | the council, Bards College Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Bards College gives and takes its members, Court and Steward here. |
+| Bards College | voice | faction (Bards College) | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader, Steward of Bards College, Bards College Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader, Steward of Bards College, Bards College Court | was Bards College in Factions |
+
+### Thieves Guild
+
+Category mode: faction (Thieves Guild).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #thieves-guild-announcements | text | factionread (Thieves Guild) | the council, Thieves Guild, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | the council, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | posts: the council, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court; topic: What the Leader and the court of Thieves Guild want every member to know. In character. |
+| #thieves-guild | text | faction (Thieves Guild) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | was #thieves-guild in Factions; topic: Thieves Guild: its members and its Leader. In character. |
+| #thieves-guild-court | text | factioncourt (Thieves Guild) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | topic: The Leader, the Steward and the court of Thieves Guild. In character. |
+| #thieves-guild-seats | text | factionseats (Thieves Guild) | the council, Thieves Guild Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Thieves Guild gives and takes its members, Court and Steward here. |
+| Thieves Guild | voice | faction (Thieves Guild) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader, Steward of Thieves Guild, Thieves Guild Court | was Thieves Guild in Factions |
+
+### Dark Brotherhood
+
+Category mode: faction (Dark Brotherhood).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #dark-brotherhood-announcements | text | factionread (Dark Brotherhood) | the council, Dark Brotherhood, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | the council, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | posts: the council, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court; topic: What the Leader and the court of Dark Brotherhood want every member to know. In character. |
+| #dark-brotherhood | text | faction (Dark Brotherhood) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | was #dark-brotherhood in Factions; topic: Dark Brotherhood: its members and its Leader. In character. |
+| #dark-brotherhood-court | text | factioncourt (Dark Brotherhood) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | topic: The Leader, the Steward and the court of Dark Brotherhood. In character. |
+| #dark-brotherhood-seats | text | factionseats (Dark Brotherhood) | the council, Dark Brotherhood Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Dark Brotherhood gives and takes its members, Court and Steward here. |
+| Dark Brotherhood | voice | faction (Dark Brotherhood) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader, Steward of Dark Brotherhood, Dark Brotherhood Court | was Dark Brotherhood in Factions |
+
+### Vigilants of Stendarr
+
+Category mode: faction (Vigilants of Stendarr).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #vigilants-of-stendarr-announcements | text | factionread (Vigilants of Stendarr) | the council, Vigilants of Stendarr, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | the council, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | posts: the council, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court; topic: What the Leader and the court of Vigilants of Stendarr want every member to know. In character. |
+| #vigilants-of-stendarr | text | faction (Vigilants of Stendarr) | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | was #vigilants-of-stendarr in Factions; topic: Vigilants of Stendarr: its members and its Leader. In character. |
+| #vigilants-of-stendarr-court | text | factioncourt (Vigilants of Stendarr) | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | topic: The Leader, the Steward and the court of Vigilants of Stendarr. In character. |
+| #vigilants-of-stendarr-seats | text | factionseats (Vigilants of Stendarr) | the council, Vigilants of Stendarr Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Vigilants of Stendarr gives and takes its members, Court and Steward here. |
+| Vigilants of Stendarr | voice | faction (Vigilants of Stendarr) | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader, Steward of Vigilants of Stendarr, Vigilants of Stendarr Court | was Vigilants of Stendarr in Factions |
+
+### Dawnguard
+
+Category mode: faction (Dawnguard).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #dawnguard-announcements | text | factionread (Dawnguard) | the council, Dawnguard, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | the council, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | posts: the council, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court; topic: What the Leader and the court of Dawnguard want every member to know. In character. |
+| #dawnguard | text | faction (Dawnguard) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | was #dawnguard in Factions; topic: Dawnguard: its members and its Leader. In character. |
+| #dawnguard-court | text | factioncourt (Dawnguard) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | topic: The Leader, the Steward and the court of Dawnguard. In character. |
+| #dawnguard-seats | text | factionseats (Dawnguard) | the council, Dawnguard Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Dawnguard gives and takes its members, Court and Steward here. |
+| Dawnguard | voice | faction (Dawnguard) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader, Steward of Dawnguard, Dawnguard Court | was Dawnguard in Factions |
+
+### Silver Hand
+
+Category mode: faction (Silver Hand).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #silver-hand-announcements | text | factionread (Silver Hand) | the council, Silver Hand, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | the council, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | posts: the council, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court; topic: What the Leader and the court of Silver Hand want every member to know. In character. |
+| #silver-hand | text | faction (Silver Hand) | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | was #silver-hand in Factions; topic: Silver Hand: its members and its Leader. In character. |
+| #silver-hand-court | text | factioncourt (Silver Hand) | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | topic: The Leader, the Steward and the court of Silver Hand. In character. |
+| #silver-hand-seats | text | factionseats (Silver Hand) | the council, Silver Hand Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Silver Hand gives and takes its members, Court and Steward here. |
+| Silver Hand | voice | faction (Silver Hand) | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader, Steward of Silver Hand, Silver Hand Court | was Silver Hand in Factions |
+
+### Forsworn
+
+Category mode: faction (Forsworn).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #forsworn-announcements | text | factionread (Forsworn) | the council, Forsworn, Gamemaster, Trial Gamemaster, Loremaster, Forsworn Leader, Steward of Forsworn, Forsworn Court | the council, Forsworn Leader, Steward of Forsworn, Forsworn Court | posts: the council, Forsworn Leader, Steward of Forsworn, Forsworn Court; topic: What the Leader and the court of Forsworn want every member to know. In character. |
+| #forsworn | text | faction (Forsworn) | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader, Steward of Forsworn, Forsworn Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader, Steward of Forsworn, Forsworn Court | was #forsworn in Factions; topic: Forsworn: its members and its Leader. In character. |
+| #forsworn-court | text | factioncourt (Forsworn) | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn Leader, Steward of Forsworn, Forsworn Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn Leader, Steward of Forsworn, Forsworn Court | topic: The Leader, the Steward and the court of Forsworn. In character. |
+| #forsworn-seats | text | factionseats (Forsworn) | the council, Forsworn Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Forsworn gives and takes its members, Court and Steward here. |
+| Forsworn | voice | faction (Forsworn) | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader, Steward of Forsworn, Forsworn Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader, Steward of Forsworn, Forsworn Court | was Forsworn in Factions |
+
+### Orc Strongholds
+
+Category mode: faction (Orc Strongholds).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #orc-strongholds-announcements | text | factionread (Orc Strongholds) | the council, Orc Strongholds, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | the council, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | posts: the council, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court; topic: What the Leader and the court of Orc Strongholds want every member to know. In character. |
+| #orc-strongholds | text | faction (Orc Strongholds) | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | was #orc-strongholds in Factions; topic: Orc Strongholds: its members and its Leader. In character. |
+| #orc-strongholds-court | text | factioncourt (Orc Strongholds) | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | topic: The Leader, the Steward and the court of Orc Strongholds. In character. |
+| #orc-strongholds-seats | text | factionseats (Orc Strongholds) | the council, Orc Strongholds Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Orc Strongholds gives and takes its members, Court and Steward here. |
+| Orc Strongholds | voice | faction (Orc Strongholds) | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader, Steward of Orc Strongholds, Orc Strongholds Court | was Orc Strongholds in Factions |
+
+### Khajiit Caravans
+
+Category mode: faction (Khajiit Caravans).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #khajiit-caravans-announcements | text | factionread (Khajiit Caravans) | the council, Khajiit Caravans, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | the council, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | posts: the council, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court; topic: What the Leader and the court of Khajiit Caravans want every member to know. In character. |
+| #khajiit-caravans | text | faction (Khajiit Caravans) | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | was #khajiit-caravans in Factions; topic: Khajiit Caravans: its members and its Leader. In character. |
+| #khajiit-caravans-court | text | factioncourt (Khajiit Caravans) | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | topic: The Leader, the Steward and the court of Khajiit Caravans. In character. |
+| #khajiit-caravans-seats | text | factionseats (Khajiit Caravans) | the council, Khajiit Caravans Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Khajiit Caravans gives and takes its members, Court and Steward here. |
+| Khajiit Caravans | voice | faction (Khajiit Caravans) | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader, Steward of Khajiit Caravans, Khajiit Caravans Court | was Khajiit Caravans in Factions |
+
+### Blades
+
+Category mode: faction (Blades).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #blades-announcements | text | factionread (Blades) | the council, Blades, Gamemaster, Trial Gamemaster, Loremaster, Blades Leader, Steward of Blades, Blades Court | the council, Blades Leader, Steward of Blades, Blades Court | posts: the council, Blades Leader, Steward of Blades, Blades Court; topic: What the Leader and the court of Blades want every member to know. In character. |
+| #blades | text | faction (Blades) | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader, Steward of Blades, Blades Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader, Steward of Blades, Blades Court | was #blades in Factions; topic: Blades: its members and its Leader. In character. |
+| #blades-court | text | factioncourt (Blades) | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades Leader, Steward of Blades, Blades Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades Leader, Steward of Blades, Blades Court | topic: The Leader, the Steward and the court of Blades. In character. |
+| #blades-seats | text | factionseats (Blades) | the council, Blades Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Blades gives and takes its members, Court and Steward here. |
+| Blades | voice | faction (Blades) | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader, Steward of Blades, Blades Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader, Steward of Blades, Blades Court | was Blades in Factions |
+
+### Volkihar Clan
+
+Category mode: faction (Volkihar Clan).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #volkihar-clan-announcements | text | factionread (Volkihar Clan) | the council, Volkihar Clan, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | the council, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | posts: the council, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court; topic: What the Leader and the court of Volkihar Clan want every member to know. In character. |
+| #volkihar-clan | text | faction (Volkihar Clan) | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | was #volkihar-clan in Factions; topic: Volkihar Clan: its members and its Leader. In character. |
+| #volkihar-clan-court | text | factioncourt (Volkihar Clan) | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | topic: The Leader, the Steward and the court of Volkihar Clan. In character. |
+| #volkihar-clan-seats | text | factionseats (Volkihar Clan) | the council, Volkihar Clan Leader, Gamemaster, Trial Gamemaster, Loremaster | the council | posts: the council; topic: The Leader of Volkihar Clan gives and takes its members, Court and Steward here. |
+| Volkihar Clan | voice | faction (Volkihar Clan) | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader, Steward of Volkihar Clan, Volkihar Clan Court | was Volkihar Clan in Factions |
+
 ### Whiterun
 
 Category mode: hold (Whiterun).
@@ -258,6 +504,7 @@ Category mode: hold (Whiterun).
 | #whiterun | text | hold (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | was #whiterun in The Holds; topic: Everybody passes through eventually. |
 | #whiterun-court | text | holdcourt (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Steward of Whiterun, Whiterun Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Steward of Whiterun, Whiterun Court | topic: The Jarl, the Steward and the court of Whiterun. In character. |
 | #whiterun-guard | text | holdguard (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Guard of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Guard of Whiterun | topic: The Jarl and the guards of Whiterun. In character. |
+| Whiterun Court | voice | holdcourt (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Steward of Whiterun, Whiterun Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Steward of Whiterun, Whiterun Court |  |
 
 ### Solitude
 
@@ -269,6 +516,7 @@ Category mode: hold (Solitude).
 | #solitude | text | hold (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Solitude Court, Steward of Solitude, Guard of Solitude, Citizen of Solitude | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Solitude Court, Steward of Solitude, Guard of Solitude, Citizen of Solitude | was #solitude in The Holds; topic: Court, trade, and the one Imperial embassy left in Skyrim. |
 | #solitude-court | text | holdcourt (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Steward of Solitude, Solitude Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Steward of Solitude, Solitude Court | topic: The Jarl, the Steward and the court of Solitude. In character. |
 | #solitude-guard | text | holdguard (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Guard of Solitude | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Guard of Solitude | topic: The Jarl and the guards of Solitude. In character. |
+| Solitude Court | voice | holdcourt (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Steward of Solitude, Solitude Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Steward of Solitude, Solitude Court |  |
 
 ### Windhelm
 
@@ -280,6 +528,7 @@ Category mode: hold (Windhelm).
 | #windhelm | text | hold (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Windhelm Court, Steward of Windhelm, Guard of Windhelm, Citizen of Windhelm | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Windhelm Court, Steward of Windhelm, Guard of Windhelm, Citizen of Windhelm | was #windhelm in The Holds; topic: The High King sits here. |
 | #windhelm-court | text | holdcourt (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Steward of Windhelm, Windhelm Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Steward of Windhelm, Windhelm Court | topic: The Jarl, the Steward and the court of Windhelm. In character. |
 | #windhelm-guard | text | holdguard (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Guard of Windhelm | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Guard of Windhelm | topic: The Jarl and the guards of Windhelm. In character. |
+| Windhelm Court | voice | holdcourt (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Steward of Windhelm, Windhelm Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Steward of Windhelm, Windhelm Court |  |
 
 ### Riften
 
@@ -291,6 +540,7 @@ Category mode: hold (Riften).
 | #riften | text | hold (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Riften Court, Steward of Riften, Guard of Riften, Citizen of Riften | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Riften Court, Steward of Riften, Guard of Riften, Citizen of Riften | was #riften in The Holds; topic: Fish, mead, and the Ratway under the canal. |
 | #riften-court | text | holdcourt (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Steward of Riften, Riften Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Steward of Riften, Riften Court | topic: The Jarl, the Steward and the court of Riften. In character. |
 | #riften-guard | text | holdguard (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Guard of Riften | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Guard of Riften | topic: The Jarl and the guards of Riften. In character. |
+| Riften Court | voice | holdcourt (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Steward of Riften, Riften Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Steward of Riften, Riften Court |  |
 
 ### Markarth
 
@@ -302,6 +552,7 @@ Category mode: hold (Markarth).
 | #markarth | text | hold (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Markarth Court, Steward of Markarth, Guard of Markarth, Citizen of Markarth | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Markarth Court, Steward of Markarth, Guard of Markarth, Citizen of Markarth | was #markarth in The Holds; topic: Stone, silver, and grudges older than the war. |
 | #markarth-court | text | holdcourt (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Steward of Markarth, Markarth Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Steward of Markarth, Markarth Court | topic: The Jarl, the Steward and the court of Markarth. In character. |
 | #markarth-guard | text | holdguard (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Guard of Markarth | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Guard of Markarth | topic: The Jarl and the guards of Markarth. In character. |
+| Markarth Court | voice | holdcourt (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Steward of Markarth, Markarth Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Steward of Markarth, Markarth Court |  |
 
 ### Dawnstar
 
@@ -313,6 +564,7 @@ Category mode: hold (Dawnstar).
 | #dawnstar | text | hold (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Dawnstar Court, Steward of Dawnstar, Guard of Dawnstar, Citizen of Dawnstar | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Dawnstar Court, Steward of Dawnstar, Guard of Dawnstar, Citizen of Dawnstar | was #dawnstar in The Holds; topic: Cold. The ships still come in. |
 | #dawnstar-court | text | holdcourt (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court | topic: The Jarl, the Steward and the court of Dawnstar. In character. |
 | #dawnstar-guard | text | holdguard (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Guard of Dawnstar | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Guard of Dawnstar | topic: The Jarl and the guards of Dawnstar. In character. |
+| Dawnstar Court | voice | holdcourt (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court |  |
 
 ### Morthal
 
@@ -324,6 +576,7 @@ Category mode: hold (Morthal).
 | #morthal | text | hold (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Morthal Court, Steward of Morthal, Guard of Morthal, Citizen of Morthal | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Morthal Court, Steward of Morthal, Guard of Morthal, Citizen of Morthal | was #morthal in The Holds; topic: A swamp, a few houses, and the Jarl's hall. |
 | #morthal-court | text | holdcourt (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Steward of Morthal, Morthal Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Steward of Morthal, Morthal Court | topic: The Jarl, the Steward and the court of Morthal. In character. |
 | #morthal-guard | text | holdguard (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Guard of Morthal | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Guard of Morthal | topic: The Jarl and the guards of Morthal. In character. |
+| Morthal Court | voice | holdcourt (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Steward of Morthal, Morthal Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Steward of Morthal, Morthal Court |  |
 
 ### Falkreath
 
@@ -335,6 +588,7 @@ Category mode: hold (Falkreath).
 | #falkreath | text | hold (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Falkreath Court, Steward of Falkreath, Guard of Falkreath, Citizen of Falkreath | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Falkreath Court, Steward of Falkreath, Guard of Falkreath, Citizen of Falkreath | was #falkreath in The Holds; topic: Pines, and a graveyard bigger than the town. |
 | #falkreath-court | text | holdcourt (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Steward of Falkreath, Falkreath Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Steward of Falkreath, Falkreath Court | topic: The Jarl, the Steward and the court of Falkreath. In character. |
 | #falkreath-guard | text | holdguard (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Guard of Falkreath | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Guard of Falkreath | topic: The Jarl and the guards of Falkreath. In character. |
+| Falkreath Court | voice | holdcourt (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Steward of Falkreath, Falkreath Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Steward of Falkreath, Falkreath Court |  |
 
 ### Winterhold
 
@@ -346,6 +600,7 @@ Category mode: hold (Winterhold).
 | #winterhold | text | hold (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Winterhold Court, Steward of Winterhold, Guard of Winterhold, Citizen of Winterhold | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Winterhold Court, Steward of Winterhold, Guard of Winterhold, Citizen of Winterhold | was #winterhold in The Holds; topic: What's left of it. |
 | #winterhold-court | text | holdcourt (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Steward of Winterhold, Winterhold Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Steward of Winterhold, Winterhold Court | topic: The Jarl, the Steward and the court of Winterhold. In character. |
 | #winterhold-guard | text | holdguard (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Guard of Winterhold | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Guard of Winterhold | topic: The Jarl and the guards of Winterhold. In character. |
+| Winterhold Court | voice | holdcourt (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Steward of Winterhold, Winterhold Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Steward of Winterhold, Winterhold Court |  |
 
 ### Raven Rock
 
@@ -357,41 +612,7 @@ Category mode: hold (Raven Rock).
 | #raven-rock | text | hold (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Raven Rock Court, Steward of Raven Rock, Guard of Raven Rock, Citizen of Raven Rock | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Raven Rock Court, Steward of Raven Rock, Guard of Raven Rock, Citizen of Raven Rock | was #raven-rock in The Holds; topic: On Solstheim, across the water. The ash still falls. |
 | #raven-rock-court | text | holdcourt (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | topic: The Jarl, the Steward and the court of Raven Rock. In character. |
 | #raven-rock-guard | text | holdguard (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Guard of Raven Rock | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Guard of Raven Rock | topic: The Jarl and the guards of Raven Rock. In character. |
-
-### Factions
-
-Category mode: faction.
-
-| Channel | Kind | Mode | Sees | Talks | Notes |
-|---|---|---|---|---|---|
-| #seats | text | seats | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | topic: Every Jarl and faction leader, and the council. In character. |
-| #imperial-embassy | text | faction (Imperial Embassy) | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader | topic: Imperial Embassy: its members and its Leader. In character. |
-| #thalmor | text | faction (Thalmor Remnant) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader | topic: Thalmor Remnant: its members and its Leader. In character. |
-| #free-skyrim-trading-company | text | faction (Free Skyrim Trading Company) | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader | topic: Free Skyrim Trading Company: its members and its Leader. In character. |
-| #companions | text | faction (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | topic: The Companions: its members and its Leader. In character. |
-| #college-of-winterhold | text | faction (College of Winterhold) | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader | topic: College of Winterhold: its members and its Leader. In character. |
-| #bards-college | text | faction (Bards College) | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader | topic: Bards College: its members and its Leader. In character. |
-| #thieves-guild | text | faction (Thieves Guild) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader | topic: Thieves Guild: its members and its Leader. In character. |
-| #dark-brotherhood | text | faction (Dark Brotherhood) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader | topic: Dark Brotherhood: its members and its Leader. In character. |
-| #vigilants-of-stendarr | text | faction (Vigilants of Stendarr) | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader | topic: Vigilants of Stendarr: its members and its Leader. In character. |
-| #dawnguard | text | faction (Dawnguard) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader | topic: Dawnguard: its members and its Leader. In character. |
-| #silver-hand | text | faction (Silver Hand) | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader | topic: Silver Hand: its members and its Leader. In character. |
-| #forsworn | text | faction (Forsworn) | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader | topic: Forsworn: its members and its Leader. In character. |
-| #orc-strongholds | text | faction (Orc Strongholds) | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader | topic: Orc Strongholds: its members and its Leader. In character. |
-| #khajiit-caravans | text | faction (Khajiit Caravans) | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader | topic: Khajiit Caravans: its members and its Leader. In character. |
-| #blades | text | faction (Blades) | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader | topic: Blades: its members and its Leader. In character. |
-| #volkihar-clan | text | faction (Volkihar Clan) | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader | topic: Volkihar Clan: its members and its Leader. In character. |
-
-### Voice
-
-Category mode: open.
-
-| Channel | Kind | Mode | Sees | Talks | Notes |
-|---|---|---|---|---|---|
-| General | voice | open | everybody on staff, Playtester | everybody on staff, Playtester |  |
-| Help Voice | voice | open | everybody on staff, Playtester | everybody on staff, Playtester | was Support in Help |
-| AFK | voice | open | everybody on staff, Playtester | everybody on staff, Playtester |  |
-| #jukebox | text | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build |
+| Raven Rock Court | voice | holdcourt (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court |  |
 
 ### Playtesters
 
@@ -401,12 +622,29 @@ Category mode: pathfind. It was Testing.
 |---|---|---|---|---|---|
 | #playtester-announcements | text | testersread | everybody on staff, Playtester | the council | posts: the council; topic: Announcements for playtesters. The council posts here. |
 | #playtester-rules | text | testersread | everybody on staff, Playtester | the council | posts: the council; written by the build from content.py TESTERRULES, a draft waiting on approval; topic: How playtesting works here. |
-| #playtest-sessions | text | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | topic: Call a session and say you are coming. |
 | #test-tasks | forum | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | was #Test-Tasks in Testing; was #test-tasks in Testing; topic: One thread per test task, tagged Main. |
-| #test-findings | forum | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | was #test-findings in Testing; topic: Pass, fail, and what went wrong. |
 | #known-issues | text | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | was #known-issues in Testing; topic: Known issues the team is working on. Kept by the bot. |
+| #test-findings | forum | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | was #test-findings in Testing; topic: Pass, fail, and what went wrong. |
+| #playtest-sessions | text | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | topic: Call a session and say you are coming. |
 | #playtester-chat | text | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | topic: Talk about testing: what you are trying and what you found. |
 | Playtester Voice | voice | pathfind | everybody on staff, Playtester | everybody on staff, Playtester | was play-testing in Testing |
+
+### Staff
+
+Category mode: staff.
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #staff-announcements | announce | staffread | everybody on staff | the council | posts: the council; was #news in Staff; topic: Announcements for every staff member. The council posts here. |
+| #council-decisions | text | staffread | everybody on staff | the council | posts: the council; topic: Every council decision, with its date. The council posts here. |
+| #staff-updates | text | staff | everybody on staff | everybody on staff | never made by the build |
+| #staff-general | text | staff | everybody on staff | everybody on staff | topic: Nobody else can see this. |
+| #council | text | council | the council | the council | topic: The council: Owner, Co-Owner and the leads. |
+| #ticket-log | text | council | the council | the council | was #tickets in Applications |
+| Staff Room | voice | staff | everybody on staff | everybody on staff |  |
+| #dev-notes | text | staff | everybody on staff | everybody on staff | never made by the build; topic: What we’re on, and what broke doing it. |
+| #deploys | text | staff | everybody on staff | everybody on staff | never made by the build; topic: Every ship and restart lands here. |
+| #reports | text | staff | everybody on staff | everybody on staff | never made by the build; topic: Reports about people. Staff only. |
 
 ### Gamemasters
 
@@ -423,20 +661,6 @@ Category mode: space (Gamemasters).
 | #gm-discipline | text | space | the council, Gamemaster, Trial Gamemaster, Moderator | the council, Gamemaster, Trial Gamemaster, Moderator | topic: Reprimands, punishments and bans only. Nothing else. |
 | GM Voice | voice | space | the council, Gamemaster, Trial Gamemaster, Moderator | the council, Gamemaster, Trial Gamemaster, Moderator |  |
 | #gm | text | space | the council, Gamemaster, Trial Gamemaster, Moderator | the council, Gamemaster, Trial Gamemaster, Moderator | never made by the build |
-
-### Dev
-
-Category mode: space (Dev).
-
-| Channel | Kind | Mode | Sees | Talks | Notes |
-|---|---|---|---|---|---|
-| #dev-announcements | text | spaceread | the council, Dev | the council | posts: the council; topic: Announcements for Dev. The council posts here. |
-| #dev-rules | text | spacerules | the council, Dev | Owner and Co-Owner, Lead Dev | posts: Owner and Co-Owner, Lead Dev; written by the build from content.py DEVRULES, a draft waiting on approval; topic: How Dev works. Lead Dev, Owner and Co-Owner post here. |
-| #dev-test-tasks | forum | space | the council, Dev | the council, Dev | never made by the build; was #dev-test-tasks in Staff; topic: Test tasks someone on dev has to measure, from the board. Kept by the bot: a post goes when its issue closes as fixed or its test task no longer says Server: Dev. |
-| #dev-test-findings | forum | space | the council, Dev | the council, Dev | was #dev-test-findings in Staff; was #dev-test-results in Staff |
-| #dev-coordination | text | space | the council, Dev | the council, Dev | topic: Developers only: a shared file being edited, the dev feed taken. Say it here before you do it. |
-| #dev-chat | text | space | the council, Dev | the council, Dev | topic: Talk between Dev. |
-| Dev Voice | voice | space | the council, Dev | the council, Dev |  |
 
 ### Lore
 
@@ -460,6 +684,18 @@ Category mode: space (Moderation).
 | #mod-chat | text | space | the council, Moderator | the council, Moderator | topic: Talk between Moderation. |
 | Moderation Voice | voice | space | the council, Moderator | the council, Moderator |  |
 
+### Support
+
+Category mode: space (Support).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| Support | voice | open | everybody on staff, Playtester | everybody on staff, Playtester | was Help Voice in Voice; was Support in Help |
+| #support-announcements | text | spaceread | the council, Support | the council | posts: the council; topic: Announcements for Support. The council posts here. |
+| #support-rules | text | spacerules | the council, Support | Owner and Co-Owner, Lead Support | posts: Owner and Co-Owner, Lead Support; written by the build from content.py SUPPORTRULES, a draft waiting on approval; topic: How Support works. Lead Support, Owner and Co-Owner post here. |
+| #support-chat | text | space | the council, Support | the council, Support | topic: Talk between Support. |
+| Support Staff | voice | space | the council, Support | the council, Support | was Support Voice in Support |
+
 ### Content
 
 Category mode: space (Content).
@@ -471,40 +707,26 @@ Category mode: space (Content).
 | #content-chat | text | space | the council, Content Creator | the council, Content Creator | topic: Talk between Content. |
 | Content Voice | voice | space | the council, Content Creator | the council, Content Creator |  |
 
-### Support
+### Dev
 
-Category mode: space (Support).
-
-| Channel | Kind | Mode | Sees | Talks | Notes |
-|---|---|---|---|---|---|
-| #support-announcements | text | spaceread | the council, Support | the council | posts: the council; topic: Announcements for Support. The council posts here. |
-| #support-rules | text | spacerules | the council, Support | Owner and Co-Owner, Lead Support | posts: Owner and Co-Owner, Lead Support; written by the build from content.py SUPPORTRULES, a draft waiting on approval; topic: How Support works. Lead Support, Owner and Co-Owner post here. |
-| #support-chat | text | space | the council, Support | the council, Support | topic: Talk between Support. |
-| Support Voice | voice | space | the council, Support | the council, Support |  |
-
-### Staff
-
-Category mode: staff.
+Category mode: space (Dev).
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
-| #staff-announcements | announce | staffread | everybody on staff | the council | posts: the council; was #news in Staff; topic: Announcements for every staff member. The council posts here. |
-| #staff-general | text | staff | everybody on staff | everybody on staff | topic: Nobody else can see this. |
-| #staff-updates | text | staff | everybody on staff | everybody on staff | never made by the build |
-| #council | text | council | the council | the council | topic: The council: Owner, Co-Owner and the leads. |
-| #council-decisions | text | staffread | everybody on staff | the council | posts: the council; topic: Every council decision, with its date. The council posts here. |
-| #ticket-log | text | council | the council | the council | was #tickets in Applications |
-| Staff Room | voice | staff | everybody on staff | everybody on staff |  |
-| #dev-notes | text | staff | everybody on staff | everybody on staff | never made by the build; topic: What we’re on, and what broke doing it. |
-| #deploys | text | staff | everybody on staff | everybody on staff | never made by the build; topic: Every ship and restart lands here. |
-| #reports | text | staff | everybody on staff | everybody on staff | never made by the build; topic: Reports about people. Staff only. |
+| #dev-announcements | text | spaceread | the council, Dev | the council | posts: the council; topic: Announcements for Dev. The council posts here. |
+| #dev-rules | text | spacerules | the council, Dev | Owner and Co-Owner, Lead Dev | posts: Owner and Co-Owner, Lead Dev; written by the build from content.py DEVRULES, a draft waiting on approval; topic: How Dev works. Lead Dev, Owner and Co-Owner post here. |
+| #dev-test-tasks | forum | space | the council, Dev | the council, Dev | never made by the build; was #dev-test-tasks in Staff; topic: Test tasks someone on dev has to measure, from the board. Kept by the bot: a post goes when its issue closes as fixed or its test task no longer says Server: Dev. |
+| #dev-test-findings | forum | space | the council, Dev | the council, Dev | was #dev-test-findings in Staff; was #dev-test-results in Staff |
+| #dev-coordination | text | space | the council, Dev | the council, Dev | topic: Developers only: a shared file being edited, the dev feed taken. Say it here before you do it. |
+| #dev-chat | text | space | the council, Dev | the council, Dev | topic: Talk between Dev. |
+| Dev Voice | voice | space | the council, Dev | the council, Dev |  |
 
 ## Retired
 
-Categories retired by the plan, removed by `-Prune` once empty: Help, The Holds.
+Categories retired by the plan, removed by `-Prune` once empty: Help, The Holds, Voice, Factions.
 
-Channel names the build no longer wants, removed by `-Prune`: tech-help, looking-for-group, off-topic, downloads, links-and-credits, Small Table, The Longhouse, Away, screenshots, clips, bot-commands, The Bannered Mare, The Road, test-these, test-tasks-archive.
+Channel names the build no longer wants, removed by `-Prune`: tech-help, looking-for-group, off-topic, downloads, links-and-credits, Small Table, The Longhouse, Away, screenshots, clips, bot-commands, The Bannered Mare, The Road, test-these, test-tasks-archive, tickets-and-applications, tickets, seats.
 
-Channels never deleted by anything in the build: council, council-decisions, dev-test-findings, dev-test-results, dev-test-tasks, general-chat, gm, gm voice, gm-chat, gm-discipline, gm-rules, gm-scene-summaries, gm-suggestions, help voice, jukebox, known-issues, news, play-testing, playtester voice, server-progression-and-economy, staff-announcements, staff-updates, suggestions, support, test-findings, test-results, test-tasks, ticket-log, tickets, welcome-travelers.
+Channels never deleted by anything in the build: council, council-decisions, dev-test-findings, dev-test-results, dev-test-tasks, general-chat, gm, gm voice, gm-chat, gm-discipline, gm-rules, gm-scene-summaries, gm-suggestions, help voice, jukebox, known-issues, news, play-testing, playtester voice, server-progression-and-economy, staff-announcements, staff-updates, suggestions, support, test-findings, test-results, test-tasks, ticket-log, welcome-travelers.
 
-Roles never deleted: every Jarl, Citizen and office role.
+Roles never deleted: every Jarl, Citizen and office role, and every faction's Leader, member, Court and Steward role.

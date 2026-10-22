@@ -125,6 +125,10 @@ try:
     os.makedirs(os.path.join(TMP, 'site', 'data', 'site'))
     shutil.copy(os.path.join(HERE, 'content.py'), os.path.join(TMP, 'bot', 'content.py'))
     shutil.copy(JOIN_MD, os.path.join(TMP, 'site', 'data', 'site', 'join.md'))
+    # #factions is read out of lore/factions.md since #3317.
+    os.makedirs(os.path.join(TMP, 'lore'))
+    shutil.copy(os.path.join(HERE, '..', 'lore', 'factions.md'),
+                os.path.join(TMP, 'lore', 'factions.md'))
 
     def load_with(md, tag):
         with open(os.path.join(TMP, 'site', 'data', 'site', 'rules.md'), 'w',
