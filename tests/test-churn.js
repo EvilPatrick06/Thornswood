@@ -474,7 +474,10 @@ function world(opts) {
     yes('the fork\'s activationService still prints "Sent activation for caster=" for every press it sends',
         svcText.indexOf('`Sent activation for caster=`') !== -1);
     yes('and objectReferenceEx still blocks activation on an NPC, so the server owns a press on a cow',
-        /t === FormType\.NPC[\s\S]{0,200}?blockActivation\(true\)/.test(refText));
+        // The whole condition up to its opening brace, however many kinds it
+        // names (#3080 added plants, trees, benches and doors to it), then
+        // the block itself as the first thing inside.
+        /t === FormType\.NPC[^{}]*\)\s*\{\s*self\.blockActivation\(true\)/.test(refText));
   }
 }
 

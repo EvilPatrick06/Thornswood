@@ -92,7 +92,7 @@ try {
     $r = Dry @('-OffBox', '-Status')
     Yes '-OffBox -Status runs here, not over ssh' ($r.Code -eq 0 -and $r.Text -match 'runner    in C:\\Thornswood-RunnerPR')
     $r = Dry @('-OffBox', '-Remove')
-    Yes '-OffBox -Remove takes its denies off every C:\Thornswood* folder' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("-Filter 'Thornswood*'") -and $r.Text -match "/remove:d 'thornswood-pr'")
+    Yes '-OffBox -Remove takes its denies off every C:\Thornswood* folder' ($r.Code -eq 0 -and $r.Text.Contains("Open-RunnerAccount 'thornswood-pr' 'C:\Thornswood-RunnerPR' 'C:\' 'Thornswood*' @("))
 
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()

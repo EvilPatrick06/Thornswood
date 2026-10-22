@@ -150,7 +150,7 @@ namespace Thornswood
         static Button btnVoiceTest;
         static TextBlock txtVoiceState;
         static Button btnUninstall, btnServerStart, btnServerStop;
-        static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics;
+        static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics, btnOpenSteam;
         static Popup serverPickPopup;
         static Border serverPickPanel;
         static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, txtServerPickMeta;
@@ -752,6 +752,7 @@ namespace Thornswood
             dotServerMain = F<Ellipse>("DotServerMain");
             dotServerDev = F<Ellipse>("DotServerDev");
             btnCheckDiagnostics = F<Button>("BtnCheckDiagnostics");
+            btnOpenSteam = F<Button>("BtnOpenSteam");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
@@ -2319,6 +2320,7 @@ namespace Thornswood
             if (btnServerDev != null) btnServerDev.Click += delegate { CloseServerPick(); SwitchToDev(); };
             if (btnServerMain != null) btnServerMain.Click += delegate { CloseServerPick(); SwitchToMain(); };
             if (btnCheckDiagnostics != null) btnCheckDiagnostics.Click += delegate { ShowPage(PageDiag); };
+            if (btnOpenSteam != null) btnOpenSteam.Click += delegate { OpenSteam(); };
 
             btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
             btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
@@ -2524,7 +2526,15 @@ namespace Thornswood
                 // history to draw rather than one lonely bar.
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
-                if (!playing) return;
+                // Steam starting or closing redraws the Ready card, so it never
+                // says "running" about a Steam that has closed or keeps "Steam
+                // not running" up after Open Steam has started it (#3204).
+                // Nothing else redraws the rows between page changes and scans.
+                if (!playing)
+                {
+                    if (Checks.SteamStillRunning() != steamShown) DrawStatus();
+                    return;
+                }
                 // Asks the game processes the last look found whether they are
                 // still up, and lists the machine's processes only when none is
                 // (#978). Same answer as GameRunning, on the same tick.
@@ -2746,12 +2756,14 @@ namespace Thornswood
             // touched now, so an unchanged pass moves nothing on screen.
             List<Check> checks = Checks.All(cfg);
             bool all = true;
-            int problems = 0;
+            var blocking = new List<Check>();
             foreach (Check c in checks)
             {
                 // An advisory row that fails is drawn amber and leaves Play
                 // alone. See Check.Advisory.
-                if (c.Blocks) { all = false; problems++; }
+                if (c.Blocks) { all = false; blocking.Add(c); }
+                // What the rows now say about Steam, for the tick to compare.
+                if (c.Name == Checks.SteamRow) steamShown = c.Ok;
             }
 
             if (statusList != null)
@@ -2768,7 +2780,7 @@ namespace Thornswood
                     FillStatusRow(statusList.Children[i] as Border, checks[i]);
             }
 
-            UpdateReadySummary(all, problems);
+            UpdateReadySummary(blocking);
 
             // No card here. It said the same thing as the bar above Play, which
             // lives in its own grid row below the scroller, so the two stacked
@@ -3038,12 +3050,20 @@ namespace Thornswood
         /// <summary>
         /// The one line summary of the checklist that sits on the Play page
         /// (#607). Updated in place: it does not flash or re-say itself when the
-        /// count has not changed. The button's own words say why Play is held
+        /// words have not changed. The button's own words say why Play is held
         /// for anything that is not a failing row (an update, a downgrade, the
         /// feed), so this stays about the checks themselves.
+        ///
+        /// A failing pass names the problem in a few words, the first failing
+        /// row's Check.Problem in the order Diagnostics lists them, and how many
+        /// more there are (#3203). It said only "Check Diagnostics", so finding
+        /// out that Steam was closed meant opening another page. Hovering it
+        /// lists every one; the Diagnostics button beside it still opens the
+        /// rows with their details.
         /// </summary>
-        static void UpdateReadySummary(bool all, int problems)
+        static void UpdateReadySummary(List<Check> blocking)
         {
+            bool all = blocking.Count == 0;
             if (dotReady != null)
             {
                 Brush want = Res(all ? "Ok" : "Bad");
@@ -3051,15 +3071,79 @@ namespace Thornswood
             }
             if (txtReadyTitle != null)
             {
-                // Pass: "Everything checks out". Fail: red "Check Diagnostics"
-                // (capital C) and a button that opens the Diagnostics page.
-                string title = all ? "Everything checks out" : "Check Diagnostics";
+                string title = ReadyTitle(blocking);
                 if (txtReadyTitle.Text != title) txtReadyTitle.Text = title;
+                string tip = blocking.Count > 1 ? ReadyList(blocking) : null;
+                if (!Equals(txtReadyTitle.ToolTip, tip)) txtReadyTitle.ToolTip = tip;
                 Brush ink = Res(all ? "Ink" : "Bad");
                 if (!ReferenceEquals(txtReadyTitle.Foreground, ink)) txtReadyTitle.Foreground = ink;
             }
             if (btnCheckDiagnostics != null)
                 btnCheckDiagnostics.Visibility = all ? Visibility.Collapsed : Visibility.Visible;
+            if (btnOpenSteam != null)
+            {
+                // Whenever the Steam row is one of the problems, not only when
+                // it is the first, so "Wrong Skyrim build and 1 more" with Steam
+                // closed still has the button.
+                bool steamDown = false;
+                foreach (Check c in blocking) if (c.Name == Checks.SteamRow) steamDown = true;
+                Visibility want = steamDown ? Visibility.Visible : Visibility.Collapsed;
+                if (btnOpenSteam.Visibility != want) btnOpenSteam.Visibility = want;
+            }
+        }
+
+        /// <summary>
+        /// What the Steam row said when the rows were last drawn. The two
+        /// second tick redraws when Steam's answer differs from it.
+        /// </summary>
+        static bool steamShown;
+
+        /// <summary>
+        /// The Open Steam button on the Ready card, shown while Steam is not
+        /// running (#3204). Opens Steam's own window through its
+        /// steam://open/main link, rather than the tray start Fix makes,
+        /// because whoever presses it wants Steam in front of them to sign
+        /// in. The card turns green by itself once steam.exe is up (the two
+        /// second tick, above).
+        /// </summary>
+        static void OpenSteam()
+        {
+            if (Downgrade.AskSteam("steam://open/main", Log))
+                Log("Opening Steam. Sign in if it asks; the Ready card turns green once Steam is running.");
+            else
+                Log("Steam could not be opened from here. Start Steam yourself, signed in to the account that owns Skyrim.");
+        }
+
+        /// <summary>
+        /// The Ready card's words: "Everything checks out", one problem as its
+        /// row says it ("Steam not running"), or the first and a count
+        /// ("Wrong Skyrim build and 2 more").
+        /// </summary>
+        static string ReadyTitle(List<Check> blocking)
+        {
+            if (blocking.Count == 0) return "Everything checks out";
+            string first = ProblemWords(blocking[0]);
+            if (blocking.Count == 1) return first;
+            return first + " and " + (blocking.Count - 1) + " more";
+        }
+
+        /// <summary>Every failing row's words, one to a line, for the hover.</summary>
+        static string ReadyList(List<Check> blocking)
+        {
+            var lines = new List<string>();
+            foreach (Check c in blocking) lines.Add(ProblemWords(c));
+            return string.Join("\n", lines.ToArray());
+        }
+
+        /// <summary>
+        /// A row's Problem, which every row that can block sets in Checks. A
+        /// row added later without one still says which row it is and what
+        /// it found, rather than nothing.
+        /// </summary>
+        static string ProblemWords(Check c)
+        {
+            if (!string.IsNullOrEmpty(c.Problem)) return c.Problem;
+            return c.Name + ": " + c.Detail;
         }
 
         /// <summary>

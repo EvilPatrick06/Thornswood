@@ -101,6 +101,10 @@ Yes 'Swap.ps1 puts Read-JsonFile.ps1 and RecordShape.ps1 in front of the stage c
     $lib.Substring($b).Contains('$checkBlock = $ThornswoodRecordShapeText + $checkBlock'))
 $checkBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Read-JsonFile.ps1')) + "`r`n" +
               [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\RecordShape.ps1')) + "`r`n" + $checkBlock
+# The swap's own text, before anything goes in front of it: what it stops is
+# read from this (below), because StopAndMove.ps1 reads command lines only
+# to name what held a refused rename (#3262), never to choose what to stop.
+$ownSwapBlock = $swapBlock
 # And the stop and the renames (#2928), the way Swap.ps1 puts them in front.
 Yes 'Swap.ps1 puts StopAndMove.ps1 in front of the swap' (
     $lib.Substring($b).Contains('$swapBlock = $ThornswoodStopAndMoveText + $swapBlock'))
@@ -167,10 +171,10 @@ Yes 'the blocks are plain ASCII, which the far end reads right with or without a
 # The narrowing on 17 September was a fix. The TCP port one above the game
 # port is 7778 on the live root, which is the voice service.
 Yes 'the stop is still by the UDP port and nothing else' (
-    $swapBlock.Contains('Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port }') -and
-    $swapBlock -notmatch 'Get-NetTCPConnection' -and
-    $swapBlock -notmatch 'Win32_Process' -and
-    $swapBlock -notmatch 'CommandLine')
+    $ownSwapBlock.Contains('Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port }') -and
+    $ownSwapBlock -notmatch 'Get-NetTCPConnection' -and
+    $ownSwapBlock -notmatch 'Win32_Process' -and
+    $ownSwapBlock -notmatch 'CommandLine')
 Yes 'the stage check stops nothing' ($checkBlock -notmatch 'Stop-Process|Stop-ScheduledTask')
 
 $flow = $src.Substring([Math]::Max(0, $src.IndexOf('# ------------------------------------------------------------- the stage')))

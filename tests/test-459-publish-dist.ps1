@@ -34,7 +34,10 @@
        not the one records\server-build.json names is still refused before
        anything is copied (the shared clone's build of another engine commit
        is this case);
-    4. the parameter block works nothing out: -Dist and -Zip have no default.
+    4. the parameter block works nothing out: -Dist and -Zip have no default;
+    5. on a machine that takes CI's engine build ({"ci": true}), no -Dist is
+       a publish from the store with CI's server zip, fetched first by
+       Get-EngineArtifact.ps1 when the pin's build is not here (#3262).
 
   Everything it writes is in its own temp folder. Nothing connects anywhere.
 #>
@@ -177,6 +180,40 @@ try {
     Yes '  and is refused as not the recorded build' ($r.Code -eq 1 -and $r.Out -match 'not the build' -and $r.Out -match 'Export-ServerPayload\.ps1 exited')
     Yes ("  before anything is copied: no ssh or scp ({0} calls)" -f $r.Calls.Count) ($r.Calls.Count -eq 0 -and $r.Out -notmatch '(?m)^Copying')
     if ($r.Code -ne 1 -or $r.Out -notmatch 'not the build') { Write-Host $r.Out }
+
+    # ---- 5. a machine that takes CI's engine build (#3262) --------------------------------------
+    # Its engine build is CI's artifact, which holds the server files and
+    # their zip and never a server-settings.json, so a publish that names no
+    # build goes from the store with that zip, fetching the pin's build first.
+    Write-Host ''; Write-Host 'no -Dist, on a machine that takes CI''s engine build'
+    $oldLocal = $env:LOCALAPPDATA
+    $env:LOCALAPPDATA = Join-Path $Scratch 'appdata'
+    try {
+        Put (Join-Path $env:LOCALAPPDATA 'Thornswood\engine-build.json') '{"ci": true}'
+        $ciDir = Join-Path $env:LOCALAPPDATA ('Thornswood\engine-ci\' + $recCommit.Substring(0, 12).ToLowerInvariant())
+        # gh, which Get-EngineArtifact.ps1 asks, says no here.
+        if ($OnWindows) { Put (Join-Path $bin 'gh.cmd') ("@echo gh %*>>""%TS_459D_CALLS%""`r`n@echo no network in this harness 1>&2`r`n@exit /b 1`r`n") }
+        else {
+            Put (Join-Path $bin 'gh') ("#!/bin/sh`necho gh ""`$*"" >> ""`$TS_459D_CALLS""`necho no network in this harness >&2`nexit 1`n")
+            & chmod 755 (Join-Path $bin 'gh')
+        }
+        $r = Run $shells[0].Path @()
+        Yes 'with the pin''s build not here, it asks Get-EngineArtifact.ps1 for it, and stops when that fails, sending nothing' (
+            $r.Code -eq 1 -and $r.Out.Contains("Get-EngineArtifact.ps1 could not fetch CI's engine build of the pin") -and
+            $r.Out -notmatch 'holds no server-settings\.json|there is no built server' -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0)
+        if ($r.Code -ne 1 -or -not $r.Out.Contains('could not fetch')) { Write-Host $r.Out }
+        Put (Join-Path $ciDir 'engine-artifact.json') '{"commit": "x", "serverZip": "server-harness-0000000000000000.zip"}'
+        $ciZip = Join-Path $ciDir 'artifact\server\server-harness-0000000000000000.zip'
+        $r = Run $shells[0].Path @()
+        Yes '  with the build here and its zip missing, it stops naming where the zip should be, sending nothing' (
+            $r.Code -eq 1 -and $r.Out.Contains("there is none at $ciZip") -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0)
+        Put $ciZip 'not a real zip'
+        $r = Run $shells[0].Path @()
+        Yes '  with the zip there, it publishes from the store and sends that zip first, never asking for a server-settings.json' (
+            $r.Out.Contains('which has no built server to pack, so this publishes from the store and sends ' + $ciZip) -and
+            $r.Out -match 'server build\s+from the store on the box' -and $r.Out -notmatch 'holds no server-settings\.json|there is no built server')
+        if (-not $r.Out.Contains('publishes from the store')) { Write-Host $r.Out }
+    } finally { $env:LOCALAPPDATA = $oldLocal }
 
     # ---- 4. the parameter block ----------------------------------------------------------------
     Write-Host ''; Write-Host 'the script'

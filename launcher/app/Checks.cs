@@ -17,6 +17,13 @@ namespace Thornswood
         // right on every tester's machine, because a row that blocks and is
         // wrong locks everybody out on the day it ships.
         public bool Advisory;
+        // What the Ready card on Play says when this row is what keeps Play
+        // shut: the problem in a few words ("Steam not running"), so nobody
+        // has to open Diagnostics to find out what is wrong (#3203). Detail
+        // is the row's own column on Diagnostics and reads next to Name;
+        // this stands alone. Every row that can block sets it where it is
+        // made, because that is where the specifics are known.
+        public string Problem;
         public Check(string n, bool ok, string d) { Name = n; Ok = ok; Detail = d; }
         public Check(string n, bool ok, string d, bool advisory) { Name = n; Ok = ok; Detail = d; Advisory = advisory; }
 
@@ -813,6 +820,21 @@ namespace Thornswood
             catch { return "client bundle"; }
             return "client bundle";
         }
+
+        /// <summary>
+        /// The Client row's few words for the Ready card (#3203), the same
+        /// split ClientDetail makes: files that are not there, or files that
+        /// are there and are not this build's. Only read when the row fails,
+        /// which ClientRuntime.Good says happens only with a record to judge by,
+        /// so the files are not read a third time on a pass where it is right.
+        /// </summary>
+        static string ClientProblem()
+        {
+            List<string> missing;
+            List<string> wrong = ClientRuntime.Wrong(out missing);
+            return (missing.Count > 0 && wrong.Count == 0) ? "Client files missing" : "Client files not this build's";
+        }
+
         public static List<Check> All(Config cfg)
         {
             // The game these rows are about. With the own folder chosen and not
@@ -826,16 +848,20 @@ namespace Thornswood
             int plugins = EnabledPlugins();
 
             var l = new List<Check>();
-            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg, exe)));
-            l.Add(new Check("Script Extender", File.Exists(Path.Combine(game, "skse64_1_6_1170.dll")), "skse64 2.2.6"));
+            l.Add(new Check("Game build", bytes == cfg.ExpectedExeBytes, Downgrade.Describe(cfg, exe))
+                  { Problem = File.Exists(exe) ? "Wrong Skyrim build" : "Skyrim not found" });
+            l.Add(new Check("Script Extender", File.Exists(Path.Combine(game, "skse64_1_6_1170.dll")), "skse64 2.2.6")
+                  { Problem = "Script Extender missing" });
             // Advisory, so it warns and never shuts Play. See AddressLibraryRow.
             l.Add(AddressLibraryRow(game, bytes == cfg.ExpectedExeBytes));
-            l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client"));
+            l.Add(new Check("Multiplayer", File.Exists(Paths.MpClient), "SkyMP client")
+                  { Problem = "Multiplayer client missing" });
             // The other half of the client, and the half that connects.
             // See ClientRuntime: every row above this one asks whether a
             // file exists, and a bundle that is present but not ours is
             // what leaves somebody sitting on the backdrop.
-            l.Add(new Check("Client", ClientRuntime.Good(), ClientDetail()));
+            bool client = ClientRuntime.Good();
+            l.Add(new Check("Client", client, ClientDetail()) { Problem = client ? null : ClientProblem() });
             // Mods and Mod list share Verify.LastIssues (filled by Scan, Fix,
             // Play, and Diagnostics open) so they cannot disagree with the
             // Scan and Fix card. A fresh Run(cfg) here would freeze the UI on
@@ -860,9 +886,13 @@ namespace Thornswood
                                 ? "none"
                                 : (foreign.Length == 1
                                     ? Path.GetFileName(foreign[0])
-                                    : foreign.Length + " client files")));
+                                    : foreign.Length + " client files"))
+                  { Problem = "Another server's client found" });
 
-l.Add(new Check("Steam", SteamRunning(), "running"));
+            // The detail said "running" whether Steam was or not, so a red
+            // row read "Steam  running" (#3204).
+            bool steam = SteamRunning();
+            l.Add(new Check(SteamRow, steam, steam ? "running" : "not running") { Problem = "Steam not running" });
             return l;
         }
 
@@ -891,9 +921,10 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                 }
             }
             if (missing.Count > 0)
-                return new Check("Mods", false, MissingDetail(missing));
+                return new Check("Mods", false, MissingDetail(missing))
+                       { Problem = missing.Count == 1 ? "1 mod missing" : missing.Count + " mods missing" };
             if (plugins <= MostPluginsWithoutCollection)
-                return new Check("Mods", false, plugins + " plugins");
+                return new Check("Mods", false, plugins + " plugins") { Problem = "Mods not installed" };
             return new Check("Mods", true, plugins + " plugins");
         }
 
@@ -909,7 +940,7 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                 foreach (Issue i in issues) if (i.Blocking) blocking.Add(i);
             if (blocking.Count == 0)
                 return new Check("Mod list", true, "matches the server");
-            return new Check("Mod list", false, ProblemDetail(blocking));
+            return new Check("Mod list", false, ProblemDetail(blocking)) { Problem = "Mod list does not match the server" };
         }
 
         static string MissingDetail(List<string> missing)
@@ -945,10 +976,60 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
             return blocking.Count + " problems: " + joined + " and more";
         }
 
+        /// <summary>
+        /// The Steam row's name. Shell finds the row by it to show the Open
+        /// Steam button and to know what the card last said about Steam.
+        /// </summary>
+        public const string SteamRow = "Steam";
+
         public static bool SteamRunning()
         {
             try { return Process.GetProcessesByName("steam").Length > 0; }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// SteamRunning for the launcher's two second tick, which redraws the
+        /// Ready card when Steam starts or closes (#3204). The rows were drawn
+        /// on a page change, a scan or a recheck and at no other time, so
+        /// Steam closed after that still read "running", and Steam started by
+        /// the Open Steam button or by hand left "Steam not running" up until
+        /// somebody changed page. Asks the steam.exe the last look found
+        /// whether it is still up, by the handle it already has, and lists
+        /// the machine's processes again only once it is not, the way
+        /// GameStillRunning does for the game (#978). Called from the
+        /// window's thread only.
+        /// </summary>
+        public static bool SteamStillRunning()
+        {
+            return steamUp.Any();
+        }
+
+        static bool steamAskRefused;
+
+        static readonly Watched<Process> steamUp = new Watched<Process>(
+            SteamProcesses,
+            delegate (Process p)
+            {
+                // One that cannot be asked is not provably up, so the watch
+                // looks again. Said once a session, as GameStillRunning does.
+                try { return !p.HasExited; }
+                catch (Exception ex)
+                {
+                    if (!steamAskRefused) { steamAskRefused = true; Swallow.Note("Checks.SteamStillRunning, has exited", ex); }
+                    return false;
+                }
+            },
+            delegate (Process p)
+            {
+                try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.SteamStillRunning, dispose", ex); }
+            });
+
+        /// <summary>Every steam.exe running now. The watch above owns what comes back.</summary>
+        static List<Process> SteamProcesses()
+        {
+            try { return new List<Process>(Process.GetProcessesByName("steam")); }
+            catch (Exception ex) { Swallow.Note("Checks.SteamProcesses", ex); return new List<Process>(); }
         }
 
         /// <summary>
