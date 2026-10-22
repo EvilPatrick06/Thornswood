@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  71,
-    "callCount":  283,
+    "callCount":  285,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1180,10 +1180,28 @@
                       "script":  "scripts/deploy/Set-Turnstile.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Invoke-ThornswoodSecretRemote",
-                      "anchor":  "Invoke-ThornswoodSecretRemote -Target \"$User@$Vps\" -SshArgs $ssh -Secret $secret -Script @\"",
+                      "anchor":  "Invoke-ThornswoodSecretRemote -Target \"$User@$Vps\" -SshArgs $ssh -Secret $secret -Script (@\"",
                       "does":  "writes the report form's Turnstile keys into config.json and restarts the site",
                       "class":  "admin",
                       "reason":  "writes a secret; no gate verb covers secrets"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "(Get-ThornswoodSealKeyBlock)",
+                      "does":  "makes the box's seal key in C:\\Thornswood-Seal if it has none, locks the folder, prints the public half",
+                      "class":  "admin",
+                      "reason":  "writes a private key and an ACL outside every gate verb"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$(Get-ThornswoodUnsealBlock)",
+                      "does":  "opens the sealed Turnstile token with the box's key, reads the widget's secret from Cloudflare, writes both keys into config.json and restarts the site",
+                      "class":  "admin",
+                      "reason":  "reads a private key and writes a secret; no gate verb covers secrets"
                   },
                   {
                       "script":  "scripts/deploy/Setup-Domain.ps1",
