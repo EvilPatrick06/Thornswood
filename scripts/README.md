@@ -28,7 +28,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/Artifact.ps1](deploy/Artifact.ps1) | What a deploy sends, built from a commit rather than copied off a working tree, and what the box keeps to say which commit each part runs. |
 | [deploy/CloudflareRanges.ps1](deploy/CloudflareRanges.ps1) | Dot-sourced. Reads scripts\deploy\cloudflare-ranges.txt, the addresses Cloudflare's proxy reaches the box from, and says whether an address is inside them (#2995). |
 | [deploy/CollectionPlugins.ps1](deploy/CollectionPlugins.ps1) | Holds the plugins a deploy sends to the collection's own bytes (#2019). |
-| [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS and restarts only that server. |
+| [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS, which loads it while it runs when nothing else changes, and otherwise restarts only that server. |
 | [deploy/Deploy-Docs.ps1](deploy/Deploy-Docs.ps1) | Puts the Thornswood docs site on the VPS and keeps it running. |
 | [deploy/Deploy-Gamemode.ps1](deploy/Deploy-Gamemode.ps1) | Puts gamemode.js into the built server and writes a server load order that actually lines up with the client's. |
 | [deploy/Deploy-Server.ps1](deploy/Deploy-Server.ps1) | Sends the built server up to the VPS and restarts it. |
@@ -43,6 +43,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/Install-ThornswoodServer.ps1](deploy/Install-ThornswoodServer.ps1) | Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator. |
 | [deploy/Install-Voice.ps1](deploy/Install-Voice.ps1) | Puts the proximity voice service on the VPS beside the game server and opens the one port it needs. |
 | [deploy/MaxOnline.ps1](deploy/MaxOnline.ps1) | How many people a Thornswood server holds at once: read from the one place it is written, records\most-online.json, and put into server-settings.json. |
+| [deploy/Reload.ps1](deploy/Reload.ps1) | A dev gamemode deploy that changes only gamemode.js puts the new one in place while the dev server runs, and the server loads it there, with nobody dropped and every NPC still in the world (#3196, Patrick's C on 22 Oct 2026). |
 | [deploy/Remirror-Site-Feed.ps1](deploy/Remirror-Site-Feed.ps1) | Puts the release feed on the site, so https://thornswood.net/feed/version.json is the same file as this machine's working copy of the feed and every asset it names can be downloaded from thornswood.net. |
 | [deploy/Rotate-BotToken.ps1](deploy/Rotate-BotToken.ps1) | Puts a new Discord bot token into both places on the VPS that use it, in one go, and restarts both programs that read it. |
 | [deploy/Rotate-ServerPassword.ps1](deploy/Rotate-ServerPassword.ps1) | Changes the server password and hands the new one to the site, so the launcher can fetch it after checking Discord. |
@@ -88,8 +89,10 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Nightly-Issue.ps1](dev/Nightly-Issue.ps1) | Keeps one issue on the board for a failing nightly, and closes it the night the checks pass. |
 | [dev/Nightly-Stray.ps1](dev/Nightly-Stray.ps1) | Names every pull request open more than two days and every branch other than main with no open pull request, reading every page GitHub has. |
 | [dev/OwnPlugins.ps1](dev/OwnPlugins.ps1) | Where a builder reads a plugin of the load order from (#2923). |
+| [dev/Run-Gate.ps1](dev/Run-Gate.ps1) | Runs the gate harnesses for build.yml's "Run the gate harnesses" step: every one on main, under the trace task's trace on the VPS, and on a pull request built on the VPS only those its change can reach (#3114). |
 | [dev/Start-Thornswood.ps1](dev/Start-Thornswood.ps1) | Launches the game the way the launcher's Play() does, without the launcher. |
 | [dev/Trace-Gate-Box.ps1](dev/Trace-Gate-Box.ps1) | The part of a gate trace that runs on the VPS, as an administrator: an ETW session that sees every file each gate harness opens, and the reading of it into one list of paths a harness (#3114). |
+| [dev/Trace-Gate-Task.ps1](dev/Trace-Gate-Task.ps1) | The trace task on the VPS: traces every main build's gate as it runs and leaves the map pull requests are held to in each build runner's folder (#3114). |
 | [dev/Trace-Gate.ps1](dev/Trace-Gate.ps1) | Traces one run of the pull request gate on the VPS: which files every gate harness opens, on the box, as the build runner runs it (#3114). |
 | [dev/Watch-Foreground.ps1](dev/Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
 | [mods/Add-Accuracy.ps1](mods/Add-Accuracy.ps1) | RETIRED. DO NOT RUN. Issue #1179: hand-installed Core Impact Framework and Accuracy, then Ships. |

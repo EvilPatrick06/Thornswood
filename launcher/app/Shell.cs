@@ -1682,6 +1682,48 @@ namespace Thornswood
             label.Text = "By " + by + " (waiting)";
             meta.Children.Add(label);
 
+            // Its smaller copies (#3218), which most screens are shown in its
+            // place once it is accepted, so staff see them before Accept, and
+            // Accept puts out only these.
+            int[] copies = item.Copies ?? new int[0];
+            if (copies.Length > 0)
+            {
+                var said = new TextBlock();
+                said.Style = (Style)win.FindResource("Small");
+                said.TextWrapping = TextWrapping.Wrap;
+                said.Margin = new Thickness(0, 6, 0, 4);
+                said.Text = "Its smaller copies, what most screens show once it is accepted:";
+                meta.Children.Add(said);
+
+                var strip = new StackPanel();
+                strip.Orientation = Orientation.Horizontal;
+                foreach (int width in copies)
+                {
+                    var small = new Border();
+                    small.Width = 120;
+                    small.Height = 68;
+                    small.Margin = new Thickness(0, 0, 8, 0);
+                    small.Background = (Brush)win.FindResource("Line");
+                    small.ClipToBounds = true;
+                    small.ToolTip = "The " + width + " pixel copy";
+                    var smallImg = new Image();
+                    smallImg.Stretch = Stretch.UniformToFill;
+                    RenderOptions.SetBitmapScalingMode(smallImg, BitmapScalingMode.HighQuality);
+                    small.Child = smallImg;
+                    strip.Children.Add(small);
+
+                    int holdWidth = width;
+                    Image holdSmall = smallImg;
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        BitmapImage copy = Gallery.FetchCopy(holdItem, holdWidth);
+                        if (copy == null) return;
+                        win.Dispatcher.BeginInvoke(new Action(delegate { holdSmall.Source = copy; }));
+                    });
+                }
+                meta.Children.Add(strip);
+            }
+
             if (item.Note != null && item.Note.Length > 0)
             {
                 var note = new TextBlock();
@@ -1702,7 +1744,7 @@ namespace Thornswood
             accept.Content = "Accept";
             accept.Padding = new Thickness(14, 6, 14, 6);
             string name = item.Name;
-            accept.Click += delegate { GalleryAccept(name); };
+            accept.Click += delegate { GalleryAccept(name, copies); };
             buttons.Children.Add(accept);
 
             var del = new Button();
@@ -1966,12 +2008,17 @@ namespace Thornswood
             {
                 int ok = 0;
                 string firstBad = "";
+                string firstCopy = "";
                 for (int i = 0; i < paths.Length; i++)
                 {
-                    string bad = Gallery.Submit(paths[i], by, note);
+                    string copyBad;
+                    string bad = Gallery.Submit(paths[i], by, note, out copyBad);
                     if (bad.Length == 0) ok++;
                     else if (firstBad.Length == 0) firstBad = bad;
+                    if (copyBad.Length > 0 && firstCopy.Length == 0) firstCopy = copyBad;
                 }
+                // A smaller copy that did not go (#3218) is said after the rest.
+                string copyNote = firstCopy.Length > 0 ? " " + firstCopy : "";
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (ok == paths.Length)
@@ -1979,16 +2026,16 @@ namespace Thornswood
                         galleryChosenPaths.Clear();
                         PaintGalleryChosen();
                         if (boxGalleryNote != null) boxGalleryNote.Text = "";
-                        SayGallery(ok == 1
+                        SayGallery((ok == 1
                             ? "Sent. It is waiting for staff to Accept it onto the gallery."
-                            : ("Sent " + ok + " pictures. They are waiting for staff to Accept."));
+                            : ("Sent " + ok + " pictures. They are waiting for staff to Accept.")) + copyNote);
                         BuildGalleryPage();
                     }
                     else if (ok > 0)
                     {
                         galleryChosenPaths.Clear();
                         PaintGalleryChosen();
-                        SayGallery("Sent " + ok + " of " + paths.Length + ". " + firstBad);
+                        SayGallery("Sent " + ok + " of " + paths.Length + ". " + firstBad + copyNote);
                         BuildGalleryPage();
                     }
                     else
@@ -2000,12 +2047,13 @@ namespace Thornswood
             });
         }
 
-        static void GalleryAccept(string name)
+        /// <summary>shown is the smaller copies the card showed (#3218).</summary>
+        static void GalleryAccept(string name, int[] shown)
         {
             SayGallery("Accepting " + name + "...");
             ThreadPool.QueueUserWorkItem(delegate
             {
-                string bad = Gallery.Approve(name);
+                string bad = Gallery.Approve(name, shown);
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (bad.Length == 0)

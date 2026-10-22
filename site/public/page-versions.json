@@ -141,6 +141,14 @@
     ],
     "privacy": [
       {
+        "sha256": "c7845c7ad96bd952dd2369cefe48d39c1cec0a993ec84b7eda17605f7a0d6fb9",
+        "changed": "2026-10-22"
+      },
+      {
+        "sha256": "05e6cceb838945d6287188305436f65745e4b9f54fb63b1e08046fb56f4314d0",
+        "changed": "2026-10-22"
+      },
+      {
         "sha256": "28f66b1383c02b71ef84a249cf180ef823691fca90f22072bb58b5bb89cd46ae",
         "changed": "2026-10-22"
       },

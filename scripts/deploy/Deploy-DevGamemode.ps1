@@ -1,8 +1,9 @@
 <#
   Deploy-DevGamemode.ps1
 
-  Sends game\gamemode.js to the dev server on the VPS and restarts only that
-  server. The dev server is a copy of the live install on its own ports
+  Sends game\gamemode.js to the dev server on the VPS, which loads it while it
+  runs when nothing else changes, and otherwise restarts only that server.
+  THE RELOAD, below, says when and how. The dev server is a copy of the live install on its own ports
   (vps-dev-instance.ps1: C:\Thornswood-Server-Dev, UDP/TCP 7787, resources
   7788, task 'Thornswood Dev Server').
 
@@ -54,6 +55,10 @@
     .\Deploy-DevGamemode.ps1 -Now  no warning and no wait, which is what this
                                    did for everybody until 24 September
 
+    .\Deploy-DevGamemode.ps1 -Restart
+                                   stop and start the dev server even when only
+                                   the gamemode changes
+
     .\Deploy-DevGamemode.ps1 -PutBack
                                    the files the last run replaced go back in,
                                    after the same warning, checked the same way
@@ -76,6 +81,19 @@
   not answer on its ports afterwards, the old files go back and this exits 1.
   What a run replaced is kept in $Root\.prev-<stamp>, the newest two, and
   -PutBack puts the newest back. See THE STAGE below and Swap.ps1.
+
+  THE RELOAD (#3196, Patrick's C on 22 Oct 2026). A run that sends only
+  gamemode.js and its stamp, to a dev server that is running an engine which
+  says how a gamemode load went, with its settings unchanged, does not stop
+  it: the new gamemode goes in while it runs, the engine loads it there, and
+  this reads server.log until the server says the new gamemode loaded. Nobody
+  is dropped, so nobody is warned, and the NPCs stay where they are. When it
+  does not load, the old one goes back and has to load the same way, and the
+  run fails with the server never stopped; when the old one does not load
+  either, the dev server restarts with the old files, as -PutBack would. A
+  run that also sends plugins or changes a setting restarts as before, since
+  the server reads those only at a start, and -Restart restarts anyway.
+  Reload.ps1 has the block and the measurements.
 
   A gamemode change that also changes the CHARGEN records needs
   Deploy-Gamemode.ps1 -Vortex first. Code-only changes do not.
@@ -241,6 +259,9 @@ param(
   # Put the files the last run replaced back in, and send nothing. See the
   # header.
   [switch]$PutBack,
+  # Stop and start the dev server even when only the gamemode changes, which
+  # it otherwise loads where it runs (THE RELOAD in the header, #3196).
+  [switch]$Restart,
   # What goes to the dev updates channel after a successful deploy. The same
   # shape Ship takes: first line the title, "- " lines the details. Not taken
   # on -PutBack, which sends nothing and posts nothing.
@@ -265,6 +286,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+. (Join-Path $Here 'Reload.ps1')   # the reload in place, #3196
 . (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
@@ -336,6 +358,8 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not 
 & node --check $Gamemode
 if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was sent.' }
 Write-Host '  gamemode.js parses'
+# The id the gamemode logs as it loads (Reload.ps1), which a reload waits for.
+$newBlob = Get-ThornswoodGamemodeBlob $Gamemode
 
 # THE ENGINE THIS GAMEMODE IS WRITTEN FOR (#2076). A gamemode goes onto the
 # server build its commit records, the comparison Deploy-Server -GamemodeOnly
@@ -1174,6 +1198,50 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   }
 }
 
+# ------------------------------------------------------------ the reload ---
+#
+# A run that sends only the gamemode and its stamp puts them in while the dev
+# server runs, and the server loads the new gamemode there (#3196, Reload.ps1
+# says how and when). Nobody is dropped, so nobody is warned. Anything else,
+# or -Restart, or -PutBack, is the warning and the swap below, which restart.
+# $outcome: swap (restart), reloaded, refused (the reload put nothing in, or
+# put the old one back and the server loaded it), or recover (the old files
+# are back on disk and the server did not load them, so the swap starts it
+# with them, as -PutBack does).
+$outcome = 'swap'
+if (-not $PutBack -and -not $Restart) {
+  Write-Host ''
+  Write-Host 'Loading the new gamemode in the running dev server...'
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $reloadOut = @(Remote ((ReloadVars $Root $Task $stageName $prevName $Wait $hashes $newBlob) + $reloadBlock) |
+                   ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+  } finally { $ErrorActionPreference = $eap }
+  if ($reloadOut -contains 'RELOAD OK') { $outcome = 'reloaded' }
+  elseif ($reloadOut -contains 'RELOAD NOT HERE') { Write-Host '  so the dev server restarts with it' }
+  elseif ($reloadOut -contains 'RELOAD FAILED') {
+    $outcome = 'recover'
+    Write-Host ''
+    Write-Host '  FAIL. The new gamemode did not load, the old one is back on disk, and the' -ForegroundColor Red
+    Write-Host '  server did not load that either. It restarts now with the old files.' -ForegroundColor Red
+  } else {
+    $outcome = 'refused'
+    Write-Host ''
+    if ($reloadOut -contains 'RELOAD PUT BACK') {
+      Write-Host '  FAIL. The new gamemode did not load, so the old one was put back and the' -ForegroundColor Red
+      Write-Host '  dev server loaded it again. It was never stopped. The lines above say why.' -ForegroundColor Red
+    } elseif ($reloadOut -contains 'RELOAD REFUSED') {
+      Write-Host '  FAIL. Nothing was put in and the dev server runs as it was. The lines above say why.' -ForegroundColor Red
+    } else {
+      Write-Host '  FAIL, AND THE BOX MAY NOT BE AS IT WAS: the reload did not say how it ended.' -ForegroundColor Red
+      Write-Host "  What it replaced is in $rootWin\$prevName. Look at the dev server before anything else." -ForegroundColor Red
+    }
+  }
+}
+
+$swapped = $false
+if ($outcome -eq 'swap' -or $outcome -eq 'recover') {
 Write-Host ''
 Write-Host 'Who is on the dev server...'
 Warn-DevRoom
@@ -1184,14 +1252,16 @@ Warn-DevRoom
 # holds this root's own UDP port, so the live server is never touched, and it
 # removes any restart.json the old process never read, so the next one does
 # not count down on its own. What it replaced is kept in .prev-<stamp>.
+# After a reload that ended with the old files on disk and not loaded, it is
+# the put-back: those files, from the .prev the reload kept them in.
 Write-Host ''
 Write-Host 'Stopping the dev server...'
 $pick = ''
-if ($PutBack) { $pick = $putBackPick }
+if ($PutBack -or $outcome -eq 'recover') { $pick = $putBackPick }
 # A put-back sends nothing and edits nothing, so it has no keys of its own and
 # no read-back: what it puts back is the whole previous set of files.
 $readBackKeys = $null
-if (-not $PutBack) { $readBackKeys = $DevSettingsKeys }
+if (-not $PutBack -and $outcome -eq 'swap') { $readBackKeys = $DevSettingsKeys }
 # A stray line on stderr must not stop this side reading while the far side is
 # half way through a swap.
 $eap = $ErrorActionPreference
@@ -1201,6 +1271,7 @@ try {
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 $swapped = Show-SwapResult $swapOut "$rootWin\.prev-<stamp>"
+}
 
 Write-Host ''
 Write-Host 'What it is running...'
@@ -1226,20 +1297,26 @@ if (Test-Path '$rootWin\server.log') {
 }
 "@ | ForEach-Object { "  $_" }
 
-if (-not $swapped) { exit 1 }
+# Deployed: a reload the server loaded, or a swap that answered. A reload
+# that did not take has deployed nothing, even when the put-back swap after it
+# answered, and the record beside the server still names what it runs, since
+# only a deploy that worked writes one.
+$deployed = ($outcome -eq 'reloaded') -or ($outcome -eq 'swap' -and $swapped)
+if (-not $deployed) { exit 1 }
 
 # The new gamemode is in place and the dev server answers: the box records
 # that it runs this artifact, and serves the record from its data folder, so
 # http://<box>:7788/thornswood-deploy.json says which commit it runs. The
-# record it had goes into .prev with the files it describes (Swap.ps1), and
-# after -PutBack the record that came back with them is the one recorded.
+# record it had goes into .prev with the files it describes (Swap.ps1, and
+# Reload.ps1 for a reload), and after -PutBack the record that came back with
+# them is the one recorded.
 if ($PutBack) { Restore-SwapRecord "$User@$Vps" $ssh $Root $swapOut "$Root/data/thornswood-deploy.json" 'gamemode' }
 else {
   Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood-deploy.json"
   $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
 }
 
-if ($swapped -and -not $PutBack) {
+if ($deployed -and -not $PutBack) {
   $discord = Join-Path $Here '..\ops\Publish-Discord.ps1'
   if (Test-Path -LiteralPath $discord) {
     Write-Host ''

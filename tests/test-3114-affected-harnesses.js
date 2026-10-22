@@ -26,6 +26,8 @@
 //      when the trace saw the directory enumerations, only in a folder it
 //      listed, a folder it only opened rerunning it only when the folder
 //      itself comes or goes.
+//   6. a change measured from a traced tree's listing, as a pull request
+//      measures it (pick), is what git diff --name-status gives.
 'use strict';
 const path = require('path');
 const REPO = path.join(__dirname, '..');
@@ -185,6 +187,25 @@ try {
   yes('  while the folder itself going reruns the one that only opened it too', r.run.join(' ') === 'test-list.ps1 test-open.ps1');
   baseFiles.pop();
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+
+// 6. a change measured from a tree's listing (pick on a pull request, which
+// has the traced commit's listing and not the commit), the way git diff
+// --name-status --no-renames measures it.
+{
+  const tree = (entries) => Buffer.from(entries.map(e => e[0] + ' ' + (e[0] === '160000' ? 'commit' : 'blob') + ' ' + e[1] + '\t' + e[2] + '\0').join(''));
+  const b = A.parseTree(tree([['100644', 'a'.repeat(40), 'docs/a.md'], ['100644', 'b'.repeat(40), 'game/x.js'], ['100644', 'c'.repeat(40), 'gone.txt'],
+    ['100644', 'd'.repeat(40), 'run.sh'], ['100644', 'e'.repeat(40), 'link'], ['160000', 'f'.repeat(40), 'engine/skymp'], ['100644', '1'.repeat(40), 'same.txt']]));
+  const h = A.parseTree(tree([['100644', 'a'.repeat(40), 'docs/a.md'], ['100644', '2'.repeat(40), 'game/x.js'], ['100755', 'd'.repeat(40), 'run.sh'],
+    ['120000', 'e'.repeat(40), 'link'], ['160000', '3'.repeat(40), 'engine/skymp'], ['100644', '1'.repeat(40), 'same.txt'], ['100644', '4'.repeat(40), 'new/n.txt']]));
+  const c = A.changesBetween(b, h).map(x => x.status + ' ' + x.path).join(', ');
+  yes('a listing reads into paths with their mode and object', b.size === 7 && b.get('engine/skymp') === '160000 ' + 'f'.repeat(40));
+  yes('the change between two listings is git\'s: a new object or executable bit M, a file become a link T, A and D (' + c + ')',
+      c === 'M engine/skymp, M game/x.js, D gone.txt, T link, A new/n.txt, M run.sh');
+  let threw = false;
+  try { A.parseTree(Buffer.from('not a listing\0')); } catch (e) { threw = true; }
+  yes('a listing that is not one is refused, so the whole gate runs', threw);
+  yes('a change to Run-Gate.ps1, the gate step\'s script, runs the whole gate', A.select({ map: map, gate: gate, base: BASE, changes: [{ status: 'M', path: 'scripts/dev/Run-Gate.ps1' }], baseFiles: baseFiles, headFiles: baseFiles }).full);
+}
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
