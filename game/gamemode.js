@@ -30092,8 +30092,10 @@ log('gamemode loaded:',
           if (sid) staffRoleIds[sid] = true;
         }
       }
-      // Business Owner and Faction Owner, the Discord roles a book is founded
-      // from. Same answer as the staff seats. Absent until the site sends them.
+      // Business Owner, the Discord role a business book is founded from, and
+      // each faction's Leader role, whose holder owns that faction's book
+      // (#3317). Same answer as the staff seats. Absent until the site sends
+      // them.
       var businessIds = {};
       if (Array.isArray(doc.businessOwnerProfiles)) {
         for (var bo = 0; bo < doc.businessOwnerProfiles.length; bo++) {
@@ -30101,11 +30103,22 @@ log('gamemode loaded:',
           if (bid) businessIds[bid] = true;
         }
       }
-      var factionIds = {};
-      if (Array.isArray(doc.factionOwnerProfiles)) {
-        for (var fo = 0; fo < doc.factionOwnerProfiles.length; fo++) {
-          var fid = Number(doc.factionOwnerProfiles[fo]);
-          if (fid) factionIds[fid] = true;
+      // Leader role name -> the profiles of the account that holds it: one
+      // book per faction, owned by whoever holds its Leader role, and it
+      // moves with the role (Patrick, 22 Oct, page card q-3317-faction-books,
+      // A). The Faction Owner role it replaces is gone.
+      var leadRoles = {};
+      var fl = doc.factionLeaderProfiles;
+      if (fl && typeof fl === 'object' && !Array.isArray(fl)) {
+        for (var lr in fl) {
+          if (!Object.prototype.hasOwnProperty.call(fl, lr) || !/^[^\n]{1,96} Leader$/.test(lr) ||
+              !Array.isArray(fl[lr])) continue;
+          for (var lp = 0; lp < fl[lr].length; lp++) {
+            var lid = Number(fl[lr][lp]);
+            if (!lid) continue;
+            if (!leadRoles[lid]) leadRoles[lid] = [];
+            if (leadRoles[lid].indexOf(lr) === -1) leadRoles[lid].push(lr);
+          }
         }
       }
       // The Discord role named Dev, not every staff seat. A Dev may found
@@ -30159,7 +30172,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, offices: offices, clash: clash, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, barred: barred, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, offices: offices, clash: clash, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, leadRoles: leadRoles, companyIds: companyIds, accounts: accounts, barred: barred, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -30200,7 +30213,8 @@ log('gamemode loaded:',
     var l = load();
     return passProved(profileId) && !!(l && l.staffRoleIds && l.staffRoleIds[Number(profileId)]);
   };
-  // Business Owner, Faction Owner, and the Discord account a book is founded on.
+  // Business Owner, the Leader roles held, and the Discord account a book is
+  // founded on.
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBookRoles = function (profileId) {
     var l = load();
     var n = Number(profileId);
@@ -30209,7 +30223,7 @@ log('gamemode loaded:',
       staff: proved && !!(l && l.staffRoleIds && l.staffRoleIds[n]),
       dev: proved && !!(l && l.devRoleIds && l.devRoleIds[n]),
       business: proved && !!(l && l.businessIds && l.businessIds[n]),
-      faction: proved && !!(l && l.factionIds && l.factionIds[n]),
+      leads: (proved && l && l.leadRoles && l.leadRoles[n]) ? l.leadRoles[n].slice() : [],
       account: (l && l.accounts && l.accounts[n]) ? String(l.accounts[n]) : ('p:' + n)
     };
   };
@@ -30614,6 +30628,24 @@ log('gamemode loaded:',
     var stale = (had.offices && typeof had.offices === 'object') ? had.offices : {};
     for (var fo in fresh) if (Object.prototype.hasOwnProperty.call(fresh, fo) && !failed[Number(fo)]) offices[fo] = fresh[fo];
     for (var so in stale) if (Object.prototype.hasOwnProperty.call(stale, so) && failed[Number(so)]) offices[so] = stale[so];
+    // The faction Leader roles (#3317) are a map by role: a profile that could
+    // not be checked keeps the Leader roles it had in the file, and no other.
+    var leaders = {};
+    var freshLead = (doc.factionLeaderProfiles && typeof doc.factionLeaderProfiles === 'object') ? doc.factionLeaderProfiles : {};
+    var staleLead = (had.factionLeaderProfiles && typeof had.factionLeaderProfiles === 'object') ? had.factionLeaderProfiles : {};
+    function lead(from, keep) {
+      for (var role in from) {
+        if (!Object.prototype.hasOwnProperty.call(from, role) || !Array.isArray(from[role])) continue;
+        for (var lp = 0; lp < from[role].length; lp++) {
+          var pid = Number(from[role][lp]);
+          if (!pid || !!failed[pid] !== keep) continue;
+          if (!leaders[role]) leaders[role] = [];
+          if (leaders[role].indexOf(pid) === -1) leaders[role].push(pid);
+        }
+      }
+    }
+    lead(freshLead, false);
+    lead(staleLead, true);
     return {
       profiles: merged(doc.profiles, had.profiles),
       devProfiles: merged(doc.devProfiles, had.devProfiles),
@@ -30621,7 +30653,7 @@ log('gamemode loaded:',
       offices: offices,
       staffRoleProfiles: merged(doc.staffRoleProfiles, had.staffRoleProfiles),
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
-      factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
+      factionLeaderProfiles: leaders,
       devRoleProfiles: merged(doc.devRoleProfiles, had.devRoleProfiles),
       companyProfiles: merged(doc.companyProfiles, had.companyProfiles),
       people: people
@@ -30773,7 +30805,7 @@ log('gamemode loaded:',
             doc.offices = kept.offices;
             doc.staffRoleProfiles = kept.staffRoleProfiles;
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
-            doc.factionOwnerProfiles = kept.factionOwnerProfiles;
+            doc.factionLeaderProfiles = kept.factionLeaderProfiles;
             doc.devRoleProfiles = kept.devRoleProfiles;
             doc.companyProfiles = kept.companyProfiles;
             doc.people = kept.people;
@@ -30797,7 +30829,10 @@ log('gamemode loaded:',
               // The Discord staff roles themselves, for the staff seats (#481).
               staffRoleProfiles: Array.isArray(doc.staffRoleProfiles) ? doc.staffRoleProfiles : [],
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
-              factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
+              // Each faction's Leader role, by name, and the profiles of the
+              // account that holds it: that faction's book is theirs (#3317).
+              factionLeaderProfiles: (doc.factionLeaderProfiles && typeof doc.factionLeaderProfiles === 'object' &&
+                                      !Array.isArray(doc.factionLeaderProfiles)) ? doc.factionLeaderProfiles : {},
               devRoleProfiles: Array.isArray(doc.devRoleProfiles) ? doc.devRoleProfiles : [],
               // The Free Skyrim Trading Company's role (#1393), for a
               // company sale. Without this line the door read a list it
@@ -55339,9 +55374,42 @@ function thornswoodBooks(env) {
       staff: !!row.staff,
       dev: !!row.dev,
       business: !!row.business,
-      faction: !!row.faction,
+      leads: Array.isArray(row.leads) ? row.leads.map(String) : [],
       account: row.account ? String(row.account) : ('p:' + Number(pid))
     };
+  }
+
+  /*
+    A FACTION'S BOOK FOLLOWS ITS LEADER ROLE (#3317, Patrick, 22 Oct, page
+    card q-3317-faction-books, A): one book per faction, owned by whoever
+    holds that faction's Leader role in Discord, and it moves with the role.
+    book.leader names the role. Whoever holds it is the owner, whatever
+    account founded the book; book.owner and book.account follow the account
+    that holds it the first time one of its characters opens the book, and
+    that character is put in it. Another character on the same account is
+    the owner as it is, so the book does not move between them. A faction
+    book founded before #3317 has no leader and keeps the account rule it had.
+  */
+  function leads(book, pid) {
+    return !!(book && book.leader) && rolesOf(pid).leads.indexOf(book.leader) !== -1;
+  }
+
+  function bookOfLeader(role) {
+    for (var i = 0; i < store.length; i++) {
+      if (store[i].kind === 'faction' && store[i].leader === role) { return store[i]; }
+    }
+    return null;
+  }
+
+  function followLeader(book, pid, name) {
+    if (!leads(book, pid) || book.account === rolesOf(pid).account) { return false; }
+    if (!memberOf(book, pid)) {
+      if (book.members.length >= MAX_MEMBERS) { return false; }
+      book.members.push({ pid: Number(pid), name: name || 'somebody', role: 'Member' });
+    }
+    book.owner = Number(pid);
+    book.account = rolesOf(pid).account;
+    return true;
   }
 
   function silenced(pid) {
@@ -55448,7 +55516,13 @@ function thornswoodBooks(env) {
           !/^[a-zA-Z0-9_-]{1,100}$/.test(book.id) || book.id === '__proto__' || bookIds[book.id] ||
           (book.kind !== 'business' && book.kind !== 'faction') ||
           typeof book.name !== 'string' || !book.name.trim() || book.name.length > MAX_NAME ||
-          typeof book.account !== 'string' || !book.account || !Number.isInteger(book.owner) || book.owner <= 0 ||
+          typeof book.account !== 'string' || !Number.isInteger(book.owner) ||
+          // A faction book is vacant (owner 0, no account) while the
+          // character that led it has been deleted and nobody holding its
+          // Leader role has opened it since (#3317). Any other book has both.
+          !(book.owner > 0 && book.account) && !(book.leader && book.owner === 0 && book.account === '') ||
+          (book.leader !== undefined && (book.kind !== 'faction' || typeof book.leader !== 'string' ||
+                                         !/^[^\n]{1,96} Leader$/.test(book.leader))) ||
           !Array.isArray(book.members) || book.members.length > MAX_MEMBERS ||
           !Array.isArray(book.roles) || !Array.isArray(book.chat) || book.chat.length > MAX_CHAT ||
           !validPrices(book.prices)) { throw new Error('Saved book entries cannot be verified'); }
@@ -55472,7 +55546,7 @@ function thornswoodBooks(env) {
         }
         roleNames[role.name.toLowerCase()] = true;
       }
-      if (!roleNames.member || !members[book.owner] || book.members.some(function (m) {
+      if (!roleNames.member || (book.owner > 0 && !members[book.owner]) || book.members.some(function (m) {
         return !roleNames[m.role.toLowerCase()];
       })) {
         throw new Error('Saved book role references cannot be verified');
@@ -55557,6 +55631,7 @@ function thornswoodBooks(env) {
   function isOwner(book, pid) {
     var r = rolesOf(pid);
     if (r.staff) { return true; }
+    if (book.leader) { return leads(book, pid); }
     if (r.account && book.account === r.account) { return true; }
     return Number(book.owner) === Number(pid);
   }
@@ -55573,6 +55648,7 @@ function thornswoodBooks(env) {
     var r = rolesOf(pid);
     if (r.staff) { return true; }
     if (memberOf(book, pid)) { return true; }
+    if (book.leader) { return leads(book, pid); }
     return !!(r.account && book.account === r.account);
   }
 
@@ -55586,7 +55662,7 @@ function thornswoodBooks(env) {
 
   function showTab(pid) {
     var r = rolesOf(pid);
-    if (r.staff || r.business || r.faction) { return true; }
+    if (r.staff || r.business || r.leads.length) { return true; }
     return visible(pid).length > 0;
   }
 
@@ -55604,17 +55680,24 @@ function thornswoodBooks(env) {
     var named = clipName(name);
     if (!named.name) { return named.why; }
     var r = rolesOf(pid);
-    // A Dev may found one of each. Any other account needs the matching role.
+    // A Dev may found one business. Any other account needs Business Owner.
     if (kind === 'business' && !r.business && !r.dev) {
       return 'Your Discord account does not hold Business Owner.';
     }
-    if (kind === 'faction' && !r.faction && !r.dev) {
-      return 'Your Discord account does not hold Faction Owner.';
+    if (kind === 'business' && ownsKind(r.account, kind)) {
+      return 'This account already has a business.';
     }
-    if (ownsKind(r.account, kind)) {
-      return kind === 'business'
-        ? 'This account already has a business.'
-        : 'This account already has a faction.';
+    // A faction's book is its Leader's (#3317), one per faction.
+    var leader = '';
+    if (kind === 'faction') {
+      if (!r.leads.length) {
+        return 'A faction\'s book belongs to whoever holds its Leader role in Discord, ' +
+               'and your Discord account holds none.';
+      }
+      for (var li = 0; li < r.leads.length && !leader; li++) {
+        if (!bookOfLeader(r.leads[li])) { leader = r.leads[li]; }
+      }
+      if (!leader) { return 'Your faction already has its book.'; }
     }
     seq += 1;
     var book = {
@@ -55628,6 +55711,7 @@ function thornswoodBooks(env) {
       prices: [],
       chat: []
     };
+    if (leader) { book.leader = leader; }
     store.push(book);
     save();
     refresh();
@@ -55693,6 +55777,7 @@ function thornswoodBooks(env) {
 
   function ownsAccount(book, pid) {
     var r = rolesOf(pid);
+    if (book.leader) { return leads(book, pid) || Number(book.owner) === Number(pid); }
     return Number(book.owner) === Number(pid) || (!!r.account && book.account === r.account);
   }
 
@@ -55933,6 +56018,9 @@ function thornswoodBooks(env) {
 
   function hand(book, pid, rest) {
     if (!rolesOf(pid).staff) { return 'Staff hand a book on.'; }
+    if (book.leader) {
+      return 'This book moves with the ' + book.leader + ' role in Discord, not by hand.';
+    }
     var who = memberByName(book, pipes(rest).join(' '));
     if (!who.member) { return who.why; }
     if (Number(who.member.pid) === Number(book.owner)) { return 'They already own it.'; }
@@ -56210,6 +56298,15 @@ function thornswoodBooks(env) {
     if (!showTab(pid)) { return { show: false }; }
     var here = onlineMap();
     var books = [];
+    // The Leader role changed hands in Discord since the book last saw its
+    // holder: the book goes to them now, the first time they open it.
+    var moved = false;
+    for (var s = 0; s < store.length; s++) {
+      if (followLeader(store[s], pid, here[pid] || here[String(pid)])) { moved = true; }
+    }
+    // The role decides who owns it, so a save that fails here loses nothing:
+    // the next save of the book writes the same owner.
+    if (moved) { try { save(); } catch (e) { } }
     var rows = visible(pid);
     for (var i = 0; i < rows.length; i++) {
       var b = rows[i];
@@ -56275,7 +56372,7 @@ function thornswoodBooks(env) {
     return {
       show: true,
       canBusiness: !!((r.business || r.dev) && !ownsKind(r.account, 'business')),
-      canFaction: !!((r.faction || r.dev) && !ownsKind(r.account, 'faction')),
+      canFaction: r.leads.some(function (role) { return !bookOfLeader(role); }),
       permNames: PERMS.slice(),
       books: books
     };
@@ -56330,7 +56427,9 @@ function thornswoodBooks(env) {
     disbanded, as its owner's disband does, with its ledger entries: a book
     has to have its owner among its members (loadStore), and handing it on is
     staff's (hand), so the procedure for a deletion request says to hand it on
-    in the game before the real run when the group wants to keep it. When
+    in the game before the real run when the group wants to keep it. A
+    faction's book is its Leader role's and is never handed on (#3317), so it
+    stays, vacant, until whoever holds the role next opens it. When
     they last left goes too. A save that fails puts everything back, as
     mutate does, and the list waits. Answers the counts and whether it took.
   */
@@ -56341,8 +56440,9 @@ function thornswoodBooks(env) {
     var keep = [];
     for (var i = 0; i < store.length; i++) {
       var book = store[i];
-      if (who.profile(book.owner)) { forgetLedger(book.id); c.books++; continue; }
+      if (who.profile(book.owner) && !book.leader) { forgetLedger(book.id); c.books++; continue; }
       var m = book.members.length, l = book.chat.length;
+      if (book.leader && who.profile(book.owner)) { book.owner = 0; book.account = ''; }
       book.members = book.members.filter(function (x) { return !who.profile(x.pid); });
       book.chat = book.chat.filter(function (x) { return !who.profile(x.pid); });
       c.members += m - book.members.length;

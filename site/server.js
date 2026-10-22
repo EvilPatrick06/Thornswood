@@ -5064,7 +5064,7 @@ async function standing(discordId) {
         out.roles = (me.roles || []).map((id) => names[id]).filter(Boolean);
         out.staffRole = holdsStaffRole(out.roles);
         out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
-        out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+        out.leads = leaderRoles(out.roles);
         out.devRole = holdsNamedRole(out.roles, 'Dev');
       } else if (r.status !== 404) {
         out.lookupFailed = r.why;
@@ -5107,7 +5107,7 @@ async function standing(discordId) {
   out.company = has(cfg.access.company);
   out.staffRole = holdsStaffRole(out.roles);
   out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
-  out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+  out.leads = leaderRoles(out.roles);
   out.devRole = holdsNamedRole(out.roles, 'Dev');
   return out;
 }
@@ -5128,6 +5128,19 @@ function holdsStaffRole(roles) {
 function holdsNamedRole(roles, name) {
   const mine = Array.isArray(roles) ? roles : [];
   return mine.indexOf(name) >= 0;
+}
+
+/*
+  THE FACTION LEADER ROLES HELD (#3317). Every faction's Leader role is its
+  name and " Leader" (bot/Build-Discord.py FACTION_LEADERS), and a faction
+  that comes in through the application as Other gets one the same way, so
+  the site reads them by that shape rather than keeping a second list of the
+  factions. Whoever holds one owns that faction's book in the game (Patrick,
+  22 Oct, page card q-3317-faction-books, A).
+*/
+function leaderRoles(roles) {
+  const mine = Array.isArray(roles) ? roles : [];
+  return mine.filter((n) => typeof n === 'string' && /^[^\n]{1,96} Leader$/.test(n));
 }
 
 /*
@@ -7929,13 +7942,15 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], offices: {}, jarlClash: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], offices: {}, jarlClash: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionLeaderProfiles: {}, factionLeaderClash: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
     const seenStaffRole = new Set();
     const seenBusiness = new Set();
-    const seenFaction = new Set();
+    // Leader role -> account -> that account's profiles, so a Leader role two
+    // accounts hold can come off both below.
+    const leaderAccounts = new Map();
     const seenDevRole = new Set();
     const seenCompany = new Set();
     const seenFailed = new Set();
@@ -7989,8 +8004,9 @@ async function handle(req, res) {
       if (st.businessOwner) {
         for (const n of profiles) if (!seenBusiness.has(n)) { seenBusiness.add(n); out.businessOwnerProfiles.push(n); }
       }
-      if (st.factionOwner) {
-        for (const n of profiles) if (!seenFaction.has(n)) { seenFaction.add(n); out.factionOwnerProfiles.push(n); }
+      for (const role of (st.leads || [])) {
+        if (!leaderAccounts.has(role)) leaderAccounts.set(role, new Map());
+        leaderAccounts.get(role).set(String(d), profiles);
       }
       if (st.devRole) {
         for (const n of profiles) if (!seenDevRole.has(n)) { seenDevRole.add(n); out.devRoleProfiles.push(n); }
@@ -8006,6 +8022,15 @@ async function handle(req, res) {
        this and nothing else. And one Jarl a hold: a hold's Jarl role two
        accounts hold comes off both, and staff are told (officesForDoor). */
     out.jarlClash = await officesForDoor(out, answers, linked);
+    /* THE FACTION BOOKS (#3317): each faction's Leader role and the profiles
+       of the account that holds it. One Leader a faction, like one Jarl a
+       hold: a Leader role two accounts hold goes to neither, so the book
+       stays with nobody new until staff fix it, and the bot's faction panel
+       refuses both the same way (bot.py leader_held_twice). */
+    for (const [role, accounts] of leaderAccounts) {
+      if (accounts.size > 1) { out.factionLeaderClash.push(role); continue; }
+      for (const pl of accounts.values()) out.factionLeaderProfiles[role] = pl.slice();
+    }
     /* STAFF BANS (#412), which are this site's own file and need no Discord.
        Every profile under an active ban is left out of every list, including
        a profile no account holds and one Discord could not be asked about,
@@ -8028,6 +8053,7 @@ async function handle(req, res) {
       }
       if (Array.isArray(out.people)) out.people = [];
       out.offices = {};
+      out.factionLeaderProfiles = {};
     }
     const barred = new Set(out.pk);
     for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
@@ -8036,8 +8062,12 @@ async function handle(req, res) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
       for (const n of Object.keys(out.offices)) if (barred.has(Number(n))) delete out.offices[n];
-      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
+      for (const k of ['businessOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
+      }
+      for (const role of Object.keys(out.factionLeaderProfiles)) {
+        out.factionLeaderProfiles[role] = out.factionLeaderProfiles[role].filter((n) => !barred.has(Number(n)));
+        if (!out.factionLeaderProfiles[role].length) delete out.factionLeaderProfiles[role];
       }
       out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
         .filter((p) => p.profiles.length);
