@@ -325,9 +325,9 @@ try {
     [IO.File]::WriteAllText($runText, (New-SignedCatalogCheckScript $sign $runCat 'Thornswood' $repo), (New-Object Text.UTF8Encoding($false)))
     $runner = '$b = [scriptblock]::Create([IO.File]::ReadAllText(''' + $runText.Replace("'", "''") + ''', [Text.Encoding]::UTF8)); . $b'
     $exe = if ($onWin) { 'powershell.exe' } else { (Get-Process -Id $PID).Path }
-    # Off Windows nothing sets TEMP, which the box's text puts its folder in.
+    # The box's text puts its folder in TEMP, which off Windows nothing sets.
     $hadTemp = $env:TEMP
-    if (-not $env:TEMP) { $env:TEMP = $runDir }
+    $env:TEMP = $runDir
     try { $ran = @(& $exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($runner))) 2>&1 | ForEach-Object { [string]$_ }) }
     finally { $env:TEMP = $hadTemp }
     $ranSaid = @($ran | Where-Object { $_ -match '^CATALOG ' })
