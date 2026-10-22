@@ -228,14 +228,16 @@ Two limitations, which it prints with every report:
 
 ## Baseline period
 
-No baseline has been recorded. The baseline period is the four weeks that
-start the first time `Read-Availability.ps1` is run on the box's
-`C:\Thornswood-Watch\alerts.jsonl`, with the load record from `Watch-Load.ps1`
-over the same weeks, including at least one busy evening (as `Watch-Load.ps1`
-itself asks). At the end of those weeks the reader, run with `-From` the date
-of that first run and `-To` four weeks later, gives the baseline. Until the
-first run's date is written here, this page has no baseline, and every figure
-on it stays as it is.
+The baseline period is 22 Oct to 19 Nov 2026: the first run of
+`Read-Availability.ps1` on the box's `C:\Thornswood-Watch\alerts.jsonl` was
+on 22 Oct 2026 at 10:07 AM (Patrick's time), from the Cloud Desk (#2183). It
+read 107 lines, the oldest from 21 Oct 11:05 AM, with these outages so far:
+the backup once (111.9 minutes), the dev game twice (24.3 minutes), runner 2
+twice (20.0 minutes) and the website once (9.4 minutes). The load record from
+`Watch-Load.ps1` over the same weeks goes with it, including at least one busy
+evening (as `Watch-Load.ps1` itself asks). On 19 Nov the reader, run with
+`-From 2026-10-22 -To 2026-11-19`, gives the baseline. Until then every
+figure on this page stays as it is.
 
 ## What doing nothing costs
 

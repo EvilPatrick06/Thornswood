@@ -118,7 +118,7 @@ Yes ("it holds workflows to read ({0}: {1})" -f $files.Count, (($files | ForEach
 # The ones that exist today. Named rather than counted, so a renamed or
 # deleted workflow says so here instead of this harness reading two files and
 # reporting that everything is fine.
-foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 'board-status.yml', 'board-read.yml', 'staff-notice.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml') {
+foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 'board-status.yml', 'board-read.yml', 'staff-notice.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'git-ref.yml') {
     Yes "$want is one of them" (@($files | Where-Object { $_.Name -eq $want }).Count -eq 1)
 }
 # drop-claims.yml (#1863) runs no action on purpose: it checks out nothing and

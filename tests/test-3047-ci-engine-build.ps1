@@ -27,8 +27,10 @@
        with nothing put in place and no half folder left: a client file
        that is not the record's (with SHA256SUMS made to agree), a file
        SHA256SUMS does not name, one it names wrongly, records of another
-       commit, a client file the record does not name, a server zip of
-       another record, and a folder that is there already.
+       commit, a client file the record does not name, no
+       client-licences.json, a licence text that is not the checkout's or
+       that it does not have (#3099), a server zip of another record, and a
+       folder that is there already.
        Get-EngineArtifactFolderProblems: a folder of another pin is not this
        one's.
     3. Where.ps1 and where.js: EngineArtifact is engine-ci\<pin 12> in the
@@ -120,9 +122,20 @@ try {
         $src = [ordered]@{ repo = 'https://github.com/EvilPatrick06/skymp.git'; commit = $c }
         return (([ordered]@{ binary = 'scam_native.node'; sha256 = (ShaText $fork['scam_native.node']); source = $src; files = $files }) | ConvertTo-Json -Depth 5).Replace("`r`n", "`n")
     }
+    # The libraries in the client file and their texts (#3099).
+    $libText = "Copyright (c) 2012 - present, Victor Zverovich`nPermission is hereby granted"
+    function LicenceRecordText([string]$c) {
+        $ports = [ordered]@{ fmt = [ordered]@{ version = '11.2.0'; portVersion = 0; licence = 'MIT'; in = @('Data\SKSE\Plugins\MpClientPlugin.dll'); sha256 = (ShaText $libText); bytes = $libText.Length } }
+        return (([ordered]@{ forkCommit = $c.Substring(0, 8); readWith = 'llvm-pdbutil'; files = [ordered]@{ 'Data\SKSE\Plugins\MpClientPlugin.dll' = @('fmt') }; ports = $ports }) | ConvertTo-Json -Depth 5).Replace("`r`n", "`n")
+    }
+    function Put-Licences([string]$dir, [string]$c) {
+        Put (Join-Path $dir 'records\client-licences.json') (LicenceRecordText $c)
+        Put (Join-Path $dir 'records\client-licences\fmt.txt') $libText
+    }
     function Set-Records([string]$c) {
         Put (Join-Path $repo 'records\client-build.json') (ClientRecordText $c)
         Put (Join-Path $repo 'records\server-build.json') (ServerRecordText $c)
+        Put-Licences $repo $c
     }
     Set-Records $commit
 
@@ -148,6 +161,7 @@ try {
         if ($Crlf) { $cr = $cr.Replace("`n", "`r`n"); $sr = $sr.Replace("`n", "`r`n") }
         Put (Join-Path $dir 'records\client-build.json') $cr
         Put (Join-Path $dir 'records\server-build.json') $sr
+        Put-Licences $dir $recCommit
         $recFile = Join-Path $T ('server-record-' + [Guid]::NewGuid().ToString('N') + '.json')
         Put $recFile (ServerRecordText $recCommit)
         $null = New-ThornswoodServerBuildArtifact -From $srvDist -Record $recFile -OutDir (Join-Path $dir 'server')
@@ -212,6 +226,9 @@ try {
     Refused 'a file SHA256SUMS names wrongly' { param($a) Put (Join-Path $a 'fork-build.json') '{"commit":"other"}' } 'fork-build\.json is not the file SHA256SUMS names'
     Refused 'a client file the record does not name, SHA256SUMS made to agree' { param($a) Put (Join-Path $a 'client\Data\extra.dll') 'x'; Write-Sums $a } 'records\\client-build\.json does not name it'
     Refused 'records of another commit' { param($a) Put (Join-Path $a 'records\server-build.json') (ServerRecordText ('b9e16e8b' + ('0' * 32))); Write-Sums $a } 'records\\server-build\.json is not this checkout''s'
+    Refused 'no client-licences.json' { param($a) Remove-Item -LiteralPath (Join-Path $a 'records\client-licences.json'); Write-Sums $a } 'the artifact has no records\\client-licences\.json'
+    Refused 'a licence text that is not the checkout''s, SHA256SUMS made to agree' { param($a) Put (Join-Path $a 'records\client-licences\fmt.txt') 'another text'; Write-Sums $a } 'records\\client-licences\\fmt\.txt in the artifact is not this checkout''s'
+    Refused 'a licence text the checkout does not have' { param($a) Put (Join-Path $a 'records\client-licences\zlib.txt') 'zlib'; Write-Sums $a } 'records\\client-licences\\zlib\.txt is in the artifact and not in this checkout'
     Refused 'a server zip of another record' {
         param($a)
         Get-ChildItem -LiteralPath (Join-Path $a 'server') -File | Remove-Item -Force
