@@ -105,6 +105,11 @@ $checkBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Read-Json
 Yes 'Swap.ps1 puts StopAndMove.ps1 in front of the swap' (
     $lib.Substring($b).Contains('$swapBlock = $ThornswoodStopAndMoveText + $swapBlock'))
 $swapBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\deploy\StopAndMove.ps1')) + "`r`n" + $swapBlock
+# And the server folders' turn (#3247), the same way. The scratch root has no
+# Thornswood-Backup beside it, so here it takes no turn.
+Yes 'Swap.ps1 puts ServerFolderTurn.ps1 in front of the swap' (
+    $lib.Substring($b).Contains('$swapBlock = $ThornswoodServerFolderTurnText + $swapBlock'))
+$swapBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\deploy\ServerFolderTurn.ps1')) + "`r`n" + $swapBlock
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 # Which settings Deploy-Server takes from the build and which stay the live
 # server's (#1222), and the carry it runs on the box: ServerSettings.ps1.

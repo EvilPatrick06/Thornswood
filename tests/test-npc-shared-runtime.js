@@ -229,7 +229,11 @@ function fixture(options = {}) {
     vm.runInContext(source.slice(policyBegin,policyEnd),context);
     population=context.createNpcPopulation(api,options.populationData,['Skyrim.esm'],null,{run:'run-now'});
   }
-  runtime = context.startSharedNpcServerRuntime(api, timers, () => time,
+  // How often each of the runtime's tasks reads the clock (#3181): a read
+  // per NPC it looks at, so it counts how many a pass looks at.
+  const reads = new Map();
+  let task = '';
+  runtime = context.startSharedNpcServerRuntime(api, timers, () => { reads.set(task, (reads.get(task) || 0) + 1); return time; },
     text => logs.push(text), population);
   function advance(ms) {
     const until = time + ms;
@@ -238,7 +242,8 @@ function fixture(options = {}) {
       const [handle, task] = [...pending].sort((a,b) => a[1].at-b[1].at || a[0]-b[0])[0];
       if (task.at > until) break;
       time = task.at; pending.delete(handle); callback = {};
-      try { task.fn(); } finally { callback = null; }
+      const named = task.fn.npcRuntimeTask || '';
+      try { taskName(named); task.fn(); } finally { callback = null; taskName(''); }
       assert.ok(++runs < 30000, 'Each turn must yield rather than reschedule endlessly');
     }
     time = until;
@@ -247,6 +252,7 @@ function fixture(options = {}) {
     assert.deepEqual(budgetViolations, [], 'No callback may exceed its budget');
     assert.deepEqual([...states.keys()], originalIds, 'The current cast is preserved');
   }
+  function taskName(name) { task = name; }
   function stop() { runtime.stop(); assert.equal(pending.size, 0, 'Stop cancels every timer'); }
   return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,teleports,writes,
     timers, policyEvents, loadedLookups:() => loadedLookups,
@@ -254,7 +260,7 @@ function fixture(options = {}) {
       assert.ok(!states.has(id)); ids.push(id); states.set(id,actor(overrides));
       originalIds.push(id);
     },
-    time:() => time, status:() => plain(runtime.getStatus()),
+    time:() => time, status:() => plain(runtime.getStatus()), reads,
     advance, stop, disconnect(id) { online = online.filter(other => other !== id); },
     forget(id) { runtime.forget(id); }};
 }
@@ -1033,6 +1039,43 @@ test('An NPC somebody can see is stepped as often as before', () => {
   f.advance(30000);
   const g = gaps(f.moves.slice(5), 1);
   assert.ok(g.length > 50 && Math.max(...g) <= 1000, 'Stepped on every near pass: ' + g.length + ' steps, longest gap ' + Math.max(...g));
+  f.stop();
+});
+test('A pass looks only at the NPCs that are due, not the whole cast', () => {
+  const f = fixture({count:400});
+  for (let i = 0; i < 12; i++) f.advance(10000);
+  const before = f.reads.get('backgroundTick') || 0, from = f.moves.length;
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  const looked = (f.reads.get('backgroundTick') || 0) - before;
+  const stepped = f.moves.slice(from).length;
+  assert.ok(stepped >= 400 * 12, 'Each of the 400 is still stepped about every 4 s: ' + stepped + ' steps in a minute');
+  // A minute is 3,000 passes. Walking the cast read the clock at least once for
+  // every NPC looked at, up to 256 a pass: about 1.5 million reads a minute.
+  assert.ok(looked < 3000 * 2 + stepped * 4, 'The clock is read about once a pass and a few times a step: ' + looked + ' reads for ' + stepped + ' steps');
+  f.stop();
+});
+test('A forgotten NPC loses its turn, and the rest keep theirs', () => {
+  const f = fixture({count:40});
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  f.forget(7);
+  const from = f.moves.length;
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  const later = f.moves.slice(from);
+  assert.ok(!later.some(m => m.id === 7), '7 is never stepped again');
+  for (const id of f.ids.filter(id => id !== 7)) {
+    const g = gaps(later, id);
+    assert.ok(g.length >= 10 && Math.min(...g) >= 4000 && Math.max(...g) <= 4100, id + ' keeps its turn: ' + JSON.stringify([g.length, Math.min(...g), Math.max(...g)]));
+  }
+  f.stop();
+});
+test('An NPC is stepped in the background again within a second or two of being left alone', () => {
+  const f = fixture({count:1, humans:[100], human:{100:{pos:[500,500,0], aggression:0}}});
+  f.advance(30000);
+  f.disconnect(100);
+  const left = f.time(), from = f.moves.length;
+  f.advance(10000);
+  const next = f.moves.slice(from).find(m => m.id === 1);
+  assert.ok(next && next.at - left <= 2100, 'Its first background step comes ' + (next ? next.at - left : 'never') + ' ms after');
   f.stop();
 });
 test('A fight nobody can see keeps its pace: the less frequent steps are for wandering only', () => {

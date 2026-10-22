@@ -214,6 +214,15 @@ a server folder, `Restore-Box.ps1` puts all of it onto a new box, and
 `tests\test-backup-restore.ps1` and `tests\test-new-box-runbook.ps1` prove the
 round trip.
 
+The backup and a server install or deploy take turns at the server folders
+(#3247): each takes `C:\Thornswood-Backup\server-folders.turn` first, the
+backup while it reads the two server folders and Publish-Server,
+Deploy-Server and Deploy-DevGamemode (and their put-backs) before they stop a
+server, so one waits for the other and says who it waits for
+(`scripts\deploy\ServerFolderTurn.ps1`). Until then a dev publish at 2:21 AM
+on 22 Oct 2026 was refused its folder swap because the backup was still
+reading dev.
+
 08:15 UTC is a quiet hour, nobody on and 45 minutes before the nightly
 checks' harness shares start at 09:00 UTC (#3187), and it is said in UTC so
 the two keep that distance across daylight saving. It is not the hour after a restart: no script under `scripts`
