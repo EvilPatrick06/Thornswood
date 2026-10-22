@@ -473,7 +473,7 @@ jobs:
           $msb = & .\scripts\release\Find-MSBuild.ps1
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::MSBuild is not on this runner, so the ship root tool cannot be built'; exit 1 }
           $out = Join-Path $env:RUNNER_TEMP 'shiproot'
-          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
+          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:UseSharedCompilation=false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $out 'Thornswood-ShipRoot.exe'))) { Write-Host '::error file=scripts/release/ShipRoot/ShipRoot.csproj::the ship root tool did not build, see the lines above'; exit 1 }
 
       - name: Check the manifests in the built exes
