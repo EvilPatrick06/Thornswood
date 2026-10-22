@@ -1237,9 +1237,10 @@ COMMENTS[81].append(task('Ferry crossing is smooth', 'Main', '1. Ride the ferry.
 bump(81, state='closed', state_reason='completed', closed_at=tick())
 (tp, te, tr), (dp, de, dr) = both()
 moved = [th for th in tf.threads if th.name == 'Ferry crossing is smooth']
-yes('closed as fixed with a newer Main test task: the dev post is DELETED, '
-    'and the Main one is posted in #test-tasks, tagged Main',
-    81 in dr and 'Ferry lag on dev' not in names(df) and 81 in tp
+yes('closed by the main Ship with a newer Main test task: the Main one is '
+    'posted in #test-tasks, tagged Main, and the dev post STAYS beside it '
+    '(the two are for different people, Patrick 22 Oct)',
+    dr == [] and 'Ferry lag on dev' in names(df) and 81 in tp
     and len(moved) == 1 and [x.name for x in moved[0].applied_tags] == ['Main'])
 
 bump(83, state='closed', state_reason='completed', closed_at=tick())
@@ -1281,10 +1282,16 @@ dp = both()[1][0]
 COMMENTS[84].append(task('Smithing works', None, '1. Smith a dagger.'))
 bump(84)
 (tp, te, tr), (dp2, de, dr) = both()
-yes('an open issue whose test task is rewritten without Server: Dev leaves '
-    '#dev-test-tasks, and is not in #test-tasks while open',
-    dp == [84] and dr == [84] and 'Smithing on dev' not in names(df)
+yes('an open issue given a Main test task beside its Dev one keeps its dev '
+    'post, and is not in #test-tasks while open',
+    dp == [84] and dr == [] and 'Smithing on dev' in names(df)
     and 84 not in tp and 'Smithing works' not in names(tf))
+COMMENTS[84][0]['body'] = 'Withdrawn test task: ' + COMMENTS[84][0]['body']
+bump(84)
+(tp, te, tr), (dp2, de, dr) = both()
+yes('  its Dev comment taken back (first line no longer "Test task:") takes '
+    'the dev post down',
+    dr == [84] and 'Smithing on dev' not in names(df) and 84 not in tp)
 
 COMMENTS[85] = [task('Forge timing', 'Dev', 'Use a forge.')]
 issue(85, 'Forge', ['Dev Findings'])
@@ -1330,14 +1337,16 @@ yes('a dev post deleted by hand is made again when its test task is rewritten',
 
 bump(81, state='open', state_reason=None, closed_at=None)
 (tp, te, tr), (dp, de, dr) = both()
-yes('a reopened issue loses its #test-tasks post, as before, and gets no dev '
-    'post from a Main test task',
-    81 in tr and 'Ferry crossing is smooth' not in names(tf) and 81 not in dp)
+yes('a reopened issue loses its #test-tasks post, as before, and its dev '
+    'post stays as it was',
+    81 in tr and 'Ferry crossing is smooth' not in names(tf) and 81 not in dp
+    and 'Ferry lag on dev' in names(df))
 COMMENTS[81].append(task('Ferry lag again on dev', 'Dev', '1. Ride the ferry.'))
 bump(81)
-dp = both()[1][0]
-yes('  and a new Server: Dev test task on it is a dev post again', dp == [81]
-    and 'Ferry lag again on dev' in names(df))
+dp, de = both()[1][:2]
+yes('  and a new Server: Dev test task on it edits that dev post, not a second',
+    dp == [] and de == [81] and 'Ferry lag again on dev' in names(df)
+    and 'Ferry lag on dev' not in names(df))
 
 hd, said = run(bot.post_test_task(g, 'Measure on dev', 'x', 'Dev',
                                   path=os.path.join(TMP, 'devpass.json')))

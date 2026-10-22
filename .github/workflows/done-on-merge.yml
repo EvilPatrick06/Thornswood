@@ -29,8 +29,12 @@
 # board: Done label on the issue with the board token, so board-status.yml
 # moves the card (a label put on with the run's own token starts no other
 # workflow, so that one would never run), and it writes a comment on the
-# issue with the test task ready to paste when the fix reaches main, in a
-# fenced block so the bot never reads it as a test task to post. A closed
+# issue with the test task in a fenced block, so the bot never reads it as a
+# test task to post. The main Ship that carries the merge closes the issue
+# with that block as its "Test task:" comment
+# (scripts/release/Close-ShippedIssues.ps1, #3279), reading the merge commit
+# and the block from this comment: change its first line or its footer and
+# that script, and tests/test-3279-close-shipped.ps1, change with it. A closed
 # issue or a pull request number is said and passed over. It checks out
 # nothing and runs no action.
 #
@@ -102,12 +106,14 @@ jobs:
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/labels') -Headers $bh -Body (@{ labels = @('board: Done') } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
               $steps = (($t.rest -join "`n").Trim())
               # A Dev test task is for developers and goes up as soon as a dev
-              # release carries the work; a Main one when a main Ship does
+              # release carries the work; a Main one when a main Ship does. The
+              # main Ship closes the issue either way, and writes this block on it
+              # unless a test task of the same kind was written after the merge
               # (Developer-Guide.md, "Test tasks and known issues").
               if ($steps -match '^\s*Server\s*:\s*Dev\s*(\n|$)') {
-                $when = 'This test task is for developers. When a dev release carries it, write a comment holding exactly this, with its Build: line naming that release, and the bot posts it in #dev-test-tasks:'
+                $when = 'This test task is for developers. When a dev release carries it, write a comment holding exactly this, with its Build: line naming that release, and the bot posts it in #dev-test-tasks. The main Ship that carries it closes this issue (scripts/release/Close-ShippedIssues.ps1), and writes this on it if nobody has:'
               } else {
-                $when = 'When a main Ship carries it, close this issue with a comment holding exactly this:'
+                $when = 'The main Ship that carries it closes this issue with a comment holding exactly this (scripts/release/Close-ShippedIssues.ps1):'
               }
               $body = ('Pull request #{0} merged ({1}), so this is in Done and stays open: the merge puts the fix on the main branch, not on the main server testers play. {2}' -f $num, ([string]$p.merge_commit_sha).Substring(0, 12), $when) + "`n`n" + '```' + "`n" + 'Test task: ' + $t.title + "`n" + $steps + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/comments') -Headers $h -Body (@{ body = $body } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null

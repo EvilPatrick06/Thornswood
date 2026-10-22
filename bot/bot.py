@@ -3872,17 +3872,16 @@ def test_task_of(issue, comments, dev_since=None):
 
 def dev_task_of(issue, comments, dev_since):
     """The issue's dev test task (task_list's tuple), or None: its last
-       "Test task:" comment saying Server: Dev, as long as no Main one was
-       written after it. Open issue or closed: a check only a dev can do
-       stays up after the fix reaches main (Patrick, 22 Oct), until a newer
-       Main test task replaces it, the comment is taken back, or staff close
-       the post."""
+       "Test task:" comment saying Server: Dev. Open issue or closed, and
+       whatever Main one is beside it: the two are for different people, and
+       a check only a dev can do stays up after the fix reaches main
+       (Patrick, 22 Oct), so the main Ship writing the Main one does not take
+       it down. It goes when its comment is taken back or staff close the
+       post; a newer Dev one replaces it."""
     if not dev_since:
         return None
-    got = task_list(issue, comments, dev_since)
-    if not got or got[-1][2] != 'Dev':
-        return None
-    return got[-1]
+    got = [t for t in task_list(issue, comments, dev_since) if t[2] == 'Dev']
+    return got[-1] if got else None
 
 
 def fix_refs(timeline):
@@ -4372,13 +4371,13 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
 async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None):
     """
     One pass over #dev-test-tasks, found by the id the setup recorded. An
-    issue, open or closed, whose last "Test task:" comment says Server: Dev
-    gets a post tagged Dev (dev_task_of), written for developers
-    (dev_render: the issue, its pull requests and commits, labels, build,
-    and the whole test task, over as many messages as it takes); it goes
-    when the issue is closed after that comment, or a newer test task does
-    not say Server: Dev. A rewritten comment, or any other change to the
-    issue that changes the post, edits it.
+    issue, open or closed, with a "Test task:" comment saying Server: Dev
+    gets a post tagged Dev from its last one (dev_task_of), written for
+    developers (dev_render: the issue, its pull requests and commits,
+    labels, build, and the whole test task, over as many messages as it
+    takes); it goes when that comment is taken back, and stays beside a
+    Main one. A rewritten comment, or any other change to the issue that
+    changes the post, edits it.
 
     The first pass sets state['dev_since'] to now: nothing written before it
     counts as a dev test task, so nothing from before floods in and no post
