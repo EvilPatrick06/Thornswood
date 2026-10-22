@@ -1755,6 +1755,9 @@ function mintedBy(owner, test) {
 }
 
 function mintedEntry(entry) {
+  // Inherited NPC gear is owned for combat, not an ordinary stock/reward
+  // stack. Explicit grants of the same item must remain separate from it.
+  if (entry && entry.npcEquipment === true) { return true; }
   const tests = globalThis.__thornswoodMinted;
   if (!entry || !tests || typeof tests !== 'object') { return false; }
   for (const owner of Object.keys(tests)) {
