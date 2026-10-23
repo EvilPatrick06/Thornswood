@@ -9,7 +9,7 @@ function make(entry,marker={version:1,worldMode:'existing'}) {
   let writes=0;
   const data={keep:[['2:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader']],
     merchantHistory:[['1:Skyrim.esm','a:Skyrim.esm'],['2:Skyrim.esm','a:Skyrim.esm']],merchantRoster:marker};
-  const ledger={version:1,entries:{'1:Skyrim.esm':null,'2:Skyrim.esm':entry}};
+  const ledger={version:2,entries:{'1:Skyrim.esm':null,'2:Skyrim.esm':entry}};
   const api={makeProperty(){},getIdFromDesc:desc=>parseInt(desc,16),get(){throw Error('no actor access during admission');},
     getNpcAIState(){throw Error('no actor access during admission');},set(){writes++;}};
   const service=ctx.createNpcMerchantPurses(api,data,{load:()=>copy(ledger),save(){writes++;},durable:true,namespace:{}});

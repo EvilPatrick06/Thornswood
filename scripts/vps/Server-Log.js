@@ -320,6 +320,10 @@ function rollNow(log, now, o) {
 
       { "profiles": [ 5001 ], "actors": [ 4278192641 ], "done": { ... } }
 
+  Its actors are runtime form ids, 0xff000000 | the local hex of a change
+  form's formDesc (#2870); a list with an actor outside that range is the old
+  shape and is left as it is, as one that is not a list is.
+
   Here is its part "saves": every change form of theirs in the engine's own
   folder (<databaseName, world>\changeForms, the files the engine loads at its
   start), their card (characters.json), their mod menu choices
@@ -385,6 +389,11 @@ function startDeletions(dir, now) {
     return writeFile(p, JSON.stringify(v, null, indent || undefined) + (/\n$/.test(was) ? '\n' : ''));
   }
   const ids = (a) => Array.isArray(a) && a.every((n) => Number.isSafeInteger(n) && n > 0);
+  // One shape for a character's form id (#2870); game\form-id.js is the
+  // original and tests\test-2870-form-id-shape.js keeps this copy the same.
+  function isFormId(n) {
+    return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
+  }
   const counts = {};
   const count = (k, n) => { if (n) counts[k] = (counts[k] || 0) + n; };
   const said = () => Object.keys(counts).map((k) => k + ' ' + counts[k]).join(', ') || 'nothing of theirs';
@@ -395,7 +404,7 @@ function startDeletions(dir, now) {
     const priv = path.join(dir, settings.privDir ? String(settings.privDir) : 'private');
     const listFile = path.join(priv, 'deleted-characters.json');
     const list = readJson(listFile);
-    const ok = isObj(list) && ids(list.profiles) && (list.actors === undefined || ids(list.actors)) &&
+    const ok = isObj(list) && ids(list.profiles) && (list.actors === undefined || (Array.isArray(list.actors) && list.actors.every(isFormId))) &&
       (list.done === undefined || (isObj(list.done) && Object.keys(list.done).every((k) => Number.isSafeInteger(list.done[k]) && list.done[k] > 0)));
     if (list === null || (list !== undefined && !ok)) {
       say(path.basename(listFile) + ' is not a list of deleted characters, so nothing was removed and it is left as it is');

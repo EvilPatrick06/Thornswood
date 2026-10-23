@@ -291,6 +291,23 @@ acts only on the profiles a list names, and a server on this machine does
 not start under `server-log.js` at all, so the writer marks `saves` done
 whenever the list it writes names no profile.
 
+Every one of these names a character by one shape of form id, the runtime
+id, `0xff000000 | local` (`game\form-id.js`, issue #2870): the list's
+`actors`, and in `merchant-ledger.json` (version 2, its `sha256` over the
+rest) the supply waits' keys and the commission owners. The gamemode,
+`server-log.js` and `Release-List.ps1` refuse a list holding a local id,
+and the merchant code refuses a version 1 ledger, each naming the converter.
+A server written before #2870 is converted once, with that game server
+stopped: `node scripts\ops\Verify-FormIdShape.js --server <folder>` into a
+file, then `node scripts\ops\Convert-FormIdShape.js --server <folder>
+--server-stopped`, then the verify again with `--before <that file>`, which
+exits 1 if a record went missing or an old shape is left. The converter backs
+the files up first (`backup-2870-<time>` in `private`, with
+`SHA256SUMS`), stops without writing on a collision, a record it cannot read
+or a pending trade, changes nothing when run again, and clears the done
+mark of the parts that compared the two shapes (`embassy` and
+`merchants`), so they run again at the next start.
+
 ## Generated tables
 
 Never hand edit these. Each script writes its json in `game\data` and then

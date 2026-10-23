@@ -111,8 +111,10 @@ const P1 = 5001, P2 = 5002, PY = 6001, PZ = 6002;     // P1 and P2 are theirs; P
 const A1 = 0xff000a01, A2 = 0xff000a02, AY = 0xff000a09;  // form ids: theirs, theirs, yours
 const NOW = Date.now();
 const GOLD = 15;
-const MKEY_1 = JSON.stringify([A1.toString(16), P1, 'iron ore']), MKEY_2 = JSON.stringify([A2.toString(16), 77, 'wheat']);
-const MKEY_Y = JSON.stringify([AY.toString(16), PY, 'iron ore']);
+// One shape (#2870): a supply key and a list actor are the same full runtime form id.
+const MKEY_1 = JSON.stringify([A1, P1, 'iron ore']), MKEY_2 = JSON.stringify([A2, 77, 'wheat']);
+const MKEY_Y = JSON.stringify([AY, PY, 'iron ore']);
+const runtimeDesc = function (id) { return (id - 0xff000000).toString(16); };   // formDesc of a runtime form
 
 function checksum(doc) {
   return crypto.createHash('sha256').update(JSON.stringify([doc.version, doc.entries])).digest('hex');
@@ -242,13 +244,13 @@ function registers(dir) {
   });
   w('last-left.json', { [P1]: NOW, [PY]: NOW });
   w('benches.json', { whiterun: 4278190081 });
-  const merchants = { version: 1, entries: {
+  const merchants = { version: 2, entries: {
     '9:Skyrim.esm': { version: 1, reference: '9:Skyrim.esm', base: 'a:Skyrim.esm', purse: 280, stock: [{ baseId: 4096, count: 3 }], revision: 4,
       supply: { [MKEY_1]: NOW, [MKEY_2]: NOW, [MKEY_Y]: NOW },
-      pending: { version: 3, id: 'dev:9:4', human: { desc: A1.toString(16), profileId: P1 }, kind: 'supply', phase: 'credit',
+      pending: { version: 3, id: 'dev:9:4', human: { desc: runtimeDesc(A1), profileId: P1 }, kind: 'supply', phase: 'credit',
                  previous: { supply: { [MKEY_2]: NOW, [MKEY_Y]: NOW } }, next: { purse: 280, stock: [{ baseId: 4096, count: 3 }], supply: {} } } },
     '8:Skyrim.esm': { version: 1, reference: '8:Skyrim.esm', base: 'a:Skyrim.esm', purse: 300, stock: [], revision: 2, supply: {},
-      pending: { version: 3, id: 'dev:8:2', human: { desc: AY.toString(16), profileId: PY }, kind: 'sell', phase: 'debit',
+      pending: { version: 3, id: 'dev:8:2', human: { desc: runtimeDesc(AY), profileId: PY }, kind: 'sell', phase: 'debit',
                  previous: { purse: 300, stock: [], supply: {} }, next: { purse: 290, stock: [{ baseId: 4096, count: 1 }], supply: {} } } }
   } };
   fs.writeFileSync(path.join(P, 'merchant-ledger.json'), JSON.stringify({ version: merchants.version, entries: merchants.entries, sha256: checksum(merchants) }));

@@ -7,7 +7,7 @@ const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8');
 const block=source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),source.indexOf('// NPC MERCHANT PURSES END'));
 function fixture(){
  const ctx={require};vm.createContext(ctx);vm.runInContext(block,ctx);
- let saved={version:1,entries:{'1:Skyrim.esm':null,'2:Skyrim.esm':null}},reads=()=>{};
+ let saved={version:2,entries:{'1:Skyrim.esm':null,'2:Skyrim.esm':null}},reads=()=>{};
  const clone=x=>JSON.parse(JSON.stringify(x));
  const storage={namespace:'dev:private/merchant-ledger.json',durable:true,load:()=>clone(saved),save(doc){saved=clone(doc);return true;}};
  const props=new Map();

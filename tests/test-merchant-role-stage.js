@@ -76,7 +76,7 @@ vm.createContext(fixtureContext);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'test-merchant-trading.js'),'utf8').split('const roleMarket=')[0],fixtureContext);
 for(const merchant of roster.merchants.filter(row=>row.bookHold==='whiterun')) {
   const f=fixture(),descs=new Map(),records=new Map();
-  function id(desc) {const value=desc==='a:Skyrim.esm'?10:f.resolve(desc);descs.set(value,desc);return value;}
+  function id(desc) {if(desc==='a')return 10;const value=desc==='a:Skyrim.esm'?10:f.resolve(desc);descs.set(value,desc);return value;}
   for(const row of roster.merchants) {
     const base=id(row.base),reference=id(row.reference),data=Buffer.alloc(4);data.writeUInt32LE(base);
     records.set(base,{id:base,type:'NPC_',flags:0,fields:[]});
@@ -84,7 +84,8 @@ for(const merchant of roster.merchants.filter(row=>row.bookHold==='whiterun')) {
   }
   for(const [desc,type] of Object.entries(stage.types)){const value=id(desc);records.set(value,{id:value,type,flags:0,fields:[]});}
   const box=fixtureContext.worldOf({on:true}),merchantId=id(merchant.reference);
-  const native={getIdFromDesc:id,getDescFromId:value=>descs.get(value) || value.toString(16)+':Skyrim.esm',
+  // The trading character (10) is a runtime form whose formDesc is its local hex alone (#2870).
+  const native={getIdFromDesc:id,getDescFromId:value=>value===10?'a':descs.get(value) || value.toString(16)+':Skyrim.esm',
     lookupEspmRecordById:value=>({record:records.get(value),toGlobalRecordId:raw=>raw}),
     validateInventoryTransaction:()=>true,makeProperty(){},getActorRuntimeIdentity:()=> '100',
     getNpcAIState:value=>box.actor(value===merchantId?1:value),

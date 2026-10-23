@@ -49,7 +49,9 @@ function inspectRetirementLedger(options) {
     retained.add(row.reference);coverage.add(row.bookHold+':'+row.role);
   }
   const ledger=parse(ledgerBytes,'Saved merchant ledger');
-  if(!object(ledger) || ledger.version!==1 || !object(ledger.entries) ||
+  // The ledger document is version 2 from #2870 (runtime form ids in its supply
+  // waits and commission owners); its entries keep their own version 1.
+  if(!object(ledger) || ledger.version!==2 || !object(ledger.entries) ||
       typeof ledger.sha256!=='string' || ledger.sha256!==hash(JSON.stringify([ledger.version,ledger.entries])) ||
       Object.keys(ledger.entries).length!==history.size || Object.keys(ledger.entries).some(ref=>!history.has(ref)))
     fail('Saved merchant ledger integrity');

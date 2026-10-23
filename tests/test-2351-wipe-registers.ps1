@@ -125,9 +125,9 @@ function RunBox([string]$body) {
 
 try {
     Put (Join-Path $Root 'server-settings.json') '{}'
-    Put (Join-Path $Root 'world\changeForms\ff000a01.json') '{"formDesc":"ff000a01","profileId":5001}'
+    Put (Join-Path $Root 'world\changeForms\ff000a01.json') '{"formDesc":"a01","profileId":5001}'
     # A character's change form is named by its slot number (0.json); the new release list names it (#2668).
-    Put (Join-Path $Root 'world\changeForms\0.json') '{"formDesc":"ff000a01","profileId":5001}'
+    Put (Join-Path $Root 'world\changeForms\0.json') '{"formDesc":"a01","profileId":5001}'
     Put (Join-Path $Root 'private\characters.json') '{"who":{"5001":{"name":"A"},"6001":{"name":"B"},"7001":{"name":"C"}}}'
     foreach ($f in 'property.json', 'farm-claims.json', 'law.json', 'beds.json', 'embassy.json', 'books.json', 'last-left.json',
                    'take-limit.json', 'trade-cargo.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',

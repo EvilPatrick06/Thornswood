@@ -17,7 +17,7 @@ const api={makeProperty(){},getIdFromDesc:d=>ids[d],get:(id,p)=>{
 },getNpcAIState:()=>({isHuman:human,profileId:human?1:0,isDead:false})};
 const data={keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader'],
   ['2:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'enemy']]};
-let ledger={version:1,entries:{'1:Skyrim.esm':null}};
+let ledger={version:2,entries:{'1:Skyrim.esm':null}};
 const storage={load:()=>JSON.parse(JSON.stringify(ledger)),save:next=>{ledger=JSON.parse(JSON.stringify(next));}};
 function make(){return ctx.createNpcMerchantPurses(api,data,storage);}
 let service=make();
@@ -55,7 +55,7 @@ console.log('PASS NPC merchant purse initialization, depletion, reload, identity
 
 for(const method of ['getNpcAIState','get','save','set']) for(const boundary of ['lookup','return']) {
   let armed=false,current=true,saves=0,mirrors=0;const stale=[];
-  let document={version:1,entries:{'1:Skyrim.esm':null}};
+  let document={version:2,entries:{'1:Skyrim.esm':null}};
   const native={makeProperty(){},getIdFromDesc:d=>ids[d],
     getNpcAIState:()=>({isHuman:false,profileId:-1}),get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,
     set(){mirrors++;}};
@@ -86,7 +86,7 @@ for(const method of ['getNpcAIState','get','save','set']) for(const boundary of 
 console.log('PASS scoped merchant preparation at native lookup, return and durable-save boundaries');
 for(const boundary of ['native-return','save-lookup','guard-reentry']) {
  let current=true,armed=false,saves=0;
- let document={version:1,entries:{'1:Skyrim.esm':null}};
+ let document={version:2,entries:{'1:Skyrim.esm':null}};
  const native={makeProperty(){},getIdFromDesc:d=>ids[d],
   getNpcAIState:()=>{if(armed&&boundary==='native-return')current=false;return {isHuman:false,profileId:0};},
   get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,set(){}};
@@ -105,7 +105,7 @@ for(const boundary of ['native-return','save-lookup','guard-reentry']) {
 
 {
   let current=true,armed=false,saves=0;
-  let document={version:1,entries:{'1:Skyrim.esm':null}};
+  let document={version:2,entries:{'1:Skyrim.esm':null}};
   const native={makeProperty(){},getIdFromDesc:d=>ids[d],getNpcAIState:()=>({isHuman:false,profileId:-1}),
     get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,set(){}};
   const disk={namespace:{},load:()=>JSON.parse(JSON.stringify(document)),
@@ -125,7 +125,7 @@ for(const boundary of ['native-return','save-lookup','guard-reentry']) {
   let reads=0,saves=0;
   const save=function(){assert.equal(this,disk);saves++;return true;};
   Object.defineProperty(save,'apply',{get(){reads++;throw Error('untrusted apply getter');}});
-  const disk={namespace:{},durable:true,load:()=>({version:1,entries:{'1:Skyrim.esm':null}}),save};
+  const disk={namespace:{},durable:true,load:()=>({version:2,entries:{'1:Skyrim.esm':null}}),save};
   const native={makeProperty(){},getIdFromDesc:d=>ids[d],getNpcAIState:()=>({isHuman:false,profileId:-1}),
     get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,set(){}};
   const purse=ctx.createNpcMerchantPurses(native,data,disk);

@@ -91,7 +91,7 @@ for(const action of ['begin','prune','inventory']){
  const mode=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8'),ctx={require};vm.createContext(ctx);
  vm.runInContext(mode.slice(mode.indexOf('// NPC MERCHANT PURSES BEGIN'),mode.indexOf('// NPC MERCHANT PURSES END')),ctx);
  for(const invalid of [false,0,'']){
-  const f=context.fixture(),stored={version:1,entries:{'1:Skyrim.esm':copy(f.states.get(1))}};
+  const f=context.fixture(),stored={version:2,entries:{'1:Skyrim.esm':copy(f.states.get(1))}};
   stored.entries['1:Skyrim.esm'].version=1;
   stored.entries['1:Skyrim.esm'].pending=invalid;
   const storage={durable:true,load:()=>copy(stored),save:()=>true};
@@ -101,7 +101,7 @@ for(const action of ['begin','prune','inventory']){
  }
  for(const invalid of [false,null,[]]){
   const f=context.fixture(),state={...copy(f.states.get(1)),version:1,supply:invalid};let writes=0;
-  const stored={version:1,entries:{'1:Skyrim.esm':state}},before=JSON.stringify(stored);
+  const stored={version:2,entries:{'1:Skyrim.esm':state}},before=JSON.stringify(stored);
   const storage={durable:true,load:()=>copy(stored),save(){writes++;return true;}};
   const api={makeProperty(){},getIdFromDesc:()=>1,getNpcAIState:()=>({isHuman:false}),get:(id,key)=>key==='baseDesc'?'a:Skyrim.esm':undefined,set(){}};
   const purse=ctx.createNpcMerchantPurses(api,{keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader']]},storage);

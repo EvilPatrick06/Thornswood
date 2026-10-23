@@ -159,9 +159,12 @@ function createSettlement(deps) {
   function humanKey(human) {
     if(!human || typeof human.desc!=='string' || !Number.isSafeInteger(human.profileId) || human.profileId<=0 || human.profileId>MAX_COUNT) return '';
     // FormDesc emits local hex alone for runtime humans and hex:plugin for
-    // placed forms. Compare numeric ids so leading zeros cannot split a lock.
+    // placed forms. Compare numeric ids so leading zeros cannot split a lock;
+    // a runtime human by its runtime form id, the one shape (#2870).
     var parts=/^([0-9a-f]{1,6})(?::([^:\/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
-    return parts ? JSON.stringify([parseInt(parts[1],16),(parts[2] || '').toLowerCase(),human.profileId]) : '';
+    if(!parts) return '';
+    if(!parts[2]) return COMMISSION_STATE.formIdOf(parts[1]) ? JSON.stringify([COMMISSION_STATE.formIdOf(parts[1]),'',human.profileId]) : '';
+    return JSON.stringify([parseInt(parts[1],16),parts[2].toLowerCase(),human.profileId]);
   }
   function nativeRows(snapshot) {
     var value=inventory(snapshot);
@@ -171,6 +174,11 @@ function createSettlement(deps) {
   function compact(pending) {
     return pending.phase==='credit' && pending.expected===undefined && pending.debit===undefined &&
       pending.previous && pending.previous.purse===undefined && pending.previous.stock===undefined;
+  }
+  // A supply wait names its character by runtime form id (#2870).
+  function supplier(owner,human) {
+    var id=COMMISSION_STATE.formIdOf(human && human.desc);
+    return id>0 && owner[0]===id;
   }
   function supplyTransition(pending,previous,next,fresh,moved) {
     if(pending.kind!=='supply') {
@@ -183,13 +191,13 @@ function createSettlement(deps) {
     if(!equal(canonical(before),canonical(after))) throw new Error('Merchant supply cannot be verified.');
     try {owner=JSON.parse(key);} catch(error) {owner=null;}
     if(fresh || pending.terms!==undefined) {
-      if(!Array.isArray(owner) || owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+      if(!Array.isArray(owner) || owner.length!==3 || !supplier(owner,pending.human) || owner[1]!==pending.human.profileId ||
           typeof owner[2]!=='string' || !owner[2] || owner[2]!==owner[2].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
       if(moved) {
         var labels=Array.from(new Set(moved.map(function(row) {return row.label;})));
         if(labels.length!==1 || owner[2]!==labels[0].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
       }
-    } else if(Array.isArray(owner) && (owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+    } else if(Array.isArray(owner) && (owner.length!==3 || !supplier(owner,pending.human) || owner[1]!==pending.human.profileId ||
         typeof owner[2]!=='string' || !owner[2]))
       throw new Error('Merchant supply owner cannot be verified.');
   }
@@ -468,7 +476,7 @@ function createSettlement(deps) {
       if (offer.kind === 'supply') {
         var key = changedSupplyKey(state, offer.next), owner;
         try { owner = JSON.parse(key); } catch (error) { owner = null; }
-        if (!Array.isArray(owner) || owner.length !== 3 || owner[0] !== human.desc ||
+        if (!Array.isArray(owner) || owner.length !== 3 || !supplier(owner, human) ||
             owner[1] !== human.profileId || typeof owner[2] !== 'string' || !owner[2])
           throw new Error('Supply cooldown cannot be verified.');
       }

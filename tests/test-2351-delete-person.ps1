@@ -187,10 +187,10 @@ function Build {
         # What tells server-log.js it starts a game server, and where its private folder is.
         Put (Join-Path $R 'server-settings.json') '{"privDir":"private"}'
         $CF = Join-Path $R 'world\changeForms'
-        Put (Join-Path $CF 'ff000a01.json') ('{"formDesc":"ff000a01","profileId":' + $P1 + ',"isDeleted":false}')
-        Put (Join-Path $CF 'ff000a02.json') ('{"formDesc":"ff000a02","profileId":' + $PY + '}')
-        Put (Join-Path $CF 'ff000a03.json') ('{"formDesc":"ff000a03","profileId":' + $P2 + '}')
-        Put (Join-Path $CF 'ff000a04.json') ('{"formDesc":"ff000a04","profileId":' + $PT + '}')
+        Put (Join-Path $CF 'ff000a01.json') ('{"formDesc":"a01","profileId":' + $P1 + ',"isDeleted":false}')
+        Put (Join-Path $CF 'ff000a02.json') ('{"formDesc":"a02","profileId":' + $PY + '}')
+        Put (Join-Path $CF 'ff000a03.json') ('{"formDesc":"a03","profileId":' + $P2 + '}')
+        Put (Join-Path $CF 'ff000a04.json') ('{"formDesc":"a04","profileId":' + $PT + '}')
         Put (Join-Path $CF '1a2b3.json') '{"formDesc":"1a2b3:Skyrim.esm","profileId":-1}'
         Put (Join-Path $CF '_discarded-20261002-000000\ff000a05.json') ('{"profileId":' + $P1 + '}')
         Put (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json') ('{"profileId":' + $P1 + '}')
@@ -212,8 +212,8 @@ function Build {
         Put (Join-Path $PV 'books.json') ('{"books":[{"id":"b1","kind":"faction","name":"F","account":"' + $ME + '","owner":' + $P1 + ',"members":[{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[],"prices":[]},' +
             '{"id":"b2","kind":"business","name":"G","account":"' + $YOU + '","owner":' + $PY + ',"members":[{"pid":' + $PY + ',"name":"Yours","role":"Member"},{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[{"pid":' + $P1 + ',"name":"Mine","text":"hello","at":1}],"prices":[]}],"ledgers":{}}')
         Put (Join-Path $PV 'dungeon-rewards-ledger.json') ('{"version":1,"entries":{"1a2b3:Skyrim.esm":{"at":1,"actor":' + $A1 + ',"tier":1,"gold":5,"items":[]}},"sha256":"x"}')
-        Put (Join-Path $PV 'merchant-ledger.json') ('{"version":1,"entries":{"9:Skyrim.esm":{"version":1,"purse":250,"stock":[],"supply":{"[\"ff000a01\",' + $P1 + ',\"ore\"]":1}},' +
-            '"8:Skyrim.esm":{"version":1,"purse":250,"stock":[],"commissions":{"v":1,"serial":1,"held":{"[\"[2561,\\\"\\\",' + $P1 + ']\",\"q-iron-1\"]":{"token":1}},"cool":{}}}},"sha256":"x"}')
+        Put (Join-Path $PV 'merchant-ledger.json') ('{"version":2,"entries":{"9:Skyrim.esm":{"version":1,"purse":250,"stock":[],"supply":{"[4278192641,' + $P1 + ',\"ore\"]":1}},' +
+            '"8:Skyrim.esm":{"version":1,"purse":250,"stock":[],"commissions":{"v":1,"serial":1,"held":{"[\"[4278192641,\\\"\\\",' + $P1 + ']\",\"q-iron-1\"]":{"token":1}},"cool":{}}}},"sha256":"x"}')
         # The trade ships' manifest names a character { actor, profile } on a line it loaded (#511).
         Put (Join-Path $PV 'trade-cargo.json') ('{"v":1,"routes":{"ports":[],"routes":[]},"cargo":{"holds":{"ship-1":{"lines":{"1":{"by":{"actor":' + $A1 + ',"profile":' + $P1 + '},"baseId":4096,"count":2}}}}}}')
         Put (Join-Path $PV 'benches.json') '{"whiterun":4278190081}'
@@ -224,11 +224,11 @@ function Build {
         Put (Join-Path $R 'data\last-left.json') ('{"' + $P1 + '":1780000000000,"' + $PY + '":1780000000001}')
         Put (Join-Path $R 'data\online.json') '{"now":0}'
     }
-    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"formDesc":"ff000a07","profileId":' + $P1 + '}')
+    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"formDesc":"a07","profileId":' + $P1 + '}')
     Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\farm-claims.json') ('{"at":1,"claims":{"' + $P1 + '":{"by":' + $P1 + ',"name":"Mine","at":1,"cell":"3c:Skyrim.esm","x":0,"y":0}},"seeded":{}}')
     # An old copy set aside with no private folder at all, only a discarded
     # change form of theirs (the 18 Oct real run stopped on ENOENT here).
-    Put (Join-Path $Box 'Thornswood-Server.prev-20260930-000000\world-before-1\changeForms\_discarded-1\ff000a08.json') ('{"formDesc":"ff000a08","profileId":' + $P1 + '}')
+    Put (Join-Path $Box 'Thornswood-Server.prev-20260930-000000\world-before-1\changeForms\_discarded-1\ff000a08.json') ('{"formDesc":"a08","profileId":' + $P1 + '}')
     # A list the dev server has not let go of yet, part of it done.
     Put (Join-Path $Dev 'private\deleted-characters.json') '{"profiles":[9999],"actors":[4278199999],"done":{"property":1}}'
 
@@ -275,6 +275,10 @@ try {
     Put $lst '["not a list"]'
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'a list of deleted characters that is not one refuses the run' ($c -eq 1 -and (Said 'deleted-characters\.json is not a list of deleted characters, so nothing was changed'))
+    $oldShape = '{"profiles":[1],"actors":[2561]}'
+    Put $lst $oldShape
+    $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
+    Yes 'a list of deleted characters in the old shape refuses the run, naming the converter, and is left as it is (#2870)' ($c -eq 1 -and (Said 'deleted-characters\.json holds form ids in the old shape \(#2870\)\. Run scripts\\ops\\Convert-FormIdShape\.js') -and (Get $lst) -eq $oldShape)
     Remove-Item -LiteralPath $lst -Force
     $pend = Join-Path $Dev 'world-before-20260930-000000\changeForms\.pending-batch'
     Put $pend '{}'

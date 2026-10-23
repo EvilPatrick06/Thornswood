@@ -12,7 +12,7 @@
   The list is private\deleted-characters.json (the server's privDir), the
   same shape Delete-Person.ps1 writes and game\gamemode.js reads:
 
-      { "profiles": [ ... ], "actors": [ form ids ], "done": { part: time } }
+      { "profiles": [ ... ], "actors": [ runtime form ids ], "done": { part: time } }
 
   WHO IT NAMES. A reset, a new character or a wipe throws characters away
   and keeps every profile: the profile keeps its id, its mod menu choices
@@ -27,9 +27,14 @@
 
   A character's form id is read off its change form the way Delete-Person
   reads it: profileId above 0 and a formDesc made in the world, a hex
-  number with no plugin (FormDesc::ToString). A change form that will not
-  parse is named in a RELEASENOTE line, so nobody is left off the list
-  without it being said.
+  number with no plugin (FormDesc::ToString), which is the form's local id.
+  The list keeps the runtime form id, 0xff000000 + that local id, the one
+  shape every register keeps (#2870, ConvertFrom-ThornswoodFormDesc, the
+  twin of game\form-id.js). A change form that will not parse, or a
+  character's whose formDesc is not a runtime form, is named in a
+  RELEASENOTE line, so nobody is left off the list without it being said.
+  A list there whose actors are local ids, the shape from before #2870, is
+  not one: scripts\ops\Convert-FormIdShape.js converts it.
 
   WHERE IT GOES. The privDir server-settings.json names, as the server reads
   it; private when the file names none or is not there. A server-settings.json
@@ -94,6 +99,15 @@ function ConvertTo-ThornswoodIds($a, [long]$top) {
   }
   return ,$out.ToArray()
 }
+# One shape for a character's form id (#2870), the twin of game\form-id.js:
+# a runtime form's formDesc is its local hex alone, and its runtime form id
+# is 0xff000000 + local. Anything else (a plugin, more digits, 0) gives 0.
+function ConvertFrom-ThornswoodFormDesc($Desc) {
+  if (-not ($Desc -is [string]) -or $Desc -notmatch '^[0-9a-f]{1,6}$') { return [long]0 }
+  $local = [Convert]::ToInt64($Desc, 16)
+  if ($local -le 0) { return [long]0 }
+  return ([long]4278190080 + $local)
+}
 function Read-ThornswoodReleaseList([string]$File) {
   if (-not $File) { return @{ ok = $false } }
   if (-not (Test-Path -LiteralPath $File)) { return @{ ok = $true; missing = $true; profiles = @(); actors = @() } }
@@ -105,6 +119,8 @@ function Read-ThornswoodReleaseList([string]$File) {
   $p = ConvertTo-ThornswoodIds $v.profiles 9007199254740991
   $a = ConvertTo-ThornswoodIds $acts 4294967295
   if ($null -eq $p -or $null -eq $a) { return @{ ok = $false } }
+  # Every actor a runtime form id; a local id is the old shape (#2870).
+  if (@($a | Where-Object { $_ -le 4278190080 }).Count) { return @{ ok = $false; old = (@($a | Where-Object { $_ -le 16777215 }).Count -gt 0) } }
   return @{ ok = $true; missing = $false; profiles = $p; actors = $a }
 }
 # The form ids of the characters in these change forms, and a RELEASENOTE
@@ -120,8 +136,10 @@ function Get-ThornswoodCharacterIds($Files) {
     if (-not ($o -is [System.Management.Automation.PSCustomObject])) { continue }
     $p = $o.profileId
     if (-not ($p -is [int] -or $p -is [long] -or $p -is [decimal] -or $p -is [double])) { $p = 0 }
-    $d = [string]$o.formDesc
-    if ($p -gt 0 -and $d -match '^[0-9a-fA-F]{1,8}$') { $ids += [Convert]::ToInt64($d, 16) }
+    if ($p -le 0) { continue }
+    $id = ConvertFrom-ThornswoodFormDesc $o.formDesc
+    if ($id -gt 0) { $ids += $id }
+    else { $notes += ('RELEASENOTE|' + $f + ' has a formDesc that is not a runtime form, so its character is not on the release list') }
   }
   return @{ ids = @($ids | Sort-Object -Unique); notes = $notes }
 }
@@ -130,6 +148,7 @@ function Write-ThornswoodReleaseList {
   $file = Get-ThornswoodReleaseListPath $Root
   if (-not $file) { 'RELEASEBAD|' + (Join-Path $Root 'server-settings.json') + ' will not parse, so the server''s private folder is not known and no list was written'; return }
   $now = Read-ThornswoodReleaseList $file
+  if (-not $now.ok -and $now.old) { 'RELEASEBAD|' + $file + ' holds form ids in the old shape (#2870), so no list was written and it is left as it is; scripts\ops\Convert-FormIdShape.js converts it'; return }
   if (-not $now.ok) { 'RELEASEBAD|' + $file + ' is not a list of deleted characters, so no list was written and it is left as it is'; return }
   $P = @($now.profiles)
   $A = @($now.actors) + @($Actors)
@@ -139,7 +158,7 @@ function Write-ThornswoodReleaseList {
     elseif (-not $old.missing) { $P += @($old.profiles); $A += @($old.actors) }
   }
   $P = @($P | Where-Object { $null -ne $_ } | ForEach-Object { [long]$_ } | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
-  $A = @($A | Where-Object { $null -ne $_ } | ForEach-Object { [long]$_ } | Where-Object { $_ -gt 0 -and $_ -le 4294967295 } | Sort-Object -Unique)
+  $A = @($A | Where-Object { $null -ne $_ } | ForEach-Object { [long]$_ } | Where-Object { $_ -gt 4278190080 -and $_ -le 4294967295 } | Sort-Object -Unique)
   if (-not $P.Count -and -not $A.Count) { 'RELEASE|none'; return }
   # 'saves' acts only on profiles, and no server on this machine runs it (above).
   if (-not $P.Count) { $Done = @($Done) + 'saves' }

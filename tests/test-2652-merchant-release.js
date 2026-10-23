@@ -88,14 +88,17 @@ const NOW = Date.now();
 const P1 = 5001, PY = 6001, P9 = 9999;
 const A1 = 0xff000a01, A2 = 0xff000a02, AY = 0xff000a09;
 const hex = (n) => n.toString(16);
-const key = (a, p, what) => JSON.stringify([hex(a), p, what]);
+// One shape (#2870): a supply key holds the full runtime form id, the same
+// number the deleted-characters list names; a runtime desc is the local hex.
+const key = (a, p, what) => JSON.stringify([a, p, what]);
+const runtimeDesc = (a) => (a - 0xff000000).toString(16);
 const REF = ['9:Skyrim.esm', '8:Skyrim.esm', '7:Skyrim.esm', '6:Skyrim.esm'];  // 6 is retired
 const BASE = 'a:Skyrim.esm';
 const sum = (doc) => crypto.createHash('sha256').update(JSON.stringify([doc.version, doc.entries])).digest('hex');
 function entry(ref, extra) {
   return Object.assign({ version: 1, reference: ref, base: BASE, purse: 300, stock: [{ baseId: 4096, count: 2 }], revision: 4 }, extra);
 }
-function human(a, p) { return { desc: hex(a), profileId: p }; }
+function human(a, p) { return { desc: runtimeDesc(a), profileId: p }; }
 function seed(priv) {
   fs.mkdirSync(priv, { recursive: true });
   const entries = {
@@ -114,9 +117,9 @@ function seed(priv) {
                  previous: { purse: 300, stock: [{ baseId: 4096, count: 2 }], supply: {} },
                  next: { purse: 310, stock: [{ baseId: 4096, count: 1 }], supply: {} } }
     }),
-    // Somebody else's waiting trade, and a placed form's desc.
+    // Somebody else's waiting trade, and a key whose number is only A1's local part.
     '7:Skyrim.esm': entry('7:Skyrim.esm', {
-      supply: { [JSON.stringify(['a01:Skyrim.esm', 0, 'wheat'])]: NOW },
+      supply: { [JSON.stringify([0xa01, 0, 'wheat'])]: NOW },
       pending: { version: 3, id: 'dev:7:4', human: human(AY, PY), kind: 'sell', phase: 'debit',
                  previous: { purse: 300, stock: [{ baseId: 4096, count: 2 }], supply: {} },
                  next: { purse: 290, stock: [{ baseId: 4096, count: 3 }], supply: {} } }
@@ -128,8 +131,8 @@ function seed(priv) {
       purse: 320, stock: []
     })
   };
-  const doc = { version: 1, entries: entries };
-  fs.writeFileSync(path.join(priv, 'merchant-ledger.json'), JSON.stringify({ version: 1, entries: entries, sha256: sum(doc) }));
+  const doc = { version: 2, entries: entries };
+  fs.writeFileSync(path.join(priv, 'merchant-ledger.json'), JSON.stringify({ version: 2, entries: entries, sha256: sum(doc) }));
   fs.writeFileSync(path.join(priv, 'merchant-ledger.initialized'), '1');
 }
 function open(dir, opt) {
@@ -178,7 +181,7 @@ try {
   const e9 = after.entries['9:Skyrim.esm'], e8 = after.entries['8:Skyrim.esm'], e7 = after.entries['7:Skyrim.esm'], e6 = after.entries['6:Skyrim.esm'];
   yes('M1 their supply wait goes by profile and form id, and the one by form id alone', !(key(A1, P1, 'iron ore') in e9.supply) && !(key(A2, P9, 'wheat') in e9.supply));
   yes('M2 somebody else\'s supply wait stays, stamp and all', e9.supply[key(AY, PY, 'iron ore')] === NOW && e9.supply['7:Skyrim.esm placed'] === NOW);
-  yes('M3 a placed form\'s desc is never taken for a character', Object.keys(e7.supply).length === 1);
+  yes('M3 a local form id is never taken for the full form id of a character', Object.keys(e7.supply).length === 1);
   yes('T1 credit: the trade waiting on them is cleared, and the trader keeps the next it already holds',
       e9.pending === null && e9.purse === 280 && JSON.stringify(e9.stock) === JSON.stringify([{ baseId: 4096, count: 3 }]));
   yes('T2 credit: no supply wait is stamped for them', Object.keys(e9.supply).length === 2);
@@ -213,16 +216,16 @@ try {
   s2.purses.shutdown();
 
   // ============================================================ P: commission promises
-  // merchant-commission-state.js keys a promise by [owner, job], the owner
-  // [local form id, plugin, profile] (owner()); a runtime character's desc
-  // has no plugin.
+  // merchant-commission-state.js keys a promise by [owner, job] (owner()):
+  // a runtime character is [full form id, '', profile] (#2870), a placed
+  // form keeps [local form id, plugin, profile].
   const COMMISSIONS = require(path.join(REPO, 'game', 'merchant-commission-state.js'));
-  const A3 = 0xa03;
+  const A3 = 0xff000a03;
   const ownerOf = (local, plugin, p) => JSON.stringify([local, plugin, p]);
   const pkey = (owner, job) => JSON.stringify([owner, job]);
   const held = (token, owner, job, gold) => ({ token: token, owner: owner, job: job, hash: 'a'.repeat(64),
     item: { baseId: 4096, name: 'Iron Ore' }, count: 1, unit: gold, gold: gold, at: NOW - 5000 });
-  const OWN_P1 = ownerOf(0xa01, '', P1), OWN_PY = ownerOf(0xa09, '', PY), OWN_A3 = ownerOf(A3, '', 77), OWN_PLACED = ownerOf(A3, 'skyrim.esm', 78);
+  const OWN_P1 = ownerOf(A1, '', P1), OWN_PY = ownerOf(AY, '', PY), OWN_A3 = ownerOf(A3, '', 77), OWN_PLACED = ownerOf(0xa03, 'skyrim.esm', 78);
   const dir3 = path.join(scratch, 'promises');
   fs.mkdirSync(path.join(dir3, 'private'), { recursive: true });
   const promised = {
@@ -237,7 +240,7 @@ try {
     '7:Skyrim.esm': entry('7:Skyrim.esm', {}),
     '6:Skyrim.esm': entry('6:Skyrim.esm', {})
   };
-  fs.writeFileSync(fileOf(dir3), JSON.stringify({ version: 1, entries: promised, sha256: sum({ version: 1, entries: promised }) }));
+  fs.writeFileSync(fileOf(dir3), JSON.stringify({ version: 2, entries: promised, sha256: sum({ version: 2, entries: promised }) }));
   fs.writeFileSync(path.join(dir3, 'private', 'merchant-ledger.initialized'), '1');
   const before3 = readFile(dir3);
   const p1 = open(dir3);
@@ -267,7 +270,7 @@ try {
   const busyDoc = readFile(dir4);
   busyDoc.entries['7:Skyrim.esm'].supply[key(A1, P1, 'wheat')] = NOW;
   delete busyDoc.sha256;
-  fs.writeFileSync(fileOf(dir4), JSON.stringify({ version: 1, entries: busyDoc.entries, sha256: sum(busyDoc) }));
+  fs.writeFileSync(fileOf(dir4), JSON.stringify({ version: 2, entries: busyDoc.entries, sha256: sum(busyDoc) }));
   const keep4 = fs.readFileSync(fileOf(dir4), 'utf8');
   const b1 = open(dir4);
   let busyWhy = '';

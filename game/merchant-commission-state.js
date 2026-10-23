@@ -10,16 +10,32 @@ const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const fields=(value,keys)=>object(value)&&Object.keys(value).length===keys.length&&keys.every(key=>owns(value,key));
 const copy=value=>JSON.parse(JSON.stringify(value));
 const job=id=>typeof id==='string'&&/^q-[a-z0-9-]{1,46}$/.test(id);
+// One shape for a character's form id (#2870); game\form-id.js is the
+// original and tests\test-2870-form-id-shape.js keeps this copy the same.
+function formIdOf(desc) {
+  if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+  var local = parseInt(desc, 16);
+  return local > 0 ? 0xff000000 + local : 0;
+}
+function isFormId(n) {
+  return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
+}
+// A runtime character (formDesc the local hex alone) owns by its runtime form
+// id, [0xff000000 | local, '', profile]; a placed form (hex:plugin) keeps
+// [local, plugin, profile]. The merchant ledger stores these strings, so its
+// version is 2 from #2870 and scripts\ops\Convert-FormIdShape.js turned the
+// version 1 owners [local, '', profile] into this shape.
 function owner(human) {
  if(!human||!integer(human.profileId,1,MAX_GOLD)||typeof human.desc!=='string')return '';
  const match=/^([0-9a-f]{1,6})(?::([^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
- return match&&parseInt(match[1],16)>0?JSON.stringify([parseInt(match[1],16),(match[2]||'').toLowerCase(),human.profileId]):'';
+ if(!match||!(parseInt(match[1],16)>0))return '';
+ return JSON.stringify(match[2]?[parseInt(match[1],16),match[2].toLowerCase(),human.profileId]:[formIdOf(match[1]),'',human.profileId]);
 }
 function ownerString(value) {
  if(typeof value!=='string')return false;
  try {
   const row=JSON.parse(value);
-  return Array.isArray(row)&&row.length===3&&integer(row[0],1,0xffffff)&&typeof row[1]==='string'&&
+  return Array.isArray(row)&&row.length===3&&typeof row[1]==='string'&&(row[1]?integer(row[0],1,0xffffff):isFormId(row[0]))&&
    (!row[1]||/^[^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)$/.test(row[1]))&&row[1]===row[1].toLowerCase()&&
    integer(row[2],1,MAX_GOLD)&&JSON.stringify(row)===value;
  }catch(error){return false;}
@@ -117,6 +133,6 @@ function close(raw,human,id,token,at,pay) {
  if(pay)next.cool[name]=owns(row,'goods')?[at,row.hours]:at;
  return {ok:true,next,gold:pay?row.gold:0,terms:row};
 }
-module.exports={WAIT,MAX_HELD,MAX_COOL,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
+module.exports={WAIT,MAX_HELD,MAX_COOL,formIdOf,isFormId,ownerString,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
  cancel:(raw,human,id,token,at)=>close(raw,human,id,token,at,false),
  finish:(raw,human,id,token,at)=>close(raw,human,id,token,at,true)};

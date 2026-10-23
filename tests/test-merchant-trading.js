@@ -41,12 +41,13 @@ function worldOf(native) {
   const live=new Map(),saved=new Map();
   return {
     actors, inv, records,
-    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,runtimeIdentity:'100',...actors[id]} : null; },
+    // A character is a runtime form (formDesc its local hex alone, #2870); a merchant is placed.
+    actor(id) { return actors[id] ? {desc:id.toString(16)+(actors[id].profileId>0?'':':Skyrim.esm'),lifeGeneration:0,runtimeIdentity:'100',...actors[id]} : null; },
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
     save() { for (const [id,receipt] of live) saved.set(id,receipt); },
     transfer: {
       available() { return native.on; }, validate() {return true;},
-      identity(id) { const a=actors[id]; return a && a.profileId>0 ? {desc:id.toString(16)+':Skyrim.esm',profileId:a.profileId} : null; },
+      identity(id) { const a=actors[id]; return a && a.profileId>0 ? {desc:id.toString(16),profileId:a.profileId} : null; },
       resolve(desc) { return parseInt(desc.split(':')[0],16); },
       inventory(id) { return {entries:Object.entries(inv[id]).filter(([,count])=>count>0).map(([baseId,count])=>({baseId:Number(baseId),count}))}; },
       receipt(id) { return live.get(id) || "null"; }, saved(id) { return saved.get(id) || "null"; },
@@ -55,7 +56,7 @@ function worldOf(native) {
         if (native.fail === 'refuse') return false;
         if (receipt!==(live.get(id) || "null") || JSON.stringify(this.inventory(id))!==JSON.stringify(expected) || profile!==actors[id].profileId) return false;
         inv[id]={}; for(const row of next.entries) inv[id][row.baseId]=(inv[id][row.baseId] || 0)+row.count;
-        live.set(id,JSON.stringify({actor:id.toString(16)+':Skyrim.esm',profile,sequence}));
+        live.set(id,JSON.stringify({actor:id.toString(16)+(actors[id].profileId>0?'':':Skyrim.esm'),profile,sequence}));
         if (native.fail!=='stuck') saved.set(id,live.get(id));
         return true;
       }
@@ -639,7 +640,7 @@ assert.equal(open(delayedResume).view.supply[0].ready,true);
 // Expired history cannot permanently fill an otherwise empty merchant intent.
 const history=service({on:true},250);
 const state=history.purses.prepare(1);
-for(let i=0;i<6000;i++)state.supply[JSON.stringify(['old'+i+':Skyrim.esm',i+1,'iron ingot'])]=1;
+for(let i=0;i<6000;i++)state.supply[JSON.stringify([0xff000100+i,i+1,'iron ingot'])]=1;
 history.purses.commit(1,state);
 open(history.api);
 assert.match(history.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']}).text,/Sold 1/);
@@ -660,7 +661,7 @@ expired=replacedCharacter.purses.prepare(1);expired.supply={'old':1};replacedCha
 const commitCleanup=replacedCharacter.purses.compareAndCommit.bind(replacedCharacter.purses);
 replacedCharacter.purses.compareAndCommit=(...args)=>{
   const result=commitCleanup(...args);
-  replacedCharacter.world.transfer.identity=()=>({desc:'new-character:Skyrim.esm',profileId:7});
+  replacedCharacter.world.transfer.identity=()=>({desc:'b0',profileId:7});
   return result;
 };
 open(replacedCharacter.api);
@@ -668,7 +669,7 @@ assert.match(replacedCharacter.api.command({actorId:10,profileId:7,parts:['/merc
 assert.equal(replacedCharacter.world.inv[10][100],8);
 assert.equal(replacedCharacter.purses.prepare(1).purse,250);
 assert.equal(replacedCharacter.purses.prepare(1).pending,undefined);
-replacedCharacter.world.transfer.identity=(id)=>({desc:id.toString(16)+':Skyrim.esm',profileId:7});
+replacedCharacter.world.transfer.identity=(id)=>({desc:id.toString(16),profileId:7});
 expired=replacedCharacter.purses.prepare(1);expired.supply={'old':1};replacedCharacter.purses.commit(1,expired);
 assert.match(replacedCharacter.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']}).text,/not yours/);
 assert.equal(replacedCharacter.world.inv[10][100],8);

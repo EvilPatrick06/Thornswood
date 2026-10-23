@@ -8,7 +8,7 @@ const clone=value=>JSON.parse(JSON.stringify(value));
 const hash=value=>crypto.createHash('sha256').update(value).digest('hex');
 function encode(doc){doc.sha256=hash(JSON.stringify([doc.version,doc.entries]));return Buffer.from(JSON.stringify(doc));}
 function fixture(){
-  const doc={version:1,entries:Object.fromEntries(roster.history.map(([reference,base])=>[reference,kept.has(reference)?
+  const doc={version:2,entries:Object.fromEntries(roster.history.map(([reference,base])=>[reference,kept.has(reference)?
     {version:1,reference,base,purse:0,stock:[],unrelated:{keep:'private evidence'}}:null]))};
   return {doc,options:{rosterBytes:Buffer.from(rosterBytes),markerBytes:Buffer.from('1'),world:'dev:test-ledger',
     resolveMerchant:reference=>ids.get(reference),validateInventory:()=>true}};

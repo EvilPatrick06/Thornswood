@@ -35960,6 +35960,12 @@ log('gamemode loaded:',
 
       { "profiles": [ 5001 ], "actors": [ 4278192641 ] }
 
+  An actor is the character's runtime form id, 0xff000000 | the local hex its
+  change form's formDesc holds (formDesc "a01" is 0xff000a01), the one number
+  every register keeps (#2870, formIdOf below, game\form-id.js). A list with
+  an actor outside that range is the old shape, from before #2870, and is not
+  read: scripts\ops\Convert-FormIdShape.js turns it into this one.
+
   The part "saves" goes first, before the engine has started:
   server-log.js, which the task starts the server under, deletes their change
   forms (the engine loads them at its start, so it cannot be done from here)
@@ -36029,9 +36035,21 @@ log('gamemode loaded:',
     return path.join(privDir, 'deleted-characters.json');
   }
 
-  // The list, read once a load, field by field. Anything that is not a whole
-  // number above 0 (a form id at most 0xffffffff), or a done mark that is not
-  // a time, makes the whole list unreadable rather than half read.
+  // One shape for a character's form id (#2870); game\form-id.js is the
+  // original and tests\test-2870-form-id-shape.js keeps this copy the same.
+  function formIdOf(desc) {
+    if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+    var local = parseInt(desc, 16);
+    return local > 0 ? 0xff000000 + local : 0;
+  }
+  function isFormId(n) {
+    return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
+  }
+
+  // The list, read once a load, field by field. A profile that is not a whole
+  // number above 0, an actor that is not a runtime form id (isFormId), or a
+  // done mark that is not a time, makes the whole list unreadable rather than
+  // half read.
   function read() {
     if (st !== undefined) { return st; }
     st = null;
@@ -36048,11 +36066,15 @@ log('gamemode loaded:',
       return Array.isArray(a) && a.every(function (n) { return Number.isSafeInteger(n) && n > 0 && n <= top; });
     };
     var ok = !!list && typeof list === 'object' && !Array.isArray(list) &&
-      idsOk(list.profiles, Number.MAX_SAFE_INTEGER) && idsOk(list.actors === undefined ? [] : list.actors, 0xffffffff) &&
+      idsOk(list.profiles, Number.MAX_SAFE_INTEGER) &&
+      (list.actors === undefined || (Array.isArray(list.actors) && list.actors.every(isFormId))) &&
       (list.done === undefined || (!!list.done && typeof list.done === 'object' && !Array.isArray(list.done) &&
         Object.keys(list.done).every(function (k) { return Number.isSafeInteger(list.done[k]) && list.done[k] > 0; })));
     if (!ok) {
-      rlog(file + ' is not a list of deleted characters, so nothing was let go and it is left as it is');
+      var old = !!list && typeof list === 'object' && Array.isArray(list.actors) &&
+        list.actors.some(function (n) { return Number.isSafeInteger(n) && n > 0 && n <= 0xffffff; });
+      rlog(file + (old ? ' holds form ids in the old shape (#2870; scripts\\ops\\Convert-FormIdShape.js converts it)'
+        : ' is not a list of deleted characters') + ', so nothing was let go and it is left as it is');
       return st;
     }
     var P = {}, A = {};
@@ -36065,7 +36087,7 @@ log('gamemode loaded:',
       done: list.done ? Object.assign({}, list.done) : {},
       who: {
         profile: function (n) { n = Number(n) || 0; return n > 0 && has(P, n); },
-        actor: function (n) { n = Number(n) || 0; return n > 0 && has(A, n); }
+        actor: function (n) { n = Number(n) || 0; return isFormId(n) && has(A, n); }
       }
     };
     rlog('a list of ' + st.profiles.length + ' profile(s) and ' + st.actors.length +
@@ -72731,7 +72753,13 @@ function createNpcMerchantPurses(api,data,storage) {
         row.baseId>0 && row.baseId<=0xffffffff && row.baseId!==15 &&
       Number.isInteger(row.count) && row.count>0 && row.count<=2147483647);
   }
-  if(!ledger || ledger.version!==1 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
+  // Version 2 from #2870: supply waits and commission owners name a runtime
+  // character by its runtime form id. A version 1 ledger keyed them by
+  // formDesc and local form id, and is refused until
+  // scripts\ops\Convert-FormIdShape.js has turned it into version 2.
+  if(ledger && ledger.version===1)
+    throw new Error('Saved merchant ledger is version 1, from before #2870; run scripts\\ops\\Convert-FormIdShape.js with the server stopped');
+  if(!ledger || ledger.version!==2 || !ledger.entries || typeof ledger.entries!=='object' || Array.isArray(ledger.entries))
     throw new Error('Saved merchant ledger cannot be verified');
   const references=new Map(Array.from(catalogue.values()).map(identity=>[identity.reference,identity]));
   if(Object.keys(ledger.entries).length!==references.size) throw new Error('Saved merchant ledger manifest cannot be verified');
@@ -72870,14 +72898,14 @@ function createNpcMerchantPurses(api,data,storage) {
   // block's: who.profile(profile id) and who.actor(form id) say whether a
   // character is on private\deleted-characters.json. In every entry, retired
   // traders' too:
-  //   supply       a supply wait keyed by [desc, profile, what] of theirs
-  //                is dropped
+  //   supply       a supply wait keyed by [form id, profile, what] of theirs
+  //                is dropped (the runtime form id, #2870)
   //   commissions  a promise the trader holds for them (commissions.held)
   //                is dropped, so its gold is the trader's to spend again
   //                and it no longer counts toward MAX_HELD; a finished one
   //                cooling down (commissions.cool) goes too. Both are keyed
   //                by the owner merchant-commission-state.js writes,
-  //                [local form id, plugin, profile]
+  //                [runtime form id, '', profile] for a character (#2870)
   //   a trade      still waiting on them is cleared:
   //     debit      the trader's state is still pending.previous (records()
   //                in the trading checks it), so clearing pending leaves it
@@ -72898,19 +72926,27 @@ function createNpcMerchantPurses(api,data,storage) {
   // that fails revokes this service, as a failed commit does. The trader's
   // own mirror (property) is not written here: prepare() is its one reader
   // and puts it right from the ledger before the trader is used.
-  function characterOf(desc) {
-    // A runtime human's desc is its form id in hex alone (FormDesc); a
-    // placed form's has a plugin and is never a character.
-    return typeof desc==='string' && /^[0-9a-f]{1,8}$/i.test(desc) ? parseInt(desc,16) : 0;
+  // One shape for a character's form id (#2870); game\form-id.js is the
+  // original and tests\test-2870-form-id-shape.js keeps this copy the same.
+  // A runtime human's formDesc is its local hex alone; a placed form's has a
+  // plugin and is never a character (formIdOf gives 0).
+  function formIdOf(desc) {
+    if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+    var local = parseInt(desc, 16);
+    return local > 0 ? 0xff000000 + local : 0;
+  }
+  function isFormId(n) {
+    return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
   }
   function release(who) {
     return mutate(()=>{
       const counts={merchants:0,supply:0,commissions:0,trades:0};
-      const theirs=(desc,profile)=>!!(who.profile(profile) || who.actor(characterOf(desc)));
-      // A commission key is JSON [owner, job], the owner JSON [local form id, plugin, profile].
+      // Every form id here is the runtime form id, as on the list (#2870).
+      const theirs=(id,profile)=>!!(who.profile(profile) || (isFormId(id) && who.actor(id)));
+      // A commission key is JSON [owner, job], the owner JSON [form id, plugin, profile].
       const promisedTo=key=>{
         const row=JSON.parse(JSON.parse(key)[0]);
-        return !!(who.profile(row[2]) || (!row[1] && who.actor(row[0])));
+        return !!(who.profile(row[2]) || (!row[1] && theirs(row[0],0)));
       };
       const next=JSON.parse(JSON.stringify(ledger)),changed=[];
       let busy=0;
@@ -72931,7 +72967,7 @@ function createNpcMerchantPurses(api,data,storage) {
           }
         }
         const pending=state.pending;
-        const trade=!!(pending && pending.human && theirs(pending.human.desc,pending.human.profileId));
+        const trade=!!(pending && pending.human && theirs(formIdOf(pending.human.desc),pending.human.profileId));
         if(!trade && !rows) continue;
         if(pending && !trade) {busy++;continue;}
         if(trade) {state.pending=null;counts.trades++;}
@@ -74482,16 +74518,32 @@ const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const fields=(value,keys)=>object(value)&&Object.keys(value).length===keys.length&&keys.every(key=>owns(value,key));
 const copy=value=>JSON.parse(JSON.stringify(value));
 const job=id=>typeof id==='string'&&/^q-[a-z0-9-]{1,46}$/.test(id);
+// One shape for a character's form id (#2870); game\form-id.js is the
+// original and tests\test-2870-form-id-shape.js keeps this copy the same.
+function formIdOf(desc) {
+  if (typeof desc !== 'string' || !/^[0-9a-f]{1,6}$/i.test(desc)) return 0;
+  var local = parseInt(desc, 16);
+  return local > 0 ? 0xff000000 + local : 0;
+}
+function isFormId(n) {
+  return Number.isSafeInteger(n) && n > 0xff000000 && n <= 0xffffffff;
+}
+// A runtime character (formDesc the local hex alone) owns by its runtime form
+// id, [0xff000000 | local, '', profile]; a placed form (hex:plugin) keeps
+// [local, plugin, profile]. The merchant ledger stores these strings, so its
+// version is 2 from #2870 and scripts\ops\Convert-FormIdShape.js turned the
+// version 1 owners [local, '', profile] into this shape.
 function owner(human) {
  if(!human||!integer(human.profileId,1,MAX_GOLD)||typeof human.desc!=='string')return '';
  const match=/^([0-9a-f]{1,6})(?::([^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
- return match&&parseInt(match[1],16)>0?JSON.stringify([parseInt(match[1],16),(match[2]||'').toLowerCase(),human.profileId]):'';
+ if(!match||!(parseInt(match[1],16)>0))return '';
+ return JSON.stringify(match[2]?[parseInt(match[1],16),match[2].toLowerCase(),human.profileId]:[formIdOf(match[1]),'',human.profileId]);
 }
 function ownerString(value) {
  if(typeof value!=='string')return false;
  try {
   const row=JSON.parse(value);
-  return Array.isArray(row)&&row.length===3&&integer(row[0],1,0xffffff)&&typeof row[1]==='string'&&
+  return Array.isArray(row)&&row.length===3&&typeof row[1]==='string'&&(row[1]?integer(row[0],1,0xffffff):isFormId(row[0]))&&
    (!row[1]||/^[^:/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)$/.test(row[1]))&&row[1]===row[1].toLowerCase()&&
    integer(row[2],1,MAX_GOLD)&&JSON.stringify(row)===value;
  }catch(error){return false;}
@@ -74589,7 +74641,7 @@ function close(raw,human,id,token,at,pay) {
  if(pay)next.cool[name]=owns(row,'goods')?[at,row.hours]:at;
  return {ok:true,next,gold:pay?row.gold:0,terms:row};
 }
-module.exports={WAIT,MAX_HELD,MAX_COOL,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
+module.exports={WAIT,MAX_HELD,MAX_COOL,formIdOf,isFormId,ownerString,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
  cancel:(raw,human,id,token,at)=>close(raw,human,id,token,at,false),
  finish:(raw,human,id,token,at)=>close(raw,human,id,token,at,true)};
 return module.exports;})();
@@ -74755,9 +74807,12 @@ function createSettlement(deps) {
   function humanKey(human) {
     if(!human || typeof human.desc!=='string' || !Number.isSafeInteger(human.profileId) || human.profileId<=0 || human.profileId>MAX_COUNT) return '';
     // FormDesc emits local hex alone for runtime humans and hex:plugin for
-    // placed forms. Compare numeric ids so leading zeros cannot split a lock.
+    // placed forms. Compare numeric ids so leading zeros cannot split a lock;
+    // a runtime human by its runtime form id, the one shape (#2870).
     var parts=/^([0-9a-f]{1,6})(?::([^:\/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
-    return parts ? JSON.stringify([parseInt(parts[1],16),(parts[2] || '').toLowerCase(),human.profileId]) : '';
+    if(!parts) return '';
+    if(!parts[2]) return COMMISSION_STATE.formIdOf(parts[1]) ? JSON.stringify([COMMISSION_STATE.formIdOf(parts[1]),'',human.profileId]) : '';
+    return JSON.stringify([parseInt(parts[1],16),parts[2].toLowerCase(),human.profileId]);
   }
   function nativeRows(snapshot) {
     var value=inventory(snapshot);
@@ -74767,6 +74822,11 @@ function createSettlement(deps) {
   function compact(pending) {
     return pending.phase==='credit' && pending.expected===undefined && pending.debit===undefined &&
       pending.previous && pending.previous.purse===undefined && pending.previous.stock===undefined;
+  }
+  // A supply wait names its character by runtime form id (#2870).
+  function supplier(owner,human) {
+    var id=COMMISSION_STATE.formIdOf(human && human.desc);
+    return id>0 && owner[0]===id;
   }
   function supplyTransition(pending,previous,next,fresh,moved) {
     if(pending.kind!=='supply') {
@@ -74779,13 +74839,13 @@ function createSettlement(deps) {
     if(!equal(canonical(before),canonical(after))) throw new Error('Merchant supply cannot be verified.');
     try {owner=JSON.parse(key);} catch(error) {owner=null;}
     if(fresh || pending.terms!==undefined) {
-      if(!Array.isArray(owner) || owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+      if(!Array.isArray(owner) || owner.length!==3 || !supplier(owner,pending.human) || owner[1]!==pending.human.profileId ||
           typeof owner[2]!=='string' || !owner[2] || owner[2]!==owner[2].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
       if(moved) {
         var labels=Array.from(new Set(moved.map(function(row) {return row.label;})));
         if(labels.length!==1 || owner[2]!==labels[0].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
       }
-    } else if(Array.isArray(owner) && (owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+    } else if(Array.isArray(owner) && (owner.length!==3 || !supplier(owner,pending.human) || owner[1]!==pending.human.profileId ||
         typeof owner[2]!=='string' || !owner[2]))
       throw new Error('Merchant supply owner cannot be verified.');
   }
@@ -75064,7 +75124,7 @@ function createSettlement(deps) {
       if (offer.kind === 'supply') {
         var key = changedSupplyKey(state, offer.next), owner;
         try { owner = JSON.parse(key); } catch (error) { owner = null; }
-        if (!Array.isArray(owner) || owner.length !== 3 || owner[0] !== human.desc ||
+        if (!Array.isArray(owner) || owner.length !== 3 || !supplier(owner, human) ||
             owner[1] !== human.profileId || typeof owner[2] !== 'string' || !owner[2])
           throw new Error('Supply cooldown cannot be verified.');
       }
@@ -76852,8 +76912,12 @@ function createMerchantTrading(deps) {
     return (quests ? quests.describe(actorId,merchantId) : []).concat(commissions.view(actorId,merchantId));
   }
 
+  // A supply wait is keyed by the character's runtime form id (#2870), the
+  // one shape every register keeps, never by its formDesc. A human whose
+  // formDesc is not a runtime form has no key and cannot supply.
   function supplyKey(human, itemName) {
-    return JSON.stringify([human.desc, human.profileId, itemName.toLowerCase()]);
+    var id = COMMISSION_STATE.formIdOf(human && human.desc);
+    return id ? JSON.stringify([id, human.profileId, itemName.toLowerCase()]) : '';
   }
   function lastSupply(state, key, itemName) {
     var stamps = state.supply || {};
@@ -76954,7 +77018,7 @@ function createMerchantTrading(deps) {
     }
     var supply = [];
     var human = settlement.available() ? transfer.identity(actorId) : null;
-    var owns = human && human.desc && human.profileId === profileId;
+    var owns = human && COMMISSION_STATE.formIdOf(human.desc) && human.profileId === profileId;
     var at = now();
     for (var k = 0; k < offers.length; k++) {
       if (offers[k].buy == null || !permits(state.reference,'supply',supplyIds[k])) continue;
@@ -77222,7 +77286,7 @@ function createMerchantTrading(deps) {
     if (verb === 'supply') {
       if (!settlement.available()) return response('Buying and selling wait on the native transfer. Nothing was taken.',state);
       var human = transfer.identity(actorId);
-      if (!human || !human.desc || human.profileId !== profileId) return fail('That request is not yours.');
+      if (!human || !COMMISSION_STATE.formIdOf(human.desc) || human.profileId !== profileId) return fail('That request is not yours.');
       completedSupplyKey = supplyKey(human, itemName);
       var last = lastSupply(state, completedSupplyKey, itemName);
       if (last && now() - last < SUPPLY_WAIT) return fail('That supply is not due.');

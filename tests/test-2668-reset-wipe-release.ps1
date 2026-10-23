@@ -158,8 +158,8 @@ function Ids($a) { return ((@($a) | ForEach-Object { [long]$_ }) -join ',') }
 function Server([string]$name, [string]$settings) {
     $root = Join-Path $T $name
     Put (Join-Path $root 'server-settings.json') $settings
-    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"ff000a01","profileId":5001,"appearanceDump":{"name":"A"}}')
-    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"ff000a02","profileId":5002}')
+    Put (Join-Path $root 'world\changeForms\0.json') ('{"formDesc":"a01","profileId":5001,"appearanceDump":{"name":"A"}}')
+    Put (Join-Path $root 'world\changeForms\1.json') ('{"formDesc":"a02","profileId":5002}')
     # Not a character made in the world (a plugin in its desc), and a world object: neither is named.
     Put (Join-Path $root 'world\changeForms\2.json') ('{"formDesc":"a01:Skyrim.esm","profileId":5003}')
     Put (Join-Path $root 'world\changeForms\13164_JKs Whiterun.esp.json') ('{"formDesc":"13164:JKs Whiterun.esp"}')
