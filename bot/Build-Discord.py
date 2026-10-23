@@ -59,6 +59,7 @@
 
 import asyncio
 import os
+import re
 import sys
 import types
 
@@ -680,26 +681,37 @@ PLAN = [
         topic='Gamemaster, Loremaster, Moderator, Dev and Content Creator.'),
  ]),
  # Out of character. It was the Thornswood category. #general-chat is the one
- # general: it was #general until Patrick renamed it, and the topic on it was
- # written by hand, so nothing here sets one.
+ # general: it was #general until Patrick renamed it. Its topic was written by
+ # hand and sent bug reports to a channel deleted since, which Discord showed
+ # as #unknown (Patrick, 23 Oct, #3317), so the plan sets it now, in his words
+ # with the channels named by key.
  ('Out of Character', [
    # Where the join cards go, and what the server's system channel points at.
    # JOIN gives the bot Attach Files here as well (JOIN_BOT_NEEDS, #2341).
    # The bot finds it by this name (JOIN_CHANNEL), so it keeps it.
    dict(kind='text',  name='welcome-travelers', key='JOIN', mode='open',
+        topic='A card for everybody who joins, posted by the bot. Say hello in '
+              '<#GENERAL>.',
         was=(('Thornswood', 'welcome-travelers'),)),
    dict(kind='text',  name='general-chat', key='GENERAL', mode='open',
+        topic="Out of character chat for everyone. Talk Thornswood, Skyrim, or "
+              "whatever's on your mind, and keep it friendly. Bug reports go in "
+              "<#RESULTS>, screenshots and clips go in <#MEDIA>.",
         was=(('Thornswood', 'general-chat'),)),
    dict(kind='text',  name='media',       key='MEDIA',    mode='open',
         topic='Screenshots and clips. Talk about one in a thread under it.',
         was=(('Thornswood', 'media'),)),
    dict(kind='text',  name='server-progression-and-economy', mode='open',
+        topic='How the server grows and how its economy works: what you have '
+              'seen, and what you would change. Ideas go in <#SUGGESTIONS>.',
         was=(('Thornswood', 'server-progression-and-economy'),)),
    dict(kind='forum', name='suggestions', key='SUGGESTIONS', mode='open',
         topic=C.SUGGEST_TOPIC, was=(('Help', 'suggestions'),)),
    # Made by hand for the music bot, and found by the audit of 22 Oct
    # (#3317). Named so -Prune leaves it; never made here. It was in Voice.
    dict(kind='text',  name='jukebox',     mode='open', make=False,
+        topic='Music bot commands go here. Jockie Music plays in the voice room '
+              'you are in.',
         was=(('Voice', 'jukebox'),)),
    # Somewhere to talk and somewhere to be idle, from the Voice category,
    # which Patrick retired on 22 Oct (#3317): each voice room now sits with
@@ -720,6 +732,8 @@ PLAN = [
    # The bot posts the buttons. It was the top of The Holds, which went when
    # each hold got a category of its own (#3317).
    dict(kind='text', name='choose-your-hold', key='CHOOSE', mode='testersread',
+        topic="Pick your hold with the buttons below. It opens that hold's "
+              "channels.",
         was=(('The Holds', 'choose-your-hold'),)),
    dict(kind='forum', name='character-introductions', key='CHARS', mode='open',
         topic='Who are you playing? One post each.'),
@@ -831,7 +845,9 @@ PLAN = [
    # Where staff status updates go (Patrick, 11 Oct), and where the bot says
    # the watchdog's messages and the sessions that went wrong, by the id in
    # staff-channel.txt (#2501). Made by hand, so never made here.
-   dict(kind='text',  name='staff-updates', mode='staff', make=False),
+   dict(kind='text',  name='staff-updates', mode='staff', make=False,
+        topic='Only what every staff member must act on: a restart, an outage, '
+              'or a change to how staff work. The bot and the watchdog post here.'),
    dict(kind='text',  name='staff-general', mode='staff',
         topic='Nobody else can see this.'),
    dict(kind='text',  name='council',       mode='council',
@@ -844,6 +860,8 @@ PLAN = [
    # reads an application (bot.py, private_channel_ok). bot.py's TICKET_LOG
    # answers to ticket-log and tickets, and checks the permissions.
    dict(kind='text',  name='ticket-log',    mode='council',
+        topic='Every ticket that gets closed, with a link back to it, and any '
+              'ticket whose private thread would not open. The council only.',
         was=(('Applications', 'tickets'),)),
    dict(kind='voice', name='Staff Room',    mode='staff'),
    # Gone from the server. Named here so prune leaves them alone, never made
@@ -915,6 +933,8 @@ PLAN = [
    # same word as #test-findings; dev-test-results is the name it was planned
    # under and is answered to as well.
    dict(kind='forum', name='dev-test-findings', mode='space', space='Dev',
+        topic='Pass, fail, and what went wrong, for the test tasks in '
+              '#dev-test-tasks.',
         was=(('Staff', 'dev-test-findings'), ('Staff', 'dev-test-results'))),
    # The developers' lines to each other: an edit to one of the six shared
    # files coming, the dev feed taken. They moved out of #staff-updates,
@@ -1738,6 +1758,64 @@ async def bring_back(guild, cat, spec, want):
     return None
 
 
+def plan_spec(key):
+    """(category, spec) of the plan channel with that key, or (None, None)."""
+    for catname, specs in PLAN:
+        for spec in specs:
+            if spec.get('key') == key:
+                return catname, spec
+    return None, None
+
+
+def plan_channel(guild, key):
+    """The live channel the plan names by key, found by its name in its
+       category, or None."""
+    catname, spec = plan_spec(key)
+    if spec is None:
+        return None
+    want = spec['name'].lower().replace(' ', '-') if spec['kind'] != 'voice' else spec['name']
+    for ch in getattr(guild, 'channels', ()):
+        cat = getattr(ch, 'category', None)
+        if ch.name == want and getattr(cat, 'name', None) == catname:
+            return ch
+    return None
+
+
+def _plain(key):
+    catname, spec = plan_spec(key)
+    return '#' + (spec['name'] if spec is not None else key.lower())
+
+
+def topic_text(guild, spec):
+    """The topic the plan gives a channel, as Discord should hold it (#3317).
+       A topic names another channel as <#KEY>, the way content.py does, and
+       that becomes a mention of the channel the plan has under that key, so
+       it follows the channel through a rename and never points at one that
+       is gone: #general-chat's hand-written topic sent bug reports to a
+       channel deleted since, which Discord shows as #unknown. A key whose
+       channel is not on the server becomes its name in plain words."""
+    topic = spec.get('topic')
+    if not topic:
+        return topic
+    def one(m):
+        ch = plan_channel(guild, m.group(1)) if guild is not None else None
+        return '<#%d>' % ch.id if ch is not None else _plain(m.group(1))
+    return re.sub(r'<#([A-Z_]+)>', one, topic)
+
+
+def topic_words(spec):
+    """The plan's topic for a reader of the layout doc: each <#KEY> as the
+       channel's name."""
+    return re.sub(r'<#([A-Z_]+)>', lambda m: _plain(m.group(1)), spec.get('topic') or '')
+
+
+def gone_mentions(guild, text):
+    """The ids of channels text mentions that are not on the server."""
+    have = set(getattr(c, 'id', None) for c in getattr(guild, 'channels', ()))
+    have.update(getattr(t, 'id', None) for t in getattr(guild, 'threads', ()) or ())
+    return [int(i) for i in re.findall(r'<#(\d+)>', text or '') if int(i) not in have]
+
+
 async def ensure_channel(guild, cat, spec, roles, found):
     name = spec['name']
     kind = spec['kind']
@@ -1772,20 +1850,20 @@ async def ensure_channel(guild, cat, spec, roles, found):
             elif kind == 'forum':
                 try:
                     existing = await guild.create_forum(
-                        want, category=cat, topic=spec.get('topic'),
+                        want, category=cat, topic=topic_text(guild, spec),
                         overwrites=ow, reason='Thornswood setup')
                 except Exception:
                     # No Community on this server yet. A text channel does the
                     # same job with less shape to it, and turning Community on
                     # later plus another run makes the forum.
                     existing = await guild.create_text_channel(
-                        want, category=cat, topic=spec.get('topic'),
+                        want, category=cat, topic=topic_text(guild, spec),
                         overwrites=ow, reason='Thornswood setup')
                     say('note', want + ' is a text channel for now, turn on '
                         'Community and run this again for a forum')
             else:
                 existing = await guild.create_text_channel(
-                    want, category=cat, topic=spec.get('topic'),
+                    want, category=cat, topic=topic_text(guild, spec),
                     overwrites=ow, reason='Thornswood setup')
             made.append('#' + want)
             say('channel', want)
@@ -1810,7 +1888,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
                 try:
                     await existing.delete(reason='wrong kind, rebuilding as a forum')
                     existing = await guild.create_forum(
-                        want, category=cat, topic=spec.get('topic'),
+                        want, category=cat, topic=topic_text(guild, spec),
                         overwrites=ow, reason='Thornswood setup')
                     made.append('#' + want + ' (rebuilt as a forum)')
                     say('rebuilt', want + ' is a forum now')
@@ -1820,12 +1898,13 @@ async def ensure_channel(guild, cat, spec, roles, found):
                 say('note', '#' + want + ' is a text channel where a forum was '
                     'wanted. The only fix for that deletes it, so ask first')
         kept.append('#' + want)
-        if spec.get('topic') and getattr(existing, 'topic', None) != spec['topic']:
+        topic = topic_text(guild, spec)
+        if topic and (getattr(existing, 'topic', None) or '') != topic:
             if CHECK:
-                say('would change', 'a server or channel setting')
+                say('would change', '#%s gets the plan\'s topic' % want)
             else:
                 try:
-                    await existing.edit(topic=spec['topic'])
+                    await existing.edit(topic=topic)
                 except discord.HTTPException as e:
                     failed.append('#%s kept its old topic (%s)' % (want, refused(e)))
         await keep_overwrites(existing, ow, '#' + want)
@@ -2717,7 +2796,7 @@ def layout():
                 notes.append('was #%s in %s' % (on, oc) if spec['kind'] != 'voice'
                              else 'was %s in %s' % (on, oc))
             if spec.get('topic'):
-                notes.append('topic: ' + spec['topic'].replace('|', '/'))
+                notes.append('topic: ' + topic_words(spec).replace('|', '/'))
             w('| %s | %s | %s | %s | %s | %s |' % (
                 _spec_name(spec), spec['kind'],
                 mode + (' (%s)' % (spec.get('hold') or spec.get('faction'))
@@ -2851,6 +2930,7 @@ async def audit(guild):
     print('\n  Categories and channels against the plan', flush=True)
     ours = set()
     docs = []
+    topics = []
     for catname, specs in PLAN:
         cat = discord.utils.get(guild.categories, name=catname) if catname else None
         if catname and cat is None:
@@ -2876,6 +2956,8 @@ async def audit(guild):
                 continue
             if spec.get('post') and spec.get('key') not in C.DRAFTS:
                 docs.append((ch, spec['key']))
+            if kind != 'voice':
+                topics.append((ch, spec))
             # A member's own overwrite is kept by the build, so it is not a
             # difference either.
             plan = with_members(ch.overwrites, spec_overwrites(guild, spec, roles))
@@ -2893,6 +2975,23 @@ async def audit(guild):
             line('#%s in %s is kept by name and not made by the plan' % (c.name, where))
         else:
             off('#%s in %s is not in the plan' % (c.name, where))
+
+    # Every channel's description (#3317, Patrick, 23 Oct: "We also need to
+    # go through and fix old descriptions"): the plan's, mentions and all,
+    # and none naming a channel that is gone, the plan's or not.
+    print('\n  Channel topics', flush=True)
+    for ch, spec in topics:
+        live = getattr(ch, 'topic', None) or ''
+        want = topic_text(guild, spec) or ''
+        if not spec.get('topic'):
+            if live:
+                off('#%s has a topic the plan does not set: "%s"' % (ch.name, live))
+        elif live != want:
+            off('#%s has the topic "%s"; the plan has "%s"' % (ch.name, live, want))
+    for c in guild.channels:
+        for i in gone_mentions(guild, getattr(c, 'topic', None)):
+            off('#%s\'s topic names a channel that is gone (<#%d>, which Discord '
+                'shows as #unknown)' % (c.name, i))
 
     # Every doc keeps its changelog (#3317), and the post links it (#3336).
     print('\n  Changelogs', flush=True)

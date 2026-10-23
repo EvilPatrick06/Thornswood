@@ -468,8 +468,12 @@ try:
     yes('  makes and moves no role',
         not any(c[0] in ('create_role', 'role.edit') for c in g.calls) and
         [(r.name, r.position) for r in g.roles] == roles_before)
-    yes('  changes no server setting, topic, post or webhook',
-        not any(c[0] in ('guild.edit', 'channel.edit', 'create_webhook', 'delete') for c in g.calls)
+    # #welcome-travelers has a topic in the plan since 23 Oct (#3317), and a
+    # channel named here gets its plan, topic included; nothing else does.
+    edits = [c for c in g.calls if c[0] == 'channel.edit']
+    yes('  changes no server setting, post or webhook, and no topic but the named channel\'s',
+        not any(c[0] in ('guild.edit', 'create_webhook', 'delete') for c in g.calls)
+        and [(c[1], sorted(c[2])) for c in edits] == [('welcome-travelers', ['topic'])]
         and 'would write' not in out and not os.path.exists(B.WEBHOOK_OUT))
     yes('  leaves #jukebox alone', not any(c[1] == 'jukebox' for c in g.calls))
     yes('  and says what it was limited to', 'Gamemasters, welcome-travelers. Nothing else was touched' in out)
