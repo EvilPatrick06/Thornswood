@@ -35,8 +35,10 @@ KEPT, whole, threads and all:
 EVERYTHING ELSE goes: every message in every text, announcement and voice
 channel, and every thread, open or archived, public or private, including
 every post in a forum. Both #news channels and #staff-updates included. In a
-channel that goes, the bot's own messages with buttons or a menu (its
-panels) stay, because the bot only edits those and its views answer them.
+channel that goes, these of the bot's stay: its panels (buttons or a menu),
+which it only edits and its views answer; the doc it pinned; and a channel's
+Changelog thread with the line that opens it, the record of what its doc
+said (#3336: the first run took #news's).
 
 Messages younger than two weeks go a hundred at a time; Discord deletes an
 older one only by itself, so a channel with years of chat takes a while.
@@ -69,7 +71,7 @@ sys.path.insert(0, HERE)
 KEEP_WORDS = ('rules', 'known-issues', 'test-tasks', 'instructions',
               'documentation')
 # And when its name is one of these.
-KEEP_NAMES = frozenset(('welcome', 'start-here', 'faq', 'lore',
+KEEP_NAMES = frozenset(('welcome', 'start-here', 'faq', 'lore', 'factions',
                         'tickets-and-applications', 'applications',
                         'choose-your-hold'))
 # Kept unless --wipe-records: what staff keep about people.
@@ -103,11 +105,27 @@ def why_kept(name, keep=(), wipe_records=False):
     return ''
 
 
+# The thread every doc channel keeps its changelog in (Build-Discord.py,
+# #3317). Never deleted, in any channel: the first wipe took #news's (#3336).
+CHANGELOG = 'Changelog'
+
+
 def is_panel(message, bot_id):
-    """The bot's own message with buttons or a menu: a panel it edits."""
+    """A message of the bot's that stays in a channel that is wiped: a panel
+       it edits (buttons or a menu), the doc it pinned, or the line that
+       opens its Changelog thread."""
     author = getattr(getattr(message, 'author', None), 'id', None)
-    return bool(bot_id is not None and author == bot_id
-                and getattr(message, 'components', None))
+    if bot_id is None or author != bot_id:
+        return False
+    if getattr(message, 'components', None) or getattr(message, 'pinned', False):
+        return True
+    return (getattr(message, 'type', None) == getattr(getattr(discord, 'MessageType', None), 'thread_created', object())
+            and (getattr(message, 'content', '') or '') == CHANGELOG)
+
+
+def keeps_thread(thread):
+    """A thread that stays in a channel that is wiped: a Changelog."""
+    return getattr(thread, 'name', None) == CHANGELOG
 
 
 def _load_env_file(argv):
@@ -183,7 +201,7 @@ async def work(args):
     for ch in rooms:
         where = '#%s (%s)' % (ch.name, cats.get(getattr(ch, 'category_id', None), 'no category'))
         why = why_kept(ch.name, args.keep, args.wipe_records)
-        mine = list((threads.get(ch.id) or {}).values())
+        mine = [t for t in (threads.get(ch.id) or {}).values() if not keeps_thread(t)]
         if why:
             say('KEEP  %s: %s' % (where, why))
             continue
