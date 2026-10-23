@@ -75,7 +75,12 @@ Yes '  the SHA-512 is checked first' ($hashAt -gt 0 -and $sigAt -gt $hashAt)
 Yes '  then the signature, both before the installer runs' ($runAt -gt $sigAt)
 Yes '  a mismatch or a bad signature deletes the download unrun' (
     ([regex]::Matches($block, 'Remove-Item -LiteralPath \$exe').Count -eq 2) -and
-    $block -match "\.Status\)`" -ne 'Valid'" -and $block -match "-notmatch '\^CN=Microsoft Corporation,'")
+    $block -match "\.Status\)`" -ne 'Valid' -or \`$who -ne \`$dotnetSigner")
+# Measured on the box on 23 Oct: .NET's installers are signed by this
+# subject, not by "CN=Microsoft Corporation" as Visual Studio's are, and
+# #3373's check, which asked for that, refused the real file.
+Yes '  by exactly the subject .NET''s installers are signed with' (
+    $block -match [regex]::Escape("`$dotnetSigner = 'CN=.NET, O=Microsoft Corporation, L=Redmond, S=Washington, C=US'"))
 Yes '  installed quietly with no restart, into a named log' ($block -match "'/install', '/quiet', '/norestart', '/log'")
 Yes '  and checked again after it ran' ($block -match '(?s)Start-Process.*\$rt = Test-SigningRuntime.*no runtime of 8 or later')
 Yes 'the report says whether the box has a runtime' ($boot -match "'dotnet', \`$\(if \(\`$rt\.Versions\.Count\)")

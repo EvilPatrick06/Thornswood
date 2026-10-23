@@ -36,12 +36,16 @@ and to its Microsoft signature, machine wide:
 .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'
 ```
 Prints ".NET runtime 10.0.13, for Microsoft's signing client", "checksum
-matched", "signature valid, CN=Microsoft Corporation", then ".NET runtime
+matched", "signature valid, CN=.NET", then ".NET runtime
 10.0.13 in C:\Program Files\dotnet\shared\Microsoft.NETCore.App", and in
 its "ready:" report a line `dotnet runtime 10.0.13`. It installs nothing
 else the box lacks unless asked (PowerShell 7 and Node are already there,
 so it says so and leaves them). If it stops on the checksum or the
-signature, nothing was installed: put the line on #3312.
+signature, nothing was installed: put the line on #3312. The first run,
+on 23 Oct after #3373, stopped there: the check asked for a signer of
+"CN=Microsoft Corporation", and .NET's installers are signed "CN=.NET,
+O=Microsoft Corporation, L=Redmond, S=Washington, C=US". The check now asks
+for exactly that subject.
 
 Then read it back the way the runner account will find it:
 ```
