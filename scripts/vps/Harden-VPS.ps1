@@ -29,10 +29,12 @@
        Disabled. Then telemetry off: DiskSnapshot.exe's, CompatTelRunner.exe's
        and the Customer Experience Improvement Program's tasks set to
        Disabled, and AllowTelemetry 0. Then Windows Update, which stays on,
-       installs every day at 4 AM box time, never restarts the box for an
-       update between 6 AM and midnight, and its automatic maintenance
-       starts at 4 AM, after the 2:15 AM backup and the nightly checks
-       (Patrick, 22 Oct 2026, #3213). Then PasswordAuthentication
+       installs every day at 4 AM box time, restarts the box 15 minutes
+       after an install that needs it, so in the 4 AM to 6 AM window, and
+       its automatic maintenance starts at 4 AM, after the 2:15 AM backup
+       and the nightly checks (Patrick, 22 Oct 2026, #3213). A restart
+       Windows set before that is said, WARN when it is outside the window,
+       and left. Then PasswordAuthentication
        no and KbdInteractiveAuthentication no in sshd_config, checked with
        sshd -t first, the old file kept beside it, and sshd restarted. Every
        line it prints says CHANGED, WOULD, ALREADY, KEPT, WARN or STOP.
