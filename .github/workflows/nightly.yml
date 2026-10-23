@@ -244,6 +244,13 @@ jobs:
           # Each on a clock, as in the step above: 300 seconds, then it and
           # everything it started are killed and it is named, and the rest
           # still run. Their output comes straight through as it is written.
+          #
+          # In UTF-8, as the bot itself runs (BotService.cs, Install-Bot.ps1)
+          # and as tests\bot-python.js runs it: the output goes to a pipe
+          # here, and Windows Python writes a pipe in the ANSI code page, so a
+          # harness that printed a channel name with an emoji in it died on
+          # the print (test-post-rules, test-wipe-channels, 23 Oct).
+          $env:PYTHONIOENCODING = 'utf-8'
           $env:DISCORD_TOKEN = 'not-a-real-token'
           $PER_HARNESS = 300
           $bad = 0

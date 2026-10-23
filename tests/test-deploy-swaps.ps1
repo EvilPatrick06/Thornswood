@@ -132,7 +132,13 @@ $utf8    = New-Object Text.UTF8Encoding($false)
 $runTag      = [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $TaskPrefix  = 'Thornswood Test ' + $runTag
 $BotService  = 'ThornswoodTest' + $runTag + 'Bot'
-foreach ($d in $farTemp, $tasks, $far) { $null = [IO.Directory]::CreateDirectory($d) }
+# The site the feed scripts read, a stand-in with nothing published on it.
+# Since #3324 Deploy-DevGamemode reads what the dev channel has already been
+# told before it sends a note, and without this it asked thornswood.net,
+# which a runner account may not reach and this harness never talks to.
+$site    = Join-Path $work 'site'
+$env:THORNSWOOD_TEST_SITE_DIR = $site
+foreach ($d in $farTemp, $tasks, $far, $site) { $null = [IO.Directory]::CreateDirectory($d) }
 
 function Put([string]$path, [string]$text) {
     $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $path))
