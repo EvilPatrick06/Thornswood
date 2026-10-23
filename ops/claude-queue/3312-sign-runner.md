@@ -8,7 +8,7 @@ lets the sign steps' Microsoft hosts through from Microsoft's published
 Service Tags). All merged before step 3 runs.
 
 What it needs before a release can fall back to the box: runner 3 carries
-the label `thornswood-sign`, has signtool and the .NET 8 runtime, and its
+the label `thornswood-sign`, has signtool and a .NET runtime (8 or later), and its
 outbound rules let the signing hosts through. Until then the box fallback
 stops, so a release only builds on GitHub's runner.
 
@@ -19,21 +19,35 @@ stops, so a release only builds on GitHub's runner.
 39841078720) exited 0. Since the runner 3 reach change, `Install-Runner.ps1
 -Number 3` registers the label as well, so a reinstall keeps it.
 
-## 2. signtool and the .NET 8 runtime on the box (the Desk, read only)
+## 2. signtool and the .NET runtime on the box (the Desk, touches the box)
 
 signtool: done on 22 Oct, `C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe`.
 
-The signing client's dlib runs on the .NET 8 runtime (its own README,
-"Install .NET 8.0 Runtime" for x64 signtool; Setup-ShipMachine.ps1 checks
-the same on One). Not read on the box yet:
+The signing client's dlib runs on .NET (its own README, "Install .NET 8.0
+Runtime" for x64 signtool; its runtimeconfig asks for net8.0 with
+rollForward "Major", so a newer runtime runs it). Read on the box by the
+Cloud Desk on 23 Oct: no .NET runtime at all, and no winget. So
+`Bootstrap-VPS.ps1 -IncludeSigningRuntime` installs one pinned release,
+.NET 10.0.13 (8's support ends 10 Nov 2026, 10's runs to 14 Nov 2028), from
+Microsoft's download host, held to the SHA-512 Microsoft publishes for it
+and to its Microsoft signature, machine wide:
 
 ```
-.\scripts\vps\Remote.ps1 "& 'C:\Program Files\dotnet\dotnet.exe' --list-runtimes"
+.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'
 ```
-Prints a `Microsoft.NETCore.App 8.` line or later. If the file is not
-there or no such line prints, write that on #3312 and install the runtime
-with the box's own installer path before step 4 (`winget install --id
-Microsoft.DotNet.Runtime.8 -e` is the one Setup-ShipMachine.ps1 names).
+Prints ".NET runtime 10.0.13, for Microsoft's signing client", "checksum
+matched", "signature valid, CN=Microsoft Corporation", then ".NET runtime
+10.0.13 in C:\Program Files\dotnet\shared\Microsoft.NETCore.App", and in
+its "ready:" report a line `dotnet runtime 10.0.13`. It installs nothing
+else the box lacks unless asked (PowerShell 7 and Node are already there,
+so it says so and leaves them). If it stops on the checksum or the
+signature, nothing was installed: put the line on #3312.
+
+Then read it back the way the runner account will find it:
+```
+.\scripts\vps\Remote.ps1 "Get-ChildItem 'C:\Program Files\dotnet\shared\Microsoft.NETCore.App' | ForEach-Object Name"
+```
+Prints `10.0.13`.
 
 ## 3. Runner 3's outbound rules (the Desk, touches the box)
 
