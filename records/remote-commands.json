@@ -974,7 +974,7 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "$need = Remote @\"",
-                      "does":  "checks pwsh, node, python and git are installed",
+                      "does":  "checks pwsh, node, python, git, MSBuild, the 4.8.1 references and WPF are installed, and on a signing runner signtool and a .NET runtime of 8 or later",
                       "class":  "read-status",
                       "reason":  "read only"
                   },
