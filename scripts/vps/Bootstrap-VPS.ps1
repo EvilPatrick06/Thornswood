@@ -13,6 +13,8 @@
                    4.8.1 targeting pack, for the build runners (below)
     Engine tools (optional, -IncludeEngineTools) the C++ compiler, CMake and
                    yarn, for the engine build's fallback on the runners (below)
+    .NET runtime (optional, -IncludeSigningRuntime) what Microsoft's signing
+                   client runs on, for the signing runner (below)
 
   What it deliberately does NOT install, unless -IncludeEngineTools asks:
     CMake, vcpkg, or the C++ half of Visual Studio Build Tools. The server
@@ -56,6 +58,23 @@
   Authenticode signature instead: valid, and signed by Microsoft Corporation,
   or it is deleted unrun.
 
+  THE .NET RUNTIME, FOR THE SIGNING RUNNER (#3312). release.yml's VPS
+  fallback signs on runner 3 with Microsoft's signing client, whose dlib runs
+  on .NET (its README: "Install .NET 8.0 Runtime" for x64 signtool). Measured
+  by the Cloud Desk on 23 Oct: the box had no .NET runtime at all and no
+  winget, so Setup-ShipMachine.ps1's winget line cannot put one here. So
+  -IncludeSigningRuntime installs one exact .NET runtime release from
+  Microsoft's own download host, held to the SHA-512 Microsoft publishes for
+  it in https://builds.dotnet.microsoft.com/dotnet/release-metadata/<major>/releases.json
+  and to its Authenticode signature, or the download is deleted unrun. It is
+  .NET 10, not 8: the client's runtimeconfig asks for net8.0 with rollForward
+  "Major", so it runs on the newest runtime there is when 8 is absent, and
+  .NET 8's support ends on 10 Nov 2026 while 10's runs to 14 Nov 2028.
+  Machine wide, into Program Files\dotnet, where the runner account's
+  signtool finds it. Like Node, one release, bumped on purpose: a security
+  release of 10 is a new -DotnetRuntimeVersion and -DotnetRuntimeSha512 here
+  and this run again.
+
   On the Node version: scam_native.node is a Node-API addon (it exports
   napi_register_module_v1 and links node-addon-api), and Node-API is ABI stable
   across major versions, so the 22.11.0 already on this box would load it. 24 is
@@ -91,6 +110,14 @@ param(
     # The yarn -IncludeEngineTools puts in Node's folder: classic, the release
     # the fork's yarn.lock files are written for.
     [string]$YarnVersion = '1.22.22',
+    # The .NET runtime Microsoft's signing client runs on, for the signing
+    # runner (#3312). See the header. The release and the SHA-512 of its
+    # win-x64 installer from Microsoft's releases.json for that major; bump
+    # both together, on purpose. 10.0.13 is the newest 10 on 23 Oct 2026, a
+    # security release of 13 Oct.
+    [switch]$IncludeSigningRuntime,
+    [string]$DotnetRuntimeVersion = '10.0.13',
+    [string]$DotnetRuntimeSha512  = '44da78e619ae23e352e81fbc3a5803d78b1375dff89c176dd17a884d4e42e17850bb7adb78c799ca15b2127b67529395df1143976e33f6c8157f53bfc5a42e62',
     [switch]$SkipFirewall
 )
 if ($IncludeEngineTools) { $IncludeBuildTools = $true }
@@ -296,6 +323,58 @@ if ($IncludeEngineTools) {
     }
 }
 
+# --- .NET runtime, only if asked (#3312) -------------------------------------
+# What Microsoft's signing client runs on. Asked of the shared runtime folder
+# of the machine wide install, the one a runner account's signtool loads it
+# from, rather than of PATH, which differs between accounts. 8 or later, the
+# same as Setup-ShipMachine.ps1 asks on One.
+function Test-SigningRuntime {
+    $pf = $env:ProgramW6432
+    if (-not $pf) { $pf = $env:ProgramFiles }
+    $shared = Join-Path $pf 'dotnet\shared\Microsoft.NETCore.App'
+    $have = @()
+    if (Test-Path -LiteralPath $shared) {
+        $have = @(Get-ChildItem -LiteralPath $shared -Directory -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -match '^(\d+)\.\d+\.\d+$' -and [int]$Matches[1] -ge 8 } |
+                  ForEach-Object { $_.Name })
+    }
+    @{ Folder = $shared; Versions = $have }
+}
+if ($IncludeSigningRuntime) {
+    $rt = Test-SigningRuntime
+    if ($rt.Versions.Count) {
+        Write-Host ".NET runtime already present: $($rt.Versions -join ', ')" -ForegroundColor Green
+    } else {
+        Write-Host ".NET runtime $DotnetRuntimeVersion, for Microsoft's signing client" -ForegroundColor Cyan
+        if ($DotnetRuntimeVersion -notmatch '^\d+\.\d+\.\d+$') { throw "DotnetRuntimeVersion $DotnetRuntimeVersion is not one release. Nothing was installed." }
+        if ($DotnetRuntimeSha512 -notmatch '^[0-9a-fA-F]{128}$') { throw "DotnetRuntimeSha512 is not a SHA-512. Nothing was installed." }
+        $name = "dotnet-runtime-$DotnetRuntimeVersion-win-x64.exe"
+        $exe = Join-Path $tmp $name
+        Write-Host "  downloading $name" -ForegroundColor DarkGray
+        Invoke-WebRequest -Uri "https://builds.dotnet.microsoft.com/dotnet/Runtime/$DotnetRuntimeVersion/$name" -OutFile $exe -UseBasicParsing
+        $got = (Get-FileHash -LiteralPath $exe -Algorithm SHA512).Hash
+        if ($got -ne $DotnetRuntimeSha512) {
+            Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue
+            throw "$name does not match the SHA-512 Microsoft publishes for it, so it was deleted unrun. Expected $DotnetRuntimeSha512, got $got. Nothing was installed."
+        }
+        Write-Host '  checksum matched' -ForegroundColor DarkGray
+        $sig = Get-AuthenticodeSignature -LiteralPath $exe
+        $who = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { '' }
+        if ("$($sig.Status)" -ne 'Valid' -or $who -notmatch '^CN=Microsoft Corporation,') {
+            Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue
+            throw "$name is not a valid Microsoft-signed file (status $($sig.Status), signer '$who'), so it was deleted unrun. Nothing was installed."
+        }
+        Write-Host "  signature valid, $($who.Split(',')[0])" -ForegroundColor DarkGray
+        $log = Join-Path $tmp "dotnet-runtime-$DotnetRuntimeVersion.log"
+        $p = Start-Process -FilePath $exe -ArgumentList @('/install', '/quiet', '/norestart', '/log', "`"$log`"") -Wait -PassThru
+        # 3010 is "done, a restart finishes it", as for the Build Tools.
+        if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw "The .NET runtime installer exited with $($p.ExitCode). Its log is $log." }
+        $rt = Test-SigningRuntime
+        if (-not $rt.Versions.Count) { throw "The .NET runtime installer finished (exit $($p.ExitCode)) but there is no runtime of 8 or later in $($rt.Folder)." }
+        Write-Host "  .NET runtime $($rt.Versions -join ', ') in $($rt.Folder)" -ForegroundColor Green
+    }
+}
+
 # --- firewall ---------------------------------------------------------------
 # SLikeNet is UDP. A TCP-only rule looks exactly like a dead server: the client
 # sits there and times out with nothing in the log to explain it.
@@ -341,6 +420,8 @@ Write-Host ("  {0,-6} {1}" -f 'msbuild', $(if ($bt.MSBuild -and $bt.Refs) { $bt.
 $et = Test-EngineTools
 Write-Host ("  {0,-6} {1}" -f 'c++', $(if ($et.Cpp -and $et.CMake) { "$($et.Cpp), with CMake" } elseif ($et.Cpp) { 'present, but no CMake' } else { 'not installed (-IncludeEngineTools for the engine build)' })) -ForegroundColor DarkGray
 Write-Host ("  {0,-6} {1}" -f 'yarn', $(if ($et.Yarn) { $et.Yarn } else { 'not installed (-IncludeEngineTools for the engine build)' })) -ForegroundColor DarkGray
+$rt = Test-SigningRuntime
+Write-Host ("  {0,-6} {1}" -f 'dotnet', $(if ($rt.Versions.Count) { "runtime $($rt.Versions -join ', ')" } else { 'no runtime (-IncludeSigningRuntime for the signing runner)' })) -ForegroundColor DarkGray
 $free = [math]::Round((Get-PSDrive C).Free / 1GB, 1)
 Write-Host ("  disk   {0} GB free on C:" -f $free) -ForegroundColor DarkGray
 

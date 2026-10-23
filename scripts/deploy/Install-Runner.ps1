@@ -1075,6 +1075,28 @@ $zipUrl = "https://github.com/actions/runner/releases/download/v$version/$zipNam
 Say "  actions/runner $version (pinned), SHA-256 $sha" 'Green'
 
 Head "What the build check needs, on $where"
+# A signing runner (#3312) also needs what release.yml's sign steps run:
+# signtool from the Windows SDK, found the way Sign-Artifact.ps1 finds it,
+# and a .NET runtime of 8 or later for Microsoft's signing client, asked of
+# the machine wide install the runner account loads it from.
+$signNeed = ''
+if ($signs) {
+  $signNeed = @'
+$st = $null
+foreach ($r in @("${env:ProgramFiles(x86)}\Windows Kits\10\bin", "$env:ProgramFiles\Windows Kits\10\bin")) {
+  if (-not (Test-Path -LiteralPath $r)) { continue }
+  $st = Get-ChildItem -LiteralPath $r -Recurse -Filter 'signtool.exe' -EA SilentlyContinue | Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+  if ($st) { break }
+}
+if ($st) { 'HAVE signtool ' + $st.FullName } else { 'MISSING signtool' }
+$pf = $env:ProgramW6432
+if (-not $pf) { $pf = $env:ProgramFiles }
+$rtDir = Join-Path $pf 'dotnet\shared\Microsoft.NETCore.App'
+$rt = @()
+if (Test-Path -LiteralPath $rtDir) { $rt = @(Get-ChildItem -LiteralPath $rtDir -Directory -EA SilentlyContinue | Where-Object { $_.Name -match '^(\d+)\.\d+\.\d+$' -and [int]$Matches[1] -ge 8 } | ForEach-Object { $_.Name }) }
+if ($rt.Count) { 'HAVE dotnet ' + ($rt -join ', ') } else { 'MISSING dotnet' }
+'@
+}
 $need = Remote @"
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine')
 foreach (`$c in 'pwsh','node','python','git') {
@@ -1089,6 +1111,7 @@ if (`$msb) { 'HAVE msbuild ' + `$msb } else { 'MISSING msbuild' }
 `$ref = Join-Path `$pf86 'Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1'
 if (Test-Path (Join-Path `$ref 'mscorlib.dll')) { 'HAVE net481refs ' + `$ref } else { 'MISSING net481refs' }
 try { Add-Type -AssemblyName PresentationFramework; 'HAVE wpf' } catch { 'MISSING wpf' }
+$signNeed
 "@
 $need | ForEach-Object { Say "  $_" }
 $missing = @($need | Where-Object { "$_" -like 'MISSING *' } | ForEach-Object { "$_".Substring(8) })
@@ -1097,6 +1120,8 @@ if ($missing.Count) {
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'msbuild' -or $missing -contains 'net481refs') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeBuildTools -SkipFirewall'   (MSBuild and the .NET Framework 4.8.1 reference assemblies the launcher builds with, #498)" }
+  if ($missing -contains 'signtool') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'   (signtool comes with the Windows SDK the C++ workload brings, #459)" }
+  if ($missing -contains 'dotnet') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'   (the .NET runtime Microsoft's signing client runs on, #3312)" }
   if ($missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
   Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }
