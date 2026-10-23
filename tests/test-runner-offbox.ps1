@@ -15,6 +15,10 @@
   Issue #2161: -NetworkOnly writes the outbound rules alone (no read deny,
   lock, account or service step), may name a VPS-label runner, and full
   -OffBox still refuses that label.
+  Issue #3312: the runner records\sign-runners.json lists is registered with
+  its label and, under -NetworkOnly, reaches the Microsoft service tags the
+  record names, read with Read-RunnerServiceTags and held to each host with
+  Get-RunnerReachMisses; the dry run writes stand-in tags and asks no one.
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -107,6 +111,9 @@ try {
     Yes "  and in -Lock, for every runner on the box (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("`$alsoDeny = $vpsAlso"))
     $r = Dry @('-Number', '5')
     Yes '  runner 5, which records\build-runners.json does not list, gets the VPS label alone and takes no builds (#2994)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-5' --labels 'thornswood-vps' --work")
+    # #3312: the runner records\sign-runners.json lists keeps its label through a reinstall.
+    $r = Dry @('-Number', '3')
+    Yes '  runner 3, which records\sign-runners.json lists, is registered with thornswood-sign and takes no builds (#3312)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-3' --labels 'thornswood-vps,thornswood-sign' --work")
     Yes '  GitHub still never asked' (-not (Test-Path -LiteralPath $ghCalled))
 
     # ---- Close-RunnerAccount on scratch folders, the off-box filter ---------
@@ -199,6 +206,31 @@ try {
     Yes '-NetworkOnly -Status counts the rules' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Get-RunnerFirewall $grdGroup'))
     $r = Dry @('-NetworkOnly', '-Lock')
     Yes "-NetworkOnly with -Lock is refused (exit $($r.Code))" ($r.Code -eq 1 -and -not $r.Text)
+
+    # ---- the signing runner's reach (#3312) ---------------------------------
+    $signRec = Get-Content -LiteralPath (Join-Path $Repo 'records\sign-runners.json') -Raw | ConvertFrom-Json
+    $hole4 = { param($t) $t -match [regex]::Escape("-198.51.99.255'") -and $t -match [regex]::Escape("'198.51.101.0-") }
+    $hole6 = { param($t) $t -match [regex]::Escape("-2001:db7:ffff:ffff:ffff:ffff:ffff:ffff'") -and $t -match [regex]::Escape("'2001:db9::-") }
+    $r = Dry @('-NetworkOnly', '-Number', '3')
+    Yes "-NetworkOnly -Number 3, the signing runner, ends 0 (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("`$grdAcct = 'thornswood-runner3'"))
+    Yes '  and lets its Microsoft tags through (stand-in 198.51.100.0/24 and 2001:db8::/32)' ((& $hole4 $r.Text) -and (& $hole6 $r.Text))
+    Yes '  naming every host records\sign-runners.json lists, with its tag' (@($signRec.reach.hosts | Where-Object { $r.Said -notmatch ([regex]::Escape($_.host + ': ' + $_.tag)) }).Count -eq 0)
+    Yes '  and still no lock step' ($r.Text -notmatch $noLock)
+    $r = Dry @('-NetworkOnly', '-Number', '4')
+    Yes '-NetworkOnly for a runner that does not sign gets no Microsoft hole' ($r.Code -eq 0 -and -not (& $hole4 $r.Text) -and $r.Said -notmatch 'api\.nuget\.org')
+    $r = Dry @('-OffBox', '-NetworkOnly', '-Number', '3')
+    Yes '  nor does an off-box runner, whatever its number' ($r.Code -eq 0 -and -not (& $hole4 $r.Text))
+
+    # Each host is the one the file that uses it names, so the record and the sign steps cannot drift apart.
+    $hosts = @($signRec.reach.hosts | ForEach-Object { [string]$_.host })
+    Yes 'records\sign-runners.json names each host once, each with a tag' ($hosts.Count -ge 5 -and @($hosts | Select-Object -Unique).Count -eq $hosts.Count -and -not @($signRec.reach.hosts | Where-Object { -not $_.tag -or -not $_.for }).Count)
+    $meta = Get-Content -LiteralPath (Join-Path $Repo 'records\signing\metadata.json') -Raw | ConvertFrom-Json
+    Yes '  the signing service is metadata.json''s Endpoint' ($hosts -contains ([Uri]$meta.Endpoint).Host)
+    $tmpl = Get-Content -LiteralPath (Join-Path $Repo 'records\signing\signing.template.json') -Raw | ConvertFrom-Json
+    Yes '  the timestamp is signing.template.json''s timestampUrl' ($hosts -contains ([Uri]$tmpl.timestampUrl).Host)
+    $pin = [regex]::Match([IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Setup-ShipMachine.ps1')), "Url\s*=\s*'(https://[^']+\.nupkg)'").Groups[1].Value
+    Yes '  the signing client comes from the host Setup-ShipMachine.ps1 pins' ($pin -and $hosts -contains ([Uri]$pin).Host)
+    Yes '  and Azure sign-in is there' ($hosts -contains 'login.microsoftonline.com')
     # ---- the range arithmetic ----------------------------------------------
     $rl = [regex]::Match($src, "(?s)\`$rangeLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the range library is where it was' ($rl -match 'function Get-RunnerBlockRanges')
@@ -210,6 +242,18 @@ try {
     $b = @(Get-RunnerBlockRanges @('10.0.0.1/8'))
     Yes 'host bits in a CIDR are ignored' ($b[0] -eq '0.0.0.0-9.255.255.255')
     Yes 'nothing to allow blocks everything' ((@(Get-RunnerBlockRanges @()) -join ',') -eq '0.0.0.0-255.255.255.255,::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')
+    # Microsoft's Service Tags file, the shape it has (#3312).
+    $st = '{"changeNumber":1,"cloud":"Public","values":[{"name":"AzureActiveDirectory","properties":{"addressPrefixes":["20.190.128.0/18","2603:1006:2000::/48"]}},{"name":"AzureFrontDoor.Frontend","properties":{"addressPrefixes":["150.171.110.0/24"]}},{"name":"Empty","properties":{"addressPrefixes":[]}}]}'
+    $tags = Read-RunnerServiceTags ([string][char]0xFEFF + $st) @('AzureActiveDirectory', 'AzureFrontDoor.Frontend', 'AzureActiveDirectory')
+    Yes 'Read-RunnerServiceTags: each tag''s ranges, a byte order mark and a repeated name taken in its stride' ($tags.Count -eq 2 -and ($tags['AzureActiveDirectory'] -join ',') -eq '20.190.128.0/18,2603:1006:2000::/48' -and ($tags['AzureFrontDoor.Frontend'] -join ',') -eq '150.171.110.0/24')
+    $why = ''; try { $null = Read-RunnerServiceTags $st @('AzureCloud.westus2') } catch { $why = $_.Exception.Message }
+    Yes '  a tag the file does not have stops it' ($why -match 'has 0 tags named AzureCloud\.westus2')
+    $why = ''; try { $null = Read-RunnerServiceTags $st @('Empty') } catch { $why = $_.Exception.Message }
+    Yes '  so does a tag with no range' ($why -match 'gives Empty no address range')
+    $why = ''; try { $null = Read-RunnerServiceTags ($st -replace '"Public"', '"AzureGovernment"') @('AzureActiveDirectory') } catch { $why = $_.Exception.Message }
+    Yes '  and a file that is not the Public cloud''s' ($why -match 'not Public')
+    $miss = @(Get-RunnerReachMisses @('20.190.155.66', '150.171.110.194', '48.192.88.101', '2603:1006:2000::1', '2603:1006:2001::1') @('20.190.128.0/18', '150.171.110.0/24', '2603:1006:2000::/48'))
+    Yes 'Get-RunnerReachMisses: an address outside every range is named, IPv4 or IPv6, and one inside is not' (($miss -join ',') -eq '48.192.88.101,2603:1006:2001::1')
 
     # ---- the guards themselves, on stand-ins and scratch folders -----------
     $gl = [regex]::Match($src, "(?s)\`$guardLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
