@@ -33,6 +33,7 @@ import asyncio
 import contextlib
 import importlib.util
 import io
+import itertools
 import os
 import shutil
 import sys
@@ -78,16 +79,19 @@ ATTACH_FILES = 1 << 15
 # not, and a public channel needs nothing for the bot.
 RESTRICTED = ('read', 'open', 'membersread', 'testersread', 'hold', 'holdread',
               'holdcourt', 'holdguard', 'staff', 'staffread', 'council',
-              'pathfind', 'space', 'spaceread', 'spacerules', 'faction', 'seats')
+              'pathfind', 'space', 'spaceread', 'spacerules', 'faction',
+              'factionread', 'factionlead', 'factionseats')
 # The hold a hold mode is asked about, where one is needed, and the staff
 # space a space mode is asked about (#3317).
 HOLD = 'Whiterun'
 SPACE = 'Gamemasters'
+FACTION = 'The Companions'
 
 
 def ow_for(guild, mode, roles):
     return B.overwrites(guild, mode, roles, HOLD if mode.startswith('hold') else None,
-                        space=SPACE if mode.startswith('space') else None)
+                        space=SPACE if mode.startswith('space') else None,
+                        faction=FACTION if mode.startswith('faction') else None)
 
 
 def bot_writes(g, me):
@@ -143,6 +147,9 @@ class Member(object):
         return '<member %d>' % self.id
 
 
+PLACES = itertools.count(100)
+
+
 class Channel(object):
     """A channel or a category. Records every write into guild.calls."""
 
@@ -155,6 +162,17 @@ class Channel(object):
         self.ow = dict(ow or {})
         self.channels = []
         self.refuse = False
+        # Made in the plan's order, so the sidebar is the plan's (#3317).
+        self.id = next(PLACES)
+        self.position = self.id
+
+    @property
+    def type(self):
+        if self.kind in ('voice', 'create_voice_channel'):
+            return discord.ChannelType.voice
+        if self.kind in ('category', 'create_category'):
+            return discord.ChannelType.category
+        return discord.ChannelType.text
 
     @property
     def overwrites(self):
@@ -220,6 +238,8 @@ class Guild(object):
                 id=int(f.read().strip()), name='staff-updates')
         self.public_updates_channel = self.staff_updates
         self.safety_alerts_channel = self.staff_updates
+        self._state = types.SimpleNamespace(http=types.SimpleNamespace(
+            bulk_channel_update=self._positions))
 
     async def _made(self, what, name, **kw):
         self.calls.append((what, name, kw))
@@ -228,6 +248,14 @@ class Guild(object):
     async def create_role(self, name=None, **kw):
         self.calls.append(('create_role', name, kw))
         return Role(name, 9999)
+
+    async def _positions(self, guild_id, payload, reason=None):
+        """The one request that sets the sidebar's order (#3317)."""
+        self.calls.append(('positions', None, payload))
+        at = dict((p['id'], p['position']) for p in payload)
+        for ch in self.channels + self.categories:
+            if ch.id in at:
+                ch.position = at[ch.id]
 
     async def create_category(self, name, **kw):
         return await self._made('create_category', name, **kw)
@@ -664,10 +692,13 @@ try:
         not before_bot[by_name['news']])
     yes('  but not out of #say-hello, which is open to everybody',
         before_bot[by_name['say-hello']])
-    tickets = by_name['tickets-and-applications']
-    yes('  and in #tickets-and-applications it could open a ticket thread but '
-        'not write in it, even with the running set on its role',
-        not resolve(g, me, tickets).send_messages_in_threads)
+    # Every ticket desk (#3317, q-3317-ticket-split, A), by its key in PLAN.
+    tickets = [by_name[s['name']] for _c, specs in B.PLAN for s in specs
+               if s.get('key') in B.TICKET_KEYS]
+    yes('  and in each of the %d ticket channels it could open a ticket thread '
+        'but not write in it, even with the running set on its role' % len(tickets),
+        len(tickets) == 5
+        and not any(resolve(g, me, t).send_messages_in_threads for t in tickets))
 
     said = run(g, True)
     yes('-Check writes nothing to any channel',
@@ -714,15 +745,15 @@ try:
         all(resolve(g, p, c).value == before_them[(p, c)]
             for p in people for c in everything))
     yes('nothing failed', not B.failed)
-    p = resolve(g, me, tickets)
-    yes('without Administrator the bot opens a private thread in '
-        '#tickets-and-applications and writes the ticket into it',
-        p.create_private_threads and p.send_messages_in_threads)
-    o = tickets.ow.get(me)
-    yes('  and its overwrite there is the three plus Create Private Threads and '
+    yes('without Administrator the bot opens a private thread in every ticket '
+        'channel and writes the ticket into it',
+        all(resolve(g, me, t).create_private_threads
+            and resolve(g, me, t).send_messages_in_threads for t in tickets))
+    yes('  and its overwrite in each is the three plus Create Private Threads and '
         'Send Messages in Threads, and denies nothing',
-        o is not None and o.pair()[0].value == WANT | (1 << 36) | (1 << 38)
-        and o.pair()[1].value == 0)
+        all(t.ow.get(me) is not None
+            and t.ow[me].pair()[0].value == WANT | (1 << 36) | (1 << 38)
+            and t.ow[me].pair()[1].value == 0 for t in tickets))
     join = by_name['welcome-travelers']
     o = join.ow.get(me)
     yes('its overwrite in #welcome-travelers is the three plus Attach Files, '
@@ -737,10 +768,7 @@ try:
             (n, True) for n in B.DOC_BOT_NEEDS)).value for c in docs))
     yes('  and every other channel it writes gets the three and nothing more',
         all(c.ow[me].pair()[0].value == WANT for c in wrote
-            if c is not tickets and c is not join and c not in docs))
-    yes('the build ends without the invite when the client cannot say which '
-        'application it is, rather than a link with no id in it',
-        'oauth2/authorize' not in said)
+            if c not in tickets and c is not join and c not in docs))
 
     said = run(g, False)
     yes('a second run writes nothing, so it asks nothing of Discord once '
@@ -754,30 +782,24 @@ try:
         gets_in(resolve(g, boss, by_name['test-tasks']))
         and gets_in(resolve(g, boss, by_name['staff-general'])))
 
-    # ---------------------------------- the invite a finished build ends on --
+    # ------------------------------- no invite, no untick, since #3317 --
+    # The bot keeps Administrator (Patrick, 22 Oct 2026: "the bot will keep
+    # admin"), so a finished build no longer ends on a smaller invite and a
+    # line saying to untick it.
     g, roles, people, news, loose = live_server()
     Client.application_id = 123456789012345678
     try:
         said = run(g, False)
-        link = ('https://discord.com/oauth2/authorize?client_id=123456789012345678'
-                '&scope=bot&permissions=%d' % B.RUN_PERMISSIONS)
-        yes('a build with nothing failed ends on the invite with the running set',
-            link in said)
-        yes('  and on the line saying to untick Administrator on the bot\'s role, '
-            'naming it', 'untick Administrator' in said and 'Thornswood Bot' in said
-            and said.index('untick Administrator') > said.index(link))
-        yes('  and never asks for 8', 'permissions=8&' not in said
-            and not said.rstrip().endswith('permissions=8'))
-        said = run(g, True)
-        yes('-Check does not, because nothing was built',
+        yes('a build with nothing failed does not end on an invite',
             'oauth2/authorize' not in said)
-        g, roles, people, news, loose = live_server()
-        by_name = dict((c.name, c) for c in g.channels)
-        by_name['staff-general'].refuse = True
-        said = run(g, False)
-        yes('nor does a build where something failed, because the run that '
-            'fixes it still wants Administrator',
-            B.failed and 'oauth2/authorize' not in said)
+        yes('  nor on a line saying to untick Administrator',
+            'untick' not in said.lower())
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            B.say_invite(123456789012345678)
+        yes('--invite gives the link with Administrator, permissions 8',
+            'client_id=123456789012345678&scope=bot&permissions=8' in buf.getvalue()
+            and 'untick' not in buf.getvalue().lower())
     finally:
         del Client.application_id
 

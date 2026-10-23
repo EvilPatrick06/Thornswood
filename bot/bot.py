@@ -206,6 +206,45 @@ TICKETS = [n.strip().lower() for n in
            if n.strip()]
 TICKETS_SAID = ' or #'.join(TICKETS)
 
+# THE TICKET DESKS (#3317, Patrick's page card q-3317-ticket-split, A): one
+# channel a kind of ticket, each with a panel offering only its kinds, and the
+# private threads open off it. A Tickets category holds help and reports, an
+# Applications category the three kinds of application; Build-Discord.py makes
+# them by these names. TICKETS above is the one channel of before the split,
+# #tickets-and-applications. It is used only on a server that has none of
+# these, so a server not yet built again keeps working, and where it is still
+# there beside them its panel says where the tickets went.
+TICKET_DESKS = [
+    ('get-help',          ('help',)),
+    ('report-someone',    ('report',)),
+    ('apply-to-playtest', ('playtest',)),
+    ('apply-for-a-seat',  ('jarl', 'faction')),
+    ('apply-for-staff',   ('gamemaster', 'loremaster', 'moderator', 'dev', 'creator')),
+]
+# Every channel a ticket thread can be off.
+TICKET_NAMES = [d for d, _k in TICKET_DESKS] + [n for n in TICKETS
+                                                  if n not in dict(TICKET_DESKS)]
+
+
+def desk_of(kind):
+    """The desk channel a kind of ticket opens in, by name."""
+    for desk, kinds in TICKET_DESKS:
+        if kind in kinds:
+            return desk
+    return None
+
+
+def ticket_channel(guild, kind):
+    """The channel this kind of ticket opens its thread off: its desk, or on a
+       server not yet split, the one channel of before."""
+    desk = desk_of(kind)
+    ch = by_name(guild, [desk]) if desk else None
+    if ch is not None:
+        return ch
+    if any(by_name(guild, [d]) is not None for d, _k in TICKET_DESKS):
+        return None
+    return by_name(guild, TICKETS)
+
 # Where a closed ticket is written down, and it is NOT the channel above.
 # Everybody who can apply can read that one, so a closed application posted
 # there is somebody else's answers sitting in front of the next person
@@ -464,6 +503,9 @@ class Thornswood(TrustedClient):
                 % ', '.join(UPPER_STAFF_IGNORED))
         warn_upper_staff_config()
         self.add_view(TicketPanel())          # so it keeps working after a restart
+        for desk, _kinds in TICKET_DESKS:     # and every desk's (#3317)
+            if desk_kinds(desk):
+                self.add_view(TicketPanel(desk))
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
         self.add_view(OfficePanel())          # and a Jarl's office buttons (#2551)
@@ -674,11 +716,12 @@ async def log_channel(guild, make=True):
             if _role_hit(r, STAFF_IDS, STAFF_NAMES):
                 over[r] = discord.PermissionOverwrite(view_channel=True,
                                                       send_messages=True)
-        where = by_name(guild, TICKETS)
+        # In Staff, where Build-Discord.py has #ticket-log (#3317).
+        where = discord.utils.get(getattr(guild, 'categories', None) or [], name='Staff')
         ch = await guild.create_text_channel(
             free[0],
             overwrites=over,
-            category=(where.category if where is not None else None),
+            category=where,
             topic='Every ticket that gets closed, with a link back to it, and '
                   'any ticket whose private thread would not open. Staff only.')
         log('made #%s for closed tickets, staff only' % ch.name)
@@ -1578,13 +1621,14 @@ class TicketModal(discord.ui.Modal):
         head = '%s opened this. %s' % (who.mention,
                                        ' '.join(r.mention for r in staff_roles))
 
-        ch = by_name(guild, TICKETS)
+        ch = ticket_channel(guild, self.kind)
         why = None
         opened = None
         posted = False
 
         if ch is None:
-            why = ('there is no text channel called #%s in this server' % TICKETS_SAID)
+            why = ('there is no text channel called #%s in this server'
+                   % (desk_of(self.kind) or TICKETS_SAID))
             log(why)
         else:
             why = thread_block(guild, ch)
@@ -1962,7 +2006,7 @@ def ticket_refusal(interaction):
 def is_ticket_thread(ch):
     """
     True for a thread a ticket opened: one off a channel named in
-    TICKET_CHANNEL, which is the only place TicketModal opens one. A ticket
+    TICKET_DESKS or TICKET_CHANNEL, the only places TicketModal opens one. A ticket
     that could not have its thread goes into the TICKET_LOG channel as a
     plain message, never a thread, so that channel has none to close.
 
@@ -1977,7 +2021,7 @@ def is_ticket_thread(ch):
     if not isinstance(ch, discord.Thread):
         return False
     name = getattr(ch.parent, 'name', None)
-    return bool(name) and name.lower() in TICKETS
+    return bool(name) and name.lower() in TICKET_NAMES
 
 
 def faction_leader_label():
@@ -2153,7 +2197,7 @@ async def age_closed_tickets(guild, bot_id, now):
     cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
     deleted = failed = 0
     for ch in getattr(guild, 'text_channels', []):
-        if (getattr(ch, 'name', '') or '').lower() not in TICKETS:
+        if (getattr(ch, 'name', '') or '').lower() not in TICKET_NAMES:
             continue
         due = []
         try:
@@ -2209,18 +2253,34 @@ async def watch_closed_tickets():
 
 
 class TicketPanel(discord.ui.View):
-    def __init__(self):
+    """One desk's panel (TICKET_DESKS), offering only its kinds, or with desk
+       None the one panel of before the split, offering every kind. A desk
+       with no kind to offer today (the playtest one while the world is
+       open) is its words alone."""
+
+    def __init__(self, desk=None):
         super().__init__(timeout=None)
-        self.add_item(TicketPicker())
+        if desk_kinds(desk):
+            self.add_item(TicketPicker(desk))
+
+
+def desk_kinds(desk):
+    """The KINDS a desk's panel offers, in KINDS' order; every one for None."""
+    if desk is None:
+        return list(KINDS)
+    want = dict(TICKET_DESKS).get(desk, ())
+    return [k for k in KINDS if k[0] in want]
 
 
 class TicketPicker(discord.ui.Select):
-    def __init__(self):
+    def __init__(self, desk=None):
         super().__init__(
-            custom_id='thornswood:ticket',
+            # A custom_id of its own a desk, so a press on any posted panel
+            # is answered after a restart; the one of before keeps its own.
+            custom_id='thornswood:ticket' + ('' if desk is None else ':' + desk),
             placeholder='What do you need?',
             options=[discord.SelectOption(label=lab, value=k, description=desc[:100])
-                     for k, lab, desc in KINDS])
+                     for k, lab, desc in desk_kinds(desk)])
 
     async def callback(self, interaction):
         # Told here, before the form opens, so nobody types out a whole
@@ -2235,34 +2295,61 @@ class TicketPicker(discord.ui.Select):
         await interaction.response.send_modal(TicketModal(k, lab, interaction.guild))
 
 
+_PANEL_THREAD = ('It asks a few questions, then opens a thread only you and staff '
+                 'can see. Nothing here is public and nobody else in the server '
+                 'can read it.')
 _PANEL_TOP = ('**Open a ticket**\n\n'
-              'Pick the one that fits. It asks a few questions, then opens a thread '
-              'only you and staff can see. Nothing here is public and nobody else in '
-              'the server can read it.\n\n')
-_PANEL_JOBS = ('**Apply: Jarl** and **Apply: Faction Leader** are '
-               'answered in character, and list only the seats nobody holds. A '
-               'Jarl is a faction leader with an application of its own, because '
-               'a hold is a seat like no other. A faction has one leader. ' +
-               STAFF_LEADERSHIP_RULE + ' Somebody who holds a seat cannot apply '
-               'for staff either.\n\n'
+              'Pick the one that fits. ' + _PANEL_THREAD + '\n\n')
+_PANEL_SEATS = ('**Apply: Jarl** and **Apply: Faction Leader** are '
+                'answered in character, and list only the seats nobody holds. A '
+                'Jarl is a faction leader with an application of its own, because '
+                'a hold is a seat like no other. A faction has one leader. ' +
+                STAFF_LEADERSHIP_RULE + ' Somebody who holds a seat cannot apply '
+                'for staff either.')
+_PANEL_ANSWER = 'Applying for one does not give you it. Somebody reads it and answers.'
+_PANEL_JOBS = (_PANEL_SEATS + '\n\n'
                'The jobs below that are open to anybody already in, and they are jobs '
                'rather than titles: each one is work somebody is currently doing '
-               'instead of you.\n\n'
-               'Applying for one does not give you it. Somebody reads it and answers.')
-PANEL_ALPHA = (_PANEL_TOP +
-               'Thornswood is in alpha, and the world is open by application. Anyone '
-               'can download it. **Apply to be an alpha playtester** is the one '
-               'everybody starts with: once it is accepted you get the Playtester '
-               'role, and that is what lets you press Play. It asks whether you are '
-               '18 or over and whether you accept the rules, so read #rules first. '
-               'Your answers are kept against your Discord account.\n\n' +
-               _PANEL_JOBS)
-PANEL_OPEN = (_PANEL_TOP +
-              'Thornswood is open: anyone in the Discord can play, so there is '
-              'nothing to apply for to get in. Read #rules, because being here '
-              'and in the world means accepting them.\n\n' +
-              _PANEL_JOBS)
+               'instead of you.\n\n' + _PANEL_ANSWER)
+_PANEL_PLAY_ALPHA = ('Thornswood is in alpha, and the world is open by application. Anyone '
+                     'can download it. **Apply to be an alpha playtester** is the one '
+                     'everybody starts with: once it is accepted you get the Playtester '
+                     'role, and that is what lets you press Play. It asks whether you are '
+                     '18 or over and whether you accept the rules, so read #rules first. '
+                     'Your answers are kept against your Discord account.')
+_PANEL_PLAY_OPEN = ('Thornswood is open: anyone in the Discord can play, so there is '
+                    'nothing to apply for to get in. Read #rules, because being here '
+                    'and in the world means accepting them.')
+PANEL_ALPHA = _PANEL_TOP + _PANEL_PLAY_ALPHA + '\n\n' + _PANEL_JOBS
+PANEL_OPEN = _PANEL_TOP + _PANEL_PLAY_OPEN + '\n\n' + _PANEL_JOBS
 PANEL = PANEL_ALPHA
+
+
+def desk_panel(desk):
+    """A desk's words, for the world as it is now (OPEN); PANEL for None."""
+    if desk == 'get-help':
+        return ('**Get help**\n\n'
+                'It will not install, will not start or will not connect, or '
+                'something else is wrong that staff can fix. Pick **I need help** '
+                'below. ' + _PANEL_THREAD)
+    if desk == 'report-someone':
+        return ('**Report somebody**\n\n'
+                'Something happened and it should not have. Pick **Report '
+                'somebody** below. ' + _PANEL_THREAD + ' The person you report '
+                'never sees it.')
+    if desk == 'apply-to-playtest':
+        if OPEN:
+            return '**Apply to play**\n\n' + _PANEL_PLAY_OPEN
+        return '**Apply to play**\n\n' + _PANEL_PLAY_ALPHA + ' ' + _PANEL_THREAD
+    if desk == 'apply-for-a-seat':
+        return ('**Apply for a seat**\n\n' + _PANEL_SEATS + '\n\n' + _PANEL_THREAD +
+                '\n\n' + _PANEL_ANSWER)
+    if desk == 'apply-for-staff':
+        return ('**Apply for staff**\n\n'
+                'These are jobs rather than titles: each one is work somebody is '
+                'currently doing instead of you. Somebody who holds a Jarl seat or '
+                'leads a faction cannot apply. ' + _PANEL_THREAD + '\n\n' + _PANEL_ANSWER)
+    return PANEL
 
 # THE ONE SWITCH (#428), read off the site so there is one copy of it: the
 # site's config.json "open", which /api/public hands out. Off, which is today,
@@ -2328,11 +2415,11 @@ def _panel_options(msg):
     return pairs
 
 
-def _panel_wanted():
-    return [(k, lab) for k, lab, _ in KINDS]
+def _panel_wanted(desk=None):
+    return [(k, lab) for k, lab, _ in desk_kinds(desk)]
 
 
-def panel_is_current(msg):
+def panel_is_current(msg, desk=None):
     """
     True when the posted panel already says what it should, text and options.
 
@@ -2342,7 +2429,8 @@ def panel_is_current(msg):
     a real fault: too eager and the panel is edited on every reconnect, too
     lazy and a ticket kind added later never appears for anybody.
     """
-    return getattr(msg, 'content', None) == PANEL and _panel_options(msg) == _panel_wanted()
+    return (getattr(msg, 'content', None) == desk_panel(desk)
+            and _panel_options(msg) == _panel_wanted(desk))
 
 
 # Which servers staff have been told cannot open ticket threads, and why, so
@@ -2351,15 +2439,41 @@ _told_blocked = set()
 
 
 async def ensure_panel(guild):
-    ch = by_name(guild, TICKETS)
-    if ch is None:
+    """Every desk's panel (TICKET_DESKS), current, in its own channel. On a
+       server not yet split, the one panel of before in TICKETS; where that
+       channel is still there beside the desks, its panel says where they
+       went (#3317, q-3317-ticket-split)."""
+    desks = [(d, by_name(guild, [d])) for d, _k in TICKET_DESKS]
+    here = [(d, ch) for d, ch in desks if ch is not None]
+    old = by_name(guild, TICKETS)
+    if not here and old is None:
         names = ', '.join('#' + c.name for c in guild.text_channels) or 'none'
-        log('there is no text channel called #%s in "%s", so there is no panel '
-            'and no tickets. Text channels there: %s. Set TICKET_CHANNEL in '
-            'bot.env.json to one of those and run Install-Bot.ps1 again.'
-            % (TICKETS_SAID, guild.name, names))
+        log('there is no ticket channel in "%s": none of #%s, and no #%s, so there '
+            'is no panel and no tickets. Text channels there: %s. Build-Discord.py '
+            'makes them.' % (guild.name, ', #'.join(d for d, _k in TICKET_DESKS),
+                             TICKETS_SAID, names))
         return
 
+    book = await log_channel(guild)
+    if book is not None:
+        log('closed tickets are written down in #%s' % book.name)
+
+    if not here:
+        await desk_ready(guild, old, None, book)
+        return
+    gone = [d for d, ch in desks if ch is None]
+    if gone:
+        log('there is no #%s in "%s", so those tickets have nowhere to open. '
+            'Build-Discord.py makes them.' % (', #'.join(gone), guild.name))
+    for d, ch in here:
+        await desk_ready(guild, ch, d, book)
+    if old is not None:
+        await point_old_panel(old, here)
+
+
+async def desk_ready(guild, ch, desk, book):
+    """One desk's channel: who cannot use /close there, whether a private
+       thread can be opened in it, and its panel posted or made current."""
     # Said at startup rather than the first time somebody applies, because the
     # first time somebody applies is the worst moment to find out.
     # Slash commands are a permission of their own, and it is granted per
@@ -2380,10 +2494,6 @@ async def ensure_panel(guild):
             'for them there. Turn it on in that channel\'s permissions. The '
             'Close button on the ticket works for them either way.'
             % (', '.join(blocked), ch.name))
-
-    book = await log_channel(guild)
-    if book is not None:
-        log('closed tickets are written down in #%s' % book.name)
 
     why = thread_block(guild, ch)
     if why:
@@ -2409,15 +2519,19 @@ async def ensure_panel(guild):
         # posted one keeps answering through the view setup_hook registers.
         # All it would do is take away the one way to report somebody, on the
         # night that way is broken.
-        if (guild.id, why) not in _told_blocked:
-            _told_blocked.add((guild.id, why))
+        if (guild.id, ch.name, why) not in _told_blocked:
+            _told_blocked.add((guild.id, ch.name, why))
             await trouble_say('**Tickets cannot open a private thread:** ' + fix)
     else:
         log('ticket threads look fine in #%s' % ch.name)
 
     try:
+        head = desk_panel(desk).split('\n', 1)[0]
         async for m in ch.history(limit=30):
-            if m.author.id == client.user.id and m.components:
+            # Its words alone when it has no kind to offer, so found by its
+            # first line as well as by a dropdown.
+            if m.author.id == client.user.id and (
+                    m.components or (m.content or '').startswith(head)):
                 # The options a dropdown offers live in the message that was
                 # posted, not in the View this process builds on startup. So
                 # leaving the old message alone is exactly why a ticket kind
@@ -2433,16 +2547,47 @@ async def ensure_panel(guild):
                 # compared: comparing the text alone puts back the bug above,
                 # where a kind added later never appeared because the words
                 # around it had not changed.
-                if panel_is_current(m):
+                if panel_is_current(m, desk):
                     log('ticket panel is already current in #%s' % ch.name)
                     return
-                await m.edit(content=PANEL, view=TicketPanel())
+                await m.edit(content=desk_panel(desk), view=TicketPanel(desk))
                 log('ticket panel updated in #%s' % ch.name)
                 return
-        await ch.send(PANEL, view=TicketPanel())
+        await ch.send(desk_panel(desk), view=TicketPanel(desk))
         log('ticket panel posted in #%s' % ch.name)
     except Exception:
         log('panel failed:\n' + traceback.format_exc())
+
+
+
+
+MOVED_HEAD = '**Tickets have moved**'
+
+
+def moved_text(here):
+    return (MOVED_HEAD + '\n\nEvery kind of ticket has a channel of its own now: ' +
+            ', '.join(ch.mention for _d, ch in here) + '. Open yours there. A '
+            'ticket already open here stays open until staff close it.')
+
+
+async def point_old_panel(old, here):
+    """The one panel of before, in a channel the desks replaced and -Prune has
+       not deleted yet: its dropdown taken off, and where each desk is said.
+       A ticket thread still open off it keeps working."""
+    text = moved_text(here)
+    try:
+        async for m in old.history(limit=30):
+            if m.author.id != client.user.id:
+                continue
+            if m.content == text and not m.components:
+                return
+            if m.components or (m.content or '').startswith(MOVED_HEAD):
+                await m.edit(content=text, view=None)
+                log('the old panel in #%s now says where the tickets went' % old.name)
+                return
+    except Exception:
+        log('the old panel in #%s could not be changed:\n' % old.name
+            + traceback.format_exc())
 
 
 # ------------------------------------------------------ holds and pings --
@@ -3099,22 +3244,69 @@ async def ensure_office_panel(guild):
 # Build-Discord.py with its "<short name> Leader" role, and the Leader is
 # whoever holds that role. Like a Jarl's offices: their own faction only, and
 # when two accounts hold one Leader role neither acts until staff take it
-# from all but one. The panel is in #seats, which every Jarl and faction
-# Leader reads. A change goes in bot.log and in Discord's audit log with its
-# reason; it is not said to staff, because staff have nothing to do about it
-# (Patrick, 22 Oct: #staff-updates only when staff must act).
-FACTION_PANEL = ('**Faction members**\n\n'
-                 'The Leader of a faction gives and takes its member role '
-                 'here, for their own faction only. Press Add member or '
-                 'Remove member, then pick the person.')
-FACTION_PANEL_CHANNEL = [n.strip().lower() for n in
-                         os.environ.get('FACTION_PANEL_CHANNEL', 'seats').split(',')
-                         if n.strip()]
+# from all but one.
+#
+# Patrick, 22 Oct, later: "seats should be in a different channel like how
+# the holds have the add member add court add a steward so one for each
+# faction in it's category", and on page card q-3317-faction-category, C:
+# "One Officer role, not Court and Steward". So each faction has its own
+# category, and in it its own seats channel with this panel: Add and Remove
+# for its members and its Officers ("<short> Officer"). The faction is the
+# channel's. The shared #seats it was in until then is retired; its old panel
+# says where the panels went until -Prune deletes it.
+#
+# A change goes in bot.log and in Discord's audit log with its reason; it is
+# not said to staff, because staff have nothing to do about it (Patrick,
+# 22 Oct: #staff-updates only when staff must act).
+FACTION_OFFICES = [('member', 'member'), ('officer', 'Officer')]
+FACTION_LABELS = {
+    'member': ('Add member', 'Remove member'),
+    'officer': ('Add Officer', 'Remove Officer'),
+}
+# The one shared panel of before, in #seats.
+OLD_FACTION_PANEL_CHANNEL = ['seats']
+
+
+def faction_slug(faction):
+    """A faction's channel name: its short name, lower case, hyphens, as
+       Build-Discord.py names its channels."""
+    return FACTION_SHORT.get(faction, faction).lower().replace(' ', '-')
+
+
+def faction_seats(faction):
+    """The channel a faction's panel is in: "#companions-seats"."""
+    return faction_slug(faction) + '-seats'
+
+
+def faction_role(office, faction):
+    """A faction's role for an office, as Build-Discord.py makes it."""
+    short = FACTION_SHORT.get(faction, faction)
+    if office == 'officer':
+        return short + ' Officer'
+    return short
 
 
 def faction_member_role(faction):
     """The member role of a named faction: "Thalmor"."""
-    return FACTION_SHORT.get(faction, faction)
+    return faction_role('member', faction)
+
+
+def faction_of_channel(ch):
+    """The faction whose seats channel this is, or None."""
+    name = (getattr(ch, 'name', '') or '').lower()
+    for f in faction_names():
+        if faction_seats(f) == name:
+            return f
+    return None
+
+
+def faction_panel_text(faction):
+    return ('**%s: seats**\n\n'
+            'The Leader of %s gives and takes its roles here: its members and '
+            'its Officers. Press a button, then pick the person. Only the '
+            'Leader can use them. An Officer is a member first, and taking '
+            'somebody\'s membership takes their Officer role with it.'
+            % (faction, faction))
 
 
 def led_factions(member):
@@ -3133,10 +3325,19 @@ LEADER_TWICE = ('Two accounts hold the %s role, so neither acts as its Leader '
                 'until staff take it from all but one.')
 
 
-async def faction_press(interaction, add):
-    """Add member or Remove member: works out the presser's faction first."""
+async def faction_press(interaction, add, office='member'):
+    """A button on a faction's panel: that faction's, by the channel it is
+       in, for its Leader only. Off a seats channel (the old shared panel),
+       the presser's own faction, asked which when they lead two."""
     guild, who = interaction.guild, interaction.user
     led = led_factions(who) if guild is not None else []
+    here = faction_of_channel(getattr(interaction, 'channel', None))
+    if here is not None:
+        if here not in led:
+            await _say(interaction, 'Only the Leader of %s uses these buttons.' % here)
+            return
+        await faction_for(interaction, here, add, office)
+        return
     if not led:
         await _say(interaction, 'Only the Leader of a faction gives its member '
                                 'role. A Leader is whoever holds that faction\'s '
@@ -3145,18 +3346,25 @@ async def faction_press(interaction, add):
     if len(led) > 1:
         await interaction.response.send_message(
             'You lead more than one faction. Which one?',
-            view=FactionPick(add, led), ephemeral=True)
+            view=FactionPick(add, led, office), ephemeral=True)
         return
-    await faction_for(interaction, led[0], add)
+    await faction_for(interaction, led[0], add, office)
 
 
-async def faction_for(interaction, faction, add):
-    """The picker for one faction: a member to give the role, or a holder to take it from."""
+def _faction_ask(faction, office):
+    if office == 'officer':
+        return 'Who becomes an Officer of %s?' % faction
+    return 'Who joins %s?' % faction
+
+
+async def faction_for(interaction, faction, add, office='member'):
+    """The picker for one faction and office: a person to give the role, or a
+       holder to take it from."""
     guild = interaction.guild
     if leader_held_twice(guild, faction):
         await _say(interaction, LEADER_TWICE % faction_leader_role(faction))
         return
-    name = faction_member_role(faction)
+    name = faction_role(office, faction)
     role = _role(guild, name)
     if role is None or not _can_give(guild, role):
         log('cannot give %s: the role is missing, or the bot has no Manage '
@@ -3166,7 +3374,7 @@ async def faction_for(interaction, faction, add):
         return
     if add:
         await interaction.response.send_message(
-            'Who joins %s?' % faction, view=FactionGive(faction), ephemeral=True)
+            _faction_ask(faction, office), view=FactionGive(faction, office), ephemeral=True)
         return
     holders = [m for m in list(getattr(role, 'members', None) or [])
                if not getattr(m, 'bot', False)]
@@ -3175,23 +3383,26 @@ async def faction_for(interaction, faction, add):
         return
     await interaction.response.send_message(
         'Take the %s role from whom?' % name,
-        view=FactionTake(faction, holders[:25]), ephemeral=True)
+        view=FactionTake(faction, holders[:25], office), ephemeral=True)
 
 
-async def faction_change(interaction, faction, member, add):
+async def faction_change(interaction, faction, member, add, office='member'):
     """
-    Give or take the member role, with every rule asked again at the moment
-    of the change: the presser still holds the faction's Leader role, nobody
-    else does, and the role is one the bot may give.
+    Give or take one of the faction's roles, with every rule asked again at
+    the moment of the change: the presser still holds the faction's Leader
+    role, nobody else does, and the role is one the bot may give. The
+    Officer role goes only to a member, and taking the member role takes it
+    with it.
     """
     guild, who = interaction.guild, interaction.user
     if guild is None or faction not in led_factions(who):
-        await _say(interaction, 'Only the Leader of %s gives its member role.' % faction)
+        await _say(interaction, 'Only the Leader of %s gives its %s.' % (
+            faction, 'member role' if office == 'member' else 'roles'))
         return
     if leader_held_twice(guild, faction):
         await _say(interaction, LEADER_TWICE % faction_leader_role(faction))
         return
-    name = faction_member_role(faction)
+    name = faction_role(office, faction)
     role = _role(guild, name)
     if role is None or not _can_give(guild, role):
         await _say(interaction, 'The %s role cannot be given out right now. Ask '
@@ -3211,84 +3422,115 @@ async def faction_change(interaction, faction, member, add):
     if not add and not has:
         await _say(interaction, '%s does not hold the %s role.' % (shown, name))
         return
+    if add and office != 'member':
+        joined = _role(guild, faction_member_role(faction))
+        if joined is None or joined not in member.roles:
+            await _say(interaction, '%s is not a member of %s. Add them as a '
+                                    'member first.' % (shown, faction))
+            return
     by = getattr(who, 'display_name', None) or str(who)
     reason = '%s by %s, Leader of %s, on the faction panel' % (
         'Given' if add else 'Taken', by, faction)
+    # Leaving the faction leaves its offices too.
+    also = []
+    if not add and office == 'member':
+        also = [r for r in (_role(guild, faction_role(o, faction))
+                            for o, _ in FACTION_OFFICES if o != 'member')
+                if r is not None and r in member.roles]
     try:
         if add:
             await member.add_roles(role, reason=reason)
         else:
-            await member.remove_roles(role, reason=reason)
+            for r in [role] + also:
+                await member.remove_roles(r, reason=reason)
     except Exception:
         log('faction change failed:\n' + traceback.format_exc())
         await _say(interaction, 'That did not go through. Try again, or ask staff.')
         return
     log('faction: %s (%s), Leader of %s, %s %s (%s) the %s role'
-        % (by, who.id, faction, 'gave' if add else 'took from', shown, member.id, name))
-    await _say(interaction, ('%s holds the %s role now.' if add
-                             else '%s no longer holds the %s role.') % (shown, name))
+        % (by, who.id, faction, 'gave' if add else 'took from', shown, member.id,
+           ', '.join([name] + [r.name for r in also])))
+    if add:
+        said = '%s holds the %s role now.' % (shown, name)
+    elif also:
+        said = '%s no longer holds the %s role, nor %s.' % (
+            shown, name, ' or '.join(r.name for r in also))
+    else:
+        said = '%s no longer holds the %s role.' % (shown, name)
+    await _say(interaction, said)
 
 
 class FactionButton(discord.ui.Button):
-    def __init__(self, add):
-        super().__init__(label='Add member' if add else 'Remove member',
+    def __init__(self, add, office='member', row=None):
+        add_label, remove_label = FACTION_LABELS[office]
+        # The member buttons keep the custom_id the one shared panel had.
+        tail = '' if office == 'member' else ':' + office
+        super().__init__(label=add_label if add else remove_label,
                          style=(discord.ButtonStyle.primary if add
                                 else discord.ButtonStyle.secondary),
-                         custom_id='thornswood:faction:%s' % ('add' if add else 'remove'))
+                         custom_id='thornswood:faction:%s%s' % ('add' if add else 'remove', tail),
+                         row=row)
         self.add = add
+        self.office = office
 
     async def callback(self, interaction):
-        await faction_press(interaction, self.add)
+        await faction_press(interaction, self.add, self.office)
 
 
 class FactionPanel(discord.ui.View):
-    """Persistent, like the office panel: Add member and Remove member."""
+    """Persistent, like the office panel: Add and Remove for each of the
+       faction's roles, a row each. The same buttons in every faction's seats
+       channel; the channel says which faction."""
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(FactionButton(True))
-        self.add_item(FactionButton(False))
+        for row, (office, _label) in enumerate(FACTION_OFFICES):
+            self.add_item(FactionButton(True, office, row))
+            self.add_item(FactionButton(False, office, row))
 
 
 class FactionPickSelect(discord.ui.Select):
-    def __init__(self, add, factions):
+    def __init__(self, add, factions, office='member'):
         super().__init__(placeholder='The faction',
                          options=[discord.SelectOption(label=f[:100], value=f) for f in factions[:25]])
         self.add = add
+        self.office = office
 
     async def callback(self, interaction):
-        await faction_for(interaction, self.values[0], self.add)
+        await faction_for(interaction, self.values[0], self.add, self.office)
 
 
 class FactionPick(discord.ui.View):
-    def __init__(self, add, factions):
+    def __init__(self, add, factions, office='member'):
         super().__init__(timeout=180)
-        self.add_item(FactionPickSelect(add, factions))
+        self.add_item(FactionPickSelect(add, factions, office))
 
 
 class FactionGiveSelect(discord.ui.UserSelect):
-    def __init__(self, faction):
+    def __init__(self, faction, office='member'):
         super().__init__(placeholder='The person', min_values=1, max_values=1)
         self.faction = faction
+        self.office = office
 
     async def callback(self, interaction):
         picked = self.values[0] if self.values else None
         member = picked if hasattr(picked, 'roles') else (
             interaction.guild.get_member(getattr(picked, 'id', 0)) if interaction.guild else None)
-        await faction_change(interaction, self.faction, member, True)
+        await faction_change(interaction, self.faction, member, True, self.office)
 
 
 class FactionGive(discord.ui.View):
-    def __init__(self, faction):
+    def __init__(self, faction, office='member'):
         super().__init__(timeout=180)
-        self.add_item(FactionGiveSelect(faction))
+        self.add_item(FactionGiveSelect(faction, office))
 
 
 class FactionTakeSelect(discord.ui.Select):
-    def __init__(self, faction, holders):
+    def __init__(self, faction, holders, office='member'):
         super().__init__(placeholder='The person', options=[
             discord.SelectOption(label=(getattr(m, 'display_name', None) or str(m))[:100],
                                  value=str(m.id)) for m in holders])
         self.faction = faction
+        self.office = office
 
     async def callback(self, interaction):
         try:
@@ -3296,46 +3538,88 @@ class FactionTakeSelect(discord.ui.Select):
         except (TypeError, ValueError, IndexError):
             mid = 0
         member = interaction.guild.get_member(mid) if interaction.guild else None
-        await faction_change(interaction, self.faction, member, False)
+        await faction_change(interaction, self.faction, member, False, self.office)
 
 
 class FactionTake(discord.ui.View):
-    def __init__(self, faction, holders):
+    def __init__(self, faction, holders, office='member'):
         super().__init__(timeout=180)
-        self.add_item(FactionTakeSelect(faction, holders))
+        self.add_item(FactionTakeSelect(faction, holders, office))
 
 
-def faction_panel_is_current(msg):
-    return (getattr(msg, 'content', None) == FACTION_PANEL and
-            _hold_ids(msg) == ['thornswood:faction:add', 'thornswood:faction:remove'])
+def faction_panel_ids():
+    return [b.custom_id for b in FactionPanel().children]
+
+
+def faction_panel_is_current(msg, faction):
+    return (getattr(msg, 'content', None) == faction_panel_text(faction) and
+            _hold_ids(msg) == faction_panel_ids())
+
+
+FACTION_MOVED_HEAD = '**Faction panels have moved**'
 
 
 async def ensure_faction_panel(guild):
-    """The faction member panel in #seats, found again by its own buttons."""
-    ch = by_name(guild, FACTION_PANEL_CHANNEL)
-    if ch is None:
-        log('no #%s yet, so the faction member panel waits for Build-Discord.py '
-            'to make it' % FACTION_PANEL_CHANNEL[0])
-        return
-    missing = [faction_member_role(f) for f in faction_names()
-               if _role(guild, faction_member_role(f)) is None]
+    """Each faction's panel in its own seats channel, found again by its own
+       buttons; the old shared one in #seats told where they went."""
+    missing = [faction_role(o, f) for f in faction_names() for o, _ in FACTION_OFFICES
+               if _role(guild, faction_role(o, f)) is None]
     if missing:
-        log('these faction member roles are missing, so they cannot be given '
-            'until Build-Discord.py makes them: %s' % ', '.join(missing))
+        log('these faction roles are missing, so they cannot be given until '
+            'Build-Discord.py makes them: %s' % ', '.join(missing))
+    here = []
+    nowhere = []
+    for f in faction_names():
+        ch = by_name(guild, [faction_seats(f)])
+        if ch is None:
+            nowhere.append(faction_seats(f))
+            continue
+        here.append(ch)
+        await _faction_panel_in(ch, f)
+    if nowhere:
+        log('no #%s yet, so those factions\' panels wait for Build-Discord.py '
+            'to make them' % ', #'.join(nowhere))
+    old = by_name(guild, OLD_FACTION_PANEL_CHANNEL)
+    if old is not None and here:
+        await _old_faction_panel(old, here)
+
+
+async def _faction_panel_in(ch, faction):
+    text = faction_panel_text(faction)
     try:
         async for m in ch.history(limit=30):
             if (m.author.id == client.user.id and m.components and
                     any(i.startswith('thornswood:faction:') for i in _hold_ids(m))):
-                if faction_panel_is_current(m):
+                if faction_panel_is_current(m, faction):
                     log('faction panel is already current in #%s' % ch.name)
                     return
-                await m.edit(content=FACTION_PANEL, view=FactionPanel())
+                await m.edit(content=text, view=FactionPanel())
                 log('faction panel updated in #%s' % ch.name)
                 return
-        await ch.send(FACTION_PANEL, view=FactionPanel())
+        await ch.send(text, view=FactionPanel())
         log('faction panel posted in #%s' % ch.name)
     except Exception:
-        log('faction panel failed:\n' + traceback.format_exc())
+        log('faction panel failed in #%s:\n' % ch.name + traceback.format_exc())
+
+
+async def _old_faction_panel(old, here):
+    text = (FACTION_MOVED_HEAD + '\n\nEach faction has its own seats channel '
+            'now, in its own category, with its Leader\'s buttons for its '
+            'members and its Officers.')
+    try:
+        async for m in old.history(limit=30):
+            if m.author.id != client.user.id:
+                continue
+            if m.content == text and not m.components:
+                return
+            if (m.components and any(i.startswith('thornswood:faction:') for i in _hold_ids(m))) \
+                    or (m.content or '').startswith(FACTION_MOVED_HEAD):
+                await m.edit(content=text, view=None)
+                log('the old faction panel in #%s now says where the panels went' % old.name)
+                return
+    except Exception:
+        log('the old faction panel in #%s could not be changed:\n' % old.name
+            + traceback.format_exc())
 
 
 # ------------------------------------------------------- testing channels --

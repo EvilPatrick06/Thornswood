@@ -306,7 +306,9 @@ section(function () {
     adminProfiles: [500], staffRoleProfiles: [500],
     // The hold offices by profile (#2551), from the Discord roles.
     offices: { 500: { jarl: ['whiterun'], court: [], steward: [], guard: ['riften'] } },
-    devRoleProfiles: [500], businessOwnerProfiles: [500], factionOwnerProfiles: [500] });
+    devRoleProfiles: [500], businessOwnerProfiles: [500],
+    // Each faction's Leader role and who holds it (#3317).
+    factionLeaderProfiles: { 'Companions Leader': [500] } });
   const fakeFs = {
     readFileSync: function (p) { if (!Object.prototype.hasOwnProperty.call(files, p)) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; } return files[p]; },
     writeFileSync: function (p, s) { files[p] = String(s); }, appendFileSync: function () { }, existsSync: function () { return true; },
@@ -345,19 +347,24 @@ section(function () {
     yes('and a proved profile still needs the role itself', box.__thornswoodIsAdmin(501) === false && box.__thornswoodIsAllowed(501) === true);
   }
   /*
-    The book roles (#1417): staff, Dev, Business Owner and Faction Owner, which
-    decide who may found or open a group book. The same rule as the five above:
-    nothing for a profile the pass has not proved.
+    The book roles (#1417): staff, Dev, Business Owner and the faction Leader
+    roles held (#3317), which decide who may found or open a group book. The
+    same rule as the five above: nothing for a profile the pass has not proved.
   */
   if (ran && typeof box.__thornswoodBookRoles === 'function') {
-    const roles = ['staff', 'dev', 'business', 'faction'];
+    const roles = ['staff', 'dev', 'business'];
+    const led = function (r) { return Array.isArray(r.leads) ? r.leads.join() : 'none'; };
     delete trusted[500];
     const before = box.__thornswoodBookRoles(500);
-    yes('the book roles are all no for a profile the pass has not proved', roles.every(function (r) { return before[r] === false; }));
+    yes('the book roles are all no for a profile the pass has not proved',
+        roles.every(function (r) { return before[r] === false; }) && led(before) === '');
     trusted[500] = true;
     const after = box.__thornswoodBookRoles(500);
-    yes('and all yes once proved, for a profile that holds them', roles.every(function (r) { return after[r] === true; }));
-    yes('and a proved profile with none of them holds none', roles.every(function (r) { return box.__thornswoodBookRoles(501)[r] === false; }));
+    yes('and all yes once proved, for a profile that holds them',
+        roles.every(function (r) { return after[r] === true; }) && led(after) === 'Companions Leader');
+    const none = box.__thornswoodBookRoles(501);
+    yes('and a proved profile with none of them holds none',
+        roles.every(function (r) { return none[r] === false; }) && led(none) === '');
   } else {
     yes('the book roles answer is in the door (#1417)', false);
   }

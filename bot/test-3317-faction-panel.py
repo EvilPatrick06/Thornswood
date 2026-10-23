@@ -5,11 +5,18 @@ A faction's Leader gives and takes its member role from a bot panel (#3317,
 Patrick, 22 Oct, page card q-3317-faction-member-give, A). The same shape as
 a Jarl's office panel (#2551):
 
-  P1 the panel is a persistent view of Add member and Remove member, and
-     setup_hook registers it; it lives in #seats and is found again by its
-     own buttons
-  P2 the member role the bot gives is the one Build-Discord.py makes, for
-     every faction in factions.json
+Later the same day each faction got its own category, and in it its own
+seats channel with the Leader's buttons for its members and its Officers
+(page card q-3317-faction-category, C: "One Officer role, not Court and
+Steward"):
+
+  P1 the panel is a persistent view of Add and Remove for the members (the
+     custom ids the one shared panel had) and the Officers, and
+     setup_hook registers it; it is in each faction's #<faction>-seats, found
+     again by its own buttons, and the old shared #seats panel is edited to
+     say where the panels went, with no buttons
+  P2 every role the bot gives is one Build-Discord.py makes, by the same
+     name, for every faction in factions.json
   L1 a press by somebody who leads no faction is refused, only to them
   L2 the Companions Leader's Add asks who, and the pick gives Companions,
      with the reason in Discord's audit log; it is not said to staff
@@ -18,6 +25,10 @@ a Jarl's office panel (#2551):
   L5 while two accounts hold the Companions Leader role, neither does anything
   L6 a bot is given nothing, and somebody already holding it is told so
   L7 somebody leading two factions is asked which first
+  S1 a press in #companions-seats is for the Companions, with no question;
+     somebody who leads another faction is refused there
+  S2 the Officer role goes only to a member, and taking somebody's
+     membership takes their Officer role with it
 
 The builder and bot.py are imported for real, the builder under another name
 so its __main__ block never runs. Read only. Never connects to anything.
@@ -68,24 +79,38 @@ bot.report_say = staff_say
 
 # ------------------------------------------------------------------ P1 --
 ids = [i.custom_id for i in bot.FactionPanel().children]
-yes('P1 the panel is two buttons, Add member and Remove member',
-    ids == ['thornswood:faction:add', 'thornswood:faction:remove']
-    and [i.label for i in bot.FactionPanel().children] == ['Add member', 'Remove member'])
+yes('P1 the panel is Add and Remove for the members and for the Officers',
+    ids == ['thornswood:faction:add', 'thornswood:faction:remove',
+            'thornswood:faction:add:officer', 'thornswood:faction:remove:officer']
+    and [i.label for i in bot.FactionPanel().children]
+    == ['Add member', 'Remove member', 'Add Officer', 'Remove Officer']
+    and [i.row for i in bot.FactionPanel().children] == [0, 0, 1, 1])
 hook = inspect.getsource(bot.Thornswood.setup_hook)
 yes('P1 setup_hook registers it, so the buttons outlive a restart',
     'add_view(FactionPanel())' in hook)
-src = inspect.getsource(bot.ensure_faction_panel)
-yes('P1 it is in #seats, found again by its own buttons, posted at start',
-    bot.FACTION_PANEL_CHANNEL == ['seats'] and 'seats' in dict(
-        (s['name'], s) for s in dict(B.PLAN)['Factions'])
+src = inspect.getsource(bot.ensure_faction_panel) + inspect.getsource(bot._faction_panel_in)
+planned = set(s['name'] for f in B.FACTIONS for s in dict(B.PLAN)[f])
+yes('P1 it is in each faction\'s seats channel, the one the builder makes, found again by its own buttons',
+    all(bot.faction_seats(f) in planned and
+        bot.faction_seats(f) in [s['name'] for s in dict(B.PLAN)[f]] for f in B.FACTIONS)
+    and bot.faction_seats('The Companions') == 'companions-seats'
     and "startswith('thornswood:faction:')" in src
     and 'await ensure_faction_panel(g)' in inspect.getsource(bot.on_ready))
+yes('P1 the old shared panel is in #seats, which the builder retires',
+    bot.OLD_FACTION_PANEL_CHANNEL == ['seats'] and 'seats' in B.RETIRED
+    and 'seats' not in planned)
+yes('P1 each faction\'s panel names its faction, and is current only with its own words',
+    'The Companions' in bot.faction_panel_text('The Companions')
+    and bot.faction_panel_text('The Companions') != bot.faction_panel_text('Thalmor Remnant'))
 
 # ------------------------------------------------------------------ P2 --
 yes('P2 the bot gives each faction the member role the builder makes, by the same short name',
     [bot.faction_member_role(f) for f in bot.faction_names()] == list(B.FACTION_MEMBERS)
     and [bot.faction_leader_role(f) for f in bot.faction_names()] == list(B.FACTION_LEADERS)
     and bot.FACTION_SHORT == B.FACTION_SHORT)
+yes('P2 and the Officer role the builder makes',
+    all(bot.faction_role('officer', f) == B.faction_roles(f)[1] for f in bot.faction_names())
+    and bot.faction_role('officer', 'Thalmor Remnant') == 'Thalmor Officer')
 
 
 # ------------------------------------------------------- a pretend server --
@@ -156,17 +181,24 @@ class Response(object):
             self.views.append(view)
 
 
+class Channel(object):
+    def __init__(self, name):
+        self.name = name
+
+
 class Interaction(object):
-    def __init__(self, guild, user):
+    def __init__(self, guild, user, channel=None):
         self.guild = guild
         self.user = user
+        self.channel = channel
         self.response = Response()
 
 
 def world():
     g = Guild()
     roles = {}
-    for n in ['Companions Leader', 'Companions', 'Thalmor Leader', 'Thalmor', 'Member']:
+    for n in ['Companions Leader', 'Companions', 'Companions Officer',
+              'Thalmor Leader', 'Thalmor', 'Member']:
         roles[n] = g.role(n)
     g.me.top_role = Role(g, 'Thornswood Bot', 999)
     people = {
@@ -178,9 +210,9 @@ def world():
     return g, roles, people
 
 
-async def press(guild, who, add):
-    i = Interaction(guild, who)
-    await bot.faction_press(i, add)
+async def press(guild, who, add, office='member', channel=None):
+    i = Interaction(guild, who, Channel(channel) if channel else None)
+    await bot.faction_press(i, add, office)
     return i
 
 
@@ -251,6 +283,45 @@ async def main():
         'Which one?' in pick.response.said[0][0] and pick.response.views
         and [o.value for o in pick.response.views[0].children[0].options]
         == ['Thalmor Remnant', 'The Companions'])
+
+    g, roles, p = world()
+    i = await press(g, p['kodlak'], True, 'officer', 'companions-seats')
+    yes('S1 the Add Officer press in #companions-seats asks who, for the Companions, with no question first',
+        i.response.said and i.response.said[0] == ('Who becomes an Officer of The Companions?', True))
+    thal = g.member('Ancano', [roles['Thalmor Leader']])
+    i = await press(g, thal, True, 'member', 'companions-seats')
+    yes('S1 the Thalmor Leader is refused in #companions-seats, only to them',
+        i.response.said == [('Only the Leader of The Companions uses these buttons.', True)]
+        and not i.response.views)
+    # Kodlak steps down first, so one account holds each Leader role.
+    p['kodlak'].roles.remove(roles['Companions Leader'])
+    thal.roles.remove(roles['Thalmor Leader'])
+    both = g.member('Two Seats', [roles['Companions Leader'], roles['Thalmor Leader']])
+    i = await press(g, both, True, 'officer', 'companions-seats')
+    yes('S1 somebody leading two factions is not asked which in a faction\'s own seats channel',
+        i.response.said and i.response.said[0] == ('Who becomes an Officer of The Companions?', True))
+    both.roles.remove(roles['Companions Leader'])
+    p['kodlak'].roles.append(roles['Companions Leader'])
+
+    c = Interaction(g, p['kodlak'])
+    await bot.faction_change(c, 'The Companions', p['aela'], True, 'officer')
+    yes('S2 the Officer role goes only to a member, and says so',
+        'is not a member of The Companions' in c.response.said[0][0]
+        and roles['Companions Officer'] not in p['aela'].roles)
+    for office in ('member', 'officer'):
+        await bot.faction_change(Interaction(g, p['kodlak']), 'The Companions', p['aela'], True, office)
+    yes('S2 a member is made an Officer',
+        all(roles[n] in p['aela'].roles for n in ('Companions', 'Companions Officer')))
+    out = Interaction(g, p['kodlak'])
+    await bot.faction_change(out, 'The Companions', p['aela'], False)
+    yes('S2 taking the membership takes the Officer role with it, and says so',
+        not any(roles[n] in p['aela'].roles for n in ('Companions', 'Companions Officer'))
+        and out.response.said[0][0] == ('Aela no longer holds the Companions role, nor '
+                                        'Companions Officer.'))
+    st = Interaction(g, p['kodlak'])
+    await bot.faction_change(st, 'The Companions', p['nobody'], False, 'officer')
+    yes('S2 Remove Officer from somebody who is not an Officer changes nothing',
+        'does not hold the Companions Officer role' in st.response.said[0][0])
 
 asyncio.run(main())
 

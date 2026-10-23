@@ -102,8 +102,9 @@ const lookedAtFor = () => [];
 // writes back (entry 142).
 eval(grab('guildMembers') + '\n' + grab('memberOf') + '\n' + grab('roleNames') + '\n' + grab('standing') +
      '\n' + route('function holdsStaffRole(') +
-     // The Business Owner, Faction Owner and Dev roles standing reads by name (#1417, #1420).
-     '\n' + route('function holdsNamedRole(') +
+     // The Business Owner and Dev roles standing reads by name (#1417, #1420),
+     // and the faction Leader roles by their shape (#3317).
+     '\n' + route('function holdsNamedRole(') + '\n' + route('function leaderRoles(') +
      '\n' + grab('standingCached') + '\n' + grab('hasLeft') + '\n' + grab('departed') +
      '\n' + route('function notAcceptedYet(') +
      // What a banned account is told at Play (#1010).

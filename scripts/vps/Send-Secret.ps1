@@ -99,7 +99,22 @@ function Invoke-ThornswoodSecretRemote {
 # A secret asked for from the person at the keyboard, hidden as it is typed or
 # pasted, so it is in no command line, no history file and no console buffer
 # (issue #1069). Hands back the plain value, '' when nothing was given.
+#
+# With no keyboard, the value is one line of standard input (#3216). A cloud
+# Desk runs these scripts with no console, and there Read-Host -AsSecureString
+# on a redirected standard input ended the whole script on the spot, with exit
+# code 0 and nothing printed, so a run looked finished when nothing had been
+# sent (measured in PowerShell 7.6, 22 Oct 2026). A value piped in is still on
+# no command line and in no file: the caller pipes it from what it holds, as
+#   $value | pwsh -NoProfile -File scripts/deploy/Set-Turnstile.ps1 -PublicSiteKey 0x...
+# A trailing CR from a Windows pipe is dropped; nothing else is changed.
 function Read-ThornswoodSecret([string]$Prompt) {
+    if ([Console]::IsInputRedirected) {
+        Write-Host ($Prompt + ': read from standard input')
+        $line = [Console]::In.ReadLine()
+        if ($null -eq $line) { return '' }
+        return $line.TrimEnd("`r")
+    }
     return (ConvertFrom-ThornswoodSecureString (Read-Host $Prompt -AsSecureString))
 }
 

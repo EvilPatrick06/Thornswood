@@ -184,6 +184,8 @@ $gm = Get-Content -LiteralPath $gamemode -Raw
 Yes 'the door asks <site>/api/allowed' ($gm.Contains("String(conf.site).replace(/\/+`$/, '') + '/api/allowed'"))
 $js = Get-Content -LiteralPath $siteJs -Raw
 Yes 'the site answers /dev/api/allowed' ($js.Contains("const devDoor = (route === '/dev/api/allowed');"))
-Yes 'and that list is only people with the dev role' ($js.Contains('if (devDoor && !st.dev) continue;'))
+# Since #3317 the dev server lets in the dev build's list (access.devBuild:
+# Owner, Co-Owner, Dev and the leads), not the staff list access.dev.
+Yes 'and that list is only people the dev build is for' ($js.Contains('if (devDoor && !st.devBuild) continue;'))
 
 Done
