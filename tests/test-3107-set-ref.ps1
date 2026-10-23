@@ -32,12 +32,18 @@
          GONE; a branch that moved on, one an open pull request comes from
          or is built onto, and the default branch each stop and delete
          nothing.
+       - a dev launcher tag (v<a.b.c.d>) on the commit given that no
+         release names is one DELETE, DELETED (#3312); one already gone is
+         GONE; one on another commit, one a draft or a published release
+         names, a main tag (v<a.b.c>) and a release/ tag each stop and
+         delete nothing.
     3. Set-Ref.ps1 in a session, against a stand-in for gh: it starts
        git-ref.yml on main with the inputs on gh's standard input, reads the
        runner's annotation and says what it did, exit 0; a stopped runner is
        1; a run not ended in time is 2 with the -Run line; and a name it would
        refuse is refused before anything is started. -Fork starts the fork's
-       thornswood-git-ref.yml instead, for a branch only.
+       thornswood-git-ref.yml instead, for a branch only. -DeleteTag reads
+       both feeds first and refuses the number either offers.
     4. Add-ReleaseTag in a cloud session (CLAUDE_CODE_REMOTE true): it hands
        the tag, the commit and the release's own message to the checkout's
        Set-Ref.ps1 and tags nothing in the checkout; a refusal says what to
@@ -95,7 +101,7 @@ Yes 'the step is pwsh with no profile' ($step -match "shell: pwsh -NoProfile -No
 $run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes '  running main''s Set-Ref.ps1 -OnGitHub' ($run -match "scripts/ops/Set-Ref\.ps1'\) -OnGitHub")
 Yes '  with nothing pasted into its script' ($run -notmatch '\$\{\{')
-foreach ($k in 'REF_TAG: ${{ inputs.tag }}', 'REF_DELETE_BRANCH: ${{ inputs.delete_branch }}', 'REF_COMMIT: ${{ inputs.commit }}', 'REF_MESSAGE: ${{ inputs.message }}', 'GH_TOKEN: ${{ github.token }}') {
+foreach ($k in 'REF_TAG: ${{ inputs.tag }}', 'REF_DELETE_BRANCH: ${{ inputs.delete_branch }}', 'REF_DELETE_TAG: ${{ inputs.delete_tag }}', 'REF_COMMIT: ${{ inputs.commit }}', 'REF_MESSAGE: ${{ inputs.message }}', 'GH_TOKEN: ${{ github.token }}') {
     Yes "  $($k.Split(':')[0]) reaches it through the environment" ($step.Contains($k))
 }
 
@@ -129,15 +135,17 @@ function Invoke-WebRequest {
     if ($Method -eq 'GET' -and $p -match '^pulls\?state=open&per_page=100&head=') { return (A 200 @($s.from | ForEach-Object { @{ number = $_ } })) }
     if ($Method -eq 'GET' -and $p -match '^pulls\?state=open&per_page=100&base=') { return (A 200 @($s.onto | ForEach-Object { @{ number = $_ } })) }
     if ($Method -eq 'DELETE' -and $p -match '^git/refs/heads/') { return (A $s.delete $null) }
+    if ($Method -eq 'GET' -and $p -match '^releases\?per_page=100&page=(\d+)$') { return (A 200 @(@($s.releases) | Select-Object -Skip ((([int]$Matches[1]) - 1) * 100) -First 100)) }
+    if ($Method -eq 'DELETE' -and $p -match '^git/refs/tags/') { return (A $s.deleteTag $null) }
     return (A 500 @{ message = "the stand-in has no answer for $Method $p" })
 }
 function OnGitHub([hashtable]$envs, [hashtable]$state) {
-    $base = @{ compare = @{ $main = 'ahead' }; refs = @{}; tagObjects = @{}; postRef = 201; from = @(); onto = @(); delete = 204 }
+    $base = @{ compare = @{ $main = 'ahead' }; refs = @{}; tagObjects = @{}; postRef = 201; from = @(); onto = @(); delete = 204; releases = @(); deleteTag = 204 }
     foreach ($k in $state.Keys) { $base[$k] = $state[$k] }
     $global:TSgh = $base
     $global:TScalls = @()
     $all = @{ GITHUB_ACTIONS = 'true'; GH_TOKEN = 'run-token'; GITHUB_REPOSITORY = 'owner/repo'; GITHUB_API_URL = 'https://api.test'
-              REF_TAG = ''; REF_DELETE_BRANCH = ''; REF_COMMIT = $main; REF_MESSAGE = ''; REF_DEFAULT_BRANCH = 'main' }
+              REF_TAG = ''; REF_DELETE_BRANCH = ''; REF_DELETE_TAG = ''; REF_COMMIT = $main; REF_MESSAGE = ''; REF_DEFAULT_BRANCH = 'main' }
     foreach ($k in $envs.Keys) { $all[$k] = $envs[$k] }
     $was = @{}
     foreach ($k in $all.Keys) { $was[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $all[$k]) }
@@ -210,6 +218,33 @@ foreach ($bad in 'claude/../main', '/x', 'x/', 'a b', 'x.lock') {
     $r = OnGitHub @{ REF_DELETE_BRANCH = $bad } @{}
     Yes "  '$bad' is not a branch name it deletes" ($r.Code -eq 1 -and $r.Calls.Count -eq 0)
 }
+
+# A dev launcher tag a stopped release left (#3312).
+$v = 'v1.2.6.8'
+$lw = @{ type = 'commit'; sha = $main }
+$others = @(1..120 | ForEach-Object { @{ id = $_; tag_name = "v1.0.$_"; draft = $false } })
+$r = OnGitHub @{ REF_DELETE_TAG = $v } @{ refs = @{ "tags/$v" = $lw }; releases = $others }
+$w = @(Writes $r)
+Yes ("a dev launcher tag on the commit given that no release names: one DELETE, exit 0, DELETED ($($r.Code))") ($r.Code -eq 0 -and $r.Out -match "Set-Ref::DELETED $([regex]::Escape($v)) $main" -and $w.Count -eq 1 -and $w[0].Method -eq 'DELETE' -and $w[0].Path -eq "git/refs/tags/$v")
+Yes '  after reading every page of the releases list, where drafts are' (@($r.Calls | Where-Object { $_.Path -match '^releases\?per_page=100&page=\d+$' }).Count -eq 2)
+$r = OnGitHub @{ REF_DELETE_TAG = $v } @{ refs = @{ "tags/$v" = @{ type = 'tag'; sha = $tagObj } }; tagObjects = @{ $tagObj = $main } }
+Yes '  an annotated one is read through its tag object' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::DELETED')
+$r = OnGitHub @{ REF_DELETE_TAG = $v } @{}
+Yes 'a tag already gone: GONE, exit 0, nothing deleted' ($r.Code -eq 0 -and $r.Out -match "Set-Ref::GONE $([regex]::Escape($v))" -and @(Writes $r).Count -eq 0)
+$r = OnGitHub @{ REF_DELETE_TAG = $v } @{ refs = @{ "tags/$v" = $lw }; deleteTag = 422 }
+Yes 'a tag gone between the read and the delete: GONE' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::GONE')
+$r = OnGitHub @{ REF_DELETE_TAG = $v } @{ refs = @{ "tags/$v" = @{ type = 'commit'; sha = $other } } }
+Yes 'a tag on another commit: stays, exit 1' ($r.Code -eq 1 -and $r.Out -match 'stays' -and @(Writes $r).Count -eq 0)
+$r = OnGitHub @{ REF_DELETE_TAG = $v } @{ refs = @{ "tags/$v" = $lw }; releases = @($others + @(@{ id = 9001; tag_name = $v; draft = $true })) }
+Yes 'a tag a draft names, on the second page: stays, says which' ($r.Code -eq 1 -and $r.Out -match '9001 \(a draft\)' -and @(Writes $r).Count -eq 0)
+$r = OnGitHub @{ REF_DELETE_TAG = $v } @{ refs = @{ "tags/$v" = $lw }; releases = @(@{ id = 9002; tag_name = $v; draft = $false }) }
+Yes 'a tag a published release names: stays' ($r.Code -eq 1 -and $r.Out -match '9002' -and @(Writes $r).Count -eq 0)
+foreach ($bad in 'v1.2.6', 'release/dev/20261022-154916-dev', 'v1.2.6.8.1', 'v1.2.6.x') {
+    $r = OnGitHub @{ REF_DELETE_TAG = $bad } @{ refs = @{ "tags/$bad" = $lw } }
+    Yes "  $bad is not a dev launcher tag: refused, nothing asked" ($r.Code -eq 1 -and $r.Calls.Count -eq 0)
+}
+$r = OnGitHub @{ REF_DELETE_TAG = $v; REF_DELETE_BRANCH = 'claude/x' } @{}
+Yes 'a tag to delete and a branch at once: refused' ($r.Code -eq 1 -and $r.Calls.Count -eq 0)
 Remove-Item Function:\Invoke-WebRequest
 
 # ---- 3. the session half -----------------------------------------------------
@@ -264,6 +299,31 @@ Yes '  and -Fork -Run reads only a run of that workflow' ($s.Code -eq 1)
 $threw = $false
 try { & $setRef -Fork -Tag $t -Commit $main -Message 'x' 6>$null } catch { $threw = $true }
 Yes '  and makes no tags' $threw
+# The feeds, for -DeleteTag: dev offers 1.2.6.7 and main 1.2.6.
+$global:TSfeedFail = $false
+$global:TSfeedAsked = @()
+function Invoke-RestMethod {
+    param($Uri, $TimeoutSec)
+    $global:TSfeedAsked += [string]$Uri
+    if ($global:TSfeedFail) { throw 'no route to host' }
+    if ([string]$Uri -match 'feed-dev/') { return [pscustomobject]@{ launcherVersion = '1.2.6.7' } }
+    return [pscustomobject]@{ launcherVersion = '1.2.6' }
+}
+$s = Session @{ DeleteTag = 'v1.2.6.8'; Commit = $main } $done @((Note 'notice' "DELETED v1.2.6.8 $main"))
+Yes '-DeleteTag: both feeds read, then delete_tag and the commit in the inputs, exit 0' ($s.Code -eq 0 -and $global:TSfeedAsked.Count -eq 2 -and $s.Body.inputs.delete_tag -eq 'v1.2.6.8' -and $s.Body.inputs.commit -eq $main -and $s.Out -match 'is deleted on GitHub')
+$s = Session @{ DeleteTag = 'v1.2.6.7'; Commit = $main } $done @()
+Yes '  the number a feed offers is refused before anything is started' ($s.Code -eq 1 -and $s.Out -match 'offers launcher 1\.2\.6\.7' -and $s.Calls.Count -eq 0)
+$global:TSfeedFail = $true
+$s = Session @{ DeleteTag = 'v1.2.6.8'; Commit = $main } $done @()
+Yes '  and so is any number while a feed cannot be read' ($s.Code -eq 1 -and $s.Out -match 'could not be read' -and $s.Calls.Count -eq 0)
+$global:TSfeedFail = $false
+$s = Session @{ DeleteTag = 'v1.2.6'; Commit = $main } $done @()
+Yes '  and a main launcher tag' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
+$global:TSfeedAsked = @()
+$threw = $false
+try { & $setRef -Fork -DeleteTag 'v1.2.6.8' -Commit $main 6>$null } catch { $threw = $true }
+Yes '  and -Fork, whose workflow has no launcher tags, is no command at all' ($threw -and $global:TSfeedAsked.Count -eq 0)
+Remove-Item Function:\Invoke-RestMethod
 $s = Session @{ Tag = 'v1.2.6.6'; Commit = $main; Message = 'x' } $done @()
 Yes 'a name it would refuse is refused before anything is started' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
 $s = Session @{ Tag = $t; Commit = $main } $done @()

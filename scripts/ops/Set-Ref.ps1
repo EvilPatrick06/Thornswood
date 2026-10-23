@@ -1,8 +1,9 @@
 <#
   Set-Ref.ps1
 
-  Makes a release tag, or deletes a branch, on GitHub for a session whose git
-  cannot write refs: a cloud Claude thread (#3107, #3314).
+  Makes a release tag, deletes a branch, or deletes a dev launcher tag no
+  release came from, on GitHub for a session whose git cannot write refs: a
+  cloud Claude thread (#3107, #3314, #3312).
 
       pwsh scripts/ops/Set-Ref.ps1 -Tag release/dev/20261022-154916-dev -Commit <40 hex> -MessageFile <file>
                        the annotated release tag on that commit
@@ -10,6 +11,9 @@
                        the branch, when it is still at that commit
       pwsh scripts/ops/Set-Ref.ps1 -Fork -DeleteBranch claude/what -Commit <40 hex>
                        the same in the fork, EvilPatrick06/skymp
+      pwsh scripts/ops/Set-Ref.ps1 -DeleteTag v1.2.6.8 -Commit <40 hex>
+                       a dev launcher tag a stopped release left, when it is
+                       still on that commit and no release came from it
       pwsh scripts/ops/Set-Ref.ps1 -Run 39712345678
                        the answer of a run that had not ended
 
@@ -46,6 +50,14 @@
         deleted with it, and no open pull request may come from it or be
         built onto it. A branch already gone is the answer GONE. GitHub's
         "Restore branch" button on a closed pull request brings one back.
+    -DeleteTag (#3312): only a dev launcher tag, v<a.b.c.d>, never a main
+        one (v<a.b.c>) or any other name. A release from the feed asks
+        release-tag.yml for that tag before release.yml builds on it, so a
+        release that stopped leaves its tag with nothing behind it (v1.2.6.8
+        on acc0715f, 22 Oct). The tag has to be on the commit given, no
+        release on GitHub (a draft included) may name it, and here, before
+        anything starts, neither feed's launcher may be that number. A tag
+        already gone is GONE.
 
   WHAT IT SAYS AND EXITS.
     TAGGED, ALREADY, DELETED, GONE    0
@@ -66,8 +78,12 @@ param(
     [string]$MessageFile = '',
     [Parameter(ParameterSetName = 'Delete', Mandatory = $true)]
     [string]$DeleteBranch,
+    # A dev launcher tag a stopped release left (#3312).
+    [Parameter(ParameterSetName = 'DeleteTag', Mandatory = $true)]
+    [string]$DeleteTag,
     [Parameter(ParameterSetName = 'Tag', Mandatory = $true)]
     [Parameter(ParameterSetName = 'Delete', Mandatory = $true)]
+    [Parameter(ParameterSetName = 'DeleteTag', Mandatory = $true)]
     [string]$Commit,
     # A git-ref run that had not ended: read its answer.
     [Parameter(ParameterSetName = 'Run', Mandatory = $true)]
@@ -91,6 +107,8 @@ $workflow = 'git-ref.yml'
 if ($Fork) { $GitHubRepo = 'EvilPatrick06/skymp'; $workflow = 'thornswood-git-ref.yml' }
 $inActions = ($env:GITHUB_ACTIONS -eq 'true')
 $tagShape = '^release/(dev/\d{8}-\d{4}(\d{2})?-dev|main/\d{8}-\d{4}(\d{2})?)$'
+# A dev launcher number's tag, the only v tag this deletes (#3312).
+$devTagShape = '^v\d+\.\d+\.\d+\.\d+$'
 $maxMessage = 4000
 
 # An annotation on the job, which GitHub keeps on its check run, so the
@@ -114,6 +132,7 @@ function Get-RefPath([string]$n) { return (@($n.Split('/') | ForEach-Object { [U
 if ($OnGitHub) {
     $Tag = [string]$env:REF_TAG
     $DeleteBranch = [string]$env:REF_DELETE_BRANCH
+    $DeleteTag = [string]$env:REF_DELETE_TAG
     $Commit = [string]$env:REF_COMMIT
     $Message = [string]$env:REF_MESSAGE
     $default = if ($env:REF_DEFAULT_BRANCH) { [string]$env:REF_DEFAULT_BRANCH } else { 'main' }
@@ -147,7 +166,7 @@ if ($OnGitHub) {
     }
 
     if ($Commit -notmatch '^[0-9a-f]{40}$') { Die "the commit has to be a full 40 character commit id, and it is '$Commit'. Nothing was changed." }
-    if ($Tag -and $DeleteBranch) { Die 'give a tag to make or a branch to delete, not both. Nothing was changed.' }
+    if (@(@($Tag, $DeleteBranch, $DeleteTag) | Where-Object { $_ }).Count -gt 1) { Die 'give one thing to do: a tag to make, a branch to delete or a tag to delete. Nothing was changed.' }
 
     if ($Tag) {
         if ($Tag -notmatch $tagShape) { Die "$Tag is not a release tag (release/dev/<id>-dev or release/main/<id>), and this makes no other. Nothing was changed." }
@@ -216,7 +235,31 @@ if ($OnGitHub) {
         if ($gone.Code -eq 422) { Note 'notice' "GONE $DeleteBranch"; Say "GONE $DeleteBranch" 'Green'; exit 0 }
         Die ("GitHub did not delete $DeleteBranch (" + (Said $gone) + ').')
     }
-    Die 'the run was given no tag to make and no branch to delete.'
+    if ($DeleteTag) {
+        if ($DeleteTag -notmatch $devTagShape) { Die "$DeleteTag is not a dev launcher tag (v<a.b.c.d>), the only tag this deletes. Nothing was changed." }
+        $refPath = 'git/ref/tags/' + (Get-RefPath $DeleteTag)
+        $has = Api GET $refPath
+        if ($has.Code -eq 404) { Note 'notice' "GONE $DeleteTag"; Say "GONE $DeleteTag" 'Green'; exit 0 }
+        if ($has.Code -ne 200) { Die ("GitHub would not say where $DeleteTag is (" + (Said $has) + '). Nothing was changed.') }
+        $on = Get-TagCommit $has.Body
+        if ($on -ne $Commit) { Die "$DeleteTag names commit $on, not ${Commit}, so it stays. Look at it, then ask again with its commit." }
+        # The releases list, not /releases/tags/<tag>: only the list holds
+        # drafts (release.yml, ONE DRAFT PER TAG). Newest first, a page at a
+        # time, until a short page says there is no more.
+        for ($page = 1; $page -le 50; $page++) {
+            $a = Api GET "releases?per_page=100&page=$page"
+            if ($a.Code -ne 200) { Die ("GitHub would not list the releases (" + (Said $a) + "), so $DeleteTag stays.") }
+            $batch = @($a.Body | Where-Object { $_ -and $_.PSObject.Properties['tag_name'] })
+            $same = @($batch | Where-Object { $_.tag_name -eq $DeleteTag })
+            if ($same.Count) { Die ("$DeleteTag stays: release " + (@($same | ForEach-Object { [string]$_.id + $(if ($_.draft) { ' (a draft)' } else { '' }) }) -join ', ') + ' names it.') }
+            if ($batch.Count -lt 100) { break }
+        }
+        $gone = Api DELETE ('git/refs/tags/' + (Get-RefPath $DeleteTag))
+        if ($gone.Code -eq 204) { Note 'notice' "DELETED $DeleteTag $Commit"; Say "DELETED $DeleteTag $Commit" 'Green'; exit 0 }
+        if ($gone.Code -eq 422) { Note 'notice' "GONE $DeleteTag"; Say "GONE $DeleteTag" 'Green'; exit 0 }
+        Die ("GitHub did not delete $DeleteTag (" + (Said $gone) + ').')
+    }
+    Die 'the run was given no tag to make, no branch to delete and no tag to delete.'
 }
 
 # ======================================================= the session half ===
@@ -237,6 +280,20 @@ if ($PSCmdlet.ParameterSetName -eq 'Tag') {
 }
 if ($PSCmdlet.ParameterSetName -eq 'Delete') {
     if (-not (Test-RefName $DeleteBranch)) { Die "'$DeleteBranch' is not a branch name this deletes. Nothing was changed." }
+}
+if ($PSCmdlet.ParameterSetName -eq 'DeleteTag') {
+    if ($DeleteTag -notmatch $devTagShape) { Die "$DeleteTag is not a dev launcher tag (v<a.b.c.d>), the only tag this deletes. Nothing was changed." }
+    # Neither feed's launcher may be this number: Ship reads a feed launcher's
+    # tag to see what changed since it. The run cannot ask, since the runner
+    # it runs on reaches GitHub alone (#2161), so it is asked here.
+    . (Join-Path $PSScriptRoot '..\release\Feed-Rules.ps1')
+    foreach ($dev in $false, $true) {
+        $url = Get-HostFeedVersionUrl -Dev:$dev
+        try { $have = [string](Invoke-RestMethod -Uri $url -TimeoutSec 60).launcherVersion }
+        catch { Die ("$url could not be read (" + $_.Exception.Message + "), so whether a feed offers $DeleteTag is not known. Nothing was changed.") }
+        if (-not $have) { Die "$url names no launcher, so whether a feed offers $DeleteTag is not known. Nothing was changed." }
+        if ('v' + $have -eq $DeleteTag) { Die "$url offers launcher $have, so $DeleteTag stays. Nothing was changed." }
+    }
 }
 
 . (Join-Path $PSScriptRoot 'WorkflowRun.ps1')
@@ -271,7 +328,11 @@ function Read-Answer([long]$id, [switch]$Started) {
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $answer = Read-Answer $Run
 } else {
-    $inputs = if ($PSCmdlet.ParameterSetName -eq 'Tag') { [ordered]@{ tag = $Tag; commit = $Commit; message = $Message } } else { [ordered]@{ delete_branch = $DeleteBranch; commit = $Commit } }
+    $inputs = switch ($PSCmdlet.ParameterSetName) {
+        'Tag' { [ordered]@{ tag = $Tag; commit = $Commit; message = $Message } }
+        'DeleteTag' { [ordered]@{ delete_tag = $DeleteTag; commit = $Commit } }
+        default { [ordered]@{ delete_branch = $DeleteBranch; commit = $Commit } }
+    }
     try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs $inputs }
     catch { Die ($_.Exception.Message + '. Nothing was changed.') }
     if (-not $started.Run) {

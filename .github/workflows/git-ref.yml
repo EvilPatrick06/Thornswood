@@ -1,5 +1,6 @@
-# Makes a release tag, or deletes a branch, for a session whose git cannot
-# write refs: a cloud Claude thread (#3107, #3314).
+# Makes a release tag, deletes a branch, or deletes a dev launcher tag no
+# release came from, for a session whose git cannot write refs: a cloud
+# Claude thread (#3107, #3314, #3312).
 #
 # WHY. A cloud session reaches GitHub through the cloud environment's proxy,
 # which refuses every ref write before GitHub sees it (measured 22 Oct 2026:
@@ -12,6 +13,7 @@
 #
 #   pwsh scripts/ops/Set-Ref.ps1 -Tag release/dev/<id>-dev -Commit <sha> -MessageFile <file>
 #   pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch claude/<what> -Commit <sha>
+#   pwsh scripts/ops/Set-Ref.ps1 -DeleteTag v<a.b.c.d> -Commit <sha>
 #
 # which starts this on main with what to do, waits for the run, and prints
 # the answer this run left as an annotation titled Set-Ref. Ship.ps1 does
@@ -19,7 +21,8 @@
 # Set-Ref.ps1's header says what it makes, what it deletes, and what it
 # refuses: only release/dev and release/main tags, on a commit main has; a
 # branch only at the commit given, never the default branch, never one an
-# open pull request comes from or is built onto.
+# open pull request comes from or is built onto; a dev launcher tag only at
+# the commit given, and never one a release, a draft included, names.
 #
 # WHAT IT RUNS. Main's Set-Ref.ps1 under pwsh with no profile. The inputs
 # reach it through the environment, never pasted into the script. The run's
@@ -30,7 +33,7 @@
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Tag or branch
-run-name: ${{ inputs.tag && format('Tag {0}', inputs.tag) || format('Delete branch {0}', inputs.delete_branch) }} by ${{ github.actor }}
+run-name: ${{ inputs.tag && format('Tag {0}', inputs.tag) || inputs.delete_tag && format('Delete tag {0}', inputs.delete_tag) || format('Delete branch {0}', inputs.delete_branch) }} by ${{ github.actor }}
 on:
   workflow_dispatch:
     inputs:
@@ -39,6 +42,9 @@ on:
         required: false
       delete_branch:
         description: 'Or the branch to delete'
+        required: false
+      delete_tag:
+        description: 'Or the dev launcher tag to delete, v<a.b.c.d>, which no release names'
         required: false
       commit:
         description: 'The commit the tag goes on, or the commit the branch has to be at'
@@ -80,6 +86,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REF_TAG: ${{ inputs.tag }}
           REF_DELETE_BRANCH: ${{ inputs.delete_branch }}
+          REF_DELETE_TAG: ${{ inputs.delete_tag }}
           REF_COMMIT: ${{ inputs.commit }}
           REF_MESSAGE: ${{ inputs.message }}
           REF_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
