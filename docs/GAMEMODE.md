@@ -305,8 +305,8 @@ exits 1 if a record went missing or an old shape is left. The converter backs
 the files up first (`backup-2870-<time>` in `private`, with
 `SHA256SUMS`), stops without writing on a collision, a record it cannot read
 or a pending trade, changes nothing when run again, and clears the done
-mark of the parts that compared the two shapes (`embassy` and
-`merchants`), so they run again at the next start.
+mark of the parts that compared the two shapes (`embassy`, `dungeon`,
+`cargo` and `merchants`), so they run again at the next start.
 
 ## Generated tables
 
