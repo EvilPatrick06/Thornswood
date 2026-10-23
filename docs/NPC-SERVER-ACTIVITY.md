@@ -148,10 +148,32 @@ starts or ends, never as it only wanders (#3180): each write saves the actor's
 whole record to disk, and until 22 Oct 2026 every NPC was written every 30
 seconds, about 5,000 files every 32 seconds on each server with nobody on.
 So after a server restart a wandering NPC starts where it was last written,
-inside its home, rather than where it had walked to. A gamemode reload
-cancels the old controller's timers and reconstructs routes from current saved
-positions. Temporary combat targets are not persisted. Saved faction removals,
-including an empty faction list, remain removed after reconstruction.
+inside its home, rather than where it had walked to. Temporary combat
+targets are not persisted. Saved faction removals, including an empty faction
+list, remain removed after reconstruction.
+
+A gamemode reload in a running server (a gamemode-only dev deploy, #3196)
+keeps the engine, its actors and where they stand, and the NPCs carry on
+through it (#3296, Patrick's C on #3196: "the NPC runtime also hands its NPCs
+straight to the new copy, so they never pause"). The old runtime and
+population stop and hand over what they know: each NPC enrolled, owned and
+prepared with its state and policy, the navigation meshes read and their tile
+index, the `due` queue, the NPCs held off walkable ground and the searches
+under way, the habitat counts and the loading cursor. The new ones go on from
+that, so no batch is read again, no NPC is owned or configured again and no
+mesh is read again; only each merchant's purse is read by the new purse
+service. Before, the new runtime took the whole cast back from nothing, about
+3 minutes 50 seconds on dev in which the NPCs stood still. What is handed
+over is data only: the new load looks each triangle up again in its own
+navigation and starts each search again, so nothing of the old load's code
+stays in memory. It is taken only when both loads have the same NPC code and
+catalogue: a SHA-256 of the population policy, catalogue and runtime blocks
+and the NPC SERVER STARTUP block, read from the file that is loading, and of
+the catalogue the merchant roles made. Any difference takes the full load and
+server.log says "Shared NPC runtime starts over" with the reason; a carried
+load says "Shared NPC runtime carried on from the previous gamemode load"
+with its counts. `tests/test-3296-npc-handover.js` holds all of it. A
+server restart still loads the cast from the saved world, as above.
 
 Fixed cave and dungeon tiers scale maximum health and outgoing weapon or spell
 damage. Tier 1 uses the source baseline, tier 2 uses 1.25 health and 1.10 damage,
