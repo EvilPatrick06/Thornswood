@@ -66,7 +66,9 @@
   -IncludeSigningRuntime installs one exact .NET runtime release from
   Microsoft's own download host, held to the SHA-512 Microsoft publishes for
   it in https://builds.dotnet.microsoft.com/dotnet/release-metadata/<major>/releases.json
-  and to its Authenticode signature, or the download is deleted unrun. It is
+  and to its Authenticode signature (Valid, by Microsoft's ".NET"
+  certificate, CN=.NET, O=Microsoft Corporation), or the download is deleted
+  unrun. It is
   .NET 10, not 8: the client's runtimeconfig asks for net8.0 with rollForward
   "Major", so it runs on the newest runtime there is when 8 is absent, and
   .NET 8's support ends on 10 Nov 2026 while 10's runs to 14 Nov 2028.
@@ -358,11 +360,16 @@ if ($IncludeSigningRuntime) {
             throw "$name does not match the SHA-512 Microsoft publishes for it, so it was deleted unrun. Expected $DotnetRuntimeSha512, got $got. Nothing was installed."
         }
         Write-Host '  checksum matched' -ForegroundColor DarkGray
+        # Microsoft signs .NET's installers as its .NET product, not as
+        # "Microsoft Corporation" the way the Visual Studio installers are:
+        # measured on the box on 23 Oct, a Valid signature by exactly this
+        # subject. A different one stops here and is named.
+        $dotnetSigner = 'CN=.NET, O=Microsoft Corporation, L=Redmond, S=Washington, C=US'
         $sig = Get-AuthenticodeSignature -LiteralPath $exe
         $who = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { '' }
-        if ("$($sig.Status)" -ne 'Valid' -or $who -notmatch '^CN=Microsoft Corporation,') {
+        if ("$($sig.Status)" -ne 'Valid' -or $who -ne $dotnetSigner) {
             Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue
-            throw "$name is not a valid Microsoft-signed file (status $($sig.Status), signer '$who'), so it was deleted unrun. Nothing was installed."
+            throw "$name is not validly signed by Microsoft's .NET certificate (status $($sig.Status), signer '$who', expected '$dotnetSigner'), so it was deleted unrun. Nothing was installed."
         }
         Write-Host "  signature valid, $($who.Split(',')[0])" -ForegroundColor DarkGray
         $log = Join-Path $tmp "dotnet-runtime-$DotnetRuntimeVersion.log"
