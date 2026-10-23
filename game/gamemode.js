@@ -73109,13 +73109,24 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     byBase.get(base).push(rule);
     counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
   }
+  // What the previous load of the gamemode had decided (#3296), from its
+  // handover(): each NPC's rule and policy, and the habitat counts that
+  // include them. The NPC SERVER STARTUP block passes it only when both loads
+  // have the same NPC code and catalogue. The policies are the same objects
+  // the runtime's carry holds, so a home it moves is moved in both.
+  const carried=options && options.carry;
+  if(carried) {
+    counts.clear();
+    for(const [bucket,count] of carried.counts) counts.set(bucket,count);
+    for(const [id,entry] of carried.configured) configured.set(id,entry);
+  }
   api.makeProperty('thornswoodNpcHome',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   api.makeProperty('thornswoodNpcCommanded',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   // A Thalmor patrol member (#1390) carries {road, slot}, set by the patrol
   // keeper before admission. Never the commanded marker: a patrol is not a
   // staff spawn, and it never joins a natural habitat bucket either.
   api.makeProperty('thornswoodNpcPatrol',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
-  const patrolSlots=new Map();
+  const patrolSlots=new Map(carried ? carried.patrolSlots : []);
   // The rule for a patrol member, from the staff's road: its home is its own
   // point, its leash and return are the road's, its bucket is the road, capped
   // at the road's points, so there is only one group on a road. 'discard'
@@ -73277,7 +73288,21 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       configured.delete(id);
     }
   }
-  return {configure,afterOwnership,release,commit,stop:()=>{closed=true;},merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
+  // An NPC carried on from the previous load has its purse read by this
+  // load's purse service, the part of afterOwnership the engine does not keep.
+  function resume(id,owner) {
+    return whileCurrent(owner,undefined,(call,current)=>{
+      if(!committed || closed) return;
+      if(configured.has(id) && merchants) merchants.prepare(id,current);
+    });
+  }
+  // Stops, and gives the next load what this one decided, for options.carry.
+  function handover() {
+    if(closed) return null;
+    closed=true;
+    return {key:options && options.key,configured,counts,patrolSlots};
+  }
+  return {configure,afterOwnership,resume,handover,release,commit,stop:()=>{closed=true;},merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
     const live=new Set(ids);
     for(const id of configured.keys()) if(id>=0xff000000 && !live.has(id)) release(id);
   },admit:(id,state,owner)=>whileCurrent(owner,false,(call,current)=>{
@@ -73647,10 +73672,13 @@ function npcNearestOn(points, pos) {
 // The 512-unit tile index. Each tile lists triangle references (mesh slot
 // times 32768 plus triangle) in insertion order, in chunks of seven
 // references and a link to the next chunk, inside shared blocks of words.
-function createNpcNavTiles() {
-  const blockWords = 1<<18, blocks = [];
-  let chunks = 0, tiles = 0;
-  let head = new Uint32Array(1024), tail = new Uint32Array(1024), count = new Uint32Array(1024);
+// kept is what carry() gave the previous load of the gamemode (#3296): its
+// words, which are only numbers, so the index goes on where it was.
+function createNpcNavTiles(kept) {
+  const blockWords = 1<<18, blocks = kept ? kept.blocks : [];
+  let chunks = kept ? kept.chunks : 0, tiles = kept ? kept.tiles : 0;
+  let head = kept ? kept.head : new Uint32Array(1024), tail = kept ? kept.tail : new Uint32Array(1024),
+    count = kept ? kept.count : new Uint32Array(1024);
   const key = (x,y) => x>-16384 && x<16384 && y>-16384 && y<16384 ? (x+16384)*32768+(y+16384) : x+':'+y;
   const read = word => blocks[Math.floor(word/blockWords)][word%blockWords];
   const write = (word,value) => { blocks[Math.floor(word/blockWords)][word%blockWords] = value; };
@@ -73688,15 +73716,28 @@ function createNpcNavTiles() {
     return Array.from(cell.keys(), k => typeof k === 'number' ?
       [Math.floor(k/32768)-16384, k%32768-16384] : k.split(':').map(Number));
   }
-  return {cell:() => new Map(), add, refs, keys, stats:() => ({tiles, chunks, blocks:blocks.length})};
+  return {cell:() => new Map(), add, refs, keys, stats:() => ({tiles, chunks, blocks:blocks.length}),
+    carry:() => ({blocks, chunks, tiles, head, tail, count})};
 }
 // Navigation for one runtime: banks of nearby meshes, the sliced mesh work,
 // the tile index, reciprocal links and floor lookup. ready(bank) runs when a
-// bank's last mesh is finished.
-function createNpcNavigation(api, now, report, ready) {
-  const banks = new Map(), meshWork = [], sharedMeshes = new Map(), meshEntries = new Map(), cellTiles = new Map();
-  const slots = [], tiles = createNpcNavTiles();
-  let geometryVersion = 0;
+// bank's last mesh is finished. kept is what carry() gave the previous load
+// of the gamemode (#3296): the meshes it read, their tile index, the banks
+// and the mesh work still waiting, all of it data.
+function createNpcNavigation(api, now, report, ready, kept) {
+  const {banks, meshWork, sharedMeshes, meshEntries, cellTiles, slots} = kept ||
+    {banks:new Map(), meshWork:[], sharedMeshes:new Map(), meshEntries:new Map(), cellTiles:new Map(), slots:[]};
+  const tiles = createNpcNavTiles(kept && kept.tiles);
+  let geometryVersion = kept ? kept.geometryVersion : 0;
+  // A mesh's triangle objects, and the links cached on them, were made by the
+  // previous load's code. They are dropped and made again here when something
+  // reaches them, so nothing kept holds a function of that load, and none of
+  // that load stays in memory. A mesh whose reading had not finished reads
+  // again from its start; reading changes nothing until it finishes.
+  if(kept) {
+    for(const mesh of slots) {mesh.geometry.linksFor=nodeLinks;mesh.nodes=new Map();}
+    for(const job of meshWork) job.work=null;
+  }
   const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
   function locate(bank,pos,s,lift) {
     let selected=null,best=Infinity;
@@ -73821,7 +73862,7 @@ function createNpcNavigation(api, now, report, ready) {
     if(!job) return;
     const {id}=job;
     try {
-      if(!job.work) job.work=npcReadMeshWork(id,api.lookupEspmRecordById(id),nodeLinks);
+      if(!job.work && !job.mesh) job.work=npcReadMeshWork(id,api.lookupEspmRecordById(id),nodeLinks);
       let cost=0,insertions=0,done=false;
       while(cost<512 && insertions<512 && now()-begin<4) {
         if(!job.mesh) {
@@ -73850,25 +73891,45 @@ function createNpcNavigation(api, now, report, ready) {
     for(const bank of job.banks) finishMesh(bank,id);
     job.banks=[];
   }
-  return {banks,ensureBank,locate,search,nodeLinks,work,pending:()=>meshWork.length,
-    meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion};
+  // The triangle this load uses for one the previous load handed over.
+  function nodeAt(node) {
+    const mesh=node && sharedMeshes.get(node.mesh);
+    return mesh ? npcTriangleAt(mesh,node.index) : undefined;
+  }
+  return {banks,ensureBank,locate,search,nodeLinks,work,nodeAt,pending:()=>meshWork.length,
+    meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion,
+    carry:()=>({banks,meshWork,sharedMeshes,meshEntries,cellTiles,slots,tiles:tiles.carry(),geometryVersion})};
 }
 function startSharedNpcServerRuntime(api, timers, now, report, population, options) {
   const invoke=Reflect.apply;
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
-  const handles = new Set(), actors = new Map(), preparing = [], owned = new Set(), unavailable = new Set();
-  const reactions = new Map(), knownFactions = new Set();
+  /*
+    WHAT THE PREVIOUS LOAD OF THE GAMEMODE KNEW (#3296). A gamemode reload
+    keeps the engine, its actors and where they stand, and until 22 Oct 2026
+    the new runtime still took every NPC back from nothing: a batch every 10
+    ms, then each prepared again and its navigation read again, 3 min 50 s on
+    dev in which the NPCs stood still. options.carry is what the old runtime's
+    handover() gave instead, and this one goes on from it. The NPC SERVER
+    STARTUP block passes it only when both loads have the same NPC code and
+    the same catalogue, so its shape is this code's. It is data only:
+    triangles are looked up again in this load's navigation, and the searches
+    under way are started again, so no function of the old load is kept.
+  */
+  const carry = options && options.carry || null;
+  const kept = carry || {actors:new Map(), preparing:[], owned:new Set(), unavailable:new Set(),
+    reactions:new Map(), knownFactions:new Set(), npcTiles:new Map(), enrolled:new Set(), excluded:new Set(),
+    policies:new Map(), held:new Map(), due:[], searching:[], cursor:0, total:0, loaded:0};
+  const handles = new Set(), {actors, preparing, owned, unavailable, reactions, knownFactions} = kept;
   const navigation = createNpcNavigation({
     getNavmeshRecords:(...args)=>nativeCall('getNavmeshRecords',...args),
     lookupEspmRecordById:(...args)=>nativeCall('lookupEspmRecordById',...args)
-  }, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
+  }, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];}, carry && carry.navigation);
   const {banks, ensureBank, locate, search} = navigation;
-  const npcTiles = new Map();
-  const enrolled = new Set(), excluded = new Set(), policies = new Map();
+  const {npcTiles, enrolled, excluded, policies} = kept;
   // Placed off walkable ground, waiting to be set down on it (#2067): out of
   // everybody's sight, or for an ambush once somebody comes near.
-  const held = new Map(), AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
+  const {held} = kept, AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
   // An NPC nobody can see that only wanders is stepped once in this long
   // (the first time at once) (#3181, Patrick's C on 22 Oct 2026: NPCs
   // nobody can see are updated less often, never paused). Before, every pass
@@ -73889,7 +73950,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // whoever was not due, so with 4,820 NPCs most of backgroundTick's 1,984
   // ms in 120 s went on looking at NPCs it then passed over.
   const UNSEEN_EVERY = 15000, SEEN_STEP = 4000, BUSY_EVERY = 100, NEAR_RECHECK = 1000;
-  const due = [];
+  const {due} = kept;
   function queue(a,at) {
     let i=due.length;due.push(null);
     while(i>0) { const p=(i-1)>>1; if(due[p].at<=at) break; due[i]=due[p];i=p; }
@@ -73910,7 +73971,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
     return top;
   }
-  let stopped=false,running=!options || options.suspended!==true,cursor=0,total=0,loaded=0,nearCursor=0;
+  let stopped=false,running=!options || options.suspended!==true,cursor=kept.cursor,total=kept.total,loaded=kept.loaded,nearCursor=0;
   const ready=[];
   let humans=new Map(),near=new Set(),nearOrder=[],moved=0,attacks=0,background=0,failed=0,lastReport=now();
   function schedule(fn, delay) {
@@ -74020,7 +74081,13 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   }
   // Searches for the walkable point nearest a placement or a home, a few
   // tiles at a time on their own tick (#2067). The actor waits for its search.
-  const searching=[];
+  // A job is data, its kind saying what its result is for, so a reload can
+  // hand it over (#3296).
+  const {searching} = kept;
+  function seek(job) {
+    job.search=search(job.bank,job.from,job.state);
+    searching.push(job);
+  }
   function searchTick() {
     armed.delete(searchTick);
     const begin=now();
@@ -74028,9 +74095,22 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       const job=searching[0];
       if(!job.search.step(begin)) break;
       searching.shift();
-      try { job.finish(job.search.result()); } catch(e) { reject(job.id,e); }
+      try { found(job,job.search.result()); } catch(e) { reject(job.id,e); }
     }
     wake();
+  }
+  function found(job,near) {
+    const {id,state,saved,bank}=job,policy=policies.get(id);
+    if(job.kind==='home') {
+      if(near) policy.home=near.pos.slice();
+      preparing.push(id);
+      return;
+    }
+    if(!near) throw new Error('No walkable navigation within reach of the placed position');
+    const ambush=!!(policy && policy.ambush);
+    if(ambush && near.d>AMBUSH_STEP) throw new Error('Ambush placement with no floor within a step');
+    if(outsideHome(policy,state.cellOrWorld,near.pos)) {policy.settled=true;policy.home=near.pos.slice();}
+    held.set(id,{id,state,saved,bank,near,ambush});
   }
   // An actor set down further from its placement than its leash would never
   // move again, so its home becomes the walkable point nearest the placement:
@@ -74042,10 +74122,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   function settleHome(id,bank,policy,s) {
     policy.settled=true;
     if(locate(bank,policy.home,s)) return false;
-    searching.push({id,search:search(bank,policy.home,s),finish:near=>{
-      if(near) policy.home=near.pos.slice();
-      preparing.push(id);
-    }});
+    seek({id,kind:'home',bank,from:policy.home,state:s});
     return true;
   }
   // Off walkable ground at its placement. An ambush waits there until somebody
@@ -74054,14 +74131,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // ambush further than a step from the floor (a pipe or a ceiling the game
   // empties by script), stays where the game put it.
   function strand(id,state,saved,bank) {
-    const policy=policies.get(id);
-    searching.push({id,search:search(bank,state.pos,state),finish:near=>{
-      if(!near) throw new Error('No walkable navigation within reach of the placed position');
-      const ambush=!!(policy && policy.ambush);
-      if(ambush && near.d>AMBUSH_STEP) throw new Error('Ambush placement with no floor within a step');
-      if(outsideHome(policy,state.cellOrWorld,near.pos)) {policy.settled=true;policy.home=near.pos.slice();}
-      held.set(id,{id,state,saved,bank,near,ambush});
-    }});
+    seek({id,kind:'floor',bank,from:state.pos,state,saved});
   }
   function emerge(h) {
     const {id,state,saved,bank,near}=h;
@@ -74465,8 +74535,46 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     for(let i=0;i<Math.min(32,nearOrder.length) && now()-begin<4;i++) step(nearOrder[nearCursor++%nearOrder.length]);
     wake();
   }
-  schedule(preload,0);arm(prepareTick,10);arm(meshTick,10);
+  // Carried on from the previous load (#3296): each triangle an actor or a
+  // held placement stands on is this load's object for it, and each search
+  // starts again. One whose mesh is gone is prepared again from the start.
+  // Every NPC already owned has its merchant purse read by this load's purse
+  // service, as afterOwnership did when it was first owned; nothing else of
+  // ownership is done again, because the engine kept it.
+  const resuming=[];
+  if(carry) {
+    const again=id=>{if(!preparing.includes(id)) preparing.push(id);};
+    for(const [id,a] of actors) {
+      const node=navigation.nodeAt(a.node);
+      if(node) {a.node=node;continue;}
+      actors.delete(id);
+      if(a.tile && npcTiles.has(a.tile)) npcTiles.get(a.tile).delete(id);
+      again(id);
+    }
+    for(const [id,h] of held) {
+      const node=navigation.nodeAt(h.near.node);
+      if(node) {h.near.node=node;continue;}
+      held.delete(id);again(id);
+    }
+    for(const job of searching) job.search=search(job.bank,job.from,job.state);
+    if(population && population.resume) resuming.push(...owned);
+    report('Shared NPC runtime carried on from the previous gamemode load: '+actors.size+' active, '+loaded+
+      ' loaded, '+(held.size+searching.length)+' waiting off walkable ground, '+preparing.length+' preparing, '+
+      navigation.pending()+' mesh jobs pending'+(cursor===total && total>0 ? '; loading complete' : '; loading continues'));
+  }
+  function resumeTick() {
+    const begin=now();
+    while(resuming.length && now()-begin<4) {
+      const id=resuming.shift();
+      // A purse that fails stops its NPC, as it would have at first ownership.
+      try {population.resume(id,()=>!stopped);} catch(e) {idle(id);reject(id,e);}
+    }
+    if(resuming.length) schedule(resumeTick,10);
+  }
+  if(!carry || cursor<total || total===0) schedule(preload,0);
+  arm(prepareTick,10);arm(meshTick,10);
   schedule(humanTick,0);schedule(backgroundTick,20);arm(nearTick,100);arm(searchTick,10);
+  if(resuming.length) schedule(resumeTick,0);
   if(population) schedule(discover,5000);
   /*
     LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). Nothing about
@@ -74475,10 +74583,16 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     never steps or reports on an actor that is gone.
   */
   function forget(id) {
+    idle(id);
+    policies.delete(id);owned.delete(id);unavailable.delete(id);enrolled.delete(id);excluded.delete(id);
+    failed=unavailable.size;
+  }
+  // Takes an actor out of everything that would step it, set it down or
+  // prepare it, and keeps what is known about it.
+  function idle(id) {
     const a=actors.get(id);
     if(a && a.tile && npcTiles.has(a.tile)) npcTiles.get(a.tile).delete(id);
-    actors.delete(id);policies.delete(id);owned.delete(id);unavailable.delete(id);
-    enrolled.delete(id);excluded.delete(id);held.delete(id);near.delete(id);
+    actors.delete(id);held.delete(id);near.delete(id);
     const without=list=>{for(let i=list.length-1;i>=0;i--) {
       const entry=list[i],entryId=typeof entry==='number' ? entry : entry && entry.id;
       if(entryId===id) list.splice(i,1);
@@ -74490,9 +74604,21 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
     without(nearOrder);without(preparing);without(searching);
     for(const bank of banks.values()) if(bank && Array.isArray(bank.waiting)) without(bank.waiting);
-    failed=unavailable.size;
   }
-  return {stop,start,enroll,forget,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
+  /*
+    STOPS, AND GIVES THE NEXT LOAD OF THE GAMEMODE WHAT THIS ONE KNOWS (#3296),
+    for options.carry. Everything in it is data; the searches under way are
+    given as what they look for, not as the search itself. Null once stopped.
+  */
+  function handover() {
+    if(stopped) return null;
+    stop();
+    return {key:options && options.key,actors,preparing,owned,unavailable,reactions,knownFactions,npcTiles,
+      enrolled,excluded,policies,held,due,cursor,total,loaded,
+      searching:searching.map(({id,kind,bank,from,state,saved})=>({id,kind,bank,from,state,saved})),
+      navigation:navigation.carry()};
+  }
+  return {stop,start,enroll,forget,handover,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
     mode:a.mode,target:a.target,pos:a.pos.slice(),path:a.path.map(p=>p.slice()),
     triangle:a.node.index,mesh:a.node.mesh,lastUpdate:a.last,paused:!!a.paused};},
     getStatus:()=>({loaded,controlled:owned.size,active:actors.size,unavailable:failed,held:held.size+searching.length,
@@ -77649,14 +77775,36 @@ function cleanup(key,value,method) {
   }
   if(globalThis[key]===value) globalThis[key]=null;
 }
+/*
+  WHETHER THE PREVIOUS LOAD'S NPCS CAN CARRY ON IN THIS ONE (#3296). The
+  runtime and the population hand over what they know when they stop, and
+  this load takes it only when both loads have the same NPC code and the same
+  catalogue: the text of the population policy, catalogue and runtime blocks
+  and of this block, read from the file that is loading, and the catalogue
+  the merchant roles made from it. Anything different takes the full load,
+  because what the old load knew may not fit this code.
+*/
+function carryKey(populationData) {
+  const text=require('fs').readFileSync(__filename,'utf8').replace(/\r\n/g,'\n');
+  const marker=(name,end)=>'// NPC '+name+(end ? ' END' : ' BEGIN');
+  const from=text.indexOf(marker('POPULATION POLICY')),to=text.indexOf(marker('SERVER RUNTIME',true),from);
+  const at=text.lastIndexOf(marker('SERVER STARTUP')),until=text.indexOf(marker('SERVER STARTUP',true),at);
+  if(from<0 || to<0 || at<0 || until<0) throw new Error('the NPC blocks are not in the loading file');
+  return require('crypto').createHash('sha256').update(text.slice(from,to)).update(text.slice(at,until))
+    .update(JSON.stringify(populationData)).digest('hex');
+}
 try {
-  const teardownErrors=[];
-  const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
-    ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]
-    .map(([key,method])=>[key,method,globalThis[key]]);
+  const teardownErrors=[],handed={};
+  // A runtime or population from before handover() existed only stops.
+  const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','handover','stop'],
+    ['__thornswoodNpcPopulation','handover','stop'],['__thornswoodNpcMerchants','shutdown']]
+    .map(([key,...methods])=>[key,methods,globalThis[key]]);
   current();
-  for(const [key,method,prior] of priorControllers) {
-    try {if(prior && typeof prior[method]==='function') prior[method]();}
+  for(const [key,methods,prior] of priorControllers) {
+    try {
+      const method=prior && methods.find(name=>typeof prior[name]==='function');
+      if(method) handed[key]=prior[method]();
+    }
     catch(error) {teardownErrors.push(error);}
     // Finish every captured controller even if a callback starts a successor.
     // Only the current startup may clear its global slots.
@@ -77687,6 +77835,14 @@ try {
     const roleStage=MERCHANT_TRADING.prepareRoles(NPC_POPULATION_DATA,roleNative);
     current();
     const populationData=roleStage.population;
+    let key=null;
+    try {key=carryKey(populationData);} catch(error) {log('NPC handover is unavailable: '+error);}
+    current();
+    const runtimeCarry=handed.__thornswoodNpcRuntime,populationCarry=handed.__thornswoodNpcPopulation;
+    const carried=!!(key && runtimeCarry && populationCarry && runtimeCarry.key===key && populationCarry.key===key);
+    if(!carried && priorControllers[1][2])
+      log('Shared NPC runtime starts over: '+(!runtimeCarry || !populationCarry ? 'the previous gamemode load handed nothing over' :
+        !key ? 'this load cannot name its NPC code' : 'the previous gamemode load had other NPC code or another catalogue'));
     const retirement=populationData.merchantRoster!==undefined;
     merchants=createNpcMerchantPurses(mp,populationData,
       createPrivateMerchantLedger(require('fs'),require('path'),cfgNpc,
@@ -77724,12 +77880,14 @@ try {
       // runtime's own preparation pass that asked about it.
       run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0),
       // #1390: the staff's patrol roads, as the patrol keeper below read them.
-      patrols:()=>globalThis.__thornswoodThalmorPatrols});
+      patrols:()=>globalThis.__thornswoodThalmorPatrols,
+      // #3296: what the previous load decided, and the key the next one checks.
+      key,carry:carried ? populationCarry : null});
     current();
     // Each step it schedules is counted on the minute line (#385).
     runtime = startSharedNpcServerRuntime(
       mp, {setTimeout:(fn,delay)=>setTimeout(counted('npc '+(fn.npcRuntimeTask||'task'),fn),delay), clearTimeout},
-      Date.now, text=>log(text),population,{suspended:true});
+      Date.now, text=>log(text),population,{suspended:true,key,carry:carried ? runtimeCarry : null});
     ready();
     // Every fallible constructor and initial timer is staged before this commit attempt.
     population.commit();

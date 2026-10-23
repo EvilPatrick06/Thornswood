@@ -263,12 +263,12 @@ Category mode: open. It was Thornswood.
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
-| #welcome-travelers | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #welcome-travelers in Thornswood |
-| #general-chat | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #general-chat in Thornswood |
+| #welcome-travelers | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #welcome-travelers in Thornswood; topic: A card for everybody who joins, posted by the bot. Say hello in #general-chat. |
+| #general-chat | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #general-chat in Thornswood; topic: Out of character chat for everyone. Talk Thornswood, Skyrim, or whatever's on your mind, and keep it friendly. Bug reports go in #test-findings, screenshots and clips go in #media. |
 | #media | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #media in Thornswood; topic: Screenshots and clips. Talk about one in a thread under it. |
-| #server-progression-and-economy | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #server-progression-and-economy in Thornswood |
+| #server-progression-and-economy | text | open | everybody on staff, Playtester | everybody on staff, Playtester | was #server-progression-and-economy in Thornswood; topic: How the server grows and how its economy works: what you have seen, and what you would change. Ideas go in #suggestions. |
 | #suggestions | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | was #suggestions in Help; topic: Mods and features you want. Nexus link if it's a mod, because whether it works here depends on how it's built. |
-| #jukebox | text | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build; was #jukebox in Voice |
+| #jukebox | text | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build; was #jukebox in Voice; topic: Music bot commands go here. Jockie Music plays in the voice room you are in. |
 | General | voice | open | everybody on staff, Playtester | everybody on staff, Playtester | was General in Voice |
 | AFK | voice | open | everybody on staff, Playtester | everybody on staff, Playtester | was AFK in Voice |
 | #bugs | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build; topic: One post per problem. Logs and screenshots welcome. |
@@ -280,7 +280,7 @@ Category mode: open.
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
-| #choose-your-hold | text | testersread | everybody on staff, Playtester | the council | posts: the council; was #choose-your-hold in The Holds |
+| #choose-your-hold | text | testersread | everybody on staff, Playtester | the council | posts: the council; was #choose-your-hold in The Holds; topic: Pick your hold with the buttons below. It opens that hold's channels. |
 | #character-introductions | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: Who are you playing? One post each. |
 | #tales | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: What happened out there. One post per story. |
 | #rp-appreciation | text | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: Somebody played a blinder. Say so. |
@@ -621,10 +621,10 @@ Category mode: staff.
 |---|---|---|---|---|---|
 | #staff-announcements | announce | staffread | everybody on staff | the council | posts: the council; was #news in Staff; topic: Announcements for every staff member. The council posts here. |
 | #council-decisions | text | staffread | everybody on staff | the council | posts: the council; topic: Every council decision, with its date. The council posts here. |
-| #staff-updates | text | staff | everybody on staff | everybody on staff | never made by the build |
+| #staff-updates | text | staff | everybody on staff | everybody on staff | never made by the build; topic: Only what every staff member must act on: a restart, an outage, or a change to how staff work. The bot and the watchdog post here. |
 | #staff-general | text | staff | everybody on staff | everybody on staff | topic: Nobody else can see this. |
 | #council | text | council | the council | the council | topic: The council: Owner, Co-Owner and the leads. |
-| #ticket-log | text | council | the council | the council | was #tickets in Applications |
+| #ticket-log | text | council | the council | the council | was #tickets in Applications; topic: Every ticket that gets closed, with a link back to it, and any ticket whose private thread would not open. The council only. |
 | Staff Room | voice | staff | everybody on staff | everybody on staff |  |
 | #dev-notes | text | staff | everybody on staff | everybody on staff | never made by the build; topic: What we’re on, and what broke doing it. |
 | #deploys | text | staff | everybody on staff | everybody on staff | never made by the build; topic: Every ship and restart lands here. |
@@ -700,7 +700,7 @@ Category mode: space (Dev).
 | #dev-announcements | text | spaceread | the council, Dev | the council | posts: the council; topic: Announcements for Dev. The council posts here. |
 | #dev-rules | text | spacerules | the council, Dev | Owner and Co-Owner, Lead Dev | posts: Owner and Co-Owner, Lead Dev; written by the build from content.py DEVRULES, a draft waiting on approval; topic: How Dev works. Lead Dev, Owner and Co-Owner post here. |
 | #dev-test-tasks | forum | space | the council, Dev | the council, Dev | never made by the build; was #dev-test-tasks in Staff; topic: Test tasks someone on dev has to measure, from the board. Kept by the bot: a post goes when its issue closes as fixed or its test task no longer says Server: Dev. |
-| #dev-test-findings | forum | space | the council, Dev | the council, Dev | was #dev-test-findings in Staff; was #dev-test-results in Staff |
+| #dev-test-findings | forum | space | the council, Dev | the council, Dev | was #dev-test-findings in Staff; was #dev-test-results in Staff; topic: Pass, fail, and what went wrong, for the test tasks in #dev-test-tasks. |
 | #dev-coordination | text | space | the council, Dev | the council, Dev | topic: Developers only: a shared file being edited, the dev feed taken. Say it here before you do it. |
 | #dev-chat | text | space | the council, Dev | the council, Dev | topic: Talk between Dev. |
 | Dev Voice | voice | space | the council, Dev | the council, Dev |  |

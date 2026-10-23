@@ -97,6 +97,20 @@ class Place(object):
                      discord.ChannelType.text if category is not None else
                      discord.ChannelType.category)
 
+        # A doc channel's post and its Changelog thread (#3336), filled in
+        # by build() for the channels the plan writes.
+        self.threads, self.msgs = [], []
+        self.mention = '<#%d>' % self.id
+        self.topic = None
+
+    async def archived_threads(self, limit=None):
+        for t in ():
+            yield t
+
+    async def history(self, limit=None):
+        for m in list(self.msgs):
+            yield m
+
     def overwrites_for(self, target):
         return self.overwrites.get(target, discord.PermissionOverwrite())
 
@@ -158,6 +172,7 @@ def build():
                  Member(13, 'A tester', [named['Playtester'], named['Member']])]
     roles = dict((n, named[n]) for n, _, _, _ in B.ROLES)
     g.categories, g.channels = [], []
+    planned = []
     for catname, specs in B.PLAN:
         cat = Place(catname, None, B.category_overwrites(g, catname, roles))
         g.categories.append(cat)
@@ -167,7 +182,25 @@ def build():
             want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
             g.channels.append(Place(want, cat, B.spec_overwrites(g, s, roles),
                                     voice=s['kind'] == 'voice'))
+            planned.append((g.channels[-1], s))
+            if s.get('post') and s.get('key') not in B.C.DRAFTS:
+                doc_in_order(g.channels[-1], s['key'], g.me.id)
+    # Each topic as the build sets it, once every channel it names is there.
+    for ch, s in planned:
+        ch.topic = B.topic_text(g, s)
     return g, named
+
+
+def doc_in_order(ch, key, me_id):
+    """A doc channel as -Posts leaves it: its post linking its Changelog
+       thread, which holds every change line (#3336)."""
+    def said(text):
+        return types.SimpleNamespace(author=types.SimpleNamespace(id=me_id), content=text,
+                                     type=discord.MessageType.default)
+    t = Place(B.CHANGELOG, ch)
+    t.msgs = [said(l) for l in B.change_lines(key)]
+    ch.threads = [t]
+    ch.msgs = [said(B.doc_with_footer(key, t))]
 
 
 def run(g):
@@ -183,6 +216,15 @@ n, out = run(g)
 yes('a server that matches the plan has no difference', n == 0)
 yes('the audit says nothing was changed', 'Nothing was changed.' in out)
 yes('the audit asked Discord for nothing', WRITES == [])
+yes('every doc channel\'s changelog is read and in order', '  Changelogs' in out and 'Changelog thread' not in out)
+
+# --------------------------------------------- a doc without its changelog --
+g, named = build()
+rules = [c for c in g.channels if c.name == 'rules'][0]
+rules.threads = []
+n, out = run(g)
+yes('a doc channel with no Changelog thread is a difference (#3336)',
+    n == 1 and 'DIFFERS  #rules, it has no Changelog thread; -Posts makes it' in out)
 yes('who holds a staff rank is said', 'Lead Gamemaster: Djinn' in out)
 yes('a non-staff role is said as a count, not names', 'Playtester: 1 member(s)' in out
     and 'A tester' not in out)
@@ -288,6 +330,40 @@ g, named = build()
 g.channels = [c for c in g.channels if c.name != 'gm-rules']
 n, out = run(g)
 yes('a planned channel that is missing is said', '#gm-rules is not in Gamemasters' in out)
+
+# ----------------------------------------------------------- topics --
+# Patrick, 23 Oct: #general-chat's description sent bug reports to #unknown,
+# a channel deleted since.
+g, named = build()
+by = dict((c.name, c) for c in g.channels)
+gc = by['general-chat']
+yes('#general-chat\'s topic in the plan mentions #test-findings and #media by id',
+    by['test-findings'].mention in gc.topic and by['media'].mention in gc.topic
+    and '<#RESULTS>' not in gc.topic)
+gc.topic = gc.topic.replace(by['test-findings'].mention, '<#987654321>')
+n, out = run(g)
+yes('a topic naming a channel that is gone is said, with the #unknown Discord shows',
+    "#general-chat's topic names a channel that is gone (<#987654321>" in out
+    and '#unknown' in out)
+yes('  and differing from the plan is said too, with both texts',
+    '#general-chat has the topic "' in out and n == 2)
+g, named = build()
+by = dict((c.name, c) for c in g.channels)
+by['media'].topic = 'Old words.'
+n, out = run(g)
+yes('a topic the plan words differently is one difference',
+    n == 1 and '#media has the topic "Old words."; the plan has "' in out)
+g, named = build()
+staff = [c for c in g.categories if c.name == 'Staff'][0]
+odd = Place('secret-room', staff, {})
+odd.topic = 'Ask in <#123>.'
+g.channels.append(odd)
+n, out = run(g)
+yes('a channel outside the plan naming a gone channel in its topic is said',
+    "#secret-room's topic names a channel that is gone (<#123>" in out)
+yes('every text, forum and announcement channel the plan makes has a topic',
+    [s['name'] for _c, specs in B.PLAN for s in specs
+     if s['kind'] != 'voice' and s.get('make', True) and not s.get('topic')] == [])
 
 yes('nothing in any run asked Discord for anything', WRITES == [])
 
