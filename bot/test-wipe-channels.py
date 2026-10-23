@@ -76,14 +76,15 @@ class Cat:
 
 
 class Msg:
-    def __init__(self, author, components=None):
+    def __init__(self, author, components=None, pinned=False, kind='default', content=''):
         self.author = types.SimpleNamespace(id=author)
         self.components = components or []
+        self.pinned, self.type, self.content = pinned, kind, content
 
 
 class Thread:
-    def __init__(self, tid, parent, log):
-        self.id, self.parent_id, self.log = tid, parent, log
+    def __init__(self, tid, parent, log, name='a thread'):
+        self.id, self.parent_id, self.log, self.name = tid, parent, log, name
 
     async def delete(self):
         self.log.append(('delete thread', self.id))
@@ -134,7 +135,8 @@ def server():
         Cat(100, 'Start Here'),
         Text(1, 'rules', 100, [Msg(BOT), Msg(BOT)], log),
         Text(2, 'tickets-and-applications', 100, [panel], log),
-        Text(3, 'news', 100, [Msg(BOT), Msg(9), Msg(9)], log),
+        Text(3, 'news', 100, [Msg(BOT, pinned=True), Msg(BOT, kind='thread_created', content='Changelog'),
+                              Msg(BOT), Msg(9), Msg(9)], log),
         Text(4, 'staff-updates', 100, [Msg(BOT)] * 5, log),
         Text(5, 'general-chat', 100, [Msg(7), Msg(8), Msg(BOT, ['button'])], log,
              archived=[types.SimpleNamespace(id=50, parent_id=5, private=False, delete=None)]),
@@ -142,7 +144,8 @@ def server():
     ]
     old = Thread(50, 5, log)
     chans[5].archived = [old]
-    active = [Thread(60, 6, log), Thread(61, 2, log)]   # a suggestion post, an open application
+    # a suggestion post, an open application, #news's changelog
+    active = [Thread(60, 6, log), Thread(61, 2, log), Thread(62, 3, log, 'Changelog')]
 
     class Guild:
         name = 'Thornswood'
@@ -169,7 +172,8 @@ def server():
 
 
 wipe.discord = types.SimpleNamespace(CategoryChannel=Cat, TextChannel=Text,
-                                     ChannelType=types.SimpleNamespace(forum=Kind.forum))
+                                     ChannelType=types.SimpleNamespace(forum=Kind.forum),
+                                     MessageType=types.SimpleNamespace(thread_created='thread_created'))
 
 
 def run(argv):
@@ -200,7 +204,11 @@ yes('and the forum\'s posts', 'WIPE  #suggestions (Start Here): would delete 0 m
 code, out, chans, log = run(['--go'])
 by = {getattr(c, 'name', ''): c for c in chans}
 yes('--go exits 0', code == 0)
-yes('#news and #staff-updates are empty', not by['news'].msgs and not by['staff-updates'].msgs)
+yes('#staff-updates is empty', not by['staff-updates'].msgs)
+yes('#news keeps only its pinned doc and the line that opens its Changelog thread',
+    [(m.pinned, m.type) for m in by['news'].msgs] == [(True, 'default'), (False, 'thread_created')])
+yes('and its Changelog thread is not deleted', ('delete thread', 62) not in log)
+yes('#factions is kept', wipe.why_kept('factions') != '')
 yes('#general-chat keeps only the bot\'s panel', len(by['general-chat'].msgs) == 1 and by['general-chat'].msgs[0].components)
 yes('its archived thread and the forum post are deleted', ('delete thread', 50) in log and ('delete thread', 60) in log)
 yes('#rules and the open application are not touched',
@@ -210,7 +218,7 @@ yes('it says what went', 'deleted 10 message(s) and 2 thread(s); 0 channel(s) fa
 # ---- 4. --only
 code, out, chans, log = run(['--go', '--only', 'news'])
 by = {getattr(c, 'name', ''): c for c in chans}
-yes('--only news empties #news and nothing else', not by['news'].msgs and len(by['general-chat'].msgs) == 3 and len(log) == 1)
+yes('--only news empties #news and nothing else', len(by['news'].msgs) == 2 and len(by['general-chat'].msgs) == 3 and len(log) == 1)
 code, out, chans, log = run(['--go', '--only', 'nope'])
 yes('--only a name the server does not have stops before anything', code == 1 and not log and 'no channel called #nope' in out)
 

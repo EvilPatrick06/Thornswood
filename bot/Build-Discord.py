@@ -1917,51 +1917,62 @@ def change_lines(key):
     return ['**%s**: %s' % (nice_date(d), line) for d, line, _ in C.CHANGES.get(key) or []]
 
 
-def doc_with_footer(key):
-    """A doc's words, ending on its newest change."""
+def doc_with_footer(key, thread=None):
+    """A doc's words, ending on its newest change and a link to the
+       channel's Changelog thread. The link is the way in: the thread's own
+       "started a thread" line can be lost, and Discord archives a quiet
+       thread out of the channel's list, but a mention always opens it."""
     lines = C.CHANGES.get(key) or []
     text = C.DOCS[key]
     if lines:
         d, line, _ = lines[-1]
-        text = text.rstrip() + '\n\n*Last changed %s: %s Every change is in the Changelog thread.*\n' % (
-            nice_date(d), line)
+        where = ('in the Changelog thread, ' + thread.mention) if thread is not None else 'in the Changelog thread'
+        text = text.rstrip() + '\n\n*Last changed %s: %s Every change is %s.*\n' % (
+            nice_date(d), line, where)
     return text
 
 
 CHANGELOG = 'Changelog'
 
 
-async def keep_changelog(channel, key):
-    """The channel's Changelog thread, made and locked if missing, with
-       every change line of its doc posted once, in order. Nothing in it is
-       ever deleted or rewritten, so it is the record of what changed."""
-    if channel is None or not hasattr(channel, 'create_thread'):
-        return
-    thread = None
+async def find_changelog(channel):
+    """The channel's Changelog thread, open or archived, or None. Raises
+       discord.HTTPException when the archive cannot be read."""
     for t in getattr(channel, 'threads', None) or []:
         if t.name == CHANGELOG:
-            thread = t
-    if thread is None:
-        try:
-            async for t in channel.archived_threads(limit=100):
-                if t.name == CHANGELOG:
-                    thread = t
-                    break
-        except discord.HTTPException as e:
-            failed.append('#%s: its Changelog thread could not be looked for (%s)' % (channel.name, refused(e)))
-            return
+            return t
+    async for t in channel.archived_threads(limit=100):
+        if t.name == CHANGELOG:
+            return t
+    return None
+
+
+async def keep_changelog(channel, key):
+    """The channel's Changelog thread, made and locked if missing, with
+       every change line of its doc posted once, in order, and handed back
+       for the post to link (None when it could not be had). Nothing in it
+       is ever deleted or rewritten, so it is the record of what changed."""
+    if channel is None or not hasattr(channel, 'create_thread'):
+        return None
+    try:
+        thread = await find_changelog(channel)
+    except discord.HTTPException as e:
+        failed.append('#%s: its Changelog thread could not be looked for (%s)' % (channel.name, refused(e)))
+        return None
     if thread is None:
         try:
             kind = (discord.ChannelType.news_thread
                     if getattr(channel, 'type', None) is discord.ChannelType.news
                     else discord.ChannelType.public_thread)
+            # A week, the longest Discord keeps a quiet thread in the list.
             thread = await channel.create_thread(name=CHANGELOG, type=kind,
+                                                 auto_archive_duration=10080,
                                                  reason='Thornswood setup, the changelog')
             await thread.edit(locked=True)
             say('changelog', '#' + channel.name + ' has its Changelog thread')
         except discord.HTTPException as e:
             failed.append('#%s: its Changelog thread could not be made (%s)' % (channel.name, refused(e)))
-            return
+            return None
     have = set()
     try:
         async for m in thread.history(limit=500):
@@ -1972,6 +1983,51 @@ async def keep_changelog(channel, key):
                 await thread.send(line)
     except discord.HTTPException as e:
         failed.append('#%s: its changelog was not brought up to date (%s)' % (channel.name, refused(e)))
+    return thread
+
+
+async def changelog_drift(channel, key, me_id):
+    """How a doc channel's changelog differs from content.py, as lines for
+       the audit: [] when its Changelog thread is there, holds every change
+       line, and the channel's post links it. Reads only."""
+    try:
+        thread = await find_changelog(channel)
+    except discord.HTTPException as e:
+        return ['its Changelog thread could not be looked for (%s)' % refused(e)]
+    if thread is None:
+        return ['it has no Changelog thread; -Posts makes it']
+    out = []
+    try:
+        have = set()
+        async for m in thread.history(limit=500):
+            if getattr(m.author, 'id', None) == me_id:
+                have.add(m.content)
+        gone = [l for l in change_lines(key) if l not in have]
+        if gone:
+            out.append('its Changelog thread is missing %d change line(s); -Posts adds them' % len(gone))
+        linked = False
+        async for m in channel.history(limit=50):
+            if doc_post_of_mine(m, me_id) and thread.mention in (m.content or ''):
+                linked = True
+                break
+        if not linked:
+            out.append('its post does not link its Changelog thread; -Posts writes the link')
+    except discord.HTTPException as e:
+        out.append('its changelog could not be read (%s)' % refused(e))
+    return out
+
+
+def doc_post_of_mine(message, me_id):
+    """A message of the bot's that post() writes and so replaces: its words
+       and the "pinned a message" line Discord adds for them. Never the
+       "started a thread" line of the Changelog thread: until 23 Oct this
+       took every message of the bot's, that line with them, so each -Posts
+       run after the first took the changelog out of sight (#3336)."""
+    if getattr(getattr(message, 'author', None), 'id', None) != me_id:
+        return False
+    kind = getattr(message, 'type', None)
+    return kind in (discord.MessageType.default, discord.MessageType.reply,
+                    discord.MessageType.pins_add)
 
 
 async def post(channel, text, found):
@@ -1993,7 +2049,7 @@ async def post(channel, text, found):
     # a channel came to say its rules twice.
     try:
         async for old in channel.history(limit=50):
-            if old.author.id == client.user.id:
+            if doc_post_of_mine(old, client.user.id):
                 try:
                     await old.delete()
                 except discord.NotFound:
@@ -2794,6 +2850,7 @@ async def audit(guild):
 
     print('\n  Categories and channels against the plan', flush=True)
     ours = set()
+    docs = []
     for catname, specs in PLAN:
         cat = discord.utils.get(guild.categories, name=catname) if catname else None
         if catname and cat is None:
@@ -2817,6 +2874,8 @@ async def audit(guild):
                 if spec.get('make', True):
                     off('#%s is not in %s' % (want, catname))
                 continue
+            if spec.get('post') and spec.get('key') not in C.DRAFTS:
+                docs.append((ch, spec['key']))
             # A member's own overwrite is kept by the build, so it is not a
             # difference either.
             plan = with_members(ch.overwrites, spec_overwrites(guild, spec, roles))
@@ -2834,6 +2893,12 @@ async def audit(guild):
             line('#%s in %s is kept by name and not made by the plan' % (c.name, where))
         else:
             off('#%s in %s is not in the plan' % (c.name, where))
+
+    # Every doc keeps its changelog (#3317), and the post links it (#3336).
+    print('\n  Changelogs', flush=True)
+    for ch, key in docs:
+        for d in await changelog_drift(ch, key, getattr(me, "id", None)):
+            off('#%s, %s' % (ch.name, d))
 
     # The sidebar's order (#3317, keep_order).
     moved = order_wanted(guild)
@@ -3189,8 +3254,9 @@ async def on_ready():
             say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
         elif POSTS:
             for ch, key in posts:
-                await post(ch, doc_with_footer(key), found)
-                await keep_changelog(ch, key)
+                # The thread first, so the post can link it.
+                thread = await keep_changelog(ch, key)
+                await post(ch, doc_with_footer(key, thread), found)
         elif posts:
             say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
 

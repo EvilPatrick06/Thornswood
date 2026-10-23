@@ -97,6 +97,19 @@ class Place(object):
                      discord.ChannelType.text if category is not None else
                      discord.ChannelType.category)
 
+        # A doc channel's post and its Changelog thread (#3336), filled in
+        # by build() for the channels the plan writes.
+        self.threads, self.msgs = [], []
+        self.mention = '<#%d>' % self.id
+
+    async def archived_threads(self, limit=None):
+        for t in ():
+            yield t
+
+    async def history(self, limit=None):
+        for m in list(self.msgs):
+            yield m
+
     def overwrites_for(self, target):
         return self.overwrites.get(target, discord.PermissionOverwrite())
 
@@ -167,7 +180,21 @@ def build():
             want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
             g.channels.append(Place(want, cat, B.spec_overwrites(g, s, roles),
                                     voice=s['kind'] == 'voice'))
+            if s.get('post') and s.get('key') not in B.C.DRAFTS:
+                doc_in_order(g.channels[-1], s['key'], g.me.id)
     return g, named
+
+
+def doc_in_order(ch, key, me_id):
+    """A doc channel as -Posts leaves it: its post linking its Changelog
+       thread, which holds every change line (#3336)."""
+    def said(text):
+        return types.SimpleNamespace(author=types.SimpleNamespace(id=me_id), content=text,
+                                     type=discord.MessageType.default)
+    t = Place(B.CHANGELOG, ch)
+    t.msgs = [said(l) for l in B.change_lines(key)]
+    ch.threads = [t]
+    ch.msgs = [said(B.doc_with_footer(key, t))]
 
 
 def run(g):
@@ -183,6 +210,15 @@ n, out = run(g)
 yes('a server that matches the plan has no difference', n == 0)
 yes('the audit says nothing was changed', 'Nothing was changed.' in out)
 yes('the audit asked Discord for nothing', WRITES == [])
+yes('every doc channel\'s changelog is read and in order', '  Changelogs' in out and 'Changelog thread' not in out)
+
+# --------------------------------------------- a doc without its changelog --
+g, named = build()
+rules = [c for c in g.channels if c.name == 'rules'][0]
+rules.threads = []
+n, out = run(g)
+yes('a doc channel with no Changelog thread is a difference (#3336)',
+    n == 1 and 'DIFFERS  #rules, it has no Changelog thread; -Posts makes it' in out)
 yes('who holds a staff rank is said', 'Lead Gamemaster: Djinn' in out)
 yes('a non-staff role is said as a count, not names', 'Playtester: 1 member(s)' in out
     and 'A tester' not in out)
