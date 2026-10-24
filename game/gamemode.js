@@ -55073,8 +55073,9 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
     if (might >= need) { return true; }
     var l = lines(need);
     slog(hex(actorId), 'refused', hex(baseId), '(weight ' + weightOf(baseId) + ', Might ' + might + ' of ' + need + ')');
-    try { notify(actorId, l[0]); notify(actorId, l[1]); } catch (e) { }
-    try { say(actorId, l[0] + ' ' + l[1] + '.'); } catch (e) { }
+    notify(actorId, l[0]);
+    notify(actorId, l[1]);
+    say(actorId, l[0] + ' ' + l[1] + '.');
     return false;
   }
 

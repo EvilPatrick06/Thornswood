@@ -1177,7 +1177,6 @@
     if (!book || book.points === undefined || book.points === null) return null;
     return Number(book.points) || 0;
   }
-  /* The marked staff spells, in the order the page draws them, which is the order they are sent in. */
   /* The weapon line on the Might row: what each weight needs, and what you hold. */
   function gateLine(gate, have) {
     var bits = [];
@@ -1190,6 +1189,7 @@
     return 'Strength: ' + bits.join(', and ') + '. ' + holds;
   }
 
+  /* The marked staff spells, in the order the page draws them, which is the order they are sent in. */
   function markedStaffDescs() {
     var out = [];
     staffRows().forEach(function (r) { if (markedStaff[r.desc] && out.indexOf(r.desc) < 0) out.push(r.desc); });
@@ -2866,7 +2866,7 @@
           Strength (#2262): Might is what a heavy weapon needs. The server
           refuses the equip (the strength weapons block in game/gamemode.js);
           this line says so first, so nobody finds out by trying. The two
-          rows are the server's STRENGTH.tiers, held equal by
+          rows are the server's STRENGTH.tiers, kept equal by
           tests/test-2262-strength-weapons.js.
         */
         if (s.gate) row.appendChild(el('div', 'sd gate', gateLine(s.gate, have)));

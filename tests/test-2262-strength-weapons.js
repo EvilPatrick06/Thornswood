@@ -286,10 +286,7 @@ if (lineSrc && gate) {
 // ------------------------------------------------------------- the rest --
 yes('docs/systems/skill-tree.md says what Might unlocks', /30 to 44 needs Might 3/.test(doc.replace(/\n/g, ' ')) && /45 or more/.test(doc));
 yes('onUpdateEquipmentAttempt is not used to gate (it fires after the save)', !/onUpdateEquipmentAttempt\s*=/.test(block));
-for (const wf of ['build.yml', 'build-pr.yml']) {
-  const y = read('.github', 'workflows', wf);
-  yes(wf + ' runs this harness', y.indexOf("'test-2262-strength-weapons.js'") >= 0);
-}
+yes('the build runs this harness (it is not in tests/gate-excluded.txt, #3009)', !/^test-2262-strength-weapons\.js\s/m.test(read('tests', 'gate-excluded.txt')));
 yes('no em dash in the block or this harness', block.indexOf('\u2014') < 0 && fs.readFileSync(__filename, 'utf8').indexOf('\u2014') < 0);
 
 done();
