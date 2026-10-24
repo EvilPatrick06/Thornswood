@@ -46,7 +46,7 @@ The PRs those runs build show `UNSTABLE` only because the runs haven't finished.
 All of these are mergeable. Codex had planned this merge order:
 
 1. **#73** `codex/2262-equip-item-attempt` @ `9dc87cce`, ready. Adds the `onEquipItemAttempt` event (#2262's engine half).
-2. **#76** `waystone/1688-player-record-spells` @ `780b0188`, ready, CLEAN (#1688).
+2. **#76** Waystone's #1688 branch (Flames and Healing from the start record) @ `780b0188`, ready, CLEAN (#1688).
 3. **#69** `anvil/2382-flora-redraw` @ `a8218f10`, ready (#2382).
 4. **#82** `anvil/1384-condition-120` @ `83caae1c`, ready (#1384).
 5. **#53** `herald/1294-rpc-local-test` @ `f6701340`, ready, CLEAN (#1294).
