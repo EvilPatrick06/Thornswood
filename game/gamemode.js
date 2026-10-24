@@ -54920,6 +54920,10 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
 mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorId, equipment) {
   var college = globalThis.__thornswoodCollege;
   if (college && college.equipped) { college.equipped(actorId, equipment); }
+  // A pair of Prisoner's Cuffs put on facing somebody (#2573), on an engine
+  // without onEquipItemAttempt. See the cuffs block.
+  var cuffsEq = globalThis.__thornswoodCuffs;
+  if (cuffsEq && cuffsEq.equipped) { cuffsEq.equipped(actorId, equipment); }
 });
 // ==== end thornswood college ====
 
@@ -59741,6 +59745,504 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 // CPU PROFILE ON REQUEST END
 
 
+// ==== thornswood cuffs (#2573) ====
+/*
+  HANDCUFFS FOR GUARDS (#2573). Patrick, 16 Oct 2026: A and B. Cuffs as an
+  action that binds somebody until a guard of that hold frees them, and only
+  guards may put the Prisoner's Cuffs on somebody. All of it in the world:
+  a press, an item and Skyrim's own animation, no command.
+
+  THE GESTURE IS THE ITEM, NOT A KEY OR A PRESS. A guard puts the cuffs on
+  the person in front of them by putting the Prisoner's Cuffs on from their
+  own pack (the inventory's Equip), facing that person within arm's reach.
+  Not E on the person: E on a person already hands over a letter the presser
+  carries for them (#1595, the front plugin's deliverPress), so one press
+  would have done two things. Not a look prompt key either: those send a
+  chat line (lookVerb), and no slash command is allowed here at all.
+
+  HOW THE SERVER HEARS IT, two engines:
+    - With the fork's onEquipItemAttempt (skymp#73, Codex's half of #2262,
+      riding the #2060 pin bump; on only with the server setting
+      equipItemAttemptEnabled): the pair going on the guard is asked about
+      before it is stored. The cuffs act, and the answer is false, so the
+      engine leaves the pair in the pack, not worn.
+    - Until then, mp.onUpdateEquipmentAttempt, which fires after the engine
+      has stored the equipment: a pair newly worn by somebody facing a person
+      acts the same way, and the guard's own game takes their pair back off
+      (USE_PROPERTY). With the fork event on, the pair never reaches the
+      stored equipment, so the two paths cannot both act on one Equip.
+
+  CUFFING. A guard of a hold, facing a person who is not cuffed, puts on a
+  pair: it moves from the guard's pack to theirs and they are bound in that
+  hold's name. The hold is the hold of the place it happens (holdAt), and it
+  has to be one the guard guards; a place the data gives no hold binds in
+  the guard's hold when they guard exactly one. Anybody else doing the same
+  facing a person is told that only a hold's guards put them on somebody
+  (B), and their pair stays theirs to wear: worn with nobody in front of
+  them, cuffs are clothing and do nothing.
+
+  BOUND. The prisoner's own game equips the cuffs so they cannot be taken off
+  (preventRemoval), plays Skyrim's bound hands idle, the one the Helgen
+  prisoners walk with (OffsetBoundStandingStart), and turns off the fighting
+  controls, so no weapon or spell can be drawn; anything drawn is put away.
+  The front plugin's controls watchdog and stuck rescue leave fighting off
+  while the server holds it off (sp.storage.thornswoodControlsHeld, #2620).
+  They still walk, talk, open doors and use menus. Everybody near sees the
+  cuffs on the body and the idle, which the neighbour script plays on that
+  body. It is written on the character, so it lasts through a logout, a
+  restart and a death, until a guard frees them (A). The server half, which
+  trusts no client: a bound person cannot drop the cuffs or put them in a
+  container (mayLetGo, from mp.onDropItem and mp.onPutItem), and with the
+  fork event on, cannot put a weapon in their hands (mayEquip).
+
+  FREEING. A guard facing the cuffed person puts a pair on the same way: the
+  cuffs come off the prisoner, the idle ends, fighting comes back, and the
+  prisoner's pair goes into that guard's pack. WHICH guard: any guard of any
+  hold (Patrick, 17 Oct 2026 on #2573). Freeing is not tied to a hold, the
+  hold that cuffed them or the one they stand in; being a guard is the whole
+  of it. Anybody else is told only a guard can take the cuffs off.
+
+  WHERE A GUARD'S CUFFS COME FROM. A guard of any hold who is in the world,
+  carries no cuffs and is not cuffed is issued one pair, at most once a real
+  day per character. Cuffing moves the pair to the prisoner and freeing gives
+  it back, so the issue only covers a pair that went away.
+
+  updateOwner runs every frame (see SWING_PROPERTY), so the owner script is
+  edge triggered on v.at and does only cheap reads between changes.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var CUFFS_DESC = '10e039:Skyrim.esm';
+  var CUFF_PROPERTY = 'thornswoodCuffed';
+  var ISSUED_PROPERTY = 'thornswoodCuffsIssued';
+  var ISSUE_EVERY_MS = 24 * 3600 * 1000;
+  var ISSUE_TICK_MS = 30000;
+  var USE_PROPERTY = 'thornswoodCuffsUsed';
+  // Arm's reach, in game units (about 2.8 m), and in front: within 60 degrees
+  // either side of the way the guard faces.
+  var REACH = 200;
+  var FRONT_COS = 0.5;
+  var stamp = 0;
+
+  function clog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[cuffs]');
+    log.apply(null, a);
+  }
+  function cuffsId() { return idOf(CUFFS_DESC); }
+  function read(id, key) { try { return mp.get(id, key); } catch (e) { return null; } }
+  function pidOf(id) { return Number(read(id, 'profileId')) || 0; }
+  /*
+    Somebody still waiting on their join pass (#410), or with no profile on
+    them yet, has no character this server may act on: the number they are
+    in the world under is one their client picked. Nothing they do counts
+    yet, so they cuff nobody, free nobody and are issued nothing, and on
+    onEquipItemAttempt (which guard() does not hold back, it is not in its
+    ACTS_AS list) the cuffs give no answer at all rather than a refusal.
+  */
+  function waiting(id) {
+    var pid = pidOf(id);
+    if (!(pid > 0)) { return true; }
+    var h = g.__thornswoodPassHeld;
+    try { return typeof h === 'function' && !!h(pid); } catch (e) { return true; }
+  }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function carried(id) {
+    var b = cuffsId();
+    var inv = null;
+    try { inv = mp.get(id, 'inventory'); } catch (e) { inv = null; }
+    var n = 0;
+    var ee = (inv && inv.entries) || [];
+    for (var i = 0; i < ee.length; i++) { if (ee[i] && ee[i].baseId === b) { n += Number(ee[i].count) || 0; } }
+    return n;
+  }
+  function cuffedBy(id) {
+    var v = read(id, CUFF_PROPERTY);
+    return (v && v.bound) ? v : null;
+  }
+  function guardHolds(pid) {
+    var p = g.__thornswoodProperty;
+    try {
+      var o = (p && p.officeOf) ? p.officeOf(pid) : null;
+      return (o && o.guardOf) ? o.guardOf.slice() : [];
+    } catch (e) { return []; }
+  }
+  function town(hold) {
+    var p = g.__thornswoodProperty;
+    return (p && p.HOLD_TOWN && p.HOLD_TOWN[hold]) || String(hold);
+  }
+  function holdOfPlace(id) {
+    var l = read(id, 'locationalData');
+    if (!l || !l.cellOrWorldDesc) { return null; }
+    try { return holdAt({ desc: l.cellOrWorldDesc, pos: l.pos }) || null; } catch (e) { return null; }
+  }
+  function tell(id, line) {
+    try { notify(id, line); } catch (e) { }
+    try { say(id, line); } catch (e2) { }
+  }
+  function write(id, v) {
+    stamp = Math.max(stamp + 1, Date.now());
+    v.at = stamp;
+    v.item = cuffsId();
+    mp.set(id, CUFF_PROPERTY, v);
+  }
+
+  /*
+    The hold a guard binds in here: the place's, if they guard it; with no
+    hold for the place, theirs when they guard exactly one. null otherwise.
+  */
+  function bindingHold(guardPid, place) {
+    var holds = guardHolds(guardPid);
+    if (place) { return holds.indexOf(place) !== -1 ? place : null; }
+    return holds.length === 1 ? holds[0] : null;
+  }
+
+  /*
+    May this person free somebody in cuffs? Any guard of any hold (Patrick,
+    17 Oct): no hold rule at all.
+  */
+  function mayFree(guardPid) { return guardHolds(guardPid).length > 0; }
+
+  /*
+    The person actorId faces within arm's reach in the same cell, the nearest
+    if several; 0 when there is nobody.
+  */
+  function facing(actorId) {
+    var me = read(actorId, 'locationalData');
+    if (!me || !me.pos || !me.cellOrWorldDesc) { return 0; }
+    var ang = ((Number(me.rot && me.rot[2]) || 0) / 180) * Math.PI;
+    var fx = Math.sin(ang), fy = Math.cos(ang);
+    var on = [];
+    try { on = mp.getOnlinePlayers() || []; } catch (e) { on = []; }
+    var best = 0, bestD = REACH * REACH;
+    for (var i = 0; i < on.length; i++) {
+      var id = on[i];
+      // Everybody online counts as the person in front, profile or not: one
+      // still waiting is answered by used(), not looked past.
+      if (id === actorId) { continue; }
+      var l = read(id, 'locationalData');
+      if (!l || !l.pos || l.cellOrWorldDesc !== me.cellOrWorldDesc) { continue; }
+      var dx = l.pos[0] - me.pos[0], dy = l.pos[1] - me.pos[1], dz = l.pos[2] - me.pos[2];
+      var d = dx * dx + dy * dy + dz * dz;
+      if (d > bestD) { continue; }
+      var flat = Math.sqrt(dx * dx + dy * dy);
+      if (flat > 1 && (dx * fx + dy * fy) / flat < FRONT_COS) { continue; }
+      best = id; bestD = d;
+    }
+    return best;
+  }
+
+  function bind(casterId, cp, targetId, tp) {
+    var place = holdOfPlace(targetId);
+    var hold = bindingHold(cp, place);
+    if (!hold) {
+      var mine = guardHolds(cp);
+      if (!mine.length) {
+        tell(casterId, 'Only a hold\'s guards may put Prisoner\'s Cuffs on somebody.');
+        return false;
+      }
+      tell(casterId, 'You are a guard of ' + mine.map(town).join(' and ') + ', and this is ' +
+                     (place ? town(place) : 'no hold of yours') + ', so you cannot put cuffs on anybody here.');
+      return true;
+    }
+    if (!takeItemById(casterId, cuffsId(), 1)) { return true; }
+    addItem(targetId, CUFFS_DESC, 1);
+    write(targetId, { bound: true, hold: hold, by: cp });
+    tell(casterId, 'You put the cuffs on them in the name of ' + town(hold) +
+                   '. Facing them, put on a pair again to take the cuffs off.');
+    tell(targetId, 'A guard of ' + town(hold) + ' puts you in cuffs. Only a guard of ' + town(hold) +
+                   ' can take them off.');
+    clog(hex(casterId), '(profile ' + cp + ') cuffed', hex(targetId), '(profile ' + tp + ') for', hold);
+    return true;
+  }
+
+  function free(casterId, cp, targetId, tp, on) {
+    if (!mayFree(cp)) {
+      tell(casterId, 'They are in the cuffs of ' + town(on.hold) + ', and only a guard can take them off.');
+      return true;
+    }
+    var back = takeItemById(targetId, cuffsId(), 1);
+    if (back) { addItem(casterId, CUFFS_DESC, 1); }
+    write(targetId, { bound: false, hold: on.hold, by: cp });
+    tell(casterId, 'You take the cuffs off. ' + (back ? 'Their pair is in your pack.' : ''));
+    tell(targetId, 'A guard takes the cuffs off. Your hands are free.');
+    clog(hex(casterId), '(profile ' + cp + ') freed', hex(targetId), '(profile ' + tp + ') from the cuffs of', on.hold);
+    return true;
+  }
+
+  /*
+    actorId has put a pair of cuffs on from their pack. True when that was
+    about somebody in front of them and has been answered, so the pair does
+    not stay on the wearer; false leaves it worn, as clothing.
+  */
+  function used(actorId) {
+    if (waiting(actorId)) { return false; }
+    var cp = pidOf(actorId);
+    if (cuffedBy(actorId)) { return false; }
+    var targetId = facing(actorId);
+    if (!targetId) {
+      if (guardHolds(cp).length) {
+        tell(actorId, 'Face the person you mean to cuff or free, within arm\'s reach, and put the cuffs on again.');
+        return true;
+      }
+      return false;
+    }
+    // The person in front still waiting on their pass, or with no profile on
+    // them yet, has no state of their own loaded: a cuffed record written now
+    // would land on a profile that is not yet theirs. Nothing happens, no
+    // cuff, no free and no refusal; the pair stays on the wearer as clothing.
+    if (waiting(targetId)) { return false; }
+    var tp = pidOf(targetId);
+    var on = cuffedBy(targetId);
+    return on ? free(actorId, cp, targetId, tp, on) : bind(actorId, cp, targetId, tp);
+  }
+
+  function isWeapon(baseId) {
+    var r = null;
+    try { r = (mp.lookupEspmRecordById(Number(baseId) >>> 0) || {}).record || null; } catch (e) { r = null; }
+    return !!(r && String(r.type) === 'WEAP');
+  }
+
+  /*
+    The answer to the fork's onEquipItemAttempt (skymp#73): false keeps the
+    item in the pack, not worn. A cuffed person puts no weapon in their
+    hands; a pair of cuffs put on by somebody facing a person acts and stays
+    in the pack.
+  */
+  function mayEquip(actorId, baseId) {
+    var b = Number(baseId) >>> 0;
+    if (cuffedBy(actorId)) {
+      if (isWeapon(b)) { tell(actorId, 'Your hands are cuffed.'); return false; }
+      return true;
+    }
+    if (b === cuffsId()) { return !used(actorId); }
+    return true;
+  }
+
+  /*
+    The stored equipment, every time it changes (mp.onUpdateEquipmentAttempt):
+    the engine before onEquipItemAttempt. A pair newly worn acts as above,
+    and the wearer's own game takes it back off. The first look at somebody
+    after they arrive only remembers, so a pair worn at logout does nothing.
+  */
+  var wornWas = {};
+  function equipped(actorId, eq) {
+    // Not even remembered while waiting: the first look after the pass is
+    // the baseline, so a pair put on before it does nothing afterwards.
+    if (!eq || typeof eq !== 'object' || waiting(actorId) || cuffedBy(actorId)) { return; }
+    var b = cuffsId();
+    var ee = (eq.inv && eq.inv.entries) || eq.entries || [];
+    var on = false;
+    for (var i = 0; i < ee.length; i++) { if (ee[i] && ee[i].baseId === b && ee[i].worn) { on = true; } }
+    var was = wornWas[actorId];
+    wornWas[actorId] = on;
+    if (was === undefined || was || !on) { return; }
+    if (used(actorId)) {
+      stamp = Math.max(stamp + 1, Date.now());
+      try { mp.set(actorId, USE_PROPERTY, { at: stamp, item: b }); } catch (e) { clog('could not hand back the pair of', hex(actorId) + ':', e); }
+    }
+  }
+
+  /*
+    May actorId let go of count of baseId (a drop, or a put into a
+    container)? Not the pair locked on their wrists while they are bound.
+  */
+  function mayLetGo(actorId, baseId, count) {
+    if (Number(baseId) !== cuffsId() || !cuffedBy(actorId)) { return true; }
+    if (carried(actorId) - (Number(count) || 1) >= 1) { return true; }
+    tell(actorId, 'The cuffs are locked on your wrists.');
+    return false;
+  }
+
+  /* One pair for a guard who has none, at most once a real day. */
+  function issue(actorId) {
+    if (waiting(actorId)) { return false; }
+    var pid = pidOf(actorId);
+    var holds = guardHolds(pid);
+    if (!holds.length || cuffedBy(actorId) || carried(actorId) > 0) { return false; }
+    var last = Number(read(actorId, ISSUED_PROPERTY)) || 0;
+    if (Date.now() - last < ISSUE_EVERY_MS) { return false; }
+    if (!addItem(actorId, CUFFS_DESC, 1)) { return false; }
+    try { mp.set(actorId, ISSUED_PROPERTY, Date.now()); } catch (e) { clog('could not write the issue of', hex(actorId) + ':', e); }
+    tell(actorId, 'As Guard of ' + town(holds[0]) + ' you are issued a pair of Prisoner\'s Cuffs. ' +
+                  'Facing somebody within arm\'s reach, put the cuffs on from your pack to cuff them, and again to free them.');
+    clog('issued a pair of cuffs to', hex(actorId), '(profile ' + pid + ')');
+    return true;
+  }
+  function tick() {
+    var on = [];
+    try { on = mp.getOnlinePlayers() || []; } catch (e) { on = []; }
+    for (var i = 0; i < on.length; i++) { issue(on[i]); }
+  }
+
+  /* The prisoner's own game. Edge triggered on v.at; between changes, held. */
+  function ownerScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.at) { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    var sp = ctx.sp;',
+      '    var pc = sp.Game.getPlayer();',
+      '    if (!pc) { return; }',
+      '    var cuffs = v.item ? sp.Game.getFormEx(v.item) : null;',
+      '    var now = Date.now();',
+      '    if (st.thornswoodCuffAt !== v.at) {',
+      '      st.thornswoodCuffAt = v.at;',
+      '      if (!v.bound) {',
+      '        if (st.thornswoodCuffBound) {',
+      '          st.thornswoodCuffBound = false;',
+      '          try { if (cuffs) { pc.unequipItem(cuffs, false, true); } } catch (e) { }',
+      '          try { sp.Debug.sendAnimationEvent(pc, "OffsetStop"); } catch (e) { }',
+      '          try { if (sp.storage.thornswoodControlsHeld) { delete sp.storage.thornswoodControlsHeld.fighting; } } catch (e) { }',
+      '          try { sp.Game.enablePlayerControls(false, true, false, false, false, false, false, false, 0); } catch (e) { }',
+      '        }',
+      '        return;',
+      '      }',
+      '      st.thornswoodCuffBound = true;',
+      '      st.thornswoodCuffIdleAt = 0;',
+      '      try { sp.Game.disablePlayerControls(false, true, false, false, false, false, false, false, 0); } catch (e) { }',
+      '    }',
+      '    if (!v.bound) { return; }',
+      '    try { var held = sp.storage.thornswoodControlsHeld || {}; if (held.fighting !== "cuffed") { held.fighting = "cuffed"; sp.storage.thornswoodControlsHeld = held; } } catch (e) { }',
+      '    try { if (sp.Game.isFightingControlsEnabled()) { sp.Game.disablePlayerControls(false, true, false, false, false, false, false, false, 0); } } catch (e) { }',
+      '    try { if (pc.isWeaponDrawn()) { pc.sheatheWeapon(); } } catch (e) { }',
+      '    try { if (cuffs && pc.getItemCount(cuffs) > 0 && !pc.isEquipped(cuffs)) { pc.equipItem(cuffs, true, true); } } catch (e) { }',
+      '    if (now - (st.thornswoodCuffIdleAt || 0) > 5000) {',
+      '      st.thornswoodCuffIdleAt = now;',
+      '      try { sp.Debug.sendAnimationEvent(pc, "OffsetBoundStandingStart"); } catch (e) { }',
+      '    }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  /* The wearer's own game, once per use: the pair they put on comes back off. */
+  function useScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.at || !ctx.state || ctx.state.thornswoodCuffUseAt === v.at) { return; }',
+      '    ctx.state.thornswoodCuffUseAt = v.at;',
+      '    var pc = ctx.sp.Game.getPlayer();',
+      '    var cuffs = v.item ? ctx.sp.Game.getFormEx(v.item) : null;',
+      '    if (pc && cuffs && pc.isEquipped(cuffs)) { pc.unequipItem(cuffs, false, true); }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  /* Everybody else's game: the idle on the prisoner's body, on each change and now and then. */
+  function neighborScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.at) { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    var a = ctx.sp.Actor.from(ctx.refr);',
+      '    if (!a) { return; }',
+      '    var now = Date.now();',
+      '    var changed = st.thornswoodCuffAt !== v.at;',
+      '    st.thornswoodCuffAt = v.at;',
+      '    if (!v.bound) {',
+      '      if (changed && st.thornswoodCuffBound) { st.thornswoodCuffBound = false; ctx.sp.Debug.sendAnimationEvent(a, "OffsetStop"); }',
+      '      return;',
+      '    }',
+      '    st.thornswoodCuffBound = true;',
+      '    if (changed || now - (st.thornswoodCuffIdleAt || 0) > 5000) {',
+      '      st.thornswoodCuffIdleAt = now;',
+      '      ctx.sp.Debug.sendAnimationEvent(a, "OffsetBoundStandingStart");',
+      '    }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  try {
+    mp.makeProperty(CUFF_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: true,
+      updateOwner: ownerScript(),
+      updateNeighbor: neighborScript()
+    });
+  } catch (e) {
+    // already made by a previous load; a changed script needs a restart, which a deploy is.
+  }
+  try {
+    mp.makeProperty(USE_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: useScript(), updateNeighbor: ''
+    });
+  } catch (e) {
+    // already made by a previous load.
+  }
+  try {
+    mp.makeProperty(ISSUED_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) {
+    // already made by a previous load.
+  }
+  if (g.__thornswoodCuffsTimer) { try { clearInterval(g.__thornswoodCuffsTimer); } catch (e) { } }
+  g.__thornswoodCuffsTimer = setInterval(guard('cuffsIssue', tick), ISSUE_TICK_MS);
+
+  /*
+    ONE ENGINE EVENT, MORE THAN ONE GATE. A cuffed person's weapon, and a
+    pair put on facing somebody, go through the fork's onEquipItemAttempt,
+    which the strength gate (#2262, #2621) answers too. mp holds one handler
+    per event, so this wraps whatever is already there, the same way the
+    strength gate does (Waystone, f3e954cb), and whichever loads second holds
+    the first:
+      - the item is refused when either gate says no (false), allowed only
+        when both let it through, the same in either load order;
+      - the gate already there is asked first, and when it refuses, this one
+        says nothing more, so nobody is told two refusals for one Equip;
+      - only false is a no; an answer of nothing (or 0, null, '') is not a
+        refusal, and the cuffs still decide;
+      - somebody still waiting on their join pass gets no answer from the
+        cuffs (a bare return), never a refusal, and the pair does nothing.
+    A reload of the gamemode does not stack a second copy:
+      - finding its own wrapper from the last load on top (HELD), it takes the
+        gate that wrapper was holding;
+      - a copy of an earlier load still held inside another gate's wrapper
+        (the strength block loads before this one in the file, so on a reload
+        it wraps the old cuffs gate) knows it is old (GEN) and only passes on
+        what the gate it holds answers, so the cuffs are asked once.
+  */
+  var HELD = '__thornswoodCuffsHeld';
+  var GEN = g.__thornswoodCuffsGen = (Number(g.__thornswoodCuffsGen) || 0) + 1;
+  var equipBefore = mp.onEquipItemAttempt;
+  if (typeof equipBefore === 'function' && Object.prototype.hasOwnProperty.call(equipBefore, HELD)) { equipBefore = equipBefore[HELD]; }
+  if (typeof equipBefore !== 'function') { equipBefore = null; }
+  var cuffsGate = guard('onEquipItemAttempt', function (actorId, baseId) {
+    // Only a strict false is a refusal, from the gate held or from this one;
+    // anything else it answers (true, nothing, 0, null) leaves it to the cuffs.
+    var before = equipBefore ? equipBefore(actorId, baseId) : undefined;
+    if (before === false) { return false; }
+    if (GEN !== g.__thornswoodCuffsGen) { return before; }
+    if (waiting(actorId)) { return; }
+    return mayEquip(actorId, baseId);
+  });
+  cuffsGate[HELD] = equipBefore;
+  mp.onEquipItemAttempt = cuffsGate;
+
+  g.__thornswoodCuffs = {
+    used: used, facing: facing, mayEquip: mayEquip, equipped: equipped, mayFree: mayFree,
+    useScript: useScript, USE_PROPERTY: USE_PROPERTY, equipBefore: equipBefore, REACH: REACH,
+    mayLetGo: mayLetGo, issue: issue, tick: tick, cuffedBy: cuffedBy,
+    bindingHold: bindingHold, ownerScript: ownerScript, neighborScript: neighborScript,
+    CUFFS_DESC: CUFFS_DESC, CUFF_PROPERTY: CUFF_PROPERTY, ISSUE_EVERY_MS: ISSUE_EVERY_MS
+  };
+})();
+// ==== end thornswood cuffs ====
+
 /*
   WHAT GOES IN A CONTAINER: ordinary goods, with bound quest items refused.
 
@@ -59755,11 +60257,16 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   drop box on the notice board is the only box, and it is an activator whose
   contents are the server's record, never a container. The handler stays for
   guard(): a session that has not shown its join pass is refused a put like
-  every other act (ACTS_AS, #410). Bound quest items also stay with their work;
-  all other valid item identities fall off the end.
+  every other act (ACTS_AS, #410). Bound quest items also stay with their work,
+  and for the cuffs: the pair locked on a prisoner's wrists cannot be put in
+  any container (mayLetGo, #2573). All other valid item identities fall off
+  the end.
 */
 mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, count) {
   if(questItemBlocked(baseId))return false;
+  // The pair locked on a prisoner's wrists stays there (#2573).
+  var cuffsPut = globalThis.__thornswoodCuffs;
+  if (cuffsPut && !cuffsPut.mayLetGo(actorId, baseId, count)) { return false; }
   return;
 });
 
@@ -59810,7 +60317,8 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   keeps their materials.
     onPutItem     Putting into a container. Bound quest items and unverified
                   item identities are refused before diagnostics, alongside
-                  the join-pass guard. No container-specific ledger remains.
+                  the join-pass guard and the cuffs on a prisoner's wrists
+                  (#2573). No container-specific ledger remains.
     onTakeItem    Taking out of a container or a body. Watched below, and
                   refused for bound quest items or unverifiable identities,
                   and by THE TAKE LIMIT, another person's
@@ -60076,6 +60584,9 @@ mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, cou
 
 mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   if(questItemBlocked(baseId))return false;
+  // The pair locked on a prisoner's wrists is not dropped (#2573).
+  var cuffsDrop = globalThis.__thornswoodCuffs;
+  if (cuffsDrop && !cuffsDrop.mayLetGo(actorId, baseId, count)) { return false; }
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
   // The engine puts the piece's extra, its condition in the name included,

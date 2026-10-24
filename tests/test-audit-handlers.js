@@ -165,8 +165,13 @@ if (handlersSrc !== null) {
   // takes retain the original take-limit refusal and otherwise pass.
   const dropSrc = handlersSrc.slice(handlersSrc.indexOf('mp.onDropItem = guard('));
   const takeSrc = handlersSrc.slice(0, handlersSrc.indexOf('mp.onDropItem = guard('));
-  yes('the drop watcher only refuses bound or unverifiable quest-item identities',
-      (dropSrc.match(/\breturn\b/g)||[]).length===1 && /if\(questItemBlocked\(baseId\)\)return false;/.test(dropSrc));
+  // One more refusal is read and allowed: the pair of Prisoner's Cuffs locked on a
+  // prisoner's wrists (#2573, mayLetGo), which refuses that pair and nothing else.
+  const CUFFS_DROP = 'if (cuffsDrop && !cuffsDrop.mayLetGo(actorId, baseId, count)) { return false; }';
+  yes('the cuffs\' refusal is in the drop watcher at most once',
+      dropSrc.split(CUFFS_DROP).length <= 2);
+  yes('the drop watcher only refuses bound or unverifiable quest-item identities, and the cuffs on a prisoner',
+      (dropSrc.split(CUFFS_DROP).join('').match(/\breturn\b/g)||[]).length===1 && /if\(questItemBlocked\(baseId\)\)return false;/.test(dropSrc));
   yes('the take watcher refuses quest items and the original take limit',
       (takeSrc.match(/\breturn\b/g) || []).length === 2 &&
       /if\(questItemBlocked\(baseId\)\)return false;/.test(takeSrc) &&

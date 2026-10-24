@@ -817,6 +817,10 @@ vm.runInContext(require('./fixtures/ordinary-quest-items') + onDrop, dropContext
 yes('ordinary drops return no override and never reach the durability block',
     onDrop !== '' && !/wear\.dropped\(/.test(onDrop) &&
     dropContext.mp.onDropItem(101, IRON_SWORD, 1) === undefined);
+yes('the drop watcher refuses nothing else but the locked pair of Prisoner\'s Cuffs (#2573)',
+    (onDrop.replace(/if\(questItemBlocked\(baseId\)\)return false;/, '')
+      .replace(/if \(cuffsDrop && !cuffsDrop\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/, '')
+      .match(/\breturn\b/g) || []).length === 0);
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
 yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers, with the blocked flag',
     onHitLines.length === 1 &&

@@ -3693,6 +3693,37 @@
   let controlsSince = 0;
 
   /*
+    CONTROLS THE SERVER HOLDS OFF ON PURPOSE (#2573, #2620).
+
+    The watchdog below and the stuck rescue turned every control back on,
+    whoever had switched it off, because nothing told them some were off on
+    purpose. Cuffs (#2573) switch fighting off for as long as somebody is
+    bound, so five seconds later the watchdog handed the weapon back. The
+    one who switches a control off now says so: sp.storage
+    .thornswoodControlsHeld, a name per control ('fighting', and the names in
+    CONTROLS) with the reason, set by the cuffs' own property script in this
+    game and taken off when they are freed. Both rescues read it, count a
+    held control as not off, and switch on everything but the held ones.
+    sp.storage, not a variable here, because the property script runs
+    outside this file.
+  */
+  function heldOff() {
+    let h = null;
+    try { h = sp.storage.thornswoodControlsHeld || null; } catch (e) { h = null; }
+    const out = [];
+    if (h && typeof h === 'object') {
+      for (const k of Object.keys(h)) { if (h[k]) { out.push(k); } }
+    }
+    return out;
+  }
+  /* Every control on but the held ones. Nine, see controlsTick. */
+  function enableAllBut(held) {
+    const on = (name) => held.indexOf(name) === -1;
+    sp.Game.enablePlayerControls(on('movement'), on('fighting'), on('camera'), on('looking'),
+      on('sneaking'), on('menus'), on('activate'), on('journal'), true);
+  }
+
+  /*
     Two states where controls being off is the game doing its job.
 
     Death, and sitting in anything. The watchdog turns every control back on
@@ -3793,7 +3824,9 @@
     const theirs = notOurs();
     if (theirs) { controlsOffNow = []; controlsSince = 0; return; }
 
-    const off = readControls();
+    // A control the server holds off is not off by mistake (heldOff).
+    const held = heldOff();
+    const off = readControls().filter((name) => held.indexOf(name) === -1);
     controlsOffNow = off;
     if (!off.length) { controlsSince = 0; return; }
 
@@ -3806,7 +3839,7 @@
       // EnablePlayerControls and DisablePlayerControls, and the binding counts
       // them. Passing eight threw every single time this ran, so the watchdog
       // has been reporting the problem and never once fixing it.
-      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
+      enableAllBut(held);
       try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
       say('the game had controls switched off with no menu open (' +
           off.join(', ') + '). turned them back on.');
@@ -7038,7 +7071,8 @@
         '. Switching controls on and taking the character back off the AI.');
 
     try {
-      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
+      // All but what the server holds off on purpose (heldOff, #2620).
+      enableAllBut(heldOff());
     } catch (e) {
       say('enablePlayerControls threw: ' + e);
     }
