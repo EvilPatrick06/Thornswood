@@ -19,7 +19,7 @@
        for signtool and the runtime before it installs, and names the
        Bootstrap-VPS line that puts each there; its check is run against the
        same planted folders.
-    4. The run note's step 2 runs that line.
+  The run note that ran that line was done and removed on 25 Oct.
 
   Read only, apart from planted folders under TEMP, which it removes.
 #>
@@ -38,7 +38,6 @@ $bootPath = Join-Path $Repo 'scripts\vps\Bootstrap-VPS.ps1'
 $runnerPath = Join-Path $Repo 'scripts\deploy\Install-Runner.ps1'
 $boot = [IO.File]::ReadAllText($bootPath)
 $runner = [IO.File]::ReadAllText($runnerPath)
-$note = [IO.File]::ReadAllText((Join-Path $Repo 'ops\claude-queue\3312-sign-runner.md'))
 $ship = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Setup-ShipMachine.ps1'))
 
 $asts = @{}
@@ -134,11 +133,6 @@ Yes '  inside the same check the build needs go in' ($runner -match "(?s)'MISSIN
 Yes '  signtool looked for the way Sign-Artifact.ps1 looks' ($signNeedText -match 'Windows Kits\\10\\bin' -and $signNeedText -match "'signtool\.exe'" -and $signNeedText -match '\\\\x64\\\\')
 Yes '  a missing runtime names Bootstrap-VPS -IncludeSigningRuntime' ($runner -match [regex]::Escape("if (`$missing -contains 'dotnet') { `$how += "".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'"))
 Yes '  a missing signtool names Bootstrap-VPS -IncludeEngineTools' ($runner -match [regex]::Escape("if (`$missing -contains 'signtool') { `$how += "".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'"))
-
-# ---- 4. the run note ---------------------------------------------------------
-Yes 'the run note''s step 2 installs with Bootstrap-VPS, not winget' (
-    $note -match [regex]::Escape(".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'") -and
-    $note -notmatch 'winget install')
 
 Write-Host ''
 Write-Host "$script:pass passed, $script:fail failed"
