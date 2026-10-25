@@ -20,7 +20,7 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
 | Repository | Private. Three collaborators can push |
 | Fork pull requests | Do not run workflows, get no write token and no secrets (`fork-pr-workflows-private-repos` all false) |
-| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; engine: contents read, by hand only; drop-claims: issues write; board-status: issues write, with the board token from the `board` environment, which only main may use; staff-notice: contents read, started by hand, with the notices key named claude from the `notices` environment, which only main may use, and which sshd takes only from 127.0.0.1 and runs only say-staff.ps1 for, #3045) |
+| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; engine: contents read, by hand only; drop-claims: issues write; board-status: issues write, with the board token from the `board` environment, which only main may use; staff-notice: contents read, started by hand, with the notices key named claude from the `notices` environment, which only main may use, and which sshd takes only from 127.0.0.1 and runs only say-staff.ps1 for, #3045; git-ref: contents write and pull-requests read, started by hand, makes only release tags and deletes only a branch at a given commit with nothing open on it, #3107; github-admin: contents read and id-token write, by hand or a push to main that changes a runner record, holds no secret and hands its OIDC token to the box's admin service on 127.0.0.1:7791, which acts only for that workflow on main and only makes the runners' labels match main's records, #3107) |
 | Actions sharing | `access_level: none` (no other repository may use these workflows) |
 | Allowed actions | all, SHA pinning not required by the setting; the workflows pin every action to a full SHA by their own rule (release.yml) |
 
@@ -145,6 +145,13 @@ outbound limit as residual risk.
    reads that off GitHub (every runner carries the same labels, so a build
    cannot be sent to one of them); `-NetworkOnly -Remove` for that one
    account is the way back.
+   The signing runner (records\sign-runners.json, runner 3 since #3312)
+   also reaches the Microsoft hosts release.yml's sign steps need, each
+   held by an Azure service tag in Microsoft's published Service Tags file,
+   which that record names; on 22 Oct its rules without them stopped the
+   first VPS signing run at api.nuget.org (release.yml run 39838728417).
+   Since then every list is read on the box, so a cloud session can run
+   `-NetworkOnly` too.
 2. GitHub-hosted runners are the default for builds. The VPS runners are a
    backup only: used by hand, or automatically when a hosted run fails
    because the account's Actions minutes or usage ran out. Patrick confirmed

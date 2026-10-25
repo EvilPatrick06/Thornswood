@@ -45,6 +45,29 @@
   Anything that goes wrong goes to standard error, starting "box bridge:",
   and the exit code is 1. ssh then says the connection closed, with that line
   above it.
+
+  WHICH HOP (#3297). Until the WebSocket is open, this keeps track of what it
+  is waiting for: the TCP connection (its DNS lookup included), the proxy's
+  tunnel, TLS, then the answer to the upgrade. Straight from a PC such as
+  One, TLS for wss://thornswood.net/box/ is with Cloudflare's edge (#2995),
+  so "the answer to the upgrade" is the one stage past Cloudflare's front: it
+  waits on Cloudflare reaching Caddy, Caddy reaching the bridge and the
+  bridge reaching sshd. (Through the cloud's proxy, which re-signs TLS, TLS
+  is with the proxy, and that stage also holds the proxy's own way out.)
+  Each failure names the stage it happened in and how long the ones before
+  it took. An answer that is not the WebSocket names its status and its
+  cf-ray, the id Cloudflare's own records of that request go by.
+
+  ssh's ConnectTimeout counts the wait for sshd's banner, which here is all of
+  the opening, and when it runs out ssh ends this (measured 22 Oct 2026, #3297:
+  Harden-VPS's ConnectTimeout=10 ended it with only ssh's own "timed out
+  during banner exchange" said, ten seconds before OPEN_MS would have). On
+  Windows, where One runs it, there is no SIGHUP to catch, so nothing here
+  can count on speaking at the end. So an opening that is still going after
+  SLOW_MS says where it is then, and again at each stage after that, before
+  any caller's ConnectTimeout (8 s is the shortest in scripts/) can cut it
+  off. A normal opening never gets there and says nothing: 40 in a row from
+  a cloud thread on 22 Oct 2026 each had sshd's banner in 0.3 to 0.6 s.
 */
 const net = require('net');
 const tls = require('tls');
@@ -76,8 +99,32 @@ function tokenFromFile() {
   }
 }
 // How long the proxy, TLS and the upgrade together may take before this gives
-// up. ssh's own ConnectTimeout does not reach inside a ProxyCommand.
+// up, for an ssh with no ConnectTimeout. One with a shorter ConnectTimeout
+// ends this first (see WHICH HOP above).
 const OPEN_MS = Number(process.env.THORNSWOOD_BOX_OPEN_MS) || 20000;
+// When an opening that has not finished says where it is. Above the slowest
+// opening measured, below the shortest ConnectTimeout in scripts/.
+const SLOW_MS = Number(process.env.THORNSWOOD_BOX_SLOW_MS) || 4000;
+
+// What the opening is waiting for now, since when, and what it already
+// passed and how long each took.
+const began = Date.now();
+let waiting = '';
+let waitingSince = began;
+const passed = [];
+let slow = false;
+function secs(ms) { return (ms / 1000).toFixed(1) + ' s'; }
+function waitFor(what) {
+  const now = Date.now();
+  if (waiting) passed.push(waiting + ' ' + (now - waitingSince) + ' ms');
+  waiting = what;
+  waitingSince = now;
+  if (slow && what) process.stderr.write('box bridge: now waiting for ' + what + ' (' + secs(now - began) + ' in)\n');
+}
+function stage() {
+  return 'waiting ' + secs(Date.now() - waitingSince) + ' for ' + waiting +
+    (passed.length ? '; before that ' + passed.join(', ') : '');
+}
 
 // Reads one HTTP head off a socket: the status line and headers, and whatever
 // came after them in the same read, which already belongs to what follows.
@@ -122,14 +169,18 @@ async function open() {
   let sock;
   if (proxyText) {
     const proxy = new URL(proxyText);
+    waitFor('a TCP connection to the proxy ' + proxy.hostname + ':' + (Number(proxy.port) || 80));
     sock = await connectTcp(proxy.hostname, Number(proxy.port) || 80);
+    waitFor('the proxy\'s tunnel to ' + where.hostname + ':' + port);
     sock.write('CONNECT ' + where.hostname + ':' + port + ' HTTP/1.1\r\nHost: ' + where.hostname + ':' + port + '\r\n\r\n');
     const h = await readHead(sock, 'the proxy');
     if (h.status !== 200) throw new Error('the proxy refused the tunnel to ' + where.hostname + ':' + port + ' (' + h.line + ')');
   } else {
+    waitFor('a TCP connection to ' + where.hostname + ':' + port);
     sock = await connectTcp(where.hostname, port);
   }
   if (secure) {
+    waitFor('TLS with ' + where.hostname);
     sock = await new Promise((resolve, reject) => {
       const t = tls.connect({ socket: sock, servername: where.hostname, ALPNProtocols: ['http/1.1'] });
       t.once('secureConnect', () => { t.off('error', reject); resolve(t); });
@@ -150,18 +201,36 @@ async function open() {
     'Sec-WebSocket-Version: 13',
   ];
   if (token) lines.push('Authorization: Bearer ' + token);
+  waitFor('the answer to the upgrade');
   sock.write(lines.join('\r\n') + '\r\n\r\n');
   const h = await readHead(sock, 'the bridge');
   if (h.status === 401) throw new Error(token ? 'the bridge refused this token (401): it is not one the box holds, or it was taken away' : 'no token was sent, and the bridge lets nobody in without one (401). Setup-SshKey.ps1 asks for it and keeps it in .ssh/thornswood-box-token');
-  if (h.status !== 101) throw new Error('the bridge did not open a WebSocket (' + h.line + ')');
+  const ray = h.headers['cf-ray'] ? '; cf-ray ' + h.headers['cf-ray'] : '';
+  if (h.status !== 101) throw new Error('the bridge did not open a WebSocket (' + h.line + ray + ')');
   if (h.headers['sec-websocket-accept'] !== accept(key)) throw new Error('the bridge answered the upgrade with the wrong Sec-WebSocket-Accept');
   return { sock, rest: h.rest };
 }
 
-const timer = setTimeout(() => die('no WebSocket to ' + where.href + ' after ' + OPEN_MS + ' ms'), OPEN_MS);
+const timer = setTimeout(() => die('no WebSocket to ' + where.href + ' after ' + OPEN_MS + ' ms, ' + stage()), OPEN_MS);
+const slowTimer = setTimeout(() => {
+  slow = true;
+  process.stderr.write('box bridge: still opening ' + where.href + ' after ' + secs(Date.now() - began) + ', ' + stage() + '\n');
+}, SLOW_MS);
+// ssh ends this with SIGHUP when its ConnectTimeout runs out (on Linux; on
+// Windows it cannot be caught, which is what SLOW_MS is for).
+function endedEarly(sig) { die('ssh ended this (' + sig + ') before the WebSocket to ' + where.href + ' opened, ' + stage()); }
+process.on('SIGHUP', endedEarly);
+process.on('SIGTERM', endedEarly);
 
 open().then(({ sock, rest }) => {
   clearTimeout(timer);
+  clearTimeout(slowTimer);
+  process.off('SIGHUP', endedEarly);
+  process.off('SIGTERM', endedEarly);
+  if (slow) {
+    waitFor('');
+    process.stderr.write('box bridge: opened after ' + secs(Date.now() - began) + ': ' + passed.join(', ') + '\n');
+  }
   const reader = new Reader({ masked: false });
   let closeSent = false;
 
@@ -210,4 +279,4 @@ open().then(({ sock, rest }) => {
   // slots and were refused. The close goes out and this ends when the
   // connection does, the same as when standard input ends.
   process.on('SIGHUP', () => { sendClose(); sock.end(); });
-}).catch((e) => die(e.message));
+}).catch((e) => die(e.message + ' (' + stage() + ')'));

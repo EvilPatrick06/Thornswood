@@ -25,6 +25,11 @@
                                     running bot already holds, and asks for
                                     nothing. Goes with -Check, -Audit, -Posts,
                                     -Prune and -Only
+    .\Setup-Discord.ps1 -Give 'Co-Owner=WiccanDjinn','Lead Dev=Patrick Thornwood'
+                                   gives each staff rank to the one member
+                                    named exactly, and does nothing else. Never
+                                    a second rank of one category, never to a
+                                    seat holder; with -Check only says it (#3317)
     .\Setup-Discord.ps1 -Only Gamemasters,welcome-travelers
                                    touches only those categories and channels
                                     of the plan: no role made or moved, no
@@ -39,15 +44,12 @@
     2. Bot in the sidebar, then Reset Token, and copy what it gives you.
     3. Still under Bot, turn ON "Server Members Intent". Leave the rest off.
     4. OAuth2, URL Generator, tick "bot" and then "Administrator". Open the URL
-       it builds and add the bot to your server. Administrator is for the build
-       only: it makes the Owner and Dev roles, which carry Administrator, and
-       Discord refuses that from a bot without it.
+       it builds and add the bot to your server. The bot keeps Administrator,
+       for a build and the rest of the time (#3317, Patrick, 22 Oct 2026: "the
+       bot will keep admin"). A build makes the Owner and Co-Owner roles, which
+       carry Administrator, and Discord refuses that from a bot without it.
 
-  Two permission sets. Administrator for a build, and a smaller set for the
-  rest of the time, which is all the running bot needs. A build that finishes
-  with nothing failed ends on the invite link with that smaller set and a line
-  saying to untick Administrator on the bot's role. Tick it again before the
-  next build. To see that link without building anything, from the repository
+  To see the invite link without building anything, from the repository
   folder, with the id from the developer portal's General Information page:
 
     python bot\Build-Discord.py --invite <application id>
@@ -62,8 +64,9 @@
   -OnBox asks for nothing (#2519, #2341). The token is the bot's own, in
   C:\Thornswood-Bot\bot.env.json on the VPS, so a machine with the VPS key
   and no token, or a run with nobody at a prompt, can still build, and the
-  token never leaves the box. Build-Discord.py, content.py and
-  staff-channel.txt go up inside the run's script as the commit holds them,
+  token never leaves the box. Build-Discord.py, content.py,
+  staff-channel.txt and factions.json go up inside the run's script as the
+  commit holds them,
   with the two site pages content.py reads its words from (join.md and
   rules.md), each at its place in the repository, because content.py finds
   them by its own folder (..\site\data\site). An uncommitted change to any
@@ -100,7 +103,11 @@ param(
   # Only these categories and channels of the plan, and nothing else in the
   # Discord (#2519). Build-Discord.py's ONLY says what that leaves out, and
   # refuses a name its plan does not have before Discord is asked anything.
-  [string[]]$Only = @()
+  [string[]]$Only = @(),
+  # Staff ranks to give, each 'rank=member' (#3317). Build-Discord.py's GIVE
+  # says which ranks and how a member is matched. Nothing else in the run
+  # happens.
+  [string[]]$Give = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -108,6 +115,12 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $app = Join-Path $Here '..\..\bot\Build-Discord.py'
 if (-not (Test-Path -LiteralPath $app)) { throw "not found: $app" }
+# One 'rank=member' each. A quote, a semicolon or anything else that could
+# leave the line it is written into stops here, before anything is sent.
+$gives = @($Give | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+foreach ($g in $gives) {
+  if ($g -notmatch '^[A-Za-z -]+=[\p{L}\p{N} _.-]+$') { throw ("-Give takes 'staff rank=member', not: " + $g) }
+}
 
 # The one switch (#428): the site's "open", read off its public page so the
 # posts say the same as the site. Anything that goes wrong is the alpha
@@ -132,9 +145,14 @@ if ($OnBox) {
   # reads join.md and rules.md through ..\site\data\site from its own folder,
   # and a run that sent only the bot's files stopped on the box with
   # FileNotFoundError for join.md (22 Oct 2026). tests\test-2519-setup-discord-onbox.ps1
-  # imports content.py from a folder holding only these.
+  # imports content.py from a folder holding only these. Build-Discord.py
+  # reads factions.json from its own folder when it loads (#3317), and the
+  # first -OnBox run after that stopped with FileNotFoundError for it; the
+  # same test imports Build-Discord.py there too, where a python with
+  # discord.py is. content.py reads #factions out of lore\factions.md (#3317).
   $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt',
-    'site/data/site/join.md', 'site/data/site/rules.md')
+    'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md',
+    'lore/factions.md')
   # The commit, never the working tree, so what ran is a commit anyone can name.
   $dirty = @(& git -C $Repo status --porcelain -- @send 2>$null)
   if ($LASTEXITCODE -ne 0) { throw 'git could not say whether the build''s files are committed. Nothing was sent.' }
@@ -155,6 +173,9 @@ if ($OnBox) {
     $names = @($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     foreach ($n in $names) { if ($n -notmatch '^[A-Za-z0-9 _-]+$') { throw ('-Only takes category and channel names from the plan, not: ' + $n) } }
     $flags += "`$env:DISCORD_ONLY = '" + ($names -join ',') + "'`r`n"
+  }
+  if ($gives.Count) {
+    $flags += "`$env:DISCORD_GIVE = '" + ($gives -join ';') + "'`r`n"
   }
   # What runs on the box. The token is read there and set for the one Python
   # process; the folder goes when the build ends, however it ends.
@@ -249,6 +270,7 @@ if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
 if ($Audit) { $env:DISCORD_AUDIT = '1' }
 if ($Only.Count) { $env:DISCORD_ONLY = (@($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ',') }
+if ($gives.Count) { $env:DISCORD_GIVE = ($gives -join ';') }
 $tok = $null
 $env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
 
@@ -262,10 +284,12 @@ try {
   $env:DISCORD_CHECK = $null
   $env:DISCORD_AUDIT = $null
   $env:DISCORD_ONLY = $null
+  $env:DISCORD_GIVE = $null
   $env:THORNSWOOD_OPEN = $null
 }
-# An audit reads and builds nothing, so there is no webhook to hand on.
-if ($Audit) { exit $code }
+# An audit reads and builds nothing, and a give only gives, so there is no
+# webhook to hand on.
+if ($Audit -or $gives.Count) { exit $code }
 
 # It used to say the webhook was ready whatever happened, including on the run
 # that stopped on a missing intent and built nothing at all. A script that

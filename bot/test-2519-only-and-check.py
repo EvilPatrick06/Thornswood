@@ -20,10 +20,12 @@ approval did not cover.
 What this checks, with Build-Discord.py imported for real under another name
 and every guild, role and channel a stand-in that records what would have
 been asked of Discord:
-  1. role_moves: roles already in the plan's order are not moved, whatever
-     sits between them and wherever a managed role is; roles out of order
-     are put in order among the places they hold, and a role the plan does
-     not name keeps its place;
+  1. role_order: roles already in the plan's order are not moved, whatever
+     sits between them; roles out of order, a managed one included (#3317:
+     the audit found Patreon out of place after every build), are put in
+     order among the places they hold, in one request; a role the plan does
+     not name keeps its place; and a role made this run goes under the plan
+     role above it;
   2. -Check makes no category, no channel and no webhook, and says would
      make for each;
   3. -Check without -Posts says the posts are left alone and never would
@@ -41,6 +43,7 @@ import asyncio
 import contextlib
 import importlib.util
 import io
+import itertools
 import os
 import shutil
 import sys
@@ -92,6 +95,9 @@ class Member(object):
         self.top_role = self.roles[-1]
 
 
+PLACES = itertools.count(100)
+
+
 class Channel(object):
     def __init__(self, guild, name, kind, category=None, topic=None, ow=None):
         self.guild = guild
@@ -101,6 +107,21 @@ class Channel(object):
         self.topic = topic
         self.ow = dict(ow or {})
         self.channels = []
+        # Made in the plan's order, so the sidebar is the plan's (#3317).
+        self.id = next(PLACES)
+        self.position = self.id
+
+    @property
+    def type(self):
+        if self.kind in ('voice', 'create_voice_channel'):
+            return discord.ChannelType.voice
+        if self.kind in ('category', 'create_category'):
+            return discord.ChannelType.category
+        return discord.ChannelType.text
+
+    @property
+    def overwrites(self):
+        return dict(self.ow)
 
     def overwrites_for(self, target):
         o = self.ow.get(target)
@@ -115,6 +136,12 @@ class Channel(object):
         self.ow[target] = discord.PermissionOverwrite.from_pair(a, d)
 
     async def edit(self, **kw):
+        # A place's overwrites set whole (#3317) are its own call, so a check
+        # on topics and settings is not confused with them.
+        if 'overwrites' in kw:
+            self.guild.calls.append(('overwrites', self.name, kw))
+            self.ow = dict(kw['overwrites'])
+            return
         self.guild.calls.append(('channel.edit', self.name, kw))
 
     async def webhooks(self):
@@ -150,6 +177,22 @@ class Guild(object):
         self.safety_alerts_channel = self.staff_updates
         self.default_role = Role(self, '@everyone', 0)
         self.me = None
+        self._state = types.SimpleNamespace(http=types.SimpleNamespace(
+            bulk_channel_update=self._positions))
+
+
+    async def onboarding(self):
+        return types.SimpleNamespace(enabled=getattr(self, 'onboarding_enabled', False))
+
+    async def edit_onboarding(self, **kw):
+        self.calls.append(('edit_onboarding', None, kw))
+        self.onboarding_enabled = kw.get('enabled', getattr(self, 'onboarding_enabled', False))
+
+    async def edit_role_positions(self, positions, reason=None):
+        """Discord's bulk move, the one request role_order sends (#3317)."""
+        self.calls.append(('role positions', None, dict((r.name, p) for r, p in positions.items())))
+        for r, p in positions.items():
+            r.position = p
 
     def move(self, role, position):
         """Discord's move: the role takes that position and the others keep
@@ -181,6 +224,14 @@ class Guild(object):
         self.roles.append(r)
         return r
 
+    async def _positions(self, guild_id, payload, reason=None):
+        """The one request that sets the sidebar's order (#3317)."""
+        self.calls.append(('positions', None, payload))
+        at = dict((p['id'], p['position']) for p in payload)
+        for ch in self.channels + self.categories:
+            if ch.id in at:
+                ch.position = at[ch.id]
+
     async def create_category(self, name, **kw):
         return await self._made('create_category', name, **kw)
 
@@ -211,25 +262,26 @@ class Client(object):
         pass
 
 
-def live_server(other_between=False):
+def live_server(other_between=False, booster_low=False):
     """The server as the 22 Oct -Check found it: every role of the plan there
-       and in the plan's order, with Server Booster (managed by Discord) sat
-       low rather than where counting down from the bot would put it, and a
-       role the plan does not name between two of the plan's; every category
+       and in the plan's order, Server Booster (managed by Discord) included,
+       or sat low with booster_low, and a role the plan does not name between
+       two of the plan's; every category
        and channel of the plan there except the Gamemasters category; and a
        channel made by hand behind the gate with no overwrite for the bot,
        the way #jukebox is."""
     g = Guild()
-    names = [n for n, _c, _h, _p in B.ROLES if n != 'Server Booster']
+    names = [n for n, _c, _h, _p in B.ROLES if not (booster_low and n == 'Server Booster')]
     if other_between:
         order = ['Thornswood Bot'] + names[:6] + ['Some Other Bot'] + names[6:]
     else:
         order = ['Thornswood Bot'] + names + ['Some Other Bot']
-    pos = len(order) + 1
+    if booster_low:
+        order.append('Server Booster')
+    pos = len(order)
     for n in order:
-        g.roles.append(Role(g, n, pos))
+        g.roles.append(Role(g, n, pos, managed=(n == 'Server Booster')))
         pos -= 1
-    g.roles.append(Role(g, 'Server Booster', 1, managed=True))
     g.me = Member([r for r in g.roles if r.name == 'Thornswood Bot'])
     roles = dict((r.name, r) for r in g.roles)
     bare = types.SimpleNamespace(default_role=g.default_role, me=None, roles=g.roles)
@@ -245,7 +297,9 @@ def live_server(other_between=False):
             if not s.get('make', True):
                 continue
             want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
-            ow = B.with_bot(g, B.overwrites(bare, s.get('mode', 'open'), roles, s.get('hold')),
+            ow = B.with_bot(g, B.overwrites(bare, s.get('mode', 'open'), roles, s.get('hold'),
+                                            space=s.get('space'), read_extra=s.get('read_extra'),
+                                            faction=s.get('faction')),
                             B.bot_needs(s)) if s.get('key') != 'JOIN' else {}
             ch = Channel(g, want, s['kind'], category=cat, topic=s.get('topic'), ow=ow)
             g.channels.append(ch)
@@ -261,10 +315,10 @@ def live_server(other_between=False):
     return g
 
 
-def run(g, check=False, posts=False, only=''):
+def run(g, check=False, posts=False, only='', prune=False):
     B.CHECK = check
     B.POSTS = posts
-    B.PRUNE = False
+    B.PRUNE = prune
     B.ROLES_ONLY = False
     B.ONLY = [n.strip() for n in only.split(',') if n.strip()]
     B.GUILD = ''
@@ -283,35 +337,52 @@ TMP = tempfile.mkdtemp(prefix='ts-2519-only-')
 try:
     B.WEBHOOK_OUT = os.path.join(TMP, 'news-webhook.txt')
 
-    # ---- 1. role_moves --------------------------------------------------
+    # ---- 1. role_order --------------------------------------------------
+    def plan_of(g):
+        return dict((r.name, r) for r in g.roles if r.name in set(n for n, _c, _h, _p in B.ROLES))
+
+    def top_plan(g):
+        want = [n for n, _c, _h, _p in B.ROLES]
+        return [n for n in g.top_down() if n in want] == want
+
     g = live_server()
-    plan = [r for n, _c, _h, _p in B.ROLES for r in g.roles if r.name == n]
-    yes('roles already in the plan\'s order are not moved, with Server Booster low',
-        B.role_moves(plan) == [])
-    top = g.me.top_role.position
-    old = [r for i, r in enumerate(plan)
-           if not r.managed and r.position != max(1, top - 1 - i)]
-    yes('  (counting down from the bot, as before, read %d of them as out of place)' % len(old),
-        len(old) > 10)
+    yes('roles already in the plan\'s order are not moved', B.role_order(g, plan_of(g)) is None)
+    g = live_server(other_between=True)
+    yes('  nor with a role the plan does not name between two of the plan\'s',
+        B.role_order(g, plan_of(g)) is None)
+
+    g = live_server(booster_low=True)
+    order = B.role_order(g, plan_of(g))
+    yes('Server Booster, managed by Discord, sat low is put in its place too (#3317)',
+        order is not None and not top_plan(g))
+    asyncio.run(g.edit_role_positions(dict((r, len(order) - i) for i, r in enumerate(order))))
+    yes('  and afterwards every plan role is in the plan\'s order', top_plan(g))
 
     g = live_server(other_between=True)
-    plan = [r for n, _c, _h, _p in B.ROLES for r in g.roles if r.name == n]
-    yes('the same with a role the plan does not name between two of the plan\'s',
-        B.role_moves(plan) == [])
     by = dict((r.name, r) for r in g.roles)
     a, b = by['Owner'], by['Moderator']
     a.position, b.position = b.position, a.position
-    plan = [r for n, _c, _h, _p in B.ROLES for r in g.roles if r.name == n]
-    moves = B.role_moves(plan)
-    yes('two roles swapped: only those two are moved', sorted(r.name for r, _ in moves) == ['Moderator', 'Owner'])
-    before_other = by['Some Other Bot'].position
-    for r, p in moves:
-        asyncio.run(r.edit(position=p))
-    want = [n for n, _c, _h, _p in B.ROLES if n != 'Server Booster']
-    yes('  and afterwards the plan\'s roles are in the plan\'s order',
-        [n for n in g.top_down() if n in want] == want)
-    yes('  and a role the plan does not name keeps its place',
-        by['Some Other Bot'].position == before_other)
+    under = [r.name for r in sorted(g.roles, key=lambda r: -r.position)]
+    next_to = under[under.index('Some Other Bot') - 1]
+    order = B.role_order(g, plan_of(g))
+    asyncio.run(g.edit_role_positions(dict((r, len(order) - i) for i, r in enumerate(order))))
+    yes('two roles swapped are put back, the rest in the plan\'s order', top_plan(g))
+    after = g.top_down()
+    yes('  and a role the plan does not name keeps its place among them',
+        after[after.index('Some Other Bot') - 1] == next_to)
+    yes('  and the bot\'s own role is not in the request',
+        'Thornswood Bot' not in [r.name for r in order] and g.top_down()[0] == 'Thornswood Bot')
+
+    g = live_server()
+    by = dict((r.name, r) for r in g.roles)
+    fresh = by['Citizen of Morthal']
+    for r in g.roles:
+        if r.position < fresh.position:
+            r.position += 1
+    fresh.position = 1
+    order = B.role_order(g, plan_of(g), new={'Citizen of Morthal'})
+    asyncio.run(g.edit_role_positions(dict((r, len(order) - i) for i, r in enumerate(order))))
+    yes('a role made this run, at the bottom, goes under the plan role above it', top_plan(g))
 
     # ---- 2 and 3. -Check ------------------------------------------------
     g = live_server()
@@ -325,6 +396,34 @@ try:
     yes('  without -Posts it never says would write, and says the posts are left alone',
         'would write' not in out and 'left alone' in out and '-Posts rewrites them' in out)
     yes('  and writes down no webhook, though one is there', not os.path.exists(B.WEBHOOK_OUT))
+    # The server as the layout run of 22 Oct found it: the faction chats
+    # and voices in one Factions category, and no category per faction yet.
+    # -Check said "would make" for each; the build moved them (#3317).
+    g = live_server()
+    comp = [c for c in g.categories if c.name == 'The Companions'][0]
+    old = Channel(g, 'Factions', 'category')
+    g.categories.append(old)
+    g.channels.append(old)
+    g.categories.remove(comp)
+    g.channels.remove(comp)
+    for ch in list(comp.channels):
+        if ch.name in ('companions', 'The Companions'):
+            ch.category = old
+            old.channels.append(ch)
+        else:
+            g.channels.remove(ch)
+    out = run(g, check=True)
+    lines = [ln.strip() for ln in out.splitlines()]
+    yes('-Check of a faction category not made yet says it would make the category',
+        'category The Companions' in out and g.calls == [])
+    yes('  and that it would move the faction\'s chat and voice in from Factions, by their was lines',
+        '#companions in Factions becomes #companions in The Companions' in out
+        and '#The Companions in Factions becomes #The Companions in The Companions' in out)
+    yes('  and not that it would make them',
+        not any(ln.endswith('#companions') and 'would make' in ln for ln in lines)
+        and not any(ln.endswith('voice The Companions') for ln in lines))
+    yes('  and still that it would make the channels that are new',
+        any(ln.endswith('#companions-leadership') and 'would make' in ln for ln in lines))
     out = run(live_server(), check=True, posts=True)
     yes('-Check with -Posts says would write', 'would write' in out)
 
@@ -335,23 +434,46 @@ try:
         not any(c[0] == 'create_webhook' for c in g.calls) and not os.path.exists(B.WEBHOOK_OUT)
         and 'would make' in out and 'news webhook' in out)
 
+    # ---- 3b. -Prune -Check: a planned name in the wrong category (#3317) --
+    # The live build of 22 Oct left a second #game-rules in In Character,
+    # beside the plan's in Roleplay Guide, and -Prune took it for the plan's.
+    g = live_server()
+    ic = [c for c in g.categories if c.name == 'In Character'][0]
+    stray = Channel(g, 'game-rules', 'text', category=ic)
+    g.channels.append(stray)
+    ic.channels.append(stray)
+
+    async def no_threads():
+        return []
+    g.active_threads = no_threads
+    out = run(g, check=True, prune=True)
+    yes('-Prune -Check would remove a planned name left in the wrong category',
+        out.count('would remove #game-rules') == 1)
+    yes('  and asks Discord for nothing, not even the forum rebuild it plans',
+        g.calls == [] and 'would rebuild' in out)
+
     # ---- 4. ONLY --------------------------------------------------------
     g = live_server()
     roles_before = [(r.name, r.position) for r in g.roles]
     out = run(g, only='Gamemasters,welcome-travelers')
     made = [c[1] for c in g.calls if c[0].startswith('create_')]
-    yes('ONLY Gamemasters,welcome-travelers makes the category and its six channels',
-        made == ['Gamemasters', 'gm-rules', 'gm-scene-summaries', 'gm-chat',
-                 'gm-suggestions', 'gm-discipline', 'GM Voice'])
-    perms = [c for c in g.calls if c[0] == 'set_permissions']
+    yes('ONLY Gamemasters,welcome-travelers makes the category and its eight channels',
+        made == ['Gamemasters', 'gm-announcements', 'gm-rules', 'gm-event-plans',
+                 'gm-scene-summaries', 'gm-chat', 'gm-suggestions', 'gm-discipline',
+                 'GM Voice'])
+    perms = [c for c in g.calls if c[0] in ('set_permissions', 'overwrites')]
     wel = [c for c in g.channels if c.name == 'welcome-travelers'][0]
     yes('  gives #welcome-travelers the bot\'s Attach Files overwrite, and writes no other channel',
         [c[1] for c in perms] == ['welcome-travelers'] and wel.overwrites_for(g.me).attach_files is True)
     yes('  makes and moves no role',
         not any(c[0] in ('create_role', 'role.edit') for c in g.calls) and
         [(r.name, r.position) for r in g.roles] == roles_before)
-    yes('  changes no server setting, topic, post or webhook',
-        not any(c[0] in ('guild.edit', 'channel.edit', 'create_webhook', 'delete') for c in g.calls)
+    # #welcome-travelers has a topic in the plan since 23 Oct (#3317), and a
+    # channel named here gets its plan, topic included; nothing else does.
+    edits = [c for c in g.calls if c[0] == 'channel.edit']
+    yes('  changes no server setting, post or webhook, and no topic but the named channel\'s',
+        not any(c[0] in ('guild.edit', 'create_webhook', 'delete') for c in g.calls)
+        and [(c[1], sorted(c[2])) for c in edits] == [('welcome-travelers', ['topic'])]
         and 'would write' not in out and not os.path.exists(B.WEBHOOK_OUT))
     yes('  leaves #jukebox alone', not any(c[1] == 'jukebox' for c in g.calls))
     yes('  and says what it was limited to', 'Gamemasters, welcome-travelers. Nothing else was touched' in out)
@@ -360,7 +482,7 @@ try:
     out = run(g, check=True, only='Gamemasters,welcome-travelers')
     yes('ONLY with -Check asks Discord for nothing, and names the category, its channels and the overwrite',
         g.calls == [] and 'category Gamemasters' in out and
-        '#welcome-travelers lets the bot in without Administrator' in out)
+        '#welcome-travelers gets the overwrites of its mode' in out)
 
     # ---- 5. a name the plan does not have -------------------------------
     try:

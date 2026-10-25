@@ -195,7 +195,12 @@
 
   function drawnByClient() {
     try {
-      const views = sp.storage.view && sp.storage.view.getFormViews();
+      /* The engine's storage answers a key nobody set with a function, not
+         undefined (the fork's storageProxy.js), so the view is read by type
+         (#3333). */
+      const view = sp.storage.view;
+      const views = (view && typeof view === 'object' && typeof view.getFormViews === 'function')
+        ? view.getFormViews() : null;
       if (!views) { return 'not known'; }
       let forms = 0;
       let actors = 0;
@@ -1109,6 +1114,8 @@
     on its way.
   */
   let relogAt = 0;
+  // targetIp and targetPort are read by type: a key nobody set in storage is
+  // a function, not undefined (the fork's storageProxy.js, #3333).
   function relogAs(id) {
     const now = Date.now();
     if (now - relogAt < 15000) { return; }
@@ -1118,8 +1125,10 @@
     relogAt = now;
     try {
       sp.storage.authGameData = { local: { profileId: id } };
-      const host = String(sp.storage.targetIp || HOST || '');
-      const port = Number(sp.storage.targetPort) || Number(client['server-port']) || 7777;
+      const ip = sp.storage.targetIp;
+      const host = String((typeof ip === 'string' && ip) || HOST || '');
+      const port = (typeof sp.storage.targetPort === 'number' && sp.storage.targetPort) ||
+                   Number(client['server-port']) || 7777;
       sp.mpClientPlugin.createClient(host, port);
       log('menu: back into the world as profile', id, 'through', host + ':' + port);
     } catch (e) {
@@ -1572,7 +1581,14 @@
     (relogAs). A hot reload does not show an old one again.
   */
   let deniedSeenAt = 0;
-  try { deniedSeenAt = Number((sp.storage.thornswoodConnectionDenied || {}).at) || 0; } catch (e) { deniedSeenAt = 0; }
+  // By type: an unset key in storage is a function, not undefined (#3333).
+  function deniedInStorage() {
+    try {
+      const d = sp.storage.thornswoodConnectionDenied;
+      return (d && typeof d === 'object') ? d : null;
+    } catch (e) { return null; }
+  }
+  deniedSeenAt = Number((deniedInStorage() || {}).at) || 0;
   function connectionDenied(reason) {
     const me = PROFILE;
     const sentence = 'The server turned the connection away' + (reason ? ': ' + reason : '.');
@@ -1590,8 +1606,7 @@
   }
   sp.on('update', guard('idle check', () => {
     const now = Date.now();
-    let denied = null;
-    try { denied = sp.storage.thornswoodConnectionDenied || null; } catch (e) { denied = null; }
+    const denied = deniedInStorage();
     if (denied && (Number(denied.at) || 0) > deniedSeenAt) {
       deniedSeenAt = Number(denied.at) || 0;
       connectionDenied(String(denied.error || ''));

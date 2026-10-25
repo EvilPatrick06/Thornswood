@@ -16,8 +16,13 @@
 //
 // This lifts the real text (spent through frameWent) out of
 // thornswood-front.js and runs it on a pretend clock against a pretend
-// client view. Run it against the plugin before the change with
-// FRONT=<that file>: the longest frame and drawn cases fail there.
+// client view, in a storage that answers an unset key the way the engine's
+// does: with a function, not undefined (#3333). A view read as plain
+// truthiness took that function for the view, and every frame line ended
+// "not known (TypeError: sp.storage.view.getFormViews is not a function)".
+// Run it against the plugin before the change with FRONT=<that file>: the
+// longest frame and drawn cases fail there, and before #3333 the not known
+// case does.
 //
 // Read only.
 'use strict';
@@ -57,6 +62,9 @@ function view(i) {
 const byId = {};
 Object.keys(forms).forEach(function (k) { byId[forms[k].id] = forms[k]; });
 let haveView = true;
+// The engine's storage: an unset key is a function that throws when called
+// (the fork's storageProxy.js).
+const unset = function () { throw new Error('Property "view" is not defined in storage'); };
 const sp = {
   storage: {},
   Game: { getFormEx: function (id) { return byId[id] || null; } },
@@ -65,7 +73,7 @@ const sp = {
 Object.defineProperty(sp.storage, 'view', { get: function () {
   return haveView ? { getFormViews: function () {
     return { getFormViewsArrayLength: function () { return 4; }, getNthFormView: view };
-  } } : undefined;
+  } } : unset;
 } });
 
 const T = new Function('sp', 'log', 'Date', code + '\nreturn { guard: guard, frameWent: frameWent };')(sp, log, FakeDate);
@@ -101,7 +109,7 @@ lines.length = 0;
 elapsed = 0;
 while (elapsed < 30100) { frame(16); elapsed += 16; }
 const none = lines.filter(function (l) { return /^frame: /.test(l); })[0] || '';
-yes('with no client view yet it says not known', /the client draws not known$/.test(none));
+yes('with no client view yet it says not known, and no TypeError', /the client draws not known$/.test(none));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -5,113 +5,108 @@ things a bot is not allowed to do for you.
 
 ## The shape of it
 
-another server has nine hold channels, two world instances and eighty Thalmor
-Inquisitors. That shape is right for eighty thousand people and wrong for six,
-because forty channels with nothing in them reads as abandoned rather than
-organised. This is the same skeleton with the empty rooms left out, and it
-grows by adding to a category rather than by rebuilding.
+`docs/systems/discord.md` is the whole layout: every category, channel and
+role in order, who sees, talks and posts in each, and what each was before.
+It is made from the builder's plan (`python3.12 bot/Build-Discord.py
+--layout`) and `test-3317-layout.py` fails when the two differ, so read it
+there rather than here. `Setup-Discord.ps1 -OnBox -Audit` says where the live
+server differs from it. What follows is only what the bot itself depends on.
 
-### Start Here
+The sidebar reads in the order somebody meets it (#3317, Patrick, 22 Oct,
+page card q-3317-discord-order, A): Start Here, Tickets, Information,
+Roleplay Guide, Applications, Out of Character, In Character, a category per
+faction, a category per hold, Playtesters, Staff, and the staff spaces.
+Somebody who joins sees Start Here, Tickets and Applications, and nothing
+else until the Member button in `#start-here` (THE GATE in the builder).
 
-| Channel | Who writes | What it is |
+### Tickets and Applications
+
+Each of these five channels has its own panel, with only its kinds of ticket
+(`TICKET_DESKS` in `bot.py`; page card q-3317-ticket-split, A):
+
+| Channel | Category | What it opens |
 |---|---|---|
-| `#rules` | staff | Seven rules, short on purpose |
-| `#welcome` | staff | What this is and the three steps to get in |
-| `#start-here` | staff | Installing, joining, where the logs are |
-| `#say-hello` | anybody | The one channel somebody who is not approved yet can talk in |
+| `#get-help` | Tickets | Cannot install, start or connect. Support answers |
+| `#report-someone` | Tickets | A report about somebody. Moderation answers |
+| `#apply-to-playtest` | Applications | The playtest application |
+| `#apply-for-a-seat` | Applications | Jarl and Faction Leader, listing only open seats |
+| `#apply-for-staff` | Applications | Gamemaster, Loremaster, Moderator, Dev, Content Creator |
 
-These four and the Applications category are all somebody sees before staff
-give them Member. The category itself is open to everybody, and the three
-read only ones stay read only.
+Each ticket opens a private thread off its channel that only the person and
+the roles pulled into that kind can read. Faction Leader tickets go only to
+the role IDs in `UPPER_STAFF_ROLES` (Owner ID and each Lead department ID);
+empty means the ticket is refused. They were all in one dropdown in
+`#tickets-and-applications`, which the builder retires with the old closed
+ticket log `#tickets`; `-Prune` leaves a channel while a thread in it is still
+open, so no open ticket goes with it.
 
-### Information
-
-| Channel | Who writes | What it is |
-|---|---|---|
-| `#news` | the launcher | Every release, posted automatically |
-| `#updates` | staff | Restarts, notices, anything happening today |
-| `#faq` | staff | The questions people actually ask |
-
-Downloads, known issues and credits are all pages on the website. A copy in
-Discord is a copy that goes stale, so the welcome post links to them instead.
-
-### Applications
-
-| Channel | Who reads | What it is |
-|---|---|---|
-| `#tickets-and-applications` | everybody | The bot's ticket panel: applying for any job, reporting somebody, cannot install or connect. Each ticket opens a private thread only the person and the roles pulled into that kind can read. Faction Leader tickets go only to the role IDs in `UPPER_STAFF_ROLES` (Owner ID and each Lead department ID). Empty means the ticket is refused |
-| `#tickets` | staff only | Every closed ticket, with a link back to it, and the whole of any ticket whose private thread would not open |
-
-`#tickets` has to stay staff only, because a report about somebody lands there
-when its thread fails. The bot checks the channel's permissions rather than
-its name, and passes over a `#tickets` anybody else can read.
-
-### Help
-
-| Channel | What it is |
-|---|---|
-| `#suggestions` | A forum, mods and features, Nexus link included |
-| `Support` (voice) | Where a ticket goes when typing is slower than talking |
+`#ticket-log`, in Staff, is every closed ticket with a link back to it, and
+the whole of any ticket whose private thread would not open. It has to stay
+the council's only, because a report about somebody lands there when its
+thread fails. The bot checks the channel's permissions rather than its name,
+and passes over a log anybody else can read.
 
 Installing and connecting problems are a ticket, not a public forum. Half of
 them involve somebody's machine, their paths, or their account, and none of
-that belongs in a channel everybody reads.
+that belongs in a channel everybody reads. `#bugs` and `#logs-and-crashes`
+are gone; the builder still names both (`make=False`) so that a prune never
+deletes a channel of either name and no run makes them again.
 
-`#bugs` and `#logs-and-crashes` were here and are gone. The builder still
-names both so that a prune never deletes a channel of either name, and never
-makes them again (`make=False`). A bug goes in a ticket or in `#general-chat`
-until somebody decides otherwise.
+### Out of Character
 
-### Thornswood
+One general, `#general-chat`: a second one only ever splits the same
+conversation in half. It was `#general` until it was renamed, and its topic is
+written by hand, so the builder leaves the topic alone. `#welcome-travelers` is
+where the join cards go, and the server's system channel points at it. The
+card is a file, so the builder gives the bot Attach Files in that channel's
+overwrite for the bot (#2341).
 
-`#general-chat`, `#media`, `#welcome-travelers`, `#game-rules`,
-`#server-progression-and-economy`.
+The General and AFK voice rooms are here, since the Voice category went
+(Patrick, 22 Oct). Proximity voice is in the launcher, so these are for
+before, after, and whoever is not in the world. AFK is the server's real AFK
+channel, so Discord moves people into it after five minutes of silence.
+The Support voice, where a ticket goes when typing is slower than talking, is
+in the Support category, open to everybody; the support staff's own room
+there is Support Staff.
 
-One general. A second one only ever splits the same conversation in half. It
-was `#general` until it was renamed, and the topic on it is written by hand,
-so the builder leaves the topic alone. `#welcome-travelers` is where the join
-cards go, and the server's system channel points at it. The card is a file, so
-the builder gives the bot Attach Files in that channel's overwrite for the bot,
-beside seeing, posting and reading back, which is all it gets elsewhere (#2341).
+`#game-rules` is in Roleplay Guide and carries the nine in-world rules, read
+out of the "In the World" part of `site\data\site\rules.md`, the /rules page,
+so the two cannot disagree.
 
-`#game-rules` sits here rather than in In Character, because that is where it
-was moved to. It carries the nine in-world rules, read out of the "In the
-World" part of `site\data\site\rules.md`, the /rules page, so the two cannot
-disagree.
+### The holds
 
-### In Character
+`#choose-your-hold` in In Character has the bot's hold buttons and, under
+them, the office panel, where a Jarl gives and takes their hold's Court,
+Steward and Guards (#2551). Each hold then has a category of its own:
+`#<hold>-announcements`, the hold's hall, `#<hold>-court`, `#<hold>-guard`
+and a `<Hold> Court` voice room. A hold's Citizen role opens its category.
 
-`#character-introductions` (a forum, one post each), `#tales` (a forum, one
-story per post), `#lore`, `#rp-appreciation`, `#graveyard`.
+### The factions
 
-### The Holds
+Each of the sixteen factions in `factions.json` has a category of its own
+(#3317, Patrick, 22 Oct; page card q-3317-faction-category, C):
+`#<faction>-announcements` (its members read; the Leader and Officers post),
+the faction's chat, `#<faction>-leadership` (the Leader and Officers),
+`#<faction>-seats` and a voice room. The faction's member role opens its
+category.
 
-`#choose-your-hold` at the top, where the bot's buttons are, then one channel
-per hold: `#whiterun` `#solitude` `#windhelm` `#riften` `#markarth`
-`#dawnstar` `#morthal` `#falkreath` `#winterhold`.
-
-In character. What is said there is said in the hold. A hold with nowhere to
-talk is a line on a map, and it is what makes the onboarding question mean
-something.
-
-### Voice
-
-**AFK** and **General**.
-
-Proximity voice is in the launcher, so these are for before, after, and
-whoever is not in the world. AFK is set as the server's real AFK channel, so
-Discord moves people into it after five minutes of silence rather than hoping
-they remember to move themselves.
-
-The support voice channel sits in Help, because that is what it is for.
+`#<faction>-seats` is the Leader's panel, and only the Leader and the faction
+staff see it: Add and Remove for the faction's members and its Officers
+(`<short> Officer`, one role per faction; Patrick picked it over a Court and
+a Steward, and named the channel leadership "since it's not a court"). The
+panel's faction is the channel's. The Officer role goes only to a member,
+and taking somebody's membership takes it with it.
+The shared `#seats` and its one panel, in the Factions category, are retired;
+until `-Prune` deletes it, the old panel says where the panels went.
 
 ### Testing
 
-`#test-findings` (a forum, `test-results` until 11 October), `#test-tasks` (a
-forum), `#known-issues` and **play-testing** (voice), visible to Playtesters
-and staff and to nobody else. `#test-tasks` also lets in the lead gamemaster
-role, which may post test tasks and is not otherwise in that gate. It is on
-that channel's own line in the builder's plan, so no other channel moved.
+The Playtesters category (Testing until #3317): `#test-tasks` (a forum),
+`#known-issues`, `#test-findings` (a forum, `test-results` until 11
+October) and the Playtester Voice room (play-testing until #3317), with the
+playtesters' announcements, rules, sessions and chat. Playtesters and staff
+see it, and nobody else. The bot finds the three testing channels by these
+names.
 
 `#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup,
 and `#test-these` is in the builder's retired list so a re-run does not bring
@@ -292,9 +287,11 @@ leaves it. `test-testing-channels.py` holds all of this.
 
 ### Staff
 
-A staff `#news` where the site watcher speaks, `dev-test-results` (a forum),
-`#dev-test-tasks` (a forum the bot keeps, see Testing above),
-`#staff-general` and a Staff Room. Invisible to everybody else.
+`#staff-announcements` (the staff `#news` until #3317, where the dev updates
+webhook posts), `#council-decisions`, `#staff-updates`, `#staff-general`,
+`#council`, `#ticket-log` and a Staff Room. Invisible to everybody else.
+`#dev-test-tasks` (a forum the bot keeps, see Testing above) and
+`#dev-test-findings` are in the Dev space.
 
 `#dev-notes`, `#deploys` and `#reports` were here and are gone, and like
 `#bugs` the builder keeps their names so that a prune cannot take a channel of
@@ -650,8 +647,8 @@ on the server when it runs:
 
 Run `-Check` first, every time. It names every channel Discord would refuse
 and why, and sends nothing while anything fails. The bot needs Manage Server
-and Manage Roles for the write: tick Administrator on its role for the run and
-untick it after.
+and Manage Roles for the write, which it has: it keeps Administrator (#3317,
+Patrick, 22 Oct 2026).
 
 Discord will not switch onboarding on until it has **at least 7 default
 channels and at least 5 of them that everybody can post in**, and it only
@@ -666,7 +663,7 @@ What it sets:
   the minimum.
 - **What are you here for?** Pick several, optional, channels only: Roleplay
   shows `#tales`, Just playing `#general`, I want to help test
-  `#tickets-and-applications` (testing starts with an application), I make
+  `#apply-to-playtest` (testing starts with an application), I make
   videos `#media`.
 
 `Build-Onboarding.py` still names `general` and `test-these`, which the server

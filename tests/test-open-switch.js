@@ -79,11 +79,13 @@ yes('a config with no play list still works', JSON.stringify(S.playRoles(undefin
 // ----------------------------------------------------- standing(), run --
 const stHead = 'async function standing(discordId) {';
 const stFrom = src.indexOf(stHead);
-// Through holdsStaffRole (#481) and holdsNamedRole (#1417, #1420), which
-// standing() calls and which follow it, in that order.
+// Through holdsStaffRole (#481), holdsNamedRole (#1417, #1420) and
+// leaderRoles (#3317), which standing() calls and which follow it, in that
+// order.
 const stStaff = src.indexOf('\nfunction holdsStaffRole(', stFrom);
 const stNamed = src.indexOf('\nfunction holdsNamedRole(', stFrom);
-const stRoles = Math.max(stStaff, stNamed);
+const stLead = src.indexOf('\nfunction leaderRoles(', stFrom);
+const stRoles = Math.max(stStaff, stNamed, stLead);
 const stTo = stFrom < 0 ? -1 : src.indexOf('\n}\n', stRoles > stFrom ? stRoles : stFrom);
 const stSrc = (stFrom >= 0 && stTo > stFrom) ? src.slice(stFrom, stTo + 2) : '';
 yes('standing() is in server.js', stSrc.length > 0);

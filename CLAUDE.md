@@ -118,17 +118,37 @@ Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
 
-### Staff notices: post them yourself, in #staff-updates
+### Staff notices: only when staff must act, in #staff-updates
 
-Decided by Patrick on 20 Oct (#2934): the notices Developer-Guide.md asks
-for (a line before an edit to one of the six shared files, taking the dev
-feed, what was merged or published) go in #staff-updates, channel
-1549254991082946570, and "the agents should do this themselves using the
-bot". A Claude posts its own. It never hands one to Patrick, never puts one
+Post only when staff must act or would otherwise be surprised (Patrick,
+22 Oct, 8:51 AM: "y'all be putting things in staff updates that don't need
+to be put in staff updates"). Every post from a cloud thread runs
+staff-notice.yml on a VPS runner, takes time and uses his limits. A post is
+for one of these three, and nothing else:
+
+- something staff must act on (for example a new step every staff member
+  takes before a shift);
+- a server restart or outage that staff will see;
+- a change to how staff do their job.
+
+No post for a release to dev or main (the update channel, the app's update
+prompt, the app's and the site's News tabs and GitHub already say it), a
+merge, progress, a pull request opened, an issue filed, a test task or a
+routine deploy (Deploy-Docs, Install-Bot -CodeOnly and the like).
+Those live in the pull request and on the board. When unsure, do not post.
+
+A Dev's line before an edit to one of the six shared files that blocks
+others' work, or before taking the dev feed, is not a staff notice: it goes
+in #dev-coordination, the Dev space's channel, and the Dev writes it there.
+The Lead Dev does not post these, and neither does a Claude working for him
+(Patrick, 22 Oct; Developer-Guide.md has the rule).
+
+Where one is due it goes in #staff-updates, channel 1549254991082946570, and
+"the agents should do this themselves using the bot" (Patrick, 20 Oct, #2934). A Claude posts its own. It never hands one to Patrick, never puts one
 on his to-dos and never asks a person to post it.
 
 ```
-pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Editing Shell.cs for the scan button, pull request to follow."
+pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Restarting the dev server at 4:30 PM for about 5 minutes; anyone on it will be dropped."
 ```
 
 It hands the notice over ssh to `C:\Thornswood-Watch\say-staff.ps1` on the

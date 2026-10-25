@@ -1,15 +1,25 @@
 <#
   Set-BuildRunners.ps1
 
-  Makes the build label on GitHub's VPS runners match records\build-runners.json,
-  so no more builds run on the box at once than that file lists runners.
+  Makes the labels on GitHub's VPS runners match the runner records on main
+  (records\<name>-runners.json): records\build-runners.json caps how many
+  builds run on the box at once, records\sign-runners.json says which runner
+  may sign a release launcher. From One, a developer's PC or a cloud thread.
 
-      .\scripts\deploy\Set-BuildRunners.ps1           put the label on the listed runners, take it off the rest
-      .\scripts\deploy\Set-BuildRunners.ps1 -Check    change nothing; exit 1 when GitHub differs from the record
+      pwsh scripts/deploy/Set-BuildRunners.ps1            make GitHub match main's records
+      pwsh scripts/deploy/Set-BuildRunners.ps1 -Check     change nothing; exit 1 when GitHub differs
+      pwsh scripts/deploy/Set-BuildRunners.ps1 -Run <id>  the answer of a run that had not ended
 
-  WHY (#2994). The VPS has six cores and, from 20 October, eight runners
-  (#2929; three since the evening of 21 October, #3108, #3219). Every
-  heavy job asked for thornswood-vps, which all eight carried,
+  A record is { "label": ..., "runners": [1, 2] }: the runners it lists
+  (thornswood-vps is 1, thornswood-vps-<n> is n) carry the label and no other
+  runner does, an off-box runner (thornswood-pr-*) never. Changing one is a
+  pull request to the record; once it merges, .github\workflows\github-admin.yml
+  runs by itself and GitHub matches it a minute later. This script is for
+  asking again, or for -Check.
+
+  WHY THE BUILD LABEL (#2994). The VPS has six cores and, from 20 October,
+  eight runners (#2929; three since the evening of 21 October, #3108,
+  #3219). Every heavy job asked for thornswood-vps, which all eight carried,
   so on the night of 20 to 21 October seven builds ran at once, each one's
   harness step stretched from about 15 minutes to 34 to 39, and the job's
   40-minute limit cancelled three pull requests' builds that were passing.
@@ -19,121 +29,145 @@
   engine fallback, the nightly checks) ask for the build label as well, and
   only the runners records\build-runners.json lists carry it. The light
   jobs (board cards, dropped claims, the release jobs) still run on any VPS
-  runner, so they never wait behind a build. The cap is the number of
-  runners in that list; changing it is a pull request to that file, then
-  this script.
+  runner, so they never wait behind a build.
 
-  It talks to GitHub only, never to the box: a runner's labels live on
-  GitHub (POST and DELETE repos/<repo>/actions/runners/<id>/labels), and a
-  job already running is not touched. A runner the record lists is named
-  thornswood-vps (1) or thornswood-vps-<n>; an off-box runner
-  (thornswood-pr-*) never gets the label. It needs gh signed in as somebody
-  who administers the repository, the same as Install-Runner.ps1.
+  HOW (#3107, Patrick's A of 22 Oct 2026). A runner's labels can be changed
+  only by somebody who administers the repository, and a cloud thread's proxy
+  refuses every actions/runners path, so this no longer calls GitHub's
+  runner API itself. It starts github-admin.yml on main, waits, and prints
+  the runner's answer, the way Set-Ref.ps1 does. That run hands GitHub's OIDC
+  token for it to the box's admin service (scripts\vps\admin\admin.js,
+  Install-AdminService.ps1), which holds the key of a GitHub App made for
+  Thornswood and nothing else does. The service checks the token is that
+  workflow on main, reads the records from main itself, and makes the labels
+  match. What to change never comes from here, so nobody can label a runner
+  any way main does not say. A job already running is not touched.
 
-  It refuses to leave GitHub with no registered runner carrying the label,
-  because every heavy job would then wait for a runner that never comes.
+  The service refuses to leave GitHub with no registered runner carrying a
+  record's label, because every job asking for it would then wait for a
+  runner that never comes. A record that names a label every VPS runner
+  carries, lists no runners, or names a label another record names, stops
+  it. tests\test-3107-admin.js runs the service's rules; #2161 (one runner
+  at a time): a runner outside the build list runs only the light jobs, so
+  to prove one, add its number to the record in the same pull request that
+  moves the rollout to it.
 
-  #2161 (one runner at a time). The outbound rules go on one runner and a
-  build through it proves them. The runners the record lists carry the
-  label (1 and 2 since 22 Oct 2026, #3114), so their builds prove them. A runner outside the list runs only the
-  light jobs; to prove one, add its number to the record in the same pull
-  request that moves the rollout to it, and run this.
-
-  -DryRunFrom <file> reads the runner list from that file (GitHub's answer
-  to repos/<repo>/actions/runners, as JSON) instead of asking GitHub, and
-  changes nothing: tests\test-2994-build-runners.ps1 runs it that way.
+  WHAT IT SAYS AND EXITS.
+    MATCHES, or CHANGED <n>          0, with the service's lines
+    DIFFERS <n> (-Check)             1, with what differs
+    refused, or the service stopped  1, with why
+    the run had not ended            2, after -WaitMinutes; -Run <id> reads it
+  -OnGitHub is the workflow's half; it writes the answer as an annotation
+  titled Set-BuildRunners.
 #>
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Ask')]
 param(
-  [string]$Repo = 'EvilPatrick06/Thornswood',
-  # Change nothing; say what differs and exit 1 when anything does.
-  [switch]$Check,
-  # The record. records\build-runners.json unless a test points it at a copy.
-  [string]$Record = '',
-  # Read the runners from this file instead of GitHub and change nothing.
-  [string]$DryRunFrom = ''
+    # Change nothing; say what differs and exit 1 when anything does.
+    [Parameter(ParameterSetName = 'Ask')]
+    [switch]$Check,
+    # A github-admin run that had not ended: read its answer.
+    [Parameter(ParameterSetName = 'Run', Mandatory = $true)]
+    [long]$Run,
+    # The workflow's half: asks the box's admin service with this run's
+    # OIDC token. -Check comes from ADMIN_CHECK there.
+    [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
+    [switch]$OnGitHub,
+    [int]$WaitMinutes = 15,
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$Here = $PSScriptRoot
-if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-if (-not $Record) { $Record = Join-Path $Here '..\..\records\build-runners.json' }
+. (Join-Path $PSScriptRoot '..\ops\WorkflowRun.ps1')
+
+$workflow = 'github-admin.yml'
+$title = 'Set-BuildRunners'
+# The audience admin.js takes, and nothing else does.
+$audience = 'thornswood-admin'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
-function Die($m) { Write-Host "STOP. $m" -ForegroundColor Red; exit 1 }
+function Die($m) { Write-ThornswoodAnnotation 'error' $title $m; Write-Host "STOP. $m" -ForegroundColor Red; exit 1 }
 
-# ---- the record --------------------------------------------------------------
-if (-not (Test-Path -LiteralPath $Record)) { Die "there is no record at $Record." }
-$rec = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
-$label = "$($rec.label)".Trim()
-$want = @($rec.runners | ForEach-Object { [int]$_ })
-if (-not $label -or $label -eq 'thornswood-vps' -or $label -match '[,\s]') { Die "the record's label ('$label') must be one word and not thornswood-vps, which every VPS runner carries." }
-if (-not $want.Count) { Die 'the record lists no runners, so no heavy job could ever run. Nothing was changed.' }
-if (@($want | Where-Object { $_ -lt 1 }).Count) { Die 'the record lists a runner number below 1. Nothing was changed.' }
+# ======================================================== the GitHub half ===
+if ($OnGitHub) {
+    $askCheck = ($env:ADMIN_CHECK -eq 'true')
+    if (-not $env:ACTIONS_ID_TOKEN_REQUEST_URL -or -not $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN) {
+        Die 'this run has no OIDC token to ask for: github-admin.yml has to give the job id-token: write. Nothing was changed.'
+    }
+    $port = if ($env:THORNSWOOD_ADMIN_PORT) { [int]$env:THORNSWOOD_ADMIN_PORT } else { 7791 }
 
-# ---- what GitHub has -----------------------------------------------------------
-function Invoke-Gh {
-  # Windows PowerShell and pwsh both turn a line gh writes to stderr into an
-  # error record under Stop; gh is judged by its exit code instead.
-  $ErrorActionPreference = 'Continue'
-  $out = & gh @args 2>$null
-  if ($LASTEXITCODE -ne 0) { throw ('gh ' + ($args -join ' ') + ' failed') }
-  return $out
+    $sep = if ($env:ACTIONS_ID_TOKEN_REQUEST_URL.Contains('?')) { '&' } else { '?' }
+    $t = Invoke-WebRequest -Uri ($env:ACTIONS_ID_TOKEN_REQUEST_URL + $sep + 'audience=' + $audience) -SkipHttpErrorCheck -TimeoutSec 60 `
+        -Headers @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }
+    $token = ''
+    if ([int]$t.StatusCode -eq 200) { $token = [string](([string]$t.Content | ConvertFrom-Json).value) }
+    if (-not $token) { Die ('GitHub gave this run no OIDC token (HTTP ' + $t.StatusCode + '). Nothing was changed.') }
+
+    # The service is on this machine; nothing between here and it.
+    $a = Invoke-WebRequest -Method POST -Uri "http://127.0.0.1:$port/converge" -SkipHttpErrorCheck -NoProxy -TimeoutSec 120 `
+        -Headers @{ Authorization = "Bearer $token" } -ContentType 'application/json' `
+        -Body (ConvertTo-Json -Compress @{ what = 'runner-labels'; check = $askCheck })
+    $code = [int]$a.StatusCode
+    $r = $null
+    try { $r = [string]$a.Content | ConvertFrom-Json } catch { $r = $null }
+    if (-not $r -or -not $r.PSObject.Properties['lines']) {
+        Die ("the box's admin service on 127.0.0.1:$port did not answer as itself (HTTP $code). Install-AdminService.ps1 -Status says whether it is there. Nothing was changed.")
+    }
+    $lines = @($r.lines | ForEach-Object { [string]$_ })
+    foreach ($l in $lines) { Say "  $l" }
+    if ($code -eq 200 -and $r.ok) {
+        $head = if ($askCheck -and [int]$r.differs) { 'DIFFERS ' + $r.differs } elseif ([int]$r.changed) { 'CHANGED ' + $r.changed } else { 'MATCHES' }
+        Write-ThornswoodAnnotation 'notice' $title (@($head) + $lines -join "`n")
+        Say $head 'Green'
+        exit 0
+    }
+    Die ((@("the box's admin service said no (HTTP $code)") + $lines) -join "`n")
 }
-if ($DryRunFrom) {
-  $answer = Get-Content -LiteralPath $DryRunFrom -Raw
+
+# ======================================================= the session half ===
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die "there is no gh here to start $workflow with. Install GitHub CLI from https://cli.github.com and run gh auth login. Nothing was changed." }
+$again = 'pwsh scripts/deploy/Set-BuildRunners.ps1 -Run '
+
+function Read-Answer([long]$id, [switch]$Started) {
+    $a = Read-ThornswoodRunAnswer -Repo $GitHubRepo -Workflow $workflow -Run $id -Title $title -WaitMinutes $WaitMinutes -Started:$Started -Say { param($m) Say $m 'DarkGray' }
+    switch ($a.State) {
+        'answer' { return $a.Text }
+        'waiting' {
+            Say ("the run has not ended after $WaitMinutes minutes (it was " + $a.Text + '), so every VPS runner is busy. It still does it when one takes it.') 'Yellow'
+            Say ('  its answer then: ' + $again + $id) 'DarkGray'
+            if ($a.Url) { Say ('  ' + $a.Url) 'DarkGray' }
+            exit 2
+        }
+        'unread' {
+            if (-not $Started) { Die $a.Text }
+            Say ("GitHub started run $id, and the run does it. Its answer was not read here: " + $a.Text) 'Yellow'
+            Say ('  its answer: ' + $again + $id) 'DarkGray'
+            exit 2
+        }
+        'stopped' { Die ($a.Text + "`n(" + $a.Url + ')') }
+        'other' { Die ($a.Text + '.') }
+    }
+    Die ($a.Text + ', so nothing it knows of was changed. Its log says why: ' + $a.Url)
+}
+
+if ($PSCmdlet.ParameterSetName -eq 'Run') {
+    $answer = Read-Answer $Run
 } else {
-  if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die 'gh is not on PATH. Install GitHub CLI from https://cli.github.com and run gh auth login.' }
-  try { $answer = Invoke-Gh api "repos/$Repo/actions/runners?per_page=100" | Out-String }
-  catch { Die "GitHub would not list the runners. gh has to be signed in as somebody who administers $Repo." }
-}
-$runners = @(($answer | ConvertFrom-Json).runners)
-
-# A VPS runner's number from its name: thornswood-vps is 1, thornswood-vps-<n> is n.
-function Get-RunnerNumber([string]$name) {
-  if ($name -eq 'thornswood-vps') { return 1 }
-  $m = [regex]::Match($name, '^thornswood-vps-(\d+)$')
-  if ($m.Success) { return [int]$m.Groups[1].Value }
-  return 0
+    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs ([ordered]@{ check = $(if ($Check) { 'true' } else { 'false' }) }) }
+    catch { Die ($_.Exception.Message + '. Nothing was changed.') }
+    if (-not $started.Run) {
+        Say ("GitHub started $workflow, but named no run" + ', so its answer cannot be read here. Its runs: ' + $started.Url) 'Yellow'
+        exit 2
+    }
+    Say ("sent to $workflow" + ': ' + $started.Url) 'DarkGray'
+    $answer = Read-Answer $started.Run -Started
 }
 
-$plan = @()
-$carry = @()
-foreach ($r in $runners) {
-  $n = Get-RunnerNumber "$($r.name)"
-  $has = @($r.labels | ForEach-Object { "$($_.name)" }) -contains $label
-  $should = ($n -gt 0) -and ($want -contains $n)
-  if ($should) { $carry += $r }
-  if ($has -and -not $should) { $plan += [pscustomobject]@{ Do = 'take off'; Runner = $r } }
-  elseif ($should -and -not $has) { $plan += [pscustomobject]@{ Do = 'put on'; Runner = $r } }
-  else { Say ("  {0}: {1}" -f $r.name, $(if ($has) { "carries $label, as the record says" } else { 'no build label, as the record says' })) }
+$said = @("$answer" -split "`n")
+foreach ($l in @($said | Select-Object -Skip 1)) { Say "  $l" }
+switch -Regex ($said[0]) {
+    '^MATCHES$' { Say 'GitHub matches main''s runner records.' 'Green'; exit 0 }
+    '^CHANGED (\d+)$' { Say ('GitHub matches main''s runner records now; ' + $Matches[1] + ' label(s) changed.') 'Green'; exit 0 }
+    '^DIFFERS (\d+)$' { Say ('GitHub differs from main''s runner records in ' + $Matches[1] + ' place(s), above. pwsh scripts/deploy/Set-BuildRunners.ps1 puts it right.') 'Yellow'; exit 1 }
 }
-foreach ($n in $want) {
-  if (-not @($runners | Where-Object { (Get-RunnerNumber "$($_.name)") -eq $n }).Count) { Say ("  runner {0} is in the record but not registered on GitHub" -f $n) 'Yellow' }
-}
-if (-not $carry.Count) { Die "no runner the record lists is registered on GitHub, so every heavy job would wait for a runner that never comes. Nothing was changed." }
-$online = @($carry | Where-Object { "$($_.status)" -eq 'online' })
-if (-not $online.Count) { Say "  none of the runners carrying $label is online now; heavy jobs wait until one is" 'Yellow' }
-
-foreach ($p in $plan) { Say ("  {0}: {1} {2}" -f $p.Runner.name, $p.Do, $label) 'Cyan' }
-if (-not $plan.Count) { Say ("GitHub matches the record: {0} runner(s) carry {1}, so at most that many heavy jobs run on the box at once." -f $carry.Count, $label) 'Green'; exit 0 }
-if ($Check) { Say ("GitHub differs from the record in {0} place(s), above. .\scripts\deploy\Set-BuildRunners.ps1 puts it right." -f $plan.Count) 'Yellow'; exit 1 }
-if ($DryRunFrom) { Say ("dry run: {0} change(s) above, none made." -f $plan.Count); exit 0 }
-
-foreach ($p in $plan) {
-  $id = $p.Runner.id
-  if ($p.Do -eq 'put on') { Invoke-Gh api -X POST "repos/$Repo/actions/runners/$id/labels" -f "labels[]=$label" | Out-Null }
-  else { Invoke-Gh api -X DELETE "repos/$Repo/actions/runners/$id/labels/$label" | Out-Null }
-  Say ("  {0}: done" -f $p.Runner.name) 'Green'
-}
-
-# Read it back rather than trust the calls.
-$after = @(((Invoke-Gh api "repos/$Repo/actions/runners?per_page=100" | Out-String) | ConvertFrom-Json).runners)
-$wrong = @($after | Where-Object {
-  $n = Get-RunnerNumber "$($_.name)"
-  $has = @($_.labels | ForEach-Object { "$($_.name)" }) -contains $label
-  $has -ne (($n -gt 0) -and ($want -contains $n))
-})
-if ($wrong.Count) { Die ("GitHub still differs for " + (($wrong | ForEach-Object { $_.name }) -join ', ') + '. The lines above say what was asked.') }
-Say ("GitHub matches the record: {0} runner(s) carry {1}." -f @($after | Where-Object { @($_.labels | ForEach-Object { "$($_.name)" }) -contains $label }).Count, $label) 'Green'
-exit 0
+Die ("the run answered '" + $said[0] + "', which is none of the answers this knows.")
