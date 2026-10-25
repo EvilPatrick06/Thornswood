@@ -72,6 +72,23 @@ try {
   Yes 'the dev root is the dev channel' ((Get-ThornswoodDeployedChannel 'C:/Thornswood-Server-Dev') -eq 'dev')
   Yes 'a trailing slash does not change the channel' ((Get-ThornswoodDeployedChannel 'C:\Thornswood-Server-Dev\') -eq 'dev')
 
+  # #3398: the docs root is the folder beside the server root, never a default,
+  # so a deploy to a scratch root writes nothing but scratch.
+  Yes 'the docs root beside the live root is the box''s site' ((Get-ThornswoodDocsRootBeside 'C:/Thornswood-Server') -eq 'C:/Thornswood-Docs')
+  Yes '  beside the dev root too, with backslashes and a trailing one' ((Get-ThornswoodDocsRootBeside 'C:\Thornswood-Server-Dev\') -eq 'C:/Thornswood-Docs')
+  Yes '  and beside a scratch root, the scratch folder, never C:/Thornswood-Docs' ((Get-ThornswoodDocsRootBeside $live) -eq ($tmp.Replace('\', '/').TrimEnd('/') + '/Thornswood-Docs'))
+  Yes '  and nothing for a root with no folder above it' ((Get-ThornswoodDocsRootBeside 'Thornswood-Server') -eq '')
+  $threw = ''
+  try { $null = Get-ThornswoodDeployedBuildScript 'C:/Thornswood-Server' '' } catch { $threw = $_.Exception.Message }
+  Yes 'the box script refuses to be made with no docs root' ($threw -match 'no docs root')
+  $before = $script:sent.Count
+  $said = @(Save-ThornswoodDeployedBuild 'u@box' @() $live '')
+  Yes '  and a deploy that names none writes nothing and sends nothing, and says so' ($script:sent.Count -eq $before -and [bool]@($said -match '^DEPLOYED BUILD NOT WRITTEN: .*no docs root').Count)
+  foreach ($f in 'scripts\deploy\DeployedBuild.ps1', 'scripts\deploy\Deploy-Server.ps1', 'scripts\release\Publish-Server.ps1') {
+    $t = [IO.File]::ReadAllText((Join-Path $Repo $f))
+    Yes ('  ' + $f + ' gives the docs root no default') ($t -notmatch '\$DocsRoot\s*=\s*''C:')
+  }
+
   Put-Record $live $A
   Remove-Item -LiteralPath $docs -Recurse -Force
   $said = @(Save-ThornswoodDeployedBuild 'u@box' @() $live $docs)
@@ -134,11 +151,11 @@ try {
   Yes 'Deploy-Server.ps1 loads DeployedBuild.ps1' ($ds -match "\. \(Join-Path \`$Here 'DeployedBuild\.ps1'\)")
   $iSwap = $ds.IndexOf("if (`$swapOut -notcontains 'SWAP OK')")
   $iCur = $ds.IndexOf('Set-ThornswoodArtifactCurrent -Artifact $artifact')
-  $iSave = $ds.IndexOf('Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root', $iCur)
+  $iSave = $ds.IndexOf('Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root (Get-ThornswoodDocsRootBeside $Root)', $iCur)
   Yes 'it writes the deployed build only after SWAP OK, beside the artifact record' ($iSwap -gt 0 -and $iCur -gt $iSwap -and $iSave -gt $iCur)
   $pb = $ds.Substring($ds.IndexOf('function Invoke-PutBack'))
   $pb = $pb.Substring(0, $pb.IndexOf("`n}") + 2)
-  Yes 'a put-back writes it too, after the swap result passes' ($pb.IndexOf('Save-ThornswoodDeployedBuild') -gt $pb.IndexOf('Show-SwapResult'))
+  Yes 'a put-back writes it too, after the swap result passes, beside its root' ($pb.IndexOf('Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root (Get-ThornswoodDocsRootBeside $Root)') -gt $pb.IndexOf('Show-SwapResult'))
 
   # Publish-Server.ps1 too (#2303): an engine reaches the dev server that way,
   # and on 11 Oct the file held live alone because only Deploy-Server wrote it.
@@ -149,8 +166,8 @@ try {
   $fn = $ps.Substring($ps.IndexOf('function Save-ServerRecords'))
   $fn = $fn.Substring(0, $fn.IndexOf("`n}") + 2)
   Yes 'its record step writes the deployed build for the root it installed, after the deploy record' (
-    $fn.IndexOf('Save-ThornswoodDeployedBuild $target $ssh $VpsRoot') -gt $fn.IndexOf('Set-ThornswoodServerRecord') -and
-    $fn.IndexOf('Save-ThornswoodDeployedBuild $target $ssh $VpsRoot') -gt $fn.IndexOf('Restore-ThornswoodServerRecord'))
+    $fn.IndexOf('Save-ThornswoodDeployedBuild $target $ssh $VpsRoot (Get-ThornswoodDocsRootBeside $VpsRoot)') -gt $fn.IndexOf('Set-ThornswoodServerRecord') -and
+    $fn.IndexOf('Save-ThornswoodDeployedBuild $target $ssh $VpsRoot (Get-ThornswoodDocsRootBeside $VpsRoot)') -gt $fn.IndexOf('Restore-ThornswoodServerRecord'))
   $iInst = $ps.IndexOf('Invoke-Installer $instArgs')
   Yes 'a publish runs that step only once the installer has said INSTALL OK' ($iInst -gt 0 -and $ps.IndexOf('Save-ServerRecords', $iInst) -gt $iInst)
   $iBack = $ps.IndexOf('-StartNow -PutBack -Wait $Wait"')
