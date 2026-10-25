@@ -53,6 +53,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
+# Move-FeedStoreInto, sent up with -Enforce and -Watch: the list goes back
+# with the same POSIX rename as the gamemode's own write of it (#2909).
+. (Join-Path $Here '..\release\Feed-Store.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
@@ -138,7 +141,7 @@ else { 'WITHOUT a join pass key: the site has not made one yet. Deploy-Docs.ps1,
 if ($Enforce -or $Watch) {
   $want = if ($Enforce) { 'true' } else { 'false' }
   Head $(if ($Enforce) { 'Turning the door ON' } else { 'Back to watching only' })
-  $out = Remote @"
+  $out = Remote ($script:FeedStoreSwap + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$root = '$root'
 `$privDir = 'private'
@@ -158,11 +161,22 @@ if ('$want' -eq 'true' -and `$n -lt 1) {
   exit
 }
 `$d.enforce = ('$want' -eq 'true')
-[IO.File]::WriteAllText(`$f, (`$d | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
+# The list goes back whole (#2909): a new file beside it, put over it with
+# the POSIX rename the gamemode's mp.writeFileWhole uses. Written in place,
+# the gamemode's read could find the list cut short or empty, and the write
+# was refused while the gamemode's own rename of the list held it.
+`$part = Join-Path (Split-Path -Parent `$f) ('.allowed.json.door-' + `$PID)
+[IO.File]::WriteAllText(`$part, (`$d | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
+try { Move-FeedStoreInto `$part `$f }
+catch {
+  Remove-Item -LiteralPath `$part -Force -ErrorAction SilentlyContinue
+  'THE LIST WAS NOT WRITTEN: ' + `$_.Exception.Message
+  exit
+}
 'enforce is now $want, with ' + `$n + ' profiles on the list'
-"@
+"@)
   $out | ForEach-Object { Say "  $_" }
-  if ("$out" -match 'THE LIST IS EMPTY|NO LIST YET') {
+  if ("$out" -match 'THE LIST IS EMPTY|NO LIST YET|THE LIST WAS NOT WRITTEN') {
     Die 'Nothing was changed.'
   }
 }
