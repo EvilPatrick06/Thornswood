@@ -510,3 +510,6 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
   height: 1px;
   overflow: hidden;
 }
+/* Turnstile's widget on the report form (#3216): its own height held, so the
+   button under it does not jump when Cloudflare draws it. */
+.ts-check { min-height: 65px; }

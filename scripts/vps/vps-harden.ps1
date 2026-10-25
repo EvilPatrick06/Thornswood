@@ -26,14 +26,16 @@
                      AllowTelemetry set to 0, with the reason beside each
                      (#3213). One that is not on the box is said and left.
     Windows Update   the policy values in $UpdatePolicies below: updates
-                     install every day at 4 AM box time, Windows never
-                     restarts for one between 6 AM and midnight, and its
+                     install every day at 4 AM box time, Windows restarts
+                     15 minutes after an install that needs it, and its
                      automatic maintenance starts at 4 AM with no random
                      delay (#3213). Windows Update itself stays on: its
                      services are read and left as they are, and a WARN
                      says so if one is Disabled. A WARN too if the box's
                      clock is not Mountain time, since every hour here is
-                     the box's own.
+                     the box's own, and if Windows already has a restart
+                     set outside 4 AM to 6 AM, which these values do not
+                     move.
     sshd_config     PasswordAuthentication no and KbdInteractiveAuthentication
                      no, as the first setting of each (sshd takes the first
                      one it reads) and above the Match block, where a global
@@ -135,17 +137,29 @@ $TelemetryTasks = @(
 #
 # Each key is one Server 2022's own Group Policy templates write: the update
 # ones WindowsUpdate.admx, the maintenance ones msched.admx and
-# AllowTelemetry DataCollection.admx. What Server 2022 has no key for is an
-# install on a schedule with the restart left to us. Option 4 restarts by
-# itself, outside active hours, when an update needs it; option 7 never
-# installs by itself, and Windows had set Reboot_AC under it all the same;
-# and NoAutoRebootWithLoggedOnUsers holds a restart off only while somebody
-# is signed in, which on this box nobody is, so it is not set. So the
-# restart is held to the night instead: active hours are the 18 hours
-# Windows allows at most (ActiveHoursMaxRange is 8 to 18), 6 AM to midnight,
-# so a restart for the 4 AM install comes before 6 AM or not until midnight.
-# One still waiting at 6 AM can also be done by Set-TimeWait.ps1 -Restart,
-# which restarts the box only when nobody is on either server. The hour Windows looks for
+# AllowTelemetry DataCollection.admx. Option 4 installs at the scheduled
+# time; option 7 never installs by itself, and Windows had set Reboot_AC
+# under it all the same; and NoAutoRebootWithLoggedOnUsers holds a restart
+# off only while somebody is signed in, which on this box nobody is, so it is
+# not set. The restart is pinned to the install: AlwaysAutoRebootAtScheduledTime
+# 1 starts a timer the moment Windows Update installs an update that needs a
+# restart, and restarts when AlwaysAutoRebootAtScheduledTimeMinutes runs out
+# (15 to 180; 15, the shortest, so an install that takes an hour still ends
+# in a restart before 6 AM). Microsoft's "Manage device restarts after
+# updates" names exactly these four values as the way to schedule a specific
+# install and restart time, and says the timer applies to Windows 10 and
+# not 11; Server 2022 is the Windows 10 line. Until 23 Oct 2026 the restart
+# was left to active hours alone, and that was measured to miss the window:
+# the 4 AM install on 23 Oct needed a restart at 4:06 AM, Windows did not
+# take it before 6 AM, and set Reboot_AC to 2:33 AM on 24 Oct instead, the
+# night hour it chose after active hours ended, 18 minutes after the backup
+# starts and outside 4 AM to 6 AM. Active hours stay set, 6 AM to midnight,
+# the 18 hours Windows allows at most (ActiveHoursMaxRange is 8 to 18):
+# Microsoft's page says they have no effect while the timer is on, and they
+# are what holds a restart Windows sets by itself (an update installed some
+# other way) out of the day instead of its default of 8 AM to 5 PM. A
+# restart Windows set before these values were is not moved by them; the
+# run says when one stands outside the window. The hour Windows looks for
 # updates and downloads them has no key outside WSUS (DetectionFrequency
 # needs an update server of our own), so only the install is moved. Low
 # priority: Windows already runs its update installer (TiWorker.exe) and the
@@ -159,7 +173,8 @@ $UpdatePolicies = @(
     @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'ScheduledInstallDay'; Type = 'DWord'; Value = 0; Why = 'every day, so an update waits a day at most' },
     @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'ScheduledInstallTime'; Type = 'DWord'; Value = 4; Why = 'at 4 AM box time, after the backup and the nightly checks' },
     @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'ScheduledInstallEveryWeek'; Type = 'DWord'; Value = 1; Why = 'every week of the month, as Group Policy writes it beside the day' },
-    @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'AlwaysAutoRebootAtScheduledTime'; Type = 'DWord'; Value = 0; Why = 'no restart forced at the install time on a 15 minute warning' },
+    @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'AlwaysAutoRebootAtScheduledTime'; Type = 'DWord'; Value = 1; Why = 'the restart an install needs comes on a timer started by the install, so in the 4 AM to 6 AM window' },
+    @{ Key = "$PolicyRoot\WindowsUpdate\AU"; Name = 'AlwaysAutoRebootAtScheduledTimeMinutes'; Type = 'DWord'; Value = 15; Why = 'the timer: 15 minutes, the shortest Windows takes, so the restart comes about 4:20 AM' },
     @{ Key = "$PolicyRoot\WindowsUpdate"; Name = 'SetActiveHours'; Type = 'DWord'; Value = 1; Why = 'Windows never restarts for an update inside the active hours below' },
     @{ Key = "$PolicyRoot\WindowsUpdate"; Name = 'ActiveHoursStart'; Type = 'DWord'; Value = 6; Why = 'active from 6 AM, so a restart for the 4 AM install can come only before 6 or after midnight' },
     @{ Key = "$PolicyRoot\WindowsUpdate"; Name = 'ActiveHoursEnd'; Type = 'DWord'; Value = 0; Why = 'to midnight: 18 hours, the most Windows allows' },
@@ -173,6 +188,8 @@ $UpdateServices = @(
     @{ Name = 'UsoSvc'; Why = 'Update Orchestrator, which starts the scheduled install' }
 )
 $BoxTimeZone = 'Mountain Standard Time'
+# Windows' own restart for an update, which it sets when an install needs one.
+$RestartTask = @{ Path = '\Microsoft\Windows\UpdateOrchestrator\'; Name = 'Reboot_AC' }
 $RollbackTask = 'Thornswood harden rollback'
 
 # ---------------------------------------------------------------- the layer ---
@@ -235,6 +252,15 @@ function Set-PolicyValue([string]$Key, [string]$Name, $Value, [string]$Type) {
 }
 
 function Get-BoxTimeZone { return [string](Get-TimeZone).Id }
+
+# When a scheduled task runs next, or $null when it is not set to.
+function Get-TaskNextRun([string]$Path, [string]$Name) {
+    $t = Get-ScheduledTask -TaskPath $Path -TaskName $Name -ErrorAction SilentlyContinue
+    if (-not $t) { return $null }
+    $next = ($t | Get-ScheduledTaskInfo).NextRunTime
+    if (-not $next -or $next.Year -lt 2000) { return $null }
+    return [datetime]$next
+}
 
 function Test-SshdFile([string]$Path) {
     $old = $ErrorActionPreference
@@ -414,6 +440,14 @@ function Invoke-Harden {
         if (-not $DryRun) { Set-PolicyValue $v.Key $v.Name $v.Value $v.Type }
         Change ($v.Name + ' set to ' + $v.Value + ' (was ' + $(if ($null -eq $have) { 'not set' } else { [string]$have }) + '): ' + $v.Why)
     }
+
+    # A restart Windows set before the values above were, read only: they
+    # pin the restart of the next install, not one already set.
+    $next = Get-TaskNextRun $RestartTask.Path $RestartTask.Name
+    $when = $(if ($next) { $next.ToString('yyyy-MM-dd h:mm tt', [Globalization.CultureInfo]::InvariantCulture) } else { '' })
+    if (-not $next) { Say 'ALREADY' 'Windows has no restart for an update set' }
+    elseif ($next.Hour -ge 4 -and $next.Hour -lt 6) { Say 'ALREADY' ('Windows has its restart for an update set for ' + $when + ', inside 4 AM to 6 AM') }
+    else { Say 'WARN' ('Windows has a restart for an update set for ' + $when + ', outside 4 AM to 6 AM. It was set by an install before the values above, which pin the restart of the next install, so it stands. Nothing here moves it.') }
 
     # The same read as the services above, and nothing more: Windows Update stays on.
     foreach ($svc in $UpdateServices) {

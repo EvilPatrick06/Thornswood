@@ -341,15 +341,25 @@ let cfg = {
   */
   open: false,
   access: {
-    admin:  ['Owner', 'Dev'],
-    play:   ['Owner', 'Dev', 'Moderator', 'Gamemaster', 'Loremaster',
-             'Content Creator', 'Playtester'],
+    // #3317 (Patrick, 22 Oct): every staff role plays the main build, with
+    // Playtester; the site's admin pages are Owner, Co-Owner and the Dev rank.
+    admin:  ['Owner', 'Co-Owner', 'Lead Dev', 'Dev'],
+    play:   ['Owner', 'Co-Owner', 'Lead Dev', 'Lead Gamemaster', 'Lead Loremaster',
+             'Lead Moderator', 'Lead Content Creator', 'Lead Support', 'Dev',
+             'Gamemaster', 'Trial Gamemaster', 'Loremaster', 'Moderator',
+             'Content Creator', 'Support', 'Playtester'],
     banned: ['Banned']
   },
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
   admins: [],            // discord ids, an override for when the bot is down
   secret: '',
-  passKey: ''            // signs join passes; the game servers hold a copy (#937)
+  passKey: '',           // signs join passes; the game servers hold a copy (#937)
+  /* Cloudflare Turnstile on the report form (#3216). The site key goes to the
+     page and is public; the secret is what the site checks a pass with, and
+     lives only here. Both are set on the box by Set-Turnstile.ps1. Either one
+     empty, as on a copy on your machine, means no widget and no check. */
+  turnstileSiteKey: '',
+  turnstileSecret: ''
 };
 /* The byte order mark matters. Windows PowerShell puts one on the front of
    anything it writes with -Encoding UTF8, JSON.parse refuses a string that
@@ -378,21 +388,31 @@ cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // The one switch (#428). Only a real true opens it: "true", 1 or a typo does not.
 cfg.open = cfg.open === true;
 cfg.access.play = playRoles(cfg.access.play, cfg.open);
-// Who may use the dev build and join the dev server. Left out of config.json
-// it is the Discord staff roles, the same set the bot's STAFF_ROLES names
-// (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
-// staff, bot.py). Patrick's call on 27 September for the dev-build install gate
-// (#605): the dev build is for staff, not the admin pair alone. It folds
-// access.admin in through out.dev below, so widening admin still widens dev.
-// Add role names here to widen it further.
+// Who is staff in the game: the staff seats over the most the world holds,
+// the game's staff powers (devProfiles), and the uploads queue. Since #3317
+// (Patrick, 22 Oct) it is the staff who work in the world: Owner and
+// Co-Owner, and the Dev, Gamemaster and Loremaster ranks with their leads.
+// Moderators moderate the Discord only, and Content Creator and Support work
+// in the Discord, so none of them is staff in the game. It folds access.admin
+// in through out.dev below, so widening admin still widens it.
 if (!Array.isArray(cfg.access.dev)) {
-  cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
+  cfg.access.dev = ['Owner', 'Co-Owner', 'Lead Dev', 'Dev', 'Lead Gamemaster',
+                    'Gamemaster', 'Trial Gamemaster', 'Lead Loremaster', 'Loremaster'];
+}
+// Who may use the dev build and join the dev server (#605, the install gate).
+// Patrick, 22 Oct (#3317): "Dev build: Owner, Co-Owner, Dev and the leads
+// only". Every lead of the council is in it, a lead whose rank is not staff
+// in the game included. It folds access.admin in through out.devBuild below.
+if (!Array.isArray(cfg.access.devBuild)) {
+  cfg.access.devBuild = ['Owner', 'Co-Owner', 'Lead Dev', 'Lead Gamemaster',
+                         'Lead Loremaster', 'Lead Moderator', 'Lead Content Creator',
+                         'Lead Support', 'Dev'];
 }
 // Who the Free Skyrim Trading Company has taken on (#1393): an application in
 // Discord, the same shape as a Jarl's, and a person gives the role. The game
 // lets them handle a company sale.
 if (!Array.isArray(cfg.access.company)) {
-  cfg.access.company = ['Trading Company'];
+  cfg.access.company = ['Free Skyrim Trading Company'];
 }
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
@@ -1657,6 +1677,50 @@ function reportFrom(req) {
   return crypto.createHmac('sha256', reportSalt).update(clientAddr(req)).digest('hex').slice(0, 32);
 }
 
+/* CLOUDFLARE TURNSTILE ON THE REPORT FORM (#3216). The report form is the one
+   form anybody can send without signing in, on purpose, so it is the one a
+   script can fill from anywhere. The gallery's forms and the hub need a
+   Discord sign in with a role, which a script does not have, and the member
+   password's form is off once Discord sign in is set up. Patrick's answer on
+   22 Oct 2026 was to put Turnstile on the site's forms; this is the form that
+   needs it.
+
+   The page draws the widget with the site key (/api/report/form), and the
+   widget gives it a one-time pass that goes with the report. The site asks
+   Cloudflare whether that pass is good, with the secret and the sender's
+   address, before it keeps anything. Both keys empty, as on a copy on your
+   machine, is no widget and no check, never one without the other: a page
+   that drew no widget would otherwise have every report refused. */
+const TURNSTILE_VERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+function turnstileOn() {
+  return typeof cfg.turnstileSiteKey === 'string' && cfg.turnstileSiteKey.length > 0 &&
+         typeof cfg.turnstileSecret === 'string' && cfg.turnstileSecret.length > 0;
+}
+/* 'yes', 'no', or 'unasked' when Cloudflare did not answer inside the same
+   ten seconds every other outside question gets (post()). The action is the
+   one the page draws the widget with, so a pass made on another page of
+   another site with the same key would not do. */
+async function turnstilePasses(token, addr) {
+  const t = String(token || '');
+  if (!t || t.length > 2048) return 'no';
+  let said;
+  try {
+    said = await post(TURNSTILE_VERIFY, { secret: cfg.turnstileSecret, response: t, remoteip: addr || '' });
+  } catch (e) {
+    // post() is the Discord helper and names Discord when nothing came back.
+    console.error('[thornswood] turnstile: Cloudflare did not answer the check (' +
+                  (e && e.discordSilent ? 'no answer in ten seconds' : (e && e.name) || 'error') + ')');
+    return 'unasked';
+  }
+  if (said && said.success === true && said.action === 'report') return 'yes';
+  // The error codes say why (timeout-or-duplicate, invalid-input-response);
+  // never the pass itself or the secret.
+  console.log('[thornswood] turnstile: a report was refused, Cloudflare said ' +
+              JSON.stringify((said && said['error-codes']) || []) +
+              (said && said.success === true ? ' with action ' + JSON.stringify(String(said.action || '')) : ''));
+  return 'no';
+}
+
 function reportRefusal(key, now, whose) {
   const from = whose || 'your connection';
   const HOUR = 60 * 60 * 1000, DAY = 24 * HOUR;
@@ -2457,9 +2521,9 @@ async function who(req, waitMs, staleOk) {
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
-    // "dev" is staff (access.dev: Owner, Dev, Gamemaster, Moderator,
-    // Loremaster), used by the gallery queue and reports. Not the Owner/Dev
-    // admin pair alone.
+    // "dev" is staff in the game (access.dev: Owner, Co-Owner, and the Dev,
+    // Gamemaster and Loremaster ranks with their leads, #3317), used by the
+    // gallery queue and reports. Not the admin pair alone.
     member: st.admin || isMember(req),
     admin: st.admin,
     dev: !!st.dev,
@@ -2581,8 +2645,25 @@ async function galleryStaff(url, w) {
    static.cloudflareinsights.com and posts what it measured to
    cloudflareinsights.com. With script-src 'self' alone every page raised a
    CSP error in the console and Cloudflare counted nothing. The privacy page
-   names it. It sets no cookie and keeps nothing on the visitor's machine. */
-const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
+   names it. It sets no cookie and keeps nothing on the visitor's machine.
+
+   The third is Cloudflare Turnstile on the report form (#3216, Patrick's
+   answer on 22 Oct 2026): its script and the frame it draws the check in
+   both come from challenges.cloudflare.com. The privacy page names it. */
+const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
+/* A NONCE ON EVERY ANSWER (#3216). Bot Fight Mode, on by Patrick's answer on
+   22 Oct 2026, turns on Cloudflare's JavaScript Detections, which cannot be
+   turned off on its own and writes a small inline script into every page
+   Cloudflare carries. script-src 'self' refuses any inline script, so every
+   page would raise a CSP error and the detection would never run. Cloudflare
+   reads a nonce out of this header and puts it on the script it writes in, so
+   each answer gets a fresh one (handle() makes it). The site's own pages
+   carry no inline script and never use it; a nonce is only good for the one
+   answer it came with, so it opens nothing to anybody else. */
+function cspFor(res) {
+  const n = res && res.cspNonce;
+  return n ? CSP_HEADER.replace("script-src 'self'", "script-src 'self' 'nonce-" + n + "'") : CSP_HEADER;
+}
 function send(res, code, payload, type, extra) {
   // Defense in depth (#1366 / #1474): conservative CSP (this page and the hub
   // name nothing on other sites, and CSS and JS are external same-origin
@@ -2596,7 +2677,7 @@ function send(res, code, payload, type, extra) {
     'Content-Type': type || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': CSP_HEADER,
+    'Content-Security-Policy': cspFor(res),
     'Referrer-Policy': 'strict-origin-when-cross-origin'
   }, extra || {}));
   res.end(payload);
@@ -2645,7 +2726,7 @@ function rangeReply(req, res, file, size, headers, head) {
       'accept-ranges': 'bytes',
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
-      'content-security-policy': CSP_HEADER,
+      'content-security-policy': cspFor(res),
       'referrer-policy': 'strict-origin-when-cross-origin'
     });
     res.end();
@@ -2660,7 +2741,7 @@ function rangeReply(req, res, file, size, headers, head) {
     'accept-ranges': 'bytes',
     'cache-control': headers['cache-control'] || 'no-store',
     'x-content-type-options': 'nosniff',
-    'content-security-policy': CSP_HEADER,
+    'content-security-policy': cspFor(res),
     'referrer-policy': 'strict-origin-when-cross-origin'
   }));
   if (head) { res.end(); return true; }
@@ -4972,7 +5053,7 @@ async function standing(discordId) {
      having a bad morning, so it cannot be gated behind a guild lookup that
      needs all three of those to be fine. */
   if (cfg.admins.indexOf(String(discordId)) >= 0) {
-    out.admin = true; out.play = true; out.inGuild = true; out.dev = true;
+    out.admin = true; out.play = true; out.inGuild = true; out.dev = true; out.devBuild = true;
     if (cfg.discord.botToken && cfg.discord.guildId) {
       const r = await memberOf(discordId);
       if (r.ok) {
@@ -4983,7 +5064,7 @@ async function standing(discordId) {
         out.roles = (me.roles || []).map((id) => names[id]).filter(Boolean);
         out.staffRole = holdsStaffRole(out.roles);
         out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
-        out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+        out.leads = leaderRoles(out.roles);
         out.devRole = holdsNamedRole(out.roles, 'Dev');
       } else if (r.status !== 404) {
         out.lookupFailed = r.why;
@@ -5022,10 +5103,11 @@ async function standing(discordId) {
   if (has(cfg.access.admin)) out.admin = true;
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
+  out.devBuild = out.admin || has(cfg.access.devBuild);
   out.company = has(cfg.access.company);
   out.staffRole = holdsStaffRole(out.roles);
   out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
-  out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+  out.leads = leaderRoles(out.roles);
   out.devRole = holdsNamedRole(out.roles, 'Dev');
   return out;
 }
@@ -5046,6 +5128,19 @@ function holdsStaffRole(roles) {
 function holdsNamedRole(roles, name) {
   const mine = Array.isArray(roles) ? roles : [];
   return mine.indexOf(name) >= 0;
+}
+
+/*
+  THE FACTION LEADER ROLES HELD (#3317). Every faction's Leader role is its
+  name and " Leader" (bot/Build-Discord.py FACTION_LEADERS), and a faction
+  that comes in through the application as Other gets one the same way, so
+  the site reads them by that shape rather than keeping a second list of the
+  factions. Whoever holds one owns that faction's book in the game (Patrick,
+  22 Oct, page card q-3317-faction-books, A).
+*/
+function leaderRoles(roles) {
+  const mine = Array.isArray(roles) ? roles : [];
+  return mine.filter((n) => typeof n === 'string' && /^[^\n]{1,96} Leader$/.test(n));
 }
 
 /*
@@ -5649,8 +5744,10 @@ process.on('uncaughtException', (e) => {
 
 async function handle(req, res) {
   // Apply before parsing the address, so streamed and malformed responses
-  // carry the same policy as ordinary pages.
-  res.setHeader('Content-Security-Policy', CSP_HEADER);
+  // carry the same policy as ordinary pages. The nonce is this answer's own
+  // (cspFor, #3216).
+  res.cspNonce = crypto.randomBytes(16).toString('base64');
+  res.setHeader('Content-Security-Policy', cspFor(res));
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -5808,6 +5905,31 @@ async function handle(req, res) {
   if (route === '/discord' && req.method === 'GET') {
     if (!cfg.discord.invite) return send(res, 404, 'No invite link set yet.', 'text/plain');
     return send(res, 302, '', 'text/plain', { Location: cfg.discord.invite });
+  }
+
+  // ------------------------------------------------------- security.txt
+  /* Where somebody who finds a hole in the site says so (RFC 9116, #3216,
+     Patrick's answer on 22 Oct 2026). The contact is the report page: open
+     to anybody without an account, read by staff and nobody else, and the
+     place staff already read every day, so a finding is never waiting in a
+     mailbox nobody opens.
+
+     Expires is written as the file is asked for, 180 days on, inside the
+     year RFC 9116 asks for. The file says what this site answers, and the
+     site answering is the proof somebody still keeps it: a date written by
+     hand into a file would run out by itself one day while the contact
+     still worked, and a check that a person has to remember to move is the
+     kind that gets forgotten. */
+  if (p === '/.well-known/security.txt' && req.method === 'GET') {
+    const until = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+    until.setUTCHours(0, 0, 0, 0);
+    return send(res, 200, [
+      'Contact: ' + PUBLIC_ORIGIN + '/report',
+      'Expires: ' + until.toISOString(),
+      'Preferred-Languages: en',
+      'Canonical: ' + PUBLIC_ORIGIN + '/.well-known/security.txt',
+      ''
+    ].join('\n'), 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=86400' });
   }
 
   // ----------------------------------------------------------- domain proof
@@ -6153,6 +6275,12 @@ async function handle(req, res) {
      how a bug turns into nobody bothering. Held to one short message at a
      time, five an hour from one place, and the inbox is capped so it cannot
      be used to fill the disk. See thornswood report limits above. */
+  // What the report page needs to draw the form: the Turnstile site key, or
+  // nothing when the check is off (#3216). Public, like the key itself.
+  if (route === '/api/report/form' && req.method === 'GET') {
+    return sendJson(res, 200, { turnstile: turnstileOn() ? cfg.turnstileSiteKey : '' });
+  }
+
   if (route === '/api/report' && req.method === 'POST') {
     const sender = reportFrom(req);
     const refuse = (no) => send(res, 429, JSON.stringify({ error: no.error }), null,
@@ -6170,6 +6298,18 @@ async function handle(req, res) {
     if (o && String(o.homepage || '').trim()) return sendJson(res, 200, { ok: true });
     const title = String(o.title || '').trim().slice(0, 200);
     if (!title) return sendJson(res, 400, { error: 'say what happened in the first box' });
+    // Turnstile's pass (#3216), asked before the limit is read again below,
+    // because it waits on Cloudflare and nothing may wait between that read
+    // and reportTaken. A refused pass is not counted against the sender.
+    if (turnstileOn()) {
+      const ts = await turnstilePasses(o.turnstile, requestAddr(req));
+      if (ts === 'unasked') {
+        return sendJson(res, 503, { error: 'Cloudflare did not answer the check that you are a person, so nothing was sent. Try again in a minute.' });
+      }
+      if (ts !== 'yes') {
+        return sendJson(res, 403, { error: 'The check that you are a person did not pass. Wait for the tick under the form, then send it again.' });
+      }
+    }
     // And asked again now the body is in, because the answer above is stale.
     // A script that opens thirty connections, sends every set of headers and
     // then every body gets all thirty past the first check before any of
@@ -7277,12 +7417,12 @@ async function handle(req, res) {
       notAcceptedYet(),
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
-    // access.dev (the staff roles by default, Patrick 27 Sep #605, unless
+    // access.devBuild (Owner, Co-Owner, Dev and the leads, #3317, unless
     // config.json says otherwise); anyone else is sent back to the main build
     // with a plain reason.
     const wantsDev = String(o.channel || '') === 'dev';
-    if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
-      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    if (wantsDev && !st.devBuild) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
+      'The dev build is for the ' + andList(cfg.access.devBuild) + ' roles. Play on the main build.' });
     /*
       The world is full (#481). Not a no any more: Patrick, 29 Sep, a full
       world lets people into the game's menu to wait in line. The yes below
@@ -7439,6 +7579,9 @@ async function handle(req, res) {
       avatar: st.avatar || '',
       admin: st.admin,
       dev: !!st.dev,
+      // Whether this account may install and play the dev build
+      // (access.devBuild, #3317). dev above is staff in the game.
+      devBuild: !!st.devBuild,
       roles: st.roles,
       slots: slotsFor(st),
       // Whether the profile id sent is now against this account. False when
@@ -7799,13 +7942,15 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], offices: {}, jarlClash: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], offices: {}, jarlClash: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionLeaderProfiles: {}, factionLeaderClash: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
     const seenStaffRole = new Set();
     const seenBusiness = new Set();
-    const seenFaction = new Set();
+    // Leader role -> account -> that account's profiles, so a Leader role two
+    // accounts hold can come off both below.
+    const leaderAccounts = new Map();
     const seenDevRole = new Set();
     const seenCompany = new Set();
     const seenFailed = new Set();
@@ -7840,7 +7985,7 @@ async function handle(req, res) {
         continue;
       }
       if (!st.play || st.banned) continue;
-      if (devDoor && !st.dev) continue;
+      if (devDoor && !st.devBuild) continue;
       for (const n of profiles) if (!seen.has(n)) { seen.add(n); out.profiles.push(n); }
       if (st.dev) {
         for (const n of profiles) if (!seenDev.has(n)) { seenDev.add(n); out.devProfiles.push(n); }
@@ -7859,8 +8004,9 @@ async function handle(req, res) {
       if (st.businessOwner) {
         for (const n of profiles) if (!seenBusiness.has(n)) { seenBusiness.add(n); out.businessOwnerProfiles.push(n); }
       }
-      if (st.factionOwner) {
-        for (const n of profiles) if (!seenFaction.has(n)) { seenFaction.add(n); out.factionOwnerProfiles.push(n); }
+      for (const role of (st.leads || [])) {
+        if (!leaderAccounts.has(role)) leaderAccounts.set(role, new Map());
+        leaderAccounts.get(role).set(String(d), profiles);
       }
       if (st.devRole) {
         for (const n of profiles) if (!seenDevRole.has(n)) { seenDevRole.add(n); out.devRoleProfiles.push(n); }
@@ -7876,6 +8022,15 @@ async function handle(req, res) {
        this and nothing else. And one Jarl a hold: a hold's Jarl role two
        accounts hold comes off both, and staff are told (officesForDoor). */
     out.jarlClash = await officesForDoor(out, answers, linked);
+    /* THE FACTION BOOKS (#3317): each faction's Leader role and the profiles
+       of the account that holds it. One Leader a faction, like one Jarl a
+       hold: a Leader role two accounts hold goes to neither, so the book
+       stays with nobody new until staff fix it, and the bot's faction panel
+       refuses both the same way (bot.py leader_held_twice). */
+    for (const [role, accounts] of leaderAccounts) {
+      if (accounts.size > 1) { out.factionLeaderClash.push(role); continue; }
+      for (const pl of accounts.values()) out.factionLeaderProfiles[role] = pl.slice();
+    }
     /* STAFF BANS (#412), which are this site's own file and need no Discord.
        Every profile under an active ban is left out of every list, including
        a profile no account holds and one Discord could not be asked about,
@@ -7898,6 +8053,7 @@ async function handle(req, res) {
       }
       if (Array.isArray(out.people)) out.people = [];
       out.offices = {};
+      out.factionLeaderProfiles = {};
     }
     const barred = new Set(out.pk);
     for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
@@ -7906,8 +8062,12 @@ async function handle(req, res) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
       for (const n of Object.keys(out.offices)) if (barred.has(Number(n))) delete out.offices[n];
-      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
+      for (const k of ['businessOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
+      }
+      for (const role of Object.keys(out.factionLeaderProfiles)) {
+        out.factionLeaderProfiles[role] = out.factionLeaderProfiles[role].filter((n) => !barred.has(Number(n)));
+        if (!out.factionLeaderProfiles[role].length) delete out.factionLeaderProfiles[role];
       }
       out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
         .filter((p) => p.profiles.length);
@@ -8075,8 +8235,8 @@ async function handle(req, res) {
       'That Discord account is not in the Thornswood Discord.' });
     if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', message:
       notAcceptedYet() });
-    if (server === 'dev' && !st.dev) return sendJson(res, 403, { ok: false, why: 'dev', message:
-      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    if (server === 'dev' && !st.devBuild) return sendJson(res, 403, { ok: false, why: 'dev', message:
+      'The dev build is for the ' + andList(cfg.access.devBuild) + ' roles. Play on the main build.' });
 
     const linked = jsonFile(LINKED, {});
     const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))

@@ -59,6 +59,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/Set-BuildRunners.ps1](deploy/Set-BuildRunners.ps1) | Makes the labels on GitHub's VPS runners match the runner records on main (records\<name>-runners.json): records\build-runners.json caps how many builds run on the box at once, records\sign-runners.json says which runner may sign a release launcher. |
 | [deploy/Set-DiscordLogin.ps1](deploy/Set-DiscordLogin.ps1) | Points the site at your Discord, which is what decides who gets in anywhere. |
 | [deploy/Set-DiscordOnboarding.ps1](deploy/Set-DiscordOnboarding.ps1) | Sets Discord's onboarding (Server Settings, Onboarding) with the bot, from bot\Build-Onboarding.py: the default channels, the questions and what each answer gives, every role and channel looked up by name on the server when it runs. |
+| [deploy/Set-Turnstile.ps1](deploy/Set-Turnstile.ps1) | Puts Cloudflare Turnstile's two keys for the report form into the site's config.json on the VPS and restarts the site, so /report draws the check and the site asks Cloudflare about every pass (#3216, Patrick's answer on 22 Oct 2026). |
 | [deploy/Setup-Discord.ps1](deploy/Setup-Discord.ps1) | Builds the Thornswood Discord: roles, categories, channels, permissions and the words in the read only channels, in one run. |
 | [deploy/Setup-Domain.ps1](deploy/Setup-Domain.ps1) | Puts thornswood.net in front of the docs site, with a real certificate. |
 | [deploy/SiteConfigSet.ps1](deploy/SiteConfigSet.ps1) | The one block that changes a single top-level setting in the site's config.json on the VPS and leaves every other setting as it was. |
@@ -163,6 +164,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Check-Records.ps1](release/Check-Records.ps1) | Holds the committed high-risk records to their shape and version, fail closed (#2180). |
 | [release/Check-ShipReady.ps1](release/Check-ShipReady.ps1) | Whether THIS machine can run a release, and what is missing if it cannot. |
 | [release/Clean-NewsRepeats.ps1](release/Clean-NewsRepeats.ps1) | Takes out of a channel's published notes every line an older note already said, so the News tab and the site list each change once. |
+| [release/Clear-News.ps1](release/Clear-News.ps1) | Takes every published note off a channel: the launcher's News tab, the site's News page for main, and the record of the channel's Discord posts. |
 | [release/Close-ShippedIssues.ps1](release/Close-ShippedIssues.ps1) | Closes the issues in Done whose fix a main Ship carries, each with the test task its pull request wrote, and says which it closed and which stay open. |
 | [release/Compare-NexusLayout.ps1](release/Compare-NexusLayout.ps1) | Says whether a collection revision's layout record (what Install-NexusRevision.ps1 writes) is the same as another layout record, or the same as what Vortex deployed into a game folder, file by file and plugin by plugin (#2969). |
 | [release/Dev-News.ps1](release/Dev-News.ps1) | Which notes on the dev feed are marked DEV, worked out from main's feed, and the one place that writes those marks and the dev feed's mainVersion. |
@@ -264,6 +266,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Restore-Box.ps1](vps/Restore-Box.ps1) | Puts a nightly backup back onto a new VPS, run from this machine. |
 | [vps/Restore-Server.ps1](vps/Restore-Server.ps1) | Puts a nightly backup's world back into a game server folder and checks the result would start: the load order resolves and the characters are there. |
 | [vps/Roll-Log.ps1](vps/Roll-Log.ps1) | Rolls a log just before the service that writes it starts. |
+| [vps/Seal.ps1](vps/Seal.ps1) | How a secret held by GitHub reaches the box without passing through any session, chat or log in a form anybody can read (#3216, Patrick's A of 22 Oct 2026). |
 | [vps/Send-Script.ps1](vps/Send-Script.ps1) | The one way a script here runs PowerShell on the VPS. |
 | [vps/Send-Secret.ps1](vps/Send-Secret.ps1) | How a secret goes to the VPS: on ssh's standard input, never on a command line. |
 | [vps/Set-SshScope.ps1](vps/Set-SshScope.ps1) | Limits which addresses may reach ssh on the VPS (port 22), after proving key login, refusing a list that leaves this machine out, and with a put back the box runs by itself if the new login fails. |

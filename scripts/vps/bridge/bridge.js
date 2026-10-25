@@ -136,7 +136,9 @@ server.on('upgrade', (req, socket, head) => {
       'Upgrade: websocket\r\n' +
       'Connection: Upgrade\r\n' +
       'Sec-WebSocket-Accept: ' + accept(req.headers['sec-websocket-key']) + '\r\n\r\n');
-    log('session ' + id + ' opened for ' + who + ' (' + open + ' open)');
+    // How long sshd took to take it, which is part of what connect.js
+    // counts as waiting for the answer to the upgrade (#3297).
+    log('session ' + id + ' opened for ' + who + ' (' + open + ' open), sshd took ' + (Date.now() - started) + ' ms');
     if (head && head.length) take(head);
   });
   ssh.on('error', (e) => finish('sshd: ' + e.message));

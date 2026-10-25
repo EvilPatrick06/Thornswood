@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  70,
-    "callCount":  282,
+    "scriptCount":  71,
+    "callCount":  286,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -899,6 +899,15 @@
                   },
                   {
                       "script":  "scripts/deploy/Install-Runner.ps1",
+                      "scope":  "Get-PublishedLists",
+                      "via":  "Remote",
+                      "anchor":  "$said = @(Remote ($listLib",
+                      "does":  "reads GitHub\u0027s address lists, Microsoft\u0027s Service Tags and the signing hosts\u0027 addresses on the box, for the runner firewall rules (#3312)",
+                      "class":  "read-status",
+                      "reason":  "fetches published lists and resolves names; writes nothing"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Runner.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "Head (\u0027Outbound rules for \u0027 + $Account + \u0027 on \u0027 + $where)",
@@ -965,7 +974,7 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "$need = Remote @\"",
-                      "does":  "checks pwsh, node, python and git are installed",
+                      "does":  "checks pwsh, node, python, git, MSBuild, the 4.8.1 references and WPF are installed, and on a signing runner signtool and a .NET runtime of 8 or later",
                       "class":  "read-status",
                       "reason":  "read only"
                   },
@@ -1175,6 +1184,33 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends ThornswoodSecret"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodSecretRemote",
+                      "anchor":  "Invoke-ThornswoodSecretRemote -Target \"$User@$Vps\" -SshArgs $ssh -Secret $secret -Script (@\"",
+                      "does":  "writes the report form's Turnstile keys into config.json and restarts the site",
+                      "class":  "admin",
+                      "reason":  "writes a secret; no gate verb covers secrets"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "(Get-ThornswoodSealKeyBlock)",
+                      "does":  "makes the box's seal key in C:\\Thornswood-Seal if it has none, locks the folder, prints the public half",
+                      "class":  "admin",
+                      "reason":  "writes a private key and an ACL outside every gate verb"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$(Get-ThornswoodUnsealBlock)",
+                      "does":  "opens the sealed Turnstile token with the box's key, reads the widget's secret from Cloudflare, writes both keys into config.json and restarts the site",
+                      "class":  "admin",
+                      "reason":  "reads a private key and writes a secret; no gate verb covers secrets"
                   },
                   {
                       "script":  "scripts/deploy/Setup-Domain.ps1",
