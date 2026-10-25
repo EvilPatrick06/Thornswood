@@ -1827,13 +1827,12 @@ function serverRunId() {
   marker rather than the NPC population's table, because that table is empty
   for the few seconds after a gamemode reload until discovery runs, and a
   temporary spawn that died then would otherwise stand up again. Any run, not
-  only this one: a temporary spawn is removed whenever it dies. The plain
-  true from before #2623 counts, since nobody chose to keep it.
+  only this one: a temporary spawn is removed whenever it dies. Only the
+  marker as it is written now, { run, keep }, is read (#3265).
 */
 function isTemporarySpawn(actorId) {
   let marker = null;
   try { marker = mp.get(actorId, 'thornswoodNpcCommanded'); } catch (e) { return false; }
-  if (marker === true) return true;
   return !!marker && typeof marker === 'object' && marker.keep !== true && typeof marker.run === 'string';
 }
 
@@ -33739,9 +33738,9 @@ log('gamemode loaded:',
       spells     { points: 2, known: [...] }    a mage's spell points and spells
       staffSpells ['12fcd:Skyrim.esm', ...]     the staff spells unlocked, by the
                  spell's form id desc: what a staff may bind (#967, #1128)
-      staffPoints 2                             an Enchanter's staff spell points.
-                 Missing on an Enchanter from before #1128: staffPoints()
-                 reads it as what their Bladebinder rank has given them.
+      staffPoints 2                             an Enchanter's staff spell points,
+                 written when they become one; a record without it holds
+                 none (#3265).
       tree       { vitality: 3, ... }           points spent per sub-skill
       points     4                              unspent tree points
       work       { miner: 7, charburner: 2 }    yields handed out since the
@@ -34138,8 +34137,7 @@ log('gamemode loaded:',
     }
 
     var next = RANKS[rankIndex(cur) + 1];
-    // Read before the rank moves: an Enchanter from before #1128 has no stored
-    // staff points, and what they hold is what the rank below gave them.
+    // What the Enchanter holds before the rank moves.
     var staffWas = (s.prof === 'enchanter' && half === STAFF_HALF) ? staffPoints(s) : null;
     s.ranks[half] = next;
 
@@ -34807,28 +34805,17 @@ log('gamemode loaded:',
 
   function knowsStaff(state, desc) { return staffKnown(state).indexOf(desc) !== -1; }
 
-  /** Staff spell points an Enchanter has been given by reaching this Bladebinder rank. */
-  function staffEarned(rank) {
-    var n = LIMITS.enchanterStartStaff;
-    var at = rankIndex(rank || 'novice');
-    for (var i = 1; i <= at; i++) {
-      n += RANKS[i] === 'master' ? LIMITS.enchanterMasterStaff : 1;
-    }
-    return n;
-  }
-
   /**
     Staff spell points to spend right now. An Enchanter's are stored, like a
-    mage's; one from before #1128 has none stored and holds what their rank
-    has given them, with the staves they already learned from tomes kept for
-    nothing. Somebody a Master Enchanter taught has the places left under
-    the non-mage cap. Anybody else has none.
+    mage's, from the day they become one; a record with none stored holds
+    none, and is not read as what the rank has given (#3265). Somebody a
+    Master Enchanter taught has the places left under the non-mage cap.
+    Anybody else has none.
   */
   function staffPoints(state) {
     var s = state || fresh();
     if (isEnchanter(s)) {
-      if (typeof s.staffPoints === 'number') { return s.staffPoints; }
-      return staffEarned(rankOf(s, STAFF_HALF));
+      return typeof s.staffPoints === 'number' ? s.staffPoints : 0;
     }
     if (!staffTaught(s)) { return 0; }
     return Math.max(0, LIMITS.outsiderSpells - staffKnown(s).length);
@@ -41815,11 +41802,10 @@ module.exports = {
     NO GOLD MOVES FOR A NIGHT. It is paid in a trade between two people, and
     the server keeps no price. The book is beds.json beside the register
     rather than a field on a claim, so the register's own reader and writer
-    are untouched. #1392's book held prices, paid nights and gold kept for a
-    holder who was away. The prices are gone. A night already paid is carried
-    over as a guest of whoever held the building, to the end of that night.
-    Kept gold is handed to its holder once, the next time they are in the
-    world, and leaves the book then. Nothing adds to it any more.
+    are untouched. The book is guests and takings and nothing else: the
+    prices and paid nights #1392's book held are not read (#3265). Kept gold
+    is handed to its holder once, the next time they are in the world, and
+    leaves the book then. Nothing adds to it any more.
   */
   // INVENTED: far enough to stand beside a double bed and press it, near
   // enough that the next room's bed is not this one.
@@ -41958,7 +41944,6 @@ module.exports = {
     catch (e) { return out; }
     if (!raw || typeof raw !== 'object') { return out; }
     var now = Date.now();
-    var carried = 0;
     function add(b, who, by, at, name) {
       if (!b || b === '__proto__' || who === '__proto__') { return false; }
       if (!((Number(who) || 0) > 0) || !(by > 0) || !(at > 0) || (now - at) >= NIGHT_MS) { return false; }
@@ -41976,16 +41961,6 @@ module.exports = {
         add(b, who, Number(gst.by) || 0, Number(gst.at) || 0, gst.name);
       }
     }
-    // #1392's paid nights, to their end, as guests of whoever held the building.
-    var nights = (raw.nights && typeof raw.nights === 'object') ? raw.nights : {};
-    for (var nb in nights) {
-      if (!bedHas(nights, nb) || !nights[nb] || typeof nights[nb] !== 'object' ||
-          !bedHas(claims, nb)) { continue; }
-      for (var nw in nights[nb]) {
-        if (bedHas(nights[nb], nw) &&
-            add(nb, nw, Number(claims[nb].by) || 0, Number(nights[nb][nw]) || 0, '')) { carried++; }
-      }
-    }
     var takings = (raw.takings && typeof raw.takings === 'object') ? raw.takings : {};
     for (var tp in takings) {
       if (!bedHas(takings, tp) || tp === '__proto__') { continue; }
@@ -41993,11 +41968,6 @@ module.exports = {
       if ((Number(tp) || 0) > 0 && gold > 0 && Math.floor(gold) === gold) {
         out.takings[tp] = gold;
       }
-    }
-    if (raw.prices || raw.nights) {
-      plog('the bed book from before #1603: night prices dropped,', carried,
-           'paid nights carried over as guests, kept gold waits for its holders');
-      out.old = true;
     }
     return out;
   }
@@ -42035,8 +42005,6 @@ module.exports = {
   }
 
   var bedBook = loadBedBook();
-  // The old shape is written over once, so the file says what the server does.
-  if (bedBook.old) { delete bedBook.old; saveBedBook(); }
 
   // ------------------------------------------------------------ the beds --
 

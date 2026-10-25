@@ -20,8 +20,8 @@
 //   A. every staff spell carries the rank the build read, and the rulebook's
 //      own rank wins for a spell it lists
 //   B. staff spell points are earned: two to start, one per Bladebinder rank,
-//      two at Master, and a character from before #1128 is given what their
-//      rank earned
+//      two at Master, and a record with none stored holds none, not what its
+//      rank would have given (#3265)
 //   C. unlocking spends one, needs no tome, and puts the spell on the character
 //   D. the Bladebinder rank caps the unlock at every rank
 //   E. a staff spell of the rank below is needed, Novice exempt, and a refusal
@@ -244,8 +244,8 @@ const L = P.TABLE.limits;
 
   const old = { cls: 'miner', prof: 'enchanter', half: 'bladebinder', schools: [], taught: [],
                 ranks: { bladebinder: 'expert', wardweaver: 'novice' }, tree: {}, points: 0, work: {}, placed: {} };
-  yes('an Enchanter from before #1128, at Expert, holds what the rank earned: 4', P.staffPoints(old) === 4);
-  yes('  and the next rank adds to that: 6 at Master', P.staffPoints(P.rankUp(old, 'bladebinder', null).state) === 6);
+  yes('an Enchanter record with no staff points stored holds none, not what an Expert would have earned (#3265)', P.staffPoints(old) === 0);
+  yes('  and the next rank adds only its own: 2 at Master', P.staffPoints(P.rankUp(old, 'bladebinder', null).state) === 2);
 }
 
 // ------------------------------------------ C, D, E. unlocking by the rules --
@@ -354,9 +354,9 @@ const E1 = 0xff000111;
   const OLD = 0xff000131;
   srv.C.writeState(OLD, { cls: 'miner', prof: 'enchanter', half: 'bladebinder', schools: [], taught: [],
     ranks: { bladebinder: 'master', wardweaver: 'novice' }, tree: {}, points: 0, work: {}, placed: {},
-    staffSpells: [SPARKS], v: 1 });
+    staffSpells: [SPARKS], staffPoints: 6, v: 1 });
   yes('OLD RECORD: a staff spell learned from a tome before #1128 still opens its staff', !srv.craft(OLD, sparksRow).refusal);
-  yes('  and that Master Enchanter holds the points the rank earned (6) with the old spell kept for nothing',
+  yes('  and that Master Enchanter holds the points stored (6), with the spell from the tome kept for nothing',
       P.staffPoints(srv.C.stateOf(OLD)) === 6);
   srv.granted.length = 0;
   srv.C.grantKnown(OLD);

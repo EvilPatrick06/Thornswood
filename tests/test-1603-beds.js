@@ -226,17 +226,19 @@ fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({ cl
   [HOME]: { by: ALICE.pid, name: 'Alice', at: clock.t, touched: clock.t }
 } }));
 /*
-  THE BOOK #1392 LEFT. A price, Eve's night paid an hour ago at the inn, a
-  night at Dragonsreach (nobody holds it), a night long over, and 20 gold
-  kept for Hulda while she was away. Read by the first boot below.
+  THE BOOK. Eve a guest at the inn an hour ago, of its holder Hulda, and 20
+  gold kept for Hulda while she was away. And the prices and paid nights
+  #1392's book held, which are not read (#3265): Carol's night there would
+  have made her a guest. Read by the first boot below.
 */
 const BOOK = path.join(dir, 'private', 'beds.json');
-fs.writeFileSync(BOOK, JSON.stringify({
+const BOOK_TEXT = JSON.stringify({
+  guests: { [INN]: { [EVE.pid]: { by: HULDA.pid, at: clock.t - HOUR, name: '' } } },
+  takings: { [HULDA.pid]: 20 },
   prices: { [INN]: { by: HULDA.pid, price: 20 } },
-  nights: { [INN]: { [EVE.pid]: clock.t - HOUR, [ALICE.pid]: clock.t - 9 * HOUR },
-            [HALL]: { [BOB.pid]: clock.t - HOUR } },
-  takings: { [HULDA.pid]: 20 }
-}));
+  nights: { [INN]: { [CAROL.pid]: clock.t - HOUR } }
+});
+fs.writeFileSync(BOOK, BOOK_TEXT);
 
 let refs = world();
 let online = PEOPLE.map(function (p) { return p.a; });
@@ -357,18 +359,16 @@ function lastTold(p) {
 function fireAt(p, away) { needs.place(p.a, '', '-', '0', '1', '0', away === null ? '-' : String(away)); }
 function up(p) { return rest(p, 'up'); }
 
-// ------------------------------------------------------- the old book --
+// ----------------------------------------------------------- the book --
 
 {
-  const file = JSON.parse(fs.readFileSync(BOOK, 'utf8'));
-  yes('O1 the book #1392 left is written over once in the new shape: no prices, no nights',
-      !file.prices && !file.nights && !!file.guests && !!file.takings);
-  yes('O1 Eve\'s paid night at the inn is carried over as a guest of its holder, to the same end',
-      !!file.guests[INN] && file.guests[INN][EVE.pid] && file.guests[INN][EVE.pid].by === HULDA.pid &&
-      file.guests[INN][EVE.pid].at === clock.t - HOUR);
-  yes('O1 a night that was already over is not carried', !file.guests[INN][ALICE.pid]);
-  yes('O1 a night in a building nobody holds is not carried', !file.guests[HALL]);
-  yes('O1 the gold kept for Hulda is still kept, for her', file.takings[HULDA.pid] === 20);
+  const book = first.book();
+  yes('O1 the book is read as written: Eve is a guest of Hulda at the inn, to the same end',
+      !!book.guests[INN] && !!book.guests[INN][EVE.pid] && book.guests[INN][EVE.pid].by === HULDA.pid &&
+      book.guests[INN][EVE.pid].at === clock.t - HOUR);
+  yes('O1 the gold kept for Hulda is still kept, for her', book.takings[HULDA.pid] === 20);
+  yes('O1 a paid night of #1392\'s book is not read: Carol is no guest (#3265)', !book.guests[INN][CAROL.pid]);
+  yes('O1 and the book is not written over as it is read', fs.readFileSync(BOOK, 'utf8') === BOOK_TEXT);
 }
 
 // --------------------------------------------------------- the ladder --
