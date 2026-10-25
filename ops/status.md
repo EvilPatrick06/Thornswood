@@ -2,9 +2,9 @@
 
 What is true now. Rewritten in place by whoever changes it; history is in git.
 
-Last rewritten 22 Oct 2026, 2:05 PM (Patrick's time) by the Cloud Desk, after
-the afternoon's runs (#3337, #3350, the #3336 wipe, #3317, #3107, #3312).
-Before that, 10:45 AM by the Cloud Desk, and 9:55 AM by the Local Desk on One,
+Last rewritten 25 Oct 2026, 5:20 PM (Patrick's time) by the Cloud Desk, after
+the #3312 proof Ship (dev 1.2.6.10). Before that, 22 Oct 2:05 PM by the Cloud
+Desk (#3337, #3350, the #3336 wipe, #3317, #3107, #3312), 10:45 AM by the Cloud Desk, and 9:55 AM by the Local Desk on One,
 which folded in what was still true from the vault's `wiki/status.md` and
 moved the run notes here.
 
@@ -13,7 +13,7 @@ moved the run notes here.
 | Channel | Launcher | Release | Built from | Engine | Game / resources / voice |
 |---------|----------|---------|------------|--------|--------------------------|
 | Main | 1.2.5 | 20261017-205912 | 24572604 (tag release/main/20261017-205912) | 3bdf3d3c | 7777 / 3000 / 7778 |
-| Dev | 1.2.6.7 | 20261022-194609-dev | 23ece55d (tag release/dev/20261022-194609-dev) | 7ae58fea | 7787 / 7788 / 7789 |
+| Dev | 1.2.6.10 | 20261025-230853-dev | 7fb962e0 (tag release/dev/20261025-230853-dev) | 7ae58fea | 7787 / 7788 / 7789 |
 
 - **Dev server:** engine 7ae58fea (#3333's storage fix, fork #109 and #107)
   since Publish-Server -FromStore -ServerBuild (CI's server zip of the pin,
@@ -58,8 +58,9 @@ moved the run notes here.
   (#3312). Labels follow `records/*-runners.json` on main through the box's
   GitHub App `thornswood-box-admin` (5431512, made 1:30 PM 22 Oct, #3107),
   which any session, the cloud included, asks with Set-BuildRunners.ps1.
-  Runner 3's network guard still refuses the signing hosts (`api.nuget.org`
-  first), so release.yml's box fallback cannot sign yet (#3312). Each runner account has its 6 outbound block rules
+  Runner 3 signs release.yml's launcher when GitHub has no minutes: it did
+  so for dev 1.2.6.10 at 5:09 PM on 25 Oct (release.yml run 40243262316,
+  #3312). Each runner account has its 6 outbound block rules
   (#2161, read 10:10 AM 22 Oct). The `Thornswood Gate Trace` task runs for
   runners 1 and 2 since 9:22 AM on 22 Oct, and its map is live: a pull
   request's gate takes about 2 minutes (#3114, closed).
@@ -113,11 +114,11 @@ moved the run notes here.
 - **#2183:** the availability baseline runs 22 Oct to 19 Nov 2026
   (docs/SERVICE-OBJECTIVES.md). Watch-Outside -Install for the off-box check
   needs One.
-- **A launcher change** still needs a Ship from One. From the cloud, -FromFeed
-  asks release.yml for a signed launcher (#3318). With no hosted minutes until
-  about 1 Nov, that falls back to runner 3, which cannot fetch the signing
-  client yet (#3312). -ModsOnly keeps the feed's launcher, and main has a
-  launcher change waiting since acc0715f.
+- **A launcher change** ships from the cloud: `Ship.ps1 -FromFeed` asks
+  release.yml for a signed launcher (#3318), and with no hosted minutes until
+  about 1 Nov runner 3 builds and signs it. The first, dev 1.2.6.10
+  (20261025-230853-dev, 5:08 PM 25 Oct, #3312), carries main's launcher
+  change waiting since acc0715f; main still has 1.2.5.
 - **#2578:** at the next main release, after the live Publish-Server,
   `claude-queue/2578-prod-parity.md`.
 - **Checks that need a game client** (nobody here starts the launcher or the

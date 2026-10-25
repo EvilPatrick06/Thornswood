@@ -335,7 +335,8 @@ carry a new launcher with no One in the chain:
   runner account's profile). It runs on runner 3 only; runner 3 needs the
   label (`pwsh scripts/deploy/Set-BuildRunners.ps1`, #3107), the
   Windows SDK's signtool, and its outbound rules to let the signing hosts
-  through (`ops\claude-queue\3312-sign-runner.md`).
+  through (`Install-Runner.ps1 -NetworkOnly -Number 3`, from
+  `records/sign-runners.json`; #3312).
 - The `verify` job runs after whichever job signed, on a build runner, so
   it is never the runner that signed.
 - A `v<a.b.c.d>` tag is a dev number: release.yml writes it into
