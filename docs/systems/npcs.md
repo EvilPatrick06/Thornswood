@@ -53,7 +53,7 @@ first stood up, once, and not again. Supply rewards debit this purse.
 Scene rewards create the amount named on the quest, subject to its
 cooldown. See [Gold](gold.md). Each hold has one recorded guild site. A later walk can move it.
 Traders are not relocated by that record. See [Merchant's Guild](merchants-guild.md).
-The60 guild traders, one of each of the six roles in every hold, are listed by role, hold, place and reference in
+The 60 guild traders, one of each of the six roles in every hold, are listed by role, hold, place and reference in
 [Merchant trader counts](merchant-traders.md).
 
 Carriage and ferry drivers stay at stops outside city walls. They are
