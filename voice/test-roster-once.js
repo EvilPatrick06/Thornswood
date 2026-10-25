@@ -15,11 +15,11 @@
 // measures on the wire:
 //
 //   PEOPLE sockets that are already open send their joins together; every one
-//   is welcomed, then sent a roster naming all of them, and no socket is sent
-//   anywhere near one roster per arrival (the first in used to get PEOPLE);
+//   is welcomed, then sent one roster naming all of them, not one per
+//   arrival (the first in used to get PEOPLE);
 //   the welcome still comes before the first roster on every socket;
-//   half of them close together, and the rest are sent a roster without them,
-//   again not one per departure;
+//   half of them close together, and the rest are sent one roster without
+//   them, again not one per departure;
 //   one person joining alone afterwards is still one roster to each socket,
 //   straight away, as before.
 //
@@ -34,8 +34,7 @@
 // and answered it with a roster, as it should. Sharing one event loop, the
 // service cannot read anything until the loop that sends the joins, or closes
 // the sockets, has finished, so every one of them is waiting when it next
-// reads, however slowly that loop ran. So the bound below is the one a real
-// burst gets: one roster per turn that handled some of it.
+// reads, however slowly that loop ran, and it handles them in one turn.
 //
 // VOICE_SERVER=<path> runs it against another copy (the one before #2332
 // fails the counts). Read only. Nothing outside the temp folder is touched.
@@ -48,11 +47,11 @@ const path = require('path');
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
 const PEOPLE = 60;
 // The most rosters any one socket may be sent while PEOPLE joins (or half
-// that many leaves) arrive together. One per turn of the event loop that
-// handled some of them; a quarter of PEOPLE leaves room for a busy build
-// runner splitting the arrivals across turns, and is still far under the
-// PEOPLE the first socket was sent before.
-const MOST_ROSTERS = Math.floor(PEOPLE / 4);
+// that many leaves) arrive together: one, since the service reads them all
+// in one turn (above). It was a quarter of PEOPLE while the service ran in a
+// child, as room for a busy runner splitting them across turns, and the 25
+// Oct nightly needed twice that.
+const MOST_ROSTERS = 1;
 const BOUND_MS = 20000;
 
 let pass = 0, fail = 0;
@@ -209,7 +208,7 @@ const names = (list, peers) => !!list && peers.every((id) => list.some((row) => 
   const total = counts.reduce((a, b) => a + b, 0);
   console.log('      rosters per socket for ' + PEOPLE + ' joins together: most ' + most + ', all sockets ' + total +
               ' (one per arrival would be ' + PEOPLE + ' to the first in and ' + (PEOPLE * (PEOPLE + 1) / 2) + ' in all)');
-  yes('no socket is sent more than ' + MOST_ROSTERS + ' rosters for ' + PEOPLE + ' joins that arrive together',
+  yes('no socket is sent more than one roster for ' + PEOPLE + ' joins that arrive together',
       most <= MOST_ROSTERS, 'most ' + most + ', counts ' + counts.join(','));
   yes('every socket is welcomed before it is sent its first roster',
       pages.every((p) => { const w = p.got.findIndex((m) => m.t === 'welcome'); const r = p.got.findIndex((m) => m.t === 'peers');
@@ -230,7 +229,7 @@ const names = (list, peers) => !!list && peers.every((id) => list.some((row) => 
   await sleep(300);
   const leaveMost = Math.max.apply(null, staying.map((p, i) => rosters(p).length - before[i]));
   console.log('      rosters per remaining socket for ' + going.length + ' leaving together: most ' + leaveMost);
-  yes('and not one per departure (at most ' + MOST_ROSTERS + ' for ' + going.length + ')', leaveMost <= MOST_ROSTERS,
+  yes('and one roster, not one per departure', leaveMost <= MOST_ROSTERS,
       'most ' + leaveMost);
 
   // --------------------------------------------------- one alone, as ever
