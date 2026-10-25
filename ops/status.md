@@ -41,7 +41,15 @@ moved the run notes here.
   site, held for #3137. Cloudflare fronts ports 80 and 443, which take only
   Cloudflare's addresses (#2995). thornswood.net has a DMARC record at
   p=none reporting to Cloudflare's DMARC Management, set 11:17 AM 22 Oct
-  through the connector (#3216).
+  through the connector (#3216). Cloudflare (#3216): two-factor is required
+  for every account member; the box's address has an IP Access allow rule;
+  AI Labyrinth and JavaScript Detections are on; Bot Fight Mode is OFF since
+  5:04 PM 25 Oct (Patrick), because the free plan's version takes no
+  exceptions and challenged the GitHub runner's launcher check, stopping
+  every Ship (#3312). The free managed WAF rules still block the WordPress
+  probes. The report form has Turnstile on (keys set by
+  `Set-Turnstile.ps1 -FromCloudflare` on 25 Oct, sealed to the box's key in
+  C:\Thornswood-Seal), and the site serves security.txt.
 
 ## The box
 
@@ -80,13 +88,6 @@ moved the run notes here.
 
 ## Waiting
 
-- **#3216:** PR #3332 (security.txt, Turnstile on the report form, the CSP
-  nonce Bot Fight Mode needs), then Deploy-Docs -Site. Bot Fight Mode, AI
-  Labyrinth, the Turnstile widget (then Set-Turnstile.ps1) and requiring
-  two-factor wait on Patrick's page to-do: two-factor on his own Cloudflare
-  login and five more connector scopes. The box's address gets an IP Access
-  allow rule before Bot Fight Mode goes on, so the game door, bot and voice,
-  which ask https://thornswood.net from the box, are never challenged.
 - **Harden-VPS for #3213** (Patrick's standing rule lets the Desk run it),
   before 6:08 AM on 23 Oct.
 - **Discord** (#3317, 22 Oct): every channel was cleared for the clean start
