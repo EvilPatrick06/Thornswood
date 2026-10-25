@@ -10,18 +10,31 @@
 // took 20 s to get back in and 400 never did. Now the joins and leaves one
 // turn of the event loop handles share one roster (sendRoster).
 //
-// This runs voice/voice-server.js in a temp folder on a port the system hands
-// out, as the other harnesses do, with real join tokens from a stand-in site
-// that says yes, and measures on the wire:
+// This runs voice/voice-server.js from a temp folder on a port the system
+// hands out, with real join tokens from a stand-in site that says yes, and
+// measures on the wire:
 //
 //   PEOPLE sockets that are already open send their joins together; every one
-//   is welcomed, then sent a roster naming all of them, and no socket is sent
-//   anywhere near one roster per arrival (the first in used to get PEOPLE);
+//   is welcomed, then sent one roster naming all of them, not one per
+//   arrival (the first in used to get PEOPLE);
 //   the welcome still comes before the first roster on every socket;
-//   half of them close together, and the rest are sent a roster without them,
-//   again not one per departure;
+//   half of them close together, and the rest are sent one roster without
+//   them, again not one per departure;
 //   one person joining alone afterwards is still one roster to each socket,
 //   straight away, as before.
+//
+// The service runs in this harness's own process, not a child of it as in the
+// other voice harnesses, because "together" has to be true for the counts to
+// mean anything. In a child it was not: the 25 Oct nightly failed with 30
+// rosters for 30 leaves, and timing each close and each roster on the runner
+// (harnesses.yml run 40210097962) showed why. The loop closing the 30 sockets
+// took 35 ms that round instead of the usual 0.5 ms, because the busy runner
+// took the CPU from this process between closes, and the service, running
+// freely in its own process meanwhile, read each close in a turn of its own
+// and answered it with a roster, as it should. Sharing one event loop, the
+// service cannot read anything until the loop that sends the joins, or closes
+// the sockets, has finished, so every one of them is waiting when it next
+// reads, however slowly that loop ran, and it handles them in one turn.
 //
 // VOICE_SERVER=<path> runs it against another copy (the one before #2332
 // fails the counts). Read only. Nothing outside the temp folder is touched.
@@ -30,16 +43,15 @@ const os = require('os');
 const net = require('net');
 const http = require('http');
 const path = require('path');
-const { spawn } = require('child_process');
 
 const SERVER = process.env.VOICE_SERVER || path.join(__dirname, 'voice-server.js');
 const PEOPLE = 60;
 // The most rosters any one socket may be sent while PEOPLE joins (or half
-// that many leaves) arrive together. One per turn of the event loop that
-// handled some of them; a quarter of PEOPLE leaves room for a busy build
-// runner splitting the arrivals across turns, and is still far under the
-// PEOPLE the first socket was sent before.
-const MOST_ROSTERS = Math.floor(PEOPLE / 4);
+// that many leaves) arrive together: one, since the service reads them all
+// in one turn (above). It was a quarter of PEOPLE while the service ran in a
+// child, as room for a busy runner splitting them across turns, and the 25
+// Oct nightly needed twice that.
+const MOST_ROSTERS = 1;
 const BOUND_MS = 20000;
 
 let pass = 0, fail = 0;
@@ -79,51 +91,52 @@ function freePort() {
 }
 
 let svc = null;
+/* Starts the service in this process, from a temp folder holding a copy of
+   it, and waits for its own "listening on ...:port" line, as
+   voice/test-most.js does. Its log lines, which all start "[voice]", are kept
+   in svc.log instead of printed, as they were from the child before. */
 async function service(site) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-roster-'));
   fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
   fs.copyFileSync(path.join(__dirname, 'headlines.js'), path.join(dir, 'headlines.js'));
   const port = await freePort();
-  const env = Object.assign({}, process.env, {
+  Object.assign(process.env, {
     THORNSWOOD_VOICE_PORT: String(port), THORNSWOOD_VOICE_BIND: '127.0.0.1', THORNSWOOD_SITE: site,
     THORNSWOOD_CHAT_DIR: path.join(dir, 'chat')
   });
-  delete env.THORNSWOOD_VOICE_MOST;
-  const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir, env: env });
-  svc = { dir: dir, port: port, proc: srv, log: '' };
-  srv.stdout.on('data', (d) => { svc.log += d; });
-  srv.stderr.on('data', (d) => { svc.log += d; });
-  await listening(srv, port);
+  delete process.env.THORNSWOOD_VOICE_MOST;
+  svc = { dir: dir, port: port, log: '' };
+  let up = null;
+  const heard = new Promise((ok) => { up = ok; });
+  const keep = (to) => function () {
+    const line = Array.prototype.join.call(arguments, ' ');
+    if (!/^\[voice\]/.test(line)) { to.apply(console, arguments); return; }
+    svc.log += line + '\n';
+    const m = /^\[voice\] listening on \S+:(\d+)/.exec(line);
+    if (m && Number(m[1]) === port) up();
+  };
+  console.log = keep(console.log);
+  console.error = keep(console.error);
+  console.warn = keep(console.warn);
+  // A port taken between freePort and the service's listen is an 'error' on
+  // its server with nothing listening for it, so it comes here.
+  let stopped = null;
+  const failed = new Promise((ok, bad) => { stopped = bad; });
+  const why = (err) => stopped(new Error((err && err.code === 'EADDRINUSE' ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped before it was listening: ' + (err && err.stack || err) +
+                                         '\nIt printed:\n' + svc.log));
+  process.once('uncaughtException', why);
+  let late = null;
+  const slow = new Promise((ok, bad) => { late = setTimeout(() => bad(new Error('the voice service did not say it was listening on ' + port +
+                                                                              ' within fifteen seconds. It printed:\n' + svc.log)), 15000); });
+  try {
+    require(path.join(dir, 'voice-server.js'));
+    await Promise.race([heard, failed, slow]);
+  } finally {
+    clearTimeout(late);
+    process.removeListener('uncaughtException', why);
+  }
   return svc;
-}
-
-/* Waits for srv's own "listening on ...:port" line, as voice/test-most.js
-   does. If it stops first, something took the port or it could not start,
-   and the error says which, with what it printed. */
-function listening(srv, port) {
-  return new Promise((ok, bad) => {
-    let out = '';
-    const said = (d) => {
-      out += d;
-      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
-      if (m && Number(m[1]) === port) { end(null); }
-    };
-    const more = (d) => { out += d; };
-    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
-                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
-    const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
-                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
-    function end(err) {
-      clearTimeout(late);
-      srv.stdout.removeListener('data', said);
-      srv.stderr.removeListener('data', more);
-      srv.removeListener('exit', gone);
-      if (err) { bad(err); } else { ok(); }
-    }
-    srv.stdout.on('data', said);
-    srv.stderr.on('data', more);
-    srv.on('exit', gone);
-  });
 }
 
 function token(port, pid) {
@@ -195,7 +208,7 @@ const names = (list, peers) => !!list && peers.every((id) => list.some((row) => 
   const total = counts.reduce((a, b) => a + b, 0);
   console.log('      rosters per socket for ' + PEOPLE + ' joins together: most ' + most + ', all sockets ' + total +
               ' (one per arrival would be ' + PEOPLE + ' to the first in and ' + (PEOPLE * (PEOPLE + 1) / 2) + ' in all)');
-  yes('no socket is sent more than ' + MOST_ROSTERS + ' rosters for ' + PEOPLE + ' joins that arrive together',
+  yes('no socket is sent more than one roster for ' + PEOPLE + ' joins that arrive together',
       most <= MOST_ROSTERS, 'most ' + most + ', counts ' + counts.join(','));
   yes('every socket is welcomed before it is sent its first roster',
       pages.every((p) => { const w = p.got.findIndex((m) => m.t === 'welcome'); const r = p.got.findIndex((m) => m.t === 'peers');
@@ -216,7 +229,7 @@ const names = (list, peers) => !!list && peers.every((id) => list.some((row) => 
   await sleep(300);
   const leaveMost = Math.max.apply(null, staying.map((p, i) => rosters(p).length - before[i]));
   console.log('      rosters per remaining socket for ' + going.length + ' leaving together: most ' + leaveMost);
-  yes('and not one per departure (at most ' + MOST_ROSTERS + ' for ' + going.length + ')', leaveMost <= MOST_ROSTERS,
+  yes('and one roster, not one per departure', leaveMost <= MOST_ROSTERS,
       'most ' + leaveMost);
 
   // --------------------------------------------------- one alone, as ever
@@ -240,14 +253,10 @@ const names = (list, peers) => !!list && peers.every((id) => list.some((row) => 
 
 function finish() {
   for (const ws of opened) { try { ws.close(); } catch (e) { } }
-  if (svc) {
-    const dir = svc.dir;
-    const rm = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { } };
-    svc.proc.once('exit', rm);
-    try { svc.proc.kill(); } catch (e) { }
-    setTimeout(rm, 300).unref();
-  }
+  if (svc) { try { fs.rmSync(svc.dir, { recursive: true, force: true }); } catch (e) { } }
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');
-  process.exitCode = fail ? 1 : 0;
+  // The service shares this process and its listener and timers never end,
+  // so the harness ends it.
+  process.exit(fail ? 1 : 0);
 }
