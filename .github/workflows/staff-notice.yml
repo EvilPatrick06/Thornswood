@@ -13,7 +13,7 @@
 #
 # HOW. A cloud thread runs the same line as anybody else:
 #
-#   pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Merged the scan button fix."
+#   pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Restarting the dev server at 4:30 PM for about 5 minutes."
 #
 # With no ssh there, it starts this workflow on main with the text (or an id
 # to -Check), waits for the run, and prints the answer this run left as an
@@ -35,6 +35,12 @@
 # the id reach it through the environment, never pasted into the script. The
 # key is written to a folder of this run's own and removed when it ends.
 #
+# WHEN. Each run takes a VPS runner, so only for a notice staff must act on,
+# a restart or outage staff will see, or a change to how staff work. Never for
+# a release to dev or main, a merge, progress, a pull request, an issue, a
+# test task or a routine deploy
+# (Patrick, 22 Oct, 8:51 AM; CLAUDE.md "Staff notices").
+#
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Staff notice
@@ -47,6 +53,9 @@ on:
         required: false
       check:
         description: 'Or a notice id to check, agent-claude-...'
+        required: false
+      unsay:
+        description: 'Or a notice id to take back out of #staff-updates (#3328)'
         required: false
 permissions:
   contents: read
@@ -82,13 +91,15 @@ jobs:
           THORNSWOOD_NOTICE_KEY_B64: ${{ secrets.NOTICE_KEY_B64 }}
           NOTICE_TEXT: ${{ inputs.text }}
           NOTICE_CHECK: ${{ inputs.check }}
+          NOTICE_UNSAY: ${{ inputs.unsay }}
         run: |
           $ErrorActionPreference = 'Stop'
           $say = Join-Path $env:GITHUB_WORKSPACE 'scripts/ops/Say-Staff.ps1'
-          if ($env:NOTICE_TEXT -and $env:NOTICE_CHECK) { Write-Host '::error title=Say-Staff::give the notice or an id to check, not both. Nothing was posted.'; exit 1 }
+          if (@($env:NOTICE_TEXT, $env:NOTICE_CHECK, $env:NOTICE_UNSAY | Where-Object { $_ }).Count -gt 1) { Write-Host '::error title=Say-Staff::give one of the notice, an id to check or an id to take back. Nothing was posted.'; exit 1 }
           if ($env:NOTICE_CHECK) { & $say -OnTheBox -Check $env:NOTICE_CHECK }
+          elseif ($env:NOTICE_UNSAY) { & $say -OnTheBox -Unsay $env:NOTICE_UNSAY }
           elseif ($env:NOTICE_TEXT) { & $say -OnTheBox -Text $env:NOTICE_TEXT }
-          else { Write-Host '::error title=Say-Staff::no notice and no id to check. Nothing was posted.'; exit 1 }
+          else { Write-Host '::error title=Say-Staff::no notice, no id to check and no id to take back. Nothing was posted.'; exit 1 }
           # 2 is "not said yet" from a check, an answer rather than a failure.
           if ($LASTEXITCODE -eq 2) { exit 0 }
           exit $LASTEXITCODE

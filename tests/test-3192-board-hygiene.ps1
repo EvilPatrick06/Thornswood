@@ -226,8 +226,8 @@ try {
     $f = Read-Flow 'done-on-merge.yml'
     Shape 'done-on-merge.yml' $f 'contents: read, issues: write, pull-requests: read'
     if ($f) {
-        Yes '  it runs on a push to main and on nothing else' ($f.On -match '(?m)^\s+push:\s*$' -and $f.On -match 'branches:\s*\[\s*main\s*\]' -and @([regex]::Matches($f.On, '(?m)^  [a-z_]+:')).Count -eq 1)
-        Yes '  in the board environment, with BOARD_TOKEN and the commits through the environment' ($f.Text -match '(?m)^\s+environment:\s*board\s*$' -and $f.Text -match [regex]::Escape('BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}') -and $f.Text -match [regex]::Escape('COMMITS: ${{ toJSON(github.event.commits.*.id) }}'))
+        Yes '  it runs on a push to main and by hand, and on nothing else' ($f.On -match '(?m)^\s+push:\s*$' -and $f.On -match 'branches:\s*\[\s*main\s*\]' -and $f.On -match '(?m)^\s+workflow_dispatch:' -and @([regex]::Matches($f.On, '(?m)^  [a-z_]+:')).Count -eq 2)
+        Yes '  in the board environment, with BOARD_TOKEN, the commits and the merges started by hand through the environment' ($f.Text -match '(?m)^\s+environment:\s*board\s*$' -and $f.Text -match [regex]::Escape('BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}') -and $f.Text -match [regex]::Escape('COMMITS: ${{ toJSON(github.event.commits.*.id) }}') -and $f.Text -match [regex]::Escape('MERGES: ${{ inputs.merges }}'))
         $body = "## What changed`n`nThe forge lists only what you can make. Refs #613, Refs #700.`n`nTest task for #613: Forge lists only what you can make`nServer: Main`n`n1. Open a forge.`n2. Look.`n`nWhat should happen: nothing a smith makes.`n`nTest task for #614: Closed one`n1. x`nTest task for #615: A pull request`n1. y`n`n## Checked`n`nharness`n`n" + [char]0xD83E + [char]0xDD16 + ' Generated with Claude Code'
         $table = @{
             'GET /commits/aaa/pulls' = @(@{ number = 3300; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = '0123456789abcdef'; body = $body })
@@ -254,6 +254,19 @@ try {
         $r = Run-Flow $f @{ 'GET /commits/eee/pulls' = @(@{ number = 3302; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = 'abcdef0123456789'; body = $dev }); 'GET /issues/616' = @{ number = 616; state = 'open' } } @{ BOARD_TOKEN = 'board-token'; COMMITS = '["eee"]' }
         $c = @($r.Writes | Where-Object { $_ -like 'POST /issues/616/comments *' })
         Yes '  a Dev test task''s comment says to post it when a dev release carries it, and that the main Ship closes the issue' ($c.Count -eq 1 -and $c[0] -match 'When a dev release carries it' -and $c[0] -match 'dev-test-tasks' -and $c[0] -match 'The main Ship that carries it closes this issue \(scripts/release/Close-ShippedIssues\.ps1\), and writes this on it if nobody has' -and $c[0] -match 'Server: Dev\\nBuild: dev release')
+
+        # A merge the push run missed (#1626, #3273), started by hand.
+        $seen = @{ user = @{ login = 'github-actions[bot]' }; body = 'Pull request #3300 merged (0123456789ab), so this is in Done and stays open: ...' }
+        $other = @{ user = @{ login = 'EvilPatrick06' }; body = 'Pull request #3300 merged (0123456789ab), moved by hand' }
+        $byHand = $table + @{ 'GET /commits/aaaaaaa/pulls' = $table['GET /commits/aaa/pulls']; 'GET /commits/ccccccc/pulls' = $table['GET /commits/ccc/pulls'] }
+        $r = Run-Flow $f ($byHand + @{ 'GET /issues/613/comments?per_page=100&page=1' = @($other) }) @{ BOARD_TOKEN = 'board-token'; COMMITS = '[]'; MERGES = ' aaaaaaa  ccccccc ' }
+        $c = @($r.Writes | Where-Object { $_ -like 'POST /issues/613/comments *' })
+        Yes ("started by hand with merges, it moves what those merges finish, like the push would have (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $c.Count -eq 1 -and $c[0] -match 'Pull request #3300 merged \(0123456789ab\)' -and @($r.Writes | Where-Object { $_ -like 'POST /issues/613/labels Bearer board-token *' }).Count -eq 1)
+        Yes '  a person''s comment of the same shape does not count as done-on-merge''s' ($c.Count -eq 1)
+        $r = Run-Flow $f ($byHand + @{ 'GET /issues/613/comments?per_page=100&page=1' = @($other, $seen) }) @{ BOARD_TOKEN = 'board-token'; COMMITS = '[]'; MERGES = 'aaaaaaa' }
+        Yes ("  an issue already holding its done-on-merge comment is said and passed over, nothing written (exit {0})" -f $r.Code) ($r.Code -eq 0 -and @($r.Writes | Where-Object { $_ -match '/issues/613/' }).Count -eq 0 -and $r.Out -match '#613, which already holds its done-on-merge comment')
+        $r = Run-Flow $f $table @{ BOARD_TOKEN = 'board-token'; COMMITS = '[]'; MERGES = 'aaaaaaa main;rm' }
+        Yes ("  anything in merges that is not a commit fails the run before a call (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Writes.Count -eq 0 -and $r.Out -match 'is not a commit')
 
         $r = Run-Flow $f @{ 'GET /commits/ddd/pulls' = @() } @{ BOARD_TOKEN = ''; COMMITS = '["ddd"]' }
         Yes ("a push with no merged pull request behind it does nothing and passes (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Writes.Count -eq 0)

@@ -22,4 +22,4 @@ It re-registers `Thornswood Backup` as LOCAL SERVICE, Limited, with a task SID o
 
 If the backup has to go back: `Install-Backup.ps1 -AsSystem`, then say why on #2612.
 ## Ran
-- 17 Oct 11:59 AM (Claude): -RunNow under LOCAL SERVICE took a backup but logged NO ACCESS C:\Thornswood-Botot.env.json, failing check 2; put back with -AsSystem (SYSTEM, Highest). Needs the bot.env.json read granted, then this note again.
+- 17 Oct 11:59 AM (Claude): -RunNow under LOCAL SERVICE took a backup but logged NO ACCESS C:\Thornswood-Bot\bot.env.json, failing check 2; put back with -AsSystem (SYSTEM, Highest). Needs the bot.env.json read granted, then this note again.

@@ -15,6 +15,7 @@ threads, so this needs neither discord.py nor a token and runs on every pull
 request. It proves:
   - a ticket the bot opened and that closed 366 days ago is deleted, with a
     line in the log, and one that closed 364 days ago stays;
+  - a ticket off one of the five desk channels (#3317) is aged the same way;
   - a thread still open, one a Gamemaster opened by hand, and one in a
     channel that is not a ticket channel are never touched;
   - a thread whose close time cannot be read is kept, not guessed at;
@@ -63,9 +64,17 @@ DAYS = constant('TICKET_KEEP_DAYS')
 yes('a closed ticket is kept 365 days', DAYS == 365)
 yes('and the tickets are looked at every hour', constant('TICKET_KEEP_EVERY') == 3600)
 
+# Since the ticket split (#3317) a ticket is off one of five channels, a desk
+# each, or off the old ones a server not built again still has: TICKET_NAMES,
+# made here the way bot.py makes it, from bot.py's own TICKET_DESKS.
+DESKS = constant('TICKET_DESKS') or []
+yes('bot.py names the five ticket channels', [d for d, _k in DESKS] == [
+    'get-help', 'report-someone', 'apply-to-playtest', 'apply-for-a-seat', 'apply-for-staff'])
+OLD = ['tickets-and-applications', 'applications']
 LOGGED = []
 space = {'datetime': datetime, 'TICKET_KEEP_DAYS': DAYS,
-         'TICKETS': ['tickets-and-applications', 'applications'],
+         'TICKETS': OLD,
+         'TICKET_NAMES': [d for d, _k in DESKS] + [n for n in OLD if n not in dict(DESKS)],
          'log': lambda *a: LOGGED.append(' '.join(str(x) for x in a))}
 for name in ('ticket_past_keeping', 'age_closed_tickets'):
     code = lift(name)
@@ -135,7 +144,9 @@ tickets = Channel('Tickets-and-Applications',
 other_old = Thread(201, NOW - 400 * DAY)
 general = Channel('general-chat', [other_old])
 locked_out = Channel('applications', [Thread(301, NOW - 400 * DAY)], refuse=True)
-guild = Guild([locked_out, general, tickets])
+help_old = Thread(401, NOW - 400 * DAY)
+desk = Channel('get-help', [help_old])
+guild = Guild([locked_out, general, tickets, desk])
 
 deleted, failed = asyncio.run(age(guild, BOT, NOW))
 
@@ -150,8 +161,9 @@ yes('a thread off a channel that is not a ticket channel is never touched',
 yes('Discord is asked for the private closed threads closed before the cut, all of them',
     tickets.asked == [{'private': True, 'joined': False, 'limit': None,
                        'before': NOW - DAYS * DAY}])
-yes('the counts say what happened: two deleted, one refused, one list unread',
-    (deleted, failed) == (2, 2))
+yes('a ticket off a desk channel (#get-help) is aged the same way', help_old.deleted)
+yes('the counts say what happened: three deleted, one refused, one list unread',
+    (deleted, failed) == (3, 2))
 yes('each deletion is a line with its id and the day it closed',
     any('deleted thread 101' in s and (NOW - 366 * DAY).date().isoformat() in s for s in LOGGED))
 yes('a refused delete is said with Discord\'s reason, and the rest still went',
@@ -167,7 +179,7 @@ LOGGED[:] = []
 again = asyncio.run(age(Guild([Channel('tickets-and-applications', [young])]), BOT, NOW))
 yes('a pass with nothing past its time deletes nothing and says nothing', again == (0, 0) and not LOGGED)
 yes('with no bot id nothing is deleted',
-    not past(Thread(401, NOW - 400 * DAY), None, NOW - DAYS * DAY))
+    not past(Thread(402, NOW - 400 * DAY), None, NOW - DAYS * DAY))
 
 watch = lift('watch_closed_tickets')
 yes('the hourly watch ages every server and sleeps TICKET_KEEP_EVERY between passes',

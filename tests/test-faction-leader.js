@@ -75,9 +75,20 @@ yes('F2 factions.json is names only, in this order, and Other is not in it',
     names.join('|') === [
       'Imperial Embassy',
       'Thalmor Remnant',
-      'Dark Brotherhood',
+      'Free Skyrim Trading Company',
       'The Companions',
-      'Free Skyrim Trading Company'
+      'College of Winterhold',
+      'Bards College',
+      'Thieves Guild',
+      'Dark Brotherhood',
+      'Vigilants of Stendarr',
+      'Dawnguard',
+      'Silver Hand',
+      'Forsworn',
+      'Orc Strongholds',
+      'Khajiit Caravans',
+      'Blades',
+      'Volkihar Clan'
     ].join('|') &&
     names.indexOf('Other') === -1 &&
     !JSON.stringify(names).includes('token') &&
@@ -102,13 +113,24 @@ yes('F5 Install-Bot sends factions.json on the artifact list and in the copy loo
     install.indexOf("'bot/factions.json'") !== -1 &&
     install.indexOf("foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json')") !== -1);
 
-yes('F6 Build-Discord still makes Trading Company and does not make a faction lead role',
-    build.indexOf("ROLES.append(('Trading Company'") !== -1 &&
-    !/Faction Lead/.test(build) && !/Faction Leader/.test(build));
+// #3317 (Patrick, 22 Oct, page card q-3317-faction-roles, A): one
+// "<faction> Leader" role per named faction, from factions.json, short names,
+// and its member role, the short name; Trading Company is renamed to the
+// company's member role so its holders keep it (lore/factions.md, 22 Oct).
+yes('F6 Build-Discord makes a member and a Leader role for each faction in factions.json, Trading Company renamed',
+    build.indexOf("ROLES.append(('Trading Company'") === -1 &&
+    /FACTION_MEMBERS = tuple\(FACTION_SHORT\.get\(f, f\) for f in FACTIONS\)/.test(build) &&
+    /'Free Skyrim Trading Company': \('Trading Company',\)/.test(build) &&
+    /FACTION_LEADERS = tuple\(FACTION_SHORT\.get\(f, f\) \+ ' Leader' for f in FACTIONS\)/.test(build) &&
+    /'factions\.json'/.test(build));
 
-yes('F7 is_staff still leaves Lead and Trial Gamemaster out, and the flag list includes them',
+// #3317 (Patrick, 22 Oct, 11:03 AM, and page card q-3317-seat-rule-check, A):
+// every staff role counts for the seat rule, and the bot refuses rather than
+// flags. bot/test-3317-seats.py runs it.
+yes('F7 is_staff still leaves Trial Gamemaster out, and the seat rule counts every staff role and refuses',
     /Lead Gamemaster and Trial Gamemaster carry Manage Threads/.test(bot) &&
-    /LEADERSHIP_EXTRA = \('Lead Gamemaster', 'Trial Gamemaster'\)/.test(bot) &&
+    /SEAT_RULE_STAFF = \('Owner', 'Co-Owner',/.test(bot) && /'Trial Gamemaster'/.test(bot) &&
+    /def seat_refusal\(kind, who, guild\):/.test(bot) &&
     /LEADERSHIP_KINDS = \('jarl', 'faction'\)/.test(bot) &&
     /def is_staff\(who\):/.test(bot) &&
     /The one gate on \/close, the Close ticket button/.test(bot));

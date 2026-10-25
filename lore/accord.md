@@ -3,8 +3,8 @@
 *Agreed at Dawnstar, 4E 221, between the Kingdom of Skyrim and the Empire of
 Tamriel. In force.*
 
-This is the whole reason there is an Imperial embassy in a country that threw
-the Empire out. It is nine articles.
+The Accord is the reason there is an Imperial embassy in a country that
+threw the Empire out. It has nine articles.
 
 ---
 
@@ -118,7 +118,7 @@ Fourth Era.*
 - **You cannot play a Legion soldier in Skyrim.** Article the Third. A veteran
   who served forty years ago and lives here now is a different thing.
 - **You can work for the Free Skyrim Trading Company.** It hauls, buys and
-  sells between the holds, out of buildings with the wrong name over the door.
+  sells between the holds, out of the old East Empire warehouses.
   Its lead seat is given rather than chosen, like a Jarl's.
 - **You can play a Thalmor.** You are a criminal. There is no embassy to run
   to and no immunity. Whether orders still come from home, and who sends them,
@@ -128,5 +128,5 @@ Fourth Era.*
 - **You can play a Jarl or a steward.** Those are positions, not characters.
   Found out in character.
 - **Arguing about the Accord in character is encouraged.** Half of Skyrim
-  thinks Article the Fourth gave away too much. The other half has eaten
-  Cyrodiilic bread every winter for thirty years.
+  thinks Article the Fourth gave away too much. The other half says thirty
+  winters of Cyrodiilic grain were worth it.

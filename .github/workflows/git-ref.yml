@@ -1,0 +1,89 @@
+# Makes a release tag, or deletes a branch, for a session whose git cannot
+# write refs: a cloud Claude thread (#3107, #3314).
+#
+# WHY. A cloud session reaches GitHub through the cloud environment's proxy,
+# which refuses every ref write before GitHub sees it (measured 22 Oct 2026:
+# a tag push is "RPC failed; HTTP 403", and DELETE or POST on git/refs is 403
+# "Write access to this GitHub API path is not permitted through this
+# proxy"). Starting a workflow is allowed. So a cloud Ship's release tag
+# (20261022-154916-dev) and every branch a cloud thread left went to One.
+#
+# HOW. A session runs
+#
+#   pwsh scripts/ops/Set-Ref.ps1 -Tag release/dev/<id>-dev -Commit <sha> -MessageFile <file>
+#   pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch claude/<what> -Commit <sha>
+#
+# which starts this on main with what to do, waits for the run, and prints
+# the answer this run left as an annotation titled Set-Ref. Ship.ps1 does
+# the first for its tag in a cloud session (Release-Name.ps1, Add-ReleaseTag).
+# Set-Ref.ps1's header says what it makes, what it deletes, and what it
+# refuses: only release/dev and release/main tags, on a commit main has; a
+# branch only at the commit given, never the default branch, never one an
+# open pull request comes from or is built onto.
+#
+# WHAT IT RUNS. Main's Set-Ref.ps1 under pwsh with no profile. The inputs
+# reach it through the environment, never pasted into the script. The run's
+# own token can write refs and read pull requests, nothing else, and there
+# is no secret. Anybody who can start this can already push and delete refs
+# with git; this only lets a session whose proxy refuses that do the same.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Tag or branch
+run-name: ${{ inputs.tag && format('Tag {0}', inputs.tag) || format('Delete branch {0}', inputs.delete_branch) }} by ${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The release tag to make, release/dev/<id>-dev or release/main/<id>'
+        required: false
+      delete_branch:
+        description: 'Or the branch to delete'
+        required: false
+      commit:
+        description: 'The commit the tag goes on, or the commit the branch has to be at'
+        required: true
+      message:
+        description: 'The tag message'
+        required: false
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  ref:
+    name: Make the tag or delete the branch
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # Six calls at most. Past this it is stuck, not slow.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A runner keeps its folder from one job to the next, and a checkout
+      # there rewrites only the files that differ from the last job's commit,
+      # so every other file keeps the line endings the last job's
+      # .gitattributes gave it (#3029). Every tracked file is written again,
+      # the way this commit checks it out.
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Make the tag or delete the branch
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_TAG: ${{ inputs.tag }}
+          REF_DELETE_BRANCH: ${{ inputs.delete_branch }}
+          REF_COMMIT: ${{ inputs.commit }}
+          REF_MESSAGE: ${{ inputs.message }}
+          REF_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/ops/Set-Ref.ps1') -OnGitHub
+          exit $LASTEXITCODE

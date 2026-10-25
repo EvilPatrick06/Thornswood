@@ -9,7 +9,7 @@ and starts no personal rest. There is no gold reward or purse change.
 These three existing Pearl Oysters use base `3828c:Dragonborn.esm`, give
 `854fe:Skyrim.esm` (an ingredient), and stand in world `800:Dragonborn.esm`.
 Each successful draw gives one Pearl. All fishers share one collection from a
-source every60 minutes; personal quest limits do not refill shared stock.
+source every 60 minutes; personal quest limits do not refill shared stock.
 
 | Exact existing reference | Winning position |
 | --- | --- |
@@ -19,8 +19,8 @@ source every60 minutes; personal quest limits do not refill shared stock.
 
 Normal Fisher class, Expert rank, suitable pole and pole coverage remain
 required. The source must stay enabled, retain its exact native identity and
-base, and remain within128 units of its winning position in the same world.
-The character must approach within400 units. Startup rejects unverifiable
+base, and remain within 128 units of its winning position in the same world.
+The character must approach within 400 units. Startup rejects unverifiable
 native evidence. A missing or failed quest service keeps these selected
 oysters shut; oysters elsewhere retain ordinary fishing behavior.
 
@@ -32,5 +32,5 @@ engine change is added. Alpha quest/trade state is disposable; this section
 introduces no historical-state migration or preservation work.
 
 Five other scarce-resource interactions and seven retrievals remain required.
-Source implementation and tests do not establish a Dev release; Claude owns
-the deployment handoff.
+Source implementation and tests do not establish a Dev release; it is live
+only once deployed.

@@ -30092,8 +30092,10 @@ log('gamemode loaded:',
           if (sid) staffRoleIds[sid] = true;
         }
       }
-      // Business Owner and Faction Owner, the Discord roles a book is founded
-      // from. Same answer as the staff seats. Absent until the site sends them.
+      // Business Owner, the Discord role a business book is founded from, and
+      // each faction's Leader role, whose holder owns that faction's book
+      // (#3317). Same answer as the staff seats. Absent until the site sends
+      // them.
       var businessIds = {};
       if (Array.isArray(doc.businessOwnerProfiles)) {
         for (var bo = 0; bo < doc.businessOwnerProfiles.length; bo++) {
@@ -30101,11 +30103,22 @@ log('gamemode loaded:',
           if (bid) businessIds[bid] = true;
         }
       }
-      var factionIds = {};
-      if (Array.isArray(doc.factionOwnerProfiles)) {
-        for (var fo = 0; fo < doc.factionOwnerProfiles.length; fo++) {
-          var fid = Number(doc.factionOwnerProfiles[fo]);
-          if (fid) factionIds[fid] = true;
+      // Leader role name -> the profiles of the account that holds it: one
+      // book per faction, owned by whoever holds its Leader role, and it
+      // moves with the role (Patrick, 22 Oct, page card q-3317-faction-books,
+      // A). The Faction Owner role it replaces is gone.
+      var leadRoles = {};
+      var fl = doc.factionLeaderProfiles;
+      if (fl && typeof fl === 'object' && !Array.isArray(fl)) {
+        for (var lr in fl) {
+          if (!Object.prototype.hasOwnProperty.call(fl, lr) || !/^[^\n]{1,96} Leader$/.test(lr) ||
+              !Array.isArray(fl[lr])) continue;
+          for (var lp = 0; lp < fl[lr].length; lp++) {
+            var lid = Number(fl[lr][lp]);
+            if (!lid) continue;
+            if (!leadRoles[lid]) leadRoles[lid] = [];
+            if (leadRoles[lid].indexOf(lr) === -1) leadRoles[lid].push(lr);
+          }
         }
       }
       // The Discord role named Dev, not every staff seat. A Dev may found
@@ -30159,7 +30172,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, offices: offices, clash: clash, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, barred: barred, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, offices: offices, clash: clash, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, leadRoles: leadRoles, companyIds: companyIds, accounts: accounts, barred: barred, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -30200,7 +30213,8 @@ log('gamemode loaded:',
     var l = load();
     return passProved(profileId) && !!(l && l.staffRoleIds && l.staffRoleIds[Number(profileId)]);
   };
-  // Business Owner, Faction Owner, and the Discord account a book is founded on.
+  // Business Owner, the Leader roles held, and the Discord account a book is
+  // founded on.
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBookRoles = function (profileId) {
     var l = load();
     var n = Number(profileId);
@@ -30209,7 +30223,7 @@ log('gamemode loaded:',
       staff: proved && !!(l && l.staffRoleIds && l.staffRoleIds[n]),
       dev: proved && !!(l && l.devRoleIds && l.devRoleIds[n]),
       business: proved && !!(l && l.businessIds && l.businessIds[n]),
-      faction: proved && !!(l && l.factionIds && l.factionIds[n]),
+      leads: (proved && l && l.leadRoles && l.leadRoles[n]) ? l.leadRoles[n].slice() : [],
       account: (l && l.accounts && l.accounts[n]) ? String(l.accounts[n]) : ('p:' + n)
     };
   };
@@ -30614,6 +30628,24 @@ log('gamemode loaded:',
     var stale = (had.offices && typeof had.offices === 'object') ? had.offices : {};
     for (var fo in fresh) if (Object.prototype.hasOwnProperty.call(fresh, fo) && !failed[Number(fo)]) offices[fo] = fresh[fo];
     for (var so in stale) if (Object.prototype.hasOwnProperty.call(stale, so) && failed[Number(so)]) offices[so] = stale[so];
+    // The faction Leader roles (#3317) are a map by role: a profile that could
+    // not be checked keeps the Leader roles it had in the file, and no other.
+    var leaders = {};
+    var freshLead = (doc.factionLeaderProfiles && typeof doc.factionLeaderProfiles === 'object') ? doc.factionLeaderProfiles : {};
+    var staleLead = (had.factionLeaderProfiles && typeof had.factionLeaderProfiles === 'object') ? had.factionLeaderProfiles : {};
+    function lead(from, keep) {
+      for (var role in from) {
+        if (!Object.prototype.hasOwnProperty.call(from, role) || !Array.isArray(from[role])) continue;
+        for (var lp = 0; lp < from[role].length; lp++) {
+          var pid = Number(from[role][lp]);
+          if (!pid || !!failed[pid] !== keep) continue;
+          if (!leaders[role]) leaders[role] = [];
+          if (leaders[role].indexOf(pid) === -1) leaders[role].push(pid);
+        }
+      }
+    }
+    lead(freshLead, false);
+    lead(staleLead, true);
     return {
       profiles: merged(doc.profiles, had.profiles),
       devProfiles: merged(doc.devProfiles, had.devProfiles),
@@ -30621,7 +30653,7 @@ log('gamemode loaded:',
       offices: offices,
       staffRoleProfiles: merged(doc.staffRoleProfiles, had.staffRoleProfiles),
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
-      factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
+      factionLeaderProfiles: leaders,
       devRoleProfiles: merged(doc.devRoleProfiles, had.devRoleProfiles),
       companyProfiles: merged(doc.companyProfiles, had.companyProfiles),
       people: people
@@ -30773,7 +30805,7 @@ log('gamemode loaded:',
             doc.offices = kept.offices;
             doc.staffRoleProfiles = kept.staffRoleProfiles;
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
-            doc.factionOwnerProfiles = kept.factionOwnerProfiles;
+            doc.factionLeaderProfiles = kept.factionLeaderProfiles;
             doc.devRoleProfiles = kept.devRoleProfiles;
             doc.companyProfiles = kept.companyProfiles;
             doc.people = kept.people;
@@ -30797,7 +30829,10 @@ log('gamemode loaded:',
               // The Discord staff roles themselves, for the staff seats (#481).
               staffRoleProfiles: Array.isArray(doc.staffRoleProfiles) ? doc.staffRoleProfiles : [],
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
-              factionOwnerProfiles: Array.isArray(doc.factionOwnerProfiles) ? doc.factionOwnerProfiles : [],
+              // Each faction's Leader role, by name, and the profiles of the
+              // account that holds it: that faction's book is theirs (#3317).
+              factionLeaderProfiles: (doc.factionLeaderProfiles && typeof doc.factionLeaderProfiles === 'object' &&
+                                      !Array.isArray(doc.factionLeaderProfiles)) ? doc.factionLeaderProfiles : {},
               devRoleProfiles: Array.isArray(doc.devRoleProfiles) ? doc.devRoleProfiles : [],
               // The Free Skyrim Trading Company's role (#1393), for a
               // company sale. Without this line the door read a list it
@@ -55355,9 +55390,42 @@ function thornswoodBooks(env) {
       staff: !!row.staff,
       dev: !!row.dev,
       business: !!row.business,
-      faction: !!row.faction,
+      leads: Array.isArray(row.leads) ? row.leads.map(String) : [],
       account: row.account ? String(row.account) : ('p:' + Number(pid))
     };
+  }
+
+  /*
+    A FACTION'S BOOK FOLLOWS ITS LEADER ROLE (#3317, Patrick, 22 Oct, page
+    card q-3317-faction-books, A): one book per faction, owned by whoever
+    holds that faction's Leader role in Discord, and it moves with the role.
+    book.leader names the role. Whoever holds it is the owner, whatever
+    account founded the book; book.owner and book.account follow the account
+    that holds it the first time one of its characters opens the book, and
+    that character is put in it. Another character on the same account is
+    the owner as it is, so the book does not move between them. A faction
+    book founded before #3317 has no leader and keeps the account rule it had.
+  */
+  function leads(book, pid) {
+    return !!(book && book.leader) && rolesOf(pid).leads.indexOf(book.leader) !== -1;
+  }
+
+  function bookOfLeader(role) {
+    for (var i = 0; i < store.length; i++) {
+      if (store[i].kind === 'faction' && store[i].leader === role) { return store[i]; }
+    }
+    return null;
+  }
+
+  function followLeader(book, pid, name) {
+    if (!leads(book, pid) || book.account === rolesOf(pid).account) { return false; }
+    if (!memberOf(book, pid)) {
+      if (book.members.length >= MAX_MEMBERS) { return false; }
+      book.members.push({ pid: Number(pid), name: name || 'somebody', role: 'Member' });
+    }
+    book.owner = Number(pid);
+    book.account = rolesOf(pid).account;
+    return true;
   }
 
   function silenced(pid) {
@@ -55464,7 +55532,13 @@ function thornswoodBooks(env) {
           !/^[a-zA-Z0-9_-]{1,100}$/.test(book.id) || book.id === '__proto__' || bookIds[book.id] ||
           (book.kind !== 'business' && book.kind !== 'faction') ||
           typeof book.name !== 'string' || !book.name.trim() || book.name.length > MAX_NAME ||
-          typeof book.account !== 'string' || !book.account || !Number.isInteger(book.owner) || book.owner <= 0 ||
+          typeof book.account !== 'string' || !Number.isInteger(book.owner) ||
+          // A faction book is vacant (owner 0, no account) while the
+          // character that led it has been deleted and nobody holding its
+          // Leader role has opened it since (#3317). Any other book has both.
+          !(book.owner > 0 && book.account) && !(book.leader && book.owner === 0 && book.account === '') ||
+          (book.leader !== undefined && (book.kind !== 'faction' || typeof book.leader !== 'string' ||
+                                         !/^[^\n]{1,96} Leader$/.test(book.leader))) ||
           !Array.isArray(book.members) || book.members.length > MAX_MEMBERS ||
           !Array.isArray(book.roles) || !Array.isArray(book.chat) || book.chat.length > MAX_CHAT ||
           !validPrices(book.prices)) { throw new Error('Saved book entries cannot be verified'); }
@@ -55488,7 +55562,7 @@ function thornswoodBooks(env) {
         }
         roleNames[role.name.toLowerCase()] = true;
       }
-      if (!roleNames.member || !members[book.owner] || book.members.some(function (m) {
+      if (!roleNames.member || (book.owner > 0 && !members[book.owner]) || book.members.some(function (m) {
         return !roleNames[m.role.toLowerCase()];
       })) {
         throw new Error('Saved book role references cannot be verified');
@@ -55573,6 +55647,7 @@ function thornswoodBooks(env) {
   function isOwner(book, pid) {
     var r = rolesOf(pid);
     if (r.staff) { return true; }
+    if (book.leader) { return leads(book, pid); }
     if (r.account && book.account === r.account) { return true; }
     return Number(book.owner) === Number(pid);
   }
@@ -55589,6 +55664,7 @@ function thornswoodBooks(env) {
     var r = rolesOf(pid);
     if (r.staff) { return true; }
     if (memberOf(book, pid)) { return true; }
+    if (book.leader) { return leads(book, pid); }
     return !!(r.account && book.account === r.account);
   }
 
@@ -55602,7 +55678,7 @@ function thornswoodBooks(env) {
 
   function showTab(pid) {
     var r = rolesOf(pid);
-    if (r.staff || r.business || r.faction) { return true; }
+    if (r.staff || r.business || r.leads.length) { return true; }
     return visible(pid).length > 0;
   }
 
@@ -55620,17 +55696,24 @@ function thornswoodBooks(env) {
     var named = clipName(name);
     if (!named.name) { return named.why; }
     var r = rolesOf(pid);
-    // A Dev may found one of each. Any other account needs the matching role.
+    // A Dev may found one business. Any other account needs Business Owner.
     if (kind === 'business' && !r.business && !r.dev) {
       return 'Your Discord account does not hold Business Owner.';
     }
-    if (kind === 'faction' && !r.faction && !r.dev) {
-      return 'Your Discord account does not hold Faction Owner.';
+    if (kind === 'business' && ownsKind(r.account, kind)) {
+      return 'This account already has a business.';
     }
-    if (ownsKind(r.account, kind)) {
-      return kind === 'business'
-        ? 'This account already has a business.'
-        : 'This account already has a faction.';
+    // A faction's book is its Leader's (#3317), one per faction.
+    var leader = '';
+    if (kind === 'faction') {
+      if (!r.leads.length) {
+        return 'A faction\'s book belongs to whoever holds its Leader role in Discord, ' +
+               'and your Discord account holds none.';
+      }
+      for (var li = 0; li < r.leads.length && !leader; li++) {
+        if (!bookOfLeader(r.leads[li])) { leader = r.leads[li]; }
+      }
+      if (!leader) { return 'Your faction already has its book.'; }
     }
     seq += 1;
     var book = {
@@ -55644,6 +55727,7 @@ function thornswoodBooks(env) {
       prices: [],
       chat: []
     };
+    if (leader) { book.leader = leader; }
     store.push(book);
     save();
     refresh();
@@ -55709,6 +55793,7 @@ function thornswoodBooks(env) {
 
   function ownsAccount(book, pid) {
     var r = rolesOf(pid);
+    if (book.leader) { return leads(book, pid) || Number(book.owner) === Number(pid); }
     return Number(book.owner) === Number(pid) || (!!r.account && book.account === r.account);
   }
 
@@ -55949,6 +56034,9 @@ function thornswoodBooks(env) {
 
   function hand(book, pid, rest) {
     if (!rolesOf(pid).staff) { return 'Staff hand a book on.'; }
+    if (book.leader) {
+      return 'This book moves with the ' + book.leader + ' role in Discord, not by hand.';
+    }
     var who = memberByName(book, pipes(rest).join(' '));
     if (!who.member) { return who.why; }
     if (Number(who.member.pid) === Number(book.owner)) { return 'They already own it.'; }
@@ -56226,6 +56314,15 @@ function thornswoodBooks(env) {
     if (!showTab(pid)) { return { show: false }; }
     var here = onlineMap();
     var books = [];
+    // The Leader role changed hands in Discord since the book last saw its
+    // holder: the book goes to them now, the first time they open it.
+    var moved = false;
+    for (var s = 0; s < store.length; s++) {
+      if (followLeader(store[s], pid, here[pid] || here[String(pid)])) { moved = true; }
+    }
+    // The role decides who owns it, so a save that fails here loses nothing:
+    // the next save of the book writes the same owner.
+    if (moved) { try { save(); } catch (e) { } }
     var rows = visible(pid);
     for (var i = 0; i < rows.length; i++) {
       var b = rows[i];
@@ -56291,7 +56388,7 @@ function thornswoodBooks(env) {
     return {
       show: true,
       canBusiness: !!((r.business || r.dev) && !ownsKind(r.account, 'business')),
-      canFaction: !!((r.faction || r.dev) && !ownsKind(r.account, 'faction')),
+      canFaction: r.leads.some(function (role) { return !bookOfLeader(role); }),
       permNames: PERMS.slice(),
       books: books
     };
@@ -56346,7 +56443,9 @@ function thornswoodBooks(env) {
     disbanded, as its owner's disband does, with its ledger entries: a book
     has to have its owner among its members (loadStore), and handing it on is
     staff's (hand), so the procedure for a deletion request says to hand it on
-    in the game before the real run when the group wants to keep it. When
+    in the game before the real run when the group wants to keep it. A
+    faction's book is its Leader role's and is never handed on (#3317), so it
+    stays, vacant, until whoever holds the role next opens it. When
     they last left goes too. A save that fails puts everything back, as
     mutate does, and the list waits. Answers the counts and whether it took.
   */
@@ -56357,8 +56456,9 @@ function thornswoodBooks(env) {
     var keep = [];
     for (var i = 0; i < store.length; i++) {
       var book = store[i];
-      if (who.profile(book.owner)) { forgetLedger(book.id); c.books++; continue; }
+      if (who.profile(book.owner) && !book.leader) { forgetLedger(book.id); c.books++; continue; }
       var m = book.members.length, l = book.chat.length;
+      if (book.leader && who.profile(book.owner)) { book.owner = 0; book.account = ''; }
       book.members = book.members.filter(function (x) { return !who.profile(x.pid); });
       book.chat = book.chat.filter(function (x) { return !who.profile(x.pid); });
       c.members += m - book.members.length;
@@ -72989,13 +73089,24 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     byBase.get(base).push(rule);
     counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
   }
+  // What the previous load of the gamemode had decided (#3296), from its
+  // handover(): each NPC's rule and policy, and the habitat counts that
+  // include them. The NPC SERVER STARTUP block passes it only when both loads
+  // have the same NPC code and catalogue. The policies are the same objects
+  // the runtime's carry holds, so a home it moves is moved in both.
+  const carried=options && options.carry;
+  if(carried) {
+    counts.clear();
+    for(const [bucket,count] of carried.counts) counts.set(bucket,count);
+    for(const [id,entry] of carried.configured) configured.set(id,entry);
+  }
   api.makeProperty('thornswoodNpcHome',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   api.makeProperty('thornswoodNpcCommanded',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   // A Thalmor patrol member (#1390) carries {road, slot}, set by the patrol
   // keeper before admission. Never the commanded marker: a patrol is not a
   // staff spawn, and it never joins a natural habitat bucket either.
   api.makeProperty('thornswoodNpcPatrol',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
-  const patrolSlots=new Map();
+  const patrolSlots=new Map(carried ? carried.patrolSlots : []);
   // The rule for a patrol member, from the staff's road: its home is its own
   // point, its leash and return are the road's, its bucket is the road, capped
   // at the road's points, so there is only one group on a road. 'discard'
@@ -73157,7 +73268,21 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       configured.delete(id);
     }
   }
-  return {configure,afterOwnership,release,commit,stop:()=>{closed=true;},merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
+  // An NPC carried on from the previous load has its purse read by this
+  // load's purse service, the part of afterOwnership the engine does not keep.
+  function resume(id,owner) {
+    return whileCurrent(owner,undefined,(call,current)=>{
+      if(!committed || closed) return;
+      if(configured.has(id) && merchants) merchants.prepare(id,current);
+    });
+  }
+  // Stops, and gives the next load what this one decided, for options.carry.
+  function handover() {
+    if(closed) return null;
+    closed=true;
+    return {key:options && options.key,configured,counts,patrolSlots};
+  }
+  return {configure,afterOwnership,resume,handover,release,commit,stop:()=>{closed=true;},merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
     const live=new Set(ids);
     for(const id of configured.keys()) if(id>=0xff000000 && !live.has(id)) release(id);
   },admit:(id,state,owner)=>whileCurrent(owner,false,(call,current)=>{
@@ -73527,10 +73652,13 @@ function npcNearestOn(points, pos) {
 // The 512-unit tile index. Each tile lists triangle references (mesh slot
 // times 32768 plus triangle) in insertion order, in chunks of seven
 // references and a link to the next chunk, inside shared blocks of words.
-function createNpcNavTiles() {
-  const blockWords = 1<<18, blocks = [];
-  let chunks = 0, tiles = 0;
-  let head = new Uint32Array(1024), tail = new Uint32Array(1024), count = new Uint32Array(1024);
+// kept is what carry() gave the previous load of the gamemode (#3296): its
+// words, which are only numbers, so the index goes on where it was.
+function createNpcNavTiles(kept) {
+  const blockWords = 1<<18, blocks = kept ? kept.blocks : [];
+  let chunks = kept ? kept.chunks : 0, tiles = kept ? kept.tiles : 0;
+  let head = kept ? kept.head : new Uint32Array(1024), tail = kept ? kept.tail : new Uint32Array(1024),
+    count = kept ? kept.count : new Uint32Array(1024);
   const key = (x,y) => x>-16384 && x<16384 && y>-16384 && y<16384 ? (x+16384)*32768+(y+16384) : x+':'+y;
   const read = word => blocks[Math.floor(word/blockWords)][word%blockWords];
   const write = (word,value) => { blocks[Math.floor(word/blockWords)][word%blockWords] = value; };
@@ -73568,15 +73696,28 @@ function createNpcNavTiles() {
     return Array.from(cell.keys(), k => typeof k === 'number' ?
       [Math.floor(k/32768)-16384, k%32768-16384] : k.split(':').map(Number));
   }
-  return {cell:() => new Map(), add, refs, keys, stats:() => ({tiles, chunks, blocks:blocks.length})};
+  return {cell:() => new Map(), add, refs, keys, stats:() => ({tiles, chunks, blocks:blocks.length}),
+    carry:() => ({blocks, chunks, tiles, head, tail, count})};
 }
 // Navigation for one runtime: banks of nearby meshes, the sliced mesh work,
 // the tile index, reciprocal links and floor lookup. ready(bank) runs when a
-// bank's last mesh is finished.
-function createNpcNavigation(api, now, report, ready) {
-  const banks = new Map(), meshWork = [], sharedMeshes = new Map(), meshEntries = new Map(), cellTiles = new Map();
-  const slots = [], tiles = createNpcNavTiles();
-  let geometryVersion = 0;
+// bank's last mesh is finished. kept is what carry() gave the previous load
+// of the gamemode (#3296): the meshes it read, their tile index, the banks
+// and the mesh work still waiting, all of it data.
+function createNpcNavigation(api, now, report, ready, kept) {
+  const {banks, meshWork, sharedMeshes, meshEntries, cellTiles, slots} = kept ||
+    {banks:new Map(), meshWork:[], sharedMeshes:new Map(), meshEntries:new Map(), cellTiles:new Map(), slots:[]};
+  const tiles = createNpcNavTiles(kept && kept.tiles);
+  let geometryVersion = kept ? kept.geometryVersion : 0;
+  // A mesh's triangle objects, and the links cached on them, were made by the
+  // previous load's code. They are dropped and made again here when something
+  // reaches them, so nothing kept holds a function of that load, and none of
+  // that load stays in memory. A mesh whose reading had not finished reads
+  // again from its start; reading changes nothing until it finishes.
+  if(kept) {
+    for(const mesh of slots) {mesh.geometry.linksFor=nodeLinks;mesh.nodes=new Map();}
+    for(const job of meshWork) job.work=null;
+  }
   const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
   function locate(bank,pos,s,lift) {
     let selected=null,best=Infinity;
@@ -73701,7 +73842,7 @@ function createNpcNavigation(api, now, report, ready) {
     if(!job) return;
     const {id}=job;
     try {
-      if(!job.work) job.work=npcReadMeshWork(id,api.lookupEspmRecordById(id),nodeLinks);
+      if(!job.work && !job.mesh) job.work=npcReadMeshWork(id,api.lookupEspmRecordById(id),nodeLinks);
       let cost=0,insertions=0,done=false;
       while(cost<512 && insertions<512 && now()-begin<4) {
         if(!job.mesh) {
@@ -73730,25 +73871,45 @@ function createNpcNavigation(api, now, report, ready) {
     for(const bank of job.banks) finishMesh(bank,id);
     job.banks=[];
   }
-  return {banks,ensureBank,locate,search,nodeLinks,work,pending:()=>meshWork.length,
-    meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion};
+  // The triangle this load uses for one the previous load handed over.
+  function nodeAt(node) {
+    const mesh=node && sharedMeshes.get(node.mesh);
+    return mesh ? npcTriangleAt(mesh,node.index) : undefined;
+  }
+  return {banks,ensureBank,locate,search,nodeLinks,work,nodeAt,pending:()=>meshWork.length,
+    meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion,
+    carry:()=>({banks,meshWork,sharedMeshes,meshEntries,cellTiles,slots,tiles:tiles.carry(),geometryVersion})};
 }
 function startSharedNpcServerRuntime(api, timers, now, report, population, options) {
   const invoke=Reflect.apply;
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
-  const handles = new Set(), actors = new Map(), preparing = [], owned = new Set(), unavailable = new Set();
-  const reactions = new Map(), knownFactions = new Set();
+  /*
+    WHAT THE PREVIOUS LOAD OF THE GAMEMODE KNEW (#3296). A gamemode reload
+    keeps the engine, its actors and where they stand, and until 22 Oct 2026
+    the new runtime still took every NPC back from nothing: a batch every 10
+    ms, then each prepared again and its navigation read again, 3 min 50 s on
+    dev in which the NPCs stood still. options.carry is what the old runtime's
+    handover() gave instead, and this one goes on from it. The NPC SERVER
+    STARTUP block passes it only when both loads have the same NPC code and
+    the same catalogue, so its shape is this code's. It is data only:
+    triangles are looked up again in this load's navigation, and the searches
+    under way are started again, so no function of the old load is kept.
+  */
+  const carry = options && options.carry || null;
+  const kept = carry || {actors:new Map(), preparing:[], owned:new Set(), unavailable:new Set(),
+    reactions:new Map(), knownFactions:new Set(), npcTiles:new Map(), enrolled:new Set(), excluded:new Set(),
+    policies:new Map(), held:new Map(), due:[], searching:[], cursor:0, total:0, loaded:0};
+  const handles = new Set(), {actors, preparing, owned, unavailable, reactions, knownFactions} = kept;
   const navigation = createNpcNavigation({
     getNavmeshRecords:(...args)=>nativeCall('getNavmeshRecords',...args),
     lookupEspmRecordById:(...args)=>nativeCall('lookupEspmRecordById',...args)
-  }, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
+  }, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];}, carry && carry.navigation);
   const {banks, ensureBank, locate, search} = navigation;
-  const npcTiles = new Map();
-  const enrolled = new Set(), excluded = new Set(), policies = new Map();
+  const {npcTiles, enrolled, excluded, policies} = kept;
   // Placed off walkable ground, waiting to be set down on it (#2067): out of
   // everybody's sight, or for an ambush once somebody comes near.
-  const held = new Map(), AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
+  const {held} = kept, AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
   // An NPC nobody can see that only wanders is stepped once in this long
   // (the first time at once) (#3181, Patrick's C on 22 Oct 2026: NPCs
   // nobody can see are updated less often, never paused). Before, every pass
@@ -73769,7 +73930,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // whoever was not due, so with 4,820 NPCs most of backgroundTick's 1,984
   // ms in 120 s went on looking at NPCs it then passed over.
   const UNSEEN_EVERY = 15000, SEEN_STEP = 4000, BUSY_EVERY = 100, NEAR_RECHECK = 1000;
-  const due = [];
+  const {due} = kept;
   function queue(a,at) {
     let i=due.length;due.push(null);
     while(i>0) { const p=(i-1)>>1; if(due[p].at<=at) break; due[i]=due[p];i=p; }
@@ -73790,7 +73951,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
     return top;
   }
-  let stopped=false,running=!options || options.suspended!==true,cursor=0,total=0,loaded=0,nearCursor=0;
+  let stopped=false,running=!options || options.suspended!==true,cursor=kept.cursor,total=kept.total,loaded=kept.loaded,nearCursor=0;
   const ready=[];
   let humans=new Map(),near=new Set(),nearOrder=[],moved=0,attacks=0,background=0,failed=0,lastReport=now();
   function schedule(fn, delay) {
@@ -73900,7 +74061,13 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   }
   // Searches for the walkable point nearest a placement or a home, a few
   // tiles at a time on their own tick (#2067). The actor waits for its search.
-  const searching=[];
+  // A job is data, its kind saying what its result is for, so a reload can
+  // hand it over (#3296).
+  const {searching} = kept;
+  function seek(job) {
+    job.search=search(job.bank,job.from,job.state);
+    searching.push(job);
+  }
   function searchTick() {
     armed.delete(searchTick);
     const begin=now();
@@ -73908,9 +74075,22 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       const job=searching[0];
       if(!job.search.step(begin)) break;
       searching.shift();
-      try { job.finish(job.search.result()); } catch(e) { reject(job.id,e); }
+      try { found(job,job.search.result()); } catch(e) { reject(job.id,e); }
     }
     wake();
+  }
+  function found(job,near) {
+    const {id,state,saved,bank}=job,policy=policies.get(id);
+    if(job.kind==='home') {
+      if(near) policy.home=near.pos.slice();
+      preparing.push(id);
+      return;
+    }
+    if(!near) throw new Error('No walkable navigation within reach of the placed position');
+    const ambush=!!(policy && policy.ambush);
+    if(ambush && near.d>AMBUSH_STEP) throw new Error('Ambush placement with no floor within a step');
+    if(outsideHome(policy,state.cellOrWorld,near.pos)) {policy.settled=true;policy.home=near.pos.slice();}
+    held.set(id,{id,state,saved,bank,near,ambush});
   }
   // An actor set down further from its placement than its leash would never
   // move again, so its home becomes the walkable point nearest the placement:
@@ -73922,10 +74102,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   function settleHome(id,bank,policy,s) {
     policy.settled=true;
     if(locate(bank,policy.home,s)) return false;
-    searching.push({id,search:search(bank,policy.home,s),finish:near=>{
-      if(near) policy.home=near.pos.slice();
-      preparing.push(id);
-    }});
+    seek({id,kind:'home',bank,from:policy.home,state:s});
     return true;
   }
   // Off walkable ground at its placement. An ambush waits there until somebody
@@ -73934,14 +74111,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // ambush further than a step from the floor (a pipe or a ceiling the game
   // empties by script), stays where the game put it.
   function strand(id,state,saved,bank) {
-    const policy=policies.get(id);
-    searching.push({id,search:search(bank,state.pos,state),finish:near=>{
-      if(!near) throw new Error('No walkable navigation within reach of the placed position');
-      const ambush=!!(policy && policy.ambush);
-      if(ambush && near.d>AMBUSH_STEP) throw new Error('Ambush placement with no floor within a step');
-      if(outsideHome(policy,state.cellOrWorld,near.pos)) {policy.settled=true;policy.home=near.pos.slice();}
-      held.set(id,{id,state,saved,bank,near,ambush});
-    }});
+    seek({id,kind:'floor',bank,from:state.pos,state,saved});
   }
   function emerge(h) {
     const {id,state,saved,bank,near}=h;
@@ -74345,8 +74515,46 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     for(let i=0;i<Math.min(32,nearOrder.length) && now()-begin<4;i++) step(nearOrder[nearCursor++%nearOrder.length]);
     wake();
   }
-  schedule(preload,0);arm(prepareTick,10);arm(meshTick,10);
+  // Carried on from the previous load (#3296): each triangle an actor or a
+  // held placement stands on is this load's object for it, and each search
+  // starts again. One whose mesh is gone is prepared again from the start.
+  // Every NPC already owned has its merchant purse read by this load's purse
+  // service, as afterOwnership did when it was first owned; nothing else of
+  // ownership is done again, because the engine kept it.
+  const resuming=[];
+  if(carry) {
+    const again=id=>{if(!preparing.includes(id)) preparing.push(id);};
+    for(const [id,a] of actors) {
+      const node=navigation.nodeAt(a.node);
+      if(node) {a.node=node;continue;}
+      actors.delete(id);
+      if(a.tile && npcTiles.has(a.tile)) npcTiles.get(a.tile).delete(id);
+      again(id);
+    }
+    for(const [id,h] of held) {
+      const node=navigation.nodeAt(h.near.node);
+      if(node) {h.near.node=node;continue;}
+      held.delete(id);again(id);
+    }
+    for(const job of searching) job.search=search(job.bank,job.from,job.state);
+    if(population && population.resume) resuming.push(...owned);
+    report('Shared NPC runtime carried on from the previous gamemode load: '+actors.size+' active, '+loaded+
+      ' loaded, '+(held.size+searching.length)+' waiting off walkable ground, '+preparing.length+' preparing, '+
+      navigation.pending()+' mesh jobs pending'+(cursor===total && total>0 ? '; loading complete' : '; loading continues'));
+  }
+  function resumeTick() {
+    const begin=now();
+    while(resuming.length && now()-begin<4) {
+      const id=resuming.shift();
+      // A purse that fails stops its NPC, as it would have at first ownership.
+      try {population.resume(id,()=>!stopped);} catch(e) {idle(id);reject(id,e);}
+    }
+    if(resuming.length) schedule(resumeTick,10);
+  }
+  if(!carry || cursor<total || total===0) schedule(preload,0);
+  arm(prepareTick,10);arm(meshTick,10);
   schedule(humanTick,0);schedule(backgroundTick,20);arm(nearTick,100);arm(searchTick,10);
+  if(resuming.length) schedule(resumeTick,0);
   if(population) schedule(discover,5000);
   /*
     LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). Nothing about
@@ -74355,10 +74563,16 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     never steps or reports on an actor that is gone.
   */
   function forget(id) {
+    idle(id);
+    policies.delete(id);owned.delete(id);unavailable.delete(id);enrolled.delete(id);excluded.delete(id);
+    failed=unavailable.size;
+  }
+  // Takes an actor out of everything that would step it, set it down or
+  // prepare it, and keeps what is known about it.
+  function idle(id) {
     const a=actors.get(id);
     if(a && a.tile && npcTiles.has(a.tile)) npcTiles.get(a.tile).delete(id);
-    actors.delete(id);policies.delete(id);owned.delete(id);unavailable.delete(id);
-    enrolled.delete(id);excluded.delete(id);held.delete(id);near.delete(id);
+    actors.delete(id);held.delete(id);near.delete(id);
     const without=list=>{for(let i=list.length-1;i>=0;i--) {
       const entry=list[i],entryId=typeof entry==='number' ? entry : entry && entry.id;
       if(entryId===id) list.splice(i,1);
@@ -74370,9 +74584,21 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
     without(nearOrder);without(preparing);without(searching);
     for(const bank of banks.values()) if(bank && Array.isArray(bank.waiting)) without(bank.waiting);
-    failed=unavailable.size;
   }
-  return {stop,start,enroll,forget,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
+  /*
+    STOPS, AND GIVES THE NEXT LOAD OF THE GAMEMODE WHAT THIS ONE KNOWS (#3296),
+    for options.carry. Everything in it is data; the searches under way are
+    given as what they look for, not as the search itself. Null once stopped.
+  */
+  function handover() {
+    if(stopped) return null;
+    stop();
+    return {key:options && options.key,actors,preparing,owned,unavailable,reactions,knownFactions,npcTiles,
+      enrolled,excluded,policies,held,due,cursor,total,loaded,
+      searching:searching.map(({id,kind,bank,from,state,saved})=>({id,kind,bank,from,state,saved})),
+      navigation:navigation.carry()};
+  }
+  return {stop,start,enroll,forget,handover,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
     mode:a.mode,target:a.target,pos:a.pos.slice(),path:a.path.map(p=>p.slice()),
     triangle:a.node.index,mesh:a.node.mesh,lastUpdate:a.last,paused:!!a.paused};},
     getStatus:()=>({loaded,controlled:owned.size,active:actors.size,unavailable:failed,held:held.size+searching.length,
@@ -77468,7 +77694,7 @@ module.exports.orchardPlots = ORCHARD_PLOTS;
 module.exports.orchardSources = function () { return {"version":1,"quest":"orchard","sources":[{"reference":"141084:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32734.08984375,-10301.1953125,-4197.89208984375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141083:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32458.767578125,-10103.2978515625,-4139.51171875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141082:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32243.041015625,-11261.99609375,-4217.8154296875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141080:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32016.349609375,-11102.0615234375,-4172.181640625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d7:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32340.267578125,-12131.546875,-4276.1220703125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29450.37890625,-12450.99609375,-4248.1787109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a3:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30332.349609375,-12917.0849609375,-4313.6650390625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[32620.939453125,-12295.2822265625,-4265.97998046875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a0:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30051.677734375,-12753.349609375,-4311.63037109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831ad:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29923.47265625,-13003.6845703125,-4364.17578125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0}]}; };
 module.exports.createQuestOrchardSources = QUEST_FISHING_SOURCES.createQuestOrchardSources;
 module.exports.huntBundles = QUEST_HUNT_BUNDLES;
-module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","contentSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
+module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","contentSha256":"8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
 module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
@@ -77501,14 +77727,36 @@ function cleanup(key,value,method) {
   }
   if(globalThis[key]===value) globalThis[key]=null;
 }
+/*
+  WHETHER THE PREVIOUS LOAD'S NPCS CAN CARRY ON IN THIS ONE (#3296). The
+  runtime and the population hand over what they know when they stop, and
+  this load takes it only when both loads have the same NPC code and the same
+  catalogue: the text of the population policy, catalogue and runtime blocks
+  and of this block, read from the file that is loading, and the catalogue
+  the merchant roles made from it. Anything different takes the full load,
+  because what the old load knew may not fit this code.
+*/
+function carryKey(populationData) {
+  const text=require('fs').readFileSync(__filename,'utf8').replace(/\r\n/g,'\n');
+  const marker=(name,end)=>'// NPC '+name+(end ? ' END' : ' BEGIN');
+  const from=text.indexOf(marker('POPULATION POLICY')),to=text.indexOf(marker('SERVER RUNTIME',true),from);
+  const at=text.lastIndexOf(marker('SERVER STARTUP')),until=text.indexOf(marker('SERVER STARTUP',true),at);
+  if(from<0 || to<0 || at<0 || until<0) throw new Error('the NPC blocks are not in the loading file');
+  return require('crypto').createHash('sha256').update(text.slice(from,to)).update(text.slice(at,until))
+    .update(JSON.stringify(populationData)).digest('hex');
+}
 try {
-  const teardownErrors=[];
-  const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
-    ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]
-    .map(([key,method])=>[key,method,globalThis[key]]);
+  const teardownErrors=[],handed={};
+  // A runtime or population from before handover() existed only stops.
+  const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','handover','stop'],
+    ['__thornswoodNpcPopulation','handover','stop'],['__thornswoodNpcMerchants','shutdown']]
+    .map(([key,...methods])=>[key,methods,globalThis[key]]);
   current();
-  for(const [key,method,prior] of priorControllers) {
-    try {if(prior && typeof prior[method]==='function') prior[method]();}
+  for(const [key,methods,prior] of priorControllers) {
+    try {
+      const method=prior && methods.find(name=>typeof prior[name]==='function');
+      if(method) handed[key]=prior[method]();
+    }
     catch(error) {teardownErrors.push(error);}
     // Finish every captured controller even if a callback starts a successor.
     // Only the current startup may clear its global slots.
@@ -77539,6 +77787,14 @@ try {
     const roleStage=MERCHANT_TRADING.prepareRoles(NPC_POPULATION_DATA,roleNative);
     current();
     const populationData=roleStage.population;
+    let key=null;
+    try {key=carryKey(populationData);} catch(error) {log('NPC handover is unavailable: '+error);}
+    current();
+    const runtimeCarry=handed.__thornswoodNpcRuntime,populationCarry=handed.__thornswoodNpcPopulation;
+    const carried=!!(key && runtimeCarry && populationCarry && runtimeCarry.key===key && populationCarry.key===key);
+    if(!carried && priorControllers[1][2])
+      log('Shared NPC runtime starts over: '+(!runtimeCarry || !populationCarry ? 'the previous gamemode load handed nothing over' :
+        !key ? 'this load cannot name its NPC code' : 'the previous gamemode load had other NPC code or another catalogue'));
     const retirement=populationData.merchantRoster!==undefined;
     merchants=createNpcMerchantPurses(mp,populationData,
       createPrivateMerchantLedger(require('fs'),require('path'),cfgNpc,
@@ -77576,12 +77832,14 @@ try {
       // runtime's own preparation pass that asked about it.
       run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0),
       // #1390: the staff's patrol roads, as the patrol keeper below read them.
-      patrols:()=>globalThis.__thornswoodThalmorPatrols});
+      patrols:()=>globalThis.__thornswoodThalmorPatrols,
+      // #3296: what the previous load decided, and the key the next one checks.
+      key,carry:carried ? populationCarry : null});
     current();
     // Each step it schedules is counted on the minute line (#385).
     runtime = startSharedNpcServerRuntime(
       mp, {setTimeout:(fn,delay)=>setTimeout(counted('npc '+(fn.npcRuntimeTask||'task'),fn),delay), clearTimeout},
-      Date.now, text=>log(text),population,{suspended:true});
+      Date.now, text=>log(text),population,{suspended:true,key,carry:carried ? runtimeCarry : null});
     ready();
     // Every fallible constructor and initial timer is staged before this commit attempt.
     population.commit();

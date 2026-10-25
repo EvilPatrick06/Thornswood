@@ -1,0 +1,15 @@
+{
+  "about": "Which VPS runner may sign a release launcher: release.yml's VPS fallback asks for this label beside thornswood-vps, so it runs on these runners and no other (#3312, Patrick, 22 Oct 2026: \"for signing it will use runner 3\"). Runner 3 is the light runner (docs/DECIDED.md) and carries no build label, so the job that can sign never shares a runner with pull request code, and release.yml's verify job, on the build runners, never runs on the runner that signed. tests/test-release-workflow.ps1 holds that this list and records/build-runners.json share no runner. GitHub's runner labels follow this file on main: a push that changes it runs github-admin.yml, and pwsh scripts/deploy/Set-BuildRunners.ps1 asks again (#3107). scripts/deploy/Install-Runner.ps1 registers a runner listed here with the label too, so a reinstall keeps it.",
+  "label": "thornswood-sign",
+  "runners": [3],
+  "reach": {
+    "about": "Every host outside GitHub that release.yml's sign steps reach from the signing runner, each with the Azure service tag in Microsoft's published Service Tags file (https://www.microsoft.com/download/details.aspx?id=56519, the Public cloud) whose ranges hold it. scripts/deploy/Install-Runner.ps1 -NetworkOnly lets these tags' ranges through for a runner this file lists, beside GitHub's, and stops before any rule changes when a host answers from an address outside its tag, so a host that moved is said, not blocked. Measured 22 Oct 2026 (#3312): release.yml run 39838728417 stopped at api.nuget.org because runner 3's rules held none of these. Not here, and not measured yet: www.microsoft.com, where the signing chain's certificate and revocation list addresses point (read off the signature of dev launcher 1.2.6.7). It is Akamai, which publishes no ranges. Whether a sign step reaches it is what the proof run in ops/claude-queue/3312-sign-runner.md measures; a stop there is a finding for #3312, never a resolved address. tests/test-runner-offbox.ps1 holds each host to the file that names it.",
+    "hosts": [
+      { "host": "api.nuget.org", "tag": "AzureFrontDoor.Frontend", "for": "Microsoft's signing client, at the URL scripts/release/Setup-ShipMachine.ps1 pins" },
+      { "host": "login.microsoftonline.com", "tag": "AzureActiveDirectory", "for": "the token exchange, the job's GitHub OIDC token for an Azure one" },
+      { "host": "wus2.codesigning.azure.net", "tag": "AzureCloud.westus2", "for": "the signing service, records/signing/metadata.json's Endpoint; no narrower tag holds it" },
+      { "host": "timestamp.acs.microsoft.com", "tag": "AzureFrontDoor.Frontend", "for": "the timestamp, records/signing/signing.template.json's timestampUrl" },
+      { "host": "oneocsp.microsoft.com", "tag": "AzureFrontDoor.FirstParty", "for": "the revocation check the signing chain's Code Signing PCA 2021 names" }
+    ]
+  }
+}

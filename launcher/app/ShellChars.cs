@@ -224,8 +224,12 @@ namespace Thornswood
                 // either way. Say that, once, and let the caller stop.
                 if (st.Why == "offline")
                 {
+                    // Which character, and what the request ran into, so a
+                    // failed check in names its own cause (22 Oct: two on dev
+                    // logged only "not answering" while the site was up).
                     PresenceLog("thornswood.net is not answering, so your characters were not " +
-                                "checked in. The game still starts.");
+                                "checked in. The game still starts. (character " + id +
+                                (st.NetFailure.Length > 0 ? ": " + st.NetFailure : "") + ")");
                     return false;
                 }
 

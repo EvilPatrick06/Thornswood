@@ -17,15 +17,15 @@ rules still apply. Another hold's Enchanter does not repeat this new offer.
 
 The source table specified the personal rest but no shared return. The chosen
 thirty minutes matches the common mineral-seam return and bounds these six
-sources at288 gems per day globally. Personal quest limits apply separately.
+sources at 288 gems per day globally. Personal quest limits apply separately.
 This is a documented source rate choice, not an assertion of an earlier timer.
 
 The six deposits keep base `10e93b:Skyrim.esm` and stay in Blackreach
-(`1ee62:Skyrim.esm`). Each must remain within128 units of its measured position;
-the character must share that world and stand within400 units of the deposit.
-The native item must retain SLGM type, SOUL0 and SLCP1. Filled gems do not count
+(`1ee62:Skyrim.esm`). Each must remain within 128 units of its measured position;
+the character must share that world and stand within 400 units of the deposit.
+The native item must retain SLGM type, SOUL 0 and SLCP 1. Filled gems do not count
 as the selected reward. Positions come from the winning enabled references
-under the103-plugin population load order pinned by the manifest.
+under the 103-plugin population load order pinned by the manifest.
 
 | Existing reference | Winning position |
 | --- | --- |
@@ -48,4 +48,4 @@ Automated tests exercise actual activation and draw paths, native empty-gem
 fields, generated production exports, actor replacement, actual profession,
 late eligibility changes, stock, caps, extras, abandonment and write refusals.
 Pearl/crimson, existing quest/trade and startup regressions remain required.
-Claude owns the release step after source merges and required green CI.
+A release can follow only after the source merges with required green CI.

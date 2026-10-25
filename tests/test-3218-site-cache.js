@@ -128,7 +128,7 @@ function named(html) {
   // ---- what is in the repository, read without a server --------------------
   const src = fs.readFileSync(path.join(APP, 'server.js'), 'utf8');
   const csp = JSON.parse((src.match(/const CSP_HEADER = ("[^"\r\n]*");/) || [, '""'])[1]);
-  yes('the CSP lets Cloudflare\'s analytics script in', /script-src 'self' https:\/\/static\.cloudflareinsights\.com;/.test(csp));
+  yes('the CSP lets Cloudflare\'s analytics script in', /script-src 'self' https:\/\/static\.cloudflareinsights\.com[ ;]/.test(csp));
   yes('and lets it report', /connect-src 'self' https:\/\/cloudflareinsights\.com;/.test(csp));
   const privacy = fs.readFileSync(path.join(APP, 'data', 'site', 'privacy.md'), 'utf8');
   yes('the privacy page names Cloudflare Web Analytics and where it comes from',

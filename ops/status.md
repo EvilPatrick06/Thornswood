@@ -2,64 +2,122 @@
 
 What is true now. Rewritten in place by whoever changes it; history is in git.
 
-Last rewritten 22 Oct 2026, 9:55 AM (Patrick's time) by the Local Desk on One,
-which folded in what was still true from the vault's `wiki/status.md` (that
-page now only points here). The run notes moved from the vault's
-`wiki/claude-queue/` to `claude-queue/` here in the same change.
+Last rewritten 22 Oct 2026, 2:05 PM (Patrick's time) by the Cloud Desk, after
+the afternoon's runs (#3337, #3350, the #3336 wipe, #3317, #3107, #3312).
+Before that, 10:45 AM by the Cloud Desk, and 9:55 AM by the Local Desk on One,
+which folded in what was still true from the vault's `wiki/status.md` and
+moved the run notes here.
 
 ## Releases now
 
 | Channel | Launcher | Release | Built from | Engine | Game / resources / voice |
 |---------|----------|---------|------------|--------|--------------------------|
 | Main | 1.2.5 | 20261017-205912 | 24572604 (tag release/main/20261017-205912) | 3bdf3d3c | 7777 / 3000 / 7778 |
-| Dev | 1.2.6.6 | 20261022-094041-dev | a8c91cc7 (tag release/dev/20261022-094041-dev) | 1a6e3e53 | 7787 / 7788 / 7789 |
+| Dev | 1.2.6.7 | 20261022-194609-dev | 23ece55d (tag release/dev/20261022-194609-dev) | 7ae58fea | 7787 / 7788 / 7789 |
 
-- **Dev server:** engine 1a6e3e53 since Publish-Server at 6:23 AM on 22 Oct
-  (INSTALL OK after #3277 fixed the swap, #3262). Gamemode 5a81f5c6 (#3286)
-  since 7:18 AM. #3302 (1d39df36, Thornswood-Last.esp) merged after the 9:37 AM
-  dev Ship began, so it needs Deploy-DevGamemode -LoadOrder and the next dev
-  Ship.
+- **Dev server:** engine 7ae58fea (#3333's storage fix, fork #109 and #107)
+  since Publish-Server -FromStore -ServerBuild (CI's server zip of the pin,
+  engine.yml run 39832871016) from the cloud at 1:11 PM on 22 Oct, INSTALL OK.
+  Gamemode and our plugins of 23ece55d by Deploy-DevGamemode -LoadOrder at
+  1:44 PM: Thornswood-Content.esp is `8370ae32…` (271,624 bytes, #3350). Both
+  went to clients in 20261022-193523-dev (1:36 PM) and 20261022-194609-dev
+  (1:47 PM), each mods-only from the feed. Its world was wiped on purpose at
+  2:48 AM for #3078 (Wipe-Saves.ps1 -Server dev, 42 characters); the 2:15 AM
+  backup holds them.
 - **Dev profile** (#3181), 7:28 AM on 22 Oct, nobody on, 4,883 NPCs loaded:
-  0.125 of a core on the JavaScript thread (0.176 before #3255).
+  0.125 of a core on the JavaScript thread (0.176 before #3255). A 120 second
+  profile on eaf9f0b9 started at 10:26 AM for the VPS performance work.
 - **Live server:** engine 3bdf3d3c with main's 1.2.5 gamemode. The next main
   release needs a live `Deploy-Server -GamemodeOnly` first, and never goes
   straight after a dev Ship.
 - **Live voice:** voice-bcc2dbaa (deployed 19 Oct), auth on, loopback only;
   /health chatRetention overdueDays 0, no prune error (read 8:37 AM 22 Oct).
-- **Site:** from main bb8a579b (Deploy-Docs -Site, 9:30 AM 22 Oct). Cloudflare
-  fronts ports 80 and 443, which take only Cloudflare's addresses (#2995).
+- **Site:** from main 23ece55d (Deploy-Docs -Site from the cloud, 1:49 PM 22
+  Oct). Its live access lists were written whole at 1:57 PM for #3317
+  (Set-DiscordLogin -Access): the dev build is for Owner, Co-Owner, Dev and
+  the leads, and the company role is Free Skyrim Trading Company. The roadmap
+  board was replaced from main at 10:16 AM (#2560: the #502 row without
+  bounties, #507's free claim row); the known board is still as typed on the
+  site, held for #3137. Cloudflare fronts ports 80 and 443, which take only
+  Cloudflare's addresses (#2995). thornswood.net has a DMARC record at
+  p=none reporting to Cloudflare's DMARC Management, set 11:17 AM 22 Oct
+  through the connector (#3216). Cloudflare (#3216): two-factor is required
+  for every account member; the box's address has an IP Access allow rule;
+  AI Labyrinth and JavaScript Detections are on; Bot Fight Mode is OFF since
+  5:04 PM 25 Oct (Patrick), because the free plan's version takes no
+  exceptions and challenged the GitHub runner's launcher check, stopping
+  every Ship (#3312). The free managed WAF rules still block the WordPress
+  probes. The report form has Turnstile on (keys set by
+  `Set-Turnstile.ps1 -FromCloudflare` on 25 Oct, sealed to the box's key in
+  C:\Thornswood-Seal), and the site serves security.txt.
 
 ## The box
 
 - **Runners:** three on the VPS. 1 and 2 carry thornswood-build, 3 takes light
-  jobs only (#3108, #3117). The `Thornswood Gate Trace` task runs for runners
-  1 and 2 since 9:22 AM on 22 Oct (#3114); no map yet.
+  jobs only (#3108, #3117) and carries thornswood-sign since 1:37 PM on 22 Oct
+  (#3312). Labels follow `records/*-runners.json` on main through the box's
+  GitHub App `thornswood-box-admin` (5431512, made 1:30 PM 22 Oct, #3107),
+  which any session, the cloud included, asks with Set-BuildRunners.ps1.
+  Runner 3's network guard still refuses the signing hosts (`api.nuget.org`
+  first), so release.yml's box fallback cannot sign yet (#3312). Each runner account has its 6 outbound block rules
+  (#2161, read 10:10 AM 22 Oct). The `Thornswood Gate Trace` task runs for
+  runners 1 and 2 since 9:22 AM on 22 Oct, and its map is live: a pull
+  request's gate takes about 2 minutes (#3114, closed).
+- **Accounts:** the dev server, dev voice, live voice, Caddy, the site, the
+  backup and the bridge run as LOCAL SERVICE, Limited. `Thornswood Server`
+  (live) is still SYSTEM until the next main release's Publish-Server (#2578).
 - **Backup:** the `Thornswood Backup` task runs on its own LOCAL SERVICE
   account and may read bot.env.json since 4:17 AM on 22 Oct (#2836, #3258). The
   4:17 AM run ended with result 0, 0 skipped. Next at 2:15 AM, and it takes
   turns with server installs (#3247).
 - **Watchdog:** a delayed-start service within 15 minutes of boot counts as
-  starting, not down (#3222).
+  starting, not down (#3222). It cannot tell a deploy from an outage: a dev
+  publish at 1:11 PM on 22 Oct was told to staff as down and back (#3356).
+- **Bridge:** the new bridge (#3297, closed) logs each session's end and who
+  closed it, and Caddy logs each `/box/` request in `data\logs\box.log`. A
+  cloud ssh run was cut from outside the box after about 39 minutes, though
+  its process ran on (#3357).
 - **Windows on the box:** telemetry tasks still on, and Windows Update still
   on its own hours. Harden-VPS for #3213 stopped at 7:51 AM on 22 Oct before
   changing anything, when one ssh through the bridge timed out at the banner
   (#3297). `UpdateOrchestrator\Reboot_AC` plans a restart of the box by
-  itself at 6:08 AM on 23 Oct until the hardening runs. #1043: upgrade OpenSSH
+  itself at 6:08 AM on 23 Oct until the hardening runs. #3297 is closed, so
+  Harden-VPS can run again. #1043: upgrade OpenSSH
   at the box's next planned restart, then check the host key against
   `scripts\vps\vps.json` and that the post-quantum warning is gone.
 
 ## Waiting
 
-- **#3297**, then Harden-VPS for #3213 (Patrick's standing rule lets the Desk
-  run it).
+- **Harden-VPS for #3213** (Patrick's standing rule lets the Desk run it),
+  before 6:08 AM on 23 Oct.
+- **Discord** (#3317, 22 Oct): every channel was cleared for the clean start
+  (#3336) except rules, instructions, docs, known issues, test tasks and the
+  staff records, and the read-only posts were rewritten. Onboarding is off;
+  Member comes from the button in #start-here. The Factions category and its
+  roles are made. The bot runs with the council's staff and upper staff roles,
+  and keeps Administrator for good (Patrick, 22 Oct: "the bot will keep
+  admin"); nothing is to untick it. Seven role-order differences and a stray
+  #game-rules in In Character remain (Setup-Discord -OnBox -Audit) until the
+  layout run (ops/claude-queue/3317-discord-layout.md: a category per
+  faction, the ticket split, the role order in one request). The dev updates
+  webhook posts into #staff-announcements.
 - **#2519:** the Gamemasters channels are made (7:51 AM 22 Oct). GM Rules v1.0
   is to be posted and pinned in #gm-rules by the bot, but its text is in none
   of the repository, the vault or Drive; it waits on Djinn or Patrick for the
   text.
-- **#3302:** Deploy-DevGamemode -LoadOrder and a dev Ship.
-- **A launcher change** still needs a Ship from One: -FromFeed refuses one and
-  -ModsOnly keeps the feed's launcher. The cloud fix is compiling and signing
-  the launcher in CI.
+- **The main release** carries what dev has: the merchant work (#1373, its
+  Content.esp is now `8370ae32…`, on the dev server and in the dev release), the
+  licences folder (#3099, #3287, both in Done), the help page's hair dye
+  section (#2705), the storage fix and engine 7ae58fea (#3333), the Passage
+  books (#3350) and the rows in `claude-queue/test-tasks-at-main.md`.
+- **#2183:** the availability baseline runs 22 Oct to 19 Nov 2026
+  (docs/SERVICE-OBJECTIVES.md). Watch-Outside -Install for the off-box check
+  needs One.
+- **A launcher change** still needs a Ship from One. From the cloud, -FromFeed
+  asks release.yml for a signed launcher (#3318). With no hosted minutes until
+  about 1 Nov, that falls back to runner 3, which cannot fetch the signing
+  client yet (#3312). -ModsOnly keeps the feed's launcher, and main has a
+  launcher change waiting since acc0715f.
 - **#2578:** at the next main release, after the live Publish-Server,
   `claude-queue/2578-prod-parity.md`.
 - **Checks that need a game client** (nobody here starts the launcher or the
@@ -92,7 +150,12 @@ page now only points here). The run notes moved from the vault's
   <channel>` before the Ship.
 - Thornswood-Last.esp's order includes the Skyrim.ccc plugins after the five
   masters.
-- Deploy-Docs, Trace-Gate and Deploy-DevGamemode take no `-NoPause`.
+- Deploy-Docs, Trace-Gate, Deploy-DevGamemode and Setup-Discord take no
+  `-NoPause`.
+- `pwsh -File` hands a comma list to a script as one string, so `-Give` and
+  `-Access` lists go through `pwsh -Command "& ./scripts/..."`.
+- A dev Ship that carries a changed Thornswood-Content.esp stops until the
+  dev server holds it: Deploy-DevGamemode -LoadOrder -ShipFollows first.
 
 ## Standing orders not written elsewhere
 

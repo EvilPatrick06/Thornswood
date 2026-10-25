@@ -62,6 +62,7 @@ for _k in ('TEST_TASK_ROLES', 'LIVE_SMOKE_ADMIN_ROLES', 'GITHUB_TOKEN'):
 
 import discord  # noqa: E402
 import bot  # noqa: E402
+bot.POST_RULES = False   # these fixtures predate the post rules; test-post-rules.py checks them
 
 PASS = []
 FAIL = []
@@ -1537,10 +1538,14 @@ _spec = importlib.util.spec_from_file_location(
 B = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(B)
 _plan = [s for _c, specs in B.PLAN for s in specs if s['name'] == 'dev-test-tasks']
-yes('Build-Discord.py names #dev-test-tasks in Staff, never makes it (the bot\'s '
-    'setup does), never deletes it, and writes the bot\'s own topic on it',
+# In the Dev space since #3317 (Patrick, 22 Oct: "the tasks and finings under
+# staff will go under the new dev category"), moved there by its was line so
+# the id the bot finds it by stays the same.
+yes('Build-Discord.py names #dev-test-tasks in Dev, moved from Staff, never makes it '
+    '(the bot\'s setup does), never deletes it, and writes the bot\'s own topic on it',
     [c for c, specs in B.PLAN if any(s['name'] == 'dev-test-tasks' for s in specs)]
-    == ['Staff'] and len(_plan) == 1 and _plan[0].get('make') is False
+    == ['Dev'] and ('Staff', 'dev-test-tasks') in (_plan[0].get('was') or ())
+    and len(_plan) == 1 and _plan[0].get('make') is False
     and _plan[0]['kind'] == 'forum' and 'dev-test-tasks' in B.KEEP
     and _plan[0].get('topic') == bot.DEV_TOPIC)
 

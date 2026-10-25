@@ -13,3 +13,7 @@ PR #2637 (Refs #2183), squash commit 956c9ad9 on main, adds scripts\vps\Read-Ava
 3. Write that start date into the "Baseline period" section of docs\SERVICE-OBJECTIVES.md in a small PR, with the date four weeks later as its end. At that end date, run the reader again with -From the start and -To the end; that output is the baseline. Do not change any threshold or say any service meets its target from the first run.
 
 No Ship, no deploy, no VPS change beyond reading alerts.jsonl.
+
+## Ran
+
+- 22 Oct 2026, 10:07 AM (Cloud Desk): step 2, on a copy of alerts.jsonl fetched with scp, deleted after. 107 lines, the oldest from 21 Oct 11:05 AM; down so far: the backup once (111.9 minutes), the dev game twice (24.3), runner 2 twice (20.0), the website once (9.4). Step 3 is in the Desk's 22 Oct batch pull request: the baseline period is 22 Oct to 19 Nov 2026. Left: step 1 on One, and on 19 Nov the reader with `-From 2026-10-22 -To 2026-11-19`, whose output goes on #2183 and into SERVICE-OBJECTIVES.md as the baseline.

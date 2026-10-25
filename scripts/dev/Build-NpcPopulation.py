@@ -617,7 +617,7 @@ def write_merchants(payload):
     for ref, row in sorted(by_ref.items(), key=lambda item: (item[1]['hold'], item[1]['role'])):
         lines.append('| ' + ' | '.join([row['hold'], row['role'], row['locationName'], ref, row['bookHold']]) + ' |')
     lines += ['', 'Total: 60', '',
-        'Each authored identity returns after360 minutes and keeps its existing512-unit home radius.',
+        'Each authored identity returns after 360 minutes and keeps its existing 512-unit home radius.',
         'Exact coordinates and the shared population rules are in [NPC spawns](../NPC-SPAWNS.csv).']
     with (root / 'docs/systems/merchant-traders.md').open('w', encoding='utf-8', newline='\n') as output:
         output.write('\n'.join(lines) + '\n')

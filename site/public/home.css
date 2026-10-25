@@ -59,7 +59,8 @@ header{position:sticky;top:0;z-index:40;
   border-bottom:1px solid var(--edge)}
 header .bar{display:flex;align-items:center;gap:26px;height:64px}
 .mark{display:flex;align-items:center;gap:11px;font:600 19px/1 var(--carve);
-  letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap}
+  letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap;
+  flex-shrink:0}
 .mark img{width:28px;height:28px;border-radius:6px}
 nav.top{display:flex;gap:24px;margin-left:auto;align-items:center}
 nav.top a{font:400 14px/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;
@@ -77,16 +78,22 @@ nav.top a:hover{color:var(--page)}
 .breadcrumbs{padding-top:24px;font:14px/1.6 var(--sans);color:var(--quiet)}
 .breadcrumbs ol{display:flex;flex-wrap:wrap;gap:12px;list-style:none;margin:0;padding:0}
 .breadcrumbs li+li::before{content:'/';margin-right:12px}
+/* The menu folds into the burger at 1080 and under, not 900: the name (210
+   wide, never squeezed) and the eight links need about 1050 across, and below
+   that the bar shrank the name into RULES and pushed Discord and Download off
+   the right edge (#3293). home.js narrow() asks the same width. */
 @media(max-width:900px){
-  header .bar{gap:12px}
   .mark{font-size:15px;letter-spacing:.04em;gap:7px}
+}
+@media(max-width:1080px){
+  header .bar{gap:12px}
   .mobile-cta{display:flex;align-items:center;min-height:44px;margin-left:auto;
     padding:0 10px;border:1px solid var(--gold);font:600 13px/1 var(--sans);color:var(--gold)}
   .burger{margin-left:0;flex-shrink:0}
 }
 /* Keep anchor destinations visible below the sticky header. */
 [id]{scroll-margin-top:100px}
-@media(max-width:900px){
+@media(max-width:1080px){
   nav.top{position:fixed;inset:calc(64px + env(safe-area-inset-top,0px)) 0 auto 0;
     flex-direction:column;align-items:stretch;gap:0;background:var(--stone);
     border-bottom:1px solid var(--edge);margin:0;padding:6px 0 14px}
@@ -510,3 +517,6 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
   height: 1px;
   overflow: hidden;
 }
+/* Turnstile's widget on the report form (#3216): its own height held, so the
+   button under it does not jump when Cloudflare draws it. */
+.ts-check { min-height: 65px; }

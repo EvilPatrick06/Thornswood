@@ -43,5 +43,5 @@ Regressions cover native body replacement, bounds/leash/reach, class, malformed
 or sparse bundles, duplicate draws across characters, respawn, restart,
 completion/extras, abandon, failed and unknown writes, final conversations,
 real loot/activation routing and reentrant reservation/rollback. Other hunting
-and gathering sources keep their existing behavior. Claude owns Dev delivery
-and connected acceptance; source checks do not claim it has been deployed.
+and gathering sources keep their existing behavior. Dev delivery
+and connected acceptance come later; source checks do not claim it has been deployed.
