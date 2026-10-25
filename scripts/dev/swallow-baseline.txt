@@ -181,7 +181,7 @@ scripts\mods\Fix-Icons.ps1 1
 scripts\mods\LoadOrder.ps1 3
 scripts\oneoff\Undo-DiscordBuild.ps1 3
 scripts\ops\Publish-News.ps1 1
-scripts\ops\Reset-Character.ps1 1
+scripts\ops\Reset-Character.ps1 0
 scripts\ops\Set-Door.ps1 6
 scripts\ops\Set-Server.ps1 1
 scripts\ops\Wipe-Saves.ps1 1

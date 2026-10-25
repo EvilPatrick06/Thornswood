@@ -35,6 +35,12 @@
        deleted profile, the saves; nobody to name writes nothing; a list set
        aside that is not one is said and not carried; a server whose move
        did not finish gets no list
+    B  the reset's stop and start (#2871): the box opens the server on the
+       root's own port before it is stopped, waits for it to exit, runs the
+       reset, starts the task and waits for both ports within the shared
+       ceiling; this machine tries once from outside; nothing sleeps a fixed
+       time; settings that will not read, or name no port, stop it with
+       nothing stopped
     G  each list the scripts wrote is read by the gamemode's own release
        block: a reset's waits on every part (with no profile, all but the
        saves), a wipe's only on the merchants' (and the saves while it
@@ -126,6 +132,46 @@ Yes 'S9 the reset''s body carries the writer and asks it for a list with no prof
     $resetBody.Contains('$found = Get-ThornswoodCharacterIds $moved') -and
     ([regex]::Matches($resetBody, 'Write-ThornswoodReleaseList -Root \$Root -Actors \$found\.ids\)\)')).Count -eq 1)
 
+# ---- B: the reset's stop and start (#2871) -----------------------------------
+# The box's script, built as the reset builds it.
+function RightOf([string]$name) {
+    $n = '$' + $name
+    $a = @($R.ast.FindAll({ param($x) $x -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($x.Left)" -eq $n }.GetNewClosure(), $true))
+    if ($a.Count -ne 1) { return $null }
+    return $a[0].Right.Extent.Text
+}
+$resetRun = $null
+$rights = @((RightOf 'stopAndMove'), (RightOf 'readyWait'), (RightOf 'run'))
+if (@($rights | Where-Object { $_ }).Count -eq 3) {
+    $resetRun = & {
+        $Here = Join-Path $Repo 'scripts\ops'
+        $stopAndMove = & ([scriptblock]::Create($rights[0]))
+        $readyWait = & ([scriptblock]::Create($rights[1]))
+        & ([scriptblock]::Create($rights[2]))
+    }
+}
+$e = $null
+if ($resetRun) { [void][System.Management.Automation.Language.Parser]::ParseInput($resetRun, [ref]$null, [ref]$e) }
+Yes 'B1 the box''s stop and start script parses, and is ASCII for Windows PowerShell 5.1' (
+    $resetRun -and $e.Count -eq 0 -and -not ($resetRun.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
+function At([string]$s) { if (-not $resetRun) { return -1 }; return $resetRun.IndexOf($s) }
+$order = @((At '$held = @(Get-ThornswoodProcessHeld $pids)'), (At 'Stop-ScheduledTask -TaskName $Task'), (At '$still = @(Stop-ThornswoodProcessHeld $held)'),
+           (At '-File C:\thornswood-reset.ps1 -Root $Root'), (At 'Start-ScheduledTask -TaskName $Task'), (At '$Wait = Get-ThornswoodServerReadyWait'))
+Yes ('B2 it opens the server on the root''s own port, then stops the task, waits for it to exit, resets, starts it and waits within the shared ceiling (' + ($order -join ',') + ')') (
+    -not ($order | Where-Object { $_ -lt 0 }) -and (@($order) -join ',') -eq (@($order | Sort-Object) -join ',') -and
+    $resetRun.Contains('$_.LocalPort -eq $port') -and $resetRun.Contains("BeginConnect('127.0.0.1', `$resPort"))
+Yes 'B3 a server still there, or one that could not be opened, moves nothing' (
+    $resetRun -and $resetRun.Contains('STOP. The server has not exited, so nothing was thrown away') -and
+    $resetRun.Contains('STOP. The server could not be opened to wait for it. Nothing was stopped or thrown away.'))
+Yes 'B4 nothing in the reset sleeps a fixed time or knocks on a fixed port from here' (
+    $R.text -notmatch 'Start-Sleep -Seconds' -and $R.text -notmatch 'BeginConnect\(\$VpsHost' -and $R.text -notmatch 'Stop-Process')
+Yes 'B5 -UseLocal opens and waits on what it stops' (
+    $R.text.Contains('$held = @(Get-ThornswoodProcessHeld @($node | ForEach-Object { $_.Id }))') -and
+    $R.text.Contains('$still = @(Stop-ThornswoodProcessHeld $held)'))
+Yes 'B6 this machine tries the resources port the box named once from outside, beside a witness' (
+    ([regex]::Matches($R.text, 'Test-ThornswoodFromOutside ')).Count -eq 1 -and
+    $R.text.Contains('$outside = Test-ThornswoodFromOutside $VpsHost $resPort $witness'))
+
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) {
     Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs these on the VPS; this is not Windows'
@@ -212,6 +258,19 @@ try {
         $x.code -eq 1 -and @($x.out | Where-Object { $_ -like 'STOP. *server-settings.json will not parse*Nothing was thrown away.' }).Count -eq 1 -and
         @(Get-ChildItem -LiteralPath (Join-Path $r5 'world\changeForms') -Filter '*.json' -File).Count -eq 4 -and
         -not (Test-Path -LiteralPath (Join-Path $r5 'private')))
+
+    # The box's stop and start, as far as it goes before anything is stopped.
+    $b7 = Server 'run-badsettings' '{"port": '
+    $x = Run51 $resetRun @('-Root', $b7, '-Task', 'Thornswood test task that is not there')
+    Yes ('B7 settings that will not read stop the box''s script before anything is stopped (' + ($x.out -join ' / ') + ')') (
+        $x.code -eq 1 -and @($x.out | Where-Object { $_ -like 'STOP. *server-settings.json will not read*Nothing was stopped or thrown away.' }).Count -eq 1 -and
+        -not @($x.out | Where-Object { $_ -like 'stopped pid*' }).Count -and
+        @(Get-ChildItem -LiteralPath (Join-Path $b7 'world\changeForms') -Filter '*.json' -File).Count -eq 4)
+    $b8 = Server 'run-noport' '{"privDir":"private"}'
+    $x = Run51 $resetRun @('-Root', $b8, '-Task', 'Thornswood test task that is not there')
+    Yes ('B8 settings that name no port stop it too: which server is not guessed (' + ($x.out -join ' / ') + ')') (
+        $x.code -eq 1 -and @($x.out | Where-Object { $_ -like 'STOP. *names no port*Nothing was stopped or thrown away.' }).Count -eq 1 -and
+        @(Get-ChildItem -LiteralPath (Join-Path $b8 'world\changeForms') -Filter '*.json' -File).Count -eq 4)
 
     $r6 = Server 'reset-badform' '{}'
     Put (Join-Path $r6 'world\changeForms\3.json') '{"formDesc":"ff000a0'

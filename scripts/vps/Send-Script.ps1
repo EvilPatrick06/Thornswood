@@ -197,7 +197,9 @@ function Invoke-ThornswoodRemote {
         $rc = $LASTEXITCODE
     }
     finally {
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        # The local copy is this helper's own scratch, not a change the caller
+        # asked about, so a caller's -WhatIf does not keep it (#3123).
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue -WhatIf:$false
         # The far side's exit code, scp's when the copy failed, or 1 when
         # nothing ran.
         $global:LASTEXITCODE = $rc
