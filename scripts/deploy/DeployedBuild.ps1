@@ -20,6 +20,15 @@
 
   Writing it never fails a deploy: the server is already swapped in and
   answering by then, so a problem here is printed and the deploy goes on.
+
+  The docs root is never assumed. Until #3398 it defaulted to
+  C:/Thornswood-Docs, so a harness that ran Deploy-Server.ps1 on a VPS runner
+  against a scratch server root still wrote the live site's file, and from
+  20 Oct /credits said the main server ran a test fixture's commit. Each
+  caller now names it, as the Thornswood-Docs folder beside the server root
+  it deployed (Get-ThornswoodDocsRootBeside): the box's C:/Thornswood-Docs
+  for C:/Thornswood-Server and C:/Thornswood-Server-Dev, and a harness's own
+  scratch folder for a scratch root.
 #>
 
 # The far side. Kept as text so it runs on the box through
@@ -69,7 +78,19 @@ function Get-ThornswoodDeployedChannel([string]$Root) {
   return 'live'
 }
 
-function Get-ThornswoodDeployedBuildScript([string]$Root, [string]$DocsRoot = 'C:/Thornswood-Docs', [string]$At = '') {
+# The docs app's folder beside a server root: C:/Thornswood-Server and
+# C:/Thornswood-Server-Dev both give C:/Thornswood-Docs, and a scratch
+# <work>/Thornswood-Server gives <work>/Thornswood-Docs. '' for a root with
+# no folder above it.
+function Get-ThornswoodDocsRootBeside([string]$Root) {
+  $r = $Root.Replace('\', '/').TrimEnd('/')
+  $i = $r.LastIndexOf('/')
+  if ($i -lt 1) { return '' }
+  return $r.Substring(0, $i + 1) + 'Thornswood-Docs'
+}
+
+function Get-ThornswoodDeployedBuildScript([string]$Root, [string]$DocsRoot, [string]$At = '') {
+  if (-not $DocsRoot) { throw 'no docs root was given, so there is nowhere it may write (#3398)' }
   if (-not $At) { $At = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ') }
   $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
   $rootWin = $Root.Replace('/', '\').TrimEnd('\')
@@ -79,7 +100,7 @@ function Get-ThornswoodDeployedBuildScript([string]$Root, [string]$DocsRoot = 'C
      (& $q ($docsWin + '\data\deployed-build.json')) + ' ' + (& $q (Get-ThornswoodDeployedChannel $Root)) + ' ' + (& $q $At)) + "`r`n"
 }
 
-function Save-ThornswoodDeployedBuild([string]$Target, [string[]]$SshArgs, [string]$Root, [string]$DocsRoot = 'C:/Thornswood-Docs') {
+function Save-ThornswoodDeployedBuild([string]$Target, [string[]]$SshArgs, [string]$Root, [string]$DocsRoot) {
   $said = @()
   try { $said = @(Invoke-ThornswoodArtifactRemote $Target $SshArgs (Get-ThornswoodDeployedBuildScript $Root $DocsRoot)) }
   catch { $said = @('DEPLOYED BUILD NOT WRITTEN: ' + $_.Exception.Message) }
