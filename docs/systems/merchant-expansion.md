@@ -9,16 +9,16 @@ it does not describe a completed release.
 Patrick clarified during alpha testing that current merchant purses, stock
 and pending trades are disposable. Preserving that test economy is not a
 prerequisite for the sixty-merchant cut. Any one-time reset belongs to
-Claude's stopped-server rollout, never to recurring startup or a timed repair.
+a stopped-server rollout, never to recurring startup or a timed repair.
 
 Deliver usable sections before the whole quest catalogue is complete. The
 first runtime section assigns the selected sixty merchants their role names,
 item tables and matching legacy quest offers. The next section applies the
 sixty-only roster to the population generator and the matching last plugin.
-It requires Claude's coordinated content/client/server release. Empty alpha
+It requires a coordinated content/client/server release. Empty alpha
 merchant records initialize through ordinary first use, once per retained
 merchant; no pre-funding or reset is required. If old pending test work blocks
-admission, the explicit reset-data tool is available to Claude. Neither
+admission, the explicit reset-data tool is available. Neither
 section adds expanded quests. New offers
 still need their own objective, eligibility and transaction checks.
 
@@ -164,7 +164,7 @@ returns a copied, frozen definition or throws. Gates are exactly `{open:true}`,
 inherited fields cannot grant work. Master profession work names its owning
 half, or a school for Mage. Master class work has no half.
 
-`allows(gate,state)` returns a boolean from a saved version1 character snapshot.
+`allows(gate,state)` returns a boolean from a saved version 1 character snapshot.
 The chosen class/profession and canonical standing must match. An earned sister
 half counts, while a taught outside trade is not a chosen profession. Mage
 Master work additionally requires an exactly named, mapped rulebook Master
@@ -236,13 +236,13 @@ intent without retained terms. This readiness check still needs integration
 with the explicit roster activation step before a cut; no population change
 is included here. Unresolved legacy transfers retain their records and block
 activation rather than being reset or reissued.
-New intents use format3 and require their retained terms; format2 identifies
+New intents use format 3 and require their retained terms; format 2 identifies
 genuine pre-summary legacy work. Dropping terms cannot downgrade a new record.
 Legacy array cooldown keys still require a nonempty item label; original
 item-only legacy keys keep their compatible saved meaning.
 Without an explicit history manifest, the current active roster remains the
-manifest. The sixty-merchant roster keeps all249 historical identities while
-retiring189 extras. Writer ownership and pending-intent checks remain.
+manifest. The sixty-merchant roster keeps all 249 historical identities while
+retiring 189 extras. Writer ownership and pending-intent checks remain.
 Existing-world admission refuses null or missing retained purses before any
 initial grant. The explicit alpha roster permits empty retained entries to
 follow ordinary one-time first-use initialization; it neither resets a saved
@@ -264,7 +264,7 @@ finish before the native exclusion commit is attempted. The trading service
 cannot interact or recover while suspended, and a required retirement gate
 cannot be bypassed by omitting the suspension option. Genuine legacy work
 still recovers under its compatible source before a retirement that it blocks.
-The alpha reset-data generator is available for Claude to discard such test
+The alpha reset-data generator is available to discard such test
 work during a stopped-server maintenance step, as Patrick authorized.
 
 A failed constructor cancels its owned timers and reaches startup cleanup.
@@ -286,12 +286,12 @@ including native lookups, returns and the durable initialization boundary.
 Cancelling that caller alone leaves the shared services available to others;
 an uncertain durable write retains the existing writer revocation rule.
 
-`game/data/merchant-roster.json` records the60 role bindings and all249
+`game/data/merchant-roster.json` records the 60 role bindings and all 249
 historical identities. The production generator checks every binding before
-changing any source row, then emits exactly60 traders, descriptive titles,
-history, counts and location tables. The matching last plugin disables the189
-extra traders at the record. Claude must deliver matching client/server
-content together with strict client admission; a gamemode-only change and
+changing any source row, then emits exactly 60 traders, descriptive titles,
+history, counts and location tables. The matching last plugin disables the 189
+extra traders at the record. Matching client/server content must ship
+together with strict client admission; a gamemode-only change and
 server exclusions cannot suppress native client copies deterministically.
 Implement quests in complete, source-bound slices with coverage checks for
 all trades, holds, tiers, classes, professions, halves and schools. No accepted alpha work needs migration; existing recovery paths remain available without becoming a rollout prerequisite.
@@ -332,6 +332,6 @@ Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-conservation.js`,
 `node tests/test-merchant-deployment.js` and
 `node scripts/dev/Build-MerchantGamemode.js --check`.
-No game playtests or operational steps are performed by Codex. Changes
-merge only after the required exact-head Launcher builds gate. Claude
-receives the release handoff; no change is described as live before that.
+These source changes include no game playtests or operational steps. Changes
+merge only after the required exact-head Launcher builds gate, and no change
+is described as live before its release.

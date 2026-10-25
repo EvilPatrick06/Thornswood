@@ -6,9 +6,9 @@ the winning enabled reference records, `resource-locations.json`, and the kept
 cast in `npc-population.json`. Counts and rewards come from [Custom quests](quests.md).
 
 This is the binding specification. The four rare-mine offers have an
-implementation in PR2065. The six kill contracts have bindings in PR2130;
-their matching native and gamemode changes still need to be released by
-Claude. The [pearl bed](merchant-pearl-bed.md), [crimson work](merchant-crimson-work.md), [geode work](merchant-geode-work.md) and [longfin work](merchant-longfin-work.md) now have their source interactions in code. The [seven retrievals](merchant-retrieval-work.md) now use exact specialists, measured sources and atomic item returns. The [mammoth ground](merchant-mammoth-work.md) now uses its existing three native bodies. The [orchard](merchant-orchard-work.md) connects its ten existing trees through Farmer claims, sowing, seasonal growth and full harvest yields. A
+implementation in PR 2065. The six kill contracts have bindings in PR 2130;
+their matching native and gamemode changes still need to be released.
+The [pearl bed](merchant-pearl-bed.md), [crimson work](merchant-crimson-work.md), [geode work](merchant-geode-work.md) and [longfin work](merchant-longfin-work.md) now have their source interactions in code. The [seven retrievals](merchant-retrieval-work.md) now use exact specialists, measured sources and atomic item returns. The [mammoth ground](merchant-mammoth-work.md) now uses its existing three native bodies. The [orchard](merchant-orchard-work.md) connects its ten existing trees through Farmer claims, sowing, seasonal growth and full harvest yields. A
 reference in this document does not mean the quest is deployed or playable.
 
 Descriptors are local hexadecimal IDs followed by their source plugin. They
@@ -40,10 +40,10 @@ normal rank and tool rules. Ordinary harvesting must not bypass a scarce gate.
 
 Eight dedicated [longfin markers](merchant-quest-content.md) now have authored
 references `17200` through `17207:Thornswood-Content.esp`, using the existing
-base `154a5:Thornswood-Content.esp`. Each is48 units east of its listed clam
-anchor,32 units below the recorded sea surface and in the same CELL. Exact positions and authoring
+base `154a5:Thornswood-Content.esp`. Each is 48 units east of its listed clam
+anchor, 32 units below the recorded sea surface and in the same CELL. Exact positions and authoring
 checks are in `quest-content.json`. The original clams remain independent.
-The runtime longfin interaction is connected in code; matching content delivery remains with Claude.
+The runtime longfin interaction is connected in code; it is live only once the matching Content is on the server.
 The Fisher page requires master rank for longfin; the quest's broad Fisher
 label does not remove that rank gate.
 
@@ -117,6 +117,6 @@ These scene contracts add no enemy spawns and change no dungeon tier,
 camp difficulty, ordinary loot, population cap, or NPC return clock.
 Connected acceptance is tracked separately from these source-record choices.
 
-The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.
+The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask 3/cap 8 and 12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires a release.
 
-The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask2/cap6 and12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.
+The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask 2/cap 6 and 12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.
