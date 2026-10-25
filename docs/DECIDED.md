@@ -169,6 +169,21 @@ link, and the old line goes.
 
 ## The box
 
+- **The site's contact is Discord only.** It names no street address,
+  business email or company, and nothing is invented to fill one. 27 Sep 2026,
+  [#718](https://github.com/EvilPatrick06/Thornswood/issues/718).
+- **No cookie banner and no GDPR claim.** The site sets only the cookies it
+  needs to work and names them on the privacy page. 27 Sep 2026,
+  [#718](https://github.com/EvilPatrick06/Thornswood/issues/718).
+- **No refund policy;** nothing is sold on the site. 27 Sep 2026,
+  [#718](https://github.com/EvilPatrick06/Thornswood/issues/718).
+- **The alpha takes 25 people at once plus 5 staff seats**, the seats filled
+  only by the Discord staff roles; when it is full, people wait in line at
+  the main menu. 29 Sep 2026,
+  [#481](https://github.com/EvilPatrick06/Thornswood/issues/481).
+- **Dev is never rolled back;** a fault on dev is fixed forward. Only main is
+  rolled back, then fixed. 29 Sep 2026,
+  [#1158](https://github.com/EvilPatrick06/Thornswood/issues/1158).
 - **Builds stay on the game box**, and each build's cost comes down; a
   second box or a public repository is a new question only if the box still
   runs above 60% busy on a day of pull requests. 22 Oct 2026,

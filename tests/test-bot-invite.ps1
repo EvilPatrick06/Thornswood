@@ -1,32 +1,30 @@
 <#
   test-bot-invite.ps1
 
-  The bot's invite asks for what it runs on, not Administrator.
+  The bot's invite asks for Administrator, which the bot keeps.
 
-  Issue #455, "The bot is invited with Administrator and keeps it". With
-  Administrator the blast radius of the bot token, or of a backup zip that
-  holds it, is the whole server. The build needs Administrator, because it
-  makes the Owner and Dev roles and those carry it, but the running bot does
-  not. So bot\Build-Discord.py has two sets: Administrator for a build, and
-  RUN_BITS for the rest of the time. A build that finishes with nothing failed
-  ends on the invite link with that set and a line saying to untick
-  Administrator, and `Build-Discord.py --invite <application id>` prints the
-  same without a token, without discord.py and without connecting.
+  Issue #455 took Administrator off the running bot and left RUN_BITS, with
+  a line at the end of every build saying to untick it and to tick it again
+  before the next. Patrick ended that on 22 Oct 2026 (#3317): "the bot will
+  keep admin". So `Build-Discord.py --invite <application id>` prints the
+  invite with Administrator, and RUN_BITS stays as the record of what the
+  running bot itself uses, which the audit checks when Administrator is gone.
+  It prints without a token, without discord.py and without connecting.
 
   This checks, in order:
 
     1. the builder parses, without running it;
-    2. the dry path prints an invite whose permissions are one integer, not 8,
-       with scope bot and the id it was given;
-    3. that integer, decoded against the bit numbers on Discord's permissions
+    2. the dry path prints one invite, with scope bot, the id it was given,
+       and permissions 8, Administrator;
+    3. RUN_BITS, decoded against the bit numbers on Discord's permissions
        page (written out below, not taken from the builder or discord.py), is
        exactly the intended list, and Administrator is not in it;
     4. the builder's own names for those bits are the page's names;
-    5. the untick Administrator line follows the link;
+    5. nothing says to untick Administrator any more;
     6. the dry path never imports discord.py and needs no token: a stand-in
        discord package that fails on import is put first on the path;
     7. with no id it says how to get one and prints no link;
-    8. Setup-Discord.ps1 parses and says the same about the two sets.
+    8. Setup-Discord.ps1 parses and says the bot keeps Administrator.
 
   The end of a real build is checked in bot\test-bot-overwrites.py, which
   drives the builder against a stand-in server and needs discord.py.
@@ -120,7 +118,7 @@ try {
     $r = Run-Py @('-c', "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf-8').read()); print('the builder parses')", $Builder)
     Yes 'Build-Discord.py parses' ($r.Code -eq 0 -and $r.Out -match 'the builder parses')
 
-    # ---- 2. the dry path prints one integer, not 8 ---------------------------
+    # ---- 2. the dry path prints the invite with Administrator ---------------
     $id = '123456789012345678'
     $r = Run-Py @($Builder, '--invite', $id)
     Yes 'the dry path exits 0' ($r.Code -eq 0)
@@ -128,11 +126,15 @@ try {
     Yes 'it prints an invite link with scope bot' $m.Success
     if (-not $m.Success) { Write-Host $r.Out; Done }
     Yes '  for the application it was given' ($m.Groups[1].Value -eq $id)
-    $n = [UInt64]$m.Groups[2].Value
-    Yes ('  and its permissions are {0}, not 8' -f $n) ($n -ne 8)
+    Yes ('  and its permissions are 8, Administrator') ($m.Groups[2].Value -eq '8')
     Yes '  and there is exactly one link' ([regex]::Matches($r.Out, 'oauth2/authorize').Count -eq 1)
 
-    # ---- 3. the integer decodes to exactly the intended list -------------
+    # ---- 3. RUN_BITS decodes to exactly the intended list -----------------
+    $src = Get-Content -LiteralPath $Builder -Raw
+    $rows = [regex]::Matches($src, "\('([A-Za-z ]+)',\s+(\d+)\),")
+    $pairs = @($rows | ForEach-Object { [pscustomobject]@{ Name = $_.Groups[1].Value; Bit = [int]$_.Groups[2].Value } })
+    $n = [UInt64]0
+    foreach ($p in $pairs) { $n = $n -bor ([UInt64]1 -shl $p.Bit) }
     $got = @()
     $unknown = @()
     for ($b = 0; $b -lt 64; $b++) {
@@ -153,9 +155,6 @@ try {
     Yes ('  and it is the sum of those bits, {0}' -f $sum) ($n -eq $sum -and $n -eq [UInt64]395405528080)
 
     # ---- 4. the builder's names are the page's names ------------------------
-    $src = Get-Content -LiteralPath $Builder -Raw
-    $rows = [regex]::Matches($src, "\('([A-Za-z ]+)',\s+(\d+)\),")
-    $pairs = @($rows | ForEach-Object { [pscustomobject]@{ Name = $_.Groups[1].Value; Bit = [int]$_.Groups[2].Value } })
     Yes ('RUN_BITS in the builder names {0} bits' -f $pairs.Count) ($pairs.Count -eq $Intended.Count)
     $named = $true
     foreach ($p in $pairs) {
@@ -166,11 +165,10 @@ try {
     Yes '  and each one is called what the page calls that bit' $named
     Yes '  and the dry path lists them by those names' (@($pairs | Where-Object { $r.Out -notmatch [regex]::Escape($_.Name) }).Count -eq 0)
 
-    # ---- 5. the untick line follows the link --------------------------------
-    $at = $r.Out.IndexOf('untick Administrator')
-    Yes 'it tells the person to untick Administrator on the bot''s role' ($at -ge 0)
-    Yes '  after the link, not before it' ($at -gt $m.Index)
-    Yes '  now the build is done' ($r.Out -match 'untick Administrator on the bot''s role now the build is done')
+    # ---- 5. nothing says to untick it ---------------------------------------
+    Yes 'the dry path says the bot keeps Administrator' ($r.Out -match 'Administrator, which it keeps')
+    Yes '  and never says to untick it' ($r.Out -notmatch '(?i)untick')
+    Yes '  and neither does the builder' ($src -notmatch '(?i)untick Administrator')
 
     # ---- 6. no discord.py, no token -----------------------------------------
     Yes 'the dry path never imported discord.py' ($r.Out -notmatch 'imported discord')
@@ -188,9 +186,9 @@ try {
     [void][System.Management.Automation.Language.Parser]::ParseFile($Setup, [ref]$tokens, [ref]$errors)
     Yes 'Setup-Discord.ps1 parses' (@($errors).Count -eq 0)
     $s = Get-Content -LiteralPath $Setup -Raw
-    Yes '  and says Administrator is for the build only' ($s -match 'Administrator is for the build')
-    Yes '  and says how to print the smaller invite' ($s -match '--invite')
-    Yes 'the builder''s own setup steps say the same' ($src -match 'Administrator is for\s+the build only' -and $src -match 'TWO PERMISSION SETS')
+    Yes '  and says the bot keeps Administrator' ($s -match 'The bot keeps Administrator' -and $s -notmatch '(?i)untick')
+    Yes '  and says how to print the invite' ($s -match '--invite')
+    Yes 'the builder''s own setup steps say the same' ($src -match 'The bot keeps\s+Administrator' -and $src -match 'ADMINISTRATOR STAYS ON')
 } finally {
     Remove-Item -LiteralPath $Tmp -Recurse -Force -EA SilentlyContinue
 }

@@ -38,5 +38,8 @@ Kept by the release desk (Claude on One). On the board, Done closes an issue wit
 | #2131 | 20261019-035823-dev (engine c4ada9c7) | Keys keep working through a long session: an hour of play, switching windows, keys never need a refocus (issue closed 20 Oct) |
 | #2758 | not deployed yet | Deleting an account restarts nothing: nobody is dropped, voice and the site stay up after a deletion (goes out after its deploy order on the issue; issue closed 20 Oct) |
 | #1382 | 20261020-145815-dev, river and lake at the next dev Ship | Tea, ale and water, Server: Main: (1) brew a tea at a cooking pot from two lavender and drink it: rest drains slower for 20 minutes, then drops 15; (2) drink three ales: a light double vision and soft edge appear, gone after 45 minutes; (3) fill an empty wine bottle at the bucket by Riften's plaza well: clean water; (4) fill one at the water bucket by the river at Riverwood, then boil it at a cooking pot; (5) eat a vegetable soup: 25 hunger and 10 thirst (issue closed 20 Oct) |
+| #3099 | 20261022-162021-dev (#3306) | No test task, a note: nobody in the game notices it. Every download of the client files carries a `licences` folder (the credits page already says so); close with that note once main's release carries it |
+| #3287 | 20261022-162021-dev (#3306) | No test task, a note, the same as #3099: the source note names Thornswood's Frida forks |
+| #1373 | dev server and 20261022-154916-dev carry Content.esp `fecfb823…` | Guild specialists' longfin, retrieval, mammoth and orchard work (drafts in `1373-merchant-quests.md`); then close #1373 |
 
 No Test task: #2727 (nothing people notice), #2180 and #2792 and #2828 (posted when closed).

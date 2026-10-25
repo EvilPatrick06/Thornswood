@@ -213,7 +213,7 @@ const RATE = 'rate limited by Discord';
   yes('and says why', t.lookupFailed === true && /socket hang up/.test(t.lookupFailedWhy));
 
   const devSide = await ask(linked, {
-    d1: ok('one', { dev: true }), d2: ok('two'), d3: { lookupFailed: RATE }, d4: ok('four'), d5: ok('five')
+    d1: ok('one', { dev: true, devBuild: true }), d2: ok('two'), d3: { lookupFailed: RATE }, d4: ok('four'), d5: ok('five')
   }, true);
   const dv = devSide ? devSide.body : {};
   yes('the dev door lists only dev people', same(dv.profiles, [101]));

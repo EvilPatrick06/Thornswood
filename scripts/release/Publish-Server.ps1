@@ -445,7 +445,7 @@ function Save-ServerRecords([switch]$PutBack) {
         Die ("the server is installed and answering, but the box's record of what it runs was not written, so its data\thornswood-deploy.json " +
              "and the store's current record still name what ran before. The lines above say why. Put that right, then run this again.")
     }
-    $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot
+    $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot (Get-ThornswoodDocsRootBeside $VpsRoot)
 }
 
 # The installer and the files it loads, sent alone, before a run that

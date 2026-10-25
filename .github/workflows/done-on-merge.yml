@@ -41,6 +41,17 @@
 # THE TOKEN. BOARD_TOKEN, in the board environment, which only main may use,
 # the same as board-status.yml; GITHUB_TOKEN for the reads and the comment.
 #
+# A MERGE THE PUSH RUN MISSED (#1626). Until #3273 was fixed, every run read
+# no pull request behind its commits, so the merges of that morning moved
+# nothing and wrote no comment. A push event is not sent again, and the main
+# Ship closes only an issue whose done-on-merge comment names a merge it
+# carries, so those issues would sit in Done for ever. Started by hand with
+# the merge commits, it does for them exactly what the push would have done.
+# An issue that already holds this workflow's comment for that pull request
+# is said and passed over, so running it twice writes nothing twice.
+#
+#     gh workflow run done-on-merge.yml --ref main -f merges="<sha> <sha>"
+#
 # WHERE IT RUNS. On the VPS runners, like board-status.yml. Every push to main
 # takes a few seconds of one; a push with no test task in its pull request
 # makes one call per commit and stops.
@@ -48,6 +59,11 @@ name: Done on merge
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      merges:
+        description: 'Merge commits on main whose push run moved nothing, by spaces'
+        required: true
 permissions:
   contents: read
   pull-requests: read
@@ -57,7 +73,7 @@ jobs:
     name: Move test-tasked issues to Done
     runs-on: [self-hosted, Windows, thornswood-vps]
     environment: board
-    # A call per commit and two per issue. Past this it is stuck, not slow.
+    # A call per commit and three per issue. Past this it is stuck, not slow.
     timeout-minutes: 3
     steps:
       - name: Read the merged pull request and move what it finishes
@@ -66,12 +82,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}
           COMMITS: ${{ toJSON(github.event.commits.*.id) }}
+          MERGES: ${{ inputs.merges }}
         run: |
           $ErrorActionPreference = 'Stop'
           $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
           $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY"
           function Has($o, [string]$n) { return ($null -ne $o -and $o.PSObject.Properties[$n] -and $null -ne $o.$n) }
-          $shas = @($env:COMMITS | ConvertFrom-Json)
+          if ($env:MERGES) {
+            $shas = @(([string]$env:MERGES).Trim() -split '[\s,]+' | Where-Object { $_ })
+            foreach ($sha in $shas) { if ($sha -notmatch '^[0-9a-fA-F]{7,40}$') { throw ("'{0}' is not a commit; merges takes merge commits, by spaces" -f $sha) } }
+          } else {
+            $shas = @($env:COMMITS | ConvertFrom-Json)
+          }
           $prs = @{}
           foreach ($sha in $shas) {
             # Through ForEach-Object so the list is one pull request per item:
@@ -102,6 +124,17 @@ jobs:
               $i = Invoke-RestMethod -Method Get -Uri ("$api/issues/" + $t.issue) -Headers $h
               if (Has $i 'pull_request') { Write-Host ("#{0} names #{1}, which is a pull request; passed over" -f $num, $t.issue); continue }
               if ([string]$i.state -ne 'open') { Write-Host ("#{0} names #{1}, which is closed; passed over" -f $num, $t.issue); continue }
+              # Started by hand for a merge already moved, or twice: its comment
+              # is there, so nothing is written again.
+              $said = $false
+              for ($pg = 1; -not $said; $pg++) {
+                $page = @(Invoke-RestMethod -Method Get -Uri ("$api/issues/" + $t.issue + "/comments?per_page=100&page=$pg") -Headers $h | ForEach-Object { $_ })
+                foreach ($k in $page) {
+                  if ((Has $k 'user') -and [string]$k.user.login -eq 'github-actions[bot]' -and ([string]$k.body).StartsWith(('Pull request #{0} merged (' -f $num))) { $said = $true }
+                }
+                if ($page.Count -lt 100) { break }
+              }
+              if ($said) { Write-Host ("#{0} finishes #{1}, which already holds its done-on-merge comment; passed over" -f $num, $t.issue); continue }
               $bh = @{ Authorization = "Bearer $env:BOARD_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/labels') -Headers $bh -Body (@{ labels = @('board: Done') } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
               $steps = (($t.rest -join "`n").Trim())

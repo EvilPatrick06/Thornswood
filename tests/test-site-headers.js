@@ -60,7 +60,11 @@ function guarded(what, r) {
   const twice = [];
   Object.keys(G).forEach(function (name) {
     const low = name.toLowerCase();
-    if (String(r.headers[low] || '') !== String(G[name])) { missing.push(name); }
+    // The CSP carries a nonce of its own on every answer (cspFor, #3216);
+    // apart from it, it is the one CSP_HEADER says.
+    let got = String(r.headers[low] || '');
+    if (low === 'content-security-policy') got = got.replace(/ 'nonce-[A-Za-z0-9+/=]+'/, '');
+    if (got !== String(G[name])) { missing.push(name); }
     let seen = 0;
     for (let i = 0; i < r.raw.length; i += 2) { if (String(r.raw[i]).toLowerCase() === low) { seen++; } }
     if (seen !== 1) { twice.push(name + ' x' + seen); }

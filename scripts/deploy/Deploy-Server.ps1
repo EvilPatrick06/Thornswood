@@ -503,7 +503,7 @@ function Invoke-PutBack {
   if (-not (Show-SwapResult $backOut "$rootWin\.undone-<stamp>")) { exit 1 }
   # The record that came back with the files is what the box says it runs.
   Restore-SwapRecord "$User@$Vps" $ssh $Root $backOut "$Root/data/thornswood-deploy.json" 'gamemode'
-  $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
+  $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root (Get-ThornswoodDocsRootBeside $Root)
   Write-Host ''
   Write-Host '  PASS. The previous files are back and the server is answering.' -ForegroundColor Green
   exit 0
@@ -1214,7 +1214,7 @@ Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood
 $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
 # And what engine it runs, from the box's own server-build.json, where the site
 # reads it for the credits page (DeployedBuild.ps1). Never fails the deploy.
-$null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
+$null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root (Get-ThornswoodDocsRootBeside $Root)
 
 # And from here, the shape Publish-Server.ps1 uses: ONE try (#2975). The box
 # answering itself on 127.0.0.1 is the same socket the rest of the world

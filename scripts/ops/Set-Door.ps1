@@ -204,6 +204,12 @@ if (-not (Test-Path `$f)) {
   'profiles  ' + @(`$d.profiles).Count
   'updated   ' + `$(if (`$d.at) { `$d.at } else { 'never, this list was written by hand' })
   foreach (`$p in @(`$d.people)) { '  ' + `$p.name + '  ' + (@(`$p.profiles) -join ', ') }
+  # Each faction's Leader role and the profiles that hold it, whose faction
+  # book is theirs in the game (#3317).
+  if (`$d.factionLeaderProfiles) {
+    'faction leaders'
+    foreach (`$l in `$d.factionLeaderProfiles.PSObject.Properties) { '  ' + `$l.Name + '  ' + (@(`$l.Value) -join ', ') }
+  }
 }
 `$j = Join-Path `$priv 'door.json'
 'refreshing ' + `$(if (Test-Path `$j) { 'yes, from the site' } else { 'NO. Run -Connect, or the list never updates.' })

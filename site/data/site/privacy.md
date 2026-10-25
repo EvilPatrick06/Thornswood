@@ -122,8 +122,18 @@ Honesty about the things a page does by existing:
   to site. Thornswood sees only totals: how many visits each page had, from
   which countries, and how fast it loaded. Blocking cloudflareinsights.com
   in your browser stops it and changes nothing else on the site.
+- **Cloudflare Turnstile**, on the report page only, since October 2026.
+  It is the check under the form that a person, not a script, is sending
+  the report. It loads from challenges.cloudflare.com when the report page
+  opens and looks at the browser, not at anything typed into the form.
+  When the report is sent, this site asks Cloudflare whether the check
+  passed, with your address, and keeps only the report. What Cloudflare
+  does with what it sees is in the
+  [Turnstile privacy addendum](https://www.cloudflare.com/turnstile-privacy-policy/).
+  Blocking challenges.cloudflare.com stops the report form from sending;
+  /report in the game and a ticket in the Discord still reach staff.
 
-Apart from that script, opening a page on this site loads nothing from
+Apart from those two, opening a page on this site loads nothing from
 anybody else. The fonts came from Google and a markdown renderer from cdnjs
 until 24 September 2026, and both are served from here now.
 
@@ -252,11 +262,12 @@ These cookies make the site and the age gate work. They are not advertising and 
 - **twst_***. One-use security cookies for a Discord sign-in, lasting ten minutes and scoped to `/auth/discord`. HttpOnly. Cleared when sign-in returns.
 - **tw**. Fallback member-password cookie when Discord sign-in is not configured, lasting up to one year. HttpOnly. Ignored when Discord is configured; cleared on sign-out.
 - **tw-age-18**. Records that this browser stated eighteen or older. The cookie and the localStorage copy both last one year, and both ask again if the gate's wording changes what you agreed to. Not HttpOnly. Clearing site storage means the gate asks again. This is not verified age.
+- **__cf_bm** and **cf_clearance**. Set by Cloudflare, not by the site, since Cloudflare's Bot Fight Mode was turned on in October 2026. They tell a browser apart from a script that is hammering the site: `__cf_bm` ends after 30 minutes of nothing, and `cf_clearance` says the browser passed Cloudflare's check. Cloudflare makes a separate one for every site and says it does not use them to follow anybody from site to site ([Cloudflare's cookies](https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/)).
 
 Sign-in cookies use SameSite=Lax and Secure when served over HTTPS. See the
 [cookie policy](/cookies) for their purposes and how to clear them.
 
-There is no advertising cookie and no analytics cookie on this site; Cloudflare's page counts set none. A longer list of what is stored about play (Discord id, character, chat, launcher logs) is in the sections above.
+There is no advertising cookie and no analytics cookie on this site; Cloudflare's page counts set none, and its two bot cookies count nothing. A longer list of what is stored about play (Discord id, character, chat, launcher logs) is in the sections above.
 
 ## Asking about any of this
 

@@ -28,6 +28,28 @@ wrong, what was measured, each option, a recommendation), not as a terse
 picker; and a date in an issue is checked against what really waits on it
 before it is trusted.
 
+## Who is on the board
+
+Moved from the vault on 22 Oct (#3311), with the dates Patrick set them.
+
+- Assignees are people with a GitHub account: EvilPatrick06 (Patrick, admin),
+  Jhinswife and WiccanDjinn (Djinn), both write. The lanes and Claude are not
+  accounts; who is working shows as a `claimed:` label (2 Oct).
+- Pick only issues that are unassigned or assigned to Patrick. Djinn's
+  issues are hands off.
+- `claimed: Claude`, `claimed: GitHub`, `Launcher`, `Installer`, `Website`,
+  `Vortex` and `Smeagle` are the claim labels. `claimed: Codex` is the Grok
+  Bot lane named Codex, and `claimed: ChatGPT` is ChatGPT in the Codex app
+  (12 Oct); a branch name or an old signature is not a claim. The labels
+  `status: In Progress` and `anyone can start` were deleted on 2 Oct and are
+  never made again.
+- An issue that is waiting keeps its claim and stays In Progress; Todo is
+  only for work nobody has picked up. Filing an issue is not claiming it: a
+  finding goes on the board unclaimed, in Todo (28 Sep).
+- VirusTotal is off the publish path (#802): signing is the trust, and
+  `scripts\release\Publish-VirusTotal.ps1` is run by hand when wanted. Never
+  wire it back into Ship or Publish-Installer.
+
 ## The runs the lanes leave
 
 Decided by Patrick on 11 Oct: the lanes only commit, push and merge, and a
@@ -96,17 +118,37 @@ Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
 
-### Staff notices: post them yourself, in #staff-updates
+### Staff notices: only when staff must act, in #staff-updates
 
-Decided by Patrick on 20 Oct (#2934): the notices Developer-Guide.md asks
-for (a line before an edit to one of the six shared files, taking the dev
-feed, what was merged or published) go in #staff-updates, channel
-1549254991082946570, and "the agents should do this themselves using the
-bot". A Claude posts its own. It never hands one to Patrick, never puts one
+Post only when staff must act or would otherwise be surprised (Patrick,
+22 Oct, 8:51 AM: "y'all be putting things in staff updates that don't need
+to be put in staff updates"). Every post from a cloud thread runs
+staff-notice.yml on a VPS runner, takes time and uses his limits. A post is
+for one of these three, and nothing else:
+
+- something staff must act on (for example a new step every staff member
+  takes before a shift);
+- a server restart or outage that staff will see;
+- a change to how staff do their job.
+
+No post for a release to dev or main (the update channel, the app's update
+prompt, the app's and the site's News tabs and GitHub already say it), a
+merge, progress, a pull request opened, an issue filed, a test task or a
+routine deploy (Deploy-Docs, Install-Bot -CodeOnly and the like).
+Those live in the pull request and on the board. When unsure, do not post.
+
+A Dev's line before an edit to one of the six shared files that blocks
+others' work, or before taking the dev feed, is not a staff notice: it goes
+in #dev-coordination, the Dev space's channel, and the Dev writes it there.
+The Lead Dev does not post these, and neither does a Claude working for him
+(Patrick, 22 Oct; Developer-Guide.md has the rule).
+
+Where one is due it goes in #staff-updates, channel 1549254991082946570, and
+"the agents should do this themselves using the bot" (Patrick, 20 Oct, #2934). A Claude posts its own. It never hands one to Patrick, never puts one
 on his to-dos and never asks a person to post it.
 
 ```
-pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Editing Shell.cs for the scan button, pull request to follow."
+pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Restarting the dev server at 4:30 PM for about 5 minutes; anyone on it will be dropped."
 ```
 
 It hands the notice over ssh to `C:\Thornswood-Watch\say-staff.ps1` on the
@@ -236,7 +278,11 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   `gh pr list` and `git ls-remote --heads origin` in both repositories;
   what of yours is still there has its reason written on its issue, or it
   goes. Developer-Guide.md "No stray branches, worktrees or pull requests"
-  is the rule for everybody.
+  is the rule for everybody. A cloud thread's git cannot delete a branch or
+  push a tag (its proxy refuses every ref write, #3107), so there
+  `pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch <branch> -Commit <its tip>`
+  has GitHub do it, `-Fork` does the same for a branch of the fork, and
+  Ship's release tag goes the same way by itself (#3314).
 - Two folders, no copies (Patrick, 5 Oct; on 20 Oct temp and worktrees moved
   into the repository, #2900). Work only in this repository (its ignored
   `worktrees\<name>` and `temp\<task>`) and the vault; never make another
@@ -252,19 +298,32 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   before acting on a rule that seems to say something odd, and never quote
   compressed output back as what a file says.
 - What is true now is `ops/status.md` in the repository, rewritten in place.
-  The lanes' other shared notes are the vault at
-  `C:\Thornswood Vault\Thornswood`. Anything a session changes about tips,
-  standing orders or what waits on Patrick goes in one of those as well as
-  on the board.
+  The vault at `C:\Thornswood Vault\Thornswood` keeps the Grok lanes' own
+  notes; every rule, procedure and fact a Claude needs from it is in this
+  repository since 22 Oct (#3311), so a Claude never needs the vault and
+  writes nothing there. Anything a session changes about tips, standing
+  orders or what waits on Patrick goes in `ops/status.md` as well as on the
+  board.
 - Merge only once the build check passes, `Launcher builds` or `Launcher
   builds (VPS fallback)`, and you are confident in the change. Nothing on GitHub enforces it; see Developer-Guide.md.
+- Vortex (from the vault, #3311): the Thornswood profile is `ZRT7NjhN_`
+  under `%APPDATA%\Vortex\skyrimse\profiles\`; `HP85qyrnq` is another
+  profile and is never switched to. One Vortex window at a time. The
+  collection is 7essxf (ombo2a is retired), and `Set-Collection` writes only
+  its CollectionUrl. Never point VortexGame at `C:\Thornswood\Game`.
+  Vortex's own window is Electron, which no shell tool here could drive
+  (2 Oct), so a step inside it has been written as a numbered click path
+  for Patrick (docs\COLLECTION-REVISION-3.md) with the steps before and
+  after it run here.
 
 ## Where things are
 
 Developer-Guide.md (the rules and the long form, for everybody), the board for open work,
 README.md,
 launcher\app\ARCHITECTURE.md (the launcher: startup, what each class owns, and
-the Play sequence), docs\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
+the Play sequence), docs\DECIDED.md (what Patrick settled), ops\ (status
+and the lanes' run notes), docs\systems\merchant-plans (ChatGPT's merchant
+design notes for #1373 and #3079), docs\MOVING-THE-SERVER.md (the VPS), lore\ (the world),
 site\data\site\*.md (public pages), scripts\release\Ship-Rules.ps1 (what
 never leaves a machine in a release), docs\archive (dated snapshots, history
 only).

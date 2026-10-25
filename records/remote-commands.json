@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  69,
-    "callCount":  273,
+    "scriptCount":  71,
+    "callCount":  286,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -808,6 +808,78 @@
                       "reason":  "sends Register-ScheduledTask"
                   },
                   {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "`$t = Get-ScheduledTask -TaskName \u0027$TaskName\u0027",
+                      "does":  "reads the admin task, which App it holds (never the key), whether a setup is armed, the port and admin.log",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027ARMED \u0027 + `$s",
+                      "does":  "writes the App\u0027s one-time setup state into the service\u0027s state folder",
+                      "class":  "admin",
+                      "reason":  "writes the folder that holds the App\u0027s key"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027FORGOTTEN \u0027 + `$slug",
+                      "does":  "deletes the App\u0027s key, id and any armed setup",
+                      "class":  "admin",
+                      "reason":  "deletes the App\u0027s key"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "Remove-Item -LiteralPath \u0027$Root\u0027 -Recurse -Force -EA SilentlyContinue",
+                      "does":  "stops the admin service, unregisters its task and deletes its folder, the key with it",
+                      "class":  "admin",
+                      "reason":  "sends Unregister-ScheduledTask"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "New-Item -ItemType Directory -Force -Path \u0027$Root\\$stage\u0027 | Out-Null",
+                      "does":  "locks the admin folder, makes its state folder and its stage folder",
+                      "class":  "admin",
+                      "reason":  "sends SetAccessRule"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $send[$k] \"${target}:$rootFar/$stage/$k\" }",
+                      "does":  "uploads admin.js and server-log.js to the stage folder",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the deploy owns"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027ADMIN OK\u0027; exit 0",
+                      "does":  "checks the stage, swaps it in and registers and starts the admin task, or puts the old one back",
+                      "class":  "admin",
+                      "reason":  "sends Register-ScheduledTask"
+                  },
+                  {
                       "script":  "scripts/deploy/Install-Runner.ps1",
                       "scope":  "Remote",
                       "via":  "Invoke-ThornswoodRemote",
@@ -824,6 +896,15 @@
                       "does":  "sends the runner registration token",
                       "class":  "admin",
                       "reason":  "secret"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Runner.ps1",
+                      "scope":  "Get-PublishedLists",
+                      "via":  "Remote",
+                      "anchor":  "$said = @(Remote ($listLib",
+                      "does":  "reads GitHub\u0027s address lists, Microsoft\u0027s Service Tags and the signing hosts\u0027 addresses on the box, for the runner firewall rules (#3312)",
+                      "class":  "read-status",
+                      "reason":  "fetches published lists and resolves names; writes nothing"
                   },
                   {
                       "script":  "scripts/deploy/Install-Runner.ps1",
@@ -893,7 +974,7 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "$need = Remote @\"",
-                      "does":  "checks pwsh, node, python and git are installed",
+                      "does":  "checks pwsh, node, python, git, MSBuild, the 4.8.1 references and WPF are installed, and on a signing runner signtool and a .NET runtime of 8 or later",
                       "class":  "read-status",
                       "reason":  "read only"
                   },
@@ -1105,6 +1186,33 @@
                       "reason":  "sends ThornswoodSecret"
                   },
                   {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodSecretRemote",
+                      "anchor":  "Invoke-ThornswoodSecretRemote -Target \"$User@$Vps\" -SshArgs $ssh -Secret $secret -Script (@\"",
+                      "does":  "writes the report form's Turnstile keys into config.json and restarts the site",
+                      "class":  "admin",
+                      "reason":  "writes a secret; no gate verb covers secrets"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "(Get-ThornswoodSealKeyBlock)",
+                      "does":  "makes the box's seal key in C:\\Thornswood-Seal if it has none, locks the folder, prints the public half",
+                      "class":  "admin",
+                      "reason":  "writes a private key and an ACL outside every gate verb"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$(Get-ThornswoodUnsealBlock)",
+                      "does":  "opens the sealed Turnstile token with the box's key, reads the widget's secret from Cloudflare, writes both keys into config.json and restarts the site",
+                      "class":  "admin",
+                      "reason":  "reads a private key and writes a secret; no gate verb covers secrets"
+                  },
+                  {
                       "script":  "scripts/deploy/Setup-Domain.ps1",
                       "scope":  "Remote",
                       "via":  "Invoke-ThornswoodRemote",
@@ -1288,7 +1396,7 @@
                       "script":  "scripts/ops/Reset-Character.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $tmp \"${target}:C:/thornswood-reset.ps1\" }",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $tmp $tmpRun \"${target}:C:/\" }",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "destructive or install-time work outside the gate verbs"
@@ -1641,6 +1749,15 @@
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
                       "does":  "checks a catalog signed on GitHub against release.json and the signer, in a temp folder of its own that it removes",
+                      "class":  "read-status",
+                      "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
+                  },
+                  {
+                      "script":  "scripts/release/Sign-OnGitHub.ps1",
+                      "scope":  "Get-SignedFileRefusal",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
+                      "does":  "checks a launcher built and signed on GitHub against the signer and the launcher\u0027s own check, in a temp folder of its own that it removes",
                       "class":  "read-status",
                       "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },

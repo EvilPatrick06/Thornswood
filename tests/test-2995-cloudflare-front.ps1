@@ -103,12 +103,23 @@ try {
     Yes 'the client''s address is CF-Connecting-IP, inside the servers block' ($cf -match '(?s)servers \{\s*trusted_proxies static [^\r\n]+\s*client_ip_headers CF-Connecting-IP\s*\}')
     $proxies = @([regex]::Matches($cf, '(?m)^\s*reverse_proxy (\S+)( \{)?\s*$'))
     Yes ('every route still goes where it went: ' + (($proxies | ForEach-Object { $_.Groups[1].Value }) -join ', ')) (
-        (($proxies | ForEach-Object { $_.Groups[1].Value }) -join ',') -eq '127.0.0.1:7778,127.0.0.1:7789,127.0.0.1:7790,127.0.0.1:3001')
+        (($proxies | ForEach-Object { $_.Groups[1].Value }) -join ',') -eq '127.0.0.1:7778,127.0.0.1:7789,127.0.0.1:7790,127.0.0.1:7791,127.0.0.1:3001')
     $bare = @($proxies | Where-Object { -not $_.Groups[2].Success })
     $sends = @([regex]::Matches($cf, '(?ms)^\s*reverse_proxy \S+ \{\s*header_up X-Forwarded-For \{client_ip\}\s*\}'))
     Yes 'and every one sends the one address as X-Forwarded-For, {client_ip}' ($bare.Count -eq 0 -and $sends.Count -eq $proxies.Count)
-    $live = (@($cf -split "`r?`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
+    # A log filter line that deletes a header takes nothing from it, so it is
+    # left out of the count (the /box/ log, #3297).
+    $live = (@($cf -split "`r?`n" | Where-Object { $_ -notmatch '^\s*#' -and $_ -notmatch '^\s*request>\S+ delete\s*$' }) -join "`n")
     Yes 'nothing else in it takes a forwarded address' (@([regex]::Matches($live, '(?i)X-Forwarded-For')).Count -eq $proxies.Count -and $live -notmatch '(?i)trusted_proxies (?!static)')
+    # The /box/ log (#3297) keeps no address: the visitor's, as Caddy works it
+    # out and as each header carries it, and the token are taken out of each
+    # line, and nothing but /box/ is logged.
+    $boxLog = [regex]::Match($cf, '(?s)\r?\n\tlog \{.*?\r?\n\t\}\r?\n')
+    Yes 'the box log is written under data, where LOCAL SERVICE may write' ($boxLog.Success -and $boxLog.Value -match 'output file C:/Thornswood-Caddy/data/logs/box\.log \{')
+    $gone = @('request>client_ip', 'request>headers>Cf-Connecting-Ip', 'request>headers>X-Forwarded-For', 'request>headers>True-Client-Ip', 'request>headers>Cf-Ipcountry', 'request>headers>Authorization')
+    $kept = @($gone | Where-Object { $boxLog.Value -notmatch ('(?m)^\s*' + [regex]::Escape($_) + ' delete\s*$') })
+    Yes ('  and takes the address and the token out of every line' + $(if ($kept.Count) { ': not ' + ($kept -join ', ') } else { '' })) ($boxLog.Success -and $kept.Count -eq 0)
+    Yes '  and logs nothing but /box/' ($cf -match '(?m)^\t@notbox not path /box/\*\s*$' -and $cf -match '(?m)^\tlog_skip @notbox\s*$')
 
     # ---- 3. one rule -------------------------------------------------------------
     Write-Host ''

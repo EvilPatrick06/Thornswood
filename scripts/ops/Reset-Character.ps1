@@ -30,6 +30,20 @@
   menu choices), so no profile is ever named. The start right after this
   lets go of the rest and the list is gone. A list already there that is not
   one stops this before anything is moved.
+
+  THE SERVER IS STOPPED AND WAITED FOR, NOT SLEPT ON (#2871). Until 22 Oct
+  2026 both paths ended the server and slept two seconds before moving its
+  files, and the VPS path then slept three more and knocked on <box>:3000
+  from here up to twenty times, with an empty catch: always the live port,
+  whatever -TaskName and -VpsRoot named. A process asked to stop still holds
+  its files until it has exited (measured on the box, #2928), and a start
+  takes as long as it takes (#1938). So each server process is opened before
+  it is ended and waited for until it has exited (StopAndMove.ps1, as the
+  installer and every swap do), and nothing is moved while one is still
+  there. On the VPS the server on -VpsRoot's own port is the one stopped, the
+  box waits for both of its ports to answer from 127.0.0.1 within the shared
+  ceiling (ServerReadyWait.ps1), and this machine then tries that resources
+  port once from outside (Test-ThornswoodFromOutside, Vps.ps1).
 #>
 [CmdletBinding()]
 param(
@@ -97,15 +111,84 @@ foreach ($l in @($found.notes) + @(Write-ThornswoodReleaseList -Root $Root -Acto
 if ($bad) { exit 1 }
 '@
 
+# What the box runs around the body (#2871): the server on this root's own
+# port opened, stopped and waited for until it has exited, the body run in its
+# own process, the task started, and both ports waited for from the box. The
+# last line says whether it answered, for this machine to read.
+$stopAndMove = Join-Path $Here '..\deploy\StopAndMove.ps1'
+$readyWait = Join-Path $Here '..\deploy\ServerReadyWait.ps1'
+$run = "param([string]`$Root, [string]`$Task)`r`n" + [IO.File]::ReadAllText($stopAndMove) + "`r`n" + [IO.File]::ReadAllText($readyWait) + "`r`n" + @'
+$settings = Join-Path $Root 'server-settings.json'
+$port = 0
+try { $port = [int](([IO.File]::ReadAllText($settings) | ConvertFrom-Json).port) }
+catch { Write-Host ('STOP. ' + $settings + ' will not read (' + $_.Exception.Message + '), so the server''s port is not known. Nothing was stopped or thrown away.'); exit 1 }
+if ($port -le 0) { Write-Host ('STOP. ' + $settings + ' names no port, so the server is not known. Nothing was stopped or thrown away.'); exit 1 }
+# skymp5-server/ts/ui.ts: 3000 when the game port is 7777, the game port plus one otherwise.
+$resPort = if ($port -eq 7777) { 3000 } else { $port + 1 }
+$pids = @()
+try { $pids = @(Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port } | ForEach-Object { [int]$_.OwningProcess }) }
+catch { Write-Host ('STOP. The UDP ports could not be listed to find the server on ' + $port + ': ' + $_.Exception.Message + '. Nothing was stopped or thrown away.'); exit 1 }
+$held = @(Get-ThornswoodProcessHeld $pids)
+if ($ThornswoodNotHeld.Count) {
+    foreach ($l in $ThornswoodNotHeld) { Write-Host $l }
+    Write-Host 'STOP. The server could not be opened to wait for it. Nothing was stopped or thrown away.'
+    exit 1
+}
+Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
+foreach ($p in $held) { Write-Host ('stopped pid ' + $p.Id + ', on UDP ' + $port) }
+$still = @(Stop-ThornswoodProcessHeld $held)
+if ($still.Count) {
+    foreach ($l in $still) { Write-Host $l }
+    Write-Host 'STOP. The server has not exited, so nothing was thrown away and it was not started again.'
+    exit 1
+}
+& powershell -NoProfile -ExecutionPolicy Bypass -File C:\thornswood-reset.ps1 -Root $Root
+$resetCode = $LASTEXITCODE
+try { Start-ScheduledTask -TaskName $Task -EA Stop }
+catch { Write-Host ('STOP. The task ' + $Task + ' would not start: ' + $_.Exception.Message); exit 1 }
+$Wait = Get-ThornswoodServerReadyWait
+$until = (Get-Date).AddSeconds($Wait)
+$why = ''
+$up = $false
+while (-not $up) {
+    $udp = $false
+    try { $udp = @(Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port }).Count -gt 0 }
+    catch { $why = 'the UDP ports could not be listed: ' + $_.Exception.Message }
+    if ($udp) {
+        $c = New-Object Net.Sockets.TcpClient
+        try { $null = $c.BeginConnect('127.0.0.1', $resPort, $null, $null).AsyncWaitHandle.WaitOne(500); $up = $c.Connected }
+        catch { $why = $_.Exception.Message }
+        finally { $c.Close() }
+    }
+    if ($up -or (Get-Date) -gt $until) { break }
+    Start-Sleep -Milliseconds 700
+}
+if ($up) { Write-Host ('the server answers on UDP ' + $port + ' and TCP ' + $resPort + ' on the box'); Write-Host ('ANSWERED|' + $port + '|' + $resPort) }
+else {
+    $line = 'the server did not answer on UDP ' + $port + ' and TCP ' + $resPort + ' on the box within ' + $Wait + ' s'
+    if ($why) { $line += ', the last look saying: ' + $why }
+    Write-Host $line
+    Write-Host ('NOTANSWERED|' + $port + '|' + $resPort)
+}
+exit $resetCode
+'@
+
 if ($UseLocal) {
     Head 'This machine'
     if (-not (Test-Path -LiteralPath $Local)) { Die "no server at $Local" }
 
-    $node = Get-Process -Name node -ErrorAction SilentlyContinue
-    if ($node) {
+    # Opened before it is ended and waited for until it has exited, so its
+    # files are closed before anything is moved (#2871, StopAndMove.ps1).
+    $node = @(Get-Process -Name node -ErrorAction SilentlyContinue)
+    if ($node.Count) {
+        . $stopAndMove
+        $held = @(Get-ThornswoodProcessHeld @($node | ForEach-Object { $_.Id }))
+        foreach ($l in $ThornswoodNotHeld) { Say $l 'Red' }
+        if ($ThornswoodNotHeld.Count) { Die 'the server could not be opened to wait for it. Nothing was stopped or thrown away.' }
         Say 'stopping the server so its files can be moved' 'Yellow'
-        $node | Stop-Process -Force
-        Start-Sleep -Seconds 2
+        $still = @(Stop-ThornswoodProcessHeld $held)
+        foreach ($l in $still) { Say $l 'Red' }
+        if ($still.Count) { Die 'the server has not exited, so nothing was thrown away.' }
     }
 
     $tmp = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-reset.ps1'
@@ -129,45 +212,55 @@ else {
     # Setup-SshKey.ps1 wrote into known_hosts, checked against vps.json.
     $ssh = @('-o', 'StrictHostKeyChecking=yes')
 
-    $tmp = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-reset.ps1'
+    # Both files in one scp and the job in one ssh session, so it is two
+    # passwords rather than more.
+    $dir = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-reset-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $tmp = Join-Path $dir 'thornswood-reset.ps1'
+    $tmpRun = Join-Path $dir 'thornswood-reset-run.ps1'
     Set-Content -LiteralPath $tmp -Value $body -Encoding UTF8
+    Set-Content -LiteralPath $tmpRun -Value $run -Encoding UTF8
 
-    Invoke-ThornswoodNative { & scp @ssh $tmp "${target}:C:/thornswood-reset.ps1" }
-    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE" }
-    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    Invoke-ThornswoodNative { & scp @ssh $tmp $tmpRun "${target}:C:/" }
+    $scpCode = $LASTEXITCODE
+    Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+    if ($scpCode -ne 0) { Die "scp exited with $scpCode" }
 
-    # One ssh session for the whole job, so it is one password rather than three.
-    $remote = "powershell -NoProfile -Command `"" +
-              "Stop-ScheduledTask -TaskName '$TaskName' -ErrorAction SilentlyContinue; " +
-              "Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { \$_.Name -eq 'node.exe' -and \$_.CommandLine -like '*skymp5-server*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -EA SilentlyContinue }; " +
-              "Start-Sleep -Seconds 2; " +
-              "& powershell -NoProfile -ExecutionPolicy Bypass -File C:\thornswood-reset.ps1 -Root '$VpsRoot'; " +
-              "Start-ScheduledTask -TaskName '$TaskName'; " +
-              "Start-Sleep -Seconds 3; " +
-              "'server restarted'`""
-    Invoke-ThornswoodNative { & ssh @ssh $target $remote }
-    if ($LASTEXITCODE -ne 0) { Die "the reset on the VPS exited with $LASTEXITCODE" }
-
-    Head 'Checking it came back'
-    $up = $false
-    for ($i = 0; $i -lt 20; $i++) {
-        try {
-            $c = New-Object Net.Sockets.TcpClient
-            $null = $c.BeginConnect($VpsHost, 3000, $null, $null).AsyncWaitHandle.WaitOne(1000)
-            $up = $c.Connected
-            $c.Close()
-        } catch { }
-        if ($up) { break }
-        Start-Sleep -Seconds 2
+    $remote = "powershell -NoProfile -ExecutionPolicy Bypass -Command `"& C:\thornswood-reset-run.ps1 -Root '$VpsRoot' -Task '$TaskName'; exit `$LASTEXITCODE`""
+    $answer = ''
+    # Said line by line as the box says it: the wait for the start can be minutes.
+    Invoke-ThornswoodNative { & ssh @ssh $target $remote } | ForEach-Object {
+        if ("$_" -like 'ANSWERED|*' -or "$_" -like 'NOTANSWERED|*') { $answer = "$_" } else { Write-Host $_ }
     }
+    $code = $LASTEXITCODE
+    $b = $answer -split '\|'
 
     Write-Host ''
-    if ($up) {
-        Say 'Done. Press Play and creation runs from the top.' 'Green'
-    } else {
-        Say "The character was cleared but the server has not come back on ${VpsHost}:3000." 'Red'
+    if ($b[0] -eq 'NOTANSWERED') {
+        Say ("The server on the box has not come back on UDP {0} and TCP {1}." -f $b[1], $b[2]) 'Red'
         Say "  ssh $target" 'DarkGray'
         Say "  Start-ScheduledTask -TaskName '$TaskName'   (the task runs node High, #2491; node started by hand does not)" 'DarkGray'
+        if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+        exit 1
+    }
+    if ($code -ne 0) { Die "the reset on the VPS exited with $code" }
+    if ($b[0] -ne 'ANSWERED') { Die 'the VPS did not say whether the server came back' }
+
+    # The box has said both ports answer there. One try from here (#2975):
+    # the server listens on every address with one socket, so a second try
+    # can only say what the first said.
+    $resPort = [int]$b[2]
+    $witness = if ($resPort -eq 3000) { 7788 } else { 3000 }
+    $outside = Test-ThornswoodFromOutside $VpsHost $resPort $witness
+    if ($outside.Answered) {
+        Say ("Done. The server answers at {0}:{1} from here as well. Press Play and creation runs from the top." -f $VpsHost, $resPort) 'Green'
+    } elseif ($outside.NotKnown) {
+        Say ("Done on the box. Whether {0}:{1} answers from here is not known: {2}." -f $VpsHost, $resPort, $outside.NotKnown) 'Yellow'
+    } else {
+        Say ("The box says the server answers, and {0}:{1} was {2} from here, though {3} on the box answers from here." -f $VpsHost, $resPort, $outside.Said, $witness) 'Red'
+        Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) 'DarkGray'
+        if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+        exit 1
     }
 }
 Write-Host ''

@@ -14,7 +14,7 @@ const PAGES = ['terms', 'privacy', 'rules'];
 const EXPECT = {
   terms: '2026-10-19',
   privacy: '2026-10-22',
-  rules: '2026-09-29'
+  rules: '2026-10-22'
 };
 const MONTHS = [null, 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];

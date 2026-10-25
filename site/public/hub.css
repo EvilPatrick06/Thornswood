@@ -2,7 +2,10 @@
    thing should not look like two different products. */
 :root{
   --ink:#0B0E0A; --panel:#14180F; --raised:#1D2318; --line:#2B3323; --line2:#3D4733;
-  --text:#E4E7DA; --dim:#96A084; --faint:#616B53;
+  /* --faint is small print (labels, counts, the sign in's way back) and must
+     read at 4.5 to 1 on every ground it sits on, up to .card.lead's lightest
+     stop #242A1D. #616B53 was 3.45 to 1 on --ink (#3290). */
+  --text:#E4E7DA; --dim:#96A084; --faint:#88927A;
   --gold:#C9A24B; --gold-dim:#8A6F33;
   --pass:#6FA05A; --fail:#C05A4E; --skip:#7C8493; --blurple:#5865F2;
   --mono:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;

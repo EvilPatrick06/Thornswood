@@ -55,6 +55,25 @@
   rollback), and -DryRunTo writes the script instead, as everywhere else.
   Fetch the lists again now and then the same way (run it again).
 
+  THE SIGNING RUNNER (#3312). A runner records\sign-runners.json lists signs
+  release launchers (release.yml's VPS fallback), and its sign steps reach
+  Microsoft as well as GitHub: the signing client from api.nuget.org, the
+  token exchange, the signing service, the timestamp and a revocation check.
+  The record's "reach" names each host with the Azure service tag whose
+  published ranges hold it, and -NetworkOnly for such a runner lets those
+  tags' ranges through as well, read from Microsoft's Service Tags file
+  (its download page names the week's file, and the file must say it is the
+  Public cloud). The box reads the file and resolves each host, as it reads
+  GitHub's lists, and each host has to answer from inside its tag, or
+  nothing is changed and the host is named: an address resolved once stops
+  holding when a front door moves, a published list does not.
+  Microsoft adds a range to that file at least a week before Azure uses it,
+  so a -NetworkOnly run each week keeps every host reachable. What it does
+  not do: a tag is a whole service's space (AzureCloud.westus2 is every
+  address Azure has in that region), wider than the one host, as GitHub's
+  actions list is. The install registers such a runner with the record's
+  label too, the way a build runner gets its label.
+
   WHAT A PULL REQUEST JOB MAY REACH (-OffBox, or -NetworkOnly for the network
   alone). Two guards, put on by the
   install and by -OffBox -Lock, taken off by -OffBox -Remove, shown by -Status
@@ -63,8 +82,9 @@
       their own ('Thornswood PR runner <account>'), that match only programs
       running as the runner's account (-LocalUser, the account's SID) and
       cover every address except GitHub's (the web, api, git and actions
-      lists of https://api.github.com/meta, fetched when it runs), loopback,
-      and whatever -AllowHost names resolve to then. Windows Firewall puts a
+      lists of https://api.github.com/meta, fetched when it runs, on the
+      machine the rules go on, #3312), loopback, and whatever -AllowHost
+      names resolve to then. Windows Firewall puts a
       block rule above any allow rule, so "block everything, allow GitHub"
       cannot be two rules: the block rules ARE the complement of GitHub's
       ranges. What that does not do: it has no idea of host names (a rule is
@@ -324,6 +344,12 @@ if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
   $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
 }
+# THE SIGNING RUNNER (#3312). A VPS runner records\sign-runners.json lists
+# is registered with its label and, under -NetworkOnly, reaches the hosts
+# the record names for the sign steps.
+$signRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\sign-runners.json') -Raw | ConvertFrom-Json
+$signs = (-not $OffBox) -and (@($signRecord.runners | ForEach-Object { [int]$_ }) -contains $Number)
+if ($signs -and -not $PSBoundParameters.ContainsKey('Label')) { $registerLabels = $registerLabels + ',' + $signRecord.label }
 # On the box, the folders records\runner-isolation.json says no runner may
 # reach that are not C:\Thornswood-* (C:\ProgramData\ssh, the
 # administrator's profile) are denied with the Thornswood ones, at every
@@ -414,7 +440,6 @@ function Invoke-Gh {
     # Stand-ins, so a dry run asks GitHub nothing.
     $a = $args -join ' '
     if ($a -match 'registration-token|remove-token') { return 'DRY-RUN-TOKEN-NOT-REAL' }
-    if ($a -match '^api meta') { return '{"web":["140.82.112.0/20","2a0a:a440::/29"],"api":["192.30.252.0/22"],"git":["140.82.112.0/20"],"actions":["4.148.0.0/16"]}' }
     return ('{"runners":[{"name":"' + $RunnerName + '","status":"online (dry run)","busy":false,"labels":[{"name":"' + $Label + '"}]}]}')
   }
   $out = & gh @args 2>$null
@@ -673,6 +698,45 @@ function Get-RunnerBlockRanges([string[]]$allow) {
   }
   $out.ToArray()
 }
+# The address ranges of each service tag in $names, out of the text of
+# Microsoft's Service Tags file (THE SIGNING RUNNER), as a hashtable of name
+# to prefixes. Throws for a file that is not the Public cloud's, or a name it
+# has not exactly once with ranges. The file is near 5 MB, past the 2 MB
+# Windows PowerShell 5.1's ConvertFrom-Json reads, so there it is read with
+# the serializer that cmdlet uses, its limit raised.
+function Read-RunnerServiceTags([string]$text, [string[]]$names) {
+  $text = $text.TrimStart([char]0xFEFF)
+  if ($PSVersionTable.PSVersion.Major -ge 6) {
+    $doc = $text | ConvertFrom-Json
+    $cloud = [string]$doc.cloud
+    $values = @($doc.values | ForEach-Object { @{ Name = [string]$_.name; Prefixes = @($_.properties.addressPrefixes) } })
+  } else {
+    Add-Type -AssemblyName System.Web.Extensions
+    $js = New-Object Web.Script.Serialization.JavaScriptSerializer
+    $js.MaxJsonLength = [int]::MaxValue
+    $doc = $js.DeserializeObject($text)
+    $cloud = [string]$doc['cloud']
+    $values = @($doc['values'] | ForEach-Object { @{ Name = [string]$_['name']; Prefixes = @($_['properties']['addressPrefixes']) } })
+  }
+  if ($cloud -ne 'Public') { throw ('the Service Tags file says it is the "' + $cloud + '" cloud, not Public') }
+  $out = @{}
+  foreach ($n in @($names | Where-Object { $_ } | Select-Object -Unique)) {
+    $hit = @($values | Where-Object { $_.Name -ceq $n })
+    if ($hit.Count -ne 1) { throw ('the Service Tags file has ' + $hit.Count + ' tags named ' + $n + ', not one') }
+    $pre = @($hit[0].Prefixes | Where-Object { $_ } | ForEach-Object { [string]$_ })
+    if (-not $pre.Count) { throw ('the Service Tags file gives ' + $n + ' no address range') }
+    $out[$n] = $pre
+  }
+  $out
+}
+# The addresses in $ips that none of $prefixes holds.
+function Get-RunnerReachMisses([string[]]$ips, [string[]]$prefixes) {
+  $rs = @($prefixes | Where-Object { $_ } | ForEach-Object { ConvertTo-RunnerRange $_ })
+  @($ips | Where-Object { $_ } | Where-Object {
+    $a = ConvertTo-RunnerRange $_
+    -not @($rs | Where-Object { $_.V -eq $a.V -and $_.Lo -le $a.Lo -and $a.Lo -le $_.Hi }).Count
+  })
+}
 '@
 $guardLib = @'
 # Outbound block rules for the account alone, replacing any it had.
@@ -680,14 +744,14 @@ function Set-RunnerFirewall([string]$acct, [string]$group, [string[]]$blocks, [i
   $sid = $(if ($acct.StartsWith('*')) { $acct.Substring(1) } else { (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value })
   if (-not @($blocks).Count) { throw 'there is no address list to block, so the firewall was left as it was' }
   @(Get-NetFirewallRule -Group $group -EA SilentlyContinue) | ForEach-Object { Remove-NetFirewallRule -Name $_.Name }
-  $why = 'Install-Runner.ps1 (#1306, #2161): this account reaches GitHub, loopback and the -AllowHost names only. -NetworkOnly -Remove takes it off.'
+  $why = 'Install-Runner.ps1 (#1306, #2161): this account reaches GitHub, loopback, the -AllowHost names and, on the signing runner, the Microsoft tags records\sign-runners.json names (#3312), only. -NetworkOnly -Remove takes it off.'
   $n = 0
   for ($i = 0; $i -lt $blocks.Count; $i += $per) {
     $n++
     $chunk = @($blocks[$i..([Math]::Min($i + $per, $blocks.Count) - 1)])
     New-NetFirewallRule -DisplayName ($group + ' ' + $n) -Group $group -Direction Outbound -Action Block -Profile Any -LocalUser ('D:(A;;CC;;;' + $sid + ')') -RemoteAddress $chunk -Description $why -EA Stop | Out-Null
   }
-  'firewall: ' + $acct + ' may reach GitHub and this machine only, ' + $blocks.Count + ' blocked range(s) in ' + $n + ' outbound rule(s), group ' + $group
+  'firewall: ' + $acct + ' may reach GitHub, this machine and what it was given only, ' + $blocks.Count + ' blocked range(s) in ' + $n + ' outbound rule(s), group ' + $group
 }
 function Remove-RunnerFirewall([string]$group) {
   $r = @(Get-NetFirewallRule -Group $group -EA SilentlyContinue)
@@ -740,12 +804,82 @@ function Get-GuardScript([string]$mode, [string[]]$blocks = @()) {
   if ($mode -eq 'remove') { return $head + "Remove-RunnerFirewall `$grdGroup`nOpen-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n" }
   return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`nClose-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n"
 }
-# GitHub's published lists, loopback and -AllowHost, as the ranges to block.
+# WHERE THE LISTS ARE READ (#3312). GitHub's lists, Microsoft's Service Tags
+# and the signing hosts' addresses are read on the machine the rules go on,
+# the box or (-OffBox) this one, by $listLib: its own traffic is what the
+# rules hold, and its name server is the one its jobs ask. That also lets a
+# cloud session run this: its GitHub access refuses api.github.com/meta
+# ("sessions are bound to their configured repositories", 22 Oct 2026), and
+# the box's does not. The script prints one line per fact, which the parse
+# below reads, and stops at the first thing it cannot read.
+$listLib = $rangeLib + @'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+function Get-RunnerWebText([string]$url) {
+  [Text.Encoding]::UTF8.GetString((Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 300).RawContentStream.ToArray())
+}
+function Get-RunnerLists([string[]]$tags, [string[]]$hosts) {
+  try {
+    $meta = (Get-RunnerWebText 'https://api.github.com/meta').TrimStart([char]0xFEFF) | ConvertFrom-Json
+    foreach ($k in 'web', 'api', 'git', 'actions') { foreach ($p in @($meta.$k | Where-Object { $_ })) { "list`tgithub-$k`t$p" } }
+    if (@($tags).Count) {
+      $page = 'https://www.microsoft.com/en-us/download/details.aspx?id=56519'
+      $urls = @([regex]::Matches((Get-RunnerWebText $page), 'https://download\.microsoft\.com/download/[0-9A-Za-z/-]+/ServiceTags_Public_\d{8}\.json') | ForEach-Object { $_.Value } | Select-Object -Unique)
+      if ($urls.Count -ne 1) { throw ('Microsoft''s download page ' + $page + ' names ' + $urls.Count + ' Service Tags files, not one') }
+      "file`t" + $urls[0]
+      $got = Read-RunnerServiceTags (Get-RunnerWebText $urls[0]) $tags
+      foreach ($n in @($got.Keys)) { foreach ($p in $got[$n]) { "list`t$n`t$p" } }
+    }
+    foreach ($h in @($hosts | Where-Object { $_ })) {
+      $ips = @()
+      try { $ips = @([Net.Dns]::GetHostAddresses($h) | ForEach-Object { $_.IPAddressToString }) } catch { throw ($h + ' does not resolve: ' + $_.Exception.Message) }
+      if (-not $ips.Count) { throw ($h + ' resolves to nothing') }
+      foreach ($ip in $ips) { "addr`t$h`t$ip" }
+    }
+  } catch { "error`t" + $_.Exception.Message; exit 1 }
+}
+'@
+# The lists, as @{ Lists = name -> prefixes; Addresses = host -> addresses;
+# File = the Service Tags file read }. GitHub's are github-web, github-api,
+# github-git and github-actions. The dry run asks no one: GitHub's lists
+# are stand-ins, every tag is 198.51.100.0/24 and 2001:db8::/32, and every
+# host answers from 198.51.100.7.
+function Get-PublishedLists([string[]]$tags, [string[]]$hosts) {
+  $out = @{ Lists = @{}; Addresses = @{}; File = '' }
+  if ($DryRunTo) {
+    $out.Lists['github-web'] = @('140.82.112.0/20', '2a0a:a440::/29'); $out.Lists['github-api'] = @('192.30.252.0/22')
+    $out.Lists['github-git'] = @('140.82.112.0/20'); $out.Lists['github-actions'] = @('4.148.0.0/16')
+    foreach ($n in @($tags)) { $out.Lists[$n] = @('198.51.100.0/24', '2001:db8::/32') }
+    foreach ($h in @($hosts)) { $out.Addresses[$h] = @('198.51.100.7') }
+    $out.File = 'a stand-in (dry run)'
+    return $out
+  }
+  $q = { param($a) '@(' + ((@($a) | Where-Object { $_ } | ForEach-Object { "'" + ([string]$_).Replace("'", "''") + "'" }) -join ', ') + ')' }
+  $said = @(Remote ($listLib + "`nGet-RunnerLists " + (& $q $tags) + ' ' + (& $q $hosts) + "`n"))
+  $code = $LASTEXITCODE
+  foreach ($line in $said) {
+    $f = ([string]$line).Split("`t")
+    if ($f[0] -eq 'error' -and $f.Count -ge 2) { throw ('reading the published lists on ' + $where + ': ' + $f[1]) }
+    if ($f[0] -eq 'file' -and $f.Count -eq 2) { $out.File = $f[1] }
+    elseif ($f[0] -eq 'list' -and $f.Count -eq 3) { if (-not $out.Lists.ContainsKey($f[1])) { $out.Lists[$f[1]] = @() }; $out.Lists[$f[1]] += $f[2] }
+    elseif ($f[0] -eq 'addr' -and $f.Count -eq 3) { if (-not $out.Addresses.ContainsKey($f[1])) { $out.Addresses[$f[1]] = @() }; $out.Addresses[$f[1]] += $f[2] }
+  }
+  if ($code -ne 0) { throw ('reading the published lists on ' + $where + ' stopped (exit ' + $code + '): ' + (@($said | Select-Object -Last 3) -join ' ')) }
+  return $out
+}
+# GitHub's published lists, loopback, -AllowHost and, for the signing runner,
+# the Microsoft tags records\sign-runners.json names, as the ranges to block.
 function Get-GuardBlocks {
-  $meta = (Invoke-Gh api meta | Out-String) | ConvertFrom-Json
+  $reach = @()
+  if ($signs) {
+    $reach = @($signRecord.reach.hosts | Where-Object { $_ })
+    if (-not $reach.Count) { throw 'records\sign-runners.json names no host the sign steps reach' }
+  }
+  $lists = Get-PublishedLists @($reach | ForEach-Object { [string]$_.tag } | Select-Object -Unique) @($reach | ForEach-Object { [string]$_.host })
   $allow = @('127.0.0.0/8', '::1/128')
   foreach ($k in 'web', 'api', 'git', 'actions') {
-    $got = @($meta.$k | Where-Object { $_ })
+    $got = @($lists.Lists['github-' + $k] | Where-Object { $_ })
     if (-not $got.Count) { throw ('api.github.com/meta has no ' + $k + ' list, so no firewall rule was made') }
     $allow += $got
   }
@@ -763,6 +897,19 @@ function Get-GuardBlocks {
     }
     $allow += $ips
     Say ('  -AllowHost ' + $h + ': ' + ($ips -join ', ') + ' (as of now)') 'Yellow'
+  }
+  # THE SIGNING RUNNER: each host has to answer, on the machine the rules go
+  # on, from inside its tag, or nothing is changed and the host is named.
+  if ($reach.Count) { Say ('  Microsoft''s Service Tags: ' + $lists.File) 'DarkGray' }
+  foreach ($r in $reach) {
+    $pre = @($lists.Lists[[string]$r.tag] | Where-Object { $_ })
+    if (-not $pre.Count) { throw ('Microsoft''s Service Tags gave ' + $r.tag + ' no range, so no firewall rule was made') }
+    $ips = @($lists.Addresses[[string]$r.host] | Where-Object { $_ })
+    if (-not $ips.Count) { throw ($r.host + ' gave no address on ' + $where + ', so no firewall rule was made') }
+    $miss = @(Get-RunnerReachMisses $ips $pre)
+    if ($miss.Count) { throw ($r.host + ' answers from ' + ($miss -join ', ') + ', which Microsoft''s ' + $r.tag + ' list does not hold, so records\sign-runners.json is out of date for it and no firewall rule was made') }
+    Say ('  ' + $r.host + ': ' + $r.tag + ', ' + $pre.Count + ' published range(s), and it answers from inside them') 'Yellow'
+    $allow += $pre
   }
   Get-RunnerBlockRanges $allow
 }
@@ -928,6 +1075,28 @@ $zipUrl = "https://github.com/actions/runner/releases/download/v$version/$zipNam
 Say "  actions/runner $version (pinned), SHA-256 $sha" 'Green'
 
 Head "What the build check needs, on $where"
+# A signing runner (#3312) also needs what release.yml's sign steps run:
+# signtool from the Windows SDK, found the way Sign-Artifact.ps1 finds it,
+# and a .NET runtime of 8 or later for Microsoft's signing client, asked of
+# the machine wide install the runner account loads it from.
+$signNeed = ''
+if ($signs) {
+  $signNeed = @'
+$st = $null
+foreach ($r in @("${env:ProgramFiles(x86)}\Windows Kits\10\bin", "$env:ProgramFiles\Windows Kits\10\bin")) {
+  if (-not (Test-Path -LiteralPath $r)) { continue }
+  $st = Get-ChildItem -LiteralPath $r -Recurse -Filter 'signtool.exe' -EA SilentlyContinue | Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+  if ($st) { break }
+}
+if ($st) { 'HAVE signtool ' + $st.FullName } else { 'MISSING signtool' }
+$pf = $env:ProgramW6432
+if (-not $pf) { $pf = $env:ProgramFiles }
+$rtDir = Join-Path $pf 'dotnet\shared\Microsoft.NETCore.App'
+$rt = @()
+if (Test-Path -LiteralPath $rtDir) { $rt = @(Get-ChildItem -LiteralPath $rtDir -Directory -EA SilentlyContinue | Where-Object { $_.Name -match '^(\d+)\.\d+\.\d+$' -and [int]$Matches[1] -ge 8 } | ForEach-Object { $_.Name }) }
+if ($rt.Count) { 'HAVE dotnet ' + ($rt -join ', ') } else { 'MISSING dotnet' }
+'@
+}
 $need = Remote @"
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine')
 foreach (`$c in 'pwsh','node','python','git') {
@@ -942,6 +1111,7 @@ if (`$msb) { 'HAVE msbuild ' + `$msb } else { 'MISSING msbuild' }
 `$ref = Join-Path `$pf86 'Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1'
 if (Test-Path (Join-Path `$ref 'mscorlib.dll')) { 'HAVE net481refs ' + `$ref } else { 'MISSING net481refs' }
 try { Add-Type -AssemblyName PresentationFramework; 'HAVE wpf' } catch { 'MISSING wpf' }
+$signNeed
 "@
 $need | ForEach-Object { Say "  $_" }
 $missing = @($need | Where-Object { "$_" -like 'MISSING *' } | ForEach-Object { "$_".Substring(8) })
@@ -950,6 +1120,8 @@ if ($missing.Count) {
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'msbuild' -or $missing -contains 'net481refs') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeBuildTools -SkipFirewall'   (MSBuild and the .NET Framework 4.8.1 reference assemblies the launcher builds with, #498)" }
+  if ($missing -contains 'signtool') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'   (signtool comes with the Windows SDK the C++ workload brings, #459)" }
+  if ($missing -contains 'dotnet') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'   (the .NET runtime Microsoft's signing client runs on, #3312)" }
   if ($missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
   Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }

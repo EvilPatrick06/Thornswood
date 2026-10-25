@@ -37,7 +37,8 @@ if (bannerVideo && bannerMotion) {
 }
 
 var burger = document.getElementById('burger'), nav = document.getElementById('nav');
-function narrow(){ return window.matchMedia('(max-width:900px)').matches; }
+// The same width home.css folds the menu at (#3293).
+function narrow(){ return window.matchMedia('(max-width:1080px)').matches; }
 function shut(){ if (narrow()) { nav.hidden = true; burger.setAttribute('aria-expanded','false'); burger.setAttribute('aria-label','Open menu'); } else { nav.hidden = false; } }
 shut();
 window.addEventListener('resize', shut);
@@ -915,10 +916,46 @@ if (AGE_PATHS[here] && !ageOk()) {
     '<p class="hint">We use what you send to investigate and respond. Your Discord name is optional for game faults and ideas. ' +
       'Do not send passwords, access tokens, payment details, or unrelated personal information. ' +
       '<a href="/privacy">How reports are stored and used</a>. Staff work in their own time; there is no guaranteed response time.</p>' +
+    // Cloudflare Turnstile's check that a person is sending it (#3216),
+    // drawn here when the site has a key for it.
+    '<div id="rCheck" class="ts-check" hidden></div>' +
     '<div><button class="btn first" type="submit">Send report</button></div>' +
     '<p id="rSaid" class="said" role="status" aria-live="polite" hidden></p>' +
     '</form>');
   var form = document.getElementById('rep');
+  /* Turnstile (#3216). The site says whether the check is on and with which
+     key; off, nothing is loaded from Cloudflare and the form is as it was.
+     On, the widget's pass goes with the report, and a pass is good once, so
+     the widget is drawn again after every answer. tsWanted is true while the
+     check is on and has not given a pass yet. */
+  var tsWanted = false, tsToken = '', tsWidget = null;
+  function tsReset() {
+    tsToken = '';
+    if (tsWidget !== null && window.turnstile) window.turnstile.reset(tsWidget);
+  }
+  request('/api/report/form').then(function (r) { return r.json(); }).then(function (d) {
+    var key = d && d.turnstile;
+    if (!key) return;
+    tsWanted = true;
+    var box = document.getElementById('rCheck');
+    box.hidden = false;
+    var s = document.createElement('script');
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    s.async = true;
+    s.onload = function () {
+      tsWidget = window.turnstile.render(box, {
+        sitekey: key, action: 'report', theme: 'dark',
+        callback: function (t) { tsToken = t; },
+        'expired-callback': function () { tsToken = ''; },
+        'error-callback': function () { tsToken = ''; }
+      });
+    };
+    s.onerror = function () {
+      box.textContent = 'The check that you are a person could not load, so this form cannot send. ' +
+        'Something in this browser may be blocking challenges.cloudflare.com.';
+    };
+    document.head.appendChild(s);
+  }).catch(function () { /* the form still sends; the site says if it needed the check */ });
   /* Who is asking, told apart (#1097): not signed in gets the sign in link;
      signed in but not let in, banned, or Discord not answering gets the
      site's own sentence (personSays, what /api/report would answer) and no
@@ -971,6 +1008,10 @@ if (AGE_PATHS[here] && !ageOk()) {
       btn.disabled = false;
       personBox();
     }
+    if (tsWanted && !tsToken) {
+      finish('Wait for the tick under the form, then send it again.');
+      return;
+    }
     var aboutPerson = document.getElementById('rPerson').checked;
     request('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -981,6 +1022,7 @@ if (AGE_PATHS[here] && !ageOk()) {
         by:     document.getElementById('rBy').value,
         homepage: document.getElementById('rHome').value,
         about:  aboutPerson ? document.getElementById('rWho').value : '',
+        turnstile: tsToken,
         kind:   aboutPerson ? 'report'
               : (document.getElementById('rIdea').checked ? 'idea' : 'bug')
       })
@@ -991,6 +1033,7 @@ if (AGE_PATHS[here] && !ageOk()) {
           .then(function (j) { return { ok: r.ok, j: j || {} }; });
       })
       .then(function (res) {
+        tsReset();
         if (res.ok) {
           form.querySelectorAll('input, textarea').forEach(function (i) {
             if (i.type === 'checkbox') { i.checked = false; } else { i.value = ''; }
@@ -1002,6 +1045,7 @@ if (AGE_PATHS[here] && !ageOk()) {
           finish(res.j.error || 'That did not send. Try again in a minute.');
         }
       }).catch(function () {
+        tsReset();
         finish(gaveUp
           ? 'No answer from the site after fifteen seconds, so it may not have gone. Try again in a minute.'
           : 'That did not send. Try again in a minute.');

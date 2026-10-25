@@ -723,6 +723,52 @@ DEED_WORDS = (
     'register but this. Keep it somewhere a thief will not look, or do not keep it '
     'at all.</font>')
 
+# THE TEN PASSAGE BOOKS' WORDS (#3349, Patrick, 22 Oct, B on the page: "Plain
+# town lines, from the tool"). Each book says what its town is, in plain words,
+# and nothing else: no aside to the reader, no joke. The town is chosen on the
+# creation panel since #2622 and nothing hands these books out or acts when one
+# is read (gamemode.js mp.onReadBook), so the old last line, "Read this and you
+# go. The other passages will burn.", is gone with the quips. The books stay
+# because their form ids key CHARGEN.towns in gamemode.js
+# (Remove-DeadRecords.ps1). Each is written over where it stands, FULL and all
+# else kept; only its DESC is this.
+def passage_words(title, line):
+    return ('<p align="center"><font size="30">%s</font></p><br><br>%s' % (title, line))
+
+
+PASSAGE_WORDS = {
+    'ThornswoodPassageWhiterun': passage_words(
+        'Passage to Whiterun',
+        'Whiterun, in the middle of Skyrim. The roads out of it go four ways.'),
+    'ThornswoodPassageRiften': passage_words(
+        'Passage to Riften',
+        'Riften, in the Rift. Fishing, the meadery, and the canal through the middle of the town.'),
+    'ThornswoodPassageSolitude': passage_words(
+        'Passage to Solitude',
+        'Solitude, in Haafingar. Ships, trade, the court, and the one Imperial embassy in Skyrim.'),
+    'ThornswoodPassageWindhelm': passage_words(
+        'Passage to Windhelm',
+        'Windhelm, in Eastmarch. Stone, snow and the docks, and the High King\'s seat.'),
+    'ThornswoodPassageMarkarth': passage_words(
+        'Passage to Markarth',
+        'Markarth, in the Reach. Silver mines under the city, and the Forsworn in the hills above it.'),
+    'ThornswoodPassageFalkreath': passage_words(
+        'Passage to Falkreath',
+        'Falkreath, in the pines. Its graveyard is bigger than the town.'),
+    'ThornswoodPassageMorthal': passage_words(
+        'Passage to Morthal',
+        'Morthal, in the swamps of Hjaalmarch. A few houses and the Jarl\'s hall.'),
+    'ThornswoodPassageDawnstar': passage_words(
+        'Passage to Dawnstar',
+        'Dawnstar, on the north coast. Ice, the mines, and a harbour that freezes.'),
+    'ThornswoodPassageWinterhold': passage_words(
+        'Passage to Winterhold',
+        'Winterhold, what is left of it after the Collapse. The College stands above it.'),
+    'ThornswoodPassageRavenrock': passage_words(
+        'Passage to Raven Rock',
+        'Raven Rock, across the water on Solstheim. The ash still falls there.'),
+}
+
 # What the recipes are made of and what they make. Every one of these was read
 # out of a record already in this file or out of TOOLS in gamemode.js, never
 # remembered.
@@ -1197,11 +1243,12 @@ def quality_record(fid, edid, name, look, effect):
     return own_record(b'ALCH', fid, pairs)
 
 
-def thornswood_records(passage, clam):
+def thornswood_records(passage, clam, passages):
     """Every record this tool writes from its own numbers, in the order it
     writes new ones. passage is the Whiterun passage book, Thornswood's own
     since 13 September, which the deed is made from; clam is Skyrim's Clam01,
-    which the catches are made from."""
+    which the catches are made from; passages is the ten passage books by
+    editor id, each written over with its PASSAGE_WORDS."""
     out = [
         kywd(KILN_KEYWORD, 'ThornswoodCraftingCharcoalKiln'),
         kywd(ALCHEMY_KEYWORD, 'ThornswoodCraftingAlchemy'),
@@ -1251,6 +1298,10 @@ def thornswood_records(passage, clam):
              SHOVEL, FORGE_KEYWORD),
         clone(passage, DEED, 'ThornswoodBookDeed', sets={
             b'FULL': zstr('Deed'), b'DESC': zstr(DEED_WORDS)}),
+    ] + [
+        clone(passages[name], passages[name].fid, name, sets={b'DESC': zstr(PASSAGE_WORDS[name])})
+        for name in PASSAGE_WORDS
+    ] + [
         misc(KEY, 'ThornswoodMiscKey', 'Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
         misc(MOLD, 'ThornswoodMiscKeyMold', 'Key Mold', MOLD_MODEL, MOLD_BOUNDS, 25, 1.0),
         cobj(RECIPE_MOLD, 'ThornswoodRecipeKeyMold', [(IRON_INGOT, 1)], MOLD, FORGE_KEYWORD),
@@ -2140,7 +2191,16 @@ def main():
         '647300f64c4bb9504e414d040000000000524e414d0400dc070100464e414d020000005046'
         '4947040003ba0e00534e414d04002605100050465043040064646464')
     clam = Rec(b'FLOR', 0, 0x85F80, clam_raw[16:24], clam_raw[24:])
-    own = thornswood_records(passage, clam)
+    passages = {}
+    for name in PASSAGE_WORDS:
+        book = by_edid.get(name)
+        if book is None or book.compressed or book.tag != b'BOOK':
+            print('')
+            print('STOP. BOOK %s, whose words this writes, is not here as an uncompressed book. '
+                  'Nothing was written.' % name)
+            return 1
+        passages[name] = book
+    own = thornswood_records(passage, clam, passages)
     if len({r.fid for r in own}) != len(own):
         raise ValueError('Two authored records share a form ID')
     unmade = sorted(remade - set(r.fid for r in own))

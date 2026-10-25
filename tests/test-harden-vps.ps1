@@ -29,8 +29,11 @@
   is not turned off (its services untouched) and installs every day at
   4 AM; automatic maintenance starts at 4 AM with no random delay; 4 AM is
   clear of the backup (Install-Backup.ps1 -At) and the nightly checks
-  (nightly.yml's cron) in summer and in winter; active hours leave 4 to 6 AM
-  out and nothing forces a restart. And that every
+  (nightly.yml's cron) in summer and in winter; the restart an install
+  needs comes on the install's own timer, inside 4 to 6 AM, active hours
+  still leave 4 to 6 AM out, and nothing in it restarts the box; a restart
+  Windows already set outside the window is said with WARN and left. And
+  that every
   command in it that changes Windows sits inside a layer function, so the
   stand-in covers all of them.
 
@@ -135,6 +138,10 @@ function Set-PolicyValue([string]$Key, [string]$Name, $Value, [string]$Type) {
     $global:Fake.log.Add('Set-PolicyValue ' + $Name)
 }
 function Get-BoxTimeZone { return $global:Fake.tz }
+function Get-TaskNextRun([string]$Path, [string]$Name) {
+    if (-not $global:Fake.next.ContainsKey($Path + $Name)) { return $null }
+    return $global:Fake.next[$Path + $Name]
+}
 function Test-SshdFile([string]$Path) {
     $global:Fake.checked.Add([IO.File]::ReadAllText($Path))
     return [pscustomobject]@{ Ok = [bool]$global:Fake.sshdOk; Said = 'line 12: Bad configuration option: KbdInteractiveAuthentication' }
@@ -192,6 +199,8 @@ function New-Fake {
         # active hours or maintenance.
         reg = @{ 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|AUOptions' = @{ Value = 7; Type = 'DWord' } }
         tz = 'Mountain Standard Time'
+        # When a task runs next, by its path and name; none set by default.
+        next = @{}
         sshdOk = $true
         restarts = 0
         rollback = ''
@@ -244,7 +253,7 @@ try {
     Yes 'vps-harden.ps1 parses' (-not $errs -or $errs.Count -eq 0)
     Yes '  and is plain ASCII, which Windows PowerShell on the box reads right without a byte order mark' (-not ($boxText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Get-IdleService', 'Stop-IdleService', 'Disable-IdleService', 'Get-WindowsTask', 'Disable-WindowsTask', 'Get-PolicyValue', 'Set-PolicyValue', 'Get-BoxTimeZone', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
+    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Get-IdleService', 'Stop-IdleService', 'Disable-IdleService', 'Get-WindowsTask', 'Disable-WindowsTask', 'Get-PolicyValue', 'Set-PolicyValue', 'Get-BoxTimeZone', 'Get-TaskNextRun', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -366,8 +375,16 @@ try {
     $active = @(0..23 | Where-Object { if ($from -le $to) { $_ -ge $from -and $_ -lt $to } else { $_ -ge $from -or $_ -lt $to } })
     Yes ('  active hours on, ' + $from + ' to ' + $to + ', 18 hours at most, leaving 4 to 6 AM out and on from 6 AM, before anybody is on at 7') (
         (Reg '\WindowsUpdate' 'SetActiveHours') -eq 1 -and $active.Count -le 18 -and $active -notcontains 4 -and $active -notcontains 5 -and $active -contains 6 -and $active -contains 7)
-    Yes '  no restart forced at the install time, and nothing in vps-harden.ps1 restarts the box' ((Reg '\WindowsUpdate\AU' 'AlwaysAutoRebootAtScheduledTime') -eq 0 -and
-        -not @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and @('Restart-Computer', 'shutdown', 'shutdown.exe') -contains $n.GetCommandName() }, $true)).Count)
+    # Microsoft's way to schedule an install and its restart (#3213, 23 Oct):
+    # AUOptions 4, the install time, and the timer the install starts. The
+    # restart has to come inside 4 to 6 AM even after an install of an hour.
+    $timer = Reg '\WindowsUpdate\AU' 'AlwaysAutoRebootAtScheduledTimeMinutes'
+    $restartAt = $install + 60 + [int]$timer
+    Yes ('  the restart an install needs comes on its timer, ' + $timer + ' minutes after it, inside 4 to 6 AM even after an hour of install') (
+        (Reg '\WindowsUpdate\AU' 'AlwaysAutoRebootAtScheduledTime') -eq 1 -and $null -ne $timer -and [int]$timer -ge 15 -and [int]$timer -le 180 -and
+        $install -ge 240 -and $restartAt -lt 360)
+    Yes '  and nothing in vps-harden.ps1 restarts the box itself' (-not @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and @('Restart-Computer', 'shutdown', 'shutdown.exe') -contains $n.GetCommandName() }, $true)).Count)
+    Yes '  with no restart set by Windows, it says so' (Has $r.Lines '^ALREADY Windows has no restart for an update set$')
     Yes '  every value written with the type Windows reads it as' (@($global:Fake.reg.Keys | Where-Object { $_ -notmatch 'Activation Boundary$' -and $global:Fake.reg[$_].Type -ne 'DWord' }).Count -eq 0)
     Yes '  the box''s clock said, Mountain' (Has $r.Lines "^ALREADY the box's clock is Mountain Standard Time")
     Yes '  all of it before sshd, so a restart that cut the session off would come last' ($global:Fake.log.IndexOf('Set-PolicyValue Randomized') -ge 0 -and
@@ -378,6 +395,18 @@ try {
     # ---- a second run -----------------------------------------------------------------
     $r2 = Invoke-BoxHere $cfg
     Yes 'second run: nothing to change' ($r2.Code -eq 0 -and $r2.Lines[-1] -eq 'DONE 0 change(s) made.' -and -not (Has $r2.Lines '^(CHANGED|WOULD) '))
+
+    # ---- a restart Windows set before the policy (#3213, 23 Oct) ------------------------
+    # As the box had it at 6:26 AM on 23 Oct: Reboot_AC set for 2:33:33 AM.
+    $rebootAc = '\Microsoft\Windows\UpdateOrchestrator\Reboot_AC'
+    $global:Fake.next[$rebootAc] = New-Object DateTime(2026, 10, 24, 2, 33, 33)
+    $before = $global:Fake.log.Count
+    $r3 = Invoke-BoxHere $cfg
+    Yes 'a restart Windows set for 2:33 AM: WARN, with the time, outside 4 AM to 6 AM' ($r3.Code -eq 0 -and (Has $r3.Lines '^WARN Windows has a restart for an update set for 2026-10-24 2:33 AM, outside 4 AM to 6 AM'))
+    Yes '  and left: its task untouched, nothing changed' ($global:Fake.tasks[$rebootAc].State -eq 'Ready' -and $global:Fake.log.Count -eq $before -and $r3.Lines[-1] -eq 'DONE 0 change(s) made.')
+    $global:Fake.next[$rebootAc] = New-Object DateTime(2026, 10, 24, 4, 20, 0)
+    $r4 = Invoke-BoxHere $cfg -Dry
+    Yes '  one at 4:20 AM is inside the window, and said so' (-not (Has $r4.Lines '^WARN Windows has a restart') -and (Has $r4.Lines '^ALREADY Windows has its restart for an update set for 2026-10-24 4:20 AM, inside 4 AM to 6 AM'))
     Yes '  no second backup and no second restart' (@(Get-ChildItem -LiteralPath $tmp -Filter 'sshd_config.before-harden-*').Count -eq 1 -and $global:Fake.restarts -eq 1 -and $global:Fake.private.Count -eq 1)
     Yes '  says ALREADY for the telemetry tasks and the update values (#3213)' ((Has $r2.Lines '^ALREADY \\Microsoft\\Windows\\DiskFootprint\\Diagnostics Disabled') -and
         (Has $r2.Lines '^ALREADY AllowTelemetry is 0') -and (Has $r2.Lines '^ALREADY AUOptions is 4') -and (Has $r2.Lines '^ALREADY Activation Boundary is 2000-01-01T04:00:00') -and
