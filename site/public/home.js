@@ -305,9 +305,13 @@ if (AGE_PATHS[here] && !ageOk()) {
       });
       out += '</div></div>';
     });
-    if (!live.some(function (s) { return (s.rows || []).length; })) {
+    // Built from the issue board by the bot (#3140): a roadmap it could not
+    // read is said, never drawn as an empty one.
+    if (b.unread) out += '<p>The roadmap could not be read from the issue board just now. Try again in a few minutes.</p>';
+    else if (!live.some(function (s) { return (s.rows || []).length; })) {
       out += '<p>Nothing on it yet.</p>';
     }
+    if (b.at) out += '<p><em>Read from the issue board ' + esc(b.at) + '.</em></p>';
     show(out);
   }).catch(function () { show('<h1>Roadmap</h1><p>Could not load it.</p>'); });
 } else if (here === '/news') {

@@ -331,6 +331,9 @@ function Move-ThornswoodBotRecords([string]$Root) {
 #     moderation.log, which the site writes there for the bot and nothing
 #     else. The rule the bot had on the site's whole data folder before, where
 #     sessions.json and the other records are, is taken off.
+#   the site's data\from-bot, Modify (issue #3140): lists.json, the site's
+#     Known Issues page and roadmap, which the bot builds from the board and
+#     the site shows. The one folder of the site's the bot writes.
 #   each game server's for-bot folder, read on it and everything in it
 #     (issue #2321): the gamemode's staff log, moderation.log, which the
 #     bot says in the staff channel. A folder, made here when the server has
@@ -469,6 +472,9 @@ function Grant-ThornswoodBotAccess {
     $forBot = Join-Path $DocsData 'for-bot'
     if (Test-Path -LiteralPath $forBot) { Give $forBot 'Read' 'tree' 'the bot''s account read' }
     else { 'not there yet, nothing granted: ' + $forBot + '. Run Deploy-Docs.ps1, whose site makes it, then Install-Bot.ps1 again' }
+    $fromBot = Join-Path $DocsData 'from-bot'
+    if (Test-Path -LiteralPath $fromBot) { Give $fromBot 'Modify' 'tree' 'the bot''s account Modify, on the known issues and roadmap it writes for the site,' }
+    else { 'not there yet, nothing granted: ' + $fromBot + '. Run Deploy-Docs.ps1, whose site makes it, then Install-Bot.ps1 again' }
   }
   foreach ($s in $ServerRoots) {
     if (-not (Test-Path -LiteralPath $s)) { 'no game server at ' + $s + ', so nothing granted there'; continue }

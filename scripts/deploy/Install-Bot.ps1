@@ -418,6 +418,13 @@ $forBot = @(Remote "if (Test-Path -LiteralPath '$docsWin\data\for-bot') { 'FOR-B
 if ($forBot -notcontains 'FOR-BOT THERE') {
   Die "the site has not made $docsWin\data\for-bot yet, where the bot now reads what the site writes for it. Run .\scripts\deploy\Deploy-Docs.ps1 first, then this again. Nothing on the box was changed."
 }
+# The other way round (issue #3140): the bot writes the site's Known Issues
+# page and roadmap into data\from-bot, which the site makes and reads. A bot
+# sent first could not write them, and the grant below needs the folder there.
+$fromBot = @(Remote "if (Test-Path -LiteralPath '$docsWin\data\from-bot') { 'FROM-BOT THERE' } else { 'NO FROM-BOT' }" | ForEach-Object { "$_".Trim() })
+if ($fromBot -notcontains 'FROM-BOT THERE') {
+  Die "the site has not made $docsWin\data\from-bot yet, where the bot writes the site's known issues and roadmap. Run .\scripts\deploy\Deploy-Docs.ps1 first, then this again. Nothing on the box was changed."
+}
 
 # A stage a run that died part way left behind was never swapped in.
 $made = @(Remote @"

@@ -76,8 +76,10 @@ if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $Here) }
 $Root = (Resolve-Path -LiteralPath $Root).Path
 
 # Files that must be there. A missing one is said out loud, not dropped.
-# site/data/board.json because the public Known Issues page is its known
-# board, written out at /known (#2414); the other boards in it are read too.
+# site/data/board.json because the hub's boards in it are shown on the site.
+# The Known Issues page and the roadmap came out of it in #3140: they are
+# written from the issue board, and the bot checks their words (bot.py
+# post_problems).
 $Named = @(
     'README.md', 'SECURITY.md', 'Developer-Guide.md', 'launcher/app/Help.cs', 'launcher/ui.xaml',
     'bot/content.py', 'site/public/home.html', 'installer/READ ME FIRST.txt', 'site/data/board.json'
