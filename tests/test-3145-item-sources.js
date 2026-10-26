@@ -14,7 +14,8 @@
 //      company ware is a riekling recipe, and a cut or tempering row is no
 //      source of anything.
 //   Q  the rare seams the custom quests open are quest, never gathered; the
-//      dungeon's exclusive list is found; the starting tools are start.
+//      dungeon's exclusive list is found; the starting tools are start;
+//      each hair dye is its own row and the plain record it rides on none.
 //   N  an input nothing hands out is under noSource, and one that something
 //      does hand out is not.
 //   P  the builder refuses, on a copy in a temporary folder, a table where
@@ -130,6 +131,13 @@ yes('Q3 the pickaxe a new miner is handed is start, and crafted by a smith as we
     table.items['e3c16:Skyrim.esm'].sources.indexOf('crafted') >= 0);
 yes('Q4 the guild satchel a retrieval asks for is quest only',
     JSON.stringify((table.items['17000:Thornswood-Content.esp'] || {}).sources) === '["quest"]');
+const dyes = json('game/data/hair-dyes.json');
+yes('Q5 every hair dye (' + dyes.dyes.length + ') is its own Tailor row, and the plain record a dye is carried on is no row (test-2675-hair-dye.js B3)',
+    !table.items[dyes.item] && dyes.dyes.length > 0 && dyes.dyes.every(function (d) {
+      const r = table.items['hair-dye:' + d.id];
+      return r && r.name === d.name && JSON.stringify(r.sources) === '["crafted"]' &&
+        r.via.every(function (v) { return /^Tailor\//.test(v.by); });
+    }));
 
 // ---------------------------------------------------------------- N
 yes('N1 noSource is exactly the rows with no sources',

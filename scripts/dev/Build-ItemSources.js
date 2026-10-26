@@ -23,6 +23,8 @@
 //             profession owns the recipe (smelting, tanning, jewellery
 //             today), and the cook's fine and burnt dishes and the tailor's
 //             hair dye, which the server makes in place of a recipe's output
+//             (each dye is a row keyed hair-dye:<id>, never the plain
+//             record it is carried on)
 //   race      a recipe only the named race may make (docs/systems/races.md)
 //   company   a Free Skyrim Trading Company ware: the Riekling pieces kept in
 //             the open book (docs/systems/cut-items.md)
@@ -279,12 +281,18 @@ Object.keys(quality.fine || {}).sort().forEach(function (base) {
   add(quality.fine[base], { kind: 'crafted', by: outOwner[base], rank: '', table: 'food-groups.json quality fine', of: base });
 });
 if (quality.burnt) { add(quality.burnt, { kind: 'crafted', by: 'Cook', rank: '', table: 'food-groups.json quality burnt' }); }
-Object.keys((hairDyes.who && hairDyes.who.halves) || {}).sort().forEach(function (half) {
-  const by = 'Tailor/' + half.charAt(0).toUpperCase() + half.slice(1);
-  add(hairDyes.item, { kind: 'crafted', by: by, rank: hairDyes.who.halves[half], table: 'hair-dyes.json' });
+// A dye is carried on a plain vanilla record that nothing else in game\ may
+// name (#2675, test-2675-hair-dye.js B3), so each dye is its own row, keyed
+// hair-dye:<its id in the list>, and the plain record is never a row here.
+(hairDyes.dyes || []).forEach(function (d) {
+  const key = 'hair-dye:' + d.id;
+  Object.keys((hairDyes.who && hairDyes.who.halves) || {}).sort().forEach(function (half) {
+    const by = 'Tailor/' + half.charAt(0).toUpperCase() + half.slice(1);
+    add(key, { kind: 'crafted', by: by, rank: hairDyes.who.halves[half], table: 'hair-dyes.json' });
+  });
+  note(key, d.name, 'MISC');
+  (d.inputs || []).forEach(function (it) { asked(it.item); });
 });
-note(hairDyes.item, 'Hair dye (a named Bowl)', 'MISC');
-(hairDyes.dyes || []).forEach(function (d) { (d.inputs || []).forEach(function (it) { asked(it.item); }); });
 
 // Class work. A rare seam is a miner's draw too, but only inside the one
 // place its merchant's scarce work opens (#1380), so it is quest, not

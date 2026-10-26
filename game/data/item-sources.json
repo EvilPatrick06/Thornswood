@@ -33,9 +33,9 @@
   "game/gamemode.js",
   "scripts/dev/MerchantScarceLongfinSources.js"
  ],
- "count": 1047,
+ "count": 1057,
  "counts": {
-  "crafted": 709,
+  "crafted": 719,
   "race": 38,
   "company": 13,
   "faction": 24,
@@ -45,7 +45,7 @@
   "start": 11
  },
  "only": {
-  "crafted": 652,
+  "crafted": 662,
   "race": 25,
   "company": 0,
   "faction": 24,
@@ -918,7 +918,6 @@
   "9171b:Skyrim.esm": {"name":"Silver Necklace","type":"ARMO","sources":["crafted"],"via":[{"kind":"crafted","by":"anybody","rank":"","recipe":"f4325:Skyrim.esm"}]},
   "92d3:FishingInSkyrim.esp": {"name":"Dwemer Fire Paste","type":"INGR","sources":["crafted"],"via":[{"kind":"crafted","by":"Cook/Hearthcook","rank":"master","recipe":"92d4:FishingInSkyrim.esp"}]},
   "981:Gourmet.esp": {"name":"Jelly Dumpling","type":"ALCH","sources":["crafted"],"via":[{"kind":"crafted","by":"Cook/Confectioner","rank":"novice","recipe":"98b:Gourmet.esp"}]},
-  "98626:Skyrim.esm": {"name":"Hair dye (a named Bowl)","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
   "9b8a4:Playable Rieklings.esp": {"name":"Riekling Bone Club","type":"WEAP","sources":["race","company"],"via":[{"kind":"race","race":"riekling","by":"Smith/Edgewright","rank":"novice","recipe":"9e775:Playable Rieklings.esp"},{"kind":"company","recipe":"9e775:Playable Rieklings.esp"}]},
   "9cd51:Skyrim.esm": {"name":"Spell Tome: Flames","type":"BOOK","sources":["found"],"via":[{"kind":"found","table":"dungeon tomes novice"}]},
   "9cd52:Skyrim.esm": {"name":"Spell Tome: Frostbite","type":"BOOK","sources":["found"],"via":[{"kind":"found","table":"dungeon tomes novice"}]},
@@ -1120,6 +1119,17 @@
   "f8713:Skyrim.esm": {"name":"Fine Clothes","type":"ARMO","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","recipe":"97f:MoreCraftableEquipment.esp"}]},
   "f8715:Skyrim.esm": {"name":"Fine Clothes","type":"ARMO","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","recipe":"981:MoreCraftableEquipment.esp"}]},
   "fde7b:Skyrim.esm": {"name":"Spell Tome: Mara's Embrace","type":"BOOK","sources":["found"],"via":[{"kind":"found","table":"dungeon tomes master"}]},
-  "ff7d1:Skyrim.esm": {"name":"Spell Tome: Clairvoyance","type":"BOOK","sources":["found"],"via":[{"kind":"found","table":"dungeon tomes novice"}]}
+  "ff7d1:Skyrim.esm": {"name":"Spell Tome: Clairvoyance","type":"BOOK","sources":["found"],"via":[{"kind":"found","table":"dungeon tomes novice"}]},
+  "hair-dye:black": {"name":"Black Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:blue": {"name":"Blue Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:brown": {"name":"Brown Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:copper": {"name":"Copper Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:deep-red": {"name":"Deep Red Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:gold": {"name":"Gold Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:green": {"name":"Green Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:hair-wash": {"name":"Hair Wash","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:nightshade": {"name":"Nightshade Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:purple": {"name":"Purple Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]},
+  "hair-dye:red": {"name":"Red Hair Dye","type":"MISC","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","table":"hair-dyes.json"},{"kind":"crafted","by":"Tailor/Liverywright","rank":"novice","table":"hair-dyes.json"}]}
  }
 }

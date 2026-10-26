@@ -1,10 +1,10 @@
 # Where every item comes from
 
-Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1047 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
+Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1057 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
-| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 709 | 652 |
+| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 719 | 662 |
 | race | a recipe only the named race may make | 38 | 25 |
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
 | faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
