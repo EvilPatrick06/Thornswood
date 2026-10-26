@@ -58,8 +58,10 @@ change it.
   starts, what each class owns and every step between Play and the game.
 - [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md): what to do when the server is down.
 - [SECURITY.md](SECURITY.md): how to report a hole quietly.
-- [LICENSE](LICENSE): Thornswood's own work is all rights reserved, and
-  everybody who contributes agrees once to the contributor terms in it.
+- [LICENSE](LICENSE): Thornswood's own code is under the MIT licence.
+  [LICENSING.md](LICENSING.md) says what it does not cover (the engine, other
+  people's files, and Thornswood's lore, art, music, plugins, name and logo),
+  and holds the contributor terms everybody who contributes agrees to once.
   [THIRD-PARTY.md](THIRD-PARTY.md) is what other people wrote, under their
   own licences.
 

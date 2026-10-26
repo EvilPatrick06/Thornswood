@@ -895,14 +895,99 @@ if (filesTxt === null) {
   yes(pair[0] + ' has no em dash', pair[1].indexOf('\u2014') < 0);
   yes(pair[0] + ' never says player', !/\bplayers?\b/i.test(pair[1]));
 });
-// Thornswood's own work is all rights reserved, in LICENSE at the root, with
-// the terms every contributor agrees to once (Patrick, 12 Oct, #1331). This
-// file points there and licenses nothing of ours itself.
+// Thornswood's own code is under MIT (Patrick, 26 Oct, #3688). LICENSE holds
+// the MIT text and nothing else: one added sentence and GitHub's licence
+// reader (licensee) stops naming it MIT, measured 26 Oct. What MIT does not
+// cover, and the terms every contributor agrees to once (#1331), are in
+// LICENSING.md. This file points there and licenses nothing of ours itself.
 const licence = read(path.join(ROOT, 'LICENSE'));
 yes('LICENSE is at the repo root', licence !== null);
-yes('  it keeps every right to Thornswood\'s own work', /All rights reserved\./.test(licence || ''));
-yes('  and carries the contributor terms', /CONTRIBUTOR TERMS/.test(licence || '') && /agrees to these\s+terms once/.test(licence || ''));
-yes('THIRD-PARTY.md sends the project\'s own licence to LICENSE', /does not license Thornswood's own work\. That is `LICENSE` at the\s+root/.test(N));
+const MIT_BODY = [
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.',
+].join('\n');
+const MIT_FILE = 'MIT License\n\nCopyright (c) 2026 Patrick (EvilPatrick06) and Thornswood contributors\n\n' +
+  MIT_BODY + '\n';
+yes('  it is the MIT text and nothing else, so GitHub reads it as MIT', licence === MIT_FILE);
+const licensing = read(path.join(ROOT, 'LICENSING.md'));
+const LG = licensing || '';
+yes('LICENSING.md is at the repo root', licensing !== null);
+yes('  it says what MIT does not cover', /## What it does not cover/.test(LG));
+yes('  the SkyMP fork keeps its own licences', /engine\/skymp/.test(LG) && /Affero/.test(LG));
+yes('  every file THIRD-PARTY.md lists keeps its own', /Every file `THIRD-PARTY\.md` lists/.test(LG));
+yes('  lore, art, music, plugins, name and logo stay all rights reserved',
+    /lore, art and music, its game plugins, and the Thornswood\s+name and logo/.test(LG) && /all rights reserved/.test(LG));
+yes('  and it carries the contributor terms', /## Contributor terms/.test(LG) && /agrees to these\s+terms once/.test(LG));
+yes('THIRD-PARTY.md sends the project\'s own licence to LICENSE and LICENSING.md',
+    /does not license Thornswood's own work\./.test(N) && /`LICENSE` at the root/.test(N) && /`LICENSING\.md` says what that licence does not cover/.test(N));
+yes('THIRD-PARTY.md says it covers files kept in the repository too, as LICENSING.md does',
+    /the files kept in this repository that somebody else wrote/.test(N));
+// Contributor term 3 asks the pull request to say whose the work is, so the
+// template has a line for it (#3651).
+const template = read(path.join(ROOT, '.github', 'pull_request_template.md')) || '';
+if (/the pull request says whose it is/.test(flat(LG))) {
+  yes('the pull request template has a "Whose work" line for contributor term 3', /^Whose work:/m.test(template));
+} else {
+  yes('LICENSING.md no longer asks the pull request to say whose the work is', true);
+}
+[['LICENSING.md', LG]].forEach(function (pair) {
+  yes(pair[0] + ' has no em dash', pair[1].indexOf('—') < 0);
+  yes(pair[0] + ' never says player', !/\bplayers?\b/i.test(pair[1]));
+});
+
+// --------------------------------------------- kept in the repository, #3761
+//
+// LICENSING.md says MIT does not cover anything THIRD-PARTY.md lists, and
+// THIRD-PARTY.md lists what sits in the repository as well as what ships.
+// A fixture that is large or carries somebody else's notice has a row in
+// "Kept in the repository, not shipped". The 2.4 MB skymp5-front build and
+// certifi's roots sat in tests\fixtures with none until #3761.
+const keptAt = N.indexOf('## Kept in the repository, not shipped');
+yes('THIRD-PARTY.md has a section for files kept in the repository, not shipped', keptAt >= 0);
+const keptSec = keptAt >= 0 ? N.slice(keptAt, N.indexOf('\n## ', keptAt + 5) > 0 ? N.indexOf('\n## ', keptAt + 5) : N.length) : '';
+const NOTICE_RE = /@license|\bCopyright\b|\bcertifi\b|-----BEGIN CERTIFICATE-----/;
+function walkFixtures(dir, rel, out) {
+  fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
+    const r = rel ? rel + '\\' + e.name : e.name;
+    if (e.isDirectory()) { walkFixtures(path.join(dir, e.name), r, out); }
+    else if (e.isFile()) { out.push({ rel: r, full: path.join(dir, e.name) }); }
+  });
+  return out;
+}
+const fixtures = walkFixtures(path.join(ROOT, 'tests', 'fixtures'), '', []);
+const flagged = fixtures.filter(function (f) {
+  const size = fs.statSync(f.full).size;
+  if (size > 100 * 1024) { return true; }
+  return NOTICE_RE.test(fs.readFileSync(f.full, 'latin1'));
+});
+yes('  the check found the fixtures it was written for (' + flagged.length + ')',
+    flagged.some(function (f) { return f.rel === '3111-roots.pem'; }));
+flagged.forEach(function (f) {
+  yes('  tests\\fixtures\\' + f.rel + ' has a row there', keptSec.indexOf('`tests\\fixtures\\' + f.rel + '`') >= 0);
+});
+const uiFront = fixtures.filter(function (f) { return f.rel === 'ui-front-build.js'; })[0];
+if (uiFront) {
+  const ui = fs.readFileSync(uiFront.full, 'utf8');
+  yes('  tests\\fixtures\\ui-front-build.js is only the build\'s asset modules: no bundled npm notice in it',
+      !/@license|\bCopyright\b|react-dom|\bLicensed under\b/i.test(ui));
+  yes('  and it has a row there all the same, since it was cut from skymp5-front\'s GPL build',
+      keptSec.indexOf('`tests\\fixtures\\ui-front-build.js`') >= 0 && /General Public License version 3/.test(keptSec));
+}
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

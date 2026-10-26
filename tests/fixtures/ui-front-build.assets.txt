@@ -1,8 +1,10 @@
 # Hashed asset names the real Data\Platform\UI\build.js emits via webpack
 # publicPath concatenation (__webpack_require__.p + "name" / n.p+"name").
 # Derived from tests/fixtures/ui-front-build.js so the set follows that file
-# (Futura hashes change after #1317). One bare name per line.
-# sha256 5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2
+# (Futura hashes change after #1317). One bare name per line. That fixture is
+# the build's asset modules only, cut from the build whose sha256 was
+# 5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2 (#3761).
+# sha256 9fa648adab38a613457e4788ab9c4888d3e1e8a37e9d7683ecc94992c9f86e22
 00e4a2200c3e5ae71d67.ttf
 02687b2110d1a50a6b4e194282ab8deb.svg
 08383611e86325b042d52c4c60d4f3c0.svg

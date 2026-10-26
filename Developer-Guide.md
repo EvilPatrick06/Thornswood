@@ -186,7 +186,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 
 Do this once on a new Windows PC. Stay in order. On every PC is the steps. Setting up a machine and Shipping from another machine are for a PC that will publish a release. You can read those two after the clone works.
 
-Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
+Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSING.md` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Each pull request then says whose work it is, on the template's "Whose work" line. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
 ### On every PC
 
@@ -812,8 +812,10 @@ Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 Nothing here assumes you use Claude: this file is the rules for everybody, and a Claude
 reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
 is added as a collaborator on the repository, and on CODEOWNERS beside the
-shared files, and agrees once to the contributor terms in `LICENSE`.
-Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
+shared files, and agrees once to the contributor terms in `LICENSING.md`.
+Thornswood's own code is under MIT, in `LICENSE` (Patrick, 26 Oct, #3688).
+Its lore, art, music, plugins, name and logo are not: `LICENSING.md` says
+what MIT does not cover.
 
 Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
 Vortex) also work here, on the shipping machine, under his GitHub account.

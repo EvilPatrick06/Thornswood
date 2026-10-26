@@ -1,20 +1,25 @@
 # Third-party notices
 
-This file lists what Thornswood hands to people that somebody else wrote, the
-licence each part is under, and where its source is. Every row was read off the
+This file lists what Thornswood hands to people that somebody else wrote, and
+the files kept in this repository that somebody else wrote even though they
+never ship ("Kept in the repository, not shipped"), the licence each part is
+under, and where its source is. Every row was read off the
 files on 24 September 2026. Licences come from each component's own licence
 file or from a font's own name table. Where a file came from was checked by
 comparing its sha256 with the copy it came from. Where something could not be
 identified, this file says so instead of guessing.
 
-This file does not license Thornswood's own work. That is `LICENSE` at the
-root: all rights reserved, with terms every contributor agrees to once
-(decided by Patrick on 12 Oct 2026, #1331).
+This file does not license Thornswood's own work. Thornswood's own code is
+under MIT, in `LICENSE` at the root (decided by Patrick on 26 Oct 2026,
+#3688). `LICENSING.md` says what that licence does not cover, which includes
+everything this file lists, and holds the terms every contributor agrees to
+once (#1331).
 
 `tests\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, every file under
 `launcher\lib`, every font and minified script the site serves from
-`site\public`, the six client files and the commits in
+`site\public`, every fixture under `tests\fixtures` that is large or
+carries somebody else's notice, the six client files and the commits in
 `records\client-build.json` and `records\server-build.json`, the two
 libraries the fork links that are not permissive, and the source paragraph on
 the public credits page. Where Vortex's copy of the Thornswood
@@ -865,6 +870,22 @@ Agreement (the section "Bethesda's own files, made on each machine" above)
 reserves every right it does not grant; it grants no right to copy the game's
 own files from anywhere but the person's own copy. Whether the fork's build
 keeps downloading them is Patrick's decision on #3728.
+
+## Kept in the repository, not shipped
+
+These files sit in the repository for its tests and are never handed to
+anybody. `tests\test-third-party.js` fails when a file under `tests\fixtures`
+is over 100 KB, or carries "@license", "Copyright", "certifi" or a
+certificate, and has no row here (#3761).
+
+| File | What it is | Where it came from | Licence | Read by |
+|---|---|---|---|---|
+| `tests\fixtures\ui-front-build.js` | The 68 asset modules of the shipped `Data\Platform\UI\build.js`, verbatim: the stub webpack writes for each picture, sound and font, with the hashed name it was given and the source path it came from. 47,757 bytes. | Cut on 26 October 2026 (#3761) from the whole development build of `skymp5-front` that was the fixture until then (2,451,499 bytes, sha256 `5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2`), the build "SkyMP's interface, built from the fork" describes. The cut leaves out the front's own code and the npm code bundled with it (React, Redux and the rest, under MIT and BSD notices); `tests\fixtures\ui-front-build.assets.txt` names its sha256. | GNU General Public License version 3, `skymp5-front`'s, as the build it was cut from | `tests\fixtures\ui-front.ps1`, `tests\test-ship-rules.ps1` (#1318) |
+| `tests\fixtures\3111-roots.pem` | Eight public root certificates and their comment lines, no key. 223 lines. | Copied from certifi 2026.7.22's `cacert.pem` (#3111): four of eMudhra's emSign roots and the four the bot needs. | Mozilla Public License 2.0, certifi's, as "The Discord bot, on the VPS" gives it | `tests\test-3111-emudhra-trust.js` |
+| `tests\fixtures\webview2-setup-chain.txt` | Three public certificates, no key: the signing certificate and issuer of Microsoft's WebView2 setup program, and the root. | Read out of the Authenticode signature of `MicrosoftEdgeWebview2Setup.exe` as Microsoft handed it out on 5 October 2026, and the root from the address the issuer names (#1330). | None given: they are Microsoft's public certificates, which every copy of that program carries | `tests\test-1330-webview2-signature.js` |
+
+The whole 2.4 MB build is still in the repository's history until the history
+rewrite takes it out (#3684).
 
 ## On our servers
 

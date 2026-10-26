@@ -44,8 +44,8 @@ verification provider needs its own necessity, retention and security review.
 
 | Asset | Existing evidence | Status |
 | --- | --- | --- |
-| `site/public/logo.png`, `favicon.ico`, `og.png` | Current branded files are tracked in the repository. | Djinn made them for Thornswood, under the contributor terms in `LICENSE` (Patrick, 15 Oct 2026, #2177). |
-| `site/public/banner.jpg`, `banner.mp4`, `banner.webm` | Current homepage art and animation are tracked in the repository. | Djinn made them for Thornswood, under the contributor terms in `LICENSE` (Patrick, 15 Oct 2026, #2177). |
+| `site/public/logo.png`, `favicon.ico`, `og.png` | Current branded files are tracked in the repository. | Djinn made them for Thornswood, under the contributor terms in `LICENSING.md` (Patrick, 15 Oct 2026, #2177). |
+| `site/public/banner.jpg`, `banner.mp4`, `banner.webm` | Current homepage art and animation are tracked in the repository. | Djinn made them for Thornswood, under the contributor terms in `LICENSING.md` (Patrick, 15 Oct 2026, #2177). |
 | Cinzel and Spectral font files | `site/public/fonts.css` identifies the authors, upstream projects and SIL Open Font License 1.1. | Preserve the licence notices with the distributed files. |
 | Community gallery media | Signed-in submissions, captions and moderation records; publication permissions described in Terms. | Staff must check permission and privacy before approving each submission. Submission alone is not proof of ownership of third-party material. |
 

@@ -3,7 +3,7 @@
   "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, docs\\WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
   "statuses": {
     "cleared": "The licence is named by the file itself or its publisher and the evidence is cited, or the file holds nothing that could need one. Nothing to ask.",
-    "ours": "Thornswood's own work: made for Thornswood by a team member under the contributor terms in LICENSE (#1331), or built here by a script in this repository from nothing but its own numbers. Who made it and who decided it are recorded. Nothing to ask.",
+    "ours": "Thornswood's own work: made for Thornswood by a team member under the contributor terms in LICENSING.md (#1331), or built here by a script in this repository from nothing but its own numbers. Who made it and who decided it are recorded. Nothing to ask.",
     "derived": "Built by a script in this repository from another entry (from). It goes out on that entry's terms, so it is settled when that one is.",
     "unconfirmed": "Made for Thornswood by this repository's own account, but who made it, on what terms, and who approved it are not recorded. Ships today. Its ask says what is missing and who can answer.",
     "agreed-not-written": "Patrick has said it may go out, but the terms with its maker are not written down anywhere. Ships today.",
@@ -21,10 +21,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
       "status": "ours"
     },
     {
@@ -34,10 +34,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -47,10 +47,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -60,10 +60,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -73,10 +73,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -86,10 +86,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -183,10 +183,10 @@
       "published": "thornswood.net, and every site that shows a link to it",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -196,10 +196,10 @@
       "published": "thornswood.net, and Discord profiles of people running the launcher",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -209,10 +209,10 @@
       "published": "thornswood.net, to anybody who asks for it by name",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: site\\public\\home.css.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: site\\public\\home.css.",
       "status": "ours"
     },
     {
@@ -300,10 +300,10 @@
       "published": "The launcher, through the update feed and the installer",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people (Thornswood's own); Build-Launcher.ps1 embeds it.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people (Thornswood's own); Build-Launcher.ps1 embeds it.",
       "status": "ours"
     },
     {
@@ -313,10 +313,10 @@
       "published": "The dev launcher, to staff",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
       "status": "ours"
     },
     {
@@ -326,10 +326,10 @@
       "published": "The setup program on thornswood.net",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it in the stub.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it in the stub.",
       "status": "ours"
     },
     {
@@ -339,10 +339,10 @@
       "published": "The launcher, through the update feed and the installer",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
       "status": "ours"
     },
     {
@@ -352,10 +352,10 @@
       "published": "The launcher, through the update feed and the installer",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
       "status": "ours"
     },
     {
@@ -365,10 +365,10 @@
       "published": "The launcher and its shortcuts",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
       "status": "ours"
     },
     {
@@ -378,10 +378,10 @@
       "published": "The dev launcher and its shortcuts, to staff",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
       "status": "ours"
     },
     {
@@ -391,10 +391,10 @@
       "published": "In the game's main menu, through game/menu/Mainmenuwallpaper.dds",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: launcher\\art\\BACKDROP-SPEC.md; launcher\\art\\ART-PROMPT.md.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: launcher\\art\\BACKDROP-SPEC.md; launcher\\art\\ART-PROMPT.md.",
       "status": "ours"
     },
     {
@@ -444,10 +444,10 @@
       "published": "Packs (Data\\Platform\\UI), travelling with thornswood-select.js",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
       "status": "ours"
     },
     {
@@ -457,10 +457,10 @@
       "published": "Packs (Data\\Platform\\UI), travelling with thornswood-select.js",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
       "status": "ours"
     },
     {
@@ -484,7 +484,7 @@
       "published": "Every pack and the installer",
       "source": "Built by scripts\\dev\\Build-Backdrop.py --logo from the numbers in that script (#2177)",
       "creator": "Thornswood, built here by a script",
-      "licence": "Thornswood's own (LICENSE)",
+      "licence": "Thornswood's own, all rights reserved like the rest of its art until a licence is chosen for it (LICENSING.md, What it does not cover, 5)",
       "attribution": "None",
       "approved": "Patrick, 15 Oct 2026 (#2177, option B): rebuild it as Thornswood's own",
       "evidence": "scripts\\dev\\Build-Backdrop.py; tests\\test-menu-backdrop.js holds it to the script byte for byte; launcher\\art\\BACKDROP-SPEC.md.",
@@ -604,10 +604,10 @@
       "published": "Discord, wherever the bot appears",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Developer-Guide.md, After a pull request is merged (the avatar row).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Developer-Guide.md, After a pull request is merged (the avatar row).",
       "status": "ours"
     },
     {
@@ -617,10 +617,10 @@
       "published": "Discord, wherever the bot appears",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Developer-Guide.md, After a pull request is merged.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Developer-Guide.md, After a pull request is merged.",
       "status": "ours"
     },
     {
@@ -630,10 +630,10 @@
       "published": "Discord, if set as the server's icon",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Its name only.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Its name only.",
       "status": "ours"
     },
     {
@@ -643,10 +643,10 @@
       "published": "Discord, if set as the server's banner",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
       "status": "ours"
     },
     {
@@ -656,10 +656,10 @@
       "published": "Discord, if set as the server's banner",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Its name only.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Its name only.",
       "status": "ours"
     },
     {
@@ -669,10 +669,10 @@
       "published": "Discord invite pages, if set; and every join card through bot/assets/join-card.png",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
       "status": "ours"
     },
     {

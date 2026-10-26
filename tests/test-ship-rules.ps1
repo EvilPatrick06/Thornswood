@@ -265,7 +265,7 @@ Yes 'OwnGame.cs has no second hand-copied Daedric list' (
 Yes 'Build-Launcher.ps1 embeds that record' (
     ([IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Build-Launcher.ps1'))).Contains('ui-gone.json'))
 
-Yes 'the real shipped build.js is committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
+Yes 'the real shipped build.js''s asset modules are committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
 $uiExpected = Get-UiFrontFixtureExpectedNames
 $uiRealParsed = $null
 $uiRealThrew = $false

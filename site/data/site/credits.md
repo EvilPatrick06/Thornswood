@@ -21,6 +21,15 @@ the collection on Nexus, linked from the [Downloads](/downloads) page, and each
 mod in it links to its own page and its author. Go and endorse the ones you
 like.
 
+## Thornswood's own work
+
+Thornswood's own code (the launcher, the installer, the overlays, the
+gamemode, the code behind this site, the bot and the voice service) is under
+the MIT licence. Its lore, art and music, its game plugins, and the
+Thornswood name and logo are not: they stay Thornswood's, with all rights
+reserved. What other people made keeps its own licence, as the rest of this
+page says.
+
 <a id='source'></a>
 
 ## Source code
