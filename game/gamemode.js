@@ -27584,9 +27584,112 @@ function wovenOutput(actorId, row) {
     log(actorId.toString(16), 'is weaving', row.name, 'and the engine names no craftOutput, so it comes out plain');
     return;
   }
-  const name = mark + String(row.name || 'Garment');
+  // A piece's quality (qualityOutput, #3151) is already on the name; the mark
+  // goes in front of it, where the needs and maneuvers blocks read it.
+  const name = mark + String(out.name || row.name || 'Garment');
   mp.set(actorId, 'craftOutput', { name: name });
   log(actorId.toString(16), 'is a Master Weaver:', out.count, name);
+}
+
+/*
+  WHAT A WEAPON OR AN ARMOUR PIECE COMES OUT AS (#3151).
+
+  Patrick, 22 October 2026, A on #3151: crafted things come in three tiers,
+  crude, fine and masterwork, at minus or plus 10%, decided by skill and
+  materials. Fine is the piece as its record has it, the same as every piece
+  that was not made at a bench; crude is a tenth worse and masterwork a tenth
+  better, in the one number each has: a weapon's damage and an armour piece's
+  rating. A garment, a ring, a staff, an arrow and a tool have no such number,
+  so they are not rolled.
+
+  SKILL AND MATERIALS ARE ONE QUESTION HERE. A row's rank is the rank of the
+  dearest thing it asks for (Build-RecipeTable.ps1), so how far the maker
+  stands above that rank is how much skill they bring to those materials. A
+  master beating out iron rarely makes crude work; a novice on their first
+  iron dagger often does. The rank is the maker's own in the half the row is,
+  read before this craft's work is counted, so a sister half or a taught half
+  at novice works its novice rows as a novice.
+
+  The tier is written on the piece's name, the way durability writes its
+  condition and a Master Weaver their mark: "Iron Sword (Masterwork)", and
+  with a condition "Iron Sword (Masterwork) (85%)". The engine's damage
+  formula reads it there (THORNSWOOD PATCH in TES5DamageFormula.cpp, fork
+  #114, from the engine pin that carries it), so the marks and the 10% are
+  the fork's as well as this file's. The
+  name is the craft's own, given through craftOutput before the engine adds
+  the piece, so nothing is made plain and renamed. The whole batch is one
+  roll, as a cook's is.
+
+  The odds are this file's, by how many ranks the maker stands above the row:
+  0 is working at the edge of what you can, 3 is a master on novice stock.
+*/
+const CRAFT_QUALITY = {
+  marks: { crude: ' (Crude)', masterwork: ' (Masterwork)' },
+  odds: [
+    { crude: 0.25, masterwork: 0.05 },
+    { crude: 0.10, masterwork: 0.15 },
+    { crude: 0.05, masterwork: 0.25 },
+    { crude: 0, masterwork: 0.35 }
+  ],
+  lines: {
+    crude: 'It comes out rough. This one is crude work, a tenth worse than a sound piece.',
+    masterwork: 'It comes out true. This one is masterwork, a tenth better than a sound piece.'
+  }
+};
+// The weapon families that strike: a staff casts, an instrument plays and a
+// woodcutter's axe is a tool, so none of those is rolled.
+const QUALITY_WEAPON_FAMILIES = ['Swords', 'Daggers', 'Greatswords', 'War axes', 'Battleaxes', 'Maces', 'Warhammers', 'Bows'];
+const QUALITY_RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+/**
+ * The tier one roll in [0, 1) gives a maker standing `margin` ranks above
+ * the row: 'crude', 'fine' or 'masterwork'.
+ */
+function qualityTier(margin, roll) {
+  const at = Math.max(0, Math.min(CRAFT_QUALITY.odds.length - 1, Math.floor(Number(margin) || 0)));
+  const odds = CRAFT_QUALITY.odds[at];
+  if (roll < odds.crude) { return 'crude'; }
+  if (roll < odds.crude + odds.masterwork) { return 'masterwork'; }
+  return 'fine';
+}
+
+/** True when this row makes a weapon that strikes or an armour piece with a rating. */
+function qualityRolled(row, baseId) {
+  if (!row || typeof row !== 'object') { return false; }
+  const wear = globalThis.__thornswoodDurability;
+  // Not knowing what a piece is means not touching it, as durability does.
+  if (!wear || !wear.pieceKind) { return false; }
+  const kind = wear.pieceKind(baseId);
+  if (row.type === 'WEAP') { return kind === 'weapon' && QUALITY_WEAPON_FAMILIES.indexOf(String(row.family || '')) !== -1; }
+  if (row.type === 'ARMO') { return kind === 'armour'; }
+  return false;
+}
+
+/**
+ * How many ranks the maker stands above the row, in the half the row is.
+ * Read before the craft's work is credited.
+ */
+function qualityMargin(actorId, row) {
+  const C = globalThis.__thornswoodCharacter;
+  const P = globalThis.__thornswoodProgression;
+  let have = 'novice';
+  try { have = (P && C && C.stateOf) ? (P.rankOf(C.stateOf(actorId), String(row.half || '').toLowerCase()) || 'novice') : 'novice'; } catch (e) { have = 'novice'; }
+  const mine = QUALITY_RANKS.indexOf(String(have).toLowerCase());
+  const asks = QUALITY_RANKS.indexOf(String(row.rank || 'novice').toLowerCase());
+  return Math.max(0, (mine < 0 ? 0 : mine) - (asks < 0 ? 0 : asks));
+}
+
+function qualityOutput(actorId, row, margin) {
+  const out = mp.get(actorId, 'craftOutput');
+  if (!out || !(out.baseId > 0) || !(out.count > 0)) { return; }
+  if (!qualityRolled(row, out.baseId)) { return; }
+  const tier = qualityTier(margin, Math.random());
+  if (tier === 'fine') { return; }
+  const name = String(row.name || 'Piece') + CRAFT_QUALITY.marks[tier];
+  mp.set(actorId, 'craftOutput', { name: name });
+  log(actorId.toString(16), 'made', out.count, name, 'standing', margin, 'rank(s) above it');
+  notify(actorId, CRAFT_QUALITY.lines[tier]);
+  say(actorId, CRAFT_QUALITY.lines[tier]);
 }
 
 /*
@@ -29129,6 +29232,8 @@ ecipes.json are hafted, and 126 of those are rows the server is
     return false;
   }
 
+  // The skill that made the piece is the rank before this craft counts (#3151).
+  const margin = qualityMargin(actorId, row);
   if (answer.credit) {
     const raised = creditWork(actorId, answer.credit);
     if (raised) {
@@ -29137,6 +29242,7 @@ ecipes.json are hafted, and 126 of those are rows the server is
     }
   }
   cookedOutput(actorId, row);
+  qualityOutput(actorId, row, margin);
   wovenOutput(actorId, row);
   return;
 });
