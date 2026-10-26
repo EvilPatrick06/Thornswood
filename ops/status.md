@@ -38,7 +38,7 @@ moved the run notes here.
   the leads, and the company role is Free Skyrim Trading Company. The roadmap
   board was replaced from main at 10:16 AM (#2560: the #502 row without
   bounties, #507's free claim row); the known board is still as typed on the
-  site, held for #3137. Cloudflare fronts ports 80 and 443, which take only
+  site until ops/claude-queue/3137-known-board.md runs. Cloudflare fronts ports 80 and 443, which take only
   Cloudflare's addresses (#2995). thornswood.net has a DMARC record at
   p=none reporting to Cloudflare's DMARC Management, set 11:17 AM 22 Oct
   through the connector (#3216). Cloudflare (#3216): two-factor is required

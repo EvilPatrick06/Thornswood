@@ -75,7 +75,9 @@ yes('it never says player', !/player/i.test(note));
 */
 const known = require('./fixtures/known-page').knownPage() || '';  // the known board, as /known writes it (#2414)
 yes('Known Issues still says mod scripts never fire',
-    /Most mod scripts never fire \| All Papyrus events except OnUpdate are blocked/.test(known));
+    /\| Many mod features do nothing here \|[^\n]*own scripts never fires/.test(known));
+yes('and lists the instruments themselves as broken right now (#3434)',
+    /\| A flute, lute or drum looks wrong when equipped and plays nothing \|[^\n]*emote/.test(known));
 
 /*
   The wheel's key. The plugin reads WheelKey out of Thornswood.ini, and a
