@@ -94,6 +94,23 @@ file's contents, a setting's value or a token, and refuses to write a report
 holding anything shaped like a secret. Rights are read from ACLs, not from
 Windows' effective access check.
 
+Two workflow rules are for the day the repository goes public (#3685):
+
+- An event anyone can cause on a public repository, with no write access
+  (opening, closing or commenting on their own issue, a discussion, a fork, a
+  star, a pull request review), may start a job on the production label only
+  while the repository is private. Such a job picks its runner with
+  `${{ github.event.repository.private && fromJSON('[...]') || 'ubuntu-latest' }}`,
+  as area-label.yml and drop-claims.yml do. The workflow file for these events
+  comes from the default branch, so the condition holds.
+- Once the facts say public, a pull request job on the production label is a
+  risk even with the same-repository condition: a pull request runs the
+  workflow files of its own branch, so a fork can carry one that drops the
+  condition or names the label in a new file. The in-file condition only
+  guards a private repository, where only collaborators open pull requests.
+  Where the VPS runners go then is Patrick's call on the report page
+  (q-3721-vps-runners).
+
 Owner: the Installer lane owns the scripts and the record. Claude runs
 `-Collect` after any `Install-Runner.ps1` or `Lock-VpsFolders.ps1` run and
 monthly.

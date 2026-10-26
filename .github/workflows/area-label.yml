@@ -16,8 +16,12 @@
 # time it is needed. It checks out nothing and runs no action, and the title
 # reaches the script through the environment, never pasted into it.
 #
-# WHERE IT RUNS. On the VPS runners, like drop-claims.yml. The job starts only
-# for an issue with no area: label, and takes a few seconds.
+# WHERE IT RUNS. On the VPS runners while the repository is private, and on
+# GitHub's ubuntu-latest once it is public (#3685). Opening an issue is
+# something anyone can do on a public repository, so this job must not reach
+# the box that runs the live game then; while private only collaborators can
+# open one, and GitHub's own runners are blocked on billing (#437). The job
+# starts only for an issue with no area: label, and takes a few seconds.
 name: Area label on new issues
 on:
   issues:
@@ -29,7 +33,7 @@ jobs:
   area:
     name: Put on an area label
     if: ${{ github.event_name == 'workflow_dispatch' || !contains(join(github.event.issue.labels.*.name, '|'), 'area:') }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'ubuntu-latest' }}
     # One call per issue, or a page of issues when started by hand.
     timeout-minutes: 5
     steps:

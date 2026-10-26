@@ -14,12 +14,14 @@
 # and passed over; any other answer turns the run red.
 #
 # WHERE IT RUNS. On the VPS runners, [self-hosted, Windows, thornswood-vps],
-# the same as build.yml, nightly.yml and release.yml: GitHub's own runners
-# have been blocked on billing since 25 Sep (#437), so they are the only
-# runners this repository has. A label edit needs no checkout, but it still
-# needs a runner to make the call. The job only starts when the closed issue
-# carries a claimed label, so a close with none takes no runner slot; one
-# that has one takes a few seconds of one.
+# while the repository is private: GitHub's own runners have been blocked on
+# billing since 25 Sep (#437). Once it is public, on GitHub's ubuntu-latest
+# (#3685): the author of an issue can close it, so on a public repository
+# anyone can start this job, and it must not reach the box that runs the live
+# game then. A label edit needs no checkout, but it still needs a runner to
+# make the call. The job only starts when the closed issue carries a claimed
+# label, so a close with none takes no runner slot; one that has one takes a
+# few seconds of one.
 name: Drop claims on close
 on:
   issues:
@@ -30,7 +32,7 @@ jobs:
   drop:
     name: Drop claims
     if: ${{ contains(join(github.event.issue.labels.*.name, '|'), 'claimed') }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'ubuntu-latest' }}
     # One call per label. Past this it is stuck, not slow.
     timeout-minutes: 2
     steps:

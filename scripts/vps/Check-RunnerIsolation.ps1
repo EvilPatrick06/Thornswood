@@ -96,16 +96,40 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
         return $out
     }
     $triggers = @(Get-TopBlock 'on' | ForEach-Object { ($_ -split ':')[0] })
-    $onProd = $t -match ('runs-on:\s*\[[^\]]*\b' + [regex]::Escape($r.productionLabel) + '\b')
+    # A runs-on line names the production label as a list or inside an
+    # expression that picks it (#3685).
+    $prodLines = @($lines | Where-Object { $_ -match ('^\s*runs-on:.*\b' + [regex]::Escape($r.productionLabel) + '\b') })
+    $onProd = $prodLines.Count -gt 0
+    # Only while the repository is private: every such line picks the
+    # production label through github.event.repository.private, and a
+    # GitHub-hosted runner otherwise.
+    $privateOnly = $onProd -and @($prodLines | Where-Object { $_ -notmatch 'github\.event\.repository\.private\s*&&\s*fromJSON\(' }).Count -eq 0
     $perm = (Get-TopBlock 'permissions') -join ' '
     $name = $wf.Name
     # A pull request may reach the production label only through a job that
     # names this repository as the head, so a fork never does (Patrick, 12 Oct
     # 2026: the VPS backs up pull request builds too, same-repository only).
     # pull_request_target is never allowed there.
+    #
+    # Once the repository is public (#3685) that condition is no guard: a pull
+    # request runs the workflow files of its own branch, so a fork can carry
+    # one with no condition, or a new one, that names the production label.
+    # Then no pull request job may be on the production label at all.
     $sameRepo = $t -match 'github\.event\.pull_request\.head\.repo\.full_name == github\.repository'
-    $prOnProd = $onProd -and ($triggers -contains 'pull_request_target' -or ($triggers -contains 'pull_request' -and -not $sameRepo))
-    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($onProd -and $sameRepo) { '; same-repository pull requests only' } else { '' })) (-not $prOnProd)
+    $public = $f.github -and -not $f.github.private
+    $prOnProd = $onProd -and ($triggers -contains 'pull_request_target' -or ($triggers -contains 'pull_request' -and ($public -or -not $sameRepo)))
+    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($onProd -and $sameRepo) { '; same-repository pull requests only' } else { '' }) + $(if ($onProd -and $public -and $triggers -contains 'pull_request') { '; the repository is public' } else { '' })) (-not $prOnProd)
+    # Events anyone can cause on a public repository, with no write access:
+    # opening, closing or commenting on their own issue, a discussion, a
+    # fork, a star, a review on a pull request. A job they start may reach
+    # the production label only while the repository is private, when only
+    # collaborators can cause them (#3685). The workflow file comes from the
+    # default branch for these, so the condition in it holds.
+    $strangerEvents = @('issues', 'issue_comment', 'discussion', 'discussion_comment', 'fork', 'watch', 'pull_request_review', 'pull_request_review_comment')
+    $byStrangers = @($triggers | Where-Object { $strangerEvents -contains $_ })
+    if ($byStrangers.Count) {
+        Row 'workflow' "$name started by anyone" "not $($r.productionLabel) once public" ("triggers " + ($byStrangers -join ',') + $(if (-not $onProd) { '; not on ' + $r.productionLabel } elseif ($privateOnly) { "; on $($r.productionLabel) only while private" } else { "; on $($r.productionLabel)" })) (-not $onProd -or $privateOnly)
+    }
     if ($triggers -contains 'pull_request_target') { Row 'workflow' "$name pull_request_target" 'not used' 'used' $false }
     Row 'workflow' "$name token" 'permissions set per workflow, no write-all' $(if ($perm) { $perm.Trim() } else { 'not set (repository default)' }) ([bool]$perm -and $perm -notmatch 'write-all')
 }

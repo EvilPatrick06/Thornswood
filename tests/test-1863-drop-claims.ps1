@@ -68,7 +68,7 @@ Yes '  and no job widens it' (@([regex]::Matches($text, '(?m)^\s+permissions:'))
 $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
 $build = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\build.yml'))
 $buildRunsOn = [regex]::Match($build, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-Yes ("it runs on the VPS runners the build check uses ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]' -and $buildRunsOn.StartsWith('[self-hosted, Windows, thornswood-vps'))
+Yes ("it runs on the VPS runners the build check uses while the repository is private, and on GitHub's once public, since anyone can close their own issue then (#3685) ({0})" -f $runsOn) ($runsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'ubuntu-latest' }}" -and $buildRunsOn.StartsWith('[self-hosted, Windows, thornswood-vps'))
 Yes '  on any of them, not only the build runners, so a few seconds of work never waits behind a build (#2994)' ($runsOn -notmatch 'thornswood-build')
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 Yes '  and only when the closed issue carries a claimed label, so a close with none takes no runner' (
