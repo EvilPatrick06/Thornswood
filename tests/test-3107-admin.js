@@ -22,6 +22,10 @@
 //      have is named, and a record whose runners GitHub has none of, one
 //      that names a label every runner carries, lists no runners, or names a
 //      label another record names, stops;
+//   3b. the About record (#3682): the real records/repo-about.json passes, and
+//      an empty, too long or two-line description, a website that is not
+//      https, and a topic in capitals, twice, or past GitHub's 20 each stop;
+//      topics compare in any order;
 //   4. admin.js spawned against a stand-in GitHub: anything through Caddy
 //      (X-Forwarded-For) but the setup pages is the plain 404; no token, a
 //      branch's token, and a token for another audience are 403 with nothing
@@ -29,7 +33,10 @@
 //      check says what differs and changes nothing, a run puts the labels
 //      right with the installation token GitHub gave, reads them back, and
 //      a second run changes nothing; the records come from main through the
-//      App, never from the caller; and the log holds no token;
+//      App, never from the caller; and the log holds no token. The About
+//      box the same way: a check names what differs and writes nothing, a
+//      run sets it in one PATCH and one PUT and reads it back, a second run
+//      changes nothing, and a bad record on main stops it;
 //   5. the App's setup: no armed setup, a wrong or expired state, and an App
 //      already held are the plain 404; the armed page sends the manifest
 //      (administration write, contents read, no webhook, private) to GitHub
@@ -162,6 +169,24 @@ yes('the real records on this checkout pass', (() => {
   return recs.length > 0 && stops(recs) === '';
 })());
 
+// ---- 3b. the About record (#3682) ---------------------------------------------------
+console.log('the About record');
+const aboutReal = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'repo-about.json'), 'utf8'));
+const aboutRec = (o) => Object.assign({ file: 'records/repo-about.json', description: aboutReal.description, homepage: aboutReal.homepage, topics: aboutReal.topics.slice() }, o || {});
+function aboutStops(r) { try { admin.checkAbout(r); return ''; } catch (e) { return e.message; } }
+yes('the real records/repo-about.json passes', aboutStops(aboutRec()) === '');
+yes('an empty description stops', /empty/.test(aboutStops(aboutRec({ description: ' ' }))));
+yes('one longer than GitHub takes stops', /350/.test(aboutStops(aboutRec({ description: 'x'.repeat(351) }))));
+yes('one of two lines stops', /one line/.test(aboutStops(aboutRec({ description: 'a\nb' }))));
+yes('a website that is not https stops', /https/.test(aboutStops(aboutRec({ homepage: 'http://thornswood.net' }))));
+yes('  and no website at all is allowed', aboutStops(aboutRec({ homepage: '' })) === '');
+yes('a topic in capitals stops', /lower case/.test(aboutStops(aboutRec({ topics: ['Skyrim'] }))));
+yes('a topic twice stops', /twice/.test(aboutStops(aboutRec({ topics: ['skyrim', 'skyrim'] }))));
+yes('more topics than GitHub takes stops', /20/.test(aboutStops(aboutRec({ topics: Array.from({ length: 21 }, (_, i) => 't' + i) }))));
+const ap = admin.planAbout(aboutRec(), { description: null, homepage: null }, []);
+yes('an empty About box differs in all three parts', ap.length === 3 && ap.map(c => c.what).join(',') === 'description,website,topics');
+yes('topics in another order are the same', admin.planAbout(aboutRec(), { description: aboutReal.description, homepage: aboutReal.homepage }, aboutReal.topics.slice().reverse()).length === 0);
+
 // ---- 4 and 5. the service, against a stand-in GitHub ---------------------------------
 const gh = {
   calls: [],
@@ -175,6 +200,8 @@ const gh = {
     runner(13, 'thornswood-vps-3', base.concat('thornswood-build')),
     runner(14, 'thornswood-vps-4', base),
   ],
+  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null },
+  topics: [],
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   installed: true,
   conversion: null,
@@ -208,6 +235,10 @@ function standIn(req, res) {
     }
     let m = /^\/repos\/EvilPatrick06\/Thornswood\/contents\/records\/(.+)$/.exec(P);
     if (m && gh.records[m[1]] && u.searchParams.get('ref') === 'main') return send(200, { content: Buffer.from(JSON.stringify(gh.records[m[1]])).toString('base64') });
+    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'GET') return send(200, gh.repo);
+    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'PATCH') { Object.assign(gh.repo, body); return send(200, gh.repo); }
+    if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'GET') return send(200, { names: gh.topics });
+    if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'PUT') { gh.topics = body.names.slice(); return send(200, { names: gh.topics }); }
     if (P === '/repos/EvilPatrick06/Thornswood/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
     m = /^\/repos\/EvilPatrick06\/Thornswood\/actions\/runners\/(\d+)\/labels(?:\/(.+))?$/.exec(P);
     if (m) {
@@ -332,6 +363,30 @@ function start(stateDir, ghPort) {
     yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && writes().length === 0);
     r = await ask4(bearer(sign(good())), { what: 'runner-labels', records: { 'x-runners.json': { label: 'thornswood-x', runners: [4] } } });
     yes('records sent by the caller are not used', r.status === 200 && r.json.changed === 0 && !labels('thornswood-vps-4').includes('thornswood-x'));
+
+    // The About box (#3682), from records/repo-about.json on main.
+    gh.records['repo-about.json'] = { about: 'x', description: aboutReal.description, homepage: aboutReal.homepage, topics: aboutReal.topics };
+    const aboutWrites = () => gh.calls.filter(c => c.method === 'PATCH' || c.method === 'PUT');
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'repo-about', check: true });
+    yes('an About check answers 200 with the three parts that differ, and changes nothing', r.status === 200 && r.json.ok && r.json.differs === 3 && r.json.changed === 0 && aboutWrites().length === 0);
+    yes('  it names what each would be', r.json.lines.some(l => /the website would be "https:\/\/thornswood\.net"/.test(l)));
+    yes('  and the runner records are not read for it', !gh.calls.some(c => /runners/.test(c.path)));
+    gh.calls = [];
+    r = await ask4(bearer(sign(good({ event_name: 'push' }))), { what: 'repo-about' });
+    yes('an About run sets the description, the website and the topics (200, 3 changed)', r.status === 200 && r.json.ok && r.json.changed === 3 &&
+      gh.repo.description === aboutReal.description && gh.repo.homepage === aboutReal.homepage && gh.topics.join(',') === aboutReal.topics.join(','));
+    yes('  in one PATCH and one PUT, with the installation token', aboutWrites().length === 2 && aboutWrites().every(c => c.auth === 'Bearer ' + gh.instToken) &&
+      JSON.stringify(Object.keys(aboutWrites().find(c => c.method === 'PATCH').body).sort()) === '["description","homepage"]');
+    yes('  and the record came from main', gh.calls.some(c => c.path === '/repos/EvilPatrick06/Thornswood/contents/records/repo-about.json?ref=main'));
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'repo-about' });
+    yes('a second About run changes nothing', r.status === 200 && r.json.changed === 0 && aboutWrites().length === 0 && /GitHub matches it/.test(r.text));
+    gh.records['repo-about.json'] = { description: 'two\nlines', homepage: '', topics: ['skyrim'] };
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'repo-about', description: 'from the caller' });
+    yes('a bad About record on main stops it, nothing changed (502)', r.status === 502 && /one line/.test(r.text) && aboutWrites().length === 0);
+    delete gh.records['repo-about.json'];
 
     gh.records['bad-runners.json'] = { label: 'thornswood-vps', runners: [1] };
     gh.calls = [];
