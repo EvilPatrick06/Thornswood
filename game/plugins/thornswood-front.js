@@ -9569,6 +9569,11 @@
       if (what.indexOf('select:alive') !== 0) { log('choice page:', what.slice(7)); }
       return;
     }
+    // The loading screen (#3130) says when it went up and down by the page's
+    // own clock, and how far the loop played. Sent during a load, so they
+    // reach this log after it: the times in them are the record, not this
+    // log's.
+    if (what.indexOf('load:') === 0) { log('loading screen:', what.slice(5)); return; }
 
     /*
       The skills panel says when it opens and closes rather than being

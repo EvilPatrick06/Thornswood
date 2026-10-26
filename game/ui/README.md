@@ -25,6 +25,15 @@ the K, P and J panels open (`thornswood-help.js`), and the "Are you still here?"
 window after 15 minutes idle (`thornswood-afk.js`). `thornswood-theme.mp3` is
 the theme the main menu plays, and the launcher plays it too while it is open.
 
+The loading screen, `thornswood-loadscreen.js`, is in the page from its start
+like the choice, because the plugins hear of a load only after it: the engine
+tells the page itself when the game's Loading Menu opens and closes (the
+`skyrimPlatform:loading` event) and draws the page while it is open. It plays
+the menu's loop with one of Thornswood's hints over it, from
+`Data\Platform\UI\thornswood-hints.js` in the game folder, which is not in
+this folder: Go.ps1 writes it from `site\data\site\lines.md`, the one copy
+of the hints (#3130, #3147).
+
 ## On your machine
 
 From the repo folder, with the game closed:
@@ -36,8 +45,9 @@ From the repo folder, with the game closed:
 unpacks the front from `local\thornswood-front.zip` into
 `C:\Thornswood\Game\Data\Platform\UI` (`-Game` names another game folder),
 copies every `.js`, every `.mp3` and `index.html` from here over it so ours
-wins, and copies the site's banner from `site\public` in as the
-menu's painting. It copies nothing else from this folder. The zip is not in
+wins, copies the site's banner from `site\public` in as the
+menu's painting, and writes the loading screen's hints there from the
+site's `lines.md`. It copies nothing else from this folder. The zip is not in
 git and nothing in the repo builds it; without it Go.ps1 says so and leaves
 the front that a release already put in the game folder. `-SkipServer`
 matters: without it Go.ps1 also copies the voice service over the live one on

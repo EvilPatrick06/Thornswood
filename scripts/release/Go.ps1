@@ -183,12 +183,61 @@ function Remove-RetiredOverlays([string]$UiDir, [string]$UiSrc) {
   if (-not (Test-Path -LiteralPath $UiDir -PathType Container)) { return @($out) }
   $have = @(Get-ChildItem -LiteralPath $UiSrc -File -Filter *.js | ForEach-Object { $_.Name })
   $have += 'thornswood-characters.js'
+  # Written below from the site's lines.md (Write-ThornswoodHints), not
+  # copied from game\ui, and shipped.
+  $have += 'thornswood-hints.js'
   foreach ($s in @(Get-ChildItem -LiteralPath $UiDir -File -Filter 'thornswood-*.js' -EA SilentlyContinue)) {
     if ($have -contains $s.Name) { continue }
     Remove-Item -LiteralPath $s.FullName -Force
     $out.Add($s.FullName)
   }
   return @($out)
+}
+
+# Writes the loading screen's hints (#3130) from site\data\site\lines.md, the
+# one copy of Thornswood's hints and lore lines (#3147), into
+# Data\Platform\UI\thornswood-hints.js as window.THORNSWOOD_HINTS, and
+# returns how many it wrote. The page reads a script, not the .md, because a
+# page opened from a file may not fetch another file.
+#
+# Read the way site\server.js's parseLines reads it: comments out, the
+# "## Hints" list, one "- " line each. The bytes are the same from every
+# machine and every PowerShell: ASCII, anything else and every quote and
+# backslash escaped by hand (ConvertTo-Json escapes differently in 5.1 and 7),
+# CRLF like every other text file the release carries (ShippedBytes.ps1).
+function Write-ThornswoodHints([string]$LinesMd, [string]$Out) {
+  $md = [IO.File]::ReadAllText($LinesMd)
+  $md = [regex]::Replace($md, '<!--[\s\S]*?-->', '')
+  $hints = New-Object System.Collections.Generic.List[string]
+  $list = $false
+  foreach ($l in ($md -split "\r?\n")) {
+    $head = [regex]::Match($l, '^##\s+(.*?)\s*$')
+    if ($head.Success) { $list = ($head.Groups[1].Value -match '^hints$'); continue }
+    if (-not $list) { continue }
+    $item = [regex]::Match($l, '^- (.*?)\s*$')
+    if ($item.Success) { $hints.Add($item.Groups[1].Value) }
+  }
+  $quoted = foreach ($h in $hints) {
+    $sb = New-Object System.Text.StringBuilder
+    [void]$sb.Append('"')
+    foreach ($c in $h.ToCharArray()) {
+      $n = [int]$c
+      if ($c -eq '"' -or $c -eq '\') { [void]$sb.Append('\').Append($c) }
+      elseif ($n -lt 0x20 -or $n -gt 0x7E) { [void]$sb.Append(('\u{0:x4}' -f $n)) }
+      else { [void]$sb.Append($c) }
+    }
+    [void]$sb.Append('"')
+    $sb.ToString()
+  }
+  $text = "'use strict';`r`n" +
+    "// Written by scripts\release\Go.ps1 from site\data\site\lines.md (#3130, #3147). Not edited here.`r`n" +
+    "window.THORNSWOOD_HINTS = [`r`n" +
+    (($quoted | ForEach-Object { '  ' + $_ }) -join ",`r`n") +
+    "`r`n];`r`n"
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Out) | Out-Null
+  if (Test-Path -LiteralPath $Out) { Remove-Item -LiteralPath $Out -Force }
+  [IO.File]::WriteAllBytes($Out, [Text.Encoding]::ASCII.GetBytes($text))
+  return $hints.Count
 }
 
 # ------------------------------------------------------------------- front --
@@ -289,6 +338,20 @@ if (Test-Path -LiteralPath $uiSrc) {
     } else {
       Gone ('the site''s ' + $pair[0] + ' is not in site\public, so the menu has no painting')
     }
+  }
+  # The loading screen's hints (#3130), from the site's one copy (#3147).
+  $linesMd = Join-Path $Here '..\..\site\data\site\lines.md'
+  $hintsJs = Join-Path $ui 'thornswood-hints.js'
+  if (Test-Path -LiteralPath $linesMd) {
+    $hintCount = Write-ThornswoodHints $linesMd $hintsJs
+    if ($hintCount -gt 0) {
+      $script:installed.Add($hintsJs)
+      Note ('thornswood-hints.js (' + $hintCount + ' hints from the site''s lines.md)')
+    } else {
+      Gone 'site\data\site\lines.md has no hints under "## Hints", so the loading screen would have none'
+    }
+  } else {
+    Gone 'site\data\site\lines.md is not there, so the loading screen has no hints'
   }
 } else {
   Gone 'game\ui is not beside tools'
