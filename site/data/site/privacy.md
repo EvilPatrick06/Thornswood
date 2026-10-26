@@ -79,7 +79,7 @@ back.
 
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you
-are on. It is how somebody who cannot play gets helped without a conversation.
+are on, and how long the launcher took to open. It is how somebody who cannot play gets helped without a conversation.
 
 **Gallery submissions.** The picture or recording, your signed-in account,
 the name for its caption and any note for staff are kept for review. Only

@@ -24,6 +24,15 @@
 # token is GitHub's own word for which run is asking, good for minutes, and
 # for this audience only.
 #
+# SETTINGS, READ ONLY (#3534). Started by hand with what = settings, it
+# changes nothing: scripts/deploy/Check-GitHubSettings.ps1 -OnGitHub reads
+# the environments and where each may deploy from with the run's own token
+# (actions read, the only reason the job has it), asks the service for the
+# Actions settings, the runners and the secret and variable names, which it
+# reads with a read-only installation token, and compares them with
+# records/github-settings.json. A cloud thread is refused all of those paths
+# (HTTP 403), which is why the weekly reviews read them this way.
+#
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: GitHub admin
@@ -35,6 +44,13 @@ on:
         description: 'Change nothing; say only what differs from main'
         type: boolean
         default: false
+      what:
+        description: 'runner-labels makes the labels match main; settings only reads the settings and compares them with main'
+        type: choice
+        options:
+          - runner-labels
+          - settings
+        default: runner-labels
   push:
     branches: [main]
     paths:
@@ -42,6 +58,9 @@ on:
 permissions:
   contents: read
   id-token: write
+  # Only to list the environments and their deployment policies for the
+  # settings read (#3534); GitHub puts those under Actions.
+  actions: read
 # One at a time, and never one cancelled half way.
 concurrency:
   group: github-admin
@@ -72,9 +91,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Ask the box
+        if: ${{ inputs.what != 'settings' }}
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
         env:
           ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
         run: |
           & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-BuildRunners.ps1') -OnGitHub
+          exit $LASTEXITCODE
+
+      - name: Read the settings
+        if: ${{ inputs.what == 'settings' }}
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Check-GitHubSettings.ps1') -OnGitHub
           exit $LASTEXITCODE

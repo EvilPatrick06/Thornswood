@@ -11,10 +11,13 @@
   scripts\deploy\Set-BuildRunners.ps1 (Patrick's A of 22 Oct 2026).
 
   WHAT IT HOLDS THEM TO.
-    1. github-admin.yml: started by hand (with -Check's input) and by a push
-       to main that changes a runner record, and by nothing else; a token
-       that reads the repository and can ask for an OIDC token, nothing
-       more; one run at a time, never cancelled half way; on any VPS runner,
+    1. github-admin.yml: started by hand (with -Check's input, and what:
+       runner-labels or settings) and by a push to main that changes a
+       runner record, and by nothing else; a token that reads the
+       repository, can ask for an OIDC token and reads Actions for the
+       settings read (#3534), nothing more; the labels step for anything but
+       settings, the settings step (Check-GitHubSettings.ps1 -OnGitHub, the
+       run's token through the environment) only for settings; one run at a time, never cancelled half way; on any VPS runner,
        not a build runner, with a timeout; no environment and no secret; no
        token kept by the checkout, every file written again after it
        (#3029); main's Set-BuildRunners.ps1 -OnGitHub under pwsh with no
@@ -86,7 +89,7 @@ Yes 'it is started by hand and by a push, nothing else' ($on -match '(?m)^  work
 Yes '  by hand with a check input that is a boolean' ($on -match '(?ms)check:\n\s+description:[^\n]*\n\s+type: boolean\n\s+default: false')
 Yes '  a push to main only, and only when a runner record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n?$")
 $perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
-Yes ("its token reads the repository and asks for an OIDC token, nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: read`n  id-token: write")
+Yes ("its token reads the repository, asks for an OIDC token and reads Actions for the settings read (#3534), nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: read`n  id-token: write`n  actions: read")
 Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
 Yes 'one run at a time, never cancelled half way' ($code -match '(?ms)^concurrency:\n  group: github-admin\n  cancel-in-progress: false')
 Yes 'it runs on any VPS runner, not a build runner' ($code -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps\]$')
@@ -94,7 +97,14 @@ Yes '  with a timeout' ($code -match '(?m)^    timeout-minutes: \d+$')
 Yes '  in no environment, so it holds no secret' ($code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
 Yes 'the checkout keeps no token' ($code -match 'uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
 Yes '  and every file is written again after it (#3029)' ($code -match '- name: Check every tracked file out again')
-$step = [regex]::Match($code, '(?ms)- name: Ask the box\n(.*)$').Groups[1].Value
+$step = [regex]::Match($code, '(?ms)- name: Ask the box\n(.*?)(?=^\s+- name: |\z)').Groups[1].Value
+Yes '  by hand with a what input, runner-labels or settings, runner-labels when unsaid' ($on -match '(?ms)what:\n\s+description:[^\n]*\n\s+type: choice\n\s+options:\n\s+- runner-labels\n\s+- settings\n\s+default: runner-labels')
+Yes 'the labels step runs for anything but settings, so a push still makes them match' ($step -match "(?m)^\s+if: \$\{\{ inputs\.what != 'settings' \}\}$")
+$read = [regex]::Match($code, '(?ms)- name: Read the settings\n(.*?)(?=^\s+- name: |\z)').Groups[1].Value
+Yes 'the settings step runs only for settings' ($read -match "(?m)^\s+if: \$\{\{ inputs\.what == 'settings' \}\}$")
+Yes '  pwsh with no profile, main''s Check-GitHubSettings.ps1 -OnGitHub, the run''s own token through the environment and nothing pasted in' (
+    $read -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"" -and $read -match "scripts/deploy/Check-GitHubSettings\.ps1'\) -OnGitHub" -and
+    $read.Contains('GH_TOKEN: ${{ github.token }}') -and [regex]::Match($read, '(?ms)run: \|\n(.*)$').Groups[1].Value -notmatch '\$\{\{')
 Yes 'the step is pwsh with no profile' ($step -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
 $run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes '  running main''s Set-BuildRunners.ps1 -OnGitHub' ($run -match "scripts/deploy/Set-BuildRunners\.ps1'\) -OnGitHub")

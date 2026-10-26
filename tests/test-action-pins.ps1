@@ -129,7 +129,9 @@ foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 
 # tests\test-3192-board-hygiene.ps1. engine-prune.yml (#3410) is too, held by
 # tests\test-3410-artifact-room.ps1, and since #3410 board-read.yml hands
 # board.json back in its log instead of an artifact, so it runs none either.
-$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml', 'engine-prune.yml', 'board-read.yml')
+# clone-report.yml (#3534) checks nothing out and only prints the report it is
+# given, held by tests\test-3534-clone-report.ps1.
+$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml', 'engine-prune.yml', 'board-read.yml', 'clone-report.yml')
 
 $all = @()
 foreach ($f in $files) {
