@@ -51,7 +51,9 @@
   with a one-time state and an hour to live, and prints the address
   https://thornswood.net/github-app/setup?state=<state>. That page sends the
   App's manifest to GitHub (name, no webhook, private, administration write
-  and contents read on the repositories it is installed on); Patrick creates
+  and contents read on the repositories it is installed on, and since #3534
+  read of the names of its secrets, variables and environments, never their
+  values); Patrick creates
   it, GitHub sends him back to /setup/done with a one-time code, and this
   trades the code for the App's key straight from GitHub. The key goes into
   state\key.pem, the App's id and name into state\app.json, the setup is
@@ -241,10 +243,13 @@ function readApp() {
 // What runner-labels needs, and nothing more.
 const LABEL_PERMISSIONS = { administration: 'write', contents: 'read' };
 // What settings reads with, all of it read only. The last three are asked for
-// only when the installation holds them (SETTINGS_EXTRA); the App was made
-// with administration and contents alone.
+// only when the installation holds them (SETTINGS_EXTRA): the App was first
+// made with administration and contents alone, and Patrick chose on 26 Oct
+// (#3534) to give it Secrets, Variables and Environments read, which an App
+// already made takes only once he adds them on its page and accepts them on
+// the installation. GitHub calls the Variables permission actions_variables.
 const SETTINGS_PERMISSIONS = { administration: 'read', contents: 'read' };
-const SETTINGS_EXTRA = ['secrets', 'variables', 'environments'];
+const SETTINGS_EXTRA = ['secrets', 'actions_variables', 'environments'];
 
 // Which permissions the installation holds, and where it is:
 // { id, permissions }.
@@ -377,15 +382,15 @@ async function readSettings(token, held) {
   if (runners.ok) readings.runners = runners.items; else unread.push('runners: ' + runners.why);
 
   const has = p => held[p] === 'read' || held[p] === 'write';
-  const need = p => 'the App has no ' + p.charAt(0).toUpperCase() + p.slice(1) + ' permission, so GitHub gives it none of these names';
+  const need = what => 'the App has no ' + what + ' permission, so GitHub gives it none of these names';
   if (has('secrets')) {
     const r = await pagedNames(token, 'actions/secrets', 'secrets');
     if (r.ok) readings.secrets = r.items.sort(); else unread.push('secrets: ' + r.why);
-  } else unread.push('secrets: ' + need('secrets'));
-  if (has('variables')) {
+  } else unread.push('secrets: ' + need('Secrets'));
+  if (has('actions_variables')) {
     const r = await pagedNames(token, 'actions/variables', 'variables');
     if (r.ok) readings.variables = r.items.sort(); else unread.push('variables: ' + r.why);
-  } else unread.push('variables: ' + need('variables'));
+  } else unread.push('variables: ' + need('Variables'));
 
   const rec = await mainSettingsRecord(token);
   readings.environments = {};
@@ -400,7 +405,7 @@ async function readSettings(token, held) {
     }
     readings.environments[env] = e;
   }
-  if (rec.environments.length && !has('environments')) unread.push('environment secrets and variables: ' + need('environments'));
+  if (rec.environments.length && !has('environments')) unread.push('environment secrets and variables: ' + need('Environments'));
   return { ok: true, readings, unread };
 }
 
@@ -424,7 +429,7 @@ function manifest() {
     hook_attributes: { url: 'https://thornswood.net/github-app/hook', active: false },
     redirect_url: 'https://thornswood.net/github-app/setup/done',
     public: false,
-    default_permissions: { administration: 'write', contents: 'read' },
+    default_permissions: { administration: 'write', contents: 'read', secrets: 'read', actions_variables: 'read', environments: 'read' },
     default_events: [],
   };
 }

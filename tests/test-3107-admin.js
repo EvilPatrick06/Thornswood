@@ -391,12 +391,12 @@ function start(stateDir, ghPort) {
       r.json.unread.some(l => /^variables: the App has no Variables permission/.test(l)) && r.json.unread.some(l => /Environments permission/.test(l)) &&
       !gh.calls.some(c => /secrets|variables/.test(c.path)));
     yes('  the environments are the record\'s on main, a name GitHub could not have left out', JSON.stringify(Object.keys(rd.environments)) === '["board","notices"]');
-    gh.instPerms = { administration: 'write', contents: 'read', metadata: 'read', secrets: 'read', variables: 'read', environments: 'read' };
+    gh.instPerms = { administration: 'write', contents: 'read', metadata: 'read', secrets: 'read', actions_variables: 'read', environments: 'read' };
     gh.calls = [];
     r = await ask4(bearer(sign(good())), { what: 'settings' });
     stok = gh.calls.find(c => /access_tokens$/.test(c.path));
     yes('with the App holding them, the token asks for secrets, variables and environments read too, and nothing more',
-      stok && JSON.stringify(stok.body.permissions) === '{"administration":"read","contents":"read","secrets":"read","variables":"read","environments":"read"}');
+      stok && JSON.stringify(stok.body.permissions) === '{"administration":"read","contents":"read","secrets":"read","actions_variables":"read","environments":"read"}');
     const rd2 = r.json.readings;
     yes('  and the names are read: the repository\'s and each environment\'s', r.status === 200 && JSON.stringify(rd2.secrets) === '["CLOUDFLARE_TURNSTILE_TOKEN"]' &&
       JSON.stringify(rd2.variables) === '["BUILD_RUNNER"]' && JSON.stringify(rd2.environments.board.secrets) === '["BOARD_TOKEN"]' && r.json.unread.length === 0);
@@ -422,8 +422,8 @@ function start(stateDir, ghPort) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write and contents read only, no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read and secrets, variables and environments read only, no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"read"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
     yes('  and the page is neither kept nor passed on', /no-store/.test(r.headers['cache-control'] || '') && r.headers['referrer-policy'] === 'no-referrer');
 
