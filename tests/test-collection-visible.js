@@ -30,6 +30,8 @@ const APP = path.join(REPO_DIR, 'launcher', 'app');
 const CR = String.fromCharCode(13);
 const read = f => fs.readFileSync(path.join(APP, f), 'utf8').split(CR).join('');
 const SHELL = read('Shell.cs');
+// Since #3201 the bar's button and Settings' share one handler, in ShellUpdate.cs.
+const UPDATE = read('ShellUpdate.cs');
 const PAGES = read('Pages.cs');
 const PACKS = read('ShellPacks.cs');
 const XAML = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'ui.xaml'), 'utf8').split(CR).join('');
@@ -90,7 +92,8 @@ const noteAt = SHELL.indexOf('bool unsure = CollectionUnconfirmed(collectionRevi
 yes('DrawStatus asks it', noteAt > 0);
 const note = noteAt > 0 ? SHELL.slice(noteAt, SHELL.indexOf('// Wrong Skyrim build', noteAt)) : '';
 yes('the note says the mods could not be confirmed', note.indexOf('Your mods could not be confirmed') >= 0);
-yes('the note offers the collection', note.indexOf('btnInstallNow.Content = "Open the collection";') >= 0);
+yes('the note offers the collection', note.indexOf('InstallLabel("Open the collection");') >= 0);
+yes('and the label is on the bar\'s button as well as Settings\' (#3201)', /static void InstallLabel\(string text\)[\s\S]*?btnUpdate\.Content = text;/.test(UPDATE));
 yes('the note never sets collectionBarUp, so it never shuts Play', note.indexOf('collectionBarUp = true') < 0);
 yes('the note never touches the Play button', note.indexOf('btnPlay') < 0);
 const guard = SHELL.slice(SHELL.lastIndexOf('if (updateBar != null', noteAt), noteAt);
@@ -103,7 +106,8 @@ yes('Play is enabled by exactly the same test as before', gate.test(SHELL));
 
 // ---- the bar's button --------------------------------------------------------
 yes('the bar\'s button opens the collection for the note but not over an update',
-    SHELL.indexOf('if (collectionBarUp || (collectionNoteUp && !updatePending))') > 0);
+    UPDATE.indexOf('if (collectionBarUp || (collectionNoteUp && !updatePending))') > 0 &&
+    SHELL.indexOf('btnUpdate.Click += delegate { InstallNowPressed(); };') > 0);
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
