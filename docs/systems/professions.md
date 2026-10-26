@@ -113,6 +113,15 @@ asks the same question the craft does, recipe by recipe, so a rank, a
 race's own gear and a roll all count. The menu then lists only what you
 may make.
 
+It sorts that list by kind first, with material groups inside (#3133).
+Weapons, armour, and arrows and bolts each have a header of their own,
+beside clothing, jewellery and food, and under each header the pieces sit
+in groups by material: Iron, Steel, Elven, Dragon and the rest, so the iron
+helmets and the iron swords are no longer one list. A piece whose record
+names no material is under its header and in no group. The groups are
+`game/ours/Data/SKSE/Plugins/CraftingCategories/Thornswood-Content.json`,
+and their names `game/ours/Data/Interface/Translations/Thornswood-Content_ENGLISH.txt`.
+
 Who each bench opens for. A half is one you can work at the rank named:
 your own half, or your sister half or a taught half at novice. No
 bench opens for everybody: the few things at a bench that nobody owns

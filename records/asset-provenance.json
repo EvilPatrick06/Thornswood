@@ -557,6 +557,32 @@
       "status": "cleared"
     },
     {
+      "path": "game/ours/Data/SKSE/Plugins/CraftingCategories/Thornswood-Content.json",
+      "sha256": "975ff49aecd246172497d90facb353ba455688c5787dd69a67a8b3640ab89d06",
+      "what": "Thornswood's config for the collection's crafting menu, Constructible Object Custom Keyword System (#3133): three headers by item type, weapons, armour and arrows and bolts, each with its material groups inside, made of keyword names and Thornswood's own label keys. Named for Thornswood-Content.esp, so the menu reads it after the collection's own configs and it moves weapons, armour and arrows out of the one shared WEAPONS & ARMOR header. Hash as git stores it, with LF line endings.",
+      "published": "Every pack and the installer (Data\\SKSE\\Plugins\\CraftingCategories)",
+      "source": "Written for Thornswood on 26 Oct 2026. The keyword names are the records' own: Skyrim's and its add-ons', and the ones Immersive Armors and More Craftable Equipment add to the load order, read from the collection's revision 4 plugins; the layout follows the mod's own schema",
+      "creator": "Thornswood",
+      "licence": "Thornswood's own",
+      "attribution": "None asked",
+      "approved": "Patrick, 22 Oct 2026, A on #3133: crafting tables sorted by item type, with material groups inside",
+      "evidence": "#3133; tests/test-3133-crafting-categories.js; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
+      "status": "ours"
+    },
+    {
+      "path": "game/ours/Data/Interface/Translations/Thornswood-Content_ENGLISH.txt",
+      "sha256": "19219e063f7687da8bc23c48180777154d9c126519685c66a32e21f0bfa54a66",
+      "what": "The English names of the crafting menu's headers and material groups that Thornswood-Content.json defines (#3133), one tab separated line per label key, in the UTF-16 with a byte order mark that Skyrim reads a translation file in. The game reads it because it is named for Thornswood-Content.esp.",
+      "published": "Every pack and the installer (Data\\Interface\\Translations)",
+      "source": "Written for Thornswood on 26 Oct 2026",
+      "creator": "Thornswood",
+      "licence": "Thornswood's own",
+      "attribution": "None asked",
+      "approved": "Patrick, 22 Oct 2026, A on #3133: crafting tables sorted by item type, with material groups inside",
+      "evidence": "#3133; tests/test-3133-crafting-categories.js; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
+      "status": "ours"
+    },
+    {
       "path": "game/content/Thornswood-Content.esp",
       "sha256": "8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66",
       "what": "Thornswood's own plugin, 271,624 bytes on 22 Oct (#3349, the ten passage books' words, plain town lines written by the tool; #2993, its header's description built from the records it holds; #1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",

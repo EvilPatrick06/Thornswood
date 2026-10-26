@@ -319,8 +319,9 @@ foreach ($pair in $menuPairs) {
 
 # ------------------------------------------------ our own menu files --
 # The empty loading spinner, the silent stand-in for the game's theme,
-# SkyHUD's settings as Thornswood set them and QuickLoot IE's with no gold
-# value column (#3113). From game\ours, beside
+# SkyHUD's settings as Thornswood set them, QuickLoot IE's with no gold
+# value column (#3113), and the crafting menu's groups, item type first with
+# material groups inside, and their English names (#3133). From game\ours, beside
 # game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
@@ -333,7 +334,9 @@ $oursMenuFiles = @(
   'Data\Interface\loadwaitspinner.swf',
   'Data\music\special\mus_maintheme.xwm',
   'Data\Interface\skyhud\skyhud.txt',
-  'Data\SKSE\Plugins\QuickLootIE.json'
+  'Data\SKSE\Plugins\QuickLootIE.json',
+  'Data\SKSE\Plugins\CraftingCategories\Thornswood-Content.json',
+  'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel

@@ -1334,7 +1334,15 @@ $ShipOursFiles = @(
     # QuickLoot IE's settings file with its loot menu's columns weight only,
     # no gold value (#3113). QuickLoot IE is GPL 3, so its file may go out
     # changed, saying so.
-    'Data\SKSE\Plugins\QuickLootIE.json'
+    'Data\SKSE\Plugins\QuickLootIE.json',
+    # The crafting menu's groups (#3133): Crafting Categories reads every
+    # config named after a plugin in the load order, in load order, so this
+    # one, named for our content plugin, comes after the collection's own and
+    # moves weapons, armour and arrows each under a header of its own, with
+    # material groups inside. The English names of those groups beside it.
+    # Both are Thornswood's own; Go.ps1 writes them too ($oursMenuFiles).
+    'Data\SKSE\Plugins\CraftingCategories\Thornswood-Content.json',
+    'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt'
 )
 
 # NEMESIS'S OUTPUT IS OURS, because we generate it from the collection.
