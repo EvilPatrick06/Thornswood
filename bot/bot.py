@@ -2386,6 +2386,62 @@ def site_open():
         return False
 
 
+#
+# THE STATUS LINES (#3147). The bot's status, under its name in the member
+# list, is one of Thornswood's hints and lore lines, a new one every
+# LINES_EVERY seconds. Their one copy is site\data\site\lines.md; the site
+# hands them out in /api/public as "lines", read here at every change, so a
+# line edited there reaches the bot at the next Deploy-Docs.ps1 -Site, with
+# no bot install. Hints and lore lines take turns, each list in its own order.
+LINES_EVERY = 15 * 60
+
+
+def status_lines(lines):
+    """The lines the status steps through: a hint, then a lore line, in turn,
+       until both lists are used up. A lore line is its quote alone; its source
+       does not fit in a status."""
+    lines = lines if isinstance(lines, dict) else {}
+    hints = [h for h in (lines.get('hints') or []) if isinstance(h, str) and h]
+    lore = [x.get('text') for x in (lines.get('lore') or [])
+            if isinstance(x, dict) and isinstance(x.get('text'), str) and x.get('text')]
+    out = []
+    for i in range(max(len(hints), len(lore))):
+        out.extend(([hints[i]] if i < len(hints) else []) + ([lore[i]] if i < len(lore) else []))
+    return out
+
+
+def site_lines():
+    """The status lines from the site's /api/public. Raises when the site
+       cannot be read, for watch_lines to say."""
+    with urllib.request.urlopen(SITE + '/api/public', timeout=8) as r:
+        return status_lines(json.loads(r.read().decode('utf-8')).get('lines'))
+
+
+async def watch_lines():
+    """
+    Sets the status to the next line every LINES_EVERY seconds. When the site
+    cannot be read, or hands out no lines, that is said in bot.log and the
+    status stays as it is until the next pass. Nothing in here may end the
+    loop.
+    """
+    await client.wait_until_ready()
+    at = 0
+    while not client.is_closed():
+        try:
+            texts = await asyncio.get_running_loop().run_in_executor(None, site_lines)
+            if texts:
+                await client.change_presence(
+                    activity=discord.CustomActivity(name=texts[at % len(texts)]))
+                at += 1
+            else:
+                log('status lines: the site handed out none, so the status '
+                    'stays as it is until the next pass')
+        except Exception:
+            log('status lines: could not set the next one, so the status stays '
+                'as it is until the next pass:\n' + traceback.format_exc())
+        await asyncio.sleep(LINES_EVERY)
+
+
 def set_open(on):
     """Point the panel, its kinds and the age and rules questions at one mode."""
     global OPEN, KINDS, AGE_KINDS, RULES_KINDS, PANEL
@@ -7037,6 +7093,7 @@ async def on_ready():
         asyncio.create_task(watch_known_issues())
         asyncio.create_task(watch_join_numbers())
         asyncio.create_task(watch_closed_tickets())
+        asyncio.create_task(watch_lines())
 
     log('up as %s' % client.user)
 

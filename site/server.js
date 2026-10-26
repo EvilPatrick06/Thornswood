@@ -870,6 +870,62 @@ function pageMarkdown(name) {
   try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
 }
 
+// The hints and lore lines (#3147): data\site\lines.md is the one copy of
+// them. The front page's lore line comes out of it as the page is served,
+// and /api/public hands the lot out, which is where the Discord bot reads its
+// status lines. The file's own comment says its rules, and
+// tests\test-3147-lines.js holds them, so nothing here checks a line again.
+// ==== thornswood lines ====
+function parseLines(md) {
+  const out = { hints: [], lore: [] };
+  let list = null, last = null;
+  String(md == null ? '' : md).replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/).forEach(function (l) {
+    const head = /^##\s+(.*?)\s*$/.exec(l);
+    if (head) {
+      list = /^hints$/i.test(head[1]) ? 'hints' : /^lore lines$/i.test(head[1]) ? 'lore' : null;
+      last = null;
+      return;
+    }
+    if (!list) return;
+    const item = /^- (.*?)\s*$/.exec(l);
+    if (item) {
+      if (list === 'hints') { out.hints.push(item[1]); last = null; }
+      else { last = { text: item[1], from: '' }; out.lore.push(last); }
+      return;
+    }
+    // The source of a lore line, on the line under it.
+    const from = /^ {2}(\S.*?)\s*$/.exec(l);
+    if (from && last && !last.from) last.from = from[1];
+  });
+  return out;
+}
+
+// home.html's lore line, the empty quote under The World, filled with one
+// line picked at pick (0 to 1, Math.random() when served). With no lore line
+// to show it stays empty and hidden.
+function fillLoreLine(html, lore, pick) {
+  const esc = function (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+  const list = Array.isArray(lore) ? lore : [];
+  if (!list.length) return html;
+  const one = list[Math.min(list.length - 1, Math.floor(pick * list.length))];
+  return html.replace('<blockquote class="chron" id="loreLine" hidden></blockquote>', () =>
+    '<blockquote class="chron" id="loreLine">' + esc(one.text) +
+    (one.from ? '<cite>' + esc(one.from) + '</cite>' : '') + '</blockquote>');
+}
+// ==== end thornswood lines ====
+
+function readLines() {
+  try {
+    return parseLines(forMode(fs.readFileSync(path.join(SITE, 'lines.md'), 'utf8'), cfg.open));
+  } catch (e) {
+    console.error('[thornswood-docs] could not read data/site/lines.md, so the front page shows ' +
+                  'no lore line and /api/public no lines: ' + e.message);
+    return { hints: [], lore: [] };
+  }
+}
+
 // The credits page says which engine each server runs. That is a fact of the
 // box, not of the repo, so a hand edit went stale with every deploy (the
 // source-offer test caught 0f54ad45 that way). Deploy-Server.ps1 and
@@ -6183,6 +6239,11 @@ async function handle(req, res) {
       // /join, never /hub. Somebody clicking Apply wants to know how to apply,
       // and sending them to the admin panel is the worst possible answer.
       html = html.split('DISCORD_URL').join(cfg.discord.invite || '/join');
+      // One lore line from lines.md under The World (#3147), a new pick each
+      // time a page is served. Every page, not only /: the front is in each
+      // one, for the page's script to show when it goes back to /. After the
+      // invite link, for the same reason as the written pages below.
+      html = fillLoreLine(html, readLines().lore, Math.random());
       // The og tags a crawler reads are the ones in the file, so the page
       // actually being served is written into them here. The browser tab reads
       // the same tags; home.js keeps no list of its own (#3138).
@@ -6266,7 +6327,9 @@ async function handle(req, res) {
       launcher: feed.launcher || '',
       collection: feed.collection || '',
       files: listFiles(),
-      news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title }))
+      news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title })),
+      // The hints and lore lines (#3147): the Discord bot's status lines.
+      lines: readLines()
     }), 'application/json; charset=utf-8', { 'Cache-Control': 'no-cache' });
   }
 
