@@ -1,6 +1,6 @@
 {
-  "_note": "The vcpkg libraries whose code is in each native client file, read from its program database by the fork's build, and each one's licence text in client-licences\\<port>.txt. Written by scripts\\release\\New-ClientLicenceRecord.ps1 (#3099). Client 20083278 (release 1.2.5) was built on One before builds measured their libraries, so this was measured from the fork's build of a2a81926 (branch claude/project-thread-ejr9zp, run 40411729486): 20083278 with only the workflow, misc\\thornswood\\Write-ClientLicences.ps1 and the copyright texts of the frida-gum and node-embedder-api-prebuilt ports from engine-changes f140ca7d; cmake, vcpkg.json, the vcpkg submodule and the triplets are those of 20083278, so the same libraries are linked.",
-  "forkCommit": "20083278",
+  "_note": "The vcpkg libraries whose code is in each native client file, read from its program database by the fork's build, and each one's licence text in client-licences\\<port>.txt. Written by scripts\\release\\New-ClientLicenceRecord.ps1 (#3099).",
+  "forkCommit": "2b015d26",
   "readWith": "LLVM version 20.1.8",
   "files": {
     "Data\\SKSE\\Plugins\\MpClientPlugin.dll": [
