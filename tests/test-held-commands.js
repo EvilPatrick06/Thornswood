@@ -180,11 +180,10 @@ if (probe && WORDS) {
   // ------------------------------------------ the client's lines are silent
   {
     const r = rig({ online: [], pid: {}, gone: {} }, { t: 0 }, {});
-    r.api.dispatch(line(8, '/ate 3ad5b'));
     r.api.dispatch(line(8, '/face'));
     r.api.dispatch(line(8, '/tspicks 1'));
-    yes('a meal, a closed race menu and a broken lockpick wait too',
-        r.api.held[8] && r.api.held[8].lines.length === 3);
+    yes('a closed race menu and a broken lockpick wait too',
+        r.api.held[8] && r.api.held[8].lines.length === 2);
     yes('without telling anybody, because nobody typed them', notices(r, 8) === 0);
     r.api.dispatch(line(8, '/stuck'));
     yes('the first line somebody did type gets the notice', notices(r, 8) === 1);

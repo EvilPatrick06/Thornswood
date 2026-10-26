@@ -72,7 +72,6 @@ const SITES = {
   "'/racemenu'": { n: 1, kind: 'report', lines: ['/racemenu'] },
   "'/racedown'": { n: 1, kind: 'report', lines: ['/racedown'] },
   "'/face done'": { n: 1, kind: 'report', lines: ['/face done'] },
-  "'/ate ' + id.toString(16)": { n: 1, kind: 'report', lines: ['/ate 3eb35', '/ate fe0012ab'] },
   // /place: kind, the weather's id or -, night, roof, height to 500, fire to 25 or -
   "line": { n: 1, kind: 'report', lines: ['/place snow 10e1f2 1 0 1500 75', '/place outdoors - 0 0 -500 -',
                                           '/place indoors 81a 0 1 0 0', '/place water 10a241 0 0 -1000 -',

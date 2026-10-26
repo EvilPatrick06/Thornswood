@@ -56642,8 +56642,9 @@ const WORDS = ['/ooc', '/o',
                // argued with. /rest is the plugin's, sent when somebody sits
                // or lies down, and never typed (#1603); see bedRest. Not
                // /eat, /drink or /bard (#1631): eating and drinking is the
-               // item (/ate), and the bard is somebody the server sees playing
-               // (bardSeen). /needs is back as a line of text (#2267), above.
+               // item (mp.onEatItem), and the bard is somebody the server
+               // sees playing (bardSeen). /needs is back as a line of text
+               // (#2267), above.
                '/rest',
                // The repair panel (#1384): sent by the inventory key and by
                // the panel's buttons, never typed. See the durability block,
@@ -56666,7 +56667,7 @@ const WORDS = ['/ooc', '/o',
                '/hairdye',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
-               '/place', '/burn', '/ate',
+               '/place', '/burn',
                // The client saying its race menu is still up. Never typed; see
                // FACE_SEEN_MS.
                '/racemenu',
@@ -57060,9 +57061,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       log('holding', word, 'for profile', profileId, 'until the character is in the world');
     }
     q.lines.push({ cmd: cmd, at: Date.now() });
-    // Said once, and never for the client's own lines: /face, /ate, a
-    // broken lockpick and the load order report are not things anybody typed.
-    if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
+    // Said once, and never for the client's own lines: /face, a broken
+    // lockpick and the load order report are not things anybody typed.
+    if (!q.told && word !== '/face' && word !== '/tspicks' &&
         word !== '/loadorder' && word !== '/loadorderlight' && word !== '/racedown') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
@@ -57782,9 +57783,10 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       ------------------------------------------------- hunger, thirst, rest
 
       The world hooks replaced the words that drove the needs block, as they
-      were always meant to (#1631): eating and drinking is the item (/ate,
-      below), the meters are the four bars and the Body page on K, and the
-      bard is somebody the needs block sees playing on the emote wheel.
+      were always meant to (#1631): eating and drinking is the item (the
+      engine's mp.onEatItem, #3136), the meters are the four bars and the
+      Body page on K, and the bard is somebody the needs block sees playing
+      on the emote wheel.
 
       /rest    sent by the plugin when somebody sits or lies down, and
                /rest up when they get off; never typed (#1603). What counts
@@ -57799,30 +57801,6 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       dispatcher answers it, and kept out of PLAYER_WORDS so /help never
       invites anybody to type it.
     */
-    /*
-      SOMETHING WAS EATEN OR DRUNK IN THE GAME.
-
-      Not something anybody types, the same as /place: the server cannot see
-      a client consume its own item, and there is no eat hook. The client
-      watches the equip event, which is how Skyrim eats, and says what it
-      was. See the note over the equip handler in thornswood-front.js.
-
-      WHAT IT IS WORTH IS THE SERVER'S TO DECIDE, which is the whole reason
-      the base id travels rather than an amount: a client that could name its
-      own number could fill its meters by saying so.
-    */
-    if (word === '/ate') {
-      var needsAte = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
-      if (needsAte && actorId) {
-        try {
-          var eatenId = parseInt(String(parts[1] || ''), 16) || 0;
-          var line = needsAte.consumed(actorId, eatenId);
-          if (line) { toProfile(profileId, line); }
-        } catch (e) { }
-      }
-      return true;
-    }
-
     if (word === '/place') {
       var pl = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (pl && pl.place && actorId) {
@@ -58307,8 +58285,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       WHERE SOMEBODY IS RESTING, AND NOTHING ELSE (#1631). /rest is the
       plugin's line when somebody sits down, lies down or gets up. /eat,
       /drink and /bard are gone: eating or drinking the item is a meal
-      (/ate), and the bard is somebody the server sees playing (bardSeen, in
-      the needs block). Typed, they get the answer every unknown word gets.
+      (mp.onEatItem), and the bard is somebody the server sees playing
+      (bardSeen, in the needs block). Typed, they get the answer every
+      unknown word gets.
       /needs went with them and came back on its own (#2267), above.
     */
     if (word === '/rest') {
@@ -59821,8 +59800,8 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   checked the pack holds the thing (MpActor::OnEquip), then
                   takes one out and applies a potion's effects. mp.onEatItem
                   in the injury and disease block hears it for a potion of
-                  cure disease (#1383) and never refuses. The needs block
-                  hears about eating from the client's /ate line instead.
+                  cure disease (#1383) and never refuses, and hands every
+                  swallow to the needs block (eaten, #3136).
     onSpellCast   A cast the engine has checked (the sender's own actor or one
                   it hosts, alive, with the spell equipped), before it goes
                   out to anybody near, and not the message that interrupts a
@@ -63158,8 +63137,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
 
     // A night in a bed, on top of the time away settled above (#1606).
-    // Three ales or more still counting when they left (#1382).
-    var leftDrunk = arriving && (Number(n.ale) || 0) >= NEEDS.ale.hangoverFrom &&
+    // Three ales or more still counting when they left, and not in a bed
+    // (#1382). drink.md: "If you drank three or more and log out without a
+    // bed". Until #3136 a bed only counted once it gave a night, so lying
+    // down drunk and coming back inside 24 minutes was a hangover; now it is
+    // still being drunk, until the 45 minutes pass or a night is slept.
+    var leftDrunk = arriving && !inBed(n.resting) &&
+      (Number(n.ale) || 0) >= NEEDS.ale.hangoverFrom &&
       typeof n.aleAt === 'number' && (n.at - n.aleAt) <= NEEDS.ale.sober * 60000;
     var slept = arriving ? arrived(actorId, n, away) : '';
     // A night in a bed ends a hangover; leaving drunk without one starts it.
@@ -63701,8 +63685,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
-    Something was eaten or drunk in the game. See the /ate command and the
-    equip handler in thornswood-front.js.
+    Something was eaten or drunk in the game: eaten(), below consumed, from
+    mp.onEatItem.
   */
   /*
     WHAT THIS POTION IS WORTH, by how many came before it in the window.
@@ -63829,6 +63813,38 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var said = words[Math.min(had, words.length - 1)];
     var crossedLine = crossed(actorId, was, n);
     return said + (crossedLine ? ' ' + crossedLine : '');
+  }
+
+  /*
+    SOMETHING WENT DOWN, AS THE ENGINE SAW IT (#3136). mp.onEatItem in the
+    injury block hands every swallow here. The engine raises it only once it
+    has checked the pack holds the thing, and the same message takes it out
+    (MpActor::OnEquip), so a meter moves only for an item somebody had.
+
+    Until #3136 the meters moved on the front plugin's /ate line, which
+    anybody could type: /ate and a food's id in the chat was a meal with no
+    food, and a drug's window with no drug. Its comment said there was no eat
+    hook, which was true before the engine raised onEatItem and stopped being
+    true when it did.
+
+    Only a person's, the way the plugin only ever spoke for its own
+    character, and only an ALCH or a brewed potion, which is everything the
+    plugin reported (Potion.from on what was equipped). An ingredient is
+    INGR and was never a meal; what eating one teaches is the alchemy
+    block's. Answers the line to say, or ''.
+  */
+  function eaten(actorId, baseId) {
+    baseId = Number(baseId) || 0;
+    if (!baseId || !onlineNow(actorId)) { return ''; }
+    if (baseId < 0xff000000) {
+      var type = '';
+      try {
+        var res = mp.lookupEspmRecordById(baseId);
+        type = (res && res.record) ? String(res.record.type || '') : '';
+      } catch (e) { type = ''; }
+      if (type !== 'ALCH') { return ''; }
+    }
+    return consumed(actorId, baseId);
   }
 
   function wearRow(baseId) {
@@ -64339,20 +64355,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       boilSay(actorId, n);
       return '';
     }
-    /*
-      Leaving the rain or the water starts the 3 minutes of wet, from what
-      that place was worth with its water (#1382). Going back in ends them.
-    */
-    var wasWet = !!NEEDS.wetPlaces[n.place], nowWet = !!NEEDS.wetPlaces[kind];
-    if (wasWet && !nowWet) {
-      n.wetFrom = Date.now();
-      n.wetPlace = NEEDS.place[n.place] + waterKind(actorId, n);
-    } else if (nowWet) {
-      n.wetFrom = 0;
-      n.wetPlace = null;
-    }
-    n.place = kind;
-    n.sky = sky;
+    moveTo(actorId, n, kind, sky);
     n.night = isNight;
     n.roof = hasRoof;
     n.high = high;
@@ -64364,6 +64367,32 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // Nothing said for the change itself. Walking indoors is not news; the
     // band crossing that follows it is, and the tick says that.
     return '';
+  }
+
+  /*
+    THE PLACE AND THE SKY CHANGE HERE, AND ONLY HERE (#3136), on a record
+    already settled up to now: place() for what the client says, and the
+    tick for a new roll of the sky (the season block's skyAdjust). The record
+    is changed and not written; the caller writes it.
+
+    Leaving the rain or the water starts the 3 minutes of wet, from what
+    that place was worth with its water (#1382). Going back in ends them.
+
+    Until #3136 the tick changed the place itself, before settling, so the
+    stretch since the last settle was charged at the new place, and a roll
+    that took the rain away dried somebody at once, with no 3 minutes.
+  */
+  function moveTo(actorId, n, kind, sky) {
+    var wasWet = !!NEEDS.wetPlaces[n.place], nowWet = !!NEEDS.wetPlaces[kind];
+    if (wasWet && !nowWet) {
+      n.wetFrom = Date.now();
+      n.wetPlace = NEEDS.place[n.place] + waterKind(actorId, n);
+    } else if (nowWet) {
+      n.wetFrom = 0;
+      n.wetPlace = null;
+    }
+    n.place = kind;
+    n.sky = sky;
   }
 
   // ------------------------------------------------------------ the water --
@@ -64802,6 +64831,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
+    Whether a kind of rest is a bed or a bedroll (#3136): one whose row puts
+    rest back after a night, which is every bed and bedroll whoever's it is,
+    and no seat. The same table as the night, so the two cannot disagree.
+  */
+  function inBed(kind) {
+    return (Number(awayRow(kind).rest) || 0) > 0;
+  }
+
+  /*
     What logging out now would do, in words, for the Body page on K (#2246).
     Worked out from the same NEEDS.away row that settle and arrived read at
     the arrival, so a change of numbers changes the page with it.
@@ -64962,21 +65000,23 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       try {
         var before = read(who);
         if (!before) { settle(who); continue; }
+        var was = { food: bandOf(before.food), drink: bandOf(before.drink),
+                    rest: bandOf(before.rest), temp: tempBand(before.temp).name };
+        // Settled first, at the place the time was spent in, and then the
+        // sky's new roll moves them (#3136). See moveTo.
+        var n = settle(who, Date.now());
         try {
           var Ssn = g.__thornswoodSeason;
           if (Ssn && Ssn.skyAdjust) {
-            var rolled = Ssn.skyAdjust(who, before);
-            if (rolled && ((rolled.sky || '') !== (before.sky || '') ||
-                (rolled.place || '') !== (before.place || ''))) {
-              if (rolled.sky) { before.sky = rolled.sky; }
-              if (rolled.place) { before.place = rolled.place; }
-              write(who, before);
+            var rolled = Ssn.skyAdjust(who, n);
+            var toSky = (rolled && rolled.sky) ? rolled.sky : n.sky;
+            var toPlace = (rolled && rolled.place) ? rolled.place : n.place;
+            if (rolled && (toSky !== n.sky || toPlace !== n.place)) {
+              moveTo(who, n, toPlace, toSky);
+              write(who, n);
             }
           }
         } catch (eSky) { }
-        var was = { food: bandOf(before.food), drink: bandOf(before.drink),
-                    rest: bandOf(before.rest), temp: tempBand(before.temp).name };
-        var n = settle(who, Date.now());
         // The ale help running out changes the character, not a band (#1382).
         if (n.aleHelpUntil && Date.now() >= n.aleHelpUntil) {
           n.aleHelpUntil = 0;
@@ -65433,6 +65473,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   g.__thornswoodNeeds = {
     NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
     bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind, groupOf: foodGroup,
+    // A swallow the engine saw, from mp.onEatItem (#3136).
+    eaten: eaten,
     // Water at a well and over a cooking fire, from mp.onActivate (#1382).
     activatedWater: activatedWater, drankWater: drankWater,
     // A bottle used up by a hair dye's steep, and the fire it steeps at (#2675).
@@ -67208,7 +67250,7 @@ module.exports = {
   /*
     SOMETHING DRUNK FROM THE PACK (mp.onEatItem, below). A potion of cure
     disease clears one ordinary disease. It is still the thirst sip, which the
-    needs block gives from the client's /ate line. Answers a line, or ''.
+    needs block gives from the same event (eaten). Answers a line, or ''.
   */
   function swallowed(actorId, baseId) {
     var cure = false;
@@ -67912,12 +67954,13 @@ module.exports = {
   }
 
   /*
-    A POTION DRUNK FROM THE PACK, heard for the potion of cure disease. This
-    is the engine's own record of the drink, not the client's /ate line: it
-    is raised only once the server has checked the pack holds the potion, and
-    it is the same message that takes it out (MpActor::OnEquip). So nobody
-    cures a disease by saying they drank something. It never refuses: the
-    engine takes the potion whatever this answers.
+    A POTION DRUNK FROM THE PACK, heard for the potion of cure disease, and
+    anything eaten or drunk, heard for the needs block. This is the engine's
+    own record of the drink: it is raised only once the server has checked
+    the pack holds the thing, and it is the same message that takes it out
+    (MpActor::OnEquip). So nobody cures a disease, or fills a meter, by
+    saying they drank something. It never refuses: the engine takes the
+    thing whatever this answers.
   */
   mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
     /*
@@ -67941,6 +67984,17 @@ module.exports = {
       } catch (e) { hlog('the eat scale threw:', e); }
     }
     try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
+    /*
+      WHAT IT DOES TO HUNGER AND THIRST (#3136), the needs block's eaten(),
+      from this event and from nothing the client says. Said in the chat
+      only, the way a meal's line always was.
+    */
+    if (needsApi && needsApi.eaten) {
+      try {
+        var mealLine = needsApi.eaten(actorId, Number(baseId) || 0);
+        if (mealLine) { say(actorId, mealLine); }
+      } catch (e) { hlog('the meal threw:', e); }
+    }
     // Withered (#1387), in the college block, on its own: five potions in an hour.
     var college = g.__thornswoodCollege;
     if (college && college.drank) {
@@ -70189,7 +70243,7 @@ module.exports = {
   because they keep their 421 settings in ini files on the machine, and
   SkyUI_SE's three script values are out of reach.
 
-  THE CHANNEL IS THE ONE /ate AND /place ALREADY USE. The front plugin reads
+  THE CHANNEL IS THE ONE /place ALREADY USES. The front plugin reads
   those globals when the game's journal (where the menus live) opens and
   again when it closes, and sends what moved as /modset lines over the chat
   socket. This block keeps them per character, by profile id, in

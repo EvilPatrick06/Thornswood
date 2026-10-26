@@ -77,8 +77,9 @@ The tundra is near zero. Ivarstead is about 3,000. High Hrothgar is
 about 12,000. The Throat of the World is past 25,000, and the cap of
 14 means the summit does not get colder than that from height alone.
 
-Open blizzard is the worst dry place: snow's 16 minus a gale's 14 is 2
-before clothes. Swimming beats it.
+Open blizzard is the worst place there is: snow's 16, less a gale's 14
+and the falling snow's 6, is 0 before clothes, as cold as the meter
+goes. Swimming in it is 0 as well.
 
 Rain and swimming leave you wet for 3 minutes after you are under a
 roof or out of the water. The exposure from rain or from the water

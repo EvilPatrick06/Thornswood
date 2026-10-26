@@ -77,7 +77,7 @@ and help text never lists it.
 | `/book` and its verbs | Anybody; founding a business needs Business Owner or Dev, and a faction's book its Leader role | Group books: found, invite, leave, roles, prices | The `/book` branch of `handle`, then the books block's `command` | Nowhere. [Factions](factions.md) names J and its buttons | J sends every verb: Invite names the person in front of you when J opens, and each role's permissions are buttons. The board panel submits a price list. The invite reads as one on the P prompt (#1591). Out of the list, `/help people`, the pages and the server's own lines. | #1630 |
 | `/rest sit`, `campfire`, `inn`, `up` | Anybody | Where you are resting, for the rest meter | `bedRest` in the property block's beds | Nowhere. [Exhaustion](exhaustion.md) names sitting, lying down and the wheel's Sit | Sitting down sends `/rest sit`, lying down `/rest bed` and getting up `/rest up`, and the server answers by the furniture it saw pressed, whatever the word (#1603). Sit on the emote wheel sends nothing: the server reads the last animation the game sent for the person, and the wheel's Sit is a seat on the ground (#1631). Out of the list, `/help living` and the Help page. | #1631 |
 | `/needs`, `/need` | Anybody | The four needs bars as one line of text: Hunger, Thirst and Rest as a per cent with their band, Temp as its word and number and where it is heading, and where you are resting. It changes nothing | The `/needs` branch of `handle`, then `textView` in the needs block | The list; the help panel's Living; Help page "You will get hungry, thirsty and cold"; the Settings line under "Show the needs bars on screen"; the Controls row for / and `Thornswood.ini` | Stays a command, and the help names it (Patrick, 11 Oct, #2267): it is another view of the bars and the Body page on K, for somebody who hid the bars. It went with #1631 and came back on its own. | #2267 |
-| `/eat`, `/drink`, `/drink ale` | Nobody | Gone (#1631). They gave food or drink with no item | None | Nowhere | Eating or drinking the item, which the front plugin reports as `/ate`. Said on #1382. | #1631 |
+| `/eat`, `/drink`, `/drink ale` | Nobody | Gone (#1631). They gave food or drink with no item | None | Nowhere | Eating or drinking the item, which the engine reports to the server itself (`mp.onEatItem`, `eaten` in the needs block, #3136). Said on #1382. | #1631 |
 | `/bard` | Nobody | Gone (#1631). The bard is somebody the server sees playing | `playing` and `bardSeen` in the needs block | Nowhere. [Exhaustion](exhaustion.md), [Emotes](emotes.md) and [People beside you](people.md) name the wheel | Lute, Flute or Drum on the emote wheel with that instrument in the pack, or Sing (Patrick, 4 Oct), read from the last animation the game sent for the person. | #1631 |
 | `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | The `/helpme` branch of `handle`, then the asking staff block's `ask` | The list; the help panel's Getting help; Help page "Getting staff"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
 | `/stuck` | Anybody | Out of a wedged spot, a few steps back or to a temple | The `/stuck` branch of `handle`, then the stuck block's `command` | The list; the help panel's Getting help; Help page "Stuck in the world"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |
@@ -141,7 +141,7 @@ The voice service's chat log, which staff read for a report, leaves out
 the ones the front plugin sends by itself (#2723,
 `voice/voice-server.js:PLUGIN_REPORTS`): `/joinpass`, `/place`, `/burn`,
 `/loadorder` and `/loadorderlight`, `/afk active`, `/face done`,
-`/racemenu` and `/racedown`, `/modset`, `/ate`, `/chopped`, `/tspicks`,
+`/racemenu` and `/racedown`, `/modset`, `/chopped`, `/tspicks`,
 `/rest`, and the panels' `refresh`. It writes the ones a key, E, a pick
 or a button sends, marked as a key press (#2251; the chat page marks
 every line that does not come from the chat box, #2732), and the wait in line
@@ -156,7 +156,6 @@ is written as typed.
 | `/afk active`, `here`, `out` | The front plugin | Whether somebody is at the game | `gamemode.js:word === '/afk'` |
 | `/face done`, `/racemenu` | The front plugin | The race menu closed, or is up | `gamemode.js:if (word === '/face') {` |
 | `/modset` | The front plugin | Mod settings menu values that changed | `gamemode.js:if (word === '/modset') {` |
-| `/ate <id>` | The front plugin | Something was eaten or drunk | `gamemode.js:word === '/ate'` |
 | `/place`, `/burn` | The front plugin | Where you stand for warmth, and being on fire, which is also timed for a burn wound | `gamemode.js:if (word === '/place') {`, `gamemode.js:word === '/burn'` |
 | `/chopped` | The front plugin | A fall of the axe at a chopping block | `gamemode.js:if (word === '/chopped') {` |
 | `/loadorder` | The front plugin | The client's load order | `gamemode.js:word === '/loadorder'` |
