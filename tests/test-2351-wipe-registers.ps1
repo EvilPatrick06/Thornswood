@@ -62,7 +62,7 @@ $Moves = @()
 if ($assign.Count -eq 1) { $Moves = @(& ([scriptblock]::Create($assign[0].Right.Extent.Text))) }
 foreach ($n in 'world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json',
                'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-               'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\dungeon-rewards-ledger.json',
+               'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\trade-carts.json', 'private\dungeon-rewards-ledger.json',
                'private\dungeon-rewards-ledger.initialized', 'private\deleted-characters.json') {
     Yes "  it moves $n" ($Moves -contains $n)
 }
@@ -130,7 +130,7 @@ try {
     Put (Join-Path $Root 'world\changeForms\0.json') '{"formDesc":"ff000a01","profileId":5001}'
     Put (Join-Path $Root 'private\characters.json') '{"who":{"5001":{"name":"A"},"6001":{"name":"B"},"7001":{"name":"C"}}}'
     foreach ($f in 'property.json', 'farm-claims.json', 'law.json', 'beds.json', 'embassy.json', 'books.json', 'last-left.json',
-                   'take-limit.json', 'trade-cargo.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
+                   'take-limit.json', 'trade-cargo.json', 'trade-carts.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
                    'season.json', 'benches.json', 'door.json', 'war.json', 'company-terms.json') {
         Put (Join-Path $Root "private\$f") ('{"file":"' + $f + '"}')
     }

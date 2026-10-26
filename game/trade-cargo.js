@@ -46,6 +46,24 @@
   Ownership of who may run a ship, contracts and freight belong to #512 (the
   Free Skyrim Trading Company). Prices, purses and trading belong to #1373.
   Nothing here calls either.
+
+  CARTS ARE THE SAME MANIFEST, DRIVEN (#3158). Patrick, 22 Oct 2026: people
+  drive the carts that move goods between holds, and a shipment is lost only
+  when people raid it, never by chance. createTradeCargo({ driven: true }) is
+  a manifest of carts: a "port" is a cart stop and a "route" a road. Every
+  rule above holds the same, and three differ:
+
+  - A cart leaves only with a driver, the character who drives it, kept on
+    the journey as sailing.driver. A ship never has one.
+  - A cart never arrives on a clock. pullIn() brings it in at its stop when
+    its driver is there and the road's least time has passed, or when staff
+    bring in one whose driver is gone. arrive() refuses a driven manifest.
+  - A driver deleted, reset, wiped or replaced comes off the journey the way
+    a loader does; the cart stays on the road for staff to bring in.
+
+  Taking from a cart on the road, the raid, is begin() with how 'taken',
+  which this file already allows at sea. Who may raid, and where, is the
+  caller's rule (game\trade-carts.js).
 */
 
 var GOLD_BASE = 15;
@@ -114,6 +132,8 @@ function createTradeCargo(opts) {
   }
   var maxLines = opts.maxLines === undefined ? MAX_LINES_DEFAULT : opts.maxLines;
   if (!Number.isInteger(maxLines) || maxLines < 1 || maxLines > 256) { throw new Error('The line limit cannot be verified.'); }
+  if (opts.driven !== undefined && typeof opts.driven !== 'boolean') { throw new Error('Whether it is driven cannot be verified.'); }
+  var driven = opts.driven === true;
 
   function empty() { return { v: 1, seq: 0, holds: {}, receipts: {} }; }
 
@@ -153,7 +173,8 @@ function createTradeCargo(opts) {
       holds++;
       if (h.sailing !== null) {
         var s = h.sailing;
-        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at) {
+        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at ||
+            (driven ? !has(s, 'driver') || !named(s.driver) : has(s, 'driver'))) {
           throw new Error('Hold ' + id + '\'s voyage cannot be verified.');
         }
         sailing++;
@@ -235,9 +256,13 @@ function createTradeCargo(opts) {
     });
   }
 
-  function depart(state, id, to, at, arriveAt) {
+  /* driver is the character driving a cart, and is never given for a ship. */
+  function depart(state, id, to, at, arriveAt, driver) {
     return change(state, function (s) {
       var h = holdOf(s, id);
+      var who = null;
+      if (driven) { who = partyOf(driver, 'Who drives it'); }
+      else if (driver !== undefined) { throw new Error('A ship has no driver.'); }
       if (h.sailing) { throw new Error('The hold is already at sea.'); }
       if (!ports[to] || to === h.port || (routes && !routes[h.port + '>' + to])) {
         throw new Error('No voyage from ' + h.port + ' to ' + to + '.');
@@ -247,6 +272,7 @@ function createTradeCargo(opts) {
       if (!carrying) { throw new Error('The hold is empty.'); }
       if (h.outs.some(function (o) { return o.receipt === null; })) { throw new Error('Something is still being handed out.'); }
       h.sailing = { from: h.port, to: to, at: at, arriveAt: arriveAt };
+      if (driven) { h.sailing.driver = who; }
       return h.sailing;
     });
   }
@@ -274,6 +300,7 @@ function createTradeCargo(opts) {
 
   /* Every hold whose voyage is over by now is docked at its destination. */
   function arrive(state, now) {
+    if (driven) { throw new Error('A cart comes in only with its driver.'); }
     if (!time(now)) { throw new Error('The time cannot be verified.'); }
     return change(state, function (s) {
       var landed = [];
@@ -286,6 +313,29 @@ function createTradeCargo(opts) {
         }
       });
       return landed;
+    });
+  }
+
+  /*
+    A cart comes in at the stop it was driven to. who is the character at the
+    stop: only the driver, and only once the road's least time has passed.
+    who null is staff bringing in a cart, at any time, whether or not its
+    driver is still named. Answers the stop.
+  */
+  function pullIn(state, id, now, who) {
+    if (!driven) { throw new Error('A ship docks on its own.'); }
+    if (!time(now)) { throw new Error('The time cannot be verified.'); }
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (!h.sailing) { throw new Error('The cart is not on the road.'); }
+      if (who !== null) {
+        var me = partyOf(who, 'Who brings it in');
+        if (!same(me, h.sailing.driver)) { throw new Error('Only its driver brings a cart in.'); }
+        if (now < h.sailing.arriveAt) { throw new Error('The road is not done yet.'); }
+      }
+      h.port = h.sailing.to;
+      h.sailing = null;
+      return h.port;
     });
   }
 
@@ -365,6 +415,7 @@ function createTradeCargo(opts) {
     function gone(p) { return !!p && (who.actor(p.actor) === true || (p.profile > 0 && who.profile(p.profile) === true)); }
     return change(state, function (s) {
       var c = { loaders: 0, recipients: 0, receivers: 0 };
+      if (driven) { c.drivers = 0; }
       Object.keys(s.holds).forEach(function (id) {
         var h = s.holds[id];
         Object.keys(h.lines).forEach(function (k) {
@@ -373,6 +424,7 @@ function createTradeCargo(opts) {
           if (gone(l.for)) { l.for = null; c.recipients++; }
         });
         h.outs.forEach(function (o) { if (gone(o.who)) { o.who = null; c.receivers++; } });
+        if (driven && h.sailing && gone(h.sailing.driver)) { h.sailing.driver = null; c.drivers++; }
       });
       return c;
     });
@@ -408,9 +460,9 @@ function createTradeCargo(opts) {
   }
 
   return {
-    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive,
+    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive, pullIn: pullIn,
     begin: begin, finish: finish, undo: undo, release: release, aboard: aboard, save: save, parse: load_,
-    PORTS: Object.keys(ports), MAX_LINES: maxLines
+    PORTS: Object.keys(ports), MAX_LINES: maxLines, DRIVEN: driven
   };
 }
 
@@ -532,17 +584,22 @@ function proposeRoutes(current, next, state) {
   openRegister(null) is the register of a server that never had one: no
   ports, no routes, no holds. A text that is there and does not verify is
   refused whole, never read as empty.
+
+  The carts' register is the same shape in its own file (#3158):
+  openRegister(text, { driven: true }), and the register remembers it is
+  driven through every adoptRoutes.
 */
-function registerOf(routes, state) {
-  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes });
+function registerOf(routes, state, driven) {
+  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes, driven: driven === true });
   ships.audit(state);
   return { routes: routes, ships: ships, state: state };
 }
 
-function openRegister(textIn) {
+function openRegister(textIn, opts) {
+  var driven = !!(opts && opts.driven === true);
   if (textIn === null || textIn === undefined) {
     var none = checkRoutes(NO_ROUTES);
-    return registerOf(none, createTradeCargo({ ports: [] }).empty());
+    return registerOf(none, createTradeCargo({ ports: [] }).empty(), driven);
   }
   if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES * 2) {
     throw new Error('The ship register cannot be verified.');
@@ -552,7 +609,7 @@ function openRegister(textIn) {
   if (!isObj(raw) || raw.v !== 1 || Object.keys(raw).length !== 3 || !has(raw, 'routes') || !has(raw, 'cargo')) {
     throw new Error('The ship register cannot be verified.');
   }
-  return registerOf(checkRoutes(raw.routes), raw.cargo);
+  return registerOf(checkRoutes(raw.routes), raw.cargo, driven);
 }
 
 function saveRegister(reg) {
@@ -566,7 +623,7 @@ function saveRegister(reg) {
 function adoptRoutes(reg, next) {
   var p = proposeRoutes(reg.routes, next, reg.state);
   if (p.strands.length) { throw new Error('The edit strands a hold: ' + p.strands.join(' ')); }
-  return registerOf(p.next, copy(reg.state));
+  return registerOf(p.next, copy(reg.state), reg.ships.DRIVEN);
 }
 
 /* The counts a load banner says. */

@@ -189,8 +189,13 @@ function parse(parts) {
     unroute <from> <to>              the route off the list
     crew <from> <to> <ref ...>       the route's crew references; none is no crew
     reset                            the draft back to the list in force
+
+  words names the places for what staff read, { place, crate, route }: a
+  port, a dock and a route when left out; a stop, a cart stop and a road for
+  the carts (#3158, game\trade-carts.js WORDS).
 */
-function editDraft(cargo, inForce, draft, edit, crate) {
+function editDraft(cargo, inForce, draft, edit, crate, words) {
+  var w = words || { place: 'port', crate: 'dock', route: 'route' };
   var d = copy(draft || inForce);
   var e = Array.isArray(edit) ? edit.map(String) : [];
   var op = (e[0] || '').toLowerCase();
@@ -199,26 +204,26 @@ function editDraft(cargo, inForce, draft, edit, crate) {
       throw new Error('Open the crate first, then press this within a minute.');
     }
     if (!/^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i.test(crate.desc)) {
-      throw new Error('That container is not one of the world\'s own, so it cannot be a dock.');
+      throw new Error('That container is not one of the world\'s own, so it cannot be a ' + w.crate + '.');
     }
     var taken = portOfCrate(d, crate.desc);
-    if (taken) { throw new Error('That crate is already the dock of ' + taken + '.'); }
+    if (taken) { throw new Error('That crate is already the ' + w.crate + ' of ' + taken + '.'); }
     return crate;
   }
   if (op === 'reset') { return cargo.checkRoutes(inForce); }
   if (op === 'port') {
     var c = needCrate();
-    if (!e[1] || portOf(d, e[1])) { throw new Error('A port needs a new plain name.'); }
-    if (HOLD_KEYS.indexOf(e[2]) < 0) { throw new Error('A port is in one of the holds.'); }
+    if (!e[1] || portOf(d, e[1])) { throw new Error('A ' + w.place + ' needs a new plain name.'); }
+    if (HOLD_KEYS.indexOf(e[2]) < 0) { throw new Error('A ' + w.place + ' is in one of the holds.'); }
     var name = e.slice(3).join(' ').trim();
     d.ports.push({ key: e[1], name: name, hold: e[2], world: c.world, pos: c.pos.slice(0, 3), crate: c.desc });
   } else if (op === 'crate') {
     var c2 = needCrate();
     var pc = portOf(d, e[1]);
-    if (!pc) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    if (!pc) { throw new Error('No ' + w.place + ' ' + e[1] + ' in the draft.'); }
     pc.crate = c2.desc; pc.world = c2.world; pc.pos = c2.pos.slice(0, 3);
   } else if (op === 'unport') {
-    if (!portOf(d, e[1])) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    if (!portOf(d, e[1])) { throw new Error('No ' + w.place + ' ' + e[1] + ' in the draft.'); }
     d.ports = d.ports.filter(function (p) { return p.key !== e[1]; });
     d.routes = d.routes.filter(function (r) { return r.from !== e[1] && r.to !== e[1]; });
   } else if (op === 'route') {
@@ -226,11 +231,11 @@ function editDraft(cargo, inForce, draft, edit, crate) {
     var r = routeOf(d, e[1], e[2]);
     if (r) { r.minutes = m; } else { d.routes.push({ from: e[1], to: e[2], minutes: m, crew: [] }); }
   } else if (op === 'unroute') {
-    if (!routeOf(d, e[1], e[2])) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    if (!routeOf(d, e[1], e[2])) { throw new Error('No ' + w.route + ' from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
     d.routes = d.routes.filter(function (x) { return !(x.from === e[1] && x.to === e[2]); });
   } else if (op === 'crew') {
     var rc = routeOf(d, e[1], e[2]);
-    if (!rc) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    if (!rc) { throw new Error('No ' + w.route + ' from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
     rc.crew = e.slice(3);
   } else {
     throw new Error('The staff panel does not know that edit.');

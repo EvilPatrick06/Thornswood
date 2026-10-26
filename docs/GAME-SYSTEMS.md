@@ -301,6 +301,9 @@ the East Empire Company.
 [Carriages and ferries](systems/carriages.md). How you travel with fast
 travel off. A fade, not a ride that has to stay in sync.
 
+[Trade carts](systems/carts.md). Goods between holds on carts people drive,
+lost only to a raid.
+
 ## Where a number comes from
 
 A number in a detail page is the plan's number. If the server already uses

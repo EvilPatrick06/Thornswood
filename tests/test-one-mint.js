@@ -345,8 +345,8 @@ const WRITERS = {
   'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)'],
   'hair dye/setPack': [1, 'writes back the pack it has just read: a hair dye\'s inputs taken and one entry named for the dye added to the list\'s item (a Bowl, never gold), or one dye taken away, or the pack it read put back when the hair would not take (#2675, test-2675-hair-dye-wiring.js)'],
   'property/boxLeave': [1, 'takes a stack off the pack into the drop box record, and refuses gold, which goes in through takeGold (#2298); it never adds'],
-  'trade ships/packTake': [1, 'the dock\'s load (#2700): a stack off the pack onto a trade ship\'s manifest, coin refused before the pack is read; it only takes away (test-2700-trade-ship-dock.js)'],
-  'trade ships/packGive': [1, 'the dock\'s hand out (#2700): only a piece the manifest begin() hands back, or the piece a refused load just took, each first debited off a pack, so never coin (trade-cargo refuses base 0xF aboard) and never more than was loaded (test-2700-trade-ship-dock.js)'],
+  'trade ships/packTake': [1, 'the dock\'s load (#2700) and a cart stop\'s (#3158, the same function through __thornswoodCargoHands): a stack off the pack onto a trade ship\'s or cart\'s manifest, coin refused before the pack is read; it only takes away (test-2700-trade-ship-dock.js, test-3158-trade-carts.js)'],
+  'trade ships/packGive': [1, 'the dock\'s hand out (#2700) and a cart\'s collect, take back and raid (#3158, the same function through __thornswoodCargoHands): only a piece the manifest begin() hands back, or the piece a refused load just took, each first debited off a pack, so never coin (trade-cargo refuses base 0xF aboard) and never more than was loaded (test-2700-trade-ship-dock.js, test-3158-trade-carts.js)'],
   'property/boxTake': [1, 'hands back a thing out of the drop box record, which holds only what boxLeave took off a pack; gold comes out through payOut, never more than the row holds, and the row goes down by the same (#2298, test-2298-dropbox.js)']
 };
 

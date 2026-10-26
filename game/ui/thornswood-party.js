@@ -533,6 +533,8 @@
                 '<span class="tools">' +
                 (nr.friend ? '' : '<button data-do="befriend" data-who="' + esc(nr.id) + '">Add friend</button>') +
                 '<button data-do="trade" data-who="' + esc(nr.id) + '">Trade</button>' +
+                // A trade cart on the road goes with its driver (#3158): Raid cart opens it.
+                (nr.cart ? '<button data-do="raid" data-who="' + esc(nr.id) + '">Raid cart</button>' : '') +
                 dyeButtons(nr.id) +
                 switches(nr) +
                 '</span></div>';
@@ -599,6 +601,7 @@
         else if (verb === 'drop') { net('/friend remove ' + who); }
         else if (verb === 'befriend') { net('/friend ' + who); }
         else if (verb === 'trade') { net('/trade ' + who); }
+        else if (verb === 'raid') { net('/cart raid ' + who); }
         else if (verb === 'dye') { net('/hairdye offer ' + who + ' ' + (this.getAttribute('data-dye') || '')); }
       };
     }

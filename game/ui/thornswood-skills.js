@@ -2291,6 +2291,8 @@
     if (o.steward || o.staff) wrap.appendChild(officeDoor(o.door));
     // The trade ships' ports and routes (#2700), staff only, while the ships are on.
     if (o.ships) wrap.appendChild(officeShips());
+    // The trade carts' stops and roads (#3158), staff only, while the carts are on.
+    if (o.carts) wrap.appendChild(officeCarts());
     if (o.steward) wrap.appendChild(officeBoards(o.boards));
     // The company's terms, for staff (#512, #2695): propose, confirm and drop.
     if (o.company) wrap.appendChild(officeCompany(o.company));
@@ -2304,6 +2306,17 @@
     card.appendChild(el('div', 'desc', 'The ports, routes and ships. Open a crate at a dock within a minute before, to make it a port. ' +
       'Every edit is a draft, and nothing changes until you confirm what the server proposes.'));
     officeRow(card, '', '', [officeButton('Ports and routes', '/ship staff')]);
+    return card;
+  }
+
+  /* The trade carts' staff panel (#3158): cart stops, roads and carts, a draft staff confirm. */
+  function officeCarts() {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'Trade carts'));
+    card.appendChild(el('div', 'desc', 'The cart stops, the roads between them, and the carts. Open a crate at a stop within a minute ' +
+      'before, to make it a cart stop. A road\'s minutes are the least a loaded cart takes on it. Every edit is a draft, and ' +
+      'nothing changes until you confirm what the server proposes.'));
+    officeRow(card, '', '', [officeButton('Cart stops and roads', '/cart staff')]);
     return card;
   }
 
