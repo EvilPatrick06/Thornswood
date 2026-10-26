@@ -114,9 +114,11 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
     # Once the repository is public (#3685) that condition is no guard: a pull
     # request runs the workflow files of its own branch, so a fork can carry
     # one with no condition, or a new one, that names the production label.
-    # Then no pull request job may be on the production label at all.
+    # Then no pull request job may be on the production label at all while
+    # a runner is still registered to the repository (Patrick's A of 26 Oct
+    # 2026: the runners move to the private ops repository).
     $sameRepo = $t -match 'github\.event\.pull_request\.head\.repo\.full_name == github\.repository'
-    $public = $f.github -and -not $f.github.private
+    $public = $f.github -and -not $f.github.private -and @($f.github.runners).Count -gt 0
     $prOnProd = $onProd -and ($triggers -contains 'pull_request_target' -or ($triggers -contains 'pull_request' -and ($public -or -not $sameRepo)))
     Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($onProd -and $sameRepo) { '; same-repository pull requests only' } else { '' }) + $(if ($onProd -and $public -and $triggers -contains 'pull_request') { '; the repository is public' } else { '' })) (-not $prOnProd)
     # Events anyone can cause on a public repository, with no write access:
@@ -138,6 +140,9 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
 if ($f.github) {
     $g = $f.github
     Row 'github' 'visibility' 'private' $(if ($g.private) { 'private' } else { 'public' }) ([bool]$g.private)
+    # A public repository may have no self-hosted runner at all: any fork's
+    # pull request can carry a workflow that names one (#3685).
+    if (-not $g.private) { Row 'github' 'self-hosted runners on a public repository' 'none' ([string]@($g.runners).Count) (@($g.runners).Count -eq 0) }
     if ($g.forkPr) { Row 'github' 'fork pull requests run workflows' 'no' $(if ($g.forkPr.run_workflows_from_fork_pull_requests) { 'yes' } else { 'no' }) (-not $g.forkPr.run_workflows_from_fork_pull_requests) }
     Row 'github' 'default workflow token' 'read' ([string]$g.workflowToken.default_workflow_permissions) ($g.workflowToken.default_workflow_permissions -eq 'read')
     Row 'github' 'collaborators who can push and so run code on the runners' 'known and few' ([string]$g.collaborators) $true

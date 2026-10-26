@@ -119,10 +119,16 @@ try {
     $x = Run $pub ''
     $bp = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build-pr.yml'))
     if ($bp -match 'runs-on:[^\n]*\bthornswood-vps\b') {
-        T ($x.Out -match 'RISK  workflow build-pr\.yml runs on: expected not thornswood-vps for untrusted code, found [^\n]*the repository is public') 'a public repository with a pull request job on the production label is a risk, condition or not'
+        T ($x.Out -match 'RISK  workflow build-pr\.yml runs on: expected not thornswood-vps for untrusted code, found [^\n]*the repository is public') 'a public repository with a runner and a pull request job on the production label is a risk, condition or not'
     } else {
         T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on') 'build-pr.yml has no job on the production label, so a public repository is safe from it'
     }
+    T ($x.Out -match 'RISK  github self-hosted runners on a public repository: expected none, found 1') '  and a public repository with any self-hosted runner registered is a risk'
+    # Patrick's A of 26 Oct 2026: on the day it goes public the runners move
+    # to the private ops repository, and then nothing here can reach them.
+    $gone = Facts; $gone.github.private = $false; $gone.github.runners = @()
+    $x = Run $gone ''
+    T ($x.Out -notmatch 'RISK  workflow [^\n]* runs on' -and $x.Out -notmatch 'RISK  workflow [^\n]* started by anyone' -and $x.Out -notmatch 'RISK  github self-hosted runners') 'once public with the runners moved off, no real workflow is a risk'
 
     # A pull request on the production label without the same-repository
     # condition is a risk; with it, it is not.

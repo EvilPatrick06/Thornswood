@@ -64,7 +64,7 @@ concurrency:
 jobs:
   prune:
     name: Drop the engine builds nothing pins
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     # A few dozen calls. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:

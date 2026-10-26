@@ -82,7 +82,7 @@ foreach ($f in Get-ChildItem -LiteralPath $wfDir -Filter *.yml) {
 }
 Yes "every heavy job named here is on the box ($seen found)" ($seen -ge 4)
 Yes 'the build label is never asked for without the VPS label' (
-    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*thornswood-build.*$') } | Where-Object { $_.Value -notmatch 'self-hosted, Windows, thornswood-vps, thornswood-build\]' }).Count -eq 0)
+    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*thornswood-build.*$') } | Where-Object { $_.Value -notmatch 'self-hosted, Windows, thornswood-vps, thornswood-build\]' -and $_.Value -notmatch [regex]::Escape('"self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') }).Count -eq 0)
 
 # ---- 3. Install-Runner.ps1 registers a listed runner with it ----------------------
 $ir = [IO.File]::ReadAllText((Under @('scripts', 'deploy', 'Install-Runner.ps1')))

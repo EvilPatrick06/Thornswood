@@ -36,7 +36,7 @@ permissions:
 jobs:
   expire:
     name: Take off claims with nothing for three days
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     # A page of issues and a timeline each for the claimed ones. Past this it
     # is stuck, not slow.
     timeout-minutes: 10

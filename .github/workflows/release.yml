@@ -141,7 +141,7 @@ jobs:
   # then the VPS job below builds the release instead.
   launcher:
     name: Build the release launcher
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}
     runs-on: windows-latest
     # The "release" environment only on a v tag: its subject is what the Azure
     # federated credential trusts, and its deployment rule allows v* tags only.
@@ -440,7 +440,7 @@ jobs:
   launcher-vps:
     name: Build the release launcher (VPS)
     needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     runs-on: [self-hosted, Windows, X64, thornswood-vps, thornswood-sign]
     environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}
     permissions:
@@ -466,7 +466,7 @@ jobs:
     name: Check the signed draft on a second machine (VPS)
     needs: [launcher, launcher-vps]
     if: ${{ !cancelled() && ((needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true') || (needs.launcher-vps.result == 'success' && needs.launcher-vps.outputs.signed == 'true')) }}
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') || 'windows-latest' }}
     permissions:
       contents: write
     timeout-minutes: 10

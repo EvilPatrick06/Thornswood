@@ -33,7 +33,7 @@ jobs:
   area:
     name: Put on an area label
     if: ${{ github.event_name == 'workflow_dispatch' || !contains(join(github.event.issue.labels.*.name, '|'), 'area:') }}
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'ubuntu-latest' }}
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     # One call per issue, or a page of issues when started by hand.
     timeout-minutes: 5
     steps:

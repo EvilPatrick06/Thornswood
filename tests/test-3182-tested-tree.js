@@ -166,14 +166,14 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   const tj = job ? job[1] : '';
   yes('build.yml\'s first job is "tested"', !!job);
   yes('  on a push only, so a manual run always builds', /\n    if: \$\{\{ github\.event_name == 'push' \}\}\n/.test(tj));
-  yes('  on any VPS runner, not a build one', /\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.test(tj));
+  yes('  on any VPS runner, not a build one, and only while the repository is private (#3685)', /\n    runs-on: \$\{\{ github\.event\.repository\.private && fromJSON\('\["self-hosted", "Windows", "thornswood-vps"\]'\) \|\| 'windows-latest' \}\}\n/.test(tj));
   yes('  with only actions, contents and pull-requests read', /\n    permissions:\n      actions: read\n      contents: read\n      pull-requests: read\n    outputs:/.test(tj));
   yes('  and no secrets', !/secrets\./.test(tj));
   yes('  its output is the script\'s', /\n      run: \$\{\{ steps\.look\.outputs\.run \}\}\n/.test(tj) && /id: look\n/.test(tj) &&
       /node scripts\\dev\\Tested-Tree\.js --tree \$tree --commit \$env:GITHUB_SHA --repo \$env:GITHUB_REPOSITORY\n/.test(tj) && /git rev-parse 'HEAD\^\{tree\}'/.test(tj));
   yes('the hosted job waits for it and builds only when it found nothing',
       /\n  launcher:\n    name: Launcher builds\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && /.test(build));
-  yes('so does the fallback', /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, launcher\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && /.test(build));
+  yes('so does the fallback', /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, launcher\]\n    if: \$\{\{ !cancelled\(\) && github\.event\.repository\.private && needs\.tested\.outputs\.run == '' && /.test(build));
   const checks = (/steps: &checks\n([\s\S]*?)\n\n  # The default:/.exec(build) || ['', ''])[1];
   const steps = checks.split(/\n(?=      - )/).filter(s => /^      - /.test(s));
   const note = steps[steps.length - 1] || '';

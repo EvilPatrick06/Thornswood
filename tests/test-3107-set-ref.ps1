@@ -85,7 +85,7 @@ Yes 'it is started by hand and by nothing else' ($on -match '^\s{2}workflow_disp
 $perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
 Yes ("its token writes refs and reads pull requests, nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: write`n  pull-requests: read")
 Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
-Yes 'it runs on the VPS runners' ($code -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps\]$')
+Yes 'it runs on the VPS runners only while the repository is private, and on GitHub''s once public (#3685)' ($code -match ('(?m)^    runs-on: ' + [regex]::Escape("`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}") + '$'))
 Yes '  with a timeout' ($code -match '(?m)^    timeout-minutes: \d+$')
 Yes '  in no environment, so it holds no secret' ($code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
 Yes 'the checkout keeps no token' ($code -match 'uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')

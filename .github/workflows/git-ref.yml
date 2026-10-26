@@ -52,7 +52,7 @@ permissions:
 jobs:
   ref:
     name: Make the tag or delete the branch
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     # Six calls at most. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:

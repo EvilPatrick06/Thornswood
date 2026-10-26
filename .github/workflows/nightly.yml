@@ -44,7 +44,7 @@ concurrency:
 jobs:
   nightly:
     name: Nightly checks
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -360,7 +360,7 @@ jobs:
     # Each share is a build check's worth of harnesses, so it takes one of
     # the box's build slots (thornswood-build, records/build-runners.json,
     # #2994); the short jobs around it run on any VPS runner.
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') || 'windows-latest' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -430,7 +430,7 @@ jobs:
     name: Put the night on the board
     needs: [nightly, harnesses]
     if: ${{ !cancelled() }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

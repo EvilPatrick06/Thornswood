@@ -49,6 +49,10 @@ function build(src) {
     fallback builds it on the box. A pull request from a fork never reaches
     the box: the fallback's condition names this repository as the head. The
     hosted job's failure stays standing as its own red check.
+    ONLY WHILE PRIVATE (#3685, Patrick's A of 26 Oct 2026). Once the
+    repository is public the fallback never runs, GitHub's runners are free,
+    and no VPS runner is registered to it: a fork's pull request runs its own
+    copy of this file, so that condition alone could not keep it off the box.
   */
   /*
     NO "tested" JOB ON A PULL REQUEST (#3182). build.yml's first job asks
@@ -60,15 +64,15 @@ function build(src) {
   if (!tested) { fail('build.yml no longer has its "tested" job before the fallback'); }
   body = body.replace(tested[0], '\n');
   body = swap(body, '    needs: [tested, launcher]\n', '    needs: launcher\n', 'the fallback\'s needs');
-  body = swap(body, "    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && needs.launcher.result", 'the fallback\'s tested condition');
-  body = swap(body, "    needs: tested\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && vars.BUILD_RUNNER", "    if: ${{ vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
+  body = swap(body, "    if: ${{ !cancelled() && github.event.repository.private && needs.tested.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result", 'the fallback\'s tested condition');
+  body = swap(body, "    needs: tested\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && (!github.event.repository.private || (vars.BUILD_RUNNER", "    if: ${{ (!github.event.repository.private || (vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
   if (/needs\.tested|needs: \[?tested|^  tested:/m.test(code(body))) { fail('the pull request build still names the tested job'); }
   const jobs = body.indexOf('\njobs:\n');
   const vps = body.indexOf('\n  launcher-vps:\n');
   const dflt = body.indexOf('\n  # The default:');
   if (jobs < 0 || vps < 0 || dflt < vps) { fail('build.yml no longer has the launcher-vps fallback job before the default job'); }
-  const IF = "    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}\n";
-  const SAME = "    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}\n";
+  const IF = "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}\n";
+  const SAME = "    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}\n";
   const job = body.slice(vps, dflt);
   if (job.indexOf(IF) < 0) { fail('the fallback job no longer has its condition'); }
   body = body.slice(0, vps) + job.replace(IF, SAME) + body.slice(dflt);

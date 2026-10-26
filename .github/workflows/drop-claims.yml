@@ -32,7 +32,7 @@ jobs:
   drop:
     name: Drop claims
     if: ${{ contains(join(github.event.issue.labels.*.name, '|'), 'claimed') }}
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'ubuntu-latest' }}
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     # One call per label. Past this it is stuck, not slow.
     timeout-minutes: 2
     steps:
