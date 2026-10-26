@@ -224,10 +224,13 @@ link, and the old line goes.
   (Mountain)**, at low priority, after the 2:15 AM backup. Telemetry stays
   off. 22 Oct 2026,
   [#3213](https://github.com/EvilPatrick06/Thornswood/issues/3213#issuecomment-6335264517).
-- **Whether a gamemode-only deploy reloads instead of restarting waits on
-  one measured start.** Measure what one dev start costs first, then decide.
-  22 Oct 2026,
-  [#3196](https://github.com/EvilPatrick06/Thornswood/issues/3196#issuecomment-6335264712).
+- **A gamemode-only dev deploy reloads the gamemode in the running server
+  instead of restarting it**, and the NPC runtime hands its NPCs straight to
+  the new copy so they never pause. Decided on the measured starts (about 15
+  processor seconds each, but everybody dropped and nearly 4 minutes before
+  the NPCs were back). A deploy that also changes plugins or settings still
+  restarts. 22 Oct 2026,
+  [#3196](https://github.com/EvilPatrick06/Thornswood/issues/3196#issuecomment-6342491535).
 - **One narrow workflow deletes a closed pull request's own branch** in this
   repository. It never checks out or runs that pull request's code. 22 Oct
   2026,
