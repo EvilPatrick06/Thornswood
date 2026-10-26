@@ -184,9 +184,10 @@ only by the always rules and by main and the nightly running everything.
 **Main and the tested-tree note.** Since #3182, main's build skips a tree
 that a green pull request build already passed. If a partial pull request
 build left that note, main would skip the full gate, and main would no longer
-run everything. So a partial build must either keep its note under another
-name, such as `tested-tree-partial-<tree>`, that Tested-Tree.js does not
-accept, or keep no note.
+run everything. So a partial build must keep no note, or one that
+Tested-Tree.js does not accept. Since #3399 the note is a `TESTED-TREE <tree>`
+line in the build's log, not an artifact, and a build that did not run the
+whole gate does not print it.
 
 ## 4. Forcing rules: a change to any of these runs the whole gate
 
@@ -381,8 +382,8 @@ of 570 gate harnesses. Replayed over the last 40 merges, a fresh map ran
    when the change touches a forcing rule (section 4, now with
    `Run-Gate.ps1`), and on a GitHub-hosted runner, which has no map.
 4. **Only a whole gate keeps the note.** Run-Gate.ps1 writes `whole=true`
-   only when every gate harness ran, and build.yml keeps the
-   `tested-tree-<tree>` note (#3182) only then. So after a pull request that
+   only when every gate harness ran, and build.yml writes the
+   `TESTED-TREE <tree>` note in its log (#3182, #3399) only then. So after a pull request that
    ran less, main builds in full, and that build is the one traced. Main and
    the nightly run the whole gate every time.
 5. **Install.** `.\scripts\dev\Trace-Gate.ps1 -Install` from the shipping
