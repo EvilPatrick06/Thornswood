@@ -556,8 +556,8 @@ person(BRYN, 'Bryn', 209, 'smith', 'edgewright');
       /Either of you can end it: the\s+master, or you/.test(pages.appr));
   yes('F2: and Patrick\'s answer on the spells: a taught school or Bladebinder keeps the spells learned',
       /taught school or a taught Bladebinder keeps the spells\s+already learned from it/.test(pages.appr));
-  yes('F2: the pages say how studying is reached: Study on K, in the College',
-      /press K, open College and press Study/.test(pages.magic) && /Study on the K panel/.test(pages.appr));
+  yes('F2: the pages say how studying is reached: E at a study desk in the College halls (#1387)',
+      /walk up to\s+one and press E/.test(pages.magic) && /a study desk hands them 1 spell point/.test(pages.appr));
   yes('F2: the overview, professions, warrior and the site say either can end it, with no command',
       /either\s+of you can end it/.test(pages.systems) && /either of them ends it on\s+the K panel/.test(pages.prof) &&
       /takes\s+you on, and stays/.test(pages.warrior) && /either of you can end it/.test(pages.site));
