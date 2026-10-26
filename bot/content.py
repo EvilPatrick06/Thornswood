@@ -338,8 +338,8 @@ all.
 
 **Why can't I save?**
 Your character lives on the server, so quit whenever you like, nothing is lost.
-A few mod settings menus still reset every session, because there's no save
-file for them to write to. **https://thornswood.net/known** names them.
+A few mod settings menus still forget their settings every session. That is a
+bug being fixed, and **https://thornswood.net/known** names them.
 
 **Why is that NPC just standing there?**
 The server runs the NPCs, so they carry on whether anybody is near or not. One
@@ -347,7 +347,6 @@ frozen in place that never moves is worth a report in <#RESULTS>.
 
 **Fast travel?**
 Off. So is levelling. Difficulty is locked.
-**https://thornswood.net/help** lists what works this way on purpose.
 
 **Something's broken.**
 Check **https://thornswood.net/known** first. It lists what is broken right now
@@ -594,6 +593,7 @@ CHANGES = {
         ('2026-10-22', 'Step 1, the playtest application, is in its own channel now.', '9464b08ac76a'),
         ('2026-10-26', 'If it goes wrong: the known issues page lists what is broken right now, and the help page has what works that way on purpose.', 'ca32544d805a'),
         ('2026-10-26', 'Your first character has its own section: the stone hall, the nine towns you can start in and where you arrive, what waits on a class or a profession, and the tool a Miner, a Farmer, a Fisher or a Woodworker is handed. Connect Discord is on the Play page, and voice names its keys: hold V to talk, O keeps the microphone open, B steps between whisper, normal and yell.', 'e4e76eaea6bf'),
+        ('2026-10-26', 'If it goes wrong: the help page has the usual fixes. Its list of what works that way on purpose is gone.', '3c1f3de182b5'),
     ],
     'NEWS': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '90be4dab837f'),
@@ -603,6 +603,7 @@ CHANGES = {
         ('2026-10-22', 'The playtest application and help tickets are each in their own channel now.', 'f4cf53ba6ce4'),
         ('2026-10-26', 'NPCs carry on with nobody near now, so the answers about NPCs standing still and the same bandit acting differently are gone. Only a few mod menus still reset, and the known issues page lists only what is actually broken.', 'a2dbef6430b1'),
         ('2026-10-26', 'Only a comma and some line breaks moved; no answer changed.', '91bab9b34c87'),
+        ('2026-10-26', 'Mod settings menus that forget their settings are a bug being fixed, not how it is meant to work. The fast travel answer no longer points at a list on the help page, which is gone.', 'b1263b3db33e'),
     ],
     'GAMERULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '037bba896ff5'),

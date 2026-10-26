@@ -774,10 +774,10 @@ function pageHtml(md) {
       roadmap: { lanes: [{ name, rows: [{ title, text }] }] } }
 
   known is the #known-issues forum's list, word for word: an open issue
-  labelled Main Findings or Dev Findings that nothing has been done about yet,
-  in the words of its last "Known issue:" comment. roadmap is every issue
-  labelled roadmap: now, next or later, in that lane while it is open and in
-  Done once it closes as done, in the words of its last "Roadmap:" comment.
+  labelled Main Findings or Dev Findings whose fix has not landed, in the
+  words of its last "Known issue:" comment. roadmap is every open issue
+  labelled roadmap: now, next or later, in that lane, in the words of its
+  last "Roadmap:" comment; there is no Done lane (Patrick, 26 Oct).
 
   These two turn the file into what /known (and /api/page/known) and /roadmap
   (and /api/roadmap) serve. A part the file does not hold, or a file that is
@@ -788,10 +788,7 @@ function pageHtml(md) {
 // ==== thornswood lists ====
 const KNOWN_INTRO = 'What is broken right now that the team already knows about. Each one is\n' +
   'on the issue board to be fixed, and comes off this page as soon as work on\n' +
-  'it is merged.\n\n' +
-  'What works the way it does on purpose, such as no saving, no fast travel\n' +
-  'and the load order rule, is on the [Help](/help) page under Things that\n' +
-  'are normal here, not here.';
+  'it is merged.';
 const ROADMAP_INTRO = 'What is being built and roughly in what order. Nothing here has a date on it, because a date would be a guess.\n\n' +
   'Things move up this list when somebody starts on them, not when they are announced.';
 const LIST_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1141,7 +1138,8 @@ function publicPageBody(route) {
     if (rm.intro) body += pageHtml(rm.intro).replace(/<h1\b/g, '<h2').replace(/<\/h1>/g, '</h2>');
     let count = 0;
     for (const section of (rm.sections || [])) {
-      // Done is drawn too (#2560), last, as it sits in the data.
+      // Every lane the bot wrote is drawn, in its order, none filtered by
+      // name (#2560); the bot writes no Done lane since 26 Oct.
       if (!(section.rows || []).length) continue;
       body += '<section class="lane"><h2>' + escAttr(section.name || '') + '</h2><ul>';
       for (const row of section.rows) {

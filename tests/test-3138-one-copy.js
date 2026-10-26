@@ -73,6 +73,51 @@ pages.forEach(function (rel) {
   yes('the home page says nothing about what is built yet', !STATUS.test(t));
 }
 
+// ------------------------------------------ each footer link once --------
+/* Patrick, 26 Oct: "the links at the bottom of the page are sometumes in
+   more than opne category and thats just not nessacery". The live footer had
+   Roadmap under The World and Community, Release notes under Community and
+   Behind it, and Download twice under Playing. Each link has one column. */
+{
+  const html = read('site/public/home.html') || '';
+  const foot = (html.match(/<footer[\s\S]*?<\/footer>/) || [''])[0];
+  const cols = foot.split(/<h2>/).slice(1);
+  const seen = {};
+  const twice = [];
+  cols.forEach(function (c) {
+    (c.match(/href="([^"]+)"/g) || []).forEach(function (h) {
+      const url = h.slice(6, -1);
+      if (seen[url]) twice.push(url);
+      seen[url] = true;
+    });
+  });
+  if (twice.length) console.log('      in the footer more than once: ' + twice.join(', '));
+  yes('the footer has its four columns', cols.length === 4);
+  yes('each footer link is in one column, once', twice.length === 0 && Object.keys(seen).length > 0);
+}
+
+// ------------------------------------- the words under the painting ------
+/* Patrick, 26 Oct: "the text be covering the logo some". On a wide screen the
+   words sat over the painting's foot and covered the painted title's thorns
+   and crest. The painting is a band of its own at every width now, kept to
+   its top, and the words follow it (home.css, the hero). */
+{
+  const css = read('site/public/home.css') || '';
+  const rule = function (sel) {
+    const i = css.indexOf(sel + '{');
+    return i < 0 ? '' : css.slice(i, css.indexOf('}', i));
+  };
+  const paint = rule('.hero > .paint');
+  yes('the painting is a band in the page, not a layer under the words',
+      /position:relative/.test(paint) && !/position:absolute|inset:0/.test(paint));
+  yes('the band is the whole 16:9 picture when it fits, and never under 27vw, so the title is in it',
+      /height:min\(56\.25vw,max\([0-9.]+vh,27vw\)\)/.test(paint));
+  yes('the picture is kept to its top, where the title is painted',
+      /object-position:50% 0\b/.test(rule('.hero .art')));
+  yes('no wide-screen rule lays the words over the painting again',
+      !/\.hero\{[^}]*align-items:end/.test(css) && css.indexOf('.hero .wrap::before{') < 0);
+}
+
 // ----------------------------------------- every cookie is named, #2763 --
 const cookies = read('site/data/site/cookies.md') || '';
 function named(name) { return cookies.indexOf('`' + name + '`') >= 0; }

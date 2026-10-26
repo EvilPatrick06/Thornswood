@@ -83,7 +83,8 @@
     - before anything is sent the box says which zip its store keeps for this
       record, its live record, port, join pass switch and load order; with no
       zip for the record it stops there. -ServerBuild <zip> sends one first
-      (engine.yml's, held to the record here and by its bytes there);
+      (the pin's, from Where.ps1 EngineArtifact's artifact\server, held to
+      the record here and by its bytes there);
     - the record, the gamemode and its stamp, and our plugins when they are
       not the box's bytes, go up into the stage as -GamemodeOnly sends them;
       the box takes the zip's files into the stage, held to the record
@@ -201,7 +202,8 @@ param(
   # The server build records\server-build.json names, out of the store on the
   # box, with no server build on this machine (#459). See FROM THE STORE.
   [switch]$FromStore,
-  # A server build zip (engine.yml's server-<...>.zip, its .json beside it) to
+  # A server build zip (server-<...>.zip, its .json beside it, as
+  # Get-EngineArtifact.ps1 makes it from the fork's build of the pin) to
   # send to the store first, for -FromStore.
   [string]$ServerBuild = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
@@ -849,7 +851,7 @@ if (Test-Path -LiteralPath $rp) {
     if (-not $stored.Name) {
       throw ('the store on the box keeps no server build of ' + $stored.Commit.Substring(0, 8) + ' with the record this commit holds' +
              $(if (@($stored.Others).Count) { ' (it has ' + (@($stored.Others) -join ', ') + ', from that commit with another record)' } else { '' }) +
-             '. Put it there with a full deploy or a publish from a machine that has that build, or with -ServerBuild and the zip engine.yml made. Nothing was sent and the server was not touched.')
+             '. Put it there with a full deploy or a publish from a machine that has that build, or with -ServerBuild and the pin''s server zip (Where.ps1 EngineArtifact, artifact\server). Nothing was sent and the server was not touched.')
     }
     $theirs = if ($boxRecordCommit) { $boxRecordCommit.Substring(0, [Math]::Min(8, $boxRecordCommit.Length)) } else { 'none recorded' }
     Write-Host ('{0,-22} {1} out of the store on the box, commit {2}; the live server runs {3}{4}' -f 'build', $stored.Name, $ours8, $theirs,

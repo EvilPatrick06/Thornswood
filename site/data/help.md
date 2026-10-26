@@ -213,8 +213,7 @@ using it to get out of a fight or to travel can mean a warning or a ban.
 ## When something goes wrong
 
 1. Look at [Known Issues](/known) first. It lists what is broken right now
-   that the team already knows about. What works the way it does on purpose
-   is under Things that are normal here, below.
+   that the team already knows about.
 2. If it is not there, [report it](/report). One line about what happened is
    enough to start with.
 3. If you have a screenshot or a crash log, drag it into your ticket in the
@@ -276,30 +275,6 @@ The easy way to send them: in the launcher open **Diagnostics** and press
 extender log, your plugin list and the launcher log, and opens the folder it
 is in. Drag that zip into your ticket in the Discord. **Settings**, **Open log**
 opens the launcher log on its own.
-
-## Things that are normal here
-
-- No saving. The server holds your character. Quitting is safe.
-- No levelling, no fast travel, and the difficulty is fixed at Expert.
-- Sleeping and waiting do not move the clock. Time is shared, so it runs at
-  the server's pace for everybody.
-- Menus do not pause the world: the inventory, the crafting menu and the map
-  all keep it running.
-- The console opens for a moment and shuts again. It is the same for
-  everybody, and the [rules](/rules) say why.
-- The creation hall is a bare room. Your face is made there, and everything
-  else is chosen on the panel that opens by itself once it is done.
-- The server owns where you are, your health, magicka and stamina, death and
-  respawn, your inventory and what you wear, what is in every container,
-  whether a door is open, which plants are picked, and your character's
-  values. A mod that changes one of those on your own machine is put back.
-- Fishing is the Fisher's trade. With a pole a woodwright makes, press **E**
-  at the fish in the water. The [Professions](/classes) page has the rest.
-- Mods are added in batches rather than one at a time, because every addition
-  moves the load order for everybody at once.
-
-All of that is deliberate. None of it is worth reporting. [Known Issues](/known)
-lists what is broken right now.
 
 ## When you die
 

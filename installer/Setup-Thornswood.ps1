@@ -951,7 +951,7 @@ function Open-Launcher([string]$exe) {
 
 Write-Host ''
 if ($bad) {
-    Say "$bad checks failed. Send staff a screenshot of this window in the Discord." 'Red'
+    Say "$bad check$(if ($bad -eq 1) { '' } else { 's' }) failed. Send staff a screenshot of this window in the Discord." 'Red'
     Write-Host ''
     # Left open on purpose. This is the window somebody has to photograph.
     # From the setup window it is that window which stays open, on exit 1.
