@@ -71,7 +71,7 @@ The same measure as the benches, but where the rule above lets a kiln stand amon
 | Where | From Skyrim's own lab |
 | --- | --- |
 | Angeline's Aromatics, Solitude | 587 units |
-| Arcadia's Cauldron, Whiterun | 131 units |
+| Arcadia's Cauldron, Whiterun | 178 units |
 | Elgrim's Elixirs, Riften | 131 units |
 | Grave Concoctions, Falkreath | 256 units |
 | Thaumaturgist's Hut, Morthal | 124 units |
@@ -88,7 +88,7 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | ImpWell01 in 9722:Skyrim.esm | 244 units |
 | ImpWell01 in BloatedMansRuins | 115 units |
 | FarmWell01 in DLC1RedwaterDen01 | 176 units |
-| FarmBWellEnt01 in DLC2HrodulfsHouse | 97 units |
+| FarmBWellEnt01 in DLC2HrodulfsHouse | 96 units |
 | RedoranWell01 in DLC2RavenRock02 | 272 units |
 | GenericWell01 in DushnikhYalExterior02 | 115 units |
 | FarmBWellEnt01 in FalkreathBarracksJail | 32 units |
@@ -100,7 +100,7 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | ImpWell01 in FortSungardExterior01 | 144 units |
 | ImpExtIceWell01 in FrostflowLighthouseExterior01 | 112 units |
 | ImpWell01 in POIPineForest08 | 143 units |
-| FarmWell01 in POITundra08 | 226 units |
+| FarmWell01 in POITundra08 | 80 units |
 | RTPlazaWell01 in RiftenOrigin | 284 units |
 | ImpWell01 in TrevasWatchExterior01 | 222 units |
 
@@ -111,9 +111,16 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | Lake Honrich at Riften | RiftenOrigin | 754 units |
 | the river at Riverwood | Riverwood02 | 2,338 units |
 
-### Study desks (#1387)
+### Study desks (4), 26 Oct 2026 (#1387)
 
-One for each hall of the College of Winterhold: the Arcanaeum, the College of Winterhold; the Hall of Attainment, the College of Winterhold; the Hall of Countenance, the College of Winterhold; and the Hall of the Elements, the College of Winterhold. `game/data/station-sites.json` has where each stands once it is measured on the box.
+| Where | Beside | From its anchor | Nearest solid thing |
+| --- | --- | --- | --- |
+| the Arcanaeum, the College of Winterhold | a square reading table | 135 units | that table, 42 units |
+| the Hall of Attainment, the College of Winterhold | the round table | 118 units | a barrel, 33 units |
+| the Hall of Countenance, the College of Winterhold | the square table on the lower floor | 138 units | a wall shelf, 39 units |
+| the Hall of the Elements, the College of Winterhold | a bench | 234 units | that bench, 31 units |
+
+Measured on the box on 26 Oct, when the station table first read the floor items Thornswood-Last.esp switches off (#3077) as nothing in the way. Three spots measured before that moved within their cells: Arcadia's Cauldron's lab, and the well buckets at Hrodulf's House and in POITundra08.
 
 ### Where the rule led to the other server's spot
 
@@ -136,7 +143,7 @@ Nothing is placed where the measure refuses every spot. Measured over the same l
   - ImpWell01 in FortGreenwall04: no clear spot within 400 units beside it (12503 off the navmesh; 3185 touches RiftenRWHallLadderDoor01, its way through).
   - ImpWell01 in FortGreymoorExterior03: no clear spot within 400 units beside it (10633 its cell 99e8:Skyrim.esm: Embers XD.esp changes it before the content plugin; 3868 off the navmesh; 767 touches ImpDoorDoubleLoad01, its way through; 237 touches Bucket01).
   - ImpWell01 in FortSungardCourtyard: the well 352a9:Skyrim.esm is not placed, or is switched off or has an enable parent.
-  - FarmWell01 in POITundra08: it shares the bucket of well-23, 226 units away.
+  - FarmWell01 in POITundra08: it shares the bucket of well-23, 80 units away.
   - GenericWell01 in SSewersSolitude02: the well 27172:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp.
   - FarmBWell01 in SSewersWRBurrow: the well 3907d:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp.
   - FarmBWell01 in WindhelmMarketplaceExterior: no clear spot within 400 units beside it (7841 off the navmesh; 3061 touches ImpExtBlocks01SnowLight; 1861 touches TreeFloraHangingMoss01; 1151 touches FishRack01Light_SNWH).
