@@ -932,6 +932,8 @@ yes('  the SkyMP fork keeps its own licences', /engine\/skymp/.test(LG) && /Affe
 yes('  every file THIRD-PARTY.md lists keeps its own', /Every file `THIRD-PARTY\.md` lists/.test(LG));
 yes('  lore, art and music Thornswood owns are under CC BY-NC-SA 4.0 (Patrick, 26 Oct, #3688)',
     /## Lore, art and music: CC BY-NC-SA 4\.0/.test(LG) && /creativecommons\.org\/licenses\/by-nc-sa\/4\.0/.test(LG));
+yes('  the content plugin\'s own records are under it, Last.esp and WoodworkerTrail once #2791 rebuilds them (q-3688-esp-licence, 4)',
+    /`game\/content\/Thornswood-Content\.esp` now/.test(flat(LG)) && /once #2791 has rebuilt them/.test(flat(LG)));
 yes('  the name and logo stay all rights reserved', /\*\*The Thornswood name and logo\.\*\* They stay all rights reserved/.test(LG));
 // Every logo file LICENSING.md keeps out of CC BY-NC-SA 4.0 is a real file.
 const logoAt = LG.indexOf('**The Thornswood name and logo.**');

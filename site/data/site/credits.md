@@ -25,7 +25,7 @@ like.
 
 Thornswood's own code (the launcher, the installer, the overlays, the
 gamemode, the code behind this site, the bot and the voice service) is under
-the MIT licence. Its own lore, art and music are under
+the MIT licence. Its own lore, art, music and game content are under
 [Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/):
 share and adapt them, not for money, crediting Thornswood and keeping the same
 licence. The Thornswood name and logo are under neither, and stay

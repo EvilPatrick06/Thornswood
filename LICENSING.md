@@ -1,10 +1,10 @@
 # Licensing
 
-Thornswood's own code is under the MIT licence in `LICENSE`. Its own lore,
-art and music are under Creative Commons Attribution-NonCommercial-ShareAlike
-4.0 International (CC BY-NC-SA 4.0). The Thornswood name and logo are under
-neither. This file says what each licence covers and what neither does, and
-holds the terms every contributor agrees to.
+Thornswood's own code is under the MIT licence in `LICENSE`. Its own lore, art
+and music, and its own records in its game plugins, are under Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0). The
+Thornswood name and logo are under neither. This file says what each licence
+covers and what neither does, and holds the terms every contributor agrees to.
 
 `LICENSE` holds the MIT text and nothing else, so GitHub can read it as MIT:
 anything added to that file stops GitHub naming the licence (measured with
@@ -12,8 +12,10 @@ licensee 10.1.0, the library GitHub uses, on 26 October 2026, #3688).
 
 Patrick decided both on 26 October 2026: MIT for the code (#3688, #3721), and
 CC BY-NC-SA 4.0 for the lore, art and music Thornswood owns, with the name and
-logo all rights reserved. Contributor term 2 below is what lets what
-contributors made move from all rights reserved to these licences.
+logo all rights reserved; and then the same CC licence for the plugins' own
+records, each plugin once it holds nothing of anybody else's. Contributor term
+2 below is what lets what contributors made move from all rights reserved to
+these licences.
 
 ## What the MIT licence covers
 
@@ -62,13 +64,14 @@ with the lore).
    `logo-84.webp`, `favicon.ico`, `icon-192.png`, `presence.png` and
    `og.png`; and `bot/thornswood-bot-1024.png`, `thornswood-bot-512.png`
    and `server-icon-512.png`.
-7. **Thornswood's own records in its .esp plugins**
-   (`game/content/Thornswood-Content.esp`, `Thornswood-Last.esp` and
-   `Thornswood-WoodworkerTrail.esp`). They are neither code nor lore, art or
-   music, and the 26 October choice does not name them, so they stay all
-   rights reserved until a licence is chosen for them. What Thornswood hands
-   people, the content plugin on Nexus Mods among it, may be used to play on
-   Thornswood's servers.
+7. **Thornswood's own records in its .esp plugins.** They go under CC
+   BY-NC-SA 4.0 too, each plugin once it holds nothing of anybody else's
+   (Patrick, 26 October 2026, on the report page, option 4):
+   `game/content/Thornswood-Content.esp` now, and
+   `Thornswood-Last.esp` and `Thornswood-WoodworkerTrail.esp` once #2791 has
+   rebuilt them from Thornswood's own records only. Until then those two stay
+   all rights reserved, and may be used only to play on Thornswood's
+   servers.
 
 ## Lore, art and music: CC BY-NC-SA 4.0
 
@@ -81,6 +84,9 @@ share and adapt them, not for money, if they credit "Thornswood
 make from them under the same licence. That covers:
 
 - the lore, under `lore`, and the public pages under `site/data/site`;
+- Thornswood's own records in `game/content/Thornswood-Content.esp` (not the
+  Bethesda records it overrides, point 3), and in each other .esp plugin
+  once it holds only Thornswood's own (point 7);
 - the pictures, meshes and textures `records/asset-provenance.json` marks as
   Thornswood's own (`ours`, or `derived` from one of those): the art under
   `launcher` and `launcher/art`, `site/public`, `bot`, `game/ui` and
