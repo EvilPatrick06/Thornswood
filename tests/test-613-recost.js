@@ -97,11 +97,20 @@ const coinRows = Object.keys(recipes).filter((k) => rule.benches.indexOf(recipes
   recipes[k].inputItems.some((i) => i.item === 'f:Skyrim.esm'));
 const coinTable = table.recipes.filter((r) => r.inputs.some((i) => i.item === 'f:Skyrim.esm'));
 const coinHeld = (table.notCopied || []).filter((r) => r.inputs.some((i) => i.item === 'f:Skyrim.esm'));
+// recipes.json reads the whole load order, Thornswood-Last.esp in it (#3105),
+// so a row the plugin carries already asks no coins there: it is the table's
+// inputs without the coins. Every row still asking coins is the table's or a
+// never-copied plugin's.
+const listed = new Set(coinTable.concat(coinHeld).map((r) => r.recipe));
+const carried = coinTable.filter((r) => recipes[r.recipe] && !coinRows.includes(r.recipe));
+const carriedRight = carried.every((r) => recipes[r.recipe].inputItems.map((i) => i.item).join() ===
+  r.inputs.filter((i) => i.to > 0).map((i) => i.item).join());
 yes('T7 every forge recipe that charges gold coins has them taken out, and nothing else of it changes unless ' +
-    'its peers say so (q-3115 B; ' + coinTable.length + ' of ' + coinRows.length + ', ' + coinHeld.length +
-    ' a never-copied plugin\'s)',
-    (rule.notMaterial || []).join() === 'f:Skyrim.esm' && coinRows.length > 0 &&
-    coinRows.length === coinTable.length + coinHeld.length && table.counts.coinsTakenOut === coinTable.length &&
+    'its peers say so (q-3115 B; ' + coinTable.length + ', ' + carried.length + ' of them carried by the last plugin already, ' +
+    coinHeld.length + ' a never-copied plugin\'s)',
+    (rule.notMaterial || []).join() === 'f:Skyrim.esm' && coinTable.length > 0 &&
+    coinRows.every((k) => listed.has(k)) && coinRows.length + carried.length === coinTable.length + coinHeld.length &&
+    carriedRight && table.counts.coinsTakenOut === coinTable.length &&
     coinTable.every((r) => r.why.indexOf('coins') >= 0 && r.inputs.every((i) => i.item === 'f:Skyrim.esm' ? i.to === 0
       : (r.why.indexOf('peers') >= 0 || i.to === i.count))));
 yes('T8 a recipe that takes a finished piece is a conversion and is not re-costed',
