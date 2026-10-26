@@ -314,10 +314,9 @@ def main():
             why = 'the game does not place it at the start (deleted, disabled, or its enable parent leaves it off)'
         if why is None:
             if c and c['interior']:
-                loc, room = c['loc'], r['cell']
+                loc = c['loc']
                 where = desc(r['cell'])
             else:
-                room = None
                 w = r['world'] or (c['world'] if c else None)
                 g = ground.get((w, int(r['pos'][0] // GRID), int(r['pos'][1] // GRID)))
                 loc = cells[g]['loc'] if g and cells[g]['loc'] else None
