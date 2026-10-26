@@ -1276,7 +1276,12 @@ try {
     $L = Pair @($P, $Q, $D)
     Yes ("a game port for the live Publish-Server runs, {0}, and {1} above it, both bound and let go" -f $L, ($L + 1)) ($L -gt 0)
     if ($L -gt 0 -and $D -gt 0) {
-        $liveRoot = Join-Path $box 'Live\Thornswood-Server'
+        # Beside the same Thornswood-Docs as the dev root, as C:\Thornswood-Server
+        # and C:\Thornswood-Server-Dev both are on the box: since #3398 a
+        # deploy writes deployed-build.json into the Thornswood-Docs beside
+        # the root it deployed, so the one file names both servers. Not
+        # Thornswood-Server itself, which the Install-Server runs above hold.
+        $liveRoot = Join-Path $box 'Thornswood-Server-Live'
         $script:PayloadStampFor = 'main'
         $code = Publish (Payload -Port $L -ForRoot $liveRoot -Shipped 'shipped live v1') @() 'main' $liveRoot ($TaskPrefix + ' Live') $L
         $failed = $script:fail
