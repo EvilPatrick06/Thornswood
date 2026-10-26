@@ -100,9 +100,10 @@
     "atlas map markers.esp",
     "Water for ENB (Shades of Skyrim).esp",
     "Water for ENB - Patch - Generic Landscape Patch.esp",
-    "Playable Rieklings.esp"
+    "Playable Rieklings.esp",
+    "Thornswood-Last.esp"
   ],
-  "builtAt": "2026-10-21T09:37:24.828Z",
+  "builtAt": "2026-10-26T17:35:41.354Z",
   "reach": {
     "flame": 300,
     "craft": 260

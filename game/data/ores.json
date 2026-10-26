@@ -1,6 +1,6 @@
 {
   "builtBy": "scripts\\dev\\Build-OreTable.ps1",
-  "source": "the ACTI and FURN records carrying MineOreScript, across 101 plugins in load order, and the MISC records their Ore property points at",
+  "source": "the ACTI and FURN records carrying MineOreScript, across 102 plugins in load order, and the MISC records their Ore property points at",
   "language": "english",
   "readFrom": "the VMAD subrecord of each vein: script MineOreScript, object property Ore",
   "yield": "four pairs, novice first: the least and the most one swing gives at that rank, 1 and a chance of one more. A pair of zeroes means that rank cannot work that seam.",

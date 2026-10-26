@@ -391,7 +391,7 @@
   }
  },
  "rule": "Patrick, 12 Oct 2026 (#1382): every vanilla well object placed in towns, farms and camps counts, and well water is safe without boiling.",
- "source": "the STAT and placed REFR records of 101 plugins in load order",
+ "source": "the STAT and placed REFR records of 102 plugins in load order",
  "wells": {
   "DLC2SkaalVilFarmWell01": "the Skaal village well (Dragonborn)",
   "FarmBWell01": "a farm well, the second farm set",

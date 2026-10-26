@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "83f861196601f46c874b1e3b609d2027eef7c9bb887b44cbe73e0f4ae135f548",
+    "game/data/recipes.json": "ec62358a6eff81eea12d34e99f5f0ef64feda1fab3a3e9f4014faa81ce0ce24b",
     "game/data/harvests.json": "9ca477811631c8027faf92151acdc039f1879df6db2240828631dd00807b4f09",
     "game/data/hunts.json": "de563914653ae6ec58532e5afb5b4aec1b5b18dfa3b16b2ba7907c1bc3661c24",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
@@ -267,7 +267,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66",
+      "sha256": "7c86cb47edecee8a8b19e59ce1656cbbe22225bf6fe11825900d0bfa845c6065",
       "repository": true
     },
     {
