@@ -138,6 +138,14 @@ second strike. A restart clears it. The salt is `34cdf:Skyrim.esm`.
 1 in Might (+0.05 melee). A smith who is also a miner stacks this on
 the smith's Might.
 
+## Ores that come only from the Pale
+
+Malachite and quicksilver are the Pale's own ores (Patrick, 22 Oct
+2026, #3150: each hold has plants or ores of its own). Their seams
+are only in the Pale. Mine them there, or trade for them anywhere
+else. Outside the Pale the seams are not in the world at all. Every
+other hold's own are plants: see [Gatherer](gatherer.md).
+
 <!-- detail:begin -->
 
 ## Every record

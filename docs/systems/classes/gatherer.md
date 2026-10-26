@@ -84,6 +84,30 @@ the farmer's. See [Farmer](farmer.md). A clam and a fish are the
 fisher's. A coin purse and an estate key are not a harvest. Mammoth
 cheese and a mead barrel stay off every ladder.
 
+## Plants that grow only in their own hold
+
+Each hold has plants of its own (Patrick, 22 Oct 2026, #3150). They
+grow only in that hold. Pick them there, or trade for them anywhere
+else. Outside their hold they are not in the world at all: nobody
+sees them and nothing is refused.
+
+| Hold | Its own plants |
+| --- | --- |
+| Whiterun | Tundra cotton, lavender |
+| Haafingar | Grass pod, garlic |
+| The Rift | Scaly pholiota, canis root, pine thrush egg |
+| The Reach | Juniper berries, rock warbler egg |
+| Eastmarch | Dragon's tongue, jazbay grapes, creep cluster |
+| Falkreath | Thistle branch, mora tapinella |
+| Hjaalmarch | Swamp fungal pod, giant lichen, deathbell |
+| Winterhold | Chaurus eggs, Nordic barnacle |
+
+The Pale's are ores (see [Miner](miner.md)). Each one is the plant
+whose placements already stood mostly in that hold, so the fewest
+were taken out. The list and what was measured for each are
+`holdOnly` in `game/data/last-plugin-policy.json`, and
+`scripts/mods/Build-LastPlugin.py` switches the rest off.
+
 <!-- detail:begin -->
 
 ## Every record

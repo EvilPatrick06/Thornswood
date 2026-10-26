@@ -26,6 +26,7 @@
     P  every reference the manifest switches off is in the plugin, initially
        disabled, keeping only its base and place, and its base is a base of
        its resource
+    D  the gatherer and miner pages (docs/systems/classes) name every one
     G  the ones the server holds off instead are in the gamemode's
        HELD_BY_SERVER block
 
@@ -148,6 +149,13 @@ const wrong = ho ? ho.off.filter((d) => {
 yes('P1 every one it switches off is in the plugin, initially disabled, keeping only its base and place, ' +
     'and is a hold-only plant or ore' + (wrong.length ? ' (not: ' + wrong.slice(0, 5).join(', ') + ')' : ''),
     !wrong.length);
+
+// ---------------------------------------------------------------- D
+const page = (n) => fs.readFileSync(path.join(ROOT, 'docs', 'systems', 'classes', n), 'utf8').toLowerCase();
+const unnamed = rows.filter((r) => page(r.kind === 'plant' ? 'gatherer.md' : 'miner.md')
+  .indexOf(r.name.toLowerCase().replace(/ ore$/, '')) < 0);
+yes('D1 the gatherer and miner pages name every one' + (unnamed.length ? ' (not: ' + unnamed.map((r) => r.name).join(', ') + ')' : ''),
+    rows.length > 0 && !unnamed.length);
 
 // ---------------------------------------------------------------- G
 const gm = fs.readFileSync(path.join(ROOT, 'game', 'gamemode.js'), 'utf8');
