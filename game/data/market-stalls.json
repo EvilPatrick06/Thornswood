@@ -1,0 +1,4 @@
+{
+  "note": "Every market stall the server knows, one row a stall. Built by scripts/dev/Build-MarketStalls.py out of the plugins. Do not hand edit.",
+  "stalls": []
+}

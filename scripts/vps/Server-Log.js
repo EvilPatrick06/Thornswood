@@ -351,7 +351,7 @@ function rollNow(log, now, o) {
   leaves the request where it is, for the next start, and is said. Each line
   here says counts and never a name, a Discord id, a profile id or a form id.
 */
-const RELEASE_PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'books', 'merchants'];
+const RELEASE_PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'stalls', 'books', 'merchants'];
 
 function startDeletions(dir, now) {
   const out = [];

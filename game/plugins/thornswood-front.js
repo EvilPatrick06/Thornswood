@@ -93,7 +93,7 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
+                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js', 'thornswood-stall.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -2179,7 +2179,7 @@
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp', box: 'thornswoodBox', ship: 'thornswoodShip'
+    help: 'thornswoodHelp', box: 'thornswoodBox', ship: 'thornswoodShip', stall: 'thornswoodStall'
   };
 
   T.claimFocus = function (who, on) {
@@ -5770,6 +5770,21 @@
     ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
     ["JK's Whiterun's Outskirts.esp", 0x141088]
   ];
+  /*
+    A MARKET STALL (#3160). Stalls are fixed market stalls (Patrick, 22 Oct
+    2026), and a stall's counter is a static, which the crosshair never
+    names. So the line goes up by where somebody stands: within a stall's
+    reach of the point in front of its counter, in its world or cell, with
+    nothing else of the lock key's under the crosshair, the line says Market
+    stall, and the lock key sends /stall open and the stall's id. The server
+    checks again that they stand there, and its panel does the rest
+    (game/ui/thornswood-stall.js).
+  */
+  // MARKET STALL SPOTS BEGIN
+  // Built by scripts\dev\Build-MarketStallsGamemode.js out of game\data\market-stalls.json. Do not hand edit.
+  const STALL_SPOTS = [];
+  // MARKET STALL SPOTS END
+  let stallWorlds = null;  // null not resolved yet, else { stall id: runtime world or cell id }
   const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
   const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
   let lockAt = 0;
@@ -5865,9 +5880,58 @@
 
   const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
 
+  /** The lock key's line at a stall: what stallAt finds, with no menu over it. */
+  function stallNow() {
+    const s = stallAt();
+    if (!s || busyMenuOpenNow()) { return null; }
+    return { hex: s, verb: 'stall open', words: 'Market stall' };
+  }
+
+  /** The id of the stall somebody is standing at, by STALL_SPOTS, or ''. */
+  function stallAt() {
+    if (!STALL_SPOTS.length) { return ''; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return ''; }
+    if (!stallWorlds) {
+      const got = {};
+      let found = 0;
+      for (let i = 0; i < STALL_SPOTS.length; i++) {
+        try {
+          const f = sp.Game.getFormFromFile(STALL_SPOTS[i][1], STALL_SPOTS[i][2]);
+          const id = f ? (f.getFormID() >>> 0) : 0;
+          if (id) { got[STALL_SPOTS[i][0]] = id; found++; }
+        } catch (e) { }
+      }
+      if (!found) { return ''; }
+      stallWorlds = got;
+      say('market stalls for the lock key: ' + found + ' of ' + STALL_SPOTS.length + ' found');
+    }
+    let where = 0, x = 0, y = 0, z = 0;
+    try {
+      const w = pc.getWorldSpace();
+      const c = pc.getParentCell();
+      where = w ? (w.getFormID() >>> 0) : (c ? (c.getFormID() >>> 0) : 0);
+      x = pc.getPositionX(); y = pc.getPositionY(); z = pc.getPositionZ();
+    } catch (e) { return ''; }
+    if (!where) { return ''; }
+    for (let i = 0; i < STALL_SPOTS.length; i++) {
+      const s = STALL_SPOTS[i];
+      if (stallWorlds[s[0]] !== where) { continue; }
+      const dx = x - s[3], dy = y - s[4], dz = z - s[5];
+      if (dx * dx + dy * dy + dz * dz <= s[6] * s[6]) { return s[0]; }
+    }
+    return '';
+  }
+
   /** What the lock key would do right now: { hex, verb, words }, or null. */
   function lockKeyNow() {
     if (anyClaim()) { return null; }
+    return lockKeyRef() || stallNow();
+  }
+
+  /** What the lock key would do at what is under the crosshair: a door, a crop or a forge. */
+  function lockKeyRef() {
     let ref = null;
     try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
     if (!ref) { return null; }
@@ -8585,6 +8649,18 @@
     }
   }));
 
+  // A market stall's panel closes when you walk away from the stall (#3160).
+  let stallWatchAt = 0;
+  sp.on('update', guard('stall distance', () => {
+    if (!T.hasFocus('stall')) { return; }
+    const now = Date.now();
+    if (now - stallWatchAt < 250) { return; }
+    stallWatchAt = now;
+    if (!stallAt()) {
+      T.js('try{window.thornswoodStall&&window.thornswoodStall.close();}catch(e){}');
+    }
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
     // Before the isDown guard, not after it.
@@ -9602,6 +9678,10 @@
     if (what === 'ship:opened') { T.claimFocus('ship', true); return; }
     if (what === 'ship:closed') { T.claimFocus('ship', false); return; }
     if (what === 'ship:ready') { log('the trade ships panel is in'); return; }
+    // A market stall's panel (#3160): the lock key at a stall.
+    if (what === 'stall:opened') { T.claimFocus('stall', true); return; }
+    if (what === 'stall:closed') { T.claimFocus('stall', false); return; }
+    if (what === 'stall:ready') { log('the market stall panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
