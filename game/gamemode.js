@@ -62696,7 +62696,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       adds the crash again." All six drugs on the approved list
       (issuecomment-6127545395) take it. Real minutes.
     */
-    drug: { holdMinutes: 10, crashRest: 30, crashFood: 10 },
+    drug: { holdMinutes: 10, crashRest: 30, crashFood: 10,
+      /*
+        WITHDRAWAL (#3153). Patrick, 22 Oct 2026, A on his report page:
+        "Withdrawal after 3 uses in a day: stamina and magicka regen down 10%
+        for 30 minutes." docs/systems/exhaustion.md, A stimulant. A use is a
+        dose; the day is the last 24 real hours, the way every other number
+        here is real time. When the window of a dose that is the third or
+        more inside that day ends, withdrawal runs for its 30 minutes from
+        that end, on top of the crash.
+      */
+      withdrawal: { uses: 3, dayHours: 24, minutes: 30,
+                    cost: { staminaRateMult: -10, magickaRateMult: -10 },
+                    line: 'Your hands shake and you want another dose. Withdrawal sets in.' } },
     /*
       TEA (#1382). docs/systems/exhaustion.md, A stimulant: "A tea holds the
       rest drain at half for 20 real minutes, then costs 15 rest more than
@@ -62754,13 +62766,20 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     */
     ale: { drink: 30, rest: -8, food: -6, worse: 0.6, less: 0.25, sober: 45,
       /*
-        THE HELP AND THE HANGOVER (#1382), docs/systems/drink.md: "The first
-        two also give +0.05 melee damage for 5 real minutes. The third and
-        after do not." And: "If you drank three or more and log out without a
-        bed, the next time you are in the world before you have slept you are
-        hung over: rest is treated as weary even if the meter is higher".
+        THE HELP (#1382), docs/systems/drink.md: "The first two also give
+        +0.05 melee damage for 5 real minutes. The third and after do not."
       */
-      help: 0.05, helpMinutes: 5, helpThrough: 2, hangoverFrom: 3,
+      help: 0.05, helpMinutes: 5, helpThrough: 2,
+      /*
+        THE HANGOVER (#3153). Patrick, 22 Oct 2026, A on his report page:
+        "Hangover: stamina regen down 25% for 10 minutes." It is what being
+        drunk leaves when it wears off: the 45 minutes pass, in the world or
+        while logged out (then it starts on the way back in). A night in a
+        bed sleeps it off instead, and a physicker's remedy ends it early.
+        docs/systems/drink.md.
+      */
+      hangoverMinutes: 10, hangover: { staminaRateMult: -25 },
+      hungLine: 'Your head pounds and your legs are slow. You are hung over.',
       /*
         DRUNK (#1382), docs/systems/drink.md: "Drunk, from the third ale until
         you sleep or the 45 minutes pass: the client draws a sway and a soft
@@ -62918,6 +62937,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // A drug's window and the crashes it owes (#1382), kept across reads.
       drugUntil: Number(v.drugUntil) || 0,
       drugCrash: Number(v.drugCrash) || 0,
+      // When each dose of the last day went down, and when withdrawal ends
+      // (#3153, NEEDS.drug.withdrawal).
+      doses: dosesKept(v.doses),
+      withdrawalUntil: Number(v.withdrawalUntil) || 0,
       // And a tea's (#1382).
       teaUntil: Number(v.teaUntil) || 0,
       teaCrash: Number(v.teaCrash) || 0,
@@ -62953,9 +62976,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // with its water, so the 3 minutes of wet survive a read (#1382).
       wetFrom: Number(v.wetFrom) || 0,
       wetPlace: (typeof v.wetPlace === 'number') ? v.wetPlace : null,
-      // The first two ales' damage help, and a hangover (#1382).
+      // The first two ales' damage help (#1382), and when a hangover ends (#3153).
       aleHelpUntil: Number(v.aleHelpUntil) || 0,
-      hangover: !!v.hangover,
+      hangoverUntil: Number(v.hangoverUntil) || 0,
+      // Which after-effect or high the screen shows, for the HUD script (#3153).
+      look: String(v.look || ''),
       // A cooked meal's warmth or stamina help and when it ends (#2682).
       // The disease guard is kept by the injury block, not here.
       mealHelp: String(v.mealHelp || ''),
@@ -63119,9 +63144,23 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     n.rest = gone ? awayDrain(n.rest, restRate * share * drained, floor)
                   : clamp(n.rest + gain * hours - restRate * share * drained);
     // The window over: the crash, once for every dose that added one.
+    var pulled = false;
     if (n.drugCrash > 0 && now >= n.drugUntil) {
       n.rest = clamp(n.rest - NEEDS.drug.crashRest * n.drugCrash);
       n.food = clamp(n.food - NEEDS.drug.crashFood * n.drugCrash);
+      /*
+        AND WITHDRAWAL, when the last dose was the third or more in a day
+        (#3153, NEEDS.drug.withdrawal). From the window's end, or from the way
+        back in for somebody whose window ended while they were away, as a
+        hangover is.
+      */
+      var W = NEEDS.drug.withdrawal;
+      if (usesOfDay(n.doses) >= W.uses) {
+        var wasPulled = n.withdrawalUntil > now;
+        var pullFrom = arriving ? now : n.drugUntil;
+        n.withdrawalUntil = Math.max(n.withdrawalUntil, pullFrom + W.minutes * 60000);
+        pulled = !wasPulled && n.withdrawalUntil > now;
+      }
       n.drugCrash = 0;
       n.drugUntil = 0;
     }
@@ -63158,22 +63197,39 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
 
     // A night in a bed, on top of the time away settled above (#1606).
-    // Three ales or more still counting when they left (#1382).
-    var leftDrunk = arriving && (Number(n.ale) || 0) >= NEEDS.ale.hangoverFrom &&
-      typeof n.aleAt === 'number' && (n.at - n.aleAt) <= NEEDS.ale.sober * 60000;
     var slept = arriving ? arrived(actorId, n, away) : '';
-    // A night in a bed ends a hangover; leaving drunk without one starts it.
-    var hungBefore = !!n.hangover;
-    // A night's sleep also ends being drunk (drink.md: "until you sleep").
-    if (slept) { n.hangover = false; n.ale = 0; }
-    else if (leftDrunk) { n.hangover = true; n.ale = 0; }
+    var hungBefore = n.hangoverUntil > now;
+    /*
+      DRUNK WEARS OFF INTO A HANGOVER (#3153). n.drunk is still what the last
+      settle wrote, so drunk then and not now is the 45 minutes passing. In
+      the world the hangover runs from the moment they passed; for somebody
+      who left drunk, from the way back in, because a hangover is felt in the
+      world. A night's sleep ends being drunk (drink.md: "until you sleep")
+      and sleeps the hangover off, one already running as well.
+    */
+    if (slept) { n.hangoverUntil = 0; n.ale = 0; }
+    else if (n.drunk && !drunkNow(n, now)) {
+      var soberAt = arriving ? now : n.aleAt + NEEDS.ale.sober * 60000;
+      n.hangoverUntil = Math.max(n.hangoverUntil, soberAt + NEEDS.ale.hangoverMinutes * 60000);
+    }
     n.drunk = drunkNow(n, now);
+    var hung = n.hangoverUntil > now;
+    n.look = lookNow(n, now);
 
     n.at = now;
     write(actorId, n);
-    // A hangover starting or ending changes what there is to tend (#1382).
-    // It changes what the character pays as well (effects reads it).
-    if (hungBefore !== !!n.hangover) { pushEffects(actorId); hangoverCare(actorId); }
+    // A hangover starting or ending changes what there is to tend (#1382),
+    // and what the character pays (effects reads it).
+    if (hungBefore !== hung) {
+      pushEffects(actorId);
+      hangoverCare(actorId);
+      if (hung) { notify(actorId, NEEDS.ale.hungLine); say(actorId, NEEDS.ale.hungLine); }
+    }
+    if (pulled) {
+      pushEffects(actorId);
+      notify(actorId, NEEDS.drug.withdrawal.line);
+      say(actorId, NEEDS.drug.withdrawal.line);
+    }
     if (slept) {
       /*
         Up, in the beds' book as well, so the property block does not go on
@@ -63818,6 +63874,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     n.ale = had + 1;
     n.aleAt = now;
     n.drunk = drunkNow(n, now);
+    n.look = lookNow(n, now);
     if (had < NEEDS.ale.helpThrough) { n.aleHelpUntil = now + NEEDS.ale.helpMinutes * 60000; }
     write(actorId, n);
     if (had < NEEDS.ale.helpThrough) { pushEffects(actorId); }
@@ -64154,8 +64211,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     /*
       A DISEASE READS AS THE METER IT IS CLOSEST TO (#1383). disease.md: ill is
       the weary penalties of that meter and bad is the bad ones, so the meter
-      counts as at least that band while it lasts, the way a hangover counts
-      rest as weary. The injury block answers which, and what a broken or
+      counts as at least that band while it lasts. The injury block answers which, and what a broken or
       crooked limb and an agreed loss add on top.
     */
     var hurt = { floors: {}, add: {} };
@@ -64171,8 +64227,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var meters = ['food', 'drink', 'rest'];
     for (var i = 0; i < meters.length; i++) {
       var floor = floors[meters[i]];
-      // A hangover reads rest as weary at the least (#1382).
-      if (meters[i] === 'rest' && n.hangover) { floor = atLeast('weary', floor); }
       add(COST[meters[i]][atLeast(bandOf(n[meters[i]]), floor)] || {});
     }
     // And temperature, which is read as a distance from comfort in either
@@ -64196,6 +64250,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (Date.now() < (Number(n.burntUntil) || 0)) {
       add({ staminaRateMult: NEEDS.cookQuality.burnt.stamina });
     }
+    // A hangover: -25% stamina recovery for its 10 minutes (#3153).
+    if (Date.now() < (Number(n.hangoverUntil) || 0)) { add(NEEDS.ale.hangover); }
+    // Withdrawal: -10% stamina and magicka recovery for its 30 minutes (#3153).
+    if (Date.now() < (Number(n.withdrawalUntil) || 0)) { add(NEEDS.drug.withdrawal.cost); }
     return out;
   }
 
@@ -64646,7 +64704,64 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var now = Date.now();
     n.drugUntil = now + NEEDS.drug.holdMinutes * 60000;
     n.drugCrash = (Number(n.drugCrash) || 0) + 1;
+    // Counted toward withdrawal (#3153).
+    n.doses = dosesOfDay(n.doses, now).concat([now]);
+    n.look = lookNow(n, now);
     write(actorId, n);
+  }
+
+  /*
+    THE DOSES OF THE LAST DAY (#3153): when each went down, in order, the ones
+    older than NEEDS.drug.withdrawal.dayHours before now let go. Kept on the
+    needs record so a withdrawal is counted across logins.
+  */
+  function dosesOfDay(list, now) {
+    var from = now - NEEDS.drug.withdrawal.dayHours * 3600000;
+    var out = [];
+    if (!Array.isArray(list)) { return out; }
+    for (var i = 0; i < list.length; i++) {
+      var t = Number(list[i]);
+      if (t > from && t <= now) { out.push(t); }
+    }
+    return out;
+  }
+
+  /* The doses as stored, numbers only: dosed() is what lets old ones go. */
+  function dosesKept(list) {
+    var out = [];
+    if (!Array.isArray(list)) { return out; }
+    for (var i = 0; i < list.length; i++) {
+      var t = Number(list[i]);
+      if (t > 0 && isFinite(t)) { out.push(t); }
+    }
+    return out;
+  }
+
+  /* How many of the doses fall in the day that ends with the last one. */
+  function usesOfDay(list) {
+    if (!list || !list.length) { return 0; }
+    var last = list[list.length - 1];
+    var from = last - NEEDS.drug.withdrawal.dayHours * 3600000;
+    var count = 0;
+    for (var i = 0; i < list.length; i++) { if (list[i] > from) { count++; } }
+    return count;
+  }
+
+  /*
+    WHAT THE SCREEN SHOWS (#3153). Patrick, 22 Oct 2026: "I also want visual
+    affects" for drunk, high, hangover and withdrawal. One at a time, because
+    Skyrim keeps one cross fade modifier: the high over being drunk, because
+    it is the shorter and sharper of the two and the drunk is still there
+    when it ends, and either of those over an after-effect. The HUD script
+    hands the word to the front plugin, which draws the content plugin's
+    record for it.
+  */
+  function lookNow(n, now) {
+    if (n.drugUntil > now) { return 'high'; }
+    if (n.drunk) { return 'drunk'; }
+    if (n.withdrawalUntil > now) { return 'withdrawal'; }
+    if (n.hangoverUntil > now) { return 'hangover'; }
+    return '';
   }
 
   /*
@@ -64677,13 +64792,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   */
   function hungOver(actorId) {
     var n = read(actorId);
-    return !!(n && n.hangover);
+    return !!(n && n.hangoverUntil > Date.now());
   }
 
   function soberUp(actorId) {
     var n = settle(actorId);
-    if (!n.hangover) { return false; }
-    n.hangover = false;
+    var now = Date.now();
+    if (!(n.hangoverUntil > now)) { return false; }
+    n.hangoverUntil = 0;
+    n.look = lookNow(n, now);
     write(actorId, n);
     pushEffects(actorId);
     hangoverCare(actorId);
@@ -64996,6 +65113,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
           write(who, n);
           pushEffects(who);
         }
+        // And a hangover or withdrawal running out (#3153). A hangover over
+        // is also nothing left for a remedy to tend.
+        if (n.hangoverUntil && Date.now() >= n.hangoverUntil) {
+          n.hangoverUntil = 0;
+          write(who, n);
+          pushEffects(who);
+          hangoverCare(who);
+        }
+        if (n.withdrawalUntil && Date.now() >= n.withdrawalUntil) {
+          n.withdrawalUntil = 0;
+          write(who, n);
+          pushEffects(who);
+        }
         var line = crossed(who, was, n);
         if (line) {
           try { notify(who, line); } catch (e) { }
@@ -65130,15 +65260,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    var st = ctx.state;',
       '    if (!st) { return; }',
       /*
-        DRUNK, HANDED TO THE FRONT PLUGIN (#1382), which draws the screen
-        effect. Edge triggered, and only marked as handed over once the
-        plugin's hook is there to take it, so a hook that loads after this
-        script first runs still gets told.
+        THE LOOK, HANDED TO THE FRONT PLUGIN (#1382, #3153): drunk, high,
+        hangover, withdrawal or nothing (lookNow), and the plugin draws the
+        screen effect for it. Edge triggered, and only marked as handed over
+        once the plugin's hook is there to take it, so a hook that loads after
+        this script first runs still gets told.
       */
-      '    var drunk = !!v.drunk && !v.creating;',
-      '    if (st.thornswoodDrunk !== drunk && typeof globalThis !== "undefined" && globalThis.thornswoodDrunk) {',
-      '      globalThis.thornswoodDrunk(drunk);',
-      '      st.thornswoodDrunk = drunk;',
+      '    var look = v.creating ? "" : String(v.look || "");',
+      '    if (st.thornswoodLook !== look && typeof globalThis !== "undefined" && globalThis.thornswoodLook) {',
+      '      globalThis.thornswoodLook(look);',
+      '      st.thornswoodLook = look;',
       '    }',
       /*
         IN CREATION THE BARS COME OFF, once, and stay off. settle() writes
@@ -66271,9 +66402,9 @@ module.exports = {
 
     "Ill. The weary penalties of the closest meter: cold for a chill, hunger
     for food sickness, thirst for fouled water, and both hunger and rest for a
-    fever." Read the way the drink page reads a hangover: the meter counts as
-    at least weary while you are ill, and at least bad while you are badly ill,
-    so a disease never stacks a second copy of a penalty you already have.
+    fever." Read as a floor: the meter counts as at least weary while you are
+    ill, and at least bad while you are badly ill, so a disease never stacks a
+    second copy of a penalty you already have.
 
     lasts is minutes, and from says what it is counted from: a chill clears in
     2 hours from catching it; food sickness and fouled water last 30 and 45

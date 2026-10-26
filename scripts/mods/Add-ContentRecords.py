@@ -454,7 +454,7 @@ CONTENTS = (
     (r'ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$|MGEF Thornswood(Burnt|Fine)Effect$', 'own',
      'burnt and fine meals'),
     (r'(MISC ThornswoodQuest\w+|ACTI ThornswoodQuestLedgerSource)$', 'own', 'quest items'),
-    (r'IMAD ThornswoodDrunkImod$', 'own', 'the drunk screen'),
+    (r'IMAD Thornswood(Drunk|High|Hangover|Withdrawal)Imod$', 'own', 'the screen looks'),
     (r'BOOK ThornswoodPassage\w+$', 'own', 'starting town passages'),
     (r'BOOK ThornswoodWelcome$', 'own', 'the welcome letter'),
     (r'COBJ (DLC[12])?Recipe(Weapon\w+Bow|Arrow\w+|TechBolt\w+)$', 'bethesda',
@@ -928,6 +928,41 @@ DRUNK_LOOK = {
     b'NAM4': 0.25,     # motion blur strength
 }
 
+# THE SCREEN LOOKS FOR HIGH, A HANGOVER AND WITHDRAWAL (#3153). Patrick, 22
+# October 2026, on his report page: drunk, high, hangover and withdrawal each
+# have visual effects ("I also want visual affects"). Each is laid out as the
+# drunk screen is and drawn the same way, one at a time, by the front plugin
+# (globalThis.thornswoodLook, lookNow in gamemode.js). A look names only what
+# it changes; every other keyed list is neutral. TNAM is a tint as red, green,
+# blue and how much; IAD is the HDR and cinematic lists by their index
+# (xEdit's IMAD: 0x03 bloom scale, 0x11 saturation, 0x12 brightness, 0x13
+# contrast), each a multiply, its add left at nothing.
+#   high        colour and light turned up, a little bloom and a warm rose
+#               wash, a soft edge: skooma's lift.
+#   hangover    light too bright and glaring, colour drained, a little blur:
+#               the morning after.
+#   withdrawal  grey and hard, a cold wash, the edges closing in: the want.
+HIGH_IMOD = 0x5018021
+HIGH_LOOK = {
+    b'VNAM': 0.002,    # double vision strength
+    b'RNAM': 0.05,     # radial blur strength
+    b'UNAM': 0.4,      # radial blur start: the edges only
+    b'TNAM': (1.0, 0.72, 0.88, 0.10),
+    'iad': {0x03: 1.6, 0x11: 1.5, 0x12: 1.08, 0x13: 1.08},
+}
+HANGOVER_IMOD = 0x5018022
+HANGOVER_LOOK = {
+    b'BNAM': 0.12,     # blur radius
+    'iad': {0x03: 1.8, 0x11: 0.75, 0x12: 1.15},
+}
+WITHDRAWAL_IMOD = 0x5018023
+WITHDRAWAL_LOOK = {
+    b'RNAM': 0.08,     # radial blur strength
+    b'UNAM': 0.45,     # radial blur start: the edges only
+    b'TNAM': (0.7, 0.8, 1.0, 0.08),
+    'iad': {0x11: 0.45, 0x12: 0.92, 0x13: 1.15},
+}
+
 # ---------------------------------------------------------------------------
 # THE SALVAGED RECORDS, REMADE AS THORNSWOOD'S OWN (#2553)
 #
@@ -1089,10 +1124,10 @@ def bench(fid, edid, box, name, model, kws, flags=0, skill=0xFF):
         (b'MNAM', BENCH_MARKERS), (b'WBDT', bytes([1, skill])), (b'FNPR', BENCH_ENTRY)])
 
 
-def drunk_imad():
-    """The drunk screen (#1382): an IMAD laid out the way dunSleepingTreeCampISMD
-    is, every keyed list two keys long, its values DRUNK_LOOK and the rest
-    neutral."""
+def look_imad(fid, edid, look):
+    """A screen look (#1382 drunk, #3153 the rest): an IMAD laid out the way
+    dunSleepingTreeCampISMD is, every keyed list two keys long, its values the
+    look's and the rest neutral."""
     dnam = bytearray(244)
     struct.pack_into('<If', dnam, 0, 0, 1.0)           # not animatable; a duration of 1
     for at in list(range(8, 200, 4)) + [212, 216, 220, 228, 232, 236, 240]:
@@ -1102,24 +1137,26 @@ def drunk_imad():
     def keyed(value):
         return struct.pack('<4f', 0.0, value, 1.0, value)
 
-    def colour():
-        # Time, red, green, blue, and how much: nothing, at both keys.
-        return struct.pack('<10f', 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0)
+    def colour(rgba=(1.0, 1.0, 1.0, 0.0)):
+        # Time, red, green, blue, and how much, the same at both keys.
+        return struct.pack('<5f', 0.0, *rgba) + struct.pack('<5f', 1.0, *rgba)
 
-    pairs = [(b'EDID', zstr('ThornswoodDrunkImod')), (b'DNAM', bytes(dnam)),
-             (b'BNAM', keyed(DRUNK_LOOK[b'BNAM'])), (b'VNAM', keyed(DRUNK_LOOK[b'VNAM'])),
-             (b'TNAM', colour()), (b'NAM3', colour())]
+    pairs = [(b'EDID', zstr(edid)), (b'DNAM', bytes(dnam)),
+             (b'BNAM', keyed(look.get(b'BNAM', 0.0))), (b'VNAM', keyed(look.get(b'VNAM', 0.0))),
+             (b'TNAM', colour(look.get(b'TNAM', (1.0, 1.0, 1.0, 0.0)))), (b'NAM3', colour())]
     for tag in (b'RNAM', b'SNAM', b'UNAM', b'NAM1', b'NAM2', b'WNAM', b'XNAM', b'YNAM', b'NAM4'):
-        pairs.append((tag, keyed(DRUNK_LOOK[tag])))
-    # The HDR and cinematic lists: each one a multiply (times one) and an add (nothing).
+        pairs.append((tag, keyed(look.get(tag, 0.0))))
+    # The HDR and cinematic lists: each one a multiply (times one unless the
+    # look says) and an add (nothing).
+    iad = look.get('iad', {})
     for i in range(21):
-        pairs.append((bytes([i]) + b'IAD', keyed(1.0)))
+        pairs.append((bytes([i]) + b'IAD', keyed(iad.get(i, 1.0))))
         pairs.append((bytes([0x40 + i]) + b'IAD', keyed(0.0)))
-    return own_record(b'IMAD', DRUNK_IMOD, pairs)
+    return own_record(b'IMAD', fid, pairs)
 
 
 def needs_records():
-    """Tea, its recipes and its effect, and the drunk screen (#1382)."""
+    """Tea, its recipes and its effect (#1382), and the screen looks (#1382, #3153)."""
     data = bytearray(TEA_EFFECT_DATA)
     struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
     out = [own_record(b'MGEF', TEA_EFFECT, [
@@ -1137,7 +1174,10 @@ def needs_records():
     for item, recipe, edid, name, herb in TEAS:
         out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'),
                         [(herb, TEA_HERBS)], item, COOKPOT_KEYWORD))
-    out.append(drunk_imad())
+    out.append(look_imad(DRUNK_IMOD, 'ThornswoodDrunkImod', DRUNK_LOOK))
+    out.append(look_imad(HIGH_IMOD, 'ThornswoodHighImod', HIGH_LOOK))
+    out.append(look_imad(HANGOVER_IMOD, 'ThornswoodHangoverImod', HANGOVER_LOOK))
+    out.append(look_imad(WITHDRAWAL_IMOD, 'ThornswoodWithdrawalImod', WITHDRAWAL_LOOK))
     out += quality_effects()
     # The verb on the crosshair says what activating it does.
     out.append(own_record(b'ACTI', WELL_BUCKET, [
@@ -1358,7 +1398,7 @@ def thornswood_records(passage, clam, passages):
              REMEDY, ALCHEMY_KEYWORD),
         misc(MASTER_KEY, 'ThornswoodMiscMasterKey', 'Master Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
     ]
-    # Tea, its recipes and the drunk screen (#1382).
+    # Tea, its recipes and the screen looks (#1382, #3153).
     out += needs_records()
     # Placeable furniture (#2679), one MISC and one woodworking recipe a row.
     out += furniture_records()

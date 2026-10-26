@@ -10,8 +10,10 @@
 // Root cause: nothing kept whether somebody was drunk, nothing told the
 // client, and no record drew it. The server keeps drunk on the needs record
 // (NEEDS.ale.drunkFrom), the needs HUD script hands it to the front plugin's
-// globalThis.thornswoodDrunk, and the front plugin applies the content
-// plugin's ThornswoodDrunkImod.
+// globalThis.thornswoodLook, and the front plugin applies the content
+// plugin's ThornswoodDrunkImod. Since #3153 the same hook carries high,
+// hangover and withdrawal (Patrick, 22 Oct 2026: "I also want visual
+// affects"), each with a record of its own.
 //
 // Drives the real needs block and the real HUD script, and reads the
 // committed plugin and front plugin. Read only.
@@ -92,7 +94,7 @@ if (r) {
     r2.store[ME].drunk === false && r2.store[ME].ale === 0);
 }
 
-// The HUD script hands drunk to the front plugin, once per change.
+// The HUD script hands the look to the front plugin, once per change (#3153).
 function lift(name) {
   const at = src.indexOf('function ' + name + '()', a);
   if (at < 0) { return null; }
@@ -101,6 +103,14 @@ function lift(name) {
 }
 const hud = lift('hudScript');
 yes('the needs HUD script is in the needs block', !!hud && src.indexOf('function hudScript()', a) < b);
+if (r) {
+  const r3 = rig();
+  r3.online.push(ME); r3.store[ME] = r3.fresh(); r3.settle(ME);
+  r3.consumed(ME, ALE); r3.consumed(ME, ALE);
+  yes('two ales: no look on the record', r3.store[ME].look === '');
+  r3.consumed(ME, ALE);
+  yes('the third: the record says drunk for the HUD', r3.store[ME].look === 'drunk');
+}
 if (hud) {
   const made = new Function(hud + '\nreturn hudScript();')();
   const told = [];
@@ -109,25 +119,31 @@ if (hud) {
     return { value: Object.assign({ food: 60, drink: 60, rest: 60, temp: 50 }, v), state: state,
              sp: { browser: { executeJavaScript: function () { } }, Debug: { notification: function () { } } } };
   };
-  delete globalThis.thornswoodDrunk;
-  new Function('ctx', made)(ctx({ drunk: true }));
-  yes('with no hook yet, nothing is marked as handed over', state.thornswoodDrunk === undefined);
-  globalThis.thornswoodDrunk = function (on) { told.push(on); };
-  new Function('ctx', made)(ctx({ drunk: true }));
-  new Function('ctx', made)(ctx({ drunk: true }));
-  yes('once the hook is there it is told drunk, once', told.length === 1 && told[0] === true);
-  new Function('ctx', made)(ctx({ drunk: false }));
-  yes('and told when it ends', told.length === 2 && told[1] === false);
-  delete globalThis.thornswoodDrunk;
+  delete globalThis.thornswoodLook;
+  new Function('ctx', made)(ctx({ look: 'drunk' }));
+  yes('with no hook yet, nothing is marked as handed over', state.thornswoodLook === undefined);
+  globalThis.thornswoodLook = function (look) { told.push(look); };
+  new Function('ctx', made)(ctx({ look: 'drunk' }));
+  new Function('ctx', made)(ctx({ look: 'drunk' }));
+  yes('once the hook is there it is told drunk, once', told.length === 1 && told[0] === 'drunk');
+  new Function('ctx', made)(ctx({ look: 'hangover' }));
+  yes('told when it turns to a hangover', told.length === 2 && told[1] === 'hangover');
+  new Function('ctx', made)(ctx({ look: '' }));
+  yes('and told when it ends', told.length === 3 && told[2] === '');
+  delete globalThis.thornswoodLook;
 }
 
-// The front plugin applies the content plugin's own record.
-const m = /const DRUNK_IMOD = 0x([0-9a-fA-F]+);/.exec(front);
-yes('the front plugin defines the hook', front.indexOf('globalThis.thornswoodDrunk = function') !== -1);
+// The front plugin applies the content plugin's own records, one per look.
+const looks = /const LOOKS = (\{[^}]*\});/.exec(front);
+let LOOKS = null;
+try { LOOKS = looks ? new Function('return ' + looks[1])() : null; } catch (e) { LOOKS = null; }
+yes('the front plugin defines the hook', front.indexOf('globalThis.thornswoodLook = function') !== -1);
+yes('and names a record for drunk, high, hangover and withdrawal',
+  !!LOOKS && ['drunk', 'high', 'hangover', 'withdrawal'].every(function (k) { return typeof LOOKS[k] === 'number'; }));
 yes('and draws with applyCrossFade and takes it off with removeCrossFade',
-  front.indexOf('mod.applyCrossFade(DRUNK_FADE)') !== -1 && front.indexOf('ImageSpaceModifier.removeCrossFade(DRUNK_FADE)') !== -1);
+  front.indexOf('mod.applyCrossFade(LOOK_FADE)') !== -1 && front.indexOf('ImageSpaceModifier.removeCrossFade(LOOK_FADE)') !== -1);
 const esp = fs.readFileSync(path.join(ROOT, 'game', 'content', 'Thornswood-Content.esp'));
-let imad = null;
+const imads = {};
 {
   let p = 24 + esp.readUInt32LE(4);
   while (p + 24 <= esp.length) {
@@ -137,19 +153,27 @@ let imad = null;
       let q = p + 24;
       while (q < p + size) {
         const rs = esp.readUInt32LE(q + 4);
-        if (m && esp.readUInt32LE(q + 12) === ((5 << 24) | parseInt(m[1], 16))) { imad = esp.slice(q + 24, q + 24 + rs); }
+        imads[esp.readUInt32LE(q + 12)] = esp.slice(q + 24, q + 24 + rs);
         q += 24 + rs;
       }
     }
     p += isGroup ? size : 24 + size;
   }
 }
-yes('the record it names is the plugin\'s ThornswoodDrunkImod', !!imad && imad.indexOf('ThornswoodDrunkImod') === 6);
-if (imad) {
-  const at = imad.indexOf('DNAM');
-  yes('and it is not animatable, so it holds while applied', at > 0 && imad.readUInt32LE(at + 6) === 0);
-  const tnam = imad.indexOf('TNAM');
-  yes('and it tints nothing', tnam > 0 && imad.readFloatLE(tnam + 6 + 16) === 0 && imad.readFloatLE(tnam + 6 + 36) === 0);
+const names = { drunk: 'ThornswoodDrunkImod', high: 'ThornswoodHighImod', hangover: 'ThornswoodHangoverImod',
+                withdrawal: 'ThornswoodWithdrawalImod' };
+for (const k in names) {
+  const imad = LOOKS ? imads[(5 << 24) | LOOKS[k]] : null;
+  yes('the ' + k + ' record it names is the plugin\'s ' + names[k], !!imad && imad.indexOf(names[k]) === 6);
+  if (imad) {
+    const at = imad.indexOf('DNAM');
+    yes('and it is not animatable, so it holds while applied', at > 0 && imad.readUInt32LE(at + 6) === 0);
+  }
+}
+const drunkImad = LOOKS ? imads[(5 << 24) | LOOKS.drunk] : null;
+if (drunkImad) {
+  const tnam = drunkImad.indexOf('TNAM');
+  yes('and the drunk one tints nothing', tnam > 0 && drunkImad.readFloatLE(tnam + 6 + 16) === 0 && drunkImad.readFloatLE(tnam + 6 + 36) === 0);
 }
 
 console.log('');

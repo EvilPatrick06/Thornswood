@@ -21,13 +21,14 @@ The first two also give +0.05 melee damage for 5 real minutes. The
 third and after do not. There is no speech check to hang a bonus on.
 
 Drunk, from the third ale until you sleep or the 45 minutes pass: the
-client draws a sway and a soft edge. Chat is not garbled for you. If
-you drank three or more and log out without a bed, the next time you
-are in the world before you have slept you are hung over: rest is
-treated as weary even if the meter is higher, until you sleep or drink
-a remedy an alchemist made. The game clock runs about twenty times real
-time, so "the next morning" is about an hour of real time after a
-night's drinking, not the next real day.
+client draws a sway and a soft edge. Chat is not garbled for you.
+
+When the 45 minutes pass, being drunk wears off into a hangover:
+stamina recovers 25% slower for 10 real minutes, and the screen is too
+bright and drained of colour while it lasts. Logged out drunk, the
+hangover starts the next time you are in the world. A night in a bed
+sleeps it off, being drunk and a hangover already running alike, and
+a remedy an alchemist made ends it early (Patrick, 22 Oct 2026).
 
 ## Water
 
@@ -46,6 +47,6 @@ not a new station.
 
 The ale curve, the 45 minutes, and the chat line that says which drink
 it was are in the server, and so are the damage help of the first two
-and the hangover, which a night in a bed or a physicker's remedy ends.
-The remedy is given from the wounds panel, which a hangover opens the
-way a wound does. Drunk is in the server too: from the third ale until a night's sleep or the 45 minutes pass, the server says so and the client draws Thornswood's own drunk screen, a little double vision and blur, soft at the edges, smearing as you turn (Patrick, 12 Oct 2026). A night in a bed starts the ale count over. Water is tagged by where you filled it, and it is done in the world, never by a command. Activating a well with an empty wine bottle fills it, at the game's normal activation range. The vanilla wells are statics and raise no activation, so the content plugin stands a well bucket beside each well it can: 18 of the 30 in the load order (two wells side by side at Oar's Rest share one), and [Station placement](station-placement.md) says where and why the others have none. Activating the bucket draws the water. A second bucket, the water bucket, stands at the edge of the river by Riverwood and of Lake Honrich at Riften (the other towns have no river within reach of their forge, see the same page), and fills a bottle with river water, which must be boiled; no cooldown. Water you stand in does not fill: no server hook sees it. Once you fill at a well it is done for you for one in-game day (72 real minutes); other wells still work. The server keeps where each bottle came from, and drinking takes the worst you carry first. Activating a cooking spot (the CraftingCookpot bench) while carrying unboiled water starts a boil; a minute later it is boiled, and leaving the fire before then loses the boil. The cooking menu still opens. Well water and Frostreach ice water are safe without boiling (Patrick, 12 Oct 2026). A bottle the server never saw filled, like one bought at an inn, is safe. Every other non-ale drink is 20.
+and the hangover, its 10 minutes and its slower stamina, which a night
+in a bed or a physicker's remedy ends sooner. The remedy is given from
+the wounds panel, which a hangover opens the way a wound does. Drunk is in the server too: from the third ale until a night's sleep or the 45 minutes pass, the server says so and the client draws Thornswood's own drunk screen, a little double vision and blur, soft at the edges, smearing as you turn (Patrick, 12 Oct 2026). The hangover's screen, and the high's and withdrawal's on the [Exhaustion](exhaustion.md) page, are drawn the same way, one at a time: a high over being drunk, and either over an after-effect. A night in a bed starts the ale count over. Water is tagged by where you filled it, and it is done in the world, never by a command. Activating a well with an empty wine bottle fills it, at the game's normal activation range. The vanilla wells are statics and raise no activation, so the content plugin stands a well bucket beside each well it can: 18 of the 30 in the load order (two wells side by side at Oar's Rest share one), and [Station placement](station-placement.md) says where and why the others have none. Activating the bucket draws the water. A second bucket, the water bucket, stands at the edge of the river by Riverwood and of Lake Honrich at Riften (the other towns have no river within reach of their forge, see the same page), and fills a bottle with river water, which must be boiled; no cooldown. Water you stand in does not fill: no server hook sees it. Once you fill at a well it is done for you for one in-game day (72 real minutes); other wells still work. The server keeps where each bottle came from, and drinking takes the worst you carry first. Activating a cooking spot (the CraftingCookpot bench) while carrying unboiled water starts a boil; a minute later it is boiled, and leaving the fire before then loses the boil. The cooking menu still opens. Well water and Frostreach ice water are safe without boiling (Patrick, 12 Oct 2026). A bottle the server never saw filled, like one bought at an inn, is safe. Every other non-ale drink is 20.

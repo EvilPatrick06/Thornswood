@@ -115,6 +115,14 @@ zero for 10 minutes, then costs 30 rest and 10 hunger. Neither replaces
 a bed. A second dose inside the window does not stack. It refreshes the
 clock and adds the crash again.
 
+While a dose holds, you are high, and the screen shows it: colour and
+light turned up, a warm wash and a soft edge. Withdrawal comes after
+three doses in a day, the last 24 real hours: when the window of the
+third or a later one ends, stamina and magicka recover 10% slower for
+30 minutes, on top of the crash, and the screen goes grey and cold at
+the edges until it passes. Logged out before the window ends, it
+starts the next time you are in the world (Patrick, 22 Oct 2026).
+
 ## Where this is
 
 The 8 hour clock, the per-swing costs, the craft gate at 15, the eight

@@ -4,8 +4,8 @@
 //
 // #1382: the first two ales give +0.05 melee damage for 5 real minutes and
 // the third does not; three or more and a logout without a bed leaves you
-// hung over, rest read as weary, until a night in a bed. docs/systems/drink.md.
-// Drives the real needs block.
+// hung over next time in the world (#3153: stamina recovery down 25% for 10
+// minutes), and a bed sleeps it off. docs/systems/drink.md.
 // Drives the real needs block out of game/gamemode.js.
 const REPO_DIR = require('path').join(__dirname, '..');
 const fs = require('fs');
@@ -81,8 +81,9 @@ if (block !== null && smoke) {
   const ME = 0xff000001;
   const ALE = 0x34c5e;
   const A = smoke.NEEDS.ale;
-  yes('ale help is +0.05 for 5 minutes through the second, hangover from 3',
-      A.help === 0.05 && A.helpMinutes === 5 && A.helpThrough === 2 && A.hangoverFrom === 3);
+  yes('ale help is +0.05 for 5 minutes through the second, a hangover is 10 minutes at -25 stamina recovery',
+      A.help === 0.05 && A.helpMinutes === 5 && A.helpThrough === 2 &&
+      A.hangoverMinutes === 10 && A.hangover.staminaRateMult === -25);
   function rigAle() { const r = rig(); r.online.push(ME); r.seed(ME); r.settle(ME); return r; }
   const dmg = (r) => r.effects(ME, r.read(ME)).attackDamageMult || 0;
   {
@@ -105,28 +106,27 @@ if (block !== null && smoke) {
     yes('the second ale renews it, the third does not', r.read(ME).aleHelpUntil === until2 && until2 > 0);
     yes('the help does not stack', Math.abs(dmg(r) - base - 0.05) < 1e-9);
   }
-  function restCost(r) { return r.effects(ME, r.read(ME)).stamina || 0; }
+  // The hangover (#3153): what drunk leaves when it wears off, stamina
+  // recovery down 25% for 10 minutes. test-3153-after-effects.js has the rest.
+  const regen = (r) => r.effects(ME, r.read(ME)).staminaRateMult || 0;
   {
     const r = rigAle();
     r.consumed(ME, ALE); r.consumed(ME, ALE); r.consumed(ME, ALE);
-    const n = r.read(ME); n.rest = 100; r.__set(ME, n);
-    const sober = r.effects(ME, r.read(ME));
+    const sober = regen(r);
     // Log out on the road, not in a bed, and come back an hour later.
     r.online.length = 0; r.tick();
     r.clock.now += 60 * MIN;
     r.online.push(ME);
     r.settle(ME);
-    yes('three ales and no bed: hung over next time in the world', r.read(ME).hangover === true);
-    const hung = r.effects(ME, r.read(ME));
-    const weary = r.effects(ME, Object.assign(r.read(ME), { hangover: false, rest: 40 }));
-    yes('rest is read as weary while the meter is full', JSON.stringify(hung) === JSON.stringify(weary) && JSON.stringify(hung) !== JSON.stringify(sober));
+    yes('three ales and no bed: hung over next time in the world, for 10 minutes from then',
+        r.read(ME).hangoverUntil === r.clock.now + 10 * MIN);
+    yes('stamina recovers 25% slower', regen(r) - sober === -25);
     // A physicker's remedy ends it (drink.md), through soberUp, which the
     // wounds panel calls; the rest of the remedy is test-1383-treatments.js.
     yes('hungOver says so', r.hungOver(ME) === true);
     yes('the injury block is told a hangover started, so the remedy can be offered', r.cared.length === 1 && r.cared[0] === ME);
-    const unhung = r.effects(ME, Object.assign(r.read(ME), { hangover: false }));
-    yes('soberUp clears the hangover and says it did', r.soberUp(ME) === true && r.read(ME).hangover === false && r.hungOver(ME) === false);
-    yes('and rest is read from the meter again', JSON.stringify(r.effects(ME, r.read(ME))) === JSON.stringify(unhung) && JSON.stringify(unhung) !== JSON.stringify(hung));
+    yes('soberUp clears the hangover and says it did', r.soberUp(ME) === true && r.hungOver(ME) === false);
+    yes('and stamina recovers as it did', regen(r) === sober);
     yes('and the injury block is told it ended', r.cared.length === 2);
     yes('soberUp with no hangover does nothing', r.soberUp(ME) === false);
   }
@@ -134,14 +134,14 @@ if (block !== null && smoke) {
     const r = rigAle();
     r.consumed(ME, ALE); r.consumed(ME, ALE);
     r.online.length = 0; r.tick(); r.clock.now += 60 * MIN; r.online.push(ME); r.settle(ME);
-    yes('two ales do not hang you over', r.read(ME).hangover === false);
+    yes('two ales do not hang you over', r.hungOver(ME) === false && r.read(ME).hangoverUntil === 0);
   }
   {
     const r = rigAle();
     r.consumed(ME, ALE); r.consumed(ME, ALE); r.consumed(ME, ALE);
     const n = r.read(ME); n.resting = 'bed'; r.__set(ME, n);
     r.online.length = 0; r.tick(); r.clock.now += 60 * MIN; r.online.push(ME); r.settle(ME);
-    yes('three ales then a bed: no hangover', r.read(ME).hangover === false);
+    yes('three ales then a bed: no hangover', r.hungOver(ME) === false && r.read(ME).hangoverUntil === 0);
   }
 }
 console.log('');

@@ -9804,48 +9804,54 @@
     log(what);
   }));
 
-  // ------------------------------------------------------ the drunk screen --
+  // ------------------------------------------------------- the screen look --
   /*
-    docs/systems/drink.md: "Drunk, from the third ale until you sleep or the
-    45 minutes pass: the client draws a sway and a soft edge." The server
-    decides drunk (NEEDS.ale.drunkFrom in gamemode.js) and the needs HUD
-    script hands it here through globalThis.thornswoodDrunk, the one thing
-    the two scopes share, as thornswoodCatchFire is.
+    docs/systems/drink.md and exhaustion.md: drunk, high, a hangover and
+    withdrawal each have a look of their own (Patrick, 12 Oct 2026, decision 3
+    on #1382 for drunk; 22 Oct 2026 on #3153 for the rest: "I also want visual
+    affects"). The server decides which one shows (lookNow in gamemode.js) and
+    the needs HUD script hands the word here through globalThis.thornswoodLook,
+    the one thing the two scopes share, as thornswoodCatchFire is.
 
-    The look is the content plugin's ThornswoodDrunkImod (IMAD 0x18020,
-    scripts/mods/Add-ContentRecords.py, Patrick's decision 3 of 12 Oct 2026
-    on #1382): a little double vision and blur, a soft radial blur at the
-    edges, and motion blur that smears into a sway as the head turns. It is
-    not animatable, so it holds for as long as it is applied: applied as the
-    cross fade modifier while drunk and taken off when that ends. Skyrim
-    keeps one cross fade modifier at a time, so it is only ever taken off
-    after this applied it.
+    Each look is a content plugin record of Thornswood's own
+    (scripts/mods/Add-ContentRecords.py, THE SCREEN LOOKS): drunk is double
+    vision, blur and a sway as the head turns; high is colour and light turned
+    up with a warm wash; a hangover is light too bright and colour drained;
+    withdrawal is grey, hard and cold at the edges. None is animatable, so
+    each holds for as long as it is applied: applied as the cross fade
+    modifier while the server says so, cross faded into the next when the
+    word changes, and taken off when it is nothing. Skyrim keeps one cross
+    fade modifier at a time, so it is only ever taken off after this applied
+    one.
   */
-  const DRUNK_FILE = 'Thornswood-Content.esp';
-  const DRUNK_IMOD = 0x18020;
-  const DRUNK_FADE = 3.0;   // seconds, in and out
-  let drunkWanted = false;
-  let drunkShown = false;
-  // A content plugin older than the record: said once, and nothing drawn.
-  let drunkNoRecord = false;
+  const LOOK_FILE = 'Thornswood-Content.esp';
+  const LOOKS = { drunk: 0x18020, high: 0x18021, hangover: 0x18022, withdrawal: 0x18023 };
+  const LOOK_FADE = 3.0;   // seconds, in and out
+  let lookWanted = '';
+  let lookShown = '';
+  // A content plugin older than a record: said once, and nothing drawn for it.
+  const lookMissing = {};
 
-  globalThis.thornswoodDrunk = function (on) { drunkWanted = !!on; };
+  globalThis.thornswoodLook = function (name) {
+    lookWanted = Object.prototype.hasOwnProperty.call(LOOKS, name) ? name : '';
+  };
 
-  sp.on('update', guard('drunk', () => {
-    if (drunkWanted === drunkShown || drunkNoRecord) { return; }
-    if (!drunkWanted) {
-      sp.ImageSpaceModifier.removeCrossFade(DRUNK_FADE);
-      drunkShown = false;
+  sp.on('update', guard('look', () => {
+    const want = (lookWanted && !lookMissing[lookWanted]) ? lookWanted : '';
+    if (want === lookShown) { return; }
+    if (!want) {
+      sp.ImageSpaceModifier.removeCrossFade(LOOK_FADE);
+      lookShown = '';
       return;
     }
-    const mod = sp.ImageSpaceModifier.from(sp.Game.getFormFromFile(DRUNK_IMOD, DRUNK_FILE));
+    const mod = sp.ImageSpaceModifier.from(sp.Game.getFormFromFile(LOOKS[want], LOOK_FILE));
     if (!mod) {
-      log('drunk: no ThornswoodDrunkImod in', DRUNK_FILE, 'so nothing is drawn');
-      drunkNoRecord = true;
+      log('look: no', want, 'record in', LOOK_FILE, 'so nothing is drawn for it');
+      lookMissing[want] = true;
       return;
     }
-    mod.applyCrossFade(DRUNK_FADE);
-    drunkShown = true;
+    mod.applyCrossFade(LOOK_FADE);
+    lookShown = want;
   }));
 
   // ----------------------------------------------- what the skill tree adds --
