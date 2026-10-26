@@ -165,7 +165,13 @@ namespace Thornswood
                     sb.AppendLine(r.Slot + " " + r.Id + " " + r.Played.Ticks + " " + r.Seconds +
                                   " " + Dash(r.Trade) + " " + Dash(r.Town) + " " + Dash(r.Owner));
                 }
-                File.WriteAllText(ProfileFile, sb.ToString());
+                // Whole or not at all (#3128): Relist reads this file on a
+                // pool thread while the game runs, and a read in the middle
+                // of a plain write sees half a list.
+                string next = ProfileFile + ".new";
+                File.WriteAllText(next, sb.ToString());
+                if (File.Exists(ProfileFile)) File.Replace(next, ProfileFile, null);
+                else File.Move(next, ProfileFile);
             }
             catch (Exception ex) { Swallow.Note("Chars.Save, write", ex); }
         }
@@ -660,52 +666,10 @@ namespace Thornswood
             // The roster was refreshed by Prepare, before the dead were moved
             // out of their slots (BuryDead), so the names are as fresh as the
             // server can make them.
-            var sb = new StringBuilder();
-            sb.Append("{\"v\":1,\"last\":").Append(last)
-              .Append(",\"spare\":").Append(spare)
-              .Append(",\"slots\":").Append(slots)
-              .Append(",\"characters\":[");
-            bool first = true;
-            // The characters in slot order, then the dead, in no slot (#1010).
-            var all = Characters(rows);
-            all.AddRange(DeadRows(rows));
-            foreach (Row r in all)
-            {
-                Roster.Row who = null;
-                try { who = Roster.For(r.Id); } catch { who = null; }
-                bool isDead = r.Slot == DeadSlot;
-                if (!first) sb.Append(',');
-                first = false;
-                sb.Append("{\"profileId\":").Append(r.Id)
-                  .Append(",\"slot\":").Append(isDead ? 0 : r.Slot)
-                  .Append(",\"seconds\":").Append(r.Seconds)
-                  .Append(",\"name\":\"").Append(Json(who == null ? "" : who.Name))
-                  .Append("\",\"race\":\"").Append(Json(who == null ? "" : who.Race))
-                  .Append("\",\"trade\":\"").Append(Json(who == null ? "" : who.Trade))
-                  .Append("\",\"town\":\"").Append(Json(who == null ? "" : who.Town))
-                  .Append("\",\"where\":\"").Append(Json(who == null ? "" : who.Where))
-                  .Append("\",\"played\":\"").Append(Json(PlayedText(r.Seconds)))
-                  .Append("\",\"lastPlayed\":\"").Append(Iso(r.Played))
-                  .Append("\"");
-                // The server said it has no character under this id (#955):
-                // the menu marks the card, since picking it makes a new one.
-                bool isGone = false;
-                try { isGone = !isDead && Roster.Gone(r.Id, r.Played); } catch { isGone = false; }
-                if (isGone) sb.Append(",\"gone\":true");
-                // Staff killed it for good, or banned it by itself (#1010):
-                // the menu shows it and will not play it.
-                if (isDead) sb.Append(",\"pk\":true");
-                bool isBarred = false;
-                try { isBarred = !isDead && Roster.Barred(r.Id); } catch { isBarred = false; }
-                if (isBarred) sb.Append(",\"banned\":true");
-                sb.Append("}");
-            }
-            sb.Append("]}");
-
+            string listed = CharactersJson(rows, last, spare, slots);
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(CharactersFile));
-                File.WriteAllText(CharactersFile, sb.ToString(), new UTF8Encoding(false));
+                WriteList(listed);
             }
             catch (Exception ex)
             {
@@ -728,7 +692,7 @@ namespace Thornswood
             try
             {
                 string ui = Path.Combine(Paths.Game, "Data\\Platform\\UI");
-                string json = sb.ToString();
+                string json = listed;
                 var extra = new StringBuilder();
                 if (File.Exists(Path.Combine(ui, "thornswood-theme.mp3")))
                     extra.Append(",\"music\":\"thornswood-theme.mp3\"");
@@ -766,6 +730,108 @@ namespace Thornswood
                 // The json above is what the plugin falls back on, so this is
                 // a slower menu rather than no menu, and not worth stopping for.
             }
+        }
+
+        /// <summary>
+        /// The list WriteCharacters describes, as text: this file's rows in
+        /// slot order, then the dead.
+        /// </summary>
+        static string CharactersJson(List<Row> rows, int last, int spare, int slots)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"v\":1,\"last\":").Append(last)
+              .Append(",\"spare\":").Append(spare)
+              .Append(",\"slots\":").Append(slots)
+              .Append(",\"characters\":[");
+            bool first = true;
+            // The characters in slot order, then the dead, in no slot (#1010).
+            var all = Characters(rows);
+            all.AddRange(DeadRows(rows));
+            foreach (Row r in all)
+            {
+                Roster.Row who = null;
+                try { who = Roster.For(r.Id); } catch { who = null; }
+                // Buried at Play, or killed since, which Relist leaves for
+                // the next Play to bury (#3128).
+                bool isDead = r.Slot == DeadSlot;
+                try { isDead = isDead || Roster.Dead(r.Id); } catch (Exception ex) { Swallow.Note("Chars.CharactersJson, dead", ex); }
+                if (!first) sb.Append(',');
+                first = false;
+                sb.Append("{\"profileId\":").Append(r.Id)
+                  .Append(",\"slot\":").Append(isDead ? 0 : r.Slot)
+                  .Append(",\"seconds\":").Append(r.Seconds)
+                  .Append(",\"name\":\"").Append(Json(who == null ? "" : who.Name))
+                  .Append("\",\"race\":\"").Append(Json(who == null ? "" : who.Race))
+                  .Append("\",\"trade\":\"").Append(Json(who == null ? "" : who.Trade))
+                  .Append("\",\"town\":\"").Append(Json(who == null ? "" : who.Town))
+                  .Append("\",\"where\":\"").Append(Json(who == null ? "" : who.Where))
+                  .Append("\",\"played\":\"").Append(Json(PlayedText(r.Seconds)))
+                  .Append("\",\"lastPlayed\":\"").Append(Iso(r.Played))
+                  .Append("\"");
+                // The server said it has no character under this id (#955):
+                // the menu marks the card, since picking it makes a new one.
+                bool isGone = false;
+                try { isGone = !isDead && Roster.Gone(r.Id, r.Played); } catch { isGone = false; }
+                if (isGone) sb.Append(",\"gone\":true");
+                // Staff killed it for good, or banned it by itself (#1010):
+                // the menu shows it and will not play it.
+                if (isDead) sb.Append(",\"pk\":true");
+                bool isBarred = false;
+                try { isBarred = !isDead && Roster.Barred(r.Id); } catch { isBarred = false; }
+                if (isBarred) sb.Append(",\"banned\":true");
+                sb.Append("}");
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        static void WriteList(string json)
+        {
+            lock (listGate)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(CharactersFile));
+                File.WriteAllText(CharactersFile, json, new UTF8Encoding(false));
+            }
+        }
+
+        // Prepare and Relist both write the list, and Relist runs on a pool
+        // thread. Relist reads the rows and writes under this, so a Prepare
+        // that saved new rows meanwhile writes its list after Relist's.
+        static readonly object listGate = new object();
+
+        /// <summary>
+        /// The menu's list again, while the game runs (#3128). Change
+        /// character takes the person back to the menu without a new Play, so
+        /// the list Prepare wrote at the start would offer the spare they have
+        /// since made a character on, and miss what they forgot. Shell calls
+        /// this off the window's thread after each choice and each forget.
+        /// Only the json: the page's script beside it is deleted once the
+        /// pick is made, so a reload in the world does not bring the choice
+        /// back, and the plugin reads the json when it goes back to the menu.
+        /// Nothing here moves a row (the slots are tidied and the dead buried
+        /// at the next Play), so a character staff killed while it was played
+        /// is marked from the roster instead.
+        /// </summary>
+        public static void Relist(Config cfg)
+        {
+            try { Roster.Refresh(cfg); } catch (Exception ex) { Swallow.Note("Chars.Relist, roster", ex); }
+            int slots = 2;
+            try { if (Door.Last != null && Door.Last.Slots > 0) slots = Door.Last.Slots; }
+            catch (Exception ex) { Swallow.Note("Chars.Relist, Door.Last.Slots", ex); }
+            lock (listGate)
+            {
+                List<Row> rows = Rows();
+                Row sp = Find(rows, 0);
+                try { WriteList(CharactersJson(rows, LastPlayedId(rows), sp != null ? sp.Id : 0, slots)); }
+                catch (Exception ex) { Swallow.Note("Chars.Relist, write", ex); }
+            }
+        }
+
+        /// <summary>The id New character uses now, or 0 when there is none yet.</summary>
+        public static int SpareId()
+        {
+            Row sp = Find(Rows(), 0);
+            return sp != null ? sp.Id : 0;
         }
 
         /// <summary>ISO 8601 in UTC, or empty for a date that was never set.</summary>

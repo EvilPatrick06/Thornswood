@@ -2645,7 +2645,8 @@ namespace Thornswood
                 // so the launcher is the only thing in a position to count.
                 // The character is whoever the menu's choice file named this
                 // session; 0 when it never did, and then nothing is counted.
-                try { Chars.AddPlaytime(chosenId, DateTime.Now - playStartedAt); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
+                // Since its pick, when Change character came first (#3128).
+                try { Chars.AddPlaytime(chosenId, DateTime.Now - PlayCountedFrom()); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
                 BuildStatRow();
                 btnPlay.Content = "PLAY";
                 btnQuitGame.Visibility = Visibility.Collapsed;

@@ -320,7 +320,12 @@ door(null);
   yes('the front plugin\'s join pass sender is where this expects it', fa > 0 && fb > fa);
   const block = front.slice(fa, fb + 6);
   const f = { sent: [], logged: [], file: '', now: T0, handler: null };
+  // Whose a pass is (#3128): only this game's character's is taken.
+  const pa = front.indexOf('  function passProfile(raw) {');
+  const pb = front.indexOf('\n  }\n', pa);
+  yes('passProfile is in the front plugin', pa > 0 && pb > pa);
   const box = {
+    PROFILE: 700, String: String, Number: Number, JSON: JSON,
     Date: { now: function () { return f.now; } },
     sp: { on: function (ev, fn) { if (ev === 'update') f.handler = fn; }, storage: {} },
     guard: function (name, fn) { return fn; },
@@ -333,6 +338,7 @@ door(null);
     log: function () { f.logged.push(Array.prototype.join.call(arguments, ' ')); }
   };
   vm.createContext(box);
+  vm.runInContext(front.slice(pa, pb + 4), box);
   vm.runInContext(block, box, { filename: 'thornswood-front.js (join pass)' });
   yes('it runs on update', typeof f.handler === 'function');
   const p1 = mint({ p: 700, s: 'dev', i: T0, x: T0 + 600000 });
@@ -341,6 +347,9 @@ door(null);
   yes('no file: nothing is sent', f.sent.length === 0);
   f.now += 5000; f.file = 'not a pass\n'; f.handler();
   yes('a file that is not a pass is not sent', f.sent.length === 0);
+  f.now += 5000; f.file = mint({ p: 701, s: 'dev', i: T0, x: T0 + 600000 }) + '\r\n'; f.handler();
+  yes('another character\'s pass, left from before a change of character, is not sent or stored (#3128)',
+      f.sent.length === 0 && !box.sp.storage.thornswoodJoinPass);
   f.now += 5000; f.file = p1 + '\r\n'; f.handler();
   yes('the launcher\'s pass is sent as "/joinpass <pass>" as soon as it is there', f.sent.length === 1 && f.sent[0] === '/joinpass ' + p1);
   f.now += 1000; f.handler();

@@ -96,6 +96,9 @@
           'and nothing runs down while you are away, and you come back rested. Anywhere else ' +
           'the bars fall at half the pace while you are gone, and never below 25. The Body ' +
           'page says what logging out where you are now would do.',
+        'Change character, at the foot of ' + k.skills + ', goes back to the character menu ' +
+          'without closing the game. Stay still and out of a fight for the ten seconds it ' +
+          'counts; moving, a fight or getting hurt stops it, and pressing it again stops it too.',
         'Fires warm you and standing in one burns you. Fur is the warmest to wear, metal the worst.',
         'In your inventory, while you have a wound to tend, ' + k.trade + ' opens the panel ' +
           'that tends it. Looking at somebody hurt, ' + k.lock + ' tends theirs when the ' +

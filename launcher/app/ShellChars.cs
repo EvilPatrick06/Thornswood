@@ -268,6 +268,9 @@ namespace Thornswood
                     if (!forgotten.Add(g)) continue;
                     try { Chars.Forget(g); Log("forgot character " + g + " at the menu"); }
                     catch (Exception ex) { Log("Could not forget character " + g + ": " + ex.Message); }
+                    // The menu can come back in this same session now
+                    // (Change character, #3128), and its list is the file.
+                    ThreadPool.QueueUserWorkItem(delegate { Chars.Relist(cfg); });
                 }
             }
 
@@ -278,16 +281,41 @@ namespace Thornswood
             int id = 0;
             try { id = Chars.ReadChoice(); } catch { id = 0; }
             if (id <= 0 || id == chosenId) return;
+            // Change character (#3128): the one played until now gets its
+            // own time, and the count starts again for this one.
+            if (chosenId > 0)
+            {
+                try { Chars.AddPlaytime(chosenId, DateTime.Now - PlayCountedFrom()); } catch (Exception ex) { Swallow.Note("Shell.PollChoice, playtime", ex); }
+                choseAt = DateTime.Now;
+            }
             chosenId = id;
             JoinPass.For(id, PresenceLog);
+            int spareWas = 0;
+            try { spareWas = Chars.SpareId(); } catch (Exception ex) { Swallow.Note("Shell.PollChoice, spare", ex); }
             try { Chars.Chose(id); }
             catch (Exception ex) { Log("Could not write that choice down: " + ex.Message); }
+            int spareNow = 0;
+            try { spareNow = Chars.SpareId(); } catch (Exception ex) { Swallow.Note("Shell.PollChoice, spare", ex); }
             Log("chose character " + id);
             ThreadPool.QueueUserWorkItem(delegate
             {
-                try { Voice.Reconfigure(id); } catch (Exception ex) { Swallow.Note("Shell.PollChoice", ex); }
-                CheckIn(id);
+                try { Voice.Reconfigure(id); } catch (Exception ex) { Swallow.Note("Shell.PollChoice, voice", ex); }
+                // A New character pick minted the next spare, which the site
+                // has never heard of. Play checks every id in before the menu
+                // shows, and Change character brings the menu back without a
+                // Play, so this one is checked in now (#3128).
+                if (CheckIn(id) && spareNow > 0 && spareNow != spareWas) CheckIn(spareNow);
+                Chars.Relist(cfg);
             });
+        }
+
+        // When the character played now was picked, for its play time; the
+        // game's start for the first pick of a Play (#3128).
+        static DateTime choseAt = DateTime.MinValue;
+
+        static DateTime PlayCountedFrom()
+        {
+            return choseAt > playStartedAt ? choseAt : playStartedAt;
         }
 
     }

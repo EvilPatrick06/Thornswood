@@ -66,7 +66,8 @@
     window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn, setKey }
     setKey(name)    SkillsKey's name, K unless it is bound elsewhere (#1919)
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
-                    'skills:refresh' | 'skills:pick <words>'
+                    'skills:refresh' | 'skills:pick <words>' |
+                    'skills:switch' (Change character, #3128)
     the plugin turns 'skills:pick X' into the chat line '/pick X'
 
   THE CONTRACT with the server, agreed 20 September, written down here
@@ -701,6 +702,7 @@
       '<div class="nav"></div>' +
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
+        '<div class="tsbtn ghost" data-act="switch">Change character</div>' +
         '<div class="tsbtn ghost" data-act="help">Help</div>' +
         '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
         '<div class="tsbtn primary" data-act="confirm">Confirm</div>' +
@@ -718,6 +720,11 @@
   // Help (#1633), beside Close: the help panel, and this one put down. Never
   // while creating, where this panel is the whole of what there is to do.
   var elHelp = root.querySelector('[data-act="help"]');
+  // Change character (#3128), beside Help and never while creating: the
+  // front waits ten seconds with the character out of combat and standing
+  // still, then takes the game to the character choice. Pressed again, it
+  // stops the wait.
+  var elSwitch = root.querySelector('[data-act="switch"]');
   // The word inside the Close button, so drawFoot can say Close Skyrim while
   // creating without rebuilding the button or losing its key cap.
   var elCloseLabel = elClose.querySelector('span');
@@ -2908,6 +2915,7 @@
     elCloseKey.textContent = keyName;
     elCloseKey.style.display = (cr || !keyName) ? 'none' : '';
     elHelp.style.display = cr ? 'none' : '';
+    elSwitch.style.display = cr ? 'none' : '';
   }
 
   function hint() {
@@ -3597,6 +3605,12 @@
   elHelp.onclick = function () {
     if (creating()) return;
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('work'); } } catch (e) { }
+    api.close();
+  };
+  // The panel goes down so the wait's lines are seen; nothing is decided here.
+  elSwitch.onclick = function () {
+    if (creating()) return;
+    tell('switch');
     api.close();
   };
 

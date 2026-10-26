@@ -40,6 +40,23 @@ Dead instead. See [Death](death.md).
 Nothing about a character is chosen in the launcher. Skyrim's own
 levelling is off, so the face menu does not start a perk tree.
 
+## Changing character in the game
+
+Change character, at the foot of the K panel, goes back to the same
+choice without closing the game (#3128). Patrick settled it on 22 October
+2026: any time out of combat, after ten seconds in place. A line a second
+counts down; moving, a fight, getting hurt or dying stops it, and so does
+pressing it again. At the end the world closes as it does when somebody
+quits, the game goes to its main menu and the slots come back with the
+character just left lit. A slot plays that character, an empty one makes a
+new one in the hall, and the bin forgets one, as at the start of a game.
+The button is not there while a character is being made.
+
+A pick there moves the chat, voice and the join pass to the character
+picked, and the launcher writes the list again after each pick and each
+forget, checks in the id New character uses next, and counts the time
+played against each character in turn.
+
 ## Where this is
 
 The hall, the face, the K panel, the town, the waiting class and

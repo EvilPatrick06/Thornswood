@@ -139,6 +139,8 @@ function panelRig(creatingNow) {
   w.elCloseKey = el();
   // Help beside Close (#1633), which is not there while creating.
   w.elHelp = el();
+  // Change character beside it (#3128), not there while creating either.
+  w.elSwitch = el();
   const api = { close: function () { w.closed++; } };
   const prelude =
     "var section = 'review', status = '', statusKind = '', footKey = '';\n" +
@@ -153,10 +155,10 @@ function panelRig(creatingNow) {
     P.drawFoot + '\n' + P.closeByHand + '\n' + P.onclick + '\n' +
     'return { drawFoot: drawFoot, closeByHand: closeByHand };';
   const made = new Function('Date', 'setTimeout', 'tell', 'api', 'mine',
-                            'elClose', 'elCloseLabel', 'elCloseKey', 'elStatus', 'elConfirm', 'elHelp', body)(
+                            'elClose', 'elCloseLabel', 'elCloseKey', 'elStatus', 'elConfirm', 'elHelp', 'elSwitch', body)(
     clock.Date, clock.setTimeout,
     function (what, extra) { w.told.push(what + (extra ? ' ' + extra : '')); },
-    api, w.mine, w.elClose, w.elCloseLabel, w.elCloseKey, el(), el(), w.elHelp);
+    api, w.mine, w.elClose, w.elCloseLabel, w.elCloseKey, el(), el(), w.elHelp, w.elSwitch);
   w.draw = made.drawFoot;
   w.hand = made.closeByHand;
   w.press = function () { w.elClose.onclick(); };
@@ -176,6 +178,7 @@ if (P.drawFoot && P.closeByHand && P.onclick) {
         w.elCloseKey.style.display === 'none');
     yes('K1 nor Help (#1633): while creating this panel is the whole of what there is to do',
         w.elHelp.style.display === 'none');
+    yes('K1 nor Change character (#3128)', w.elSwitch.style.display === 'none');
   }
   // One press arms it, and nothing is sent.
   {
@@ -222,6 +225,7 @@ if (P.drawFoot && P.closeByHand && P.onclick) {
     yes('K7 in the world the button reads Close', w.label() === 'Close');
     yes('K7 with the K key cap beside it', w.elCloseKey.style.display === '');
     yes('K7 and Help beside it, which opens the help panel (#1633)', w.elHelp.style.display === '');
+    yes('K7 and Change character (#3128)', w.elSwitch.style.display === '');
     w.press();
     yes('K7 a press puts the panel down', w.closed === 1);
     w.press();

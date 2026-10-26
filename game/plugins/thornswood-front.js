@@ -611,6 +611,33 @@
   // settings hold the last one played and the real answer comes from the main
   // menu (the block below), so this is reassigned when the choice is made.
   let PROFILE = Number((client.gameData || {}).profileId) || 0;
+  // For the other plugins, which read the settings file and so had the
+  // character played last rather than the one picked (#3128): voice asks
+  // this, and follows a pick made again at the choice in the game.
+  T.profile = function () { return PROFILE; };
+
+  /*
+    Whose a join pass is: its p, or 0 (#3128). jp1.<payload>.<mac>, the
+    payload base64url JSON the site signs (readPass in gamemode.js reads the
+    same). Only read here, never trusted: the server checks the signature.
+    A pass is put in storage and sent only for the character this game is
+    now, so a character picked again at the choice in the game is never
+    offered the one before it's pass while the launcher fetches its own.
+  */
+  function passProfile(raw) {
+    const parts = String(raw || '').split('.');
+    if (parts.length !== 3 || parts[0] !== 'jp1') { return 0; }
+    const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    let bits = 0, acc = 0, text = '';
+    for (let i = 0; i < parts[1].length; i++) {
+      const v = A.indexOf(parts[1].charAt(i));
+      if (v < 0) { return 0; }
+      acc = ((acc << 6) | v) & 0xffffff;
+      bits += 6;
+      if (bits >= 8) { bits -= 8; text += String.fromCharCode((acc >> bits) & 255); }
+    }
+    try { return Number(JSON.parse(text).p) || 0; } catch (e) { return 0; }
+  }
 
   // ------------------------------------------------- the main menu choice --
   /*
@@ -1038,9 +1065,19 @@
     // starts in the place in line this game holds for the character it was.
     // Ended by the server (#1157): the slots, with the server's sentence over
     // them, and no place in line.
+    // Change character on K (#3128): the slots and nothing over them, with
+    // the character they just left lit and named, since a character made in
+    // this game has no name in the list the launcher wrote at its pick.
     if (menuAgain) {
       list.intro = false; list.music = '';
-      if (menuAgain.ended) { list.ended = String(menuAgain.ended); } else { list.away = menuAgain; }
+      if (menuAgain.ended) { list.ended = String(menuAgain.ended); }
+      else if (menuAgain.switched) {
+        list.last = menuAgain.id;
+        list.characters.forEach(function (c) {
+          if (c && Number(c.profileId) === menuAgain.id && !c.name && menuAgain.name) { c.name = menuAgain.name; }
+        });
+      }
+      else { list.away = menuAgain; }
     }
     if (has !== 'list' || menuAgain) { T.js('window.THORNSWOOD_SELECT=' + JSON.stringify(list) + ';'); }
     inject('thornswood-select.js');
@@ -1098,7 +1135,35 @@
       lineId = 0;
     }
     log('menu: chosen profile', id);
-    if (menuAgain) { relogAs(id); }
+    if (menuAgain) { pickedAgain(id); relogAs(id); }
+  }
+
+  /*
+    PICKED AGAIN AT THE CHOICE IN THE GAME, maybe as somebody else (#3128).
+
+    The page, the chat's connection and the join pass in storage all outlive
+    the world: they were the character this game was before it came back to
+    the choice (the idle check, the server ending the session, or Change
+    character on K). A pick at the menu at the start of a game is before any
+    of them exist; a pick here is not, so each is moved to the new one here.
+
+    - The chat (and voice, which rides on its socket) joins again as the
+      new character: rejoinAs closes the connection and opens it as id,
+      asking the launcher for that character's own token, and does nothing
+      for the same character.
+    - The join pass in storage, which skymp5-client answers the game
+      server's login challenge with, goes when it is another character's.
+      The client then waits for one, and the joinpass block puts this
+      character's there once the launcher has fetched it (passProfile).
+  */
+  function pickedAgain(id) {
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.rejoinAs(' + id + ',"");}catch(e){}');
+    let jp = null;
+    try { jp = sp.storage.thornswoodJoinPass; } catch (e) { jp = null; }
+    if (jp && typeof jp === 'object' && passProfile(jp.pass) !== id) {
+      try { sp.storage.thornswoodJoinPass = null; } catch (e) { }
+      log('menu: the join pass in storage was another character\'s, so the login waits for profile', id + '\'s own');
+    }
   }
 
   /*
@@ -1327,7 +1392,7 @@
     // The pass when it is new and every minute, as the world does (#937), so
     // a staff role can be seated ahead of the line and a required pass is on hand.
     const pass = readText(LINE_PASS_FILE).trim();
-    const passOk = /^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(pass);
+    const passOk = /^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(pass) && passProfile(pass) === lineId;
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
@@ -1659,6 +1724,128 @@
       tellServer('/afk active');
     }
     if (now - afkLastInput >= AFK_MS) { afkAsk(now); }
+  }));
+
+  /*
+    ------------------------------------------------- change character (#3128)
+
+    Patrick's ask: switch to another character from inside the game, without
+    closing Skyrim and going back through the launcher, and the same screen
+    picks a slot, makes a new character and deletes one. His answer on the
+    report page, 22 Oct: any time out of combat, after a 10 s wait in place.
+
+    THE WAY OUT IS THE ONE THE IDLE CHECK TAKES. Change character on the K
+    panel says 'skills:switch'. The character has to be out of combat, and
+    then stand where it is for SWITCH_WAIT_MS, a line a second saying how long
+    is left. Moving more than SWITCH_MOVE_UNITS, getting into combat, losing
+    health, dying or leaving the world stops it and says why; the button
+    again stops it too. At the end the connection to the game server closes
+    (destroyClient, so skymp5-client does not connect again as the same
+    character), the game goes to the main menu, and the character choice
+    comes up with the slots, the one just left lit (backToChoice). A slot
+    plays that character, an empty one makes a new one and the delete icon
+    forgets one, the way the choice at the start of a game does; a pick
+    connects again (relogAs) as whoever was picked (pickedAgain).
+
+    The game server sees a connection close, as when somebody quits, so the
+    character left is put away the same way. Out of combat is this game's
+    check: closing Skyrim leaves at any moment, so a check on the server
+    would hold nobody who wanted out, and the wait is there so a switch is
+    not a way out of a fight.
+
+    In update only: quitToMainMenu and the reads of the character are
+    Papyrus, and the K panel's message arrives on tick.
+  */
+  const SWITCH_WAIT_MS = 10000;
+  const SWITCH_MOVE_UNITS = 32;
+  let switchAsked = false;   // the button was pressed, for the next update
+  let switchAt = 0;          // when the wait began, 0 while there is none
+  let switchFrom = null;     // { x, y, z, hp } when it began
+  let switchSaid = 0;        // the whole seconds left that were last said
+
+  /* What would stop a switch now, in words, or '' when nothing would. */
+  function switchHeld(pc) {
+    if (!pc) { return 'there is no character'; }
+    try { if (pc.isDead()) { return 'your character is dead'; } } catch (e) { }
+    try { if (pc.isInCombat()) { return 'you are in combat'; } } catch (e) { }
+    return '';
+  }
+
+  function switchWhere(pc) {
+    try {
+      return { x: pc.getPositionX(), y: pc.getPositionY(), z: pc.getPositionZ(),
+               hp: pc.getActorValue('Health') };
+    } catch (e) { return null; }
+  }
+
+  function switchStop(why) {
+    switchAt = 0;
+    switchFrom = null;
+    switchSaid = 0;
+    note('Change of character stopped: ' + why + '.');
+  }
+
+  function switchStart(now) {
+    if (!chooseAtMenu || !(PROFILE > 0)) {
+      note('This game does not choose its character in the game. Close Skyrim and press Play to pick another.');
+      return;
+    }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    const held = switchHeld(pc);
+    if (held) { note('You cannot change character now: ' + held + '.'); return; }
+    switchFrom = switchWhere(pc);
+    if (!switchFrom) { note('You cannot change character now: your character could not be found.'); return; }
+    switchAt = now;
+    switchSaid = 0;
+    log('change character: profile', PROFILE, 'asked; waiting', SWITCH_WAIT_MS / 1000 + 's in place');
+  }
+
+  function switchLeave() {
+    const me = PROFILE;
+    const name = myName();
+    switchAt = 0;
+    switchFrom = null;
+    log('change character: ' + SWITCH_WAIT_MS / 1000 + 's in place and out of combat, so out of the world ' +
+        'to the character choice as profile', me, '(' + (name || 'no name') + ')');
+    afkGone = true;
+    afkClose();
+    try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+    try { sp.mpClientPlugin.destroyClient(); } catch (e) { log('change character: could not close the connection to the game server:', e); }
+    try { sp.Game.quitToMainMenu(); } catch (e) { log('change character: could not go to the main menu:', e); }
+    backToChoice({ id: me, name: name, switched: true });
+  }
+
+  sp.on('update', guard('change character', () => {
+    const now = Date.now();
+    if (switchAsked) {
+      switchAsked = false;
+      if (switchAt) { switchStop('as you asked'); return; }
+      switchStart(now);
+      return;
+    }
+    if (!switchAt) { return; }
+    let here = false;
+    try { here = !!globalThis.__thornswoodInWorld; } catch (e) { here = false; }
+    if (!here || afkGone) { switchStop('you left the world'); return; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    const held = switchHeld(pc);
+    if (held) { switchStop(held); return; }
+    const at = switchWhere(pc);
+    if (!at) { switchStop('your character could not be found'); return; }
+    const dx = at.x - switchFrom.x, dy = at.y - switchFrom.y, dz = at.z - switchFrom.z;
+    if (dx * dx + dy * dy + dz * dz > SWITCH_MOVE_UNITS * SWITCH_MOVE_UNITS) { switchStop('you moved'); return; }
+    // Against the most it has been since the wait began, so health coming
+    // back first does not hide a hit after it.
+    if (at.hp < switchFrom.hp) { switchStop('you were hurt'); return; }
+    switchFrom.hp = at.hp;
+    const left = Math.ceil((SWITCH_WAIT_MS - (now - switchAt)) / 1000);
+    if (left <= 0) { switchLeave(); return; }
+    if (left !== switchSaid) {
+      switchSaid = left;
+      note('Changing character in ' + left + (left === SWITCH_WAIT_MS / 1000 ? '. Stay where you are.' : '.'));
+    }
   }));
 
   /* The choice is on screen and this block is holding it up: asking the page
@@ -9678,6 +9865,8 @@
     if (what.indexOf('skills:quit ') === 0) { log('skills:', what.slice(7)); return; }
 
     if (what === 'skills:opened') { T.claimFocus('skills', true); return; }
+    // Change character (#3128); the wait itself runs in update.
+    if (what === 'skills:switch') { switchAsked = true; return; }
     if (what === 'skills:closed') { T.claimFocus('skills', false); return; }
     if (what === 'skills:ready' || what === 'skills:refresh') {
       if (what === 'skills:ready') {
@@ -10672,6 +10861,8 @@
     passReadAt = now;
     const raw = readText(PASS_FILE).trim();
     if (!/^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw)) { return; }
+    // The one before's, until the launcher has this character's (#3128).
+    if (passProfile(raw) !== PROFILE) { return; }
     const keyLine = readText(PASS_KEY_FILE).trim().split(' ');
     if (keyLine.length === 2 && keyLine[0] === raw.split('.')[2] && /^[A-Za-z0-9_-]{16,128}$/.test(keyLine[1])) {
       sp.storage.thornswoodJoinPass = { pass: raw, key: keyLine[1] };
