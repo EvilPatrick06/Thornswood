@@ -4334,6 +4334,10 @@ TASK_TAG = 'Main'
 TASK_FORM = 4
 KNOWN_FORM = 4
 DEV_FORM = 3
+# What a remembered merged change (known_changed) was found under. True: any
+# merged pull request naming the issue. 2: one that is work on it, works_on
+# (#3140, 26 Oct).
+KNOWN_CHANGED_FORM = 2
 
 
 def _github_get(url):
@@ -4607,7 +4611,8 @@ def fix_refs(timeline):
     """
     (pull requests, commits) from the issue's timeline: every pull request of
     KNOWN_REPO that mentions the issue and is merged or still open, as dicts
-    of number, title, url and merged_at, by number; and every commit of
+    of number, title, url, merged_at and text (its title and body, which
+    works_on reads), by number; and every commit of
     KNOWN_REPO whose message names the issue, by sha, in the order GitHub
     saw them. A pull request closed without merging carries nothing, so it
     is left out. Read from the timeline alone, which the bot's issues token
@@ -4631,7 +4636,8 @@ def fix_refs(timeline):
                 'number': int(src['number']),
                 'title': str(src.get('title') or '').strip(),
                 'url': str(src.get('html_url') or ''),
-                'merged_at': pr.get('merged_at')}
+                'merged_at': pr.get('merged_at'),
+                'text': '%s\n%s' % (src.get('title') or '', src.get('body') or '')}
         elif ev.get('event') == 'referenced' and ev.get('commit_id'):
             if ('/repos/%s/' % KNOWN_REPO).lower() not in str(ev.get('commit_url') or '').lower():
                 continue
@@ -4639,6 +4645,29 @@ def fix_refs(timeline):
             if sha not in commits:
                 commits.append(sha)
     return [prs[n] for n in sorted(prs)], commits
+
+
+# How a pull request says it is work on an issue: "Refs #N", or a closing
+# keyword (Closes, Fixes, Resolves #N), the way the pull request template and
+# Developer-Guide.md write it, with a list after one word ("Refs #1, #2 and
+# #3") and an owner/repo in front allowed. GitHub cross-references an issue
+# from any pull request that has its number anywhere, a table of other
+# issues included: #3437 (Refs #3137) named five known issues in its body
+# while it cleaned the list, and on merging would have taken all five off
+# #known-issues, though nothing had been done about any of them.
+WORK_REF = re.compile(r'\b(?:refs?|close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s*:?\s*'
+                      r'((?:(?:[\w.-]+/[\w.-]+)?#\d+\b(?:\s*(?:,|\band\b|&)\s*)?)+)', re.I)
+WORK_REF_ONE = re.compile(r'(?:([\w.-]+/[\w.-]+))?#(\d+)')
+
+
+def works_on(pr, number):
+    """Whether the pull request (fix_refs' dict) says it is work on issue
+       number, with "Refs #N" or a closing keyword; only naming it is not."""
+    for m in WORK_REF.finditer(str(pr.get('text') or '')):
+        for repo, n in WORK_REF_ONE.findall(m.group(1)):
+            if int(n) == int(number) and (not repo or repo.lower() == KNOWN_REPO.lower()):
+                return True
+    return False
 
 
 BUILD_LINE = re.compile(r'^\s*(?:needs\s+)?build\s*:\s*(\S.*?)\s*$', re.I | re.M)
@@ -5103,7 +5132,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
 
     A known issue is a finding nothing has been done about yet (Patrick, 22
     Oct): an open issue labelled Dev Findings or Main Findings with no merged
-    pull request that names it and no "Test task:" comment. The moment one of
+    pull request that is work on it (works_on: "Refs #N" or a closing
+    keyword, not a mention) and no "Test task:" comment. The moment one of
     those comes, or the issue closes or loses its label, its post goes: the
     work on it is then a test task, not a known issue.
 
@@ -5113,6 +5143,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     request merging does not change the issue's updated_at, so the timeline
     of each finding is read every pass until a merged pull request is found
     in it; that is remembered (state['known_changed']), since a merge stays.
+    A finding remembered under an older rule of what counts
+    (KNOWN_CHANGED_FORM) is read once more under this one.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
@@ -5132,11 +5164,14 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
-        if key not in changed:
+        if changed.get(key) != KNOWN_CHANGED_FORM:
             timeline = await loop.run_in_executor(None, github_timeline, num, get)
-            if any(p.get('merged_at') for p in fix_refs(timeline)[0]):
-                changed[key] = True
+            if any(p.get('merged_at') and works_on(p, num)
+                   for p in fix_refs(timeline)[0]):
+                changed[key] = KNOWN_CHANGED_FORM
                 state['_dirty'] = True
+            elif changed.pop(key, None) is not None:
+                state['_dirty'] = True      # an older rule's mention, not work
         if key in changed:
             continue                # a change for it is merged: not a known issue
         if (have and have.get('updated') == issue.get('updated_at')
