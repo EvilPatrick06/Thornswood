@@ -249,6 +249,16 @@ jobs:
           & python tests/test-retrieval-source-reader.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Check every Discord doc has its change line
+        shell: pwsh
+        run: |
+          # Issue #3457: #3445 changed the words of four Discord docs, which are
+          # read out of the join and rules pages, with no change line, and was
+          # green, since check_docs ran only in the nightly's bot harnesses.
+          # The fingerprints are in bot\content.py now, no discord.py needed.
+          & python tests/test-3457-doc-change-lines.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run the gate harnesses
         id: gate
         shell: pwsh
