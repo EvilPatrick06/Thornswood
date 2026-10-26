@@ -268,13 +268,34 @@ namespace Thornswood
         // ------------------------------------------------------------ Fix
 
         /// <summary>The Fix button.</summary>
-        static void RunFix()
+        static void RunFix() { RunFix(false); }
+
+        /// <summary>
+        /// True when Fix after an update found Thornswood's own folder being
+        /// prepared, so the folder's finish runs it (FolderWork) instead of
+        /// leaving it for a press of Fix (#3201).
+        /// </summary>
+        static bool fixWhenFolderReady;
+
+        /// <summary>
+        /// Install now's second half (#3201): the update has gone in, or
+        /// failed, and Fix's whole path runs on the folder as it left it.
+        /// </summary>
+        static void FixAfterUpdate(bool wentIn)
+        {
+            if (wentIn) Upkeep.Forget(IssueKind.Update);
+            RunFix(true);
+        }
+
+        /// <param name="afterUpdate">True when an update has just gone in or failed (Install now, the automatic update, the first start of a new launcher): the log says so, and FixRest never takes that same update a second time (#3201).</param>
+        static void RunFix(bool afterUpdate)
         {
             if (fixing) return;
             // Nothing is written into a folder while it is being made or
             // brought up to date. On 11 Oct a new dev build's first Fix ran
             // while its own folder was being made and wrote into the Steam
-            // copy (#2403).
+            // copy (#2403). After an update, the folder's finish runs it.
+            if (ownGameBusy && afterUpdate) { fixWhenFolderReady = true; Log("Thornswood's own Skyrim folder is being prepared. The scan after the update runs, and puts right what it finds, as soon as the folder is ready."); return; }
             if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Press Fix when it is done: nothing is put right in a folder while it is being made."); return; }
             if (Downgrade.Busy) { Log("The Downgrade is running. Press Fix when it is done."); return; }
             if (playBar.Active) { Log("An update is going in. Press Fix when it is done."); return; }
@@ -293,7 +314,7 @@ namespace Thornswood
             btnScan.IsEnabled = false;
             triedByFix.Clear();
             Verify.OwnFolderNext = false;
-            Log("Fix: scanning everything first.");
+            Log(afterUpdate ? "The update is done. Scanning everything again, and putting right what the scan finds." : "Fix: scanning everything first.");
             List<Issue> plugins = null, rest = null;
             VersionDoc feed = null;
             try
@@ -314,7 +335,7 @@ namespace Thornswood
             if (AllIssues(plugins).Count == 0)
             {
                 fixing = false;
-                Log("Fix found nothing to put right.");
+                Log(afterUpdate ? "The scan after the update found nothing wrong." : "Fix found nothing to put right.");
                 ShowVerify(plugins, false);
                 return;
             }
@@ -324,17 +345,18 @@ namespace Thornswood
             // carries on whether it succeeds or not, and the scan after says.
             VersionDoc known = feed;
             if (Has(rest, IssueKind.Behind) &&
-                StartOwnGame(false, true, delegate { FixRest(known); }, delegate { FixRest(known); }))
+                StartOwnGame(false, true, delegate { FixRest(known, afterUpdate); }, delegate { FixRest(known, afterUpdate); }))
                 return;
-            FixRest(known);
+            FixRest(known, afterUpdate);
         }
 
         /// <summary>
         /// Fix after the folder: what writes files, a scan, the report, and
         /// then what asks or restarts. <paramref name="feed"/> is the update
         /// feed Fix's first scan read, so the update is judged on one answer.
+        /// <paramref name="afterUpdate"/> is RunFix's.
         /// </summary>
-        static void FixRest(VersionDoc feed)
+        static void FixRest(VersionDoc feed, bool afterUpdate)
         {
             var said = new List<string>();
             Action<string> say = delegate(string m) { lock (said) said.Add(m); };
@@ -401,10 +423,24 @@ namespace Thornswood
             if (Has(Upkeep.LastIssues, IssueKind.Update) && feed != null)
             {
                 OnVersionDoc(feed, false);
-                if (updatePending && (pendingPacks.Count > 0 || selfUpdateOffered))
+                bool waiting = updatePending && (pendingPacks.Count > 0 || selfUpdateOffered);
+                // Straight after an update, only a newer one on the feed is
+                // taken: a Ship that published again while the first was
+                // going in. The one that was just tried is never taken a
+                // second time, whether it went in or failed, because doing
+                // the same thing again is not a fix for why it did not hold.
+                if (waiting && afterUpdate && updateTried != null &&
+                    updateTried.IsSupersetOf(UpdateParts(pendingPacks, feed, selfUpdateOffered)))
                 {
-                    Log("Fix is taking the update now, last." + (selfUpdateOffered ? " The launcher restarts into the new one when it is in." : ""));
-                    RunUpdate(delegate
+                    Log(updateTriedWentIn
+                        ? "The update that just went in is still on the feed as waiting, so Fix does not take it a second time. Send the launcher log to the Discord: this one needs looking at."
+                        : "The update did not go in, so Fix does not take it again. The update's own line in the log says why; Install now takes it once that is put right.");
+                }
+                else if (waiting)
+                {
+                    Log((afterUpdate && updateTried != null ? "A newer update went out while that one was going in. Fix is taking it now, last." : "Fix is taking the update now, last.") +
+                        (selfUpdateOffered ? " The launcher restarts into the new one when it is in." : ""));
+                    RunUpdate(delegate(bool wentIn)
                     {
                         Upkeep.Forget(IssueKind.Update);
                         RunScan(true);
@@ -412,9 +448,12 @@ namespace Thornswood
                     });
                     return;
                 }
-                // The mod updates wait for the collection (OnVersionDoc), so
-                // Fix has tried the update and the card says why it waits.
-                Log("The update waits until the collection is installed, as the card above Play says.");
+                else
+                {
+                    // The mod updates wait for the collection (OnVersionDoc), so
+                    // Fix has tried the update and the card says why it waits.
+                    Log("The update waits until the collection is installed, as the card above Play says.");
+                }
                 if (Upkeep.LastIssues != null)
                     foreach (Issue i in Upkeep.LastIssues) if (i.Kind == IssueKind.Update) triedByFix.Add(FixKey(i));
                 ShowVerify(plugins, false);

@@ -44,6 +44,12 @@
        runners on the box are eight accounts, and another runner's stand-in
        SkyrimSE.exe made case 4 see a running game. The stand-in here has a
        name of its own, so no other build can see it as a game.
+    7. #3201. One press of Install now does the whole update: the card's
+       button and Settings' are one handler, the automatic update is the
+       same press, the update is followed by Fix's whole path (scan, put
+       right, scan again), which never takes the update it just tried a
+       second time, and the first start of a new launcher runs that Fix.
+       By the source, in the wiring section.
 
   HOW. Every file in launcher\app is compiled with a driver into one program,
   with the compiler and C# version the build uses (Launcher-Csc.ps1). The
@@ -91,14 +97,14 @@ $checks = Src (Join-Path $App 'Checks.cs')
 
 Yes 'the Scan button asks everything, and the Fix button is RunFix' (
     $shell.Contains('btnScan.Click += delegate { RunScan(true); };') -and $shell.Contains('btnFix.Click += delegate { RunFix(); };'))
-$runFix = [regex]::Match($sf, '(?s)static void RunFix\(\)(.*?)\n        \}\n').Groups[1].Value
+$runFix = [regex]::Match($sf, '(?s)static void RunFix\(bool afterUpdate\)(.*?)\n        \}\n').Groups[1].Value
 Yes 'Fix refuses while the own folder is being prepared, so it never writes into a folder that is being made (#2403)' (
     $runFix -match 'if \(ownGameBusy\) \{ Log\(' -and $runFix.IndexOf('if (ownGameBusy)') -lt $runFix.IndexOf('fixing = true;'))
 Yes 'and while the Downgrade or an update is going in' ($runFix -match 'if \(Downgrade\.Busy\)' -and $runFix -match 'if \(playBar\.Active\)')
 Yes 'Fix scans first, then brings the folder up to date from Vortex before anything else, carrying on either way' (
     $runFix -match 'Upkeep\.Look\(cfg, true, null, out feed\)' -and
-    $runFix -match 'Has\(rest, IssueKind\.Behind\) &&\s*StartOwnGame\(false, true, delegate \{ FixRest\(known\); \}, delegate \{ FixRest\(known\); \}\)')
-$fixRest = [regex]::Match($sf, '(?s)static void FixRest\(VersionDoc feed\)(.*?)\n        \}\n').Groups[1].Value
+    $runFix -match 'Has\(rest, IssueKind\.Behind\) &&\s*StartOwnGame\(false, true, delegate \{ FixRest\(known, afterUpdate\); \}, delegate \{ FixRest\(known, afterUpdate\); \}\)')
+$fixRest = [regex]::Match($sf, '(?s)static void FixRest\(VersionDoc feed, bool afterUpdate\)(.*?)\n        \}\n').Groups[1].Value
 $disk = $fixRest.IndexOf('Upkeep.FixOnDisk(')
 $rescan = $fixRest.IndexOf('List<Issue> plugins = Rescan(feed);')
 $report = $fixRest.IndexOf('Report(plugins);')
@@ -116,7 +122,32 @@ Yes 'and says only what is still wrong, with what will put it right, after it' (
 Yes 'the Fix button is on exactly when there is something Fix can do' ($sf.Contains('btnFix.IsEnabled = canFix > 0 && !fixing;'))
 Yes 'a log line that blocks Play keeps the words the site reads' ($sf.Contains('(i.Blocking ? "blocks Play: " : "worth knowing: ")'))
 Yes 'the bring-up-to-date tells Fix when it fails, so Fix carries on' ($own -match 'else if \(fail != null && failed != null\) failed\(\);')
-Yes 'and the update tells Fix when it is done, or failed, so Fix scans again' (([regex]::Matches($upd, 'if \(after != null\) after\(\);')).Count -eq 2)
+Yes 'and the update tells Fix when it is done, or failed, so Fix scans again' (
+    $upd.Contains('if (after != null) after(true);') -and $upd.Contains('if (after != null) after(false);'))
+
+# #3201: one press of Install now does the whole update. Both buttons are one
+# handler, the automatic update is the same press, the update is followed by
+# Fix's whole path, which never takes the update it just tried again, and the
+# first start of a new launcher runs that same Fix.
+Yes 'Install now, on the card above Play and in Settings, is one handler (#3201)' (
+    $shell.Contains('btnUpdate.Click += delegate { InstallNowPressed(); };') -and $shell.Contains('btnInstallNow.Click += delegate { InstallNowPressed(); };'))
+Yes 'which opens the collection while the card is about the mods, and is UpdateNow otherwise' (
+    $upd -match '(?s)static void InstallNowPressed\(\)\s*\{\s*if \(collectionBarUp \|\| \(collectionNoteUp && !updatePending\)\).*?UpdateNow\(\);')
+Yes 'both buttons say the same thing, so the card never says Install now over a card about the mods' (
+    -not ($shellCode -match 'btnInstallNow\.Content = ') -and $upd -match 'btnUpdate\.Content = text;')
+Yes 'the automatic update after the game closed for one is the same press' ($upd -match '(?s)if \(install && cfg\.AutoUpdate\)\s*\{\s*Log\("Installing it now\."\);\s*UpdateNow\(\);')
+Yes 'UpdateNow is the update, then Fix after it' ($upd -match 'static void UpdateNow\(\)\s*\{\s*RunUpdate\(FixAfterUpdate\);\s*\}')
+Yes 'Fix after an update forgets the update only when it went in, and runs Fix whole' (
+    $sf -match '(?s)static void FixAfterUpdate\(bool wentIn\)\s*\{\s*if \(wentIn\) Upkeep\.Forget\(IssueKind\.Update\);\s*RunFix\(true\);\s*\}')
+Yes 'after an update, Fix never takes that same update a second time, whether it went in or failed' (
+    $fixRest -match 'afterUpdate && updateTried != null &&\s*updateTried\.IsSupersetOf\(UpdateParts\(pendingPacks, feed, selfUpdateOffered\)\)' -and
+    $fixRest.IndexOf('updateTried.IsSupersetOf') -lt $fixRest.IndexOf('RunUpdate(delegate'))
+Yes 'and the update records what it tried both ways' (([regex]::Matches($upd, 'updateTried = UpdateParts\(packs, doc, withLauncher\);')).Count -eq 2)
+Yes 'a folder being prepared holds Fix after an update until it is ready, and its finish runs it' (
+    $runFix -match 'if \(ownGameBusy && afterUpdate\) \{ fixWhenFolderReady = true;' -and
+    $own -match '(?s)if \(fixWhenFolderReady\)\s*\{\s*fixWhenFolderReady = false;\s*RunFix\(true\);')
+Yes 'the first start of a new launcher runs that Fix, after the icon pass, in a folder of its own' (
+    $shell -match '(?s)moved = Icons\.Ensure\(true\);.*?if \(!Paths\.Collection\)\s*try \{ win\.Dispatcher\.BeginInvoke\(\(Action\)delegate \{ RunFix\(true\); \}\);')
 Yes 'Fix writes into the game folder with the folder to itself (OwnGame.Alone)' ($upkeep -match '(?s)OwnGame\.Alone\(delegate\s*\{.*?Verify\.Fix\(cfg, say\).*?\}, delegate')
 Yes 'a game whose path cannot be read counts as ours only while our own file of that name runs (#2856)' (
     $checks -match '\(at == null && !OwnImageRunning\(n\)\)\) skip = true;')

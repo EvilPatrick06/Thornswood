@@ -527,6 +527,14 @@ namespace Thornswood
                     DrawOwnGame();
                     if (fail == null && !make && then != null) then();
                     else if (fail != null && failed != null) failed();
+                    // The scan after an update that found the folder being
+                    // prepared (#3201). Fix's own refresh is "then", and Fix
+                    // under way turns this away.
+                    if (fixWhenFolderReady)
+                    {
+                        fixWhenFolderReady = false;
+                        RunFix(true);
+                    }
                 });
             }
             catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, finish BeginInvoke", ex); }

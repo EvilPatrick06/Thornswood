@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Windows;
 
@@ -286,7 +287,7 @@ namespace Thornswood
             {
                 collectionBarUp = false;
             }
-            btnInstallNow.Content = "Install now";
+            InstallLabel("Install now");
 
             if (pendingPacks.Count == 0 && !newLauncher)
             {
@@ -321,7 +322,7 @@ namespace Thornswood
             if (install && cfg.AutoUpdate)
             {
                 Log("Installing it now.");
-                RunUpdate();
+                UpdateNow();
             }
         }
 
@@ -431,10 +432,71 @@ namespace Thornswood
             });
         }
 
-        static void RunUpdate() { RunUpdate(null); }
+        /// <summary>
+        /// Install now, on the card above Play and in Settings, and the
+        /// automatic update after the game was closed for one: the whole
+        /// update in one press (#3201). The update goes in, then Fix's whole
+        /// path runs on the folder as the update left it: it scans everything
+        /// again, puts right what it can and says what is left, so Diagnostics
+        /// and Ready to launch show the install after the update, not before
+        /// it. An update that failed still gets the rest of Fix, and is not
+        /// taken again (FixRest). A new launcher restarts the launcher; the
+        /// new one runs the same Fix once its window is up (Shell.cs,
+        /// win.ContentRendered).
+        ///
+        /// Patrick, 21 Oct, 6:30 PM: "when you click update now it should let
+        /// you click it only once and do it all and not have to click twice
+        /// like I just did". Until this the update went in and stopped: Scan's
+        /// lists were the ones from before it, Play went by them, and what
+        /// Scan had found stayed for a second press, of Fix.
+        /// </summary>
+        static void UpdateNow()
+        {
+            RunUpdate(FixAfterUpdate);
+        }
 
-        /// <param name="after">Run on the window's thread when the update has gone in or failed without restarting the launcher, or null. Fix takes the update last and scans again after it (#2627).</param>
-        static void RunUpdate(Action after)
+        /// <summary>
+        /// The card's button above Play and the one in Settings: opens the
+        /// collection while the card is about the mods, and otherwise is
+        /// Install now (UpdateNow).
+        /// </summary>
+        static void InstallNowPressed()
+        {
+            if (collectionBarUp || (collectionNoteUp && !updatePending))
+            {
+                try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                return;
+            }
+            UpdateNow();
+        }
+
+        /// <summary>What both of those buttons say, so the card's never says Install now over a card about the mods.</summary>
+        static void InstallLabel(string text)
+        {
+            if (btnInstallNow != null) btnInstallNow.Content = text;
+            if (btnUpdate != null) btnUpdate.Content = text;
+        }
+
+        /// <summary>
+        /// What the last update tried to put in (UpdateParts) and whether it
+        /// went in, so Fix after it can tell a new update on the feed from the
+        /// one it just tried, and never takes that one a second time (FixRest).
+        /// </summary>
+        static HashSet<string> updateTried = null;
+        static bool updateTriedWentIn;
+
+        /// <summary>Each pack of <paramref name="packs"/>, by id and checksum, and the feed's launcher when <paramref name="launcher"/>.</summary>
+        static HashSet<string> UpdateParts(List<Pack> packs, VersionDoc v, bool launcher)
+        {
+            var parts = new HashSet<string>(StringComparer.Ordinal);
+            if (packs != null) foreach (Pack p in packs) if (p != null) parts.Add(p.id + "@" + p.sha256);
+            if (launcher && v != null) parts.Add("launcher " + v.launcherVersion);
+            return parts;
+        }
+
+        /// <param name="after">Run on the window's thread when the update has gone in (true) or failed (false) without restarting the launcher, or null. Fix takes the update last and scans again after it (#2627); Install now runs Fix after it (#3201).</param>
+        static void RunUpdate(Action<bool> after)
         {
             if (playing) { Log("Quit the game first."); return; }
             // An update writes into the build. A game still holding files open
@@ -507,8 +569,10 @@ namespace Thornswood
                         PlayProgress.End();
                         updatePending = false;
                         DrawStatus(); BuildModList();
+                        updateTried = UpdateParts(packs, doc, withLauncher);
+                        updateTriedWentIn = true;
                         Log("Update finished.");
-                        if (after != null) after();
+                        if (after != null) after(true);
                     }));
                 }
                 catch (Exception ex)
@@ -529,7 +593,9 @@ namespace Thornswood
                         PlayProgress.End();
                         DrawStatus();
                         Log("Play stays off until the update goes through, because the server is expecting the newer mod list.");
-                        if (after != null) after();
+                        updateTried = UpdateParts(packs, doc, withLauncher);
+                        updateTriedWentIn = false;
+                        if (after != null) after(false);
                     }));
                 }
                 finally { PlayProgress.Second(false); }

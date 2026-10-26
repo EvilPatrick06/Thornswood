@@ -123,7 +123,7 @@ it says a pool thread.
 | 21 | `Shell.cs:490 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:206 Heal()` fetches them. Then `Shell.cs:491 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:492 StartPing` asks whether the server is up. |
 | 22 | `Shell.cs:496 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). Always: config.json cannot switch it off, and Play stays shut until it answers (#937). |
 | 23 | `Shell.cs:512 Voice.Prepare` | Installs the resolver that loads WebView2 out of the exe. `Shell.cs:520 Voice.Start` is queued until the window is idle on screen. |
-| 24 | `Shell.cs:529 win.ContentRendered` | Once the window has drawn, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. |
+| 24 | `Shell.cs:529 win.ContentRendered` | Once the window has drawn, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. On that first start the shortcut icons are brought up to date and then, in Thornswood's own folder, Fix runs as it does after any update (`RunFix(true)`, #3201), so the update that restarted the launcher ends the way Install now does. |
 | 25 | `Shell.cs:571 Application` | A new WPF Application with `ShutdownMode.OnMainWindowClose`, because the hidden voice window would otherwise keep the process alive. `Shell.cs:573 app.Exit` stops voice and presence and releases Hold. `Shell.cs:580 DispatcherUnhandledException` logs a fault and keeps the launcher up. `Shell.cs:618 StartStallWatch` logs when the window stops answering. |
 | 26 | `Shell.cs:643 app.Run` | The message loop. Run does not return until the window closes. |
 | 27 | `ShellOwnGame.cs:46 ContentRendered` | Once the window is on screen: `ShellOwnGame.cs:65 OwnGameAtStart()` refreshes the game folder by itself when Vortex has deployed since it was made (`OwnGame.cs:662 NeedsRefresh()`), or offers to make it in the shared shape. When Vortex deploys into a Thornswood game folder it logs why nothing is refreshed and what to do (`OwnGame.RefusedSource`). Play also asks that same test now, through `OwnGameRefreshIfDue`. |
@@ -250,7 +250,13 @@ packs and the new launcher and writes nothing into Game or the records a
 refresh reads, so it runs while the game folder is being prepared;
 `WriteUpdate` then puts them in under `OwnGame.Alone`, after any refresh
 under way, and checks again any file a refresh changed in between; the new
-launcher goes in last (`SwapIn`). `ShellUpdate.cs:51 CheckFailed()` keeps
+launcher goes in last (`SwapIn`). Install now, on the card above Play and in
+Settings, and the automatic update after the game was closed for one, go
+through `ShellUpdate.cs UpdateNow` (#3201): the update, then Fix's whole
+path on the folder the update left (`ShellScanFix.cs FixAfterUpdate`), which
+scans everything again, puts right what the scan finds and never takes the
+update it just tried a second time. A new launcher's first start runs the
+same Fix (row 24 of the startup order). `ShellUpdate.cs:51 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:80 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
