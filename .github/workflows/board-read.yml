@@ -14,9 +14,20 @@
 #
 #   pwsh scripts/ops/Read-Board.ps1
 #
-# which starts this workflow on main, waits for the run, downloads the
-# "board" artifact it leaves and writes board.json where it says. The run
-# changes nothing on the board: every call it makes is a GraphQL query.
+# which starts this workflow on main, waits for the run, reads board.json
+# back out of the run's log and writes it where it says. The run changes
+# nothing on the board: every call it makes is a GraphQL query.
+#
+# THE HAND-BACK IS THE LOG, NOT AN ARTIFACT (#3410). Until 25 Oct 2026 the
+# file was the run's artifact "board". Artifact storage is capped at 500 MB
+# for the whole repository, and that day it was full: three board reads in a
+# row (runs 40210248299, 40211493452, 40231207157) read all 712 cards and
+# could not hand them back. A run's log takes no room in that storage. So the
+# read step prints board.json, gzipped and in base64, between a BOARD-JSON
+# begin line (its length and sha256) and a BOARD-JSON end line, 4000
+# characters a line, and Read-Board.ps1 reads the job's log, puts it back
+# together and holds it to that length and sha256. GitHub keeps a log 90
+# days.
 #
 # WHAT board.json HOLDS. When it was read, the board's title and address, its
 # Status options in board order, its built-in workflows and whether each is
@@ -27,14 +38,10 @@
 #
 # THE TOKEN. BOARD_TOKEN, the classic token board-status.yml uses, from the
 # "board" environment, which only main may use. The run's own token is given
-# no permissions at all; the artifact upload uses the runner's own runtime
-# token, not GITHUB_TOKEN.
+# no permissions at all.
 #
 # WHERE IT RUNS. On the VPS runners, like board-status.yml. The read is a few
-# GraphQL pages and the upload one small file.
-#
-# Every action here is named by a full length commit SHA with its tag in the
-# comment, for the reason build.yml gives.
+# GraphQL pages. It runs no action, so there is nothing in it to pin.
 name: Read the board
 run-name: Board read by ${{ github.actor }}
 on:
@@ -45,7 +52,7 @@ jobs:
     name: Read every card
     runs-on: [self-hosted, Windows, thornswood-vps]
     environment: board
-    # A dozen calls to GitHub and one upload. Past this it is stuck, not slow.
+    # A dozen calls to GitHub. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:
       - name: Read the board into board.json
@@ -103,20 +110,28 @@ jobs:
           }
           $dir = Join-Path $env:RUNNER_TEMP 'board-read'
           New-Item -ItemType Directory -Force -Path $dir | Out-Null
-          [IO.File]::WriteAllText((Join-Path $dir 'board.json'), ($out | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding $false))
+          $file = Join-Path $dir 'board.json'
+          [IO.File]::WriteAllText($file, ($out | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding $false))
           Write-Host ("read {0} cards from {1}" -f $items.Count, $project.url)
           foreach ($g in @($items | Group-Object { if ($_.status) { $_.status } else { '(no Status)' } } | Sort-Object Name)) { Write-Host ("  {0}: {1}" -f $g.Name, $g.Count) }
           "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Keep board.json as the run's artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: board
-          path: ${{ steps.read.outputs.dir }}
-          if-no-files-found: error
-          retention-days: 3
+          # The hand-back (header, THE HAND-BACK IS THE LOG). The marker is
+          # put together here so the script's own text, which the log shows
+          # first, never holds it.
+          $mark = 'BOARD' + '-JSON'
+          $bytes = [IO.File]::ReadAllBytes($file)
+          $sha = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+          $packed = New-Object IO.MemoryStream
+          $zip = New-Object IO.Compression.GZipStream($packed, [IO.Compression.CompressionLevel]::Optimal)
+          $zip.Write($bytes, 0, $bytes.Length)
+          $zip.Dispose()
+          $b64 = [Convert]::ToBase64String($packed.ToArray())
+          Write-Host ("{0} begin {1} {2}" -f $mark, $bytes.Length, $sha)
+          for ($i = 0; $i -lt $b64.Length; $i += 4000) { Write-Host ("{0} {1}" -f $mark, $b64.Substring($i, [Math]::Min(4000, $b64.Length - $i))) }
+          Write-Host ("{0} end" -f $mark)
 
-      # The file is on the artifact now; the runner keeps nothing of it.
+      # The file is in the log now; the runner keeps nothing of it.
       - name: Remove board.json from the runner
         if: always()
         shell: pwsh

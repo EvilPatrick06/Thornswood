@@ -118,7 +118,7 @@ Yes ("it holds workflows to read ({0}: {1})" -f $files.Count, (($files | ForEach
 # The ones that exist today. Named rather than counted, so a renamed or
 # deleted workflow says so here instead of this harness reading two files and
 # reporting that everything is fine.
-foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 'board-status.yml', 'board-read.yml', 'staff-notice.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'git-ref.yml', 'github-admin.yml') {
+foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 'board-status.yml', 'board-read.yml', 'staff-notice.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'git-ref.yml', 'github-admin.yml', 'engine-prune.yml') {
     Yes "$want is one of them" (@($files | Where-Object { $_.Name -eq $want }).Count -eq 1)
 }
 # drop-claims.yml (#1863) runs no action on purpose: it checks out nothing and
@@ -126,8 +126,10 @@ foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 
 # tests\test-1863-drop-claims.ps1 holds it to that. board-status.yml (#2863)
 # is the same shape, held by tests\test-2863-board-status.ps1, and so are
 # expire-claims.yml, done-on-merge.yml and area-label.yml (#3192), held by
-# tests\test-3192-board-hygiene.ps1.
-$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml')
+# tests\test-3192-board-hygiene.ps1. engine-prune.yml (#3410) is too, held by
+# tests\test-3410-artifact-room.ps1, and since #3410 board-read.yml hands
+# board.json back in its log instead of an artifact, so it runs none either.
+$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml', 'engine-prune.yml', 'board-read.yml')
 
 $all = @()
 foreach ($f in $files) {
