@@ -178,7 +178,7 @@ function Remove-Capability([string]$Name) { return [bool](Remove-WindowsCapabili
 function Add-Capability([string]$Name) { return [bool](Add-WindowsCapability -Online -Name $Name).RestartNeeded }
 
 function Save-Download([string]$From, [string]$To) {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -Uri $From -OutFile $To -UseBasicParsing
 }
 function Get-Sha256([string]$Path) { return [string](Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash }
