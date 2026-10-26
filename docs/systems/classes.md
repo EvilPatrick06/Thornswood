@@ -7,6 +7,13 @@ Smith who is a Hunter does not, and has to know somebody who did.
 Until a class is picked, every seam, carcass, plant, fishing spot and
 crop turns you away.
 
+Every plant, tree and rack in the world is somebody's work, split
+resource by resource: one of these five classes, or a short list of
+things that are anybody's (a giant's bowl of mammoth cheese) or
+nobody's (a sealed mead barrel). A thing no list names is nobody's.
+It gives nothing, and the server log names it so it can be given its
+owner.
+
 The hours are the profession ladder, and the count starts again at
 each rank: 100 pieces to advanced, 250 to expert, 600 to master.
 One successful use of the verb is one piece. See

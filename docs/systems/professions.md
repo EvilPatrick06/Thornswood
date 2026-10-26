@@ -138,6 +138,10 @@ are made by whoever the bench opens for.
 | Aetherium forge | Shut for everybody. Nobody works it |
 | Smelter | Platewright, from novice |
 
+A cooking spit is a cookpot: the same recipes, so it opens for the
+Hearthcook and nobody else. Boiling water there is not cooking, and
+anybody may boil water at a spit or a pot.
+
 A forge or a skyforge burns one charcoal, cheapest grade in the pack
 first. No charcoal, nothing is made. A war axe, a battleaxe, a
 warhammer, and a mace also take 1 Tool Handle. Swords, greatswords,

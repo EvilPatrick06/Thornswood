@@ -7001,7 +7001,108 @@ const GAME_TUNING = {
  *  '__proto__' finds something on Object.prototype that a truth test cannot
  *  tell from a pheasant. */
 function isGame(baseDesc) {
-  return Object.prototype.hasOwnProperty.call(GAME_BY_BASE, baseDesc);
+  return Object.prototype.hasOwnProperty.call(GAME_BY_BASE, baseDesc) ||
+         Object.prototype.hasOwnProperty.call(RACKS_BY_HAND, baseDesc);
+}
+
+/*
+  A CARCASS OR A CATCH LYING IN THE WORLD THAT THE PASS LEFT UNRANKED (#3141).
+
+  Patrick, 22 October, on #3141: each gathering action goes to the class whose
+  work it is, resource by resource, "Neither just properly split it". The pass
+  files these four in its unranked list because their produce is a leveled list
+  (a LVLI) rather than one item, so it could not price or rank them, and until
+  now nothing answered them: the press fell out of onActivate and the engine
+  handed the list's roll to whoever pressed it.
+
+    38a83 Dragonborn  DLC2HorkerDead01, a dead horker the Skaal have hauled up
+                      in their village. A body, so the hunter's, at the rank the
+                      hunter's own horker body asks (lists/hunter.md: advanced).
+    17b9e1, 17ba31,   WHOarFish, WHOarFishHanging, WHOarFishHangingBig: fish
+    19648b Windhelm   landed and hung at the docks. A catch, so the fisher's,
+                      at novice, the rank of the fisher's commonest water. It
+                      is taken by hand like hanging game, so no pole is asked.
+
+  A row says who (owner), the rank, what the thing in the world is (from, for
+  the sentence) and the list the record hands over (list). The list is read out
+  of the load order when it is first pressed (listItems): one of its items is
+  handed over a press, as many as the owner's yield for their rank. Nothing
+  about what is in the list is written down here, so a plugin update that
+  changes the fish changes what is caught.
+*/
+var RACKS_BY_HAND = {
+  '38a83:Dragonborn.esm':   { owner: 'hunter', rank: 'advanced', from: 'Horker', list: '3c6a8:Dragonborn.esm' },
+  '17b9e1:WindhelmSSE.esp': { owner: 'fisher', rank: 'novice', from: 'catch', list: '19647b:WindhelmSSE.esp' },
+  '17ba31:WindhelmSSE.esp': { owner: 'fisher', rank: 'novice', from: 'hanging catch', list: '19647b:WindhelmSSE.esp' },
+  '19648b:WindhelmSSE.esp': { owner: 'fisher', rank: 'novice', from: 'hanging catch', list: '19647b:WindhelmSSE.esp' }
+};
+
+/*
+  The two owners a rack can have, and what each one's gate, ladder, waits and
+  yields are. The hunter's are the hanging game's (GAME_TUNING) and the fisher's
+  are the water's (FISH_TUNING), so a catch on a rack waits and pays what the
+  same rank of water does.
+*/
+var RACK_OWNERS = {
+  hunter: { verb: 'loot', ladder: 'hunter', word: 'Hunter', tuning: function () { return GAME_TUNING; } },
+  fisher: { verb: 'fish', ladder: 'fisher', word: 'Fisher', tuning: function () { return FISH_TUNING; } }
+};
+
+/** The row and its owner for a rack base, or null. The generated hanging game
+ *  is all the hunter's. */
+function rackOf(baseDesc) {
+  if (Object.prototype.hasOwnProperty.call(GAME_BY_BASE, baseDesc)) {
+    return { row: GAME_BY_BASE[baseDesc], owner: RACK_OWNERS.hunter };
+  }
+  if (Object.prototype.hasOwnProperty.call(RACKS_BY_HAND, baseDesc)) {
+    var row = RACKS_BY_HAND[baseDesc];
+    if (Object.prototype.hasOwnProperty.call(RACK_OWNERS, row.owner)) {
+      return { row: row, owner: RACK_OWNERS[row.owner] };
+    }
+  }
+  return null;
+}
+
+/*
+  THE ITEMS A LEVELED LIST CAN HAND OVER, read out of the load order the first
+  time it is asked and kept. Each LVLO entry names a form at bytes 4 to 7 (the
+  level is 0 to 1, the count 8 to 9); a list inside a list is walked to its
+  items, four deep at most. The engine's own pick does the same walk
+  (LeveledListUtils::EvaluateListRecurse in the fork). An entry twice in a list
+  is twice as likely, as it is in Skyrim. Empty when the plugin that owns the
+  list is not loaded, and the press then says nothing came away.
+*/
+var LIST_ITEMS = {};
+
+function listItems(desc) {
+  if (Object.prototype.hasOwnProperty.call(LIST_ITEMS, desc)) { return LIST_ITEMS[desc]; }
+  var out = [];
+  (function walk(id, depth) {
+    if (!id || depth > 4) { return; }
+    var found = null;
+    try { found = mp.lookupEspmRecordById(id); } catch (e) { found = null; }
+    var rec = found && found.record;
+    if (!rec) { return; }
+    if (String(rec.type) !== 'LVLI') {
+      var item = '';
+      try { item = String(mp.getDescFromId(id) || ''); } catch (e) { item = ''; }
+      if (item) { out.push(item); }
+      return;
+    }
+    var fields = rec.fields || [];
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (!f || String(f.type) !== 'LVLO' || !f.data || f.data.length < 8) { continue; }
+      var b = f.data;
+      var local = (b[4] | (b[5] << 8) | (b[6] << 16)) + b[7] * 0x1000000;
+      var global = 0;
+      try { global = Number(found.toGlobalRecordId(local)) || 0; } catch (e) { global = 0; }
+      walk(global, depth + 1);
+    }
+  })(idOf(desc), 0);
+  if (!out.length) { log('the list', desc, 'hands over no item in this load order'); }
+  LIST_ITEMS[desc] = out;
+  return out;
 }
 
 /*
@@ -7163,6 +7264,87 @@ function plantAt(baseDesc) {
 /** True when somebody pressing this base should be answered by harvest(). */
 function isPlant(baseDesc) {
   return plantAt(baseDesc) !== null;
+}
+
+/*
+  EVERY PLANT AND TREE IN THE WORLD HAS AN OWNER, AND ONE NO LIST NAMES IS
+  NOBODY'S, NEVER EVERYBODY'S (#3141).
+
+  Patrick, 22 October, on #3141: each gathering action is split to the class
+  whose work it is, resource by resource, and not left open to everyone. The
+  chain in onActivate answers a FLOR or a TREE by table: a crop for the farmer,
+  water for the fisher, a rack for the hunter or the fisher, a nest, a churn or
+  a hive for the farmer, a reagent for the gatherer. Until this change a base no
+  table named fell out of the chain, and the engine's own pick
+  (MpObjectReference::ProcessActivate in the fork) handed its produce to
+  whoever pressed it. So the open door was the default: every record the pass
+  could not rank, and every plant a new plugin brings, was free to everybody.
+
+  Now the chain asks this last for a FLOR or a TREE, and it answers by name:
+
+    anybody  Patrick, 21 September: "make mammoth cheese bowls able to be picked
+             up by literally anybody." A giant's bowl of mammoth cheese. The
+             engine hands it over, as it always has.
+    nobody   records with nothing in them for anybody, each with its reason.
+             The HearthFires mead barrel's produce is a sack only a Papyrus
+             script opens, and no trade here draws or brews mead. Bashir's clam
+             (Oar's Rest) holds a quest prop, a fake Dwemer coin, not a catch.
+             A coin purse is not a harvest (gold.md), and every placed one is
+             switched off in Thornswood-Last.esp (#3077). The three Creation
+             Club roots are named on no list at all, because no table here may
+             name Creation Club content (#479, test-special-edition-only.js):
+             nothing places one, and the rule below would refuse it.
+
+  Any other FLOR or TREE is refused with the nobody sentence and named once in
+  the log, so a plant a plugin adds turns up there to be given its owner in
+  the right table, instead of being handed out.
+*/
+var WORLD_PRODUCE_ANYBODY = {
+  '7edf0:Skyrim.esm': 'Mammoth Cheese'
+};
+
+var NOBODYS_PRODUCE = 'This is nobody\'s work here, so nothing comes away.';
+var NOT_A_HARVEST = 'A coin purse is not a harvest. Nothing comes away.';
+
+var WORLD_PRODUCE_NOBODY = {
+  'f39b:HearthFires.esm': 'The mead barrel is sealed. Nobody draws from it here.',
+  '4d078:OarsRest.esp': 'There is nothing in this clam to take.',
+  'd790c:Skyrim.esm': NOT_A_HARVEST,
+  'd8e7f:Skyrim.esm': NOT_A_HARVEST,
+  'd8e80:Skyrim.esm': NOT_A_HARVEST,
+  'd8e8a:Skyrim.esm': NOT_A_HARVEST,
+  'd8e8b:Skyrim.esm': NOT_A_HARVEST,
+  'd8e8c:Skyrim.esm': NOT_A_HARVEST
+};
+
+var unownedProduceSeen = {};
+
+/** True when this base is a plant or a tree, or on one of the two lists. Asked
+ *  after every table in onActivate, so it only ever sees what none of them
+ *  named. A body's base is an NPC_ and is never one. */
+function isWorldProduce(baseDesc) {
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_ANYBODY, baseDesc)) { return true; }
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_NOBODY, baseDesc)) { return true; }
+  var spoils = globalThis.__thornswoodSpoils;
+  if (!spoils || !spoils.kindOf) { return false; }
+  var kind = '';
+  try { kind = spoils.kindOf(idOf(baseDesc)); } catch (e) { kind = ''; }
+  return kind === 'FLOR' || kind === 'TREE';
+}
+
+/** ALLOW for a record anybody may take, so the engine hands it over; the
+ *  record's reason for one nobody may; the nobody sentence for the rest. */
+function worldProduce(actorId, refrId, baseDesc) {
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_ANYBODY, baseDesc)) { return ALLOW; }
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_NOBODY, baseDesc)) {
+    return WORLD_PRODUCE_NOBODY[baseDesc];
+  }
+  if (!Object.prototype.hasOwnProperty.call(unownedProduceSeen, baseDesc)) {
+    unownedProduceSeen[baseDesc] = true;
+    log('#3141: a plant or tree no list names was pressed, so it is nobody\'s:', baseDesc,
+        'Give it its owner in a class table, WORLD_PRODUCE_ANYBODY or WORLD_PRODUCE_NOBODY.');
+  }
+  return NOBODYS_PRODUCE;
 }
 
 /* Shrine -> the ability it grants. These are the Altar*Spell records, which
@@ -7364,7 +7546,27 @@ var CROP_RULES = {
   '141081:JK\'s Whiterun\'s Outskirts.esp': { rank: 'expert', growMinutes: 40,
                             produce: '64b2e:Skyrim.esm', name: 'Red Apple' },
   '141088:JK\'s Whiterun\'s Outskirts.esp': { rank: 'expert', growMinutes: 40,
-                            produce: '64b2f:Skyrim.esm', name: 'Green Apple' }
+                            produce: '64b2f:Skyrim.esm', name: 'Green Apple' },
+  /*
+    THE HEARTHFIRES GARDEN PLANTERS (#3141). The pass files them unranked,
+    because each one's produce is a sack (Cabbage (2) and the like) that only a
+    Papyrus script opens, and nothing answered them: the engine handed the sack
+    to whoever pressed. The ingredient planters beside them went to the gatherer
+    in GATHER_UNRANKED. These six are field crops and the farmer's, so they are
+    plots like the field ones: the same produce, rank and time as that crop.
+  */
+  '1045e:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '64b3f:Skyrim.esm', name: 'Cabbage' },
+  '1045f:HearthFires.esm': { rank: 'novice', growMinutes: 25,
+                            produce: '10d666:Skyrim.esm', name: 'Gourd' },
+  '10460:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '669a5:Skyrim.esm', name: 'Leek' },
+  '110b9:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '64b40:Skyrim.esm', name: 'Carrot' },
+  '110ba:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '64b41:Skyrim.esm', name: 'Potato' },
+  '110cd:HearthFires.esm': { rank: 'advanced', growMinutes: 45,
+                            produce: '4b0ba:Skyrim.esm', name: 'Wheat' }
 };
 
 /*
@@ -7855,10 +8057,17 @@ function fish(actorId, refrId, baseDesc) {
  * the class first and before the wait, then the rank refused by name with an
  * unknown rank treated as the strictest rather than the loosest, then the
  * record's own wait, then the count for the hunter's rank.
+ *
+ * Since #3141 it answers the racks in RACKS_BY_HAND as well: a horker for the
+ * hunter and the landed fish for the fisher, each through its owner's gate,
+ * ladder, waits and yields (RACK_OWNERS).
  */
 function game(actorId, refrId, baseDesc) {
-  if (!isGame(baseDesc)) return null;
-  const hung = GAME_BY_BASE[baseDesc];
+  const rack = rackOf(baseDesc);
+  if (!rack) return null;
+  const hung = rack.row;
+  const who = rack.owner;
+  const tuning = who.tuning();
   if(!withinResourceReach(actorId,refrId)) return 'Come closer to this rack.';
   const stock=globalThis.__thornswoodResourceStock;
   if(!stock) return 'This rack is unavailable for now.';
@@ -7867,7 +8076,7 @@ function game(actorId, refrId, baseDesc) {
   // mineOre, harvest() and fish() settled on and for the same reason: somebody
   // who is not a hunter is never going to work this rack, and 'it is picked
   // clean' tells them the wrong thing about why nothing happened.
-  const refusal = classGate(actorId, 'loot');
+  const refusal = classGate(actorId, who.verb);
   if (refusal) return refusal;
 
   /*
@@ -7885,37 +8094,44 @@ function game(actorId, refrId, baseDesc) {
     failure to expect. That script fails its run on a rank that is not one of
     the four, so this is the second lock on that door rather than the only one.
   */
-  const step = rankStep(actorId, 'hunter');
+  const step = rankStep(actorId, who.ladder);
   const named = RANK_LADDER.indexOf(hung.rank);
   const want = named < 0 ? RANK_LADDER.length - 1 : named;
   if (want > 0 && step < want) {
     return 'This ' + hung.from + ' takes ' + rankWord(RANK_LADDER[want]) +
-           ' Hunter. Work what you can until you are one.';
+           ' ' + who.word + '. Work what you can until you are one.';
   }
 
   // The wait is the record's own. A rank the table does not name falls back to
   // the longest wait rather than the shortest, the same way the rivers, the
   // seams and the bodies do.
-  const span = Object.prototype.hasOwnProperty.call(GAME_TUNING.cooldownMs, hung.rank)
-    ? GAME_TUNING.cooldownMs[hung.rank] : GAME_TUNING.cooldownMs.master;
+  const span = Object.prototype.hasOwnProperty.call(tuning.cooldownMs, hung.rank)
+    ? tuning.cooldownMs[hung.rank] : tuning.cooldownMs.master;
   // milliseconds from the stock, seconds to waitWord, as in fish() (#1826)
   const waitMs = stock.left(refrId,span);
   if (waitMs > 0) {
     return 'This one is picked clean for now. ' + waitWord(waitMs / 1000) + ' to go.';
   }
 
-  const pair = GAME_TUNING.yieldByStep[step] || GAME_TUNING.yieldByStep[0];
+  const pair = tuning.yieldByStep[step] || tuning.yieldByStep[0];
   const got = randInt(pair[0], pair[1]);
+  // A hand row hands one item of its list (RACKS_BY_HAND); none in this load
+  // order is the same answer as a produce that is not loaded.
+  let produce = hung.produce;
+  if (hung.list) {
+    const items = listItems(hung.list);
+    produce = items.length ? items[randInt(0, items.length - 1)] : '';
+  }
   // addItem answers false in one case only, which is idOf returning 0 because
   // the plugin that owns the produce is not in the load order. The same
   // sentence the seams and the rivers say, because sending somebody off to
   // empty their pack over a broken build is the wrong answer twice.
-  const taken=stock.take(refrId,span,()=>addItemsAtomic(actorId,[{item:hung.produce,count:got}]));
+  const taken=stock.take(refrId,span,()=>!!produce && addItemsAtomic(actorId,[{item:produce,count:got}]));
   if (!taken.ok) {
-    return 'There is ' + hung.name + ' here and nothing in this load order to ' +
+    return 'There is ' + (hung.name || 'something') + ' here and nothing in this load order to ' +
            'put in your hands. Say so in the dev channel.';
   }
-  const rank = creditWork(actorId, 'loot');
+  const rank = creditWork(actorId, who.verb);
   /*
     The same doubling fish() has to handle: a row whose name in the world reads
     the same as what it gives would say 'You take 1 Cooked Skeever off the
@@ -7924,6 +8140,9 @@ function game(actorId, refrId, baseDesc) {
     CharredSkeever03 giving Cooked Skeever, but a mod renaming one is a sentence
     nobody would see until somebody read it in the world.
   */
+  if (!hung.name) {
+    return 'You take ' + got + ' from the ' + hung.from + '.' + (rank ? ' ' + rank : '');
+  }
   const doubled = String(hung.from).toLowerCase() === String(hung.name).toLowerCase();
   const where = doubled ? 'the rack' : 'the ' + hung.from;
   return 'You take ' + got + ' ' + hung.name + ' off ' + where + '.' +
@@ -7955,10 +8174,9 @@ function game(actorId, refrId, baseDesc) {
   wait it does not read, and ten minutes is the plants' number already. These
   are first numbers for the dev server.
 
-  THE MAMMOTH CHEESE BOWL IS NOT HERE AND MUST NOT BE. "Literally anybody" is a
-  base in none of the tables onActivate asks, which falls through to the engine
-  and is handed to whoever pressed it. That needs no code, and a line here would
-  be the thing that broke it.
+  THE MAMMOTH CHEESE BOWL IS NOT HERE AND MUST NOT BE. "Literally anybody" is
+  its row in WORLD_PRODUCE_ANYBODY (#3141), which lets the engine hand it to
+  whoever pressed it. A line here would make it the farmer's.
 
   MILK IS BESIDE loot(), FOR LIVING COWS ONLY.
   A farmer pressing E on a living cow is given one Jug of Milk
@@ -9223,6 +9441,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   else if (isHive(baseDesc)) message = hive(casterRefrId, refrId, baseDesc);
   else if (isPlant(baseDesc)) message = harvest(casterRefrId, refrId, baseDesc);
   else if (isVein(baseDesc)) message = mineOre(casterRefrId, refrId, baseDesc);
+  // A plant or a tree none of the tables above named: its owner by name, or
+  // nobody's (#3141). Never the engine's free pick for whoever pressed it.
+  else if (isWorldProduce(baseDesc)) message = worldProduce(casterRefrId, refrId, baseDesc);
   else {
     /*
       A BODY IS LAST, AND IT IS THE ONLY BRANCH THAT IS NOT A TABLE LOOKUP.

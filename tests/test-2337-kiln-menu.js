@@ -130,7 +130,8 @@ function world() {
     'kindIsContainer', 'STATIONS', 'mineSalt', 'burnCharcoal', 'isChoppingBlock', 'chopWood',
     'SHRINES', 'bless', 'isCrop', 'farmActivate', 'isFish', 'fish', 'ALLOW', 'floraHanded',
     'putBack', 'isGame', 'game', 'isChickenNest', 'collectEgg', 'isChurn', 'churn', 'isHive',
-    'hive', 'isPlant', 'harvest', 'isVein', 'mineOre', 'milk', 'loot'];
+    'hive', 'isPlant', 'harvest', 'isVein', 'mineOre', 'milk', 'loot',
+    'isWorldProduce', 'worldProduce'];
   const onActivate = new Function(names.join(','), "'use strict';\nreturn " + handler + ';').apply(null, [
     benchGate,
     function (id, text) { rec.told.push(text); },
@@ -141,7 +142,8 @@ function world() {
     {}, tag('bless'), never, tag('farmActivate'), never, tag('fish'), { thornswoodAllow: true },
     never, function () { }, never, tag('game'), never, tag('collectEgg'), never, tag('churn'),
     never, tag('hive'), never, tag('harvest'), never, tag('mineOre'), nothing,
-    function () { rec.branch.push('loot'); return null; }]);
+    function () { rec.branch.push('loot'); return null; },
+    never, tag('worldProduce')]);
   return { onActivate: onActivate, rec: rec, firewood: firewood };
 }
 
