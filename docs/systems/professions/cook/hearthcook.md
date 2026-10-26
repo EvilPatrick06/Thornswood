@@ -1,13 +1,13 @@
 # Hearthcook
 
-Dinners. 112 recipes, all of them reach the server.
+Dinners. 123 recipes, all of them reach the server.
 
 The full table, every row: [lists/cook-hearthcook.md](../../lists/cook-hearthcook.md).
 
 | Rank | Recipes |
 | --- | --- |
-| Novice | 51 |
-| Advanced | 42 |
+| Novice | 55 |
+| Advanced | 49 |
 | Expert | 14 |
 | Master | 5 |
 
@@ -15,9 +15,9 @@ The full table, every row: [lists/cook-hearthcook.md](../../lists/cook-hearthcoo
 | --- | --- |
 | Stews | 24 |
 | Meat dishes | 22 |
+| Other food and drink | 20 |
 | Soups | 18 |
 | Cheese | 14 |
-| Other food and drink | 9 |
 | Bread | 8 |
 | Vegetable dishes | 8 |
 | Fish dishes | 4 |
@@ -25,21 +25,22 @@ The full table, every row: [lists/cook-hearthcook.md](../../lists/cook-hearthcoo
 | Chowders | 2 |
 | Ingredients | 1 |
 
-98 are the cookpot. 13 are the oven. 1 is the grain mill, the sack
+106 are the cookpot. 16 are the oven. 1 is the grain mill, the sack
 of flour, and it is novice. A recipe has no gold price. No row is
 race locked.
 
 ## Novice, the day-one kitchen
 
 Baked Potatoes, Beef Stew, Cabbage Soup, Carrot Soup, Clam Chowder,
-Cooked Beef, Cooked Dog, Cooked Skeever, Goat Roast, Goat Stew, Gourd
-Soup, Grilled Chicken Breast, Grilled Leeks, Pheasant Roast, Pheasant
-Stew, Potato Soup, Rabbit Haunch, Rabbit Stew, Roasted Carrots,
-Roasted Mushrooms, Sack of Flour, Salmon Steak, Slaughterfish Steak,
-Steamed Mudcrab Legs, Venison Chop, Venison Stew.
+Cooked Beef, Cooked Dog, Cooked Skeever, First Planting Mead, Goat
+Roast, Goat Stew, Gourd Soup, Grilled Chicken Breast, Grilled Leeks,
+Juniper Tea, Lavender Tea, Midyear Jazbay Wine, Pheasant Roast,
+Pheasant Stew, Potato Soup, Rabbit Haunch, Rabbit Stew, Roasted
+Carrots, Roasted Mushrooms, Sack of Flour, Salmon Steak, Slaughterfish
+Steak, Steamed Mudcrab Legs, Venison Chop, Venison Stew.
 
 Several of those exist twice in the table, a one-portion row and a
-two-portion row, which is why 26 names are 51 recipes. A Confectioner
+two-portion row, which is why 30 names are 55 recipes. A Confectioner
 using the sister half can make this novice list and nothing above it.
 
 ## Master
@@ -176,7 +177,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 
 ## Where this is
 
-The 112 rows, the oven, the mill, and the flour recipe are in the
+The 123 rows, the oven, the mill, and the flour recipe are in the
 server. The hunger numbers a finished meal grants are partly in the
 server (unlisted food is 15, and the food table has its own values)
 and the plan's raw, burnt, cooked, and feast steps are on
