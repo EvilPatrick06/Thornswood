@@ -167,6 +167,18 @@ link, and the old line goes.
   button. 21 Oct 2026,
   [#3155](https://github.com/EvilPatrick06/Thornswood/issues/3155#issuecomment-6333339922).
 
+## Voice and the in-game UI
+
+- **Voice leaves the browser:** a native voice engine in the launcher sends
+  one stream to the box, and the box forwards each voice only to the people
+  in range. Every launcher no longer connects to every other. 26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
+- **The in-game panels become Skyrim's own menus (Scaleform)**, chat
+  included, and the in-game browser goes once they have; the away window is
+  built first as the proof. Emotes as Q menu powers stay as #2026 decided.
+  26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
+
 ## The box
 
 - **The site's contact is Discord only.** It names no street address,
