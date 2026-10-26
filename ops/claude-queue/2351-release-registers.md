@@ -39,7 +39,7 @@ It must show `release: a list of N profile(s) and M character(s) to let go, at s
 
     .\scripts\vps\Remote.ps1 'Test-Path C:\Thornswood-Server-Dev\private\deleted-characters.json'
 
-must print `False`. A part that says it waits names why; read that line and fix the cause before anything else. If the run also wrote a list on live (the test account had something there), live keeps it until the live gamemode carries this change and lets go of it at that start; the same two reads with `C:\Thornswood-Server` show it then. Write the lines (counts only) on #2351, and in `wiki/status.md`.
+must print `False`. A part that says it waits names why; read that line and fix the cause before anything else. If the run also wrote a list on live (the test account had something there), live keeps it until the live gamemode carries this change and lets go of it at that start; the same two reads with `C:\Thornswood-Server` show it then. Write the lines (counts only) on #2351, and in `ops/status.md`.
 
 ## Risks and how to put it back
 - A real deletion run on a server stops it and starts it again (it did before too, wherever a character was removed); it refuses while anybody is on unless `-Now`.
