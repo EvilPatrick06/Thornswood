@@ -9804,6 +9804,182 @@
     log(what);
   }));
 
+  // ------------------------------------------------- the map's calendar --
+  /*
+    THE MAP'S CALENDAR: THE DATE, THE SEASON AND THE SERVER CLOCK (#3156).
+
+    Patrick, 22 Oct 2026, on his page: C, on the map menu. A strip at the top
+    of the screen while MapMenu is up, gone the moment it closes:
+
+      26th of Frostfall, 4E 252
+      Autumn, winter in 3 days
+      Server clock 9:46 AM MDT, yours 4:46 PM
+
+    THE DATE is the game's own calendar, the globals the game's map line
+    reads (GameDay 0x37, GameMonth 0x36, GameYear 0x35), which the engine's
+    TimeService writes from today's date in UTC. It is read here rather than
+    worked out again, so this line and the game's never disagree. There is
+    no day of the week: the game counts that from GameDaysPassed, which
+    TimeService never writes (#841), so it is not the same for two people.
+
+    THE SEASON AND THE SERVER CLOCK are the server's, handed over by the
+    calendar property (gamemode.js, THE DATE, THE SEASON AND THE SERVER CLOCK
+    ON THE MAP) through globalThis.thornswoodCalendar, as the drunk screen's
+    is. The server clock is the box's zone put on this machine's own clock,
+    the clock the sky already runs on. Yours shows only when your zone is not
+    the server's. Before the server has said anything, the date shows alone.
+
+    Read once a second while the map is up, and written to the page only when
+    a line changed, which is once a minute.
+  */
+  const MAP_MENU = 'MapMenu';
+  const MAP_CAL_ID = 'ts-map-calendar';
+  const MAP_CAL_EVERY_MS = 1000;
+  // GameMonth counts from 0, Morning Star.
+  const MONTHS = ['Morning Star', 'Sun\'s Dawn', 'First Seed', 'Rain\'s Hand', 'Second Seed', 'Midyear',
+                  'Sun\'s Height', 'Last Seed', 'Hearthfire', 'Frostfall', 'Sun\'s Dusk', 'Evening Star'];
+  const GAME_DAY = 0x37;
+  const GAME_MONTH = 0x36;
+  const GAME_YEAR = 0x35;
+  let mapCalendar = null;   // what the server last handed over
+  let mapUp = false;
+  let mapCalAt = 0;
+  let mapCalShown = '';
+  let mapCalUnread = false; // the calendar could not be read, said once a map
+
+  globalThis.thornswoodCalendar = function (v) { mapCalendar = v; mapCalShown = ''; };
+
+  function ordinal(n) {
+    const t = n % 100;
+    if (t >= 11 && t <= 13) { return n + 'th'; }
+    if (n % 10 === 1) { return n + 'st'; }
+    if (n % 10 === 2) { return n + 'nd'; }
+    if (n % 10 === 3) { return n + 'rd'; }
+    return n + 'th';
+  }
+
+  function clock12(h, m) {
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return hh + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
+  }
+
+  function gameGlobal(id) {
+    const gv = sp.GlobalVariable.from(sp.Game.getFormEx(id));
+    return gv ? Math.floor(gv.getValue()) : NaN;
+  }
+
+  function mapDateLine() {
+    let day = NaN, month = NaN, year = NaN;
+    try {
+      day = gameGlobal(GAME_DAY);
+      month = gameGlobal(GAME_MONTH);
+      year = gameGlobal(GAME_YEAR);
+    } catch (e) {
+      if (!mapCalUnread) { mapCalUnread = true; log('map calendar: the game\'s calendar could not be read: ' + e); }
+      return '';
+    }
+    if (!(day >= 1 && day <= 31) || !(month >= 0 && month <= 11) || !(year >= 1)) {
+      if (!mapCalUnread) {
+        mapCalUnread = true;
+        log('map calendar: the game\'s calendar reads day ' + day + ', month ' + month + ', year ' + year + ', so no date');
+      }
+      return '';
+    }
+    return ordinal(day) + ' of ' + MONTHS[month] + ', 4E ' + year;
+  }
+
+  function untilWords(ms) {
+    const H = 3600000;
+    if (ms >= 36 * H) { return 'in ' + Math.round(ms / (24 * H)) + ' days'; }
+    if (ms >= 90 * 60000) { return 'in ' + Math.round(ms / H) + ' hours'; }
+    return 'within the hour';
+  }
+
+  function capital(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+
+  function mapSeasonLine(cal, now) {
+    if (!cal || !cal.season) { return ''; }
+    const line = capital(cal.season);
+    if (!cal.next || !(cal.turns > now)) { return line; }
+    return line + ', ' + cal.next + ' ' + untilWords(cal.turns - now);
+  }
+
+  function mapClockLine(cal, now) {
+    if (!cal || typeof cal.off !== 'number' || !isFinite(cal.off)) { return ''; }
+    const s = new Date(now + cal.off * 60000);
+    let line = 'Server clock ' + clock12(s.getUTCHours(), s.getUTCMinutes()) + (cal.tz ? ' ' + cal.tz : '');
+    const here = new Date(now);
+    if (-here.getTimezoneOffset() !== cal.off) {
+      line += ', yours ' + clock12(here.getHours(), here.getMinutes());
+    }
+    return line;
+  }
+
+  function mapCalendarLines(now) {
+    return [mapDateLine(), mapSeasonLine(mapCalendar, now), mapClockLine(mapCalendar, now)]
+      .filter(function (l) { return !!l; });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /*
+    The strip, in the needs HUD's own pixels (--ts, gamemode.js hudScript):
+    the screen's height over 720 or its width over 1280, whichever is smaller,
+    so it sits in the same place at every screen size. Centred at the top,
+    where the map has nothing of its own.
+  */
+  const MAP_CAL_CSS = '--ts:min(0.078125vw,0.1388889vh);' +
+    'position:fixed;left:50vw;top:calc(50vh - 350 * var(--ts));transform:translateX(-50%);' +
+    'z-index:2147483500;pointer-events:none;text-align:center;white-space:nowrap;' +
+    'font-family:Georgia,serif;font-size:calc(11 * var(--ts));line-height:1.35;color:#efe4cc;' +
+    'background:rgba(12,10,8,.62);border:calc(1 * var(--ts)) solid rgba(0,0,0,.65);' +
+    'border-radius:calc(4 * var(--ts));padding:calc(4 * var(--ts)) calc(10 * var(--ts));' +
+    'text-shadow:0 1px 3px rgba(0,0,0,.95)';
+
+  function drawMapCalendar(now) {
+    const lines = mapCalendarLines(now);
+    const text = lines.join('\n');
+    if (text === mapCalShown) { return; }
+    mapCalShown = text;
+    if (!lines.length) { hideMapCalendar(); return; }
+    const html = lines.map(function (l) { return '<div>' + escapeHtml(l) + '</div>'; }).join('');
+    T.js('(function(){try{' +
+         'var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(!d){d=document.createElement("div");d.id=' + JSON.stringify(MAP_CAL_ID) + ';' +
+         'd.style.cssText=' + JSON.stringify(MAP_CAL_CSS) + ';document.body.appendChild(d);}' +
+         'd.innerHTML=' + JSON.stringify(html) + ';' +
+         '}catch(e){}})();');
+  }
+
+  function hideMapCalendar() {
+    T.js('(function(){try{var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(d&&d.parentNode){d.parentNode.removeChild(d);}}catch(e){}})();');
+  }
+
+  sp.on('menuOpen', guard('map calendar open', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = true;
+    mapCalAt = 0;
+    mapCalShown = '';
+    mapCalUnread = false;
+  }));
+  sp.on('menuClose', guard('map calendar close', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = false;
+    mapCalShown = '';
+    hideMapCalendar();
+  }));
+  sp.on('update', guard('map calendar', () => {
+    if (!mapUp) { return; }
+    const now = Date.now();
+    if (now - mapCalAt < MAP_CAL_EVERY_MS) { return; }
+    mapCalAt = now;
+    drawMapCalendar(now);
+  }));
+  // ------------------------------------------------ end the map's calendar --
+
   // ------------------------------------------------------ the drunk screen --
   /*
     docs/systems/drink.md: "Drunk, from the third ale until you sleep or the
