@@ -47,7 +47,10 @@ moved the run notes here.
   the leads, and the company role is Free Skyrim Trading Company. Cloudflare fronts ports 80 and 443, which take only
   Cloudflare's addresses (#2995). thornswood.net has a DMARC record at
   p=none reporting to Cloudflare's DMARC Management, set 11:17 AM 22 Oct
-  through the connector (#3216). Cloudflare (#3216): two-factor is required
+  through the connector (#3216). thornswood.net is signed with DNSSEC end to
+  end (#3225): the DS at .net is 2371 13 2 EA6ADBBE…DD9A, Verisign's RDAP says
+  delegationSigned, Cloudflare's zone DNSSEC is active, and Google's resolver
+  answers with AD set (read 5:15 PM 26 Oct). Cloudflare (#3216): two-factor is required
   for every account member; the box's address has an IP Access allow rule;
   AI Labyrinth and JavaScript Detections are on; Bot Fight Mode is OFF since
   5:04 PM 25 Oct (Patrick), because the free plan's version takes no
