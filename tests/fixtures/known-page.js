@@ -1,14 +1,18 @@
 // tests/fixtures/known-page.js
 //
-// The Known Issues page as the site serves it (#2414). Its one copy is the
-// "known" board in site/data/board.json, which the hub edits, and /known and
-// /api/page/known are that board written out by knownMarkdown in
-// site/server.js. A test that reads what the page says reads it through here,
-// so it reads the same text a person sees, made by the same code.
+// The Known Issues page as the site serves it. Since #3140 it is written from
+// the issue board: the bot puts the #known-issues list into
+// data/from-bot/lists.json, and knownMarkdown in site/server.js turns that
+// into the markdown /known and /api/page/known serve. The rows live on GitHub,
+// so the part of the page the repository holds is the page around them: its
+// title, its intro and its headings. A test that reads what the page says
+// reads it through here, so it reads the same text a person sees, made by the
+// same code.
 //
 //   const { knownPage } = require('./fixtures/known-page');
-//   const md = knownPage();          // the page's markdown, or null
-//   const md = knownPage(otherRoot);  // the same out of another checkout
+//   const md = knownPage();               // the page with no rows, or null
+//   const md = knownPage(otherRoot);       // the same out of another checkout
+//   const md = knownPage(null, lists);     // the page written from these lists
 //
 // Read only.
 'use strict';
@@ -16,25 +20,31 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO = path.join(__dirname, '..', '..');
-const MARK = /\/\/ ==== thornswood known board ====([\s\S]*?)\/\/ ==== end thornswood known board ====/;
+const MARK = /\/\/ ==== thornswood lists ====([\s\S]*?)\/\/ ==== end thornswood lists ====/;
 
-// knownMarkdown out of server.js, between its markers, or null.
-function knownWriter(serverSource) {
+// The block between the markers in server.js, as { knownMarkdown,
+// roadmapBoard, listTime }, or null.
+function listWriters(serverSource) {
   const cut = MARK.exec(String(serverSource || ''));
   if (!cut) return null;
-  return new Function(cut[1] + '\nreturn knownMarkdown;')();
+  return new Function(cut[1] + '\nreturn { knownMarkdown, roadmapBoard, listTime };')();
 }
 
-// The page's markdown out of a checkout (this one by default), or null when
-// server.js has no writer or board.json has no known board.
-function knownPage(root) {
-  const base = root || REPO;
-  let src, board;
-  try { src = fs.readFileSync(path.join(base, 'site', 'server.js'), 'utf8'); } catch (e) { return null; }
-  try { board = JSON.parse(fs.readFileSync(path.join(base, 'site', 'data', 'board.json'), 'utf8')); } catch (e) { return null; }
+// knownMarkdown out of server.js, or null.
+function knownWriter(serverSource) {
+  const w = listWriters(serverSource);
+  return w ? w.knownMarkdown : null;
+}
+
+// The page's markdown out of a checkout (this one by default), written from
+// lists (an empty known list read just now by default), or null when
+// server.js has no writer.
+function knownPage(root, lists) {
+  let src;
+  try { src = fs.readFileSync(path.join(root || REPO, 'site', 'server.js'), 'utf8'); } catch (e) { return null; }
   const write = knownWriter(src);
-  if (!write || !board || !board.known) return null;
-  return write('Known Issues', board.known);
+  if (!write) return null;
+  return write(lists || { at: new Date().toISOString(), known: [] });
 }
 
-module.exports = { knownPage, knownWriter, MARK };
+module.exports = { knownPage, knownWriter, listWriters, MARK };

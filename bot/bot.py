@@ -25,7 +25,9 @@ What it does:
            python bot.py --post-task). #dev-test-tasks, a staff only forum
            in Staff, holds the test tasks whose comment says "Server: Dev":
            a measurement someone on dev has to take, open issue or closed,
-           and any posted by hand tagged Dev.
+           and any posted by hand tagged Dev. The same read writes the
+           site's Known Issues page (the #known-issues list) and its
+           roadmap (the "roadmap:" labels) for the site to show (#3140).
            The channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
@@ -76,6 +78,8 @@ Everything it needs is in env:
   KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
   KNOWN_ISSUES_LABELS default Dev Findings,Main Findings
   KNOWN_ISSUES_EVERY  seconds between GitHub reads, default 300, never under 60
+  PUBLIC_LISTS_FILE   where the site's known issues and roadmap are written,
+                      default the site's data/from-bot/lists.json on the VPS
   HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
                    file, which is where the watchdog reads it
   HEARTBEAT_EVERY  seconds between heartbeats, default 60
@@ -4331,6 +4335,10 @@ TASK_TAG = 'Main'
 TASK_FORM = 4
 KNOWN_FORM = 4
 DEV_FORM = 3
+# What a remembered merged change (known_changed) was found under. True: any
+# merged pull request naming the issue. 2: one that is work on it, works_on
+# (#3140, 26 Oct).
+KNOWN_CHANGED_FORM = 2
 
 
 def _github_get(url):
@@ -4344,6 +4352,18 @@ def _github_get(url):
         return json.loads(r.read().decode('utf-8'))
 
 
+def _github_rows(got, url):
+    """A page of a GitHub list, which is a list. Anything else is an answer
+       that is not the list, and is raised, never read as no issues: a pass
+       that read no findings would take every #known-issues post down."""
+    if got is None:
+        return []
+    if not isinstance(got, list):
+        raise ValueError('GitHub answered %s with a %s, not a list'
+                         % (url.split('?')[0], type(got).__name__))
+    return got
+
+
 def github_open_findings(get=None):
     """Every open issue (not pull request) carrying one of KNOWN_LABELS, by
        number. One query per label because GitHub ANDs labels in one."""
@@ -4355,7 +4375,7 @@ def github_open_findings(get=None):
             url = ('%s/repos/%s/issues?state=open&per_page=100&page=%d&labels=%s'
                    % (GITHUB_API, KNOWN_REPO, page,
                       urllib.parse.quote(label)))
-            rows = get(url) or []
+            rows = _github_rows(get(url), url)
             for row in rows:
                 if isinstance(row, dict) and 'pull_request' not in row:
                     out.setdefault(int(row['number']), row)
@@ -4636,7 +4656,8 @@ def fix_refs(timeline):
     """
     (pull requests, commits) from the issue's timeline: every pull request of
     KNOWN_REPO that mentions the issue and is merged or still open, as dicts
-    of number, title, url and merged_at, by number; and every commit of
+    of number, title, url, merged_at and text (its title and body, which
+    works_on reads), by number; and every commit of
     KNOWN_REPO whose message names the issue, by sha, in the order GitHub
     saw them. A pull request closed without merging carries nothing, so it
     is left out. Read from the timeline alone, which the bot's issues token
@@ -4660,7 +4681,8 @@ def fix_refs(timeline):
                 'number': int(src['number']),
                 'title': str(src.get('title') or '').strip(),
                 'url': str(src.get('html_url') or ''),
-                'merged_at': pr.get('merged_at')}
+                'merged_at': pr.get('merged_at'),
+                'text': '%s\n%s' % (src.get('title') or '', src.get('body') or '')}
         elif ev.get('event') == 'referenced' and ev.get('commit_id'):
             if ('/repos/%s/' % KNOWN_REPO).lower() not in str(ev.get('commit_url') or '').lower():
                 continue
@@ -4668,6 +4690,29 @@ def fix_refs(timeline):
             if sha not in commits:
                 commits.append(sha)
     return [prs[n] for n in sorted(prs)], commits
+
+
+# How a pull request says it is work on an issue: "Refs #N", or a closing
+# keyword (Closes, Fixes, Resolves #N), the way the pull request template and
+# Developer-Guide.md write it, with a list after one word ("Refs #1, #2 and
+# #3") and an owner/repo in front allowed. GitHub cross-references an issue
+# from any pull request that has its number anywhere, a table of other
+# issues included: #3437 (Refs #3137) named five known issues in its body
+# while it cleaned the list, and on merging would have taken all five off
+# #known-issues, though nothing had been done about any of them.
+WORK_REF = re.compile(r'\b(?:refs?|close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b\s*:?\s*'
+                      r'((?:(?:[\w.-]+/[\w.-]+)?#\d+\b(?:\s*(?:,|\band\b|&)\s*)?)+)', re.I)
+WORK_REF_ONE = re.compile(r'(?:([\w.-]+/[\w.-]+))?#(\d+)')
+
+
+def works_on(pr, number):
+    """Whether the pull request (fix_refs' dict) says it is work on issue
+       number, with "Refs #N" or a closing keyword; only naming it is not."""
+    for m in WORK_REF.finditer(str(pr.get('text') or '')):
+        for repo, n in WORK_REF_ONE.findall(m.group(1)):
+            if int(n) == int(number) and (not repo or repo.lower() == KNOWN_REPO.lower()):
+                return True
+    return False
 
 
 BUILD_LINE = re.compile(r'^\s*(?:needs\s+)?build\s*:\s*(\S.*?)\s*$', re.I | re.M)
@@ -4750,6 +4795,9 @@ STEP_LINE = re.compile(r'^\s*\d+[.)]\s+\S', re.M)
 ISSUE_NUMBER = re.compile(r'(?<![\w&])#\d+\b')
 LINK = re.compile(r'https?://|www\.', re.I)
 CODE = re.compile(r'`')
+# Built from its code point, never pasted, as Check-Words.ps1 explains.
+EM_DASH = re.compile(chr(0x2014) + r'|&mdash;|&#8212;|&#x2014;', re.I)
+BANNED_WORD = re.compile(r'\bplayers?\b', re.I)
 # Steps a Claude, the Desk, a harness, a workflow or a command can do: a
 # dev test task is only for what a human dev must do in the game.
 AUTOMATABLE = re.compile(
@@ -4815,6 +4863,22 @@ def post_problems(channel, title, body, *, server=None, issue=None,
     if ISSUE_NUMBER.search(text) or LINK.search(text) or CODE.search(text):
         out.append('Format: the text has an issue number, a link or code; '
                    'posts carry none.')
+    if channel in ('known', 'roadmap'):
+        # The site shows these two to anybody (#3140), so the writing rules
+        # every public page keeps hold here too (Check-Words.ps1 reads the
+        # repository; these words are on GitHub, so the bot reads them).
+        words = '%s\n%s' % (title or '', text)
+        if EM_DASH.search(words):
+            out.append('Words: the text has an em dash; nothing written for '
+                       'people has one.')
+        if BANNED_WORD.search(words):
+            out.append('Words: the text says "player"; write "people", '
+                       '"characters" or "testers" instead.')
+    if channel == 'roadmap':
+        if not text.strip():
+            out.append('Roadmap: the "Roadmap:" comment has nothing under its '
+                       'first line, which is where the work stands.')
+        return out
     if channel == 'known':
         if issue is not None and str(issue.get('state')) != 'open':
             out.append('Known issues: the issue is closed.')
@@ -4870,6 +4934,9 @@ def github_say(number, text):
 
 CHANNEL_NAMES = {'dev': 'dev-test-tasks', 'main': 'test-tasks',
                  'known': 'known-issues'}
+# Where each kind of post goes, as the refusal comment says it.
+POST_PLACES = {'dev': 'in #dev-test-tasks', 'main': 'in #test-tasks',
+               'known': 'in #known-issues', 'roadmap': "on the site's roadmap"}
 
 
 def refuse(state, channel, num, problems, say=None):
@@ -4888,10 +4955,13 @@ def refuse(state, channel, num, problems, say=None):
     sig = '\n'.join(problems)
     if seen.get(key) == sig:
         return True
-    text = ('The bot did not post this issue in #%s, because the post breaks '
-            'these rules (Developer-Guide.md, "Test tasks and known issues"):\n\n%s'
+    text = ('The bot did not post this issue %s, because the post breaks '
+            'these rules (%s):\n\n%s'
             '\n\nFix the comment and the bot tries again on its next pass.'
-            % (CHANNEL_NAMES.get(channel, channel),
+            % (POST_PLACES.get(channel, 'in #' + channel),
+               'bot/README.md, "The site\'s known issues and roadmap"'
+               if channel == 'roadmap'
+               else 'Developer-Guide.md, "Test tasks and known issues"',
                '\n'.join('- ' + p for p in problems)))
     try:
         (say or github_say)(num, text)
@@ -5107,7 +5177,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
 
     A known issue is a finding nothing has been done about yet (Patrick, 22
     Oct): an open issue labelled Dev Findings or Main Findings with no merged
-    pull request that names it and no "Test task:" comment. The moment one of
+    pull request that is work on it (works_on: "Refs #N" or a closing
+    keyword, not a mention) and no "Test task:" comment. The moment one of
     those comes, or the issue closes or loses its label, its post goes: the
     work on it is then a test task, not a known issue. An issue the label
     lists leave out is read itself first, and its post stays unless that
@@ -5120,6 +5191,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     request merging does not change the issue's updated_at, so the timeline
     of each finding is read every pass until a merged pull request is found
     in it; that is remembered (state['known_changed']), since a merge stays.
+    A finding remembered under an older rule of what counts
+    (KNOWN_CHANGED_FORM) is read once more under this one.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
@@ -5135,16 +5208,27 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         changed.pop(key, None)      # closed or unlabelled: asked again if it is back
         state['_dirty'] = True
     posted, edited, removed, listed = [], [], [], set()
+    # Why each issue that is not listed is not, said when its post comes
+    # down. Ten posts came down and went back up as a set several times
+    # before 26 Oct with no line saying why (#3140).
+    why = {}
     for num in sorted(issues):
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
-        if key not in changed:
+        if changed.get(key) != KNOWN_CHANGED_FORM:
             timeline = await loop.run_in_executor(None, github_timeline, num, get)
-            if any(p.get('merged_at') for p in fix_refs(timeline)[0]):
-                changed[key] = True
+            work = [p['number'] for p in fix_refs(timeline)[0]
+                    if p.get('merged_at') and works_on(p, num)]
+            if work:
+                changed[key] = KNOWN_CHANGED_FORM
+                why[key] = 'merged pull request %s is work on it' % ', '.join(
+                    '#%d' % n for n in work)
                 state['_dirty'] = True
+            elif changed.pop(key, None) is not None:
+                state['_dirty'] = True      # an older rule's mention, not work
         if key in changed:
+            why.setdefault(key, 'a merged pull request is work on it')
             continue                # a change for it is merged: not a known issue
         if (have and have.get('updated') == issue.get('updated_at')
                 and have.get('form') == KNOWN_FORM):
@@ -5152,6 +5236,7 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
         if _all_marked(issue, comments, TASK_MARK, room=None):
+            why[key] = 'it has a "Test task:" comment'
             continue                # it has a test task: being checked, not known
         title, body, tags = known_of(issue, comments)
         taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items() if k != key]
@@ -5160,6 +5245,7 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
                 has_task=False, taken_titles=taken), say):
             if have:
                 listed.add(num)     # the post already up stays as it was
+            why[key] = 'its post breaks a rule'
             continue
         listed.add(num)
         sig = _sig(title, body, tags)
@@ -5188,17 +5274,16 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     # An issue the label lists left out is read itself before its post comes
     # down (finding_gone). Every read is made before anything is taken down,
     # so a read that fails fails the pass with every post still up.
-    gone = {}
     for key in list(rec):
         if int(key) in listed or int(key) in issues:
             continue                # listed, or not for a reason found above
-        why = await loop.run_in_executor(None, finding_gone, int(key), get)
-        if why is None:
+        gone = await loop.run_in_executor(None, finding_gone, int(key), get)
+        if gone is None:
             log('known issues: the open findings GitHub listed left out #%s, '
                 'which is still open and labelled; its post stays' % key)
             listed.add(int(key))
         else:
-            gone[key] = why
+            why[key] = gone
     for key, have in list(rec.items()):
         if int(key) in listed:
             continue
@@ -5209,8 +5294,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         rec.pop(key, None)
         state['_dirty'] = True
         removed.append(int(key))
-        if key in gone:
-            log('known issues: took #%s down: %s' % (key, gone[key]))
+        log('known issues: took #%s down: %s'
+            % (key, why.get(key, 'no reason was recorded')))
     return posted, edited, removed
 
 
@@ -5517,6 +5602,166 @@ def adopt_task(number, thread_id, path=None):
     return 'issue %d now owns test task post %d' % (int(number), int(thread_id))
 
 
+# -------------------------------------- the site's known issues and roadmap --
+#
+# Issue #3140 (Patrick): the site's Known Issues page and its roadmap are built
+# from the board, so they cannot go stale. Until then both were boards typed
+# into site/data/board.json; the roadmap's Later lane said the emote wheel was
+# never started while it shipped (test-roadmap.js), and the known board kept
+# NPC behaviour that #504 had fixed. The bot already reads the board for the
+# Discord forums, with the one issues token there is, so it writes both lists
+# into one file the site reads:
+#
+#   known    the posts that are up in #known-issues, the same list, each as
+#            its title, its words and where it was found (Main, Dev). One
+#            rule decides both: known_issues_once.
+#   roadmap  every issue labelled "roadmap: now", "roadmap: next" or
+#            "roadmap: later", open, in that lane; closed as done, in Done.
+#            Its words are its last "Roadmap:" comment: the first line is
+#            what is being built (45 characters at most), the lines under it
+#            where it stands. The rules of a known issue hold for it (no
+#            footer, no issue number, link or code), and so do the writing
+#            rules of a public page (no em dash, never "player"). An issue
+#            with a lane and no such comment, or one that breaks a rule, is
+#            left off and gets one comment saying why (refuse).
+#
+# The file is PUBLIC_LISTS_FILE, in the site's data\from-bot folder, which
+# holds only what the bot writes for the site: the site makes it, and
+# Install-Bot.ps1 gives the bot's account Modify on it and nothing else of the
+# site's (the other way round from for-bot, #1102). It is written whole after
+# every pass, with the time of the pass, so the site can say how old it is;
+# a part the bot could not read this pass is left out rather than written
+# empty, and the site says that part could not be read.
+PUBLIC_LISTS_FILE = os.environ.get(
+    'PUBLIC_LISTS_FILE', r'C:\Thornswood-Docs\data\from-bot\lists.json')
+ROADMAP_LANES = (('now', 'Being built now'), ('next', 'Next'), ('later', 'Later'))
+ROADMAP_DONE = 'Done'
+ROADMAP_MARK = re.compile(r'^\s*roadmap\s*:\s*(.*)$', re.I)
+
+
+def roadmap_label(lane):
+    return 'roadmap: %s' % lane
+
+
+def github_labelled(label, state, get=None):
+    """Every issue (not pull request) with the label, open or closed (state),
+       by number."""
+    get = get or _github_get
+    out = {}
+    page = 1
+    while True:
+        url = ('%s/repos/%s/issues?state=%s&per_page=100&page=%d&labels=%s'
+               % (GITHUB_API, KNOWN_REPO, state, page, urllib.parse.quote(label)))
+        rows = get(url) or []
+        for row in rows:
+            if isinstance(row, dict) and 'pull_request' not in row:
+                out.setdefault(int(row['number']), row)
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
+def roadmap_lanes_of(issue):
+    """The lanes (now, next, later) the issue is labelled with."""
+    names = [n.lower() for n in _labels(issue)]
+    return [lane for lane, _name in ROADMAP_LANES if roadmap_label(lane) in names]
+
+
+def roadmap_of(issue, comments):
+    """(title, words, problems) for the issue's roadmap row, from its last
+       "Roadmap:" comment. problems is empty when it may go on the site."""
+    got = _marked(issue, comments, ROADMAP_MARK, room=None)
+    if got is None:
+        return None, None, ['Roadmap: the issue has a roadmap label and no '
+                            'comment whose first line starts "Roadmap:", '
+                            'which holds the words the site shows.']
+    title, body = got[0], strip_footer(got[1])
+    return title, body, post_problems('roadmap', title, body)
+
+
+def roadmap_once(state, get=None, say=None):
+    """
+    One read of the roadmap off the board. state is the dict kept in
+    known-issues.json, changed in place; its 'roadmap' part remembers each
+    labelled issue's row by its updated_at, so comments are read only for an
+    issue that changed (a label, a close and a comment all move it). Returns
+    the roadmap as the site draws it: {lanes: [{name, rows: [{title, text}]}]},
+    the open lanes in order and Done last, each lane by issue number and Done
+    newest close first.
+    """
+    seen = {}
+    for lane, _name in ROADMAP_LANES:
+        for state_ in ('open', 'closed'):
+            for num, issue in github_labelled(roadmap_label(lane), state_, get).items():
+                seen[num] = issue
+    rec = state.setdefault('roadmap', {})
+    for key in [k for k in rec if int(k) not in seen]:
+        rec.pop(key, None)
+        state['_dirty'] = True
+    rows = dict((name, []) for _lane, name in ROADMAP_LANES)
+    rows[ROADMAP_DONE] = []
+    for num in sorted(seen):
+        issue = seen[num]
+        key = str(num)
+        closed = str(issue.get('state')) != 'open'
+        if closed and str(issue.get('state_reason') or 'completed') != 'completed':
+            continue        # dropped or a duplicate: never built, so not Done
+        have = rec.get(key)
+        if not have or have.get('updated') != issue.get('updated_at'):
+            title, body, problems = roadmap_of(issue, github_comments(num, get))
+            lanes = roadmap_lanes_of(issue)
+            if len(lanes) > 1 and not closed:
+                problems = problems + ['Roadmap: the issue is in %s at once; '
+                                       'one lane only.' % ', '.join(
+                                           roadmap_label(l) for l in lanes)]
+            have = rec[key] = {'updated': issue.get('updated_at'),
+                               'title': title, 'text': body,
+                               'problems': problems}
+            state['_dirty'] = True
+        if refuse(state, 'roadmap', num, have.get('problems') or [], say):
+            continue
+        row = {'title': have['title'], 'text': have['text'],
+               'closed': str(issue.get('closed_at') or '')}
+        if closed:
+            rows[ROADMAP_DONE].append(row)
+        else:
+            rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(row)
+    rows[ROADMAP_DONE].sort(key=lambda r: r['closed'], reverse=True)
+    lanes = [name for _lane, name in ROADMAP_LANES] + [ROADMAP_DONE]
+    return {'lanes': [{'name': name,
+                       'rows': [{'title': r['title'], 'text': r['text']}
+                                for r in rows[name]]} for name in lanes]}
+
+
+def known_list(state):
+    """The posts up in #known-issues, as the site shows them: title, words
+       and where (Main, Dev), by issue number. The records hold each post's
+       sig, which is exactly what went up (_sig)."""
+    out = []
+    for key in sorted((state.get('issues') or {}), key=int):
+        sig = str((state['issues'][key] or {}).get('sig') or '')
+        if not sig:
+            continue
+        title, rest = (sig.split('\n', 1) + [''])[:2]
+        body, _, tags = rest.rpartition('\n')
+        out.append({'title': title, 'text': body,
+                    'where': [t for t in tags.split(',') if t]})
+    return out
+
+
+def write_public_lists(known, roadmap, path=None, now=None):
+    """Writes the site's lists: known and roadmap as the passes made them,
+       either None when it could not be read this pass, and so left out."""
+    data = {'at': now or _utc_stamp()}
+    if known is not None:
+        data['known'] = known
+    if roadmap is not None:
+        data['roadmap'] = roadmap
+    _state_write(path or PUBLIC_LISTS_FILE, data)
+    return data
+
+
 def issue_tags_found(issue):
     names = _labels(issue)
     return any(l in names for l in KNOWN_LABELS)
@@ -5540,7 +5785,7 @@ async def watch_known_issues():
             'fixed by hand (posting from empty would double every post)'
             % KNOWN_STATE)
         return
-    said_text = said_dev = False
+    said_text = said_dev = said_lists = False
     while not client.is_closed():
         try:
             known = tasks = dev = None
@@ -5582,8 +5827,24 @@ async def watch_known_issues():
                 if posted or edited or removed:
                     log('dev test tasks: posted %s, edited %s, removed %s'
                         % (posted or 'none', edited or 'none', removed or 'none'))
+            # The site's lists (#3140): known only when #known-issues was
+            # kept this pass, since it is that forum's list.
+            roadmap = await asyncio.get_running_loop().run_in_executor(
+                None, roadmap_once, state)
             if state.get('_dirty'):
                 _known_save(state)
+            try:
+                write_public_lists(known_list(state) if known is not None else None,
+                                   roadmap)
+            except OSError as e:
+                if not said_lists:
+                    log('known issues: could not write the site\'s lists to %s '
+                        '(%s). Install-Bot.ps1 gives the bot Modify on that '
+                        'folder once Deploy-Docs.ps1 has made it.'
+                        % (PUBLIC_LISTS_FILE, type(e).__name__))
+                    said_lists = True
+            else:
+                said_lists = False
         except Exception as e:
             # Never the URL with the token, and never the token: the request
             # carries it in a header, which str(e) does not print.

@@ -2,7 +2,7 @@
 
 - **Issue / PR:** #3438, the pull request this note came in with.
 - **Where:** the live bot on the box (Install-Bot -CodeOnly). No Ship, no game server, no site, no Discord layout change.
-- **Needs first:** nothing. If #3140's pull request (#3440) merges first, this runs once for both.
+- **Needs first:** nothing. If `3140-site-lists.md` has not run yet when this merges, its Install-Bot carries this change too: run that note, then delete both, and put what ran on #3438 as well as #3140.
 - **Staff notice:** no. The bot restarts for a few seconds, and nothing staff do changes.
 
 What it does: when GitHub's list of open Dev Findings or Main Findings leaves an issue out, the bot reads that issue itself before taking its #known-issues post down, and keeps the post when the issue is still open and labelled. On 22 Oct the lists left issues out and the same ten posts came down and went back up as a set three times.
