@@ -85,7 +85,8 @@ yes('its intro and section notes can be changed there too, not only its cells',
 // 4. The stale row is gone, and the page says what #504 made true.
 yes('nothing says NPCs stand still with nobody near',
     !/NPCs stand still when nobody is nearby/i.test(JSON.stringify(board)) && !/NPCs stand still when nobody is nearby/i.test(page || ''));
-yes('the page says NPCs keep moving when nobody is nearby', /keep moving when nobody is nearby/i.test(page || ''));
+yes('nor that NPC behaviour differs between people near the same enemy, which #504 fixed (#3137)',
+    !/NPC behaviour differs/i.test(page || ''));
 
 // 5. The writer, on planted boards.
 {

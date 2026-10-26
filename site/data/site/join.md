@@ -128,9 +128,9 @@ world.
 
 ## If it goes wrong
 
-Check the [known issues](/known) first. A lot of what looks like a bug is a
-limit of how a shared Skyrim works, and it is written down with the reason. The
-[help](/help) page has the usual fixes.
+Check the [known issues](/known) first: it lists what is broken right now that
+the team already knows about. The [help](/help) page has the usual fixes, and
+what works the way it does on purpose.
 
 If it is not there, say so in the Discord with what you were doing, what you
 expected, and what happened instead, or use the [report](/report) page.

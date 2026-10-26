@@ -612,7 +612,7 @@ const BLURB = {
   '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
   '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
   '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
-  '/known':     ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
+  '/known':     ['Known issues', 'What is broken right now that the team already knows about, each one on the board to be fixed. Read this before reporting anything.'],
   '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
