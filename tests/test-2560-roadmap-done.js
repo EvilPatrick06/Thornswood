@@ -6,64 +6,71 @@
 //   2. The Done rows #2561 added never reached /roadmap, because both
 //      renderers (home.js and server.js's server-drawn page) skipped any
 //      section named Done.
-// This holds the data and both renderers. home.js's /roadmap branch is run
-// against the real board, and server.js's /roadmap block is checked for any
-// Done filter.
+// Since #3140 the roadmap is built from the issue board, so the first cannot
+// come back the same way: a row's words are its issue's "Roadmap:" comment,
+// and an issue that closes moves to Done by itself. What still lives here is
+// the drawing, so this holds both renderers: the bot's lists, as server.js
+// turns them into the roadmap (roadmapBoard), are drawn by home.js's /roadmap
+// branch, Done last, and server.js's /roadmap block has no Done filter.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { listWriters } = require('./fixtures/known-page');
 const root = path.join(__dirname, '..');
 let fails = 0;
 function yes(name, ok) { console.log((ok ? 'ok   ' : 'FAIL ') + name); if (!ok) fails++; }
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
-const board = JSON.parse(read('site/data/board.json'));
-const rm = board.roadmap || { sections: [] };
+// 1. The bot's lists, planted, as server.js turns them into the roadmap.
+const writers = listWriters(read('site/server.js'));
+yes('server.js has its list writers between their markers', !!writers);
+const rm = writers ? writers.roadmapBoard({
+  at: '2026-10-26T08:05:00Z',
+  roadmap: { lanes: [
+    { name: 'Being built now', rows: [{ title: 'Guards and cells run by people', text: 'A guard holds the cells of their own hold.' }] },
+    { name: 'Next', rows: [] },
+    { name: 'Later', rows: [{ title: 'The Thalmor war', text: 'A remnant holds the embassy.' }] },
+    { name: 'Done', rows: [{ title: 'Thinning the crowd', text: 'The cast was cut.' }] }] }
+}) : { sections: [] };
 const secs = rm.sections || [];
-const titleOf = (sec, row) => (row.cells || {})[(sec.columns || [])[0] && sec.columns[0].id] || '';
-const all = [];
-secs.forEach(sec => (sec.rows || []).forEach(row => all.push({ sec, row, title: titleOf(sec, row) })));
+yes('every lane is a section, in order, Done last',
+    secs.map(s => s.name).join('|') === 'Being built now|Next|Later|Done');
+yes('a row reads like the board it replaced: What, then Where it stands',
+    secs[0] && secs[0].columns.map(c => c.name).join('|') === 'What|Where it stands' &&
+    secs[0].rows[0].cells.what === 'Guards and cells run by people');
 
-// 1. The #502 row
-const guards = all.find(x => /^Guards\b/.test(x.title));
-yes('the #502 row is titled "Guards and cells run by people"', !!guards && guards.title === 'Guards and cells run by people');
-yes('and it is in "Being built now"', !!guards && /being built now/i.test(guards.sec.name || ''));
-const roadmapText = JSON.stringify(rm);
-yes('no roadmap row or note mentions a bounty', !/bount/i.test(roadmapText));
-
-// 2. Done is in the data, last, with #2561's rows
-const done = secs.find(s => /^\s*done\s*$/i.test(s.name || ''));
-yes('the roadmap has a Done section', !!done);
-yes('Done is the last section', !!done && secs[secs.length - 1] === done);
-const doneTitles = done ? done.rows.map(r => titleOf(done, r)) : [];
-for (const t of ['Thinning the crowd', 'Parties', 'Voice through a relay', 'An economy with a bottom', 'Seasons', 'Gathering, fishing and mining', 'Speech you hear nearby']) {
-  yes('Done carries "' + t + '"', doneTitles.includes(t));
-}
-
-// 3. home.js draws Done: run its /roadmap branch on the real board
+// 2. home.js draws Done: run its /roadmap branch on that roadmap
 const home = read('site/public/home.js');
 const start = home.indexOf("} else if (here === '/roadmap') {");
 const end = home.indexOf("} else if (here === '/news') {");
 yes('home.js has its /roadmap branch', start > 0 && end > start);
-let drawn = '';
-if (start > 0 && end > start) {
-  const branch = home.slice(start + "} else ".length, end);
-  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const thenable = v => ({ then(f) { try { return thenable(f(v)); } catch (e) { return thenable(undefined); } }, catch() { return this; } });
-  const ctx = {
-    here: '/roadmap', esc,
-    request: () => thenable({ json: () => rm }),
-    show: html => { drawn = html; }
-  };
-  vm.runInNewContext(branch + '}', ctx);
+function draw(answer) {
+  let drawn = '';
+  if (start > 0 && end > start) {
+    const branch = home.slice(start + "} else ".length, end);
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const thenable = v => ({ then(f) { try { return thenable(f(v)); } catch (e) { return thenable(undefined); } }, catch() { return this; } });
+    const ctx = {
+      here: '/roadmap', esc,
+      request: () => thenable({ json: () => answer }),
+      show: html => { drawn = html; }
+    };
+    vm.runInNewContext(branch + '}', ctx);
+  }
+  return drawn;
 }
+const drawn = draw(rm);
 yes('home.js draws a Done lane', /<h2>Done<\/h2>/.test(drawn));
 yes('home.js draws "Thinning the crowd"', drawn.includes('Thinning the crowd'));
 yes('home.js draws Done after Later', drawn.indexOf('<h2>Later</h2>') >= 0 && drawn.indexOf('<h2>Done</h2>') > drawn.indexOf('<h2>Later</h2>'));
-yes('home.js draws the guards row with no bounty', drawn.includes('Guards and cells run by people') && !/bount/i.test(drawn));
+yes('home.js leaves out a lane with nothing in it', drawn.indexOf('<h2>Next</h2>') < 0);
+yes('home.js says when the board was read', drawn.includes('26 Oct 2026, 8:05 AM UTC'));
+const unread = draw(writers ? writers.roadmapBoard(null) : {});
+yes('a roadmap the bot has not written is said, not drawn empty',
+    /could not be read from the issue board/.test(unread) && !/Nothing on it yet/.test(unread));
 
-// 4. server.js's server-drawn /roadmap skips no Done section
+// 3. server.js's server-drawn /roadmap skips no Done section
 const srv = read('site/server.js');
 const s0 = srv.indexOf("} else if (route === '/roadmap') {");
 const s1 = srv.indexOf("} else if (route === '/gallery') {", s0);

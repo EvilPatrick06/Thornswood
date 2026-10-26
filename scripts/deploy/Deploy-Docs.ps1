@@ -17,7 +17,7 @@
                                the browser, so this is safe
     .\Deploy-Docs.ps1 -Boards  also board.json, which DOES overwrite anything
                                typed into a board on the site
-    .\Deploy-Docs.ps1 -Board known
+    .\Deploy-Docs.ps1 -Board active
                                replaces just the named board inside the live
                                board.json with the repo's, .bak first, and
                                leaves every other board as it was typed. A
@@ -87,7 +87,7 @@ param(
   # Just the boards. -SeedDocs would also flatten every markdown document up
   # there, which is too big a hammer when only the runbook moved.
   [switch]$Boards,
-  # One board out of board.json, by its key (known), put in place of the
+  # One board out of board.json, by its key (active), put in place of the
   # live one while every other board stays exactly as typed on the site
   # (#2414). -Boards flattens them all. The live board.json goes to .bak
   # first, and the board's revision moves on, so a hub page still open on the
@@ -199,7 +199,7 @@ if ($Board) {
   $repoBoards = Get-Content -Raw -LiteralPath (Join-Path $App 'data/board.json') | ConvertFrom-Json
   foreach ($b in @($Board)) {
     if (-not $b) { continue }
-    if ($b -notmatch '^[a-z]+$') { throw "-Board takes a board's key, such as known: $b" }
+    if ($b -notmatch '^[a-z]+$') { throw "-Board takes a board's key, such as active: $b" }
     if (-not ($repoBoards.PSObject.Properties.Name -contains $b)) { throw "no board named $b in the repo's data/board.json" }
     $boardNames += $b
   }

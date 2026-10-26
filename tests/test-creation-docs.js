@@ -49,7 +49,7 @@ function yes(what, cond) {
 const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const gm = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const skills = read(path.join('game', 'ui', 'thornswood-skills.js'));
-// Known Issues is the known board, as /known writes it (#2414).
+// Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
 const known = require('./fixtures/known-page').knownPage() || '';
 const help = read(path.join('site', 'data', 'help.md'));
 

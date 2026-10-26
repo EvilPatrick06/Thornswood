@@ -30,9 +30,9 @@
 // NPC section, test-known-page.js for the table of removed mods) went with
 // them, since what they checked is no longer on the page by decision.
 //
-// A row records its issue as "issue" beside its cells. The page does not show
-// it (testers have no GitHub); it is how anybody reading the board finds the
-// fix, and what #3140 builds on.
+// A row recorded its issue as "issue" beside its cells. Since #3140 the rows
+// are the board's own Findings issues, written out by the bot, so there is no
+// typed row left; the checks of the rows went with them.
 //
 // Read only.
 'use strict';
@@ -45,57 +45,16 @@ let pass = 0, fail = 0;
 function yes(what, cond) { if (cond) { pass++; console.log('PASS  ' + what); } else { fail++; console.log('FAIL  ' + what); } }
 function read(rel) { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n'); } catch (e) { return null; } }
 
-const board = JSON.parse(read('site/data/board.json') || '{}');
-const known = board.known || {};
 const page = knownPage() || '';
 const help = read('site/data/help.md') || '';
 const content = read('bot/content.py') || '';
 
-// The rows a reader sees: not ticked done in the hub.
-function shown(b) {
-  const out = [];
-  ((b && b.sections) || []).forEach(function (s) {
-    ((s && s.rows) || []).forEach(function (r) { if (r && !r.done) { out.push({ section: s, row: r }); } });
-  });
-  return out;
-}
-// What is wrong with a board: rows with no issue, an issue twice, a section of
-// prose alone (a section with nothing broken in it is explanation, which
-// belongs on Help).
-function problems(b) {
-  const bad = [];
-  const seen = {};
-  shown(b).forEach(function (x) {
-    const n = x.row.issue;
-    const first = String(((x.row.cells || {})[(((x.section.columns || [])[0]) || {}).id]) || '').trim();
-    if (!(Number.isInteger(n) && n > 0)) { bad.push('no issue: ' + (first || x.row.id)); return; }
-    if (seen[n]) { bad.push('issue #' + n + ' twice'); }
-    seen[n] = true;
-    if (!first) { bad.push('#' + n + ' has no words'); }
-  });
-  ((b && b.sections) || []).forEach(function (s) {
-    if (String(s.note || '').trim() && !shown({ sections: [s] }).length) { bad.push('prose only: ' + s.name); }
-  });
-  return bad;
-}
-
-// 1. Every row on the page is an issue on the board.
-const rows = shown(known);
-yes('the known board has rows, ' + rows.length + ' of them', rows.length >= 3);
-const bad = problems(known);
-if (bad.length) { console.log('      ' + bad.join('; ')); }
-yes('every row names its board issue, each once, and no section is prose alone', bad.length === 0);
-yes('the issues behind it include the five measured on 26 Oct',
-    [503, 2710, 3434, 3435, 3436].every(function (n) { return rows.some(function (x) { return x.row.issue === n; }); }));
+// 1. Every row on the page is an issue on the board. Since #3140 that holds
+// by construction: the page is written from the board's Findings issues (the
+// bot's lists.json), so there is no typed row left to check here. What the
+// repository still writes is the page around the rows.
+yes('the page around the rows is there', /^# Known Issues\n/.test(page));
 yes('the page does not show issue numbers to testers', !/#\d{2,}/.test(page));
-
-// Planted boards.
-yes('planted: a row typed in the hub with no issue is caught',
-    problems({ sections: [{ name: 'S', columns: [{ id: 'a' }], rows: [{ id: 'r', cells: { a: 'x' } }] }] }).length === 1);
-yes('planted: a row ticked done needs no issue (it is off the page)',
-    problems({ sections: [{ name: 'S', columns: [{ id: 'a' }], rows: [{ id: 'r', done: true, cells: { a: 'x' } }, { id: 's', issue: 5, cells: { a: 'y' } }] }] }).length === 0);
-yes('planted: a section of explanation with no rows is caught',
-    problems({ sections: [{ name: 'The load order rule', note: 'Words.', columns: [], rows: [] }] }).length === 1);
 
 // 2. What came off: fixed, untrue, or on purpose.
 [
@@ -120,10 +79,6 @@ yes('it no longer calls the menus that still reset deliberate', !/QuickLoot/.tes
 yes('and it ends by pointing at Known Issues for what is broken', /\[Known Issues\]\(\/known\)\s+lists what is broken right now/.test(normal));
 yes('Help tells somebody with a launcher from before 26 September to take the installer again',
     /launcher last opened before 26 September/.test(help) && /\[Downloads\]\(\/downloads\)/.test(help));
-
-// 4. The roadmap does not carry a bug as work to build.
-yes('the roadmap no longer lists Bard instruments, a bug on the board now',
-    !/Bard instruments/.test(JSON.stringify(board.roadmap || {})));
 
 // 5. Discord says the same about the page.
 yes('Discord no longer calls the known issues page broken on purpose', !/broken on purpose/i.test(content));

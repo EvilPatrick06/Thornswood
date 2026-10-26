@@ -107,10 +107,12 @@ and the cookie secret, and is never in the repo. `.\scripts\deploy\Deploy-Docs.p
 sends `server.js` and everything in `public\` and restarts the task, and
 `-Site` also sends the public pages. A plain deploy never overwrites a
 document somebody has typed into on the site; `-Boards`, `-Docs` and
-`-SeedDocs` do, after a `.bak` of each. `-Board known` replaces that one board
-inside the live `board.json` and leaves every other board as typed: the
-public Known Issues page is the known board, written out at `/known`, and
-the hub edits it at `/hub/known`. `-Password` asks for the new member
+`-SeedDocs` do, after a `.bak` of each. `-Board active` replaces that one board
+inside the live `board.json` and leaves every other board as typed. The
+public Known Issues page (`/known`) and the roadmap (`/roadmap`) are not
+boards: the bot writes both from the issue board into `data\from-bot\lists.json`,
+which the site makes and reads (#3140; bot/README.md, "The site's known
+issues and roadmap"). `-Password` asks for the new member
 password without showing it, never typed on the command line, where the
 shell's history would keep it. `-Password` reads the `config.json`
 on the VPS, changes the member password in it and keeps every other setting.
