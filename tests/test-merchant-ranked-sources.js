@@ -8,7 +8,8 @@ const gates=require('../game/quest-eligibility').createQuestEligibility({table:p
 const {validateRankedQuests}=require('../scripts/dev/MerchantQuestSources');
 const load=name=>require('../game/data/'+name+'.json'),copy=value=>JSON.parse(JSON.stringify(value));
 const doc=load('merchant-ranked-quests'),source={legacy:load('merchant-quests').quests,roster:load('merchant-roster').merchants,
- roles:load('merchant-role-tables'),gates,recipes:load('recipes').recipes,harvests:load('harvests').harvests,ores:load('ores').ores};
+ roles:load('merchant-role-tables'),gates,recipes:load('recipes').recipes,harvests:load('harvests').harvests,ores:load('ores').ores,
+ published:Object.fromEntries(load('merchant-quest-activation').commissions.map(pin=>[pin.id,pin.sha256]))};
 assert.equal(validateRankedQuests(doc,source).length,231);
 for(const defect of ['source','quantity','price','merchant','tier','duplicate','half-source','missing-part','difficulty','held','gate','school','class-half','public-proof','other-logistics','lower-producer','lower-recipe','copied-logistics','non-tailor-batches']) {
  const broken=copy(doc),sources={...copy(source),gates};
@@ -54,10 +55,30 @@ for(const defect of ['source','quantity','price','merchant','tier','duplicate','
  }
  assert.throws(()=>validateRankedQuests(broken,sources),/source evidence/,defect);
 }
+// #3120: a recipe a published commission copied moves to its trade's bench.
+// The published commission stays as pinned and still validates; the same
+// copy offered as a new commission is refused, and a published one whose
+// text no longer hashes to its pin is refused.
+{
+ const id='q-morthal-woodworker-expert-parcel',reference='8f0:MoreCraftableEquipment.esp';
+ const sources={...copy(source),gates};
+ Object.assign(sources.recipes[reference],{bench:'154e1:Thornswood-Content.esp',benchName:'ThornswoodCraftingWoodworking',
+  movedFrom:'88105:Skyrim.esm',movedFromName:'CraftingSmithingForge'});
+ const parcel=copy(doc),row=parcel.quests.find(quest=>quest.id===id);
+ assert.ok(row&&row.goods.some(good=>good.recipe&&good.recipe.reference===reference),'the Morthal parcel names the Falmer Arrow recipe');
+ parcel.quests=[row];sources.legacy=[];
+ assert.doesNotThrow(()=>validateRankedQuests(parcel,sources),'a published commission is held to its pin when a recipe it copied moves bench');
+ const offered=copy(parcel);offered.quests[0].id='q-morthal-woodworker-expert-again';
+ assert.throws(()=>validateRankedQuests(offered,sources),/source evidence/,'a new commission still copies today\'s recipe field for field');
+ const edited=copy(parcel);edited.quests[0].goods.find(good=>good.recipe.reference===reference).recipe.bench='154e1:Thornswood-Content.esp';
+ assert.throws(()=>validateRankedQuests(edited,sources),/source evidence/,'a published commission whose text changed is refused');
+ const gone=copy(sources);gone.gates=gates;gone.recipes[reference].book='cut';
+ assert.throws(()=>validateRankedQuests(parcel,gone),/source evidence/,'a published commission whose recipe nobody makes any more is refused');
+}
 const all=source.legacy.concat(doc.quests);
 {
  const parcel=copy(doc),row=parcel.quests[0],sources={...copy(source),gates};
- row.tier='novice';row.cooldownHours=6;row.gate={profession:'smith',half:'edgewright',rank:'novice'};
+ row.id='q-new-smith-traded-inputs';row.tier='novice';row.cooldownHours=6;row.gate={profession:'smith',half:'edgewright',rank:'novice'};
  row.goods=['15491:Thornswood-Content.esp','f7f43:Skyrim.esm'].map(reference=>{
   const recipe=sources.recipes[reference];return {item:recipe.out,count:recipe.makes,recipe:{reference,...Object.fromEntries(
    ['owner','half','rank','out','makes','bench','inputItems','needs'].map(key=>[key,recipe[key]]))}};
@@ -65,7 +86,7 @@ const all=source.legacy.concat(doc.quests);
  assert.doesNotThrow(()=>validateRankedQuests(parcel,sources),'canonical public traded inputs are admitted by actual Smith buy permission');
 }
 {
- const sources={...copy(source),gates},parcel=copy(doc),row=parcel.quests[5];
+ const sources={...copy(source),gates},parcel=copy(doc),row=parcel.quests[5];row.id='q-new-alchemist-master-supply';
  for(const harvest of Object.values(sources.harvests))if(harvest.produce==='59b86:Skyrim.esm')harvest.rank='master';
  const reference='abcdef:Thornswood-Content.esp',recipe={...copy(sources.recipes['154c6:Thornswood-Content.esp']),
   out:'59b86:Skyrim.esm',type:'INGR',inputItems:[{item:'1cd74:Dragonborn.esm',name:'Ash Creep Cluster',type:'INGR',count:1,

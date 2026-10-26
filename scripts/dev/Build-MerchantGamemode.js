@@ -42,11 +42,13 @@ const traders = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-t
 const roster = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-roster.json'), 'utf8'));
 const roles = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-role-tables.json'), 'utf8'));
 const quests = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-quests.json'), 'utf8'));
+const activation = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-quest-activation.json'), 'utf8'));
 const ranked=require(path.join(root,'scripts/dev/MerchantQuestSources.js')).validateRankedQuests(
   JSON.parse(fs.readFileSync(path.join(root,'game/data/merchant-ranked-quests.json'),'utf8')),
-  {legacy:quests.quests,roster:roster.merchants,roles,gates,recipes:require(path.join(root,'game/data/recipes.json')).recipes,
+  {legacy:quests.quests,roster:roster.merchants,roles,gates,
+   published:Object.fromEntries((Array.isArray(activation.commissions)?activation.commissions:[]).map(pin=>[pin.id,pin.sha256])),
+   recipes:require(path.join(root,'game/data/recipes.json')).recipes,
    harvests:require(path.join(root,'game/data/harvests.json')).harvests,ores:require(path.join(root,'game/data/ores.json')).ores});
-const activation = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-quest-activation.json'), 'utf8'));
 if(activation.version!==1 || !Array.isArray(activation.killScenes) || activation.killScenes.length>4 ||
     new Set(activation.killScenes.map(row=>row.id)).size!==activation.killScenes.length)
   throw new Error('Invalid merchant quest activation manifest');
