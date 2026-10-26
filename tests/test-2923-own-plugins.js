@@ -19,7 +19,13 @@
   C  scripts/mods/content-tables.json, the list
      scripts/mods/Rebuild-ContentTables.ps1 runs: every builder that reads a
      load order is in it or left out with a reason, no step reads a table a
-     later step writes, and the script lists every step.
+     later step writes, and the script lists every step. #3425: each
+     builder's own source is read for every file of the repository it names
+     outside scripts, game/content, game/data and records, and each one is
+     in a step's reads, readsBack, uses or writes, which is what
+     scripts/mods/Run-OnBox.ps1 sends to the box (the K panel's book that
+     Build-SpellTable.ps1 reads was named nowhere, and the box run stopped
+     there).
   N  the harnesses that hold a table to the plugin's bytes name the script.
   L  #2976. The load order is read in one place: the three helpers say the
      same of a plugins.txt holding switched off lines (the masters, then each
@@ -200,7 +206,7 @@ yes('C4 no step reads a table a later step writes' + (late.length ? ' (' + late.
 const unnamed = [];
 for (const s of steps) {
   const src = read(s.tool);
-  for (const f of (s.reads || []).concat(s.readsBack || [], s.writes || [])) {
+  for (const f of (s.reads || []).concat(s.readsBack || [], s.uses || [], s.writes || [])) {
     if (src.indexOf(path.basename(f)) < 0) { unnamed.push(s.tool + ' ' + f); }
   }
 }
@@ -215,6 +221,67 @@ for (const s of steps) {
 }
 yes('C6 and takes the Data folder and plugin list by the names the list gives' + (flags.length ? ' (not: ' + flags.join('; ') + ')' : ''),
     flags.length === 0);
+// #3425. The files of the repository a builder's source names: each run of
+// string literals that are only joined to each other (path.join's commas,
+// Python's '/', a single '..\\..\\game\\ui\\x.js'), read as a path with any
+// leading ../ dropped, that starts in a folder of the repository's and is a
+// file there. Under scripts the artifact carries scripts/mods, scripts/dev
+// and what a builder loads (tests/test-2899-run-on-box.ps1 holds that), so
+// scripts is not read here.
+const TOPS = fs.readdirSync(ROOT).filter((n) => n !== 'scripts' && n[0] !== '.' && fs.statSync(path.join(ROOT, n)).isDirectory());
+function namedFiles(src) {
+  const lits = [];
+  const re = /'([^'\r\n]*)'|"([^"\r\n]*)"/g;
+  let m;
+  while ((m = re.exec(src))) { lits.push({ v: m[1] !== undefined ? m[1] : m[2], s: m.index, e: re.lastIndex }); }
+  const runs = [];
+  lits.forEach((l, i) => {
+    if (i && /^[\s,+/]*$/.test(src.slice(lits[i - 1].e, l.s))) { runs[runs.length - 1].push(l.v); } else { runs.push([l.v]); }
+  });
+  const found = new Set();
+  for (const r of runs) {
+    for (let i = 0; i < r.length; i++) {
+      for (let j = i + 1; j <= r.length; j++) {
+        let p = r.slice(i, j).join('/').replace(/\\+/g, '/').replace(/\/+/g, '/');
+        while (/^\.\.?\//.test(p)) { p = p.replace(/^\.\.?\//, ''); }
+        const parts = p.split('/');
+        if (parts.length < 2 || TOPS.indexOf(parts[0]) < 0) { continue; }
+        const full = path.join(ROOT, p);
+        if (fs.existsSync(full) && fs.statSync(full).isFile()) { found.add(p); }
+      }
+    }
+  }
+  return Array.from(found);
+}
+const SENT = ['game/content', 'game/data', 'records'];
+const under = (f, list) => list.some((d) => f === d || f.indexOf(d + '/') === 0);
+// Any step's: Write-SystemLists.js reads the spell ids Build-SpellTable.ps1
+// writes into game/gamemode.js, which later steps write other tables into.
+const listed = [].concat.apply([], steps.map((s) => (s.reads || []).concat(s.readsBack || [], s.uses || [], s.writes || [])));
+const notListed = [];
+let named = 0;
+for (const s of steps) {
+  for (const f of namedFiles(read(s.tool))) {
+    named++;
+    if (!under(f, SENT) && !under(f, listed)) { notListed.push(s.tool + ' names ' + f); }
+  }
+}
+yes('C9 every file of the repository a builder names outside scripts, game/content, game/data and records goes up in a step\'s list (' + named + ' named)' +
+    (notListed.length ? ' (not: ' + notListed.slice(0, 4).join('; ') + ')' : ''), named > 0 && notListed.length === 0);
+const spell = steps.filter((s) => s.tool === 'scripts/dev/Build-SpellTable.ps1')[0] || {};
+yes('C10 the spell table step uses the K panel\'s book', (spell.uses || []).indexOf('game/ui/thornswood-skills.js') >= 0);
+const written = [].concat.apply([], steps.map((s) => s.writes || []));
+const badUses = [];
+for (const s of steps) {
+  for (const f of s.uses || []) {
+    if (!fs.existsSync(path.join(ROOT, f)) || !fs.statSync(path.join(ROOT, f)).isFile()) { badUses.push(s.tool + ' uses ' + f + ', which is not a file here'); }
+    if (under(f, written)) { badUses.push(s.tool + ' uses ' + f + ', which a step writes: that is a read'); }
+    if (under(f, SENT) || /^scripts\//.test(f)) { badUses.push(s.tool + ' uses ' + f + ', which goes up anyway'); }
+  }
+}
+yes('C11 each use is a file here that no step writes and the box would not get otherwise' + (badUses.length ? ' (' + badUses.slice(0, 3).join('; ') + ')' : ''),
+    badUses.length === 0);
+
 const script = read('scripts/mods/Rebuild-ContentTables.ps1');
 yes('C7 Rebuild-ContentTables.ps1 runs content-tables.json and writes the register\'s hashes',
     /content-tables\.json/.test(script) && /asset-provenance\.json/.test(script));
