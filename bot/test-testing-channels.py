@@ -1381,9 +1381,9 @@ SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'
 
 
 def pr_ref(num, title, state='closed', merged='2026-10-14T07:00:00Z',
-           repo='EvilPatrick06/Thornswood'):
+           repo='EvilPatrick06/Thornswood', body=''):
     return {'event': 'cross-referenced', 'source': {'type': 'issue', 'issue': {
-        'number': num, 'title': title, 'state': state,
+        'number': num, 'title': title, 'state': state, 'body': body,
         'html_url': 'https://github.com/%s/pull/%d' % (repo, num),
         'pull_request': {'merged_at': merged},
         'repository': {'full_name': repo}}}}
@@ -1569,20 +1569,41 @@ yes('findings with no merged change and no test task are posts; an OPEN pull '
     'request naming one does not take it off',
     posted == [120, 121, 122] and sorted(names(kf)) == ['Chairs stand you up',
                                                          'Ferry lag', 'Killmoves unseen'])
-TIMELINE[121].append(pr_ref(501, 'Killmoves show on everybody'))
+# #3140: a merged pull request that only names a finding (#3437 listed five
+# in a table while it cleaned the known list) is not work on it.
+TIMELINE[121].append(pr_ref(499, 'Clean the known list',
+                            body='Refs #3137.\n\n| Row | Issue |\n|---|---|\n| Killmoves | #121 |'))
+TIMELINE[120] = [pr_ref(498, 'Chairs list', body='Chairs are #120, see Refs #3137.')]
+out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+yes('a merged pull request that only names a finding, without Refs or a '
+    'closing keyword for it, leaves its post up',
+    out == ([], [], []) and len(names(kf)) == 3 and ks.get('known_changed') == {})
+TIMELINE[121].append(pr_ref(501, 'Killmoves show on everybody', body='Refs #3137, #121 and #4.'))
 COMMENTS[122] = [task('Ferry is smooth', 'Main', '1. Ride the ferry.')]
 bump(122)
 posted, edited, removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
-yes('a merged pull request naming a finding takes its post down, though the '
-    'issue itself did not change, and so does a "Test task:" comment',
+yes('a merged pull request that is work on a finding (Refs, in a list) takes '
+    'its post down, though the issue itself did not change, and so does a '
+    '"Test task:" comment',
     sorted(removed) == [121, 122] and names(kf) == ['Chairs stand you up']
-    and ks['known_changed'] == {'121': True})
+    and ks['known_changed'] == {'121': bot.KNOWN_CHANGED_FORM})
 n = len([u for u in ASKED if u.endswith('/121/timeline?per_page=100&page=1')])
 out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
 yes('  a finding found with a merged change is not asked about again, and '
     'nothing comes back',
     out == ([], [], []) and names(kf) == ['Chairs stand you up']
     and len([u for u in ASKED if u.endswith('/121/timeline?per_page=100&page=1')]) == n)
+ks['known_changed']['120'] = True
+out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+yes('  a finding remembered under the old rule (any mention) is read again, '
+    'and a mention alone keeps its post up',
+    out == ([], [], []) and names(kf) == ['Chairs stand you up']
+    and '120' not in ks['known_changed'])
+del ks['issues']['120']
+ks['known_changed']['120'] = True
+out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+yes('  and one whose post the old rule took down is posted again',
+    out[0] == [120] and '120' not in ks['known_changed'])
 bump(120, state='closed', state_reason='completed', closed_at=tick())
 removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
 yes('  a closed finding goes, as before', removed == [120] and names(kf) == [])

@@ -261,7 +261,7 @@ const MCM_PAGES = { 'QuickLoot': 'QuickLootIEMCM.pex', 'Skyrim Unbound': 'Skyrim
 const named = Object.keys(MCM_PAGES).filter(function (k) { return mcmRow.indexOf(k) >= 0; });
 yes('the row gives an example of a mod whose page is there', named.length > 0);
 
-// Known Issues is the known board, written out the way /known writes it (#2414).
+// Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
 const KNOWN = require('./fixtures/known-page').knownPage() || '';
 yes('the row does not say the choices are kept in your save, when Known Issues says menus reset',
     !(/reset every session/i.test(KNOWN) && /kept in your save/i.test(mcmRow)));

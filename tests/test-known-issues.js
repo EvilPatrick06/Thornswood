@@ -22,12 +22,9 @@
 // too (299 mod settings, 323 Papyrus events, 300 killmoves and stagger), so
 // the fix is to the promise over the table rather than to two of its rows.
 //
-// HOW A SUBJECT IS MATCHED. A row and a roadmap item are about the same thing
-// when the row's first cell and the roadmap item's title share a word once
-// plurals and common words are taken out: "NPCs stand still" and "NPCs with
-// their own work" share "npc". The roadmap is read out of board.json rather
-// than copied in here, so a roadmap edit on the site is what this checks
-// against the next time it runs.
+// SINCE #3140 the rows and the roadmap are both on the issue board, so what
+// this checks is the part of the page the repository still writes, and that
+// the other places keep saying the same.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -50,27 +47,6 @@ function yes(what, cond) {
    is permanent" is the opposite, so "permanent" on its own is not here; the
    phrases are the ones this site has actually used. */
 const PROMISE = /not going to change|none are changing|are not changing|never going to change|will not change|won't change|permanent limits/i;
-
-/* Words that say nothing about what a row is about. "launcher" is here because
-   the roadmap's launcher item is about switching servers, and every row about
-   getting in names the launcher without being about that. */
-const STOP = ['the', 'and', 'for', 'with', 'their', 'own', 'you', 'your',
-  'yours', 'into', 'from', 'through', 'run', 'make', 'real', 'worth', 'going',
-  'actually', 'when', 'nobody', 'near', 'nearby', 'same', 'not', 'other',
-  'most', 'never', 'show', 'does', 'every', 'between', 'people', 'all', 'any',
-  'one', 'its', 'can', 'cannot', 'are', 'has', 'have', 'what', 'who', 'this',
-  'that', 'them', 'they', 'out', 'off', 'get', 'where', 'how', 'but', 'still',
-  'launcher'];
-function words(s) {
-  const out = [];
-  String(s || '').toLowerCase().replace(/[^a-z]+/g, ' ').split(' ').forEach(function (w) {
-    if (!w || STOP.indexOf(w) >= 0) { return; }
-    const one = (w.length > 3 && /[^s]s$/.test(w)) ? w.slice(0, -1) : w;
-    if (one.length >= 3 && STOP.indexOf(one) < 0 && out.indexOf(one) < 0) { out.push(one); }
-  });
-  return out;
-}
-function shared(a, b) { return a.filter(function (w) { return b.indexOf(w) >= 0; }); }
 
 /* A markdown page as the text before the first heading and one entry per
    "## " heading: the words between the heading and its table, and the first
@@ -98,100 +74,35 @@ function sections(md) {
   return out;
 }
 
-// -------------------------------------------------------------- the roadmap
-const boardText = read(path.join('data', 'board.json'));
-let board = null;
-try { board = JSON.parse(boardText); } catch (e) { board = null; }
-yes('board.json reads as JSON', !!board);
-
-/* Work that is not done: every roadmap row outside the Done section. */
-const work = [];
-if (board && board.roadmap && board.roadmap.sections) {
-  board.roadmap.sections.forEach(function (s) {
-    if (/^\s*done\s*$/i.test(s.name || '')) { return; }
-    const what = (s.columns || []).filter(function (c) { return /^what$/i.test(c.name); })[0] ||
-                 (s.columns || [])[0];
-    (s.rows || []).forEach(function (r) {
-      if (r.done === true || !what) { return; }
-      const title = String((r.cells || {})[what.id] || '');
-      if (title) { work.push({ title: title, words: words(title), section: s.name }); }
-    });
-  });
-}
-yes('the roadmap has work on it that is not done, ' + work.length + ' items', work.length > 0);
-function workFor(text) {
-  const w = words(text);
-  return work.filter(function (r) { return shared(w, r.words).length > 0; });
-}
-
 // ---------------------------------------------------------- the known page
-// The page is the known board, written out the way /known writes it (#2414).
-const known = require('./fixtures/known-page').knownPage();
-yes('the Known Issues page is there, written from the known board', known !== null);
-const page = sections(known || '');
-/* Since #3137 the page holds only what is broken right now, in one table;
-   what works the way it does on purpose moved to the Help page. */
-const skymp = page.list[0] || { heading: '', lead: '', rows: [] };
-yes('its first table is what is broken right now, with its rows',
-    /broken right now/i.test(skymp.heading) && skymp.rows.length >= 3);
-
-/* The subjects the SkyMP table shares with the roadmap. Worked out rather than
-   written down, so the checks below follow whatever the roadmap says. */
-const onRoadmap = [];
-page.list.forEach(function (s) {
-  s.rows.forEach(function (row) {
-    workFor(row).forEach(function (r) {
-      shared(words(row), r.words).forEach(function (w) {
-        if (onRoadmap.indexOf(w) < 0) { onRoadmap.push(w); }
-      });
-    });
-  });
+/* Since #3140 both the Known Issues page and the roadmap are written from the
+   issue board (the bot's lists.json), so a row and a roadmap item are two
+   labels on the board, and whether one is the other is decided there. What
+   the repository still holds is the page around the rows, written by
+   knownMarkdown in server.js: that is what is checked here, written from one
+   made-up row. */
+const known = require('./fixtures/known-page').knownPage(null, {
+  at: '2026-10-26T08:00:00Z',
+  known: [{ title: 'Doors stick', text: 'A door sticks shut. Push it twice.', where: ['Main'] }]
 });
-console.log('INFO  subjects the Known Issues rows share with the roadmap: ' +
-            (onRoadmap.join(', ') || 'none'));
+yes('the Known Issues page is there, written from the issue board', known !== null);
+const page = sections(known || '');
+/* Since #3137 the page holds only what is broken right now; what works the
+   way it does on purpose moved to the Help page. */
+const skymp = page.list[0] || { heading: '', lead: '', rows: [] };
+yes('its first section is what is broken right now, with the row in it',
+    /broken right now/i.test(skymp.heading) && /### Doors stick/.test(skymp.text));
 
 /*
   THE DEFECT ITSELF. The page's own opening said the first group "is not
-  going to change", and the table under it said it again, over two rows the
-  roadmap lists as work under Next.
+  going to change", over rows the roadmap listed as work under Next.
 */
-yes('the page opening no longer promises the first group will not change',
-    !PROMISE.test(page.intro));
-{
-  const bad = [];
-  page.list.forEach(function (s, i) {
-    const promises = PROMISE.test(s.lead) || (i === 0 && PROMISE.test(page.intro));
-    if (!promises) { return; }
-    s.rows.forEach(function (row) {
-      workFor(row).forEach(function (r) { bad.push(row + ' / ' + r.title); });
-    });
-  });
-  if (bad.length) { console.log('      under a promise and on the roadmap: ' + bad.join('; ')); }
-  yes('no row under a heading that says it will not change is roadmap work', bad.length === 0);
-}
-
-/* "It belongs under a heading that says so." A row that is roadmap work sits
-   in a section that says so, and names the roadmap item by the title a reader
-   will find on /roadmap. */
-{
-  const bad = [];
-  page.list.forEach(function (s) {
-    s.rows.forEach(function (row) {
-      const items = workFor(row);
-      if (!items.length) { return; }
-      const lead = s.lead.toLowerCase();
-      const named = items.some(function (r) { return lead.indexOf(r.title.toLowerCase()) >= 0; });
-      if (lead.indexOf('roadmap') < 0 || !named) { bad.push(s.heading + ': ' + row); }
-    });
-  });
-  if (bad.length) { console.log('      roadmap work under a section that does not say so: ' + bad.join('; ')); }
-  yes('every row that is roadmap work sits under words that say it is, by the roadmap title',
-      bad.length === 0);
-}
+yes('the page opening does not promise anything on it will not change',
+    !PROMISE.test(page.intro) && !page.list.some(function (s) { return PROMISE.test(s.lead); }));
 
 /* "Rather than one that tells people never to report it." The section still
    tells people when a report is worth making. */
-yes('that table says what is still worth reporting',
+yes('that section says what is still worth reporting',
     /report[^.]*only if|only report|worth reporting|worth a report/i.test(skymp.lead));
 
 // ------------------------------------------------------------ the preview
@@ -214,48 +125,35 @@ yes('nor does the one the browser tab reads',
     homeBlurb !== null && !/permanent/i.test(homeBlurb) && !PROMISE.test(homeBlurb));
 yes('and the two say the same thing', serverBlurb !== null && serverBlurb === homeBlurb);
 
-// ------------------------------------------------------- the tester note
+// ------------------------------------------- the tester note and Help page
+/* Both used to be checked here against the roadmap's rows in board.json:
+   anything on the roadmap that the tester note called never worth reporting,
+   or Help called deliberate, failed. The roadmap is on the issue board since
+   #3140 ("roadmap:" labels), which no file here holds, so the check went
+   with it. That the two lists are still there is checked. */
 const tests = read(path.join('data', 'tests.md'));
 yes('tests.md is there', tests !== null);
-{
-  const s = sections(tests || '').list.filter(function (x) { return /do not report/i.test(x.heading); })[0];
-  yes('it still has its Do not report these list', !!s);
-  const said = s ? s.text.replace(/\s+/g, ' ').trim().split(/(?:\.)\s+/) : [];
-  const bad = [];
-  said.forEach(function (line, i) {
-    if (!shared(words(line), onRoadmap).length) { return; }
-    const here = line + '. ' + (said[i + 1] || '');
-    if (!/roadmap/i.test(here) || !/report[^.]*only|only report|worth reporting|worth a report/i.test(here)) {
-      bad.push(line);
-    }
-  });
-  if (bad.length) { console.log('      listed as never to report: ' + bad.join('; ')); }
-  yes('anything on the roadmap in that list says so, and says what is worth reporting',
-      bad.length === 0);
-}
-
-// ------------------------------------------------------------ the Help page
-/* help.md lists things that are normal here and closes "All of that is
-   deliberate. None of it is worth reporting." Roadmap work is not
-   deliberate. */
+yes('it still has its Do not report these list',
+    sections(tests || '').list.some(function (x) { return /do not report/i.test(x.heading); }));
 const help = read(path.join('data', 'help.md'));
 yes('help.md is there', help !== null);
 {
   const s = sections(help || '').list.filter(function (x) { return /deliberate/i.test(x.text); })[0];
   yes('it still has the list it calls deliberate', !!s && s.items.length > 0);
-  const bad = (s ? s.items : []).filter(function (it) { return shared(words(it), onRoadmap).length > 0; });
-  if (bad.length) { console.log('      called deliberate and on the roadmap: ' + bad.join('; ')); }
-  yes('nothing in it is roadmap work', bad.length === 0);
 }
 
-// ---------------------------------------------------- one copy only (#2414)
+// ----------------------------------------------- one copy only (#2414, #3140)
 /* The text was kept twice, known.md for the page and a known board nothing
-   showed, and the board went stale: its intro said "Permanent limits of how
-   this server works. None are bugs, none are changing." over NPC rows #504
-   made untrue. Patrick, 12 October: the hub board is the one copy. The page
-   above is that board, and tests/test-2414-known-one-copy.js keeps a second
-   copy from coming back. */
-yes('there is no known.md beside the board', read(path.join('data', 'known.md')) === null);
+   showed, and the board went stale. Then the board was the one copy (#2414),
+   and it went stale too. Since #3140 the one copy is the issue board, and
+   neither known.md nor a known board in board.json comes back. */
+yes('there is no known.md', read(path.join('data', 'known.md')) === null);
+{
+  let board = null;
+  try { board = JSON.parse(read(path.join('data', 'board.json'))); } catch (e) { board = null; }
+  yes('board.json has no known board and no roadmap board',
+      !!board && !('known' in board) && !('roadmap' in board));
+}
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

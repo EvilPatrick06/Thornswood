@@ -257,12 +257,25 @@ try {
     .forEach(function (f) { pages.push(path.join(APP, 'data', 'site', f)); });
 } catch (e) { }
 pages.push(path.join(APP, 'data', 'help.md'));
-// Known Issues is the known board, written out the way /known writes it (#2414).
-const KNOWN_PAGE = require('./fixtures/known-page').knownPage();
-pages.push('known board');
+// Known Issues is written from the bot's lists (#3140), here one made up the
+// way the bot writes it, with HTML typed into a comment on the board.
+const LISTS = {
+  at: '2026-10-26T08:05:00Z',
+  known: [{ title: 'Doors stick', text: 'A door sticks shut. <img src=x onerror=alert(1)> Push it **twice**.', where: ['Main', 'Dev'] }],
+  roadmap: { lanes: [
+    { name: 'Being built now', rows: [{ title: 'Property you own', text: 'Claim it at the door. <script>alert(1)</script>' }] },
+    { name: 'Next', rows: [] }, { name: 'Later', rows: [] },
+    { name: 'Done', rows: [{ title: 'The emote wheel', text: 'On G.' }] }] }
+};
+const KNOWN_PAGE = require('./fixtures/known-page').knownPage(null, LISTS);
+// The browser's drawing passes HTML through and ours does not, so the page
+// compared with it below is written from words with none in them.
+const KNOWN_PLAIN = require('./fixtures/known-page').knownPage(null, {
+  at: LISTS.at, known: [{ title: 'Doors stick', text: 'A door sticks shut. Push it **twice**.', where: ['Main'] }] });
+pages.push('known page');
 yes('there are real pages to draw, ' + pages.length + ' of them', pages.length >= 9);
 pages.forEach(function (p) {
-  const raw = p === 'known board' ? KNOWN_PAGE : read(p);
+  const raw = p === 'known page' ? KNOWN_PLAIN : read(p);
   if (raw === null) { yes(path.basename(p) + ' reads', false); return; }
   [false, true].forEach(function (open) {
     const md = forMode(raw, open);
@@ -359,13 +372,12 @@ fs.writeFileSync(path.join(work, 'config.json'), JSON.stringify({
   gameCheckPort: 1,
   onlineFile: path.join(work, 'online.json')
 }));
-// A page somebody has typed HTML into, and a board with a roadmap intro.
+// A page somebody has typed HTML into, and the bot's lists (#3140).
 fs.writeFileSync(path.join(work, 'data', 'site', 'terms.md'),
   '# Terms\n\n<img src=x onerror=alert(1)>\n\n[click](javascript:alert(1))\n\nIt costs $1 and $&.\n');
-fs.writeFileSync(path.join(work, 'data', 'board.json'), JSON.stringify({
-  roadmap: { intro: 'Coming **next**. <script>alert(1)</script>', sections: [] },
-  known: JSON.parse(fs.readFileSync(path.join(APP, 'data', 'board.json'), 'utf8')).known
-}));
+fs.writeFileSync(path.join(work, 'data', 'board.json'), '{}');
+fs.mkdirSync(path.join(work, 'data', 'from-bot'), { recursive: true });
+fs.writeFileSync(path.join(work, 'data', 'from-bot', 'lists.json'), JSON.stringify(LISTS));
 
 function freePort() {
   return new Promise(function (resolve, reject) {
@@ -499,14 +511,18 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   yes('/world carries the anchor the footer points at', world.text.indexOf('<a id="accord"></a>') >= 0);
   const help = await get(port, '/help');
   yes('/help comes from the data folder and is drawn too', /<div class="wrap" id="pagebody"><h1>/.test(help.text));
-  // #2414: /known is the known board, written out and drawn, with no known.md anywhere.
+  // #3140: /known is written from the issue board, by way of the bot's lists.
   const known = await get(port, '/known');
-  yes('/known is drawn from the known board', known.status === 200 &&
-      known.text.indexOf('<div class="wrap" id="pagebody"><h1>Known Issues</h1>') >= 0 &&
-      /<table>[\s\S]*Many mod features do nothing here/.test(known.text));
+  const knownBody = (/<div class="wrap" id="pagebody">([\s\S]*?)<\/div><\/div>/.exec(known.text) || [])[1] || '';
+  yes('/known is drawn from the bot\'s lists', known.status === 200 &&
+      knownBody.indexOf('<h1>Known Issues</h1>') >= 0 &&
+      /<h3[^>]*>Doors stick<\/h3>[\s\S]*Found on main and the dev server\./.test(knownBody) &&
+      knownBody.indexOf('26 Oct 2026, 8:05 AM UTC') >= 0);
+  yes('and HTML typed into the comment on the board is text there', unsafe(knownBody).length === 0 &&
+      knownBody.indexOf('&lt;img src=x onerror=alert(1)&gt;') >= 0);
   let kapi = {};
   try { kapi = JSON.parse((await get(port, '/api/page/known')).text); } catch (e) { }
-  yes('and /api/page/known hands out the same page the board writes', !!KNOWN_PAGE && kapi.md === KNOWN_PAGE);
+  yes('and /api/page/known hands out the same page the lists write', !!KNOWN_PAGE && kapi.md === KNOWN_PAGE);
 
   const terms = await get(port, '/terms');
   const termsBody = (/<div class="wrap" id="pagebody">([\s\S]*?)<\/div><\/div>/.exec(terms.text) || [])[1] || '';
@@ -522,6 +538,11 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const roadmap = await get(port, '/roadmap');
   yes('the roadmap has useful initial HTML before the API responds',
       roadmap.text.indexOf('<div class="wrap" id="pagebody"><h1>Roadmap</h1>') >= 0);
+  yes('and that HTML is the bot\'s roadmap, lanes in order, Done last, with when it was read',
+      /Being built now[\s\S]*Property you own[\s\S]*<h2>Done<\/h2>[\s\S]*The emote wheel/.test(roadmap.text) &&
+      roadmap.text.indexOf('<h2>Next</h2>') < 0 && roadmap.text.indexOf('26 Oct 2026, 8:05 AM UTC') >= 0);
+  yes('and what was typed into a comment on the board is text there',
+      roadmap.text.indexOf('<script>alert(1)</script>') < 0 && roadmap.text.indexOf('&lt;script&gt;alert(1)&lt;/script&gt;') >= 0);
   yes('an async public page does not flash the home landing while it loads',
       roadmap.text.indexOf('<div id="landing" hidden>') >= 0);
 
@@ -534,9 +555,21 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
 
   let rm = {};
   try { rm = JSON.parse((await get(port, '/api/roadmap')).text); } catch (e) { }
-  yes('/api/roadmap keeps its intro and adds it drawn',
-      /\*\*next\*\*/.test(rm.intro || '') && (rm.introHtml || '').indexOf('<strong>next</strong>') >= 0);
+  yes('/api/roadmap hands out its intro, drawn too, and the lanes as sections',
+      /Nothing here has a date/.test(rm.intro || '') && /^<p>/.test(rm.introHtml || '') &&
+      (rm.sections || []).map(function (x) { return x.name; }).join('|') === 'Being built now|Next|Later|Done' &&
+      rm.unread === false && rm.at === '26 Oct 2026, 8:05 AM UTC');
   yes('and the drawn intro is safe', unsafe(rm.introHtml || '').length === 0);
+  // A site the bot has not written for yet says so, rather than an empty roadmap.
+  fs.unlinkSync(path.join(work, 'data', 'from-bot', 'lists.json'));
+  rm = {};
+  try { rm = JSON.parse((await get(port, '/api/roadmap')).text); } catch (e) { }
+  yes('with no lists.json, /api/roadmap says it was not read', rm.unread === true && (rm.sections || []).length === 0);
+  const unreadPage = await get(port, '/roadmap');
+  yes('and /roadmap says so in words', unreadPage.text.indexOf('could not be read from the issue board') >= 0);
+  const unreadKnown = await get(port, '/known');
+  yes('and so does /known, with no list drawn', unreadKnown.text.indexOf('could not be read from the issue board') >= 0 &&
+      unreadKnown.text.indexOf('Broken right now') < 0);
 
   const js = await get(port, '/' + MARKED);
   yes('/' + MARKED + ' is served as script, cached', js.status === 200 && /javascript/.test(js.type) && /max-age/.test(js.cache));
