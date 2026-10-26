@@ -4,7 +4,7 @@
 - **Issue:** #3163
 - **PRs:**
   - Fork: EvilPatrick06/skymp #118 (branch `claude/project-thread-to9q6n`), into `thornswood/engine-changes`. Needs Patrick's own line to merge
-  - Thornswood: the pull request this note is in (branch `claude/project-thread-to9q6n`). Held as a draft until it carries the pin
+  - Thornswood: the pull request this note is in (branch `claude/project-thread-to9q6n`). Held as a draft until Nightly's pin #3785 (with fork #118) has merged and the content tables are rebuilt
 - **Channel:** dev first, then main in the next main Ship
 - **Who runs it:** Claude
 
