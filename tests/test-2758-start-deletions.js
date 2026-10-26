@@ -231,8 +231,10 @@ try {
     yes('  their character numbers are marked in roster.json with the time and nothing else',
         Object.keys(mk).sort().join(',') === [P1, 5003].sort().join(',') &&
         Object.values(mk).every((m) => Object.keys(m).sort().join(',') === 'at,clear' && m.at > 0 && m.clear.length === 0));
-    const a = SRC.indexOf("  if ((route === '/api/roster' || route === '/dev/api/roster') && req.method === 'POST') {");
-    const b = a < 0 ? -1 : SRC.indexOf('\n  }\n', a);
+    // A Windows checkout has server.js with CRLF; the route is cut at LF.
+    const LF = SRC.split('\r').join('');
+    const a = LF.indexOf("  if ((route === '/api/roster' || route === '/dev/api/roster') && req.method === 'POST') {");
+    const b = a < 0 ? -1 : LF.indexOf('\n  }\n', a);
     yes('server.js has the /api/roster route', a >= 0 && b > a);
     const ROUTE = new Function('route', 'o_body', 'ROSTER', 'fs',
       'const req = { method: "POST" }, res = {}, cfg = { botKey: "k" };\n' +
@@ -242,7 +244,7 @@ try {
       'function jsonFile(p, d) { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) { return d; } }\n' +
       'function putJson(p, v) { fs.writeFileSync(p, JSON.stringify(v)); return true; }\n' +
       'function sendJson(r, code, obj) { r.code = code; r.obj = obj; return r; }\n' +
-      'return (async function () {\n' + SRC.slice(a, b + 4) + '\n return null; })();');
+      'return (async function () {\n' + LF.slice(a, b + 4) + '\n return null; })();');
     const RO = path.join(D, 'roster.json');
     const push = (srv, o) => ROUTE(srv === 'dev' ? '/dev/api/roster' : '/api/roster', JSON.stringify(Object.assign({ key: 'k', server: srv }, o)), RO, fs);
     const T = mk[P1] ? mk[P1].at : 0;
