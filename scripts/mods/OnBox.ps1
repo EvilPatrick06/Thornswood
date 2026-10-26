@@ -91,8 +91,16 @@ function Get-ThornswoodOnBoxScript {
         [Parameter(Mandatory = $true)][string]$ServerRoot,
         [Parameter(Mandatory = $true)][string]$Tool,
         [string[]]$Arguments = @(),
-        [string]$ArchiveStore = $ThornswoodGameArchiveStore
+        [string]$ArchiveStore = $ThornswoodGameArchiveStore,
+        # What the run lists and brings back when it changes: folders and
+        # files of the repository, with forward slashes. Run-OnBox.ps1 adds
+        # every file a step of the content chain writes outside these (#3425).
+        [string[]]$Watch = @('game', 'records', 'docs/systems')
     )
+    foreach ($w in $Watch) {
+        if ($w -notmatch '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$' -or $w -match '(^|/)\.\.?(/|$)') { throw "$w is not a path inside the repository to watch." }
+    }
+    $watchText = (@($Watch | ForEach-Object { "'" + $_.Replace('/', '\') + "'" }) -join ', ')
     $argText = (@($Arguments | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ')
     $wantsPlugins = [bool]@($Arguments | Where-Object { $_ -like '*{plugins}*' }).Count
     $wantsSettings = [bool]@($Arguments | Where-Object { $_ -like '*{settings}*' }).Count
@@ -157,10 +165,11 @@ if (`$$wantsSettings) {
 `$sha = [Security.Cryptography.SHA256]::Create()
 function Hashes {
   `$h = @{}
-  foreach (`$top in 'game', 'records', 'docs\systems') {
+  foreach (`$top in $watchText) {
     `$d = Join-Path `$repo `$top
     if (-not (Test-Path -LiteralPath `$d)) { continue }
-    foreach (`$f in @(Get-ChildItem -LiteralPath `$d -File -Recurse)) {
+    `$files = `$(if (Test-Path -LiteralPath `$d -PathType Leaf) { @(Get-Item -LiteralPath `$d) } else { @(Get-ChildItem -LiteralPath `$d -File -Recurse) })
+    foreach (`$f in `$files) {
       `$rel = `$f.FullName.Substring(`$repo.Length + 1).Replace('\', '/')
       `$s = [IO.File]::OpenRead(`$f.FullName)
       try { `$h[`$rel] = [BitConverter]::ToString(`$sha.ComputeHash(`$s)) } finally { `$s.Close() }
