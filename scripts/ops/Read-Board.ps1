@@ -11,12 +11,13 @@
   A cloud thread is refused GraphQL, and the board is read only through
   GraphQL, so this starts .github/workflows/board-read.yml on main, which
   reads the board with the board token on a VPS runner, waits for the run to
-  end, downloads the "board" artifact the run leaves and writes its
-  board.json to -OutFile. The workflow's header says what the file holds.
+  end, reads board.json back out of the run's log and writes it to -OutFile.
+  The workflow's header says what the file holds, and why it comes back in
+  the log and not as an artifact (#3410: the artifact storage was full).
   Nothing on the board changes.
 
-  -Run reads the artifact of a run already started, for when the wait ran out
-  before a runner took it.
+  -Run reads a run already started, for when the wait ran out before a
+  runner took it. GitHub keeps a run's log 90 days.
 
   Exits:
     0  board.json written; the path and the count per Status are printed
@@ -57,6 +58,44 @@ function Get-GitHub([string]$path, [switch]$NotYet) {
     return (($o -join "`n") | ConvertFrom-Json)
 }
 
+# board.json from the lines of a board-read job's log (board-read.yml, THE
+# HAND-BACK IS THE LOG): the BOARD-JSON begin line gives its length and
+# sha256, the lines after it its gzip in base64, up to the end line. A log
+# line may start with GitHub's timestamp. Throws, saying what is wrong, when
+# a marker is missing or twice, or the bytes are not the length and sha256
+# the begin line gives.
+function Read-BoardFromLog([string[]]$Lines) {
+    $mark = 'BOARD' + '-JSON'
+    $re = '^(?:\d{4}-\d\d-\d\dT[\d:.]+Z )?' + $mark + ' (.*)$'
+    $begin = $null; $ended = $false; $parts = New-Object System.Text.StringBuilder
+    foreach ($l in @($Lines | ForEach-Object { ([string]$_) -split "`r?`n" })) {
+        $m = [regex]::Match($l.TrimEnd(), $re)
+        if (-not $m.Success) { continue }
+        $rest = $m.Groups[1].Value
+        if ($rest -match '^begin (\d+) ([0-9a-f]{64})$') {
+            if ($begin) { throw "the log has two $mark begin lines" }
+            $begin = [pscustomobject]@{ Length = [long]$Matches[1]; Sha = $Matches[2] }
+            continue
+        }
+        if (-not $begin) { continue }
+        if ($rest -eq 'end') { $ended = $true; break }
+        if ($rest -notmatch '^[A-Za-z0-9+/=]+$') { throw "a $mark line between begin and end is not base64" }
+        [void]$parts.Append($rest)
+    }
+    if (-not $begin) { throw "the log has no $mark begin line" }
+    if (-not $ended) { throw "the log has no $mark end line after its begin line" }
+    $in = New-Object IO.MemoryStream (, [Convert]::FromBase64String($parts.ToString()))
+    $zip = New-Object IO.Compression.GZipStream($in, [IO.Compression.CompressionMode]::Decompress)
+    $out = New-Object IO.MemoryStream
+    $zip.CopyTo($out)
+    $zip.Dispose()
+    $bytes = $out.ToArray()
+    if ($bytes.Length -ne $begin.Length) { throw ("it is {0} bytes, and the begin line says {1}" -f $bytes.Length, $begin.Length) }
+    $sha = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+    if ($sha -ne $begin.Sha) { throw "its sha256 is $sha, and the begin line says $($begin.Sha)" }
+    return , $bytes
+}
+
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $id = $Run
     $started = $false
@@ -69,7 +108,7 @@ if ($PSCmdlet.ParameterSetName -eq 'Run') {
     if ($c -ne 0) { Die ('GitHub did not start the board-read workflow: ' + (($o | Select-Object -Last 2) -join ' ')) }
     $answer = ($o -join "`n") | ConvertFrom-Json
     if (-not $answer.PSObject.Properties['workflow_run_id'] -or -not $answer.workflow_run_id) {
-        Die ('GitHub started the board-read workflow but named no run, so its artifact cannot be found from here. Its runs: https://github.com/' + $GitHubRepo + '/actions/workflows/' + $workflow)
+        Die ('GitHub started the board-read workflow but named no run, so its log cannot be found from here. Its runs: https://github.com/' + $GitHubRepo + '/actions/workflows/' + $workflow)
     }
     $id = [long]$answer.workflow_run_id
     $started = $true
@@ -97,32 +136,20 @@ while (-not $r -or $r.status -ne 'completed') {
 if ($r.path -notmatch ('/' + [regex]::Escape($workflow) + '$')) { Die ("run $id is not a board-read run (it is " + $r.path + ').') }
 if ($r.conclusion -ne 'success') { Die ("the run ended $($r.conclusion), so there is no board.json. Its log says why: " + $r.html_url) }
 
-$art = @((Get-GitHub "$runPath/artifacts").artifacts | Where-Object { $_.name -eq 'board' })
-if ($art.Count -ne 1) { Die ('the run left no artifact named board: ' + $r.html_url) }
-if ($art[0].expired) { Die ("run $id's board artifact has expired (they are kept 3 days). Read the board again: pwsh scripts/ops/Read-Board.ps1") }
-
-# gh run download fetches and unpacks the artifact itself. Measured 22 Oct
-# 2026 on the first real read: Start-Process, redirecting gh's output, reads the
-# child's output as text and writes it back out, so the zip that way came out
-# changed and Expand-Archive refused it ("Offset to Central Directory cannot
-# be held in an Int64").
-$work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-board-read-' + [Guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $work | Out-Null
-try {
-    # gh's own lines on stderr are not a failure; its exit code says.
-    $ErrorActionPreference = 'Continue'
-    $said = & gh run download $id -R $GitHubRepo -n board -D (Join-Path $work 'x') 2>&1
-    $ErrorActionPreference = 'Stop'
-    if ($LASTEXITCODE -ne 0) { Die ('GitHub did not hand over the board artifact: ' + ((@($said) | Out-String).Trim())) }
-    $json = Join-Path (Join-Path $work 'x') 'board.json'
-    if (-not (Test-Path -LiteralPath $json)) { Die ('the board artifact holds no board.json: ' + $r.html_url) }
-    $board = [IO.File]::ReadAllText($json) | ConvertFrom-Json
-    $dir = Split-Path -Parent $OutFile
-    if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
-    Copy-Item -LiteralPath $json -Destination $OutFile -Force
-} finally {
-    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
-}
+# The job's log, as text. gh api follows GitHub's redirect to where the log
+# is kept and prints it as it is.
+$jobs = @((Get-GitHub "$runPath/jobs").jobs)
+if ($jobs.Count -ne 1) { Die ("run $id has $($jobs.Count) jobs, not the one board-read.yml runs: " + $r.html_url) }
+$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+$log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs" 2>&1 | ForEach-Object { "$_" })
+$c = $LASTEXITCODE
+$ErrorActionPreference = $old
+if ($c -ne 0) { Die ("GitHub did not hand over run $id's log: " + (($log | Select-Object -Last 2) -join ' ')) }
+try { $bytes = Read-BoardFromLog $log } catch { Die ("run $id's log does not hold board.json whole: " + $_.Exception.Message + ' ' + $r.html_url) }
+$board = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
+$dir = Split-Path -Parent $OutFile
+if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+[IO.File]::WriteAllBytes($OutFile, $bytes)
 
 $items = @($board.items)
 Say ("read {0} cards from {1}, as of {2}" -f $items.Count, $board.board.url, $board.read_at) 'Green'
