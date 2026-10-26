@@ -788,10 +788,7 @@ function pageHtml(md) {
 // ==== thornswood lists ====
 const KNOWN_INTRO = 'What is broken right now that the team already knows about. Each one is\n' +
   'on the issue board to be fixed, and comes off this page as soon as work on\n' +
-  'it is merged.\n\n' +
-  'What works the way it does on purpose, such as no saving, no fast travel\n' +
-  'and the load order rule, is on the [Help](/help) page under Things that\n' +
-  'are normal here, not here.';
+  'it is merged.';
 const ROADMAP_INTRO = 'What is being built and roughly in what order. Nothing here has a date on it, because a date would be a guess.\n\n' +
   'Things move up this list when somebody starts on them, not when they are announced.';
 const LIST_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
