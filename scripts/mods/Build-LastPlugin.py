@@ -137,6 +137,19 @@ WHAT IT PUTS IN THE PLUGIN
      does not carry is added, one it carries is changed, one of another type
      stops the build, and so does a script the quest does not have.
 
+  8. The recipes game/data/recipes.json moved to their trade's bench
+     (movedFrom on a row, TRADE_BENCHES in scripts/dev/Build-RecipeTable.ps1,
+     #3120): each is the winning record with only its bench keyword (BNAM)
+     changed to the one the row is made at now, so the forge stops listing a
+     Tailor's fur hood and the loom lists it. Patrick, 21 October 2026: "make
+     sure if a bench has a recipoe that should be on adifferent bench it should
+     get moved". A winning record whose bench is not the one recipes.json says
+     its mod put it at stops the build. A re-costed recipe (6) that moves is
+     one record carrying both. A recipe of a plugin the policy never copies
+     from is not copied: it is listed in the RECIPES_MOVED_IN_GAME block this
+     writes into game/gamemode.js, and each person's game moves its own copy
+     of the record, the way RECIPES_SET_IN_GAME sets the re-costed counts.
+
   A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
   them, form ids moved into this plugin's numbering. A quest and a location
@@ -258,9 +271,11 @@ CATALOGUE = os.path.join(ROOT, 'game', 'data', 'npc-population.json')
 POLICY = os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')
 MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
 RECOST = os.path.join(ROOT, 'game', 'data', 'recost.json')
+RECIPES = os.path.join(ROOT, 'game', 'data', 'recipes.json')
 OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
 GAMEMODE = os.path.join(ROOT, 'game', 'gamemode.js')
 HELD_BLOCK = ('// ==== HELD_BY_SERVER, generated ====', '// ==== end HELD_BY_SERVER ====')
+MOVED_BLOCK = ('// ==== RECIPES_MOVED_IN_GAME, generated ====', '// ==== end RECIPES_MOVED_IN_GAME ====')
 
 COMPRESSED = 0x00040000
 DELETED = 0x20
@@ -740,6 +755,14 @@ class Renumber(object):
             self.named.add(owner)
             return fid
         return (self.masters.index(owner) << 24) | (fid & 0xFFFFFF)
+
+    def gid(self, g):
+        """A record named by (owning plugin, object id) rather than through a
+        source plugin's masters: a bench keyword a recipe is moved to."""
+        if self.masters is None:
+            self.named.add(g[0])
+            return g[1]
+        return (self.masters.index(g[0]) << 24) | g[1]
 
     def ctda(self, src, b, what):
         b = bytearray(b)
@@ -1375,6 +1398,11 @@ def build(data_dir):
     # 5. The re-costed smith recipes (#613).
     recipes = recost_entries(json.load(open(RECOST, encoding='utf-8')), plugins, win)
 
+    # 8. The recipes moved to their trade's bench (#3120). One a never-copied
+    # plugin has, or wins, is moved in each person's game instead.
+    moves, moved_in_game = move_entries(json.load(open(RECIPES, encoding='utf-8')), plugins, win, canon,
+                                        blocked, carries)
+
     # 6. Nothing is copied out of a plugin the policy never copies from
     # (notCopiedFrom, above) but what it carries; anything else it would
     # contribute stops the build, and so does a carried record not needed.
@@ -1491,10 +1519,20 @@ def build(data_dir):
             pairs = set_properties(copy_record(src, e, rn, strings, what), row, what)
             out['qust'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
+        # A recipe re-costed and moved is one record carrying both.
+        cobjs = collections.OrderedDict()
         for e, row in recipes:
+            cobjs.setdefault((e.pi, e.fid), [e, None, None])[1] = row
+        for e, kw, row in moves:
+            cobjs.setdefault((e.pi, e.fid), [e, None, None])[2] = kw
+        for e, cost, kw in cobjs.values():
             src = plugins[e.pi]
             what = '%s COBJ 0x%08X' % (src.name, e.fid)
-            pairs = recount(copy_record(src, e, rn, strings, what), row)
+            pairs = copy_record(src, e, rn, strings, what)
+            if cost is not None:
+                pairs = recount(pairs, cost)
+            if kw is not None:
+                pairs = rebench(pairs, struct.pack('<I', rn.gid(kw)), what)
             out['cobj'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
         return out
@@ -1551,7 +1589,8 @@ def build(data_dir):
                    'modQuestsStopped': len(mod_stopped),
                    'questsKept': len(quests_kept), 'gatesUnlocked': len(gates),
                    'placeLocations': len(made['lctn']), 'placeRooms': len(hold_cells),
-                   'recipesRecosted': len(made['cobj']), 'questScriptProperties': len(qprops)},
+                   'recipesRecosted': len(recipes), 'recipesMoved': len(moves),
+                   'recipesMovedInGame': len(moved_in_game), 'questScriptProperties': len(qprops)},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
         'gatesUnlocked': [desc_of(g, canon) for g in GATES],
         'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
@@ -1568,6 +1607,12 @@ def build(data_dir):
         'recost': [{'recipe': row['recipe'], 'editorId': row['editorId'],
                     'inputs': [[i['item'], i['count'], i['to']] for i in row['inputs']]}
                    for _, row in recipes],
+        # The recipes moved to their trade's bench (#3120): from the bench
+        # their mod put them at to the one recipes.json makes them at, here,
+        # or in each person's game for a plugin never copied from.
+        'benchMoves': [{'recipe': row['recipe'], 'editorId': row['editorId'], 'from': row['movedFrom'],
+                        'to': row['bench']} for _, _, row in moves],
+        'benchMovesInGame': moved_in_game,
         # The floor items switched off (#3077), counted rather than listed
         # (there are tens of thousands); refsSha256 is the sha256 of every one,
         # 'object id:plugin' sorted and joined by newlines, which
@@ -1599,6 +1644,56 @@ def build(data_dir):
         'carried': sorted(carried[k] for k in used),
     }
     return plugin, manifest
+
+
+def move_entries(table, plugins, win, canon, blocked, carries):
+    """The rows recipes.json moved to their trade's bench (#3120), each
+    checked against its winning record: (winning entry, the keyword's
+    (plugin, object id), row) for every one copied here, and for every one a
+    never-copied plugin has or wins, what each person's game is handed
+    (RECIPES_MOVED_IN_GAME): its output, the bench it moves from and to, and
+    its inputs as the record asks them."""
+    here, in_game = [], []
+    for desc in sorted(table.get('recipes', {}), key=ref_key):
+        row = table['recipes'][desc]
+        if not row.get('movedFrom'):
+            continue
+        row = dict(row, recipe=desc)
+        e = win.get((b'COBJ', ref_key(desc)))
+        if e is None:
+            raise SystemExit('STOP. recipes.json moves %s %s and no plugin has it. Rebuild recipes.json. '
+                             'Nothing was written.' % (desc, row['editorId']))
+        src = plugins[e.pi]
+        pairs = subrecords(src.data(e))
+        got = dict(pairs)
+        edid = got.get(b'EDID', b'').rstrip(b'\x00').decode('latin1')
+        bnam = got.get(b'BNAM')
+        put = desc_of(src.gid(struct.unpack_from('<I', bnam, 0)[0]), canon) if bnam else ''
+        if edid != row['editorId'] or put.lower() != row['movedFrom'].lower():
+            raise SystemExit('STOP. %s in %s is not the recipe recipes.json moved (%s, at %s, and it is %s at %s). '
+                             'Rebuild recipes.json. Nothing was written.'
+                             % (desc, src.name, row['editorId'], row['movedFrom'], edid, put or 'no bench'))
+        kw = ref_key(row['bench'])
+        if kw[0] not in canon:
+            raise SystemExit('STOP. %s moves to %s, and %s is not in the load order. Nothing was written.'
+                             % (desc, row['bench'], row['bench'].split(':', 1)[1]))
+        g = src.gid(e.fid)
+        if (src.name.lower() in blocked or desc.split(':', 1)[1].lower() in blocked) and not carries(b'COBJ', g):
+            in_game.append({'recipe': desc, 'editorId': edid, 'name': row.get('name', ''),
+                            'out': desc_of(src.gid(struct.unpack_from('<I', got[b'CNAM'], 0)[0]), canon),
+                            'from': row['movedFrom'], 'to': row['bench'],
+                            'inputs': [[desc_of(src.gid(struct.unpack_from('<I', b, 0)[0]), canon),
+                                        struct.unpack_from('<i', b, 4)[0]] for t, b in pairs if t == b'CNTO']})
+        else:
+            here.append((e, kw, row))
+    return here, in_game
+
+
+def rebench(pairs, bnam, what):
+    """The recipe with its bench keyword (BNAM) set, and nothing else."""
+    if [t for t, _ in pairs].count(b'BNAM') != 1:
+        raise SystemExit('STOP. %s does not carry exactly one bench keyword. Nothing was written.' % what)
+    return [(t, bnam if t == b'BNAM' else b) for t, b in pairs]
 
 
 def recost_entries(table, plugins, win):
@@ -1870,6 +1965,13 @@ def verify(data_dir, plugin_bytes, manifest):
                 for t, b in pairs if t == b'CNTO'] if e else []
         if e is None or e.pi != last.index or have != [(ref_key(i[0]), i[2]) for i in row['inputs'] if i[2]]:
             fails.append('recipe %s %s does not ask the re-costed counts' % (row['recipe'], row['editorId']))
+    # Every recipe moved to its trade's bench (#3120) wins here, at that bench.
+    for row in manifest.get('benchMoves', []):
+        e = win.get((b'COBJ', ref_key(row['recipe'])))
+        bnam = dict(subrecords(plugins[e.pi].data(e))).get(b'BNAM') if e else None
+        if e is None or e.pi != last.index or not bnam or \
+                plugins[e.pi].gid(struct.unpack_from('<I', bnam, 0)[0]) != ref_key(row['to']):
+            fails.append('recipe %s %s is not at %s' % (row['recipe'], row['editorId'], row['to']))
     # Every script property the policy sets (#3101) is on the winning quest,
     # with the policy's value.
     for row in (json.load(open(POLICY, encoding='utf-8')).get('questScriptProperties') or {}).get('quests', []):
@@ -1996,6 +2098,7 @@ def main():
         print('  ok    %d locations and %d rooms are in the hold the policy gives them'
               % (c.get('placeLocations', 0), c.get('placeRooms', 0)))
         print('  ok    %d smith recipes ask the counts recost.json gives' % c.get('recipesRecosted', 0))
+        print('  ok    %d recipes are at their trade\'s bench (recipes.json, #3120)' % c.get('recipesMoved', 0))
         print('  ok    %d floor items are off and nothing can switch them on' % c.get('floorItemsOff', 0))
         print('  ok    %d mod quests carry the script properties the policy sets'
               % c.get('questScriptProperties', 0))
@@ -2018,6 +2121,8 @@ def main():
     for row in manifest['placeHolds']['rooms']:
         print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
     print('  %d smith recipes re-costed (recost.json, #613)' % c['recipesRecosted'])
+    print('  %d recipes moved to their trade\'s bench here, %d in each person\'s game (recipes.json, #3120)'
+          % (c['recipesMoved'], c['recipesMovedInGame']))
     for row in manifest['questScriptProperties']:
         print('  %s (%s, from %s): %s' % (row['quest'], row['edid'], row['winner'],
                                          ', '.join('%s %s' % (k, json.dumps(v)) for k, v in row['set'].items())))
@@ -2051,16 +2156,21 @@ def main():
         c = held_block(manifest, gm) == gm
         print('  %s the HELD_BY_SERVER block %s' % (('ok   ', 'is what this builds') if c else
                                                           ('DIFFERS', 'is not what this builds')))
-        return 0 if a and b and c else 1
-    gm = held_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read())
+        d = moved_block(manifest, gm) == gm
+        print('  %s the RECIPES_MOVED_IN_GAME block %s' % (('ok   ', 'is what this builds') if d else
+                                                                 ('DIFFERS', 'is not what this builds')))
+        return 0 if a and b and c and d else 1
+    gm = moved_block(manifest, held_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read()))
     with open(OUT, 'wb') as f:
         f.write(plugin)
     with open(MANIFEST, 'wb') as f:
         f.write(manifest_bytes(manifest))
     with io.open(GAMEMODE, 'w', encoding='utf-8', newline='') as f:
         f.write(gm)
-    print('Wrote game/content/%s, game/data/last-plugin.json and the HELD_BY_SERVER block (%d)'
-          % (PLUGIN, len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer'])))
+    print('Wrote game/content/%s, game/data/last-plugin.json, the HELD_BY_SERVER block (%d) and the '
+          'RECIPES_MOVED_IN_GAME block (%d)'
+          % (PLUGIN, len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']),
+             len(manifest['benchMovesInGame'])))
     return 0
 
 
@@ -2079,6 +2189,27 @@ def held_block(manifest, gamemode):
                                                      manifest['refs']['heldByServer'])),
         HELD_BLOCK[1]])
     return gamemode[:a] + block + gamemode[b + len(HELD_BLOCK[1]):]
+
+
+def moved_block(manifest, gamemode):
+    """game/gamemode.js with its RECIPES_MOVED_IN_GAME block: the recipes
+    moved to their trade's bench (#3120) that Thornswood-Last.esp cannot
+    carry without copying a plugin it never copies from, which each person's
+    game moves instead."""
+    a, b = gamemode.find(MOVED_BLOCK[0]), gamemode.find(MOVED_BLOCK[1])
+    if a < 0 or b < a:
+        raise SystemExit('STOP. no RECIPES_MOVED_IN_GAME markers in game/gamemode.js. Nothing was written.')
+    rows = {r['recipe']: {'name': r['name'], 'out': r['out'], 'from': r['from'], 'to': r['to'],
+                          'inputs': r['inputs']} for r in manifest['benchMovesInGame']}
+    block = '\n'.join([
+        MOVED_BLOCK[0],
+        '// Generated by scripts\\mods\\Build-LastPlugin.py from game\\data\\recipes.json; do not hand edit.',
+        '// The recipes moved to their trade\'s bench (#3120) of a plugin Thornswood-Last.esp never copies',
+        '// from, moved in each person\'s game instead: the bench keyword each moves from and to, and its',
+        '// inputs as [item, count] as the record asks them.',
+        'var RECIPES_MOVED_IN_GAME = %s;' % json.dumps(rows, sort_keys=True, ensure_ascii=False),
+        MOVED_BLOCK[1]])
+    return gamemode[:a] + block + gamemode[b + len(MOVED_BLOCK[1]):]
 
 
 if __name__ == '__main__':

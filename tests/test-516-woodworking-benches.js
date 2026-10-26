@@ -53,7 +53,7 @@ const TOOL = path.join(ROOT, 'scripts', 'dev', 'Build-WoodworkingBenches.py');
 const gm = read(path.join(ROOT, 'game', 'gamemode.js'));
 const BENCH = '154e2:Thornswood-Content.esp';
 const KEYWORD = '154e1:Thornswood-Content.esp';
-const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
+const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp'];
 
 let pass = 0, fail = 0;
 function yes(w, c) { if (c) { pass++; console.log('PASS  ' + w); } else { fail++; console.log('FAIL  ' + w); } }

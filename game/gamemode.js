@@ -28168,8 +28168,17 @@ function handEnchantSlots(actorId, state) {
   somebody goes onto or off a roll. A recipe nobody owns is not in the table
   and stays listed for everybody.
 
-  The value is { at, files: { plugin: 'hex,hex,...' } }, the refused rows by
-  plugin, and it is written only when the list changes. updateOwner runs
+  THE SAME SCRIPT MOVES A RECIPE TO ITS TRADE'S BENCH (#3120). A recipe of a
+  plugin Thornswood-Last.esp never copies from (Immersive Armors) that
+  recipes.json moved to its trade's bench cannot be moved in the plugin, so
+  each game moves its own copy of the record: the same SetWorkbenchKeyword,
+  to the keyword RECIPES_MOVED_IN_GAME names. A moved recipe this person is
+  refused is hidden like any other, and goes back to the bench it moved to,
+  never the one its mod put it at.
+
+  The value is { at, files: { plugin: 'hex,hex,...' }, moved: { recipe:
+  bench } }, the refused rows by plugin and the recipes each game moves, and
+  it is written only when either changes. updateOwner runs
   every frame, so the script acts on a new stamp only, and spreads the
   records over frames (RECIPES_PER_FRAME): a character with no profession is
   refused every owned row, and two thousand records in one frame is a stall.
@@ -28200,12 +28209,23 @@ function recipesHiddenScript() {
     '      var todo = [];',
     '      for (var k in want) { if (!own.call(put, k)) { todo.push(k); } }',
     '      for (var h in put) { if (own.call(put, h) && !want[h]) { todo.push(h); } }',
+    // A recipe moved to its trade's bench (#3120): moved once, unless hidden.
+    '      var moveTo = (v.moved && typeof v.moved === "object") ? v.moved : {};',
+    '      if (!st.thornswoodRecipesMoved) { st.thornswoodRecipesMoved = {}; }',
+    '      for (var m in moveTo) { if (own.call(moveTo, m) && !want[m] && st.thornswoodRecipesMoved[m] !== moveTo[m]) { todo.push(m); } }',
     '      st.thornswoodRecipesWant = want;',
+    '      st.thornswoodRecipesMoveTo = moveTo;',
     '      st.thornswoodRecipesTodo = todo;',
     '    }',
     '    var queue = st.thornswoodRecipesTodo;',
     '    if (!queue || !queue.length) { return; }',
     '    var wanted = st.thornswoodRecipesWant || {};',
+    '    var moves = st.thornswoodRecipesMoveTo || {};',
+    '    var moved = st.thornswoodRecipesMoved || {};',
+    '    var kwOf = function (d) {',
+    '      var c = d.indexOf(":");',
+    '      try { return sp.Keyword.from(sp.Game.getFormFromFile(parseInt(d.slice(0, c), 16), d.slice(c + 1))); } catch (e) { return null; }',
+    '    };',
     '    for (var n = 0; queue.length && n < ' + RECIPES_PER_FRAME + '; n++) {',
     '      var key = queue.pop();',
     '      var at = key.indexOf(":");',
@@ -28219,8 +28239,13 @@ function recipesHiddenScript() {
     '        cobj.setWorkbenchKeyword(null);',
     '      } else if (!wanted[key] && own.call(put, key)) {',
     '        var was = put[key];',
-    '        cobj.setWorkbenchKeyword(was ? sp.Keyword.from(sp.Game.getFormEx(was)) : null);',
+    '        var back = own.call(moves, key) ? kwOf(moves[key]) : null;',
+    '        cobj.setWorkbenchKeyword(back ? back : (was ? sp.Keyword.from(sp.Game.getFormEx(was)) : null));',
+    '        if (back) { moved[key] = moves[key]; }',
     '        delete put[key];',
+    '      } else if (!wanted[key] && own.call(moves, key) && moved[key] !== moves[key]) {',
+    '        var to = kwOf(moves[key]);',
+    '        if (to) { cobj.setWorkbenchKeyword(to); moved[key] = moves[key]; }',
     '      }',
     '    }',
     '  } catch (e) { }',
@@ -28268,14 +28293,29 @@ function recipesRefused(actorId) {
   return files;
 }
 
+/**
+ * The recipes each game moves to their trade's bench (#3120), by recipe, to
+ * the bench keyword it is made at now: RECIPES_MOVED_IN_GAME, below.
+ */
+function recipesMoved() {
+  var out = {};
+  if (typeof RECIPES_MOVED_IN_GAME !== 'object' || !RECIPES_MOVED_IN_GAME) { return out; }
+  for (var desc in RECIPES_MOVED_IN_GAME) {
+    if (Object.prototype.hasOwnProperty.call(RECIPES_MOVED_IN_GAME, desc)) { out[desc] = RECIPES_MOVED_IN_GAME[desc].to; }
+  }
+  return out;
+}
+
 /** Hand the owner the recipes they cannot make, when the list has changed. */
 function handRecipesHidden(actorId) {
   var files = recipesRefused(actorId);
+  var moved = recipesMoved();
   var had = null;
   try { had = mp.get(actorId, RECIPES_HIDDEN_PROPERTY); } catch (e) { had = null; }
-  if (had && typeof had === 'object' && JSON.stringify(had.files) === JSON.stringify(files)) { return; }
+  if (had && typeof had === 'object' && JSON.stringify(had.files) === JSON.stringify(files) &&
+      JSON.stringify(had.moved || {}) === JSON.stringify(moved)) { return; }
   try {
-    mp.set(actorId, RECIPES_HIDDEN_PROPERTY, { at: Date.now(), files: files });
+    mp.set(actorId, RECIPES_HIDDEN_PROPERTY, { at: Date.now(), files: files, moved: moved });
   } catch (e) {
     log(actorId.toString(16), 'was not handed the recipes they cannot make:', e);
   }
@@ -28416,6 +28456,78 @@ function recipeSetInGame(craftedItemBaseId, workbenchId, inputs) {
     var want = {};
     for (var n = 0; n < row.inputs.length; n++) {
       if (row.inputs[n][2]) { want[row.inputs[n][0]] = (want[row.inputs[n][0]] || 0) + row.inputs[n][2]; }
+    }
+    var same = Object.keys(want).length === Object.keys(held).length;
+    for (var k in want) { if (own.call(want, k) && held[k] !== want[k]) { same = false; } }
+    if (same) { return desc; }
+  }
+  return null;
+}
+
+/*
+  A NEVER-COPIED PLUGIN'S RECIPES ARE MOVED IN EACH GAME TOO (#3120).
+
+  Patrick, 21 October 2026: "make sure if a bench has a recipoe that should
+  be on adifferent bench it should get moved". recipes.json moves a row its
+  mod put at a bench its trade does not work at to that trade's bench
+  (TRADE_BENCHES in scripts/dev/Build-RecipeTable.ps1): 48 of Immersive
+  Armors' fur hoods, capes, robes and mage sets sat at the forge, so the forge
+  opened for every Tailor. Thornswood-Last.esp carries the move for every
+  other plugin. Immersive Armors is never copied (#2454), so each person's
+  game moves its own copy of the record (recipesHiddenScript, above) to the
+  bench RECIPES_MOVED_IN_GAME names.
+
+  THE SERVER STILL READS THE MOD'S BENCH. CraftService matches a craft to a
+  record only at a bench carrying the record's own keyword, so a craft at the
+  loom matches no record and arrives with no recipe id. recipeMovedInGame
+  names the recipe from its output, the bench it is made at now and exactly
+  the counts the record asks, and onCraft treats it as that recipe from
+  there. A craft at the bench its mod put it at, from a game that has not
+  moved it yet, matches the record and is refused, so the forge makes none
+  of them.
+
+  RECIPES_MOVED_IN_GAME is written by scripts/mods/Build-LastPlugin.py.
+*/
+// ==== RECIPES_MOVED_IN_GAME, generated ====
+// ==== end RECIPES_MOVED_IN_GAME ====
+
+/**
+ * The RECIPES_MOVED_IN_GAME recipe a craft with no recipe id is, or null:
+ * the same output, the bench keyword it is made at now, and exactly the
+ * counts its record asks, summed per item.
+ */
+function recipeMovedInGame(craftedItemBaseId, workbenchId, inputs) {
+  if (typeof RECIPES_MOVED_IN_GAME !== 'object' || !RECIPES_MOVED_IN_GAME || !Array.isArray(inputs)) { return null; }
+  var own = Object.prototype.hasOwnProperty;
+  var outDesc = null;
+  var benchKey = '';
+  try {
+    outDesc = mp.getDescFromId(craftedItemBaseId);
+    var benchBase = mp.get(workbenchId, 'baseDesc');
+    if (benchBase && own.call(BENCH_BY_BASE, benchBase)) { benchKey = String(BENCH_BY_BASE[benchBase]); }
+  } catch (e) {
+    return null;
+  }
+  if (!outDesc || !benchKey) { return null; }
+  var held = {};
+  for (var i = 0; i < inputs.length; i++) {
+    var entry = inputs[i] || {};
+    var d = null;
+    try { d = mp.getDescFromId(Number(entry.baseId) || 0); } catch (e) { d = null; }
+    if (!d) { return null; }
+    held[d] = (held[d] || 0) + (Number(entry.count) || 0);
+  }
+  for (var desc in RECIPES_MOVED_IN_GAME) {
+    if (!own.call(RECIPES_MOVED_IN_GAME, desc)) { continue; }
+    var row = RECIPES_MOVED_IN_GAME[desc];
+    if (row.out !== outDesc || row.to !== benchKey) { continue; }
+    // A recipe whose counts are set in each game too is named by
+    // recipeSetInGame at its new counts, at this bench; its record's own
+    // counts are the ones that game refuses.
+    if (typeof RECIPES_SET_IN_GAME === 'object' && RECIPES_SET_IN_GAME && own.call(RECIPES_SET_IN_GAME, desc)) { continue; }
+    var want = {};
+    for (var n = 0; n < row.inputs.length; n++) {
+      want[row.inputs[n][0]] = (want[row.inputs[n][0]] || 0) + row.inputs[n][1];
     }
     var same = Object.keys(want).length === Object.keys(held).length;
     for (var k in want) { if (own.call(want, k) && held[k] !== want[k]) { same = false; } }
@@ -28962,6 +29074,9 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   if (!recipeId && typeof recipeSetInGame === 'function') {
     desc = recipeSetInGame(craftedItemBaseId, workbenchId, arguments[6]);
   }
+  if (!recipeId && !desc && typeof recipeMovedInGame === 'function') {
+    desc = recipeMovedInGame(craftedItemBaseId, workbenchId, arguments[6]);
+  }
   if (!recipeId && !desc) {
     /*
       THE SOUL GEM FIRST (#1648): the engine's seventh argument is the inputs,
@@ -29010,6 +29125,18 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
       notify(actorId, no);
       say(actorId, no);
       log(actorId.toString(16), 'was refused', desc, '(' + asks.name + ') at the mod\'s own counts');
+      return false;
+    }
+    // The bench its mod put it at, for a recipe moved in each game: this
+    // game has not moved it yet (#3120), and that bench is not its trade's.
+    if (typeof RECIPES_MOVED_IN_GAME === 'object' && RECIPES_MOVED_IN_GAME &&
+        Object.prototype.hasOwnProperty.call(RECIPES_MOVED_IN_GAME, desc)) {
+      const moved = RECIPES_MOVED_IN_GAME[desc];
+      const no = 'The ' + String(moved.name || 'that').trim() + ' is not made at this bench here. ' +
+                 'Leave the bench and use the one it is made at.';
+      notify(actorId, no);
+      say(actorId, no);
+      log(actorId.toString(16), 'was refused', desc, '(' + moved.name + ') at', moved.from, 'and it is made at', moved.to);
       return false;
     }
   }

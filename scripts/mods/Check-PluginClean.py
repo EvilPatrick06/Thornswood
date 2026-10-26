@@ -119,7 +119,7 @@ CLEANING
   When this finds something, the cure is in the writer that made the record,
   not in an editor: the plugins are rebuilt by their scripts and an edit by
   hand is lost at the next build. Content: Add-ContentRecords.py. Last:
-  Build-LastPlugin.py. Woodworker trail: Build-WoodworkerTrailOverrides.py.
+  Build-LastPlugin.py.
 """
 
 import argparse

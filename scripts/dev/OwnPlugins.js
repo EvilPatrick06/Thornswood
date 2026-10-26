@@ -2,8 +2,8 @@
 //
 // Where a builder reads a plugin of the load order from (#2923).
 //
-// Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp,
-// Thornswood-WoodworkerTrail.esp, and any other file in game/content) are made
+// Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp, and
+// any other file in game/content) are made
 // and shipped from this repository's game/content. A game folder holds
 // whichever release last reached it: on 20 Oct One's held a Content plugin
 // from 12 Oct, 146,941 bytes against the repository's 117,274 the day before

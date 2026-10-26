@@ -3,8 +3,8 @@
 
   Where a builder reads a plugin of the load order from (#2923).
 
-  Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp,
-  Thornswood-WoodworkerTrail.esp, and any other file in game\content) are made
+  Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp, and
+  any other file in game\content) are made
   and shipped from this repository's game\content. A game folder holds
   whichever release last reached it, so a table read from there describes a
   plugin nobody ships. Every plugin whose name is a file in game\content is

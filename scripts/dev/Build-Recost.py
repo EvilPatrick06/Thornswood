@@ -127,13 +127,21 @@ def metals(recipes):
     return out
 
 
+def put_at(row):
+    """The bench the recipe's mod put it at. A row recipes.json moved to its
+    trade's bench (movedFromName, #3120) is measured, and its coins taken out,
+    where its mod put it, so a move changes no count; RECIPES_SET_IN_GAME
+    still names the bench it is made at now."""
+    return row.get('movedFromName') or row.get('benchName')
+
+
 def candidates(recipes, metal, kept):
     """(desc, row, inputs, group) for every row the rule may ask, with the
     original inputs: the ones recost.json first measured, or the record's own."""
     out = []
     for desc in sorted(recipes['recipes']):
         row = recipes['recipes'][desc]
-        if row.get('owner') != OWNER or row.get('benchName') not in BENCHES or row.get('fires') is False:
+        if row.get('owner') != OWNER or put_at(row) not in BENCHES or row.get('fires') is False:
             continue
         if not metal.get(row.get('out')):
             continue
@@ -206,7 +214,7 @@ def build(recipes, previous, policy=None):
     # (Patrick, q-3115 B): the coins come out and the materials stay.
     for desc in sorted(recipes['recipes']):
         row = recipes['recipes'][desc]
-        if desc in done or row.get('benchName') not in BENCHES:
+        if desc in done or put_at(row) not in BENCHES:
             continue
         source = kept[desc]['inputs'] if desc in kept else row.get('inputItems', [])
         inputs = [{'item': i['item'], 'name': i['name'], 'count': i['count']} for i in source]
