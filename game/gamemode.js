@@ -53921,6 +53921,11 @@ return module.exports;
       var firstSteps = null;
       try { firstSteps = (FS && FS.view) ? FS.view(actorId, s) : null; } catch (eSteps) { firstSteps = null; }
       if (firstSteps) { view.firstSteps = firstSteps; }
+      // The Alchemy journal page (#3142): what was eaten and brewed, or nothing at all.
+      var AJ = g.__thornswoodAlchemy;
+      var alchemyPage = null;
+      try { alchemyPage = (AJ && AJ.page) ? AJ.page(actorId) : null; } catch (eAlch) { alchemyPage = null; }
+      if (alchemyPage) { view.alchemy = alchemyPage; }
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
@@ -58880,6 +58885,50 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
   }
 
   /*
+    THE ALCHEMY JOURNAL, the page of K (#3142): every ingredient this
+    character has eaten, with the effects of it they know, and every mix they
+    have brewed, in names a person reads. The writeState of the character
+    block puts it on the panel; K asks for the panel as it opens, so the page
+    reads as of then. null while there is nothing on it, so nobody who has
+    never tasted an ingredient gets an empty page.
+
+    A known effect is named when the mixtures list names it, which is every
+    effect a brew here can make. The names of the rest are in Skyrim's
+    strings files, which the server does not load, and no brew here makes
+    them, so they are counted and not named. effects: null is an ingredient
+    whose record this server cannot find (a plugin taken out of the load
+    order): what was eaten stays, and the page says the rest is not known.
+  */
+  function page(actorId) {
+    var id = Number(actorId) || 0;
+    if (!id || !personOf(id)) { return null; }
+    var rec = read(id);
+    var eaten = [];
+    for (var desc in rec.eaten) {
+      if (!own(rec.eaten, desc)) { continue; }
+      var slots = effectsOf(idOfDesc(desc));
+      var mask = Number(rec.known[desc]) || 0;
+      var row = { name: nameOf(desc), effects: null, other: 0, known: 0, of: 0 };
+      if (slots) {
+        row.effects = [];
+        row.of = Math.min(slots.length, SLOTS);
+        for (var s = 0; s < row.of; s++) {
+          if (!(mask & (1 << s))) { continue; }
+          row.known++;
+          var md = descOf(slots[s]);
+          if (md && typeof MIXTURES !== 'undefined' && own(MIXTURES, md)) { row.effects.push(MIXTURES[md].name); }
+          else { row.other++; }
+        }
+      }
+      eaten.push(row);
+    }
+    eaten.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+    var recipes = journal(id).recipes;
+    if (!eaten.length && !recipes.length) { return null; }
+    return { eaten: eaten, recipes: recipes };
+  }
+
+  /*
     Edge triggered on v.at through ctx.state, because updateOwner runs every
     frame (see SWING_PROPERTY): the game is taught once for each stamp, and
     the stamp is kept only once the character was there to teach.
@@ -58930,7 +58979,7 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
   g.__thornswoodAlchemy = {
     ALCHEMY_PROPERTY: ALCHEMY_PROPERTY, LEARN_PROPERTY: LEARN_PROPERTY,
     effectsOf: effectsOf, ate: ate, brewRefusal: brewRefusal, brewed: brewed,
-    arrival: arrival, journal: journal, read: read, learnScript: learnScript
+    arrival: arrival, journal: journal, page: page, read: read, learnScript: learnScript
   };
   alog('ready');
 })();

@@ -127,6 +127,8 @@ with an ingredient you have never eaten is refused, and the ingredients stay in
 your pack. Once you have brewed a mix, your character remembers it at any
 alchemy lab, with every effect it showed you, and the alchemy menu shows them
 again every time you come into the world.
+The Alchemy journal page of the K panel lists every mix you have brewed and
+every ingredient you have eaten, with the effects you know of each.
 
 ### Tempering and repair
 

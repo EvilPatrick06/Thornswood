@@ -125,6 +125,15 @@
       answer on their own prompt. The server answers in the chat and by
       rewriting this.
 
+    alchemy: { eaten: [ { name, effects: [ '<effect>' ] | null, other, known, of } ],
+               recipes: [ { with: [ '<ingredient>' ], makes: [ '<effect>' ], times } ] }
+      The Alchemy journal (#3142), sent only once the character has eaten an
+      ingredient or brewed a mix. eaten is every ingredient tasted, with the
+      effects of it the character knows: known of of are known, effects
+      names the ones a brew here can make and other counts the rest. effects
+      is null when the server cannot find the ingredient's record. recipes
+      is every mix brewed, and how many times. Nothing on it is sent.
+
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
       An Enchanter's staff spells (#1128), sent to an Enchanter and nobody
@@ -421,6 +430,15 @@
     hairdye: {
       title: 'Hair dye',
       lead: 'A dye you carry colours your own hair, or the hair of somebody in front of you once they say yes. Each one is used up.',
+      rows: []
+    },
+    /*
+      The Alchemy journal (#3142). What was eaten and brewed is the server's,
+      under mine.alchemy; this is the title and the sentence over the page.
+    */
+    alchemy: {
+      title: 'Alchemy journal',
+      lead: 'Every ingredient you have eaten and what you know of it, and every mix you have brewed. Your character remembers all of it at any alchemy lab. An ingredient goes in a brew only once you have eaten it, and eating teaches its first effect; a brew teaches the effects its ingredients share.',
       rows: []
     },
     /*
@@ -1220,6 +1238,16 @@
     if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
     return got;
   }
+  /* The Alchemy journal (#3142): the server's, under mine.alchemy, or null with nothing on it. */
+  function alchemyView() {
+    var got = mine && mine.alchemy;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  function alchemyList(field) {
+    var v = alchemyView();
+    return (v && Array.isArray(v[field])) ? v[field].filter(function (r) { return r && typeof r === 'object'; }) : [];
+  }
   /* The Body page (#1631): the server's, under mine.body, or null while creating. */
   function bodyView() {
     var got = mine && mine.body;
@@ -1544,6 +1572,8 @@
     if (section === 'office') return 0;
     // The Body page is what is true, and one button to read it again.
     if (section === 'body') return 0;
+    // The Alchemy journal is what is true, and nothing on it is sent.
+    if (section === 'alchemy') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -1613,6 +1643,8 @@
     if (creating()) sections.splice(sections.indexOf('home') < 0 ? sections.length : sections.indexOf('home'), 0, 'guides');
     else sections.push('guides');
     if (!creating() && bodyView()) sections.push('body');
+    // The Alchemy journal (#3142), after Body: only once something was eaten or brewed.
+    if (!creating() && alchemyView()) sections.push('alchemy');
     if (!creating() && officePage()) sections.push('office');
     /*
       Property, last, and only once there is something on it. Patrick,
@@ -1741,6 +1773,11 @@
       if (hdV && hdV.steeping && !hdN) return { t: 'steeping', c: '' };
       return { t: hdN + (hdN === 1 ? ' dye' : ' dyes'), c: 'set' };
     }
+    if (sec === 'alchemy') {
+      var alE = alchemyList('eaten').length, alR = alchemyList('recipes').length;
+      if (alR) return { t: alR + (alR === 1 ? ' mix' : ' mixes') + ', ' + alE + ' eaten', c: 'set' };
+      return { t: alE + ' eaten', c: alE ? 'set' : '' };
+    }
     if (sec === 'body') {
       var bv = bodyView();
       var bw = bodyWorries(bv);
@@ -1848,6 +1885,7 @@
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
     else if (section === 'body') drawNeeds();
+    else if (section === 'alchemy') drawAlchemy();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -2099,6 +2137,61 @@
     again.appendChild(line);
     wrap.appendChild(again);
     elBody.appendChild(wrap);
+  }
+
+  /*
+    THE ALCHEMY JOURNAL (#3142). Two lists of what is already true, both the
+    server's: the mixes brewed, first, because they are what somebody comes
+    here to brew again, and every ingredient eaten with what is known of it.
+    Nothing on it is picked or sent, so Confirm stays hidden and the keyboard
+    has no rows to walk.
+  */
+  function drawAlchemy() {
+    var recipes = alchemyList('recipes');
+    var eaten = alchemyList('eaten');
+    var bar = el('div', 'spellbar');
+    bar.appendChild(el('div', 'spellpts',
+      (recipes.length ? recipes.length + (recipes.length === 1 ? ' mix brewed' : ' mixes brewed') : 'No mix brewed yet') +
+      ', ' + eaten.length + (eaten.length === 1 ? ' ingredient eaten' : ' ingredients eaten')));
+    bar.appendChild(el('div', 'spellnote',
+      'Two ingredients that share an effect make it at a lab. The alchemy menu shows the effects you know too.'));
+    elBody.appendChild(bar);
+
+    var wrap = el('div', 'cards');
+    recipes.forEach(function (r) {
+      var card = el('div', 'card mine');
+      var makes = Array.isArray(r.makes) ? r.makes.map(String) : [];
+      var nm = el('div', 'name', makes.length ? listWords(makes) : 'A mix');
+      var times = Number(r.times) || 0;
+      nm.appendChild(el('span', 'tag', times === 1 ? 'brewed once' : 'brewed ' + times + ' times'));
+      card.appendChild(nm);
+      card.appendChild(el('div', 'desc', listWords((Array.isArray(r.with) ? r.with : []).map(String)) + '.'));
+      wrap.appendChild(card);
+    });
+    eaten.forEach(function (r) {
+      var card = el('div', 'card');
+      var nm = el('div', 'name', String(r.name || 'something'));
+      var of = Number(r.of) || 0, known = Number(r.known) || 0;
+      if (Array.isArray(r.effects) && of) nm.appendChild(el('span', 'tag', known + ' of ' + of + ' known'));
+      card.appendChild(nm);
+      if (!Array.isArray(r.effects)) {
+        card.appendChild(el('div', 'desc', 'Eaten. The server cannot find this ingredient in the game now, so what it does is not known.'));
+      } else {
+        var named = r.effects.map(String);
+        var other = Number(r.other) || 0;
+        var line = named.length ? 'Known: ' + listWords(named) + '.' : 'Eaten.';
+        if (other) line += ' ' + (other === 1 ? 'One more known effect is' : other + ' more known effects are') + ' not one a brew here makes.';
+        if (of && known < of) line += ' Brewing it with another ingredient that shares an effect teaches that effect.';
+        card.appendChild(el('div', 'desc', line));
+      }
+      wrap.appendChild(card);
+    });
+    elBody.appendChild(wrap);
+  }
+  /* Words joined the way a sentence lists them: a, b and c. */
+  function listWords(words) {
+    if (words.length < 2) return words.join('');
+    return words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1];
   }
 
   /*
@@ -3410,7 +3503,7 @@
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'start' && section !== 'tree' && section !== 'recipes' && section !== 'guides' && section !== 'property' && section !== 'office' &&
-         section !== 'apprentice' && section !== 'hairdye' && section !== 'body');
+         section !== 'apprentice' && section !== 'hairdye' && section !== 'body' && section !== 'alchemy');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
     if (key === footKey) return;
@@ -3470,6 +3563,7 @@
     }
     if (section === 'office') return 'Each button is checked again by the server, and it answers in the chat.';
     if (section === 'body') return 'As the server counted it when K opened. Read again asks it now.';
+    if (section === 'alchemy') return 'What your character knows, as K opened. Nothing here is picked or sent.';
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
       if (markedStaffDescs().length) return 'Unlock sends the staff spells you marked, one staff spell point each.';
