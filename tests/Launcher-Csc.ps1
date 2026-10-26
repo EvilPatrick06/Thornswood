@@ -14,7 +14,8 @@
                           names (System.dll, PresentationFramework.dll, ...).
     $LauncherLib          the libraries it references out of launcher\lib
                           (WebView2's two, and NLayer, the menu theme's
-                          decoder, #3207), as full paths.
+                          decoder, #3207), as full paths, and on Windows the
+                          netstandard facade NLayer needs to compile against.
     $LauncherRefDir       the .NET Framework 4.8.1 reference assemblies the
                           project builds against, the WPF ones included.
 
@@ -104,6 +105,13 @@ $launcherAppDir = Join-Path $PSScriptRoot '..\launcher\app'
 $LauncherLib = @($launcherProjXml.SelectNodes('//m:Reference/m:HintPath', $launcherNs) | ForEach-Object {
     [IO.Path]::GetFullPath((Join-Path $launcherAppDir ($_.InnerText.Trim() -replace '\\', [IO.Path]::DirectorySeparatorChar)))
 })
+# NLayer is a netstandard2.0 library, so code that uses its types needs the
+# netstandard facade to compile. MSBuild adds it by itself
+# (ImplicitlyExpandNETStandardFacades, for any reference that depends on
+# netstandard); a harness that runs csc with /noconfig names it, from the
+# same 4.8.1 reference assemblies, so it is on this list (#3207: without it
+# every harness that compiles MenuMusic.cs stopped at CS0012).
+if ($OnWindows) { $LauncherLib += Join-Path $LauncherRefDir 'Facades\netstandard.dll' }
 
 function Add-LauncherType {
     param(

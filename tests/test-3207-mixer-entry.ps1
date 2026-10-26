@@ -207,7 +207,7 @@ namespace Thornswood
 }
 '@
 
-$asm = Add-LauncherType -Source $paths, $swallow, $music, $probe -Reference $nlayer[0]
+$asm = Add-LauncherType -Source $paths, $swallow, $music, $probe -Reference @($LauncherLib)
 $P = $asm.GetType('Thornswood.Probe3207')
 Write-Host ('      decoder: ' + $P::UseDecoder($nlayer[0]))
 

@@ -74,7 +74,7 @@ namespace Thornswood
         /// build carries no icon resource and the exe has to do. The menu
         /// music's Volume Mixer entry shows the same file (MenuMusic.cs).
         /// </summary>
-        public static string IconFile()
+        internal static string IconFile()
         {
             try
             {
