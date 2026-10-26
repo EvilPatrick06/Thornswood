@@ -278,6 +278,87 @@ if (hud) {
         used > 0 && isFinite(W) && used <= W - 2 * pad - 2 * bord);
   }
 
+  /*
+    S3e: DRUNK AND HIGH, AN ICON EACH, ONLY WHILE IT APPLIES (#3143).
+
+    Patrick, 22 October: "An icon that shows only while drunk or high", not
+    a bar. The four rows fill the strip (S3d), so the icons are their own
+    small panel on the strip's left end, and that panel must clear every bar
+    S3c knows about. kShowAll scales the whole 1280x720 HUD by one number,
+    so a box that clears the bars in the HUD's own pixels clears them at
+    every screen; this works it out in those pixels from the CSS.
+  */
+  {
+    const icons = function (v) {
+      const r = run(made, Object.assign({ food: 80, drink: 80, rest: 80, temp: 50 }, v), {});
+      const h = r.made['ts-hud'].innerHTML;
+      return { h: h, svgs: (h.match(/<svg /g) || []).length, marks: h.indexOf('id="ts-hud-marks"') !== -1 };
+    };
+    const sober = icons({});
+    yes('S3e sober and clean: no icon panel, only the four rows', !sober.marks && sober.svgs === 4);
+    const drunk = icons({ drunk: true });
+    yes('S3e drunk: one icon over the strip', drunk.marks && drunk.svgs === 5 && drunk.h.indexOf('#e3b04b') !== -1);
+    const high = icons({ drugged: true });
+    yes('S3e high: one icon, a different one', high.marks && high.svgs === 5 && high.h.indexOf('#c58cf0') !== -1 &&
+        high.h.indexOf('#e3b04b') === -1);
+    const both = icons({ drunk: true, drugged: true });
+    yes('S3e both: two icons', both.marks && both.svgs === 6);
+    yes('S3e the altitude field called high is not read as high', !icons({ high: 9000 }).marks);
+    yes('S3e no stray backslash in the panel', both.h.indexOf(BS) === -1);
+
+    const st = {};
+    const a = run(made, { food: 80, drink: 80, rest: 80, temp: 50 }, st);
+    const b = run(made, { food: 80, drink: 80, rest: 80, temp: 50, drunk: true }, st);
+    const c = run(made, { food: 80, drink: 80, rest: 80, temp: 50, drunk: true }, st);
+    const d = run(made, { food: 80, drink: 80, rest: 80, temp: 50 }, st);
+    yes('S3e becoming drunk redraws though no meter moved, once', !!a.handed && !!b.handed && !c.handed);
+    yes('S3e and sobering up redraws without the icon', !!d.handed &&
+        d.made['ts-hud'].innerHTML.indexOf('ts-hud-marks') === -1);
+
+    // The panel in the HUD's pixels, from the strip's CSS and its own.
+    const css = run(made, { food: 80, drink: 80, rest: 80, temp: 50 }, {}).made['ts-hud'].style.cssText;
+    const num = function (re, t) { const m = re.exec(t); return m ? Number(m[1]) : NaN; };
+    const L = num(/left:calc\(50vw - (\d+(?:\.\d+)?) \* var\(--ts\)\)/, css);
+    const B = num(/bottom:calc\(50vh - (\d+(?:\.\d+)?) \* var\(--ts\)\)/, css);
+    const H = num(/height:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/, css);
+    const bord = num(/border:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/, css);
+    const panel = (/<div id="ts-hud-marks" style="([^"]*)"/.exec(both.h) || [])[1] || '';
+    const pl = num(/left:calc\((-?\d+(?:\.\d+)?) \* var\(--ts\)\)/, panel);
+    const pb = num(/bottom:calc\(100% \+ (\d+(?:\.\d+)?) \* var\(--ts\)\)/, panel);
+    const pw = num(/width:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/, panel);
+    const ph = num(/height:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/, panel);
+    yes('S3e the panel is placed and sized only in the HUD\'s units',
+        /position:absolute/.test(panel) && /box-sizing:border-box/.test(panel) &&
+        [L, B, H, bord, pl, pb, pw, ph].every(function (v) { return isFinite(v); }));
+    // The strip's padding box is where an absolute child is placed from.
+    const x1 = 640 - L + bord + pl, x2 = x1 + pw;
+    const y2 = 360 + B - H + bord - pb, y1 = y2 - ph;
+    const BARS = {
+      'TrueHUD magicka': [64.5, 349.5, 667.2, 686.4],
+      'TrueHUD health': [497.5, 782.5, 667.2, 686.4],
+      'TrueHUD charge meter': [575, 705, 689, 708],
+      'SkyHUD magicka': [117.9, 410.7, 610.8, 640.0],
+      'SkyHUD charge meter': [137.0, 392.2, 602.9, 615.9]
+    };
+    const hits = Object.keys(BARS).filter(function (k) {
+      const q = BARS[k];
+      return x1 < q[1] && q[0] < x2 && y1 < q[3] && q[2] < y2;
+    });
+    yes('S3e with both icons up the panel (x ' + x1 + ' to ' + x2 + ', y ' + y1 + ' to ' + y2 +
+        ') is on the screen and clears every bar' + (hits.length ? ': not ' + hits.join(', ') : ''),
+        hits.length === 0 && x1 >= 0 && y1 >= 0 && x2 <= 1280 && y2 <= 720 - H);
+    // And the two icons fit inside it: its padding and border, then the
+    // icons and the gap between them, read from the markup after its tag.
+    const pp = num(/padding:0 calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/, panel);
+    const pbd = num(/border:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/, panel);
+    const inner = both.h.split('id="ts-hud-marks"')[1].split('>').slice(1).join('>');
+    let used = 0;
+    inner.replace(/(?:width|margin-left):calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/g,
+      function (all, n) { used += Number(n); return all; });
+    yes('S3e and the two icons (' + used + ') fit inside it (' + (pw - 2 * pp - 2 * pbd) + ')',
+        used > 0 && used <= pw - 2 * pp - 2 * pbd);
+  }
+
   // S4: THE PER-FRAME GUARD. updateOwner runs every frame; this is what stops
   // the HUD being rebuilt sixty times a second for ever.
   {

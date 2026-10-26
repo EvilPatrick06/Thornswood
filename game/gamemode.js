@@ -62918,6 +62918,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // A drug's window and the crashes it owes (#1382), kept across reads.
       drugUntil: Number(v.drugUntil) || 0,
       drugCrash: Number(v.drugCrash) || 0,
+      // Whether that window is still open, for the HUD's high icon (#3143).
+      drugged: !!v.drugged,
       // And a tea's (#1382).
       teaUntil: Number(v.teaUntil) || 0,
       teaCrash: Number(v.teaCrash) || 0,
@@ -63168,6 +63170,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (slept) { n.hangover = false; n.ale = 0; }
     else if (leftDrunk) { n.hangover = true; n.ale = 0; }
     n.drunk = drunkNow(n, now);
+    // High while a drug's window is open (#3143); the crash above closes it.
+    n.drugged = n.drugUntil > now;
 
     n.at = now;
     write(actorId, n);
@@ -64646,6 +64650,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var now = Date.now();
     n.drugUntil = now + NEEDS.drug.holdMinutes * 60000;
     n.drugCrash = (Number(n.drugCrash) || 0) + 1;
+    n.drugged = true;
     write(actorId, n);
   }
 
@@ -65160,7 +65165,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    var temp = Math.round(Number(v.temp));',
       '    if (!isFinite(food) || !isFinite(drink) || !isFinite(rest)) { return; }',
       '    if (!isFinite(temp)) { temp = 50; }',
-      '    var sig = food + "|" + drink + "|" + rest + "|" + temp;',
+      /*
+        DRUNK AND HIGH ARE IN THE SIGNATURE (#3143), so the icon comes and
+        goes the moment either does, even when no meter moved.
+      */
+      '    var high = !!v.drugged;',
+      '    var sig = food + "|" + drink + "|" + rest + "|" + temp + "|" + (drunk ? "d" : "") + (high ? "h" : "");',
       '    if (st.thornswoodHud === sig) { return; }',
       '    st.thornswoodHud = sig;',
       '',
@@ -65268,6 +65278,46 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '               row("rest", "Rest", rest, tone(rest, "#8fb85e"), rest + "%") +',
       '               row("temp", "Temp", temp, tempTone(temp),',
       '                   tempWord(temp) + " " + temp);',
+      '',
+      /*
+        DRUNK AND HIGH, AN ICON EACH, ONLY WHILE IT APPLIES (#3143).
+
+        Patrick, 22 October, on his report page: "An icon that shows only
+        while drunk or high", not a fifth bar. Drunk is the server's own
+        answer (NEEDS.ale.drunkFrom, the third ale until a sleep or the 45
+        minutes), and high is a drug's window being open (NEEDS.drug, the
+        10 minutes skooma or any of the six drugs holds the rest drain at
+        zero). Both ride on the needs record, so nothing is worked out here.
+
+        A tankard for drunk and a four point star for high, in their own
+        small panel sitting on the strip's left end. It has to sit there:
+        the strip's 540 pixels are all used by the four rows (S3d), and the
+        corner above the strip's left end, x 10 to 49 and y 679 to 697 of
+        the HUD's pixels with both icons up, is left of TrueHUD's magicka
+        bar (from x 64.5) and below SkyHUD's (to y 640), so it covers none
+        of them. tests\test-hud.js works that out at every screen it knows.
+        It is a child of the strip, so taking the strip off in creation takes
+        it off too.
+      */
+      '    var MARK = {',
+      '      drunk: "M5 7h8v8.6a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 15.6z M13 9h1.8a1.8 1.8 0 0 1 1.8 1.8v1.6a1.8 1.8 0 0 1-1.8 1.8H13 M4.8 7c-.3-1.7 1.1-3 2.6-2.6.7-1.3 2.8-1.5 3.6-.3 1.4-.4 2.7.7 2.4 2.9",',
+      '      high: "M10 2.6l1.8 5.6 5.6 1.8-5.6 1.8L10 17.4l-1.8-5.6L2.6 10l5.6-1.8z"',
+      '    };',
+      '    var marks = [];',
+      '    if (drunk) { marks.push(["drunk", "#e3b04b"]); }',
+      '    if (high) { marks.push(["high", "#c58cf0"]); }',
+      '    if (marks.length) {',
+      '      var icons = "";',
+      '      for (var m = 0; m < marks.length; m++) {',
+      '        icons += \'<svg viewBox="0 0 20 20" fill="none" stroke="\' + marks[m][1] + \'" stroke-width="1.9" \' +',
+      '          \'stroke-linecap="round" stroke-linejoin="round" style="width:\' + u(14) + \';height:\' + u(14) + \';flex:none;margin-left:\' + u(m ? 3 : 0) + \'">\' +',
+      '          \'<path d="\' + MARK[marks[m][0]] + \'"/></svg>\';',
+      '      }',
+      '      html += \'<div id="ts-hud-marks" style="position:absolute;left:\' + u(-1) + \';bottom:calc(100% + 2 * var(--ts));\' +',
+      '        \'width:\' + u(8 + marks.length * 14 + (marks.length - 1) * 3) + \';height:\' + u(18) + \';box-sizing:border-box;\' +',
+      '        \'display:flex;align-items:center;padding:0 \' + u(3) + \';background:rgba(12,10,8,.62);\' +',
+      '        \'border:\' + u(1) + \' solid rgba(0,0,0,.65);border-radius:\' + u(4) + \'">\' + icons + \'</div>\';',
+      '    }',
       '',
       '    var src = "(function(){try{" +',
       '      "var d=document.getElementById(\'ts-hud\');" +',
