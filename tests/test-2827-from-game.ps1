@@ -325,7 +325,9 @@ namespace Thornswood
         elseif ($l -match '^files: (.*)$') { $files = $Matches[1] -split '\|' }
         else { Write-Host "      $l" }
     }
-    Yes 'the driver ran to the end and reported' ($files.Count -eq 8)
+    # The three of the game's, then one for each recipe FromGameModMenus.cs holds.
+    $modRecipes = [regex]::Matches((Src (Join-Path $App 'FromGameModMenus.cs')), 'public static readonly MenuRecipe \w+ = new MenuRecipe').Count
+    Yes ('the driver ran to the end and reported all {0} files' -f (3 + $modRecipes)) ($modRecipes -gt 0 -and $files.Count -eq 3 + $modRecipes)
 
     $zcheck = Join-Path $work 'zcheck.py'
     [IO.File]::WriteAllText($zcheck, @'
