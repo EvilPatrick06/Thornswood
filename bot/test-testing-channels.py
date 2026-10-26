@@ -635,6 +635,7 @@ def issue(num, title, label, state='open', reason=None, pr=False,
            'state_reason': reason, 'closed_at': closed_at,
            'updated_at': HOUR[0] + ':%02d:%02dZ' % divmod(UPD[0], 60),
            'html_url': 'https://github.com/EvilPatrick06/Thornswood/issues/%d' % num,
+           'repository_url': 'https://api.github.com/repos/EvilPatrick06/Thornswood',
            'labels': [{'name': l} for l in label]}
     if pr:
         row['pull_request'] = {}
@@ -642,6 +643,10 @@ def issue(num, title, label, state='open', reason=None, pr=False,
 
 
 ASKED = []
+# Labels whose open-issue list GitHub answers with nothing, though the issues
+# are still open and labelled (#3438), and issues GitHub has deleted.
+EMPTY_LISTS = set()
+DELETED = set()
 
 
 def gh(url):
@@ -652,7 +657,10 @@ def gh(url):
     if path.endswith('/timeline'):
         return TIMELINE.get(int(path.split('/')[-2]), [])
     if '/issues/' in path:
-        return ISSUES[int(path.rsplit('/', 1)[1])]
+        num = int(path.rsplit('/', 1)[1])
+        if num in DELETED:
+            raise bot.urllib.error.HTTPError(url, 410, 'Gone', {}, None)
+        return ISSUES[num]
     if 'state=all' in url:
         since = bot.urllib.parse.unquote(url.split('since=')[1].split('&')[0])
         return sorted([r for r in ISSUES.values() if r['updated_at'] >= since],
@@ -662,6 +670,8 @@ def gh(url):
         return [r for r in ISSUES.values() if r['state'] == 'closed'
                 and r['updated_at'] >= since]
     label = bot.urllib.parse.unquote(url.split('labels=')[1])
+    if label in EMPTY_LISTS:
+        return []
     return [r for r in ISSUES.values() if r['state'] == 'open'
             and label in [l['name'] for l in r['labels']]]
 
@@ -1586,6 +1596,91 @@ yes('  a finding found with a merged change is not asked about again, and '
 bump(120, state='closed', state_reason='completed', closed_at=tick())
 removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
 yes('  a closed finding goes, as before', removed == [120] and names(kf) == [])
+
+
+# --- 12b. a label list that leaves an issue out does not take its post down --
+# #3438: on 22 Oct GitHub's list of open Dev Findings, then of Main Findings,
+# then both, came back without issues that were open and labelled the whole
+# time, and the same ten posts came down and went back up as a set three
+# times. A post comes down on what the issue itself says.
+ISSUES.clear()
+COMMENTS.clear()
+TIMELINE.clear()
+g, tasks, results, play, staff = server()
+run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'known3.json')))
+kf = bot._channel_named(g, 'known-issues', ('forum',))
+ks = {}
+issue(2299, 'Pauses on load', ['Dev Findings'])
+issue(2710, 'Doors stick', ['Main Findings'])
+issue(385, 'Both servers', ['Dev Findings', 'Main Findings'])
+posted = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[0]
+first = sorted(th.id for th in kf.threads)
+yes('three findings, three posts', posted == [385, 2299, 2710] and len(first) == 3)
+said = []
+bot_log = bot.log
+bot.log = lambda *a: said.append(' '.join(str(x) for x in a))
+try:
+    EMPTY_LISTS.update(['Dev Findings'])
+    out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+    yes('the Dev Findings list comes back empty: nothing is taken down or '
+        'posted, the Dev only finding keeps its post (%s)' % (out,),
+        out == ([], [], []) and sorted(th.id for th in kf.threads) == first)
+    yes('  and the bot log says the list left it out and the post stays',
+        any('left out #2299' in x and 'post stays' in x for x in said))
+    EMPTY_LISTS.update(['Main Findings'])
+    out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+    yes('both lists come back empty: still nothing comes down (%s)' % (out,),
+        out == ([], [], []) and sorted(th.id for th in kf.threads) == first
+        and sorted(ks['issues']) == ['2299', '2710', '385'])
+    EMPTY_LISTS.clear()
+    out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+    yes('the lists answer again: nothing is posted twice',
+        out == ([], [], []) and sorted(th.id for th in kf.threads) == first)
+    EMPTY_LISTS.update(['Dev Findings', 'Main Findings'])
+    bump(2299, state='closed', state_reason='completed', closed_at=tick())
+    bump(2710, labels=[{'name': 'bug'}])
+    DELETED.add(385)
+    del said[:]
+    removed = sorted(run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2])
+    yes('a left out issue that is closed, unlabelled or deleted does come down',
+        removed == [385, 2299, 2710] and kf.threads == [] and ks['issues'] == {})
+    yes('  each with its reason in the bot log',
+        any('took #2299 down: it is closed' in x for x in said)
+        and any('took #2710 down: it no longer carries' in x for x in said)
+        and any('took #385 down: GitHub has no issue #385' in x for x in said))
+    EMPTY_LISTS.clear()
+    DELETED.clear()
+    issue(2299, 'Pauses on load', ['Dev Findings'])
+    issue(2215, 'Moved away', ['Dev Findings'])
+    run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+    EMPTY_LISTS.update(['Dev Findings'])
+    ISSUES[2215]['repository_url'] = 'https://api.github.com/repos/EvilPatrick06/skymp'
+    del said[:]
+    removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
+    yes('  and so does one moved to another repository',
+        removed == [2215] and any('took #2215 down: it moved to evilpatrick06/skymp'
+                                  in x for x in said))
+
+    def broken_issue(url):
+        if '/issues/2299' in url.split('?')[0]:
+            raise bot.urllib.error.HTTPError(url, 502, 'Bad Gateway', {}, None)
+        return gh(url)
+    ISSUES[2215]['repository_url'] = 'https://api.github.com/repos/EvilPatrick06/Thornswood'
+    run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+    EMPTY_LISTS.update(['Dev Findings'])
+    keep = sorted(th.id for th in kf.threads)
+    try:
+        run(bot.known_issues_once(kf, ks, broken_issue, me_id=me.id))
+        failed = False
+    except bot.urllib.error.HTTPError:
+        failed = True
+    yes('a left out issue that will not read fails the pass, and every post '
+        'is still up', failed and sorted(th.id for th in kf.threads) == keep
+        and len(keep) == 2)
+finally:
+    bot.log = bot_log
+    EMPTY_LISTS.clear()
+    DELETED.clear()
 
 
 # ------------- 13. never two posts for one thing, and the check that finds them --

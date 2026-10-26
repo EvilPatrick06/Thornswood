@@ -101,6 +101,7 @@ import time
 import traceback
 import sys
 import typing
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -4413,6 +4414,38 @@ def github_issue(number, get=None):
     return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
 
 
+def finding_gone(number, get=None):
+    """Why issue number is no longer an open finding, read from the issue
+       itself, or None when it still is one: open, in KNOWN_REPO, carrying
+       one of KNOWN_LABELS.
+
+       The label lists (github_open_findings) are not the issue. On 22 Oct
+       one list, then the other, then both came back from GitHub without
+       issues that were open and labelled the whole time (no label, close or
+       reopen on their timelines), and the same ten #known-issues posts came
+       down and went back up as a set three times in one process (#3438).
+       So a post whose issue a list left out comes down on this answer, not
+       on the list's. Any other failure to read raises, and the pass that
+       asked changes nothing."""
+    try:
+        issue = github_issue(number, get)
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 410):
+            return 'GitHub has no issue #%d any more (%d)' % (int(number), e.code)
+        raise
+    if not isinstance(issue, dict):
+        raise ValueError('GitHub answered issue #%d with a %s, not an issue'
+                         % (int(number), type(issue).__name__))
+    where = str(issue.get('repository_url') or '').lower()
+    if not where.endswith('/repos/' + KNOWN_REPO.lower()):
+        return 'it moved to %s' % (where.split('/repos/')[-1] or 'another repository')
+    if str(issue.get('state')) != 'open':
+        return 'it is closed'
+    if not issue_tags_found(issue):
+        return 'it no longer carries %s' % ' or '.join(KNOWN_LABELS)
+    return None
+
+
 def github_comments(number, get=None):
     get = get or _github_get
     out, page = [], 1
@@ -5076,7 +5109,10 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     Oct): an open issue labelled Dev Findings or Main Findings with no merged
     pull request that names it and no "Test task:" comment. The moment one of
     those comes, or the issue closes or loses its label, its post goes: the
-    work on it is then a test task, not a known issue.
+    work on it is then a test task, not a known issue. An issue the label
+    lists leave out is read itself first, and its post stays unless that
+    read says it is closed, unlabelled, moved or deleted (finding_gone,
+    #3438).
 
     Comments are read only for an issue GitHub says changed since the last
     pass (its updated_at), or whose record was made with an older form of
@@ -5149,6 +5185,20 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         if save:
             save(state)      # straight away, so a crash cannot double it
         posted.append(num)
+    # An issue the label lists left out is read itself before its post comes
+    # down (finding_gone). Every read is made before anything is taken down,
+    # so a read that fails fails the pass with every post still up.
+    gone = {}
+    for key in list(rec):
+        if int(key) in listed or int(key) in issues:
+            continue                # listed, or not for a reason found above
+        why = await loop.run_in_executor(None, finding_gone, int(key), get)
+        if why is None:
+            log('known issues: the open findings GitHub listed left out #%s, '
+                'which is still open and labelled; its post stays' % key)
+            listed.add(int(key))
+        else:
+            gone[key] = why
     for key, have in list(rec.items()):
         if int(key) in listed:
             continue
@@ -5159,6 +5209,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         rec.pop(key, None)
         state['_dirty'] = True
         removed.append(int(key))
+        if key in gone:
+            log('known issues: took #%s down: %s' % (key, gone[key]))
     return posted, edited, removed
 
 
