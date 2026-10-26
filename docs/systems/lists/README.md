@@ -24,4 +24,5 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Hunter](hunter.md) (96 rows, 336 records)
 - [Eggs and wild food](wild-food.md) (4)
 - [Unranked](unranked.md) (44)
+- [Who makes what the world hands out](who-makes-it.md)
 

@@ -155,6 +155,16 @@ lists linked from each sub-profession.
 
 A mage sees the spell book there instead.
 
+## Everything has a maker
+
+Everything in the world has a recipe or a class that gathers it, except
+named uniques and quest items (Patrick, 22 October 2026). That covers
+what a chest or a body pays, the clothes and tool a new character is
+handed, and whatever a recipe asks for. [Who makes what the world hands
+out](lists/who-makes-it.md) lists each item and its maker, and the few
+that have none yet, each with the issue that gives it one. The build
+fails when something new is handed out that nobody makes.
+
 ## Names that are not a profession
 
 Bard, merchant, priest, scholar and thief are not picked on K. They

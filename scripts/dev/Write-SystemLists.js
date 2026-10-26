@@ -307,6 +307,8 @@ if (harvests.unranked) {
   index.push('- [Unranked](unranked.md) (' + got.names + ')');
 }
 
+// Written by scripts/dev/Check-Makers.js, which the gate runs (#3132).
+index.push('- [Who makes what the world hands out](who-makes-it.md)');
 index.push('');
 write('README.md', index.join('\n') + '\n');
 
