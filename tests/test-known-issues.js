@@ -129,9 +129,11 @@ function workFor(text) {
 const known = require('./fixtures/known-page').knownPage();
 yes('the Known Issues page is there, written from the known board', known !== null);
 const page = sections(known || '');
+/* Since #3137 the page holds only what is broken right now, in one table;
+   what works the way it does on purpose moved to the Help page. */
 const skymp = page.list[0] || { heading: '', lead: '', rows: [] };
-yes('its first table is the group that follows from SkyMP, with its rows',
-    /shared Skyrim/i.test(skymp.heading) && skymp.rows.length >= 3);
+yes('its first table is what is broken right now, with its rows',
+    /broken right now/i.test(skymp.heading) && skymp.rows.length >= 3);
 
 /* The subjects the SkyMP table shares with the roadmap. Worked out rather than
    written down, so the checks below follow whatever the roadmap says. */
@@ -189,7 +191,7 @@ yes('the page opening no longer promises the first group will not change',
 
 /* "Rather than one that tells people never to report it." The section still
    tells people when a report is worth making. */
-yes('the SkyMP table says what is still worth reporting',
+yes('that table says what is still worth reporting',
     /report[^.]*only if|only report|worth reporting|worth a report/i.test(skymp.lead));
 
 // ------------------------------------------------------------ the preview
