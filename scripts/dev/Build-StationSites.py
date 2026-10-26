@@ -105,9 +105,12 @@ WHAT HOLDS A SPOT CLEAR, the same measure as the woodworking benches:
 
 WHAT IT READS. The collection's plugins in game\\data\\last-plugin.json's load
 order, from --data, and from the repository's Thornswood-Content.esp only the
-four station records: their bounds are the stations' outlines. It does not
-read Thornswood-Last.esp or Thornswood-WoodworkerTrail.esp, and it checks
-that neither places anything. It reads the benches' spots out of
+four station records: their bounds are the stations' outlines. Of
+Thornswood-Last.esp it reads only the placed references it overrides: the
+town gates it unlocks, which stand where they always stood, and the floor
+items it switches off (#3077), which no machine draws, so none of them is in
+anybody's way. It checks that Thornswood-WoodworkerTrail.esp places nothing
+and Thornswood-Last.esp nothing else. It reads the benches' spots out of
 game\\data\\woodworking-benches.json and the boards' out of game\\gamemode.js.
 
 WHAT IT WRITES. game\\data\\station-sites.json: every site's anchor, the spot,
@@ -866,27 +869,40 @@ def main():
               % (len(other), args.data, record.get('revision'), ', '.join(other[:6])))
         return 2
     # Thornswood's two plugins after the content plugin place nothing new, so
-    # they are not read: measured here, not assumed. The one exception is
-    # Thornswood-Last.esp's overrides of the town gates Bethesda ships locked
-    # (#2484): each is a master's own reference, left where it stands without
-    # its lock or script, and last-plugin.json names every one. A gate is not
-    # a station and stands where it always stood, so no spot changes.
+    # they are not read for placements: measured here, not assumed.
+    # Thornswood-Last.esp overrides two kinds of a master's own references,
+    # and last-plugin.json counts both. The town gates Bethesda ships locked
+    # (#2484), left where they stand without their lock or script: a gate is
+    # not a station and stands where it always stood, so no spot changes. And
+    # every floor item (#3077, Build-LastPlugin.py step 5), switched off with
+    # its base and position only: no machine draws one and the server never
+    # makes it, so it is in nobody's way and is no obstacle (floor_off).
     gates = set(lo_doc.get('gatesUnlocked') or [])
+    floor_off = set()
     for n in OURS_AFTER:
         pl = wb.Plugin(os.path.join(ROOT, 'game', 'content', n), n)
         placed = []
-        pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append(fid) if tag == b'REFR' else None,
+        pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append((fid, flags)) if tag == b'REFR' else None,
                 tops={b'WRLD', b'CELL'})
         named = []
-        for fid in placed:
+        for fid, flags in placed:
             i = fid >> 24
             desc = '%x:%s' % (fid & 0xFFFFFF, pl.masters[i]) if i < len(pl.masters) else None
-            if not (n == 'Thornswood-Last.esp' and desc in gates):
-                named.append(desc or '%08X (its own)' % fid)
+            if n == 'Thornswood-Last.esp' and desc in gates:
+                continue
+            if n == 'Thornswood-Last.esp' and desc and flags & DISABLED:
+                floor_off.add(pl.key(fid))
+                continue
+            named.append(desc or '%08X (its own)' % fid)
         if named:
-            print('STOP. %s places %d reference(s) that are not the town gates it unlocks (%s); '
-                  'this table would have to read it.' % (n, len(named), ', '.join(named[:6])))
+            print('STOP. %s places %d reference(s) that are not the town gates it unlocks or the floor items it '
+                  'switches off (%s); this table would have to read it.' % (n, len(named), ', '.join(named[:6])))
             return 1
+    floor_count = (lo_doc.get('counts') or {}).get('floorItemsOff', 0)
+    if len(floor_off) != floor_count:
+        print('STOP. Thornswood-Last.esp switches off %d placed reference(s), and last-plugin.json counts %d floor '
+              'items; build the last plugin again first.' % (len(floor_off), floor_count))
+        return 1
     print('The load order: %d plugins, game\\data\\last-plugin.json\'s; %s read from game\\content for its '
           'station records only' % (len(plugins), CONTENT))
     world = wb.World(plugins)
@@ -955,7 +971,7 @@ def main():
             keys.add(k)
     scan = Scan(plugins, world, keys, regions, interiors, set())
     gate = CellGate(order, args.data, scan, plugins)
-    skip = {k for k, x in scan.refs.items() if k[0] == OWN and x['base'] in station_bases}
+    skip = {k for k, x in scan.refs.items() if k[0] == OWN and x['base'] in station_bases} | floor_off
 
     rows = {}
     taken = {}   # space -> the stations already chosen
@@ -1058,7 +1074,8 @@ def main():
                     'quarries, beehives and alchemy labs, the way the woodworking benches were placed, and the '
                     'content plugin places them.'),
         'readFrom': ('game/data/last-plugin.json loadOrder, the collection\'s bytes; from %s only its four station '
-                     'records; %s place nothing' % (CONTENT, ' and '.join(OURS_AFTER))),
+                     'records; %s place nothing new, and the floor items Thornswood-Last.esp switches off '
+                     '(#3077) are no obstacle' % (CONTENT, ' and '.join(OURS_AFTER))),
         'kinds': {kind: {'base': '%x:%s' % (k['base'], CONTENT), 'edid': k['edid'], 'name': k['name'],
                          'bounds': list(bases[kind][2]), 'user': list(k['user']), 'flat': k['flat'],
                          'reach': k['reach'], 'rule': RULES[kind], 'count': counts.get(kind, 0),
