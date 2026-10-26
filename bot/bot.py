@@ -4351,6 +4351,18 @@ def _github_get(url):
         return json.loads(r.read().decode('utf-8'))
 
 
+def _github_rows(got, url):
+    """A page of a GitHub list, which is a list. Anything else is an answer
+       that is not the list, and is raised, never read as no issues: a pass
+       that read no findings would take every #known-issues post down."""
+    if got is None:
+        return []
+    if not isinstance(got, list):
+        raise ValueError('GitHub answered %s with a %s, not a list'
+                         % (url.split('?')[0], type(got).__name__))
+    return got
+
+
 def github_open_findings(get=None):
     """Every open issue (not pull request) carrying one of KNOWN_LABELS, by
        number. One query per label because GitHub ANDs labels in one."""
@@ -4362,7 +4374,7 @@ def github_open_findings(get=None):
             url = ('%s/repos/%s/issues?state=open&per_page=100&page=%d&labels=%s'
                    % (GITHUB_API, KNOWN_REPO, page,
                       urllib.parse.quote(label)))
-            rows = get(url) or []
+            rows = _github_rows(get(url), url)
             for row in rows:
                 if isinstance(row, dict) and 'pull_request' not in row:
                     out.setdefault(int(row['number']), row)
@@ -5160,19 +5172,27 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         changed.pop(key, None)      # closed or unlabelled: asked again if it is back
         state['_dirty'] = True
     posted, edited, removed, listed = [], [], [], set()
+    # Why each issue that is not listed is not, said when its post comes
+    # down. Ten posts came down and went back up as a set several times
+    # before 26 Oct with no line saying why (#3140).
+    why = {}
     for num in sorted(issues):
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
         if changed.get(key) != KNOWN_CHANGED_FORM:
             timeline = await loop.run_in_executor(None, github_timeline, num, get)
-            if any(p.get('merged_at') and works_on(p, num)
-                   for p in fix_refs(timeline)[0]):
+            work = [p['number'] for p in fix_refs(timeline)[0]
+                    if p.get('merged_at') and works_on(p, num)]
+            if work:
                 changed[key] = KNOWN_CHANGED_FORM
+                why[key] = 'merged pull request %s is work on it' % ', '.join(
+                    '#%d' % n for n in work)
                 state['_dirty'] = True
             elif changed.pop(key, None) is not None:
                 state['_dirty'] = True      # an older rule's mention, not work
         if key in changed:
+            why.setdefault(key, 'a merged pull request is work on it')
             continue                # a change for it is merged: not a known issue
         if (have and have.get('updated') == issue.get('updated_at')
                 and have.get('form') == KNOWN_FORM):
@@ -5180,6 +5200,7 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
         if _all_marked(issue, comments, TASK_MARK, room=None):
+            why[key] = 'it has a "Test task:" comment'
             continue                # it has a test task: being checked, not known
         title, body, tags = known_of(issue, comments)
         taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items() if k != key]
@@ -5188,6 +5209,7 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
                 has_task=False, taken_titles=taken), say):
             if have:
                 listed.add(num)     # the post already up stays as it was
+            why[key] = 'its post breaks a rule'
             continue
         listed.add(num)
         sig = _sig(title, body, tags)
@@ -5223,6 +5245,9 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         rec.pop(key, None)
         state['_dirty'] = True
         removed.append(int(key))
+        log('known issues: took #%s down: %s' % (key, why.get(
+            key, 'it is not among the %d open issues labelled %s this pass'
+            % (len(issues), ' or '.join(KNOWN_LABELS)))))
     return posted, edited, removed
 
 
