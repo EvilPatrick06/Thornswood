@@ -8,7 +8,7 @@ namespace Thornswood
     /// The load order as the game counts it, and how to put a plugin list
     /// into the server's order. Pure functions over lists: nothing in here
     /// reads a path, a setting or the window, so the file compiles on its own
-    /// with a test, and tools\LoadOrder.ps1 carries the same rule for the
+    /// with a test, and scripts\mods\LoadOrder.ps1 carries the same rule for the
     /// publisher, line for line.
     ///
     /// The game hands a normal index to the five masters, then to every
