@@ -135,7 +135,8 @@ Yes 'which opens the collection while the card is about the mods, and is UpdateN
     $upd -match '(?s)static void InstallNowPressed\(\)\s*\{\s*if \(collectionBarUp \|\| \(collectionNoteUp && !updatePending\)\).*?UpdateNow\(\);')
 Yes 'both buttons say the same thing, so the card never says Install now over a card about the mods' (
     -not ($shellCode -match 'btnInstallNow\.Content = ') -and $upd -match 'btnUpdate\.Content = text;')
-Yes 'the automatic update after the game closed for one is the same press' ($upd -match '(?s)if \(install && cfg\.AutoUpdate\)\s*\{\s*Log\("Installing it now\."\);\s*UpdateNow\(\);')
+# Since #3202 the automatic update is UpdateBySelf, after every check, not only after the game closed for one.
+Yes 'the automatic update is the same press' ($upd -match '(?s)static void UpdateBySelf\(\).*?Log\("Installing it now, because automatic updates are on \(Settings, Updates\)\."\);\s*UpdateNow\(\);')
 Yes 'UpdateNow is the update, then Fix after it' ($upd -match 'static void UpdateNow\(\)\s*\{\s*RunUpdate\(FixAfterUpdate\);\s*\}')
 Yes 'Fix after an update forgets the update only when it went in, and runs Fix whole' (
     $sf -match '(?s)static void FixAfterUpdate\(bool wentIn\)\s*\{\s*if \(wentIn\) Upkeep\.Forget\(IssueKind\.Update\);\s*RunFix\(true\);\s*\}')

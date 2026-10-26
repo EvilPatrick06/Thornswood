@@ -251,12 +251,20 @@ refresh reads, so it runs while the game folder is being prepared;
 `WriteUpdate` then puts them in under `OwnGame.Alone`, after any refresh
 under way, and checks again any file a refresh changed in between; the new
 launcher goes in last (`SwapIn`). Install now, on the card above Play and in
-Settings, and the automatic update after the game was closed for one, go
+Settings, and the automatic update, go
 through `ShellUpdate.cs UpdateNow` (#3201): the update, then Fix's whole
 path on the folder the update left (`ShellScanFix.cs FixAfterUpdate`), which
 scans everything again, puts right what the scan finds and never takes the
 update it just tried a second time. A new launcher's first start runs the
-same Fix (row 24 of the startup order). `ShellUpdate.cs:51 CheckFailed()` keeps
+same Fix (row 24 of the startup order). The automatic update is
+`ShellUpdate.cs UpdateBySelf` (#3202), run after every update check's
+answer when `Config.AutoUpdate` is on (the default; only an explicit false
+in `config.json` turns it off): the start's check, the feed watch, Check
+now, the retry after a failed check and the check after the game closed
+for an update. It leaves the update to the in-play clock while a game the
+launcher started runs, to the card while a Skyrim it did not start is open,
+and never takes the update `RunUpdate` tried last a second time by itself.
+`RunUpdate` runs one update at a time (`updating`). `ShellUpdate.cs:51 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:80 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.

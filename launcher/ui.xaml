@@ -1357,7 +1357,9 @@
 
                 <TextBlock Text="Updates" Style="{StaticResource Eyebrow}"/>
                 <StackPanel Margin="0,0,0,30">
-                  <CheckBox x:Name="ChkAutoUpdate" Content="Check for updates when the launcher opens"/>
+                  <CheckBox x:Name="ChkAutoUpdate" Content="Install updates by themselves"/>
+                  <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0"
+                             Text="An update goes in as soon as the launcher sees it, and Diagnostics checks the install after it. During a game it waits for the server's countdown. Off, the card above Play waits until you press Install now. The launcher always checks for updates either way."/>
                   <CheckBox x:Name="ChkKeepOpen" Margin="0,12,0,0" Content="Keep the launcher on screen while playing"/>
                   <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0"
                              Text="It normally minimises. It cannot close, because it has to put your Windows Skyrim folders back when you quit."/>
