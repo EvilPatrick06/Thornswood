@@ -326,7 +326,8 @@ def main():
             elif not hold:
                 why = 'its place (%s) is in no hold' % (' < '.join(edids) or 'no location')
             elif not town:
-                why = 'its place (%s) is in %s but is not a town\'s own ground' % (' < '.join(edids), hold)
+                why = 'its place (%s) is in %s but is not a town\'s own ground; %s has keywords %s' % (
+                    ' < '.join(edids), hold, edids[0], ', '.join(kywd.get(x, desc(x)) for x in (locs.get(ch[0]) or {}).get('kw', [])) or 'none')
         if why:
             refused[desc(k)] = {'base': b['edid'], 'by': r['by'], 'why': why}
             continue
