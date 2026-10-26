@@ -635,6 +635,31 @@
     -236.0
    ]
   },
+  "study": {
+   "amongPlants": false,
+   "base": "18032:Thornswood-Content.esp",
+   "bounds": [
+    -44,
+    -49,
+    0,
+    44,
+    12,
+    63
+   ],
+   "count": 4,
+   "edid": "ThornswoodActivatorStudyDesk",
+   "flat": 8.0,
+   "name": "study desk",
+   "reach": 900,
+   "rule": "One in each of the four halls of the College of Winterhold, the Hall of the Elements, the Hall of Countenance, the Hall of Attainment and the Arcanaeum, beside the tables, or in the Hall of the Elements the benches, that the site names in that hall: a semester at the College is taken at a study desk in the College halls, not a command (Patrick, 22 October 2026, A on #1387; magic.md).",
+   "setIntoRock": false,
+   "user": [
+    -35.0,
+    -110.0,
+    35.0,
+    -50.0
+   ]
+  },
   "well": {
    "amongPlants": false,
    "base": "18030:Thornswood-Content.esp",
@@ -665,7 +690,7 @@
   "FalkreathLodsHouseLocation": "Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots within 2,400 units of its door: a smith's yard, not a field."
  },
  "measure": "Each station stands at the nearest clear spot to its anchor, tried every step units out to its reach in eight turns of the anchor's angle, a turn costing 60 units. Its outline and its user's place lie on the navmesh, on ground flat to the kind's flat and within 60 units of the anchor's height, out of doors above the water, and touch no furniture, container, door, item, plant or static under 250 by 250, nor where anybody stands at other furniture, the way through a door, a woodworking bench, a notice board, or another station, from 6 to 140 units above the floor, with 30 units to the nearest solid thing. A kiln stands 1000 units or more from every woodworking bench. A kiln may stand among small plants, and a salt vein is set into rock: only its miner's place needs the ground (Patrick, B on #2553). The cell and worldspace records the plugin carries are Bethesda's and change nothing in the game.",
- "readFrom": "game/data/last-plugin.json loadOrder, the collection's bytes; from Thornswood-Content.esp only its four station records; Thornswood-Last.esp and Thornswood-WoodworkerTrail.esp place nothing",
+ "readFrom": "game/data/last-plugin.json loadOrder, the collection's bytes; from Thornswood-Content.esp only its four station records; Thornswood-Last.esp and Thornswood-WoodworkerTrail.esp place nothing new, and the floor items Thornswood-Last.esp switches off (#3077) are no obstacle",
  "sites": {
   "hive-brandymug": {
    "anchor": "28c4b:Skyrim.esm",
@@ -775,7 +800,7 @@
     },
     {
      "anchor": "141089:JK's Whiterun's Outskirts.esp",
-     "why": "no clear spot within 1200 units (17710 its ground is more than # from the anchor's height; 3574 off the navmesh; 2408 touches TreeThicket01; 1628 touches TreeFloraCabbage01)"
+     "why": "no clear spot within 1200 units (17710 its ground is more than # from the anchor's height; 3575 off the navmesh; 2408 touches TreeThicket01; 1638 touches TreeFloraCabbage01)"
     },
     {
      "anchor": "c8e46:Skyrim.esm",
@@ -1615,8 +1640,8 @@
    "interior": true,
    "kind": "lab",
    "nearest": {
-    "edid": "Bucket01",
-    "ref": "e0320:Skyrim.esm",
+    "edid": "FirewoodPileSmall01",
+    "ref": "e037d:Skyrim.esm",
     "units": 36
    },
    "offset": [
@@ -1878,14 +1903,14 @@
    "anchorTouchedBy": [
     "Skyrim.esm"
    ],
-   "angle": 270.0,
+   "angle": 0.0,
    "base": "42e69:Thornswood-Content.esp",
    "cell": "165b6:Skyrim.esm",
    "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
    "cellEdid": "WhiterunArcadiasCauldron",
-   "fromAnchor": 131,
+   "fromAnchor": 178,
    "groundUnder": [
-    68.3,
+    68.4,
     68.4
    ],
    "interior": true,
@@ -1893,22 +1918,22 @@
    "nearest": {
     "edid": "CraftingAlchemyWorkbench",
     "ref": "c6e45:Skyrim.esm",
-    "units": 33
+    "units": 44
    },
    "offset": [
-    -100,
-    -84
+    -164,
+    -68
    ],
    "passedOver": [],
    "pos": [
-    -118.6,
-    -94.5,
-    68.3
+    -182.6,
+    -78.5,
+    68.4
    ],
    "ref": "15540:Thornswood-Content.esp",
    "space": "165b6:Skyrim.esm",
    "spaceEdid": "WhiterunArcadiasCauldron",
-   "turn": 270,
+   "turn": 0,
    "where": "Arcadia's Cauldron, Whiterun"
   },
   "lab-winterhold": {
@@ -2255,6 +2280,190 @@
    "where": "Winterhold",
    "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
   },
+  "study-arcanaeum": {
+   "anchor": "77da3:Skyrim.esm",
+   "anchorAngle": 330.84,
+   "anchorAt": [
+    429.7,
+    248.3,
+    -1.0
+   ],
+   "anchorEdid": "NobleTableSquare01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 330.84,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "13810:Skyrim.esm",
+   "cellCopy": "won by Dawnguard.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeArcanaeum",
+   "fromAnchor": 135,
+   "groundUnder": [
+    -0.8,
+    0.0
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "NobleTableSquare01",
+    "ref": "77da3:Skyrim.esm",
+    "units": 42
+   },
+   "offset": [
+    -132,
+    28
+   ],
+   "passedOver": [],
+   "pos": [
+    300.8,
+    208.5,
+    -0.8
+   ],
+   "ref": "18150:Thornswood-Content.esp",
+   "space": "13810:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeArcanaeum",
+   "turn": 0,
+   "where": "the Arcanaeum, the College of Winterhold"
+  },
+  "study-attainment": {
+   "anchor": "83316:Skyrim.esm",
+   "anchorAngle": 339.95,
+   "anchorAt": [
+    -608.9,
+    -165.8,
+    0.5
+   ],
+   "anchorEdid": "NobleTableRound01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 339.95,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "cab91:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeHallofAttainment",
+   "fromAnchor": 118,
+   "groundUnder": [
+    0.0,
+    0.0
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "Barrel02Static",
+    "ref": "838c1:Skyrim.esm",
+    "units": 33
+   },
+   "offset": [
+    -20,
+    -116
+   ],
+   "passedOver": [],
+   "pos": [
+    -587.9,
+    -281.6,
+    0.0
+   ],
+   "ref": "18151:Thornswood-Content.esp",
+   "space": "cab91:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeHallofAttainment",
+   "turn": 0,
+   "where": "the Hall of Attainment, the College of Winterhold"
+  },
+  "study-countenance": {
+   "anchor": "8661e:Skyrim.esm",
+   "anchorAngle": 225.36,
+   "anchorAt": [
+    363.7,
+    -647.9,
+    -383.7
+   ],
+   "anchorEdid": "NobleTableSquare01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 90.36,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "1380f:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeHallofCountenance",
+   "fromAnchor": 138,
+   "groundUnder": [
+    -384.0,
+    -384.0
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "NobleWallShelf02",
+    "ref": "86622:Skyrim.esm",
+    "units": 39
+   },
+   "offset": [
+    60,
+    124
+   ],
+   "passedOver": [],
+   "pos": [
+    233.3,
+    -692.4,
+    -384.0
+   ],
+   "ref": "18152:Thornswood-Content.esp",
+   "space": "1380f:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeHallofCountenance",
+   "turn": 225,
+   "where": "the Hall of Countenance, the College of Winterhold"
+  },
+  "study-elements": {
+   "anchor": "10cea6:Skyrim.esm",
+   "anchorAngle": 322.76,
+   "anchorAt": [
+    680.8,
+    -3070.9,
+    0.0
+   ],
+   "anchorEdid": "NobleBench01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 322.76,
+   "base": "18032:Thornswood-Content.esp",
+   "cell": "1380e:Skyrim.esm",
+   "cellCopy": "won by Skyrim.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeHallofTheElements",
+   "fromAnchor": 234,
+   "groundUnder": [
+    0.0,
+    0.0
+   ],
+   "interior": true,
+   "kind": "study",
+   "nearest": {
+    "edid": "NobleBench01",
+    "ref": "10cea6:Skyrim.esm",
+    "units": 31
+   },
+   "offset": [
+    188,
+    140
+   ],
+   "passedOver": [],
+   "pos": [
+    745.8,
+    -2845.7,
+    0.0
+   ],
+   "ref": "18153:Thornswood-Content.esp",
+   "space": "1380e:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeHallofTheElements",
+   "turn": 0,
+   "where": "the Hall of the Elements, the College of Winterhold"
+  },
   "well-03": {
    "anchor": "10aaa6:Skyrim.esm",
    "anchorAngle": 0.0,
@@ -2413,9 +2622,9 @@
    "cell": "21074:Dragonborn.esm",
    "cellCopy": "won by Dragonborn.esm, Bethesda's own",
    "cellEdid": "DLC2HrodulfsHouse",
-   "fromAnchor": 97,
+   "fromAnchor": 96,
    "groundUnder": [
-    541.8,
+    541.3,
     543.3
    ],
    "interior": true,
@@ -2423,17 +2632,17 @@
    "nearest": {
     "edid": "DLC2HrodulfsBookshelf",
     "ref": "38f48:Dragonborn.esm",
-    "units": 33
+    "units": 47
    },
    "offset": [
     96,
-    16
+    0
    ],
    "passedOver": [],
    "pos": [
     633.4,
-    -299.3,
-    541.8
+    -315.3,
+    541.3
    ],
    "ref": "18106:Thornswood-Content.esp",
    "space": "21074:Dragonborn.esm",
@@ -2701,9 +2910,9 @@
    "interior": false,
    "kind": "well",
    "nearest": {
-    "edid": "Bucket02b",
-    "ref": "c9187:Skyrim.esm",
-    "units": 53
+    "edid": "ImpExtIceBldgStraight03",
+    "ref": "523e8:Skyrim.esm",
+    "units": 171
    },
    "offset": [
     80,
@@ -2748,9 +2957,9 @@
    "interior": false,
    "kind": "well",
    "nearest": {
-    "edid": "Bucket01",
-    "ref": "33edb:Skyrim.esm",
-    "units": 208
+    "edid": "MrkMetalCage01",
+    "ref": "c3c6e:Skyrim.esm",
+    "units": 437
    },
    "offset": [
     144,
@@ -2795,9 +3004,9 @@
    "interior": false,
    "kind": "well",
    "nearest": {
-    "edid": "Bucket01",
-    "ref": "6f580:Skyrim.esm",
-    "units": 119
+    "edid": "TreePineShrub01Snow",
+    "ref": "6f4ba:Skyrim.esm",
+    "units": 175
    },
    "offset": [
     144,
@@ -2975,27 +3184,27 @@
    "cell": "9b3a:Skyrim.esm",
    "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
    "cellEdid": "POITundra08",
-   "fromAnchor": 226,
+   "fromAnchor": 80,
    "groundUnder": [
-    1093.2,
-    1100.7
+    1101.6,
+    1109.3
    ],
    "interior": false,
    "kind": "well",
    "nearest": {
     "edid": "TreeFloraThistle01",
-    "ref": "31ca:OarsRest.esp",
-    "units": 30
+    "ref": "31c9:OarsRest.esp",
+    "units": 36
    },
    "offset": [
-    -160,
-    -160
+    -80,
+    0
    ],
    "passedOver": [],
    "pos": [
-    -47884.0,
-    -46384.5,
-    1093.2
+    -47813.8,
+    -46220.0,
+    1101.6
    ],
    "ref": "18116:Thornswood-Content.esp",
    "space": "3c:Skyrim.esm",
@@ -3106,7 +3315,7 @@
    "triedAnchors": [
     {
      "anchor": "c394f:Skyrim.esm",
-     "why": "no clear spot within 1200 units (5034 touches TreeThicket01; 3704 off the navmesh; 3165 its cell 95f8:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin; 3147 touches TreeFloraLeek01)"
+     "why": "no clear spot within 1200 units (5271 touches TreeThicket01; 3710 off the navmesh; 3165 its cell 95f8:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin; 3147 touches TreeFloraLeek01)"
     },
     {
      "anchor": "a8ab3:Skyrim.esm",
@@ -3118,7 +3327,7 @@
     },
     {
      "anchor": "ee9fa:Skyrim.esm",
-     "why": "no clear spot within 1200 units (4071 its cell 95f8:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin; 3550 touches TreeThicket01; 3143 touches TreeFloraLeek01; 2660 off the navmesh)"
+     "why": "no clear spot within 1200 units (4071 its cell 95f8:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin; 3550 touches TreeThicket01; 3143 touches TreeFloraLeek01; 2674 off the navmesh)"
     },
     {
      "anchor": "15f798:JK's Whiterun's Outskirts.esp",
@@ -3226,7 +3435,7 @@
     },
     {
      "anchor": "d6c2b:Skyrim.esm",
-     "why": "no clear spot within 1600 units (4526 off the navmesh; 1811 touches RockM01; 1660 touches StonewallEndL01Ivy; 1374 touches TreeClover01)"
+     "why": "no clear spot within 1600 units (4526 off the navmesh; 1811 touches RockM01; 1660 touches StonewallEndL01Ivy; 1519 touches Barrel02Static)"
     },
     {
      "anchor": "99b49:Skyrim.esm",
@@ -3260,7 +3469,7 @@
    "triedAnchors": [
     {
      "anchor": "a9ee1:Skyrim.esm",
-     "why": "no clear spot within 1600 units (13436 off the navmesh; 1833 touches TreeFloraWheat01; 1666 touches WallLeanMarker; 1165 touches HandCartCanopy)"
+     "why": "no clear spot within 1600 units (13834 off the navmesh; 1833 touches TreeFloraWheat01; 1666 touches WallLeanMarker; 1165 touches HandCartCanopy)"
     }
    ],
    "where": "Solitude"
@@ -3270,11 +3479,11 @@
    "triedAnchors": [
     {
      "anchor": "c6dff:Skyrim.esm",
-     "why": "no clear spot within 900 units (52073 off the navmesh; 5470 touches WHIntWoodWallStoneWindow03; 5152 touches WHIntWoodWallStone01; 2973 touches WHIntWoodLadder01)"
+     "why": "no clear spot within 900 units (52096 off the navmesh; 5470 touches WHIntWoodWallStoneWindow03; 5152 touches WHIntWoodWallStone01; 2973 touches WHIntWoodLadder01)"
     },
     {
      "anchor": "10e3b6:Skyrim.esm",
-     "why": "no clear spot within 900 units (53127 off the navmesh; 5460 touches WHIntCastleRoomWall01; 3564 touches WHIntmetalarchdoor, its way through; 2470 touches CraftingAlchemyWorkbench)"
+     "why": "no clear spot within 900 units (53670 off the navmesh; 5460 touches WHIntCastleRoomWall01; 3564 touches WHIntmetalarchdoor, its way through; 2470 touches CraftingAlchemyWorkbench)"
     }
    ],
    "where": "The White Phial, Windhelm"
@@ -3354,7 +3563,7 @@
    "triedAnchors": [
     {
      "anchor": "2b245:Dragonborn.esm",
-     "why": "no clear spot within 400 units (5446 the ground runs # to #; 3135 its cell eda3:Dragonborn.esm: Embers XD.esp changes it before the content plugin; 2944 off the navmesh; 1901 touches FishRack01)"
+     "why": "no clear spot within 400 units (5446 the ground runs # to #; 3204 its cell eda3:Dragonborn.esm: Embers XD.esp changes it before the content plugin; 2944 off the navmesh; 1901 touches FishRack01)"
     }
    ],
    "where": "DLC2SkaalVilFarmWell01 in 142ec:Dragonborn.esm"
@@ -3374,7 +3583,7 @@
    "triedAnchors": [
     {
      "anchor": "2b2c:aaaGraniteHill.esp",
-     "why": "no clear spot within 400 units (6766 its cell 9ad9:Skyrim.esm: aaaGraniteHill.esp changes it before the content plugin; 2468 off the navmesh; 1326 touches CommonBench01; 906 touches TreeClover01)"
+     "why": "no clear spot within 400 units (6809 its cell 9ad9:Skyrim.esm: aaaGraniteHill.esp changes it before the content plugin; 2468 off the navmesh; 1326 touches CommonBench01; 906 touches TreeClover01)"
     }
    ],
    "where": "FarmWell01 in 9ad9:Skyrim.esm"
@@ -3404,7 +3613,7 @@
    "triedAnchors": [
     {
      "anchor": "51762:Skyrim.esm",
-     "why": "no clear spot within 400 units (10633 its cell 99e8:Skyrim.esm: Embers XD.esp changes it before the content plugin; 3868 off the navmesh; 767 touches ImpDoorDoubleLoad01, its way through; 237 touches Bucket01)"
+     "why": "no clear spot within 400 units (10989 its cell 99e8:Skyrim.esm: Embers XD.esp changes it before the content plugin; 3868 off the navmesh; 767 touches ImpDoorDoubleLoad01, its way through; 64 the ground runs # to #)"
     }
    ],
    "where": "ImpWell01 in FortGreymoorExterior03"
@@ -3419,7 +3628,7 @@
    "kind": "well",
    "triedAnchors": [],
    "where": "FarmWell01 in POITundra08",
-   "why": "it shares the bucket of well-23, 226 units away"
+   "why": "it shares the bucket of well-23, 80 units away"
   },
   "well-26": {
    "kind": "well",
