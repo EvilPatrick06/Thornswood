@@ -804,6 +804,8 @@ the copy the project's own Google Fonts folder keeps with its copyright line:
   person owns.
 - The WebView2 Runtime, which comes from Microsoft.
 - texconv, the tool the main menu picture is built with (next section).
+- Bethesda's five master files, which the fork's build downloads to run its
+  unit tests (the section after texconv's).
 
 ## texconv, Microsoft's texture converter, used to build and not shipped
 
@@ -826,6 +828,43 @@ Source: https://github.com/microsoft/DirectXTex, tag `may2026`.
 Licence: MIT, by the `LICENSE` file at that tag, "Copyright (c) Microsoft
 Corporation." Nobody is handed a copy, so its notice has nothing to travel
 with.
+
+## Bethesda's master files, downloaded by the fork's build to test it and not shipped
+
+The fork's build, `.github/workflows/thornswood-pr-windows.yml` on
+`thornswood/engine-changes` of https://github.com/EvilPatrick06/skymp, runs on
+every pull request into that branch and every push to it. Through upstream's
+`pr_base` action it configures with `-DUNIT_DATA_DIR=skyrim_data_files
+-DDOWNLOAD_SKYRIM_DATA=ON`, and `cmake/download_skyrim_data.cmake` then
+downloads the five masters below from https://gitlab.com/pospelov/se-data
+(main), a copy under the GitLab account pospelov (Leonid Pospelov), for the
+unit tests that read game records. The download is upstream's: skyrim-multiplayer/skymp
+has the same file and the same two flags. The files stay on GitHub's runner
+for the run and are thrown away with it. None of them is uploaded (every
+artifact the run keeps is under `build\` or vcpkg), none is in the fork or in
+this repository, and none reaches anybody (issue #3728).
+
+| File | Bytes | sha256 |
+|---|---|---|
+| `Skyrim.esm` | 249,753,573 | `9ec6b3818bbd002487bdc4104add07f814cc067e70c79ea2d164108a6c960f04` |
+| `Update.esm` | 18,557,306 | `8502f3975a84fc4fd62c9781e867df5bb661972887c93f017db0857b20dc90f2` |
+| `Dawnguard.esm` | 25,189,548 | `501bbcf0c61c8f28396a13a2ca877f904803ef9c0002b329edde7fb741119023` |
+| `HearthFires.esm` | 3,978,606 | `30d319a8e439dbd1c5dec03860a60aaec9142642f2c9168419b424c897f592d1` |
+| `Dragonborn.esm` | 64,564,304 | `4f2fe839956db8807e07b1a0feb805130487899ce337e60ad43f15ed9f8cb988` |
+
+The sizes and sha256 values are what se-data serves on 26 October 2026
+(GitLab's own size and content sha256 for each file), and a download of
+HearthFires.esm that day hashed to the same value. Since fork pull request
+#120 the build holds each file to its sha256 and stops when one differs. They
+are an older release of the game's masters than the one Thornswood plays on:
+`records\skyrim-files.json` has Skyrim.esm at 249,753,412 bytes and Update.esm
+at 18,874,041.
+
+Licence: none. They are ZeniMax's files, and the Creation Kit End User License
+Agreement (the section "Bethesda's own files, made on each machine" above)
+reserves every right it does not grant; it grants no right to copy the game's
+own files from anywhere but the person's own copy. Whether the fork's build
+keeps downloading them is Patrick's decision on #3728.
 
 ## On our servers
 
