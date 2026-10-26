@@ -139,9 +139,11 @@ log.
 - `#known-issues`, read only: one post per open issue labelled Dev Findings
   or Main Findings whose fix has not landed yet, tagged Dev or Main
   (Patrick, 22 Oct). Its fix has landed once the issue has a `Test task:`
-  comment or is on the board as Done (`board: Done`, which
-  done-on-merge.yml puts on a merged fix with its test task); then it is not
-  a known issue and its post goes at once. A merged pull request alone does
+  comment or is in Done: done-on-merge.yml's comment on it, `Pull request #N
+  merged (...)` written by the workflow, or the `board: Done` label for the
+  minute before board-status.yml takes it off. Then it is not a known issue
+  and its post goes at once. A card moved to Done by hand with no merge is
+  not seen, since the bot cannot read the board. A merged pull request alone does
   not take a post down (#3140): when any merged pull request that named the
   issue did, a measuring step on the scripts finding, partial fixes and a
   `Refs` written by mistake kept bugs people still meet off the list. Each
@@ -299,11 +301,11 @@ whole file at once.
 
 - The known list is the `#known-issues` posts above, word for word, with where
   each was found. Nothing is typed into the site for it.
-- The roadmap has four lanes: Being built now, Next, Later and Done. An open
+- The roadmap has three lanes: Being built now, Next and Later. An open
   issue labelled `roadmap: now`, `roadmap: next` or `roadmap: later` is in
-  that lane; once it is closed as done it is in Done, newest first, whatever
-  its lane was. Closed as not planned, it is nowhere. Its words are the
-  issue's last comment that starts `Roadmap:`:
+  that lane. Once it closes, however, it leaves the roadmap: there is no
+  Done section (Patrick, 26 Oct, "Done section needs removed from the
+  roadmap"). Its words are the issue's last comment that starts `Roadmap:`:
 
       Roadmap: <what, at most 45 characters>
       <where it stands, in a sentence or two>

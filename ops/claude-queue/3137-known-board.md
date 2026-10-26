@@ -10,7 +10,7 @@ What it does:
 
 - The known board (thornswood.net/known) goes from fourteen rows and three prose sections to the five things actually broken, each naming its board issue (#503, #2710, #3434, #3435, #3436) in the row's `issue` field, which the page does not show. Since #3140 the page is those issues' `Known issue:` comments, the same as #known-issues, and no step here puts it live.
 - The roadmap loses its Later row "Bard instruments", which is a bug on the board now (#3434). Since #3140 the roadmap is built from `roadmap:` labels, and that issue carries none.
-- help.md's Things that are normal here takes what is on purpose (what the server owns, fishing with a pole, mods in batches) and the old launcher paragraph; the menus that still reset come off that list, since they are a bug.
+- help.md takes the old launcher paragraph. Its Things that are normal here section, which #3137 filled, was removed whole on 26 Oct (Patrick), so what works on purpose is listed nowhere.
 - join.md, the /known link preview and the home page say what /known is now.
 - The Discord welcome and FAQ stop calling /known "broken on purpose", and the FAQ's NPC answers say what #504 made true (the server runs the NPCs). Both carry their changelog line.
 
@@ -36,7 +36,7 @@ What it does:
 ## Check afterwards
 
 - Once 3140-site-lists.md has run: https://thornswood.net/api/page/known has one section, Broken right now, with the issues #known-issues holds, and names no SunHelm, no creation hall and no load order rule.
-- https://thornswood.net/help has the server owns, fishing and batches lines under Things that are normal here, and the launcher before 26 September paragraph under When something goes wrong.
+- https://thornswood.net/help has no Things that are normal here section, and has the launcher before 26 September paragraph under When something goes wrong.
 - #welcome's known issues line and #faq's Fast travel and Something's broken answers read as content.py has them.
 - Then delete this note, put what ran on #3137, and close #2703 as completed (its sentence and its failing harness went with the removed mods table; 2703-known-page-removed-mods.md went in this pull request).
 
