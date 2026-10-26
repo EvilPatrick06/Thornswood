@@ -1629,6 +1629,22 @@ foreach ($k in @($prev.Keys)) {
     $m = [regex]::Match([string]$prev[$k], '^\d+:([0-9a-fA-F]{64})$')
     if ($m.Success) { $gone[$k] = $m.Groups[1].Value.ToLowerInvariant() }
 }
+# ==== thornswood shipped not ours ====
+# tests\test-shipped-not-ours.ps1 runs this block on its own.
+#
+# And the ones no record named any more when #1261 came (#1178): the scrub of
+# 29 September had already taken them out of the records, so the loop above
+# never saw them, and every install the old packs reached kept them.
+# Ship-Rules' Get-ShipShippedNotOurs reads them, with the bytes we shipped, from
+# records\shipped-not-ours.json, and stops the release on a path that is not
+# another author's. A path this release ships is its own file again and is not
+# gone; one Ship-Rules deletes everywhere stays 'always'.
+$shippedNotOurs = Get-ShipShippedNotOurs
+foreach ($k in @($shippedNotOurs.Keys)) {
+    if ($now.ContainsKey($k) -or [string]$gone[$k] -eq 'always') { continue }
+    $gone[$k] = $shippedNotOurs[$k]
+}
+# ==== end thornswood shipped not ours ====
 foreach ($k in @($gone.Keys)) {
     if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
     if ($gone[$k] -eq 'always') { continue }

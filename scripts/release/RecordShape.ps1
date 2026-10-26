@@ -16,6 +16,7 @@
       skyrim-files        records\skyrim-files.json      every file of that build (the launcher embeds it)
       ui-gone             records\ui-gone.json           the files every pack deletes (Ship and the launcher)
       generated           records\generated.json         what Build-Generated builds before a Ship
+      shipped-not-ours    records\shipped-not-ours.json  other authors' files our old packs shipped, deleted by sha256 (#1178)
 
       $doc = Read-ThornswoodRecord -Path <file> -Kind server-build
       $problems = Get-ThornswoodRecordProblems -Doc $doc -Kind server-build
@@ -53,6 +54,8 @@ $script:ThornswoodRecordKinds = [ordered]@{
     'skyrim-files'       = @{ File = 'records\skyrim-files.json';       Versions = @(1); MustSay = $false }
     'ui-gone'            = @{ File = 'records\ui-gone.json';            Versions = @(1); MustSay = $false }
     'generated'          = @{ File = 'records\generated.json';          Versions = @(1); MustSay = $false }
+    # #1178: what every release record deletes where the bytes still match.
+    'shipped-not-ours'   = @{ File = 'records\shipped-not-ours.json';   Versions = @(1); MustSay = $true }
     # Slice 5 (#2180): the feed store's files. No committed file: each channel's
     # store holds its own (Check-Records -Feed <folder> reads them).
     'feed-version'       = @{ File = $null; Feed = 'version.json';      Versions = @(1); MustSay = $false }
@@ -227,6 +230,19 @@ function Get-ThornswoodRecordProblems {
             $un = Get-ThornswoodRecordProp $Doc 'unused'
             if ($null -eq $un -or $un -isnot [array] -or @($un).Count -eq 0) { $out += 'unused is missing, empty, or not a list of file names' }
             elseif (@($un | Where-Object { -not ($_ -is [string]) -or -not $_.Trim() }).Count) { $out += 'unused has an entry that is not a file name' }
+        }
+        'shipped-not-ours' {
+            # Other authors' loose files earlier packs shipped as ours, by the
+            # bytes they had (#1178). Publish-Update turns each into a gone
+            # line the launcher acts on only while the file still matches, so
+            # every path is a file under Data and nothing that climbs out.
+            $files = Get-ThornswoodRecordProp $Doc 'files'
+            $out += @(Get-ThornswoodFilesMapProblems $files 'files')
+            if ($null -ne $files -and $files -is [psobject] -and $files -isnot [array] -and $files -isnot [string]) {
+                foreach ($p in $files.PSObject.Properties) {
+                    if ($p.Name -notmatch '^Data\\[^\\/:*?"<>|]' -or $p.Name -match '(^|\\)\.\.?(\\|$)' -or $p.Name -match '[/:*?"<>|]' -or $p.Name.Contains('\\') -or $p.Name.EndsWith('\')) { $out += "files.$($p.Name) is not a file under Data" }
+                }
+            }
         }
         'generated' {
             # What Build-Generated builds before a Ship (#1247). Either part may

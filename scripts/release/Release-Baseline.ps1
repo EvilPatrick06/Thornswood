@@ -395,6 +395,10 @@ function Get-FeedAssetFile([string]$Url, [string]$Sha, [string]$Dest, [string]$S
 #                                             whose Vortex deploys that path now
 #                         'always'            Ship-Rules' delete list, taken out
 #                                             whatever put it there
+#                         '<sha256>'          another author's file we once
+#                                             shipped (#1261, #1178): taken out
+#                                             only while it still has those
+#                                             bytes and Vortex does not deploy it
 #   ':record:files'       '1'                 every file above is on the site
 #                                             beside the record. Without it (every
 #                                             record before #1050) a launcher

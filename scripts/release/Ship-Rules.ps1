@@ -1704,6 +1704,38 @@ function Test-ShipNotOurs([string]$rel, [int]$Revision = $ShipCollectionRevision
     return (-not (Test-ShipHeld $rel $Revision))
 }
 
+# OTHER AUTHORS' FILES OUR OLD PACKS SHIPPED, BY THEIR BYTES (#1178). The packs
+# carried them as ours until the scrub of 29 September, which took them out of
+# the packs and the records. #1261 (2 October) makes a release list such a file
+# as gone at the sha256 we shipped, but only when the release before it named
+# the file, and after the scrub none did. So every install the old packs reached
+# kept them: 166 files, 67.6 MB, on the main install on 12 October, among them
+# old MCM Helper scripts over the collection's newer ones and the other server's
+# haybale. records\shipped-not-ours.json names each with those bytes, and
+# Publish-Update puts every one in the record as gone. The launcher deletes one
+# only while it still has those bytes and Vortex does not deploy the path, so a
+# copy somebody installed themselves is never touched.
+#
+# Returns path -> lowercase sha256. Stops, naming them, on a record that does
+# not read, or on a path Ship-Rules does not call another author's: a delete
+# must never reach Bethesda's files, one machine's own, or a backup.
+$ShipShippedNotOursRecord = Join-Path $PSScriptRoot '..\..\records\shipped-not-ours.json'
+function Get-ShipShippedNotOurs {
+    $doc = Read-ThornswoodRecord -Path $ShipShippedNotOursRecord -Kind shipped-not-ours
+    $map = [ordered]@{}
+    $wrong = @()
+    foreach ($p in @($doc.files.PSObject.Properties)) {
+        $rel = $p.Name
+        if (-not (Test-ShipNotOurs $rel) -or (Test-ShipBethesda $rel) -or (Test-ShipOneMachine $rel) -or (Test-ShipBackup $rel)) { $wrong += $rel; continue }
+        $map[$rel] = ([string]$p.Value.sha256).ToLowerInvariant()
+    }
+    if ($wrong.Count) {
+        throw ("records\shipped-not-ours.json names {0} file(s) Ship-Rules does not call another author's loose file, so no release may delete them by it: {1}" -f
+               $wrong.Count, (($wrong | Select-Object -First 5) -join ', '))
+    }
+    return $map
+}
+
 # Where this build's reference plugins.txt and loadorder.txt are read from.
 #   no Root\Game         the Steam copy: Vortex writes them into AppData
 #   an own folder        Profile\OwnGame: the Vortex profile's lists as of the

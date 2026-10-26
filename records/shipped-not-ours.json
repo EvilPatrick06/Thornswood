@@ -1,0 +1,670 @@
+{
+  "version": 1,
+  "measured": "12 Oct 2026 on the shipping machine, from C:\\Thornswood\\Game (the main install, which took every pack): the files the launcher brought in from our packs that the main record no longer names and Ship-Rules calls another author's. The same 166 files and 67.6 MB the installer left out on 2 Oct (#1178).",
+  "files": {
+    "Data\\Interface\\racemenu\\bottombar.swf": {
+      "sha256": "7b038ff50d71f5fe83a71d59fa12ae335230ffe977dbd0e378ce50d405610db2",
+      "bytes": 14745
+    },
+    "Data\\Interface\\racemenu\\buttonart.swf": {
+      "sha256": "adde25f37de76e76eb0d6df720e7b89a30180b3aab1bbf08a1e964438746652b",
+      "bytes": 18967
+    },
+    "Data\\Interface\\racemenu\\racesex_icons.swf": {
+      "sha256": "501d36fc27226a9d9603d855a105dc2da06ce0a2c9d277ff53833c4aefa107da",
+      "bytes": 8872
+    },
+    "Data\\Interface\\racesex_menu.swf": {
+      "sha256": "ab3901335a28bbe53b360ce73be4dee5e74190c1efbb447ce22004f0638280e9",
+      "bytes": 105756
+    },
+    "Data\\Interface\\Translations\\racemenu_czech.txt": {
+      "sha256": "b17661fa5074a432c29e5fb14769bed083f773ea89793d716491c1efff8a865b",
+      "bytes": 28758
+    },
+    "Data\\Interface\\Translations\\racemenu_english.txt": {
+      "sha256": "d60ca0de788496a6071fdb65878f6b6d3295a0c56eacc17ff1012055e6c7fd5c",
+      "bytes": 26254
+    },
+    "Data\\Interface\\Translations\\racemenu_french.txt": {
+      "sha256": "975e181d0b555aac56d6dd1e1288b48f2fbf2c28109587e390697c092b2170e4",
+      "bytes": 31046
+    },
+    "Data\\Interface\\Translations\\racemenu_german.txt": {
+      "sha256": "2cac5ca3641824660017e2a6df0682f0c355a9dcb29491429df994cc3249d1a5",
+      "bytes": 29570
+    },
+    "Data\\Interface\\Translations\\racemenu_italian.txt": {
+      "sha256": "a316141f08b7c616e5212b02713e7bb1810010deac430460fc0ade4d5f79edd7",
+      "bytes": 30648
+    },
+    "Data\\Interface\\Translations\\racemenu_japanese.txt": {
+      "sha256": "2f17a0bd459c0340924091d75814a3475e6baeac7f392821e1e3efb3100e3f9f",
+      "bytes": 20940
+    },
+    "Data\\Interface\\Translations\\racemenu_polish.txt": {
+      "sha256": "5c42edb6dac2b3e3507b06e0ede7b67fec59f130b71251ee54a320adb806ef3f",
+      "bytes": 28648
+    },
+    "Data\\Interface\\Translations\\racemenu_russian.txt": {
+      "sha256": "67d7eb3b1c15bb5ba43453fcc1aa07812a696e50c4a1a89b2b717e37a195f0a7",
+      "bytes": 29400
+    },
+    "Data\\Interface\\Translations\\racemenu_spanish.txt": {
+      "sha256": "eef14ff84cf7e7c54d2cecddb5aef65e936c0861c8918355f21be1a8dcfaaa90",
+      "bytes": 31780
+    },
+    "Data\\Interface\\Translations\\racemenuplugin_english.txt": {
+      "sha256": "2312f14552f0c6364e4d0396f26712724e52ab28650c65e3175119108c9297df",
+      "bytes": 314
+    },
+    "Data\\Interface\\vr\\racemenu\\bottombar.swf": {
+      "sha256": "55f725c99305ed4f0434815fd6311f2fd76d79450abe3464fdc6300678e97ab7",
+      "bytes": 15075
+    },
+    "Data\\Interface\\vr\\racemenu\\buttonart.swf": {
+      "sha256": "0e97d96d56d19234321b3de032fd6d6fe2acb171e69d66663eff5b6d9652b1c3",
+      "bytes": 50802
+    },
+    "Data\\Interface\\vr\\racemenu\\racesex_icons.swf": {
+      "sha256": "501d36fc27226a9d9603d855a105dc2da06ce0a2c9d277ff53833c4aefa107da",
+      "bytes": 8872
+    },
+    "Data\\Interface\\vr\\racesex_menu.swf": {
+      "sha256": "3a012da4fed80637ce3257b9b2b89243befab29a4bec5316a935cea87c889963",
+      "bytes": 104279
+    },
+    "Data\\meshes\\0CCE\\f\\0CCE_Dress1_FirstPerson.tri": {
+      "sha256": "8048f3a7342c928e8602d720e118e3812d0f3ff138934fec14ffba7fe15ccc45",
+      "bytes": 48962
+    },
+    "Data\\meshes\\0CCE\\f\\0CCE_Dress2_FirstPerson.tri": {
+      "sha256": "7145931e2f0627c365ff4c805fede6d2fe5d60764b8145c477bb03fdd9727215",
+      "bytes": 57652
+    },
+    "Data\\meshes\\0CCE\\f\\0CCE_Dress3_FirstPerson.tri": {
+      "sha256": "4e5d3267e8983721577e3b54867fb312928432faf3c0ccc4e23e052363485ddc",
+      "bytes": 54950
+    },
+    "Data\\meshes\\0CCE\\f\\0CCE_Dress4_FirstPerson.tri": {
+      "sha256": "ba44488348fd04d31281794cc80f778ed9908af25d664943f8d3e843bebabc1a",
+      "bytes": 57856
+    },
+    "Data\\meshes\\0CCE\\f\\0CCE_Hoodf.tri": {
+      "sha256": "cd1bb0942c40edbeab0b3ffd703c7c91fa913e6bc8fe1f46df88d277b44f02b7",
+      "bytes": 33348
+    },
+    "Data\\meshes\\0CCE\\f\\Dress\\0CCE_Dress.tri": {
+      "sha256": "88a6f88147f6ed9b9df13c307a424025c6e681cff60ed474ea52d0b58cc1046f",
+      "bytes": 964681
+    },
+    "Data\\meshes\\0CCE\\f\\Dress\\0CCE_Dress2.tri": {
+      "sha256": "cb49695318c9fe9207d4fbc99cfa978af55afea0fa8656e6e1d83ce9e37f8e5c",
+      "bytes": 864668
+    },
+    "Data\\meshes\\0CCE\\f\\Dress\\0CCE_Dress3.tri": {
+      "sha256": "122d12a2a586dba4ac579c1eb91b3c0427be211408349f2981a7730ed9f51fae",
+      "bytes": 542619
+    },
+    "Data\\meshes\\0CCE\\f\\Dress\\0CCE_Dress4.tri": {
+      "sha256": "b6e9aa62898411d2c0883e84a9d238853110c3bdf6d898a2629166e23306cb4d",
+      "bytes": 751488
+    },
+    "Data\\meshes\\actors\\character\\character assets\\childbody.nif": {
+      "sha256": "7437091a352035a8c47f98c0e89a196f64ba5a93634009675515bd8c2b61c5ec",
+      "bytes": 100941
+    },
+    "Data\\meshes\\actors\\character\\character assets\\childfeet.nif": {
+      "sha256": "b0b5463af06eb3ae2d1583b4921c9d9019a071cb0213bea1fba39f1b2871c26c",
+      "bytes": 374924
+    },
+    "Data\\meshes\\actors\\character\\character assets\\femaletailargonian.nif": {
+      "sha256": "3b93e628e560703ff2f76f860f5ba7136b399d5a36a1e36f8b8962ebbad10fbf",
+      "bytes": 41998
+    },
+    "Data\\meshes\\actors\\character\\character assets\\femaletailkhajiit.nif": {
+      "sha256": "af79579c7e72a1a3a045345d28bb37800dad76fbdbc53328fc52d3a48595fdce",
+      "bytes": 21028
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\dlc01\\dlc1soulcairnskeletonwarrior.nif": {
+      "sha256": "170bb2f77fe46a2bbb69dca700a4b917373da648ddcf7beab82b32d1f31c409a",
+      "bytes": 754757
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\dlc01\\skeletonwarrior.nif": {
+      "sha256": "6f06e17b906463a89232519bd21a87329acb02396a856c48f6721f386517918e",
+      "bytes": 754491
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\draugrfemale.nif": {
+      "sha256": "d1f3b99d080f2b59f1ead63c0baab30a7ad26061d990cfb09d7b48e9c4988fd4",
+      "bytes": 257293
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\draugrmagicfemale01.nif": {
+      "sha256": "35839c4940ce0a76059806915c0f6777e99f8b11b2aadc7514fc047e10539bbb",
+      "bytes": 422940
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\hevarmorf_1.nif": {
+      "sha256": "72c190ec1e97613e3e9bbf6578d9d78e078b4939e5f338b4deb2f21e70e9880b",
+      "bytes": 367159
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\hevarmorf_2.nif": {
+      "sha256": "9745f3f06d1e7baf8abcc59b48e4abead1e333641662376abbdb79da25fe6f17",
+      "bytes": 469536
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\lightarmorf.nif": {
+      "sha256": "78fb709e5ab17c5efb076ae5e3c0fbb4d0ff12c1e12907b194144dd245ea0301",
+      "bytes": 300315
+    },
+    "Data\\meshes\\actors\\draugr\\character assets\\midarmorf.nif": {
+      "sha256": "4a109657fd53106adddd5bc0f5148d1d379b18ea1da59ca9f57c797e89e360a6",
+      "bytes": 339160
+    },
+    "Data\\meshes\\actors\\vampirelord\\character assets\\vampirelordfemale.nif": {
+      "sha256": "6b6cb8f0174f72c83f89f9913e1a491f70a0d9e1cf2848ca6f0892d205bb4b7a",
+      "bytes": 500815
+    },
+    "Data\\meshes\\actors\\werewolfbeast\\character assets\\malebodywerewolf_1.nif": {
+      "sha256": "f2f2bb21ea1a7ef4e41438176f7c60c696ddc01200c4097c0ed54c522a7cc2f1",
+      "bytes": 692695
+    },
+    "Data\\meshes\\armor\\dragon priests\\ahzidal\\dragonpriestclothingf_ahzidal_0.nif": {
+      "sha256": "d95036af6e1f28eb6373c389b49d4caec3422f7ba663447a48950752c19ed9b1",
+      "bytes": 184435
+    },
+    "Data\\meshes\\armor\\dragon priests\\ahzidal\\dragonpriestclothingf_ahzidal_1.nif": {
+      "sha256": "253301c337ceb420abbdde079dd0b129744fe5551b473c944c23a17e858ea6b1",
+      "bytes": 184435
+    },
+    "Data\\meshes\\armor\\dragon priests\\dukaan\\dragonpriestclothingf_dukaan_0.nif": {
+      "sha256": "dab47392819c0df875adcc82ada4d353f07a6c12a22ca85bbed979824d5d808d",
+      "bytes": 184433
+    },
+    "Data\\meshes\\armor\\dragon priests\\dukaan\\dragonpriestclothingf_dukaan_1.nif": {
+      "sha256": "9406a845e10dc33c0e0d795e8aad060e9347b8ad7e68df92a6d3c443e58141b2",
+      "bytes": 184433
+    },
+    "Data\\meshes\\armor\\dragon priests\\hevnoraak\\dragonpriestclothingf_hevnoraak_0.nif": {
+      "sha256": "f93c8252358612bb85429b2f2c2d4f46240adf0adff951f39b45147073a301be",
+      "bytes": 184447
+    },
+    "Data\\meshes\\armor\\dragon priests\\hevnoraak\\dragonpriestclothingf_hevnoraak_1.nif": {
+      "sha256": "528e7835f3338ec502caaed85b90cbe83b486d641eaa0976f6458e50090b6cf0",
+      "bytes": 184447
+    },
+    "Data\\meshes\\armor\\dragon priests\\konahrik\\dragonpriestclothingf_konahrik_0.nif": {
+      "sha256": "55edd48f15b9878644de1ca1c6c9e1db9ec4282230f61f12b1b925e8710a0a3c",
+      "bytes": 184437
+    },
+    "Data\\meshes\\armor\\dragon priests\\konahrik\\dragonpriestclothingf_konahrik_1.nif": {
+      "sha256": "028fa0a24997ea49615f13ab1d45969f5c7eab1542b6a2b94b32aa470d2543ef",
+      "bytes": 184437
+    },
+    "Data\\meshes\\armor\\dragon priests\\krosis\\dragonpriestclothingf_krosis_0.nif": {
+      "sha256": "9201cb961e85fb3be03a1981bb9dd8c4ab71be9e962ad9df67f6dff4c43d1725",
+      "bytes": 184423
+    },
+    "Data\\meshes\\armor\\dragon priests\\krosis\\dragonpriestclothingf_krosis_1.nif": {
+      "sha256": "5a1a8610cbdf90ea6b750f96bfa317c7f90f4a221733bca9765b0a0facda2f32",
+      "bytes": 184423
+    },
+    "Data\\meshes\\armor\\dragon priests\\morokei\\dragonpriestclothingf_morokei_0.nif": {
+      "sha256": "61a9eeabebdb44b9042207b1270d1435ee9bc179158ed28905ba7f924787db79",
+      "bytes": 184427
+    },
+    "Data\\meshes\\armor\\dragon priests\\morokei\\dragonpriestclothingf_morokei_1.nif": {
+      "sha256": "57d249645cad576a19e0a8f19084899f779b75a03c2b88b96dd18ce245608e3d",
+      "bytes": 184427
+    },
+    "Data\\meshes\\armor\\dragon priests\\nahkriin\\dragonpriestclothingf_nahkriin_0.nif": {
+      "sha256": "fb3efe290bb62637e0200bc15cc1c77818076364f16f531c961d70e12c44c74e",
+      "bytes": 184441
+    },
+    "Data\\meshes\\armor\\dragon priests\\nahkriin\\dragonpriestclothingf_nahkriin_1.nif": {
+      "sha256": "5dfa0083e573e329592e4b730c6e28f0caa3f53b122b177e1bfba854e26da15b",
+      "bytes": 184441
+    },
+    "Data\\meshes\\armor\\dragon priests\\otar\\dragonpriestclothingf_otar_0.nif": {
+      "sha256": "25ef04cd9e56c821e19d64e9aa1660772420520747d25b590bba9773f3faa9a0",
+      "bytes": 184413
+    },
+    "Data\\meshes\\armor\\dragon priests\\otar\\dragonpriestclothingf_otar_1.nif": {
+      "sha256": "50ddaffd177f3b637a0dcb0073bb333cea65a9bf25f6d6caa398c9d1535722b2",
+      "bytes": 184413
+    },
+    "Data\\meshes\\armor\\dragon priests\\rahgot\\dragonpriestclothingf_rahgot_0.nif": {
+      "sha256": "14fb27bbb2f6385b126c854e8dcd9739fb3c19f700b2dc6ba566339d3c49274f",
+      "bytes": 184425
+    },
+    "Data\\meshes\\armor\\dragon priests\\rahgot\\dragonpriestclothingf_rahgot_1.nif": {
+      "sha256": "a045ed57d3156a33aa644c312284b684c2322c38376c9cf39b1d780468f87d11",
+      "bytes": 184425
+    },
+    "Data\\meshes\\armor\\dragon priests\\vahlok\\dragonpriestclothingf_vahlok_0.nif": {
+      "sha256": "c3fd59e127cccf5c3a921d84baf6acb295d138f3ca39df273893d29e31b860ba",
+      "bytes": 184427
+    },
+    "Data\\meshes\\armor\\dragon priests\\vahlok\\dragonpriestclothingf_vahlok_1.nif": {
+      "sha256": "c9a941d3edba8287d67e718cd10063ea93b5f430f1b2e797b0436ba16e7f4a1a",
+      "bytes": 184427
+    },
+    "Data\\meshes\\armor\\dragon priests\\vokun\\dragonpriestclothingf_vokun_0.nif": {
+      "sha256": "1b6d152ee15f79b2ec4eb376a41d6cd4b64548f29a5aad77df2dc6ff87dcfd98",
+      "bytes": 184423
+    },
+    "Data\\meshes\\armor\\dragon priests\\vokun\\dragonpriestclothingf_vokun_1.nif": {
+      "sha256": "1bbcb94d7dab5f5c20ea4ea07851a10cd76d4da9103dcd1b269425475963cbec",
+      "bytes": 184423
+    },
+    "Data\\meshes\\armor\\dragon priests\\volsung\\dragonpriestclothingf_volsung_0.nif": {
+      "sha256": "a09878ad94dfdc2a1306e4e115d97854fef5f0e06a0f97f264521210f4209b95",
+      "bytes": 184429
+    },
+    "Data\\meshes\\armor\\dragon priests\\volsung\\dragonpriestclothingf_volsung_1.nif": {
+      "sha256": "f183d4e6554352230ef0bea7a7bed87ac9750845d6d6a33fa475841fcae640d6",
+      "bytes": 184429
+    },
+    "Data\\meshes\\armor\\dragon priests\\zahkriisos\\dragonpriestclothingf_zahkriisos_0.nif": {
+      "sha256": "d7daf45bcfd7755530722816d8bf0559fac9be70e63200ae29b8c10dd68a6623",
+      "bytes": 184441
+    },
+    "Data\\meshes\\armor\\dragon priests\\zahkriisos\\dragonpriestclothingf_zahkriisos_1.nif": {
+      "sha256": "4b738c9ae6272fff468e0accda1cf80000d81d4f8c84c91e606dc28f88ac6f17",
+      "bytes": 184441
+    },
+    "Data\\meshes\\armor\\travel clothes\\clothes\\3clothesf_0.nif": {
+      "sha256": "02463d44e83db280f504105761e99b8e8ac60b62fbc8e7e991fcb2f6a217fca6",
+      "bytes": 278125
+    },
+    "Data\\meshes\\armor\\travel clothes\\clothes\\3clothesf_1.nif": {
+      "sha256": "18a689c5369bf2c3af3e2d0f40cd87646a09a6f8443ee68ba1844b377ae95da7",
+      "bytes": 278015
+    },
+    "Data\\meshes\\armor\\travel clothes\\clothes\\7clothesf_0.nif": {
+      "sha256": "c308648c0cec894a119c65fdff51fc4be1d9e563c35a872b584c7c910c5043cb",
+      "bytes": 270770
+    },
+    "Data\\meshes\\armor\\travel clothes\\clothes\\7clothesf_1.nif": {
+      "sha256": "039e5fdd205824fe46b25727d6bba6386e8351db0ccdd0587baa5b966ce85aee",
+      "bytes": 271059
+    },
+    "Data\\meshes\\armor\\travel clothes\\new robes\\2hrobesf_0.nif": {
+      "sha256": "b6ae489d9b9facb5c6d73c6c90600f6bbd9f206ba03589fb2fb6aa0ea1b7bfcd",
+      "bytes": 410313
+    },
+    "Data\\meshes\\armor\\travel clothes\\new robes\\2hrobesf_1.nif": {
+      "sha256": "df8f65a48f465cfbbc0977fbb71d4f6baccc475f98035815ffe855fe8fa13d16",
+      "bytes": 410111
+    },
+    "Data\\meshes\\armor\\travel clothes\\new robes\\6crobesf_0.nif": {
+      "sha256": "0ef7bfe9756aef6a040f120bb9a74068d989bf85a2d1593090c07bc0508ecdfe",
+      "bytes": 366848
+    },
+    "Data\\meshes\\armor\\travel clothes\\new robes\\6crobesf_1.nif": {
+      "sha256": "9d4f4ddb16ad00d7751d7aa308ef2ba9475101805b344e0e1df446677f10e4c7",
+      "bytes": 366644
+    },
+    "Data\\meshes\\armor\\travel clothes\\new robes\\6robesf_0.nif": {
+      "sha256": "cd7ec0bb4a935cc4153a7df576fc39fdbe3c62d30de64ea41c7d6652cf761765",
+      "bytes": 366868
+    },
+    "Data\\meshes\\armor\\travel clothes\\new robes\\6robesf_1.nif": {
+      "sha256": "390525645883ab774853abd04ba4d690eb9c5190f909a74aa7c1f6a21a92e78a",
+      "bytes": 366664
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\3aclothesf_0.nif": {
+      "sha256": "b86ec66d4217ce0ee73d24fd83c063cfb2f7fa2032d47e44445a9c9ee7be9c76",
+      "bytes": 278125
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\3aclothesf_1.nif": {
+      "sha256": "386862291009e3a69ca36d87205d219a381e31deb7cbbec32f5fe4c8a4dd0ab8",
+      "bytes": 278015
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\3bclothesf_0.nif": {
+      "sha256": "e92284059ea742ab45149f8144e2c9c249698df45c27243092aa1c898546d5f4",
+      "bytes": 278125
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\3bclothesf_1.nif": {
+      "sha256": "1801ea9fa574d0baca18843158d268f590926044bcaa4f234649af6506746cff",
+      "bytes": 278015
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\3cclothesf_0.nif": {
+      "sha256": "33b4c9df6159aac22942d66cac68c054999a35d632f27a055d9b0aaa1c8b9994",
+      "bytes": 278134
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\3cclothesf_1.nif": {
+      "sha256": "0c1c835b85ab370d6db3e9f00ab05c0ef1c2be3e743dfa8c916a2d43d11d985d",
+      "bytes": 278024
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\torso3f_0.nif": {
+      "sha256": "5c1c848c0de748e8b77fc0a5b47d9241e64e361b8445c4b450fb228476556fed",
+      "bytes": 270770
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\torso3f_1.nif": {
+      "sha256": "cd386844463e009a6dbc8106e10be9bc5201459d1be75d51f01facb8a091a3cc",
+      "bytes": 271059
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\torso4f_0.nif": {
+      "sha256": "c11ddeb830389f4d5baba7ef1c7d61126e71708abe2398ab72214d659bab10c5",
+      "bytes": 270792
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\torso4f_1.nif": {
+      "sha256": "b2820a98cf5e2fb09fd280e7c6640dff19c104e0a6896884f0d7a5cc2800b5bd",
+      "bytes": 271081
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\torso5f_0.nif": {
+      "sha256": "bd6b3c9eb20ba2f3111cae5f9bbc5f7c319e797b7e91efdcd7097bd7474f9f20",
+      "bytes": 270792
+    },
+    "Data\\meshes\\armor\\travel clothes\\new variants\\torso5f_1.nif": {
+      "sha256": "9280b3248596551352b1d7f52cdcfff088a72ef03b2210521ee1fcda5fab9e64",
+      "bytes": 271081
+    },
+    "Data\\meshes\\armor\\travel clothes\\quiltedrobe\\4clothesf_0.nif": {
+      "sha256": "9e8ea03794a68abd99659441f9525a5a09cbe7f5b6df653631b2e0ba2217b750",
+      "bytes": 431920
+    },
+    "Data\\meshes\\armor\\travel clothes\\quiltedrobe\\4clothesf_1.nif": {
+      "sha256": "45577367778113222c592d6da18e8e51b6056957c3c7d86c7d0be0d447842d38",
+      "bytes": 432034
+    },
+    "Data\\meshes\\armor\\travel clothes\\quiltedrobe\\5clothesf_0.nif": {
+      "sha256": "de8095a25a5459680edc5882806c4fbfd7a8ad8d51aa2513ac13059d298d1bc6",
+      "bytes": 431918
+    },
+    "Data\\meshes\\armor\\travel clothes\\quiltedrobe\\5clothesf_1.nif": {
+      "sha256": "844f61adedb018d9947159113d1c336cb7cdc0315e8617e54d5b2dfcf19f6c9a",
+      "bytes": 432032
+    },
+    "Data\\meshes\\armor\\travel clothes\\robes\\6brobesf_0.nif": {
+      "sha256": "c597969c2214c6390176234b2ea3fe9bf1251fe1a44ca766c920a1dfc8fcda69",
+      "bytes": 366857
+    },
+    "Data\\meshes\\armor\\travel clothes\\robes\\6brobesf_1.nif": {
+      "sha256": "44ba30ba4bb77e3d1542963a60934773123d275441e14e9cbc3d88819a329360",
+      "bytes": 366653
+    },
+    "Data\\meshes\\armor\\travel clothes\\robes\\6robesf_0.nif": {
+      "sha256": "d4ca83f6bb0551b3b0bfeb1ebc3341ddb84a0da0fa2640da443d7892dfb502ab",
+      "bytes": 366838
+    },
+    "Data\\meshes\\armor\\travel clothes\\robes\\6robesf_1.nif": {
+      "sha256": "64b518481750019350a45714103875fa9d72d17a82d4283120e8f1061ff2628b",
+      "bytes": 366634
+    },
+    "Data\\meshes\\Armor_Replacer\\2_nordwar\\lamellar\\armor\\1stpersonsteelarmorm_1.nif": {
+      "sha256": "f87d9e17ffaacad50ceafbc2065255c7f43e06a7b4f225232b062990f6c2fda7",
+      "bytes": 120716
+    },
+    "Data\\meshes\\Armor_Replacer\\orc\\ArmorMedium3F_1.nif": {
+      "sha256": "daec348390532c0820ab84ac3f2d1bc1b904e7d743dc1a9c9a9799875d3c9f29",
+      "bytes": 421548
+    },
+    "Data\\meshes\\Armor_Replacer\\steel\\armor1m_0.nif": {
+      "sha256": "ee54840ccc763c3a2d99b79f6b2619dd6976c3963044b426cbf8ca2def975889",
+      "bytes": 538984
+    },
+    "Data\\meshes\\clothes\\farmclothes03\\farmerhat03argf.nif": {
+      "sha256": "6188895240cc68cad7b0f7369f398e5b43c186dd8ddbdfab6c6f264339acdc4c",
+      "bytes": 23542
+    },
+    "Data\\meshes\\clothes\\farmclothes03\\farmerhat03khaf.nif": {
+      "sha256": "2b05ed6957f3777377dc964ad62be7cb1d30e3e25b20d3c7b20742a7b522fe51",
+      "bytes": 23543
+    },
+    "Data\\meshes\\clothes\\farmclothes03\\farmerhatf.nif": {
+      "sha256": "cb2fd157c4b0ae382c9c2740bd2ab78e3e5a732169ec46fc10459ed4da53a55a",
+      "bytes": 22919
+    },
+    "Data\\meshes\\clothes\\monk\\fxmonkvariant2.nif": {
+      "sha256": "5a15c2f2053bdf97c42c89173bb5a2d758584d81549d1a2f4e27b1a47a9814d2",
+      "bytes": 62879
+    },
+    "Data\\meshes\\clothes\\saviik\\banker\\bankeroutfitf_0.nif": {
+      "sha256": "abd6d99fc41a5276b3829717b03a51711f41c25e56114fdd29cc9039a48bd4be",
+      "bytes": 177484
+    },
+    "Data\\meshes\\clothes\\saviik\\banker\\bankeroutfitf_1.nif": {
+      "sha256": "7eae917c28b997773af2b29a6b06439c54b0c3d9502ec0e857a04f4628a1bbb9",
+      "bytes": 177484
+    },
+    "Data\\meshes\\clothes\\saviik\\finedoublet\\finedoubletf_0.nif": {
+      "sha256": "e776ea0421f4885b31b8b8806b4d1274939af08de18cdad25ae3a87bc322c5db",
+      "bytes": 205863
+    },
+    "Data\\meshes\\clothes\\saviik\\finedoublet\\finedoubletf_1.nif": {
+      "sha256": "479c67fe6ff6a50ae175541c679e33fec7d3a67ec7fa8fc0ee3ad704771bf6c8",
+      "bytes": 205595
+    },
+    "Data\\meshes\\clothes\\saviik\\tailor\\tailorvestf_0.nif": {
+      "sha256": "ec66d8c87a7bddb05e9a192ab44b1696cc4c5d6d39cfd1896d900f2eb5b9b4c6",
+      "bytes": 289797
+    },
+    "Data\\meshes\\clothes\\saviik\\tailor\\tailorvestf_1.nif": {
+      "sha256": "c99a3c16ff39901eb5def06ad4a9b456bd12c9bb33ab9b718e8edd50f89a4930",
+      "bytes": 289797
+    },
+    "Data\\meshes\\clothes\\sheogorath\\sheogorathoutfit.nif": {
+      "sha256": "adcf2eb193c3fcb151bcd92d10168c2dfb137e1e1d5b1cc838f507fc2a9eff20",
+      "bytes": 246617
+    },
+    "Data\\meshes\\clothes\\ssewersvolkiharcountess\\f\\volkiharcountess_1.nif": {
+      "sha256": "0500d9c3e813b07ef70d9471961d1ce7eb6767afa92a7b9b64fb852cdaa885c3",
+      "bytes": 306963
+    },
+    "Data\\meshes\\dlc01\\actors\\skeleton\\armorskeleton1.nif": {
+      "sha256": "929e9b17a0129b0f1c2d31b75172a6053bf8807f6292b099a456415996db0705",
+      "bytes": 588671
+    },
+    "Data\\meshes\\dlc01\\actors\\skeleton\\armorskeleton2.nif": {
+      "sha256": "3de6cd9b003297340d085b05e36837ed68ed4fdaca13e001e3c38b5e6de8f02f",
+      "bytes": 614641
+    },
+    "Data\\meshes\\dlc01\\actors\\skeleton\\armorskeleton3.nif": {
+      "sha256": "c34415a6c313ae24809163fc8a255fdb4cee321262a6f59e39ec231aed296db0",
+      "bytes": 533398
+    },
+    "Data\\meshes\\dlc01\\actors\\skeleton\\armorskeleton4.nif": {
+      "sha256": "44865e2b5a4da9f438de82098655622b0d4eb3a322683754e8f9b678b3433a86",
+      "bytes": 596755
+    },
+    "Data\\meshes\\dlc02\\clothes\\darkelf\\f\\hood_0.nif": {
+      "sha256": "91ae6e0817691369bc4c403a81a0e9e767c6986e98c9fcc3f822adbb3769dade",
+      "bytes": 31390
+    },
+    "Data\\meshes\\dlc02\\clothes\\darkelf\\f\\hood_1.nif": {
+      "sha256": "63372137f76ba31c1198cd52a770181a017c2ce21337f1832092b20be8f1d890",
+      "bytes": 31390
+    },
+    "Data\\meshes\\dlc02\\clothes\\darkelf\\f\\hoodargkhaj_0.nif": {
+      "sha256": "547fbf2c09d9f012a01ad1b099a0cbfd49c95be1302014d5ae3e5c82f39f021a",
+      "bytes": 31404
+    },
+    "Data\\meshes\\dlc02\\clothes\\darkelf\\f\\hoodargkhaj_1.nif": {
+      "sha256": "c1d35b737a554e0f8aedbcc8e43197c9e05b0bb9334c37b1de089955646528db",
+      "bytes": 31404
+    },
+    "Data\\meshes\\dlc02\\clothes\\miraakrobes\\miraakskinhider.nif": {
+      "sha256": "4332c62668878533dfdacc2171c9670a0687fe7b58ac33853cfcc0bc3e3ca8f7",
+      "bytes": 4647
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(01f)_Variant1.tri": {
+      "sha256": "065d1633e28e8dd3997047c7741c94a0bfe7acff5c977d4014e8dcf612835430",
+      "bytes": 2589917
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(03f)_Variant.tri": {
+      "sha256": "fea119e717769cd889e3bb1105d45d27b7f3c6dd5a9970619ae9aac6ef06f7d4",
+      "bytes": 3911521
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(04f)_Variant.tri": {
+      "sha256": "8c41473b201cf1e673ef0c98b6958091ef20d258dbb91909b7ec43c84dcfe570",
+      "bytes": 2829989
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(05f)_MageRobe.tri": {
+      "sha256": "e54d3b9946c5f89223ef9facc4f4f4f251b51eedf13c48e6b508d089a3f65128",
+      "bytes": 648507
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(1f)_Romper.tri": {
+      "sha256": "065d1633e28e8dd3997047c7741c94a0bfe7acff5c977d4014e8dcf612835430",
+      "bytes": 2589917
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(2f)_Adventurer.tri": {
+      "sha256": "9707565f8000c627af1503f74a0e0ff5f9465b18d88a80f925d5c7ddf5c0183c",
+      "bytes": 3054583
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(2f)_variant1.tri": {
+      "sha256": "9707565f8000c627af1503f74a0e0ff5f9465b18d88a80f925d5c7ddf5c0183c",
+      "bytes": 3054583
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(3f)_Cleric.tri": {
+      "sha256": "fea119e717769cd889e3bb1105d45d27b7f3c6dd5a9970619ae9aac6ef06f7d4",
+      "bytes": 3911521
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_(4f)_MageDress.tri": {
+      "sha256": "8c41473b201cf1e673ef0c98b6958091ef20d258dbb91909b7ec43c84dcfe570",
+      "bytes": 2829989
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_ApprenticeAlt_F.tri": {
+      "sha256": "6c9712bc5e5d13b535e17c96086b75b6e0dc34242cedee5f971378af0151c676",
+      "bytes": 707883
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_ApprenticeAlt_F_Variant.tri": {
+      "sha256": "6c9712bc5e5d13b535e17c96086b75b6e0dc34242cedee5f971378af0151c676",
+      "bytes": 707883
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_BrelynaOutfit.tri": {
+      "sha256": "5ded5391d3867619a4822fef0e76facf72a8d073157f52f1a018133da21fe779",
+      "bytes": 754319
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_HighPriest_F.tri": {
+      "sha256": "fcf84440af1105a1853115cdb17354a8832b60cc88b7ec947ef0ccb45094bc94",
+      "bytes": 865931
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_HighPriest_F_Black.tri": {
+      "sha256": "fcf84440af1105a1853115cdb17354a8832b60cc88b7ec947ef0ccb45094bc94",
+      "bytes": 865931
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_JourneymanRobe_F.tri": {
+      "sha256": "29dafb73f50dc72767252a98946c4469e7f86763c68f8cdd904ac017e92590c2",
+      "bytes": 660020
+    },
+    "Data\\meshes\\MCE\\Clothing\\F\\0MCE_JourneymanRobe_F_Orange.tri": {
+      "sha256": "29dafb73f50dc72767252a98946c4469e7f86763c68f8cdd904ac017e92590c2",
+      "bytes": 660020
+    },
+    "Data\\meshes\\pulcharmsolis\\rhino beetle\\armorloinclothm_0.nif": {
+      "sha256": "f49c7ac6de2a29cc576f5bff928e6b6a2e95f306fa8318405c74616c4332f607",
+      "bytes": 1218034
+    },
+    "Data\\meshes\\pulcharmsolis\\rhino beetle\\armorloinclothm_1.nif": {
+      "sha256": "19d7611b6f1ca84ba7cdb692647415f7c1ab461a6c56d4a0414082ecc7e309ee",
+      "bytes": 1218034
+    },
+    "Data\\meshes\\surarmorcustommeshes\\agileoutfitnewv2.nif": {
+      "sha256": "f77f78db495bcf1d0ca033161aedaa268d53951093b567c0959b2564f88693aa",
+      "bytes": 255126
+    },
+    "Data\\meshes\\surarmorcustommeshes\\kidtestarmor5v2.nif": {
+      "sha256": "0eccfa2fa09c829f5d0eaf457d57e4f0ed5cbb7fc70e9c950fe4024ff498c18f",
+      "bytes": 188087
+    },
+    "Data\\meshes\\surarmorcustommeshes\\redf_0.nif": {
+      "sha256": "dca6cede8b85397acaf74556e18a7c17b24b4a878ababe2efd57dc7a32749e49",
+      "bytes": 249756
+    },
+    "Data\\meshes\\surarmorcustommeshes\\sets\\bearrobef\\bearrobev2journey_1.nif": {
+      "sha256": "b12323c1fa7fad1756a094c5edabeebc8bd2cba96487e0d5a72ef7369fcef4e2",
+      "bytes": 417865
+    },
+    "Data\\meshes\\surarmorcustommeshes\\sets\\fancynofur\\femnofur_0.nif": {
+      "sha256": "9ac768db2673299b60b8db284dd356961a8541d0f529961964edfc2eb5401ce8",
+      "bytes": 154255
+    },
+    "Data\\meshes\\surarmorcustommeshes\\sets\\fancynofur\\femnofur_1.nif": {
+      "sha256": "315a33c3554c5ddbfdd25602248164839669ce8330427005e619380cc381abb8",
+      "bytes": 154255
+    },
+    "Data\\meshes\\surarmorcustommeshes\\sets\\nora\\noratest_1.nif": {
+      "sha256": "d393034d678a8bf3d01cbd5338021dbad5836721faac533c44bf9130cee230b6",
+      "bytes": 178281
+    },
+    "Data\\meshes\\surarmorcustommeshes\\warmfarm04f_1.nif": {
+      "sha256": "28e90fea972d9cbcd8d06641b8eeb8dccdec2fce28ac73e7a73fb480a9b09200",
+      "bytes": 224885
+    },
+    "Data\\meshes\\surarmorcustommeshes\\windhelmchefoutfit_1.nif": {
+      "sha256": "c0cd2f1c704dce52b0bb58f3aa14b70dd965ea2a812ad60f099573f1524210f8",
+      "bytes": 281076
+    },
+    "Data\\meshes\\surwhiterunmeshes\\outfit_0.nif": {
+      "sha256": "d8f880771cb54000f57e32c8ad40f0168ab7c2e6c1f521bcd6679caa5f7a24f6",
+      "bytes": 284438
+    },
+    "Data\\meshes\\surwhiterunmeshes\\outfit_1.nif": {
+      "sha256": "1311670c9f428e84b6b3c36d769a8a5e65207d392d8e74cb571fde827a9247e3",
+      "bytes": 284438
+    },
+    "Data\\meshes\\surwhiterunmeshes\\outfitsbyme\\witchoutfitv4.nif": {
+      "sha256": "79e738d56865e642c5559d437c0bfb4fd28271dfcb0656c2707af6e7b6ee1125",
+      "bytes": 267299
+    },
+    "Data\\meshes\\weapons\\kzl\\kzl_haybale.nif": {
+      "sha256": "88c2739744b8fc951f103eedea30ccfa9a83cc525dfc5d349c56054c7798c6c3",
+      "bytes": 44541
+    },
+    "Data\\Scripts\\dlc1vcmoondialscript.pex": {
+      "sha256": "2d7e95907fbbcb0f77f572de47fbf597d5839a61143fb8991809a5d158db921e",
+      "bytes": 2513
+    },
+    "Data\\Scripts\\dlc1vcmoondialtilescript.pex": {
+      "sha256": "8baf9edb6163c22ba538722be130e9b0e78d9c84db2866291b756dbf7c3294a2",
+      "bytes": 2348
+    },
+    "Data\\Scripts\\IED.pex": {
+      "sha256": "c34a67ff90dfbbbcb3c8b75b2519eceeeaae46f8e3eb9c8a4761d7c28928d8a5",
+      "bytes": 8569
+    },
+    "Data\\Scripts\\MCM.pex": {
+      "sha256": "050fe0f297ce7d0e7a3a03ea250b76171af80aa10e4f153d6825cd58795bc270",
+      "bytes": 1155
+    },
+    "Data\\Scripts\\MCM_ConfigBase.pex": {
+      "sha256": "0bf7f4e533da9e784dad8f70fadac99f5830e9a70a4ec6489e5679f489ea7d85",
+      "bytes": 2143
+    },
+    "Data\\Scripts\\rp_trapcactusscript.pex": {
+      "sha256": "8f77245e2fa22ba01beafac6fbcc0ca1021d8f6503ff0d38194023af5a584085",
+      "bytes": 1454
+    },
+    "Data\\Scripts\\wbptlightonscript.pex": {
+      "sha256": "94798614b377c39c17c4d6c7255b2ef643c9e668866ab6251d6f2796f1e0a8b5",
+      "bytes": 614
+    },
+    "Data\\Scripts\\wbptlightswitchscript.pex": {
+      "sha256": "38df39d3b6484f52544f512821698a35218f504829fbaf5ea109ca13a14b60b6",
+      "bytes": 1115
+    },
+    "Data\\SKSE\\Plugins\\ImGuiVRHelper.toml": {
+      "sha256": "47227445942047319f53a81d8bb7efbe08b60befed5ad1380125d4f65adb005c",
+      "bytes": 3035
+    },
+    "Data\\SKSE\\Plugins\\TrueHUD\\RP_Bosses.ini": {
+      "sha256": "5d1ed5a18a6d6186be30697c55e0d70cf18dd357fad3347928d6773165ac033b",
+      "bytes": 2824
+    },
+    "Data\\textures\\actors\\character\\facegendata\\facetint\\fishinginskyrim.esp\\00025905.tga": {
+      "sha256": "985de6c1bdc6f3109cf37d724e839d00dde23daeadf5b02739c328b94a50668c",
+      "bytes": 1048594
+    },
+    "Data\\textures\\actors\\character\\facegendata\\facetint\\fishinginskyrim.esp\\0002A07C.tga": {
+      "sha256": "e8cdf0c79d2242fb47c035ded7c2daf3fad1d9a343d7f0ac732fd1f1bd016e23",
+      "bytes": 1048594
+    },
+    "Data\\textures\\architecture\\riften\\riftencanalwood01.dds": {
+      "sha256": "235fa7a09122c2abb473d17cc0820587cb6a4485d73d17eefb730331f59e1ff6",
+      "bytes": 2796344
+    },
+    "Data\\textures\\Elysium Estate\\AARS\\openbook\\largebookpaper03.dds": {
+      "sha256": "ef2f59516f5ce555f1c16e6d44c28a478540d51d4985dfe3565c0be9d79d5f31",
+      "bytes": 262272
+    }
+  }
+}
