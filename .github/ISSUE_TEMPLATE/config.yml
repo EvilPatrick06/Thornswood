@@ -1,8 +1,11 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: A security hole
-    url: https://github.com/EvilPatrick06/Thornswood/security/advisories/new
-    about: Report it privately, never as an issue. SECURITY.md says how.
-  - name: A tester's report
+    url: https://github.com/EvilPatrick06/Thornswood/blob/main/SECURITY.md
+    about: Never as an issue, which everybody can read. SECURITY.md says where to send it quietly.
+  - name: Somebody behaving badly
     url: https://thornswood.net/report
-    about: Testers report on the site or in the Discord, not here.
+    about: Report a person on the site's report page, signed in, never as an issue.
+  - name: A question, or help to join
+    url: https://thornswood.net/discord
+    about: Ask in the Discord. Joining is decided there, not here.

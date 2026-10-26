@@ -45,7 +45,7 @@ yes('the table has rows to compare (' + rows.length + ')', rows.length >= 8);
 
 // ------------------------------------------------------------ the template's list
 const tpl = read('.github/pull_request_template.md');
-const sec = /## Which parts it touches[^\n]*\n([\s\S]*?)\n## /.exec(tpl);
+const sec = /#{2,3} Which parts it touches[^\n]*\n([\s\S]*?)\n#{2,3} /.exec(tpl);
 yes('the template has its "Which parts it touches" section', sec !== null);
 const body = sec ? sec[1] : '';
 const boxes = body.split('\n').filter(function (l) { return /^- \[ \] /.test(l); });

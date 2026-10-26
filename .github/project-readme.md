@@ -19,7 +19,7 @@ is not going to get done.
 ## Working on it
 
 - Assign yourself when you start, and move the card to In Progress.
-- Found something new? Open an issue with the Work to do template and give it
+- Found something new? Open an issue with the Work for the team form and give it
   the Order of where it belongs (52.5 between 52 and 53 is fine), not the end.
 - Something that fits an existing issue goes on that issue as an edit or a
   comment, not a second issue.
