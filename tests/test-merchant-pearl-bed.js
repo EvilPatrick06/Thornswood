@@ -35,7 +35,7 @@ function setup() {
   withinResourceReach:()=>true,FISH_TUNING:{cooldownMs:{expert:3600000},yieldByStep:{2:[3,3]}},
   RANK_LADDER:['novice','advanced','expert','master'],rankStep:()=>standing==='expert'?2:0,rankWord:v=>v,
   waitWord:v=>String(v),randInt:()=>3,addItemsAtomic:()=>{normalGrants++;return true;},
-  creditWork:()=>{credit++;return '';},wearTool:()=>{worn++;return '';}});
+  creditWork:()=>{credit++;return '';},economyGathered:()=>{},wearTool:()=>{worn++;return '';}});
  vm.runInContext(gm.slice(at,end),w.ctx);
  const fish=()=>w.ctx.fish(500,6000,doc.sources[0].base),take=()=>w.svc.act(500,'take','pearl',null,7000);
  return {w,fish,take,deadlines,stock,standing:v=>{standing=v;},tool:v=>{tool=v;},

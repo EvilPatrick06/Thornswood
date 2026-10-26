@@ -211,7 +211,7 @@ if (harvestFn && plantAtFn && HARVESTS_BY_BASE && HARVESTS) {
     const harvest = new Function(
       'classGate', 'rankStep', 'rankWord', 'RANK_LADDER', 'addItem', 'creditWork',
       'isCrop', 'plantAt', 'lastUse', 'stampCooldown', 'HARVEST_COOLDOWN_MS', 'Date',
-      harvestFn + '\nreturn harvest;'
+      'function economyGathered() { }\n' + harvestFn + '\nreturn harvest;'
     )(
       classGate,
       rankStep,

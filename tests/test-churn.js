@@ -187,7 +187,7 @@ function world(opts) {
     'farmActivate', 'isFish', 'fish', 'isGame', 'game', 'isChickenNest', 'collectEgg',
     'isPlant', 'harvest', 'ALLOW',
     'isVein', 'mineOre', 'loot', 'milk', 'log', 'ITEMS', 'floraHanded', 'isHive', 'hive'];
-  const body = "'use strict';\n" +
+  const body = "'use strict';\n" + 'function economyGathered() { }\n' +
     [parts.coolBlock, parts.waitLine, parts.churnsLine,
      parts.waitWord, parts.isChurn, parts.churn].filter(Boolean).join('\n') + '\n' +
     'const onActivate = ' + (parts.handler || 'null') + ';\n' +

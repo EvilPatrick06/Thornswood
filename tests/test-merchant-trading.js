@@ -520,6 +520,9 @@ assert.equal(cooldownPanel.api.recover().length,0,'unchanged recovery retains th
 cooldownPanel.world.actors[10].lifeGeneration=1;
 assert.deepEqual(cooldownPanel.api.recover(),[],'recovery retires the obsolete session without closing a replacement runtime');
 
+// Each trade that went through is told to the hold economy (#3164), once.
+const tradedRows = [];
+box.deps.traded = (row) => tradedRows.push(row);
 let sold = box.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'sell', '2', 'Iron', 'Ingot'] });
 assert.match(sold.text, /Sold 2/);
 assert.equal(box.purses.prepare(1).purse, 244);
@@ -547,6 +550,15 @@ assert.equal(box.world.inv[10][100], 7);
 let bare = box.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'buy', '5', 'Iron', 'Ingot'] });
 assert.match(bare.text, /empty/);
 assert.equal(box.purses.prepare(1).stock[0].count, 1);
+assert.deepEqual(tradedRows, [
+  { hold: 'whiterun', verb: 'sell', baseId: 100, name: 'Iron Ingot', count: 2 },
+  { hold: 'whiterun', verb: 'buy', baseId: 100, name: 'Iron Ingot', count: 1 }
+], 'the hold economy hears each trade that went through and none that was refused (#3164)');
+box.deps.traded = () => { throw new Error('the count failed'); };
+let countless = box.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'buy', '1', 'Iron', 'Ingot'] });
+assert.match(countless.text, /Bought 1/, 'a hold economy count that throws never stops the trade (#3164)');
+assert.equal(box.purses.prepare(1).stock.length, 0);
+delete box.deps.traded;
 
 let off = service({ on: false }, 250);
 open(off.api);

@@ -170,6 +170,7 @@ const box = {
   toolGate: function () { return null; },
   rankStep: function () { return 0; },
   creditWork: function () { return null; },
+  economyGathered: function () { },
   wearTool: function () { return null; },
   addItem: function (actorId, desc, n) {
     const id = idOf(desc);

@@ -770,11 +770,21 @@ function goldDescriptors(text) {
       writes nothing.
     */
     const names = bodyOf('property/itemName') || '';
-    const inNames = function (name) { return (names.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length; };
-    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box only for a name',
+    /*
+      And the hold economy's names (#3164): recordNames reads the two tables
+      to name a counted record on staff's page, the same one way round as the
+      drop box, and hands nothing out.
+    */
+    const counted = bodyOf('hold economy/recordNames') || '';
+    const inNames = function (name) {
+      return (names.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length +
+             (counted.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length;
+    };
+    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box and the hold economy only for a name',
         refs('ITEM_NAMES') === (build.match(/\bITEM_NAMES\b/g) || []).length + inNames('ITEM_NAMES') &&
         refs('ADMIN_ITEMS') === (build.match(/\bADMIN_ITEMS\b/g) || []).length + inNames('ADMIN_ITEMS') &&
-        refs('ADMIN_ITEMS') > 0 && !!names && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names));
+        refs('ADMIN_ITEMS') > 0 && !!names && !!counted &&
+        !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names) && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(counted));
     yes('ADMIN_ACTORS is read by the /spawn index and nothing else',
         refs('ADMIN_ACTORS') > 0 && refs('ADMIN_ACTORS') === (beasts.match(/\bADMIN_ACTORS\b/g) || []).length);
     yes('and /give and /spawn still refuse anybody who is not a playtester',

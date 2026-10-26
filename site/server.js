@@ -574,9 +574,10 @@ const BOARDS = {
    The page now matches the doors behind it. The linked accounts are 'staff'
    since #1010, because that page is where staff ban, PK and write notes, and
    every staff role may. The other two stay 'admin': the play sessions and
-   the report inbox. */
+   the report inbox. The hold economy is 'staff' (#3164, Patrick, 22 Oct:
+   staff's hold economy view is a staff page on the hub). */
 const LEVEL = {
-  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin', economy: 'staff'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -1365,7 +1366,8 @@ const PAGES = {
   '/uploads':     'uploads',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/inbox':       'inbox'
+  '/inbox':       'inbox',
+  '/economy':     'economy'
 };
 
 /*
@@ -3692,6 +3694,73 @@ const ROSTER = path.join(DATA, 'roster.json');
 // How old a server's report of which characters it holds may be and still be
 // passed on (#955). It is sent every five minutes; an hour covers a restart.
 const ROSTER_HELD_FRESH_MS = 60 * 60 * 1000;
+
+/*
+  WHAT EACH HOLD GATHERS, MAKES AND TRADES (#3164), for the hub's Hold economy
+  page. Each game server counts it (the hold economy block in
+  game\gamemode.js) and sends the whole of what it keeps every five minutes,
+  POST /api/economy with the door key; the dev server's door names the site
+  with /dev, so its count lands on /dev/api/economy. Kept per server and
+  replaced whole on each push, so this file holds what the game server holds
+  and never more, and days past ECONOMY_KEEP_DAYS go on every write and read.
+  A row is a day, a hold, a kind, an item and a count: nothing about anybody.
+*/
+const ECONOMY = path.join(DATA, 'economy.json');
+const ECONOMY_KINDS = ['gathered', 'crafted', 'bought', 'sold', 'hauled'];
+const ECONOMY_HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                       'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock', 'elsewhere'];
+const ECONOMY_KEEP_DAYS = 30;
+const ECONOMY_MOST = 1000000000;
+/* The box's own date, the day the game server counts a row on (same box). */
+function economyDay(t) {
+  const d = new Date(t);
+  const two = (n) => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate());
+}
+/* One server's count held to its shape: anything else is left out. */
+function cleanEconomy(o, now) {
+  const out = { at: 0, today: '', keepDays: ECONOMY_KEEP_DAYS, days: {}, names: {} };
+  if (!o || typeof o !== 'object') return out;
+  out.at = Number(o.at) > 0 ? Number(o.at) : 0;
+  out.today = /^\d{4}-\d{2}-\d{2}$/.test(String(o.today || '')) ? String(o.today) : '';
+  const cut = economyDay((Number(now) || Date.now()) - (ECONOMY_KEEP_DAYS - 1) * 86400000);
+  const days = (o.days && typeof o.days === 'object') ? o.days : {};
+  const names = (o.names && typeof o.names === 'object') ? o.names : {};
+  const has = (x, k) => Object.prototype.hasOwnProperty.call(x, k);
+  for (const day of Object.keys(days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < cut) continue;
+    const holds = days[day];
+    if (!holds || typeof holds !== 'object') continue;
+    for (const hold of Object.keys(holds)) {
+      if (ECONOMY_HOLDS.indexOf(hold) < 0) continue;
+      const kinds = holds[hold];
+      if (!kinds || typeof kinds !== 'object') continue;
+      for (const kind of ECONOMY_KINDS) {
+        const items = kinds[kind];
+        if (!items || typeof items !== 'object') continue;
+        for (const key of Object.keys(items)) {
+          const n = items[key];
+          if (!key || key.length > 120 || key === '__proto__' || !Number.isSafeInteger(n) || n <= 0) continue;
+          const row = ((out.days[day] = out.days[day] || {})[hold] = out.days[day][hold] || {});
+          (row[kind] = row[kind] || {})[key] = Math.min(n, ECONOMY_MOST);
+          const nm = has(names, key) && typeof names[key] === 'string' ? names[key].slice(0, 120) : '';
+          out.names[key] = nm || key;
+        }
+      }
+    }
+  }
+  return out;
+}
+/* Every server's count as kept now, aged on the way out as well as in. */
+function economyNow(now) {
+  const store = jsonFile(ECONOMY, { servers: {} });
+  const servers = (store && store.servers && typeof store.servers === 'object') ? store.servers : {};
+  const out = {};
+  for (const srv of ['main', 'dev']) {
+    if (servers[srv]) out[srv] = cleanEconomy(servers[srv], now);
+  }
+  return out;
+}
 
 /* How many character slots this person gets at the game's main menu. */
 function slotsFor(st) {
@@ -7970,6 +8039,29 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true, merged: n, total: Object.keys(store.who).length });
   }
 
+  /*
+    A game server's hold economy count (#3164), whole, with the door key, the
+    roster's way: the dev server's door names the site with /dev, so its count
+    comes in on /dev/api/economy and is kept apart from main's.
+  */
+  if ((route === '/api/economy' || route === '/dev/api/economy') && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { passBodyFailure(e); }
+    if (!sameSecret(String(o.key || ''), String(cfg.botKey))) return sendJson(res, 401, { error: 'no' });
+    const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
+    const now = Date.now();
+    const kept = cleanEconomy(Object.assign({}, o, { at: now }), now);
+    const store = jsonFile(ECONOMY, { servers: {} });
+    const servers = (store && store.servers && typeof store.servers === 'object') ? store.servers : {};
+    servers[srv] = kept;
+    for (const other of Object.keys(servers)) {
+      if (other !== srv) servers[other] = cleanEconomy(servers[other], now);
+    }
+    if (!putJson(ECONOMY, { servers })) return sendJson(res, 500, { error: 'could not save' });
+    return sendJson(res, 200, { ok: true, server: srv, days: Object.keys(kept.days).length });
+  }
+
   if (p === '/api/play/roster' && req.method === 'POST') {
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
@@ -8448,6 +8540,12 @@ async function handle(req, res) {
         sessions: w.admin ? sessionRows() : [],
         inbox: w.admin ? trimInbox(jsonFile(INBOX, []), Date.now()) : []
       });
+    }
+
+    /* The hub's Hold economy page (#3164): staff, the same as the page. */
+    if (p === '/api/economy' && req.method === 'GET') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      return sendJson(res, 200, { keepDays: ECONOMY_KEEP_DAYS, servers: economyNow(Date.now()) });
     }
 
     if (p === '/api/results' && req.method === 'PUT') {

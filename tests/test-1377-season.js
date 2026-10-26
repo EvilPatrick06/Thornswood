@@ -273,7 +273,7 @@ if (hiveSrc && isHiveSrc) {
   const hives = src.slice(src.indexOf('const HIVES = {'), src.indexOf('function isHive('));
   hiveApi = new Function(
     'classGate', 'addItem', 'creditWork', 'cooldownLeft', 'stampCooldown', 'waitWord', 'ITEMS', 'HARVEST_COOLDOWN_MS',
-    hives + '\n' + isHiveSrc + '\n' + hiveSrc + '\nreturn { hive: hive, isHive: isHive, HIVES: HIVES };'
+    'function economyGathered() { }\n' + hives + '\n' + isHiveSrc + '\n' + hiveSrc + '\nreturn { hive: hive, isHive: isHive, HIVES: HIVES };'
   )(
     function (actorId) { return actorId === 2 ? 'Only a farmer can bring a crop in. Ask one.' : null; },
     function (actorId, desc, n) { hiveApi && hiveApi.given.push({ actorId: actorId, desc: desc, n: n }); return true; },

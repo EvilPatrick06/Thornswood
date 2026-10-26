@@ -196,7 +196,7 @@ function server() {
     'isPlant', 'harvest', 'putBack', 'isVein', 'mineOre',
     'isCarcass', 'HUNTS_BY_BASE', 'classGate', 'swingEnd'
   ];
-  const body = allowM[0] + '\n' + halfGate + '\n' + gateHalf + '\n' + benchGate + '\n' +
+  const body = 'function economyGathered() { }\n' + allowM[0] + '\n' + halfGate + '\n' + gateHalf + '\n' + benchGate + '\n' +
     loot + '\n' + chopping + '\n' +
     'globalThis.__thornswoodCharacter = { gateHalf: gateHalf };\n' +
     handler + '\n' +

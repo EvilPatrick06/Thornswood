@@ -549,3 +549,15 @@ tr.adder .plus{color:var(--faint);font-size:16px;line-height:38px}
   color: var(--gold);
 }
 .formfoot-center.formfoot { justify-content: center; }
+
+/* ----------------------------------------------- the hold economy (#3164) -- */
+table.econ th.num,table.econ td.num{text-align:right}
+table.econ td .cell{cursor:default}
+table.econ td .cell:hover{background:none}
+table.econ .share{font-size:12px;color:var(--dim);margin-left:4px}
+.econhold>summary{grid-template-columns:minmax(0,1fr) auto 12px}
+.econbody{padding:0 0 10px}
+.econbody .section-label{padding:14px 19px 6px;margin:0}
+@media(max-width:640px){
+  table.econ th.num,table.econ td.num{text-align:left}
+}

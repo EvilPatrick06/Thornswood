@@ -23,7 +23,8 @@ var S = {
 
 var ROUTES = {
   '/hub':'home',
-  '/uploads':'uploads', '/linked':'linked', '/sessions':'sessions', '/inbox':'inbox'
+  '/uploads':'uploads', '/linked':'linked', '/sessions':'sessions', '/inbox':'inbox',
+  '/economy':'economy'
 };
 var PATHS = {};
 Object.keys(ROUTES).forEach(function (u) { PATHS[ROUTES[u]] = u; });
@@ -40,7 +41,8 @@ var ABOUT = {
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
                'Open one for every session they have had, with its logs and ' +
-               'what they said in it.'
+               'what they said in it.',
+  economy:     'What each hold gathers, makes and trades, counted in pieces, so a hold out of balance shows.'
 };
 
 /* Hub trimmed (#433): Gallery, Sessions, Linked Accounts, Inbox. Issue
@@ -48,7 +50,7 @@ var ABOUT = {
    No site theme/appearance prefs. */
 var GROUPS = [
   { label:'',     keys:['home'] },
-  { label:'Hub',  keys:['uploads','sessions','linked','inbox'] }
+  { label:'Hub',  keys:['uploads','sessions','linked','inbox','economy'] }
 ];
 
 var el = function (id) { return document.getElementById(id); };
@@ -63,6 +65,7 @@ function label(k) {
   if (k === 'inbox') return 'Inbox';
   if (k === 'linked') return 'Linked accounts';
   if (k === 'sessions') return 'Play sessions';
+  if (k === 'economy') return 'Hold economy';
   return S.titles[k] || k;
 }
 /* The level the server sent for this page, against who the server says we are.
@@ -1563,6 +1566,7 @@ function draw() {
   if (S.at === 'link')    return drawLink();
   if (S.at === 'linked')  return drawLinked();
   if (S.at === 'sessions') return drawSessions();
+  if (S.at === 'economy') return drawEconomy();
   if (isBoard(S.at))      return drawBoard();
   if (S.editing)          return drawEdit();
   drawDoc();
@@ -1584,6 +1588,235 @@ function saidNow(t) {
   if (!s) return;
   s.textContent = t;
   if (t === 'saved') setTimeout(function () { if (el('said') === s) s.textContent = ''; }, 1600);
+}
+
+/* ------------------------------------------------------------- economy -- */
+/*
+  WHAT EACH HOLD GATHERS, MAKES AND TRADES (#3164). Patrick, 22 Oct: staff's
+  hold economy view is a staff page on the hub. Each game server counts the
+  pieces gathered, crafted, bought from and sold to the hold's traders, and
+  the hauls between holds, by the day and the hold, and sends them here every
+  five minutes; GET /api/economy hands them to staff. Items have no gold
+  price on this server, so it is pieces, never value.
+
+  Shaped like the question asked of it, which hold is out of step: the table
+  is one row a hold, each count beside its share of every hold's, and a card
+  a hold under it with what was counted. The item box narrows all of it to
+  one good, so "where does the iron ore come from" is one word typed.
+
+  Fetched when the page opens rather than with /api/all: thirty days of
+  counts is the biggest answer the hub reads, and most visits never open it.
+*/
+var EFIND = { srv: 'main', span: '7', q: '' };
+var ECON = null;
+var ECON_HOLDS = [
+  ['whiterun', 'Whiterun'], ['solitude', 'Haafingar (Solitude)'], ['riften', 'The Rift (Riften)'],
+  ['markarth', 'The Reach (Markarth)'], ['windhelm', 'Eastmarch (Windhelm)'], ['falkreath', 'Falkreath'],
+  ['morthal', 'Hjaalmarch (Morthal)'], ['dawnstar', 'The Pale (Dawnstar)'], ['winterhold', 'Winterhold'],
+  ['ravenrock', 'Solstheim (Raven Rock)'], ['elsewhere', 'No hold']
+];
+var ECON_KINDS = [
+  ['gathered', 'Gathered'], ['crafted', 'Crafted'], ['bought', 'Bought from traders'],
+  ['sold', 'Sold to traders'], ['hauled', 'Hauls out'], ['hauledIn', 'Hauls in']
+];
+function econHoldName(h) {
+  for (var i = 0; i < ECON_HOLDS.length; i++) if (ECON_HOLDS[i][0] === h) return ECON_HOLDS[i][1];
+  return h;
+}
+
+/* The days the span covers, counted back from the server's own today. */
+function econDays(srv, span) {
+  var today = srv.today || '';
+  var days = Object.keys(srv.days || {}).sort();
+  if (!today) today = days.length ? days[days.length - 1] : '';
+  if (!today) return [];
+  var n = Number(span) || 1;
+  var t = Date.parse(today + 'T12:00:00Z');
+  var want = {};
+  for (var i = 0; i < n; i++) want[new Date(t - i * 86400000).toISOString().slice(0, 10)] = true;
+  return days.filter(function (d) { return want[d]; });
+}
+
+/*
+  The counts of one server over some days, added up: per hold, per kind, per
+  item key. Hauls are counted where they left; Hauls in is the same hauls read
+  from the other end, keyed by the hold they came from.
+*/
+function econSum(srv, days, q) {
+  var out = {};
+  ECON_HOLDS.forEach(function (h) { out[h[0]] = {}; });
+  var names = srv.names || {};
+  var match = function (kind, key) {
+    if (!q) return true;
+    var shown = kind === 'hauled' ? econHoldName(key) : (names[key] || key);
+    return String(shown).toLowerCase().indexOf(q) >= 0;
+  };
+  days.forEach(function (d) {
+    var holds = srv.days[d] || {};
+    Object.keys(holds).forEach(function (h) {
+      if (!out[h]) return;
+      ECON_KINDS.forEach(function (k) {
+        var items = (holds[h] || {})[k[0]];
+        if (!items) return;
+        Object.keys(items).forEach(function (key) {
+          if (!match(k[0], key)) return;
+          var n = Number(items[key]) || 0;
+          var row = out[h][k[0]] = out[h][k[0]] || {};
+          row[key] = (row[key] || 0) + n;
+          if (k[0] === 'hauled' && out[key]) {
+            var back = out[key].hauledIn = out[key].hauledIn || {};
+            back[h] = (back[h] || 0) + n;
+          }
+        });
+      });
+    });
+  });
+  return out;
+}
+function econTotal(items) {
+  var n = 0;
+  Object.keys(items || {}).forEach(function (k) { n += items[k]; });
+  return n;
+}
+
+function loadEconomy() {
+  ECON = { loading: true };
+  api('/api/economy').then(function (r) {
+    if (!r.ok) throw new Error('the site answered ' + r.status);
+    return r.json();
+  }).then(function (d) {
+    ECON = { servers: (d && d.servers) || {}, keepDays: (d && d.keepDays) || 30 };
+    if (S.at === 'economy') drawEconomy();
+  }).catch(function (e) {
+    // Said in the page, never shown as an empty economy (#2736).
+    ECON = { failed: String((e && e.message) || e) };
+    if (S.at === 'economy') drawEconomy();
+  });
+}
+
+function drawEconomy() {
+  if (!ECON) loadEconomy();
+  var out = head('<button class="btn" id="ereload">Read again</button>') +
+    '<div class="bar bar-mb-16">' +
+      '<select id="esrv" aria-label="Server">' +
+        [['main', 'Main server'], ['dev', 'Dev server']].map(function (o) {
+          return '<option value="' + o[0] + '"' + (EFIND.srv === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') +
+      '</select>' +
+      '<select id="espan" aria-label="Days">' +
+        [['1', 'Today'], ['7', 'The last 7 days'], ['30', 'The last 30 days']].map(function (o) {
+          return '<option value="' + o[0] + '"' + (EFIND.span === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') +
+      '</select>' +
+      '<input type="search" id="efind" value="' + esc(EFIND.q) + '" placeholder="One good, or a hold for hauls: iron ore, wheat, Riften">' +
+    '</div>';
+
+  if (!ECON || ECON.loading) {
+    el('page').innerHTML = out + '<div class="empty">Reading the counts.</div>';
+    return wireEconomy();
+  }
+  if (ECON.failed) {
+    el('page').innerHTML = out + '<div class="empty">The counts could not be read: ' + esc(ECON.failed) +
+      '. Read again, or reload the page if you were signed out.</div>';
+    return wireEconomy();
+  }
+  var srv = ECON.servers[EFIND.srv];
+  if (!srv || !Object.keys(srv.days || {}).length) {
+    el('page').innerHTML = out + '<div class="empty">Nothing counted on the ' +
+      (EFIND.srv === 'dev' ? 'dev' : 'main') + ' server yet. Its game server sends what it has ' +
+      'counted every five minutes once something is gathered, made or traded.</div>';
+    return wireEconomy();
+  }
+
+  var q = EFIND.q.trim().toLowerCase();
+  var days = econDays(srv, EFIND.span);
+  var sum = econSum(srv, days, q);
+  var all = {};
+  ECON_KINDS.forEach(function (k) {
+    all[k[0]] = 0;
+    ECON_HOLDS.forEach(function (h) { all[k[0]] += econTotal(sum[h[0]][k[0]]); });
+  });
+  var at = srv.at ? new Date(srv.at).toLocaleString() : 'never';
+  out += '<div class="said said-show">Counted on the game server by the day it was done, ' +
+    days.length + (days.length === 1 ? ' day' : ' days') + ' with counts in this span. ' +
+    'Last sent ' + esc(at) + '. Kept ' + esc(String(ECON.keepDays)) + ' days.</div>';
+
+  /* One row a hold. Each count has its share of every hold's beside it,
+     which is the number that says one hold is doing all of it. */
+  out += '<div class="tablewrap"><table class="board econ"><thead><tr><th>Hold</th>' +
+    ECON_KINDS.map(function (k) { return '<th class="num">' + esc(k[1]) + '</th>'; }).join('') +
+    '</tr></thead><tbody>';
+  ECON_HOLDS.forEach(function (h) {
+    var row = sum[h[0]];
+    var any = ECON_KINDS.some(function (k) { return econTotal(row[k[0]]) > 0; });
+    if (h[0] === 'elsewhere' && !any) return;
+    out += '<tr><td data-label="Hold"><div class="cell">' + esc(h[1]) + '</div></td>' +
+      ECON_KINDS.map(function (k) {
+        var n = econTotal(row[k[0]]);
+        var share = all[k[0]] ? Math.round(n * 100 / all[k[0]]) : 0;
+        return '<td class="num" data-label="' + esc(k[1]) + '"><div class="cell">' + n +
+          (n ? ' <span class="share">' + share + '%</span>' : '') + '</div></td>';
+      }).join('') + '</tr>';
+  });
+  out += '</tbody></table></div>';
+
+  /* A card a hold, with what each count was made of, most first. */
+  var names = srv.names || {};
+  var cards = '';
+  ECON_HOLDS.forEach(function (h) {
+    var row = sum[h[0]];
+    var total = 0;
+    ECON_KINDS.forEach(function (k) { total += econTotal(row[k[0]]); });
+    if (!total) return;
+    var body = '';
+    ECON_KINDS.forEach(function (k) {
+      var items = row[k[0]] || {};
+      var keys = Object.keys(items).sort(function (a, b) { return items[b] - items[a] || String(a).localeCompare(String(b)); });
+      if (!keys.length) return;
+      body += '<div class="section-label">' + esc(k[1]) + ' &middot; ' + econTotal(items) + '</div>' +
+        '<div class="tablewrap"><table class="board econ"><thead><tr><th>' +
+        (k[0] === 'hauled' ? 'To' : k[0] === 'hauledIn' ? 'From' : 'Item') +
+        '</th><th class="num">Pieces</th></tr></thead><tbody>' +
+        keys.map(function (key) {
+          var shown = (k[0] === 'hauled' || k[0] === 'hauledIn') ? econHoldName(key) : (names[key] || key);
+          return '<tr><td data-label="' + (k[0] === 'hauled' ? 'To' : k[0] === 'hauledIn' ? 'From' : 'Item') +
+            '"><div class="cell">' + esc(shown) + '</div></td>' +
+            '<td class="num" data-label="Pieces"><div class="cell">' + items[key] + '</div></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    });
+    cards += '<details class="person econhold"><summary>' +
+      '<span class="pf"><span class="lab">Hold</span><span class="val nm">' + esc(h[1]) + '</span></span>' +
+      '<span class="pf"><span class="lab">Counted</span><span class="val hrs">' + total + ' pieces</span></span>' +
+      '<span class="chev" aria-hidden="true">&#9654;</span></summary>' +
+      '<div class="pbody econbody">' + body + '</div></details>';
+  });
+  out += cards
+    ? '<div class="section-label">By hold</div><div class="people">' + cards + '</div>'
+    : '<div class="empty">' + (q ? 'Nothing matches that in this span.' : 'Nothing was counted in this span.') + '</div>';
+
+  el('page').innerHTML = out;
+  wireEconomy();
+}
+
+function wireEconomy() {
+  var r = el('ereload');
+  if (r) r.onclick = function () { ECON = null; drawEconomy(); };
+  var s = el('esrv');
+  if (s) s.onchange = function () { EFIND.srv = s.value; drawEconomy(); };
+  var d = el('espan');
+  if (d) d.onchange = function () { EFIND.span = d.value; drawEconomy(); };
+  var f = el('efind');
+  if (f) {
+    f.oninput = function () {
+      EFIND.q = f.value;
+      clearTimeout(wireEconomy.t);
+      wireEconomy.t = setTimeout(function () {
+        drawEconomy();
+        var again = el('efind');
+        if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      }, 250);
+    };
+  }
 }
 
 /* ---------------------------------------------------------------- home -- */
@@ -1618,6 +1851,7 @@ function countFor(k) {
     return open ? open + ' waiting' : 'nothing waiting';
   }
   if (k === 'link')   return 'Discord decides';
+  if (k === 'economy') return 'per hold, the last 30 days';
   if (k === 'linked') return S.linked.length + ' linked';
   if (k === 'sessions') {
     var w = sessionTotals(S.sessions);
@@ -1642,7 +1876,7 @@ function drawHome() {
     '<div class="hero">' +
       '<img src="/logo.png" alt="Thornswood">' +
       '<div><h1>Hub</h1>' +
-      '<div class="sub">Gallery, sessions, linked accounts and the report inbox. ' +
+      '<div class="sub">Gallery, sessions, linked accounts, the report inbox and the hold economy. ' +
       'The public site is at <a href="/">thornswood.net</a>.</div></div>' +
     '</div>' +
     '<div class="rule"></div>';
@@ -1651,7 +1885,7 @@ function drawHome() {
   // a Gamemaster lands on a home page with Gallery on it and nothing else.
   if (inHub()) {
     out += '<div class="cards">' +
-      card('uploads') + card('sessions') + card('linked') + card('inbox') +
+      card('uploads') + card('sessions') + card('linked') + card('inbox') + card('economy') +
       '</div>';
   } else {
     out += '<p class="lede">Signing in with Discord opens the hub.</p>' +

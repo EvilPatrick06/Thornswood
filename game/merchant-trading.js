@@ -648,6 +648,11 @@ function createMerchantTrading(deps) {
     }
     var current = purses.prepare(merchantId);
     if (!moved.done) return response(moved.reason,current,moved.reason);
+    // The pieces that changed hands, for staff's hold economy page (#3164).
+    if (typeof deps.traded === 'function') {
+      try { deps.traded({hold:place.bookHold,verb:verb,baseId:resolved.baseId,name:itemName,count:asked.count}); }
+      catch (error) { if (typeof deps.log === 'function') deps.log('hold economy count failed: ' + error); }
+    }
     var said = npcBuys
       ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
       : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
@@ -815,7 +820,11 @@ function installMerchantTrading(env) {
       if (typeof fn !== 'function') return null;
       return fn(name);
     },
-    isTrader: function (id) { return traderIds.has(Number(id) >>> 0); }
+    isTrader: function (id) { return traderIds.has(Number(id) >>> 0); },
+    traded: function (row) {
+      var economy = g.__thornswoodEconomy;
+      if (economy && typeof economy.traded === 'function') economy.traded(row);
+    }
   });
   var property = 'thornswoodMerchantView';
   var script = [

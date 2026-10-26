@@ -41,7 +41,7 @@ function setup() {
  const helper=gm.indexOf('function harvestCrimson(');
  if(helper>=0)vm.runInContext(gm.slice(helper,gm.indexOf('\n}',helper)+2),w.ctx);
  Object.assign(w.ctx,{isCrop:()=>false,lastUse:new Map(),HARVEST_COOLDOWN_MS:600000,
-  stampCooldown(){},creditWork:()=>{credit++;return '';},addItem:()=>{normalGrants++;return true;}});
+  stampCooldown(){},creditWork:()=>{credit++;return '';},economyGathered:()=>{},addItem:()=>{normalGrants++;return true;}});
  vm.runInContext(gm.slice(at,end),w.ctx);
  return {w,stock,deadlines,pick:(ref=refs[0],base=doc.sources[0].base)=>w.ctx.harvest(500,ref,base),
   take:()=>w.svc.act(500,'take','crimson',null,7000),source:v=>{sourceGood=v;},
