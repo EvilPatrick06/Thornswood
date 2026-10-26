@@ -45,9 +45,6 @@
     "writes": ["game/data/recipes.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Write-CutItems.js", "data": null, "plugins": null,
     "reads": ["game/data/recipes.json"], "writes": ["docs/systems/cut-items.json", "docs/systems/cut-items.md"] },
-  { "tool": "scripts/dev/Write-SystemLists.js", "data": null, "plugins": null,
-    "reads": ["game/data/recipes.json", "game/data/harvests.json", "game/data/ores.json", "game/data/hunts.json", "game/data/races.json"],
-    "writes": ["docs/systems/lists", "docs/systems/classes", "docs/systems/professions"] },
   { "tool": "scripts/dev/Build-FuelTable.js", "data": null, "plugins": null,
     "reads": ["game/data/recipes.json"], "writes": ["game/gamemode.js"] },
   { "tool": "scripts/dev/Build-ItemNameTable.js", "data": null, "plugins": null,
@@ -68,7 +65,13 @@
     "writes": ["game/data/merchant-retrievals.json", "tests/fixtures/merchant-retrieval-records.json"] },
   { "tool": "scripts/dev/Build-MerchantGamemode.js", "data": null, "plugins": null,
     "reads": ["game/data/merchant-role-tables.json", "game/data/merchant-retrievals.json", "game/data/recipes.json", "game/data/harvests.json", "game/data/ores.json", "game/data/npc-population.json"],
-    "writes": ["game/gamemode.js"] }
+    "writes": ["game/gamemode.js"] },
+  { "tool": "scripts/dev/Build-ItemSources.js", "data": null, "plugins": null,
+    "reads": ["game/data/recipes.json", "docs/systems/cut-items.json", "game/data/harvests.json", "game/data/hunts.json", "game/data/ores.json", "game/data/merchant-role-tables.json", "game/data/merchant-retrievals.json", "game/gamemode.js"],
+    "writes": ["game/data/item-sources.json"] },
+  { "tool": "scripts/dev/Write-SystemLists.js", "data": null, "plugins": null,
+    "reads": ["game/data/recipes.json", "game/data/harvests.json", "game/data/ores.json", "game/data/hunts.json", "game/data/races.json", "game/data/item-sources.json"],
+    "writes": ["docs/systems/lists", "docs/systems/classes", "docs/systems/professions"] }
  ],
  "notInChain": {
   "scripts/dev/Build-NpcPopulation.py": "Reads the server's load order from a server-settings file (or, with --data, its own committed load order out of one folder, which is how Run-OnBox.ps1 rebuilds it after Build-LastPlugin.py), and reads placed actors: Thornswood-Content.esp places none (measured 20 Oct: IMAD, ALCH, MGEF, MESG, WRLD, CELL, REFR, COBJ, FURN, FLOR, MISC, BOOK, ACTI and KYWD records, no ACHR). It is rebuilt when the collection's load order moves, and Build-LastPlugin.py says so when it has.",
