@@ -418,9 +418,16 @@ jobs:
           # which this already covers, is gone (#3114). The nightly keeps it.
           # ruff comes into a venv of this run's own, never the machine's
           # Python, pinned by version and hash in .github\ruff-requirements.txt.
-          # By hand, from the repository folder, in any venv:
-          #   python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
-          #   python -m ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
+          # By hand, from the repository folder, into .venv (git ignores it).
+          # With uv, which needs no python on the PATH (uv's own Python
+          # refuses pip as "externally-managed", and a uv venv has no pip):
+          #   uv venv .venv
+          #   uv pip install --python .venv --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # or with Python's own pip:
+          #   python -m venv .venv
+          #   .venv\Scripts\python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # then:
+          #   .venv\Scripts\ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
           $venv = Join-Path $env:RUNNER_TEMP 'ruff-venv'
           python -m venv $venv
           $py = Join-Path $venv 'Scripts\python.exe'
