@@ -5768,7 +5768,10 @@
     ['JKs Skyrim.esp', 0x2493e], ['JKs Skyrim.esp', 0x2493d], ['JKs Skyrim.esp', 0x2c91],
     ['JKs Skyrim.esp', 0x3274], ["JK's Whiterun's Outskirts.esp", 0x1503ff],
     ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
-    ["JK's Whiterun's Outskirts.esp", 0x141088]
+    ["JK's Whiterun's Outskirts.esp", 0x141088],
+    // The HearthFires garden planters, plots since #3141.
+    ['HearthFires.esm', 0x1045e], ['HearthFires.esm', 0x1045f], ['HearthFires.esm', 0x10460],
+    ['HearthFires.esm', 0x110b9], ['HearthFires.esm', 0x110ba], ['HearthFires.esm', 0x110cd]
   ];
   const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
   const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
