@@ -394,10 +394,26 @@ try {
             # reports Catalog on a dual-signed file (#2046).
             $sc = Get-EmbeddedCert $c
             if (-not $sc) { continue }
+            # Expected chain from the certificates the file's own signature
+            # carries, the ones WinVerifyTrust reads, not only from what this
+            # account's stores and an AIA fetch find. Built from the leaf
+            # alone, on thornswood-vps-3 under load the chain stopped at the
+            # leaf, the leaf was read as the root, and four programs
+            # MicrosoftRefusal rightly accepted were expected refused (#3405).
+            $carried = New-Object Security.Cryptography.X509Certificates.X509Certificate2Collection
+            try { $carried.Import($c) } catch {
+                Yes ((Split-Path -Leaf $c) + ': the certificates in its signature can be read to say what to expect: ' + $_.Exception.Message) $false
+                continue
+            }
             $ch = New-Object Security.Cryptography.X509Certificates.X509Chain
             $ch.ChainPolicy.RevocationMode = 'NoCheck'
+            $null = $ch.ChainPolicy.ExtraStore.AddRange($carried)
             $null = $ch.Build($sc)
             $top = $ch.ChainElements[$ch.ChainElements.Count - 1].Certificate
+            if ($top.Subject -ne $top.Issuer) {
+                Yes ((Split-Path -Leaf $c) + ': the chain from the ' + $carried.Count + ' certificates in its signature reaches a self-signed root to say what to expect, but stops at ' + $top.Subject + ' issued by ' + $top.Issuer) $false
+                continue
+            }
             $theirs = ($top.Thumbprint -eq $msRoot) -and ($sc.GetNameInfo('SimpleName', $false) -eq $msName)
             $r = MsCheck $c
             if ($theirs) {
