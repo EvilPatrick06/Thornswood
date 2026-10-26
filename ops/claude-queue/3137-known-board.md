@@ -3,7 +3,7 @@
 - **Issue / PR:** #3137, the pull request this note came in with.
 - **Where:** the live site (Deploy-Docs) and the live Discord (Setup-Discord -OnBox). No Ship, no game server, no bot install.
 - **Changed by #3140:** the two boards this note replaced are gone; see step 1.
-- **Needs first:** nothing, but step 1's `-Docs help` also puts #2705's hair dye section live (see step 1).
+- **Needs first:** nothing for step 1, but step 1's `-Docs help` also puts #2705's hair dye section live (see step 1).
 - **Staff notice:** no. Pages and two Discord posts change, and nothing staff do.
 
 What it does:
@@ -22,12 +22,7 @@ What it does:
 
    The site should answer. Since #3140 the known board and the roadmap board are gone: /known and /roadmap are written from the issue board by the bot (3140-site-lists.md), so there is no `-Board` step here, and the rows #3137 cleaned are the `Known issue:` comments on #503, #2710, #3434, #3435 and #3436. help.md on main already carries #2705's "Dyeing your hair" section, so this puts that live too. Run this step only once 2705-hair-dye-help.md's first step holds (the live server runs the hair dye code); until then run it without `-Docs help`, leave `-Docs help` for the run of 2705's note, and say so on #3137.
 
-2. **Discord: the welcome and the FAQ.**
-
-       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox -Audit
-       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox
-
-   The second should end with nothing under "did not manage".
+2. **Discord: the welcome and the FAQ.** Runs as 3138-site-refresh.md's step 2, after the main Ship, not here (#3457). The Discord build writes every doc from main at once, and since #3445 main's join.md and rules.md, which #start-here, #welcome, #faq and #game-rules are read out of, describe main's game, which the live server has only after that Ship. That one run puts this note's welcome and FAQ live too; mark this step done on #3137 once it has run.
 
 ## Check afterwards
 
