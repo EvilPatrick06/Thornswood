@@ -53,6 +53,7 @@ $carriers = [ordered]@{
     'scripts/vps/Lock-VpsFolders.ps1'            = @{ Args = "-WhatIf -Parent '<scratch>' -SiteSid none -BotSid none -DumpWriterSids none"; Word = 'REFUSED: ' }
     'scripts/deploy/Install-ThornswoodServer.ps1' = @{ Args = "-Zip '<scratch>\none.zip' -Root '<scratch>'"; Word = '' }
     'scripts/vps/vps-harden.ps1'                 = @{ Args = "-DryRun -SshdConfig '<scratch>\sshd_config' -Sshd '<scratch>\sshd.exe'"; Word = 'STOP ' }
+    'scripts/vps/vps-openssh.ps1'                = @{ Args = "-DryRun -Pins 'SHA256:x'";               Word = 'STOP ' }
     'scripts/vps/vps-time-wait.ps1'              = @{ Args = '-Check';                                 Word = 'STOP ' }
     'scripts/vps/vps-ssh-scope.ps1'              = @{ Args = "-From '203.0.113.7' -DryRun";            Word = 'STOP ' }
     'scripts/vps/vps-web-firewall.ps1'           = @{ Args = "-Apply -Ranges '198.51.100.0/24' -DryRun"; Word = 'STOP ' }

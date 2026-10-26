@@ -83,9 +83,11 @@ moved the run notes here.
   changing anything, when one ssh through the bridge timed out at the banner
   (#3297). `UpdateOrchestrator\Reboot_AC` plans a restart of the box by
   itself at 6:08 AM on 23 Oct until the hardening runs. #3297 is closed, so
-  Harden-VPS can run again. #1043: upgrade OpenSSH
-  at the box's next planned restart, then check the host key against
-  `scripts\vps\vps.json` and that the post-quantum warning is gone.
+  Harden-VPS can run again. #1043: the box's sshd is the inbox OpenSSH for
+  Windows 9.5.5.3, built with no post-quantum key exchange (measured 25 Oct);
+  `Upgrade-OpenSsh.ps1` puts Microsoft's 10.4 in its place, keeping the pinned
+  host keys, and its run waits in `ops/claude-queue/1043-openssh-upgrade.md`
+  for the 4 AM to 6 AM window.
 
 ## Waiting
 

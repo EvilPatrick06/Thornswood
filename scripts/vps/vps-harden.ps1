@@ -62,7 +62,10 @@
   The sshd_config to change. The Windows OpenSSH server's own by default.
 
 .PARAMETER Sshd
-  The sshd.exe that checks the new file (sshd -t) before it is used.
+  The sshd.exe that checks the new file (sshd -t) before it is used. The one
+  the sshd service runs when empty, read from the service, so the check is
+  made by the sshd that will read the file: since #1043 that is OpenSSH for
+  Windows in C:\Program Files\OpenSSH, not the inbox one in System32.
 
 .PARAMETER Layer
   A file that replaces the functions below that touch Windows (the registry,
@@ -74,7 +77,7 @@
 param(
     [switch]$DryRun,
     [string]$SshdConfig = (Join-Path $env:ProgramData 'ssh\sshd_config'),
-    [string]$Sshd = (Join-Path $env:WINDIR 'System32\OpenSSH\sshd.exe'),
+    [string]$Sshd = '',
     [string]$Layer = ''
 )
 
@@ -262,10 +265,21 @@ function Get-TaskNextRun([string]$Path, [string]$Name) {
     return [datetime]$next
 }
 
+# The program the sshd service runs, without quotes or arguments.
+function Get-SshdExe {
+    $p = [string](Get-CimInstance -ClassName Win32_Service -Filter "Name='sshd'" -ErrorAction Stop).PathName
+    if (-not $p) { throw 'there is no sshd service' }
+    if ($p.StartsWith('"')) { return $p.Substring(1, $p.IndexOf('"', 1) - 1) }
+    if ($p -match '^(.*?\.exe)\b') { return $Matches[1] }
+    return $p
+}
+
 function Test-SshdFile([string]$Path) {
+    $exe = $Sshd
+    if (-not $exe) { $exe = Get-SshdExe }
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $out = @(& $Sshd -t -f $Path 2>&1 | ForEach-Object { [string]$_ })
+    $out = @(& $exe -t -f $Path 2>&1 | ForEach-Object { [string]$_ })
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     return [pscustomobject]@{ Ok = ($rc -eq 0); Said = ($out -join ' ') }

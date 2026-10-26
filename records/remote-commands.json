@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  71,
-    "callCount":  286,
+    "scriptCount":  72,
+    "callCount":  289,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2282,6 +2282,33 @@
                       "does":  "reads the bot log",
                       "class":  "read-status",
                       "reason":  "read only"
+                  },
+                  {
+                      "script":  "scripts/vps/Upgrade-OpenSsh.ps1",
+                      "scope":  "Test-KeyLogin",
+                      "via":  "ssh",
+                      "anchor":  "$out = @(Invoke-ThornswoodNative { \u0026 ssh @ssh -o PreferredAuthentications=publickey \"$User@$Vps\" \u0027echo THORNSWOOD_KEY_OK\u0027 } 2\u003e\u00261 | ForEach-Object { [string]$_ })",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Upgrade-OpenSsh.ps1",
+                      "scope":  "Get-Handshake",
+                      "via":  "ssh",
+                      "anchor":  "$out = @(Invoke-ThornswoodNative { \u0026 ssh @ssh -v -o PreferredAuthentications=publickey \"$User@$Vps\" \u0027echo THORNSWOOD_KEY_OK\u0027 } 2\u003e\u00261 | ForEach-Object { [string]$_ })",
+                      "does":  "reads the key exchange and server version a login gets",
+                      "class":  "read-status",
+                      "reason":  "read only"
+                  },
+                  {
+                      "script":  "scripts/vps/Upgrade-OpenSsh.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script) | ForEach-Object { [string]$_ } | Where-Object { $_ })",
+                      "does":  "runs vps-openssh.ps1, which replaces the inbox OpenSSH with Microsoft\u0027s 10.4 MSI and arms its swap and put back tasks (#1043)",
+                      "class":  "admin",
+                      "reason":  "installs sshd, removes Windows capabilities, registers SYSTEM tasks"
                   },
                   {
                       "script":  "scripts/vps/Vps.ps1",
