@@ -194,13 +194,20 @@ using it to get out of a fight or to travel can mean a warning or a ban.
 
 ## When something goes wrong
 
-1. Look at [Known Issues](/known) first. A lot of what looks like a bug is a
-   limit of how a shared Skyrim works, and it is written down there with the
-   reason.
+1. Look at [Known Issues](/known) first. It lists what is broken right now
+   that the team already knows about. What works the way it does on purpose
+   is under Things that are normal here, below.
 2. If it is not there, [report it](/report). One line about what happened is
    enough to start with.
 3. If you have a screenshot or a crash log, drag it into your ticket in the
    Discord, or say in the report that you have one. Where the logs are is below.
+
+A launcher last opened before 26 September says it cannot read the update
+source, or never offers an update. Updates come only from thornswood.net now,
+and a launcher that old still looks for them where they used to be, so it
+cannot find the new place by itself. Take the installer again from the
+[Downloads](/downloads) page and run it over your install. Your characters live
+on the server and nothing is lost.
 
 ## LOAD ORDER ERROR
 
@@ -255,19 +262,20 @@ opens the launcher log on its own.
 ## Things that are normal here
 
 - No saving. The server holds your character. Quitting is safe.
-- Most mod settings menus keep your choices: MCM Helper menus in a file on
-  your machine, and Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and
-  chfshVariousActions on the server, with your character. QuickLoot, the
-  instrument menu, MCM Recorder and SkyUI's favourite group and unequip options
-  still forget themselves every session, because there is no save to write
-  them to.
 - No levelling, no fast travel, and the difficulty is fixed at Expert.
 - The creation hall is a bare room. Your face is made there, and everything
   else is chosen on the panel that opens by itself once it is done.
+- The server owns where you are, your health, magicka and stamina, death and
+  respawn, your inventory and what you wear, what is in every container,
+  whether a door is open, which plants are picked, and your character's
+  values. A mod that changes one of those on your own machine is put back.
+- Fishing is the Fisher's trade. With a pole a woodwright makes, press **E**
+  at the fish in the water. The [Professions](/classes) page has the rest.
+- Mods are added in batches rather than one at a time, because every addition
+  moves the load order for everybody at once.
 
 All of that is deliberate. None of it is worth reporting. [Known Issues](/known)
-covers the rest of what a shared Skyrim cannot do, and which of it is going to
-change.
+lists what is broken right now.
 
 ## Restart warnings
 

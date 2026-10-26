@@ -503,7 +503,7 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   const known = await get(port, '/known');
   yes('/known is drawn from the known board', known.status === 200 &&
       known.text.indexOf('<div class="wrap" id="pagebody"><h1>Known Issues</h1>') >= 0 &&
-      /<table>[\s\S]*Most mod scripts never fire/.test(known.text));
+      /<table>[\s\S]*Many mod features do nothing here/.test(known.text));
   let kapi = {};
   try { kapi = JSON.parse((await get(port, '/api/page/known')).text); } catch (e) { }
   yes('and /api/page/known hands out the same page the board writes', !!KNOWN_PAGE && kapi.md === KNOWN_PAGE);
