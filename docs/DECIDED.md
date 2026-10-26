@@ -167,6 +167,18 @@ link, and the old line goes.
   button. 21 Oct 2026,
   [#3155](https://github.com/EvilPatrick06/Thornswood/issues/3155#issuecomment-6333339922).
 
+## Voice and the in-game UI
+
+- **Voice leaves the browser:** a native voice engine in the launcher sends
+  one stream to the box, and the box forwards each voice only to the people
+  in range. Every launcher no longer connects to every other. 26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
+- **The in-game panels become Skyrim's own menus (Scaleform)**, chat
+  included, and the in-game browser goes once they have; the away window is
+  built first as the proof. Emotes as Q menu powers stay as #2026 decided.
+  26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
+
 ## The box
 
 - **The site's contact is Discord only.** It names no street address,
@@ -224,10 +236,13 @@ link, and the old line goes.
   (Mountain)**, at low priority, after the 2:15 AM backup. Telemetry stays
   off. 22 Oct 2026,
   [#3213](https://github.com/EvilPatrick06/Thornswood/issues/3213#issuecomment-6335264517).
-- **Whether a gamemode-only deploy reloads instead of restarting waits on
-  one measured start.** Measure what one dev start costs first, then decide.
-  22 Oct 2026,
-  [#3196](https://github.com/EvilPatrick06/Thornswood/issues/3196#issuecomment-6335264712).
+- **A gamemode-only dev deploy reloads the gamemode in the running server
+  instead of restarting it**, and the NPC runtime hands its NPCs straight to
+  the new copy so they never pause. Decided on the measured starts (about 15
+  processor seconds each, but everybody dropped and nearly 4 minutes before
+  the NPCs were back). A deploy that also changes plugins or settings still
+  restarts. 22 Oct 2026,
+  [#3196](https://github.com/EvilPatrick06/Thornswood/issues/3196#issuecomment-6342491535).
 - **One narrow workflow deletes a closed pull request's own branch** in this
   repository. It never checks out or runs that pull request's code. 22 Oct
   2026,

@@ -453,7 +453,7 @@ by hand, and no secret is written into the repository.
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
-| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches engine.yml's artifact `engine-<fork commit 12>` and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
+| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from EvilPatrick06/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md`) |
 | Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
@@ -1007,7 +1007,11 @@ How to use it:
 - Labels: `area:` is the part of the project, `needs: patrick` marks what
   waits on him, and `anyone can start` marks what needs nobody in
   particular. `Main Findings` and `Dev Findings` mark what testers found on
-  main and on dev, and the bot keeps #known-issues from them. `area: triage`
+  main and on dev, and the bot keeps #known-issues and the site's Known
+  Issues page from them. `roadmap: now`, `roadmap: next` and `roadmap: later`
+  put an issue on the site's roadmap in that lane, in the words of its last
+  `Roadmap:` comment, and under Done once it closes as done (#3140; bot
+  README, "The site's known issues and roadmap"). `area: triage`
   marks an issue whose title did not say which part it is:
   `.github\workflows\area-label.yml` gives a new issue with no `area:` label
   the one its title names, or this one, and a person swaps it for the right
@@ -1083,8 +1087,8 @@ Three Discord forums show testing, and the bot keeps all three from the
 board (`bot\README.md`, Testing). Patrick, 22 Oct: "dev test tasks are for
 things that only devs can test and can still be there while on main; main
 is for just regular testing for our playtesters, only when it's on main",
-and known issues are what is on the board that nothing has been done about
-yet. Test tasks never go on the report page; they go in Discord.
+and known issues are what is on the board whose fix has not landed yet
+(Patrick, 26 Oct, #3140). Test tasks never go on the report page; they go in Discord.
 
 - **#test-tasks, Main test tasks.** An ordinary check any playtester can do
   with the normal game. If a playtester could do it once it is on main, it
@@ -1129,10 +1133,13 @@ yet. Test tasks never go on the report page; they go in Discord.
   replaces the older Dev post; put every measurement the issue still needs
   in the newest. Put what was measured on the issue.
 - **#known-issues.** An open issue labelled `Main Findings` or `Dev
-  Findings` that nothing has been done about yet: no merged pull request
-  names it and it has no test task. The bot takes the post down the moment
-  a pull request naming it merges, a `Test task:` comment is written on it,
-  or it closes or loses its label. Its words come from the last `Known
+  Findings` whose fix has not landed: it has no test task and is not on the
+  board as Done. The bot takes the post down the moment a `Test task:`
+  comment is written on it, it gets `board: Done` (Done on merge puts both
+  on a merged fix), or it closes or loses its label. A merged pull request
+  alone does not take it down (Patrick, 26 Oct, #3140), so a measuring step
+  or a partial fix leaves the post up. The site's Known Issues page is the
+  same list. Its words come from the last `Known
   issue:` comment: a title of 45 characters at most, then what goes wrong,
   where, and how to avoid it, in plain words.
 - **One post per issue per forum, never two.** A changed test task or known
@@ -2197,10 +2204,14 @@ it per session and ignores which profile Vortex has on.
   the site.
 - The site's hub boards (Active Issues, Test These, Suggestions, Archive, the
   Patrick runbook) are older than the board and are being retired (issue
-  #433); where they disagree with the board, the board is right. Known
-  Issues is not one of them: it is the public page's only copy, the known
-  board in `site\data\board.json`, edited in the hub at `/hub/known` and
-  written out at `/known` (decided by Patrick on 12 Oct, issue #2414).
+  #433); where they disagree with the board, the board is right. The
+  public Known Issues page and roadmap are not boards: the bot writes both
+  from the issue board into the site's `data\from-bot\lists.json`, the
+  known list from the `Known issue:` comments on the findings and the
+  roadmap from the `roadmap:` labels and `Roadmap:` comments, and `/known`
+  and `/roadmap` show that file (issue #3140; bot README, "The site's known
+  issues and roadmap"). Change their words on the issue, never in a site
+  file.
 - `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
   WORKING-NOTES and the old To Do List), history only.
 
