@@ -100,14 +100,16 @@ function findings(text) {
 // Planted lines, each built from pieces so this file holds no value itself.
 const at = '@';
 const bs = String.fromCharCode(92);
+const ms = '.onmicro' + 'soft.com';
+const U = 'Users';
 const plant = (s) => findings(s).length;
 yes('a Gmail address is found', plant('email someone' + at + 'gmail.com') === 1);
 yes('  and an Outlook one', plant('it names someone' + at + 'outlook.com and') === 1);
 yes('  and a school one', plant('a' + at + 'student.example.edu') === 1);
-yes('  and a tenant name, with or without an address', plant('domain `someone.onmicrosoft.com`') === 1 && plant('x' + at + 'someone.onmicrosoft.com') === 1);
+yes('  and a tenant name, with or without an address', plant('domain `someone' + ms + '`') === 1 && plant('x' + at + 'someone' + ms) === 1);
 yes('  but not a role address, a noreply or a .invalid one', plant('a' + at + 'thornswood.net b' + at + 'users.noreply.github.com c' + at + 'thornswood.invalid') === 0);
 yes('a profile path is found', plant('C:' + bs + 'Users' + bs + 'someone' + bs + 'Downloads') === 1);
-yes('  and with forward slashes, doubled backslashes, Git Bash and WSL', plant('C:/Users/someone/x') === 1 && plant("'C:" + bs + bs + 'Users' + bs + bs + "someone'") === 1 && plant('cd /c/Users/someone/x') === 1 && plant('/mnt/c/Users/someone/x') === 1 && plant('"/Users/someone/github/x"') === 1);
+yes('  and with forward slashes, doubled backslashes, Git Bash and WSL', plant('C:/' + U + '/someone/x') === 1 && plant("'C:" + bs + bs + 'Users' + bs + bs + "someone'") === 1 && plant('cd /c/' + U + '/someone/x') === 1 && plant('/mnt/c/' + U + '/someone/x') === 1 && plant('"/' + U + '/someone/github/x"') === 1);
 yes('  but not a placeholder or the box\'s own accounts', plant('C:' + bs + 'Users' + bs + '<you>' + bs + 'x C:' + bs + 'Users' + bs + 'Administrator' + bs + 'x C:' + bs + 'Users' + bs + 'thornswood-runner5' + bs + 'x C:' + bs + 'Users' + bs + '%USERNAME%') === 0);
 yes('  nor a web address with Users in it', plant('https://github.com/users/someone/projects/1') === 0);
 
