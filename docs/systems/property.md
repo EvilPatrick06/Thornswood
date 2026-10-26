@@ -272,6 +272,10 @@ mints a vendor, and the guild does not own the counter. Prices are
 what the two people agree when they trade. Coin moves as
 [Gold](gold.md) says.
 
+A stall in a town's market is claimed the same way, for nothing, and
+its keeper names the prices on it; it sells only while they stand at it.
+That is [Market stalls](stalls.md).
+
 ## What is not a house
 
 Nails, hinges, a lock, and iron fittings are refused at the forge.
