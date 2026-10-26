@@ -566,6 +566,15 @@ function Measure-One([string]$name) {
 
 # --- Run --------------------------------------------------------------------
 
+# Every run opens a window that takes the focus, so none starts while
+# somebody is playing on this machine: checked at the start and again before
+# the runs, which come after builds that can take most of an hour.
+function Assert-NoGame {
+    $game = Get-Process -Name SkyrimSE, skse64_loader -ErrorAction SilentlyContinue
+    if ($game) { throw "Skyrim is running here (pid $($game.Id -join ', ')); measure once it is closed." }
+}
+Assert-NoGame
+
 New-Item -ItemType Directory -Force -Path $Work, $Out | Out-Null
 $script:Wav = Join-Path $Work 'loop.wav'
 Write-QuietWav $script:Wav
@@ -581,6 +590,7 @@ if (-not $MeasureOnly) {
     }
 }
 
+Assert-NoGame
 $results = @()
 foreach ($n in $names) {
     if ($failed.Contains($n)) { continue }
