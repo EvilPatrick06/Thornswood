@@ -98,7 +98,7 @@ spell needs nothing below it. They do not earn the mage's stored spell
 points. They do not pick schools on K. They do not receive the
 school's placed point.
 
-At the College, Study on the K panel hands them 1 spell point in a
+At the College, a study desk hands them 1 spell point in a
 semester, and it can only be spent on a novice spell of the school they
 were taught.
 A mage's semester is a different number, on that page.
@@ -186,9 +186,9 @@ An outside trade that was ended stays counted, so it does not open a
 third.
 
 The two-spell cap, the two staff-spell cap, and the three gates on a
-tome are in the server. So is the semester: Study on the K panel's
-College page, in one of the College's rooms, hands a person a master
-has taught 1 point once in 24 hours. The server asks for that point as
+tome are in the server. So is the semester: E at a study desk in one
+of the College's halls hands a person a master has taught 1 point once
+in 24 hours. The server asks for that point as
 well as a place before a tome teaches them, because the semester is the
 only thing that hands them one. Patrick decided on 4 October that they
 need both (issue 1387). See [Magic and the College](magic.md).

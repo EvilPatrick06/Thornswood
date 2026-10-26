@@ -434,6 +434,7 @@ CONTENTS = (
     (r'FURN ThornswoodFurnitureSaltMine$', 'own', 'salt quarries'),
     (r'FLOR ThornswoodFloraBeehive$', 'own', 'beehives'),
     (r'ACTI ThornswoodActivator(Well|Water)Bucket$', 'own', 'well and water buckets'),
+    (r'ACTI ThornswoodActivatorStudyDesk$', 'own', 'study desks'),
     # The placements, and the cells and worlds they stand in, are the stations
     # above and the quest sites below put in the world (the tool refuses any
     # other placement), so those rows' words already say them.
@@ -901,6 +902,16 @@ WELL_BUCKET_BOUNDS = (-18, -18, 0, 18, 18, 46)
 # river water is), placed where game\data\station-sites.json, kind river,
 # measures.
 RIVER_BUCKET = 0x5018031
+# THE STUDY DESK (#1387). Patrick, 22 October 2026, A on #1387: a semester at
+# the College is taken at a study desk in the College halls, not a command.
+# Skyrim's NobleDesk01 (STAT 0xD70EC) is a static, which raises no activation,
+# so the plugin stands an activator wearing its mesh and bounds in each of the
+# four halls, and activating it is the semester (deskActivated in the college
+# block of gamemode.js). Where each one stands is game\data\station-sites.json,
+# kind study, measured by scripts\dev\Build-StationSites.py.
+STUDY_DESK = 0x5018032
+STUDY_DESK_MODEL = 'Furniture\\Noble\\NobleDesk01.nif'
+STUDY_DESK_BOUNDS = (-44, -49, 0, 44, 12, 63)
 
 # THE DRUNK SCREEN. docs/systems/drink.md: from the third ale "the client draws
 # a sway and a soft edge". Skyrim has no drunk image space modifier (measured
@@ -1146,6 +1157,9 @@ def needs_records():
     out.append(own_record(b'ACTI', RIVER_BUCKET, [
         (b'EDID', zstr('ThornswoodActivatorWaterBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
         (b'FULL', zstr('Water Bucket')), (b'MODL', zstr(WELL_BUCKET_MODEL)), (b'RNAM', zstr('Draw Water'))]))
+    out.append(own_record(b'ACTI', STUDY_DESK, [
+        (b'EDID', zstr('ThornswoodActivatorStudyDesk')), (b'OBND', bounds(STUDY_DESK_BOUNDS)),
+        (b'FULL', zstr('Study Desk')), (b'MODL', zstr(STUDY_DESK_MODEL)), (b'RNAM', zstr('Study'))]))
     return out
 
 
@@ -1558,7 +1572,8 @@ def bethesdas_world_records(masters_dir, plugin_masters, wanted):
 STATION_SITES = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                                               'game', 'data', 'station-sites.json'))
 STATION_NAMES = {KILN: 'charcoal kilns', SALT_QUARRY: 'salt quarries', BEEHIVE: 'beehives',
-                 ALCHEMY_LAB: 'alchemy labs', WELL_BUCKET: 'well buckets', RIVER_BUCKET: 'water buckets'}
+                 ALCHEMY_LAB: 'alchemy labs', WELL_BUCKET: 'well buckets', RIVER_BUCKET: 'water buckets',
+                 STUDY_DESK: 'study desks'}
 STATION_BASES = set(STATION_NAMES)
 QUEST_CONTENT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                                              'game', 'data', 'quest-content.json'))

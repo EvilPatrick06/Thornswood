@@ -8927,6 +8927,24 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 
 
   /*
+    A STUDY DESK IN THE COLLEGE HALLS (#1387): a semester at the College,
+    which is the desk's whole use. The college block answers null for any
+    other press, which goes on down the chain.
+  */
+  try {
+    const collegeDesk = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCollege;
+    const deskLine = (collegeDesk && collegeDesk.deskActivated)
+      ? collegeDesk.deskActivated(refrId, casterRefrId, baseDesc) : null;
+    if (deskLine !== null) {
+      notify(casterRefrId, deskLine);
+      say(casterRefrId, deskLine);
+      return false;
+    }
+  } catch (eDesk) {
+    log('the study desk at', Number(refrId).toString(16), 'threw:', eDesk);
+  }
+
+  /*
     A NOTICE BOARD OR ITS DROP BOX (#2516, #2298): the server's own
     references. The board opens only the board's panel and the box only the
     box's, and nothing else in this chain sees the press.
@@ -51650,14 +51668,14 @@ return module.exports;
         if (r.ok) { staffPicked = r.spell; }
       } else if (what === 'study') {
         /*
-          A semester at the College (#1387): the Study button on the K
-          panel's College page sends this. The college block says whether
-          they are in one of the rooms, and the rules hand out the points.
+          A semester at the College (#1387) is taken by pressing E at a
+          study desk in one of its halls (Patrick, 22 October 2026, A), never
+          picked: the college block's deskActivated hands out the points. A
+          K panel from before the desks still sends this from its Study
+          button, and is told where the desks are.
         */
         about = 'study';
-        var CO = g.__thornswoodCollege;
-        r = (CO && CO.study) ? CO.study(actorId, s)
-          : { ok: false, why: 'the College is not running on this server right now' };
+        r = { ok: false, why: 'a semester is taken at a study desk in one of the College\'s halls: press E at the desk' };
       } else if (what === 'weave') {
         // A Master Weaver's pick on the profession card (#1398): see weaveOf.
         about = 'weave';
@@ -51789,7 +51807,6 @@ return module.exports;
       with no form id yet is in the book and not in the hands, which
       grantSpell says in the log and nothing else notices.
     */
-    if (about === 'study' && r.line) { toProfile(profileId, r.line); }
     if (about === 'weave' && r.line) { toProfile(profileId, r.line); }
 
     if (spellPicked) {
@@ -54203,13 +54220,13 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
 
   A SEMESTER. Studying at the College hands out spell points once a
   semester; P.study holds the numbers and the clock, and keeps the moment on
-  the character, so a relog or a restart does not reset it. This block says
-  whether somebody is in a room magic.md names: the Hall of the Elements,
-  the courtyard, the Hall of Countenance, the Hall of Attainment or the
-  Arcanaeum. Anywhere else refuses. Nobody types anything: the College page
-  on K has a Study button, which reaches the server as /pick study, the way
-  the rest of that panel's buttons do (Patrick, 4 Oct: no commands for
-  things people do).
+  the character, so a relog or a restart does not reset it. It is taken at a
+  study desk in the College halls (Patrick, 22 October 2026, A on #1387: a
+  desk, not a command). Thornswood-Content.esp stands one in each of the
+  four halls, the Hall of the Elements, the Hall of Countenance, the Hall of
+  Attainment and the Arcanaeum, and pressing E at one is the semester
+  (deskActivated, from mp.onActivate). The College page on K says where the
+  desks are and when the next semester opens; it has no button for it.
 
   ONLY THE BOOK IS GRANTED. A spell of the five schools that the book
   (SPELLS, by its form id in SPELL_IDS) does not list is not a college spell
@@ -54301,87 +54318,45 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     try { if (typeof say === 'function') { say(actorId, line); } } catch (e) { }
   }
 
-  // ----------------------------------------------------------- the rooms --
+  // ----------------------------------------------------------- the desks --
   /*
-    The four halls are interior cells, read out of game/data/doors.json (the
-    cells table there is built from the plugins by tools/Build-DoorTable.py).
+    THE STUDY DESK. Thornswood-Content.esp's activator
+    ThornswoodActivatorStudyDesk, wearing Skyrim's NobleDesk01, stands in
+    each hall where game/data/station-sites.json, kind study, measures it
+    (scripts/dev/Build-StationSites.py, the way the stations of #2553 are
+    placed). The halls are interior cells, read out of game/data/doors.json
+    (the cells table there is built from the plugins by
+    tools/Build-DoorTable.py), and the hall a semester is taken in is the
+    one the pressed desk stands in.
   */
+  var DESK_BASE = '18032:Thornswood-Content.esp';
   var HALLS = {
     '1380e:Skyrim.esm': 'the Hall of the Elements',
     '1380f:Skyrim.esm': 'the Hall of Countenance',
     'cab91:Skyrim.esm': 'the Hall of Attainment',
     '13810:Skyrim.esm': 'the Arcanaeum'
   };
-  var ROOM_LIST = ['the Hall of the Elements', 'the courtyard', 'the Hall of Countenance',
-                   'the Hall of Attainment', 'the Arcanaeum'];
-  var ROOMS = ROOM_LIST.slice(0, -1).join(', ') + ' or ' + ROOM_LIST[ROOM_LIST.length - 1];
+  var HALL_LIST = ['the Hall of the Elements', 'the Hall of Countenance', 'the Hall of Attainment', 'the Arcanaeum'];
 
-  /*
-    THE COURTYARD is open ground in Tamriel, with no cell of its own to ask
-    for. The doors out of the four halls stand in it, and Skyrim's open
-    ground comes in cells 4096 units a side, so the courtyard is the cells
-    those doors stand in, measured off the doors themselves the first time
-    anybody studies. Every door below is the outside half of a door into one
-    of the four halls (game/data/doors.json: its 'to' is a door in a hall).
-  */
-  var OUTSIDE_DOORS = [
-    '177f3:Skyrim.esm', '8392e:Skyrim.esm',   // the Hall of Countenance
-    '177f9:Skyrim.esm',                       // the Hall of the Elements
-    '83929:Skyrim.esm', '177f1:Skyrim.esm',   // the Hall of Attainment
-    '107f00:Skyrim.esm', '107f01:Skyrim.esm'  // the Arcanaeum
-  ];
-  var CELL = 4096;
-  var yard = null;
-
-  function courtyard() {
-    if (yard) { return yard; }
-    var world = '', x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, n = 0;
-    for (var i = 0; i < OUTSIDE_DOORS.length; i++) {
-      var id = idOfDesc(OUTSIDE_DOORS[i]);
-      var p = null, w = '';
-      try { p = mp.get(id, 'pos'); w = String(mp.get(id, 'worldOrCellDesc') || ''); } catch (e) { p = null; }
-      if (!id || !p || !w) { continue; }
-      if (world && w !== world) { continue; }
-      world = w;
-      var gx = Math.floor(p[0] / CELL), gy = Math.floor(p[1] / CELL);
-      x0 = Math.min(x0, gx); x1 = Math.max(x1, gx); y0 = Math.min(y0, gy); y1 = Math.max(y1, gy);
-      n++;
-    }
-    if (!n) {
-      clog('none of the doors out of the halls could be read, so the courtyard is not counted yet');
-      return null;
-    }
-    yard = { world: world, x0: x0, x1: x1, y0: y0, y1: y1 };
-    clog('the courtyard is', world, 'cells', x0 + '..' + x1, 'by', y0 + '..' + y1, 'from', n, 'doors');
-    return yard;
-  }
-
-  /** The room somebody is standing in, as a person would say it, or '' outside the College. */
-  function placeOf(actorId) {
+  /** The hall a reference stands in, as a person would say it, or '' outside the four. */
+  function hallOf(refrId) {
     var cell = '';
-    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
-    if (own(HALLS, cell)) { return HALLS[cell]; }
-    var y = courtyard();
-    if (!y || cell !== y.world) { return ''; }
-    var p = null;
-    try { p = mp.get(actorId, 'pos'); } catch (e) { return ''; }
-    if (!p) { return ''; }
-    var gx = Math.floor(p[0] / CELL), gy = Math.floor(p[1] / CELL);
-    return (gx >= y.x0 && gx <= y.x1 && gy >= y.y0 && gy <= y.y1) ? 'the courtyard' : '';
+    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+    return own(HALLS, cell) ? HALLS[cell] : '';
   }
 
   // ---------------------------------------------------------- a semester --
   /*
-    The Study button. Answers what P.study answers, with line, the words for
-    the chat, on a yes. The rules go first, so somebody with no magic, or a
-    semester that is not open yet, is told that wherever they are.
+    A semester at the desk deskId. Answers what P.study answers, with line,
+    the words for the chat, on a yes. The rules go first, so somebody with
+    no magic, or a semester that is not open yet, is told that at any desk.
   */
-  function study(actorId, s) {
+  function study(actorId, s, deskId) {
     var r = P.study(s, now());
     if (!r.ok) { return r; }
-    var where = placeOf(actorId);
+    var where = hallOf(deskId);
     if (!where) {
-      return { ok: false, why: 'you can only study in the College of Winterhold: ' + ROOMS };
+      return { ok: false, why: 'this desk is not in one of the College\'s halls' };
     }
     var left = P.spellPoints(r.state);
     var got = r.gained + (r.gained === 1 ? ' spell point' : ' spell points');
@@ -54392,6 +54367,24 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
       ' The next semester opens in ' + L.semesterHours + ' hours.';
     clog(hex(actorId), 'studied in', where, '+' + r.gained);
     return r;
+  }
+
+  /*
+    A press in the world (mp.onActivate). Answers null for anything that is
+    not a study desk, which goes on down the chain; for a desk, the line to
+    say to the person who pressed it, the semester or why not. A yes is
+    written to the character, which tells the K panel the next semester's
+    clock; a refusal changes nothing.
+  */
+  function deskActivated(refrId, actorId, baseDesc) {
+    if (String(baseDesc || '') !== DESK_BASE) { return null; }
+    var C = char();
+    if (!C || !C.stateOf || !C.writeState) { return 'The College is not running on this server right now.'; }
+    var r = study(actorId, C.stateOf(actorId), refrId);
+    if (!r.ok) { return 'No: ' + r.why + '.'; }
+    r.state.note = null;
+    C.writeState(actorId, r.state);
+    return r.line;
   }
 
   /** What the College page on K draws, or null for somebody magic is not open to. */
@@ -54405,7 +54398,7 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
       school: mage ? null : schools[0],
       opens: P.semesterOpens(s),
       hours: L.semesterHours,
-      rooms: ROOM_LIST.slice()
+      halls: HALL_LIST.slice()
     };
   }
 
@@ -54882,9 +54875,9 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   }
 
   g.__thornswoodCollege = {
-    HALLS: HALLS, OUTSIDE_DOORS: OUTSIDE_DOORS, STRAIN: STRAIN, REANIMATE: REANIMATE,
+    HALLS: HALLS, DESK_BASE: DESK_BASE, STRAIN: STRAIN, REANIMATE: REANIMATE,
     TAKE_PROPERTY: TAKE_PROPERTY, LAYDOWN_PROPERTY: LAYDOWN_PROPERTY,
-    placeOf: placeOf, courtyard: courtyard, study: study, view: view,
+    hallOf: hallOf, study: study, deskActivated: deskActivated, view: view,
     spellKind: spellKind, offBook: offBook, cleanAtLogin: cleanAtLogin, equipped: equipped,
     reanimates: reanimates, hit: hit,
     isRestoration: isRestoration, cast: cast, effects: effects, strain: strain,

@@ -53,6 +53,12 @@ against its rule and stops on one that does not follow it.
            the shop Skyrim marks as a store that has Skyrim's own alchemy lab,
            beside that lab. Winterhold has no apothecary in town, so its lab
            is in the College's Hall of Countenance, beside the lab there.
+  study    docs\\systems\\magic.md: a semester at the College is taken at a
+           study desk in the College halls (Patrick, 22 October 2026, A on
+           #1387). So one desk in each of the four halls, the Hall of the
+           Elements, the Hall of Countenance, the Hall of Attainment and the
+           Arcanaeum, beside the tables or benches SITES names in that hall,
+           where the College's own reading furniture stands.
 
 NO COORDINATE IN HERE IS TYPED FROM THE GAME. Each site's rule gives its
 anchors, nearest first: the chopping blocks or boats nearest its town (within
@@ -205,6 +211,12 @@ KINDS = {
     'river': {'base': 0x18031, 'edid': 'ThornswoodActivatorWaterBucket', 'name': 'water bucket',
               'user': (-30.0, -80.0, 30.0, -18.0), 'flat': 8.0, 'reach': 3000, 'step': 48, 'shore': 60.0,
               'river': True},
+    # The study desk (#1387) is an activator wearing Skyrim's NobleDesk01,
+    # whose origin is at its back edge (its bounds run from y -49 to 12), the
+    # edge Skyrim stands against a wall: somebody stands at its open front,
+    # inside the game's reach of it, to press it.
+    'study': {'base': 0x18032, 'edid': 'ThornswoodActivatorStudyDesk', 'name': 'study desk',
+              'user': (-35.0, -110.0, 35.0, -50.0), 'flat': 8.0, 'reach': 900, 'step': 16},
 }
 
 RULES = {
@@ -234,6 +246,10 @@ RULES = {
               'the water is there to reach. Patrick, 12 October 2026, approved '
               'drawing spots at rivers and lakes on #1382, and 20 October 2026: lake water is worth what river '
               'water is, so one bucket serves both, and both must be boiled.'),
+    'study': ('One in each of the four halls of the College of Winterhold, the Hall of the Elements, the Hall of '
+              'Countenance, the Hall of Attainment and the Arcanaeum, beside the tables, or in the Hall of the '
+              'Elements the benches, that the site names in that hall: a semester at the College is taken at a '
+              'study desk in the College halls, not a command (Patrick, 22 October 2026, A on #1387; magic.md).'),
     'lab': ('One in the apothecary of each of the nine hold capitals, the shop Skyrim marks as a store that holds '
             'Skyrim\'s own alchemy lab, beside that lab; Winterhold has no apothecary in town, so the College\'s '
             'Hall of Countenance. The poultice and the remedy are made only at Thornswood\'s lab (physicker.md, '
@@ -315,6 +331,21 @@ SITES = {
                     'ref': 0x15547},
     'lab-winterhold': {'kind': 'lab', 'where': 'The College\'s Hall of Countenance, Winterhold',
                        'anchors': ['86775:Skyrim.esm'], 'ref': 0x15548},
+    # Study desks (#1387): in each hall of the College, beside its own tables, or the
+    # Hall of the Elements' benches, which is all the furniture it has to read at.
+    'study-arcanaeum': {'kind': 'study', 'where': 'the Arcanaeum, the College of Winterhold',
+                        'hall': '13810:Skyrim.esm',
+                        'anchors': ['77da3:Skyrim.esm', '77f9c:Skyrim.esm', '78014:Skyrim.esm'], 'ref': 0x18150},
+    'study-attainment': {'kind': 'study', 'where': 'the Hall of Attainment, the College of Winterhold',
+                         'hall': 'cab91:Skyrim.esm',
+                         'anchors': ['83316:Skyrim.esm', '83317:Skyrim.esm', '8334c:Skyrim.esm', '8319d:Skyrim.esm'],
+                         'ref': 0x18151},
+    'study-countenance': {'kind': 'study', 'where': 'the Hall of Countenance, the College of Winterhold',
+                          'hall': '1380f:Skyrim.esm',
+                          'anchors': ['8661e:Skyrim.esm', '86708:Skyrim.esm', '866a5:Skyrim.esm'], 'ref': 0x18152},
+    'study-elements': {'kind': 'study', 'where': 'the Hall of the Elements, the College of Winterhold',
+                       'hall': '1380e:Skyrim.esm',
+                       'anchors': ['10cea6:Skyrim.esm', '10cea9:Skyrim.esm', '10ceaa:Skyrim.esm'], 'ref': 0x18153},
     # Water buckets (#1382): on the river shore nearest each town's forge, and on
     # Lake Honrich at Riften. lake: a town Skyrim's own map sets on a lake, whose
     # deep water is that lake. Every other deep water is the sea or a marsh's.
@@ -359,6 +390,10 @@ SITES = {
     'well-29': {'kind': 'well', 'where': 'FarmBWell01 in WindhelmMarketplaceExterior', 'anchors': ['9283:JKs Skyrim.esp'], 'ref': 0x1811C},
     'well-30': {'kind': 'well', 'where': 'RTPlazaWell01 in bcd0:Skyrim.esm', 'anchors': ['10060d:Skyrim.esm'], 'ref': 0x1811D},
 }
+
+# What a study desk's anchor is: the halls' own reading tables and benches
+# (measured on #1387 by scripts\\dev\\List-CellRefs.py over the four cells).
+STUDY_ANCHOR = re.compile(r'^Noble(Table(Square|Round|Thin)01|Bench01)$')
 
 # Farms the rule leaves out, measured over the same load order.
 LEFT_OUT = {
@@ -1141,6 +1176,19 @@ def anchors_for(site, s, world, first, benches):
                 return '%s is not one of Skyrim\'s alchemy labs' % a
             if r['space'][0] != 'cell':
                 return 'the lab %s is not indoors' % a
+            out.append((key_of(a), r))
+        return out
+    if kind == 'study':
+        out = []
+        for a in s['anchors']:
+            r = first.refs.get(key_of(a))
+            b = world.bases.get(r['base']) if r else None
+            if not r or not usable(r):
+                return 'the anchor %s is not placed, or is switched off or has an enable parent' % a
+            if not b or not STUDY_ANCHOR.match(b[1]):
+                return '%s is not one of the College\'s tables or benches' % a
+            if r['space'] != ('cell', key_of(s['hall'])):
+                return 'the anchor %s is not in the hall %s' % (a, s['hall'])
             out.append((key_of(a), r))
         return out
     if kind == 'well':

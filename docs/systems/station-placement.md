@@ -18,6 +18,7 @@ The rulebook says what each station is for and who works it, and names no town. 
 - **Alchemy lab** ([physicker.md](professions/alchemist/physicker.md), [injury.md](injury.md)): the poultice and the remedy are made only at Thornswood's lab. One in the apothecary of each of the nine hold capitals, beside Skyrim's own lab there; Winterhold has no apothecary in town, so the College's Hall of Countenance; Windhelm's Palace of the Kings is tried after the White Phial.
 - **Well bucket** ([drink.md](drink.md)): water is drawn at a well by activating it (Patrick, 12 Oct, #1382), and every placed well in the load order is a static, which the game never lets anybody activate. So one bucket beside each of the 30 placed wells in `game/data/wells.json`, the nearest clear spot within 400 units of the well. Activating it fills an empty bottle with well water. A well in a cell that no master of the content plugin carries (the two in the sewers) is left out, since the plugin can only place into its masters' cells.
 - **Water bucket** ([drink.md](drink.md)): drawing spots at rivers and lakes (Patrick, 12 Oct, #1382). One for each of the nine towns with a forge, on the river nearest it, or for Riften on Lake Honrich: the nearest clear spot to the forge within 3,000 units whose cell's water `game/data/waters.json` classes as a river (for Riften, the deep water of the lake), at its edge: ground no lower than the water and no more than 120 units above it, with navmesh under the water within 160 units, so the water is there to reach. Lake water is worth what river water is (Patrick, 20 Oct), so one bucket serves both, and the water drawn there must be boiled.
+- **Study desk** ([magic.md](magic.md)): a semester at the College is taken at a study desk in the College halls, not a command (Patrick, 22 Oct, A on #1387). Skyrim's desks are statics, which nobody can activate, so the plugin stands an activator wearing Skyrim's NobleDesk01. One in each of the four halls, the Hall of the Elements, the Hall of Countenance, the Hall of Attainment and the Arcanaeum, the nearest clear spot within 900 units of the hall's own reading tables (the Hall of the Elements has only benches), measured off the cells by `scripts/dev/List-CellRefs.py`. Pressing E at it is the semester.
 
 Each rule gives its anchors nearest first. The builder searches round each in turn, every step out to the kind's reach in eight turns, and takes the nearest clear spot; the first anchor with one wins.
 
@@ -109,6 +110,10 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | --- | --- | --- |
 | Lake Honrich at Riften | RiftenOrigin | 754 units |
 | the river at Riverwood | Riverwood02 | 2,338 units |
+
+### Study desks (#1387)
+
+One for each hall of the College of Winterhold: the Arcanaeum, the College of Winterhold; the Hall of Attainment, the College of Winterhold; the Hall of Countenance, the College of Winterhold; and the Hall of the Elements, the College of Winterhold. `game/data/station-sites.json` has where each stands once it is measured on the box.
 
 ### Where the rule led to the other server's spot
 
