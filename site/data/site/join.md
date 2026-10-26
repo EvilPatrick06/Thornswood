@@ -148,8 +148,7 @@ your voice carries in the world.
 ## If it goes wrong
 
 Check the [known issues](/known) first: it lists what is broken right now that
-the team already knows about. The [help](/help) page has the usual fixes, and
-what works the way it does on purpose.
+the team already knows about. The [help](/help) page has the usual fixes.
 
 If it is not there, say so in the Discord with what you were doing, what you
 expected, and what happened instead, or use the [report](/report) page.
