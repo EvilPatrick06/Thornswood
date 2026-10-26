@@ -60558,11 +60558,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     repairs to 120%; maker is that half as a person reads it. item is the
     kit's MISC record in Thornswood-Content.esp (Add-ContentRecords.py).
     Only the half the person picked repairs to 120%, never the sister half at
-    any rank (Patrick, 4 October).
+    any rank (Patrick, 4 October). atMaster is a kit whose 120% waits for
+    Master in that half: the Smith's two, because the 120% repair is the
+    Smith's Master perk, Mastercraft (Patrick, 26 October, #3442). Below
+    Master a smith mends to 100% like anybody else. The Sewing Kit is not
+    the Tailor's Master perk (that is Master Weaver), so it keeps 120% at
+    every rank.
   */
   var KITS = {
-    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: '154b0:Thornswood-Content.esp' },
-    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: '154b1:Thornswood-Content.esp' },
+    weapon:   { name: 'Weapon Kit', half: 'edgewright',  maker: 'Edgewright',  item: '154b0:Thornswood-Content.esp', atMaster: true },
+    armour:   { name: 'Armor Kit',  half: 'platewright', maker: 'Platewright', item: '154b1:Thornswood-Content.esp', atMaster: true },
     clothing: { name: 'Sewing Kit', half: 'haberdasher', maker: 'Haberdasher', item: '154b2:Thornswood-Content.esp' }
   };
 
@@ -60791,12 +60796,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       THE NUMBER A KIT MENDS TO, for this person. The half that makes that
       kit mends to 120; anybody else, the other half of the same profession
       included, mends to 100. The half is the one they picked, so a sister
-      half held at novice is not it.
+      half held at novice is not it. A kit marked atMaster mends to 120 only
+      for that half at Master, read from the person's own ranks.
     */
     function repairTo(state, key) {
       var kit = kits[key];
-      if (!kit) { return CONDITION.sound; }
-      return (state && state.half === kit.half) ? CONDITION.highest : CONDITION.sound;
+      if (!kit || !state || state.half !== kit.half) { return CONDITION.sound; }
+      if (kit.atMaster) {
+        var rank = (state.ranks && own(state.ranks, kit.half)) ? state.ranks[kit.half] : null;
+        if (rank !== 'master') { return CONDITION.sound; }
+      }
+      return CONDITION.highest;
     }
 
     function heldOf(entries, id) {

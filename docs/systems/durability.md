@@ -43,12 +43,18 @@ on who they are.
 
 | Who uses the kit | Condition after |
 | --- | --- |
-| The half that makes that kit | 120% |
-| Anyone else, including the other half of the same profession | 100% |
+| An Edgewright at Master, with a Weapon Kit | 120% |
+| A Platewright at Master, with an Armor Kit | 120% |
+| A Haberdasher at any rank, with a Sewing Kit | 120% |
+| Anyone else, including that half below Master for the two smith kits, and the other half of the same profession | 100% |
 
 The half that makes the kit is the half the person picked. The
 sister half is never it, at any rank, even past novice under a
-master (Patrick, 4 October).
+master (Patrick, 4 October). The two smith kits give 120% only at
+Master, because that repair is the Smith's Master perk, Mastercraft
+(Patrick, 26 October, #3442). The Sewing Kit is not the Tailor's
+Master perk, which is Master Weaver, so a Haberdasher of any rank
+mends to 120% with it.
 
 120% is what allows a buff. 100% is a sound repair and nothing more.
 
@@ -95,8 +101,10 @@ counted as work. They are held so a temper can come back for an
 event. `recipes.json` is not edited by that list.
 
 Mastercraft was the smith's master perk for tempering past the metal.
-The 120% repair is that idea now: the right half can put a piece past
-a plain repair. The perk is not a second system on top of the kit.
+The 120% repair is that idea now: a smith at Master in the right half
+can put a piece past a plain repair, and below Master mends to 100%
+like anybody else (#3442). The perk is not a second system on top of
+the kit.
 
 ## Where this is
 
@@ -114,8 +122,8 @@ The key shuts the inventory and opens the repair panel: every piece
 you carry that is not at 100%, and every sound piece your own kit
 would raise to 120%, worst first, each with the kit it takes and
 what a repair by you comes out at. Mend uses one kit on one piece,
-to 120% for the half that makes that kit and to 100% for anyone
-else. A piece already at or above that number has no button, and the
+to 120% for the half that makes that kit (at Master, for the two
+smith kits) and to 100% for anyone else. A piece already at or above that number has no button, and the
 row says why. No command does any of this.
 
 Each hit takes 1% off the armour and clothing worn by the person hit,

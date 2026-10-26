@@ -144,8 +144,10 @@
       }
       out += '</div>';
     }
-    out += '<div class="note">One kit mends one piece. The half that makes a kit mends to 120%, ' +
-      'anybody else to 100%.</div>';
+    // Who mends to what is the server's (repairTo, #3442): each row already
+    // says the number, so the note does not say the rule again.
+    out += '<div class="note">One kit mends one piece. Each row says what a repair by you ' +
+      'comes out at.</div>';
     body.innerHTML = out;
     var buttons = body.querySelectorAll('button[data-n]');
     for (var b = 0; b < buttons.length; b++) { buttons[b].onclick = onMend; }

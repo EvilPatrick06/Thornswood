@@ -61,7 +61,9 @@ Repair is a kit, not a temper. See [Durability](../durability.md).
 
 At master. The old line was temper to legendary, past what the metal
 should take. That is the 120% repair now: an Edgewright's Weapon Kit
-on a weapon, a Platewright's Armor Kit on armour. See
+on a weapon, a Platewright's Armor Kit on armour, past new. Below
+Master a smith mends with their own kit to 100%, like anybody else;
+at Master, to 120% (Patrick, 26 October, #3442). See
 [Durability](../durability.md). The armour table and the sharpening
 wheel are still in the lists and marked server asked: no.
 
@@ -78,5 +80,5 @@ and the smelter burn the grade the table above names, and nothing is
 taken when the grade or the handle is missing. The ingredient column
 on the recipe pages still omits the handle, because the plugin record
 does. The grindstone and the armour table do not open, and a temper that
-reaches the server anyway is refused and not counted as work. The 120% repair waits on the Weapon Kit and
-the Armor Kit, which are not records in the plugin yet.
+reaches the server anyway is refused and not counted as work. The kits are records in the plugin, and
+the 120% repair at Master is in the server (#3442).

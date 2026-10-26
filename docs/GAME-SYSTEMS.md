@@ -151,7 +151,8 @@ past novice, and the two outside trades. A master decides, and either
 of you can end it.
 
 [Durability](systems/durability.md). Weapon Kit, Armor Kit, Sewing
-Kit. The right half repairs to 120%. Anyone else repairs to 100%.
+Kit. The right half repairs to 120%, at Master for the two smith
+kits. Anyone else repairs to 100%.
 Worn gear loses 1% a hit. At 0%, a worn piece can break.
 
 [Cut items](systems/cut-items.md). What leaves the open book, and the
