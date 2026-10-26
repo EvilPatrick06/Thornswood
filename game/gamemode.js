@@ -50925,59 +50925,6 @@ return module.exports;
   }
 
   /*
-    WHAT THE NEW RANK OPENED (#3149). Patrick, 26 October, on his report page:
-    at each rank up the person is told what just opened, from the same count
-    the recipe book on K uses. So this reads recipeIndex, the book's own
-    index, at the one rank just reached: the rows of that half at exactly that
-    rank, by family, and how many of them Skyrim will list.
-
-    A half only. A class verb and a mage's school own no recipe, and a half
-    with nothing at the new rank (a Physicker at expert) says nothing more
-    than the rank line already does.
-
-    THE SECOND NUMBER IS THE BOOK'S open, said rather than left out. A row
-    with open false carries a condition of its own that Skyrim's crafting menu
-    checks before the server is asked, and telling a new Advanced Platewright
-    that 71 recipes are theirs when the menu lists 2 is the promise bookHalf
-    stopped making on 21 September. When #1402 takes the vanilla perk lines
-    off and Build-RecipeTable.ps1 writes open again, this sentence shrinks by
-    itself.
-  */
-  function unlockLine(actorId, raised) {
-    if (!raised || !isCraftHalf(raised.key)) { return null; }
-    var idx = recipeIndex(actorId);
-    var got = (idx && P.has(idx, raised.key)) ? idx[raised.key] : null;
-    var to = String(raised.to || '');
-    var n = (got && P.has(got.byRank, to)) ? got.byRank[to] : 0;
-    if (!n) { return null; }
-    var open = P.has(got.openByRank, to) ? got.openByRank[to] : 0;
-    var fams = [];
-    for (var i = 0; i < got.families.length; i++) {
-      var f = got.families[i];
-      var c = P.has(f.byRank, to) ? f.byRank[to] : 0;
-      if (c) { fams.push({ name: String(f.name).toLowerCase(), n: c, at: i }); }
-    }
-    // The biggest kinds first, and the book's own order between equals.
-    fams.sort(function (a, b) { return (b.n - a.n) || (a.at - b.at); });
-    var names = fams.map(function (x) { return x.name; });
-    var list = names.length > 1
-      ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]
-      : names[0];
-    var line = rankName(to) + ' ' + nameOf(raised.key) + ' work opens ' + n + ' more recipe' +
-               (n === 1 ? '' : 's') + ' to you: ' + list + '.';
-    if (open < n) {
-      var held = n - open;
-      line += (open === 0)
-        ? ' Skyrim will not list ' + (n === 1 ? 'it' : 'any of them') + ' at the bench: ' +
-          (n === 1 ? 'it carries' : 'each carries') + ' a condition of its own,'
-        : ' Skyrim lists ' + open + ' of them at the bench. The other ' + held + ' ' +
-          (held === 1 ? 'carries' : 'each carry') + ' a condition of ' + (held === 1 ? 'its' : 'their') + ' own,';
-      line += ' a perk or a spell or something you have to be holding.';
-    }
-    return line;
-  }
-
-  /*
     Every rank that came out of one action, in the order it happened: the one
     the work was for, and then whatever a mage's schools took from it. Each
     one is a sentence of its own rather than a list, because that is how a
@@ -50991,8 +50938,7 @@ return module.exports;
     if (!raises.length) { return null; }
     var out = [];
     for (var j = 0; j < raises.length; j++) {
-      var opened = unlockLine(actorId, raises[j]);
-      out.push(opened ? raiseLine(raises[j]) + ' ' + opened : raiseLine(raises[j]));
+      out.push(raiseLine(raises[j]));
       clog(actorId.toString(16), raises[j].key, raises[j].from, '->', raises[j].to);
     }
     return out.join(' ');

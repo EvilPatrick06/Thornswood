@@ -37,22 +37,6 @@ that makes two items from one craft is still one piece of work.
 
 Each rank hands one skill-tree point. See [Skill tree](skill-tree.md).
 
-A rank in a half you make things in also says what it just opened,
-counted the way the recipe book on K counts it: how many recipes sit at
-that rank, their kinds, and how many of them Skyrim lists at the bench
-(Patrick, 26 October 2026, #3149). The rest each carry a condition of
-their own, a perk or a spell or something to hold first:
-
-> You are now an Advanced Platewright. 1 skill point to spend, on K.
-> Advanced Platewright work opens 57 more recipes to you: armoured
-> boots, gauntlets, helmets, body armour, shields and other armour and
-> clothing. Skyrim lists 2 of them at the bench. The other 55 each
-> carry a condition of their own, a perk or a spell or something you
-> have to be holding.
-
-The count leaves out what your race may not make, as the book does. A
-half with nothing at the rank reached gets the rank line alone.
-
 The same ladder is used by every class. A miner and a tailor are not
 on different clocks.
 
@@ -230,13 +214,12 @@ Master taking you on or a roll changes the list straight away. A recipe
 nobody owns is listed for everybody.
 
 A weapon or an armour piece comes out crude, fine or masterwork, and
-the tier is on its name, in the server. The line at a rank up naming
-what it opened is in the server too.
+the tier is on its name, in the server.
 
 Not in the world yet: the tenth less or more for a crude or masterwork
-piece, which the engine's damage formula reads off the name (the fork
-has it since 26 October, and it waits on the next engine pin), the
-parts of a warrior's maneuvers the game
+piece, which the engine's damage formula has to read off the name (the
+fork change for it waits on the next engine pin), the parts of a
+warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), the check of which effect a
 brew or an enchantment carries (the engine does not pass it yet),
