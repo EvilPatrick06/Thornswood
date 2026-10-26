@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "7dd5c9bbb098de17a35aaf6ea606648ce279aa4f1f09af36423787bc299874d4",
+    "game/data/recipes.json": "df3b9ecbde46a7dfb33ebd3bb57586c65b982fd1427f0e74eef5c529b0d61438",
     "game/data/harvests.json": "9ca477811631c8027faf92151acdc039f1879df6db2240828631dd00807b4f09",
     "game/data/hunts.json": "de563914653ae6ec58532e5afb5b4aec1b5b18dfa3b16b2ba7907c1bc3661c24",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
