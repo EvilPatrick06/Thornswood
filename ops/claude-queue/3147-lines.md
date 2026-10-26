@@ -11,7 +11,12 @@
 
        pwsh scripts/deploy/Deploy-Docs.ps1 -Site
 
-2. **The bot, after the site, so it finds `lines` the first time it asks.**
+2. **The bot.** It already runs #3447's code: the #3140 install at 11:34 AM
+   on 26 Oct went out from main 44152b1b, and since then it logs "status
+   lines: the site handed out none" every fifteen minutes, as it should with
+   no `lines` on the live site. So after step 1 nothing needs installing; it
+   picks the lines up on its next pass, within fifteen minutes. Run this
+   only if bot.py has changed on main since 44152b1b:
 
        pwsh scripts/deploy/Install-Bot.ps1 -CodeOnly
 

@@ -36,7 +36,11 @@ moved the run notes here.
   #3140; -Site and the known and roadmap boards from b3972289 at 1:39 AM,
   #3137). /known and /roadmap are written by the bot from the issue board
   (data\from-bot\lists.json, #3140); the old known and roadmap boards in
-  board.json are unread. help.md is still the one before #3137 and #2705:
+  board.json are unread. The bot runs main 44152b1b (Install-Bot -CodeOnly
+  from the cloud, 11:34 AM 26 Oct, #3140): a known post stays until its issue
+  has a `Test task:` comment or `board: Done`, or closes, and #known-issues
+  and /known hold 12 findings. Its status lines wait on the site carrying
+  lines.md (3147-lines.md); until then it logs "the site handed out none". help.md is still the one before #3137 and #2705:
   `-Docs help` waits on the main Ship (3137-known-board.md). Its live access
   lists were written whole at 1:57 PM 22 Oct for #3317
   (Set-DiscordLogin -Access): the dev build is for Owner, Co-Owner, Dev and
