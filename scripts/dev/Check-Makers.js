@@ -292,7 +292,10 @@ function page(result) {
   L.push('');
   L.push('| Who | Items | Note |');
   L.push('| --- | --- | --- |');
-  for (const t of result.trades) L.push('| ' + cell(t.who) + ' | ' + t.items + ' | ' + cell(t.note) + ' |');
+  // A path in a note (scripts\\dev\\Build-SpellTable.ps1) is code, not prose.
+  for (const t of result.trades) {
+    L.push('| ' + cell(t.who) + ' | ' + t.items + ' | ' + cell(t.note).replace(/[\w.-]*\w(?:\\[\w.-]*\w)+/g, '`$&`') + ' |');
+  }
   L.push('');
   L.push('## Every item and its maker');
   L.push('');

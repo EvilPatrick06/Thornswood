@@ -138,7 +138,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | --- | --- | --- |
 | Warrior/Bulwark | 0 | warriors do not craft. classes.md gives Bulwark and Berserker combat maneuvers rather than recipes, so there is nothing in the records to find and nothing for a crafting gate to refuse. The profession is offered like any other. |
 | Warrior/Berserker | 0 | warriors do not craft. classes.md gives Bulwark and Berserker combat maneuvers rather than recipes, so there is nothing in the records to find and nothing for a crafting gate to refuse. The profession is offered like any other. |
-| Mage | 0 | a mage has no halves. classes.md gives the Mage two schools and two starting spells, and none of it is a crafting recipe. What a mage knows is written by scripts\dev\Build-SpellTable.ps1. |
+| Mage | 0 | a mage has no halves. classes.md gives the Mage two schools and two starting spells, and none of it is a crafting recipe. What a mage knows is written by `scripts\dev\Build-SpellTable.ps1`. |
 | Alchemist/Blightbrewer | 0 | brews poisons in the alchemy lab's menu, which has no recipe rows |
 | Alchemist/Physicker | 2 | also brews medicine in the alchemy lab's menu, which has no recipe rows |
 | Cook/Hearthcook | 56 |  |
