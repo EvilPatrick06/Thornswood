@@ -36,10 +36,11 @@ moved the run notes here.
   #3140; -Site and the known and roadmap boards from b3972289 at 1:39 AM,
   #3137). /known and /roadmap are written by the bot from the issue board
   (data\from-bot\lists.json, #3140); the old known and roadmap boards in
-  board.json are unread. The bot runs main 44152b1b (Install-Bot -CodeOnly
-  from the cloud, 11:34 AM 26 Oct, #3140): a known post stays until its issue
-  has a `Test task:` comment or `board: Done`, or closes, and #known-issues
-  and /known hold 12 findings. Its status lines wait on the site carrying
+  board.json are unread. The bot runs main 38e8baaf (Install-Bot -CodeOnly
+  from the cloud, 4:43 PM 26 Oct, #3140): the roadmap has no Done lane, and a
+  known post stays until its issue has a `Test task:` comment, done-on-merge's
+  `Pull request #N merged` comment or `board: Done`, or closes. That pass took
+  #613 and #1626 down, and #3539 (forge menu rows) took over #613's warning. Its status lines wait on the site carrying
   lines.md (3147-lines.md); until then it logs "the site handed out none". help.md is still the one before #3137 and #2705:
   `-Docs help` waits on the main Ship (3137-known-board.md). Its live access
   lists were written whole at 1:57 PM 22 Oct for #3317
