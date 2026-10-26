@@ -587,11 +587,13 @@ CHANGES = {
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '4a290d7afd52'),
         ('2026-10-22', 'The help, known issues, roadmap and credits lines are links you can click, and the playtest application is in its own channel now.', 'a290f9d3bc8f'),
         ('2026-10-26', 'The known issues link now says what that page is: what is broken right now that we know about. What works that way on purpose is on the help page.', 'ce6ac2b915a6'),
+        ('2026-10-26', 'Only the line breaks of the Vortex profile sentence moved; no words changed.', '938f8250a962'),
     ],
     'START': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Logs and crash files now go in #test-findings, since #logs-and-crashes is gone.', '8a49f1c3335b'),
         ('2026-10-22', 'Step 1, the playtest application, is in its own channel now.', '9464b08ac76a'),
         ('2026-10-26', 'If it goes wrong: the known issues page lists what is broken right now, and the help page has what works that way on purpose.', 'ca32544d805a'),
+        ('2026-10-26', 'Your first character has its own section: the stone hall, the nine towns you can start in and where you arrive, what waits on a class or a profession, and the tool a Miner, a Farmer, a Fisher or a Woodworker is handed. Connect Discord is on the Play page, and voice names its keys: hold V to talk, O keeps the microphone open, B steps between whisper, normal and yell.', 'e4e76eaea6bf'),
     ],
     'NEWS': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '90be4dab837f'),
@@ -600,10 +602,12 @@ CHANGES = {
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Something broken now points at #test-findings, since #bugs is gone.', '199e5f79c8af'),
         ('2026-10-22', 'The playtest application and help tickets are each in their own channel now.', 'f4cf53ba6ce4'),
         ('2026-10-26', 'NPCs carry on with nobody near now, so the answers about NPCs standing still and the same bandit acting differently are gone. Only a few mod menus still reset, and the known issues page lists only what is actually broken.', 'a2dbef6430b1'),
+        ('2026-10-26', 'Only a comma and some line breaks moved; no answer changed.', '91bab9b34c87'),
     ],
     'GAMERULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '037bba896ff5'),
         ('2026-10-22', 'Titles: a Jarl seat is asked for on the Jarl application, which lists only the holds with no Jarl, and a Jarl names their hold\'s steward, court and guards.', '859039c7cdd4'),
+        ('2026-10-26', 'The chat log is read only by the Owner, the Co-Owner and the Dev rank, and is kept for 365 days, then dropped.', '755ede28b88f'),
     ],
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),
