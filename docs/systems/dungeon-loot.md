@@ -46,12 +46,21 @@ bandit, Falmer and Riekling boss chests. Decided by Patrick on 12
 October 2026.
 
 Gold is always in the chest pile, inside those spans. Two draws are
-made for ordinary goods. The pile is food, drink, potions, ore, gems,
+made for ordinary goods. The pile is food, drink, ore, gems,
 ingredients, soul gems, and ordinary weapons and armour. Lower tiers
 are mostly the common supplies and iron or hide. Higher tiers keep
-those and add steel, silver, better gems, stronger potions, and, at
-the top, ebony, glass, and a grand soul gem. The richer goods are the
-rarer ones.
+those and add steel, silver, better gems, more of the healing
+ingredients, and, at the top, ebony, glass, and a grand soul gem. The
+richer goods are the rarer ones.
+
+No potion is in the pile. A bottle the alchemy lab brews is a new form,
+never one of Skyrim's potion records, so a potion found here was one
+nobody could make. Each of the ten the pile paid is an ingredient with
+the same effect that a Gatherer or a Hunter gathers: imp stool, swamp
+fungal pod and eye of sabre cat for healing, red mountain flower for
+magicka, purple mountain flower for stamina, snowberries for fire and
+glowing mushroom for shock. Decided by Patrick on 26 October 2026
+(#3470).
 
 ## Spell tomes
 

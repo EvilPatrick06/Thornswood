@@ -158,7 +158,9 @@ A mage sees the spell book there instead.
 ## Everything has a maker
 
 Everything in the world has a recipe or a class that gathers it, except
-named uniques and quest items (Patrick, 22 October 2026). That covers
+named uniques and quest items (Patrick, 22 October 2026), and the
+Ancient Nord burial set, which is found in a dungeon and nowhere else
+(Patrick, 26 October 2026, #3524). That covers
 what a chest or a body pays, the clothes and tool a new character is
 handed, and whatever a recipe asks for. [Who makes what the world hands
 out](lists/who-makes-it.md) lists each item and its maker, and the few

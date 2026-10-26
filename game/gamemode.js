@@ -47519,6 +47519,14 @@ module.exports = {
     'eb8:dawnguard.esm': 1,
   };
 
+  /*
+    NO POTION IN THE PILE (#3470). Patrick, 26 Oct 2026, A on the report
+    page: a bottle the alchemy lab brews is a new form, never one of
+    Skyrim's potion records, so a potion here was one nobody could make.
+    Each of the ten is an ingredient now, one that carries the same effect
+    and that a Gatherer or a Hunter gathers (scripts\dev\Check-Makers.js
+    holds every row to a maker), at the same tier and weight.
+  */
   var GOODS = [
     { desc: 'a:Skyrim.esm', name: 'lockpick', plural: 'lockpicks', count: 2, weight: 16, tier: 1 },
     { desc: '34cdf:Skyrim.esm', name: 'salt pile', plural: 'salt piles', count: 2, weight: 12, tier: 1 },
@@ -47526,13 +47534,13 @@ module.exports = {
     { desc: '5ace4:Skyrim.esm', name: 'iron ingot', plural: 'iron ingots', count: 1, weight: 10, tier: 1 },
     { desc: '800e4:Skyrim.esm', name: 'leather strip', plural: 'leather strips', count: 3, weight: 8, tier: 1 },
     { desc: '2e4e2:Skyrim.esm', name: 'petty soul gem', plural: 'petty soul gems', count: 1, weight: 8, tier: 1 },
-    { desc: '3eadd:Skyrim.esm', name: 'potion of minor healing', plural: 'potions of minor healing', count: 1, weight: 10, tier: 1 },
+    { desc: '4da23:Skyrim.esm', name: 'imp stool', plural: 'imp stools', count: 2, weight: 10, tier: 1 },
     { desc: '516c8:Skyrim.esm', name: 'deathbell', plural: 'deathbells', count: 2, weight: 6, tier: 1 },
     { desc: '2f44c:Skyrim.esm', name: 'nightshade', plural: 'nightshade', count: 2, weight: 6, tier: 2 },
     { desc: '5ace5:Skyrim.esm', name: 'steel ingot', plural: 'steel ingots', count: 1, weight: 8, tier: 2 },
     { desc: '63b45:Skyrim.esm', name: 'garnet', plural: 'garnets', count: 1, weight: 5, tier: 2 },
     { desc: '2e4e4:Skyrim.esm', name: 'lesser soul gem', plural: 'lesser soul gems', count: 1, weight: 6, tier: 2 },
-    { desc: '3eade:Skyrim.esm', name: 'potion of healing', plural: 'potions of healing', count: 1, weight: 6, tier: 2 },
+    { desc: '7e8b7:Skyrim.esm', name: 'swamp fungal pod', plural: 'swamp fungal pods', count: 2, weight: 6, tier: 2 },
     { desc: '5ace3:Skyrim.esm', name: 'silver ingot', plural: 'silver ingots', count: 1, weight: 4, tier: 2 },
     { desc: '5ad93:Skyrim.esm', name: 'corundum ingot', plural: 'corundum ingots', count: 1, weight: 5, tier: 3 },
     { desc: '63b46:Skyrim.esm', name: 'amethyst', plural: 'amethysts', count: 1, weight: 4, tier: 3 },
@@ -47543,14 +47551,14 @@ module.exports = {
     { desc: '2e4f4:Skyrim.esm', name: 'greater soul gem', plural: 'greater soul gems', count: 1, weight: 3, tier: 4 },
     { desc: '68521:Skyrim.esm', name: 'flawless garnet', plural: 'flawless garnets', count: 1, weight: 2, tier: 4 },
     { desc: '2e4fc:Skyrim.esm', name: 'grand soul gem', plural: 'grand soul gems', count: 1, weight: 2, tier: 4 },
-    { desc: '3eae1:Skyrim.esm', name: 'potion of magicka', plural: 'potions of magicka', count: 1, weight: 6, tier: 2 },
-    { desc: '3eae0:Skyrim.esm', name: 'potion of minor magicka', plural: 'potions of minor magicka', count: 1, weight: 8, tier: 1 },
-    { desc: '39be8:Skyrim.esm', name: 'potion of stamina', plural: 'potions of stamina', count: 1, weight: 6, tier: 2 },
-    { desc: '3eae5:Skyrim.esm', name: 'potion of minor stamina', plural: 'potions of minor stamina', count: 1, weight: 8, tier: 1 },
-    { desc: '39b4a:Skyrim.esm', name: 'potion of resist fire', plural: 'potions of resist fire', count: 1, weight: 4, tier: 2 },
-    { desc: '39be1:Skyrim.esm', name: 'potion of resist shock', plural: 'potions of resist shock', count: 1, weight: 4, tier: 2 },
-    { desc: '3eadf:Skyrim.esm', name: 'potion of plentiful healing', plural: 'potions of plentiful healing', count: 1, weight: 4, tier: 3 },
-    { desc: '3eae3:Skyrim.esm', name: 'potion of vigorous healing', plural: 'potions of vigorous healing', count: 1, weight: 3, tier: 4 },
+    { desc: '77e1d:Skyrim.esm', name: 'red mountain flower', plural: 'red mountain flowers', count: 3, weight: 6, tier: 2 },
+    { desc: '77e1d:Skyrim.esm', name: 'red mountain flower', plural: 'red mountain flowers', count: 2, weight: 8, tier: 1 },
+    { desc: '77e1e:Skyrim.esm', name: 'purple mountain flower', plural: 'purple mountain flowers', count: 3, weight: 6, tier: 2 },
+    { desc: '77e1e:Skyrim.esm', name: 'purple mountain flower', plural: 'purple mountain flowers', count: 2, weight: 8, tier: 1 },
+    { desc: '1b3bd:Skyrim.esm', name: 'snowberries', plural: 'snowberries', count: 2, weight: 4, tier: 2 },
+    { desc: '7ee01:Skyrim.esm', name: 'glowing mushroom', plural: 'glowing mushrooms', count: 2, weight: 4, tier: 2 },
+    { desc: '6bc07:Skyrim.esm', name: 'eye of sabre cat', plural: 'eyes of sabre cat', count: 1, weight: 4, tier: 3 },
+    { desc: '6bc07:Skyrim.esm', name: 'eye of sabre cat', plural: 'eyes of sabre cat', count: 2, weight: 3, tier: 4 },
     { desc: '34c5e:Skyrim.esm', name: 'ale', plural: 'ales', count: 1, weight: 8, tier: 1 },
     { desc: '65c98:Skyrim.esm', name: 'bread', plural: 'loaves of bread', count: 1, weight: 8, tier: 1 },
     { desc: '64b31:Skyrim.esm', name: 'goat cheese wedge', plural: 'goat cheese wedges', count: 1, weight: 6, tier: 1 },

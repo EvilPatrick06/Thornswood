@@ -6,107 +6,20 @@ Everything in the world has a recipe except named uniques and quest items (Patri
 
 A maker is a recipe in the open book (not cut and not tempering), or a class that gathers the item. A bottle the alchemy lab brews is a new form, not a record, so the lab is the maker of no record. The build fails when the world hands out something with no maker that `scripts/dev/Check-Makers.waiting.json` does not name with the issue that will give it one.
 
-275 items handed out. 148 have a maker. 127 have none yet.
+268 items handed out. 151 have a maker. 117 have none yet.
 
 ## Nobody makes these yet
 
 | Item | Where the world has it | Recipes that wait on it | Waiting on | Why |
 | --- | --- | --- | --- | --- |
+| Ancient Nord Amulet | Dungeon exclusive | 0 | exempt | The burial set is found in a dungeon and nowhere else. Patrick, 26 Oct, B on #3132; its four Skyforge armour recipes are cut on #3524. |
+| Ancient Nord Arrow | Dungeon exclusive | 0 | exempt | The burial set is found in a dungeon and nowhere else. Patrick, 26 Oct, B on #3132; its four Skyforge armour recipes are cut on #3524. |
+| Ancient Nord Battleaxe | Dungeon exclusive | 0 | exempt | The burial set is found in a dungeon and nowhere else. Patrick, 26 Oct, B on #3132; its four Skyforge armour recipes are cut on #3524. |
+| Ancient Nord Bow | Dungeon exclusive | 0 | exempt | The burial set is found in a dungeon and nowhere else. Patrick, 26 Oct, B on #3132; its four Skyforge armour recipes are cut on #3524. |
+| Ancient Nord Greatsword | Dungeon exclusive | 0 | exempt | The burial set is found in a dungeon and nowhere else. Patrick, 26 Oct, B on #3132; its four Skyforge armour recipes are cut on #3524. |
+| Ancient Nord Sword | Dungeon exclusive | 0 | exempt | The burial set is found in a dungeon and nowhere else. Patrick, 26 Oct, B on #3132; its four Skyforge armour recipes are cut on #3524. |
+| Ancient Nord War Axe | Dungeon exclusive | 0 | exempt | The burial set is found in a dungeon and nowhere else. Patrick, 26 Oct, B on #3132; its four Skyforge armour recipes are cut on #3524. |
 | Gold | Asked for by a recipe | 1 | #3115 | a forge recipe (the Eyepatch) still asks for a gold coin, which no recipe may |
-| Dwarven Oil | Asked for by a recipe | 1 | #3132 | no animal, plant or recipe gives it; where it comes from is Patrick's decision on #3132 |
-| Bone Meal | Dungeon and body loot, Asked for by a recipe | 6 | #3132 | no animal, plant or recipe gives it; where it comes from is Patrick's decision on #3132 |
-| Common Soul Gem | Dungeon and body loot, Asked for by a recipe | 7 | #3132 | who makes soul gems is Patrick's decision on #3132 |
-| Diamond | Dungeon and body loot | 0 | #3132 | where garnets and diamonds come from is Patrick's decision on #3132 |
-| Flawless Diamond | Dungeon and body loot | 0 | #3132 | where garnets and diamonds come from is Patrick's decision on #3132 |
-| Flawless Garnet | Dungeon and body loot | 0 | #3132 | where garnets and diamonds come from is Patrick's decision on #3132 |
-| Garnet | Dungeon and body loot | 0 | #3132 | where garnets and diamonds come from is Patrick's decision on #3132 |
-| Grand Soul Gem | Dungeon and body loot | 0 | #3132 | who makes soul gems is Patrick's decision on #3132 |
-| Greater Soul Gem | Dungeon and body loot | 0 | #3132 | who makes soul gems is Patrick's decision on #3132 |
-| Lesser Soul Gem | Dungeon and body loot | 0 | #3132 | who makes soul gems is Patrick's decision on #3132 |
-| Spell Tome: Bane of the Undead | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Blizzard | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Bound Battleaxe | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Bound Bow | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Bound Sword | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Call To Arms | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Calm | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Candlelight | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Chain Lightning | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Clairvoyance | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Conjure Familiar | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Conjure Flame Atronach | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Conjure Frost Atronach | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Conjure Storm Atronach | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Courage | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Dead Thrall | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Detect Life | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Detect Undead | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Dragonhide | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Dread Zombie | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Ebonyflesh | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Expel Daedra | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Fast Healing | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Fear | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Fire Rune | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Fire Storm | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Fireball | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Firebolt | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Flame Cloak | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Flame Thrall | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Flames | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Frenzy | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Frost Cloak | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Frost Rune | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Frost Thrall | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Frostbite | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Fury | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Grand Healing | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Harmony | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Heal Other | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Healing | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Healing Hands | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Hysteria | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Ice Spike | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Ice Storm | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Invisibility | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Ironflesh | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Lesser Ward | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Lightning Bolt | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Lightning Cloak | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Lightning Rune | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Lightning Storm | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Magelight | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Mara's Embrace | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Mass Paralysis | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Mayhem | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Muffle | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Oakflesh | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Pacify | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Paralyze | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Rally | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Reanimate Corpse | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Rout | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Soul Trap | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Sparks | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Steadfast Ward | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Stoneflesh | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Storm Thrall | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Telekinesis | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Turn Greater Undead | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Turn Lesser Undead | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Turn Undead | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Wall of Flames | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Wall of Frost | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Wall of Storms | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Spell Tome: Waterbreathing | Dungeon and body loot, tomes | 0 | #3132 | who writes a spell tome is Patrick's decision on #3132 |
-| Ancient Nord Amulet | Dungeon exclusive | 0 | #3132 | the burial set is dungeon only (dungeon-loot.md); whether it gets recipes is Patrick's decision on #3132 |
-| Ancient Nord Arrow | Dungeon exclusive | 0 | #3132 | the burial set is dungeon only (dungeon-loot.md); whether it gets recipes is Patrick's decision on #3132 |
-| Ancient Nord Battleaxe | Dungeon exclusive | 0 | #3132 | the burial set is dungeon only (dungeon-loot.md); whether it gets recipes is Patrick's decision on #3132 |
-| Ancient Nord Bow | Dungeon exclusive | 0 | #3132 | the burial set is dungeon only (dungeon-loot.md); whether it gets recipes is Patrick's decision on #3132 |
-| Ancient Nord Greatsword | Dungeon exclusive | 0 | #3132 | the burial set is dungeon only (dungeon-loot.md); whether it gets recipes is Patrick's decision on #3132 |
-| Ancient Nord Sword | Dungeon exclusive | 0 | #3132 | the burial set is dungeon only (dungeon-loot.md); whether it gets recipes is Patrick's decision on #3132 |
-| Ancient Nord War Axe | Dungeon exclusive | 0 | #3132 | the burial set is dungeon only (dungeon-loot.md); whether it gets recipes is Patrick's decision on #3132 |
-| Black Soul Gem | Dungeon exclusive | 0 | #3132 | who makes soul gems is Patrick's decision on #3132 |
 | Drum | Asked for by a recipe | 1 | #3461 | Woodwright work with no recipe yet |
 | Flute | Asked for by a recipe | 1 | #3461 | Woodwright work with no recipe yet |
 | Lute | Asked for by a recipe | 1 | #3461 | Woodwright work with no recipe yet |
@@ -129,16 +42,93 @@ A maker is a recipe in the open book (not cut and not tempering), or a class tha
 | Boar Meat | Asked for by a recipe | 2 | #3465 | an animal part no hunt gives yet |
 | Small Antlers | Asked for by a recipe | 1 | #3465 | an animal part no hunt gives yet |
 | Spider Egg | Asked for by a recipe | 4 | #3465 | an animal part no hunt gives yet |
-| Potion of Healing | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Magicka | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Minor Healing | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Minor Magicka | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Minor Stamina | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Plentiful Healing | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Resist Fire | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Resist Shock | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Stamina | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
-| Potion of Vigorous Healing | Dungeon and body loot | 0 | #3470 | The lab's bottle is a new form, never this record; no recipe makes it. |
+| Spell Tome: Bane of the Undead | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Blizzard | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Bound Battleaxe | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Bound Bow | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Bound Sword | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Call To Arms | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Calm | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Candlelight | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Chain Lightning | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Clairvoyance | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Conjure Familiar | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Conjure Flame Atronach | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Conjure Frost Atronach | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Conjure Storm Atronach | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Courage | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Dead Thrall | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Detect Life | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Detect Undead | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Dragonhide | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Dread Zombie | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Ebonyflesh | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Expel Daedra | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Fast Healing | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Fear | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Fire Rune | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Fire Storm | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Fireball | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Firebolt | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Flame Cloak | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Flame Thrall | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Flames | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Frenzy | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Frost Cloak | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Frost Rune | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Frost Thrall | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Frostbite | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Fury | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Grand Healing | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Harmony | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Heal Other | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Healing | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Healing Hands | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Hysteria | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Ice Spike | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Ice Storm | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Invisibility | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Ironflesh | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Lesser Ward | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Lightning Bolt | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Lightning Cloak | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Lightning Rune | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Lightning Storm | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Magelight | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Mara's Embrace | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Mass Paralysis | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Mayhem | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Muffle | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Oakflesh | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Pacify | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Paralyze | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Rally | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Reanimate Corpse | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Rout | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Soul Trap | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Sparks | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Steadfast Ward | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Stoneflesh | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Storm Thrall | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Telekinesis | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Turn Greater Undead | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Turn Lesser Undead | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Turn Undead | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Wall of Flames | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Wall of Frost | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Wall of Storms | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Spell Tome: Waterbreathing | Dungeon and body loot, tomes | 0 | #3519 | Patrick, 26 Oct, A: a Mage writes tomes of their own school at the writing desk. |
+| Common Soul Gem | Dungeon and body loot, Asked for by a recipe | 7 | #3520 | Patrick, 26 Oct, A: the Wardweaver makes soul gems, a size up by rank. |
+| Grand Soul Gem | Dungeon and body loot | 0 | #3520 | Patrick, 26 Oct, A: the Wardweaver makes soul gems, a size up by rank. |
+| Greater Soul Gem | Dungeon and body loot | 0 | #3520 | Patrick, 26 Oct, A: the Wardweaver makes soul gems, a size up by rank. |
+| Lesser Soul Gem | Dungeon and body loot | 0 | #3520 | Patrick, 26 Oct, A: the Wardweaver makes soul gems, a size up by rank. |
+| Black Soul Gem | Dungeon exclusive | 0 | #3520 | Patrick, 26 Oct, A: the Wardweaver makes soul gems, a size up by rank. |
+| Diamond | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
+| Flawless Diamond | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
+| Flawless Garnet | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
+| Garnet | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
+| Dwarven Oil | Asked for by a recipe | 1 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
+| Bone Meal | Dungeon and body loot, Asked for by a recipe | 6 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
 
 ## What each trade makes or gathers
 
@@ -200,7 +190,6 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Firewood | Asked for by a recipe | Whoever the Smelter opens for; woodworker, novice | `6f993:Skyrim.esm` |
 | Frost Mirriam | Asked for by a recipe | Gatherer, novice | `34d32:Skyrim.esm` |
 | Fur Plate | Asked for by a recipe | Whoever the TanningRack opens for | `da0bf1:Update.esm` |
-| Glowing Mushroom | Asked for by a recipe | Gatherer, advanced | `7ee01:Skyrim.esm` |
 | Goat Meat | Asked for by a recipe | Hunter, novice | `65c9a:Skyrim.esm` |
 | Gourd | Asked for by a recipe | Farmer, novice | `10d666:Skyrim.esm` |
 | Hanging Moss | Asked for by a recipe | Gatherer, novice | `57f91:Skyrim.esm` |
@@ -221,13 +210,11 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Netch Leather | Asked for by a recipe | Hunter, advanced | `1cd7c:Dragonborn.esm` |
 | Orichalcum Ore | Asked for by a recipe | Miner, advanced | `5acdd:Skyrim.esm` |
 | Pheasant Breast | Asked for by a recipe | Hunter, novice | `65c9d:Skyrim.esm` |
-| Purple Mountain Flower | Asked for by a recipe | Gatherer, advanced | `77e1e:Skyrim.esm` |
 | Quicksilver Ingot | Asked for by a recipe | Smith/Platewright at Smelter | `5ada0:Skyrim.esm` |
 | Quicksilver Ore | Asked for by a recipe | Miner, advanced | `5ace2:Skyrim.esm` |
 | Raw Beef | Asked for by a recipe | Hunter, novice | `65c99:Skyrim.esm` |
 | Raw Rabbit Leg | Asked for by a recipe | Hunter, novice | `65c9e:Skyrim.esm` |
 | Red Apple | Asked for by a recipe | Farmer, expert | `64b2e:Skyrim.esm` |
-| Red Mountain Flower | Asked for by a recipe | Gatherer, advanced | `77e1d:Skyrim.esm` |
 | Refined Malachite | Asked for by a recipe | Smith/Platewright at Smelter | `5ada1:Skyrim.esm` |
 | Refined Moonstone | Asked for by a recipe | Smith/Platewright at Smelter | `5ad9f:Skyrim.esm` |
 | Sabre Cat Pelt | Asked for by a recipe | Hunter, advanced | `3ad6d:Skyrim.esm` |
@@ -240,7 +227,6 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Skeever Meat | Asked for by a recipe | Hunter, novice | `8ac:Gourmet.esp` |
 | Slaughterfish Meat | Asked for by a recipe | Hunter, novice | `8ae:Gourmet.esp` |
 | Snow Bear Pelt | Asked for by a recipe | Hunter, expert | `3ad54:Skyrim.esm` |
-| Snowberries | Asked for by a recipe | Gatherer, advanced | `1b3bd:Skyrim.esm` |
 | Stalhrim | Asked for by a recipe | Miner, master | `2b06b:Dragonborn.esm` |
 | Thread | Asked for by a recipe | Tailor/Haberdasher at MCE_CraftingLoom | `6ce001:Update.esm` |
 | Tomato | Asked for by a recipe | Farmer, advanced | `64b42:Skyrim.esm` |
@@ -264,17 +250,20 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Ebony Sword | Dungeon and body loot | Smith/Edgewright at SmithingForge | `139b1:Skyrim.esm` |
 | Elven Sword | Dungeon and body loot | Smith/Edgewright at SmithingForge | `139a1:Skyrim.esm` |
 | Emerald | Dungeon and body loot | Miner, master; Whoever the Smelter opens for | `63b43:Skyrim.esm` |
+| Eye of Sabre Cat | Dungeon and body loot | Hunter, advanced; Hunter, expert; Hunter, novice | `6bc07:Skyrim.esm` |
 | Fire Salts | Dungeon and body loot, Asked for by a recipe | Miner, expert | `3ad5e:Skyrim.esm` |
 | Frost Salts | Dungeon and body loot, Asked for by a recipe | Miner, expert | `3ad5f:Skyrim.esm` |
 | Garlic | Dungeon and body loot, Asked for by a recipe | Gatherer, novice | `34d22:Skyrim.esm` |
 | Glass Armor | Dungeon and body loot | Smith/Platewright at SmithingForge | `13939:Skyrim.esm` |
 | Glass Sword | Dungeon and body loot | Smith/Edgewright at SmithingForge | `139a9:Skyrim.esm` |
+| Glowing Mushroom | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `7ee01:Skyrim.esm` |
 | Gold Ingot | Dungeon and body loot, Asked for by a recipe | Smith/Platewright at Smelter | `5ad9e:Skyrim.esm` |
 | Gold Ore | Dungeon and body loot, Asked for by a recipe | Miner, expert; Whoever the Smelter opens for | `5acde:Skyrim.esm` |
 | Grilled Leeks | Dungeon and body loot | Cook/Hearthcook at BYOHCraftingOven | `64b3e:Skyrim.esm` |
 | Hide Armor | Dungeon and body loot | Smith/Platewright at SmithingForge | `13911:Skyrim.esm` |
 | Hide Helmet | Dungeon and body loot | Smith/Platewright at SmithingForge | `13913:Skyrim.esm` |
 | Honey Nut Treat | Dungeon and body loot | Cook/Confectioner at BYOHCraftingOven | `64b38:Skyrim.esm` |
+| Imp Stool | Dungeon and body loot | Gatherer, novice | `4da23:Skyrim.esm` |
 | Iron Armor | Dungeon and body loot | Smith/Platewright at SmithingForge | `12e49:Skyrim.esm` |
 | Iron Arrow | Dungeon and body loot | Woodworker/Woodwright at ThornswoodCraftingWoodworking | `1397d:Skyrim.esm` |
 | Iron Boots | Dungeon and body loot | Smith/Platewright at SmithingForge | `12e4b:Skyrim.esm` |
@@ -298,11 +287,14 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Orichalcum Ingot | Dungeon and body loot, Asked for by a recipe | Smith/Platewright at Smelter | `5ad99:Skyrim.esm` |
 | Petty Soul Gem | Dungeon and body loot | Enchanter, novice, scarce | `2e4e2:Skyrim.esm` |
 | Potato | Dungeon and body loot, Asked for by a recipe | Farmer, novice | `64b41:Skyrim.esm` |
+| Purple Mountain Flower | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `77e1e:Skyrim.esm` |
+| Red Mountain Flower | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `77e1d:Skyrim.esm` |
 | Ruby | Dungeon and body loot | Miner, master; Whoever the Smelter opens for | `63b42:Skyrim.esm` |
 | Salt Pile | Dungeon and body loot, Asked for by a recipe | Miner, novice | `34cdf:Skyrim.esm` |
 | Sapphire | Dungeon and body loot | Miner, master; Whoever the Smelter opens for | `63b44:Skyrim.esm` |
 | Silver Ingot | Dungeon and body loot, Asked for by a recipe | Smith/Platewright at Smelter | `5ace3:Skyrim.esm` |
 | Silver Ore | Dungeon and body loot, Asked for by a recipe | Miner, advanced | `5acdf:Skyrim.esm` |
+| Snowberries | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `1b3bd:Skyrim.esm` |
 | Steel Armor | Dungeon and body loot | Smith/Platewright at SmithingForge | `13952:Skyrim.esm` |
 | Steel Arrow | Dungeon and body loot | Woodworker/Woodwright at ThornswoodCraftingWoodworking | `1397f:Skyrim.esm` |
 | Steel Dagger | Dungeon and body loot | Smith/Edgewright at SmithingForge | `13986:Skyrim.esm` |
@@ -311,6 +303,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Steel Shield | Dungeon and body loot | Smith/Platewright at SmithingForge | `13955:Skyrim.esm` |
 | Steel Sword | Dungeon and body loot | Smith/Edgewright at SmithingForge | `13989:Skyrim.esm` |
 | Steel War Axe | Dungeon and body loot | Smith/Edgewright at SmithingForge | `13983:Skyrim.esm` |
+| Swamp Fungal Pod | Dungeon and body loot | Gatherer, advanced | `7e8b7:Skyrim.esm` |
 | Sweet Roll | Dungeon and body loot | Cook/Confectioner at BYOHCraftingOven | `64b3d:Skyrim.esm` |
 | Venison | Dungeon and body loot, Asked for by a recipe | Hunter, novice | `669a2:Skyrim.esm` |
 | Void Salts | Dungeon and body loot | Miner, expert | `3ad60:Skyrim.esm` |
