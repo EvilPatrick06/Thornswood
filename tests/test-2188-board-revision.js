@@ -169,7 +169,7 @@ const board = (who) => ({ intro: '', sections: [{ id: 's1', title: 'Open', colum
     yes('A11 none of the refused saves wrote anything', bf.todo.sections[0].rows[0].cells[0] === 'the refused tab, after reloading' && bf._rev.todo === 2);
 
     const [r1, r2] = await Promise.all([
-      request(port, 'PUT', '/api/board/roadmap', h(0), board('roadmap edit')),
+      request(port, 'PUT', '/api/board/archive', h(0), board('archive edit')),
       request(port, 'PUT', '/api/board/todo', h(2), board('todo edit')),
     ]);
     yes('A12 two people on two boards at once: both land', r1.status === 200 && r2.status === 200 && r1.j.rev === 1 && r2.j.rev === 3);

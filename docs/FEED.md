@@ -49,8 +49,8 @@ what it does not is under "Checks on every download".
   old fallback asks a repository that answers 404 while the site is down, and
   the site answering is all it needs. A launcher last run before 26 Sep reads
   only GitHub, so once the repository is deleted it finds no feed and has to be
-  reinstalled from the site; the Known Issues page (the known board in
-  `site\data\board.json`, #2414) says so to the person.
+  reinstalled from the site; the Known Issues page (written from the issue
+  board, #3140) says so to the person.
 
 ### Downloads come from the site (#897)
 

@@ -70,14 +70,12 @@ yes('it never says player', !/player/i.test(note));
 
 // ------------------------------------------------------ what it relies on
 /*
-  "scripts that never fire here" is the Known Issues page's own reason. If
-  that row ever changes, because scripts start running, this line is wrong.
+  "scripts that never fire here" is the Known Issues page's own reason, and
+  the instruments are on it as broken right now. Since #3140 that page is
+  written from the issue board: those two rows are the "Known issue:"
+  comments on the mod scripts issue and on the instruments issue, which no
+  file here holds, so nothing in this harness can read them.
 */
-const known = require('./fixtures/known-page').knownPage() || '';  // the known board, as /known writes it (#2414)
-yes('Known Issues still says mod scripts never fire',
-    /\| Many mod features do nothing here \|[^\n]*own scripts never fires/.test(known));
-yes('and lists the instruments themselves as broken right now (#3434)',
-    /\| A flute, lute or drum looks wrong when equipped and plays nothing \|[^\n]*emote/.test(known));
 
 /*
   The wheel's key. The plugin reads WheelKey out of Thornswood.ini, and a
