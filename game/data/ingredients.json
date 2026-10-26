@@ -284,36 +284,6 @@
     "AlchFortifyDestruction"
    ]
   },
-  "306d:Update.esm": {
-   "edid": "ccBGS_RootRotScaleIngredient",
-   "from": "Update.esm",
-   "effects": [
-    "AlchDamageSpeed",
-    "AlchDamageHealthDuration",
-    "AlchInfluenceConfDown",
-    "AlchParalysis"
-   ]
-  },
-  "306e:Update.esm": {
-   "edid": "ccBGS_RootScreamingMawIngredient",
-   "from": "Update.esm",
-   "effects": [
-    "AlchFortifyMagickaRate",
-    "AlchFortifyAlteration",
-    "AlchInvisibillity",
-    "AlchFortifyHealRate"
-   ]
-  },
-  "306f:Update.esm": {
-   "edid": "ccBGS_RootThornHookIngredient",
-   "from": "Update.esm",
-   "effects": [
-    "AlchDamageHealthDuration",
-    "AlchParalysis",
-    "AlchFortifyMagickaRate",
-    "AlchFortifyHealRate"
-   ]
-  },
   "34cdd:Skyrim.esm": {
    "edid": "BoneMeal",
    "from": "Skyrim.esm",

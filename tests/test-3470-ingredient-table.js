@@ -16,6 +16,8 @@
 //   a potion and a poison are kept with their kind, and a food item is not;
 //   an effect no plugin defines is kept as its desc and counted, never
 //     dropped.
+//   one of Update.esm's Creation Club records (records/update-creation-club.json)
+//     is left out, so no recipe can ask for it (#479).
 //
 // Nothing outside the temporary folder is written.
 const fs = require('fs');
@@ -90,7 +92,11 @@ try {
                   alch(0x3eaf0, 'DamageHealth01', 0x00020000, [0x3eaf3]),
                   alch(0x65c98, 'FoodBread', 0x2, [0x3eb15])])
   ]));
-  for (const m of ['Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']) {
+  // Update.esm's own Creation Club root, 306d, which the list names.
+  fs.writeFileSync(path.join(DATA, 'Update.esm'), plugin(['Skyrim.esm'], [
+    grup('INGR', [ingr(0x0100306d, 'ccBGS_RootRotScaleIngredient', [0x3eb15])])
+  ]));
+  for (const m of ['Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']) {
     fs.writeFileSync(path.join(DATA, m), plugin(['Skyrim.esm'], []));
   }
   // A mod that changes the red flower (its high byte 00 is Skyrim.esm by its
@@ -122,6 +128,8 @@ try {
     (q['3eadd:Skyrim.esm'] || {}).kind === 'potion' && (q['3eaf0:Skyrim.esm'] || {}).kind === 'poison' &&
     JSON.stringify(q['3eadd:Skyrim.esm'].effects) === JSON.stringify(['AlchRestoreHealth']));
   yes('a meal is not a potion', !q['65c98:Skyrim.esm']);
+  yes('Update.esm\'s Creation Club root is left out, and said',
+    !i['306d:Update.esm'] && /1 of them Update\.esm's Creation Club records, left out/.test(p.stdout));
   yes('it says how many effects no plugin names', /1 effect\(s\) no plugin names/.test(p.stdout));
 } finally {
   fs.rmSync(TMP, { recursive: true, force: true });

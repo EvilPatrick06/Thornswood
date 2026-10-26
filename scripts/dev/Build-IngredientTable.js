@@ -24,6 +24,14 @@
 // Names come from EDID: FULL in a localized master is a number into a
 // strings file, and food.json shows what reading it as text gives.
 //
+// UPDATE.ESM'S CREATION CLUB RECORDS ARE LEFT OUT. Update.esm holds records
+// whose editor id starts with cc (three Creation Club roots among the
+// ingredients), whose meshes and scripts come only with the Creation Club
+// files, which Thornswood leaves out (#479). records\update-creation-club.json
+// lists them and tests\test-special-edition-only.js holds every gamemode
+// table to that list, so this skips them the way Build-HarvestTable.ps1 and
+// Build-HuntTable.ps1 do: no recipe may ask for one.
+//
 // Read only. It opens the plugins of the build and writes
 // game\data\ingredients.json.
 //
@@ -44,6 +52,11 @@ function opt(name, def) {
 const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const OUT = opt('out', path.join(__dirname, '..', '..', 'game', 'data', 'ingredients.json'));
 const PLUGINS_TXT = opt('plugins', '');
+
+const CREATION = {};
+for (const local of Object.keys(JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'records', 'update-creation-club.json'), 'utf8')).records)) {
+  CREATION[local.toLowerCase() + ':Update.esm'] = true;
+}
 
 // The plugin list, the same default as Build-FoodTable.js.
 function pluginsTxt() {
@@ -109,6 +122,7 @@ const mgef = {};        // magic effect desc -> editor id, last plugin wins
 const ingredients = {}; // desc -> { edid, from, effects: [effect desc] }
 const potions = {};     // desc -> { edid, from, kind, effects: [effect desc] }
 let read = 0;
+let creation = 0;   // Update.esm's Creation Club records, left out
 
 function walk(b, start, end) {
   let j = start;
@@ -129,7 +143,9 @@ function walk(b, start, end) {
       const s = subrecords(rec);
       const desc = descOf(formId);
       read++;
-      if (type === 'MGEF') {
+      if (CREATION[desc] && type !== 'MGEF') {
+        creation++;
+      } else if (type === 'MGEF') {
         mgef[desc] = s.EDID;
       } else if (type === 'INGR') {
         ingredients[desc] = { edid: s.EDID, from: here.file, effects: s.effects };
@@ -171,7 +187,8 @@ function sorted(o, kind) {
 const ing = sorted(ingredients, false);
 const pot = sorted(potions, true);
 
-console.log(order.length + ' plugins in the order, ' + read + ' INGR, ALCH and MGEF records read');
+console.log(order.length + ' plugins in the order, ' + read + ' INGR, ALCH and MGEF records read, ' +
+            creation + ' of them Update.esm\'s Creation Club records, left out');
 console.log(Object.keys(ing).length + ' ingredients, ' + Object.keys(pot).length + ' potions and poisons, ' +
             unnamed + ' effect(s) no plugin names');
 
