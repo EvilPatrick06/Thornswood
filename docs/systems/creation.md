@@ -21,7 +21,7 @@ panel behind K opens on its own. On it:
   every seam, carcass, plant, fishing spot and crop turns them away.
 - **Profession and half.** One profession, then one half of it. Can wait
   the same way. Until it is picked, they cannot make anything that is
-  somebody's work. Smelting and tanning stay open. See
+  somebody's work, smelting and tanning included. See
   [Professions](professions.md).
 
 They are handed 40 gold once, and nothing else, except a tool at the
@@ -30,9 +30,12 @@ woodcutter's axe for a Woodworker, a shovel and seed for a Farmer, a
 crude fishing pole for a Fisher. The tool has 50 uses.
 
 The towns are Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath,
-Morthal, Dawnstar, Winterhold and Raven Rock. The arrival is that town's
-inn. The same points are where a death wakes them, preferring a temple.
-See [Death](death.md).
+Morthal, Dawnstar and Winterhold (`game\data\chargen.json`). The arrival
+is that town's start spot (#2622): the stables or the carriage stop at
+Whiterun, Solitude, Windhelm and Riften, Understone Keep in Markarth, and
+a quiet spot of each of the other four. The inn spot is kept for staff, as
+`/tp <town> inn`. A death wakes them at the nearest temple or Hall of the
+Dead instead. See [Death](death.md).
 
 Nothing about a character is chosen in the launcher. Skyrim's own
 levelling is off, so the face menu does not start a perk tree.

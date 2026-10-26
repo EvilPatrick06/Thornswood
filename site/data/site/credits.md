@@ -17,8 +17,9 @@ GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES.
 ## The mod list
 
 Every mod in Thornswood was made by somebody who gave it away. The full list is
-in the launcher, and each one links to its own page. Go and endorse the ones
-you like.
+the collection on Nexus, linked from the [Downloads](/downloads) page, and each
+mod in it links to its own page and its author. Go and endorse the ones you
+like.
 
 <a id='source'></a>
 

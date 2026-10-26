@@ -106,24 +106,20 @@ yes('that section says what is still worth reporting',
     /report[^.]*only if|only report|worth reporting|worth a report/i.test(skymp.lead));
 
 // ------------------------------------------------------------ the preview
-/* What a link to /known says when it is pasted into Discord. server.js is the
-   one a crawler reads, the home page's script the one the browser tab reads,
-   and they are meant to be the same list. That script moved out of home.html
-   into home.js in #1479 (no inline script under the content security policy). */
+/* What a link to /known says when it is pasted into Discord, and what the
+   browser tab reads. server.js writes both into the page from its one list
+   (BLURB). home.js kept a second copy until #3138, and the two were edited
+   apart, so the test now checks there is only the one. */
 function blurb(rel) {
   const src = read(rel) || '';
   const m = src.match(/'\/known':\s*\[\s*'([^']*)',\s*'([^']*)'\s*\]/);
   return m ? m[2] : null;
 }
 const serverBlurb = blurb('server.js');
-const homeBlurb = blurb(path.join('public', 'home.js'));
 yes('server.js has a /known preview', serverBlurb !== null);
-yes('home.js has a /known preview', homeBlurb !== null);
-yes('the preview a crawler reads no longer calls the page permanent',
+yes('the preview no longer calls the page permanent',
     serverBlurb !== null && !/permanent/i.test(serverBlurb) && !PROMISE.test(serverBlurb));
-yes('nor does the one the browser tab reads',
-    homeBlurb !== null && !/permanent/i.test(homeBlurb) && !PROMISE.test(homeBlurb));
-yes('and the two say the same thing', serverBlurb !== null && serverBlurb === homeBlurb);
+yes('home.js keeps no second copy of it', blurb(path.join('public', 'home.js')) === null);
 
 // ------------------------------------------- the tester note and Help page
 /* Both used to be checked here against the roadmap's rows in board.json:
