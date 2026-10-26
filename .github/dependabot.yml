@@ -38,9 +38,11 @@
 # The launcher is C# built by MSBuild from launcher/app/Thornswood.csproj with
 # no package manager at all, by design: WebView2 is vendored in launcher/lib
 # and referenced by path (#498), so there is no manifest here for dependabot
-# to read. WebView2 is watched by hand: THIRD-PARTY.md records the version
-# the three files are (1.0.2903.40) and their sha256, and moving it means
-# taking the new package from nuget.org and rewriting that section (#3683).
+# to read. WebView2 is watched by the nightly instead (#3683, Patrick's
+# answer on 26 Oct): tests\test-3683-webview2-advisories.js asks osv.dev for
+# advisories on the version THIRD-PARTY.md records, and a red night opens the
+# board issue. Moving it means taking the fixed package from nuget.org and
+# rewriting that section, files, sha256 and version together.
 #
 # Weekly rather than daily: this is a small team, and a pull request a day
 # from a robot is a pull request nobody reads.

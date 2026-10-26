@@ -6,15 +6,22 @@ played. That is enough to be worth reporting a hole in rather than posting one.
 
 ## Where to send it
 
-Either of these. Only the owner reads a report sent either way, and nothing
-about it is public until we say so.
+Any of these. Nothing about a report is public until we say so.
 
 - **On GitHub:** the **Report a vulnerability** button on this repository's
-  Security tab. GitHub offers that button on public repositories only, and
-  only once it is switched on, so if you do not see it, use the Discord route.
-- **Anywhere else:** a direct message to the owner on Discord. The Discord is
-  linked from every page of [thornswood.net](https://thornswood.net), and the
-  site's privacy and terms pages give the same route.
+  Security tab. Only the owner reads it. GitHub offers that button on public
+  repositories only, and only once it is switched on, so if you do not see
+  it, use one of the other two.
+- **On Discord:** a direct message to the owner, who alone reads it. The
+  Discord is linked from every page of [thornswood.net](https://thornswood.net),
+  and the site's privacy and terms pages give the same route.
+- **On the site, with no account at all:** the
+  [report page](https://thornswood.net/report). The staff read it, so say at
+  the top that it is a security hole and leave out the steps; the owner will
+  ask for them.
+
+The site's [security.txt](https://thornswood.net/.well-known/security.txt)
+gives the same routes.
 
 Please do not open a public issue for a security problem, and please do not
 post it in a Discord channel. Both are read by everybody, including whoever

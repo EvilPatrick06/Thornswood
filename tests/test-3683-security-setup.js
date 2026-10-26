@@ -17,9 +17,11 @@
        its event, so the gate would read nothing there; it has none.
     B. The issue chooser's "A security hole" link opens SECURITY.md, never
        GitHub's advisory form, which a private repository cannot use (#3650).
-    C. SECURITY.md gives both routes, the Security tab's button with the
-       Discord message for when the button is not there, a reply time, and no
-       head count that goes stale (#3642).
+    C. SECURITY.md gives the three routes security.txt and it share (the
+       Security tab's button, a Discord message to the owner, the site's
+       report page; Patrick, 26 Oct, q-3683-report-route A), a reply time, and
+       no head count that goes stale (#3642). tests\test-3216-site-security.js
+       holds security.txt's half.
     D. Dependabot watches every manifest this repository has, and only those:
        every entry's directory holds the manifest its ecosystem reads, and a
        package.json anywhere means an npm entry is owed. The npm lockfiles
@@ -97,8 +99,9 @@ yes('B  and the reader fails the advisory form it used to open',
 function securityFaults(t) {
   const bad = [];
   if (!/Report a vulnerability/.test(t) || !/Security tab/.test(t)) { bad.push('does not name the Security tab\'s button'); }
-  if (!/public repositories only/.test(t)) { bad.push('does not say the button is there only on a public repository'); }
-  if (!/direct message to the owner on Discord/.test(t)) { bad.push('does not give the Discord route'); }
+  if (!/public\s+repositories only/.test(t)) { bad.push('does not say the button is there only on a public repository'); }
+  if (!/direct message to the owner/.test(t)) { bad.push('does not give the Discord route'); }
+  if (!/\(https:\/\/thornswood\.net\/report\)/.test(t)) { bad.push('does not give the report page, which security.txt names first'); }
   if (!/\*\*72 hours\*\*/.test(t)) { bad.push('gives no reply time'); }
   if (/\b(two|three|four) person\b/i.test(t)) { bad.push('counts the people, which goes stale'); }
   if (/repository is private/i.test(t)) { bad.push('says the repository is private, which stops being true at the flip'); }
@@ -106,7 +109,7 @@ function securityFaults(t) {
 }
 const sec = read('SECURITY.md');
 const secBad = securityFaults(sec);
-yes('C  SECURITY.md gives both routes and a reply time, and no head count' + (secBad.length ? ' (' + secBad.join('; ') + ')' : ''), secBad.length === 0);
+yes('C  SECURITY.md gives the three routes and a reply time, and no head count' + (secBad.length ? ' (' + secBad.join('; ') + ')' : ''), secBad.length === 0);
 yes('C  and the reader fails the text it replaced',
     securityFaults('The repository is private, so the Security tab is there only for people with access. This is a two person project.').length >= 4);
 
