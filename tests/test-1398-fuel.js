@@ -48,7 +48,7 @@ function lineOf(re) { const m = re.exec(gm); return m ? m[0] : null; }
 // ------------------------------------------------- 1. the table and the page
 const fuelLine = /^const FUEL_BY_RECIPE = (\{.*\});$/m.exec(gm);
 const FUEL = fuelLine ? JSON.parse(fuelLine[1]) : {};
-yes('FUEL_BY_RECIPE is installed in the gamemode', !!fuelLine && Object.keys(FUEL).length > 300);
+yes('FUEL_BY_RECIPE is installed in the gamemode', !!fuelLine && Object.keys(FUEL).length > 200);
 {
   const built = Fuel.blockLines(Fuel.fuelTable(RECIPES_JSON), Object.keys(RECIPES_JSON.recipes || {}).length).join('\n');
   const installed = slice(gm, '// ==== FUEL_BY_RECIPE, generated ====', '// ==== end FUEL_BY_RECIPE ====');
@@ -104,7 +104,12 @@ if (RECIPES && KEPT) {
   yes('a hotter metal on the list wins: glass ingots in a Tribunal robe burn briquette',
       grade('Tribunal Light Robe Black') === 3);
   yes('a forge piece with no metal on the table still burns one charcoal, the lowest',
-      grade('Fur Hood') === 1 && FUEL[byName('Fur Hood')][1] === '');
+      grade('Hide Helmet') === 1 && FUEL[byName('Hide Helmet')][1] === '');
+  // #3120 moved the Tailor's and the Woodwright's forge rows to their own bench,
+  // where nothing burns.
+  yes('a piece moved off the forge to its trade\'s bench burns nothing: the Fur Hood is made at the loom',
+      !!byName('Fur Hood') && RECIPES_JSON.recipes[byName('Fur Hood')].movedFromName === 'CraftingSmithingForge' &&
+      !Object.prototype.hasOwnProperty.call(FUEL, byName('Fur Hood')));
   const reach = Object.keys(FUEL).every(function (k) {
     return (Object.prototype.hasOwnProperty.call(RECIPES, k) && !RECIPES[k].nobody) || Object.prototype.hasOwnProperty.call(KEPT, k);
   });
@@ -301,7 +306,8 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     ['Lute', 'Drum', 'Flute'].forEach(function (name) {
       const r = craftRig(wood);
       r.give(T1, 1);
-      yes('a ' + name.toLowerCase() + ' is made without a tool handle', r.craft(byName(name)) !== false && r.count(T1) === 0);
+      yes('a ' + name.toLowerCase() + ' is made at the woodworking bench without a tool handle, and burns no charcoal',
+          r.craft(byName(name)) !== false && r.count(T1) === 1);
     });
     ['Iron War Axe', 'Iron Battleaxe', 'Iron Warhammer', 'Iron Mace'].forEach(function (name) {
       const r = craftRig(smith);

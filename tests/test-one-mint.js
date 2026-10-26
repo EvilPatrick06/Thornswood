@@ -732,7 +732,27 @@ function goldDescriptors(text) {
       !!setTable && Object.keys(setTable).every(function (k) {
         return setTable[k].inputs.every(function (i) { return goldDescriptors('"' + i[0] + '"').gold.length === 0 || i[2] === 0; });
       }));
-  const outside = noDungeon && cut(noDungeon, '// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====');
+  /*
+    AND THE RECIPES MOVED IN EACH GAME (#3120). RECIPES_MOVED_IN_GAME names a
+    moved recipe's inputs as its mod's record asks them, so the eyepatch moved
+    to the loom names its one gold coin there. Its counts are also set in each
+    game, where that coin goes to 0, and recipeMovedInGame leaves a recipe set
+    in game to recipeSetInGame. So gold may stand in that block only as an
+    input of a recipe RECIPES_SET_IN_GAME takes it to 0 in.
+  */
+  const movedInGame = lift('// ==== RECIPES_MOVED_IN_GAME, generated ====', '// ==== end RECIPES_MOVED_IN_GAME ====') || '';
+  const movedRows = (/var RECIPES_MOVED_IN_GAME = (\{.*\});/.exec(movedInGame) || [])[1];
+  let movedTable = null;
+  try { movedTable = JSON.parse(movedRows); } catch (e) { movedTable = null; }
+  yes('a recipe moved in each game names gold only where the recipes set in each game take it to 0',
+      !!movedTable && !!setTable && Object.keys(movedTable).every(function (k) {
+        return movedTable[k].inputs.every(function (i) {
+          if (goldDescriptors('"' + i[0] + '"').gold.length === 0) { return true; }
+          return !!setTable[k] && setTable[k].inputs.some(function (s) { return s[0] === i[0] && s[1] === i[1] && s[2] === 0; });
+        });
+      }));
+  const noSet = noDungeon && cut(noDungeon, '// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====');
+  const outside = noSet && cut(noSet, '// ==== RECIPES_MOVED_IN_GAME, generated ====', '// ==== end RECIPES_MOVED_IN_GAME ====');
   const dungeon=lift('// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
   const dungeonGold=goldDescriptors(dungeon || '');
   yes('the checked dungeon reward names exactly one gold descriptor as GOLD_DESC',

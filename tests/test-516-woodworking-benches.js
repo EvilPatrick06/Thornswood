@@ -212,10 +212,15 @@ const atBench = Object.keys(recipes.recipes || {}).concat(Object.keys(recipes.un
 const furnitureDoc = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'furniture.json'), 'utf8').replace(/^\uFEFF/, ''));
 const furnitureOuts = furnitureDoc.pieces.filter((p) => furnitureDoc.limits.types[p.type])
   .map((p) => p.item + ':Thornswood-Content.esp');
-const movedAt = atBench.length - furnitureOuts.length;
-yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, and one for each piece of furniture (' +
-    atBench.length + ', ' + furnitureOuts.length + ' of them furniture)',
-    movedAt === 26 && furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
+// And the Woodwright's forge rows #3120 moved to its home bench (movedFrom
+// keeps the forge their mod put them at).
+const benchMoved = atBench.filter((r) => r.movedFrom).length;
+const movedAt = atBench.length - furnitureOuts.length - benchMoved;
+yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, the 9 #3120 moved off the forge, and one for each piece of furniture (' +
+    atBench.length + ', ' + benchMoved + ' moved off the forge, ' + furnitureOuts.length + ' of them furniture)',
+    movedAt === 26 && benchMoved === 9 &&
+    atBench.filter((r) => r.movedFrom).every((r) => r.movedFromName === 'CraftingSmithingForge') &&
+    furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
     atBench.every((r) => r.benchName === 'ThornswoodCraftingWoodworking'));
 const bbb = /const BENCH_BY_BASE = (\{.*\});/.exec(gm);
 const bac = /const BENCH_ACCESS = (\{.*\});/.exec(gm);
