@@ -2,8 +2,8 @@
   test-3192-board-read.ps1
 
   The board-read workflow reads every card's Status and Order into board.json
-  and keeps it as the run's artifact, changing nothing on the board, and
-  scripts\ops\Read-Board.ps1 starts it and fetches that file.
+  and hands it back in the run's log, changing nothing on the board, and
+  scripts\ops\Read-Board.ps1 starts it and reads that file out of the log.
 
   WHY THIS EXISTS. Issue #3192. A cloud Claude thread is refused GraphQL, and
   the board is read only through GraphQL, so a cloud thread could move a card
@@ -15,9 +15,10 @@
     1. the workflow is there, starts only by hand (workflow_dispatch, which
        is how Read-Board.ps1 starts it), gives its own token no permissions,
        takes the board token from the "board" environment, runs on the VPS
-       runners board-status.yml uses, with a timeout, and keeps board.json as
-       an artifact named board for a few days, then removes it from the
-       runner however the run ended;
+       runners board-status.yml uses, with a timeout, keeps nothing as an
+       artifact (#3410: the repository's artifact storage filled on 25 Oct
+       2026 and three reads in a row could not hand the board back), and
+       removes board.json from the runner however the run ended;
     2. the read script has no ${{ }} in it, and every call it can make to the
        board is a query: no mutation anywhere in the workflow;
     3. the read script, lifted out of the workflow and run in a child
@@ -26,10 +27,14 @@
        entry per card with its repository, number, kind, title, state, Status,
        Order and archived flag, and null for a missing Status, Order or
        number (a draft card); it writes the Status options and the board's
-       workflows; a missing token, an error from the board and a board with no
-       Status field each fail the run and write no file;
+       workflows; it prints board.json in the log between the BOARD-JSON begin
+       and end lines, and Read-BoardFromLog, lifted out of Read-Board.ps1,
+       gives back the very bytes from that log, with or without GitHub's
+       timestamps, and refuses a log with a line missing, a line changed or
+       no end line; a missing token, an error from the board and a board with
+       no Status field each fail the run and write no file;
     4. Read-Board.ps1 parses, starts board-read.yml on main and reads the
-       artifact named board.
+       one job's log, not an artifact.
 
   It never reaches GitHub. Read only apart from files under its own temp
   folder.
@@ -75,12 +80,7 @@ $statusRunsOn = [regex]::Match($status, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Va
 Yes ("it runs on the VPS runners board-status uses ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]' -and $runsOn -eq $statusRunsOn)
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 
-$upload = [regex]::Match($text, '(?ms)uses: actions/upload-artifact@[0-9a-f]{40} # v\d+\n(.*?)\n\n')
-Yes 'board.json is kept with upload-artifact, pinned' ($upload.Success)
-Yes '  as the artifact named board' ($upload.Groups[1].Value -match '(?m)^\s+name:\s*board\s*$')
-Yes '  from the folder the read step names' ($upload.Groups[1].Value -match [regex]::Escape('path: ${{ steps.read.outputs.dir }}'))
-Yes '  failing when the file is not there' ($upload.Groups[1].Value -match '(?m)^\s+if-no-files-found:\s*error\s*$')
-Yes '  for a few days, not the 90 GitHub keeps by default' ($upload.Groups[1].Value -match '(?m)^\s+retention-days:\s*[1-7]\s*$')
+Yes 'it keeps no artifact: the board comes back in the log (#3410)' ($text -notmatch 'upload-artifact' -and $text -notmatch '(?m)^\s+uses:')
 Yes 'the runner''s copy is removed however the run ended' ($text -match '(?ms)- name: Remove board\.json from the runner\n\s+if: always\(\)')
 
 # ---- 2. nothing pasted into the script, nothing written to the board --------
@@ -113,6 +113,8 @@ $calls = Join-Path $work 'calls.txt'
 # Answers as GitHub would: the board, then its cards in two pages of
 # TS_PAGE cards each (the page after names the cursor the first gave), an
 # error when TS_BOARD_ERROR is set, and no Status field when TS_NO_STATUS is.
+# TS_BIG adds 400 draft cards with titles that do not compress, so the
+# board's lines in the log are more than one.
 $standIn = @'
 function Invoke-RestMethod {
     param([string]$Method, [string]$Uri, [hashtable]$Headers, [string]$Body)
@@ -136,6 +138,7 @@ function Invoke-RestMethod {
     $nodes = @(
         [pscustomobject]@{ isArchived = $true; status = [pscustomobject]@{ name = 'Done' }; order = [pscustomobject]@{}; content = [pscustomobject]@{ __typename = 'Issue'; number = 2863; title = 'Board labels'; state = 'CLOSED'; repository = $repo } }
         [pscustomobject]@{ isArchived = $false; status = [pscustomobject]@{ name = 'Todo' }; order = $null; content = [pscustomobject]@{ __typename = 'DraftIssue'; title = 'A draft' } })
+    if ($env:TS_BIG) { foreach ($n in 1..400) { $nodes += [pscustomobject]@{ isArchived = $false; status = $null; order = $null; content = [pscustomobject]@{ __typename = 'DraftIssue'; title = ([Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')) } } } }
     return [pscustomobject]@{ data = [pscustomobject]@{ user = [pscustomobject]@{ projectV2 = [pscustomobject]@{ items = [pscustomobject]@{ pageInfo = [pscustomobject]@{ hasNextPage = $false; endCursor = 'cursor-2' }; nodes = $nodes } } } } }
 }
 
@@ -143,7 +146,7 @@ function Invoke-RestMethod {
 $runner = Join-Path $work 'read.ps1'
 [IO.File]::WriteAllText($runner, $standIn + $script)
 
-$names = 'BOARD_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'RUNNER_TEMP', 'GITHUB_OUTPUT', 'TS_CALLS', 'TS_BOARD_ERROR', 'TS_NO_STATUS'
+$names = 'BOARD_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'RUNNER_TEMP', 'GITHUB_OUTPUT', 'TS_CALLS', 'TS_BOARD_ERROR', 'TS_NO_STATUS', 'TS_BIG'
 function Invoke-Read([hashtable]$extra = @{}) {
     foreach ($f in $calls, (Join-Path $work 'out.txt')) { if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force } }
     $temp = Join-Path $work 'runner-temp'
@@ -160,6 +163,7 @@ function Invoke-Read([hashtable]$extra = @{}) {
         $env:TS_CALLS = $calls
         $env:TS_BOARD_ERROR = ''
         $env:TS_NO_STATUS = ''
+        $env:TS_BIG = ''
         foreach ($k in $extra.Keys) { [Environment]::SetEnvironmentVariable($k, $extra[$k]) }
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner 2>&1 | Out-String; $code = $LASTEXITCODE }
@@ -171,9 +175,22 @@ function Invoke-Read([hashtable]$extra = @{}) {
     if (Test-Path -LiteralPath $calls) { $made = @(Get-Content -LiteralPath $calls | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
     $file = Join-Path (Join-Path $temp 'board-read') 'board.json'
     $board = if (Test-Path -LiteralPath $file) { [IO.File]::ReadAllText($file) | ConvertFrom-Json } else { $null }
+    $bytes = if (Test-Path -LiteralPath $file) { [IO.File]::ReadAllBytes($file) } else { $null }
     $said = if (Test-Path -LiteralPath (Join-Path $work 'out.txt')) { [IO.File]::ReadAllText((Join-Path $work 'out.txt')) } else { '' }
-    return [pscustomobject]@{ Code = $code; Out = $out; Calls = $made; Board = $board; Output = $said; Dir = (Join-Path $temp 'board-read') }
+    return [pscustomobject]@{ Code = $code; Out = $out; Calls = $made; Board = $board; Bytes = $bytes; Output = $said; Dir = (Join-Path $temp 'board-read') }
 }
+
+# Read-BoardFromLog, lifted out of Read-Board.ps1 as it is, to read the run's
+# output back the way Read-Board.ps1 reads the job's log.
+$fromLog = $null
+if (Test-Path -LiteralPath $Reader) {
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Reader, [ref]$null, [ref]$null)
+    $fromLog = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Read-BoardFromLog' }, $true)
+}
+Yes 'Read-Board.ps1 has Read-BoardFromLog to read the log with' ($null -ne $fromLog)
+if ($fromLog) { . ([scriptblock]::Create($fromLog.Extent.Text)) }
+function Same([byte[]]$a, [byte[]]$b) { return ($null -ne $a -and $null -ne $b -and [Convert]::ToBase64String($a) -eq [Convert]::ToBase64String($b)) }
+function Back([string[]]$lines) { try { return , (Read-BoardFromLog $lines) } catch { return $_.Exception.Message } }
 
 try {
     $r = Invoke-Read
@@ -201,6 +218,42 @@ try {
     }
     Yes '  the log says how many cards and how many in each Status' ($r.Out -match 'read 4 cards from https://github.com/users/EvilPatrick06/projects/1' -and $r.Out -match '\(no Status\): 1' -and $r.Out -match 'In Progress: 1')
 
+    # ---- the hand-back: board.json in the log ----
+    $lines = @($r.Out -split "`r?`n")
+    $mark = 'BOARD' + '-JSON'
+    $begin = @($lines | Where-Object { $_ -match ('^' + $mark + ' begin ') })
+    Yes '  the log has one BOARD-JSON begin line, with the file''s length and sha256' (
+        $begin.Count -eq 1 -and $null -ne $r.Bytes -and $begin[0] -match ('^' + $mark + ' begin (\d+) ([0-9a-f]{64})$') -and [long]$Matches[1] -eq $r.Bytes.Length -and
+        $Matches[2] -eq [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($r.Bytes)).Replace('-', '').ToLowerInvariant())
+    Yes '  and one end line after it' (@($lines | Where-Object { $_ -eq "$mark end" }).Count -eq 1)
+    Yes '  and the script''s own text never holds the marker, so the log''s echo of it is not read as the board' ($script -notmatch [regex]::Escape($mark))
+    if ($fromLog) {
+        $back = Back $lines
+        Yes '  Read-BoardFromLog gives back the very bytes of board.json from that log' (Same $back $r.Bytes)
+        $stamped = @($lines | ForEach-Object { '2026-10-25T16:20:01.1234567Z ' + $_ })
+        $stamped[0] = [char]0xFEFF + $stamped[0]
+        Yes '  and from the log as GitHub serves it, every line with its timestamp' (Same (Back $stamped) $r.Bytes)
+        $data = @(for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match ('^' + $mark + ' [A-Za-z0-9+/=]+$')) { $i } })
+        $cut = @($lines | Where-Object { $_ -ne "$mark end" })
+        Yes '  a log with no end line is refused' ((Back $cut) -match 'no BOARD-JSON end line')
+        $changed = @($lines)
+        if ($data.Count) { $l = $changed[$data[0]]; $at = $l.Length - 8; $changed[$data[0]] = $l.Substring(0, $at) + $(if ($l[$at] -eq 'A') { 'B' } else { 'A' }) + $l.Substring($at + 1) }
+        $c = Back $changed
+        Yes '  a log with one character of the board changed is refused' ($data.Count -ge 1 -and $c -is [string] -and $c.Length -gt 0)
+        Yes '  a log with no begin line is refused' ((Back @($lines | Where-Object { $_ -notmatch ('^' + $mark + ' begin ') })) -match 'no BOARD-JSON begin line')
+    }
+
+    $r = Invoke-Read @{ TS_BIG = '1' }
+    $lines = @($r.Out -split "`r?`n")
+    $data = @($lines | Where-Object { $_ -match ('^' + $mark + ' [A-Za-z0-9+/=]+$') })
+    Yes ("a board of 404 cards passes (exit {0}) and comes back in {1} lines, none past 4000 characters" -f $r.Code, $data.Count) (
+        $r.Code -eq 0 -and $data.Count -gt 1 -and @($data | Where-Object { $_.Length -gt (4000 + $mark.Length + 1) }).Count -eq 0)
+    if ($fromLog) {
+        Yes '  and Read-BoardFromLog gives back the very bytes of it' (Same (Back $lines) $r.Bytes)
+        $short = @($lines | Where-Object { $_ -ne $data[1] })
+        Yes '  a log with one of its lines missing is refused' ((Back $short) -is [string])
+    }
+
     $r = Invoke-Read @{ BOARD_TOKEN = '' }
     Yes ("no board token fails the run, says so, makes no call and writes no file (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Out -match 'BOARD_TOKEN is not set' -and $r.Calls.Count -eq 0 -and $null -eq $r.Board)
 
@@ -222,8 +275,10 @@ if (Test-Path -LiteralPath $Reader) {
     Yes '  it parses' (@($errs).Count -eq 0)
     $rt = [IO.File]::ReadAllText($Reader)
     Yes '  it starts board-read.yml on main' ($rt -match [regex]::Escape("`$workflow = 'board-read.yml'") -and $rt -match [regex]::Escape("ref = 'main'") -and $rt -match [regex]::Escape('actions/workflows/$workflow/dispatches'))
-    Yes '  and reads the artifact named board' ($rt -match [regex]::Escape("`$_.name -eq 'board'"))
-    Yes '  fetching it with gh run download, which unpacks it, not through a PowerShell redirect, which changes its bytes' ($rt -match 'gh run download \$id -R \$GitHubRepo -n board -D' -and $rt -notmatch 'RedirectStandardOutput')
+    Yes '  and reads the one job''s log, not an artifact (#3410)' (
+        $rt -match [regex]::Escape('(Get-GitHub "$runPath/jobs").jobs') -and $rt -match [regex]::Escape('gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs"') -and $rt -notmatch 'gh run download' -and $rt -notmatch '/artifacts')
+    Yes '  holding it to the length and sha256 the log gives, and writing those bytes as they are' (
+        $rt -match [regex]::Escape('$bytes = Read-BoardFromLog $log') -and $rt -match [regex]::Escape('[IO.File]::WriteAllBytes($OutFile, $bytes)'))
 }
 
 Done
