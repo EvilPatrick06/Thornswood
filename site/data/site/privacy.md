@@ -243,7 +243,10 @@ killed for good, a report you made or one made about you, a line in a staff
 log, and a session staff marked kept because a report rests on it. A request
 does not delete them, and they still go when their time above is up. A completed request is written down
 with your Discord id and character numbers and nothing else, so that an older
-backup put back into service has you removed again first.
+backup put back into service has you removed again first. Until every game
+server has removed your character, the site also keeps its character numbers
+and nothing else, so that a server that has not restarted yet cannot put it
+back.
 
 ## Who can see it
 

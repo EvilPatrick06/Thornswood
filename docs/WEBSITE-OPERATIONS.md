@@ -137,7 +137,10 @@ clone, in PowerShell 7.
    says so in its own log with counts and never a name or a number:
    - **the site** (`site.log`, `deletion requests:`) removes their link, rules
      answer, sign-ins, sessions with their logs and alerts, roster rows,
-     tickets and gallery pictures;
+     tickets and gallery pictures, and keeps their character numbers (no
+     names) only until every game server has sent a roster without them, so
+     a game server that has not restarted yet cannot send their rows back
+     (#3677);
    - **each game server**: `server-log.js`, which its task starts it under,
      deletes their characters' saves and takes them off the card, mod menu,
      take count and last-left files before the engine starts (`server.log`,

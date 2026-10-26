@@ -26,6 +26,10 @@
       reports and the reported picture stay, a character made since the
       request goes too, and the request is deleted; a store that will not
       parse leaves it waiting and changes nothing
+    - the site's /api/roster after that start (#3677): a game server that has
+      not started since sends their old rows, and they stay off; a row it
+      wrote after the deletion goes in; the marks go once every server has
+      sent a book without them
     - server-log.js's RELEASE_PARTS is the gamemode's PARTS
 
   The bot's start step is tested by bot\test-2758-deletion-requests.py.
@@ -61,6 +65,7 @@ function start(root, env) {
   return { code: r.status, log: rd(path.join(root, 'server.log')) || '' };
 }
 
+(async () => {
 try {
   // ---- the parts match
   const SL = require(WRITER);
@@ -221,6 +226,58 @@ try {
     yes('  the request is deleted, and the log says counts and never an id',
         !fs.existsSync(path.join(D, 'deletion-requests.json')) && /done, and the request is gone/.test(said) && !/111111111111111111|5001/.test(said));
 
+    // ---- a game server that has not started since (#3677)
+    const mk = ro.deleted || {};
+    yes('  their character numbers are marked in roster.json with the time and nothing else',
+        Object.keys(mk).sort().join(',') === [P1, 5003].sort().join(',') &&
+        Object.values(mk).every((m) => Object.keys(m).sort().join(',') === 'at,clear' && m.at > 0 && m.clear.length === 0));
+    const a = SRC.indexOf("  if ((route === '/api/roster' || route === '/dev/api/roster') && req.method === 'POST') {");
+    const b = a < 0 ? -1 : SRC.indexOf('\n  }\n', a);
+    yes('server.js has the /api/roster route', a >= 0 && b > a);
+    const ROUTE = new Function('route', 'o_body', 'ROSTER', 'fs',
+      'const req = { method: "POST" }, res = {}, cfg = { botKey: "k" };\n' +
+      'function body() { return Promise.resolve(o_body); }\n' +
+      'function passBodyFailure() {}\n' +
+      'function sameSecret(x, y) { return x === y; }\n' +
+      'function jsonFile(p, d) { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) { return d; } }\n' +
+      'function putJson(p, v) { fs.writeFileSync(p, JSON.stringify(v)); return true; }\n' +
+      'function sendJson(r, code, obj) { r.code = code; r.obj = obj; return r; }\n' +
+      'return (async function () {\n' + SRC.slice(a, b + 4) + '\n return null; })();');
+    const RO = path.join(D, 'roster.json');
+    const push = (srv, o) => ROUTE(srv === 'dev' ? '/dev/api/roster' : '/api/roster', JSON.stringify(Object.assign({ key: 'k', server: srv }, o)), RO, fs);
+    const T = mk[P1] ? mk[P1].at : 0;
+    let r = await push('main', { who: { [P1]: { name: 'Mine', at: T - 1000 }, [PY]: { name: 'Yours', at: T - 500 }, 5003: { name: 'Mine too' } },
+      checked: [P1, PY, 5003], held: [P1, PY, 5003] });
+    let st = J(RO);
+    yes('a running server\'s book with their old rows does not put them back; everybody else\'s goes in',
+        r.code === 200 && r.obj.merged === 1 && !st.who[P1] && !st.who[5003] && st.who[PY].name === 'Yours');
+    yes('  a row with no time is not taken as new', !st.who[5003]);
+    yes('  and they are not reported held or checked', st.servers.main.held.join(',') === String(PY) && st.servers.main.checked.join(',') === String(PY));
+    yes('  and the marks stay', !!st.deleted[P1] && st.deleted[P1].clear.length === 0);
+    await push('dev', { who: { [PY]: { name: 'Yours', at: T - 500 } }, checked: [PY], held: [PY] });
+    st = J(RO);
+    yes('a server whose book never had them clears its part, and the marks stay for the one that has',
+        st.deleted[P1].clear.join(',') === 'dev' && st.deleted[5003].clear.join(',') === 'dev');
+    await push('main', { who: { [PY]: { name: 'Yours', at: T - 500 } }, checked: [PY], held: [PY] });
+    st = J(RO);
+    yes('once every server has sent a book without them, the marks are gone', st.deleted === undefined && !st.who[P1]);
+    r = await push('main', { who: { [P1]: { name: 'Mine', at: T - 1000 } } });
+    yes('  after which the roster takes rows for that number again', r.obj.merged === 1 && J(RO).who[P1].name === 'Mine');
+
+    site();
+    runSite();
+    const T2 = J(RO).deleted[P1].at;
+    r = await push('main', { who: { [P1]: { name: 'New', at: T2 + 1 }, 5003: { name: 'Mine too', at: T2 - 1 } } });
+    st = J(RO);
+    yes('a row the server wrote after the deletion is a character played since, and goes in',
+        r.obj.merged === 1 && st.who[P1].name === 'New' && !st.who[5003] && !st.deleted[P1] && !!st.deleted[5003]);
+    r = await push('main', { who: { 5003: { name: 'Mine too', at: T2 - 1 } }, checked: [5003], held: [] });
+    yes('  and an old row for another of their numbers is still refused',
+        r.obj.merged === 0 && !J(RO).who[5003]);
+    await push('main', { who: {}, checked: [], held: [5003] });
+    yes('  while a server that still holds the character keeps the mark, with no row in its book',
+        !!J(RO).deleted && !!J(RO).deleted[5003] && J(RO).deleted[5003].clear.indexOf('main') < 0);
+
     site();
     put(path.join(D, 'sessions.json'), '[{"session":');
     const linkedBefore = rd(path.join(D, 'linked.json'));
@@ -237,3 +294,4 @@ try {
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
+})();
