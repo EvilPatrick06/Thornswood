@@ -4,8 +4,8 @@
  "issue": 2468,
  "plugin": {
   "name": "Thornswood-Last.esp",
-  "size": 12899542,
-  "sha256": "ebb71d60663bd104522f0a2b6cc51d4e0b7e0c4dd2023a3641965a18683b2b9d"
+  "size": 12901082,
+  "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11"
  },
  "loadOrder": [
   "Skyrim.esm",
@@ -645,6 +645,7 @@
   "aaaGraniteHill.esp",
   "ElysiumEstate.esp",
   "FishingInSkyrim.esp",
+  "Thornswood-Content.esp",
   "Populated Cities Towns Villages Legendary.esp",
   "SkyrimSewers.esp",
   "Solitude Arena.esp",
@@ -674,6 +675,8 @@
   "placeLocations": 8,
   "placeRooms": 3,
   "recipesRecosted": 43,
+  "recipesMoved": 12,
+  "recipesMovedInGame": 48,
   "questScriptProperties": 1,
   "floorItemsOff": 91416
  },
@@ -24515,6 +24518,1278 @@
      "800e4:Skyrim.esm",
      1,
      1
+    ]
+   ]
+  }
+ ],
+ "benchMoves": [
+  {
+   "recipe": "490d86:Immersive Weapons.esp",
+   "editorId": "IWRecipeAmmoJusticiarArrow",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "8f0:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArrowFalmer",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "8f7:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeWeaponFalmerBow",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "19fb4:Playable Rieklings.esp",
+   "editorId": "DLC2RecipeArrowRieklingSpear",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "19fb7:Playable Rieklings.esp",
+   "editorId": "RecipeWeaponRieklingSpear",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "19fb8:Playable Rieklings.esp",
+   "editorId": "RecipeWeaponRieklingSpearCharge",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "23a0a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorRieklingCloak",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm"
+  },
+  {
+   "recipe": "bfee5:Playable Rieklings.esp",
+   "editorId": "RecipeArmorClothesFarmClothes01",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm"
+  },
+  {
+   "recipe": "bfefb:Playable Rieklings.esp",
+   "editorId": "RecipeArmorClothesPrisonerShoes",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm"
+  },
+  {
+   "recipe": "1838:PlayFluteLuteDrum.esp",
+   "editorId": "RecipeWeaponFlute",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "2de4:PlayFluteLuteDrum.esp",
+   "editorId": "RecipeWeaponLute",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  },
+  {
+   "recipe": "2de5:PlayFluteLuteDrum.esp",
+   "editorId": "RecipeWeaponDrum",
+   "from": "88105:Skyrim.esm",
+   "to": "154e1:Thornswood-Content.esp"
+  }
+ ],
+ "benchMovesInGame": [
+  {
+   "recipe": "1d90:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurHoodWhite",
+   "name": "Fur Hood - White",
+   "out": "48e0:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "22fe:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurHoodBlack",
+   "name": "Fur Hood - Black",
+   "out": "48d9:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "286a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARSeadogEyepatch",
+   "name": "Eyepatch",
+   "out": "285f:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "f:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "2dd7:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARSeadogCape",
+   "name": "Seadog Cape",
+   "out": "2dd5:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "53b3:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurHoodPlainScarf",
+   "name": "Fur Mantle",
+   "out": "ba99a:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "53b5:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurHoodBlackScarf",
+   "name": "Fur Mantle - Black",
+   "out": "22fc:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "53b7:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurHoodWhiteScarf",
+   "name": "Fur Mantle - White",
+   "out": "1d8e:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "f74d:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARRedguardKnightCape",
+   "name": "Redguard Knight Cape",
+   "out": "f74c:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "23062:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurCollar",
+   "name": "Fur Collar - Loose",
+   "out": "23060:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     1
+    ],
+    [
+     "da0bf1:Update.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "23063:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurCollarTight",
+   "name": "Fur Collar - Tight",
+   "out": "23061:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     1
+    ],
+    [
+     "da0bf1:Update.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "231c6:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredBootsBlack",
+   "name": "Tribunal Unarmored Boots Black",
+   "out": "2317c:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "231c7:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredBootsBlue",
+   "name": "Tribunal Unarmored Boots Blue",
+   "out": "2317d:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "231c8:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredBootsGreen",
+   "name": "Tribunal Unarmored Boots Green",
+   "out": "2317e:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "231c9:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredBootsRed",
+   "name": "Tribunal Unarmored Boots Red",
+   "out": "2317f:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "231ca:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredBootsWhite",
+   "name": "Tribunal Unarmored Boots White",
+   "out": "23180:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "231cb:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredGlovesBlack",
+   "name": "Tribunal Unarmored Gloves Black",
+   "out": "23181:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "231cc:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredGlovesBlue",
+   "name": "Tribunal Unarmored Gloves Blue",
+   "out": "23182:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "231cd:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredGlovesGreen",
+   "name": "Tribunal Unarmored Gloves Green",
+   "out": "23183:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "231ce:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredGlovesRed",
+   "name": "Tribunal Unarmored Gloves Red",
+   "out": "23184:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "231cf:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredGlovesWhite",
+   "name": "Tribunal Unarmored Gloves White",
+   "out": "23185:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "231d0:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredHoodBlack",
+   "name": "Tribunal Unarmored Hood Black",
+   "out": "23186:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "231d1:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredHoodBlue",
+   "name": "Tribunal Unarmored Hood Blue",
+   "out": "23187:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "231d2:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredHoodGreen",
+   "name": "Tribunal Unarmored Hood Green",
+   "out": "23188:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "231d3:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredHoodRed",
+   "name": "Tribunal Unarmored Hood Red",
+   "out": "23189:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "231d4:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredHoodWhite",
+   "name": "Tribunal Unarmored Hood White",
+   "out": "2318a:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "231d5:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredRobeBlack",
+   "name": "Tribunal Unarmored Robe Black",
+   "out": "2318b:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "2e4e6:Skyrim.esm",
+     1
+    ],
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     9
+    ]
+   ]
+  },
+  {
+   "recipe": "231d6:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredRobeBlue",
+   "name": "Tribunal Unarmored Robe Blue",
+   "out": "2318c:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "2e4e6:Skyrim.esm",
+     1
+    ],
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     9
+    ]
+   ]
+  },
+  {
+   "recipe": "231d7:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredRobeGreen",
+   "name": "Tribunal Unarmored Robe Green",
+   "out": "2318d:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "2e4e6:Skyrim.esm",
+     1
+    ],
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     9
+    ]
+   ]
+  },
+  {
+   "recipe": "231d8:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredRobeRed",
+   "name": "Tribunal Unarmored Robe Red",
+   "out": "2318e:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "2e4e6:Skyrim.esm",
+     1
+    ],
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     9
+    ]
+   ]
+  },
+  {
+   "recipe": "231d9:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARTribunalUnarmoredRobeWhite",
+   "name": "Tribunal Unarmored Robe White",
+   "out": "2318f:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "2e4e6:Skyrim.esm",
+     1
+    ],
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     9
+    ]
+   ]
+  },
+  {
+   "recipe": "238fe:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerFullCape",
+   "name": "Bosmer Full Cape",
+   "out": "238ea:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "57f91:Skyrim.esm",
+     4
+    ],
+    [
+     "5ace3:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "9151b:Skyrim.esm",
+     4
+    ],
+    [
+     "da0bf1:Update.esm",
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "23907:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerEngravedShoulderCape",
+   "name": "Bosmer Engraved Shoulder Cape",
+   "out": "238e9:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "57f91:Skyrim.esm",
+     3
+    ],
+    [
+     "5ad9e:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "9151b:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "23918:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerMask",
+   "name": "Bosmer Mask",
+   "out": "238fb:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "57f91:Skyrim.esm",
+     2
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "9151b:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "23919:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerShoulderCape",
+   "name": "Bosmer Shoulder Cape",
+   "out": "238fc:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "57f91:Skyrim.esm",
+     3
+    ],
+    [
+     "5ace3:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "9151b:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "372fe:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IAREbonyMageUnarmoredBoots",
+   "name": "Ebony Mage Unarmored Boots",
+   "out": "372fa:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     2
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "372ff:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IAREbonyMageUnarmoredGloves",
+   "name": "Ebony Mage Unarmored Gloves",
+   "out": "372fb:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     1
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "37300:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IAREbonyMageUnarmoredHood",
+   "name": "Ebony Mage Unarmored Hood",
+   "out": "372fc:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     1
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "37301:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IAREbonyMageUnarmoredRobe",
+   "name": "Ebony Mage Unarmored Robe",
+   "out": "372fd:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     4
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     2
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "37306:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARDwarvenMageUnarmoredRobe",
+   "name": "Dwarven Mage Unarmored Robe",
+   "out": "37305:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "db8a2:Skyrim.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "37307:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARDwarvenMageUnarmoredHood",
+   "name": "Dwarven Mage Unarmored Hood",
+   "out": "37304:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "db8a2:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "37308:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARDwarvenMageUnarmoredGauntlets",
+   "name": "Dwarven Mage Unarmored Gauntlets",
+   "out": "37303:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2
+    ],
+    [
+     "db8a2:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "37309:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARDwarvenMageUnarmoredBoots",
+   "name": "Dwarven Mage Unarmored Boots",
+   "out": "37302:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2
+    ],
+    [
+     "db8a2:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "6aa09:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARImperialKnightCape",
+   "name": "Imperial Knight Cape",
+   "out": "6aa04:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "82ebf:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARShamanUBoots",
+   "name": "Shaman Unarmored Boots",
+   "out": "82eb5:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     2
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "82ec0:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARShamanUGloves",
+   "name": "Shaman Unarmored Gloves",
+   "out": "82eb6:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad72:Skyrim.esm",
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "82ec1:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARShamanUHelm",
+   "name": "Shaman Unarmored Cap",
+   "out": "82eb7:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "3ad52:Skyrim.esm",
+     1
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "82ec2:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARShamanURobe",
+   "name": "Shaman Unarmored Robe",
+   "out": "82eb8:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "34cd6:Skyrim.esm",
+     2
+    ],
+    [
+     "3ad72:Skyrim.esm",
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3
+    ],
+    [
+     "da0bf1:Update.esm",
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "bc99a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFurHoodPlain",
+   "name": "Fur Hood",
+   "out": "48d8:Hothtrooper44_ArmorCompilation.esp",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2
+    ],
+    [
+     "da0bf1:Update.esm",
+     2
     ]
    ]
   }

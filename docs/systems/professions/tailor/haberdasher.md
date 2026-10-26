@@ -84,14 +84,14 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Cowl | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `972:MoreCraftableEquipment.esp` |
 | Dark Alik'r Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 3 Thread | redguard | yes | `948:MoreCraftableEquipment.esp` |
 | Fine Hat | 1 | novice | Hats and hoods | MCE_CraftingLoom | 4 Thread |  | yes | `982:MoreCraftableEquipment.esp` |
-| Fur Collar - Loose | 1 | novice | Hats and hoods | SmithingForge | 1 Leather Strips, 1 Fur Plate |  | yes | `23062:Hothtrooper44_ArmorCompilation.esp` |
-| Fur Collar - Tight | 1 | novice | Hats and hoods | SmithingForge | 1 Leather Strips, 1 Fur Plate |  | yes | `23063:Hothtrooper44_ArmorCompilation.esp` |
-| Fur Hood | 1 | novice | Hats and hoods | SmithingForge | 2 Leather Strips, 2 Fur Plate |  | yes | `bc99a:Hothtrooper44_ArmorCompilation.esp` |
-| Fur Hood - Black | 1 | novice | Hats and hoods | SmithingForge | 2 Leather Strips, 2 Fur Plate |  | yes | `22fe:Hothtrooper44_ArmorCompilation.esp` |
-| Fur Hood - White | 1 | novice | Hats and hoods | SmithingForge | 2 Leather Strips, 2 Fur Plate |  | yes | `1d90:Hothtrooper44_ArmorCompilation.esp` |
-| Fur Mantle | 1 | novice | Hats and hoods | SmithingForge | 2 Leather Strips, 4 Fur Plate |  | yes | `53b3:Hothtrooper44_ArmorCompilation.esp` |
-| Fur Mantle - Black | 1 | novice | Hats and hoods | SmithingForge | 2 Leather Strips, 4 Fur Plate |  | yes | `53b5:Hothtrooper44_ArmorCompilation.esp` |
-| Fur Mantle - White | 1 | novice | Hats and hoods | SmithingForge | 2 Leather Strips, 4 Fur Plate |  | yes | `53b7:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Collar - Loose | 1 | novice | Hats and hoods | MCE_CraftingLoom | 1 Leather Strips, 1 Fur Plate |  | yes | `23062:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Collar - Tight | 1 | novice | Hats and hoods | MCE_CraftingLoom | 1 Leather Strips, 1 Fur Plate |  | yes | `23063:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Leather Strips, 2 Fur Plate |  | yes | `bc99a:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Hood - Black | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Leather Strips, 2 Fur Plate |  | yes | `22fe:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Hood - White | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Leather Strips, 2 Fur Plate |  | yes | `1d90:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Mantle | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Leather Strips, 4 Fur Plate |  | yes | `53b3:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Mantle - Black | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Leather Strips, 4 Fur Plate |  | yes | `53b5:Hothtrooper44_ArmorCompilation.esp` |
+| Fur Mantle - White | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Leather Strips, 4 Fur Plate |  | yes | `53b7:Hothtrooper44_ArmorCompilation.esp` |
 | Hat | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `979:MoreCraftableEquipment.esp` |
 | Hat | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `97a:MoreCraftableEquipment.esp` |
 | Hat | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `97b:MoreCraftableEquipment.esp` |
@@ -103,7 +103,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Temple Priest Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 3 Thread |  | yes | `965:MoreCraftableEquipment.esp` |
 | Vampire Hood | 1 | novice | Hats and hoods | MCE_CraftingLoom | 2 Thread |  | yes | `94e:MoreCraftableEquipment.esp` |
 | Leather Cape | 1 | novice | Other armour and clothing | TanningRack | 2 Leather |  | yes | `55bd:Cloaks&Capes.esp` |
-| Riekling Fur Cloak | 1 | novice | Other armour and clothing | SmithingForge | 3 Leather | riekling | yes | `23a0a:Playable Rieklings.esp` |
+| Riekling Fur Cloak | 1 | novice | Other armour and clothing | MCE_CraftingLoom | 3 Leather | riekling | yes | `23a0a:Playable Rieklings.esp` |
 | Bandage | 1 | novice | Other goods | MCE_CraftingLoom | 1 Tundra Cotton |  | yes | `154c4:Thornswood-Content.esp` |
 | Boy's Blue Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f7:MoreCraftableEquipment.esp` |
 | Boy's Green Tunic | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9f6:MoreCraftableEquipment.esp` |
@@ -154,7 +154,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Noble Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `984:MoreCraftableEquipment.esp` |
 | Ragged Trousers | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Thread |  | yes | `9b6:MoreCraftableEquipment.esp` |
 | Refined Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `98e:MoreCraftableEquipment.esp` |
-| Riekling Belted Tunic | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips | riekling | yes | `bfee5:Playable Rieklings.esp` |
+| Riekling Belted Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 2 Leather Strips | riekling | yes | `bfee5:Playable Rieklings.esp` |
 | Roughspun Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Thread |  | yes | `9b8:MoreCraftableEquipment.esp` |
 | Tavern Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9d2:MoreCraftableEquipment.esp` |
 | Ulfric's Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `9de:MoreCraftableEquipment.esp` |
@@ -180,7 +180,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Pleated Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 3 Thread |  | yes | `98b:MoreCraftableEquipment.esp` |
 | Ragged Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Thread |  | yes | `922:MoreCraftableEquipment.esp` |
 | Redguard Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 1 Thread | redguard | yes | `9bd:MoreCraftableEquipment.esp` |
-| Riekling Footwraps | 1 | novice | Shoes and light boots | SmithingForge | 2 Leather Strips | riekling | yes | `bfefb:Playable Rieklings.esp` |
+| Riekling Footwraps | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather Strips | riekling | yes | `bfefb:Playable Rieklings.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `920:MoreCraftableEquipment.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `926:MoreCraftableEquipment.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `92b:MoreCraftableEquipment.esp` |
@@ -190,13 +190,13 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Ulfric's Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 3 Thread |  | yes | `9e0:MoreCraftableEquipment.esp` |
 | Vampire Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `94c:MoreCraftableEquipment.esp` |
 | Wedding Sandals | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather Strips, 1 Leather |  | yes | `9d0:MoreCraftableEquipment.esp` |
-| Shaman Unarmored Gloves | 1 | advanced | Gloves | SmithingForge | 1 Troll Fat, 2 Leather Strips, 3 Leather |  | yes | `82ec0:Hothtrooper44_ArmorCompilation.esp` |
-| Eyepatch | 1 | advanced | Hats and hoods | SmithingForge | 1 Gold, 1 Leather Strips |  | yes | `286a:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Hood Black | 1 | advanced | Hats and hoods | SmithingForge | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d0:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Hood Blue | 1 | advanced | Hats and hoods | SmithingForge | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d1:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Hood Green | 1 | advanced | Hats and hoods | SmithingForge | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d2:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Hood Red | 1 | advanced | Hats and hoods | SmithingForge | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d3:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Hood White | 1 | advanced | Hats and hoods | SmithingForge | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d4:Hothtrooper44_ArmorCompilation.esp` |
+| Shaman Unarmored Gloves | 1 | advanced | Gloves | MCE_CraftingLoom | 1 Troll Fat, 2 Leather Strips, 3 Leather |  | yes | `82ec0:Hothtrooper44_ArmorCompilation.esp` |
+| Eyepatch | 1 | advanced | Hats and hoods | MCE_CraftingLoom | 1 Gold, 1 Leather Strips |  | yes | `286a:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Hood Black | 1 | advanced | Hats and hoods | MCE_CraftingLoom | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d0:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Hood Blue | 1 | advanced | Hats and hoods | MCE_CraftingLoom | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d1:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Hood Green | 1 | advanced | Hats and hoods | MCE_CraftingLoom | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d2:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Hood Red | 1 | advanced | Hats and hoods | MCE_CraftingLoom | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d3:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Hood White | 1 | advanced | Hats and hoods | MCE_CraftingLoom | 3 Troll Fat, 3 Leather Strips, 6 Leather |  | yes | `231d4:Hothtrooper44_ArmorCompilation.esp` |
 | Apotheus Scarf | 1 | advanced | Other armour and clothing | TanningRack | 2 Linen Wrap, 2 Leather Strips |  | yes | `332a:Hothtrooper44_ArmorCompilation.esp` |
 | Bandana | 1 | advanced | Other armour and clothing | TanningRack | 1 Linen Wrap |  | yes | `2326c:Hothtrooper44_ArmorCompilation.esp` |
 | Bandana, Tied | 1 | advanced | Other armour and clothing | TanningRack | 1 Linen Wrap |  | yes | `23272:Hothtrooper44_ArmorCompilation.esp` |
@@ -213,36 +213,36 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Thread | 1 | advanced | Other goods | MCE_CraftingLoom | 5 Purple Mountain Flower |  | yes | `84c:MoreCraftableEquipment.esp` |
 | Thread | 1 | advanced | Other goods | MCE_CraftingLoom | 5 Red Mountain Flower |  | yes | `84d:MoreCraftableEquipment.esp` |
 | Thread | 1 | advanced | Other goods | MCE_CraftingLoom | 5 Yellow Mountain Flower |  | yes | `84e:MoreCraftableEquipment.esp` |
-| Redguard Knight Cape | 1 | advanced | Robes and body wear | SmithingForge | 2 Linen Wrap, 2 Leather Strips, 1 Leather | redguard | yes | `f74d:Hothtrooper44_ArmorCompilation.esp` |
-| Seadog Cape | 1 | advanced | Robes and body wear | SmithingForge | 2 Linen Wrap, 2 Leather Strips, 1 Leather |  | yes | `2dd7:Hothtrooper44_ArmorCompilation.esp` |
-| Shaman Unarmored Boots | 1 | advanced | Shoes and light boots | SmithingForge | 2 Troll Fat, 2 Leather Strips, 2 Leather, 2 Fur Plate |  | yes | `82ebf:Hothtrooper44_ArmorCompilation.esp` |
-| Dwarven Mage Unarmored Gauntlets | 1 | expert | Gloves | SmithingForge | 1 Troll Fat, 2 Leather Strips, 2 Leather, 1 Dwarven Metal Ingot |  | yes | `37308:Hothtrooper44_ArmorCompilation.esp` |
+| Redguard Knight Cape | 1 | advanced | Robes and body wear | MCE_CraftingLoom | 2 Linen Wrap, 2 Leather Strips, 1 Leather | redguard | yes | `f74d:Hothtrooper44_ArmorCompilation.esp` |
+| Seadog Cape | 1 | advanced | Robes and body wear | MCE_CraftingLoom | 2 Linen Wrap, 2 Leather Strips, 1 Leather |  | yes | `2dd7:Hothtrooper44_ArmorCompilation.esp` |
+| Shaman Unarmored Boots | 1 | advanced | Shoes and light boots | MCE_CraftingLoom | 2 Troll Fat, 2 Leather Strips, 2 Leather, 2 Fur Plate |  | yes | `82ebf:Hothtrooper44_ArmorCompilation.esp` |
+| Dwarven Mage Unarmored Gauntlets | 1 | expert | Gloves | MCE_CraftingLoom | 1 Troll Fat, 2 Leather Strips, 2 Leather, 1 Dwarven Metal Ingot |  | yes | `37308:Hothtrooper44_ArmorCompilation.esp` |
 | Gilded Wristguards | 1 | expert | Gloves | MCE_CraftingLoom | 1 Gold Ingot, 2 Leather, 1 Thread |  | yes | `988:MoreCraftableEquipment.esp` |
-| Shaman Unarmored Cap | 1 | expert | Hats and hoods | SmithingForge | 1 Bear Pelt, 2 Troll Fat, 2 Leather |  | yes | `82ec1:Hothtrooper44_ArmorCompilation.esp` |
-| Bosmer Mask | 1 | expert | Other armour and clothing | SmithingForge | 2 Hanging Moss, 2 Leather Strips, 2 Spider Egg, 2 Fur Plate | woodelf | yes | `23918:Hothtrooper44_ArmorCompilation.esp` |
+| Shaman Unarmored Cap | 1 | expert | Hats and hoods | MCE_CraftingLoom | 1 Bear Pelt, 2 Troll Fat, 2 Leather |  | yes | `82ec1:Hothtrooper44_ArmorCompilation.esp` |
+| Bosmer Mask | 1 | expert | Other armour and clothing | MCE_CraftingLoom | 2 Hanging Moss, 2 Leather Strips, 2 Spider Egg, 2 Fur Plate | woodelf | yes | `23918:Hothtrooper44_ArmorCompilation.esp` |
 | Fur Cloak (Black) | 1 | expert | Other armour and clothing | TanningRack | 1 Bear Pelt, 1 Gold Ingot |  | yes | `2e04:Cloaks&Capes.esp` |
 | Fur Cloak (Brown) | 1 | expert | Other armour and clothing | TanningRack | 1 Sabre Cat Pelt, 1 Gold Ingot |  | yes | `2e05:Cloaks&Capes.esp` |
 | Fur Cloak (Snowy Sabre) | 1 | expert | Other armour and clothing | TanningRack | 1 Sabre Cat Snow Pelt, 1 Gold Ingot |  | yes | `2e06:Cloaks&Capes.esp` |
 | Fur Cloak (Vale Sabre) | 1 | expert | Other armour and clothing | TanningRack | 1 Gold Ingot, 1 Vale Sabre Cat Hide |  | yes | `2e07:Cloaks&Capes.esp` |
 | Fur Cloak (White) | 1 | expert | Other armour and clothing | TanningRack | 1 Snow Bear Pelt, 1 Gold Ingot |  | yes | `2e03:Cloaks&Capes.esp` |
-| Dwarven Mage Unarmored Boots | 1 | expert | Shoes and light boots | SmithingForge | 1 Troll Fat, 2 Leather Strips, 2 Leather, 1 Dwarven Metal Ingot |  | yes | `37309:Hothtrooper44_ArmorCompilation.esp` |
-| Ebony Mage Unarmored Gloves | 1 | master | Gloves | SmithingForge | 1 Troll Fat, 1 Ebony Ingot, 2 Leather Strips, 1 Leather |  | yes | `372ff:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Gloves Black | 1 | master | Gloves | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cb:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Gloves Blue | 1 | master | Gloves | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cc:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Gloves Green | 1 | master | Gloves | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cd:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Gloves Red | 1 | master | Gloves | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231ce:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Gloves White | 1 | master | Gloves | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cf:Hothtrooper44_ArmorCompilation.esp` |
-| Dwarven Mage Unarmored Hood | 1 | master | Hats and hoods | SmithingForge | 1 Troll Fat, 2 Leather Strips, 3 Leather, 1 Dwarven Metal Ingot |  | yes | `37307:Hothtrooper44_ArmorCompilation.esp` |
-| Ebony Mage Unarmored Hood | 1 | master | Hats and hoods | SmithingForge | 1 Troll Fat, 1 Ebony Ingot, 3 Leather Strips, 3 Leather |  | yes | `37300:Hothtrooper44_ArmorCompilation.esp` |
-| Bosmer Engraved Shoulder Cape | 1 | master | Robes and body wear | SmithingForge | 3 Hanging Moss, 1 Gold Ingot, 2 Leather Strips, 3 Spider Egg, 3 Fur Plate | woodelf | yes | `23907:Hothtrooper44_ArmorCompilation.esp` |
-| Bosmer Full Cape | 1 | master | Robes and body wear | SmithingForge | 4 Hanging Moss, 1 Silver Ingot, 2 Leather Strips, 4 Spider Egg, 4 Fur Plate | woodelf | yes | `238fe:Hothtrooper44_ArmorCompilation.esp` |
-| Bosmer Shoulder Cape | 1 | master | Robes and body wear | SmithingForge | 3 Hanging Moss, 1 Silver Ingot, 2 Leather Strips, 3 Spider Egg, 3 Fur Plate | woodelf | yes | `23919:Hothtrooper44_ArmorCompilation.esp` |
-| Ebony Mage Unarmored Boots | 1 | master | Shoes and light boots | SmithingForge | 2 Troll Fat, 1 Ebony Ingot, 2 Leather Strips, 2 Leather |  | yes | `372fe:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Boots Black | 1 | master | Shoes and light boots | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c6:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Boots Blue | 1 | master | Shoes and light boots | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c7:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Boots Green | 1 | master | Shoes and light boots | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c8:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Boots Red | 1 | master | Shoes and light boots | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c9:Hothtrooper44_ArmorCompilation.esp` |
-| Tribunal Unarmored Boots White | 1 | master | Shoes and light boots | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231ca:Hothtrooper44_ArmorCompilation.esp` |
+| Dwarven Mage Unarmored Boots | 1 | expert | Shoes and light boots | MCE_CraftingLoom | 1 Troll Fat, 2 Leather Strips, 2 Leather, 1 Dwarven Metal Ingot |  | yes | `37309:Hothtrooper44_ArmorCompilation.esp` |
+| Ebony Mage Unarmored Gloves | 1 | master | Gloves | MCE_CraftingLoom | 1 Troll Fat, 1 Ebony Ingot, 2 Leather Strips, 1 Leather |  | yes | `372ff:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Gloves Black | 1 | master | Gloves | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cb:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Gloves Blue | 1 | master | Gloves | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cc:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Gloves Green | 1 | master | Gloves | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cd:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Gloves Red | 1 | master | Gloves | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231ce:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Gloves White | 1 | master | Gloves | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 5 Leather |  | yes | `231cf:Hothtrooper44_ArmorCompilation.esp` |
+| Dwarven Mage Unarmored Hood | 1 | master | Hats and hoods | MCE_CraftingLoom | 1 Troll Fat, 2 Leather Strips, 3 Leather, 1 Dwarven Metal Ingot |  | yes | `37307:Hothtrooper44_ArmorCompilation.esp` |
+| Ebony Mage Unarmored Hood | 1 | master | Hats and hoods | MCE_CraftingLoom | 1 Troll Fat, 1 Ebony Ingot, 3 Leather Strips, 3 Leather |  | yes | `37300:Hothtrooper44_ArmorCompilation.esp` |
+| Bosmer Engraved Shoulder Cape | 1 | master | Robes and body wear | MCE_CraftingLoom | 3 Hanging Moss, 1 Gold Ingot, 2 Leather Strips, 3 Spider Egg, 3 Fur Plate | woodelf | yes | `23907:Hothtrooper44_ArmorCompilation.esp` |
+| Bosmer Full Cape | 1 | master | Robes and body wear | MCE_CraftingLoom | 4 Hanging Moss, 1 Silver Ingot, 2 Leather Strips, 4 Spider Egg, 4 Fur Plate | woodelf | yes | `238fe:Hothtrooper44_ArmorCompilation.esp` |
+| Bosmer Shoulder Cape | 1 | master | Robes and body wear | MCE_CraftingLoom | 3 Hanging Moss, 1 Silver Ingot, 2 Leather Strips, 3 Spider Egg, 3 Fur Plate | woodelf | yes | `23919:Hothtrooper44_ArmorCompilation.esp` |
+| Ebony Mage Unarmored Boots | 1 | master | Shoes and light boots | MCE_CraftingLoom | 2 Troll Fat, 1 Ebony Ingot, 2 Leather Strips, 2 Leather |  | yes | `372fe:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Boots Black | 1 | master | Shoes and light boots | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c6:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Boots Blue | 1 | master | Shoes and light boots | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c7:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Boots Green | 1 | master | Shoes and light boots | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c8:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Boots Red | 1 | master | Shoes and light boots | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c9:Hothtrooper44_ArmorCompilation.esp` |
+| Tribunal Unarmored Boots White | 1 | master | Shoes and light boots | MCE_CraftingLoom | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231ca:Hothtrooper44_ArmorCompilation.esp` |
 
 <!-- detail:end -->
 
