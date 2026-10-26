@@ -927,11 +927,25 @@ yes('  it is the MIT text and nothing else, so GitHub reads it as MIT', licence 
 const licensing = read(path.join(ROOT, 'LICENSING.md'));
 const LG = licensing || '';
 yes('LICENSING.md is at the repo root', licensing !== null);
-yes('  it says what MIT does not cover', /## What it does not cover/.test(LG));
+yes('  it says what MIT does not cover', /## What MIT does not cover/.test(LG));
 yes('  the SkyMP fork keeps its own licences', /engine\/skymp/.test(LG) && /Affero/.test(LG));
 yes('  every file THIRD-PARTY.md lists keeps its own', /Every file `THIRD-PARTY\.md` lists/.test(LG));
-yes('  lore, art, music, plugins, name and logo stay all rights reserved',
-    /lore, art and music, its game plugins, and the Thornswood\s+name and logo/.test(LG) && /all rights reserved/.test(LG));
+yes('  lore, art and music Thornswood owns are under CC BY-NC-SA 4.0 (Patrick, 26 Oct, #3688)',
+    /## Lore, art and music: CC BY-NC-SA 4\.0/.test(LG) && /creativecommons\.org\/licenses\/by-nc-sa\/4\.0/.test(LG));
+yes('  the name and logo stay all rights reserved', /\*\*The Thornswood name and logo\.\*\* They stay all rights reserved/.test(LG));
+// Every logo file LICENSING.md keeps out of CC BY-NC-SA 4.0 is a real file.
+const logoAt = LG.indexOf('**The Thornswood name and logo.**');
+const logoPara = logoAt >= 0 ? LG.slice(logoAt, LG.indexOf('\n7. ', logoAt)) : '';
+const logoFiles = [];
+let dirNow = '';
+(logoPara.match(/`[^`]+`/g) || []).forEach(function (q) {
+  const f = q.slice(1, -1);
+  if (f.indexOf('/') >= 0) { dirNow = f.slice(0, f.lastIndexOf('/') + 1); logoFiles.push(f); }
+  else if (dirNow) { logoFiles.push(dirNow + f); }
+});
+const logoMissing = logoFiles.filter(function (f) { return !fs.existsSync(path.join(ROOT, f)); });
+logoMissing.forEach(function (f) { console.log('      named as a logo file, not in the repository: ' + f); });
+yes('  every logo file it names is in the repository (' + logoFiles.length + ')', logoFiles.length >= 10 && logoMissing.length === 0);
 yes('  and it carries the contributor terms', /## Contributor terms/.test(LG) && /agrees to these\s+terms once/.test(LG));
 yes('THIRD-PARTY.md sends the project\'s own licence to LICENSE and LICENSING.md',
     /does not license Thornswood's own work\./.test(N) && /`LICENSE` at the root/.test(N) && /`LICENSING\.md` says what that licence does not cover/.test(N));

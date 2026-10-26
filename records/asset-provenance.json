@@ -484,7 +484,7 @@
       "published": "Every pack and the installer",
       "source": "Built by scripts\\dev\\Build-Backdrop.py --logo from the numbers in that script (#2177)",
       "creator": "Thornswood, built here by a script",
-      "licence": "Thornswood's own, all rights reserved like the rest of its art until a licence is chosen for it (LICENSING.md, What it does not cover, 5)",
+      "licence": "Thornswood's own: CC BY-NC-SA 4.0, like the rest of the art Thornswood owns (Patrick, 26 Oct 2026, #3688; LICENSING.md)",
       "attribution": "None",
       "approved": "Patrick, 15 Oct 2026 (#2177, option B): rebuild it as Thornswood's own",
       "evidence": "scripts\\dev\\Build-Backdrop.py; tests\\test-menu-backdrop.js holds it to the script byte for byte; launcher\\art\\BACKDROP-SPEC.md.",

@@ -59,9 +59,11 @@ change it.
 - [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md): what to do when the server is down.
 - [SECURITY.md](SECURITY.md): how to report a hole quietly.
 - [LICENSE](LICENSE): Thornswood's own code is under the MIT licence.
-  [LICENSING.md](LICENSING.md) says what it does not cover (the engine, other
-  people's files, and Thornswood's lore, art, music, plugins, name and logo),
-  and holds the contributor terms everybody who contributes agrees to once.
+  [LICENSING.md](LICENSING.md) says what it does not cover: the engine and
+  other people's files keep their own licences, Thornswood's lore, art and
+  music are under CC BY-NC-SA 4.0, and the name and logo stay all rights
+  reserved. It also holds the contributor terms everybody who contributes
+  agrees to once.
   [THIRD-PARTY.md](THIRD-PARTY.md) is what other people wrote, under their
   own licences.
 

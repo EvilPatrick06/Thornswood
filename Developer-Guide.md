@@ -813,9 +813,9 @@ Nothing here assumes you use Claude: this file is the rules for everybody, and a
 reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
 is added as a collaborator on the repository, and on CODEOWNERS beside the
 shared files, and agrees once to the contributor terms in `LICENSING.md`.
-Thornswood's own code is under MIT, in `LICENSE` (Patrick, 26 Oct, #3688).
-Its lore, art, music, plugins, name and logo are not: `LICENSING.md` says
-what MIT does not cover.
+Thornswood's own code is under MIT, in `LICENSE`, and its lore, art and music
+under CC BY-NC-SA 4.0; the name and logo stay all rights reserved (Patrick,
+26 Oct, #3688). `LICENSING.md` says what each covers.
 
 Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
 Vortex) also work here, on the shipping machine, under his GitHub account.

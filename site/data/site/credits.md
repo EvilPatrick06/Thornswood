@@ -25,10 +25,12 @@ like.
 
 Thornswood's own code (the launcher, the installer, the overlays, the
 gamemode, the code behind this site, the bot and the voice service) is under
-the MIT licence. Its lore, art and music, its game plugins, and the
-Thornswood name and logo are not: they stay Thornswood's, with all rights
-reserved. What other people made keeps its own licence, as the rest of this
-page says.
+the MIT licence. Its own lore, art and music are under
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/):
+share and adapt them, not for money, crediting Thornswood and keeping the same
+licence. The Thornswood name and logo are under neither, and stay
+Thornswood's with all rights reserved. What other people made keeps its own
+licence, as the rest of this page says.
 
 <a id='source'></a>
 
