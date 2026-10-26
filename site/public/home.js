@@ -65,36 +65,6 @@ var PAGES = { '/world':1, '/rules':1, '/join':1, '/credits':1,
               '/privacy':1, '/terms':1, '/cookies':1 };
 var here = location.pathname.replace(/\/+$/, '').toLowerCase() || '/';
 
-/* What each address says when it is pasted into a channel. A crawler reads the
-   tags in the file rather than waiting for this, so the server fills them in
-   for the page it is serving; this is for the browser tab and for anything
-   that does run the script. */
-var BLURB = {
-  '/world':   ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
-  '/rules':   ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
-  '/join':    ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
-  '/credits': ['Credits', 'Everyone whose work Thornswood is built on.'],
-  '/classes': ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make steel armour, so you find somebody who can.'],
-  '/known':   ['Known issues', 'What is broken right now that the team already knows about, each one on the board to be fixed. Read this before reporting anything.'],
-  '/help':    ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
-  '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
-  '/roadmap': ['Roadmap', 'What is being worked on and roughly in what order.'],
-  '/news':    ['Every release', 'What changed, newest first. The same list the launcher shows.'],
-  '/report':  ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
-  '/gallery': ['From the world', 'Pictures taken by people playing.'],
-  '/privacy': ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no tracking cookie.'],
-  '/terms':   ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
-  '/cookies': ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
-};
-(function () {
-  var b = BLURB[here];
-  if (!b) return;
-  var t = document.getElementById('ogTitle'), d = document.getElementById('ogDesc');
-  if (t) t.setAttribute('content', b[0] + ' \u00b7 Thornswood');
-  if (d) d.setAttribute('content', b[1]);
-  var md = document.querySelector('meta[name="description"]');
-  if (md) md.setAttribute('content', b[1]);
-})();
 
 /* The anchor in a fetched page. Called after the markdown is on the page,
    because until then there is nothing with that id to scroll to. */
@@ -173,9 +143,11 @@ function show(html) {
   var page = document.getElementById('page');
   page.hidden = false;
   document.getElementById('pagebody').innerHTML = html;
-  document.title = BLURB[here] ? BLURB[here][0] + ' \u00b7 Thornswood' : (document.querySelector('#pagebody h1') || {}).textContent
-    ? document.querySelector('#pagebody h1').textContent + ' \u00b7 Thornswood'
-    : 'Thornswood';
+  // The server wrote this page's own title from its one list of them (BLURB
+  // in server.js, #3138). A page that list does not name keeps the bare name,
+  // and takes its heading instead.
+  var h1 = document.querySelector('#pagebody h1');
+  if (document.title === 'Thornswood' && h1 && h1.textContent) document.title = h1.textContent + ' \u00b7 Thornswood';
 }
 
 /* Hard eighteen-and-over door on /downloads and /join only. Remembered in

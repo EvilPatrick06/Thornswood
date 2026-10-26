@@ -268,9 +268,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .feat p{margin:0;color:var(--quiet);font-size:15.5px;line-height:1.65}
 
 .being-built{margin-top:40px;padding-top:28px;border-top:1px solid var(--edge)}
-.being-built .eyebrow{margin-bottom:10px}
-.being-built h3.built-title{margin:0 0 8px;font:500 22px/1.25 var(--carve);color:var(--page)}
-.being-built .built-lead{margin:0 0 22px;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
+.being-built .built-lead{margin:0;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
 
 .steps{counter-reset:s;margin-top:48px;border-top:1px solid var(--edge)}
 /* 34px of top margin was right when this sat on its own above the steps.
