@@ -775,8 +775,8 @@ namespace Thornswood
                 is a Diagnostics reading; Logs' newest crash is in the report
                 Diagnostics builds; the add-ons and the collection card were
                 already on Diagnostics (#1170).
-              Gallery is still a page while Patrick decides where sending a
-              picture lives (#3146).
+              Gallery stays a page: Patrick kept it in the launcher on
+              26 Oct (#3146).
 
               A blocked Play sends people to Diagnostics (ShowPage(PageDiag)),
               where Scan and Fix are since #607.
