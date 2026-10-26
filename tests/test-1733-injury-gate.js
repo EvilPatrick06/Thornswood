@@ -183,13 +183,16 @@ function key(r, parts, pressed) {
   if (pressed) { pieces.touchedBench(ME, pressed.base, pressed.ref); }
   const run = new Function('g', 'isSmith', 'forgeHere', 'moldInHand', 'heldBy', 'here', 'takeItem',
     'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'plog', 'unfitToMake',
+    'toolGate', 'wearTool',
     KEY_SRC + '\nreturn cutKey;')(
     r.G, function () { return true; }, pieces.forgeHere,
     function () { return 'home:Skyrim.esm'; }, function () { return []; }, function () { return ''; },
     function (id, item, n) { took.push(n); return true; },
     function () { gave.push(1); return true; }, function () { },
     'ingot', 'key', function () { return 'Key to Honeyside'; }, function () { return 'Honeyside'; },
-    function () { }, r.gate);
+    function () { }, r.gate,
+    // The smith holds a hammer (#3162); tests/test-3162-bench-tools.js asks the refusal.
+    function () { return null; }, function () { return null; });
   run(ME, 202, function (pid, m) { told.push(m); }, parts);
   return { said: told, made: gave.length > 0, took: took.length };
 }

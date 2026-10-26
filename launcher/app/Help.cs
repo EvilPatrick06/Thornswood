@@ -77,7 +77,7 @@ namespace Thornswood
                 "The profession, and which half of it you work, decides what you can make. The eight are Warrior, Mage, Alchemist, Cook, Smith, Enchanter, Tailor and Woodworker. The class decides where raw material comes from: only a Hunter loots an animal, only a Fisher fishes, only a Gatherer gathers, only a Miner mines and only a Farmer farms. You get one of each, for the life of the character."),
 
             new HelpItem("Character", "The tools come with the pick",
-                "A Miner is handed a pickaxe, a Farmer a shovel and a few crops to sow, a Fisher a crude fishing pole, and a Woodworker a woodcutter's axe, the moment they choose. A tool wears out. When it breaks or is lost, a smith forges the next one, and a woodwright makes the next pole: nothing in the world hands one out."),
+                "A Miner is handed a pickaxe, a Farmer a shovel and a few crops to sow, a Fisher a crude fishing pole, and a Woodworker a woodcutter's axe, the moment they choose. The bench trades get theirs the same way: a Smith a hammer, a Tailor a pair of shears, a Cook a wooden ladle, an Alchemist an alembic and an Enchanter a rune knife, and the bench turns away somebody without one. A tool wears out. When it breaks or is lost, a smith forges the next one, and a woodwright makes the next pole or ladle: nothing in the world hands one out. A smith with no hammer can forge their own."),
 
             new HelpItem("Character", "K is your character",
                 "K opens your profession, your class, the recipe book and the skill tree. Skyrim's own levelling is off: rank comes from doing the work of your trade. The panel does not pause the world."),

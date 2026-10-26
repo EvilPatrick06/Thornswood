@@ -111,9 +111,11 @@ Press **Confirm** on the Review page and you are sent to a quiet spot in or
 near the town you chose, not its inn.
 
 You start with forty gold, once, and nothing else is handed out, except a tool
-to the four picks whose work needs one: a Miner is handed a pickaxe, a
-Woodworker a woodcutter's axe, a Farmer a shovel and seed to sow, and a Fisher
-a crude fishing pole. Each tool is handed over at the moment its pick is made.
+to the nine picks whose work needs one: a Miner is handed a pickaxe, a
+Woodworker a woodcutter's axe, a Farmer a shovel and seed to sow, a Fisher a
+crude fishing pole, a Smith a hammer, a Tailor a pair of shears, a Cook a
+wooden ladle, an Alchemist an alembic and an Enchanter a rune knife. Each tool
+is handed over at the moment its pick is made.
 
 ## Keys
 

@@ -95,9 +95,11 @@ function gateWith(character, progression) {
   // craftRow and craftAnswer are the gamemode's; here every row is one this
   // master smith may make.
   const make = new Function("BENCH_BY_BASE", "BENCH_ACCESS", "globalThis", "log", "NO_PROFESSION_AT_A_BENCH", "rankWord",
-    "craftRow", "craftAnswer", gateSrc + "\nreturn benchGate;");
+    "craftRow", "craftAnswer", "benchToolKey", "toolGate", "professionOfHalf", gateSrc + "\nreturn benchGate;");
   return make(BY_BASE, ACCESS, g, function () {}, "NO PROFESSION", function (r) { return r; },
-    function () { return {}; }, function () { return { refusal: null }; });
+    function () { return {}; }, function () { return { refusal: null }; },
+    // No tool asked here: these rows are nobody's trade's (#3162).
+    function () { return ''; }, function () { return null; }, function () { return ''; });
 }
 const MASTER = { prof: "smith", half: "edgewright", ranks: { edgewright: "master", platewright: "master" } };
 const C = { stateOf: function () { return MASTER; }, nameOf: function (h) { return h; } };
@@ -119,9 +121,10 @@ if (gate) {
   // #3080: somebody craftAnswer refuses every forge row is told so and the
   // forge does not open, whatever halves canWork would have said.
   const refusedAll = new Function("BENCH_BY_BASE", "BENCH_ACCESS", "globalThis", "log", "NO_PROFESSION_AT_A_BENCH", "rankWord",
-    "craftRow", "craftAnswer", gateSrc + "\nreturn benchGate;")(BY_BASE, ACCESS,
+    "craftRow", "craftAnswer", "benchToolKey", "toolGate", "professionOfHalf", gateSrc + "\nreturn benchGate;")(BY_BASE, ACCESS,
     { __thornswoodCharacter: C, __thornswoodProgression: P }, function () {}, "NO PROFESSION", function (r) { return r; },
-    function () { return {}; }, function () { return { refusal: "no" }; });
+    function () { return {}; }, function () { return { refusal: "no" }; },
+    function () { return ''; }, function () { return null; }, function () { return ''; });
   const said = forge ? refusedAll(0x14, forge) : null;
   yes("a forge does not open for somebody who may make none of its rows", typeof said === "string" && /^There is nothing you can make here\./.test(said));
 }

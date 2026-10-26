@@ -454,7 +454,7 @@ function tableNames(src, name) {
   const gate = gateAt < 0 ? '' : gm.slice(gateAt, gm.indexOf('\n}\n', gateAt))
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   yes('toolGate refuses somebody with no tool and hands nothing over',
-      /return 'You need a ' \+ tool\.name \+ ' in your pack for that\. ' \+ tool\.where;/.test(gate) &&
+      /return 'You need ' \+ aWord\(tool\.name\) \+ ' in your pack for that\. ' \+ tool\.where;/.test(gate) &&
       !/\b(offerTool|handTool|giveTool)\(/.test(gate));
   // #1038: offerTool, the free replacement nothing called, is gone, and the
   // one way a tool is handed over is giveTool at a starting class's pick.

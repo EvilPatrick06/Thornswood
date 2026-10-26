@@ -155,9 +155,17 @@ const pieces = {
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function wovenMark(actorId)',
         'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
-        'function unfitToMake(actorId, workbenchId)'].map(cut),
+        'function unfitToMake(actorId, workbenchId)',
+        // The trade's tool (#3162): asked before anything is taken and worn after.
+        'function aWord(name)', 'function toolFor(key)', 'function holdsTool(actorId, tool)',
+        'function toolGate(actorId, key)', 'function toolStamps(actorId)', 'function heldToolId(actorId, tool)',
+        'function takeItemById(actorId, baseId, count)', 'function wearTool(actorId, key)',
+        'function benchToolKey(row)'].map(cut),
+  toolNumbers: [lineOf(/^const TOOL_USES = .*$/m), lineOf(/^const TOOL_WARN_AT = .*$/m),
+                lineOf(/^const POLE_USES = .*$/m), lineOf(/^const TOOL_PROPERTY = .*$/m)].join('\n'),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
+const TOOLS_TABLE = pieces.tools ? new Function(pieces.tools.replace(/^const TOOLS = /, 'return '))() : {};
 yes('the craft pieces are all in the gamemode',
     !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key &&
     pieces.fns.every(function (f) { return !!f; }) && !!pieces.onCraft);
@@ -201,7 +209,7 @@ function craftRig(state) {
     __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } },
     __thornswoodManeuvers: { WOVEN: WOVEN }
   };
-  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key]
+  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.toolNumbers, pieces.key]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
   const onCraft = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'guard', 'notify', 'say', 'log',
     'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork', body)(
@@ -211,6 +219,11 @@ function craftRig(state) {
     function () { return { refusal: null, note: null, credit: 'the half' }; },
     function (a, half) { credited.push(half); return ''; });
   const A = 0xff000001;
+  // Every bench trade's tool in the pack (#3162), so these crafts are asked
+  // about the fuel and the handle and not refused for a missing hammer.
+  ['smith', 'tailor', 'cook', 'woodworker'].forEach(function (k) {
+    (packs[A] = packs[A] || []).push({ baseId: id(TOOLS_TABLE[k].give), count: 1 });
+  });
   return {
     A: A, packs: packs, said: said, credited: credited, timers: timers,
     give: function (desc, n, extra) { (packs[A] = packs[A] || []).push(Object.assign({ baseId: id(desc), count: n }, extra || {})); },

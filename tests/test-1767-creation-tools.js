@@ -5,7 +5,8 @@
 // table (game/gamemode.js) hands a new fisher the crude fishing pole beside the
 // pickaxe, the woodcutter's axe and the shovel (#1379, #1487), and the fishing
 // verb refuses without a pole. This holds the page to TOOLS: the count, every
-// tool by its name, and the fisher's pole.
+// tool by its name, and the fisher's pole. Since #3162 the five bench trades
+// have a tool each too, so TOOLS hands out nine.
 //
 // Read only.
 const REPO_DIR = require("path").join(__dirname, "..");
@@ -34,15 +35,15 @@ if (a >= 0 && b > a) {
   TOOLS = box.TOOLS;
 }
 const kinds = TOOLS ? Object.keys(TOOLS) : [];
-yes("TOOLS hands out four tools: miner, woodworker, farmer, fisher",
-  kinds.join(",") === "miner,woodworker,farmer,fisher");
+yes("TOOLS hands out nine tools: miner, woodworker, farmer, fisher and the bench trades smith, tailor, cook, alchemist, enchanter",
+  kinds.join(",") === "miner,woodworker,farmer,fisher,smith,tailor,cook,alchemist,enchanter");
 yes("the fisher is handed the crude fishing pole", !!TOOLS && TOOLS.fisher && TOOLS.fisher.give === "15498:Thornswood-Content.esp" &&
   TOOLS.fisher.name === "crude fishing pole");
 yes("the fishing verb refuses without a pole", /toolGate\(actorId, 'fisher'\)/.test(gm));
 
 const where = page.slice(page.indexOf("## Where this is"));
 yes("the creation page has a Where this is section", page.indexOf("## Where this is") >= 0);
-const WORDS = ["zero", "one", "two", "three", "four", "five", "six"];
+const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 const said = /the (\w+) tools are in the server/.exec(where.replace(/\s+/g, " "));
 yes("Where this is counts the tools as TOOLS does (" + (said ? said[1] : "no count") + ")",
   !!said && WORDS.indexOf(said[1]) === kinds.length);

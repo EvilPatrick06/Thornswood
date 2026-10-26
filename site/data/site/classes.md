@@ -262,8 +262,8 @@ Class and Profession. **Gatherer** and **Tailor** remain in the tables above.
 
 ## The tools
 
-Four picks need a tool in your pack before the work happens: three of the
-classes and one whole profession. In the pack is enough; nothing has to be
+Nine picks need a tool in your pack before the work happens: three of the
+classes and six of the professions. In the pack is enough; nothing has to be
 equipped.
 
 | Who | What they carry |
@@ -271,13 +271,21 @@ equipped.
 | **Miner** | A pickaxe |
 | **Farmer** | A shovel |
 | **Fisher** | A crude fishing pole, or a fine or master one |
-| **Woodworker** | A woodcutter's axe |
+| **Woodworker** | A woodcutter's axe, at the chopping block and at the bench |
+| **Smith** | A hammer |
+| **Tailor** | A pair of shears |
+| **Cook** | A wooden ladle |
+| **Alchemist** | An alembic |
+| **Enchanter** | A rune knife |
 
 You are handed yours the moment you pick. After that it wears with the work:
-each one has 50 uses in it, you are told when it is worn thin, and when it
-breaks the next one comes from a smith, or for a pole from a woodwright. With
-no tool in your pack the seam, the plot, the water, the chopping block and the
-kiln turn you away, and nothing hands you a free one.
+each one has 50 uses in it, you are told when it is worn thin, and when it breaks the next one comes from a smith, or
+for a pole or a ladle from a woodwright. With no tool in your pack the seam, the
+plot, the water, the chopping block, the kiln and your trade's bench turn you
+away, and nothing hands you a free one.
+
+A smith with no hammer is not stuck: a hammer is the one thing at the forge
+that needs no hammer to make, so a smith can always forge their own.
 
 Any of them counts. The game has two shovels that look and read exactly alike,
 and six things it calls a pickaxe including the Notched Pickaxe and the ancient

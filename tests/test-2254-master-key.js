@@ -227,6 +227,8 @@ function boot() {
     BENCH_BY_BASE: { [FORGE_BASE]: '88105:Skyrim.esm' },
     idOf: idOf, takeItem: takeItem, addItem: addItem,
     unfitToMake: function () { return ''; },
+    // The smith holds a hammer (#3162); tests/test-3162-bench-tools.js asks the refusal.
+    toolGate: function () { return null; }, wearTool: function () { return null; },
     notify: function (a, line) { told.push({ a: a, line: line }); },
     say: function (a, line) { told.push({ a: a, line: line }); },
     guard: function (n, f) { return f; },

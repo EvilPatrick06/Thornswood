@@ -27,7 +27,10 @@ panel behind K opens on its own. On it:
 They are handed 40 gold once, and nothing else, except a tool at the
 moment a pick that needs one is made: a pickaxe for a Miner, a
 woodcutter's axe for a Woodworker, a shovel and seed for a Farmer, a
-crude fishing pole for a Fisher. The tool has 50 uses.
+crude fishing pole for a Fisher, and for the bench trades (#3162) a
+hammer for a Smith, a pair of shears for a Tailor, a wooden ladle for a
+Cook, an alembic for an Alchemist and a rune knife for an Enchanter. The
+tool has 50 uses.
 
 The towns are Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath,
 Morthal, Dawnstar and Winterhold (`game\data\chargen.json`). The arrival
@@ -43,10 +46,12 @@ levelling is off, so the face menu does not start a perk tree.
 ## Where this is
 
 The hall, the face, the K panel, the town, the waiting class and
-profession, the 40 gold and the four tools are in the server: the
-pickaxe, the woodcutter's axe, the shovel, and the crude fishing pole
-a new fisher is handed, without which the water turns them away. The
-farmer's seed is handed with the shovel. The public
+profession, the 40 gold and the nine tools are in the server: the
+pickaxe, the woodcutter's axe, the shovel, the crude fishing pole
+a new fisher is handed, without which the water turns them away, and
+the bench trades' hammer, pair of shears, wooden ladle, alembic and rune
+knife, without which their bench turns them away. The farmer's seed is
+handed with the shovel. The public
 steps are on the site's help page.
 
 Somebody still choosing who puts the panel down gets it back on its
