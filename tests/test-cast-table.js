@@ -82,6 +82,14 @@ function yes(what, cond) {
 
 const TOOL = process.env.CAST_TOOL || path.join(REPO_DIR, 'scripts', 'dev', 'Build-CastTable.py');
 yes('scripts/dev/Build-CastTable.py is in the repo', fs.existsSync(TOOL));
+// #3543: Thornswood-Last.esp switches off every actor the catalogue cuts. The
+// cast is the list written before that deletion, so its placements are not
+// read, and its other records are, as Build-NpcPopulation.py reads them.
+const toolText = fs.existsSync(TOOL) ? fs.readFileSync(TOOL, 'utf8') : '';
+yes('Thornswood-Last.esp\'s placements are not read, and its other records are',
+  /LAST_PLUGIN = 'Thornswood-Last\.esp'/.test(toolText) &&
+  /read\(pl, t, placements=\(name != LAST_PLUGIN\)\)/.test(toolText) &&
+  /if tag in \(b'REFR', b'ACHR'\) and not placements:/.test(toolText));
 
 // ------------------------------------------------------------ plugin bytes
 function u32(n) { const b = Buffer.alloc(4); b.writeUInt32LE(n >>> 0, 0); return b; }
@@ -620,14 +628,9 @@ try {
   }));
   const holds = ['Whiterun', 'Haafingar', 'Falkreath', 'Hjaalmarch', 'the Pale', 'the Rift',
     'Winterhold', 'Eastmarch', 'the Reach', 'Solstheim'];
-  // Counted in the hold's columns, or among those switched off at the start:
-  // Thornswood-Last.esp switches off the cut actors (#2468), guards among
-  // them, and a table built from the load order the server runs (#3105)
-  // counts them there.
   yes('all nine holds and Solstheim have traders and guards counted', holds.every(function (h) {
     const c = (j.holds[h] || {}).counts || {};
-    const off = (j.holds[h] || {}).offAtStartBy || {};
-    return c.traders + (off.traders || 0) > 0 && c.guards + (off.guards || 0) > 0;
+    return c.traders > 0 && c.guards > 0;
   }));
   yes('the Companions are not counted as guards', Object.keys(j.holds).every(function (h) {
     return !((j.holds[h] || {}).guards || {})['Aela the Huntress'];

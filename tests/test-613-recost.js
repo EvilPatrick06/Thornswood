@@ -93,21 +93,26 @@ yes('T6 no gold worth is read: the item has no gold price here (docs/systems/pro
     !/worth|price/.test(JSON.stringify(rule)) && !/\['worth'\]|get\('worth'\)/.test(generator) &&
     table.recipes.every((r) => !('worth' in r) && r.inputs.every((i) => !('price' in i))));
 
-const coinRows = Object.keys(recipes).filter((k) => rule.benches.indexOf(recipes[k].benchName) >= 0 &&
-  recipes[k].inputItems.some((i) => i.item === 'f:Skyrim.esm'));
 const coinTable = table.recipes.filter((r) => r.inputs.some((i) => i.item === 'f:Skyrim.esm'));
+// A forge recipe that charges coins, as measured. Where Thornswood-Last.esp
+// is in the load order recipes.json was built from, it reads the recipes
+// Last.esp carries: their coins are gone and their counts are the table's
+// (#3543). Those are counted by the table's row, the rest by recipes.json.
+const carriedNow = (r) => {
+  const row = recipes[r.recipe];
+  const left = r.inputs.filter((i) => i.item !== 'f:Skyrim.esm');
+  return !!row && row.inputItems.map((i) => i.item + ' ' + i.count).join() ===
+    left.map((i) => i.item + ' ' + i.to).join();
+};
+const coinRows = Object.keys(recipes).filter((k) => rule.benches.indexOf(recipes[k].benchName) >= 0 &&
+  (recipes[k].inputItems.some((i) => i.item === 'f:Skyrim.esm') ||
+   coinTable.some((r) => r.recipe === k && carriedNow(r))));
 const coinHeld = (table.notCopied || []).filter((r) => r.inputs.some((i) => i.item === 'f:Skyrim.esm'));
 yes('T7 every forge recipe that charges gold coins has them taken out, and nothing else of it changes unless ' +
     'its peers say so (q-3115 B; ' + coinTable.length + ' of ' + coinRows.length + ', ' + coinHeld.length +
     ' a never-copied plugin\'s)',
-    // Every forge row the recipe table still reads coins on is in the file.
-    // Not a count: once Thornswood-Last.esp is in the load order the table is
-    // built from (the server's, #3105), the rows it re-costs read without
-    // their coins, as "WHY IT IS STABLE" in Build-Recost.py says, and only
-    // the never-copied plugin's rows still carry them.
     (rule.notMaterial || []).join() === 'f:Skyrim.esm' && coinRows.length > 0 &&
-    coinRows.every((k) => coinTable.some((r) => r.recipe === k) || coinHeld.some((r) => r.recipe === k)) &&
-    table.counts.coinsTakenOut === coinTable.length && coinTable.length > 0 &&
+    coinRows.length === coinTable.length + coinHeld.length && table.counts.coinsTakenOut === coinTable.length &&
     coinTable.every((r) => r.why.indexOf('coins') >= 0 && r.inputs.every((i) => i.item === 'f:Skyrim.esm' ? i.to === 0
       : (r.why.indexOf('peers') >= 0 || i.to === i.count))));
 yes('T8 a recipe that takes a finished piece is a conversion and is not re-costed',
