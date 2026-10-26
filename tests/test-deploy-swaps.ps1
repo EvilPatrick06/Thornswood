@@ -885,10 +885,13 @@ try {
     # The service $BotService (ThornswoodTest<run>Bot), standing in for ThornswoodBot (#465).
     Task $BotService 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
     function BotSays([string]$v) { return ((Get $botLog) -match [regex]::Escape($v + ' watching')) }
-    # The site's data\for-bot, which Install-Bot waits for before it sends the
-    # bot (#1102): a site that has not made it yet is refused below.
+    # The site's data\for-bot and data\from-bot, which Install-Bot waits for
+    # before it sends the bot (#1102, and #3140 for from-bot, where the bot
+    # writes the site's known issues and roadmap): a site that has not made
+    # one yet is refused below.
     $siteForBot = Join-Path $box 'Thornswood-Docs'
     $null = [IO.Directory]::CreateDirectory((Join-Path $siteForBot 'data\for-bot'))
+    $null = [IO.Directory]::CreateDirectory((Join-Path $siteForBot 'data\from-bot'))
     $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; DocsRoot = $siteForBot; Service = $BotService; CodeOnly = $true; NoPause = $true; Wait = 20 }
     Yes 'Install-Bot: the stand-in bot is up' (WaitFor { BotSays 'bot v1' })
 
@@ -899,6 +902,17 @@ try {
     $failed = $script:fail
     Yes 'Install-Bot: a site with no data\for-bot yet stops it, naming Deploy-Docs, with the bot untouched' (
         (-not $r.Ok) -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
+    if ($script:fail -gt $failed) { Show }
+
+    Bot 'bot v2'
+    $live = Live $botRoot
+    $noFrom = Join-Path $box 'Site-Without-From-Bot'
+    $null = [IO.Directory]::CreateDirectory((Join-Path $noFrom 'data\for-bot'))
+    $a = $bot.Clone(); $a['DocsRoot'] = $noFrom
+    $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Bot: a site with data\for-bot but no data\from-bot yet stops it, naming from-bot and Deploy-Docs, with the bot untouched' (
+        (-not $r.Ok) -and $r.Said -match 'from-bot yet' -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
     if ($script:fail -gt $failed) { Show }
 
     Bot 'bot v2'

@@ -19,8 +19,8 @@
 // travel was switched off by SunHelm, when it is the SkyMP client that does
 // it. Every one of those sends somebody looking for a thing that is not there.
 // known.md listed all five mods as "in the collection" too; entry 280 fixed
-// that table first (tests/test-known-page.js owns it), and all this adds there
-// is the SunHelm row saying where the needs went.
+// that table, and since #3137 the page names none of them: a mod taken out on
+// purpose is not a known issue.
 //
 // So this reads the text people read and checks it two ways: it names no mod
 // that has gone as though it were still here, and where it describes the
@@ -261,34 +261,17 @@ const MCM_PAGES = { 'QuickLoot': 'QuickLootIEMCM.pex', 'Skyrim Unbound': 'Skyrim
 const named = Object.keys(MCM_PAGES).filter(function (k) { return mcmRow.indexOf(k) >= 0; });
 yes('the row gives an example of a mod whose page is there', named.length > 0);
 
-// Known Issues is the known board, written out the way /known writes it (#2414).
+// Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
 const KNOWN = require('./fixtures/known-page').knownPage() || '';
 yes('the row does not say the choices are kept in your save, when Known Issues says menus reset',
     !(/reset every session/i.test(KNOWN) && /kept in your save/i.test(mcmRow)));
 
 // --------------------------------------------------------- Known Issues
-/*
-  The table of what the collection took out belongs to entry 280 and to
-  tests/test-known-page.js, which checks every row is Out or In by its plugin
-  file and that no removed mod is named anywhere else on the page. The one
-  thing this entry adds is on the SunHelm Survival row: somebody reading that
-  SunHelm is out should learn where the needs went, not wonder whether they
-  went too. What it says is checked against the gamemode like the Help item.
-*/
-const shRow = KNOWN.split('\n').filter(function (l) { return /^\|\s*SunHelm Survival\s*\|/.test(l); })[0] || '';
-yes('Known Issues has a row for SunHelm Survival', shRow.length > 0);
-yes('it says the needs run on the server now', /on the server/i.test(shRow) && /hunger/i.test(shRow));
-yes('and points at the Body page on K, which the K panel draws (#1631)',
-    /Body page on K/.test(shRow) && bodyPage && shRow.indexOf('/needs') < 0);
-if (/bottom left/i.test(shRow)) {
-  yes('it says the bars are bottom left, and the HUD is anchored bottom left',
-      /position:fixed;left:[^;]+;bottom:[^;]+;/.test(hud));
-}
-const shCount = /\b(two|three|four|five|six) bars\b/i.exec(shRow);
-if (shCount) {
-  yes('it says there are ' + shCount[1].toLowerCase() + ' bars, and the HUD draws ' + HUD_ROWS.length,
-      COUNT[shCount[1].toLowerCase()] === HUD_ROWS.length);
-}
+/* Since #3137 Known Issues lists only what is broken right now, so the table
+   of mods the collection took out came off it: a mod taken out on purpose is
+   not a bug. Nothing on it may name one of them now. */
+yes('Known Issues names none of the mods that left', KNOWN.length > 0 &&
+    GONE.every(function (g) { return !g.re.test(KNOWN); }));
 
 // ------------------------------------------------------- Add-CartTravel.ps1
 const CART = read(['scripts', 'mods', 'Add-CartTravel.ps1']);

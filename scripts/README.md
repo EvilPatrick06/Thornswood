@@ -168,8 +168,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Close-ShippedIssues.ps1](release/Close-ShippedIssues.ps1) | Closes the issues in Done whose fix a main Ship carries, each with the test task its pull request wrote, and says which it closed and which stay open. |
 | [release/Compare-NexusLayout.ps1](release/Compare-NexusLayout.ps1) | Says whether a collection revision's layout record (what Install-NexusRevision.ps1 writes) is the same as another layout record, or the same as what Vortex deployed into a game folder, file by file and plugin by plugin (#2969). |
 | [release/Dev-News.ps1](release/Dev-News.ps1) | Which notes on the dev feed are marked DEV, worked out from main's feed, and the one place that writes those marks and the dev feed's mainVersion. |
-| [release/EngineArtifact.ps1](release/EngineArtifact.ps1) | CI's engine build of the pin, the artifact engine.yml keeps, made this machine's engine build after every file in it is held to the checkout's records. |
+| [release/EngineArtifact.ps1](release/EngineArtifact.ps1) | CI's engine build of the pin, the public fork's own build of the commit (thornswood-engine-<commit>), made this machine's engine build after every file in it is held to the checkout's records. |
 | [release/EngineJobs.ps1](release/EngineJobs.ps1) | How many projects an engine build compiles at once, and whether a compile that failed ran the machine out of memory. |
+| [release/EngineRecords.ps1](release/EngineRecords.ps1) | The records engine.yml makes for a pin, carried from the run to the pin pull request in the run's log (#3399). |
 | [release/Export-ServerPayload.ps1](release/Export-ServerPayload.ps1) | Packages everything the VPS needs into one zip. |
 | [release/Feed-Json.ps1](release/Feed-Json.ps1) | The one way a channel's version.json is written (#1050). |
 | [release/Feed-News.ps1](release/Feed-News.ps1) | The notes the launcher's News tab shows, wherever the feed keeps them (#1050). |
@@ -178,12 +179,14 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Find-MSBuild.ps1](release/Find-MSBuild.ps1) | Says where the MSBuild that builds launcher\app\Thornswood.csproj is, and whether this machine has the .NET Framework 4.8.1 reference assemblies it builds against (issue #498). |
 | [release/ForkEngineBuild.ps1](release/ForkEngineBuild.ps1) | Finds the public fork's own build of an engine commit, and puts it where a build of that commit on this machine would be, for engine.yml to record. |
 | [release/Front.ps1](release/Front.ps1) | What Build-Front.ps1 and Go.ps1 share about the front build, the page skymp5-front's webpack makes for Data\Platform\UI: the record of it, the zip it travels in, and the check that a zip is the recorded build. |
-| [release/Get-EngineArtifact.ps1](release/Get-EngineArtifact.ps1) | Fetches CI's engine build of the pin (engine.yml's artifact), holds every file in it to records\client-build.json and records\server-build.json, and makes it this machine's engine build. |
+| [release/Get-EngineArtifact.ps1](release/Get-EngineArtifact.ps1) | Fetches CI's engine build of the pin (the public fork's own build of it), holds every file in it to records\client-build.json and records\server-build.json, and makes it this machine's engine build. |
+| [release/Get-EngineRecords.ps1](release/Get-EngineRecords.ps1) | Takes the records an engine.yml run made out of its log and writes them into this checkout's records\, for the pin pull request. |
 | [release/Get-ScratchDir.ps1](release/Get-ScratchDir.ps1) | Says where a short-lived build scratch folder goes, so Ship and Install-Thornswood take their launcher build (and the CI setup stub) from one place instead of each calling [IO.Path]::GetTempPath(). |
 | [release/Get-SevenZip.ps1](release/Get-SevenZip.ps1) | Puts 7-Zip's own Linux build (7zz, 25.01) on a Linux machine, checked against its pinned sha256, and prints where it is, so a cloud session can unpack every archive of the collection (#2969). |
 | [release/Go.ps1](release/Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/Install-NexusRevision.ps1](release/Install-NexusRevision.ps1) | Lays out one revision of the Thornswood collection on Nexus Mods (slug 7essxf) into a game folder, the way Vortex installs and deploys it, without Vortex (#2754). |
+| [release/LogHandBack.ps1](release/LogHandBack.ps1) | A file handed back from a workflow run in its job's log rather than as an artifact. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
 | [release/New-ClientLicenceRecord.ps1](release/New-ClientLicenceRecord.ps1) | Records which vcpkg libraries are in the client files, with each one's licence text, into records\client-licences.json and records\client-licences\. |
 | [release/New-FeedRoot.ps1](release/New-FeedRoot.ps1) | Stages the folder a release from the feed is built from: every file the channel's last release left installed, from the site, by its sha256. |

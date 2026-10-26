@@ -25,7 +25,7 @@
   channel's assets or else the other channel's, so main can carry the client
   a dev Ship already put on the site without an engine build here. A client no
   Ship has carried yet is on neither feed: it is taken from CI's engine build
-  of the pin instead (engine.yml's artifact, which Get-EngineArtifact.ps1
+  of the pin instead (the fork's own build, which Get-EngineArtifact.ps1
   fetches and holds to the records, #3047), so the dev Ship that first carries
   a new engine pin runs without an engine build here too.
 

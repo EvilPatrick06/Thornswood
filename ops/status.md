@@ -32,13 +32,19 @@ moved the run notes here.
   straight after a dev Ship.
 - **Live voice:** voice-bcc2dbaa (deployed 19 Oct), auth on, loopback only;
   /health chatRetention overdueDays 0, no prune error (read 8:37 AM 22 Oct).
-- **Site:** from main 23ece55d (Deploy-Docs -Site from the cloud, 1:49 PM 22
-  Oct). Its live access lists were written whole at 1:57 PM for #3317
+- **Site:** from main aa4423c0 (Deploy-Docs from the cloud, 2:12 AM 26 Oct,
+  #3140; -Site and the known and roadmap boards from b3972289 at 1:39 AM,
+  #3137). /known and /roadmap are written by the bot from the issue board
+  (data\from-bot\lists.json, #3140); the old known and roadmap boards in
+  board.json are unread. The bot runs main 44152b1b (Install-Bot -CodeOnly
+  from the cloud, 11:34 AM 26 Oct, #3140): a known post stays until its issue
+  has a `Test task:` comment or `board: Done`, or closes, and #known-issues
+  and /known hold 12 findings. Its status lines wait on the site carrying
+  lines.md (3147-lines.md); until then it logs "the site handed out none". help.md is still the one before #3137 and #2705:
+  `-Docs help` waits on the main Ship (3137-known-board.md). Its live access
+  lists were written whole at 1:57 PM 22 Oct for #3317
   (Set-DiscordLogin -Access): the dev build is for Owner, Co-Owner, Dev and
-  the leads, and the company role is Free Skyrim Trading Company. The roadmap
-  board was replaced from main at 10:16 AM (#2560: the #502 row without
-  bounties, #507's free claim row); the known board is still as typed on the
-  site, held for #3137. Cloudflare fronts ports 80 and 443, which take only
+  the leads, and the company role is Free Skyrim Trading Company. Cloudflare fronts ports 80 and 443, which take only
   Cloudflare's addresses (#2995). thornswood.net has a DMARC record at
   p=none reporting to Cloudflare's DMARC Management, set 11:17 AM 22 Oct
   through the connector (#3216). Cloudflare (#3216): two-factor is required

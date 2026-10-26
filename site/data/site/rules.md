@@ -3,7 +3,7 @@
 Two lists, because they are two different jobs. The first is about being decent
 to each other. The second is about playing here.
 
-Last changed: 22 October 2026.
+Last changed: 26 October 2026.
 
 <!-- alpha -->
 Thornswood is in alpha, and the world is open by application. The application
@@ -337,7 +337,8 @@ whichever of them is more convincing. That protects you as much as it protects
 anybody: if you did not say the thing you are accused of, the log is what shows
 it.
 
-Only moderators and above can read it. It is kept for a year.
+Only the Owner, the Co-Owner and the Dev rank can read it. It is kept for 365
+days, then dropped.
 
 ---
 

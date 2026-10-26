@@ -49,7 +49,7 @@ function yes(what, cond) {
 const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const gm = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const skills = read(path.join('game', 'ui', 'thornswood-skills.js'));
-// Known Issues is the known board, as /known writes it (#2414).
+// Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
 const known = require('./fixtures/known-page').knownPage() || '';
 const help = read(path.join('site', 'data', 'help.md'));
 
@@ -158,21 +158,21 @@ fs.readdirSync(siteDir).filter(function (f) { return /\.md$/.test(f); }).forEach
   if (wrong.length) { yes('site/' + f + ' puts a choice in the launcher: "' + wrong[0] + '"', false); }
 });
 
-// Known Issues: the row about the hall.
+// The bare hall is how it works, not a bug, so since #3137 it is on the Help
+// page's Things that are normal here and not on Known Issues, which lists only
+// what is broken.
 const rows = known.split('\n').filter(function (l) { return /^\|/.test(l); });
-const hallRows = rows.filter(function (l) { return /\bhall\b/i.test(l); });
-yes('Known Issues still has a row about the creation hall', hallRows.length > 0);
-yes('and none of them says nothing in the hall is a choice',
-    !hallRows.some(function (l) { return /nothing in the creation hall is a choice/i.test(l); }));
-yes('one of them says the panel on K opens by itself',
-    choosing !== null && hallRows.some(function (l) {
-      return /\bpanel\b/i.test(l) && /\bK\b/.test(l) && /\b(by itself|on its own)\b/i.test(l);
-    }));
-yes('one of them says only the town has to be chosen to leave, and the rest can wait',
-    homeMustBe && classCanWait && profCanWait && hallRows.some(function (l) {
-      return /\btown\b/i.test(l) && /\bclass\b/i.test(l) && /\bprofession\b/i.test(l) &&
-             /\b(can wait|later)\b/i.test(l);
-    }));
+yes('Known Issues no longer lists the creation hall',
+    !rows.some(function (l) { return /\bhall\b/i.test(l); }));
+const normal = slice(help, '## Things that are normal here', '\n## ') || '';
+yes('Help lists the bare hall as normal, and says the panel on K opens by itself',
+    choosing !== null && /creation hall is a bare room/i.test(normal) &&
+    /\bpanel\b/i.test(normal) && /\b(by itself|on its own)\b/i.test(normal));
+yes('nothing says nothing in the hall is a choice',
+    !/nothing in the creation hall is a choice/i.test(help + known));
+yes('Help says only the town has to be chosen to leave, and the class and profession can wait',
+    homeMustBe && classCanWait && profCanWait &&
+    /Only the town has to be chosen before you leave the hall\. Your class and\s+profession can wait/.test(help));
 
 // Help: the first character, in the order it happens.
 const first = slice(help, '## Your first character', '\n## ');
