@@ -702,6 +702,66 @@
       "name": "Spider Egg",
       "issue": "#3465",
       "why": "an animal part no hunt gives yet"
+    },
+    {
+      "desc": "3eadd:Skyrim.esm",
+      "name": "Potion of Minor Healing",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "3eade:Skyrim.esm",
+      "name": "Potion of Healing",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "3eadf:Skyrim.esm",
+      "name": "Potion of Plentiful Healing",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "3eae3:Skyrim.esm",
+      "name": "Potion of Vigorous Healing",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "3eae0:Skyrim.esm",
+      "name": "Potion of Minor Magicka",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "3eae1:Skyrim.esm",
+      "name": "Potion of Magicka",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "3eae5:Skyrim.esm",
+      "name": "Potion of Minor Stamina",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "39be8:Skyrim.esm",
+      "name": "Potion of Stamina",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "39b4a:Skyrim.esm",
+      "name": "Potion of Resist Fire",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
+    },
+    {
+      "desc": "39be1:Skyrim.esm",
+      "name": "Potion of Resist Shock",
+      "issue": "#3470",
+      "why": "The lab's bottle is a new form, never this record; no recipe makes it."
     }
   ],
   "exempt": []

@@ -50,7 +50,7 @@ yes('every waiting entry names an issue',
 const FILES = [
   'game/gamemode.js',
   'game/data/recipes.json', 'game/data/harvests.json', 'game/data/hunts.json', 'game/data/ores.json',
-  'game/data/food.json', 'game/data/chargen.json',
+  'game/data/chargen.json',
   'game/data/merchant-scarce-fishing.json', 'game/data/merchant-scarce-geodes.json', 'game/data/merchant-scarce-harvest.json',
   'scripts/dev/Check-Makers.waiting.json', 'docs/systems/lists/who-makes-it.md'
 ];

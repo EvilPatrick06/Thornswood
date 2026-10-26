@@ -29,10 +29,10 @@
 //   a class's own table: harvests and crops, hunts, ores, FISH_BY_BASE in
 //     game/gamemode.js, and the scarce sources in game/data/merchant-scarce-*.json;
 //   the producer the recipe table records on an input (the salt quarry and the
-//     like, which have no table of their own);
-//   an Alchemist at the lab for a potion or a poison (game/data/food.json),
-//     because Skyrim has no alchemy recipe records: the lab is the work
-//     (docs/systems/professions/alchemist.md).
+//     like, which have no table of their own).
+// The alchemy lab makes no record: a bottle it brews is a new form above
+// 0xff000000 (docs/systems/professions/alchemist.md), so a potion record the
+// world hands out needs a maker of its own like anything else.
 //
 // AN ITEM NOBODY MAKES YET is a failure unless Check-Makers.waiting.json names
 // it with the open issue that gives it a maker. An entry that now has a maker,
@@ -153,10 +153,6 @@ function makers(root, src) {
   for (const file of Object.keys(SCARCE_WHO)) {
     for (const s of readJson(root, 'game/data/' + file).sources) add(s.item, SCARCE_WHO[file] + ', ' + s.rank + ', scarce');
   }
-  // food.json's potion and poison names did not survive as words (alchemist.md), so only its kind is read.
-  for (const [desc, v] of Object.entries(readJson(root, 'game/data/food.json').items)) {
-    if (v.kind === 'potion' || v.kind === 'poison') add(desc, 'Alchemist at the lab');
-  }
   // The rest of the names, as the game writes them, from ITEM_NAMES and then ADMIN_ITEMS.
   const itemNames = between(src, '// ==== ITEM_NAMES ====', '// ==== end ITEM_NAMES ====', 'ITEM_NAMES') +
     between(src, 'var ADMIN_ITEMS = {', '\n  };', 'ADMIN_ITEMS');
@@ -268,7 +264,7 @@ function page(result) {
     'The world here is what the server puts into a pack from nothing: the dungeon and body loot ([Dungeon loot](../dungeon-loot.md)), ' +
     'a new character\'s clothes, the tool a class pick hands over, and whatever a recipe in the open book asks for. A trader sells only what somebody sold or hauled to it, so traders are not on this page.');
   L.push('');
-  L.push('A maker is a recipe in the open book (not cut and not tempering), a class that gathers the item, or an Alchemist at the lab for a potion or a poison. ' +
+  L.push('A maker is a recipe in the open book (not cut and not tempering), or a class that gathers the item. A bottle the alchemy lab brews is a new form, not a record, so the lab is the maker of no record. ' +
     'The build fails when the world hands out something with no maker that `scripts/dev/Check-Makers.waiting.json` does not name with the issue that will give it one.');
   L.push('');
   L.push(rows.length + ' items handed out. ' + (rows.length - none.length) + ' have a maker. ' + none.length + ' have none yet.');
