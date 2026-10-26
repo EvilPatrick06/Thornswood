@@ -21,7 +21,7 @@ namespace Thornswood
 {
     /// <summary>
     /// The launcher itself: Main, the window, every button, and the Play
-    /// sequence. There is no compiled window class. Run parses tools\ui.xaml,
+    /// sequence. There is no compiled window class. Run parses launcher\ui.xaml,
     /// which Build-Launcher.ps1 embeds in the exe, into a live Window at run
     /// time; Bind finds the named controls in it and Wire attaches every
     /// handler. So this is one static class, not a Window subclass, split
@@ -31,7 +31,7 @@ namespace Thornswood
     /// each of the other classes owns on disk, and every step between the
     /// Play button and the game starting, with the file and line of each.
     /// Whoever changes one of those steps changes that page in the same pull
-    /// request; tools\test-architecture.js fails when the page names a step
+    /// request; tests\test-architecture.js fails when the page names a step
     /// that is gone or out of order.
     /// </summary>
     static partial class Shell

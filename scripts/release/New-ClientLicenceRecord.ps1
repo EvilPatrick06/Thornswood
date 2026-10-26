@@ -27,9 +27,9 @@
                                      licence, files, and its text's size and
                                      sha256
     records\client-licences\<port>.txt   each text, byte for byte
-  engine.yml keeps both under records\ in its artifact, and the pin pull
-  request commits them with the other two records (engine\README.md, "The
-  engine built in CI").
+  engine.yml hands both back in its log with the other two records
+  (Get-EngineRecords.ps1, #3399), and the pin pull request commits them
+  (engine\README.md, "The engine built in CI").
 
   Run it after New-ClientBuildRecord.ps1, from the same build. Read only
   except for what it writes. It never starts anything and never talks to

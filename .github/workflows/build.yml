@@ -96,13 +96,14 @@ jobs:
   # of it cancelled by the next merge. When the pull request's build ran
   # against the main it lands on, a squash merge gives main that very tree.
   # This job asks scripts\dev\Tested-Tree.js whether a green build-pr.yml run
-  # of this repository kept a note of HEAD's tree (the last step of the checks
-  # below), and when one did it names that run and the build stops green.
-  # Any other tree, an expired note, a fork's run or a GitHub answer it cannot
-  # read builds main in full, as before. A manual run always builds. It runs
-  # on any VPS runner, not a build one: it starts node and asks GitHub three
-  # questions. tests\test-3182-tested-tree.js holds what it accepts, and why a
-  # tree is enough is in the script's header.
+  # of the pull request merged as HEAD wrote down HEAD's tree in its log (the
+  # last step of the checks below), and when one did it names that run and
+  # the build stops green. Any other tree, a fork's run or a GitHub answer it
+  # cannot read builds main in full, as before. A manual run always builds.
+  # It runs on any VPS runner, not a build one: it starts node and asks
+  # GitHub a few questions, which pull request a commit came from among them
+  # (pull-requests: read). tests\test-3182-tested-tree.js holds what it
+  # accepts, and why a tree is enough is in the script's header.
   tested:
     name: Already tested in its pull request
     if: ${{ github.event_name == 'push' }}
@@ -111,6 +112,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     outputs:
       run: ${{ steps.look.outputs.run }}
     steps:
@@ -131,7 +133,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
-          node scripts\dev\Tested-Tree.js --tree $tree --repo $env:GITHUB_REPOSITORY
+          node scripts\dev\Tested-Tree.js --tree $tree --commit $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
           exit 0
 
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
@@ -634,33 +636,27 @@ jobs:
           exit 0
 
       # The note main's build looks for (#3182, the job "tested" at the top
-      # of build.yml): the tree every step before this one passed on. Last,
-      # so it is kept only when they all did, and only when the gate step
-      # ran every gate harness (#3114): a pull request that ran only what
-      # its change can reach leaves main to build in full. A pull request's
-      # checkout is GitHub's merge of it into main, so this is the tree a
-      # squash merge gives main while main has not moved. A few hundred bytes for seven
-      # days, against the 2 GB below; nothing else reads it.
+      # of build.yml): the tree every step before this one passed on, one
+      # line of this job's log. Last, so it is written only when they all
+      # did, and only when the gate step ran every gate harness (#3114): a
+      # pull request that ran only what its change can reach leaves main to
+      # build in full. A pull request's checkout is GitHub's merge of it into
+      # main, so this is the tree a squash merge gives main while main has
+      # not moved. In the log and not an artifact since #3399: this
+      # repository's artifact storage is counted by the hour, it used
+      # October's whole allowance by 23 Oct 2026, and from then the note's
+      # upload failed and took every pull request's build red. A log costs no
+      # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
       - name: Write down the tree these checks passed on
-        id: tree
         if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
         shell: pwsh
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
           if ($tree -notmatch '^[0-9a-f]{40}$') { Write-Host "::error::git gave no tree for HEAD: $tree"; exit 1 }
-          $note = Join-Path $env:RUNNER_TEMP 'tested-tree.txt'
-          Set-Content -LiteralPath $note -Encoding utf8 -Value @(
-            "tree $tree", "commit $env:GITHUB_SHA", "pull request ${{ github.event.pull_request.number }}", "head ${{ github.event.pull_request.head.sha }}")
-          "tree=$tree" >> $env:GITHUB_OUTPUT
-          "note=$note" >> $env:GITHUB_OUTPUT
-      - name: Keep the tree these checks passed on
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
-        with:
-          name: tested-tree-${{ steps.tree.outputs.tree }}
-          path: ${{ steps.tree.outputs.note }}
-          retention-days: 7
-          overwrite: true
+          Write-Host ('TESTED-TREE {0} commit {1} pull request {2} head {3}' -f $tree, $env:GITHUB_SHA, $env:PR_NUMBER, $env:PR_HEAD)
 
       # No other artifact from this build (#2163, 19 Oct). It used to keep the exe
       # for 7 days, and nothing read it: Ship takes the launcher from

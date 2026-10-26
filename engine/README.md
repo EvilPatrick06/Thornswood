@@ -288,21 +288,25 @@ A change to the engine goes like this:
    worktree of the fork, and a pull request in the fork, merged with a merge
    commit. A merge commit has the same files as the branch it merges, so a
    build of the branch's last commit is a build of the head.
-2. Build both halves from that commit: `Build-Engine.ps1 -Fork <that worktree>`,
-   then `Build-Server.ps1 -Fork <that worktree>`, which builds every server file
-   again from it (the JavaScript half included) and records them. A fork under
-   a path with an `&` in it is reached through the drive letter it was
-   configured through (`K:\<fork>`).
-3. `New-ClientBuildRecord.ps1 -Dist <fork>\build\dist\client -Clone <fork>`; the
-   server record came out of step 2. Then `Build-Front.ps1 -Fork <fork> -Commit
-   <commit> -Record`, which builds the front from the same commit and writes
-   `records\front-build.json` (#2754). Then the client's libraries and their
-   licence texts (#3099): `<fork>\misc\thornswood\Write-ClientLicences.ps1
-   -Build <fork>\build`, which needs llvm-pdbutil (LLVM's), and
-   `New-ClientLicenceRecord.ps1 -Licences <fork>\build\licences -Clone <fork>`.
-4. One pull request here with the new pin (`git -C engine/skymp checkout
-   <commit>`, then `git add engine/skymp`), the four records and the
-   `records\client-licences` texts, and the commit named
+2. The fork builds the merge itself: every push to `thornswood/engine-changes`
+   builds the engine on GitHub's runner and keeps it as
+   `thornswood-engine-<commit>` for 90 days. Wait for that build to be green.
+3. The records come from that build, in CI ("The engine built in CI",
+   below): `gh workflow run engine.yml --ref main -f commit=<commit>` records
+   it, and hands back `records\server-build.json`, `records\client-build.json`,
+   `records\client-licences.json` and the `records\client-licences` texts in
+   its log. A build made on a machine (`Build-Engine.ps1 -Fork <worktree>`,
+   then `Build-Server.ps1 -Fork <worktree>`) is for trying a change on that
+   machine; its records are never a pin's, because a Ship machine takes the
+   fork's own build, and a rebuild is never the same bytes (#3399). Then
+   `Build-Front.ps1 -Fork <fork> -Commit <commit> -Record`, which builds the
+   front from the same commit and writes `records\front-build.json` (#2754).
+4. One pull request here with the new pin (`git update-index --cacheinfo
+   160000,<commit>,engine/skymp`, or `git -C engine/skymp checkout <commit>`
+   then `git add engine/skymp`), the records engine.yml handed back
+   (`.\scripts\release\Get-EngineRecords.ps1 -Run <its run id>` writes them,
+   and only when the index already pins that commit), `records\front-build.json`,
+   and the commit named
    in `THIRD-PARTY.md` (its fork section, "On our servers" with the server's
    SHA256, and the link in "Where the source is") and in
    `site\data\site\credits.md`. `tests\test-third-party.js` is red when any of
@@ -350,50 +354,34 @@ taken and who decided.
 ## The engine built in CI
 
 Decided by Patrick on 15 October (issue #459, "C, then B"): the engine is
-built in CI on GitHub's own runner first, and on the VPS runners when GitHub
-refuses it, the way the build check falls back (#2407). That is
+recorded in CI on GitHub's own runner first, and on the VPS runners when
+GitHub refuses it, the way the build check falls back (#2407). That is
 `.github\workflows\engine.yml`, whose header says each choice and why.
 
-It runs the steps of "One engine" above on a runner, from this repository's
-scripts: the fork checked out at one commit of `thornswood/engine-changes`,
-`Build-Engine.ps1 -NoSkyrim`, then `Build-Server.ps1`, which records the
-server, then `New-ClientBuildRecord.ps1`. A runner has no game, so
-`-NoSkyrim` configures without `SKYRIM_DIR`: the fork then puts its committed
-Papyrus into the build, as upstream's own CI build does, and the records
-hold the build to it. Every runner sets `CI=true`, which makes the fork's
-`CMakeLists.txt` take `C:/vcpkg` instead of its own vcpkg, so both scripts
-take it out of their own environment first (`EngineJobs.ps1`,
-`Clear-EngineCiSwitch`). There is no drive letter to keep and no Store
-PowerShell to lose on a runner: its checkout path has no `&` in it, and its
-pwsh is an installed one.
+It records the fork's own build, and builds nothing (Patrick's B on #459,
+16 October; #3014; #3399). The fork is public, so GitHub builds it at no
+cost: since fork #79 every push to `thornswood/engine-changes` builds the
+engine on GitHub's runner (`.github\workflows\thornswood-pr-windows.yml` in
+the fork) and keeps what the records need as the artifact
+`thornswood-engine-<commit>` for 90 days, with `fork-build.json` naming the
+run and each file's sha256 and time. `engine.yml` looks for that build of the
+commit (`scripts\release\ForkEngineBuild.ps1`), holds it to the commit, the
+run and every file, puts it in the fork's build folder, and makes the records
+from it with `-BuiltBy` naming the fork's run: `New-ServerBuildRecord.ps1`,
+`New-ClientBuildRecord.ps1` and `New-ClientLicenceRecord.ps1`, as for any
+build. A fork build still running, or one that ended red, or none at all,
+stops the run with its link.
 
-The fork's own build comes first (Patrick's B on #459, 16 October). The
-fork is public, so GitHub builds it at no cost: since fork #79 every push to
-`thornswood/engine-changes` builds the engine on GitHub's runner
-(`.github\workflows\thornswood-pr-windows.yml` in the fork) and keeps what
-the records need as the artifact `thornswood-engine-<commit>`, with
-`fork-build.json` naming the run and each file's sha256 and time. Before
-anything is compiled, `engine.yml` looks for that build of the commit
-(`scripts\release\ForkEngineBuild.ps1`), holds it to the commit, the run and
-every file, puts it in the fork's build folder, and makes both records from
-it with `-BuiltBy` naming the fork's run. The engine is compiled here, on
-GitHub's runner alone, only when the fork has no build of the commit (one
-from before fork #79, one whose 90 days are over, or one that was never a
-head of `thornswood/engine-changes`). A fork build still running, or one that
-ended red, stops the run with its link.
-
-The VPS compiles nothing (#3014, Patrick's A on 22 October). Its runner
-accounts reach GitHub's addresses and nothing else (#2161), and a compile
-needs more: the fork's libraries come from eight other hosts (mirror.msys2.org,
-the CEF CDN and more), and Windows checks each download's certificate with
-its authority's servers, which even GitHub's own downloads need. Run
-39727871475 stopped at vcpkg's first download that way. So on the
-box `engine.yml` takes the fork's build or stops before anything is compiled,
-saying so. A pin therefore names a commit the fork built: a head of
-`thornswood/engine-changes`, built by the push that made it the head. A
-commit the fork never built goes to GitHub's runner when there are minutes
-(`-f runner=hosted`), or is built on One.
-Both check the fork out as committed, LF, as One does: the image's git turns
+Nothing is compiled in CI. The VPS cannot (#3014, Patrick's A on 22
+October): its runner accounts reach GitHub's addresses and nothing else
+(#2161), and a compile needs more, the fork's libraries from eight other hosts
+and Windows' certificate checks with each authority's servers (run
+39727871475 stopped at vcpkg's first download). And since #3399 (Patrick's A
+on 26 October) a Ship machine takes the fork's own build of the pin, so a
+build compiled on GitHub's runner would be bytes no Ship machine could take.
+A pin therefore names a commit the fork built: a head of
+`thornswood/engine-changes`, built by the push that made it the head.
+The fork is checked out as committed, LF, as One does: the image's git turns
 text to CR LF, and the records hold the server's `package.json`, `yarn.lock`
 and bundle to the fork's bytes.
 
@@ -403,50 +391,46 @@ Start it from the Actions tab, or from the repository folder:
 gh workflow run engine.yml --ref main -f commit=<the fork commit>
 ```
 
-With no commit it builds the one the branch pins. It runs only when started
+With no commit it records the one the branch pins. It runs only when started
 by hand: a pull request's code reaches the box through the build check alone
-(#1306). One artifact of the run, `engine-<fork commit, 12>`,
-holds `records\server-build.json` and `records\client-build.json`, with
-`records\client-licences.json` and `records\client-licences\` beside them (the
-vcpkg libraries in the client files and each one's licence text, which the
-fork's build measures from each file's program database, #3099), the server
-build as the store on the box keeps it (`server\server-<fork commit
-12>-<zip hash 16>.zip` and its `.json`, `scripts\deploy\ServerArtifact.ps1`),
-the six client files under `client\` at the paths the record names,
-`fork-build.json` when the fork built it, and `SHA256SUMS` over all of it.
-The run commits nothing and sends nothing.
+(#1306). The run keeps nothing as an artifact: this repository's artifact
+storage was used up on 25 October (#3410), and stays used up until the
+month's count resets whatever is deleted, since it counts time stored. So the
+records come back in the job's log instead, between `ENGINE-RECORDS` lines
+(`scripts\release\EngineRecords.ps1` says what is carried, `LogHandBack.ps1`
+how), which GitHub keeps 90 days. The log also names the server build the
+store keeps for them (`server-<fork commit 12>-<zip hash 16>.zip`,
+`scripts\deploy\ServerArtifact.ps1`), which any machine makes again from the
+same record and the fork's build. The run commits nothing and sends nothing.
 
-The pin pull request from it, step 4 of "One engine" with the records CI
-made instead of a machine's own build, from the repository folder on a branch:
+The pin pull request from it, step 4 of "One engine", from the repository
+folder on a branch (any machine with gh, a cloud thread's too):
 
 ```powershell
-gh run download <the run's id> -n engine-<fork commit 12> -D out\engine-<fork commit 12>
-Copy-Item out\engine-<fork commit 12>\records\server-build.json, out\engine-<fork commit 12>\records\client-build.json, out\engine-<fork commit 12>\records\client-licences.json records\
-if (Test-Path records\client-licences) { Remove-Item records\client-licences -Recurse -Force }
-Copy-Item out\engine-<fork commit 12>\records\client-licences records\client-licences -Recurse
-git -C engine/skymp fetch origin
-git -C engine/skymp checkout <the fork commit>
-git add -A engine/skymp records\server-build.json records\client-build.json records\client-licences.json records\client-licences
+git update-index --cacheinfo 160000,<the fork commit>,engine/skymp
+.\scripts\release\Get-EngineRecords.ps1 -Run <the run's id>
+git add records\server-build.json records\client-build.json records\client-licences.json records\client-licences
 ```
 
-then the commit in `THIRD-PARTY.md` and `site\data\site\credits.md`, as step 4
-says. The six client files go into a game folder with
-`.\scripts\release\Sync-Client.ps1 -Dist out\engine-<fork commit 12>\client`,
-which holds each to the record first.
+`Get-EngineRecords.ps1` reads the log of the job that succeeded, holds the
+records to the length and sha256 the log gives, refuses anything but the
+four, and writes them only when both name the commit the index pins;
+`records\client-licences` is replaced whole. Then the commit in
+`THIRD-PARTY.md` and `site\data\site\credits.md`, as step 4 says.
 
 A rebuild is never the same bytes ("Rebuilding the same commit", above), so a
-pin takes the records of the one build whose files are then sent: CI's, or
-one machine's, never a mix.
+pin takes the records of the one build whose files are then sent: the fork's,
+never a machine's, never a mix.
 
 ### A Ship machine takes CI's build
 
 Issue #3047. Since the pins come from CI, the client and server the records
-name are the files in CI's artifact, and no build made on a Ship machine is.
-On 21 October #3040 moved the pin to `57fd87d8`; One's recorded engine build
-was still a fork worktree of the old pin, so the dev Ship stopped at Check-ShipReady with "the
-build is not the recorded one", and every fix it printed led to building the
-engine on One again, which could not have matched either. Run 39588485569's
-artifact held the exact client all along.
+name are the files of the build CI recorded, and no build made on a Ship
+machine is. On 21 October #3040 moved the pin to `57fd87d8`; One's recorded
+engine build was still a fork worktree of the old pin, so the dev Ship stopped
+at Check-ShipReady with "the build is not the recorded one", and every fix it
+printed led to building the engine on One again, which could not have matched
+either. CI held the exact client all along.
 
 So a machine that ships records CI's build as its engine build, once:
 
@@ -463,21 +447,23 @@ checkout's `records\server-build.json` names, so `ClientDist` and `ServerDist`
 are under it. The folder is named for the pin: a pin move is a new folder,
 never a stale one, and each checkout reads the build of its own pin.
 
-`.\scripts\release\Get-EngineArtifact.ps1` fills it. It asks GitHub (through
-`gh`) for `engine-<fork commit 12>` from a green `engine.yml` run, downloads
-it, and puts it in place only after holding it to the checkout's records. Every
-green run of the commit keeps its own, and only the run that made the
-checkout's records holds the same record text, so when there are several it
-holds each in turn, newest first, and takes the first that passes (#3243 is
-why two runs of one build differ). What is held
-(`scripts\release\EngineArtifact.ps1` says it): every file to
-`SHA256SUMS`, the artifact's two records to the checkout's, the six client
-files to `records\client-build.json`, and the server zip to
-`records\server-build.json` with the same check the box makes. The client goes
-to `build\dist\client`, the server's files to `build\dist\server`, and the
-artifact as it came to `artifact\`, where its server zip is what
-`Deploy-Server.ps1 -ServerBuild` and `Publish-Server.ps1 -ServerBuild` send.
-`-Check` says whether it is here or on GitHub, and changes nothing.
+`.\scripts\release\Get-EngineArtifact.ps1` fills it, from the fork (#3399,
+Patrick's A on 26 October). It asks GitHub (through `gh`, signed in as
+anybody: the fork is public) for the fork's green push builds of the commit
+that still keep `thornswood-engine-<commit>`, downloads one, and puts it in
+place only after holding it to the checkout's records. Until 26 October it
+took `engine.yml`'s own artifact out of this repository's storage, which
+filled. A commit built again in the fork is other bytes, so when the fork
+keeps several it holds each in turn, newest first, and takes the first that
+passes. What is held (`scripts\release\EngineArtifact.ps1` says it): every
+file to the fork's `fork-build.json` (the check `engine.yml` makes), the six
+client files to `records\client-build.json`, and the server files to
+`records\server-build.json` with the same check every deploy makes. The client
+goes to `build\dist\client`, the server's files to `build\dist\server`, and
+the server zip made from them, with `fork-build.json`, to `artifact\`, where
+the zip is what `Deploy-Server.ps1 -ServerBuild` and
+`Publish-Server.ps1 -ServerBuild` send. `-Check` says whether it is here or
+on GitHub, and changes nothing.
 
 Nobody has to run it by hand after a pin move: `Sync-Client.ps1` runs it when
 the game folder needs the client and the folder for the pin is not there
@@ -485,17 +471,16 @@ yet, so the first Ship (through `Update-ShipRoot.ps1`) or `Go.ps1` after the
 merge fetches it, and Check-ShipReady counts a build GitHub keeps as one the
 Ship will have. No engine build on any machine is part of a release.
 
-`engine.yml` keeps its artifact 30 days. Past that, `gh workflow run
-engine.yml --ref main` makes it again: it takes the fork's own build of the
-commit, which the fork keeps 90 days, so the files are the same bytes. Its
-`records\client-build.json` is not the same text, though, because it records
-when it was written (`recordedUtc`), so until #3243 is fixed that artifact does
-not pass the records check. `tests\test-3047-ci-engine-build.ps1` holds all of it.
+The fork keeps its build 90 days. Past that a Ship machine that has not
+fetched it yet cannot, and the pin needs new records: run the fork's build of
+the commit again in the fork, then `engine.yml` for it, and a pull request
+with the records it hands back. `tests\test-3047-ci-engine-build.ps1` holds
+all of it, and `tests\test-3399-engine-records.ps1` the records' way back.
 
 On the VPS the fallback needs yarn, for the fork build's server packages:
 `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'`
 puts it there, with the C++ half of the Build Tools and CMake, which the box
 no longer uses (#3014). `tests\test-459-engine-workflow.ps1` holds the
-workflow's shape and these two scripts' part in it, and
+workflow's shape and the build scripts' part in building the engine, and
 `tests\test-459-fork-build.ps1` which fork build is taken, what it is held
 to, and the records' `-BuiltBy`.

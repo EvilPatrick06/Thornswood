@@ -22,7 +22,7 @@ namespace Thornswood
     /// the keyboard away from the game. Positions, names and distances all
     /// worked there, because that is signalling. Audio never once did.
     ///
-    /// another server does not do it that way. Their in-game voice service only tracks
+    /// Another server does not do it that way. Their in-game voice service only tracks
     /// push to talk, the socket and the HUD, and reports a launcher status of
     /// connected / micOk / talking. The microphone and the audio pipeline live
     /// in their launcher, which is Electron and therefore a real browser.
