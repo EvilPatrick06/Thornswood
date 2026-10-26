@@ -63,17 +63,17 @@ emote is not a chop.
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 44 recipes. 44 reach the server. None of them are tempering. The same rows, with ids, are in [woodworker-woodwright](../../lists/woodworker-woodwright.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 45 recipes. 45 reach the server. None of them are tempering. The same rows, with ids, are in [woodworker-woodwright](../../lists/woodworker-woodwright.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
-**Novice** (20 names). Bar Stool. Bed. Bedroll. Chest. Crude Fishing Pole. Double Bed. Drum. Dwarven Arrow. Dwarven Bolt. Fine Bench. Fine Chair. Fine Double Bed. Fish Trap. Flute. Iron Arrow. Large Chest. Lute. Splint. Wooden Bench. Wooden Chair.
+**Novice** (21 names). Bar Stool. Bed. Bedroll. Chest. Crude Fishing Pole. Double Bed. Drum. Dwarven Arrow. Dwarven Bolt. Fine Bench. Fine Chair. Fine Double Bed. Fish Trap. Flute. Iron Arrow. Large Chest. Lute. Splint. Wooden Bench. Wooden Chair. Wooden Ladle.
 
-**Advanced** (9 names). Crossbow. Dwarven Bow. Nordic Arrow. Nordic Bow. Orcish Arrow. Orcish Bow. Riekling Spear. Steel Arrow. Steel Bolt.
+**Advanced** (8 names). Crossbow. Nordic Arrow. Nordic Bow. Orcish Arrow. Orcish Bow. Riekling Spear. Steel Arrow. Steel Bolt.
 
-**Expert** (8 names). Dwarven Crossbow. Elven Arrow. Elven Bow. Falmer Arrow. Falmer Bow. Fine Fishing Pole. Glass Arrow. Glass Bow.
+**Expert** (9 names). Dwarven Bow. Dwarven Crossbow. Elven Arrow. Elven Bow. Falmer Arrow. Falmer Bow. Fine Fishing Pole. Glass Arrow. Glass Bow.
 
 **Master** (5 names). Ebony Arrow. Ebony Bow. Master Fishing Pole. Stalhrim Arrow. Stalhrim Bow.
 
@@ -96,6 +96,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Splint | 1 | novice | Other goods | ThornswoodCraftingCharcoalKiln | 1 Firewood, 1 Leather Strips |  | yes | `154c5:Thornswood-Content.esp` |
 | Wooden Bench | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 4 Firewood, 1 Leather Strips |  | yes | `16082:Thornswood-Content.esp` |
 | Wooden Chair | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 3 Firewood, 1 Leather Strips |  | yes | `16081:Thornswood-Content.esp` |
+| Wooden Ladle | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 1 Firewood |  | yes | `154f7:Thornswood-Content.esp` |
 | Drum | 1 | novice | Other weapons | SmithingForge | 1 Drum |  | yes | `2de5:PlayFluteLuteDrum.esp` |
 | Flute | 1 | novice | Other weapons | SmithingForge | 1 Flute |  | yes | `1838:PlayFluteLuteDrum.esp` |
 | Lute | 1 | novice | Other weapons | SmithingForge | 1 Lute |  | yes | `2de4:PlayFluteLuteDrum.esp` |
@@ -105,7 +106,6 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Steel Arrow | 24 | advanced | Arrows and bolts | ThornswoodCraftingWoodworking | 1 Firewood, 1 Steel Ingot |  | yes | `b650:Dawnguard.esm` |
 | Steel Bolt | 10 | advanced | Arrows and bolts | ThornswoodCraftingWoodworking | 1 Firewood, 1 Steel Ingot |  | yes | `f813:Dawnguard.esm` |
 | Crossbow | 1 | advanced | Bows | DLC1CraftingDawnguard | 3 Steel Ingot, 3 Firewood |  | yes | `f80e:Dawnguard.esm` |
-| Dwarven Bow | 1 | advanced | Bows | ThornswoodCraftingWoodworking | 1 Iron Ingot, 2 Dwarven Metal Ingot |  | yes | `108cf8:Skyrim.esm` |
 | Nordic Bow | 1 | advanced | Bows | ThornswoodCraftingWoodworking | 3 Steel Ingot, 1 Quicksilver Ingot |  | yes | `2b07f:Dragonborn.esm` |
 | Orcish Bow | 1 | advanced | Bows | ThornswoodCraftingWoodworking | 1 Iron Ingot, 2 Orichalcum Ingot |  | yes | `108cfc:Skyrim.esm` |
 | Riekling Spear | 1 | advanced | Greatswords | SmithingForge | 1 Steel Ingot, 2 Firewood | riekling | yes | `19fb7:Playable Rieklings.esp` |
@@ -113,6 +113,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Elven Arrow | 24 | expert | Arrows and bolts | ThornswoodCraftingWoodworking | 1 Firewood, 1 Refined Moonstone |  | yes | `b655:Dawnguard.esm` |
 | Falmer Arrow | 48 | expert | Arrows and bolts | SmithingForge | 1 Chaurus Chitin, 1 Firewood |  | yes | `8f0:MoreCraftableEquipment.esp` |
 | Glass Arrow | 24 | expert | Arrows and bolts | ThornswoodCraftingWoodworking | 1 Firewood, 1 Refined Malachite |  | yes | `b653:Dawnguard.esm` |
+| Dwarven Bow | 1 | expert | Bows | ThornswoodCraftingWoodworking | 1 Iron Ingot, 2 Dwarven Metal Ingot |  | yes | `108cf8:Skyrim.esm` |
 | Dwarven Crossbow | 1 | expert | Bows | DLC1CraftingDawnguard | 5 Dwarven Metal Ingot |  | yes | `f810:Dawnguard.esm` |
 | Elven Bow | 1 | expert | Bows | ThornswoodCraftingWoodworking | 1 Quicksilver Ingot, 2 Refined Moonstone |  | yes | `108cfa:Skyrim.esm` |
 | Falmer Bow | 1 | expert | Bows | SmithingForge | 1 Iron Ingot, 1 Chaurus Chitin |  | yes | `8f7:MoreCraftableEquipment.esp` |

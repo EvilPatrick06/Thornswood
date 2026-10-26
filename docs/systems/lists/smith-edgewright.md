@@ -1,8 +1,8 @@
 # Smith/Edgewright
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 79 recipes, 79 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 83 recipes, 83 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 14, advanced 35, expert 16, master 14.
+By rank: novice 18, advanced 35, expert 16, master 14.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -11,8 +11,12 @@ By rank: novice 14, advanced 35, expert 16, master 14.
 | Iron Greatsword | 1 | novice | Greatswords | SmithingForge | 4 Iron Ingot, 2 Leather Strips |  | yes | `da76f:Skyrim.esm` |
 | Iron Mace | 1 | novice | Maces | SmithingForge | 3 Iron Ingot, 2 Leather Strips |  | yes | `da76b:Skyrim.esm` |
 | Riekling Bone Club | 1 | novice | Maces | SmithingForge | 5 Bone Meal | riekling | yes | `9e775:Playable Rieklings.esp` |
+| Alembic | 1 | novice | Other goods | SmithingForge | 2 Iron Ingot |  | yes | `154f5:Thornswood-Content.esp` |
+| Hammer | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Tool Handle |  | yes | `154f3:Thornswood-Content.esp` |
 | Key | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot |  | yes | `15497:Thornswood-Content.esp` |
 | Key Mold | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot |  | yes | `15496:Thornswood-Content.esp` |
+| Rune Knife | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Leather Strips |  | yes | `154f6:Thornswood-Content.esp` |
+| Shears | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot |  | yes | `154f4:Thornswood-Content.esp` |
 | Shovel | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Tool Handle |  | yes | `15492:Thornswood-Content.esp` |
 | Weapon Kit | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Leather Strips |  | yes | `154b3:Thornswood-Content.esp` |
 | Woodcutter's Axe | 1 | novice | Other weapons | SmithingForge | 1 Iron Ingot, 1 Tool Handle |  | yes | `1548e:Thornswood-Content.esp` |

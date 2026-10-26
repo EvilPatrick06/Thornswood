@@ -63,13 +63,13 @@ advanced 322.
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 79 recipes. 79 reach the server. None of them are tempering. The same rows, with ids, are in [smith-edgewright](../../lists/smith-edgewright.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 83 recipes. 83 reach the server. None of them are tempering. The same rows, with ids, are in [smith-edgewright](../../lists/smith-edgewright.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
-**Novice** (14 names). Iron Battleaxe. Iron Dagger. Iron Greatsword. Iron Mace. Iron Sword. Iron War Axe. Iron Warhammer. Key. Key Mold. Pickaxe. Riekling Bone Club. Shovel. Weapon Kit. Woodcutter's Axe.
+**Novice** (18 names). Alembic. Hammer. Iron Battleaxe. Iron Dagger. Iron Greatsword. Iron Mace. Iron Sword. Iron War Axe. Iron Warhammer. Key. Key Mold. Pickaxe. Riekling Bone Club. Rune Knife. Shears. Shovel. Weapon Kit. Woodcutter's Axe.
 
 **Advanced** (35 names). Dwarven Battleaxe. Dwarven Dagger. Dwarven Greatsword. Dwarven Mace. Dwarven Sword. Dwarven War Axe. Dwarven Warhammer. Forsworn Axe. Forsworn Sword. Nordic Battleaxe. Nordic Dagger. Nordic Greatsword. Nordic Mace. Nordic Sword. Nordic War Axe. Nordic Warhammer. Orcish Battleaxe. Orcish Dagger. Orcish Greatsword. Orcish Mace. Orcish Sword. Orcish War Axe. Orcish Warhammer. Silver Battleaxe. Silver Greatsword. Silver Sword. Silver War Axe. Steel Battleaxe. Steel Dagger. Steel Greatsword. Steel Mace. Steel Sword. Steel War Axe. Steel Warhammer. Wolf Sword.
 
@@ -84,8 +84,12 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Iron Greatsword | 1 | novice | Greatswords | SmithingForge | 4 Iron Ingot, 2 Leather Strips |  | yes | `da76f:Skyrim.esm` |
 | Iron Mace | 1 | novice | Maces | SmithingForge | 3 Iron Ingot, 2 Leather Strips |  | yes | `da76b:Skyrim.esm` |
 | Riekling Bone Club | 1 | novice | Maces | SmithingForge | 5 Bone Meal | riekling | yes | `9e775:Playable Rieklings.esp` |
+| Alembic | 1 | novice | Other goods | SmithingForge | 2 Iron Ingot |  | yes | `154f5:Thornswood-Content.esp` |
+| Hammer | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Tool Handle |  | yes | `154f3:Thornswood-Content.esp` |
 | Key | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot |  | yes | `15497:Thornswood-Content.esp` |
 | Key Mold | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot |  | yes | `15496:Thornswood-Content.esp` |
+| Rune Knife | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Leather Strips |  | yes | `154f6:Thornswood-Content.esp` |
+| Shears | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot |  | yes | `154f4:Thornswood-Content.esp` |
 | Shovel | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Tool Handle |  | yes | `15492:Thornswood-Content.esp` |
 | Weapon Kit | 1 | novice | Other goods | SmithingForge | 1 Iron Ingot, 1 Leather Strips |  | yes | `154b3:Thornswood-Content.esp` |
 | Woodcutter's Axe | 1 | novice | Other weapons | SmithingForge | 1 Iron Ingot, 1 Tool Handle |  | yes | `1548e:Thornswood-Content.esp` |
