@@ -138,6 +138,7 @@ const MEDIA = /\.(png|jpe?g|gif|webp|ico|bmp|tga|dds|mp3|mp4|webm|ogg|wav|flac|x
 
 const hits = [];
 let text = 0, binary = 0, plugins = 0;
+const pluginNames = [];
 tracked.forEach(function (rel) {
   ALL.lastIndex = 0;
   if (ALL.test(rel)) hits.push(rel + ' (its path)');
@@ -151,6 +152,7 @@ tracked.forEach(function (rel) {
   let m;
   if (/\.es[pml]$/i.test(rel)) {
     plugins++;
+    pluginNames.push(path.basename(rel));
     const s = pluginText(buf);
     if (s === null) { hits.push(rel + ' (a plugin that does not read as records, so it could not be searched)'); return; }
     ALL.lastIndex = 0;
@@ -178,7 +180,8 @@ tracked.forEach(function (rel) {
 });
 
 yes('read the tracked text files (' + text + '), plugins (' + plugins + ') and other binary files (' + binary + ')',
-    text > 100 && plugins >= 3 && binary > 0);
+    text > 100 && ['Thornswood-Content.esp', 'Thornswood-Last.esp'].every(function (n) { return pluginNames.indexOf(n) >= 0; }) &&
+    binary > 0);
 hits.forEach(function (h) { console.log('      ' + h); });
 yes('no tracked file names the server the content plugin was salvaged from, or its short forms (' + hits.length + ' found)', hits.length === 0);
 
