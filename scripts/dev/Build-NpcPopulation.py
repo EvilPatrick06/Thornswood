@@ -465,18 +465,23 @@ def activate_guild(payload):
 
 def main():
     parser = argparse.ArgumentParser()
-    where = parser.add_mutually_exclusive_group(required=True)
+    where = parser.add_mutually_exclusive_group()
     where.add_argument('--settings', help='A server-settings file; its loadOrder paths are read')
     # The catalogue's own load order, every plugin read out of one folder:
-    # how it is rebuilt off One, by scripts/mods/Run-OnBox.ps1 with
-    # --data '{data}', after Build-LastPlugin.py has rebuilt the plugin it
-    # lists last (#3077). The order itself moves only with the collection,
-    # and then from a server-settings file.
-    where.add_argument('--data', help='A folder holding every plugin of the catalogue\'s own load order')
+    # how it is rebuilt after Build-LastPlugin.py has rebuilt the plugin it
+    # lists last (#3077), by scripts/mods/Run-OnBox.ps1 with --data '{data}'
+    # and, since #3120, as the step after it in scripts/mods/content-tables.json,
+    # on One out of the game's Data folder when neither is named. The order
+    # itself moves only with the collection, and then from a server-settings
+    # file.
+    where.add_argument('--data', help='A folder holding every plugin of the catalogue\'s own load order '
+                       '(default: THORNSWOOD_DATA, else C:\\Thornswood\\Game\\Data)')
     parser.add_argument('--out', default=str(HERE.parent.parent / 'game/data/npc-population.json'))
     parser.add_argument('--write-runtime', action='store_true')
     parser.add_argument('--strings-dir', help='Installed archive directory for localized record names')
     args = parser.parse_args()
+    if not args.settings and not args.data:
+        args.data = os.environ.get('THORNSWOOD_DATA') or r'C:\Thornswood\Game\Data'
     if args.settings:
         with open(args.settings, encoding='utf-8-sig') as source:
             paths = json.load(source)['loadOrder']
@@ -547,11 +552,10 @@ def write_hunting_spots(npcs):
     hunts = json.loads((root / 'game/data/hunts.json').read_text(encoding='utf-8'))['hunts']
     rows = hunting_rows(npcs, hunts)
     target = root / 'docs' / 'HUNTING-SPOTS.csv'
-    # The line ending the file already uses, so a run on any clone changes
-    # only the rows that changed.
-    eol = '\r\n' if target.is_file() and b'\r\n' in target.read_bytes() else '\n'
+    # LF on every machine, as git stores it (#3029): since #3120 this builder
+    # is a step of scripts/mods/content-tables.json.
     with target.open('w', encoding='utf-8', newline='') as output:
-        writer = csv.DictWriter(output, fieldnames=HUNTING_COLUMNS, lineterminator=eol)
+        writer = csv.DictWriter(output, fieldnames=HUNTING_COLUMNS, lineterminator='\n')
         writer.writeheader()
         writer.writerows({key: row.get(key, '') for key in HUNTING_COLUMNS} for row in rows)
     return rows
@@ -564,7 +568,7 @@ def write_catalogues(payload):
                'species', 'tier', 'cap', 'returnMinutes', 'leash', 'cell', 'world', 'x', 'y', 'z']
     kept = [r for r in payload['npcs'] if r['keep']]
     with (root / 'NPC-SPAWNS.csv').open('w', encoding='utf-8', newline='') as output:
-        writer = csv.DictWriter(output, fieldnames=columns)
+        writer = csv.DictWriter(output, fieldnames=columns, lineterminator='\n')
         writer.writeheader()
         for r in kept:
             writer.writerow(dict({k: r.get('displayName', r.get(k)) if k == 'name' else r.get(k)
@@ -597,7 +601,8 @@ def write_catalogues(payload):
         name = str(row['name']).replace('|', '/')
         lines.append(f"| {name} | {row['hold']} | {row['habitat']} | {row['tier'] or ''} | {row['count']} | " +
                      ', '.join(map(str, row['returnMinutes'])) + ' |')
-    (root / 'NPC-POPULATION.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    page = '\n'.join(lines) + '\n'
+    (root / 'NPC-POPULATION.md').write_text(page, encoding='utf-8', newline='\n')
     write_merchants(payload)
 
 

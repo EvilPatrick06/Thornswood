@@ -1,7 +1,7 @@
 {
  "issue": 2923,
  "what": "Every table read out of the plugins of the load order, in the order they read each other. scripts/mods/Rebuild-ContentTables.ps1 runs them after a change to one of Thornswood's own plugins (game/content). tests/test-2923-own-plugins.js holds the list to the builders: every builder that reads a load order is a step here or is in notInChain with its reason, and no step reads a table a later step writes.",
- "fields": "tool is the builder. data and plugins are the names it takes the game's Data folder and the plugin list by (null: it takes none). reads are the tables it reads that a builder writes; readsBack is one it reads and a later step writes back unchanged. writes are what it writes.",
+ "fields": "tool is the builder. data and plugins are the names it takes the game's Data folder and the plugin list by (null: it takes none). reads are the tables it reads that a builder writes; readsBack is one it reads and a later step writes back, leaving what this step read in it as it was. writes are what it writes.",
  "steps": [
   { "tool": "scripts/dev/Build-HuntTable.ps1", "data": "-Data", "plugins": "-PluginList",
     "reads": [], "writes": ["game/data/hunts.json", "game/gamemode.js"] },
@@ -55,7 +55,9 @@
   { "tool": "scripts/dev/Build-BenchTable.py", "data": "--data", "plugins": "--plugins",
     "reads": ["game/data/recipes.json"], "writes": ["game/gamemode.js"] },
   { "tool": "scripts/mods/Build-LastPlugin.py", "data": "--data", "plugins": null,
-    "reads": ["game/data/npc-population.json", "game/data/recipes.json"], "writes": ["game/content/Thornswood-Last.esp", "game/data/last-plugin.json", "game/gamemode.js"] },
+    "reads": ["game/data/recipes.json"], "readsBack": ["game/data/npc-population.json"], "writes": ["game/content/Thornswood-Last.esp", "game/data/last-plugin.json", "game/gamemode.js"] },
+  { "tool": "scripts/dev/Build-NpcPopulation.py", "data": "--data", "plugins": null,
+    "reads": [], "writes": ["game/data/npc-population.json"] },
   { "tool": "scripts/dev/Build-BuildingHolds.py", "data": "--data", "plugins": null,
     "reads": ["game/data/doors.json", "game/data/data.json", "game/data/last-plugin.json"], "writes": ["game/data/building-holds.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Build-WoodworkingBenches.py", "data": "--data", "plugins": null,
@@ -71,8 +73,7 @@
     "writes": ["game/gamemode.js"] }
  ],
  "notInChain": {
-  "scripts/dev/Build-NpcPopulation.py": "Reads the server's load order from a server-settings file (or, with --data, its own committed load order out of one folder, which is how Run-OnBox.ps1 rebuilds it after Build-LastPlugin.py), and reads placed actors: Thornswood-Content.esp places none (measured 20 Oct: IMAD, ALCH, MGEF, MESG, WRLD, CELL, REFR, COBJ, FURN, FLOR, MISC, BOOK, ACTI and KYWD records, no ACHR). It is rebuilt when the collection's load order moves, and Build-LastPlugin.py says so when it has.",
-  "scripts/dev/Build-ResourceLocations.py": "Reads the server's load order from a server-settings file, like Build-NpcPopulation.py, and refuses any plugin whose bytes are not the ones npc-population.json pins, its Thornswood-Content.esp row included. So it is rebuilt together with Build-NpcPopulation.py when the collection's load order moves, never alone after a content change.",
+  "scripts/dev/Build-ResourceLocations.py": "Reads the server's load order from a server-settings file, like Build-NpcPopulation.py does when the collection's load order moves, and refuses any plugin whose bytes are not the ones npc-population.json pins, its Thornswood-Content.esp row included. So it is rebuilt from that settings file together with the catalogue when the collection's load order moves. The chain's own catalogue step (after Build-LastPlugin.py, #3120) keeps those pins on the repository's plugins.",
   "scripts/dev/Build-StationSites.py":"Comes before the content plugin, not after it: it measures where the plugin's stations stand, and scripts/mods/Add-ContentRecords.py writes them into the plugin from its table. docs/systems/station-placement.md says how a site changes.",
   "scripts/dev/Audit-PapyrusEvents.py": "An audit: it says which scripts in the load order register for which events and writes no table a server or another builder reads.",
   "scripts/mods/Audit-ModMenus.js": "An audit: it says where each mod settings menu keeps its values and writes no table a server or another builder reads.",
