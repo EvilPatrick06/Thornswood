@@ -9623,6 +9623,13 @@
     if (what === 'help:opened') { T.claimFocus('help', true); return; }
     if (what === 'help:closed') { T.claimFocus('help', false); return; }
     if (what === 'help:ready') { log('the help panel is in'); helpToPage(); return; }
+    // Report a problem (#3155): to the game server as /problem, which takes
+    // where the character stands itself and sends it on to the site.
+    if (what.indexOf('help:problem ') === 0) {
+      const text = what.slice(13).replace(/\s+/g, ' ').trim().slice(0, 1000);
+      if (text) { log('help: a problem report sent,', text.length, 'characters'); tellServer('/problem ' + text); }
+      return;
+    }
     if (what === 'trade:opened') { T.claimFocus('trade', true); return; }
     if (what === 'trade:closed') { T.claimFocus('trade', false); return; }
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }

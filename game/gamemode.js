@@ -56535,6 +56535,10 @@ const WORDS = ['/ooc', '/o',
                // Asking staff for help and reporting somebody; see the asking
                // staff block at the end of this file.
                '/helpme', '/help-me', '/report',
+               // Report a problem on the help panel (#3155): the button's
+               // line, never typed and not in PLAYER_WORDS. It goes on the
+               // board through the site and the bot; see the asking staff block.
+               '/problem',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
                // The four needs bars said as one line of text, for somebody
@@ -58918,6 +58922,20 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       }
       askStaff.ask(word === '/report' ? 'report' : 'help', parts, profileId, actorId,
                    toProfile, isDev);
+      return;
+    }
+
+    // Report a problem on the help panel (#3155), the same block's third
+    // kind: to the site, and from there onto the board.
+    if (word === '/problem') {
+      if (!needCharacter()) { return; }
+      var askBoard = g.__thornswoodAskStaff;
+      if (!askBoard) {
+        toProfile(profileId, 'Problems cannot be sent from the game right now. Post it in ' +
+                  '#test-findings in the Discord and it will reach the developers.');
+        return;
+      }
+      askBoard.ask('problem', parts, profileId, actorId, toProfile, isDev);
       return;
     }
 
@@ -70608,6 +70626,14 @@ module.exports = {
 
   /stuck, the escape hatch the issue also names, is the stuck block right
   after this one, built to Patrick's rules of 28 September.
+
+  REPORT A PROBLEM (#3155), the third kind. Patrick, 21 Oct: testers get a
+  button that files a board issue with their log and where they are. The
+  button is on the help panel and its line is /problem, which nobody types.
+  It goes to the site the same way, kind 'problem', and is said to no staff
+  in the world: it is for the developers, and the bot files it on the board
+  from the inbox. The site ties it to the session the launcher has open for
+  that account, so the issue points at that session's logs.
 */
 (function () {
   'use strict';
@@ -70636,7 +70662,10 @@ module.exports = {
     wait: 8000,
     // The longest a reason is kept, and a name.
     said: 300,
-    name: 60
+    name: 60,
+    // The longest a problem report is kept: a bug wants more words than a
+    // call for help (#3155). The site keeps the same.
+    problem: 1000
   };
 
   // On globalThis, so a hot reload does not hand everybody a fresh allowance.
@@ -70662,6 +70691,11 @@ module.exports = {
   function refusal(kind, profileId, aboutKey, now) {
     prune(now);
     var mine = seen.by[profileId] || [];
+    if (mine.length >= LIMIT.hour && kind === 'problem') {
+      return 'That is ' + LIMIT.hour + ' reports and calls to staff from you in the last hour, ' +
+             'which is as many as the game takes. Try again in ' +
+             minutes(mine[0].at + 60 * 60 * 1000 - now) + ', or post it in #test-findings in the Discord.';
+    }
     if (mine.length >= LIMIT.hour) {
       return 'That is ' + LIMIT.hour + ' calls to staff from you in the last hour, which is ' +
              'as many as the game takes. Try again in ' +
@@ -70674,6 +70708,12 @@ module.exports = {
         return 'Staff already have your call for help from ' + minutes(now - r.at) +
                ' ago. Somebody will come to you; try again in ' +
                minutes(r.at + LIMIT.helpEvery - now) + ' if nobody has.';
+      }
+      // The same problem sent twice: aboutKey is its words for this kind.
+      if (kind === 'problem' && r.kind === 'problem' && aboutKey && r.about === aboutKey &&
+          now - r.at < LIMIT.sameEvery) {
+        return 'You sent that problem ' + minutes(now - r.at) + ' ago, and it is on its way ' +
+               'to the board. Anything new about it can go in #test-findings in the Discord.';
       }
       if (kind === 'report' && r.kind === 'report' && aboutKey && r.about === aboutKey &&
           now - r.at < LIMIT.sameEvery) {
@@ -70832,13 +70872,20 @@ module.exports = {
         toProfile(profileId, 'That is you. /helpme reaches staff if something is wrong.');
         return;
       }
+    } else if (kind === 'problem') {
+      said = words.join(' ');
+      if (!said) {
+        toProfile(profileId, 'Say what went wrong in the box on the help panel, then press Send.');
+        return;
+      }
     } else {
       said = words.join(' ');
     }
-    said = said.slice(0, LIMIT.said);
+    said = said.slice(0, kind === 'problem' ? LIMIT.problem : LIMIT.said);
 
     var aboutKey = about ? (about.person ? 'p' + about.person.profileId
-                                         : 'n' + about.name.toLowerCase()) : '';
+                                         : 'n' + about.name.toLowerCase())
+                         : (kind === 'problem' ? 's' + said.toLowerCase() : '');
     var no = refusal(kind, profileId, aboutKey, now);
     if (no) { toProfile(profileId, no); return; }
     taken(kind, profileId, aboutKey, now);
@@ -70850,22 +70897,25 @@ module.exports = {
     } catch (e) { }
 
     // Staff in the world, told now. Never the person reported, and never the
-    // one asking, who is told separately below.
+    // one asking, who is told separately below. Never for a problem, which
+    // is for the developers and the board, not for whoever is on shift.
     var told = 0;
-    var line = kind === 'help'
-      ? '[staff] ' + mine + ' asks for help at ' + (cell || 'somewhere unknown') +
-        (said ? ': ' + said : '.')
-      : '[staff] ' + mine + ' reported ' + about.name + ': ' + said +
-        ' (at ' + (cell || 'somewhere unknown') + ')';
-    for (var i = 0; i < people.length; i++) {
-      var p = people[i];
-      if (p.profileId === profileId) { continue; }
-      if (about && about.person && p.profileId === about.person.profileId) { continue; }
-      var staff = false;
-      try { staff = !!isStaff(p.profileId); } catch (e) { staff = false; }
-      if (!staff) { continue; }
-      toProfile(p.profileId, line);
-      told++;
+    if (kind !== 'problem') {
+      var line = kind === 'help'
+        ? '[staff] ' + mine + ' asks for help at ' + (cell || 'somewhere unknown') +
+          (said ? ': ' + said : '.')
+        : '[staff] ' + mine + ' reported ' + about.name + ': ' + said +
+          ' (at ' + (cell || 'somewhere unknown') + ')';
+      for (var i = 0; i < people.length; i++) {
+        var p = people[i];
+        if (p.profileId === profileId) { continue; }
+        if (about && about.person && p.profileId === about.person.profileId) { continue; }
+        var staff = false;
+        try { staff = !!isStaff(p.profileId); } catch (e) { staff = false; }
+        if (!staff) { continue; }
+        toProfile(p.profileId, line);
+        told++;
+      }
     }
 
     var row = {
@@ -70880,12 +70930,20 @@ module.exports = {
       at: now,
       staffTold: told
     };
-    slog(kind === 'help' ? '/helpme' : '/report', 'from profile', profileId,
+    slog(kind === 'help' ? '/helpme' : '/' + kind, 'from profile', profileId,
          about ? 'about ' + (row.aboutProfileId || JSON.stringify(row.about)) : '',
          'at', cell, 'staff in the world told:', told);
 
     toSite(row, function (ok, why) {
       if (!ok) { slog('the site did not take it:', why); }
+      if (kind === 'problem') {
+        toProfile(profileId, ok
+          ? 'Your problem report reached the site and goes on the board for the developers, ' +
+            'with where you are and the logs of this game once you close it. Thank you.'
+          : 'Your problem report could not reach the site, so nothing was filed. Post it in ' +
+            '#test-findings in the Discord and it will reach the developers.');
+        return;
+      }
       var inWorld = told
         ? (told === 1 ? 'A member of staff in the world has it now'
                       : told + ' members of staff in the world have it now')

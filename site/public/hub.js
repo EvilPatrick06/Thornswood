@@ -1332,7 +1332,7 @@ function sessionMatches(s, q, show, chan) {
 
   if (q) {
     var hay = [
-      s.name, s.who, s.profile, s.version, s.channel,
+      s.session, s.name, s.who, s.profile, s.version, s.channel,
       s.trouble, s.troubleLine, s.troubleFile,
       s.start ? new Date(s.start).toLocaleString() : '',
       s.end ? new Date(s.end).toLocaleString() : ''
@@ -1431,7 +1431,9 @@ function drawSessions() {
       var warn = p.rows.filter(function (s) { return s.troubleAt === 'warn'; }).length;
       var kept = p.rows.filter(function (s) { return s.keep; }).length;
 
-      out += '<details class="person"' + (mq ? ' open' : '') + '>' +
+      // Opened as well when the page search leaves one person, which is
+      // how a problem on the board links its session (#3155).
+      out += '<details class="person"' + (mq || (SFIND.q && people.length === 1) ? ' open' : '') + '>' +
         '<summary>' +
           '<span class="pf"><span class="lab">Discord name</span>' +
             '<span class="val nm">' + esc(p.name || 'not linked') + '</span></span>' +
@@ -2442,7 +2444,7 @@ function drawInbox() {
     // A report about a person and a call for help from the game (#414) say
     // what they are, rather than reading as a bug.
     var label = (n.kind === 'idea' || n.kind === 'report' || n.kind === 'help' ||
-                 n.kind === 'ticket') ? n.kind : 'bug';
+                 n.kind === 'ticket' || n.kind === 'problem') ? n.kind : 'bug';
     out += '<div class="note' + (n.state !== 'new' ? ' done' : '') + '" data-i="' + n.id + '">' +
       '<span class="kind ' + (n.kind === 'idea' ? 'idea' : 'bug') + '">' +
         label + '</span>' +
@@ -2552,6 +2554,13 @@ function drawInbox() {
       }
     }
   });
+})();
+
+// A problem filed on the board links its session as /sessions?find=<id>
+// (#3155): the page search starts with it.
+(function () {
+  var f = new URLSearchParams(location.search).get('find');
+  if (f) SFIND.q = String(f).slice(0, 80);
 })();
 
 // Discord sends people back here with a word about how it went.

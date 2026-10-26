@@ -132,9 +132,11 @@ open under the same title is handed back rather than made twice.
 **Known issues and test tasks, from the board** (Patrick, 11 Oct: "it is
 supposed to be automatic as we add things and fix things"). Three forums are
 kept from `EvilPatrick06/Thornswood`, every five minutes (`KNOWN_ISSUES_EVERY`,
-never under a minute), with `GITHUB_TOKEN` from `bot.env.json`, a read only
-token for that repository's issues. No token, none is kept, said once in the
-log.
+never under a minute), with `GITHUB_TOKEN` from `bot.env.json`, a token for
+that repository's issues. Reading them is all these forums need; the token
+also needs issues write, for the comments the bot leaves on an issue and for
+Report a problem below, which files new ones. No token, none is kept, said
+once in the log.
 
 - `#known-issues`, read only: one post per open issue labelled Dev Findings
   or Main Findings that nothing has been done about yet, tagged Dev or Main
@@ -255,6 +257,38 @@ Which post is which issue is kept in `data\known-issues.json`, written
 straight after each post, and a post is matched back by its title among the
 bot's own, so neither a restart nor a crash between a post and its save posts
 twice.
+
+**Report a problem** (Patrick, 21 Oct, #3155). Testers file a problem on the
+board themselves, from two places, and each one becomes an issue in
+`EvilPatrick06/Thornswood` labelled `Tester report` and `area: triage`
+(`PROBLEM_LABELS`), never Main or Dev Findings, so it does not go public in
+`#known-issues` until somebody on the team looks at it and labels it.
+
+- In the game: Report a problem at the end of Getting help on the help panel
+  (F7), a box and Send. The gamemode sends it to the site's
+  `/api/report/game` as kind `problem`, with the character, the cell and the
+  position; the site adds the Discord account and the launcher session open
+  on that server, and writes it to `data\for-bot\inbox.json` like a
+  `/report`. `watch_problems` reads that inbox every `REPORTS_EVERY` seconds,
+  files each problem once, oldest first, and says it in the staff channel
+  with its number. Which rows are filed is kept in
+  `data\problems-filed.json`, written after each one, so a stop part way never
+  files one twice; a record that will not read files nothing until it does.
+  A GitHub refusal stops that look and is said once in the log.
+- In Discord: the Report a problem post the bot makes and pins in
+  `#test-findings` (`PROBLEM_CHANNEL`), with a button that opens a form:
+  what went wrong, what they were doing and where, and which server. Only
+  playtesters (`TESTER_ROLES`, Playtester by default) and staff may use it,
+  five an hour each. The bot files the issue at once and answers only them.
+  The pin needs Manage Threads, which the bot has through Administrator.
+
+The logs are never copied into the issue. They reach the site from the
+launcher when the game closes, as they always have, and the issue links the
+hub's Sessions page at that session (`/sessions?find=<session>`), or, from
+Discord, at the account's sessions. What the tester typed goes into the
+issue inside a `<pre>` block, so nothing in it can mention anybody or turn
+into markup. `bot\test-3155-problems.py` holds the bot's half and
+`tests\test-3155-report-problem.js` the game's and the site's.
 
 **The one-time setup.** Moving a server from the old shape is the only channel
 change the bot makes, Patrick's explicit exception for these three changes. It

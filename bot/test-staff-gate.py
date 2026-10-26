@@ -99,6 +99,9 @@ BUTTONS = [
     # that Leader role: faction_press and faction_change.
     # bot/test-3317-faction-panel.py presses them.
     ('thornswood:faction:', ANYBODY),
+    # Report a problem in #test-findings (#3155): playtesters and staff, five
+    # an hour each, problem_refusal. bot/test-3155-problems.py holds it.
+    ('thornswood:problem', ANYBODY),
 ]
 
 # Staff: the council (Owner, Co-Owner and every lead, #3317, Patrick, 22 Oct)
@@ -319,9 +322,9 @@ hook = inspect.getsource(bot.Thornswood.setup_hook)
 VIEWS = re.findall(r'add_view\((\w+)\((?:desk)?\)\)', hook)
 yes('setup_hook registers the ticket panel and each ticket desk\'s (#3317), the '
     'ticket tools, the hold panel, the office panel (#2551), the faction panel '
-    '(#3317) and no other panel (the Live smoke rows are gone)',
-    sorted(VIEWS) == ['FactionPanel', 'HoldPanel', 'OfficePanel', 'TicketPanel',
-                      'TicketPanel', 'TicketTools']
+    '(#3317), Report a problem (#3155) and no other panel (the Live smoke rows are gone)',
+    sorted(VIEWS) == ['FactionPanel', 'HoldPanel', 'OfficePanel', 'ProblemPanel',
+                      'TicketPanel', 'TicketPanel', 'TicketTools']
     and 'live_smoke' not in hook
     and hook.count('add_view(') == len(VIEWS))
 

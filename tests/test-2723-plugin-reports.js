@@ -102,6 +102,8 @@ const SITES = {
     { n: 1, kind: 'report', lines: ['/loadorder 3 0 0a1b23c4d5e6f7a', '/loadorder 130 64 ' + 'abc12'.repeat(64),
                                     '/loadorderlight 2 0 9f8e7d6c5b'] },
   "'/joinpass ' + raw": { n: 1, kind: 'report', lines: ['/joinpass jp1.eyJwIjo3MDF9.Zm9vYmFy_-x'] },
+  // Send under Report a problem on the help panel (#3155), written like a typed /report
+  "'/problem ' + text": { n: 1, kind: 'kept', lines: ['/problem The door to the inn will not open'] },
   // thornswoodNet.say written into the page (a press, quiet or not, since #2732)
   "' + JSON.stringify('/line hand ' + id) + '": { n: 1, kind: 'line', lines: ['/line hand 777'] },
   "' + JSON.stringify('/joinpass ' + pass) + '": { n: 1, kind: 'report', lines: ['/joinpass jp1.eyJwIjo3MDF9.YmFyYmF6'] },

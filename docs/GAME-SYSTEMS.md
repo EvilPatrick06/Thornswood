@@ -67,6 +67,15 @@ page on K already show, so it is an exception, like the ones above. The
 help in the game, the launcher's Help and the Settings line under the
 bars name it.
 
+Reporting a problem to the developers is the one help line with a
+button. Decided by Patrick on 21 Oct (#3155): testers get both a
+Discord button and a button in the game that file an issue on the board
+with where they are and the logs of that game. In the game it is Report
+a problem at the end of Getting help on the help panel (F7): a box, then
+Send. In the Discord it is the Report a problem post pinned in
+#test-findings. `/stuck`, `/helpme` and `/report`, which reach staff,
+stay commands with no button, as above.
+
 A panel or a key may send the server the same line a command used to
 be. The look prompt already sends `/trade` and the id of the person
 under the crosshair. Nobody is told to type that line, and help text

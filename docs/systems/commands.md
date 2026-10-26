@@ -13,7 +13,9 @@ except the /stuck and the ones for getting help from GMs"), and the
 ways of saying a line and `/roll`, which stay commands with no buttons
 (Patrick, 4 Oct, #1639: "Allow those commands and don't do buttons"),
 and `/needs`, the needs bars as a line of text for somebody who hid them
-(Patrick, 11 Oct, #2267).
+(Patrick, 11 Oct, #2267). Report a problem is the one help line with a
+button, on the help panel (Patrick, 21 Oct, #3155); it sends `/problem`,
+below with the lines the game sends itself.
 The umbrella is #1620.
 
 File and line numbers are main at 9b5a667 on 4 Oct. They move as the
@@ -167,6 +169,7 @@ is written as typed.
 | `/plot <id>`, `/claim <id>` at a crop | A crop under the crosshair, and X at it (#1636) | Asks for the line at that plot; claims the farm around it | The farming block's `command`, `plotLine` and `claim` |
 | `/rest bed`, `/rest sit`, `/rest up` | Lying down, sitting down and getting up | Resting in a bed or on a seat, as the server measures it | `bedRest` in the property block's beds |
 | `/sleephere <id>`, `/sleephere stop <profile> <building>` | U on a person inside a building you hold, and Stop on the K panel's property page | Lets them sleep there for a night, or ends their night (#1603) | `sleepHere` in the property block's beds |
+| `/problem <what went wrong>` | Send under Report a problem on the help panel (#3155) | A problem for the board: the site takes it with where you are and the open launcher session, and the bot files it as an issue | `gamemode.js:if (word === '/problem') {`, then the asking staff block's `ask` |
 | `/dropbox open` | E on a hold's drop box (#2298) | Open the box's panel, filtered for who opened it | `dropboxCmd` in the property block |
 | `/ride e <id>`, `/merchant e <id>` | E on a driver or a trader | Which one was pressed | `gamemode.js:if (word === '/ride') {`, `gamemode.js:if (word === '/merchant') {` |
 | `/party refresh`, `/trade refresh`, `/pick refresh` | A panel as it opens | Send the panel its view | `gamemode.js:if (word === '/party' && rest === 'refresh') {`, `gamemode.js:word === '/trade'`, `gamemode.js:if (word === '/pick') {` |

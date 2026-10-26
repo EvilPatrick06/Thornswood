@@ -3885,6 +3885,23 @@ function findSession(rows, key, who) {
 }
 
 /*
+  The session a launcher has open for this account on this server, newest
+  start first, or null (#3155). A problem reported from the game is tied to
+  it, so the issue on the board points at the logs the launcher sends for it
+  when the game closes. Open is no end yet; the game is running, so its
+  session has none. A session that never said its build counts for either.
+*/
+function openSessionOf(rows, who, channel) {
+  let best = null;
+  for (const r of rows) {
+    if (!r || String(r.who) !== String(who) || Number(r.end) > 0) continue;
+    if (r.channel && r.channel !== channel) continue;
+    if (!best || (Number(r.start) || 0) > (Number(best.start) || 0)) best = r;
+  }
+  return best;
+}
+
+/*
   A CRASH STAFF HAVE LOOKED AT (#2319, decided by Patrick on 12 Oct).
 
   A crash snapshot is every byte of the game's memory, 3.7 to 9.7 GB, and it
@@ -6497,7 +6514,7 @@ async function handle(req, res) {
     try { o = JSON.parse(await body(req, 8000)) || {}; }
     catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
     const dev = route.indexOf('/dev/') === 0;
-    const kind = o.kind === 'report' ? 'report' : (o.kind === 'help' ? 'help' : '');
+    const kind = o.kind === 'report' ? 'report' : (o.kind === 'help' ? 'help' : (o.kind === 'problem' ? 'problem' : ''));
     const pid = Number(o.profileId) || 0;
     if (!kind || !(pid > 0)) return sendJson(res, 400, { error: 'no kind or no profile' });
     const key = 'game:' + (dev ? 'dev:' : '') + pid;
@@ -6506,12 +6523,22 @@ async function handle(req, res) {
     const name = String(o.name || '').trim().slice(0, 60) || 'Somebody';
     const about = String(o.about || '').trim().slice(0, 60);
     if (kind === 'report' && !about) return sendJson(res, 400, { error: 'a report names somebody' });
-    const said = String(o.said || '').trim().slice(0, 300);
+    const said = String(o.said || '').trim().slice(0, kind === 'problem' ? 1000 : 300);
+    if (kind === 'problem' && !said) return sendJson(res, 400, { error: 'a problem says what went wrong' });
     const cell = String(o.cell || '').slice(0, 120);
     const pos = (Array.isArray(o.pos) ? o.pos : []).slice(0, 3).map((n) => Math.round((Number(n) || 0) * 10) / 10);
     const aboutPid = Number(o.aboutProfileId) || 0;
+    // Report a problem (#3155): the account holding the profile, and the
+    // session its launcher has open, whose logs arrive when the game closes.
+    // The bot files it on the board from here.
+    let problem = null;
+    if (kind === 'problem') {
+      const acct = accountOf(pid);
+      const open = acct ? openSessionOf(sessionRows(), acct, dev ? 'dev' : 'main') : null;
+      problem = { discordId: acct, session: open ? String(open.session) : '', server: dev ? 'dev' : 'main' };
+    }
     const list = jsonFile(INBOX, []);
-    list.unshift({
+    list.unshift(Object.assign({
       id: 'i' + Date.now().toString(36) + crypto.randomBytes(2).toString('hex'),
       kind,
       title: kind === 'help' ? (said || 'Asked for help and said nothing more') : said,
@@ -6519,9 +6546,10 @@ async function handle(req, res) {
       aboutProfileId: kind === 'report' && aboutPid > 0 ? aboutPid : 0,
       detail: 'At ' + (cell || 'an unknown place') + (pos.length === 3 ? ', ' + pos.join(', ') : '') + '. ' +
         'Profile ' + pid + (kind === 'report' && aboutPid > 0 ? ', about profile ' + aboutPid : '') +
-        ': the game takes these numbers from the client, so they are a claim, not proof. ' +
-        (Number(o.staffTold) > 0 ? Number(o.staffTold) + ' of staff in the world were told in game.'
-                                 : 'Nobody from staff was in the world.'),
+        ': the game takes these numbers from the client, so they are a claim, not proof.' +
+        (kind === 'problem' ? ''
+          : ' ' + (Number(o.staffTold) > 0 ? Number(o.staffTold) + ' of staff in the world were told in game.'
+                                           : 'Nobody from staff was in the world.')),
       by: name,
       profileId: pid,
       cell,
@@ -6529,7 +6557,7 @@ async function handle(req, res) {
       at: Date.now(),
       state: 'new',
       from: dev ? 'in game on the dev server' : 'in game'
-    });
+    }, problem || {}));
     if (!putJson(INBOX, trimInbox(list))) {
       return sendJson(res, 500, { error: 'could not save' });
     }

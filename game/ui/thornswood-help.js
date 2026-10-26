@@ -28,15 +28,27 @@
   at once, with or without the chat's connection, which is when somebody
   wedged in a wall needs it.
 
+  REPORT A PROBLEM (#3155). Patrick, 21 Oct: testers get a button that files
+  a board issue with their log and where they are, an exception to the rule
+  that what reaches staff stays typed. Getting help ends with a box and
+  Send. The words go to the plugin, the plugin sends them to the game
+  server as /problem (nobody types it), and the server says in the chat
+  whether the site took it. Where they stand and this game's logs go with
+  it without being asked for.
+
   THE CONTRACT with thornswood-front.js:
     window.thornswoodHelp = { open(topic), close(), toggle(), isOpen(), setKeys(names) }
-    page -> plugin  'help:ready' | 'help:opened' | 'help:closed'
+    page -> plugin  'help:ready' | 'help:opened' | 'help:closed' |
+                    'help:problem <what went wrong>'
 */
 (function () {
   if (window.thornswoodHelp) { return; }
 
   var ID = 'ts-help';
   var shown = false;
+  // What is typed in the problem box, kept across redraws (#3155).
+  var problemDraft = '';
+  var PROBLEM_MAX = 1000;
   var root = null;
   var topic = 'talking';
 
@@ -202,7 +214,14 @@
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
     '  padding:6px 12px;font-size:15px;line-height:20px;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}',
-    '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}'
+    '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
+    '#' + ID + ' .problem{margin-top:18px;padding-top:14px;border-top:1px solid rgba(198,170,109,.22)}',
+    '#' + ID + ' .problem h3{margin:0 0 8px;font-size:19px;font-weight:normal;color:#f6e9c8}',
+    '#' + ID + ' .problem textarea{width:100%;box-sizing:border-box;height:96px;resize:none;',
+    '  font-family:inherit;font-size:16px;line-height:1.4;padding:8px 10px;color:#f6e9c8;',
+    '  background:rgba(0,0,0,.35);border:1px solid rgba(198,170,109,.42)}',
+    '#' + ID + ' .problem .row{margin-top:8px;display:flex;gap:12px;align-items:center;',
+    '  font-size:14px;font-style:italic;color:rgba(217,207,180,.7)}'
   ].join('\n');
 
   function build() {
@@ -231,7 +250,9 @@
     document.addEventListener('keydown', function (ev) {
       if (!shown) { return; }
       var k = String(ev.key || '');
-      if (k === 'Escape' || (keys.help && k.toUpperCase() === String(keys.help).toUpperCase())) {
+      // A letter typed in the problem box is a letter, even the help key's.
+      var typing = document.activeElement && document.activeElement.tagName === 'TEXTAREA';
+      if (k === 'Escape' || (!typing && keys.help && k.toUpperCase() === String(keys.help).toUpperCase())) {
         if (ev.preventDefault) { ev.preventDefault(); }
         close();
       }
@@ -268,8 +289,40 @@
     var out = '<p class="lead">' + esc(lead(keys)) + '</p>';
     var paras = t.text(keys);
     for (var p = 0; p < paras.length; p++) { out += '<p>' + esc(paras[p]) + '</p>'; }
+    if (t.id === 'help') { out += problemForm(); }
     body.innerHTML = out;
+    if (t.id === 'help') { wireProblem(); }
     foot.textContent = 'Escape or ' + keys.help + ' closes this.';
+  }
+
+  /* Report a problem (#3155), at the end of Getting help. */
+  function problemForm() {
+    return '<div class="problem">' +
+      '<h3>Report a problem</h3>' +
+      '<p>Say what went wrong and what you were doing. It goes on the board for the ' +
+      'developers, with where you are standing and the logs of this game, which are ' +
+      'sent when you close it.</p>' +
+      '<textarea id="' + ID + '-ptext" maxlength="' + PROBLEM_MAX + '">' + esc(problemDraft) + '</textarea>' +
+      '<div class="row"><button class="go" id="' + ID + '-psend">Send</button>' +
+      '<span id="' + ID + '-psaid"></span></div>' +
+      '</div>';
+  }
+
+  function wireProblem() {
+    var box = root.querySelector('#' + ID + '-ptext');
+    var send = root.querySelector('#' + ID + '-psend');
+    var said = root.querySelector('#' + ID + '-psaid');
+    if (!box || !send || !said) { return; }
+    box.oninput = function () { problemDraft = String(box.value || '').slice(0, PROBLEM_MAX); };
+    send.onclick = function () {
+      // One line to the server, which splits on spaces anyway.
+      var text = String(box.value || '').replace(/\s+/g, ' ').trim().slice(0, PROBLEM_MAX);
+      if (!text) { said.textContent = 'Say what went wrong first.'; return; }
+      tell('problem ' + text);
+      problemDraft = '';
+      box.value = '';
+      said.textContent = 'Sent. The chat says when it reaches the site.';
+    };
   }
 
   function open(which) {
