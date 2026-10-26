@@ -60,6 +60,11 @@ ships have at a dock.
 The driver cannot raid their own cart. A cart standing at a stop is not on
 the road and cannot be raided.
 
+A driver who leaves the world on the road takes the cart with them for now,
+and it cannot be raided until they come back. Patrick decided on 26 Oct that
+the cart stays where they left and can be raided there; that is
+[#3531](https://github.com/EvilPatrick06/Thornswood/issues/3531).
+
 ## Staff
 
 Cart stops and roads, on the Office page of K, opens the staff side. Open a
