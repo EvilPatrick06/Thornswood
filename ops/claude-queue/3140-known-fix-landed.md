@@ -1,6 +1,6 @@
 # 3140 A known post comes down when its fix lands, not for any merged pull request
 
-- **Issue / PR:** #3140, the pull request this note came in with. It waits on Patrick's answer to the report page card q-3140-known-takedown (option B).
+- **Issue / PR:** #3140, the pull request this note came in with. Patrick picked this on the report page card q-3140-known-takedown (option B, 26 Oct).
 - **Where:** the live bot (Install-Bot -CodeOnly). No site deploy, no Ship, no game server.
 - **Needs first:** nothing.
 - **Staff notice:** no. Discord posts change, and nothing staff do changes.
