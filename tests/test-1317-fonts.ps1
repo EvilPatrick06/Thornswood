@@ -180,7 +180,9 @@ foreach ($x in $naming) { Write-Host "      $x" }
 # ---- 5. the script writes this file -----------------------------------------------------------
 $py = $null
 foreach ($c in 'python3', 'python') { if (Get-Command $c -ErrorAction SilentlyContinue) { $py = $c; break } }
-$ttf = Join-Path $Here 'engine\skymp\skymp5-front\src\fonts\Barlow-SemiBold.ttf'
+# Inside the fork's submodule, which git lists only as engine\skymp, so the
+# path is joined onto that (tests\test-script-paths.ps1 reads git's list).
+$ttf = Join-Path (Join-Path $Here 'engine\skymp') 'skymp5-front\src\fonts\Barlow-SemiBold.ttf'
 if ($py -and (Test-Path -LiteralPath $ttf)) {
     & $py -c 'import PIL.features, sys; sys.exit(0 if PIL.features.check("freetype2") else 1)' 2>$null
     if ($LASTEXITCODE -eq 0) {
