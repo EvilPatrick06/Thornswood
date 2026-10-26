@@ -155,6 +155,31 @@ lists linked from each sub-profession.
 
 A mage sees the spell book there instead.
 
+## The guides on K
+
+Press K, Profession guides. Every profession has a page, one tab
+each, and it opens on your own (Patrick, 22 Oct, A on #3165). It is
+there while you create a character too, before Home, so a profession
+can be read before it is picked. A page says three things:
+
+- What it makes: each half, the benches it works at and the rank each
+  opens at, its families with how many rows sit at each rank, and the
+  first things a new novice can make. A warrior's page lists the
+  maneuvers instead, and a mage's the spells of each school.
+- Where the materials come from: the inputs its recipes ask for most,
+  the class each one rests on and at what rank, the bench that makes
+  it out of what, and where it is found (the mines with the most veins
+  of the ore, or the kinds of animal that give the part).
+- How to rank up: what counts as a piece of work for it, the ladder,
+  the rest a piece costs, the sister half and the party bonus.
+
+The facts are read out of `game\data\recipes.json`,
+`game\data\mine-buildings.json`, `game\data\hunts.json` and the
+gamemode's bench table, maneuvers and tuning by
+`scripts\dev\Build-ProfessionGuides.js`, which writes them into
+`game\ui\thornswood-skills.js`. Run it after any of those change;
+`tests\test-3165-profession-guides.js` fails while the page is behind.
+
 ## Names that are not a profession
 
 Bard, merchant, priest, scholar and thief are not picked on K. They

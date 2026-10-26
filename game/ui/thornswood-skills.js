@@ -370,6 +370,16 @@
       rows: []   // the server sends the halves and their families
     },
     /*
+      The profession guides (#3165): a page per profession, which is
+      Patrick's answer A on the issue. The facts are GUIDES below, built out
+      of the server's own tables; the sentences are GUIDE_TEXT.
+    */
+    guides: {
+      title: 'Profession guides',
+      lead: 'Every profession, one page each: what it makes, where its materials come from, and how it ranks up. Pick one to read it.',
+      rows: []
+    },
+    /*
       A semester at the College (#1387). How many points, which school and
       when the next one opens are all the server's, under mine.college; this
       is the title and the one sentence over the page.
@@ -452,6 +462,112 @@
 
   var RANK_NAMES = { novice: 'Novice', advanced: 'Advanced', expert: 'Expert', master: 'Master' };
   var CAP = 5;             // points that fill a skill; the server's LIMITS.skillCap, mirrored for the pips
+
+  /*
+    THE PROFESSION GUIDES (#3165). What each profession makes, where its
+    materials come from and the numbers of the ladder, built by
+    scripts/dev/Build-ProfessionGuides.js out of game/data/recipes.json (the
+    rows the recipe book counts), game/data/mine-buildings.json,
+    game/data/hunts.json and the gamemode's BENCH_ACCESS, MANEUVERS and
+    tuning. It rides in this file rather than on the panel the server sends,
+    because it is the same for everybody and the panel is sent on every
+    write; what is a person's own on the page, their profession and rank, is
+    read from that panel as everything else here is.
+
+      ladder:   { per: { advanced, expert, master }, rest: { <rank>: n },
+                  craftRest, party (a percent), perSpell, perRank, toolUses }
+      professions: { <key>: { halves: { <half>: { count, race, first: [ name ],
+                       families: [ [ family, novice, advanced, expert, master ] ],
+                       benches: [ [ bench, lowest rank ] ],
+                       maneuvers: [ [ name, rank, stamina, seconds ] ] } },
+                     materials: [ [ name, recipes, class, rank, bench, [ from ],
+                                    [ where ], more places ] ] } }
+
+    Run the script after any of those change; tests/test-3165-profession-guides.js
+    runs it with --check and fails while this block is stale.
+  */
+  // ==== PROFESSION_GUIDES ====
+  /* Built by scripts/dev/Build-ProfessionGuides.js out of game/data and game/gamemode.js. Do not hand edit. */
+  var GUIDES = {"ladder":{"per":{"advanced":100,"expert":250,"master":600},"rest":{"novice":1.5,"advanced":1.2,"expert":0.9,"master":0.6},"craftRest":15,"party":15,"perSpell":5,"perRank":10,"toolUses":50},"professions":{"warrior":{"halves":{"bulwark":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Set","novice",15,45],["Plant","advanced",20,60],["Cover","expert",25,90],["Wall","master",40,180]]},"berserker":{"count":0,"families":[],"first":[],"race":0,"benches":[],"maneuvers":[["Rush","novice",15,30],["Heavy","advanced",20,45],["Break","expert",25,60],["Wreck","master",40,120]]}},"materials":[]},"mage":{"halves":{},"materials":[]},"alchemist":{"halves":{"blightbrewer":{"count":0,"families":[],"first":[],"race":0,"benches":[["Alchemy lab","novice"]]},"physicker":{"count":2,"families":[["Other goods",1,1,0,0]],"first":["Poultice"],"race":0,"benches":[["Alchemy lab","novice"]]}},"materials":[["Blue Mountain Flower",1,"gatherer","advanced","",[],[],0],["Garlic",1,"gatherer","novice","",[],[],0],["Mudcrab Chitin",1,"hunter","novice","",[],["Mudcrab"],0],["Tundra Cotton",1,"gatherer","novice","",[],[],0]]},"cook":{"halves":{"hearthcook":{"count":56,"families":[["Stews",5,2,4,1],["Meat dishes",7,3,0,1],["Soups",4,2,3,0],["Other food and drink",5,3,0,0],["Bread",0,4,0,0],["Vegetable dishes",3,1,0,0],["Cheese",0,3,0,0],["Fish dishes",2,0,0,0],["Chowders",1,0,0,0],["Crab dishes",1,0,0,0],["Ingredients",0,0,0,1]],"first":["Juniper Tea"],"race":0,"benches":[["Cookpot","novice"],["Grain mill","novice"],["Oven","novice"]]},"confectioner":{"count":12,"families":[["Desserts",7,3,2,0]],"first":[],"race":0,"benches":[["Oven","novice"]]}},"materials":[["Salt Pile",45,"miner","novice","",[],[],0],["Butter",21,"farmer","novice","",[],[],0],["Garlic",16,"gatherer","novice","",[],[],0],["Sack of Flour",16,"farmer","advanced","Grain mill",["Wheat"],[],0],["Frost Mirriam",12,"gatherer","novice","",[],[],0],["Chicken's Egg",6,"farmer","novice","",[],[],0],["Elves Ear",6,"gatherer","expert","",[],[],0],["Leek",6,"farmer","novice","",[],[],0],["Jug of Milk",5,"farmer","novice","",[],[],0],["Lavender",4,"gatherer","novice","",[],[],0]]},"smith":{"halves":{"platewright":{"count":157,"families":[["Body armour",8,11,8,6],["Helmets",8,11,8,5],["Armoured boots",7,13,6,5],["Gauntlets",7,12,6,5],["Shields",2,9,3,2],["Ingots",11,0,0,0],["Leather",2,0,0,0],["Other armour and clothing",0,1,0,0],["Other goods",1,0,0,0]],"first":["Corundum Ingot","Fur Armor","Fur Bracers","Fur Helmet"],"race":10,"benches":[["Forge","novice"],["Smelter","novice"],["Tanning rack","novice"],["Skyforge","advanced"]]},"edgewright":{"count":79,"families":[["Swords",1,7,3,2],["War axes",2,6,3,2],["Battleaxes",1,5,2,2],["Greatswords",1,5,2,2],["Maces",2,4,2,2],["Daggers",1,4,2,2],["Warhammers",1,4,2,2],["Other goods",4,0,0,0],["Other weapons",1,0,0,0]],"first":["Key Mold","Iron War Axe","Iron Battleaxe","Iron Dagger"],"race":1,"benches":[["Forge","novice"],["Skyforge","advanced"]]}},"materials":[["Leather Strips",198,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",103,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",78,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Leather",58,"hunter","novice","Tanning rack",[],[],0],["Refined Moonstone",29,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",24,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Corundum Ingot",20,"miner","advanced","Smelter",["Corundum Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Ebony Ingot",20,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1],["Refined Malachite",16,"miner","expert","Smelter",["Malachite Ore"],["Dimhollow Cavern","Steamscorch Mine","Nchardak Great Chamber"],2],["Stalhrim",16,"miner","master","",[],["Kolbjorn Barrow","Gyldenhul Barrow","Benkongerike Great Hall"],2]]},"enchanter":{"halves":{"bladebinder":{"count":13,"families":[["Staves",3,6,4,0]],"first":["Staff of Flames"],"race":0,"benches":[["Arcane enchanter","novice"],["Staff enchanter","novice"]]},"wardweaver":{"count":0,"families":[],"first":[],"race":0,"benches":[["Arcane enchanter","novice"]]}},"materials":[["Heart Stone",13,"miner","master","",[],["Coldcinder Cave","Broken Tusk Mine","Fort Frostmoth"],1],["Unenchanted Destruction Staff",10,"","","",[],[],0],["Unenchanted Restoration Staff",2,"","","",[],[],0],["Unenchanted Conjuration Staff",1,"","","",[],[],0]]},"tailor":{"halves":{"liverywright":{"count":81,"families":[["Robes and body wear",38,0,5,3],["Hats and hoods",15,0,0,0],["Other armour and clothing",0,10,0,0],["Shoes and light boots",7,0,0,0],["Gloves",3,0,0,0]],"first":["Black Robes","Black Cowl","Boots"],"race":2,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","advanced"]]},"haberdasher":{"count":170,"families":[["Robes and body wear",42,2,0,3],["Shoes and light boots",31,1,1,6],["Hats and hoods",23,6,1,2],["Other armour and clothing",2,12,6,0],["Other goods",13,4,0,0],["Gloves",6,1,2,6]],"first":["Belted Tunic","Chef's Hat","Boots","Bandage"],"race":22,"benches":[["Forge","novice"],["Loom","novice"],["Tanning rack","novice"]]}},"materials":[["Thread",164,"gatherer","novice","Loom",["Tundra Cotton"],[],0],["Leather",101,"hunter","novice","Tanning rack",[],[],0],["Leather Strips",58,"hunter","novice","Tanning rack",["Leather"],[],0],["Linen Wrap",39,"","","",[],[],0],["Troll Fat",32,"hunter","advanced","",[],["Frost Troll","Troll","Snow Troll"],2],["Fur Plate",19,"hunter","novice","Tanning rack",[],[],0],["Gold Ingot",7,"miner","expert","Smelter",["Gold Ore"],["Kolskeggr Mine","Frossel","Darkshade"],14],["Common Soul Gem",5,"","","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Ebony Ingot",4,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]},"woodworker":{"halves":{"charburner":{"count":5,"families":[["Other goods",2,1,1,1]],"first":["Poor Charcoal"],"race":0,"benches":[["Charcoal kiln","novice"]]},"woodwright":{"count":44,"families":[["Other goods",14,0,1,1],["Arrows and bolts",3,5,3,2],["Bows",0,4,4,2],["Other weapons",3,0,0,0],["Greatswords",0,2,0,0]],"first":["Bar Stool","Drum","Iron Arrow"],"race":3,"benches":[["Charcoal kiln","novice"],["Forge","novice"],["Woodworking bench","novice"],["Dawnguard bench","advanced"],["Skyforge","advanced"]]}},"materials":[["Firewood",36,"woodworker","novice","",[],[],0],["Leather Strips",13,"hunter","novice","Tanning rack",["Leather"],[],0],["Iron Ingot",10,"miner","novice","Smelter",["Iron Ore"],["Raven Rock Mine","Halted Stream Camp","Fort Fellhammer Mines"],43],["Steel Ingot",10,"miner","advanced","Smelter",["Corundum Ore","Iron Ore"],["Knifepoint Mine","Dead Drop Mine","Goldenrock Mine"],18],["Tundra Cotton",6,"gatherer","novice","",[],[],0],["Dwarven Metal Ingot",4,"","","",[],[],0],["Refined Moonstone",4,"miner","expert","Smelter",["Moonstone Ore"],["Soljund's Sinkhole","Mzulft","Mzulft Boilery"],11],["Quicksilver Ingot",3,"miner","advanced","Smelter",["Quicksilver Ore"],["Quicksilver Mine","Blind Cliff Bastion","Altar of Thrond Cave"],10],["Chaurus Chitin",2,"hunter","expert","",[],["Chaurus","Frozen Chaurus","Chaurus Hunter"],3],["Ebony Ingot",2,"miner","master","Smelter",["Ebony Ore"],["Gloombound Mine","Raven Rock Mine","Redbelly Mine"],1]]}}};
+  // ==== end PROFESSION_GUIDES ====
+
+  /*
+    The page's own sentences around those facts, one set per profession:
+    makes, for a half with no recipe rows to count (it says what the work
+    is instead); climb, what counts as a piece of work; and where, what the
+    materials list cannot say because no recipe names it (charcoal, a
+    handle, an alchemist's ingredients). Each is what docs/systems/professions
+    says the server does, craft says whether the bench rules of the ladder
+    (rest under which nothing is made) apply, and sister replaces the line
+    about the sister half where it climbs on something other than recipes.
+  */
+  var GUIDE_TEXT = {
+    warrior: {
+      craft: false,
+      makes: {
+        bulwark: 'Nothing at a bench. A Bulwark holds the line, and each rank gives one more maneuver on the maneuver key.',
+        berserker: 'Nothing at a bench. A Berserker breaks the line, and each rank gives one more maneuver on the maneuver key.'
+      },
+      climb: 'A kill counts on your half: anything that is not a person, brought down by you. A chicken is 1 piece of work, a bear 4, a giant 8 and a dragon 16. A person killed by a person counts for nothing, and no other profession is credited for a kill.',
+      where: 'A warrior needs no materials of their own. A Smith makes the arms and armour, and a Tailor the clothes under them.',
+      sister: 'Your sister half stays at Novice, and its Novice maneuver opens only when a Master of it takes you on.'
+    },
+    mage: {
+      craft: false,
+      makes: 'Spells, not things. You hold two schools and learn spells by the point on the Spell book page. At Master you pick a third school.',
+      climb: 'Casting is not counted. A spell learned is {perSpell} work in its school, and a rank gained anywhere else, in the other school or in a class, is {perRank} work in every school you hold. A semester at the College of Winterhold hands you spell points as well.',
+      where: 'A mage needs no materials to learn a spell. The College page on this panel says when the next semester opens.'
+    },
+    alchemist: {
+      craft: true,
+      makes: {
+        blightbrewer: 'Poisons, mixed at the alchemy lab. Skyrim has no alchemy recipes: a brew is whatever its ingredients share.',
+        physicker: 'Medicine, mixed at the alchemy lab. Skyrim has no alchemy recipes: a brew is whatever its ingredients share.'
+      },
+      climb: 'A successful batch at the alchemy lab is one piece of work. Master Chemist, at Master, makes two from one batch, and that is still one piece.',
+      where: 'Ingredients are a Gatherer\'s plants, a Hunter\'s parts, and the salts a Miner pulls from the quarry at Expert and Master. Or buy them from somebody who has them.'
+    },
+    cook: {
+      craft: true,
+      climb: 'A successful meal or dessert at your bench is one piece of work. Grand Chef, at Master, makes two from one batch, and that is still one piece.'
+    },
+    smith: {
+      craft: true,
+      climb: 'Every craft that goes through at a bench of your half is one piece of work.',
+      where: 'A forge or a skyforge burns one charcoal for each piece, which a Charburner makes at the kiln. A war axe, a battleaxe, a warhammer or a mace takes one Tool Handle as well, also a Charburner\'s.'
+    },
+    enchanter: {
+      craft: true,
+      makes: {
+        wardweaver: 'Enchantments on armour and clothing, at the arcane enchanter. Learn one by breaking an item down, then put it on a piece. There are no recipe rows to count.'
+      },
+      climb: 'Every staff made, and every enchantment put on a piece at the arcane enchanter, is one piece of work. Staff spells are unlocked on the Staff spells page, with the points each Bladebinder rank hands you.',
+      where: 'A soul gem holds the soul an enchantment is made from. A Miner brings the heart stone a staff is bound around.'
+    },
+    tailor: {
+      craft: true,
+      climb: 'Every garment or piece made at a bench of your half is one piece of work.'
+    },
+    woodworker: {
+      craft: true,
+      climb: 'Every craft at a bench of your half is one piece of work. So is every load of logs split at a chopping block with the woodcutter\'s axe, and that piece counts on Woodwright.',
+      where: 'Firewood is split at a chopping block with the woodcutter\'s axe a Woodworker is handed with the profession. The axe lasts {toolUses} uses, and a Smith makes the next one.'
+    }
+  };
+  // The class whose work an input rests on, as a person says it.
+  var GUIDE_WHO = { miner: 'Miner', hunter: 'Hunter', gatherer: 'Gatherer', farmer: 'Farmer', fisher: 'Fisher', woodworker: 'Woodworker' };
+  // What each maneuver does, from the table on docs/systems/professions/warrior.md.
+  var GUIDE_MANEUVER = {
+    Set: 'a block costs half the stamina for 8 seconds',
+    Plant: 'nothing staggers you for 8 seconds',
+    Cover: 'one person within 3 metres takes 20% less damage while you block',
+    Wall: 'you and your party within 3 metres take 20% less damage for 10 seconds',
+    Rush: '+4 speed for 5 seconds',
+    Heavy: 'the next power attack within 8 seconds deals 25% more',
+    Break: 'the next hit within 8 seconds staggers',
+    Wreck: 'the next power attack within 8 seconds deals 50% more and staggers'
+  };
+  var guideAt = '';        // the profession the guides page is on; '' is your own, or the first
 
   // ---------------------------------------------------------------- state --
   // Profession first, then class, then the tree, and the home last while
@@ -559,6 +675,10 @@
     // halves and schools inside an open profession card
     '#ts-skills .halves{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}',
     '#ts-skills .halves.five{grid-template-columns:repeat(5,1fr)}',
+    // the profession guides' tabs (#3165): eight professions, four to a row
+    '#ts-skills .halves.eight{grid-template-columns:repeat(4,1fr);margin:0 0 16px}',
+    '#ts-skills .guidehead{margin-top:18px}',
+    '#ts-skills .guideline{font-size:13px;line-height:1.55;color:rgba(217,207,180,.78);margin:6px 0 0;max-width:680px}',
     '#ts-skills .half{border:1px solid rgba(198,170,109,.32);padding:9px 12px;background:rgba(0,0,0,.22);cursor:pointer}',
     '#ts-skills .half.on{border-color:#e9d19b;background:rgba(201,162,75,.20)}',
     '#ts-skills .half.mine{border-color:rgba(160,205,150,.85);background:rgba(120,170,115,.13)}',
@@ -1387,6 +1507,8 @@
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
+    // The guides are read, not picked: the profession is chosen on its tab.
+    if (section === 'guides') return 0;
     // Nothing on the property page is picked, marked or sent either. It is a
     // list of what is already true.
     if (section === 'property') return 0;
@@ -1425,7 +1547,7 @@
     var v = null;
     if (mine) { v = {}; for (var k in mine) if (!NOT_DRAWN[k]) v[k] = mine[k]; }
     return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape(),
-                           candidate, endArmed, dyeTarget]);
+                           candidate, endArmed, dyeTarget, guideAt]);
   }
 
   function draw() {
@@ -1454,6 +1576,14 @@
     // the server sends the page to them and nobody else, never while creating.
     // The Body page (#1631), after the tree: the server sends it to anybody
     // in the world, and never while creating.
+    /*
+      The profession guides (#3165), for everybody, the world and creation
+      alike: a page per profession is most use to somebody still choosing
+      one. In the world it comes after the tree; while creating, before Home,
+      so Review stays last and its Confirm is still the one that sends.
+    */
+    if (creating()) sections.splice(sections.indexOf('home') < 0 ? sections.length : sections.indexOf('home'), 0, 'guides');
+    else sections.push('guides');
     if (!creating() && bodyView()) sections.push('body');
     if (!creating() && officePage()) sections.push('office');
     /*
@@ -1611,6 +1741,10 @@
                         : pKeys + (pKeys === 1 ? ' key' : ' keys'),
                c: pHeld ? 'set' : '' };
     }
+    if (sec === 'guides') {
+      var gp = guideProf();
+      return { t: gp ? nameOf('profession', gp) : 'every profession', c: '' };
+    }
     if (sec === 'recipes') {
       // How many things you can make, added up over every half you stand in.
       // One number, because the section list is one line per section and the
@@ -1665,6 +1799,7 @@
     else if (section === 'apprentice') drawApprentice();
     else if (section === 'hairdye') drawHairDye();
     else if (section === 'recipes') drawRecipes();
+    else if (section === 'guides') drawGuides();
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
     else if (section === 'body') drawNeeds();
@@ -2593,6 +2728,168 @@
     elBody.appendChild(cols);
   }
 
+  /*
+    THE PROFESSION GUIDES (#3165). One page per profession, Patrick's answer
+    A: what it makes, where the materials come from, how it ranks up. The
+    tabs across the top are the eight professions; the page opens on your
+    own, or while creating on the one marked, and a tab press reads another.
+    Nothing on it is picked or sent. The facts are GUIDES, the sentences
+    GUIDE_TEXT, and a person's own rank is the panel's, as everywhere here.
+  */
+  function guideRows() { return DATA.profession ? DATA.profession.rows : []; }
+  function guideHas(key) {
+    var list = guideRows();
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) return true;
+    return false;
+  }
+  function guideProf() {
+    if (guideAt && guideHas(guideAt)) return guideAt;
+    if (mine && mine.profession && guideHas(mine.profession)) return mine.profession;
+    var p = picked.profession;
+    if (creating() && p && p.row && guideHas(p.row)) return p.row;
+    return '';
+  }
+  // A ladder number in a sentence: {perSpell} and the like, out of GUIDES.ladder.
+  function guideFill(text) {
+    var ladder = (typeof GUIDES === 'object' && GUIDES && GUIDES.ladder) || {};
+    return String(text || '').replace(/\{(\w+)\}/g, function (all, k) { return ladder[k] !== undefined ? String(ladder[k]) : all; });
+  }
+  function guideList(names) {
+    var n = names.length;
+    if (!n) return '';
+    if (n === 1) return names[0];
+    return names.slice(0, n - 1).join(', ') + ' and ' + names[n - 1];
+  }
+  function guideRank(r) { return RANK_NAMES[r] || cap(r); }
+  /* One material, as a sentence: who it rests on, where it is made, and where it is found. */
+  function guideMaterial(m) {
+    var who = GUIDE_WHO[m[2]] || '';
+    var at = guideRank(m[3]);
+    var bench = String(m[4] || '');
+    var from = Array.isArray(m[5]) ? m[5] : [];
+    var where = Array.isArray(m[6]) ? m[6] : [];
+    var more = Number(m[7]) || 0;
+    var out;
+    if (!who) out = 'Nobody in Thornswood gathers it: it is found or bought.';
+    else if (bench) {
+      out = 'Made at the ' + bench.charAt(0).toLowerCase() + bench.slice(1) +
+            (from.length ? ' from ' + guideList(from) : '') + ', out of a ' + who + '\'s work at ' + at + '.';
+    } else out = 'A ' + who + '\'s work, at ' + at + '.';
+    if (where.length) {
+      out += ' ' + (m[2] === 'miner' ? 'Veins in ' : 'Taken from ') + guideList(where) +
+             (more ? ', and ' + more + ' more' + (m[2] === 'miner' ? (more === 1 ? ' place' : ' places') : '') : '') + '.';
+    }
+    return out;
+  }
+  function guideLine(text) { elBody.appendChild(el('p', 'guideline', text)); }
+  function guideHead(text) { elBody.appendChild(el('div', 'colhead guidehead', text)); }
+  function guideRow(name, value) {
+    var row = el('div', 'bookrow');
+    row.appendChild(el('span', 'bn', name));
+    if (value) row.appendChild(el('span', 'bv', value));
+    elBody.appendChild(row);
+    return row;
+  }
+  function guideCounts(byRank, what) {
+    var out = [];
+    for (var i = 0; i < RANK_ORDER.length; i++) {
+      var n = Number(byRank[i]) || 0;
+      if (n) out.push(n + ' ' + RANK_ORDER[i]);
+    }
+    return out.join(', ') + (what ? ' ' + what : '');
+  }
+
+  function drawGuides() {
+    var g = (typeof GUIDES === 'object' && GUIDES) ? GUIDES : null;
+    var at = guideProf();
+    var tabs = el('div', 'halves eight');
+    guideRows().forEach(function (r) {
+      var tab = el('div', 'half' + (r.key === at ? ' on' : '') + (mine && mine.profession === r.key ? ' mine' : ''));
+      tab.appendChild(el('div', 'hn', r.name));
+      if (mine && mine.profession === r.key) tab.appendChild(el('div', 'hr', 'yours'));
+      tab.onclick = function () { guideAt = r.key; draw(); };
+      tabs.appendChild(tab);
+    });
+    elBody.appendChild(tabs);
+    if (!at) {
+      guideLine('Pick a profession above to read its page.');
+      return;
+    }
+    var row = rowOf('profession', at) || {};
+    var page = (g && g.professions && g.professions[at]) || null;
+    var text = GUIDE_TEXT[at] || {};
+    var ladder = (g && g.ladder) || null;
+    if (!page || !ladder) {
+      guideLine('This page has no guide for ' + (row.name || cap(at)) + ' yet.');
+      return;
+    }
+    guideLine((row.desc || '') + (row.perk ? ' ' + row.perk : ''));
+    // Where you stand in it, from the ranks the server sent: only on your own.
+    var subs = row.subs || [];
+    if (mine && mine.profession === at) {
+      var held = [];
+      subs.forEach(function (s) { var rk = rankOf(s.key); if (rk) held.push(guideRank(rk) + ' ' + s.name); });
+      if (held.length) guideLine('You are ' + guideList(held) + '. The skill tree page counts the work to your next rank.');
+    }
+
+    guideHead('What it makes');
+    if (at === 'mage') {
+      guideLine(guideFill(text.makes));
+      var schools = (DATA.spells && DATA.spells.schools) || {};
+      subs.forEach(function (s) {
+        var by = schools[s.key] || {};
+        var counts = RANK_ORDER.map(function (rk) { return (by[rk] || []).length; });
+        guideRow(s.name, guideCounts(counts, 'spells'));
+      });
+    } else {
+      subs.forEach(function (s) {
+        var h = (page.halves && page.halves[s.key]) || null;
+        elBody.appendChild(el('div', 'rankhead', s.name + (s.desc ? ': ' + s.desc : '')));
+        var makes = text.makes && text.makes[s.key];
+        if (makes) guideLine(guideFill(makes));
+        if (!h) return;
+        if (h.benches && h.benches.length) {
+          var from = {};
+          h.benches.forEach(function (b) { (from[b[1]] = from[b[1]] || []).push(b[0]); });
+          var parts = [];
+          RANK_ORDER.forEach(function (rk) {
+            if (from[rk]) parts.push(guideList(from[rk]) + (rk === 'novice' ? ' from Novice' : ' at ' + guideRank(rk)));
+          });
+          guideLine('Works at the ' + parts.join('; the ') + '.');
+        }
+        (h.maneuvers || []).forEach(function (m) {
+          guideRow(m[0], guideRank(m[1]) + ': ' + (GUIDE_MANEUVER[m[0]] || '') + '. ' + m[2] + ' stamina, then ' + m[3] + ' seconds to wait');
+        });
+        (h.families || []).forEach(function (f) { guideRow(f[0], guideCounts(f.slice(1), '')); });
+        if (h.count) {
+          if (h.first && h.first.length) guideLine('A new Novice can start with ' + guideList(h.first) + '.');
+          else guideLine('Nothing here is open on the first day: every Novice recipe waits on a perk, a spell or something you have to be holding.');
+          if (h.race) guideLine(h.race + (h.race === 1 ? ' of these is' : ' of these are') + ' for one race only.');
+        }
+      });
+    }
+
+    guideHead('Where the materials come from');
+    (page.materials || []).forEach(function (m) {
+      guideRow(String(m[0]), m[1] + (m[1] === 1 ? ' recipe asks for it' : ' recipes ask for it'));
+      guideLine(guideMaterial(m));
+    });
+    if (text.where) guideLine(guideFill(text.where));
+
+    guideHead('How to rank up');
+    if (text.climb) guideLine(guideFill(text.climb));
+    var per = ladder.per || {};
+    guideLine('The count starts again at each rank: ' + per.advanced + ' into Advanced, ' + per.expert +
+              ' into Expert and ' + per.master + ' into Master. Each rank hands you a skill tree point.');
+    if (at !== 'mage') {
+      var rest = ladder.rest || {};
+      guideLine('Each piece of work costs rest: ' + RANK_ORDER.map(function (rk) { return rest[rk] + ' at ' + guideRank(rk); }).join(', ') + '.' +
+                (text.craft ? ' Under ' + ladder.craftRest + ' rest, nothing is made at a bench.' : ''));
+      guideLine(text.sister || 'Your sister half gives you its Novice work, and climbs past Novice only when a Master of it takes you on.');
+    }
+    guideLine('Work done while somebody from your party is in the same cell banks ' + ladder.party + '% more.');
+  }
+
   /* The last card of Class and of Profession while creating. A click is the mark; nothing is sent. */
   function laterCard(wrap, sec, i) {
     var card = el('div', 'card later' + (i === rowAt ? ' at' : ''));
@@ -2888,7 +3185,7 @@
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
-      : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
+      : (section !== 'tree' && section !== 'recipes' && section !== 'guides' && section !== 'property' && section !== 'office' &&
          section !== 'apprentice' && section !== 'hairdye' && section !== 'body');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
@@ -2912,6 +3209,7 @@
 
   function hint() {
     if (section === 'tree') return 'Press + on a skill to put a point in it.';
+    if (section === 'guides') return 'Pick a profession to read its page. Nothing here is picked or sent.';
     if (section === 'recipes') {
       var halves = recipeHalves();
       if (!halves.length) return 'Pick a profession and its half, and this fills with what that half can make.';
@@ -3617,6 +3915,7 @@
       candidate = null;   // the person the look prompt opened it on is that moment's, not the next
       dyeTarget = null;   // and the same for Hair dye's (#2675)
       endArmed = null;
+      guideAt = '';       // the guides open on your own profession again next time (#3165)
       tell('closed');
     },
     toggle: function () {
