@@ -31,6 +31,4 @@ install.
 On a new person's machine, once, from the site's download. The payload and the
 stub reach the site through `scripts\release\Publish-Installer.ps1`, which
 `scripts\release\Package-Thornswood.ps1` runs at its end unless it is told not to.
-Moved here from `tools\` on 25 September (issue #440, phase 7); the
-comments inside these files still say `tools\` in places, because changing
-them would change what ships.
+Moved here from `tools\` on 25 September (issue #440, phase 7).
