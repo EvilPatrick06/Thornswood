@@ -3,7 +3,7 @@
 - **Issue / PR:** #3137, the pull request this note came in with.
 - **Where:** the live site (Deploy-Docs) and the live Discord (Setup-Discord -OnBox). No Ship, no game server, no bot install.
 - **Changed by #3140:** the two boards this note replaced are gone; see step 1.
-- **Needs first:** nothing, but step 1's `-Docs help` also puts #2705's hair dye section live (see step 1).
+- **Needs first:** the main Ship. Main's join.md and rules.md carry #3445's words since 26 Oct, and #start-here, #welcome, #faq and #game-rules are read out of them, so step 2 would put those words in Discord before the release they describe (measured 26 Oct, see #3137). Step 1's `-Docs help` also puts #2705's hair dye section live (see step 1).
 - **Staff notice:** no. Pages and two Discord posts change, and nothing staff do.
 
 What it does:
@@ -25,9 +25,13 @@ What it does:
 2. **Discord: the welcome and the FAQ.**
 
        pwsh scripts/deploy/Setup-Discord.ps1 -OnBox -Audit
-       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox
+       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox -Posts
 
-   The second should end with nothing under "did not manage".
+   Without `-Posts` no post changes. The audit should name only the
+   changelog lines -Posts adds, and the second should end with nothing under
+   "did not manage". It refuses before asking anything of Discord when a doc
+   has words with no change line; then the change line goes in content.py
+   first. Patrick said yes to this step on 26 Oct, so it needs no second ask.
 
 ## Check afterwards
 
