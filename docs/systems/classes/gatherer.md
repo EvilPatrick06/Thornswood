@@ -13,6 +13,16 @@ the price a person posts.
 A plant above your rank is refused by name. You are told the rank it
 takes. You keep standing there. Nothing is picked.
 
+## The season of a plant
+
+Four plants give only in their two seasons (#3152): Lavender in spring
+and summer, Jazbay Grapes in summer and autumn, Snowberries in autumn
+and winter, Juniper Berries in winter and spring. Out of season the
+plant is bare. Nothing is picked, it is no piece of work, and it keeps
+no wait. The line says which seasons it gives in. Every other plant
+gives all year. The season is the farmer's, one for the province. Why
+these four: [Food](../food.md), "Seasonal food".
+
 ## What one pick gives
 
 One. The rank does not grow the handful. It only opens the plant.
@@ -143,7 +153,8 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 ## Where this is
 
-The verb, the ranks, the ten minutes, and the list are in the server.
+The verb, the ranks, the ten minutes, the four herbs' seasons, and the
+list are in the server.
 The wait is the plant, for everybody: the next person cannot take it
 early. A press from someone who is not a gatherer is refused before
 the plant is consumed, and a gatherer below the plant's rank takes

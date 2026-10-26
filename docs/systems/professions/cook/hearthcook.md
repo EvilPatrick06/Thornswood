@@ -47,6 +47,14 @@ using the sister half can make this novice list and nothing above it.
 Mammoth Steak, twice in the table, 6 gold, meat. Mammoth Stew, twice,
 16 gold, stew. Dwemer Fire Paste, 50 gold, the ingredient row.
 
+## Festival dishes and brews
+
+Four festival dishes and four festival brews, one of each for each
+season, made from that season's two herbs (#3152, [Food](../../food.md),
+"Seasonal food"). The loaf, the tart and the cake are the oven, the roast
+and the brews the cookpot. A festival dish is a feast and comes out
+burnt, plain or fine like any dish; a brew is an ale.
+
 ## Benches and the mill
 
 The oven wants Hearthcook or Confectioner from novice. The mill wants

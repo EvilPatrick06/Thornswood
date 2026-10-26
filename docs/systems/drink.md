@@ -29,6 +29,14 @@ a remedy an alchemist made. The game clock runs about twenty times real
 time, so "the next morning" is about an hour of real time after a
 night's drinking, not the next real day.
 
+## Festival brews
+
+Four ales are made by people: a Hearthcook brews one for each season's
+festival at the cookpot, from that season's herbs (#3152). First
+Planting Mead, Midyear Jazbay Wine, Harvest's End Ale and Saturalia
+Mulled Mead each go down as an ale does, on the curve above. Their
+herbs are on [Food](food.md), "Seasonal food".
+
 ## Water
 
 | Source | Thirst | Risk |

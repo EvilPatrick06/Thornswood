@@ -450,9 +450,10 @@ CONTENTS = (
     (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Weapon|Armor|Sewing)Kit$', 'own', 'repair kits'),
     (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$', 'own', 'treatments'),
     (r'(MISC ThornswoodFurniture|COBJ ThornswoodRecipeFurniture)\w+$', 'own', 'furniture'),
-    (r'(ALCH ThornswoodFoodTea|COBJ ThornswoodRecipeTea)\w+$|MGEF ThornswoodTeaSteepEffect$', 'own', 'teas'),
-    (r'ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$|MGEF Thornswood(Burnt|Fine)Effect$', 'own',
-     'burnt and fine meals'),
+    # The teas, the burnt and fine meals and the festival feasts and brews
+    # (#3152) share one row, which keeps the description under its 512.
+    (r'(ALCH ThornswoodFood|COBJ ThornswoodRecipe)(Tea|Feast|Brew)\w+$|ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$'
+     r'|MGEF Thornswood(TeaSteep|Burnt|Fine|Feast|Brew)Effect$', 'own', 'food and drink'),
     (r'(MISC ThornswoodQuest\w+|ACTI ThornswoodQuestLedgerSource)$', 'own', 'quest items'),
     (r'IMAD ThornswoodDrunkImod$', 'own', 'the drunk screen'),
     (r'BOOK ThornswoodPassage\w+$', 'own', 'starting town passages'),
@@ -848,6 +849,59 @@ TEAS = (
 )
 TEA_HERBS = 2
 
+# SEASONAL FOOD AND DRINK (#3152). Patrick, 22 October 2026, A: a seasonal
+# dish can be made any time with its ingredients, and the ingredients are what
+# is seasonal. The server picks Lavender, Jazbay Grapes, Snowberries and
+# Juniper Berries only in their two seasons each (game\data\food-groups.json
+# inSeason), so each season has its own pair, and each season's festival dish
+# and brew want that pair. Off season they are made from what was put by.
+#
+# A festival dish is a feast (docs/systems/food.md, the feast row): the server
+# knows it by group feast in food-groups.json, with the help each one gives
+# (feasts), and every cook of one comes out burnt, plain or fine as any dish
+# does, so each has a fine record in the quality block, made by the quality
+# pass below from the same look. A brew is ale (group ale), so it goes down
+# the way any ale does. All are a Hearthcook's: none carries Gourmet.esp's
+# dessert keyword, which this plugin does not master. The festivals are the
+# calendar's own: First Planting, the Mid Year Celebration, Harvest's End and
+# Saturalia.
+#
+# Each carries one effect of this plugin's own, the tea's kind (a script
+# effect with no script), which says on the item what the server does. A
+# feast wears a vanilla dish's mesh, bounds and weight, the ones this plugin's
+# fine dish of it reads from the masters, so nothing new ships; a brew wears
+# the tea's cup. Form ids 0x501A000 on, a range no version of this plugin used.
+FEAST_EFFECT = 0x501A000
+FEAST_EFFECT_WORDS = ('A festival feast. It fills more than a meal, and its help is twice as strong '
+                      'for half as long.')
+BREW_EFFECT = 0x501A001
+BREW_EFFECT_WORDS = 'A festival brew. It goes down the way any ale does.'
+OVEN_KEYWORD = 0x030117F7                       # BYOHCraftingOven, HearthFires.esm
+FLOUR = 0x03003538                              # Sack of Flour, HearthFires.esm
+BUTTER = 0x0300353C                             # Butter, HearthFires.esm
+CHICKEN_EGG = 0x00023D77                        # Chicken's Egg, a farmer's
+VENISON = 0x000669A2                            # Venison, a hunter's
+SALT_PILE = 0x00034CDF                          # Salt Pile, a miner's
+JAZBAY_GRAPES = 0x0006AC4A                      # a gatherer's at novice
+WHEAT = 0x0004B0BA                              # a farmer's at advanced
+FEAST_VALUE = 5
+FEAST_EAT = 0x000CAF94                          # ITMFoodEat, the eating sound Skyrim's dishes carry
+FEASTS = (
+    # item       recipe     editor id                            name                    bench
+    #   inputs; the mesh, its bounds and the weight, each a vanilla dish's
+    (0x501A010, 0x501A020, 'ThornswoodFoodFeastFirstPlanting', 'First Planting Loaf', OVEN_KEYWORD,
+     ((FLOUR, 1), (CHICKEN_EGG, 1), (LAVENDER, 1), (JUNIPER_BERRIES, 1)),
+     '_BYOH\\Clutter\\Food\\BraidedBread01.nif', (0, 0, 0, 0, 0, 0), 0.2),          # Braided Bread
+    (0x501A011, 0x501A021, 'ThornswoodFoodFeastMidyear', 'Midyear Jazbay Tart', OVEN_KEYWORD,
+     ((FLOUR, 1), (BUTTER, 1), (JAZBAY_GRAPES, 2), (LAVENDER, 1)),
+     '_BYOH\\Clutter\\Food\\Tart01.nif', (-20, -20, 0, 20, 20, 7), 0.2),             # Jazbay Crostata
+    (0x501A012, 0x501A022, 'ThornswoodFoodFeastHarvestsEnd', "Harvest's End Roast", COOKPOT_KEYWORD,
+     ((VENISON, 1), (SALT_PILE, 1), (JAZBAY_GRAPES, 1), (SNOWBERRIES, 1)),
+     'Clutter\\Ingredients\\VenisonCooked.nif', (0, 0, 0, 0, 0, 0), 2.0),              # Venison Chop
+    (0x501A013, 0x501A023, 'ThornswoodFoodFeastSaturalia', 'Saturalia Spice Cake', OVEN_KEYWORD,
+     ((FLOUR, 1), (BUTTER, 1), (SNOWBERRIES, 1), (JUNIPER_BERRIES, 1)),
+     'Clutter\\Food\\NuttyBread01.nif', (-5, -17, -4, 4, 14, 5), 0.1),               # Honey Nut Treat
+)
 # COOKING QUALITY (#2906). Patrick, 20 October 2026, B: a cook comes out
 # burnt, plain or fine, the odds by the cook's rank, and every dish needs a
 # fine record as well as the burnt one, because an item cannot carry per-copy
@@ -969,6 +1023,20 @@ IS_BLACKSMITH_WORKBENCH = 0x000D932E  # isBlacksmithWorkbench, the carpenter ben
 ACTOR_TYPE_NPC = 0x00013794           # ActorTypeNPC, who may use a bench
 HONEYCOMB = 0x000B08C5                # BeeHoneyComb
 HONEYCOMB_SOUND = 0x0010FD51          # ITMIngredientBeehiveHuskUp, the comb's own sound
+
+# The festival brews (#3152, SEASONAL FOOD AND DRINK above), here because the
+# first and the last want the comb.
+BREWS = (
+    # item       recipe     editor id                          name                      inputs
+    (0x501A040, 0x501A050, 'ThornswoodFoodBrewFirstPlanting', 'First Planting Mead',
+     ((HONEYCOMB, 1), (LAVENDER, 1), (JUNIPER_BERRIES, 1))),
+    (0x501A041, 0x501A051, 'ThornswoodFoodBrewMidyear', 'Midyear Jazbay Wine',
+     ((JAZBAY_GRAPES, 2), (LAVENDER, 1))),
+    (0x501A042, 0x501A052, 'ThornswoodFoodBrewHarvestsEnd', "Harvest's End Ale",
+     ((WHEAT, 1), (JAZBAY_GRAPES, 1), (SNOWBERRIES, 1))),
+    (0x501A043, 0x501A053, 'ThornswoodFoodBrewSaturalia', 'Saturalia Mulled Mead',
+     ((HONEYCOMB, 1), (SNOWBERRIES, 1), (JUNIPER_BERRIES, 1))),
+)
 
 # A bench's furniture marker numbers, as Skyrim's own benches carry them: one
 # marker, entered from the front (MNAM, FNPR), and its WBDT, the kind of bench
@@ -1171,6 +1239,10 @@ def quality_wanted(plugin_masters, plugin_name):
     names = {}
     for row in recipes.values():
         names.setdefault(row.get('out'), row.get('name'))
+    # The festival feasts are this plugin's own (#3152), named here before the
+    # recipe table is built from the plugin that holds them.
+    for item, recipe, edid, name, bench_kw, inputs, model, box, weight in FEASTS:
+        names.setdefault('%x:%s' % (item & 0xFFFFFF, plugin_name), name)
     out = [(local_fid(quality['burnt'], plugin_masters, plugin_name), BURNT_MEAL_EDID, BURNT_MEAL_NAME,
             BURNT_MEAL_LOOK, BURNT_EFFECT)]
     for plain, fine in sorted(quality.get('fine', {}).items(), key=lambda kv: kv[1]):
@@ -1178,8 +1250,10 @@ def quality_wanted(plugin_masters, plugin_name):
         if not name:
             raise SystemExit('STOP. %s has a fine record and no recipe makes it (game\\data\\recipes.json). '
                              'Nothing was written.' % plain)
+        # An apostrophe is dropped, not a break: Harvest's End is HarvestsEnd.
         edid = 'ThornswoodFoodFine' + ''.join(w[:1].upper() + w[1:] for w in
-                                               ''.join(c if c.isalnum() else ' ' for c in name).split())
+                                               ''.join(c if c.isalnum() else ' '
+                                                       for c in name.replace("'", '')).split())
         out.append((local_fid(fine, plugin_masters, plugin_name), edid, 'Fine ' + name, plain, FINE_EFFECT))
     return out
 
@@ -1241,6 +1315,43 @@ def quality_record(fid, edid, name, look, effect):
              field(b'ZNAM') + field(b'DATA') + field(b'ENIT') +
              [(b'EFID', struct.pack('<I', effect)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))])
     return own_record(b'ALCH', fid, pairs)
+
+
+def feast_look(model, box, weight):
+    """A festival feast's look (#3152), as [(tag, bytes)] the way dish_look
+    answers one, so its fine record wears the same."""
+    return [(b'OBND', bounds(box)), (b'MODL', zstr(model)), (b'DATA', struct.pack('<f', weight)),
+            # Worth, no auto calc and a food item, no addiction, the eating sound.
+            (b'ENIT', struct.pack('<iIIfI', FEAST_VALUE, 0x3, 0, 0.0, FEAST_EAT))]
+
+
+def seasonal_records():
+    """The festival feasts and brews, their recipes and their two effects
+    (#3152)."""
+    data = bytearray(TEA_EFFECT_DATA)
+    struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
+    out = [own_record(b'MGEF', fid, [
+        (b'EDID', zstr(edid)), (b'FULL', zstr(name)),
+        (b'DATA', bytes(data)), (b'SNDD', b''), (b'DNAM', zstr(words))])
+        for fid, edid, name, words in (
+            (FEAST_EFFECT, 'ThornswoodFeastEffect', 'Feast', FEAST_EFFECT_WORDS),
+            (BREW_EFFECT, 'ThornswoodBrewEffect', 'Festival Brew', BREW_EFFECT_WORDS))]
+    for item, recipe, edid, name, bench_kw, inputs, model, box, weight in FEASTS:
+        out.append(quality_record(item, edid, name, feast_look(model, box, weight), FEAST_EFFECT))
+    for item, recipe, edid, name, inputs in BREWS:
+        out.append(own_record(b'ALCH', item, [
+            (b'EDID', zstr(edid)), (b'OBND', bounds(TEA_BOUNDS)), (b'FULL', zstr(name))] +
+            keywords((VENDOR_ITEM_FOOD,)) + [
+            (b'MODL', zstr(TEA_MODEL)), (b'YNAM', struct.pack('<I', TEA_PICK_UP)),
+            (b'DATA', struct.pack('<f', TEA_WEIGHT)),
+            (b'ENIT', struct.pack('<iIIfI', TEA_VALUE, 0x3, 0, 0.0, TEA_DRINK)),
+            (b'EFID', struct.pack('<I', BREW_EFFECT)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))]))
+    for item, recipe, edid, name, bench_kw, inputs, model, box, weight in FEASTS:
+        out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'), list(inputs), item, bench_kw))
+    for item, recipe, edid, name, inputs in BREWS:
+        out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'), list(inputs), item,
+                        COOKPOT_KEYWORD))
+    return out
 
 
 def thornswood_records(passage, clam, passages):
@@ -2201,6 +2312,7 @@ def main():
             return 1
         passages[name] = book
     own = thornswood_records(passage, clam, passages)
+    own += seasonal_records()
     if len({r.fid for r in own}) != len(own):
         raise ValueError('Two authored records share a form ID')
     unmade = sorted(remade - set(r.fid for r in own))
@@ -2317,7 +2429,10 @@ def main():
             print('STOP. %s is already in this plugin as 0x%07X and this writes it as 0x%07X. '
                   'Nothing was written.' % (edid, other.fid, fid))
             return 1
-        look = dish_look(args.masters, dish, plugin_masters, problems)
+        # A festival feast's fine record wears the feast's own look (#3152),
+        # which is this plugin's and needs no master.
+        feast = next((row for row in FEASTS if '%x:%s' % (row[0] & 0xFFFFFF, args.plugin) == dish), None)
+        look = feast_look(*feast[6:]) if feast else dish_look(args.masters, dish, plugin_masters, problems)
         if look is not None:
             quality_new.append(quality_record(fid, edid, name, look, effect))
     if problems:
