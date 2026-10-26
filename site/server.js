@@ -604,26 +604,28 @@ const SITE = path.join(DATA, 'site');
 
 /* What a link to each page says when it is pasted into Discord. Every address
    used to unfurl with the same generic home text, so a link to the rules and a
-   link to the roadmap read identically in a channel. home.html carries the
-   same list for the browser tab; this is the one a crawler sees, because a
-   crawler does not run the page's script. */
+   link to the roadmap read identically in a channel. This is the only copy:
+   the page is sent with its title, description and og tags already written
+   from it (publicDiscovery and the route below), so the browser tab and a
+   crawler read the same words. home.js kept a second list for the tab until
+   #3138, and the two had drifted apart on two pages. */
 const BLURB = {
   '/':          ['Thornswood', 'A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.'],
   '/world':     ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
   '/rules':     ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
-  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
+  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and arriving in your town.'],
   '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
-  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
+  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make steel armour, so you find somebody who can.'],
   '/known':     ['Known issues', 'What is broken right now that the team already knows about, each one on the board to be fixed. Read this before reporting anything.'],
   '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
   '/news':      ['Every release', 'What changed, newest first. The same list the launcher shows.'],
-  '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/report':    ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
   '/gallery':   ['From the world', 'Pictures taken by people playing.'],
   '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no tracking cookie.'],
   '/terms':     ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
-  '/cookies':   ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
+  '/cookies':   ['Cookies', 'Every cookie and piece of browser storage this site uses: sign-in and the eighteen-and-over gate. No advertising cookie.']
 };
 const escAttr = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -6182,8 +6184,8 @@ async function handle(req, res) {
       // and sending them to the admin panel is the worst possible answer.
       html = html.split('DISCORD_URL').join(cfg.discord.invite || '/join');
       // The og tags a crawler reads are the ones in the file, so the page
-      // actually being served is written into them here. home.html rewrites
-      // the same tags for the browser tab.
+      // actually being served is written into them here. The browser tab reads
+      // the same tags; home.js keeps no list of its own (#3138).
       const blurb = BLURB[route];
       let pageTitle = null;
       if (blurb) {
