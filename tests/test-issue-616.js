@@ -117,7 +117,7 @@ const ini = read(path.join(ROOT, 'launcher', 'Thornswood.ini'));
 // The key: one number in the ini, the same number as the front plugin's
 // default, so a build where the ini and the plugin drifted apart is caught.
 const iniKey = /^\s*CloseGameKey\s*=\s*(\d+)\s*$/m.exec(ini);
-const frontDefault = /const CLOSE_GAME_KEY = iniNumber\(ini, 'CloseGameKey', (\d+)\);/.exec(front);
+const frontDefault = /(?:const|let) CLOSE_GAME_KEY = iniNumber\(ini, 'CloseGameKey', (\d+)\);/.exec(front);
 yes('Thornswood.ini carries a CloseGameKey', !!iniKey);
 yes('the front plugin reads CloseGameKey with a default', !!frontDefault);
 yes('the shipped ini key and the front plugin default are the same key',

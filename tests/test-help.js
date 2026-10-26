@@ -79,7 +79,7 @@ if (help && helpLine) {
     yes('/help answers once', top.length === 1);
     const line = top[0] || '';
     yes('and says the help is a panel, on F7 or Help on the K, P or J panel',
-        /^Help is a panel: F7 opens it, unless you moved it on the launcher's Controls page, and so does Help on the K, P or J panel\./.test(line));
+        /^Help is a panel: F7 opens it, unless you moved it on Settings in the game, and so does Help on the K, P or J panel\./.test(line));
     yes('it names the commands people still type, every one of them',
         PLAYER_WORDS.every(function (w) { return line.indexOf(w) !== -1; }));
     const named = (line.match(/\/[a-z]+/g) || []).filter(function (w, i, all) { return all.indexOf(w) === i; });

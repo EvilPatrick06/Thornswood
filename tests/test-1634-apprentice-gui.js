@@ -480,7 +480,7 @@ person(BRYN, 'Bryn', 209, 'smith', 'edgewright');
 
 // ---------------------------------------------- E. the look prompt, in front --
 {
-  yes('E1: the row is on K, the skills key, and not a new key', /const APPRENTICE_KEY = SKILLS_KEY;/.test(front) &&
+  yes('E1: the row is on K, the skills key, and not a new key', /(?:const|let) APPRENTICE_KEY = SKILLS_KEY;/.test(front) &&
       !/iniNumber\(ini, 'Apprentice/.test(front));
   const dp = between(front, '  function drawPrompt(row) {', '\n  }\n');
   let drawn = [];
@@ -523,10 +523,12 @@ person(BRYN, 'Bryn', 209, 'smith', 'edgewright');
         // The hair dye's K (#2675) may come between: it is asked after this one.
         /if \(e\.code === APPRENTICE_KEY && apprenticePress\(\)\) \{ return; \}\n(?:    \/\/[^\n]*\n    if \(e\.code === HAIR_DYE_KEY && hairDyePress\(\)\) \{ return; \}\n)?    if \(e\.code === SKILLS_KEY\) \{/.test(front));
   }
-  const keysCs = read('launcher', 'app', 'Keys.cs');
+  // The row on Settings in the game (#3126), where the Controls page's was.
+  const settingsPage = read('game', 'ui', 'thornswood-settings.js');
   const ini = read('launcher', 'Thornswood.ini');
-  yes('E4: the Controls row and the ini say what K does on a person a Master could take on',
-      /ThornIni, "SkillsKey", 37/.test(keysCs) && /could take on as an apprentice sees this key named under the crosshair/.test(keysCs) &&
+  const skillsRow = (/\{ ini: 'SkillsKey', def: 37,[^}]*\}/.exec(settingsPage) || [''])[0];
+  yes('E4: the Settings row and the ini say what K does on a person a Master could take on',
+      !!skillsRow && /could take on as an apprentice sees this key named under the crosshair/.test(skillsRow) &&
       /could take on as an apprentice sees this key named under the crosshair/.test(ini.replace(/\n; /g, ' ')));
 }
 

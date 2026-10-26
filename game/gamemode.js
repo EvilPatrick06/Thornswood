@@ -56538,7 +56538,7 @@ const WORDS = ['/ooc', '/o',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
                // The four needs bars said as one line of text, for somebody
-               // who hid the bars in the launcher's Settings (#2267). Patrick's
+               // who hid the bars on Settings in the game (#2267). Patrick's
                // exception to "buttons, not commands", 11 Oct: it is another
                // view of what the bars and the Body page on K already show.
                // /need is the same word. See the /needs branch of handle().
@@ -57653,14 +57653,14 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     The help panel's key is HelpKey in Thornswood.ini, 65 by default, which is
     F7; the server cannot see a rebind, so it names the default and says where
     it moves. tests/test-1633-help-panel.js holds the F7 here to the ini, the
-    Controls page and the plugin. The commands are PLAYER_WORDS, the one list,
+    in-game Settings panel and the plugin. The commands are PLAYER_WORDS, the one list,
     and nothing else. A tester or dev is told their own as well, and nobody
     else is: naming /tp to somebody it then refuses was the first thing a new
     person learned about this server.
   */
   function helpLine(profileId) {
-    return 'Help is a panel: F7 opens it, unless you moved it on the launcher\'s ' +
-           'Controls page, and so does Help on the K, P or J panel. Typed in the ' +
+    return 'Help is a panel: F7 opens it, unless you moved it on Settings in ' +
+           'the game, and so does Help on the K, P or J panel. Typed in the ' +
            'chat: ' + PLAYER_WORDS.join(', ') + '.' +
            (isPlaytester(profileId)
              ? ' You are ' + roleOf(profileId) + ': /tp <place> moves you and /tp on ' +
@@ -58345,8 +58345,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     }
 
     /*
-      THE NEEDS BARS AS TEXT (#2267). Typed, by somebody who hid the bars in
-      the launcher's Settings, or anybody else: Patrick's exception to
+      THE NEEDS BARS AS TEXT (#2267). Typed, by somebody who hid the bars on
+      Settings in the game, or anybody else: Patrick's exception to
       "buttons, not commands" on 11 Oct, because it is another view of the
       bars and the Body page on K rather than something done in the world.
       /need is the same. It reads and says; it changes nothing. See textView
@@ -58928,7 +58928,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       anything people do. It was a menu and six topics typed into the chat,
       each written as commands; it is the help panel now,
       game/ui/thornswood-help.js, on its own key (HelpKey in Thornswood.ini,
-      F7 unless it was moved on the launcher's Controls page) and on Help on
+      F7 unless it was moved on Settings in the game) and on Help on
       the K, P and J panels, which opens without the chat and names every key
       as that machine has it bound. Nothing tells anybody to type /help.
 

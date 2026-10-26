@@ -85,6 +85,6 @@ G and Escape close the open wheel. While it is up it holds the
 keyboard, so the wheel's own page hears the two keys and asks for it
 to close, the same as every panel hears its own Escape (#1852).
 The tap of G that opens the wheel does not also close it. In the
-search G is a letter, and Escape still closes. The Controls page's
-Close the wheel, moved to a letter, closes it too, and Escape always
-does.
+search G is a letter, and Escape still closes. Close the wheel on
+Settings in the game, moved to a letter, closes it too, and Escape
+always does.

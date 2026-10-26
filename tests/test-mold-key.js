@@ -80,7 +80,7 @@ function liftSpan(src, first, lastOpen) {
 }
 
 // =================================================================== the key
-const defM = /const MOLD_KEY\s*=\s*iniNumber\(ini, 'MoldKey', (\d+)\);/.exec(front);
+const defM = /(?:const|let) MOLD_KEY\s*=\s*iniNumber\(ini, 'MoldKey', (\d+)\);/.exec(front);
 yes('the plugin reads MoldKey out of Thornswood.ini', !!defM);
 const MOLD_DEFAULT = defM ? Number(defM[1]) : -1;
 yes('and U, scan code 22, is its default', MOLD_DEFAULT === 22);
@@ -113,16 +113,17 @@ yes('the shipped Thornswood.ini carries MoldKey = 22', !!iniM && Number(iniM[1])
   while ((m = rxIni.exec(ini)) !== null) {
     if (['MoldKey', 'VoicePort', 'Microphone'].indexOf(m[1]) === -1) { take(Number(m[2]), 'ini ' + m[1]); }
   }
-  const keys = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
-  const rxCs = /ThornIni, "(\w+)", (-?\d+)\)/g;
+  // The rows on Settings in the game (#3126), where the Controls page's were.
+  const settingsPage = read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-settings.js'));
+  const rxRow = /\{ ini: '(\w+)', def: (-?\d+),/g;
   let rows = 0;
-  while ((m = rxCs.exec(keys)) !== null) { rows++; if (m[1] !== 'MoldKey') { take(Number(m[2]), 'Controls ' + m[1]); } }
+  while ((m = rxRow.exec(settingsPage)) !== null) { rows++; if (m[1] !== 'MoldKey') { take(Number(m[2]), 'Settings ' + m[1]); } }
   // Vanilla Skyrim, keyboard: W A S D, E, R, Q, Z, F, T, M, I, C, X, J, P,
   // Tab, Escape, Space, Shift, Alt, Ctrl, Caps Lock and the hotkeys 1 to 8.
   [17, 30, 31, 32, 18, 19, 16, 44, 33, 20, 50, 23, 46, 45, 36, 25, 15, 1, 57,
    42, 56, 29, 58, 2, 3, 4, 5, 6, 7, 8, 9].forEach(function (c) { take(c, 'Skyrim'); });
   yes('the other keys were found to compare against (' + Object.keys(taken).length +
-      ' codes, ' + rows + ' Controls rows)', Object.keys(taken).length > 20 && rows >= 10);
+      ' codes, ' + rows + ' Settings rows)', Object.keys(taken).length > 20 && rows >= 10);
   yes('and nothing else of ours or Skyrim\'s answers to U' +
       (taken[22] ? ' (' + taken[22].join(', ') + ')' : ''), !taken[22]);
 }

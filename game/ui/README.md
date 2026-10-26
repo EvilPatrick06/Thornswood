@@ -21,7 +21,10 @@ building you may arrange (`thornswood-furniture.js`),
 the stops and fares of a carriage or ferry driver that E on the driver
 opens (`thornswood-ride.js`), the hold's drop box that E on the box on a
 notice board opens (`thornswood-box.js`), the help that the help key, F7, and Help on
-the K, P and J panels open (`thornswood-help.js`), and the "Are you still here?"
+the K, P and J panels open (`thornswood-help.js`), the Settings that Settings
+on the help panel and on the K, P and J panels opens, where every Thornswood
+key, the field of view, the chat fade and the needs bars are changed with the
+game running (`thornswood-settings.js`, #3126), and the "Are you still here?"
 window after 15 minutes idle (`thornswood-afk.js`). `thornswood-theme.mp3` is
 the theme the main menu plays, and the launcher plays it too while it is open.
 

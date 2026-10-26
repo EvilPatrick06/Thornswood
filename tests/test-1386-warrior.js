@@ -1145,11 +1145,11 @@ later(200000);
 const front = fs.readFileSync(path.join(root, 'game', 'plugins', 'thornswood-front.js'), 'utf8').replace(/\r/g, '');
 const overlay = fs.readFileSync(path.join(root, 'game', 'ui', 'thornswood-maneuvers.js'), 'utf8').replace(/\r/g, '');
 const ini = fs.readFileSync(path.join(root, 'launcher', 'Thornswood.ini'), 'utf8').replace(/\r/g, '');
-const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'utf8').replace(/\r/g, '');
+const settingsPage = fs.readFileSync(path.join(root, 'game', 'ui', 'thornswood-settings.js'), 'utf8').replace(/\r/g, '');
 {
-  yes('the maneuver key is 9, scan code 10, in the plugin, the template and the Controls page',
-    /const MANEUVER_KEY = iniNumber\(ini, 'ManeuverKey', 10\);/.test(front) && /^ManeuverKey = 10$/m.test(ini) &&
-    /ThornIni, "ManeuverKey", 10\)\);/.test(keysCs));
+  yes('the maneuver key is 9, scan code 10, in the plugin, the template and Settings in the game',
+    /(?:const|let) MANEUVER_KEY = iniNumber\(ini, 'ManeuverKey', 10\);/.test(front) && /^ManeuverKey = 10$/m.test(ini) &&
+    /\{ ini: 'ManeuverKey', def: 10,/.test(settingsPage));
   const overlays = /const OVERLAYS = (\[[\s\S]*?\]);/.exec(front);
   yes('the front fetches the maneuver panel with the other overlays',
     !!overlays && new Function('return ' + overlays[1])().indexOf('thornswood-maneuvers.js') !== -1);

@@ -88,7 +88,7 @@ yes('it never says player', !/player/i.test(note));
 */
 const emotes = read(EMOTES);
 yes('the plugin takes the wheel key from WheelKey in the ini',
-    /const OPEN_KEY\s*=\s*key\('WheelKey', \d+\);/.test(emotes));
+    /(?:const|let) OPEN_KEY\s*=\s*key\('WheelKey', \d+\);/.test(emotes));
 
 let section = '', wheelCode = NaN;
 read(INI).split('\n').forEach(function (line) {

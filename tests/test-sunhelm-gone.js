@@ -242,19 +242,23 @@ if (/metal the worst|metal is the worst/i.test(body)) {
       worst === 'heavy');
 }
 
-// ------------------------------------------------------ the Controls page
-const pagesStrings = csStrings(read(['launcher', 'app', 'Pages.cs']));
-yes('the Controls page has text to read, ' + pagesStrings.length + ' strings', pagesStrings.length > 20);
+// ------------------------------------------------- Settings in the game
+// The launcher's Controls page until #3126; its rows are on Settings in the
+// game now, game/ui/thornswood-settings.js.
+const settingsPage = read(['game', 'ui', 'thornswood-settings.js']);
+const pagesStrings = (settingsPage.match(/'(?:[^'\\\n]|\\.)*'/g) || [])
+  .map(function (l) { return l.slice(1, -1).replace(/\\'/g, "'"); });
+yes('Settings in the game has text to read, ' + pagesStrings.length + ' strings', pagesStrings.length > 20);
 const pagesGone = [];
 pagesStrings.forEach(function (s) {
   goneIn(s).forEach(function (g) { pagesGone.push(g + ' in "' + s.slice(0, 60) + '"'); });
 });
-yes('the Controls page names no mod that has left' + (pagesGone.length ? ': ' + pagesGone.join('; ') : ''),
+yes('Settings in the game names no mod that has left' + (pagesGone.length ? ': ' + pagesGone.join('; ') : ''),
     pagesGone.length === 0);
 
-const mAt = pagesStrings.indexOf('Esc,  Mod Configuration');
+const mAt = pagesStrings.indexOf('Mod Configuration');
 const mcmRow = mAt >= 0 ? (pagesStrings[mAt + 1] || '') : '';
-yes('the Mod Configuration row is on the Controls page', mcmRow.length > 0);
+yes('the Mod Configuration row is on Settings in the game', mcmRow.length > 0);
 
 // The MCM page each example stands for, as a script in the build.
 const MCM_PAGES = { 'QuickLoot': 'QuickLootIEMCM.pex', 'Skyrim Unbound': 'SkyrimUnboundMCMScript.pex' };

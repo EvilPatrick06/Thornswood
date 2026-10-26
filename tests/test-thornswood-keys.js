@@ -1,8 +1,9 @@
 // test-thornswood-keys.js
 //
 // Thornswood's own keys, held together: the shipped Thornswood.ini, the
-// launcher's Controls rows and the plugins' defaults say the same thing, no
-// two of them share a key, and every Controls row can be written.
+// rows on Settings in the game (game/ui/thornswood-settings.js, with the
+// front's SETTINGS_KEYS beside them) and the plugins' defaults say the same
+// thing, no two of them share a key, and every row can be written.
 //
 // FOUND 24 September by the review of pull request 287 (#529). The template
 // put the emote wheel on G, which is also the friend key, while the emote
@@ -13,6 +14,11 @@
 // install. MoldKey had no Controls row, so the clash check did not know U
 // was taken.
 //
+// #3126 moved the rows from the launcher's Controls page (Keys.cs) into the
+// game, where they are written by the front's iniWith and setSetting. The
+// launcher keeps a reader for the six keys it names (Keys.All), held to the
+// template here too.
+//
 // Read only.
 const fs = require('fs');
 const path = require('path');
@@ -22,6 +28,7 @@ function read(...bits) { return fs.readFileSync(path.join(ROOT, ...bits), 'utf8'
 
 const ini = read('launcher', 'Thornswood.ini');
 const keysCs = read('launcher', 'app', 'Keys.cs');
+const settingsPage = read('game', 'ui', 'thornswood-settings.js');
 const front = read('game', 'plugins', 'thornswood-front.js');
 const emotes = read('game', 'plugins', 'thornswood-emotes.js');
 const voice = read('game', 'plugins', 'thornswood-voice.js');
@@ -45,11 +52,28 @@ const template = {};
   }
 }
 
+// The rows on Settings in the game.
 const rows = {};
 {
-  const rx = /ThornIni, "(\w+)", (-?\d+)\)/g;
+  const rx = /\{ ini: '(\w+)', def: (-?\d+),/g;
   let m;
-  while ((m = rx.exec(keysCs)) !== null) { rows[m[1]] = Number(m[2]); }
+  while ((m = rx.exec(settingsPage)) !== null) { rows[m[1]] = Number(m[2]); }
+}
+// The front's own list of what it may write, and the launcher's reader.
+const frontRows = {};
+{
+  const a = front.indexOf('const SETTINGS_KEYS = {');
+  const b = front.indexOf('};', a);
+  const body = a >= 0 && b > a ? front.slice(a, b) : '';
+  const rx = /(\w+): (\d+)/g;
+  let m;
+  while ((m = rx.exec(body)) !== null) { frontRows[m[1]] = Number(m[2]); }
+}
+const launcherRows = {};
+{
+  const rx = /Dx\("\w+", "(\w+)", (\d+)\)/g;
+  let m;
+  while ((m = rx.exec(keysCs)) !== null) { launcherRows[m[1]] = Number(m[2]); }
 }
 
 const plugins = {};
@@ -71,16 +95,34 @@ function plugin(name, code, who) { (plugins[name] = plugins[name] || []).push({ 
   if (mk) { plugin('MarkKey', Number(mk[1]), 'mark'); }
 }
 
-yes('the template, the Controls rows and the plugins were all read (' +
+yes('the template, the Settings rows and the plugins were all read (' +
     Object.keys(template).length + ' keys, ' + Object.keys(rows).length + ' rows, ' +
     Object.keys(plugins).length + ' plugin keys)',
     Object.keys(template).length >= 15 && Object.keys(rows).length >= 15 && Object.keys(plugins).length >= 15);
 
-// Every Controls row is in the template, at the same value.
+// Every Settings row is in the template, at the same value, and the front
+// writes exactly those keys with the same defaults.
 Object.keys(rows).forEach(function (k) {
-  yes('Controls row ' + k + ' is in the template, at ' + rows[k],
+  yes('Settings row ' + k + ' is in the template, at ' + rows[k],
       Object.prototype.hasOwnProperty.call(template, k) && template[k] === rows[k]);
 });
+yes('the front\'s SETTINGS_KEYS are the page\'s rows, at the same defaults (' +
+    Object.keys(frontRows).length + ' and ' + Object.keys(rows).length + ')',
+    Object.keys(frontRows).length === Object.keys(rows).length &&
+    Object.keys(rows).every(function (k) { return frontRows[k] === rows[k]; }));
+{
+  // Every key of ours in the template has a row, so no key is left that
+  // only a text editor can move. MarkKey is the exception: the mark plugin
+  // is a dev's tool that only somebody the site calls a dev can use, so it
+  // has no row on everybody's Settings.
+  const missing = Object.keys(template).filter(function (k) { return k !== 'MarkKey' && !Object.prototype.hasOwnProperty.call(rows, k); });
+  yes('every key in the template has a row on Settings' + (missing.length ? ' (not ' + missing.join(', ') + ')' : ''), missing.length === 0);
+}
+Object.keys(launcherRows).forEach(function (k) {
+  yes('the launcher reads ' + k + ' with the template\'s value, ' + launcherRows[k],
+      Object.prototype.hasOwnProperty.call(template, k) && template[k] === launcherRows[k]);
+});
+yes('the launcher reads the six keys it names (' + Object.keys(launcherRows).length + ')', Object.keys(launcherRows).length === 6);
 
 // Every key a plugin reads is in the template, at the same value.
 Object.keys(plugins).forEach(function (k) {
@@ -107,21 +149,35 @@ Object.keys(template).forEach(function (k) {
   yes('no two of our keys share a default' + (shared.length ? ' (' + shared.join('; ') + ')' : ''), shared.length === 0);
 }
 
-yes('the key mold has a Controls row, so the clash check knows U is taken', rows.MoldKey === 22);
-yes('the lock key has a Controls row, so the clash check knows X is taken', rows.LockKey === 45);
+yes('the key mold has a Settings row, so the clash check knows U is taken', rows.MoldKey === 22);
+yes('the lock key has a Settings row, so the clash check knows X is taken', rows.LockKey === 45);
 yes('the emote wheel is G everywhere', template.WheelKey === 34 && rows.WheelKey === 34);
 yes('and the friend key is not', template.FriendKey !== 34);
 yes('no row writes MuteKey, which nothing reads', !Object.prototype.hasOwnProperty.call(rows, 'MuteKey'));
 
-// A row for a key an older install's file does not have yet still writes.
+// A row for a key an older install's file does not have yet still writes,
+// and nothing but Thornswood.ini is ever written.
 {
-  const a = keysCs.indexOf('static bool WriteIni(string file, string key, string value)');
-  const b = keysCs.indexOf('\n        }\n', a);
-  const body = a >= 0 && b > a ? keysCs.slice(a, b) : '';
-  yes('WriteIni adds a missing key to Thornswood.ini',
-      /Path\.GetFullPath\(ThornIni\)/.test(body) && /lines\.Add\(key \+ " = " \+ value\)/.test(body));
-  yes('and only there: another mod\'s file is never added to',
-      /if \(!string\.Equals\(Path\.GetFullPath\(file\), Path\.GetFullPath\(ThornIni\)[^)]*\)\)\s*return false;/.test(body));
+  const a = front.indexOf('function iniWith(text, key, value) {');
+  const b = front.indexOf('\n  }\n', a);
+  const src = a >= 0 && b > a ? front.slice(a, b + 4) : '';
+  let iniWith = null;
+  try { iniWith = new Function(src + '\nreturn iniWith;')(); } catch (e) { iniWith = null; }
+  const old = '; keys\r\n[Emotes]\r\nWheelKey = 34\r\n';
+  const added = iniWith ? iniWith(old, 'MoldKey', '22') : '';
+  yes('iniWith adds a missing key to Thornswood.ini, at the end, in the file\'s own line ends',
+      added === '; keys\r\n[Emotes]\r\nWheelKey = 34\r\nMoldKey = 22\r\n');
+  const moved = iniWith ? iniWith('WheelKey=34\n; WheelKey = 1\nWheelKey = 30\n', 'WheelKey', '33') : '';
+  yes('and rewrites one where it is, keeping its spacing, its comments, and dropping a second copy',
+      moved === 'WheelKey=33\n; WheelKey = 1\n');
+  const gone = iniWith ? iniWith('Fov = 90\nChatFade = 5\n', 'Fov', null) : '';
+  yes('and a setting back at its default takes its line out', gone === 'ChatFade = 5\n');
+  const s0 = front.indexOf('function setSetting(name, raw) {');
+  const s1 = front.indexOf('\n  }\n', s0);
+  const set = s0 >= 0 && s1 > s0 ? front.slice(s0, s1) : '';
+  yes('setSetting writes Thornswood.ini and no other file: another mod\'s is never touched',
+      (set.match(/writeFileSync\(/g) || []).length === 1 && /writeFileSync\(INI, after\)/.test(set));
+  yes('the launcher no longer writes a key anywhere', !/WriteIni|WriteAllLines|WriteAllText/.test(keysCs));
 }
 
 console.log('');

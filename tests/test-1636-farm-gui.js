@@ -54,7 +54,8 @@ function helpTopic(id) {
   } catch (e) { return ''; }
 }
 const front = read(process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'));
-const keysCs = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
+// The rows on Settings in the game (#3126), where the Controls page's were.
+const settingsPage = read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-settings.js'));
 const farmerMd = read(path.join(REPO_DIR, 'docs', 'systems', 'classes', 'farmer.md'));
 
 let pass = 0, fail = 0;
@@ -534,8 +535,8 @@ try {
     yes('H3 the help panel\'s ' + t + ' topic names none of them', said.length > 100 && !/\/(plot|plant|claim)\b/.test(said));
   });
   yes('H4 farmer.md tells nobody to type them', !/`\/(plot|plant|claim)`/.test(farmerMd) && /Claim this farm/.test(farmerMd));
-  const row = (/Dx\("lockkey",[\s\S]*?ThornIni, "LockKey", 45\)\);/.exec(keysCs) || [''])[0];
-  yes('H5 the Controls row says the key claims a farm at a crop', /At a crop, it claims the farm/.test(row));
+  const row = (/\{ ini: 'LockKey', def: 45,[^}]*\}/.exec(settingsPage) || [''])[0];
+  yes('H5 the Settings row says the key claims a farm at a crop', /At a crop, it claims the farm/.test(row));
 }
 
 done();

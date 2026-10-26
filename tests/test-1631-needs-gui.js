@@ -155,16 +155,18 @@ const GONE = ['/eat', '/drink', '/bard'];
 
   // #1743: the launcher's Settings page. The line under "Show the needs bars
   // on screen", and what Settings logs when the bars are turned off, both
-  // said to type /needs, which the server no longer answers.
-  const shellCs = read('launcher', 'app', 'Shell.cs');
-  const uiXaml = read('launcher', 'ui.xaml');
-  const offLine = (/\? "The needs bars are shown\.[^"]*"\s*:\s*"([^"]*)"\);/.exec(shellCs) || [])[1] || '';
-  const boxLine = (/x:Name="ChkNeedsBars"[^>]*\/>\s*<TextBlock[^>]*Text="([^"]*)"/.exec(uiXaml) || [])[1] || '';
-  yes('A8 the Settings page\'s needs bars line, and the line it logs when they go off, are there',
+  // said to type /needs, which the server no longer answers. Since #3126
+  // they are on Settings in the game: the note under the Shown and Hidden
+  // buttons, and the line the front says back when the bars go off.
+  const front = read('game', 'plugins', 'thornswood-front.js');
+  const settingsPage = read('game', 'ui', 'thornswood-settings.js');
+  const offLine = (/said = shown \? 'The needs bars are shown\.' : ('[^;]*);/.exec(front) || [])[1] || '';
+  const boxLine = (/'<p class="note">Hunger, Thirst, Rest and Temp\.[\s\S]*?<\/p>';/.exec(settingsPage) || [])[0] || '';
+  yes('A8 the Settings needs bars line, and the line said when they go off, are there',
       offLine.length > 0 && boxLine.length > 0);
-  yes('A8 and the line under the box names /needs, the bars as text (#2267)', /\/needs in the chat/.test(boxLine));
-  yes('A8 and both send people to the Body page on K',
-      /Body page on K/.test(offLine) && /Body page on K/.test(boxLine));
+  yes('A8 and the line under the buttons names /needs, the bars as text (#2267)', /\/needs in the chat/.test(boxLine));
+  yes('A8 and both send people to the Body page on the skills key, K unless it is moved',
+      /Body page on ' \+ keyName\(SKILLS_KEY\)/.test(offLine) && /Body page on ' \+\s*esc\(nameOf\([^\n]*SkillsKey[^\n]*: 37\)\)/.test(boxLine));
 }
 
 // ================================================ B. the bard, as it plays

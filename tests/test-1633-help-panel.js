@@ -7,7 +7,8 @@
 // and staff commands; everything else takes buttons and GUI". /help was a
 // menu and six topics typed into the chat, each written as commands. His
 // answer on #1633: the suggested one, a help panel with its own key on the
-// launcher's Controls page, and a Help button on the K, P and J panels. And
+// launcher's Controls page (on Settings in the game since #3126), and a Help
+// button on the K, P and J panels. And
 // later the same day: /stuck, /helpme and /report stay commands (#1682), and
 // so do the ways of saying a line, /me, /do, /w, /s, /y and /ooc, and /roll
 // (#1639). Those are what the help names, and nothing else.
@@ -15,8 +16,8 @@
 // What is held here, each half run where it can be:
 //
 //   A. THE KEY. HelpKey, F7 (scan code 65): the plugin's default, the
-//      shipped Thornswood.ini and the Controls row agree, and nothing else of
-//      ours, the mods' on the Controls page, the client's, RaceMenu's or
+//      shipped Thornswood.ini and the row on Settings agree, and nothing else
+//      of ours, the mods' shown on Settings, the client's, RaceMenu's or
 //      Skyrim's answers to it, the way test-mold-key.js checks U.
 //   B. THE PLUGIN. The page is one of the overlays, the cap can close it,
 //      the key opens it only with the keyboard free, and it is handed every
@@ -29,7 +30,7 @@
 //   E. THE SERVER. The list named to everybody is exactly the commands that
 //      stay; /help and a word nobody has say where the panel is; /where
 //      answers dev and testers only.
-//   F. THE PAGES THAT SAY SO: the launcher's Help, the Controls row for /,
+//   F. THE PAGES THAT SAY SO: the launcher's Help, the Settings row for /,
 //      and docs/systems/commands.md row by row.
 //
 // Read only.
@@ -46,7 +47,13 @@ const party = read('game', 'ui', 'thornswood-party.js');
 const journal = read('game', 'ui', 'thornswood-journal.js');
 const skills = read('game', 'ui', 'thornswood-skills.js');
 const ini = read('launcher', 'Thornswood.ini');
-const keysCs = read('launcher', 'app', 'Keys.cs');
+const settingsPage = read('game', 'ui', 'thornswood-settings.js');
+// The rows on Settings in the game (#3126): { ini, def, group, label, what }.
+function settingsRow(name) {
+  const q = "'((?:[^'\\\\]|\\\\.)*)'";
+  const m = new RegExp("\\{ ini: '" + name + "', def: (\\d+), group: " + q + ', label: ' + q + ',\\s*what: ' + q + ' \\}').exec(settingsPage);
+  return m ? { def: Number(m[1]), group: m[2], label: m[3], what: m[4].replace(/\\'/g, "'") } : null;
+}
 const helpCs = read('launcher', 'app', 'Help.cs');
 const commandsMd = read('docs', 'systems', 'commands.md');
 
@@ -87,14 +94,14 @@ const WORDS = arrayOf('WORDS') || [];
 // =================================================================== A. the key
 const F7 = 65;
 attempt('A', function () {
-  const defM = /const HELP_KEY = iniNumber\(ini, 'HelpKey', (\d+)\);/.exec(front);
+  const defM = /(?:const|let) HELP_KEY = iniNumber\(ini, 'HelpKey', (\d+)\);/.exec(front);
   yes('A1 the plugin reads HelpKey out of Thornswood.ini, F7 (scan code 65) by default',
       !!defM && Number(defM[1]) === F7);
   yes('A1 the shipped Thornswood.ini carries HelpKey = 65', /^HelpKey = 65$/m.test(ini));
-  const row = /Dx\("help", "ThornsWood", "Help",\s*"([^"]*)",\s*ThornIni, "HelpKey", (\d+)\)\);/.exec(keysCs);
-  yes('A2 the launcher\'s Controls page has a Help row on HelpKey, 65', !!row && Number(row[2]) === F7);
+  const row = settingsRow('HelpKey');
+  yes('A2 Settings in the game has a Help row on HelpKey, 65', !!row && row.def === F7 && row.label === 'Help');
   yes('A2 and it says what the key opens, and that Help on K, P and J does too',
-      !!row && /help panel/.test(row[1]) && /Help on the K, P and J panels/.test(row[1]));
+      !!row && /help panel/.test(row.what) && /Help on the K, P and J panels/.test(row.what));
 
   const taken = {};
   function take(code, who) { (taken[code] = taken[code] || []).push(who); }
@@ -116,12 +123,15 @@ attempt('A', function () {
   while ((m = rxIni.exec(ini)) !== null) {
     if (['HelpKey', 'VoicePort', 'Microphone'].indexOf(m[1]) === -1) { take(Number(m[2]), 'ini ' + m[1]); }
   }
-  // Every row on the Controls page, ours and the mods' (SkyUI's favourite
-  // groups are F1 to F4 there).
-  const rxCs = /Dxd?\("(\w+)",[\s\S]*?, "(\w+)", (?:"\w+", )?(-?\d+)\)\);/g;
+  // Every row on Settings in the game, ours and the mods' (SkyUI's
+  // favourite groups are F1 to F4 there), and the mod settings window's F4.
   let rows = 0;
-  while ((m = rxCs.exec(keysCs)) !== null) { rows++; if (m[2] !== 'HelpKey') { take(Number(m[3]), 'Controls ' + m[2]); } }
-  if (/string\.IsNullOrEmpty\(menu\) \? "F4"/.test(keysCs)) { take(62, 'Controls menu'); }
+  const rxOurs = /\{ ini: '(\w+)', def: (-?\d+),/g;
+  while ((m = rxOurs.exec(settingsPage)) !== null) { rows++; if (m[1] !== 'HelpKey') { take(Number(m[2]), 'Settings ' + m[1]); } }
+  const rxMods = /\['(\w+)', '\w+', '\w+', (-?\d+)\]/g;
+  const modList = between(front, 'const MOD_KEYS = [', '];') || '';
+  while ((m = rxMods.exec(modList)) !== null) { rows++; take(Number(m[2]), 'Settings ' + m[1]); }
+  if (/iniValue\(menu, 'ToggleKey'\) \|\| 'F4'/.test(front)) { take(62, 'Settings menu'); }
   // skymp5-client, compiled in: F1 names, F2 the overlay, F6 focus. Skyrim's
   // controlmap.txt: F5, F9, F12, the console, Tab, Escape and the letters
   // and numbers it uses. RaceMenu: F5, F9, Tab, Enter, Shift, Alt, Space.
@@ -131,7 +141,7 @@ attempt('A', function () {
    36, 25, 24, 38, 57, 42, 56, 29, 58, 2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(function (c) { take(c, 'Skyrim'); });
   [63, 67, 15, 28, 42, 56, 57].forEach(function (c) { take(c, 'RaceMenu'); });
   yes('A3 the other keys were found to compare against (' + Object.keys(taken).length + ' codes, ' +
-      rows + ' Controls rows)', Object.keys(taken).length > 30 && rows >= 30);
+      rows + ' Settings rows)', Object.keys(taken).length > 30 && rows >= 30);
   yes('A3 and nothing else of ours, the mods\', the client\'s, RaceMenu\'s or Skyrim\'s answers to F7' +
       (taken[F7] ? ' (' + taken[F7].join(', ') + ')' : ''), !taken[F7]);
 
@@ -140,7 +150,7 @@ attempt('A', function () {
   yes('A4 the plugin calls 65 F7, 28 Enter and 53 /, so the help names them',
       !!keyName && keyName(65) === 'F7' && keyName(28) === 'Enter' && keyName(53) === '/' && keyName(25) === 'P');
   yes('A4 and the server names the same F7 when it says where the help is',
-      /'Help is a panel: F7 opens it, unless you moved it on the launcher\\'s ' \+/.test(gm));
+      /'Help is a panel: F7 opens it, unless you moved it on Settings in ' \+/.test(gm));
 });
 
 // ================================================================ B. the plugin
@@ -409,8 +419,8 @@ attempt('D', function () {
         j.told.indexOf('thornswood-front journal:closed') !== -1);
   }
   {
-    yes('D3 the K panel has Help beside Close',
-        skills.indexOf("'<div class=\"tsbtn ghost\" data-act=\"help\">Help</div>' +\n        '<div class=\"tsbtn ghost\" data-act=\"close\">") !== -1);
+    yes('D3 the K panel has Help and Settings beside Close',
+        skills.indexOf("'<div class=\"tsbtn ghost\" data-act=\"help\">Help</div>' +\n        '<div class=\"tsbtn ghost\" data-act=\"settings\">Settings</div>' +\n        '<div class=\"tsbtn ghost\" data-act=\"close\">") !== -1);
     yes('D3 and hides it while creating, where this panel is all there is to do',
         /elHelp\.style\.display = cr \? 'none' : '';/.test(between(skills, '  function drawFoot() {', '\n  }\n') || ''));
     const click = between(skills, '  elHelp.onclick = function () {', '\n  };\n');
@@ -505,10 +515,10 @@ attempt('F', function () {
   yes('F1 the Help page\'s Chat and commands names no command but the ones that stay' +
       (other.length ? ' (not: ' + other.join(', ') + ')' : ''), named.length >= 5 && other.length === 0);
   yes('F1 and sends people to the help panel on F7, not to /help',
-      /F7, unless you have moved it on the Controls page, opens the help in the game/.test(chat) && !/\/help\b(?!me)/.test(chat));
-  const slash = /Dx\("command", "ThornsWood", "Type a command",\s*"([^"]*)"/.exec(keysCs);
-  yes('F2 the Controls row for / says what is still typed there, and that the rest is staff\'s and dev\'s',
-      !!slash && /staff and dev commands/.test(slash[1]) && /\/stuck, \/helpme and \/report/.test(slash[1]));
+      /F7, unless you have moved it on Settings in the game, opens the help in the game/.test(chat) && !/\/help\b(?!me)/.test(chat));
+  const slash = settingsRow('CommandKey');
+  yes('F2 the Settings row for / says what is still typed there, and that the rest is staff\'s and dev\'s',
+      !!slash && /staff and dev commands/.test(slash.what) && /\/stuck, \/helpme and \/report/.test(slash.what));
   yes('F2 and so does Thornswood.ini', /^; \/ooc\), \/roll, \/needs for the needs bars as text, and staff and dev$/m.test(ini) &&
       /^; commands\. The game's skill tree/m.test(ini));
 

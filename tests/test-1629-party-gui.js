@@ -78,7 +78,7 @@ yes('the key handler, partyPress and lookVerb are in the plugin',
   after #529 moved it to Y, so the harness pressed a key the plugin no longer
   reads.
 */
-const KEY_DECLS = (front.match(/^  const (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
+const KEY_DECLS = (front.match(/^  (?:const|let) (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
 const INI_AT = front.indexOf('  function iniNumber(text, key, fallback) {');
 const INI_NUMBER = INI_AT < 0 ? '' : front.slice(INI_AT, front.indexOf('\n  }\n', INI_AT) + 4);
 function keyPrelude(iniText) {
@@ -86,7 +86,7 @@ function keyPrelude(iniText) {
 }
 yes('the plugin reads its keys through iniNumber', INI_NUMBER !== '' && KEY_DECLS !== '');
 const KEY = INI_NUMBER === '' ? {} : new Function(keyPrelude('') + 'return { ' +
-  (KEY_DECLS.match(/const \w+/g) || []).map(function (d) { return d.slice(6) + ': ' + d.slice(6); }).join(', ') + ' };')();
+  (KEY_DECLS.match(/(?:const|let) \w+/g) || []).map(function (d) { d = d.replace(/^(?:const|let) /, ''); return d + ': ' + d; }).join(', ') + ' };')();
 
 const Y = KEY.FRIEND_KEY, P = KEY.PARTY_KEY;
 yes('the plugin declares every key the handler reads', !!keys &&

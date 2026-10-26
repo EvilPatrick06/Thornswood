@@ -391,8 +391,8 @@ attempt('C', function () {
   yes('C2 on skills:ready the front hands the K panel SkillsKey\'s name',
       /if \(what === 'skills:ready'\) \{[\s\S]{0,400}?window\.thornswoodSkills\.setKey\(' \+\s*JSON\.stringify\(keyName\(SKILLS_KEY\)\)/.test(front));
   yes('C3 PartyKey is P and SkillsKey is K unless rebound',
-      /const PARTY_KEY\s+= iniNumber\(ini, 'PartyKey', 25\);/.test(front) &&
-      /const SKILLS_KEY = iniNumber\(ini, 'SkillsKey', 37\);/.test(front));
+      /(?:const|let) PARTY_KEY\s+= iniNumber\(ini, 'PartyKey', 25\);/.test(front) &&
+      /(?:const|let) SKILLS_KEY = iniNumber\(ini, 'SkillsKey', 37\);/.test(front));
   const kn = /\n  function keyName\(code\) \{[\s\S]*?\n  \}\n/.exec(front);
   const keyName = kn ? new Function(kn[0] + '\nreturn keyName;')() : null;
   yes('C4 and the front calls 25 P and 37 K, the letters the pages compare',

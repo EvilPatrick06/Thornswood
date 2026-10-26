@@ -747,7 +747,7 @@ function up(p) { return rest(p, 'up'); }
 // ------------------------------------------------------- the client --
 
 {
-  yes('X1 the sleep key is the mold\'s key, armed only on a person', /const SLEEP_KEY {3}= MOLD_KEY;/.test(front) &&
+  yes('X1 the sleep key is the mold\'s key, armed only on a person', /(?:const|let) SLEEP_KEY {3}= MOLD_KEY;/.test(front) &&
       /if \(e\.code === MOLD_KEY && moldPress\(\)\) \{ return; \}\n(\s*\/\/[^\n]*\n)*\s*if \(e\.code === SLEEP_KEY && sleepPress\(\)\) \{ return; \}/.test(front));
   yes('X1 the prompt draws Let sleep here or Stop letting sleep here from the server\'s mark',
       /\(row\.s \? keyRow\(SLEEP_NAME, row\.s === 2 \? 'Stop letting sleep here' : 'Let sleep here',/.test(front) &&

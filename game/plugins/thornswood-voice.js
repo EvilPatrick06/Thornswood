@@ -212,8 +212,8 @@ try {
 }
 
 // ------------------------------------------------------------------- keys ----
-// A scan code, the same numbering the launcher's Controls page writes. 47 is
-// V, but the number is whatever it was rebound to.
+// A scan code, the same numbering the Settings panel in the game writes
+// (#3126). 47 is V, but the number is whatever it was rebound to.
 //
 // Push to talk and nothing else. There used to be a mute key as well, which
 // was a control for shutting a microphone that is already shut: push to talk
@@ -288,6 +288,26 @@ try {
 } catch (e) {
   log('could not read Thornswood.ini, using the default keys');
 }
+
+/*
+ * A key moved on the Settings panel in the game (#3126): the front writes
+ * Thornswood.ini and hands every plugin that reads it the new text, so the
+ * three voice keys are the file's from the next press. The defaults are the
+ * ones above.
+ */
+(function () {
+  const T = (globalThis.Thornswood = globalThis.Thornswood || {});
+  (T.settingsListeners = T.settingsListeners || []).push(function (text) {
+    const grab = function (key, fallback) {
+      const m = String(text || '').match(new RegExp('^\\s*' + key + '\\s*=\\s*(\\d+)', 'm'));
+      return m ? Number(m[1]) : fallback;
+    };
+    PTT_KEY = grab('PushToTalk', 47);
+    MODE_KEY = grab('VoiceModeKey', 48);
+    LOCK_KEY = grab('VoiceLockKey', 24);
+    log('keys read again: ptt', PTT_KEY, 'mode key', MODE_KEY, 'lock key', LOCK_KEY);
+  });
+})();
 
 log('profile', profileId, 'server', host || '(none)', 'voice port', VOICE_PORT, 'ptt', PTT_KEY,
     'mode key', MODE_KEY, 'microphone', MIC_ON ? 'on' : 'off',

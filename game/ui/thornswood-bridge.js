@@ -197,8 +197,8 @@
     focusInput, which puts it back and stops the clock while the box is open;
     blurInput starts the clock again when the line is sent or Escape shuts it.
 
-    The number is the launcher's Settings, ChatFade in Thornswood.ini, which
-    thornswood-front.js hands over as window.THORNSWOOD.chatFade. 0 is how it
+    The number is the Settings panel in the game's, ChatFade in Thornswood.ini
+    (#3126), which thornswood-front.js hands over as window.THORNSWOOD.chatFade. 0 is how it
     was before, on screen all the time. It is read each time rather than once
     because that object goes in after this page has loaded.
 
@@ -234,8 +234,8 @@
   }
 
   /*
-    The needs bars, hidden from the launcher's Settings (NeedsBars in
-    Thornswood.ini, window.THORNSWOOD.needsBars). The bars are a div the
+    The needs bars, hidden from the Settings panel in the game (NeedsBars in
+    Thornswood.ini, window.THORNSWOOD.needsBars, #3126). The bars are a div the
     server's own script writes into this page, #ts-hud, and it is rewritten
     every few seconds, so a rule in the sheet is what keeps it hidden rather
     than taking the node out. The Body page on K still says every one of them.
@@ -542,7 +542,7 @@
     'html.' + FADE_CLASS + ' #chat{opacity:0 !important;visibility:hidden !important;' +
       'transition:opacity .8s ease,visibility 0s linear .8s !important}',
 
-    // The needs bars, when the launcher's Settings say not to draw them.
+    // The needs bars, when the Settings panel says not to draw them.
     'html.' + NEEDS_CLASS + ' #ts-hud{display:none !important}',
 
     // Up off the bars.
@@ -645,6 +645,17 @@
     line: run,
     focusInput: focusInput,
     blurInput: blurInput,
+
+    /*
+      The Settings panel changed how long the chat stays up or whether the
+      needs bars are drawn (#3126): thornswood-front.js has put the new
+      values on window.THORNSWOOD, and both take effect now. The clock starts
+      again on the new number, unless the box is open, which stops it.
+    */
+    settings: function () {
+      applyNeedsBars();
+      if (shown && !window.thornswoodTyping) { fadeLater(); }
+    },
 
     /**
      * Put the chat on screen, retrying until the front is ready for it.

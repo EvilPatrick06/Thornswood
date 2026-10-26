@@ -713,12 +713,15 @@ if (social && trade) {
   yes('D5: the lifted handler holds the unavailable notice, the opened events and the ready block',
     start>=0 && ready>start && end>ready && /party:opened/.test(FR.slice(start,ready)) && /setKey/.test(FR.slice(ready,end)));
   const lines=[],focus=[],notes=[],pageJs=[];
-  // PARTY_NAME: the P panel is told its key when it is ready (#1919).
-  const event=new Function('what','T','tellServer','log','note','PARTY_NAME',FR.slice(start,end));
+  // PARTY_NAME: the P panel is told its key when it is ready (#1919), and
+  // the J panel its own, as Settings in the game has it (#3126).
+  const event=new Function('what','T','tellServer','log','note','PARTY_NAME','keyName','JOURNAL_KEY',FR.slice(start,end));
+  const keyName=code=>(code===36?'J':'#'+code);
   for(const what of ['party:ready','journal:ready','party:opened','journal:opened']) {
-    event(what,{claimFocus(name,value){focus.push([name,value]);},js(code){pageJs.push(code);}},line=>lines.push(line),()=>{},text=>notes.push(text),'P');
+    event(what,{claimFocus(name,value){focus.push([name,value]);},js(code){pageJs.push(code);}},line=>lines.push(line),()=>{},text=>notes.push(text),'P',keyName,36);
   }
-  yes('D5: a ready P panel is told its key, and no other panel is', pageJs.length===1&&pageJs[0].indexOf('thornswoodParty.setKey("P")')>=0);
+  yes('D5: a ready P panel is told its key, a ready J panel its own, and no other panel is', pageJs.length===2&&
+    pageJs[0].indexOf('thornswoodParty.setKey("P")')>=0&&pageJs[1].indexOf('thornswoodJournal.setKey("J")')>=0);
   yes('D5: mounting and opening social panels request an owner refresh', lines.length===4&&lines.every(x=>x==='/party refresh'));
   event('trade:ready',{},line=>lines.push(line),()=>{},()=>{});
   yes('D5: a ready trade panel requests its own current session',lines[4]==='/trade refresh');

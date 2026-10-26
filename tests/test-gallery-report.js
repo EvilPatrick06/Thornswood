@@ -207,10 +207,17 @@ yes('staff Accept is not gated on who.Answered',
     /bool staff = GalleryStaff\(\);/.test(SHELL) &&
     !/bool staff = doors && GalleryStaff\(\);/.test(SHELL));
 
-yes('PageGallery is index 11 at the end of the arrays',
-    /PageGallery = 11/.test(SHELL) &&
-    /F<Button>\("NavGallery"\)/.test(SHELL) &&
-    /F<Grid>\("PageGallery"\)/.test(SHELL));
+{
+  // Last in all three arrays, whatever its number: the Controls page left
+  // them in #3126 and the pages after it moved down one.
+  const at = Number((/PageGallery = (\d+);/.exec(SHELL) || [])[1]);
+  const nav = (/navButtons = new Button\[\] \{([\s\S]*?)\};/.exec(SHELL) || ['', ''])[1].match(/F<Button>\("(\w+)"\)/g) || [];
+  const grids = (/pages = new UIElement\[\] \{([\s\S]*?)\};/.exec(SHELL) || ['', ''])[1].match(/F<Grid>\("(\w+)"\)/g) || [];
+  const titles = ((/PageTitles = \{([\s\S]*?)\};/.exec(SHELL) || ['', ''])[1].match(/"[^"]*"/g) || []);
+  yes('PageGallery (' + at + ') is the last index of the three arrays (' + nav.length + ', ' + grids.length + ', ' + titles.length + ')',
+      at === nav.length - 1 && at === grids.length - 1 && at === titles.length - 1 &&
+      nav[at] === 'F<Button>("NavGallery")' && grids[at] === 'F<Grid>("PageGallery")' && titles[at] === '"Gallery"');
+}
 yes('ShowPage rebuilds the Gallery page',
     /else if \(i == PageGallery\) BuildGalleryPage\(\);/.test(SHELL));
 yes('Choose wires to GalleryChooseFile',

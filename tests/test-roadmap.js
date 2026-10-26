@@ -96,11 +96,12 @@ yes('PageKey (' + PAGE + ') is Tab by the ini\'s table', !!tab && parseInt(tab[1
 
 function opens(t, l) { return new RegExp('(^|[^A-Za-z])' + l + ' opens').test(t); }
 
-/* "The launcher's Controls page moves any of those keys" is a claim too. */
-const keys = read('launcher/app/Keys.cs');
-yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey',
+/* "Settings in the game moves any of those keys" is a claim too. Until
+   #3126 it was the launcher's Controls page. */
+const settingsPage = read('game/ui/thornswood-settings.js');
+yes('Settings in the game does list WheelKey, PageKey and StopKey',
     ['WheelKey', 'PageKey', 'StopKey'].every(function (k) {
-      return keys.indexOf('ThornIni, "' + k + '"') !== -1;
+      return settingsPage.indexOf("{ ini: '" + k + "', def: ") !== -1;
     }));
 
 // ------------------------------------------------------------ the emotes ----

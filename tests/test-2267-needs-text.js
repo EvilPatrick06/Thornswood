@@ -4,7 +4,8 @@
 //
 // Patrick, 11 Oct 2026, on the board sweep's list: planned, not ruled out.
 // /needs is for people who choose to hide their needs bars (the launcher's
-// Settings, "Show the needs bars on screen") and want a quick text version of
+// Settings, "Show the needs bars on screen", and Settings in the game since
+// #3126) and want a quick text version of
 // them. It is another view of something with a button already, the Body page
 // on K, so it is his exception to "buttons, not chat commands", like the
 // commands that rule already lists, and docs/GAME-SYSTEMS.md "Buttons, not
@@ -205,10 +206,11 @@ function typed(N, word, actorId) {
   yes('D1 the help panel\'s Living names /needs for the bars as text',
       /\/needs in the chat says all four as a line of text/.test(help));
   const helpCs = read('launcher', 'app', 'Help.cs');
-  yes('D2 the launcher\'s Help item on the needs names it', /hidden in Settings, \/needs in the chat says all four/.test(helpCs));
-  const xaml = read('launcher', 'ui.xaml');
-  yes('D3 the Settings line under "Show the needs bars on screen" names it',
-      /x:Name="ChkNeedsBars"[^>]*\/>\s*<TextBlock[^>]*Text="[^"]*\/needs in the chat says them as a line of text\."/.test(xaml));
+  yes('D2 the launcher\'s Help item on the needs names it', /hidden on Settings in the game, \/needs in the chat says all four/.test(helpCs));
+  // The needs bars are shown or hidden on Settings in the game since #3126.
+  const settingsPage = read('game', 'ui', 'thornswood-settings.js');
+  yes('D3 the line under the needs bars on Settings in the game names it',
+      /data-bars="0"[\s\S]{0,400}\/needs in the chat says them as a line of text\./.test(settingsPage));
   const systems = read('docs', 'GAME-SYSTEMS.md');
   const buttons = slice(systems, '## Buttons, not commands', '\n## ') || '';
   yes('D4 docs/GAME-SYSTEMS.md "Buttons, not commands" says /needs stays a command, and why',
@@ -223,7 +225,7 @@ function typed(N, word, actorId) {
   const commands = read('docs', 'systems', 'commands.md');
   yes('D6 docs/systems/commands.md has its row: anybody, on the list, stays a command',
       /^\| `\/needs`, `\/need` \| Anybody \|[^\n]*\| The list;[^\n]*\| Stays a command[^\n]*\| #2267 \|$/m.test(commands));
-  const all = [help, helpCs, xaml, buttons, rule].join('\n');
+  const all = [help, helpCs, settingsPage, buttons, rule].join('\n');
   yes('D7 none of it says the word the house rules forbid, or has an em dash',
       !/\bplayers?\b/i.test(textOf(branch) + textOf(slice(needsBlock, '  function textView(actorId) {', '\n  }\n') || '')) &&
       all.indexOf(String.fromCharCode(0x2014)) === -1);

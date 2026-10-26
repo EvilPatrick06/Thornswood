@@ -117,7 +117,7 @@ const CURSOR = 'Cursor Menu';
   after #529 moved it to Y, so the harness pressed a key the plugin no longer
   reads.
 */
-const KEY_DECLS = (src.match(/^  const (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
+const KEY_DECLS = (src.match(/^  (?:const|let) (?:[A-Z]+_)*KEY\b[^;\n]*;|^  const ESC = \d+;/gm) || []).join('\n');
 const INI_AT = src.indexOf('  function iniNumber(text, key, fallback) {');
 const INI_NUMBER = INI_AT < 0 ? '' : src.slice(INI_AT, src.indexOf('\n  }\n', INI_AT) + 4);
 function keyPrelude(iniText) {
@@ -125,7 +125,7 @@ function keyPrelude(iniText) {
 }
 yes('the plugin reads its keys through iniNumber', INI_NUMBER !== '' && KEY_DECLS !== '');
 const KEY = INI_NUMBER === '' ? {} : new Function(keyPrelude('') + 'return { ' +
-  (KEY_DECLS.match(/const \w+/g) || []).map(function (d) { return d.slice(6) + ': ' + d.slice(6); }).join(', ') + ' };')();
+  (KEY_DECLS.match(/(?:const|let) \w+/g) || []).map(function (d) { d = d.replace(/^(?:const|let) /, ''); return d + ': ' + d; }).join(', ') + ' };')();
 
 // U is the mold key, which the game's journal is moved onto in S4 and ours in S5.
 const J = KEY.JOURNAL_KEY, ESC = KEY.ESC, U = KEY.MOLD_KEY;

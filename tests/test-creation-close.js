@@ -137,8 +137,9 @@ function panelRig(creatingNow) {
   w.elClose = el(); w.elClose.className = 'tsbtn ghost';
   w.elCloseLabel = el(); w.elCloseLabel.textContent = 'Close';
   w.elCloseKey = el();
-  // Help beside Close (#1633), which is not there while creating.
+  // Help and Settings beside Close (#1633, #3126), not there while creating.
   w.elHelp = el();
+  w.elSettings = el();
   const api = { close: function () { w.closed++; } };
   const prelude =
     "var section = 'review', status = '', statusKind = '', footKey = '';\n" +
@@ -153,10 +154,10 @@ function panelRig(creatingNow) {
     P.drawFoot + '\n' + P.closeByHand + '\n' + P.onclick + '\n' +
     'return { drawFoot: drawFoot, closeByHand: closeByHand };';
   const made = new Function('Date', 'setTimeout', 'tell', 'api', 'mine',
-                            'elClose', 'elCloseLabel', 'elCloseKey', 'elStatus', 'elConfirm', 'elHelp', body)(
+                            'elClose', 'elCloseLabel', 'elCloseKey', 'elStatus', 'elConfirm', 'elHelp', 'elSettings', body)(
     clock.Date, clock.setTimeout,
     function (what, extra) { w.told.push(what + (extra ? ' ' + extra : '')); },
-    api, w.mine, w.elClose, w.elCloseLabel, w.elCloseKey, el(), el(), w.elHelp);
+    api, w.mine, w.elClose, w.elCloseLabel, w.elCloseKey, el(), el(), w.elHelp, w.elSettings);
   w.draw = made.drawFoot;
   w.hand = made.closeByHand;
   w.press = function () { w.elClose.onclick(); };
@@ -174,8 +175,8 @@ if (P.drawFoot && P.closeByHand && P.onclick) {
     yes('K1 while creating the button reads Close Skyrim', w.label() === 'Close Skyrim');
     yes('K1 and the K key cap is not shown beside it, because K never closes the game',
         w.elCloseKey.style.display === 'none');
-    yes('K1 nor Help (#1633): while creating this panel is the whole of what there is to do',
-        w.elHelp.style.display === 'none');
+    yes('K1 nor Help (#1633) nor Settings (#3126): while creating this panel is the whole of what there is to do',
+        w.elHelp.style.display === 'none' && w.elSettings.style.display === 'none');
   }
   // One press arms it, and nothing is sent.
   {
@@ -494,7 +495,7 @@ if (F.iniNumber && F.raceMenuOpen && F.race && F.messages) {
 }
 
 // ================================================================== the key
-const defM = /const CLOSE_GAME_KEY = iniNumber\(ini, 'CloseGameKey', (\d+)\);/.exec(front);
+const defM = /(?:const|let) CLOSE_GAME_KEY = iniNumber\(ini, 'CloseGameKey', (\d+)\);/.exec(front);
 yes('the plugin reads CloseGameKey out of Thornswood.ini', !!defM);
 const KEY = defM ? Number(defM[1]) : -1;
 yes('and F10, scan code 68, is its default', KEY === F10);
@@ -527,13 +528,18 @@ yes('the shipped Thornswood.ini carries CloseGameKey = 68', !!iniM && Number(ini
   while ((m = rxIni.exec(ini)) !== null) {
     if (['CloseGameKey', 'VoicePort', 'Microphone'].indexOf(m[1]) === -1) { take(Number(m[2]), 'ini ' + m[1]); }
   }
-  // Every row on the launcher's Controls page, ours and the mods'.
-  const keys = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
-  const rxCs = /Dxd?\("(\w+)",[\s\S]*?, "(\w+)", (?:"\w+", )?(-?\d+)\)\);/g;
+  // Every row on Settings in the game (#3126), ours and the mods', but the
+  // close key's own.
+  const settingsPage = read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-settings.js'));
   let rows = 0;
-  while ((m = rxCs.exec(keys)) !== null) { rows++; take(Number(m[3]), 'Controls ' + m[1]); }
+  const rxOurs = /\{ ini: '(\w+)', def: (-?\d+),/g;
+  while ((m = rxOurs.exec(settingsPage)) !== null) { rows++; if (m[1] !== 'CloseGameKey') { take(Number(m[2]), 'Settings ' + m[1]); } }
+  const modsAt = front.indexOf('const MOD_KEYS = [');
+  const modList = modsAt >= 0 ? front.slice(modsAt, front.indexOf('];', modsAt)) : '';
+  const rxMods = /\['(\w+)', '\w+', '\w+', (-?\d+)\]/g;
+  while ((m = rxMods.exec(modList)) !== null) { rows++; take(Number(m[2]), 'Settings ' + m[1]); }
   // The mod settings menu, a key by name: F4.
-  if (/string\.IsNullOrEmpty\(menu\) \? "F4"/.test(keys)) { take(62, 'Controls menu'); }
+  if (/iniValue\(menu, 'ToggleKey'\) \|\| 'F4'/.test(front)) { take(62, 'Settings menu'); }
   // skymp5-client, compiled in: F1 names, F2 the overlay, F6 focus.
   [59, 60, 64].forEach(function (c) { take(c, 'skymp5-client'); });
   // Skyrim's controlmap.txt in play: Quicksave F5, Quickload F9, CameraPath
@@ -544,7 +550,7 @@ yes('the shipped Thornswood.ini carries CloseGameKey = 68', !!iniM && Number(ini
   // F9 for its presets), and by code Tab, Enter, Shift, Alt and Space.
   [63, 67, 15, 28, 42, 56, 57].forEach(function (c) { take(c, 'RaceMenu'); });
   yes('the other keys were found to compare against (' + Object.keys(taken).length +
-      ' codes, ' + rows + ' Controls rows)', Object.keys(taken).length > 30 && rows >= 20);
+      ' codes, ' + rows + ' Settings rows)', Object.keys(taken).length > 30 && rows >= 20);
   yes('and nothing else of ours, RaceMenu\'s or Skyrim\'s answers to the close key' +
       (taken[KEY] ? ' (' + taken[KEY].join(', ') + ')' : ''), KEY > 0 && !taken[KEY]);
   // The name is typed into a box on this same menu, so a letter would be

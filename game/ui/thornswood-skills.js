@@ -702,6 +702,7 @@
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
         '<div class="tsbtn ghost" data-act="help">Help</div>' +
+        '<div class="tsbtn ghost" data-act="settings">Settings</div>' +
         '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
         '<div class="tsbtn primary" data-act="confirm">Confirm</div>' +
       '</div></div>' +
@@ -718,6 +719,8 @@
   // Help (#1633), beside Close: the help panel, and this one put down. Never
   // while creating, where this panel is the whole of what there is to do.
   var elHelp = root.querySelector('[data-act="help"]');
+  // Settings beside it (#3126), and never while creating either.
+  var elSettings = root.querySelector('[data-act="settings"]');
   // The word inside the Close button, so drawFoot can say Close Skyrim while
   // creating without rebuilding the button or losing its key cap.
   var elCloseLabel = elClose.querySelector('span');
@@ -2908,6 +2911,7 @@
     elCloseKey.textContent = keyName;
     elCloseKey.style.display = (cr || !keyName) ? 'none' : '';
     elHelp.style.display = cr ? 'none' : '';
+    elSettings.style.display = cr ? 'none' : '';
   }
 
   function hint() {
@@ -3597,6 +3601,11 @@
   elHelp.onclick = function () {
     if (creating()) return;
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('work'); } } catch (e) { }
+    api.close();
+  };
+  elSettings.onclick = function () {
+    if (creating()) return;
+    try { if (window.thornswoodSettings) { window.thornswoodSettings.open(); } } catch (e) { }
     api.close();
   };
 
