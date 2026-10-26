@@ -6,14 +6,15 @@ played. That is enough to be worth reporting a hole in rather than posting one.
 
 ## Where to send it
 
-**Send it to the owner as a Discord direct message.** The Discord is linked
-from every page of [thornswood.net](https://thornswood.net). Only the owner
-reads it, and nothing about it is public until we say so.
+Either of these. Only the owner reads a report sent either way, and nothing
+about it is public until we say so.
 
-The repository is private, so GitHub's private vulnerability reporting (the
-Security tab) is there only for people who already have access to it. The
-site's privacy and terms pages give the Discord message route for everybody
-else, and this file says the same.
+- **On GitHub:** the **Report a vulnerability** button on this repository's
+  Security tab. GitHub offers that button on public repositories only, and
+  only once it is switched on, so if you do not see it, use the Discord route.
+- **Anywhere else:** a direct message to the owner on Discord. The Discord is
+  linked from every page of [thornswood.net](https://thornswood.net), and the
+  site's privacy and terms pages give the same route.
 
 Please do not open a public issue for a security problem, and please do not
 post it in a Discord channel. Both are read by everybody, including whoever
@@ -35,8 +36,8 @@ deleted.
 ## What happens next
 
 - A reply within **72 hours**, saying whether it is understood and whether it
-  is being worked on. This is a two person project, so that is a person
-  answering rather than a process.
+  is being worked on. This is a small team, so that is a person answering
+  rather than a process.
 - A fix goes out on the dev build first and then to everybody, which is how
   every change here goes out.
 - You will be told when it is fixed, and credited in the release note if you
@@ -50,6 +51,9 @@ deleted.
   what is not theirs, or take the world down.
 - The launcher and the update feed: anything that would put a file on somebody
   else's machine.
+- The code in this repository and the engine Thornswood builds from its fork
+  of SkyMP. If a hole in the engine is upstream's too, say so, and it will be
+  passed on once it is fixed here.
 
 ## What is not
 

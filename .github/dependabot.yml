@@ -13,11 +13,15 @@
 # file into a per-run venv; Install-Bot.ps1 installs the same file on the VPS.
 # Watching /bot keeps those versions from going stale without a hand check.
 #
-# NOT npm: there is no package.json anywhere in this repository. The site and
-# the voice service are deliberately written against node's own library and
-# depend on nothing. Pointing dependabot at a folder with no manifest gives
-# an error on the Dependabot tab that reads like a fault and watches nothing,
-# which is worse than not configuring it.
+# NOT npm here, because there is no package.json anywhere in this
+# repository. The site and the voice service are deliberately written against
+# node's own library and depend on nothing. Pointing dependabot at a folder
+# with no manifest gives an error on the Dependabot tab that reads like a
+# fault and watches nothing, which is worse than not configuring it. The npm
+# lockfiles that ship are the engine's (skymp5-server, skymp5-client and
+# skymp5-front), and they are watched in the fork, where they live: its
+# .github/dependabot.yml on main targets thornswood/engine-changes (#2759,
+# #3683). A bump there reaches this repository through the usual pin move.
 #
 # NOT gitsubmodule, for engine/skymp (issue #1348). Dependabot's bump would
 # move the pin alone, and a pin is merged only with a client build and a
@@ -33,10 +37,13 @@
 #
 # The launcher is C# built by MSBuild from launcher/app/Thornswood.csproj with
 # no package manager at all, by design: WebView2 is vendored in launcher/lib
-# and referenced by path (#498), so there is nothing here for it.
+# and referenced by path (#498), so there is no manifest here for dependabot
+# to read. WebView2 is watched by hand: THIRD-PARTY.md records the version
+# the three files are (1.0.2903.40) and their sha256, and moving it means
+# taking the new package from nuget.org and rewriting that section (#3683).
 #
-# Weekly rather than daily: this is a two person project, and a pull request a
-# day from a robot is a pull request nobody reads.
+# Weekly rather than daily: this is a small team, and a pull request a day
+# from a robot is a pull request nobody reads.
 version: 2
 updates:
   - package-ecosystem: github-actions

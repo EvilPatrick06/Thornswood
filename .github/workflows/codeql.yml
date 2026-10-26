@@ -1,0 +1,81 @@
+# Code scanning: GitHub's CodeQL reads the code for security faults and puts
+# what it finds on the Security tab (#3683, part of #3721).
+#
+# WHAT IT READS. The four languages this repository is written in: the
+# launcher's C#, the JavaScript of the site, the gamemode, the voice service
+# and the tests, the bot's Python, and these workflows themselves (actions).
+# Every one is read from source with build-mode none, so nothing is built and
+# no MSBuild or engine is needed. The engine submodule is not checked out:
+# the fork, EvilPatrick06/skymp, is its own repository. The one vendored
+# script, site/public/marked-12.0.2.min.js, is left out, because a fault in
+# it is upstream's and THIRD-PARTY.md already says where it comes from.
+#
+# ONLY ONCE THE REPOSITORY IS PUBLIC. On a private repository owned by a
+# person, code scanning results can only be uploaded with GitHub Advanced
+# Security, which is paid; on a public one it is free. Measured 26 Oct 2026:
+# api.github.com/repos/EvilPatrick06/Thornswood says private: true. So the job
+# runs only when the event says the repository is not private, and until the
+# flip every run shows as skipped instead of failing on an upload that cannot
+# succeed. The same commit starts scanning the first push after the flip,
+# with no second change. No schedule trigger, because a scheduled run's event
+# carries no repository to read that from; every push to main and every pull
+# request is scanned, which is when the code changes.
+#
+# GITHUB'S RUNNERS ONLY. This runs pull request code, and once the repository
+# is public that includes pull requests from forks. A self-hosted runner is
+# the VPS, beside the live server, so this must never run there (#3685,
+# #2760; tests\test-1306-pr-workflow.js fails any workflow that runs a pull
+# request on the VPS). Hosted minutes cost nothing on a public repository,
+# and this job never starts while the repository is private, so it spends
+# none of the private minutes either.
+#
+# This is CodeQL's advanced setup, a workflow in the repository, rather than
+# its default setup, a switch in the settings: the actions are pinned here
+# like every other workflow's, and a change to what is scanned is a pull
+# request someone can read. Default setup refuses to run beside an advanced
+# one, so at the flip it stays off.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: CodeQL
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze:
+    name: CodeQL (${{ matrix.language }})
+    if: ${{ github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, csharp, javascript-typescript, python]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          config: |
+            paths-ignore:
+              - site/public/marked-12.0.2.min.js
+
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:${{ matrix.language }}
