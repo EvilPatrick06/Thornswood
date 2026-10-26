@@ -2548,8 +2548,8 @@
                       "script":  "scripts/mods/Send-GameArchives.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Send-ThornswoodArtifactFile",
-                      "anchor":  "Send-ThornswoodArtifactFile (Join-Path $Data $n) $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
-                      "does":  "uploads one Skyrim archive to C:\\Thornswood-GameData",
+                      "anchor":  "Send-ThornswoodArtifactFile $want[$n].From $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
+                      "does":  "uploads one Skyrim archive, or the script pack (#3105), to C:\\Thornswood-GameData",
                       "class":  "admin",
                       "reason":  "writes into a folder only SYSTEM and Administrators reach"
                   },

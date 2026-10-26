@@ -316,9 +316,14 @@ if (!listed3105 || !refused3105) {
   yes('C12 #3105: every builder that takes a plugin list is given the load order npc-population.json records (' + recordedOrder.length + '), not a profile\'s',
       listed3105.status === 0 && listed3105.stdout.indexOf(js.loadOrderName(recordedOrder)) >= 0 &&
       steps.filter((s) => s.plugins).every((s) => new RegExp(s.plugins.replace(/[-]/g, '\\-') + ' \\S*thornswood-loadorder-[0-9a-f]{12}[\\\\/]plugins\\.txt').test(listed3105.stdout)));
-  yes('C13 and a -PluginsTxt that is not that load order stops the run before any builder, naming where they part',
-      refused3105.status !== 0 && /is not the load order game.data.npc-population\.json records/.test(refused3105.stdout + refused3105.stderr) &&
-      /Thornswood-Last\.esp/.test(refused3105.stdout + refused3105.stderr));
+  // PowerShell prints a throw in its error view: colour codes, a "|" gutter,
+  // and on Windows the message folded at the console's width, between words or
+  // inside one. The sentence is read with those and every space taken out.
+  const refusal = (refused3105.stdout + refused3105.stderr).replace(/\x1b\[[0-9;]*m/g, '').replace(/\r?\n\s*\|/g, '').replace(/\s+/g, '');
+  const c13 = refused3105.status !== 0 && /isnottheloadordergame.data.npc-population\.jsonrecords/.test(refusal) &&
+      /Thornswood-Last\.esp/.test(refusal);
+  yes('C13 and a -PluginsTxt that is not that load order stops the run before any builder, naming where they part', c13);
+  if (!c13) { console.log('      exit ' + refused3105.status + ': ' + JSON.stringify(refused3105.stdout + refused3105.stderr).slice(0, 3000)); }
 }
 
 // ---------------------------------------------------------------- N
