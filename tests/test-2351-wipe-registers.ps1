@@ -144,7 +144,7 @@ try {
     $chars = @($out | Where-Object { $_ -like 'CHARS|*' })
     Yes ('the survey counts the 3 characters in characters.json, and only there (' + ($chars -join ' ') + ')') ($chars.Count -eq 1 -and $chars[0] -eq 'CHARS|3')
     $items = @($out | Where-Object { $_ -like 'ITEM|*' })
-    Yes ('the survey lists the 14 things there that would go (' + $items.Count + ')') ($items.Count -eq 14 -and @($out | Where-Object { $_ -like '*|data\*' }).Count -eq 0)
+    Yes ('the survey lists the 15 things there that would go (' + $items.Count + ')') ($items.Count -eq 15 -and @($out | Where-Object { $_ -like '*|data\*' }).Count -eq 0)
 
     # ---- the stop, with a process running from the folder
     $node = (Get-Command node -ErrorAction SilentlyContinue)
@@ -171,11 +171,11 @@ try {
     # ---- the move
     $stamp = '20261017-0100'
     $out = RunBox (Fill $move $stamp)
-    Yes 'the move says nothing failed' (@($out | Where-Object { $_ -like 'FAILED*' }).Count -eq 0 -and @($out | Where-Object { $_ -like 'moved*' }).Count -eq 14)
+    Yes 'the move says nothing failed' (@($out | Where-Object { $_ -like 'FAILED*' }).Count -eq 0 -and @($out | Where-Object { $_ -like 'moved*' }).Count -eq 15)
     $P = Join-Path $Root 'private'
     Yes 'the world goes aside as world-before-<date>' ((Test-Path (Join-Path $Root "world-before-$stamp\changeForms\ff000a01.json")) -and -not (Test-Path (Join-Path $Root 'world')))
     $ok = $true
-    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'trade-cargo', 'dungeon-rewards-ledger') {
+    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'trade-cargo', 'trade-carts', 'dungeon-rewards-ledger') {
         if (-not (Test-Path (Join-Path $P "$f-before-$stamp.json")) -or (Test-Path (Join-Path $P "$f.json"))) { $ok = $false; Write-Host "      not moved: $f.json" }
     }
     Yes 'every register naming a character goes aside under its own name with the date' $ok
