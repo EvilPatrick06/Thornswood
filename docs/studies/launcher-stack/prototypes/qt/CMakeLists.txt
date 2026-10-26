@@ -1,0 +1,12 @@
+# The Qt 6 (Qt Quick) prototype for the launcher stack study (#3209).
+cmake_minimum_required(VERSION 3.21)
+project(proto-qt LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(Qt6 REQUIRED COMPONENTS Quick)
+qt_standard_project_setup()
+qt_add_executable(proto-qt WIN32 main.cpp)
+qt_add_resources(proto-qt "ui" PREFIX "/" FILES Main.qml)
+target_link_libraries(proto-qt PRIVATE Qt6::Quick)
+if(WIN32)
+  target_link_libraries(proto-qt PRIVATE winmm)
+endif()

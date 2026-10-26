@@ -1,0 +1,6 @@
+# Made by `flutter create .` and the build; only lib/ and pubspec.yaml are ours.
+*
+!.gitignore
+!pubspec.yaml
+!lib/
+!lib/main.dart

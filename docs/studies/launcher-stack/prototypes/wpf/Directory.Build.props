@@ -1,0 +1,8 @@
+<Project>
+  <!-- Three projects share Proto.cs in this folder; each keeps its own obj. -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**;out\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>
