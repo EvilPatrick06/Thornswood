@@ -6022,10 +6022,15 @@ async function handle(req, res) {
 
   // ------------------------------------------------------- security.txt
   /* Where somebody who finds a hole in the site says so (RFC 9116, #3216,
-     Patrick's answer on 22 Oct 2026). The contact is the report page: open
-     to anybody without an account, read by staff and nobody else, and the
-     place staff already read every day, so a finding is never waiting in a
-     mailbox nobody opens.
+     Patrick's answer on 22 Oct 2026). The first contact is the report page:
+     open to anybody without an account, read by staff and nobody else, and
+     the place staff already read every day, so a finding is never waiting in
+     a mailbox nobody opens. The second is the Discord, for a direct message
+     to the owner alone. These are the routes SECURITY.md gives too (#3683,
+     Patrick's answer on 26 Oct, q-3683-report-route A), so a stranger gets
+     one answer wherever they look. GitHub's Report a vulnerability button
+     joins both, with a Policy line for SECURITY.md, once the repository is
+     public: before that both addresses answer 404 to anybody outside it.
 
      Expires is written as the file is asked for, 180 days on, inside the
      year RFC 9116 asks for. The file says what this site answers, and the
@@ -6038,6 +6043,7 @@ async function handle(req, res) {
     until.setUTCHours(0, 0, 0, 0);
     return send(res, 200, [
       'Contact: ' + PUBLIC_ORIGIN + '/report',
+      'Contact: ' + PUBLIC_ORIGIN + '/discord',
       'Expires: ' + until.toISOString(),
       'Preferred-Languages: en',
       'Canonical: ' + PUBLIC_ORIGIN + '/.well-known/security.txt',
