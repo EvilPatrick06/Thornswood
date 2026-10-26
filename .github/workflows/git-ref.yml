@@ -23,8 +23,9 @@
 #
 # WHAT IT RUNS. Main's Set-Ref.ps1 under pwsh with no profile. The inputs
 # reach it through the environment, never pasted into the script. The run's
-# own token can write refs and read pull requests, nothing else, and there
-# is no secret. Anybody who can start this can already push and delete refs
+# own token can write refs, read pull requests and start a workflow (for
+# release-files.yml after a release tag, #3686), nothing else, and there is
+# no secret. Anybody who can start this can already push and delete refs
 # with git; this only lets a session whose proxy refuses that do the same.
 #
 # Every action here is named by a full length commit SHA with its tag in the
@@ -49,6 +50,8 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  # To start release-files.yml after a release tag it made (#3686).
+  actions: write
 jobs:
   ref:
     name: Make the tag or delete the branch
@@ -87,3 +90,22 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & (Join-Path $env:GITHUB_WORKSPACE 'scripts/ops/Set-Ref.ps1') -OnGitHub
           exit $LASTEXITCODE
+
+      # A tag this run's token made starts no workflow by itself, so the
+      # release's files go on its Release by name (#3686, release-files.yml,
+      # which runs only while the repository is public). Only after the tag
+      # step succeeded, and only for a release tag.
+      - name: Start release-files.yml for the release tag
+        if: ${{ inputs.tag != '' }}
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_TAG: ${{ inputs.tag }}
+          REF_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:REF_TAG -notmatch '^release/(main|dev)/[0-9]{8}-[0-9]{4,6}(-dev)?$') { Write-Host "not a release tag: $env:REF_TAG"; exit 1 }
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $b = @{ ref = $env:REF_DEFAULT_BRANCH; inputs = @{ tag = $env:REF_TAG } } | ConvertTo-Json
+          Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/workflows/release-files.yml/dispatches" -Headers $h -ContentType 'application/json' -Body $b | Out-Null
+          Write-Host "started release-files.yml for $env:REF_TAG"
