@@ -171,6 +171,15 @@
       reads as of the panel's last arrival; Read again sends 'skills:refresh'
       for a new one. Nothing on it is picked or sent.
 
+    firstSteps: { town: '<the town>', steps: [ { key, name, text, done } ] }
+      A new character's first steps (#3166), sent from the arrival until the
+      Cook's errand is done or the page is put away, and never while
+      creating. key is pick, cook, board, work or back; the server ticks
+      each one when it sees it done, and the words are its own. The page is
+      first in the list while it is there and opens on it once. Put this
+      away sends 'skills:pick firststeps hide', and the answer is the panel
+      written again without it.
+
     officePage: { jarls: [ { hold, where, offices: { court | steward | guard:
                     { role, label, holders: [ { pid, name, was, chosen } ], people: [ { pid, name } ] } } } ],
                   toHold: [ { office, hold, where, role, by } ],
@@ -220,6 +229,11 @@
     this one wholesale.
   */
   var DATA = {
+    start: {
+      title: 'First steps',
+      lead: 'Your first hour in the town you chose. Each step ticks itself when the server sees it done, in any order.',
+      rows: []
+    },
     'class': {
       title: 'Class',
       lead: 'One class, for good. It is the one kind of work only you can do. Everything else you buy, trade for, or ask a friend to do.',
@@ -1040,6 +1054,13 @@
       });
     }
   }
+  /* First steps (#3166): the server's, under mine.firstSteps, or null when there are none. */
+  function startView() {
+    var got = mine && mine.firstSteps;
+    if (!got || typeof got !== 'object' || Array.isArray(got) || !Array.isArray(got.steps)) return null;
+    return got;
+  }
+  var startOpened = false;   // the page opens on First steps once, the first time it arrives
   /* Hair dye (#2675): the server's, under mine.hairDye, or null when you carry none. */
   function dyeView() {
     var got = mine && mine.hairDye;
@@ -1384,6 +1405,8 @@
     if (section === 'apprentice') return 0;
     // Hair dye: its buttons are on its cards.
     if (section === 'hairdye') return 0;
+    // First steps: what is true, and one button.
+    if (section === 'start') return 0;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
@@ -1470,6 +1493,11 @@
     // Hair dye (#2675): only while you carry one or one is steeping.
     if (!creating() && dyeView()) sections.push('hairdye');
     if (propertyRows().length) sections.push('property');
+    // First steps (#3166), first in the list while a new character has them.
+    if (!creating() && startView()) {
+      sections.unshift('start');
+      if (!startOpened) { startOpened = true; goTo('start'); }
+    }
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
     if (rowAt >= n) rowAt = n ? n - 1 : 0;
@@ -1565,6 +1593,12 @@
       if (apT.length) return { t: apT.length + (apT.length === 1 ? ' apprentice' : ' apprentices'), c: 'set' };
       if (apB.length) return { t: apB.length === 1 ? 'taken on by ' + apB[0].name : apB.length + ' Masters', c: 'set' };
       return { t: apV ? (Number(apV.used) || 0) + ' of ' + (Number(apV.of) || 0) + ' trades used' : 'nobody yet', c: '' };
+    }
+    if (sec === 'start') {
+      var stS = startView() ? startView().steps : [];
+      var stD = 0;
+      for (var si = 0; si < stS.length; si++) if (stS[si] && stS[si].done) stD++;
+      return { t: stD + ' of ' + stS.length + ' done', c: stD < stS.length ? 'need' : 'set' };
     }
     if (sec === 'hairdye') {
       var hdN = dyeList().length, hdV = dyeView();
@@ -1664,6 +1698,7 @@
     else if (section === 'college') drawCollege();
     else if (section === 'apprentice') drawApprentice();
     else if (section === 'hairdye') drawHairDye();
+    else if (section === 'start') drawStart();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
@@ -2888,7 +2923,7 @@
     // The recipe book sends nothing, the same way the tree's plus buttons are
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
-      : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
+      : (section !== 'start' && section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
          section !== 'apprentice' && section !== 'hairdye' && section !== 'body');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
@@ -2936,6 +2971,7 @@
       if (apprList('took').length || apprList('by').length) return 'End asks twice. Either of you can end it, and the ranks earned stay.';
       return 'A Master takes somebody on by looking at them and pressing the key the prompt names.';
     }
+    if (section === 'start') return 'Nothing here is picked. Each step ticks itself, and Put this away takes the page off your panel.';
     if (section === 'hairdye') {
       if (dyeTarget) return 'Offer to dye asks them. They answer on their own prompt.';
       return 'Dye my hair uses the dye at once. The server answers in the chat.';
@@ -3096,6 +3132,40 @@
     if (!sayLine(line)) { draw(); return; }
     status = done; statusKind = '';
     draw();
+  }
+  /*
+    FIRST STEPS (#3166). One card a step, in the server's words, green once
+    the server has seen it done. Nothing on it is picked; Put this away is
+    the one press, and the server takes the page off the panel for it.
+  */
+  function drawStart() {
+    var v = startView();
+    if (!v) return;
+    var wrap = el('div', 'cards');
+    v.steps.forEach(function (st, i) {
+      if (!st || typeof st !== 'object') return;
+      var card = el('div', 'card' + (st.done ? ' mine' : ''));
+      var name = el('div', 'name', (i + 1) + '. ' + String(st.name || ''));
+      name.appendChild(el('span', 'tag' + (st.done ? '' : ' dim'), st.done ? 'done' : 'to do'));
+      card.appendChild(name);
+      card.appendChild(el('div', 'desc', String(st.text || '')));
+      wrap.appendChild(card);
+    });
+    // The card's own row styles (.card .guest, .card .act), so the button is a card too.
+    var last = el('div', 'card');
+    var away = el('div', 'guest');
+    away.appendChild(el('span', '', 'Know your way already?'));
+    var go = el('span', 'act', 'Put this away');
+    go.onclick = function (ev) {
+      ev.stopPropagation();
+      tell('pick', 'firststeps hide');
+      status = 'Sent.'; statusKind = '';
+      draw();
+    };
+    away.appendChild(go);
+    last.appendChild(away);
+    wrap.appendChild(last);
+    elBody.appendChild(wrap);
   }
   function drawHairDye() {
     var v = dyeView();

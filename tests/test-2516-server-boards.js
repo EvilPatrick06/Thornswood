@@ -276,8 +276,10 @@ yes('  E on the box opens the box for her, and not the board', r === 'box' && bo
 inDir(function () { r = W.boardActivated(0xff00aaaa, ALICE.a); });
 yes('  and E on anything else is not theirs', r === '');
 const onActivate = slice(gm, "mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {", 'WATER (#1382)') || '';
+// Since #3166 the answer is kept, so that the board (and not its box) also ticks a
+// newcomer's first steps before the press stops there.
 yes('  and onActivate asks it first, and stops there when it answered',
-    /if \(propBoard && propBoard\.boardActivated && propBoard\.boardActivated\(refrId, casterRefrId\)\) \{\s*return false;\s*\}/.test(onActivate));
+    /const boardWhich = \(propBoard && propBoard\.boardActivated\) \? propBoard\.boardActivated\(refrId, casterRefrId\) : '';\s*if \(boardWhich\) \{[\s\S]{0,600}?\n      return false;\n    \}/.test(onActivate));
 
 // --------------------------------------------------------------- a restart
 const ids = JSON.stringify([W.boards().whiterun.ref, W.boards().whiterun.boxRef, W.boards().ravenrock.ref]);

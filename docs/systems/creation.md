@@ -40,14 +40,69 @@ Dead instead. See [Death](death.md).
 Nothing about a character is chosen in the launcher. Skyrim's own
 levelling is off, so the face menu does not start a perk tree.
 
+## The first steps
+
+Patrick, 22 October 2026 (#3166): a new character is guided by a short
+guide on the K panel and a short errand in the start town, and gets the
+basic tool for the profession they pick. The tool is the one above, handed
+at the pick. The guide and the errand are one thing.
+
+On arriving, one line in the chat says the first steps are on the panel
+behind K. There, **First steps** is the first page while they last, and K
+opens on it once. It has five steps, and each one ticks itself when the
+server sees it done, in any order:
+
+1. Choose your class and your profession, on the panel.
+2. Speak to the Cook at the building they stand in. Look at them and press
+   E, as at any guild trader.
+3. Find the notice board in the town and press E on it. Its drop box is not
+   the board.
+4. Do one piece of your own work: a seam, a log, a fish, a crop, a plant, a
+   hunt, or something made at a bench.
+5. Go back to the Cook.
+
+The Cook is the start town's guild Cook, from the trader list
+(`game\data\merchant-traders.json`, [Merchant trader counts](merchant-traders.md)):
+
+| Town | The Cook stands in |
+| --- | --- |
+| Whiterun | The Bannered Mare |
+| Riften | Marise Aravel's House |
+| Solitude | The Winking Skeever |
+| Windhelm | Candlehearth Hall |
+| Markarth | Understone Keep |
+| Falkreath | Dead Man's Drink |
+| Morthal | Moorside Inn |
+| Dawnstar | Northern Star Goods |
+| Winterhold | The Frozen Hearth |
+
+The first time, the Cook gives the errand: find the notice board, do a piece
+of your own work, and come back. Before both are done the Cook says which
+are left. After them the errand is finished, and the Cook names where the
+guild's trader of your own profession stands in that hold, for a Smith,
+Woodworker, Tailor, Enchanter, Cook or Alchemist. Nothing is handed over:
+the 40 gold and the tool are the whole start. The page goes when the errand
+is finished, and **Put this away** on it takes it off at any time.
+
+Only a character who arrives from the hall has first steps. A character
+made before them is shown nothing.
+
 ## Where this is
 
 The hall, the face, the K panel, the town, the waiting class and
-profession, the 40 gold and the four tools are in the server: the
+profession, the 40 gold, the first steps and the four tools are in the server: the
 pickaxe, the woodcutter's axe, the shovel, and the crude fishing pole
 a new fisher is handed, without which the water turns them away. The
 farmer's seed is handed with the shovel. The public
 steps are on the site's help page.
+
+The first steps are kept on the character (`thornswoodFirstSteps`), so a
+relog, a reload and a restart find them where they were. The Cook is
+answered from the E press the game already sends for anybody under the
+crosshair, within 400 of the Cook in the same cell, whether or not trading
+is open; the board from the board's own press; the work from the count every
+piece of work goes through. `tests\test-3166-first-steps.js` walks a new
+character through all of it on the whole gamemode.
 
 Somebody still choosing who puts the panel down gets it back on its
 own: ten minutes after Escape or K, and within thirty seconds when it
