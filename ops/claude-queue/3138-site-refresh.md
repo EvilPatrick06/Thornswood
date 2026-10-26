@@ -1,7 +1,7 @@
 # 3138 Every site page says how the world works on main, with one copy of each text
 
 - **Issue / PR:** #3138, the pull request this note came in with.
-- **Where:** the live site (Deploy-Docs). No game server, no bot install, no Discord.
+- **Where:** the live site (Deploy-Docs) and the live Discord (Setup-Discord -OnBox). No game server, no bot install.
 - **Needs first:** the next main Ship, the first one cut from main at or after this pull request's merge. The pages describe main's game (the nine town start spots, kits that mend, tempering cut, the apprentice prompt, the cut town fillers), and the live server runs release 1.2.5 until that Ship, so the pages go live with it, not before. Step 1's `-Docs help` also puts #2705's hair dye section live, so it waits on 2705-hair-dye-help.md's first step as well (see step 1).
 - **Staff notice:** no. Pages change, and nothing staff do.
 
@@ -20,6 +20,13 @@ What it does:
 
    The site should answer at the end. Run it with `-Docs help` only once 2705-hair-dye-help.md's first step holds (the live server runs the hair dye code), because help.md on main carries #2705's "Dyeing your hair" section. Until then, if the main Ship has gone out, run `pwsh scripts/deploy/Deploy-Docs.ps1 -Site` alone, leave `-Docs help` for the run of 2705's note, and say so on #3138.
 
+2. **Discord: #start-here, #welcome, #faq and #game-rules.** They take their words from join.md and rules.md, so they change with the pages, each with its change line in bot/content.py.
+
+       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox -Audit
+       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox
+
+   The second should end with nothing under "did not manage". Run it in the same sitting as step 1, after the main Ship, so the channels and the site say the same thing. Any Setup-Discord run from main after this merge posts the same words, 3137-known-board.md's step 2 included; if one already has, this step finds nothing to change, and that is said on #3138.
+
 ## Check afterwards
 
 - https://thornswood.net/join says your first character arrives at the town's start spot, not its inn, and names the nine towns.
@@ -27,6 +34,7 @@ What it does:
 - https://thornswood.net/api/page/terms, /privacy and /rules each return a `changed` of 2026-10-26.
 - The home page has no "Being built" block, only the line pointing at the roadmap.
 - Pasting https://thornswood.net/cookies into Discord shows "Every cookie and piece of browser storage this site uses".
+- #start-here has a Your first character section, and each of the four channels' Changelog thread ends on a 26 Oct line.
 - Then delete this note, put what ran on #3138, and close #3138 as completed, with #2763 and #3431 if the pages read as above.
 
 ## Risks
