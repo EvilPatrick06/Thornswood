@@ -6582,6 +6582,11 @@ _MOD_DID = {
     'worldpropose': 'proposed moving the world to %s',
     'worldconfirm': 'confirmed moving the world to %s',
     'worlddrop': 'dropped the proposal to move the world to %s',
+    # Staff on the crafting card, the Office page of K (#3167): the why says
+    # which rank from what to what, or what was given back and why.
+    'craftrank': 'raised a rank of %s',
+    'craftrecipes': 'handed the newer recipe list to the game of %s',
+    'craftgive': 'gave back to %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).

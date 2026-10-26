@@ -422,7 +422,7 @@
     },
     office: {
       title: 'Office',
-      lead: 'The offices your Discord roles give you. The Jarl of a hold names its Court, its Steward and its Guards. A steward ends a claim and sets the rent at a door, and moves their hold\'s notice board. A guard keeps the cells of their hold\'s jail. The Court, the Guards, the Steward and the Jarl take anything out of their hold\'s drop box. Staff hold no office, but end a claim and set the rent at any door, and each press is logged for staff.',
+      lead: 'The offices your Discord roles give you. The Jarl of a hold names its Court, its Steward and its Guards. A steward ends a claim and sets the rent at a door, and moves their hold\'s notice board. A guard keeps the cells of their hold\'s jail. The Court, the Guards, the Steward and the Jarl take anything out of their hold\'s drop box. Staff hold no office, but end a claim and set the rent at any door, raise a rank, check a stuck recipe and give back a lost item, and each press is logged for staff.',
       rows: []
     },
     home: {
@@ -2294,7 +2294,129 @@
     if (o.steward) wrap.appendChild(officeBoards(o.boards));
     // The company's terms, for staff (#512, #2695): propose, confirm and drop.
     if (o.company) wrap.appendChild(officeCompany(o.company));
+    // The crafting tools, for staff (#3167): ranks, a stuck recipe, and giving back what was lost.
+    if (o.craft) officeCraft(wrap, o.craft);
     elBody.appendChild(wrap);
+  }
+
+  /*
+    THE CRAFTING TOOLS, FOR STAFF (#3167, Patrick, 22 Oct: on the Office
+    page, not commands). Pick somebody in the world, then their ranks with
+    Raise, a recipe check that says why a recipe is stuck, and Give back.
+    Everything here is the server's, under officePage.craft, and the server
+    checks staff again on every line. Raise and Give back ask twice, and
+    neither is offered on yourself: another staff member does it.
+  */
+  function officeCraft(wrap, c) {
+    var them = c && c.them;
+    var people = Array.isArray(c && c.people) ? c.people : [];
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', them ? 'Crafting: ' + String(them.name) : 'Crafting'));
+    if (!them) {
+      card.appendChild(el('div', 'desc', 'Pick somebody in the world to see their ranks, check a recipe they cannot ' +
+        'make, or give back something they lost. Every change goes in the staff log with your name.'));
+      if (!people.length) card.appendChild(el('div', 'inn', 'Nobody is in the world to pick.'));
+      people.forEach(function (p) {
+        officeRow(card, String(p.name || 'somebody'), 'profile ' + (Number(p.pid) || 0),
+          [officeButton('Pick', '/craftstaff pick ' + (Number(p.pid) || 0))]);
+      });
+      wrap.appendChild(card);
+      return;
+    }
+    var pid = Number(them.pid) || 0;
+    var who = String(them.name || 'them');
+    officeRow(card, 'Profile ' + pid, them.self ? 'you: check only, another staff member changes you' : '',
+      [officeButton('Pick somebody else', '/craftstaff pick -')]);
+    wrap.appendChild(card);
+
+    // Ranks: one step up through the rulebook, or the rulebook's reason it will not.
+    var ranks = el('div', 'card');
+    ranks.appendChild(el('div', 'name', 'Ranks'));
+    var list = Array.isArray(them.ranks) ? them.ranks : [];
+    ranks.appendChild(el('div', 'desc', list.length
+      ? 'A raise is one rank, and gives what a rank always gives: a skill point, and a spell point for a mage\'s ' +
+        'school or an Enchanter\'s staff spells. Their count toward the next rank starts again at 0.'
+      : who + ' has no class, profession or school yet.'));
+    list.forEach(function (k) {
+      var name = String(k.name || k.key);
+      var rank = cap(k.rank);
+      var at = Number(k.need) > 0 ? rank + ', ' + (Number(k.work) || 0) + ' of ' + Number(k.need) + ' toward ' + cap(k.next || '') : rank;
+      var buttons = [];
+      if (k.next && !them.self) {
+        buttons.push(officeButton('Raise to ' + cap(k.next), '/craftstaff raise ' + pid + ' ' + String(k.key),
+          'Press again to make ' + who + ' ' + cap(k.next) + ' in ' + name));
+      }
+      var row = officeRow(ranks, name, at, buttons);
+      if (!k.next && k.why) row.appendChild(el('span', 'dim', ' ' + String(k.why) + '.'));
+    });
+    wrap.appendChild(ranks);
+
+    // A recipe: what the craft gate says, and what their game was handed.
+    var rc = el('div', 'card');
+    rc.appendChild(el('div', 'name', 'A recipe they cannot make'));
+    rc.appendChild(el('div', 'desc', 'Type part of the name of what it makes. The server says whether ' + who +
+      ' may make it, and why not, and whether their game lists it.'));
+    var ask = document.createElement('input');
+    ask.placeholder = 'what it makes';
+    var check = officeButton('Check', function () {
+      var w = String(ask.value || '').trim();
+      if (!w) { status = 'Type part of the name of what the recipe makes.'; statusKind = 'no'; drawFoot(); return ''; }
+      return '/craftstaff recipe ' + pid + ' ' + w;
+    });
+    ask.onkeydown = function (ev) { if (ev && ev.key === 'Enter') check.onclick(ev); };
+    officeRow(rc, '', '', [ask, check]);
+    var ch = them.check;
+    if (ch) {
+      var rows = Array.isArray(ch.rows) ? ch.rows : [];
+      if (!rows.length) rc.appendChild(el('div', 'inn', 'No recipe anybody owns makes anything called ' + String(ch.want) + '.'));
+      var stale = false;
+      rows.forEach(function (x) {
+        var what = x.half ? String(x.half) + (x.rank ? ', ' + cap(x.rank) : '') : '';
+        var said;
+        if (!x.may) said = String(x.why);
+        else if (x.stale) said = 'They may make it, but their game was handed it as one to leave off the benches.';
+        else if (x.asks) said = 'They may make it, and the server lists it. The game\'s own recipe asks for something first ' +
+          '(a perk, an item or a spell), so the bench leaves it out until they have that.';
+        else said = 'They may make it, and the server lists it for them.';
+        if (!x.may && x.stale) said += ' Their game still lists it, from an older answer.';
+        if (x.stale) stale = true;
+        var row = officeRow(rc, String(x.name), what, []);
+        row.appendChild(el('span', 'dim', ' ' + said));
+      });
+      if (ch.more) rc.appendChild(el('div', 'inn', 'More recipes than these match. Type more of the name.'));
+      if (stale) {
+        rc.appendChild(el('div', 'desc', 'Their game has an older answer than the craft gate gives now. Hand it the list, ' +
+          'and say in the dev channel what changed for them just before: nothing should leave it old.'));
+        officeRow(rc, '', '', [officeButton('Hand their game the list', '/craftstaff recipes ' + pid)]);
+      }
+    }
+    wrap.appendChild(rc);
+
+    // Give back: nothing records what somebody lost, so the reason is the record.
+    if (them.self) return;
+    var gb = el('div', 'card');
+    gb.appendChild(el('div', 'name', 'Give back'));
+    gb.appendChild(el('div', 'desc', 'Nothing records what somebody lost, so you go on what they and the logs say. Name ' +
+      'the item, how many, and why: the reason goes in the staff log with your name, and ' + who + ' is told.'));
+    var item = document.createElement('input');
+    item.placeholder = 'item';
+    var count = document.createElement('input');
+    count.placeholder = 'how many';
+    var why = document.createElement('input');
+    why.placeholder = 'why: what they lost, and how';
+    var give = officeButton('Give back', function () {
+      var n = Number(String(count.value || '').trim());
+      var thing = String(item.value || '').trim();
+      var because = String(why.value || '').replace(/\|/g, ' ').trim();
+      var no = !thing ? 'Name the item to give back.'
+        : (!(n > 0) || Math.floor(n) !== n || n > 1000) ? 'How many is a whole number from 1 to 1000.'
+        : !because ? 'Say why: what they lost, and how.' : '';
+      if (no) { status = no; statusKind = 'no'; drawFoot(); return ''; }
+      return '/craftstaff give ' + pid + ' ' + n + ' ' + thing.replace(/\|/g, ' ') + ' | ' + because;
+    }, 'Press again to give it back to ' + who);
+    officeRow(gb, '', '', [item, count]);
+    officeRow(gb, '', '', [why, give]);
+    wrap.appendChild(gb);
   }
 
   /* The trade ships' staff panel (#2700): ports, routes and ships, a draft staff confirm. */
