@@ -319,14 +319,14 @@ def main():
                 where = desc(w) if w else None
             ch = chain(loc)
             hold = next((holds[x] for x in ch if x in holds), None)
-            town = next((x for x in ch if town_kw & set((locs.get(x) or {}).get('kw', []))), None)
+            town = ch[0] if ch and town_kw & set((locs.get(ch[0]) or {}).get('kw', [])) else None
             edids = [(lctn.get(x) or {}).get('edid') or desc(x) for x in ch]
             if not where:
                 why = 'it stands in no world or cell'
             elif not hold:
                 why = 'its place (%s) is in no hold' % (' < '.join(edids) or 'no location')
             elif not town:
-                why = 'its place (%s) is in %s but in no town' % (' < '.join(edids), hold)
+                why = 'its place (%s) is in %s but is not a town\'s own ground' % (' < '.join(edids), hold)
         if why:
             refused[desc(k)] = {'base': b['edid'], 'by': r['by'], 'why': why}
             continue
@@ -340,7 +340,7 @@ def main():
         reach = math.hypot((x2 - x1) / 2.0, (y2 - y1) / 2.0) * s + ARM
         place = (locs.get(town) or {}).get('name') or lctn[town]['edid']
         rows.append({'ref': desc(k), 'base': b['edid'] + ' ' + desc(r['base']), 'by': r['by'],
-                     'hold': hold, 'place': place, 'location': lctn[town]['edid'],
+                     'hold': hold, 'place': place, 'location': ' < '.join(edids),
                      'world': where, 'pos': [round(px), round(py), round(pz)], 'reach': int(math.ceil(reach)),
                      'key': k})
 
