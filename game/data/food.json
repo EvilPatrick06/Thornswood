@@ -1,14 +1,14 @@
 {
  "builtBy": "scriptsdevBuild-FoodTable.js",
- "builtAt": "2026-10-21T09:37:20.171Z",
+ "builtAt": "2026-10-26T18:11:51.387Z",
  "source": "the ALCH records of the plugins in load order",
  "readFrom": "ENIT for the food and poison flags, FULL for the name",
  "note": "what a kind is WORTH is balance and lives in NEEDS in gamemode.js",
- "count": 525,
+ "count": 537,
  "byKind": {
-  "food": 140,
+  "food": 148,
   "drink": 62,
-  "ale": 35,
+  "ale": 39,
   "potion": 208,
   "poison": 80
  },
@@ -4162,6 +4162,78 @@
    "kind": "drink",
    "gold": 5
   },
+  "1a010:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a010",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFeastFirstPlanting",
+   "name": "First Planting Loaf",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a011:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a011",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFeastMidyear",
+   "name": "Midyear Jazbay Tart",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a012:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a012",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFeastHarvestsEnd",
+   "name": "Harvest's End Roast",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a013:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a013",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFeastSaturalia",
+   "name": "Saturalia Spice Cake",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a040:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a040",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodBrewFirstPlanting",
+   "name": "First Planting Mead",
+   "kind": "ale",
+   "gold": 5
+  },
+  "1a041:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a041",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodBrewMidyear",
+   "name": "Midyear Jazbay Wine",
+   "kind": "ale",
+   "gold": 5
+  },
+  "1a042:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a042",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodBrewHarvestsEnd",
+   "name": "Harvest's End Ale",
+   "kind": "ale",
+   "gold": 5
+  },
+  "1a043:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a043",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodBrewSaturalia",
+   "name": "Saturalia Mulled Mead",
+   "kind": "ale",
+   "gold": 5
+  },
   "19000:Thornswood-Content.esp": {
    "file": "Thornswood-Content.esp",
    "local": "0x19000",
@@ -4735,6 +4807,42 @@
    "from": "Thornswood-Content.esp",
    "edid": "ThornswoodFoodFineGoatCheeseFondue",
    "name": "Fine Goat Cheese Fondue",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a030:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a030",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineFirstPlantingLoaf",
+   "name": "Fine First Planting Loaf",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a031:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a031",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineMidyearJazbayTart",
+   "name": "Fine Midyear Jazbay Tart",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a032:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a032",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineHarvestsEndRoast",
+   "name": "Fine Harvest's End Roast",
+   "kind": "food",
+   "gold": 5
+  },
+  "1a033:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1a033",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineSaturaliaSpiceCake",
+   "name": "Fine Saturalia Spice Cake",
    "kind": "food",
    "gold": 5
   }

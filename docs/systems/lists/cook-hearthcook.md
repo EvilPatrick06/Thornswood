@@ -1,8 +1,8 @@
 # Cook/Hearthcook
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 56 recipes, 56 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 64 recipes, 64 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 28, advanced 18, expert 7, master 3.
+By rank: novice 30, advanced 24, expert 7, master 3.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -18,8 +18,10 @@ By rank: novice 28, advanced 18, expert 7, master 3.
 | Rabbit Haunch | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Raw Rabbit Leg |  | yes | `f430f:Skyrim.esm` |
 | Venison Chop | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Venison |  | yes | `f4311:Skyrim.esm` |
 | Cooked Dog | 1 | novice | Other food and drink | Cookpot | 1 Salt Pile, 1 Dog Meat |  | yes | `8ab:Gourmet.esp` |
+| First Planting Mead | 1 | novice | Other food and drink | Cookpot | 1 Honeycomb, 1 Lavender, 1 Juniper Berries |  | yes | `1a050:Thornswood-Content.esp` |
 | Juniper Tea | 1 | novice | Other food and drink | Cookpot | 2 Juniper Berries |  | yes | `18012:Thornswood-Content.esp` |
 | Lavender Tea | 1 | novice | Other food and drink | Cookpot | 2 Lavender |  | yes | `18011:Thornswood-Content.esp` |
+| Midyear Jazbay Wine | 1 | novice | Other food and drink | Cookpot | 2 Jazbay Grapes, 1 Lavender |  | yes | `1a051:Thornswood-Content.esp` |
 | Roasted Mushrooms | 1 | novice | Other food and drink | Cookpot | 1 Garlic, 1 Namira's Rot, 1 Butter |  | yes | `904:Gourmet.esp` |
 | Sack of Flour | 1 | novice | Other food and drink | isGrainMill | 1 Wheat |  | yes | `17ec3:HearthFires.esm` |
 | Cabbage Soup | 1 | novice | Soups | Cookpot | 1 Salt Pile, 1 Cabbage, 1 Leek |  | yes | `3cd5c:Dragonborn.esm` |
@@ -44,8 +46,14 @@ By rank: novice 28, advanced 18, expert 7, master 3.
 | Cooked Boar Meat | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Boar Meat |  | yes | `81e:Gourmet.esp` |
 | Horker Loaf | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Horker Meat |  | yes | `f430b:Skyrim.esm` |
 | Horse Haunch | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Horse Meat |  | yes | `f430c:Skyrim.esm` |
+| First Planting Loaf | 1 | advanced | Other food and drink | BYOHCraftingOven | 1 Sack of Flour, 1 Chicken's Egg, 1 Lavender, 1 Juniper Berries |  | yes | `1a020:Thornswood-Content.esp` |
+| Harvest's End Ale | 1 | advanced | Other food and drink | Cookpot | 1 Wheat, 1 Jazbay Grapes, 1 Snowberries |  | yes | `1a052:Thornswood-Content.esp` |
+| Harvest's End Roast | 1 | advanced | Other food and drink | Cookpot | 1 Venison, 1 Salt Pile, 1 Jazbay Grapes, 1 Snowberries |  | yes | `1a022:Thornswood-Content.esp` |
+| Midyear Jazbay Tart | 1 | advanced | Other food and drink | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 2 Jazbay Grapes, 1 Lavender |  | yes | `1a021:Thornswood-Content.esp` |
 | Roasted Glowing Mushroom | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Glowing Mushroom, 1 Butter |  | yes | `906:Gourmet.esp` |
 | Roasted Wild Mushrooms | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Scaly Pholiota, 1 Butter |  | yes | `905:Gourmet.esp` |
+| Saturalia Mulled Mead | 1 | advanced | Other food and drink | Cookpot | 1 Honeycomb, 1 Snowberries, 1 Juniper Berries |  | yes | `1a053:Thornswood-Content.esp` |
+| Saturalia Spice Cake | 1 | advanced | Other food and drink | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Snowberries, 1 Juniper Berries |  | yes | `1a023:Thornswood-Content.esp` |
 | Snowberry Tea | 1 | advanced | Other food and drink | Cookpot | 2 Snowberries |  | yes | `18013:Thornswood-Content.esp` |
 | Ash Yam Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Garlic, 1 Horker Meat, 1 Ash Yam |  | yes | `3cd5d:Dragonborn.esm` |
 | Tomato Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Tomato, 1 Leek |  | yes | `f4318:Skyrim.esm` |

@@ -8884,9 +8884,9 @@
   "buildings": 850,
   "doorBases": 363,
   "failedToInflate": 0,
-  "keyed": 335,
+  "keyed": 333,
   "lead": 2794,
-  "locked": 385,
+  "locked": 382,
   "owned": 330,
   "placed": 5652,
   "unpaired": 0
@@ -16162,10 +16162,6 @@
   "1b1f1:Skyrim.esm": {
    "base": "50973:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
-   "lock": {
-    "key": "d8f0c:Skyrim.esm",
-    "level": 255
-   },
    "to": "1b1f3:Skyrim.esm"
   },
   "1b1f3:Skyrim.esm": {
@@ -24030,10 +24026,6 @@
   "42284:Skyrim.esm": {
    "base": "8a1f9:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
-   "lock": {
-    "key": "e6705:Skyrim.esm",
-    "level": 255
-   },
    "to": "42283:Skyrim.esm"
   },
   "42285:Skyrim.esm": {
@@ -24044,10 +24036,6 @@
   "42286:Skyrim.esm": {
    "base": "8a1f9:Skyrim.esm",
    "cell": "d74:Skyrim.esm",
-   "lock": {
-    "key": null,
-    "level": 255
-   },
    "to": "42285:Skyrim.esm"
   },
   "42287:Skyrim.esm": {
@@ -38980,6 +38968,6 @@
    }
   }
  },
- "readFrom": "101 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "readFrom": "102 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
  "whatABuildingIs": "the interior cell a door opens into. Two front doors into one interior are two doors of one building, which is what makes a house with a back door a single claim."
 }

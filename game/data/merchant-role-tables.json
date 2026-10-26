@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "83f861196601f46c874b1e3b609d2027eef7c9bb887b44cbe73e0f4ae135f548",
+    "game/data/recipes.json": "7dd5c9bbb098de17a35aaf6ea606648ce279aa4f1f09af36423787bc299874d4",
     "game/data/harvests.json": "9ca477811631c8027faf92151acdc039f1879df6db2240828631dd00807b4f09",
     "game/data/hunts.json": "de563914653ae6ec58532e5afb5b4aec1b5b18dfa3b16b2ba7907c1bc3661c24",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
@@ -267,7 +267,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66",
+      "sha256": "bea10873c87b2c8bc0dc759ae286effc980723b17c5d8b84b6b671b8fdde57a0",
       "repository": true
     },
     {
@@ -1788,6 +1788,62 @@
       "flags": 0,
       "edid": "1ArmorRieklingCuirassChiefAlt",
       "winner": "Playable Rieklings.esp"
+    },
+    "1a010:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodFeastFirstPlanting",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "1a011:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodFeastMidyear",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "1a012:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodFeastHarvestsEnd",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "1a013:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodFeastSaturalia",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "1a040:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodBrewFirstPlanting",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "1a041:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodBrewMidyear",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "1a042:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodBrewHarvestsEnd",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "1a043:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodBrewSaturalia",
+      "winner": "Thornswood-Content.esp",
+      "food": true
     },
     "1b39f:Skyrim.esm": {
       "type": "ARMO",
@@ -7477,6 +7533,14 @@
         "18001:Thornswood-Content.esp",
         "18002:Thornswood-Content.esp",
         "18003:Thornswood-Content.esp",
+        "1a010:Thornswood-Content.esp",
+        "1a011:Thornswood-Content.esp",
+        "1a012:Thornswood-Content.esp",
+        "1a013:Thornswood-Content.esp",
+        "1a040:Thornswood-Content.esp",
+        "1a041:Thornswood-Content.esp",
+        "1a042:Thornswood-Content.esp",
+        "1a043:Thornswood-Content.esp",
         "1b3bd:Skyrim.esm",
         "1cd72:Dragonborn.esm",
         "206e7:Dragonborn.esm",
@@ -7573,6 +7637,7 @@
         "981:Gourmet.esp",
         "9db:HearthFires.esm",
         "9dc:HearthFires.esm",
+        "b08c5:Skyrim.esm",
         "e8448:Skyrim.esm",
         "e8947:Skyrim.esm",
         "eba01:Skyrim.esm",
@@ -7598,6 +7663,14 @@
         "18001:Thornswood-Content.esp",
         "18002:Thornswood-Content.esp",
         "18003:Thornswood-Content.esp",
+        "1a010:Thornswood-Content.esp",
+        "1a011:Thornswood-Content.esp",
+        "1a012:Thornswood-Content.esp",
+        "1a013:Thornswood-Content.esp",
+        "1a040:Thornswood-Content.esp",
+        "1a041:Thornswood-Content.esp",
+        "1a042:Thornswood-Content.esp",
+        "1a043:Thornswood-Content.esp",
         "1b3bd:Skyrim.esm",
         "1cd72:Dragonborn.esm",
         "206e7:Dragonborn.esm",
@@ -7694,6 +7767,7 @@
         "981:Gourmet.esp",
         "9db:HearthFires.esm",
         "9dc:HearthFires.esm",
+        "b08c5:Skyrim.esm",
         "e8448:Skyrim.esm",
         "e8947:Skyrim.esm",
         "eba01:Skyrim.esm",
@@ -7759,6 +7833,7 @@
         "7ee01:Skyrim.esm",
         "8ac:Gourmet.esp",
         "8ae:Gourmet.esp",
+        "b08c5:Skyrim.esm",
         "e8448:Skyrim.esm",
         "eba03:Skyrim.esm",
         "edb2e:Skyrim.esm",
@@ -8721,6 +8796,30 @@
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:19f97:Playable Rieklings.esp:out"
     ],
+    "1a010:Thornswood-Content.esp": [
+      "Cook:recipe:1a020:Thornswood-Content.esp:out"
+    ],
+    "1a011:Thornswood-Content.esp": [
+      "Cook:recipe:1a021:Thornswood-Content.esp:out"
+    ],
+    "1a012:Thornswood-Content.esp": [
+      "Cook:recipe:1a022:Thornswood-Content.esp:out"
+    ],
+    "1a013:Thornswood-Content.esp": [
+      "Cook:recipe:1a023:Thornswood-Content.esp:out"
+    ],
+    "1a040:Thornswood-Content.esp": [
+      "Cook:recipe:1a050:Thornswood-Content.esp:out"
+    ],
+    "1a041:Thornswood-Content.esp": [
+      "Cook:recipe:1a051:Thornswood-Content.esp:out"
+    ],
+    "1a042:Thornswood-Content.esp": [
+      "Cook:recipe:1a052:Thornswood-Content.esp:out"
+    ],
+    "1a043:Thornswood-Content.esp": [
+      "Cook:recipe:1a053:Thornswood-Content.esp:out"
+    ],
     "1b39f:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:dca05:Skyrim.esm:out"
@@ -8743,7 +8842,11 @@
       "Alchemist:harvests:harvests:df015:Skyrim.esm",
       "Cook:recipe:117fd:HearthFires.esm:input:0",
       "Cook:recipe:11802:HearthFires.esm:input:0",
-      "Cook:recipe:18013:Thornswood-Content.esp:input:0"
+      "Cook:recipe:18013:Thornswood-Content.esp:input:0",
+      "Cook:recipe:1a022:Thornswood-Content.esp:input:3",
+      "Cook:recipe:1a023:Thornswood-Content.esp:input:2",
+      "Cook:recipe:1a052:Thornswood-Content.esp:input:2",
+      "Cook:recipe:1a053:Thornswood-Content.esp:input:1"
     ],
     "1b935:Dragonborn.esm": [
       "Woodworker:recipe:19fb7:Playable Rieklings.esp:out"
@@ -9148,6 +9251,7 @@
       "Cook:recipe:117fc:HearthFires.esm:input:0",
       "Cook:recipe:117fd:HearthFires.esm:input:1",
       "Cook:recipe:117fe:HearthFires.esm:input:0",
+      "Cook:recipe:1a020:Thornswood-Content.esp:input:1",
       "Cook:recipe:8a4:Gourmet.esp:input:0",
       "Cook:recipe:a11:HearthFires.esm:input:0"
     ],
@@ -9492,6 +9596,7 @@
       "Alchemist:station:saltPile",
       "Cook:recipe:117f6:HearthFires.esm:input:0",
       "Cook:recipe:117f8:HearthFires.esm:input:0",
+      "Cook:recipe:1a022:Thornswood-Content.esp:input:1",
       "Cook:recipe:3542:HearthFires.esm:input:0",
       "Cook:recipe:3543:HearthFires.esm:input:0",
       "Cook:recipe:3544:HearthFires.esm:input:0",
@@ -9606,6 +9711,9 @@
       "Cook:recipe:11800:HearthFires.esm:input:1",
       "Cook:recipe:11802:HearthFires.esm:input:1",
       "Cook:recipe:17ec3:HearthFires.esm:out",
+      "Cook:recipe:1a020:Thornswood-Content.esp:input:0",
+      "Cook:recipe:1a021:Thornswood-Content.esp:input:0",
+      "Cook:recipe:1a023:Thornswood-Content.esp:input:0",
       "Cook:recipe:80f:Gourmet.esp:input:1",
       "Cook:recipe:8a4:Gourmet.esp:input:1",
       "Cook:recipe:8a6:Gourmet.esp:input:1",
@@ -9631,6 +9739,8 @@
       "Cook:recipe:117fe:HearthFires.esm:input:3",
       "Cook:recipe:11800:HearthFires.esm:input:2",
       "Cook:recipe:11802:HearthFires.esm:input:2",
+      "Cook:recipe:1a021:Thornswood-Content.esp:input:1",
+      "Cook:recipe:1a023:Thornswood-Content.esp:input:1",
       "Cook:recipe:3543:HearthFires.esm:input:3",
       "Cook:recipe:80f:Gourmet.esp:input:2",
       "Cook:recipe:81f:Gourmet.esp:input:2",
@@ -9940,6 +10050,10 @@
     "45c28:Skyrim.esm": [
       "Alchemist:harvests:harvests:1bb3d:Skyrim.esm",
       "Cook:recipe:18011:Thornswood-Content.esp:input:0",
+      "Cook:recipe:1a020:Thornswood-Content.esp:input:2",
+      "Cook:recipe:1a021:Thornswood-Content.esp:input:3",
+      "Cook:recipe:1a050:Thornswood-Content.esp:input:1",
+      "Cook:recipe:1a051:Thornswood-Content.esp:input:1",
       "Cook:recipe:811:Gourmet.esp:input:2",
       "Cook:recipe:812:Gourmet.esp:input:2",
       "Cook:recipe:813:Gourmet.esp:input:2"
@@ -9967,7 +10081,8 @@
     "4b0ba:Skyrim.esm": [
       "Alchemist:harvests:crops:bb953:Skyrim.esm",
       "Alchemist:harvests:harvests:bb953:Skyrim.esm",
-      "Cook:recipe:17ec3:HearthFires.esm:input:0"
+      "Cook:recipe:17ec3:HearthFires.esm:input:0",
+      "Cook:recipe:1a052:Thornswood-Content.esp:input:0"
     ],
     "4c3cb:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -10046,6 +10161,10 @@
       "Alchemist:harvests:harvests:bb948:Skyrim.esm",
       "Cook:recipe:117fc:HearthFires.esm:input:1",
       "Cook:recipe:18012:Thornswood-Content.esp:input:0",
+      "Cook:recipe:1a020:Thornswood-Content.esp:input:3",
+      "Cook:recipe:1a023:Thornswood-Content.esp:input:3",
+      "Cook:recipe:1a050:Thornswood-Content.esp:input:2",
+      "Cook:recipe:1a053:Thornswood-Content.esp:input:2",
       "Cook:recipe:80f:Gourmet.esp:input:0"
     ],
     "50d0:Dawnguard.esm": [
@@ -10760,6 +10879,7 @@
       "Cook:hunts:db2ab:Skyrim.esm:1",
       "Cook:hunts:ea872:ZIA_Complete Pack.esp:1",
       "Cook:hunts:f797:Dawnguard.esm:1",
+      "Cook:recipe:1a022:Thornswood-Content.esp:input:0",
       "Cook:recipe:f4311:Skyrim.esm:input:1",
       "Cook:recipe:f4317:Skyrim.esm:input:3"
     ],
@@ -10791,7 +10911,11 @@
     "6ac4a:Skyrim.esm": [
       "Alchemist:harvests:harvests:bb949:Skyrim.esm",
       "Cook:recipe:117fa:HearthFires.esm:input:1",
-      "Cook:recipe:11800:HearthFires.esm:input:0"
+      "Cook:recipe:11800:HearthFires.esm:input:0",
+      "Cook:recipe:1a021:Thornswood-Content.esp:input:2",
+      "Cook:recipe:1a022:Thornswood-Content.esp:input:2",
+      "Cook:recipe:1a051:Thornswood-Content.esp:input:0",
+      "Cook:recipe:1a052:Thornswood-Content.esp:input:1"
     ],
     "6b46b:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -11878,7 +12002,9 @@
       "Smith:recipe:ab75:Hothtrooper44_ArmorCompilation.esp:out"
     ],
     "b08c5:Skyrim.esm": [
-      "Alchemist:station:honeycomb"
+      "Alchemist:station:honeycomb",
+      "Cook:recipe:1a050:Thornswood-Content.esp:input:0",
+      "Cook:recipe:1a053:Thornswood-Content.esp:input:0"
     ],
     "b097:Dawnguard.esm": [
       "Alchemist:harvests:harvests:10f37:Dawnguard.esm",
@@ -12459,9 +12585,9 @@
       "supply": 16
     },
     "Cook": {
-      "buy": 119,
-      "sell": 119,
-      "supply": 53
+      "buy": 128,
+      "sell": 128,
+      "supply": 54
     },
     "Alchemist": {
       "buy": 70,
