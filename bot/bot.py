@@ -25,7 +25,9 @@ What it does:
            python bot.py --post-task). #dev-test-tasks, a staff only forum
            in Staff, holds the test tasks whose comment says "Server: Dev":
            a measurement someone on dev has to take, open issue or closed,
-           and any posted by hand tagged Dev.
+           and any posted by hand tagged Dev. The same read writes the
+           site's Known Issues page (the #known-issues list) and its
+           roadmap (the "roadmap:" labels) for the site to show (#3140).
            The channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
@@ -76,6 +78,8 @@ Everything it needs is in env:
   KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
   KNOWN_ISSUES_LABELS default Dev Findings,Main Findings
   KNOWN_ISSUES_EVERY  seconds between GitHub reads, default 300, never under 60
+  PUBLIC_LISTS_FILE   where the site's known issues and roadmap are written,
+                      default the site's data/from-bot/lists.json on the VPS
   HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
                    file, which is where the watchdog reads it
   HEARTBEAT_EVERY  seconds between heartbeats, default 60
@@ -4717,6 +4721,9 @@ STEP_LINE = re.compile(r'^\s*\d+[.)]\s+\S', re.M)
 ISSUE_NUMBER = re.compile(r'(?<![\w&])#\d+\b')
 LINK = re.compile(r'https?://|www\.', re.I)
 CODE = re.compile(r'`')
+# Built from its code point, never pasted, as Check-Words.ps1 explains.
+EM_DASH = re.compile(chr(0x2014) + r'|&mdash;|&#8212;|&#x2014;', re.I)
+BANNED_WORD = re.compile(r'\bplayers?\b', re.I)
 # Steps a Claude, the Desk, a harness, a workflow or a command can do: a
 # dev test task is only for what a human dev must do in the game.
 AUTOMATABLE = re.compile(
@@ -4782,6 +4789,22 @@ def post_problems(channel, title, body, *, server=None, issue=None,
     if ISSUE_NUMBER.search(text) or LINK.search(text) or CODE.search(text):
         out.append('Format: the text has an issue number, a link or code; '
                    'posts carry none.')
+    if channel in ('known', 'roadmap'):
+        # The site shows these two to anybody (#3140), so the writing rules
+        # every public page keeps hold here too (Check-Words.ps1 reads the
+        # repository; these words are on GitHub, so the bot reads them).
+        words = '%s\n%s' % (title or '', text)
+        if EM_DASH.search(words):
+            out.append('Words: the text has an em dash; nothing written for '
+                       'people has one.')
+        if BANNED_WORD.search(words):
+            out.append('Words: the text says "player"; write "people", '
+                       '"characters" or "testers" instead.')
+    if channel == 'roadmap':
+        if not text.strip():
+            out.append('Roadmap: the "Roadmap:" comment has nothing under its '
+                       'first line, which is where the work stands.')
+        return out
     if channel == 'known':
         if issue is not None and str(issue.get('state')) != 'open':
             out.append('Known issues: the issue is closed.')
@@ -4837,6 +4860,9 @@ def github_say(number, text):
 
 CHANNEL_NAMES = {'dev': 'dev-test-tasks', 'main': 'test-tasks',
                  'known': 'known-issues'}
+# Where each kind of post goes, as the refusal comment says it.
+POST_PLACES = {'dev': 'in #dev-test-tasks', 'main': 'in #test-tasks',
+               'known': 'in #known-issues', 'roadmap': "on the site's roadmap"}
 
 
 def refuse(state, channel, num, problems, say=None):
@@ -4855,10 +4881,13 @@ def refuse(state, channel, num, problems, say=None):
     sig = '\n'.join(problems)
     if seen.get(key) == sig:
         return True
-    text = ('The bot did not post this issue in #%s, because the post breaks '
-            'these rules (Developer-Guide.md, "Test tasks and known issues"):\n\n%s'
+    text = ('The bot did not post this issue %s, because the post breaks '
+            'these rules (%s):\n\n%s'
             '\n\nFix the comment and the bot tries again on its next pass.'
-            % (CHANNEL_NAMES.get(channel, channel),
+            % (POST_PLACES.get(channel, 'in #' + channel),
+               'bot/README.md, "The site\'s known issues and roadmap"'
+               if channel == 'roadmap'
+               else 'Developer-Guide.md, "Test tasks and known issues"',
                '\n'.join('- ' + p for p in problems)))
     try:
         (say or github_say)(num, text)
@@ -5465,6 +5494,166 @@ def adopt_task(number, thread_id, path=None):
     return 'issue %d now owns test task post %d' % (int(number), int(thread_id))
 
 
+# -------------------------------------- the site's known issues and roadmap --
+#
+# Issue #3140 (Patrick): the site's Known Issues page and its roadmap are built
+# from the board, so they cannot go stale. Until then both were boards typed
+# into site/data/board.json; the roadmap's Later lane said the emote wheel was
+# never started while it shipped (test-roadmap.js), and the known board kept
+# NPC behaviour that #504 had fixed. The bot already reads the board for the
+# Discord forums, with the one issues token there is, so it writes both lists
+# into one file the site reads:
+#
+#   known    the posts that are up in #known-issues, the same list, each as
+#            its title, its words and where it was found (Main, Dev). One
+#            rule decides both: known_issues_once.
+#   roadmap  every issue labelled "roadmap: now", "roadmap: next" or
+#            "roadmap: later", open, in that lane; closed as done, in Done.
+#            Its words are its last "Roadmap:" comment: the first line is
+#            what is being built (45 characters at most), the lines under it
+#            where it stands. The rules of a known issue hold for it (no
+#            footer, no issue number, link or code), and so do the writing
+#            rules of a public page (no em dash, never "player"). An issue
+#            with a lane and no such comment, or one that breaks a rule, is
+#            left off and gets one comment saying why (refuse).
+#
+# The file is PUBLIC_LISTS_FILE, in the site's data\from-bot folder, which
+# holds only what the bot writes for the site: the site makes it, and
+# Install-Bot.ps1 gives the bot's account Modify on it and nothing else of the
+# site's (the other way round from for-bot, #1102). It is written whole after
+# every pass, with the time of the pass, so the site can say how old it is;
+# a part the bot could not read this pass is left out rather than written
+# empty, and the site says that part could not be read.
+PUBLIC_LISTS_FILE = os.environ.get(
+    'PUBLIC_LISTS_FILE', r'C:\Thornswood-Docs\data\from-bot\lists.json')
+ROADMAP_LANES = (('now', 'Being built now'), ('next', 'Next'), ('later', 'Later'))
+ROADMAP_DONE = 'Done'
+ROADMAP_MARK = re.compile(r'^\s*roadmap\s*:\s*(.*)$', re.I)
+
+
+def roadmap_label(lane):
+    return 'roadmap: %s' % lane
+
+
+def github_labelled(label, state, get=None):
+    """Every issue (not pull request) with the label, open or closed (state),
+       by number."""
+    get = get or _github_get
+    out = {}
+    page = 1
+    while True:
+        url = ('%s/repos/%s/issues?state=%s&per_page=100&page=%d&labels=%s'
+               % (GITHUB_API, KNOWN_REPO, state, page, urllib.parse.quote(label)))
+        rows = get(url) or []
+        for row in rows:
+            if isinstance(row, dict) and 'pull_request' not in row:
+                out.setdefault(int(row['number']), row)
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
+def roadmap_lanes_of(issue):
+    """The lanes (now, next, later) the issue is labelled with."""
+    names = [n.lower() for n in _labels(issue)]
+    return [lane for lane, _name in ROADMAP_LANES if roadmap_label(lane) in names]
+
+
+def roadmap_of(issue, comments):
+    """(title, words, problems) for the issue's roadmap row, from its last
+       "Roadmap:" comment. problems is empty when it may go on the site."""
+    got = _marked(issue, comments, ROADMAP_MARK, room=None)
+    if got is None:
+        return None, None, ['Roadmap: the issue has a roadmap label and no '
+                            'comment whose first line starts "Roadmap:", '
+                            'which holds the words the site shows.']
+    title, body = got[0], strip_footer(got[1])
+    return title, body, post_problems('roadmap', title, body)
+
+
+def roadmap_once(state, get=None, say=None):
+    """
+    One read of the roadmap off the board. state is the dict kept in
+    known-issues.json, changed in place; its 'roadmap' part remembers each
+    labelled issue's row by its updated_at, so comments are read only for an
+    issue that changed (a label, a close and a comment all move it). Returns
+    the roadmap as the site draws it: {lanes: [{name, rows: [{title, text}]}]},
+    the open lanes in order and Done last, each lane by issue number and Done
+    newest close first.
+    """
+    seen = {}
+    for lane, _name in ROADMAP_LANES:
+        for state_ in ('open', 'closed'):
+            for num, issue in github_labelled(roadmap_label(lane), state_, get).items():
+                seen[num] = issue
+    rec = state.setdefault('roadmap', {})
+    for key in [k for k in rec if int(k) not in seen]:
+        rec.pop(key, None)
+        state['_dirty'] = True
+    rows = dict((name, []) for _lane, name in ROADMAP_LANES)
+    rows[ROADMAP_DONE] = []
+    for num in sorted(seen):
+        issue = seen[num]
+        key = str(num)
+        closed = str(issue.get('state')) != 'open'
+        if closed and str(issue.get('state_reason') or 'completed') != 'completed':
+            continue        # dropped or a duplicate: never built, so not Done
+        have = rec.get(key)
+        if not have or have.get('updated') != issue.get('updated_at'):
+            title, body, problems = roadmap_of(issue, github_comments(num, get))
+            lanes = roadmap_lanes_of(issue)
+            if len(lanes) > 1 and not closed:
+                problems = problems + ['Roadmap: the issue is in %s at once; '
+                                       'one lane only.' % ', '.join(
+                                           roadmap_label(l) for l in lanes)]
+            have = rec[key] = {'updated': issue.get('updated_at'),
+                               'title': title, 'text': body,
+                               'problems': problems}
+            state['_dirty'] = True
+        if refuse(state, 'roadmap', num, have.get('problems') or [], say):
+            continue
+        row = {'title': have['title'], 'text': have['text'],
+               'closed': str(issue.get('closed_at') or '')}
+        if closed:
+            rows[ROADMAP_DONE].append(row)
+        else:
+            rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(row)
+    rows[ROADMAP_DONE].sort(key=lambda r: r['closed'], reverse=True)
+    lanes = [name for _lane, name in ROADMAP_LANES] + [ROADMAP_DONE]
+    return {'lanes': [{'name': name,
+                       'rows': [{'title': r['title'], 'text': r['text']}
+                                for r in rows[name]]} for name in lanes]}
+
+
+def known_list(state):
+    """The posts up in #known-issues, as the site shows them: title, words
+       and where (Main, Dev), by issue number. The records hold each post's
+       sig, which is exactly what went up (_sig)."""
+    out = []
+    for key in sorted((state.get('issues') or {}), key=int):
+        sig = str((state['issues'][key] or {}).get('sig') or '')
+        if not sig:
+            continue
+        title, rest = (sig.split('\n', 1) + [''])[:2]
+        body, _, tags = rest.rpartition('\n')
+        out.append({'title': title, 'text': body,
+                    'where': [t for t in tags.split(',') if t]})
+    return out
+
+
+def write_public_lists(known, roadmap, path=None, now=None):
+    """Writes the site's lists: known and roadmap as the passes made them,
+       either None when it could not be read this pass, and so left out."""
+    data = {'at': now or _utc_stamp()}
+    if known is not None:
+        data['known'] = known
+    if roadmap is not None:
+        data['roadmap'] = roadmap
+    _state_write(path or PUBLIC_LISTS_FILE, data)
+    return data
+
+
 def issue_tags_found(issue):
     names = _labels(issue)
     return any(l in names for l in KNOWN_LABELS)
@@ -5488,7 +5677,7 @@ async def watch_known_issues():
             'fixed by hand (posting from empty would double every post)'
             % KNOWN_STATE)
         return
-    said_text = said_dev = False
+    said_text = said_dev = said_lists = False
     while not client.is_closed():
         try:
             known = tasks = dev = None
@@ -5530,8 +5719,24 @@ async def watch_known_issues():
                 if posted or edited or removed:
                     log('dev test tasks: posted %s, edited %s, removed %s'
                         % (posted or 'none', edited or 'none', removed or 'none'))
+            # The site's lists (#3140): known only when #known-issues was
+            # kept this pass, since it is that forum's list.
+            roadmap = await asyncio.get_running_loop().run_in_executor(
+                None, roadmap_once, state)
             if state.get('_dirty'):
                 _known_save(state)
+            try:
+                write_public_lists(known_list(state) if known is not None else None,
+                                   roadmap)
+            except OSError as e:
+                if not said_lists:
+                    log('known issues: could not write the site\'s lists to %s '
+                        '(%s). Install-Bot.ps1 gives the bot Modify on that '
+                        'folder once Deploy-Docs.ps1 has made it.'
+                        % (PUBLIC_LISTS_FILE, type(e).__name__))
+                    said_lists = True
+            else:
+                said_lists = False
         except Exception as e:
             # Never the URL with the token, and never the token: the request
             # carries it in a header, which str(e) does not print.
