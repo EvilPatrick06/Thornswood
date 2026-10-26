@@ -26,6 +26,7 @@ on 1 Oct. Every builder takes its load order from load_order.
     path = own_plugins.plugin_path(data, 'Thornswood-Content.esp')
 """
 
+import hashlib
 import io
 import os
 
@@ -79,3 +80,12 @@ def load_order(plugins_txt):
 
 def switched_off(plugins_txt):
     return read_plugins_txt(plugins_txt)[1]
+
+
+def load_order_name(order):
+    """What a table says it was read from: how many plugins and the first
+    twelve hex of the sha256 of their names in order, one per line. Never the
+    plugin list's path, which names one machine (#3105: every box run wrote
+    its own temp folder into ten tables)."""
+    digest = hashlib.sha256('\n'.join(order).encode('utf-8')).hexdigest()[:12]
+    return '%d plugins in load order (names sha256 %s)' % (len(order), digest)

@@ -645,7 +645,7 @@ def main():
 
     payload = {
         'builtBy': 'scripts/dev/Build-CastTable.py',
-        'readFrom': '%d plugins, the five masters then %s' % (len(got['order']), args.plugins),
+        'readFrom': own_plugins.load_order_name(got['order']),
         'whatThisIs': 'A candidate for the surviving cast, entry 320: traders and the carriage '
                       'and ferry workers survive, everyone else is rebuilt as a custom character '
                       'or removed. Nothing reads this file and nothing is removed because of it. '

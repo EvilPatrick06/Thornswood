@@ -717,6 +717,73 @@ yes('LZ4: a copy reaching back into a stored block before it, past checksums and
 yes('LZ4: something that is not a frame is refused', !!got[n + 1] && got[n + 1].err === 'ValueError');
 yes('LZ4: a copy reaching before the start is refused', !!got[n + 2] && got[n + 2].err === 'ValueError');
 
+// ---------------------------------------------------------------------------
+// The script pack (#3105). The box holds the plugins and none of the archives
+// that carry scripts, so on 26 Oct the crime table stopped there with 14,553
+// scripts missing. scripts/mods/New-ScriptPack.py packs a game PC's scripts,
+// and the audit reads the pack in place of the archives and Data\Scripts it
+// stands for. Here a box's folder of plugins and the pack must audit exactly
+// as the folder the pack was made from.
+
+const PACKER = path.join(REPO, 'scripts', 'mods', 'New-ScriptPack.py');
+const SRC = path.join(ROOT, 'Src');
+const BOX = path.join(ROOT, 'Box');
+fs.cpSync(DATA, SRC, { recursive: true });
+fs.writeFileSync(path.join(SRC, 'Skyrim - Misc.bsa'), bsa105([
+  ['scripts', [['ts_misc.pex', script('TS_Misc', 'ObjectReference', { OnLoad: handler() }), true]]],
+], true));
+const OUTP = path.join(ROOT, 'pack');
+const made = py([PACKER, '--data', SRC, '--out', OUTP]);
+let packRec = null;
+try { packRec = JSON.parse(fs.readFileSync(path.join(OUTP, 'papyrus-scripts.json'), 'utf8')); } catch (e) { packRec = null; }
+const packBytes = fs.existsSync(path.join(OUTP, 'papyrus-scripts.zip')) ? fs.readFileSync(path.join(OUTP, 'papyrus-scripts.zip')) : Buffer.alloc(0);
+yes('New-ScriptPack.py packs a Data folder and writes its record (exit ' + made.status + ')', made.status === 0 && !!packRec);
+if (made.status !== 0) { console.log(String(made.stdout) + String(made.stderr)); }
+const looseCount = fs.readdirSync(path.join(DATA, 'Scripts')).length;
+yes('the record holds the pack\'s size and sha256, every archive that carries a script and the loose ones', !!packRec &&
+  packRec.bytes === packBytes.length && packRec.sha256 === require('crypto').createHash('sha256').update(packBytes).digest('hex') &&
+  same(packRec.archives, { 'Skyrim - Misc.bsa': 1, 'TestA.bsa': 3, 'TestC.bsa': 1 }) && packRec.loose === looseCount && packRec.scripts === 5 + looseCount);
+const OUTP2 = path.join(ROOT, 'pack2');
+py([PACKER, '--data', SRC, '--out', OUTP2]);
+yes('the same folder makes the same bytes', packBytes.length > 0 &&
+  fs.existsSync(path.join(OUTP2, 'papyrus-scripts.zip')) && fs.readFileSync(path.join(OUTP2, 'papyrus-scripts.zip')).equals(packBytes));
+const notGame = py([PACKER, '--data', DATA, '--out', path.join(ROOT, 'pack3')]);
+yes('a folder with no Skyrim - Misc.bsa is refused and nothing is written', notGame.status !== 0 &&
+  /STOP/.test(notGame.stdout) && !fs.existsSync(path.join(ROOT, 'pack3', 'papyrus-scripts.zip')));
+
+fs.mkdirSync(BOX);
+fs.readdirSync(SRC).filter(function (f) { return /\.(esp|esm|esl)$/i.test(f); })
+  .forEach(function (f) { fs.copyFileSync(path.join(SRC, f), path.join(BOX, f)); });
+const SRC_OUT = path.join(ROOT, 'src.json');
+const BOX_OUT = path.join(ROOT, 'box.json');
+py([AUDIT, '--data', SRC, '--plugins', PLUGINS, '--json', SRC_OUT]);
+const unpacked = py([AUDIT, '--data', BOX, '--plugins', PLUGINS, '--json', BOX_OUT]);
+yes('a box folder with no pack and no archive stops: no script in it', unpacked.status !== 0 && /no script in/.test(String(unpacked.stdout) + String(unpacked.stderr)));
+fs.copyFileSync(path.join(OUTP, 'papyrus-scripts.zip'), path.join(BOX, 'papyrus-scripts.zip'));
+const boxed = py([AUDIT, '--data', BOX, '--plugins', PLUGINS, '--json', BOX_OUT]);
+let S = null, B = null;
+try { S = JSON.parse(fs.readFileSync(SRC_OUT, 'utf8')); B = JSON.parse(fs.readFileSync(BOX_OUT, 'utf8')); } catch (e) { S = B = null; }
+yes('with the pack, the box folder audits (exit ' + boxed.status + ')', boxed.status === 0 && !!B);
+if (boxed.status !== 0) { console.log(String(boxed.stdout) + String(boxed.stderr)); }
+yes('and every plugin\'s scripts, their sources and what is missing are the same as in the folder the pack came from',
+  !!S && !!B && same(S.plugins, B.plugins) && same(S.eventNames, B.eventNames) && S.counts.scriptsRead === B.counts.scriptsRead);
+yes('  the archive a script came from among them: TS_Dead from TestA.bsa, as a loose one from Data\\Scripts', !!B &&
+  B.plugins.some(function (p) { return p.plugin === 'TestDead.esp' && String(p.scripts.TS_Dead && p.scripts.TS_Dead.source).toLowerCase() === 'testa.bsa'; }) &&
+  B.plugins.some(function (p) { return p.plugin === 'TestStuck.esp' && p.scripts.TS_Timer && p.scripts.TS_Timer.source === 'Data\\Scripts'; }));
+fs.writeFileSync(path.join(BOX, 'TestA.bsa'), bsa105([
+  ['scripts', [['ts_dead.pex', script('TS_Dead', 'ObjectReference', { OnLoad: handler() }), true]]],
+], true));
+const both = path.join(ROOT, 'both.json');
+py([AUDIT, '--data', BOX, '--plugins', PLUGINS, '--json', both]);
+let W = null;
+try { W = JSON.parse(fs.readFileSync(both, 'utf8')); } catch (e) { W = null; }
+function deadRow(J) {
+  const p = J && J.plugins.filter(function (x) { return x.plugin === 'TestDead.esp'; })[0];
+  return p ? p.scripts.TS_Dead : null;
+}
+yes('an archive the folder itself holds is read from there, not from the pack', !!W && !!deadRow(B) && !!deadRow(W) &&
+  !same(deadRow(W), deadRow(B)) && !same(deadRow(W).events, deadRow(B).events));
+
 fs.rmSync(ROOT, { recursive: true, force: true });
 
 // ---------------------------------------------------------------------------

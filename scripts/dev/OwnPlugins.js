@@ -84,4 +84,12 @@ function loadedOrder(file, dataDir) {
   return order;
 }
 
-module.exports = { OWN_DIR, MASTERS, isOwn, pluginPath, loadOrder, switchedOff, loadedOrder };
+// What a table says it was read from: how many plugins and the first twelve
+// hex of the sha256 of their names in order, one per line. Never the plugin
+// list's path, which names one machine (#3105).
+function loadOrderName(order) {
+  const hex = require('crypto').createHash('sha256').update(order.join('\n'), 'utf8').digest('hex').slice(0, 12);
+  return order.length + ' plugins in load order (names sha256 ' + hex + ')';
+}
+
+module.exports = { OWN_DIR, MASTERS, isOwn, pluginPath, loadOrder, switchedOff, loadedOrder, loadOrderName };

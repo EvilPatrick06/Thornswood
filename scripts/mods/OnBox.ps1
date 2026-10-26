@@ -33,6 +33,14 @@
 $ThornswoodGameArchiveStore = 'C:\Thornswood-GameData'
 $ThornswoodGameArchives = @('Skyrim - Interface.bsa', 'Skyrim - Meshes0.bsa', 'Skyrim - Meshes1.bsa') +
     @(0..8 | ForEach-Object { 'Skyrim - Textures' + $_ + '.bsa' }) + @('_ResourcePack.bsa')
+# And the script pack (#3105): every Papyrus script a game PC's Data folder
+# holds, which scripts\mods\New-ScriptPack.py makes there and
+# records\papyrus-scripts.json pins. None of the archives that carry scripts
+# is on the box (Skyrim - Misc.bsa, the Creation Club ones, the mods'), so on
+# 26 Oct the whole rebuild stopped at the crime table with 14,553 scripts
+# missing. Each run links it into its data folder beside the archives, where
+# scripts\dev\Audit-PapyrusEvents.py reads it in their place.
+$ThornswoodScriptPack = 'papyrus-scripts.zip'
 
 # Text for the box: makes a file readable, and linkable, and nothing more to
 # everyone but SYSTEM. A run reaches the archives through hard links, which
@@ -132,6 +140,11 @@ if (Test-Path -LiteralPath `$store) {
   }
 }
 if (`$linked) { 'archives  ' + `$linked + ' from ' + `$store + ', linked, read only' } else { 'archives  none: ' + `$store + ' holds no Skyrim archive, so a tool that reads one stops' }
+`$pack = Join-Path `$store '$ThornswoodScriptPack'
+if (Test-Path -LiteralPath `$pack) {
+  `$null = New-Item -ItemType HardLink -Path (Join-Path `$data '$ThornswoodScriptPack') -Value `$pack
+  'scripts   $ThornswoodScriptPack from ' + `$store + ', linked, read only'
+} else { 'scripts   none: ' + `$store + ' holds no $ThornswoodScriptPack, so a tool that reads the scripts stops' }
 `$storeStrings = Join-Path `$store 'Strings'
 `$linkedStrings = 0
 if (Test-Path -LiteralPath `$storeStrings) {

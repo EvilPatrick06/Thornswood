@@ -463,7 +463,7 @@ try {
 
     yes('nothing was lost to a record that would not inflate', j.counts.failedToInflate === 0);
     yes('six plugins read, though plugins.txt lists Skyrim.esm again as skyrim.esm',
-      /^6 plugins,/.test(j.readFrom || ''));
+      /^6 plugins in load order \(names sha256 [0-9a-f]{12}\)$/.test(j.readFrom || ''));
     yes('32 placements read, 2 of them deleted, one by a patch that kept only the flag',
       j.counts.placed === 32 && j.counts.deleted === 2);
     yes('a wolf and a mannequin are counted, not listed as people', j.counts.notPeople === 2);

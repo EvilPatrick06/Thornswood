@@ -76,7 +76,11 @@ scenes, packages and perks. The last plugin to define a record decides its
 scripts, and a script is credited to the plugin that first put it there, so a
 patch carrying a vanilla script forward does not make it the patch's. Scripts
 come from Data\\Scripts first, then from the archives, a later one winning, as
-the game reads them.
+the game reads them. A folder with no script archive of its own (the run's
+data folder on the box) may hold the script pack instead,
+papyrus-scripts.zip, which scripts\\mods\\New-ScriptPack.py makes on a PC
+with the game: each archive's scripts under its own name and the loose ones,
+read here as if those archives and Data\\Scripts were there (#3105).
 
 WHAT IT DOES NOT KNOW, and says so rather than guess.
   Fragments. Quest stage, dialogue, scene, package and perk fragments are
@@ -106,6 +110,7 @@ import os
 import struct
 import sys
 import textwrap
+import zipfile
 import zlib
 from collections import defaultdict
 
@@ -550,39 +555,84 @@ class NoScripts(Exception):
     """The data folder holds no script at all."""
 
 
+# The script pack's name in a data folder, and its layout: archives/<archive
+# file name>/<the file's path in the archive>, and loose/<name>.pex for the
+# files of Data\\Scripts. scripts/mods/New-ScriptPack.py writes it.
+SCRIPT_PACK = 'papyrus-scripts.zip'
+
+
+def read_script_pack(path):
+    """({archive file name: {path in the archive: bytes}}, {loose file name:
+    bytes}) out of a script pack."""
+    archives, loose = defaultdict(dict), {}
+    with zipfile.ZipFile(path) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            parts = info.filename.split('/')
+            if parts[0] == 'archives' and len(parts) >= 4 and parts[1].lower().endswith('.bsa'):
+                archives[parts[1]]['/'.join(parts[2:]).lower()] = z.read(info)
+            elif parts[0] == 'loose' and len(parts) == 2 and parts[1]:
+                loose[parts[1]] = z.read(info)
+    return archives, loose
+
+
 def script_index(data_dir, order, stats):
     """{script name in lower case: (where it came from, bytes)}, as the game
     would find it: archives in load order, a later one winning, then loose
-    files over all of them."""
+    files over all of them. An archive or loose file that is in the folder
+    itself is read from there; the script pack stands in for the ones that
+    are not."""
     stems = [os.path.splitext(n)[0].lower() for n in order]
-    ranked = []
-    for archive in os.listdir(data_dir):
-        if not archive.lower().endswith('.bsa'):
-            continue
+
+    def rank_of(archive):
         stem = archive[:-4].lower()
         rank = -1
         for i, s in enumerate(stems):
             if stem == s or stem.startswith(s + ' - '):
                 rank = i
-        ranked.append((rank, archive.lower(), archive))
-    index = {}
-    for _rank, _low, archive in sorted(ranked):
+        return rank
+
+    names = os.listdir(data_dir)
+    here = set(n.lower() for n in names)
+    ranked = []
+    for archive in names:
+        if archive.lower().endswith('.bsa'):
+            ranked.append((rank_of(archive), archive.lower(), archive, None))
+    packed, packed_loose = {}, {}
+    pack = os.path.join(data_dir, SCRIPT_PACK)
+    if os.path.isfile(pack):
         try:
-            files = bsa.read(os.path.join(data_dir, archive), 'scripts')
-        except (ValueError, struct.error, zlib.error, IndexError) as exc:
-            stats['unreadable archives'].append('%s: %s' % (archive, exc))
-            continue
+            packed, packed_loose = read_script_pack(pack)
+        except (zipfile.BadZipFile, OSError) as exc:
+            stats['unreadable archives'].append('%s: %s' % (SCRIPT_PACK, exc))
+        for archive in packed:
+            if archive.lower() not in here:
+                ranked.append((rank_of(archive), archive.lower(), archive, packed[archive]))
+                stats['packed archives'] += 1
+    index = {}
+    for _rank, _low, archive, files in sorted(ranked, key=lambda r: (r[0], r[1])):
+        if files is None:
+            try:
+                files = bsa.read(os.path.join(data_dir, archive), 'scripts')
+            except (ValueError, struct.error, zlib.error, IndexError) as exc:
+                stats['unreadable archives'].append('%s: %s' % (archive, exc))
+                continue
         for path, data in files.items():
             if path.endswith('.pex'):
                 index[path.split('/')[-1][:-4]] = (archive, data)
                 stats['archive scripts'] += 1
+    loose_files = dict(packed_loose)
     loose = os.path.join(data_dir, 'Scripts')
     if os.path.isdir(loose):
         for f in os.listdir(loose):
             if f.lower().endswith('.pex'):
                 with open(os.path.join(loose, f), 'rb') as fh:
-                    index[f[:-4].lower()] = ('Data\\Scripts', fh.read())
-                stats['loose scripts'] += 1
+                    loose_files[f] = fh.read()
+    for f in sorted(loose_files):
+        if f.lower().endswith('.pex'):
+            index[f[:-4].lower()] = ('Data\\Scripts', loose_files[f])
+            stats['loose scripts'] += 1
     if not index:
         # A Skyrim load order always carries scripts (Skyrim - Misc.bsa alone
         # holds thousands), so none found means the folder lacks the archives

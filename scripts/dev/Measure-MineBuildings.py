@@ -507,7 +507,7 @@ def main():
 
     payload = {
         'builtBy': 'scripts/dev/Measure-MineBuildings.py',
-        'readFrom': '%d plugins, the five masters then %s' % (len(order), args.plugins),
+        'readFrom': own_plugins.load_order_name(order),
         'whatAMineIs': 'a building holding at least one placed reference whose base is in '
                        'ORES_BY_BASE, which is exactly what mineOre lets a person work. A '
                        'building is what BUILDING_BY_DOOR says, the one /claim takes.',

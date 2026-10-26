@@ -31,6 +31,11 @@
      same of a plugins.txt holding switched off lines (the masters, then each
      '*' line, once), and no builder reads plugins.txt's lines itself.
      tests/test-1712-builders-skip-off.js runs the builders on such a list.
+  O  #3105. A table says which load order it was read from by its count and
+     a hash of its names (the three helpers' load order name, the same in
+     each), never the plugin list's path: a box run reads a list in a new
+     temp folder each time, so a path in a table made two runs of one commit
+     disagree, and on One it named the profile, not the load order.
 
   Nothing outside a temporary folder is written.
 */
@@ -296,6 +301,26 @@ if (!shell) {
   if (shell.status !== 0) { console.log(said + shell.stderr); }
 }
 
+const recordedOrder = JSON.parse(read('game/data/npc-population.json')).loadOrder.map((r) => r.name);
+const sameList = path.join(TMP, 'same-3105.txt');
+fs.writeFileSync(sameList, recordedOrder.slice(5).map((n) => '*' + n).join('\r\n') + '\r\n');
+const otherList = path.join(TMP, 'other-3105.txt');
+fs.writeFileSync(otherList, recordedOrder.slice(5).filter((n) => n !== 'Thornswood-Last.esp').map((n) => '*' + n).join('\r\n') + '\r\n');
+const listed3105 = run(['pwsh', 'powershell'], ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+  path.join(ROOT, 'scripts', 'mods', 'Rebuild-ContentTables.ps1'), '-List', '-Data', DATA, '-PluginsTxt', sameList]);
+const refused3105 = run(['pwsh', 'powershell'], ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+  path.join(ROOT, 'scripts', 'mods', 'Rebuild-ContentTables.ps1'), '-List', '-Data', DATA, '-PluginsTxt', otherList]);
+if (!listed3105 || !refused3105) {
+  console.log('SKIP  C12-C13: no PowerShell here');
+} else {
+  yes('C12 #3105: every builder that takes a plugin list is given the load order npc-population.json records (' + recordedOrder.length + '), not a profile\'s',
+      listed3105.status === 0 && listed3105.stdout.indexOf(js.loadOrderName(recordedOrder)) >= 0 &&
+      steps.filter((s) => s.plugins).every((s) => new RegExp(s.plugins.replace(/[-]/g, '\\-') + ' \\S*thornswood-loadorder-[0-9a-f]{12}[\\\\/]plugins\\.txt').test(listed3105.stdout)));
+  yes('C13 and a -PluginsTxt that is not that load order stops the run before any builder, naming where they part',
+      refused3105.status !== 0 && /is not the load order game.data.npc-population\.json records/.test(refused3105.stdout + refused3105.stderr) &&
+      /Thornswood-Last\.esp/.test(refused3105.stdout + refused3105.stderr));
+}
+
 // ---------------------------------------------------------------- N
 const naming = ['tests/test-2468-last-plugin.js', 'tests/test-2551-building-holds.js', 'tests/test-516-woodworking-benches.js',
   'tests/test-asset-provenance.js', 'docs/systems/station-placement.md', 'Developer-Guide.md'];
@@ -354,6 +379,29 @@ for (const dir of ['scripts/dev', 'scripts/mods']) {
 }
 yes('L5 no builder reads plugins.txt\'s lines itself; each takes its load order from the helper' +
     (parsers.length ? ' (' + parsers.slice(0, 6).join(', ') + ')' : ''), parsers.length === 0);
+
+// ---------------------------------------------------------------- O
+const NAMED = js.MASTERS.concat(['Unofficial Skyrim Special Edition Patch.esp', 'Thornswood-Content.esp', 'Thornswood-Last.esp']);
+const jsName = js.loadOrderName(NAMED);
+yes('O1 OwnPlugins.js names a load order by its count and the sha256 of its names: ' + jsName,
+    new RegExp('^' + NAMED.length + ' plugins in load order \\(names sha256 [0-9a-f]{12}\\)$').test(jsName) &&
+    jsName.indexOf(require('crypto').createHash('sha256').update(NAMED.join('\n')).digest('hex').slice(0, 12)) > 0 &&
+    js.loadOrderName(NAMED.slice().reverse()) !== jsName);
+const pyO = run(['python', 'py', 'python3'], ['-c', 'import sys; sys.path.insert(0, sys.argv[1]); import own_plugins\n' +
+  'print(own_plugins.load_order_name(sys.argv[2:]))', DEV].concat(NAMED));
+if (!pyO) { console.log('SKIP  O2: no python here'); } else { yes('O2 own_plugins.py names it the same', pyO.status === 0 && pyO.stdout.trim() === jsName); }
+const asksO = path.join(TMP, 'asks-3105.ps1');
+fs.writeFileSync(asksO, 'param([string]$Dev, [string]$Names)\n. (Join-Path $Dev \'OwnPlugins.ps1\')\nGet-LoadOrderName ($Names -split \'\\|\')\n');
+const psO = run(['pwsh', 'powershell'], ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', asksO, '-Dev', DEV, '-Names', NAMED.join('|')]);
+if (!psO) { console.log('SKIP  O3: no PowerShell here'); } else { yes('O3 OwnPlugins.ps1 names it the same', psO.status === 0 && psO.stdout.trim() === jsName); }
+// A table's own line naming its source: readFrom, or source. The plugin list
+// a builder was given is args.plugins, $PluginList, $PluginsTxt or PLUGINS.
+const LIST_VAR = /args\.plugins|\$PluginList\b|\$PluginsTxt\b|\bPLUGINS\b|pluginsTxt\b/;
+const pathInTable = [];
+for (const t of tools.concat(['scripts/dev/Measure-MineBuildings.py'])) {
+  read(t).split('\n').forEach((l, i) => { if (/readFrom|['"]source['"]|\bsource:/.test(l) && LIST_VAR.test(l)) { pathInTable.push(t + ':' + (i + 1)); } });
+}
+yes('O4 no builder writes the plugin list it was given into its table' + (pathInTable.length ? ' (' + pathInTable.join(', ') + ')' : ''), pathInTable.length === 0);
 
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log('');
