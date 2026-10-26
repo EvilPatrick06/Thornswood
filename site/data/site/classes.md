@@ -122,6 +122,12 @@ An **alchemy lab** works for an Alchemist, either a **Blightbrewer** or a
 Somebody who has not chosen a profession yet can use neither, and is told to
 press K and choose one.
 
+An ingredient goes in a brew only once your character has eaten one. A brew
+with an ingredient you have never eaten is refused, and the ingredients stay in
+your pack. Once you have brewed a mix, your character remembers it at any
+alchemy lab, with every effect it showed you, and the alchemy menu shows them
+again every time you come into the world.
+
 ### Tempering and repair
 
 There is no tempering. The sharpening wheel and the armour table do not open

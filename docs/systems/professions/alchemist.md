@@ -36,9 +36,23 @@ still a potion for thirst: the sip of 5 on
 table's poison and potion names are not usable as a catalogue. Most
 of them did not survive as words. They are not repeated here.
 
-Learned ingredient effects live on the character the game saved.
-This server does not keep that list. A relog can forget what the lab
-had revealed. Do not treat a revealed effect as a rank.
+## Eat it first, and your character remembers
+
+Decided by Patrick on 22 Oct
+([#3134](https://github.com/EvilPatrick06/Thornswood/issues/3134)).
+An ingredient goes in a brew only once your character has eaten one.
+Eating it teaches its first effect, the game's own rule. A brew with
+an ingredient you have never eaten is refused before anything is
+taken, and the line names the ingredient. The ingredients stay in
+your pack.
+
+Mixing different ingredients makes different things: a brew is the
+effects two or more of its ingredients share. Once you have brewed a
+mix, your character remembers it at any alchemy lab: the mix, what it
+made, and every effect of each ingredient it showed you. The server
+keeps that on your character, so a relog or a restart forgets
+nothing, and every time you come into the world your game is taught
+it again, so the alchemy menu shows it. A known effect is not a rank.
 
 ## Master Chemist
 
@@ -60,7 +74,10 @@ the batch the server sees. See the bottom of each half.
 
 The lab gate is in the server. A batch is one piece of work, and
 Master Chemist's second bottle goes on the same stack once the first
-is in the pack. The mixtures list is in the server and is asked once
-the engine says which effects a brew carries, which it does not yet
-(see [Mixtures](../mixtures.md)). There is no item list, because
-there are no recipe rows.
+is in the pack. The mixtures list is in the server and asks the
+effects the engine names for each brew (see [Mixtures](../mixtures.md)).
+What your character has eaten and brewed is the alchemy block in
+`game/gamemode.js`: it hears an ingredient eaten from the engine's own
+eat, refuses a brew with one you never ate, and teaches your game what
+you know at every arrival. There is no item list, because there are
+no recipe rows.
