@@ -154,6 +154,10 @@ of you can end it.
 Kit. The right half repairs to 120%. Anyone else repairs to 100%.
 Worn gear loses 1% a hit. At 0%, a worn piece can break.
 
+[Spoilage](systems/spoilage.md). Raw food keeps a real week, a dish
+two, salted or smoked food never. A pack spoils only while its owner
+is online. A cook salts or smokes raw meat and fish on a panel.
+
 [Cut items](systems/cut-items.md). What leaves the open book, and the
 references kept so a row can come back. The recipe file is not
 deleted.

@@ -93,7 +93,8 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
+                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-preserve.js',
+                    'thornswood-furniture.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -468,6 +469,15 @@
   */
   const TREAT_SELF_KEY = TRADE_KEY;
   /*
+    "Salt or smoke your food" in the inventory (#3163). THE FRIEND KEY, Y,
+    and not a new one: every letter is already Skyrim's or ours. In the
+    inventory the social keys refuse to act and Skyrim binds nothing to Y,
+    and U, H and X, the other three keys with a line there, are other keys,
+    so all four lines can be up at once. Rebinding FriendKey moves both. See
+    preservePress.
+  */
+  const PRESERVE_KEY = FRIEND_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the game's own favourites hotkeys (and the emote slots while
     the wheel is open), and every letter is already one of ours or the game's.
@@ -520,6 +530,7 @@
   const HELP_NAME = keyName(HELP_KEY);
   const TREAT_NAME = keyName(TREAT_KEY);
   const TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+  const PRESERVE_NAME = keyName(PRESERVE_KEY);
   /*
     HANDING OVER A LETTER (#1595). Patrick, 4 Oct: /deliver becomes a key on
     the look prompt, shown while you carry a letter for the person under the
@@ -2176,7 +2187,7 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat', preserve: 'thornswoodPreserve',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
     help: 'thornswoodHelp', box: 'thornswoodBox', ship: 'thornswoodShip'
@@ -6228,6 +6239,84 @@
   }
 
   /*
+    ------------------------------------- salting and smoking food, from the inventory
+
+    #3163. Food spoils (docs/systems/spoilage.md), and a cook keeps raw meat
+    and fish by salting or smoking it. There is no item to use for that, so
+    it is the repair kit's pattern: while the inventory is open and the
+    server says you may preserve something you carry, one line at the bottom
+    names a key, and that key shuts the inventory and asks the server for
+    the preserving panel (game/ui/thornswood-preserve.js), whose buttons
+    send the rest. /preserve is that ask; nobody is told to type it.
+
+    Whether there is anything to preserve is the server's: you have to be a
+    cook and carry raw food that spoils, and its spoilage block writes that
+    on the thornswoodPreserveLine property, whose owner's script sets
+    globalThis.thornswoodPreserveLine. Above the furniture line, so all four
+    can be up.
+  */
+  let preserveShown = false;
+  const PRESERVE_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:27%');
+
+  function preserveCan() {
+    try { return !!globalThis.thornswoodPreserveLine; } catch (e) { return false; }
+  }
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawPreserveLine(on) {
+    if (on === preserveShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-preserve-line");if(d){d.style.display="none";}}catch(e){}')) {
+        preserveShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + PRESERVE_NAME + '</span>' +
+      'Salt or smoke your food';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-preserve-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-preserve-line";' +
+             'd.style.cssText=' + JSON.stringify(PRESERVE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      preserveShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('preserve line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(!!T.ready && preserveCan());
+  }));
+  sp.on('menuClose', guard('preserve line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, something to preserve. Answers whether it was used, so
+    the key falls through when it was not.
+  */
+  function preservePress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!preserveCan()) { drawPreserveLine(false); return false; }
+    drawPreserveLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('preserve: closeMenu threw on the inventory: ' + err); }
+    tellServer('/preserve');
+    say('pressed ' + PRESERVE_NAME + ' in the inventory with food to preserve, asked the server for the preserving panel');
+    return true;
+  }
+
+  /*
     ------------------------------------- furniture in a building you hold (#2679)
 
     Setting a chair, a bed or a chest down, moving it and picking it up again,
@@ -8664,6 +8753,8 @@
     if (e.code === TREAT_KEY && treatPress()) { return; }
     // The trade key in the inventory, with a wound to tend (#1383). See TREAT_SELF_KEY.
     if (e.code === TREAT_SELF_KEY && treatSelfPress()) { return; }
+    // The friend key in the inventory, for a cook with raw food (#3163). See PRESERVE_KEY.
+    if (e.code === PRESERVE_KEY && preservePress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
       close their own panel. Djinn on dev, 24 September: "The party menu
@@ -9628,6 +9719,9 @@
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'preserve:opened') { T.claimFocus('preserve', true); return; }
+    if (what === 'preserve:closed') { T.claimFocus('preserve', false); return; }
+    if (what === 'preserve:ready') { log('the preserving panel is in'); return; }
     if (what === 'furniture:opened') { T.claimFocus('furniture', true); return; }
     if (what === 'furniture:closed') { T.claimFocus('furniture', false); return; }
     if (what === 'furniture:ready') { log('the furniture panel is in'); return; }

@@ -155,6 +155,8 @@ const pieces = {
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function wovenMark(actorId)',
         'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
+        // A dish named with its days left (#3163), after the other two.
+        'function spoilingOutput(actorId)',
         'function unfitToMake(actorId, workbenchId)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };

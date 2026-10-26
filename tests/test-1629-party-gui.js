@@ -154,6 +154,9 @@ function rig(opts) {
     // H in the inventory. Nobody hurt is looked at and no inventory is open
     // here; test-1383-treatments.js has what they do.
     'function treatPress() { return false; }\nfunction treatSelfPress() { return false; }\n' +
+    // Salt or smoke your food (#3163), Y in the inventory. No inventory is
+    // open here; test-3163-spoilage.js has what it does.
+    'function preservePress() { return false; }\n' +
     'function maneuverKeyPressed() { }\n' +
     'function helpKeyPressed() { }\n' +
     'function commandKeyPressed() { }\n' +

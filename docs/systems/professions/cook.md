@@ -12,6 +12,12 @@ Hearthcook's, from novice, so a confectioner at the pot is making
 their sister half and stops at novice meals.
 The grain mill is Hearthcook only.
 
+## Salting and smoking
+
+Either half, from novice, preserves raw meat and fish so it never
+spoils: a Salt Pile a piece, or a lit fire and a Firewood for every 5
+pieces. See [Spoilage](../spoilage.md).
+
 ## Grand Chef
 
 At master, either half. Every batch yields two instead of one. The

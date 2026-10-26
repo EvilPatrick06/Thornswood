@@ -85,6 +85,8 @@ const SITES = {
   "'/' + sig": { n: 2, kind: 'kept', lines: ['/lock ff001234', '/unlock ff001234', '/claim ff001234', '/key ff001234 master'] },
   "'/repair'": { n: 1, kind: 'kept', lines: ['/repair'] },
   "'/treat'": { n: 1, kind: 'kept', lines: ['/treat'] },
+  // the preserving panel, from the friend key in the inventory (#3163)
+  "'/preserve'": { n: 1, kind: 'kept', lines: ['/preserve'] },
   // furniture in a held building (#2679): the line asked for, the panel, a piece's keys
   "'/furniture look'": { n: 1, kind: 'report', lines: ['/furniture look'] },
   "'/furniture'": { n: 1, kind: 'kept', lines: ['/furniture'] },

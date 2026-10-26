@@ -178,7 +178,7 @@ yes('2 a guard from a fine dish is told its 30 minutes (the injury block\'s guar
 // ------------------------------------------------- 3. cookedOutput, onCraft --
 const pieces = [cut('function holdsPerk(actorId, key) {'), cut('function cookedOutput(actorId, row) {')];
 yes('3 cookedOutput is in the gamemode, and mp.onCraft asks it once every gate has passed',
-  pieces.every(Boolean) && /\n  cookedOutput\(actorId, row\);\n  wovenOutput\(actorId, row\);\n  return;\n\}\);/.test(gm));
+  pieces.every(Boolean) && /\n  cookedOutput\(actorId, row\);\n  wovenOutput\(actorId, row\);\n  spoilingOutput\(actorId\);\n  return;\n\}\);/.test(gm));
 function onCraftRig(state, perks, roll) {
   let output = null;
   const said = [];
