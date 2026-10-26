@@ -1,5 +1,5 @@
 // The Tauri prototype for the launcher stack study (#3209): the window is
-// web\index.html in the system web view (WebView2 on Windows). README.md has
+// index.html in the system web view (WebView2 on Windows). README.md has
 // the contract every prototype keeps.
 #![windows_subsystem = "windows"]
 

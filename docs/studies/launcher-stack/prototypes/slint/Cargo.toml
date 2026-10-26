@@ -3,6 +3,10 @@ name = "proto-slint"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "proto-slint"
+path = "main.rs"
+
 [dependencies]
 slint = "1.18"
 

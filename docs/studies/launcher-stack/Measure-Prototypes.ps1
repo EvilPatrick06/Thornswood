@@ -219,7 +219,7 @@ function Write-QuietWav([string]$to) {
 function Add-Assets([string]$dir, [switch]$Page) {
     Copy-Item -LiteralPath $Art -Destination (Join-Path $dir 'art.png') -Force
     Copy-Item -LiteralPath $script:Wav -Destination (Join-Path $dir 'loop.wav') -Force
-    if ($Page) { Copy-Item -LiteralPath (Join-Path $Proto 'web\index.html') -Destination $dir -Force }
+    if ($Page) { Copy-Item -LiteralPath (Join-Path $Proto 'index.html') -Destination $dir -Force }
 }
 
 function Reset-Dir([string]$dir) {
@@ -270,7 +270,7 @@ $Builds = [ordered]@{
     'tauri' = {
         $src = Join-Path $Proto 'tauri'; $dist = Join-Path $src 'dist'
         $o = Join-Path $Out 'tauri'; $w = Join-Path $Out 'tauri-weigh'; Reset-Dir $o; Reset-Dir $w
-        Reset-Dir $dist; Copy-Item -LiteralPath (Join-Path $Proto 'web\index.html') -Destination $dist
+        Reset-Dir $dist; Copy-Item -LiteralPath (Join-Path $Proto 'index.html') -Destination $dist
         Push-Location $src
         try {
             Invoke-Checked 'build tauri (weighed, page only)' { cargo build --release }
@@ -296,7 +296,7 @@ $Builds = [ordered]@{
     'wails' = {
         $src = Join-Path $Proto 'wails'; $front = Join-Path $src 'frontend'
         $o = Join-Path $Out 'wails'; $w = Join-Path $Out 'wails-weigh'; Reset-Dir $o; Reset-Dir $w
-        Reset-Dir $front; Copy-Item -LiteralPath (Join-Path $Proto 'web\index.html') -Destination $front
+        Reset-Dir $front; Copy-Item -LiteralPath (Join-Path $Proto 'index.html') -Destination $front
         Push-Location $src
         try {
             Invoke-Checked 'build wails (weighed, page only)' { go build -tags desktop,production -ldflags '-w -s -H windowsgui' -o (Join-Path $w 'proto-wails.exe') . }
@@ -311,7 +311,7 @@ $Builds = [ordered]@{
         try {
             Invoke-Checked 'install electron' { npm install --no-audit --no-fund }
             Remove-Item -LiteralPath 'art.png', 'loop.wav' -ErrorAction SilentlyContinue
-            Copy-Item -LiteralPath (Join-Path $Proto 'web\index.html') -Destination $src -Force
+            Copy-Item -LiteralPath (Join-Path $Proto 'index.html') -Destination $src -Force
             Invoke-Checked 'package electron (weighed, page only)' { npx electron-packager . proto-electron --platform=win32 --arch=x64 --out $w --overwrite --ignore='^/node_modules' }
             Add-Assets $src
             Invoke-Checked 'package electron (run, page with art and music)' { npx electron-packager . proto-electron --platform=win32 --arch=x64 --out $o --overwrite --ignore='^/node_modules' }
@@ -332,7 +332,7 @@ $Builds = [ordered]@{
         Push-Location $src
         try {
             Invoke-Checked 'make the flutter platform folder' { flutter create --platforms=windows --project-name proto_flutter . }
-            Invoke-Checked 'build flutter' { flutter build windows --release }
+            Invoke-Checked 'build flutter' { flutter build windows --release -t main.dart }
             Copy-Item -Path 'build\windows\x64\runner\Release\*' -Destination $o -Recurse
         } finally { Pop-Location }
         Add-Assets $o

@@ -1,5 +1,5 @@
 // The Electron prototype for the launcher stack study (#3209): the window is
-// web\index.html in Electron's own Chromium. README.md has the contract every
+// index.html in Electron's own Chromium. README.md has the contract every
 // prototype keeps.
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');

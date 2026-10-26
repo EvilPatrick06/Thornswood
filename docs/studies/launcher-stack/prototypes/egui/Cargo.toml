@@ -3,6 +3,10 @@ name = "proto-egui"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "proto-egui"
+path = "main.rs"
+
 [dependencies]
 eframe = "0.37"
 egui_extras = { version = "0.37", features = ["image", "file"] }

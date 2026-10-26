@@ -3,11 +3,39 @@
   "productName": "proto-tauri",
   "version": "0.1.0",
   "identifier": "net.thornswood.proto.tauri",
-  "build": { "frontendDist": "dist" },
+  "build": {
+    "frontendDist": "dist"
+  },
   "app": {
     "withGlobalTauri": true,
-    "windows": [{ "title": "Thornswood tauri", "width": 1220, "height": 800, "center": true }],
-    "security": { "csp": null }
+    "windows": [
+      {
+        "title": "Thornswood tauri",
+        "width": 1220,
+        "height": 800,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "default",
+          "windows": [
+            "main"
+          ],
+          "permissions": [
+            "core:default"
+          ]
+        }
+      ]
+    }
   },
-  "bundle": { "active": false, "icon": ["../../../../../launcher/app.ico", "../../../../../launcher/logo-192.png"] }
+  "bundle": {
+    "active": false,
+    "icon": [
+      "../../../../../launcher/app.ico",
+      "../../../../../launcher/logo-192.png"
+    ]
+  }
 }

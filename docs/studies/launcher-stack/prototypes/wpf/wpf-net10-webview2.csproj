@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- WPF on .NET 10, window and music drawn by WebView2 (web\index.html). -->
+  <!-- WPF on .NET 10, window and music drawn by WebView2 (index.html). -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

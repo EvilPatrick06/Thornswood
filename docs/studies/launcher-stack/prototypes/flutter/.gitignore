@@ -1,6 +1,6 @@
-# Made by `flutter create .` and the build; only lib/ and pubspec.yaml are ours.
+# Made by `flutter create .` and the build; only main.dart and pubspec.yaml
+# are ours (the build script passes -t main.dart).
 *
 !.gitignore
 !pubspec.yaml
-!lib/
-!lib/main.dart
+!main.dart

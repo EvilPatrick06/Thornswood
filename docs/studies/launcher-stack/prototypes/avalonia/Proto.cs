@@ -62,7 +62,7 @@ static class Proto
         grid.Children.Add(panel);
         win.Content = grid;
         // Two animation frames after Opened: the second callback runs once the
-        // first frame is drawn, as in web\index.html.
+        // first frame is drawn, as in index.html.
         win.Opened += (s, e) => win.RequestAnimationFrame(_ => win.RequestAnimationFrame(_ =>
         {
             Ready();

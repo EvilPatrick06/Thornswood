@@ -1,7 +1,7 @@
 # Launcher stack prototypes
 
 One small window per candidate stack for the launcher stack study (#3209,
-`docs/studies/launcher-stack/README.md`). Each one is the same window, so the
+[the study](../README.md)). Each one is the same window, so the
 numbers compare the stacks and nothing else. None of them is the launcher and
 none of them ships.
 
@@ -31,24 +31,23 @@ never count them: those stacks are weighed from a second build without them.
 
 ## The prototypes
 
-| Name | Stack | Folder | Built where |
+| Name | Stack | Built where | Files |
 |---|---|---|---|
-| wpf-net481-webview2 | WPF on .NET Framework 4.8.1, page in WebView2: the launcher's stack today | `wpf` | anywhere with the .NET 10 SDK |
-| wpf-net10 | WPF on .NET 10, needs the .NET 10 Desktop Runtime | `wpf` | anywhere with the .NET 10 SDK |
-| wpf-net10-sc | the same, self-contained in one file | `wpf` | anywhere with the .NET 10 SDK |
-| wpf-net10-webview2-sc | WPF on .NET 10 self-contained, page in WebView2 | `wpf` | anywhere with the .NET 10 SDK |
-| winui3 | WinUI 3 (Windows App SDK) on .NET 10, unpackaged, self-contained | `winui3` | Windows only |
-| avalonia | Avalonia on .NET 10, self-contained, trimmed, one file | `avalonia` | anywhere with the .NET 10 SDK |
-| avalonia-aot | the same compiled ahead of time to native code | `avalonia` | Windows only |
-| tauri | Tauri 2 (Rust), page in the system web view | `tauri` | Windows, or Linux with cargo-xwin |
-| slint | Slint (Rust), its own renderer | `slint` | Windows, or Linux with cargo-xwin |
-| egui | egui through eframe (Rust), immediate mode | `egui` | Windows, or Linux with cargo-xwin |
-| wails | Wails 2 (Go), page in the system web view | `wails` | anywhere with Go |
-| electron | Electron (TypeScript and Node), its own Chromium | `electron` | anywhere with Node |
-| qt | Qt 6 Quick (C++) | `qt` | Windows only for the Windows build |
-| flutter | Flutter (Dart) | `flutter` | Windows only for the Windows build |
+| wpf-net481-webview2 | WPF on .NET Framework 4.8.1, page in WebView2: the launcher's stack today | anywhere with the .NET 10 SDK | [wpf-net481-webview2.csproj](wpf/wpf-net481-webview2.csproj), [Proto.cs](wpf/Proto.cs), [Directory.Build.props](wpf/Directory.Build.props) (the three WPF projects share one folder and keep apart builds) |
+| wpf-net10 and wpf-net10-sc | WPF on .NET 10, needing the .NET 10 Desktop Runtime, and the same self-contained in one file | anywhere with the .NET 10 SDK | [wpf-net10.csproj](wpf/wpf-net10.csproj) |
+| wpf-net10-webview2-sc | WPF on .NET 10 self-contained, page in WebView2 | anywhere with the .NET 10 SDK | [wpf-net10-webview2.csproj](wpf/wpf-net10-webview2.csproj) |
+| winui3 | WinUI 3 (Windows App SDK) on .NET 10, unpackaged, self-contained | Windows only | [proto-winui3.csproj](winui3/proto-winui3.csproj), [Proto.cs](winui3/Proto.cs) |
+| avalonia and avalonia-aot | Avalonia on .NET 10, self-contained, trimmed, one file; and the same compiled ahead of time to native code | the first anywhere with the .NET 10 SDK, the second on Windows only | [proto-avalonia.csproj](avalonia/proto-avalonia.csproj), [Proto.cs](avalonia/Proto.cs), [app.manifest](avalonia/app.manifest) |
+| tauri | Tauri 2 (Rust), page in the system web view | Windows, or Linux with cargo-xwin | [Cargo.toml](tauri/Cargo.toml), [Cargo.lock](tauri/Cargo.lock), [build.rs](tauri/build.rs), [main.rs](tauri/main.rs), [tauri.conf.json](tauri/tauri.conf.json) |
+| slint | Slint (Rust), its own renderer | Windows, or Linux with cargo-xwin | [Cargo.toml](slint/Cargo.toml), [Cargo.lock](slint/Cargo.lock), [main.rs](slint/main.rs) |
+| egui | egui through eframe (Rust), immediate mode | Windows, or Linux with cargo-xwin | [Cargo.toml](egui/Cargo.toml), [Cargo.lock](egui/Cargo.lock), [main.rs](egui/main.rs) |
+| wails | Wails 2 (Go), page in the system web view | anywhere with Go | [go.mod](wails/go.mod), [go.sum](wails/go.sum), [main.go](wails/main.go), [hide_windows.go](wails/hide_windows.go), [hide_other.go](wails/hide_other.go) |
+| electron | Electron (TypeScript and Node), its own Chromium | anywhere with Node | [package.json](electron/package.json), [package-lock.json](electron/package-lock.json), [main.js](electron/main.js), [preload.js](electron/preload.js) |
+| qt | Qt 6 Quick (C++) | Windows only for the Windows build | [CMakeLists.txt](qt/CMakeLists.txt), [main.cpp](qt/main.cpp), [Main.qml](qt/Main.qml) |
+| flutter | Flutter (Dart) | Windows only for the Windows build | [pubspec.yaml](flutter/pubspec.yaml), [main.dart](flutter/main.dart), [.gitignore](flutter/.gitignore) (everything `flutter create .` makes stays out of the repository) |
 
-`web/index.html` is the one page the web view stacks share.
+[index.html](index.html) is the one page the web view stacks share, and
+[.gitignore](.gitignore) keeps every build out of the repository.
 
 ## Building and measuring
 
@@ -59,7 +58,7 @@ repository root:
 pwsh -File docs\studies\launcher-stack\Measure-Prototypes.ps1
 ```
 
-It fetches every toolchain into its own work folder, builds all fourteen,
+[Measure-Prototypes.ps1](../Measure-Prototypes.ps1) fetches every toolchain into its own work folder, builds all fourteen,
 runs each five times and writes `results.md` there. `-Clean` removes the
 work folder and the web view data folders afterwards. The script's own help
 says the rest.
