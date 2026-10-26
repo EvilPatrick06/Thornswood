@@ -90,7 +90,9 @@ last one wins, the same reader Build-DoorTable.py uses. A plugin that names
 its master as Hearthfires.esm and one that names it HearthFires.esm mean the
 same file, so masters are matched to the load order without case: without
 that, CFTO's override of a Hearthfire carriage driver reads as a second
-driver.
+driver. Thornswood-Last.esp is in the load order but its placements are not
+read: it is the deletion this list is written before, and read, it would make
+every actor the NPC catalogue cuts look switched off at the start (#3543).
 
 WHAT IT WRITES. game\\data\\cast.json, and nothing else.
 
@@ -184,6 +186,13 @@ CRIME_HOLD = {
 }
 
 NO_HOLD = 'no hold'
+# Thornswood-Last.esp is the deletion this list comes before: it switches off
+# every placed actor the NPC catalogue cuts (#2468) and the floor items
+# (#3077). Its placements are not read, or every cut actor would read as
+# switched off at the start and the cast would lose its guards and traders
+# (#3543). Its other records are, so a cell's location is the one the game
+# puts it in, the way Build-NpcPopulation.py reads it.
+LAST_PLUGIN = 'Thornswood-Last.esp'
 WANTED = (b'FACT', b'NPC_', b'LVLN', b'RACE', b'KYWD', b'LCTN', b'CELL', b'WRLD')
 
 
@@ -195,8 +204,9 @@ def edid_of(body):
     return body.rstrip(bytes([0])).decode('ascii', 'replace')
 
 
-def read(pl, t):
-    """Every record this pass wants out of one plugin, into t, last one wins."""
+def read(pl, t, placements=True):
+    """Every record this pass wants out of one plugin, into t, last one wins.
+    With placements False its REFRs and ACHRs are left out."""
     buf = pl.buf
 
     def ref(body, off=0):
@@ -221,7 +231,9 @@ def read(pl, t):
                 continue
             flags, fid = struct.unpack_from('<II', buf, p + 8)
             d = pl.desc(fid)
-            if d and tag == b'REFR' and cell:
+            if tag in (b'REFR', b'ACHR') and not placements:
+                pass
+            elif d and tag == b'REFR' and cell:
                 # Only what decides whether a placed thing starts switched on:
                 # its own flag, and the enable parent it follows. A marker is
                 # usually the parent, which is why every REFR is looked at.
@@ -510,7 +522,7 @@ def build(data, plugins_txt, say):
             pl.strings = bsa.load_strings(data, name)
             if pl.strings:
                 tables += 1
-        read(pl, t)
+        read(pl, t, placements=(name != LAST_PLUGIN))
         failed += pl.failed
 
     cast = Cast(t)
