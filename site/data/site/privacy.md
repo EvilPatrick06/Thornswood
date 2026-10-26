@@ -188,7 +188,11 @@ until 24 September 2026, and both are served from here now.
   and it stays in the Discord, closed, for 365 days, then the bot deletes it.
   A ticket nobody closes is closed by Discord after a week with nothing said
   in it, and goes 365 days after that. Opening a ticket again starts its 365
-  days over when it next closes. The bot checks every hour.
+  days over when it next closes. Each time a ticket is closed, the bot writes
+  a line in a staff only ticket log naming the ticket, which carries your
+  name in Discord, and a ticket whose private thread cannot be opened goes
+  into that log whole instead. Each of those goes 365 days after it was
+  written. The bot checks every hour.
 - **Your answer to the rules** is kept for as long as your account is here,
   because it is the record that you agreed to them, and goes with the rest
   of your account when you ask for that to be deleted.

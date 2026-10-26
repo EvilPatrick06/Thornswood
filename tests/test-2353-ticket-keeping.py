@@ -23,6 +23,10 @@ request. It proves:
   - a delete Discord refuses is said with its reason, and the rest still go;
   - a channel whose list cannot be read is said with its reason, and the
     next channel is still aged;
+  - the bot's own messages in the staff ticket log (#3634), a whole ticket
+    put there because its thread would not open and the Closed lines, go
+    365 days after they were posted; anybody else's, a channel tickets open
+    off and a channel that is not a log are never touched;
 and that the bot starts the hourly watch when it is ready, the close message
 and the privacy page say the year, and the bot is still allowed to delete
 threads. Synthetic ids only. Read only.
@@ -181,9 +185,95 @@ yes('a pass with nothing past its time deletes nothing and says nothing', again 
 yes('with no bot id nothing is deleted',
     not past(Thread(402, NOW - 400 * DAY), None, NOW - DAYS * DAY))
 
+# ---- the staff ticket log (#3634)
+LOG_NAMES = ['ticket-log', 'tickets']
+space['TICKET_LOG'] = LOG_NAMES
+code = lift('age_ticket_log')
+yes('bot.py has age_ticket_log', bool(code))
+exec(code, space)
+age_log = space['age_ticket_log']
+
+
+class Author:
+    def __init__(self, uid):
+        self.id = uid
+
+
+class Message:
+    def __init__(self, mid, posted, author=BOT, refuse=False):
+        self.id = mid
+        self.created_at = posted
+        self.author = Author(author)
+        self.refuse = refuse
+        self.deleted = False
+
+    async def delete(self):
+        if self.refuse:
+            raise Refused('Missing Permissions')
+        self.deleted = True
+
+
+class LogChannel:
+    def __init__(self, name, messages, refuse=False):
+        self.name = name
+        self.messages = messages
+        self.refuse = refuse
+        self.asked = []
+
+    async def history(self, limit=100, before=None):
+        self.asked.append({'limit': limit, 'before': before})
+        if self.refuse:
+            raise Refused('Forbidden (status code: 403)')
+        # Every message, so the function's own check is what is tested.
+        for m in self.messages:
+            yield m
+
+
+fallback = [Message(501, NOW - 366 * DAY), Message(502, NOW - 366 * DAY)]
+closed_line = Message(503, NOW - 400 * DAY)
+young_line = Message(504, NOW - 364 * DAY)
+staff_said = Message(505, NOW - 400 * DAY, author=7)
+no_when = Message(506, None)
+naive_when = Message(507, (NOW - 400 * DAY).replace(tzinfo=None))
+stuck = Message(508, NOW - 500 * DAY, refuse=True)
+book = LogChannel('Ticket-Log', fallback + [closed_line, young_line, staff_said, no_when, naive_when, stuck])
+old_book = Message(601, NOW - 800 * DAY)
+legacy = LogChannel('tickets', [old_book])
+panel = Message(701, NOW - 800 * DAY)
+desk_named = LogChannel('get-help', [panel])
+chat_old = Message(801, NOW - 800 * DAY)
+chat = LogChannel('general-chat', [chat_old])
+unread = LogChannel('tickets', [Message(901, NOW - 800 * DAY)], refuse=True)
+LOGGED[:] = []
+got = asyncio.run(age_log(Guild([unread, chat, desk_named, book, legacy]), BOT, NOW))
+yes('a whole ticket the bot put in the log 366 days ago is deleted, every part of it',
+    all(m.deleted for m in fallback))
+yes('a Closed line 400 days old is deleted', closed_line.deleted)
+yes('one 364 days old stays', not young_line.deleted)
+yes('a message somebody else wrote there is never touched', not staff_said.deleted)
+yes('a message whose time is missing, or has no time zone, is kept',
+    not no_when.deleted and not naive_when.deleted)
+yes('the old #tickets log is aged too', old_book.deleted)
+yes('a channel tickets open off is never touched, even if TICKET_LOG named it',
+    not panel.deleted and not desk_named.asked)
+yes('nor a channel that is not a log', not chat_old.deleted and not chat.asked)
+yes('Discord is asked for every message posted before the cut',
+    book.asked == [{'limit': None, 'before': NOW - DAYS * DAY}])
+yes('the counts say what happened: four deleted, one refused, one history unread', got == (4, 2))
+yes('a refused delete is said with its id and Discord\'s reason',
+    any('could not delete message 508' in s and 'Missing Permissions' in s for s in LOGGED))
+yes('a history that cannot be read is said with its reason, and the next channel is still aged',
+    any('could not read #tickets' in s and '403' in s for s in LOGGED) and old_book.deleted)
+yes('what went is said as a count a channel, never what a message said',
+    any('deleted 3 of the bot' in s and '#Ticket-Log' in s for s in LOGGED) and
+    not any('501' in s or '503' in s for s in LOGGED))
+yes('with no bot id nothing is deleted',
+    asyncio.run(age_log(Guild([LogChannel('ticket-log', [Message(902, NOW - 800 * DAY)])]), None, NOW)) == (0, 0))
+
 watch = lift('watch_closed_tickets')
 yes('the hourly watch ages every server and sleeps TICKET_KEEP_EVERY between passes',
-    'age_closed_tickets(gd, bot_id, now)' in watch and 'asyncio.sleep(TICKET_KEEP_EVERY)' in watch)
+    'age_closed_tickets, age_ticket_log' in watch and 'await age(gd, bot_id, now)' in watch
+    and 'asyncio.sleep(TICKET_KEEP_EVERY)' in watch)
 yes('the bot starts the watch when it is ready',
     'asyncio.create_task(watch_closed_tickets())' in lift('on_ready'))
 yes('a ticket is opened with the week Discord closes an idle one after',
@@ -203,6 +293,9 @@ yes('the privacy page says a closed ticket goes after 365 days',
     'closed, for 365 days, then the bot deletes it' in page)
 yes('and when one nobody closed goes', 'A ticket nobody closes is closed by Discord after a week' in page)
 yes('and no longer that it stays until staff delete it', 'until staff delete it' not in page)
+yes('the privacy page names the staff ticket log and its 365 days (#3634)',
+    'a line in a staff only ticket log naming the ticket' in page and
+    'goes into that log whole instead. Each of those goes 365 days after it was written' in page)
 
 print('\n%d passed, %d failed' % (len(PASS), len(FAIL)))
 sys.exit(1 if FAIL else 0)
