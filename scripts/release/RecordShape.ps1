@@ -15,6 +15,7 @@
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
       skyrim-files        records\skyrim-files.json      every file of that build (the launcher embeds it)
       ui-gone             records\ui-gone.json           the files every pack deletes (Ship and the launcher)
+      shipped-not-ours    records\shipped-not-ours.json  other authors' files the packs once shipped, gone by sha256 (#1178)
       generated           records\generated.json         what Build-Generated builds before a Ship
 
       $doc = Read-ThornswoodRecord -Path <file> -Kind server-build
@@ -52,6 +53,8 @@ $script:ThornswoodRecordKinds = [ordered]@{
     'skyrim-pin'         = @{ File = 'records\skyrim-pin.json';         Versions = @(1); MustSay = $false }
     'skyrim-files'       = @{ File = 'records\skyrim-files.json';       Versions = @(1); MustSay = $false }
     'ui-gone'            = @{ File = 'records\ui-gone.json';            Versions = @(1); MustSay = $false }
+    # #1178: what Publish-Update carries into every record as gone by sha256.
+    'shipped-not-ours'   = @{ File = 'records\shipped-not-ours.json';   Versions = @(1); MustSay = $true }
     'generated'          = @{ File = 'records\generated.json';          Versions = @(1); MustSay = $false }
     # Slice 5 (#2180): the feed store's files. No committed file: each channel's
     # store holds its own (Check-Records -Feed <folder> reads them).
@@ -227,6 +230,17 @@ function Get-ThornswoodRecordProblems {
             $un = Get-ThornswoodRecordProp $Doc 'unused'
             if ($null -eq $un -or $un -isnot [array] -or @($un).Count -eq 0) { $out += 'unused is missing, empty, or not a list of file names' }
             elseif (@($un | Where-Object { -not ($_ -is [string]) -or -not $_.Trim() }).Count) { $out += 'unused has an entry that is not a file name' }
+        }
+        'shipped-not-ours' {
+            # Other authors' files the packs shipped before the scrub (#1178):
+            # Publish-Update makes each a gone line with this sha256.
+            $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
+            $f = Get-ThornswoodRecordProp $Doc 'files'
+            if ($null -ne $f -and $f -is [psobject]) {
+                foreach ($p in $f.PSObject.Properties) {
+                    if ($p.Name -notmatch '^Data\\[^/:*?"<>|]+$' -or $p.Name -match '(^|\\)\.\.(\\|$)') { $out += "files.$($p.Name) is not a path under Data, written with backslashes" }
+                }
+            }
         }
         'generated' {
             # What Build-Generated builds before a Ship (#1247). Either part may

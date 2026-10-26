@@ -39,6 +39,19 @@ read it (issue #440, phase 8):
   copy those files back. No script writes this one: it is changed by hand, in
   a pull request. `tests\test-ship-rules.ps1` fails while Ship-Rules and
   OwnGame disagree with it.
+- `shipped-not-ours.json`: the 166 loose files of other authors (67.6 MB)
+  that the packs and the installer handed out before the scrub of 29 Sep
+  (#1257), each with the sha256 we shipped, as they sat in the shipping
+  machine's own main install on 12 Oct (issue #1178). The scrub took them out
+  of every record before #1261 made a dropped file of somebody else's into a
+  gone line, so no record ever named them as gone and every install the old
+  packs reached kept them. Publish-Update carries each into every release
+  record as `:gone:<path>` with its sha256, unless the release ships that
+  path, and stops if this file cannot be read. The launcher deletes such a
+  file only while its bytes still match and Vortex has not deployed that
+  path, so a person's own copy and the collection's are never touched. No
+  script writes this one: it is changed by hand, in a pull request.
+  `tests\test-1178-shipped-not-ours.ps1` holds it.
 - `skyrim-files.json`: every file of the pinned build, 46 on 1.6.1170, with
   its bytes, SHA-1 and depot, read out of Steam's own manifests of the three
   depots `skyrim-pin.json` names by `scripts\release\New-SkyrimFilesRecord.ps1`

@@ -228,7 +228,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -
 # launcher\app\VortexProfileState.cs: LoadOrder.ps1 compiles the Vortex state
 # reader from the launcher's source since #1416, and the publish reads the
 # collection revision through it (#1878).
-foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'launcher\app\VortexProfileState.cs') {
+foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\shipped-not-ours.json', 'launcher\app\VortexProfileState.cs') {
     $from = Join-Path $repo $f
     if (Test-Path -LiteralPath $from) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null; Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force }
 }
@@ -388,6 +388,11 @@ Yes '  every release''s record says its files are up, and the gone list carries 
     [string]$records[$R2][':record:files'] -eq '1' -and [string]$records[$R3][':record:files'] -eq '1' -and
     [string]$records[$R3][':gone:Data\Platform\UI\thornswood-old.esp'] -eq 'removed' -and [string]$records[$R3][':gone:Data\Platform\UI\thornswood-ancient.esp'] -eq 'removed')
 Yes ("  the feed still lists the packs ({0}) beside the record" -f @($d3.packs).Count) (@($d3.packs).Count -eq 4)
+# #1178: the other authors' files the packs shipped before the scrub, gone by sha256.
+$snoDoc = [IO.File]::ReadAllText((Join-Path $repo 'records\shipped-not-ours.json')) | ConvertFrom-Json
+$snoMissing = @($snoDoc.files.PSObject.Properties | Where-Object { [string]$records[$R3][':gone:' + $_.Name] -ne [string]$_.Value.sha256 })
+Yes ("  and every record carries records\shipped-not-ours.json's files as gone by their sha256 ({0} not)" -f $snoMissing.Count) (
+    $snoMissing.Count -eq 0 -and [string]$records[$R1][':gone:Data\meshes\weapons\kzl\kzl_haybale.nif'] -match '^[0-9a-f]{64}$')
 
 # ---- the launcher reads it ----------------------------------------------------
 Write-Host ''; Write-Host 'the launcher reads the feed'

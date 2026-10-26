@@ -1629,6 +1629,28 @@ foreach ($k in @($prev.Keys)) {
     $m = [regex]::Match([string]$prev[$k], '^\d+:([0-9a-fA-F]{64})$')
     if ($m.Success) { $gone[$k] = $m.Groups[1].Value.ToLowerInvariant() }
 }
+# ==== thornswood shipped not ours gone ====
+# tests\test-1178-shipped-not-ours.ps1 runs this block on its own.
+#
+# #1178: the other authors' files the packs shipped before the scrub of 29 Sep
+# (#1257). The scrub took them out of every record before #1261 merged, so no
+# previous record names them and the loop above never made them gone: every
+# install those packs reached kept them. records\shipped-not-ours.json holds
+# each one with the sha256 we shipped, and every record carries it the same
+# way. A broken or missing list stops the release rather than dropping them.
+$shippedNotOursPath = Join-Path $Here '..\..\records\shipped-not-ours.json'
+try { $shippedNotOurs = Read-ThornswoodRecord -Path $shippedNotOursPath -Kind shipped-not-ours }
+catch { Die ("records\shipped-not-ours.json could not be read, so the other authors' files the packs once shipped would stay in every install: " + $_.Exception.Message) }
+foreach ($p in @($shippedNotOurs.files.PSObject.Properties)) {
+    $k = [string]$p.Name
+    if ($now.ContainsKey($k)) { continue }
+    # Ship-Rules' delete list takes it out whatever its bytes.
+    if ($gone.ContainsKey($k) -and $gone[$k] -eq 'always') { continue }
+    if (-not (Test-ShipNotOurs $k)) { continue }
+    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k)) { continue }
+    $gone[$k] = ([string]$p.Value.sha256).ToLowerInvariant()
+}
+# ==== end thornswood shipped not ours gone ====
 foreach ($k in @($gone.Keys)) {
     if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
     if ($gone[$k] -eq 'always') { continue }
