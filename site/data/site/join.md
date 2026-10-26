@@ -9,8 +9,8 @@ Steam for 1.6.1170's files under your own account and puts them in
 Thornswood's folder. Your Steam copy stays on the build it is on. Nothing
 comes from anywhere but Steam.
 
-**Anniversary Edition is not required** and never will be. If you own it,
-nothing breaks. If you do not, nothing is missing.
+**Anniversary Edition is not required**, and never will be. If you own it, nothing breaks. If you
+do not, nothing is missing.
 
 **Vortex**, with a free Nexus Mods account. The mods come from a collection on
 Nexus, and a collection is a Vortex thing: Mod Organizer cannot install it.
@@ -20,9 +20,9 @@ verify it and mod it as you like. The launcher builds a game folder of its
 own, `C:\Thornswood\Game`, out of your Steam copy and what Vortex put into it,
 and after that it only takes Vortex's files from there. The mods and Skyrim's
 archives are hard links, which take no extra space, and the launcher checks
-the archives before every Play; everything else is Thornswood's own copy. Vortex keeps the mods in a profile of their own, so
-switching back to your usual profile and running Purge Mods leaves your own
-Skyrim the way it was.
+the archives before every Play; everything else is Thornswood's own copy.
+Vortex keeps the mods in a profile of their own, so switching back to your
+usual profile and running Purge Mods leaves your own Skyrim the way it was.
 
 <!-- alpha -->
 ## 1. Apply
@@ -46,8 +46,8 @@ Discord account is what lets you in. There is nothing else to sign up for, no
 second password, and no form on this site.
 
 You can do steps 2 and 3 while you wait. Step 4 works once you are accepted.
-It is an alpha, so things break: a bug found by four people is a bug that gets
-fixed by the weekend, so say when you find one.
+It is an alpha, so things break. Say so when you find something: a bug four
+people report is a bug that gets fixed.
 <!-- /alpha -->
 <!-- open -->
 ## 1. Come into the Discord
@@ -78,8 +78,9 @@ Not optional. Without it you have a launcher and no mods, and the server turns
 you away when you press Play.
 
 The link is on the [Downloads](/downloads) page and on the launcher's
-Diagnostics page. Open it and Vortex takes it from there: it makes a profile for Thornswood,
-downloads every mod from its own author, and deploys them. Give it time.
+Diagnostics page. Open it and Vortex takes it from there: it makes a profile
+for Thornswood, downloads every mod from its own author, and deploys them.
+Give it time.
 
 If the wrong profile is active in Vortex, the launcher says so before you press
 Play.
@@ -87,7 +88,7 @@ Play.
 ## 4. Connect your Discord in the launcher
 
 Open Thornswood from the desktop shortcut and press **Connect Discord** on the
-main page. Your browser opens, you say yes, and it closes itself.
+Play page. Your browser opens, you say yes, and it closes itself.
 
 You never do this again.
 
@@ -101,30 +102,48 @@ compares every plugin with the server's copy, byte for byte. If one differs it
 says so. For Thornswood's own plugin **Fix** downloads the server's copy; for
 another author's mod it names the mod to update or reinstall in Vortex.
 
-Then the game loads to its main menu and asks who you are today: one of your
-characters, or a new one. Pick and press Play.
+Then the game loads to its main menu and lists your characters, with an empty
+slot for a new one. Pick one and you are in. There is no address to type and
+no password to remember.
 
-A new character arrives in a quiet hall and the race menu opens, and that is
-where you make your face. When you are done, a panel opens on its own for the
-three choices on the [Professions](/classes) page: your class, your
-profession and the half of it you will make your own, and the town you wake
-up in. Only the town has to be chosen before you leave the hall, and choosing
-it sends you to that town; your class and profession can wait, and are picked
-later in the world from the same panel. Until you pick a profession you cannot
-make anything at a bench, smelting and tanning included, so do not wait long if
-you mean to make things. You arrive in the clothes you stand in,
-with forty gold. The same panel is behind **K** from then on, for your skill
-points.
+## Your first character
 
-There is no address to type and no password to remember.
+A new character arrives in a quiet stone hall in a tunic and boots, and the
+race menu opens. That is where you make your face and give your character a
+name that belongs in Skyrim.
+
+When you close it, the panel behind **K** opens on its own. It holds the three
+choices on the [Professions](/classes) page, your class, your profession and
+the half of it you will make your own, and the town you start in: Whiterun,
+Riften, Solitude, Windhelm, Markarth, Falkreath, Morthal, Dawnstar or
+Winterhold.
+
+Only the town has to be chosen before you leave the hall, and choosing it
+sends you there. You arrive at a quiet spot in or near the town, not in its
+inn: the stables or the carriage stop at Whiterun, Solitude, Windhelm and
+Riften, Understone Keep in Markarth, and a quiet corner of each of the other
+four. The town cannot be changed afterwards.
+
+Your class and profession can wait, and are picked later in the world from the
+same panel. Until you pick a profession you cannot make anything at a bench,
+smelting and tanning included, and until you pick a class every seam, carcass,
+plant, fishing spot and crop turns you away. So do not wait long.
+
+You start with the clothes you stand in and forty gold, once. A Miner, a
+Farmer, a Fisher and a Woodworker are handed the tool their work needs the
+moment they pick it. Everything else you earn, make, buy or are given.
+
+The same panel is behind **K** from then on: your rank, your recipe book and
+your skill points.
 
 ---
 
 ## Voice
 
 Voice runs in the launcher, not the game, so leave the launcher open while you
-play. Push to talk. Whisper and yell change how far your voice carries in the
-world.
+play. Hold **V** to talk, or press **O** to keep the microphone open. **B**
+steps between a whisper, your normal voice and a yell, which change how far
+your voice carries in the world.
 
 ## If it goes wrong
 
