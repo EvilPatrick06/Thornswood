@@ -620,9 +620,14 @@ try {
   }));
   const holds = ['Whiterun', 'Haafingar', 'Falkreath', 'Hjaalmarch', 'the Pale', 'the Rift',
     'Winterhold', 'Eastmarch', 'the Reach', 'Solstheim'];
+  // Counted in the hold's columns, or among those switched off at the start:
+  // Thornswood-Last.esp switches off the cut actors (#2468), guards among
+  // them, and a table built from the load order the server runs (#3105)
+  // counts them there.
   yes('all nine holds and Solstheim have traders and guards counted', holds.every(function (h) {
     const c = (j.holds[h] || {}).counts || {};
-    return c.traders > 0 && c.guards > 0;
+    const off = (j.holds[h] || {}).offAtStartBy || {};
+    return c.traders + (off.traders || 0) > 0 && c.guards + (off.guards || 0) > 0;
   }));
   yes('the Companions are not counted as guards', Object.keys(j.holds).every(function (h) {
     return !((j.holds[h] || {}).guards || {})['Aela the Huntress'];

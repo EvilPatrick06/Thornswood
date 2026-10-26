@@ -100,8 +100,14 @@ const coinHeld = (table.notCopied || []).filter((r) => r.inputs.some((i) => i.it
 yes('T7 every forge recipe that charges gold coins has them taken out, and nothing else of it changes unless ' +
     'its peers say so (q-3115 B; ' + coinTable.length + ' of ' + coinRows.length + ', ' + coinHeld.length +
     ' a never-copied plugin\'s)',
+    // Every forge row the recipe table still reads coins on is in the file.
+    // Not a count: once Thornswood-Last.esp is in the load order the table is
+    // built from (the server's, #3105), the rows it re-costs read without
+    // their coins, as "WHY IT IS STABLE" in Build-Recost.py says, and only
+    // the never-copied plugin's rows still carry them.
     (rule.notMaterial || []).join() === 'f:Skyrim.esm' && coinRows.length > 0 &&
-    coinRows.length === coinTable.length + coinHeld.length && table.counts.coinsTakenOut === coinTable.length &&
+    coinRows.every((k) => coinTable.some((r) => r.recipe === k) || coinHeld.some((r) => r.recipe === k)) &&
+    table.counts.coinsTakenOut === coinTable.length && coinTable.length > 0 &&
     coinTable.every((r) => r.why.indexOf('coins') >= 0 && r.inputs.every((i) => i.item === 'f:Skyrim.esm' ? i.to === 0
       : (r.why.indexOf('peers') >= 0 || i.to === i.count))));
 yes('T8 a recipe that takes a finished piece is a conversion and is not re-costed',
