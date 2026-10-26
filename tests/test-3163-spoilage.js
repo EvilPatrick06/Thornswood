@@ -63,6 +63,8 @@ yes('A1 drink, ale, tea, potions and drugs never spoil',
 yes('A1 only raw food is preserved', JSON.stringify(S.preserve) === '["raw"]');
 yes('A1 salting takes the game\'s Salt Pile and smoking its Firewood',
     S.salt === '34cdf:Skyrim.esm' && S.firewood === '6f993:Skyrim.esm');
+yes('A1 spoiled food is the content plugin\'s own record (Patrick, 26 October, C)',
+    S.spoiled === '19100:Thornswood-Content.esp');
 const fmLine = gm.split('\n').filter(function (l) { return l.indexOf('const FOOD_GROUPS = ') === 0; })[0] || '';
 yes('A2 the gamemode\'s FOOD_GROUPS line is food-groups.json as it is (scripts/dev/Build-SpoilNames.js)',
     fmLine === 'const FOOD_GROUPS = ' + groupsText.trim() + ';');
@@ -95,6 +97,7 @@ if (typeof create !== 'function') {
 const VENISON = 0x65c99, SALMON = 0x106e1b, APPLE = 0x64b2f, ALE = 0x34c5e, HONEY = 0x0;
 const SOUP = 0x3cd5b, FINE_SOUP = 0x5019010, BEEF_STEW = 0x1000001, MILK = 0x6003534;
 const SALT = 0x34cdf, WOOD = 0x6f993, SWORD = 0x12eb7, POTION = 0x3eae3, CHEESE = 0x64b33;
+const SPOILED = 0x5019100;
 const DESC = {};
 function descFor(id, wanted) { DESC[id] = wanted; }
 // Records picked out of the real table by group, so the test follows it.
@@ -119,6 +122,7 @@ descFor(SALT, S.salt);
 descFor(WOOD, S.firewood);
 descFor(SWORD, '12eb7:Skyrim.esm');
 descFor(POTION, '3eae3:Skyrim.esm');
+descFor(SPOILED, S.spoiled);
 void HONEY;
 const ID = {};
 Object.keys(DESC).forEach(function (id) { ID[DESC[id]] = Number(id); });
@@ -129,7 +133,7 @@ const COOK = 0xff000001, STRANGER = 0xff000002, CHEST = 0x10a001, COLD_CHEST = 0
 function world() {
   const w = {
     inv: {}, packClock: {}, chestClock: {}, said: [], shown: [], lines: {}, writes: 0,
-    failWrite: false, fire: false, cooks: {}, coldIds: {}
+    failWrite: false, fire: false, cooks: {}, coldIds: {}, winter: function () { return false; }
   };
   w.api = {
     table: S,
@@ -149,6 +153,7 @@ function world() {
     chestClock: function (id) { return w.chestClock[id] || null; },
     setChestClock: function (id, c) { w.chestClock[id] = c; },
     cold: function (id) { return !!w.coldIds[id]; },
+    winterAt: function (t) { return w.winter(t); },
     isContainer: function (desc) { return desc === 'chest'; },
     stateOf: function (id) { return { id: id }; },
     canWork: function (state, half) { return !!(w.cooks[state.id] && w.cooks[state.id] === half); },
@@ -200,7 +205,12 @@ function names(entries) { return (entries || []).map(function (x) { return x.bas
   yes('D2 a day comes off every piece, and two stacks that come to the same days fold into one',
       JSON.stringify(names(r1.entries)) === JSON.stringify(names([e(VENISON, 1, 'Venison (1 day left)'), e(VENISON, 2, 'Venison (2 days left)')])));
   const r2 = w.rot.aged([e(VENISON, 1, 'Venison (1 day left)'), e(VENISON, 1, 'Venison (1 day left)')], 1);
-  yes('D3 food that reaches 0 is gone, and said', r2.entries.length === 0 && r2.gone.length === 2);
+  yes('D3 food that reaches 0 is spoiled food named for what it was, and said',
+      r2.entries.length === 1 && r2.entries[0].baseId === SPOILED && r2.entries[0].count === 2 &&
+      r2.entries[0].name === 'Venison (spoiled)' && r2.gone.length === 2);
+  const r2b = w.rot.aged([e(SPOILED, 3, 'Venison (spoiled)')], 40);
+  yes('D3 and spoiled food never changes again', JSON.stringify(r2b.entries) === JSON.stringify([e(SPOILED, 3, 'Venison (spoiled)')]) &&
+      r2b.gone.length === 0 && w.rot.lifeOf(SPOILED) === 0);
   const r3 = w.rot.aged([e(VENISON, 1, 'Venison (salted)'), e(VENISON, 1, 'Grandma\'s Venison'), e(SWORD, 1, 'Iron Sword (85%)')], 30);
   yes('D4 preserved food, a name somebody else gave and a sword\'s condition are left as they are',
       JSON.stringify(names(r3.entries)) === JSON.stringify(names([e(VENISON, 1, 'Venison (salted)'),
@@ -232,9 +242,9 @@ function names(entries) { return (entries || []).map(function (x) { return x.bas
   w.packClock[COOK] = { at: t, ms: DAY - 1 };
   w.said = [];
   w.rot.pass(COOK, t + 60000);
-  yes('E5 food that went off is gone and its owner is told',
-      w.inv[COOK].length === 0 && w.said.length === 1 && w.said[0].id === COOK &&
-      w.said[0].line === 'Your 2 Venison went off and were thrown out.');
+  yes('E5 food that went off is spoiled food in the pack, and its owner is told',
+      w.inv[COOK].length === 1 && w.inv[COOK][0].baseId === SPOILED && w.inv[COOK][0].name === 'Venison (spoiled)' &&
+      w.said.length === 1 && w.said[0].id === COOK && w.said[0].line === 'Your 2 Venison went off.');
   w.inv[COOK] = [e(VENISON, 1, 'Venison (3 days left)')];
   w.packClock[COOK] = { at: t, ms: DAY - 1 };
   w.failWrite = true;
@@ -266,9 +276,10 @@ function names(entries) { return (entries || []).map(function (x) { return x.bas
       w.inv[CHEST].filter(function (x) { return x.name === 'Venison (3 days left)'; }).length === 1 && w.chestClock[CHEST].at === t0);
   w.said = [];
   w.rot.opened(CHEST, STRANGER, t0 + 10 * DAY);
-  yes('F4 food that went off in a chest is gone and the opener is told',
-      w.inv[CHEST].length === 0 && w.said.length === 1 && w.said[0].id === STRANGER &&
-      /^The .* in this chest went off and were thrown out\.$/.test(w.said[0].line));
+  yes('F4 food that went off in a chest is spoiled food there, and the opener is told',
+      w.inv[CHEST].length === 2 && w.inv[CHEST].every(function (x) { return x.baseId === SPOILED && / \(spoiled\)$/.test(x.name); }) &&
+      w.said.length === 1 && w.said[0].id === STRANGER &&
+      /^The Venison and .* in this chest went off\.$/.test(w.said[0].line));
   w.inv[COLD_CHEST] = [e(VENISON, 1, 'Venison (6 days left)')];
   w.coldIds[COLD_CHEST] = true;
   w.rot.opened(COLD_CHEST, COOK, t0);
@@ -278,8 +289,35 @@ function names(entries) { return (entries || []).map(function (x) { return x.bas
   w.coldIds[COLD_CHEST] = false;
   w.rot.opened(COLD_CHEST, COOK, t0 + 5 * DAY);
   yes('F5 and taken out of the cold it owes nothing for the cold days', w.inv[COLD_CHEST][0].name === 'Venison (5 days left)');
+  // Every chest is cold in the winter week (Patrick, 26 October, B).
+  const WINTER_FROM = t0 + 20 * DAY, WINTER_TO = t0 + 27 * DAY;
+  w.winter = function (t) { return t >= WINTER_FROM && t < WINTER_TO; };
+  const WARM = 0x10a004;
+  w.inv[WARM] = [e(VENISON, 1, 'Venison (6 days left)')];
+  w.rot.opened(WARM, COOK, t0 + 18 * DAY);
+  const rw = w.rot.opened(WARM, COOK, t0 + 28 * DAY + 5);
+  yes('F7 a chest anywhere keeps food through the winter week: 10 days pass and only the 3 outside winter come off',
+      rw.turned === 3 && w.inv[WARM][0].name === 'Venison (3 days left)' && w.chestClock[WARM].days === 10);
+  w.winter = function () { return false; };
   yes('F6 a press on something that is not a container is no chest clock',
       w.rot.pressed(COOK, DOOR, 'door', t0) === null && w.rot.pressed(COOK, CHEST, 'chest', t0) !== null);
+})();
+
+// ------------------------------------------- C3. no record, no spoiling --
+(function () {
+  const w = world();
+  const saved = DESC[SPOILED];
+  delete DESC[SPOILED];
+  delete ID[saved];
+  const logs = [];
+  w.api.log = function () { logs.push(Array.prototype.join.call(arguments, ' ')); };
+  w.rot = create(w.api);
+  const r = w.rot.aged([e(VENISON, 1, 'Venison (1 day left)')], 3);
+  yes('C3 without the spoiled food record nothing spoils, and the block says so once',
+      w.rot.lifeOf(VENISON) === 0 && r.gone.length === 0 && r.entries[0].name === 'Venison (1 day left)' &&
+      (w.rot.lifeOf(BEEF_STEW), logs.length === 1) && /no spoiled food record/.test(logs[0]));
+  DESC[SPOILED] = saved;
+  ID[saved] = SPOILED;
 })();
 
 // ------------------------------------------------- G. crafting --
@@ -404,11 +442,24 @@ yes('I8 the panel\'s buttons send /preserve salt and /preserve smoke with the ro
     !/type \/preserve/i.test(ui) && !/type \/preserve/i.test(front));
 yes('I9 the server\'s view reaches the page through its property', /window\.thornswoodPreserve\.setData\(d\)/.test(block));
 
+const needs = slice(gm, '// ==== thornswood needs: hunger, thirst and exhaustion ====', '// ==== end thornswood needs ====') || '';
+yes('I10 eating spoiled food fills nothing and starts food sickness, always',
+    /if \(baseId && baseId === spoiledFood\(\)\) \{[\s\S]{0,300}meal\(actorId, \{ food: 0, sick: 'spoiled' \}\)/.test(needs) &&
+    /row\.food === 0 \? 0 :/.test(needs) && /food: \{ raw: 0\.40, full: 1, spoiled: 1 \}/.test(gm) &&
+    needs.indexOf('baseId === spoiledFood()') < needs.indexOf('if (baseId === burntMeal())'));
+const plugin = fs.readFileSync(path.join(REPO_DIR, 'game', 'content', 'Thornswood-Content.esp'));
+yes('I11 the content plugin carries the spoiled food record and its effect',
+    plugin.indexOf(Buffer.from('ThornswoodFoodSpoiled\0', 'latin1')) >= 0 &&
+    plugin.indexOf(Buffer.from('ThornswoodSpoiledEffect\0', 'latin1')) >= 0 &&
+    plugin.indexOf(Buffer.from('Spoiled Food\0', 'latin1')) >= 0);
+
 // ------------------------------------------------- J. the page --
 yes('J1 docs/systems/spoilage.md is the design', page.length > 0);
 yes('J1 and says the numbers: 7 days raw, 14 cooked, preserved never, a Salt Pile a piece, a Firewood for every 5',
     /7 days/.test(page) && /14 days/.test(page) && /never spoil/i.test(page) && /Salt Pile/.test(page) && /every 5 pieces/.test(page));
 yes('J1 and that a pack does not spoil while its owner is offline', /offline/i.test(page));
+yes('J1 and Patrick\'s answers of 26 October: cooks only, every chest cold in winter, spoiled food stays',
+    /winter week/i.test(page) && /\(spoiled\)/.test(page) && /fills nothing/i.test(page) && /compost/i.test(page));
 yes('J2 the page is linked from the food page', read('docs/systems/food.md').indexOf('spoilage.md') >= 0);
 const words = (page + '\n' + block + '\n' + ui).match(/\bplayers?\b/gi) || [];
 yes('J3 the page, the block and the panel never say player', words.length === 0);

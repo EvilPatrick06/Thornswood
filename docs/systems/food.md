@@ -9,6 +9,7 @@ kind it is. The state says how good a meal it is.
 | --- | --- | --- |
 | Raw meat or fish | 8 | Can start food sickness. What you eat with no fire |
 | Burnt | 8 | Stamina recovery -10% for 10 real minutes |
+| Spoiled | 0 | Starts food sickness. Food that ran out of days ([Spoilage](spoilage.md)) |
 | Ordinary food the table does not special-case | 15 | Nothing else |
 | Cooked | 25 | A small help for 20 real minutes, from what went in it (below) |
 | A feast | 40 | A stronger help for 10 real minutes |
@@ -90,8 +91,9 @@ fine one is what is in the pack after.
 
 Food spoils gently: raw in a real week, a dish in two, salted or smoked
 food never. A pack spoils only while its owner is online; a chest
-counts real days. A cook salts or smokes raw meat and fish. See
-[Spoilage](spoilage.md).
+counts real days, and keeps food in a snowy climate and in the winter
+week. Food that runs out is spoiled food, which fills nothing. A cook
+salts or smokes raw meat and fish. See [Spoilage](spoilage.md).
 
 ## Where this is
 

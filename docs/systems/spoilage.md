@@ -34,8 +34,26 @@ the server looks at it. That is a steak just cut from a deer, an
 apple just picked, or bread off a shelf. A dish comes off the pot
 with its full life already on it.
 
-When the last day runs out, the food is gone. Its owner is told what
-went off. For a chest, the person who opens it is told.
+## Spoiled food
+
+When the last day runs out, the food goes off and stays where it was,
+named for what it was: "Venison (spoiled)". Its owner is told what went
+off. For a chest, the person who opens it is told. Patrick decided this
+on his report page on 26 October (C).
+
+| Spoiled food | |
+| --- | --- |
+| Eating it | Fills nothing, and starts food sickness ([Disease](disease.md)) |
+| Cooking with it | No recipe takes it |
+| Worth | Nothing to a trader |
+| Compost | A Farmer can work it into a plot. Not built yet: [#3526](https://github.com/EvilPatrick06/Thornswood/issues/3526) |
+
+Spoiled food is one item of Thornswood's own, Spoiled Food, with each
+piece named for its food. It is not the food's own item with a new
+name, because the game tells the server only which item was eaten,
+never which line of it. With "Venison (spoiled)" and
+"Venison (3 days left)" both Venison, the server could not tell which
+one went down.
 
 ## Two clocks
 
@@ -58,14 +76,18 @@ whole day, never a share of one.
 
 ## Cold storage
 
+Patrick decided this on his report page on 26 October (B).
+
 A chest in a snowy climate keeps food. That is Winterhold, the Pale,
 and outdoors high in the mountains (the same places
 [Temperature](temperature.md) calls snowy and high). The chest's days
 still turn, so nothing is owed when the food leaves it, but none of
-them come off the food. A pack is never cold storage.
+them come off the food.
 
-Cold storage is open on Patrick's report page
-(q-3163-cold-storage). This is the recommended answer.
+In the winter week of the year every chest anywhere keeps food. A day
+that turns in winter comes off nothing in a chest (the seasons are on
+[Temperature](temperature.md)). A pack is never cold storage, in
+winter or anywhere.
 
 ## Preserving
 
@@ -83,8 +105,9 @@ One press preserves as much of the stack as the salt or the firewood
 carried covers. The rest of the stack is left as it was. Nothing is
 used when anything is refused.
 
-Who may preserve is open on Patrick's report page
-(q-3163-preserve-who). This is the recommended answer.
+Patrick decided who preserves on his report page on 26 October (B):
+cooks only. Everybody else sells fresh meat to a cook or buys preserved
+food.
 
 ### The key and the panel
 
