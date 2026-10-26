@@ -96,7 +96,7 @@
   (Setup-ShipMachine.ps1 -EngineBuild ci), and EngineBuild is then
   EngineArtifact: engine-ci\<the fork commit this checkout's
   records\server-build.json names, 12> in this machine's own data, where
-  Get-EngineArtifact.ps1 puts engine.yml's artifact of that commit after
+  Get-EngineArtifact.ps1 puts the fork's build of that commit after
   holding every file to the records. It is named for the pin, so a pin move
   is a new folder and never a stale one, and each checkout reads the build
   of its own pin. Like any place it is answered whether or not it is there

@@ -15,36 +15,42 @@
   again, which could not have matched either. Run 39588485569's artifact held
   the exact client.
 
+  Since #3399 (Patrick's A, 26 Oct) the build taken is the public fork's own
+  build of the pin, thornswood-engine-<commit>, which engine.yml records,
+  and not an artifact of this repository, whose storage was used up.
+
   WHAT IT HOLDS, in a scratch copy of the scripts with records made here and
   a stand-in GitHub, nothing sent anywhere:
-    1. Find-EngineArtifact (EngineArtifact.ps1): no artifact, one past its
-       days, one from another workflow, one from a red run are each "none",
-       saying how to make it again; every green engine.yml one is a
-       candidate, newest first, and a red one is not; a GitHub that cannot be read throws rather than saying none.
-    2. Install-EngineArtifact: the right artifact goes in as an engine build
-       (build\dist\client and build\dist\server, the artifact beside them,
-       engine-artifact.json naming the run), CR LF records and all. Refused,
-       with nothing put in place and no half folder left: a client file
-       that is not the record's (with SHA256SUMS made to agree), a file
-       SHA256SUMS does not name, one it names wrongly, records of another
-       commit, a client file the record does not name, no
-       client-licences.json, a licence text that is not the checkout's or
-       that it does not have (#3099), a server zip of another record, and a
-       folder that is there already.
-       Get-EngineArtifactFolderProblems: a folder of another pin is not this
-       one's.
+    1. Find-EngineArtifact (EngineArtifact.ps1): no fork build, one whose
+       artifact is past its 90 days, one still running and one red are each
+       "none", saying so; every green push build of the commit that keeps
+       its artifact is a candidate, newest first, and a red one is not; a
+       GitHub that cannot be read throws rather than saying none.
+    2. Install-EngineArtifact: the right build goes in as an engine build
+       (build\dist\client and build\dist\server, the server zip and
+       fork-build.json under artifact\, engine-artifact.json naming the fork's
+       run), CR LF records and all, and the fork's other server files
+       (gamemode.js, the settings, the .pdb) stay out. Refused, with nothing
+       put in place and no half folder left: a client file that is not the
+       record's (with fork-build.json made to agree), a file fork-build.json
+       does not name, one it names wrongly, a build of another commit or
+       from another run, a client file the record does not name, a server
+       file that is not the record's or is missing, and a folder that is
+       there already. Get-EngineArtifactFolderProblems: a folder of another
+       pin is not this one's.
     3. Where.ps1 and where.js: EngineArtifact is engine-ci\<pin 12> in the
        machine's data, answered with no record and whether or not it is
        there; {"ci": true} makes it EngineBuild, so ClientDist and ServerDist
        are under it, the two agree, and a pin move is another folder; a
        server record with no commit stops with a sentence.
     4. Get-EngineArtifact.ps1 whole, with a stand-in gh: -Check says it is on
-       GitHub (exit 2) and writes nothing; a run fetches it (exit 0) and
-       removes its scratch; a second run finds it there (exit 0); no artifact
-       and a gh that fails each stop (exit 1) saying why. Two kept for the
-       pin, the newer recorded later (#3243): the older, the checkout's, is
-       taken after the newer is held and passed over with why; neither the
-       checkout's stops (exit 1) naming both runs.
+       GitHub (exit 2) and writes nothing; a run fetches it from the fork
+       (exit 0) and removes its scratch; a second run finds it there (exit
+       0); no fork build and a gh that fails each stop (exit 1) saying why.
+       Two kept for the pin, the newer a build run again in the fork (other
+       bytes): the older, the one the records name, is taken after the newer
+       is held and passed over with why; neither the records' stops (exit 1)
+       naming both runs.
     5. Sync-Client.ps1 on a machine that takes CI's build, with a stand-in
        Get-EngineArtifact.ps1: without -Check it fetches the missing folder and
        copies the client in; -Check fetches nothing and names the script; a
@@ -141,71 +147,91 @@ try {
 
     . (Join-Path $repo 'scripts\release\EngineArtifact.ps1')
 
-    # An artifact as engine.yml's "Gather what this run made" writes it, for
-    # the records at $recDir (this checkout's unless told otherwise).
-    $srvDist = Join-Path $T 'server-dist'
-    foreach ($k in $fork.Keys) { Put (Join-Path $srvDist ($k -replace '/', '\')) $fork[$k] }
-    function Write-Sums([string]$dir) {
-        $base = (Resolve-Path -LiteralPath $dir).ProviderPath.TrimEnd('\', '/')
-        $lines = foreach ($f in @(Get-ChildItem -LiteralPath $dir -Recurse -File | Where-Object { $_.Name -ne 'SHA256SUMS' } | Sort-Object FullName)) {
-            (ShaFile $f.FullName) + '  ' + $f.FullName.Substring($base.Length + 1).Replace('\', '/')
-        }
-        [IO.File]::WriteAllLines((Join-Path $dir 'SHA256SUMS'), [string[]]@($lines))
-    }
-    # -RecordedUtc: the client record another engine.yml run of the same build
-    # writes, which differs only in when it was written (#3243).
-    function New-Artifact([string]$dir, [string]$recCommit = $commit, [switch]$Crlf, [string]$RecordedUtc = '2026-10-21T11:00:08Z') {
+    # The fork's build as gh run download leaves thornswood-engine-<commit>:
+    # fork-build.json and build\, every file in it named with its sha256,
+    # size and time. -Rebuilt changes a client file's bytes (a build run again
+    # in the fork is other bytes); $edit changes the folder or the manifest
+    # before fork-build.json is written.
+    $ForkRepo = 'EvilPatrick06/skymp'
+    function New-ForkBuild([string]$dir, [long]$runId = 39588485569, [string]$c = $commit, [hashtable]$Rebuilt = @{}, [scriptblock]$edit) {
         if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
-        foreach ($k in $client.Keys) { Put (Join-Path $dir ('client\' + $k)) $client[$k] }
-        $cr = ClientRecordText $recCommit $RecordedUtc; $sr = ServerRecordText $recCommit
-        if ($Crlf) { $cr = $cr.Replace("`n", "`r`n"); $sr = $sr.Replace("`n", "`r`n") }
-        Put (Join-Path $dir 'records\client-build.json') $cr
-        Put (Join-Path $dir 'records\server-build.json') $sr
-        Put-Licences $dir $recCommit
-        $recFile = Join-Path $T ('server-record-' + [Guid]::NewGuid().ToString('N') + '.json')
-        Put $recFile (ServerRecordText $recCommit)
-        $null = New-ThornswoodServerBuildArtifact -From $srvDist -Record $recFile -OutDir (Join-Path $dir 'server')
-        Put (Join-Path $dir 'fork-build.json') ('{"commit":"' + $recCommit + '"}')
-        Write-Sums $dir
+        $put = [ordered]@{}
+        foreach ($k in $client.Keys) { $put['build/dist/client/' + ($k -replace '\\', '/')] = $(if ($Rebuilt.ContainsKey($k)) { $Rebuilt[$k] } else { $client[$k] }) }
+        foreach ($k in $fork.Keys) { $put['build/dist/server/' + $k] = $fork[$k] }
+        # What else the fork's build folder holds, which no record names.
+        $put['build/dist/server/gamemode.js'] = 'the fork''s own gamemode'
+        $put['build/dist/server/server-settings.json'] = '{}'
+        $put['build/dist/server/scam_native.pdb'] = 'symbols'
+        $put['build/skymp5-server/launch_server.bat.tmp'] = $fork['launch_server.bat']
+        $put['build/licences/licences.json'] = '{"ports":{}}'
+        $files = [ordered]@{}
+        foreach ($rel in $put.Keys) {
+            $pth = Join-Path $dir $rel
+            Put $pth $put[$rel]
+            $files[$rel] = [ordered]@{ sha256 = (ShaFile $pth); bytes = (Get-Item -LiteralPath $pth).Length; lastWriteUtc = '2026-10-21T10:40:00Z' }
+        }
+        $m = [ordered]@{ repository = $ForkRepo; event = 'push'; ref = 'refs/heads/thornswood/engine-changes'; commit = $c; runId = $runId; runAttempt = 1
+                         runUrl = "https://github.com/$ForkRepo/actions/runs/$runId"; files = $files }
+        if ($edit) { & $edit $dir $m }
+        Put (Join-Path $dir 'fork-build.json') ($m | ConvertTo-Json -Depth 5)
         return $dir
     }
-    $run = [pscustomobject]@{ id = 39588485569; html_url = 'https://github.com/EvilPatrick06/Thornswood/actions/runs/39588485569'; path = '.github/workflows/engine.yml'; status = 'completed'; conclusion = 'success' }
-    $art = [pscustomobject]@{ id = 12340888147; name = 'engine-1a7b6eecdb38'; expired = $false; digest = 'sha256:' + ('a' * 64); size_in_bytes = 1234; workflow_run = [pscustomobject]@{ id = 39588485569 } }
+    # fork-build.json made to agree with the folder as it now is.
+    function Restamp([string]$dir) {
+        $m = [IO.File]::ReadAllText((Join-Path $dir 'fork-build.json')) | ConvertFrom-Json
+        $files = [ordered]@{}
+        $base = (Resolve-Path -LiteralPath $dir).ProviderPath.TrimEnd('\', '/')
+        foreach ($f in @(Get-ChildItem -LiteralPath $dir -Recurse -File | Where-Object { $_.Name -ne 'fork-build.json' } | Sort-Object FullName)) {
+            $files[$f.FullName.Substring($base.Length + 1).Replace('\', '/')] = [ordered]@{ sha256 = (ShaFile $f.FullName); bytes = $f.Length; lastWriteUtc = '2026-10-21T10:40:00Z' }
+        }
+        $m.files = $files
+        Put (Join-Path $dir 'fork-build.json') ($m | ConvertTo-Json -Depth 5)
+    }
+    function Run-Of([long]$id, [string]$status = 'completed', [string]$conclusion = 'success') {
+        return [pscustomobject]@{ id = $id; html_url = "https://github.com/$ForkRepo/actions/runs/$id"; status = $status; conclusion = $conclusion
+                                  head_sha = $commit; head_branch = 'thornswood/engine-changes'; event = 'push'; repository = [pscustomobject]@{ full_name = $ForkRepo } }
+    }
+    function Art-Of([long]$id, [bool]$expired = $false) {
+        return [pscustomobject]@{ id = $id; name = ('thornswood-engine-' + $commit); expired = $expired; digest = 'sha256:' + ('a' * 64); size_in_bytes = 34677624 }
+    }
+    $run = Run-Of 39588485569
+    $art = Art-Of 12340888147
 
     # ================================================ 1. Find-EngineArtifact ==
     Write-Host ''; Write-Host '1. Find-EngineArtifact'
-    function Stand-In($arts, $runs) {
+    # A stand-in GitHub: the fork's runs of the commit, and each run's
+    # artifacts by run id.
+    function Stand-In($runs, [hashtable]$arts) {
         $o = [pscustomobject]@{ Asked = New-Object Collections.Generic.List[string]; Get = $null }
         $o.Get = {
             param($path)
             $o.Asked.Add($path)
-            if ($path -like 'repos/EvilPatrick06/Thornswood/actions/artifacts?name=engine-1a7b6eecdb38*') { return [pscustomobject]@{ artifacts = @($arts) } }
-            if ($path -match '^repos/EvilPatrick06/Thornswood/actions/runs/(\d+)$') { return @($runs | Where-Object { [string]$_.id -eq $Matches[1] })[0] }
+            if ($path -like "repos/$ForkRepo/actions/workflows/thornswood-pr-windows.yml/runs?head_sha=$commit*") { return [pscustomobject]@{ workflow_runs = @($runs) } }
+            if ($path -match "^repos/$ForkRepo/actions/runs/(\d+)/artifacts\?name=thornswood-engine-$commit") { $a = $arts[[long]$Matches[1]]; return [pscustomobject]@{ artifacts = @($(if ($a) { $a })) } }
             throw "stand-in GitHub was asked $path"
         }.GetNewClosure()
         return $o
     }
-    $f = Find-EngineArtifact $commit (Stand-In @() @()).Get
-    Yes '1. no artifact at all: none, saying to run engine.yml again' ($f.State -eq 'none' -and $f.Why -match 'gh workflow run engine\.yml --ref main')
-    $old = $art.PSObject.Copy(); $old.expired = $true
-    $f = Find-EngineArtifact $commit (Stand-In @($old) @($run)).Get
-    Yes '1. one past its days: none, saying so' ($f.State -eq 'none' -and $f.Why -match 'past the 30 days' -and $f.Why -match 'gh workflow run engine\.yml')
-    $other = $run.PSObject.Copy(); $other.path = '.github/workflows/build.yml'
-    $f = Find-EngineArtifact $commit (Stand-In @($art) @($other)).Get
-    Yes '1. one from another workflow: none' ($f.State -eq 'none' -and $f.Why -match 'finished green')
-    $red = $run.PSObject.Copy(); $red.conclusion = 'failure'
-    $f = Find-EngineArtifact $commit (Stand-In @($art) @($red)).Get
-    Yes '1. one from a red engine.yml run: none' ($f.State -eq 'none')
-    $newRun = $run.PSObject.Copy(); $newRun.id = 39600000000
-    $newArt = $art.PSObject.Copy(); $newArt.id = 12350000000; $newArt.workflow_run = [pscustomobject]@{ id = 39600000000 }
-    $f = Find-EngineArtifact $commit (Stand-In @($art, $newArt) @($run, $newRun)).Get
+    $f = Find-EngineArtifact $commit (Stand-In @() @{}).Get
+    Yes '1. no fork build at all: none, saying a pin names a head the fork built' ($f.State -eq 'none' -and $f.Why -match 'has no build of a push of 1a7b6eec' -and $f.Why -match 'A pin names a head')
+    $f = Find-EngineArtifact $commit (Stand-In @($run) @{ 39588485569 = (Art-Of 1 $true) }).Get
+    Yes '1. one whose artifact is past its 90 days: none, saying the pin then needs new records' ($f.State -eq 'none' -and $f.Why -match '90 days' -and $f.Why -match 'new records')
+    $f = Find-EngineArtifact $commit (Stand-In @((Run-Of 39600000000 'in_progress' '')) @{}).Get
+    Yes '1. one still running: none, saying to run this again once it has finished' ($f.State -eq 'none' -and $f.Why -match 'still building' -and $f.Why -match '39600000000')
+    $f = Find-EngineArtifact $commit (Stand-In @((Run-Of 39600000000 'completed' 'failure')) @{}).Get
+    Yes '1. one that ended red: none, naming it' ($f.State -eq 'none' -and $f.Why -match 'ended failure')
+    $newRun = Run-Of 39600000000
+    $newArt = Art-Of 12350000000
+    $f = Find-EngineArtifact $commit (Stand-In @($run, $newRun) @{ 39588485569 = $art; 39600000000 = $newArt }).Get
     Yes '1. two green ones: both are candidates, newest first' ($f.State -eq 'found' -and @($f.Candidates).Count -eq 2 -and [long]$f.Candidates[0].Artifact.id -eq 12350000000 -and [long]$f.Candidates[0].Run.id -eq 39600000000 -and [long]$f.Candidates[1].Run.id -eq 39588485569)
-    Yes '1.   Run and Artifact are the newest, and the Why names both runs' ([long]$f.Artifact.id -eq 12350000000 -and [long]$f.Run.id -eq 39600000000 -and $f.Why -match '39600000000' -and $f.Why -match '39588485569' -and $f.Why -match "records are this checkout's")
-    $redNew = $newRun.PSObject.Copy(); $redNew.conclusion = 'failure'
-    $f = Find-EngineArtifact $commit (Stand-In @($art, $newArt) @($run, $redNew)).Get
+    Yes '1.   Run and Artifact are the newest, and the Why names both runs' ([long]$f.Artifact.id -eq 12350000000 -and [long]$f.Run.id -eq 39600000000 -and $f.Why -match '39600000000' -and $f.Why -match '39588485569' -and $f.Why -match 'the ones this checkout records')
+    $f = Find-EngineArtifact $commit (Stand-In @($run, (Run-Of 39600000000 'completed' 'failure')) @{ 39588485569 = $art; 39600000000 = $newArt }).Get
     Yes '1. a red newer run is no candidate' ($f.State -eq 'found' -and @($f.Candidates).Count -eq 1 -and [long]$f.Run.id -eq 39588485569)
-    $f = Find-EngineArtifact $commit (Stand-In @($art) @($run)).Get
-    Yes '1. the green engine.yml one is found, naming its run' ($f.State -eq 'found' -and $f.Why -match '39588485569')
+    $si = Stand-In @($run) @{ 39588485569 = $art }
+    $f = Find-EngineArtifact $commit $si.Get
+    Yes '1. the green push build is found, naming its run' ($f.State -eq 'found' -and $f.Why -match '39588485569')
+    Yes '1.   asked of the fork''s build, for this commit, a push and the branch, never of this repository' ($si.Asked[0] -match "^repos/$ForkRepo/actions/workflows/thornswood-pr-windows\.yml/runs\?head_sha=$commit&event=push&branch=thornswood%2Fengine-changes" -and
+        @($si.Asked | Where-Object { $_ -cmatch 'EvilPatrick06/Thornswood' }).Count -eq 0)
     $e = Threw { Find-EngineArtifact $commit { param($p) throw 'HTTP 401: Bad credentials' } }
     Yes '1. a GitHub that cannot be read throws, and is not "none"' ($e -match 'Bad credentials')
 
@@ -214,41 +240,40 @@ try {
     $into = [string](& (Join-Path $repo 'scripts\release\Where.ps1') EngineArtifact)
     $parent = Split-Path -Parent $into
     function Left { return @(Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '.partial-*' }).Count }
-    function Refused([string]$tag, [scriptblock]$spoil, [string]$says) {
-        $a = New-Artifact (Join-Path $T ('art-' + $tag))
+    function Refused([string]$tag, [scriptblock]$spoil, [string]$says, $withRun = $run) {
+        $a = New-ForkBuild (Join-Path $T ('fork-' + ($tag -replace '[^A-Za-z]', '')))
         & $spoil $a
-        $e = Threw { Install-EngineArtifact -From $a -Repo $repo -Into $into -Run $run -Artifact $art }
+        $e = Threw { Install-EngineArtifact -From $a -Repo $repo -Into $into -Run $withRun -Artifact $art }
         Yes ("2. refused: $tag" + $(if ($e) { '  (' + $e.Substring(0, [Math]::Min(150, $e.Length)) + ')' } else { '' })) (
             $e -match 'nothing was put in place' -and $e -match $says -and -not (Test-Path -LiteralPath $into) -and (Left) -eq 0)
     }
-    Refused 'a client file that is not the record''s, SHA256SUMS made to agree' { param($a) Put (Join-Path $a 'client\Data\Scripts\TESModPlatform.pex') 'A REBUILT PEX'; Write-Sums $a } 'TESModPlatform\.pex in the artifact is not the file records\\client-build\.json names'
-    Refused 'a file SHA256SUMS does not name' { param($a) Put (Join-Path $a 'client\Data\extra.dll') 'x' } 'extra\.dll is in the artifact and SHA256SUMS does not name it'
-    Refused 'a file SHA256SUMS names wrongly' { param($a) Put (Join-Path $a 'fork-build.json') '{"commit":"other"}' } 'fork-build\.json is not the file SHA256SUMS names'
-    Refused 'a client file the record does not name, SHA256SUMS made to agree' { param($a) Put (Join-Path $a 'client\Data\extra.dll') 'x'; Write-Sums $a } 'records\\client-build\.json does not name it'
-    Refused 'records of another commit' { param($a) Put (Join-Path $a 'records\server-build.json') (ServerRecordText ('b6c76e45' + ('0' * 32))); Write-Sums $a } 'records\\server-build\.json is not this checkout''s'
-    Refused 'no client-licences.json' { param($a) Remove-Item -LiteralPath (Join-Path $a 'records\client-licences.json'); Write-Sums $a } 'the artifact has no records\\client-licences\.json'
-    Refused 'a licence text that is not the checkout''s, SHA256SUMS made to agree' { param($a) Put (Join-Path $a 'records\client-licences\fmt.txt') 'another text'; Write-Sums $a } 'records\\client-licences\\fmt\.txt in the artifact is not this checkout''s'
-    Refused 'a licence text the checkout does not have' { param($a) Put (Join-Path $a 'records\client-licences\zlib.txt') 'zlib'; Write-Sums $a } 'records\\client-licences\\zlib\.txt is in the artifact and not in this checkout'
-    Refused 'a server zip of another record' {
-        param($a)
-        Get-ChildItem -LiteralPath (Join-Path $a 'server') -File | Remove-Item -Force
-        $rf = Join-Path $T 'server-record-other.json'
-        $txt = ServerRecordText $commit
-        Put $rf ($txt.Replace('"repo": "https://github.com/EvilPatrick06/skymp.git"', '"repo": "https://github.com/EvilPatrick06/skymp.git", "note": "another record"'))
-        $null = New-ThornswoodServerBuildArtifact -From $srvDist -Record $rf -OutDir (Join-Path $a 'server')
-        Write-Sums $a
-    } 'another record'
+    Refused 'a client file that is not the record''s, fork-build.json made to agree' { param($a) Put (Join-Path $a 'build/dist/client/Data/Scripts/TESModPlatform.pex') 'A REBUILT PEX'; Restamp $a } 'TESModPlatform\.pex in the fork''s build is not the file records\\client-build\.json names'
+    Refused 'a file fork-build.json does not name' { param($a) Put (Join-Path $a 'build/dist/client/Data/extra.dll') 'x' } 'extra\.dll is in the artifact and fork-build\.json does not name it'
+    Refused 'a file fork-build.json names wrongly' { param($a) Put (Join-Path $a 'build/dist/server/scam_native.node') 'other bytes' } 'scam_native\.node is not the file fork-build\.json names'
+    Refused 'a build of another commit' { param($a) $m = [IO.File]::ReadAllText((Join-Path $a 'fork-build.json')) | ConvertFrom-Json; $m.commit = 'b6c76e45' + ('0' * 32); Put (Join-Path $a 'fork-build.json') ($m | ConvertTo-Json -Depth 5) } 'fork-build\.json names commit b6c76e45'
+    Refused 'a build from another run than the one asked for' { param($a) } 'fork-build\.json names run 39588485569, not 39600000000' $newRun
+    Refused 'a client file the record does not name, fork-build.json made to agree' { param($a) Put (Join-Path $a 'build/dist/client/Data/extra.dll') 'x'; Restamp $a } 'records\\client-build\.json does not name it'
+    Refused 'a server file that is not the record''s, fork-build.json made to agree' { param($a) Put (Join-Path $a 'build/dist/server/dist_back/skymp5-server.js') 'another bundle'; Restamp $a } 'skymp5-server\.js in the fork''s build\\dist\\server is not the build records\\server-build\.json records'
+    Refused 'a server file missing, fork-build.json made to agree' { param($a) Remove-Item -LiteralPath (Join-Path $a 'build/dist/server/package.json'); Restamp $a } 'package\.json is not in the fork''s build\\dist\\server'
 
-    $a = New-Artifact (Join-Path $T 'art-good') -Crlf
+    Put (Join-Path $repo 'records\client-build.json') (ClientRecordText $commit).Replace("`n", "`r`n")
+    Put (Join-Path $repo 'records\server-build.json') (ServerRecordText $commit).Replace("`n", "`r`n")
+    $a = New-ForkBuild (Join-Path $T 'fork-good')
     $stamp = Install-EngineArtifact -From $a -Repo $repo -Into $into -Run $run -Artifact $art
-    Yes '2. the right artifact goes in, CR LF records and all' ((Test-Path -LiteralPath $into) -and (Left) -eq 0)
+    Yes '2. the right build goes in, CR LF records and all' ((Test-Path -LiteralPath $into) -and (Left) -eq 0)
     $allClient = $true
-    foreach ($k in $client.Keys) { $p = Join-Path $into ('build\dist\client\' + $k); if (-not (Test-Path -LiteralPath $p) -or (ShaFile $p) -ne (ShaText $client[$k])) { $allClient = $false } }
+    foreach ($k in $client.Keys) { $pth = Join-Path $into ('build\dist\client\' + $k); if (-not (Test-Path -LiteralPath $pth) -or (ShaFile $pth) -ne (ShaText $client[$k])) { $allClient = $false } }
     Yes '2.   every client file is in build\dist\client, as recorded' $allClient
     $sums = Get-ThornswoodServerFolderSums (Join-Path $into 'build\dist\server')
     Yes '2.   the server files are in build\dist\server, and hold to the record' ($sums.Count -eq $fork.Count -and $sums['scam_native.node'] -eq (ShaText $fork['scam_native.node']))
-    Yes '2.   the artifact is beside them as it came, its zip for -ServerBuild' ((Test-Path -LiteralPath (Join-Path $into 'artifact\SHA256SUMS')) -and @(Get-ChildItem -LiteralPath (Join-Path $into 'artifact\server') -Filter '*.zip').Count -eq 1)
-    Yes '2.   engine-artifact.json names the commit, the artifact and the run' ($stamp.commit -eq $commit -and $stamp.artifact -eq 'engine-1a7b6eecdb38' -and [long]$stamp.runId -eq 39588485569 -and $stamp.serverZip -match '^server-1a7b6eecdb38-')
+    Yes '2.   and the fork''s gamemode, settings and symbols stay out' (-not (Test-Path -LiteralPath (Join-Path $into 'build\dist\server\gamemode.js')) -and -not (Test-Path -LiteralPath (Join-Path $into 'build\dist\server\server-settings.json')) -and
+        -not (Test-Path -LiteralPath (Join-Path $into 'build\dist\server\scam_native.pdb')))
+    $zips = @(Get-ChildItem -LiteralPath (Join-Path $into 'artifact\server') -Filter '*.zip')
+    Yes '2.   the server zip the store keeps is under artifact\server, with its .json, for -ServerBuild' ($zips.Count -eq 1 -and (Test-Path -LiteralPath ([IO.Path]::ChangeExtension($zips[0].FullName, '.json'))) -and
+        $zips[0].Name -eq $stamp.serverZip -and $null -ne (Test-ThornswoodServerBuildArtifact -Zip $zips[0].FullName -Record (Join-Path $repo 'records\server-build.json')))
+    Yes '2.   and fork-build.json beside it' (Test-Path -LiteralPath (Join-Path $into 'artifact\fork-build.json'))
+    Yes '2.   engine-artifact.json names the commit, the fork, its artifact and its run' ($stamp.commit -eq $commit -and $stamp.repository -eq $ForkRepo -and $stamp.artifact -eq ('thornswood-engine-' + $commit) -and
+        [long]$stamp.runId -eq 39588485569 -and $stamp.run -match "$ForkRepo/actions/runs/39588485569" -and $stamp.serverZip -match '^server-1a7b6eecdb38-')
     $e = Threw { Install-EngineArtifact -From $a -Repo $repo -Into $into -Run $run -Artifact $art }
     Yes '2. a folder that is there already is never written into' ($e -match 'is there already')
     Yes '2. Get-EngineArtifactFolderProblems: the folder is this pin''s' (@(Get-EngineArtifactFolderProblems $into $repo).Count -eq 0)
@@ -257,6 +282,7 @@ try {
     [IO.File]::WriteAllText($sf, $keep.Replace($commit, ('b6c76e45' + ('0' * 32))), $utf8)
     Yes '2.   and one that holds another pin''s build is not' (@(Get-EngineArtifactFolderProblems $into $repo) -match 'this checkout pins').Count -gt 0
     [IO.File]::WriteAllText($sf, $keep, $utf8)
+    Set-Records $commit
 
     # ============================================ 3. Where.ps1 and where.js ==
     Write-Host ''; Write-Host '3. Where.ps1 and where.js'
@@ -286,23 +312,26 @@ try {
     # ==================================== 4. Get-EngineArtifact.ps1 whole ==
     Write-Host ''; Write-Host '4. Get-EngineArtifact.ps1'
     Remove-Item -LiteralPath $into -Recurse -Force
-    $good = New-Artifact (Join-Path $T 'art-for-gh')
+    $good = New-ForkBuild (Join-Path $T 'fork-for-gh')
     $ghState = Join-Path $T 'gh-state'
     $null = New-Item -ItemType Directory -Force -Path $ghState
-    [IO.File]::WriteAllText((Join-Path $ghState 'artifacts.json'), (ConvertTo-Json -InputObject ([ordered]@{ artifacts = @($art) }) -Depth 5), $utf8)
-    [IO.File]::WriteAllText((Join-Path $ghState 'run.json'), (ConvertTo-Json -InputObject $run -Depth 5), $utf8)
+    function Save-GhState($runs, [hashtable]$arts) {
+        [IO.File]::WriteAllText((Join-Path $ghState 'runs.json'), (ConvertTo-Json -InputObject ([ordered]@{ workflow_runs = @($runs) }) -Depth 5), $utf8)
+        foreach ($k in $arts.Keys) { [IO.File]::WriteAllText((Join-Path $ghState ('arts-' + $k + '.json')), (ConvertTo-Json -InputObject ([ordered]@{ artifacts = @($arts[$k]) }) -Depth 5), $utf8) }
+    }
+    Save-GhState @($run) @{ 39588485569 = $art }
     $ghFake = Join-Path $T 'gh-stand-in.ps1'
     [IO.File]::WriteAllText($ghFake, @'
 $state = $env:TS_GH_STATE
 [IO.File]::AppendAllText((Join-Path $state 'calls.txt'), (($args -join ' ') + "`n"))
 if ($env:TS_GH_FAIL) { [Console]::Error.WriteLine('HTTP 401: Bad credentials'); exit 1 }
-if ($args[0] -eq 'api' -and $args[1] -like 'repos/EvilPatrick06/Thornswood/actions/artifacts?name=*') {
-  if ($env:TS_GH_NONE) { '{"artifacts":[]}' } else { [IO.File]::ReadAllText((Join-Path $state 'artifacts.json')) }
+if ($args[0] -eq 'api' -and $args[1] -like 'repos/EvilPatrick06/skymp/actions/workflows/thornswood-pr-windows.yml/runs?*') {
+  if ($env:TS_GH_NONE) { '{"workflow_runs":[]}' } else { [IO.File]::ReadAllText((Join-Path $state 'runs.json')) }
   exit 0
 }
-if ($args[0] -eq 'api' -and $args[1] -like 'repos/EvilPatrick06/Thornswood/actions/runs/*') {
-  $one = Join-Path $state ('run-' + ($args[1] -replace '^.*/', '') + '.json')
-  if (Test-Path -LiteralPath $one) { [IO.File]::ReadAllText($one) } else { [IO.File]::ReadAllText((Join-Path $state 'run.json')) }
+if ($args[0] -eq 'api' -and $args[1] -match '^repos/EvilPatrick06/skymp/actions/runs/(\d+)/artifacts\?') {
+  $one = Join-Path $state ('arts-' + $Matches[1] + '.json')
+  if (Test-Path -LiteralPath $one) { [IO.File]::ReadAllText($one) } else { '{"artifacts":[]}' }
   exit 0
 }
 if ($args[0] -eq 'run' -and $args[1] -eq 'download') {
@@ -324,47 +353,48 @@ if ($args[0] -eq 'run' -and $args[1] -eq 'download') {
         try { $t = & $ps -NoProfile -ExecutionPolicy Bypass -File $get -Gh $ghFake -NoPause @more 2>&1 | Out-String; return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $t } }
         finally { $ErrorActionPreference = $o }
     }
+    $name = 'thornswood-engine-' + $commit
     $r = Fetch @('-Check')
-    Yes ("4. -Check: on GitHub, exit 2 (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match 'keeps engine-1a7b6eecdb38')
+    Yes ("4. -Check: on GitHub, exit 2 (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match "keeps $name")
     Yes '4.   and nothing was fetched or written' (-not (Test-Path -LiteralPath $into) -and -not ([IO.File]::ReadAllText((Join-Path $ghState 'calls.txt')) -match 'run download'))
     $r = Fetch @()
     Yes ("4. a run fetches it and makes it the engine build (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'every file held to the records' -and (Test-Path -LiteralPath (Join-Path $into 'build\dist\client\Data\Scripts\TESModPlatform.pex')))
-    Yes '4.   it downloaded the artifact by its run and name' ([IO.File]::ReadAllText((Join-Path $ghState 'calls.txt')) -match 'run download 39588485569 --name engine-1a7b6eecdb38 --dir .+ --repo EvilPatrick06/Thornswood')
+    Yes '4.   it downloaded the fork''s build by its run and name, from the fork' ([IO.File]::ReadAllText((Join-Path $ghState 'calls.txt')) -match "run download 39588485569 --name $name --dir .+ --repo EvilPatrick06/skymp")
+    Yes '4.   and asked this repository for nothing' (-not ([IO.File]::ReadAllText((Join-Path $ghState 'calls.txt')) -cmatch 'EvilPatrick06/Thornswood'))
     Yes '4.   and left no scratch behind' (@(Get-ChildItem -LiteralPath $env:THORNSWOOD_SCRATCH_ROOT -Force -ErrorAction SilentlyContinue).Count -eq 0)
     $r = Fetch @()
     Yes ("4. a second run finds it there and fetches nothing (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'here already')
     Remove-Item -LiteralPath $into -Recurse -Force
     $env:TS_GH_NONE = '1'
     $r = Fetch @()
-    Yes ("4. no artifact: exit 1, saying how to make it again (exit {0})" -f $r.Code) ($r.Code -eq 1 -and $r.Out -match 'STOP\. .*gh workflow run engine\.yml' -and -not (Test-Path -LiteralPath $into))
+    Yes ("4. no fork build: exit 1, saying so (exit {0})" -f $r.Code) ($r.Code -eq 1 -and $r.Out -match 'STOP\. .*has no build of a push of 1a7b6eec' -and -not (Test-Path -LiteralPath $into))
     $env:TS_GH_NONE = ''; $env:TS_GH_FAIL = '1'
     $r = Fetch @()
     Yes ("4. a gh that fails: exit 1, naming what it said (exit {0})" -f $r.Code) ($r.Code -eq 1 -and $r.Out -match 'could not be asked' -and $r.Out -match 'Bad credentials')
     $env:TS_GH_FAIL = ''
 
-    # Two green runs of the pin, as on 22 Oct: the newer one (the #3014 proof
-    # run) recorded the same build a few minutes later, so its client record
-    # is not this checkout's, and the older one's is.
-    $later = New-Artifact (Join-Path $T 'art-later') -RecordedUtc '2026-10-21T11:07:23Z'
-    [IO.File]::WriteAllText((Join-Path $ghState 'artifacts.json'), (ConvertTo-Json -InputObject ([ordered]@{ artifacts = @($art, $newArt) }) -Depth 5), $utf8)
-    [IO.File]::WriteAllText((Join-Path $ghState 'run-39600000000.json'), (ConvertTo-Json -InputObject $newRun -Depth 5), $utf8)
+    # Two green fork builds of the pin: the newer one is that build run again
+    # in the fork, which is other bytes, so the records name only the older.
+    $later = New-ForkBuild (Join-Path $T 'fork-later') 39600000000 -Rebuilt @{ 'Data\SKSE\Plugins\MpClientPlugin.dll' = 'CLIENT-PLUGIN, BUILT AGAIN' }
+    Save-GhState @($run, $newRun) @{ 39588485569 = $art; 39600000000 = $newArt }
     [IO.File]::WriteAllText((Join-Path $ghState 'artifact-39600000000.txt'), $later, $utf8)
     [IO.File]::WriteAllText((Join-Path $ghState 'calls.txt'), '', $utf8)
     $r = Fetch @('-Check')
-    Yes ("4. two kept: -Check says it is on GitHub, exit 2 (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match 'keeps 2 engine-1a7b6eecdb38' -and -not ([IO.File]::ReadAllText((Join-Path $ghState 'calls.txt')) -match 'run download'))
+    Yes ("4. two kept: -Check says it is on GitHub, exit 2 (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match "keeps 2 $name" -and -not ([IO.File]::ReadAllText((Join-Path $ghState 'calls.txt')) -match 'run download'))
     $r = Fetch @()
     $calls = @([IO.File]::ReadAllLines((Join-Path $ghState 'calls.txt')) | Where-Object { $_ -match '^run download' })
-    Yes ("4. two kept, the newer of another record: the older is taken (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'every file held to the records' -and ([IO.File]::ReadAllText((Join-Path $into 'engine-artifact.json')) | ConvertFrom-Json).runId -eq 39588485569)
-    Yes '4.   it held the newer first and said why it passed it over' ($calls.Count -eq 2 -and $calls[0] -match '^run download 39600000000 ' -and $calls[1] -match '^run download 39588485569 ' -and $r.Out -match "run 39600000000's engine-1a7b6eecdb38 is not CI's build of what this checkout records \(the artifact's records\\client-build\.json is not this checkout's")
+    Yes ("4. two kept, the newer other bytes: the older is taken (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'every file held to the records' -and ([IO.File]::ReadAllText((Join-Path $into 'engine-artifact.json')) | ConvertFrom-Json).runId -eq 39588485569)
+    Yes '4.   it held the newer first and said why it passed it over' ($calls.Count -eq 2 -and $calls[0] -match '^run download 39600000000 ' -and $calls[1] -match '^run download 39588485569 ' -and
+        $r.Out -match "run 39600000000's $name is not the build this checkout records \(build\\dist\\client\\Data\\SKSE\\Plugins\\MpClientPlugin\.dll in the fork's build is not the file")
     Yes '4.   and left no scratch behind' (@(Get-ChildItem -LiteralPath $env:THORNSWOOD_SCRATCH_ROOT -Force -ErrorAction SilentlyContinue).Count -eq 0)
     Remove-Item -LiteralPath $into -Recurse -Force
-    $alsoLater = New-Artifact (Join-Path $T 'art-also-later') -RecordedUtc '2026-10-21T11:03:00Z'
+    $alsoLater = New-ForkBuild (Join-Path $T 'fork-also-later') -Rebuilt @{ 'Data\Scripts\TESModPlatform.pex' = 'CLIENT-PEX, BUILT AGAIN' }
     [IO.File]::WriteAllText((Join-Path $ghState 'artifact-39588485569.txt'), $alsoLater, $utf8)
     $r = Fetch @()
-    Yes ("4. two kept and neither this checkout's: exit 1 naming both runs (exit {0})" -f $r.Code) ($r.Code -eq 1 -and $r.Out -match 'STOP\. no engine-1a7b6eecdb38 engine\.yml keeps is CI''s build' -and $r.Out -match 'run 39600000000: ' -and $r.Out -match 'run 39588485569: ' -and -not (Test-Path -LiteralPath $into))
+    Yes ("4. two kept and neither the records': exit 1 naming both runs (exit {0})" -f $r.Code) ($r.Code -eq 1 -and $r.Out -match "STOP\. no $name the fork keeps is the build this checkout records" -and $r.Out -match 'run 39600000000: ' -and $r.Out -match 'run 39588485569: ' -and -not (Test-Path -LiteralPath $into))
     Yes '4.   and left no scratch behind' (@(Get-ChildItem -LiteralPath $env:THORNSWOOD_SCRATCH_ROOT -Force -ErrorAction SilentlyContinue).Count -eq 0)
-    foreach ($x in 'run-39600000000.json', 'artifact-39600000000.txt', 'artifact-39588485569.txt') { Remove-Item -LiteralPath (Join-Path $ghState $x) -Force }
-    [IO.File]::WriteAllText((Join-Path $ghState 'artifacts.json'), (ConvertTo-Json -InputObject ([ordered]@{ artifacts = @($art) }) -Depth 5), $utf8)
+    foreach ($x in 'arts-39600000000.json', 'artifact-39600000000.txt', 'artifact-39588485569.txt') { Remove-Item -LiteralPath (Join-Path $ghState $x) -Force }
+    Save-GhState @($run) @{ 39588485569 = $art }
 
     # ================================================= 5. Sync-Client.ps1 ==
     Write-Host ''; Write-Host '5. Sync-Client.ps1'
@@ -374,7 +404,7 @@ if ($args[0] -eq 'run' -and $args[1] -eq 'download') {
     [IO.File]::WriteAllText($get, @'
 param([switch]$Check, [switch]$NoPause)
 [IO.File]::AppendAllText($env:TS_FETCH_CALLS, "fetch`n")
-if ($env:TS_FETCH_FAIL) { Write-Host 'STOP. stand-in: engine.yml keeps no engine-1a7b6eecdb38.'; exit 1 }
+if ($env:TS_FETCH_FAIL) { Write-Host 'STOP. stand-in: the fork keeps no build of 1a7b6eec.'; exit 1 }
 & (Join-Path $PSScriptRoot 'Get-EngineArtifact-real.ps1') -Gh $env:TS_GH -NoPause
 exit $LASTEXITCODE
 '@, $utf8)
@@ -453,8 +483,8 @@ exit $LASTEXITCODE
     function Row($ci) { return @(Get-ClientRows $sync $cliRec $game $missing $ci | Where-Object { $_.What -like 'the recorded client*' })[0] }
     $r = Row ([pscustomobject]@{ Code = 2; Said = '' })
     Yes '6. Check-ShipReady: CI''s build GitHub keeps passes before the Ship fetches it' ($r.Ok -and $r.Detail -match 'the Ship fetches it first')
-    $r = Row ([pscustomobject]@{ Code = 1; Said = 'engine.yml has kept no engine-1a7b6eecdb38' })
-    Yes '6.   one it cannot have fails as a need, saying why' (-not $r.Ok -and $r.Level -eq 'need' -and $r.Detail -match 'cannot be fetched: engine\.yml has kept no' -and $r.Fix -match 'Get-EngineArtifact\.ps1')
+    $r = Row ([pscustomobject]@{ Code = 1; Said = 'the fork''s thornswood-pr-windows.yml has no build of a push of 1a7b6eec' })
+    Yes '6.   one it cannot have fails as a need, saying why' (-not $r.Ok -and $r.Level -eq 'need' -and $r.Detail -match 'cannot be fetched: the fork''s thornswood-pr-windows\.yml has no build' -and $r.Fix -match 'Get-EngineArtifact\.ps1')
     $r = Row $null
     Yes '6.   with no CI build asked about, the fix names -EngineBuild ci and no rebuild' (-not $r.Ok -and $r.Fix -match 'Setup-ShipMachine\.ps1 -EngineBuild ci' -and $r.Fix -notmatch 'Build-Engine')
 
