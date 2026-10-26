@@ -126,17 +126,16 @@ yes('home.js keeps no second copy of it', blurb(path.join('public', 'home.js')) 
    anything on the roadmap that the tester note called never worth reporting,
    or Help called deliberate, failed. The roadmap is on the issue board since
    #3140 ("roadmap:" labels), which no file here holds, so the check went
-   with it. That the two lists are still there is checked. */
+   with it. That the tester note's list is still there is checked. Help's
+   list of what is deliberate (Things that are normal here) was removed whole
+   by Patrick on 26 Oct, so the check is that it stays gone. */
 const tests = read(path.join('data', 'tests.md'));
 yes('tests.md is there', tests !== null);
 yes('it still has its Do not report these list',
     sections(tests || '').list.some(function (x) { return /do not report/i.test(x.heading); }));
 const help = read(path.join('data', 'help.md'));
 yes('help.md is there', help !== null);
-{
-  const s = sections(help || '').list.filter(function (x) { return /deliberate/i.test(x.text); })[0];
-  yes('it still has the list it calls deliberate', !!s && s.items.length > 0);
-}
+yes('it has no list of what is deliberate any more', !/normal here|All of that is deliberate/i.test(help || ''));
 
 // ----------------------------------------------- one copy only (#2414, #3140)
 /* The text was kept twice, known.md for the page and a known board nothing
