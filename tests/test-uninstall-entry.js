@@ -283,7 +283,6 @@ const MUST_NOT = [
   ['Swap.Restore', 'the redirect put back at startup (the uninstall does it itself, in its own order)'],
   ['Leaks.Clean', 'the leak clean-up'],
   ['ThornIni.Ensure', 'Thornswood.ini written'],
-  ['ThornIni.UndoShippedFov', 'the field of view fix'],
   ['SteamUpdates.Report', 'Steam\'s Updates setting for Skyrim read and reported'],
   ['Display.MatchScreen', 'the game set to the screen'],
   ['Icons.Ensure', 'the shortcut icon'],

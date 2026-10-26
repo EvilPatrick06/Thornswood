@@ -53,9 +53,9 @@ queued for Claude. The one decision only Patrick can make is in section 6.
    and signed on One today; decided (Patrick, 11 Oct 2026) to sign in
    release.yml on GitHub's runner through a federated Azure identity
    limited to `v*` tags (docs\SIGNED-RELEASES.md section 8).
-7. CI to the engine: engine.yml (#459) builds the fork at one commit and
-   records it, on GitHub's runner first and on these runners when that is
-   refused (from the fork's own build alone, #3014), started only by hand,
+7. CI to the engine: engine.yml (#459) records the fork's own build of one
+   commit, on GitHub's runner first and on these runners when that is
+   refused, and compiles nothing (#3014, #3399), started only by hand,
    with contents read. It sends nothing and
    commits nothing; its records reach main through a pull request.
 

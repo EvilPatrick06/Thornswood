@@ -39,7 +39,7 @@ namespace Thornswood
     /// asking the old question, and a text search cannot tell you WHICH build
     /// you have, only that somebody wrote our name in it once.
     ///
-    /// THE RECORD TRAVELS IN THE EXE. tools\client-build.json is embedded by
+    /// THE RECORD TRAVELS IN THE EXE. records\client-build.json is embedded by
     /// Build-Launcher.ps1, the same way ui.xaml and Thornswood.ini are. That is
     /// deliberate rather than shipping it as a file: the launcher and the
     /// client go out in one release, so the launcher that is running IS the
