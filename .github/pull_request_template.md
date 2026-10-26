@@ -28,16 +28,20 @@ Developer-Guide.md, "Test tasks and known issues". -->
 
 ## Which parts it touches, and what runs after the merge
 
-<!-- Tick every part this pull request changes. Developer-Guide.md, "After a pull
-request is merged", has the command for each. They all run in the same sitting. -->
+<!-- Tick every part this pull request changes. Each line is one row of the table
+in Developer-Guide.md, "After a pull request is merged", and the command for it is
+in that table, the one copy of them. They all run in the same sitting. -->
 
-- [ ] The launcher, the game plugins or anything in a pack: a dev Ship
-- [ ] The gamemode (`game\gamemode.js`): Deploy-DevGamemode, or Deploy-Gamemode then Deploy-Server
-- [ ] The site's app or `site\public`: Deploy-Docs
-- [ ] The public pages (`site\data\site`): Deploy-Docs -Site
-- [ ] The bot (`bot`): Install-Bot -CodeOnly
-- [ ] The voice service (`voice`): Install-Voice
-- [ ] Only scripts that run on the machine that ships: nothing more
+- [ ] The launcher (`launcher\app`, `launcher\ui.xaml`), the game plugins (`game\plugins`) or anything else in a pack
+- [ ] The gamemode on the dev server
+- [ ] The gamemode on the live server (`game\gamemode.js`) or the content plugin (`game\content\Thornswood-Content.esp`), whose server command goes before the Ship
+- [ ] The live server build, or the live settings
+- [ ] The site's app or `site\public`
+- [ ] The public pages (`site\data\site\*.md`)
+- [ ] The bot's code or join card art (`bot`)
+- [ ] The bot's avatar (`bot\thornswood-bot-*.png`), which no script sends
+- [ ] The voice service (`voice\voice-server.js`, `voice\headlines.js`)
+- [ ] Only scripts that change how a release is built
 - [ ] Docs only
 
 ## Checked
