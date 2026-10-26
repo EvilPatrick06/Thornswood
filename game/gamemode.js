@@ -33745,6 +33745,12 @@ log('gamemode loaded:',
                        born in that state. It cannot be worked for profit: it
                        asks for an empty pack and pays about nine gold, while one
                        plot pays more than that in half an hour.
+        compostGrow    what one spoiled food worked into a sown plot does to
+                       the wait that is on it. Patrick, 26 October 2026, on his
+                       report page (#3526, A): a quarter less time to ripen.
+        compostExtra   how many more that plot gives when it is brought in.
+                       The same answer (#3526, B): one more. Once per sowing;
+                       see compost in the farming block.
     */
     farming: {
       growByRank: [1, 0.85, 0.7, 0.55],
@@ -33754,7 +33760,9 @@ log('gamemode loaded:',
       claimLapseDays: 14,
       startingSeeds: 3,
       startingCrops: ['bcf48:Skyrim.esm', 'bb952:Skyrim.esm', 'bcf47:Skyrim.esm'],
-      seedAgainHours: 12
+      seedAgainHours: 12,
+      compostGrow: 0.75,
+      compostExtra: 1
     }
   };
 
@@ -36419,7 +36427,8 @@ log('gamemode loaded:',
     if (ms <= 0) { ms = growMs(v.crop, 0); }
     var step = Number(v.step) || 0;
     if (step < 0 || step > RANK_STEPS.length - 1) { step = 0; }
-    return { by: Number(v.by) || 0, crop: v.crop, at: at, ms: ms, step: step };
+    return { by: Number(v.by) || 0, crop: v.crop, at: at, ms: ms, step: step,
+             fed: v.fed === 1 ? 1 : 0 };
   }
 
   /*
@@ -36574,6 +36583,96 @@ log('gamemode loaded:',
   function yieldAt(step) {
     var by = tuning().yieldByRank;
     return by[Math.max(0, Math.min(by.length - 1, step))];
+  }
+
+  /*
+    COMPOST (#3526). Patrick, 26 October 2026, on his report page: food
+    that runs out of days stays as spoiled food, and a Farmer can work it
+    into a plot as compost (#3163, C). What it does there he answered
+    "A+B": the crop needs a quarter less time to ripen, and the plot gives
+    one more when it is brought in (compostGrow and compostExtra).
+
+    The press is the plot's own. A Farmer presses a plot they sowed while
+    it is still growing, with spoiled food in the pack, and one piece goes
+    into the ground; the line at the plot names that press first. Nothing
+    is typed. Once per sowing: the plot carries fed: 1 until it is brought
+    in, and clearPlot's empty shape has no fed.
+
+    Only on ordinary plots. The ten orchard trees are the orchard work's
+    (createCustomQuests), which counts what it hands over against the
+    work's own hold, so a plot there that gave one more would be refused
+    at the bring-in.
+
+    Spoiled food is one record of the content plugin, each piece named
+    for its food (the spoilage block), so the record is the whole test
+    and the name is only what the sentence says.
+  */
+  var compostKept = -1;
+  function compostId() {
+    if (compostKept < 0) {
+      var sp = (typeof FOOD_GROUPS !== 'undefined' && FOOD_GROUPS && FOOD_GROUPS.spoil) || null;
+      compostKept = 0;
+      try { compostKept = (sp && sp.spoiled) ? (idOf(sp.spoiled) || 0) : 0; } catch (e) { compostKept = 0; }
+      if (!compostKept) { flog('no spoiled food record in this load order, so no plot takes compost'); }
+    }
+    return compostKept;
+  }
+
+  /*
+    The spoiled food this press would work into this plot, as the pack
+    and which line of it, or null when the press is not compost: not the
+    presser's own sowing, already fed, an orchard tree, or nothing spoiled
+    in the pack.
+  */
+  function compostFor(actorId, refrId, plot) {
+    if (!plot || plot.fed || orchardRef(refrId)) { return null; }
+    var mine = profileOf(actorId);
+    if (!mine || plot.by !== mine) { return null; }
+    var id = compostId();
+    if (!id) { return null; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return null; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === id && e.count > 0 && !mintedEntry(e)) { return { entries: entries, at: i }; }
+    }
+    return null;
+  }
+
+  /*
+    One piece out of the pack, then the plot written with the shorter wait
+    and fed. The pack goes first and is put back as it was when the plot
+    will not take the write, the way sowAt hands the seed back: a plot fed
+    for nothing is the free yield this block exists to stop, and food lost
+    to a failed write is a person's food gone.
+  */
+  function compost(actorId, refrId, plot, carried) {
+    var before = JSON.parse(JSON.stringify(carried.entries));
+    var after = JSON.parse(JSON.stringify(carried.entries));
+    var piece = after[carried.at];
+    var name = String(piece.name || '') || 'spoiled food';
+    piece.count -= 1;
+    if (piece.count <= 0) { after.splice(carried.at, 1); }
+    try { mp.set(actorId, 'inventory', { entries: after }); } catch (e) {
+      flog('could not take compost from', actorId.toString(16) + ':', e);
+      return 'The server cannot get at your pack right now. Press it again in a moment.';
+    }
+    var fed = { by: plot.by, crop: plot.crop, at: plot.at,
+                ms: Math.max(60000, Math.round(plot.ms * tuning().compostGrow)),
+                step: plot.step, fed: 1 };
+    try { setPlotValue(refrId, fed); } catch (e) {
+      flog('could not feed', refrId.toString(16) + ':', e);
+      try { mp.set(actorId, 'inventory', { entries: before }); } catch (e2) {
+        flog('could not put the compost back for', actorId.toString(16) + ':', e2);
+      }
+      return 'The ground would not take it. Nothing was worked in and the ' + name +
+             ' is back in your pack.';
+    }
+    var crop = CROPS[plot.crop];
+    flog(actorId.toString(16), 'worked', name, 'into', crop.name, 'at', refrId.toString(16));
+    return 'You work the ' + name + ' into the ground. The ' + crop.name + ' is ready in ' +
+           minutes(minutesLeft(fed)) + ' now, and gives one more when you bring it in.';
   }
 
   // -------------------------------------------------------------- the land --
@@ -37157,6 +37256,8 @@ log('gamemode loaded:',
 
     var left = minutesLeft(plot);
     if (left > 0) {
+      var carried = grant ? null : compostFor(actorId, refrId, plot);
+      if (carried) { return compost(actorId, refrId, plot, carried); }
       return 'The ' + crop.name + ' is still growing. ' + minutes(left) + ' to go.';
     }
 
@@ -37210,7 +37311,7 @@ log('gamemode loaded:',
       return 'The ' + crop.name + ' comes up and there is nothing in this load ' +
              'order to put in your hands. Say so in the dev channel.';
     }
-    var n = yieldAt(plot.step);
+    var n = yieldAt(plot.step) + (plot.fed ? tuning().compostExtra : 0);
     if (grant ? !awardQuestCrop(actorId,refrId,baseDesc,crop,n,original,plot,grant) : !clearPlot(refrId,original)) {
       return 'The ' + crop.name + ' will not come out of the ground. Try it again in a moment.';
     }
@@ -37475,7 +37576,8 @@ log('gamemode loaded:',
     }
     var left = minutesLeft(plot);
     if (left > 0) {
-      return CROPS[plot.crop].name + ' growing, ' + minutes(left) + ' to go. ' + whose;
+      return CROPS[plot.crop].name + ' growing' + (plot.fed ? ', composted' : '') + ', ' +
+             minutes(left) + ' to go. ' + whose;
     }
     return CROPS[plot.crop].name + ' ready to bring in. ' + whose;
   }
@@ -37530,7 +37632,10 @@ log('gamemode loaded:',
       t    what is in the ground and whose farm it is, plotWords
       e    'Sow a Cabbage' when pressing it would sow it: empty, worked
            before, and this person a farmer with the shovel, the rank and
-           the crop in the pack, on ground nobody else holds; else ''
+           the crop in the pack, on ground nobody else holds; 'Work in
+           spoiled food' when it would compost it (#3526): their own
+           sowing, still growing, not fed yet, spoiled food in the pack;
+           else ''
       x    'Claim this farm' when the lock key would claim it: a farmer, on
            ground nobody holds and that runs into nobody's farm; with 'and
            let your other one go' when they hold one already; else ''
@@ -37557,6 +37662,11 @@ log('gamemode loaded:',
           !neverWorked(found.refrId) && (!held || held.by === mine) &&
           rankOk(rankStep(actorId, 'farmer'), found.base) && carriesSeed(actorId, found.base)) {
         line.e = 'Sow ' + aOrAn(CROPS[found.base].name);
+      }
+      var sown = readPlot(found.refrId);
+      if (farmer && sown && !toolGate(actorId, 'farmer') && minutesLeft(sown) > 0 &&
+          compostFor(actorId, found.refrId, sown)) {
+        line.e = 'Work in spoiled food';
       }
       if (farmer && mine && ground && !held && !claimTooClose(ground, mine)) {
         line.x = P.has(claims, String(mine)) ? 'Claim this farm and let your other one go'

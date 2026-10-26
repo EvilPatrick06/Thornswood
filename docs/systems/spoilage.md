@@ -46,7 +46,10 @@ on his report page on 26 October (C).
 | Eating it | Fills nothing, and starts food sickness ([Disease](disease.md)) |
 | Cooking with it | No recipe takes it |
 | Worth | Nothing to a trader |
-| Compost | A Farmer can work it into a plot. Not built yet: [#3526](https://github.com/EvilPatrick06/Thornswood/issues/3526) |
+| Compost | A Farmer works it into a plot they sowed: the crop needs a quarter less time and gives one more ([Farmer](classes/farmer.md#compost)) |
+
+Patrick decided what compost does on his report page on 26 October
+("A+B", [#3526](https://github.com/EvilPatrick06/Thornswood/issues/3526)).
 
 Spoiled food is one item of Thornswood's own, Spoiled Food, with each
 piece named for its food. It is not the food's own item with a new
