@@ -175,7 +175,7 @@ function New-ThornswoodServerBuildArtifact {
   there: it reads the .json files and prints a line each, and nothing else.
 
   Test-ThornswoodServerBuildArtifact holds a server zip on this machine (one
-  CI made, engine.yml's artifact) to the record the same way the box will,
+  made from CI's build, Get-EngineArtifact.ps1's) to the record the same way the box will,
   with the same function, so -ServerBuild sends only a zip that is the build
   the commit records. It returns the artifact as New-ThornswoodServerBuildArtifact
   does, for Send-ThornswoodArtifact, which checks the bytes on the box.
@@ -240,7 +240,7 @@ function Test-ThornswoodServerBuildArtifact {
     if (-not (Test-Path -LiteralPath $Zip -PathType Leaf)) { throw "there is no server build at $Zip. Nothing was sent." }
     $Zip = (Resolve-Path -LiteralPath $Zip).ProviderPath
     $json = [IO.Path]::ChangeExtension($Zip, '.json')
-    if (-not (Test-Path -LiteralPath $json)) { throw "$Zip has no .json beside it, which the store keeps with every build (engine.yml's artifact has both). Nothing was sent." }
+    if (-not (Test-Path -LiteralPath $json)) { throw "$Zip has no .json beside it, which the store keeps with every build (Get-EngineArtifact.ps1 makes both). Nothing was sent." }
     $raw = [IO.File]::ReadAllBytes($Record)
     $rec = $null
     try { $rec = ([Text.Encoding]::UTF8.GetString($raw) -replace '^\uFEFF', '') | ConvertFrom-Json } catch { $rec = $null }

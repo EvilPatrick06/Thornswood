@@ -11,8 +11,10 @@
   1. A path that is not a .py, .js or .ps1 tool under scripts\mods or
      scripts\dev, a tool that is not there, and an argument with a double
      quote in it are refused before anything is built or sent.
-  1b. The artifact carries what every builder of the content chain reads or
-     writes, and every script a builder loads from beside it.
+  1b. The artifact carries what every builder of the content chain reads,
+     uses or writes, and every script a builder loads from beside it; what
+     comes back is game\, records\, docs\systems\ and every other file a
+     builder writes (#3425).
   2. The far side text (scripts\mods\OnBox.ps1) is ASCII and parses, and the
      server's plugins folder is only ever read from.
   3. On Windows, the far side text runs under Windows PowerShell 5.1, as on
@@ -114,11 +116,18 @@ foreach ($st in $top) {
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $chain = Get-Content -LiteralPath (Join-Path $Repo 'scripts\mods\content-tables.json') -Raw | ConvertFrom-Json
-$need = @($chain.steps | ForEach-Object { @($_.reads) + @($_.readsBack) + @($_.writes) } | Where-Object { $_ } | Sort-Object -Unique)
+$need = @($chain.steps | ForEach-Object { @($_.reads) + @($_.readsBack) + @($_.uses) + @($_.writes) } | Where-Object { $_ } | Sort-Object -Unique)
 $left = @($need | Where-Object { $n = [string]$_; -not @($paths | Where-Object { $n -eq $_ -or $n.StartsWith($_ + '/') }).Count })
-Yes ('every file a builder of the chain reads or writes goes up (' + $need.Count + ')' + $(if ($left.Count) { ': not ' + ($left -join ', ') } else { '' })) (
+Yes ('every file a builder of the chain reads, uses or writes goes up (' + $need.Count + ')' + $(if ($left.Count) { ': not ' + ($left -join ', ') } else { '' })) (
     $need.Count -gt 0 -and $left.Count -eq 0)
 Yes '  game\gamemode.js among them' ($paths -contains 'game/gamemode.js')
+Yes '  and the K panel''s book Build-SpellTable.ps1 reads, which until #3425 stopped the box run at the spell table' ($paths -contains 'game/ui/thornswood-skills.js')
+Yes '  and the game scripts Build-MerchantGamemode.js embeds' (($paths -contains 'game/merchant-trading.js') -and ($paths -contains 'game/quest-eligibility.js'))
+$writes = @($chain.steps | ForEach-Object { @($_.writes) } | Where-Object { $_ } | Sort-Object -Unique)
+$unwatched = @($writes | Where-Object { $n = [string]$_; -not @($watch | Where-Object { $n -eq $_ -or $n.StartsWith($_ + '/') }).Count })
+Yes ('every file a builder of the chain writes comes back (' + $writes.Count + ')' + $(if ($unwatched.Count) { ': not ' + ($unwatched -join ', ') } else { '' })) (
+    $writes.Count -gt 0 -and $unwatched.Count -eq 0)
+Yes '  tests\fixtures\merchant-retrieval-records.json among them, which a box run left on the box until #3425' ($watch -contains 'tests/fixtures/merchant-retrieval-records.json')
 Yes '  and what Build-RecipeTable.ps1 loads from scripts\deploy, and what that loads from scripts\release' (
     ($paths -contains 'scripts/deploy/ServerOrder.ps1') -and ($paths -contains 'scripts/release/Read-JsonFile.ps1'))
 $loads = @()
@@ -179,6 +188,14 @@ Yes 'a PowerShell tool runs under PowerShell 7 with no profile, a node tool unde
 Yes '{plugins} makes the plugin list from the server''s loadOrder alone, and only when an argument names it' (
     $farPs.Contains('if ($True) {') -and $farPs.Contains(").loadOrder)") -and $farPs.Contains(".Replace('{plugins}', `$pluginList)") -and $far.Contains('if ($False) {'))
 Yes 'what changed under docs\systems is listed with game\ and records\' ($far.Contains("foreach (`$top in 'game', 'records', 'docs\systems')"))
+$farWatch = Get-ThornswoodOnBoxScript -Run 'C:\Windows\Temp\thornswood-onbox-test' -ServerRoot 'C:\Thornswood-Server-Dev' -Tool 'scripts/mods/Rebuild-ContentTables.ps1' -Arguments @('-Data', '{data}') -Watch @('game', 'records', 'docs/systems', 'tests/fixtures/merchant-retrieval-records.json')
+$errs = $null
+[void][Management.Automation.Language.Parser]::ParseInput($farWatch, [ref]$null, [ref]$errs)
+Yes 'a watched file outside them is listed too, a file read as itself and a folder walked, and the text parses (#3425)' (
+    (-not $errs -or $errs.Count -eq 0) -and $farWatch.Contains("foreach (`$top in 'game', 'records', 'docs\systems', 'tests\fixtures\merchant-retrieval-records.json')") -and
+    $farWatch.Contains('Test-Path -LiteralPath $d -PathType Leaf'))
+$bad = @(foreach ($w in @('../outside', 'game/../..', '/etc', 'a b')) { try { [void](Get-ThornswoodOnBoxScript -Run 'C:\Windows\Temp\thornswood-onbox-test' -ServerRoot 'C:\Thornswood-Server-Dev' -Tool 'scripts/mods/Rebuild-ContentTables.ps1' -Watch @($w)); $w } catch { } })
+Yes 'and a watch that is not a plain path inside the repository is refused' ($bad.Count -eq 0)
 $ro = Get-ThornswoodArchiveReadOnlyScript
 $errs = $null
 [void][Management.Automation.Language.Parser]::ParseInput($ro, [ref]$null, [ref]$errs)
@@ -412,12 +429,16 @@ sys.exit(3)
 param([string]$Data, [string]$PluginsTxt)
 'PLUGINS ' + ([IO.File]::ReadAllLines($PluginsTxt) -join '|')
 'SHELL ' + $PSVersionTable.PSEdition
-Set-Content -LiteralPath (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'docs\systems\cut-items.json') -Value '["x"]'
+$top = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+Set-Content -LiteralPath (Join-Path $top 'docs\systems\cut-items.json') -Value '["x"]'
+New-Item -ItemType Directory -Force -Path (Join-Path $top 'tests\fixtures') | Out-Null
+Set-Content -LiteralPath (Join-Path $top 'tests\fixtures\watched.json') -Value '{}'
+Set-Content -LiteralPath (Join-Path $top 'tests\fixtures\not-watched.json') -Value '{}'
 exit 0
 '@
         [IO.File]::WriteAllText((Join-Path $src2 'scripts\mods\t.ps1'), $psTool)
         [IO.Compression.ZipFile]::CreateFromDirectory($src2, (Join-Path $run2 'tools.zip'))
-        $text = Get-ThornswoodOnBoxScript -Run $run2 -ServerRoot $server -Tool 'scripts/mods/t.ps1' -Arguments @('-Data', '{data}', '-PluginsTxt', '{plugins}') -ArchiveStore $store
+        $text = Get-ThornswoodOnBoxScript -Run $run2 -ServerRoot $server -Tool 'scripts/mods/t.ps1' -Arguments @('-Data', '{data}', '-PluginsTxt', '{plugins}') -ArchiveStore $store -Watch @('game', 'records', 'docs/systems', 'tests/fixtures/watched.json')
         [IO.File]::WriteAllText($file, $text, (New-Object Text.UTF8Encoding($true)))
         $env:PATH = (Split-Path -Parent $pwsh) + [IO.Path]::PathSeparator + $env:PATH
         $lines = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" })
@@ -427,7 +448,8 @@ exit 0
             ($lines -contains 'PLUGINS *Mod A.esp|*Thornswood-Content.esp') -and ($lines -contains 'SHELL Core') -and (($lines -match '^plugins\s+2 line\(s\)').Count -eq 1))
         Yes 'and nothing else of the server''s settings reaches the run' (-not @($lines | Where-Object { $_ -match 'not-for-the-run' }).Count -and
             -not @(Get-ChildItem -LiteralPath $run2 -Recurse -File | Where-Object { $_.Extension -ne '.esp' -and $_.Name -ne 'tools.zip' -and [IO.File]::ReadAllText($_.FullName).Contains('not-for-the-run') }).Count)
-        Yes 'what it wrote under docs\systems comes back' ((@($lines | Where-Object { $_ -like 'CHANGED *' }) -join ',') -eq 'CHANGED docs/systems/cut-items.json' -and ($lines -contains 'EXIT 0'))
+        Yes 'what it wrote under docs\systems comes back, and a watched file outside them it made, and not one it was not asked to watch (#3425)' (
+            (@($lines | Where-Object { $_ -like 'CHANGED *' }) -join ',') -eq 'CHANGED docs/systems/cut-items.json,CHANGED tests/fixtures/watched.json' -and ($lines -contains 'EXIT 0'))
         $gone = Stop-Keeper $runKeeper
         Yes 'and its keeper removes its folder' (($gone -contains ('GONE ' + $run2)) -and -not (Test-Path -LiteralPath $run2))
     } finally {
