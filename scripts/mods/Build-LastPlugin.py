@@ -137,6 +137,23 @@ WHAT IT PUTS IN THE PLUGIN
      does not carry is added, one it carries is changed, one of another type
      stops the build, and so does a script the quest does not have.
 
+  8. The hold-only plants and ores (Patrick, 22 Oct 2026, page answer A on
+     #3150: each hold has 2 to 3 hold-only plants, ores or animals, which
+     grow only in their own hold). The policy's holdOnly names each by its
+     produce and its hold; every base of game/data/harvests.json or
+     game/data/ores.json that gives that produce is hold-only. Every placed
+     reference of one standing anywhere but its hold is overridden initially
+     disabled, keeping its base and position, the way a floor item is (5),
+     and the ones in their hold stay. The hold is the NPC catalogue's rule
+     (scripts/dev/Build-CastTable.py, Cast.place): the location the
+     reference carries, then its cell's, then the ground under a world's
+     persistent cell, then the nearest ground within six cells that names a
+     place, with the policy's place holds (4) read in. A Thornswood
+     plugin's own placement outside its hold, and one a quest or trade
+     table draws from (SOURCE_TABLES), stop the build. Which ones was
+     measured by scripts/dev/Measure-HoldResources.py, and the policy says
+     what it found beside each.
+
   A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
   them, form ids moved into this plugin's numbering. A quest and a location
@@ -1104,6 +1121,139 @@ def floor_scan(plugins, win, bases):
     return floor, parents
 
 
+# A hold-only plant or ore (#3150) is placed in a hold the way the NPC
+# catalogue places a person (scripts/dev/Build-CastTable.py, Cast.place): the
+# location the reference carries, the location of the cell it stands in, the
+# ground under it when it stands in a world's persistent cell, and last the
+# nearest ground within HOLD_NEAREST cells that names a place.
+HOLD_ONLY = 'hold-only '
+CELL_UNITS = 4096.0
+HOLD_NEAREST = 6
+# The nine holds. Solstheim is a hold location in the records but not one of
+# Skyrim's holds, so nothing grows only there.
+NINE_HOLDS = HOLD_LOCATIONS[:9]
+# The tables whose rows name a placed reference a quest or a trade draws from,
+# by its reference field. A hold-only switch-off that reaches one stops the
+# build, so the quest is decided rather than emptied.
+SOURCE_TABLES = ('merchant-scarce-harvest.json', 'merchant-scarce-geodes.json', 'merchant-scarce-fishing.json',
+                 'merchant-orchard.json')
+
+
+def hold_only_rows(policy):
+    """The policy's holdOnly resources checked against the plant and ore
+    tables: {base gid: row}, and the rows. A row names its produce, and every
+    base of game/data/harvests.json or game/data/ores.json that gives it is
+    hold-only."""
+    rules = policy.get('holdOnly') or {}
+    harvests = json.load(open(os.path.join(ROOT, 'game', 'data', 'harvests.json'), encoding='utf-8'))['harvests']
+    ores = json.load(open(os.path.join(ROOT, 'game', 'data', 'ores.json'), encoding='utf-8'))['ores']
+    by_base, rows, seen = {}, [], set()
+    for row in rules.get('resources', []):
+        if row['produce'] in seen:
+            raise SystemExit('STOP. the policy makes %s hold-only twice. Nothing was written.' % row['produce'])
+        seen.add(row['produce'])
+        if row['holdEdid'] not in NINE_HOLDS:
+            raise SystemExit('STOP. the policy keeps %s to %s, which is not one of the nine holds. '
+                             'Nothing was written.' % (row['name'], row['holdEdid']))
+        table, field = (harvests, 'produce') if row['kind'] == 'plant' else (ores, 'ore') \
+            if row['kind'] == 'ore' else (None, None)
+        if table is None:
+            raise SystemExit('STOP. the policy calls %s a %s; a hold-only resource is a plant or an ore. '
+                             'Nothing was written.' % (row['name'], row['kind']))
+        bases = sorted(b for b, r in table.items() if r[field] == row['produce'])
+        names = {table[b]['name'] for b in bases}
+        if not bases or names != {row['name']}:
+            raise SystemExit('STOP. the policy keeps %s (%s) to its hold, and the %s table gives it from %s. '
+                             'Nothing was written.' % (row['produce'], row['name'], row['kind'],
+                                                       ', '.join(sorted(names)) or 'nothing'))
+        for b in bases:
+            if ref_key(b) in by_base:
+                raise SystemExit('STOP. %s gives two hold-only resources. Nothing was written.' % b)
+            by_base[ref_key(b)] = row
+        rows.append(dict(row, bases=bases))
+    per = collections.Counter(r['holdEdid'] for r in rows)
+    if rows and any(not 2 <= per[h] <= 3 for h in NINE_HOLDS):
+        raise SystemExit('STOP. each hold keeps 2 to 3 hold-only resources (Patrick, 22 Oct 2026, #3150), '
+                         'and the policy gives %s. Nothing was written.'
+                         % ', '.join('%s %d' % (h, per[h]) for h in NINE_HOLDS))
+    return by_base, rows
+
+
+def quest_sources():
+    """Every placed reference a quest or trade table draws from, as gids."""
+    out = set()
+    for name in SOURCE_TABLES:
+        path = os.path.join(ROOT, 'game', 'data', name)
+        if os.path.isfile(path):
+            for row in json.load(open(path, encoding='utf-8')).get('sources', []):
+                out.add(ref_key(row['reference']))
+    return out
+
+
+def ref_holds(plugins, win, planned=None, rooms=None):
+    """A function giving the hold location's editor id a placed reference
+    stands in, or None. planned is {location: its new parent} and rooms
+    {cell gid: its new location gid}, the policy's place holds, read in place
+    of the records' own (#2551)."""
+    ground, named = {}, {}
+    for (tag, g), e in win.items():
+        if tag != b'CELL' or e.ctx[0] is None or e.ctx[3]:
+            continue
+        pairs = dict(subrecords(plugins[e.pi].data(e)))
+        if len(pairs.get(b'XCLC', b'')) < 8:
+            continue
+        square = (plugins[e.pi].gid(e.ctx[0]),) + struct.unpack_from('<ii', pairs[b'XCLC'], 0)
+        ground[square] = g
+        h = hold_of(plugins, win, form_field(plugins, e, b'XLCN'), planned)
+        if h:
+            named[square] = h
+
+    def cell_hold(cg):
+        if cg in (rooms or {}):
+            return hold_of(plugins, win, rooms[cg], planned)
+        ce = win.get((b'CELL', cg))
+        return hold_of(plugins, win, form_field(plugins, ce, b'XLCN'), planned) if ce is not None else None
+
+    def nearest(world, gx, gy):
+        for r in range(1, HOLD_NEAREST + 1):
+            best = None
+            for dx in range(-r, r + 1):
+                for dy in range(-r, r + 1):
+                    if max(abs(dx), abs(dy)) != r:
+                        continue
+                    h = named.get((world, gx + dx, gy + dy))
+                    if h and (best is None or (dx * dx + dy * dy, h) < best):
+                        best = (dx * dx + dy * dy, h)
+            if best:
+                return best[1]
+        return None
+
+    def place(e):
+        src = plugins[e.pi]
+        h = hold_of(plugins, win, form_field(plugins, e, b'XLCN'), planned)
+        if h:
+            return h
+        cg = src.gid(e.ctx[1])
+        h = cell_hold(cg)
+        if h:
+            return h
+        ce = win.get((b'CELL', cg))
+        if ce is None or ce.ctx[0] is None:
+            return None
+        d = dict(subrecords(src.data(e))).get(b'DATA', b'')
+        if len(d) < 8:
+            return None
+        x, y = struct.unpack_from('<ff', d, 0)
+        world, gx, gy = plugins[ce.pi].gid(ce.ctx[0]), int(x // CELL_UNITS), int(y // CELL_UNITS)
+        if ce.ctx[3]:
+            h = cell_hold(ground.get((world, gx, gy)))
+            if h:
+                return h
+        return nearest(world, gx, gy)
+
+    return place
+
+
 def build(data_dir):
     catalogue = json.load(open(CATALOGUE, encoding='utf-8'))
     policy = json.load(open(POLICY, encoding='utf-8'))
@@ -1264,9 +1414,19 @@ def build(data_dir):
 
     # 4. The floor items (#3077): every placed reference a person could pick
     # up, switched off like a cut actor. Left alone, the same way: one a later
-    # plugin deleted, and one already off with no enable parent.
+    # plugin deleted, and one already off with no enable parent. The
+    # hold-only plants and ores (8, #3150) are found in the same pass.
     bases = floor_bases(plugins, win, canon)
-    found, parents = floor_scan(plugins, win, bases)
+    hold_bases, hold_rows = hold_only_rows(policy)
+    scan = dict(bases)
+    for g, row in hold_bases.items():
+        if g in bases:
+            raise SystemExit('STOP. %s is a floor item and a hold-only %s at once. Nothing was written.'
+                             % (desc_of(g, canon), row['kind']))
+        scan[g] = HOLD_ONLY + row['produce']
+    found, parents = floor_scan(plugins, win, scan)
+    hold_found = {g: v for g, v in found.items() if v[1].startswith(HOLD_ONLY)}
+    found = {g: v for g, v in found.items() if not v[1].startswith(HOLD_ONLY)}
 
     def in_blocked_place(e):
         """Whether e stands in a cell or world a never-copied plugin wins."""
@@ -1278,6 +1438,38 @@ def build(data_dir):
                 return True
         return False
 
+    def sort_off(g, e, kind, off, rows, server):
+        """Where one placed reference to switch off goes: off (switched off
+        here, from the record that is copied), rows (deleted or already off,
+        left alone) or server (held off by the server)."""
+        src = plugins[e.pi]
+        tags = [t for t, _ in subrecords(src.data(e))]
+        if e.flags & DELETED:
+            rows['deleted'].append(desc_of(g, canon))
+        # Off already only with nothing that could switch it on: no enable
+        # parent and no script. A disabled item with a script is switched off
+        # here, without the script.
+        elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
+            rows['alreadyOff'].append(desc_of(g, canon))
+        elif in_blocked_place(e):
+            # It stands in a cell or world a never-copied plugin wins, so
+            # switching it off here would copy that plugin's record of the
+            # place, or undo its edit with the one below. The server holds
+            # it off instead.
+            server.append((g, kind))
+        elif src.name.lower() in blocked and not carries(b'REFR', g):
+            if under(e, b'REFR', g) is not None:
+                off.append((g, under(e, b'REFR', g), kind))
+            elif canon[g[0]].lower() in blocked:
+                # Its own, placed by it: nothing below to switch off, and its
+                # record is not copied. The server holds it off.
+                server.append((g, kind))
+            else:
+                raise SystemExit('STOP. %s wins %s %s and no plugin below it has it. Nothing was '
+                                 'written.' % (src.name, kind, desc_of(g, canon)))
+        else:
+            off.append((g, e, kind))
+
     floor, floor_rows, by_server = [], {'deleted': [], 'alreadyOff': []}, []
     for g in sorted(found, key=lambda g: (canon[g[0]].lower(), g[1])):
         e, kind = found[g]
@@ -1286,46 +1478,59 @@ def build(data_dir):
             raise SystemExit('STOP. %s puts %s on the floor (a %s). A Thornswood plugin\'s own floor item '
                              'is Patrick\'s to keep or take out (#3077), never switched off unasked. '
                              'Nothing was written.' % (src.name, desc_of(g, canon), kind))
-        tags = [t for t, _ in subrecords(src.data(e))]
-        if e.flags & DELETED:
-            floor_rows['deleted'].append(desc_of(g, canon))
-        # Off already only with nothing that could switch it on: no enable
-        # parent and no script. A disabled item with a script is switched off
-        # here, without the script.
-        elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
-            floor_rows['alreadyOff'].append(desc_of(g, canon))
-        elif in_blocked_place(e):
-            # It stands in a cell or world a never-copied plugin wins, so
-            # switching it off here would copy that plugin's record of the
-            # place, or undo its edit with the one below. The server holds
-            # it off instead.
-            by_server.append((g, kind))
-        elif src.name.lower() in blocked and not carries(b'REFR', g):
-            if under(e, b'REFR', g) is not None:
-                floor.append((g, under(e, b'REFR', g), kind))
-            elif canon[g[0]].lower() in blocked:
-                # Its own, placed by it: nothing below to switch off, and its
-                # record is not copied. The server holds it off.
-                by_server.append((g, kind))
-            else:
-                raise SystemExit('STOP. %s wins floor item %s and no plugin below it has it. Nothing was '
-                                 'written.' % (src.name, desc_of(g, canon)))
-        else:
-            floor.append((g, e, kind))
+        sort_off(g, e, kind, floor, floor_rows, by_server)
+
+    # 8. The hold-only plants and ores (#3150). Patrick, 22 Oct 2026 (page
+    # answer A): each hold has 2 to 3 hold-only plants, ores or animals, which
+    # grow only in their own hold. Every placed one of them standing anywhere
+    # but its own hold is switched off the way a floor item is; the ones in
+    # their hold stay. A Thornswood plugin's own placement outside its hold,
+    # and one a quest or trade table draws from, stop the build, so each is
+    # decided rather than switched off unasked.
+    hold_planned = {ref_key(r['location']): ref_key(r['parent'])
+                    for r in (policy.get('placeHolds') or {}).get('locations', [])}
+    hold_rooms = {ref_key(r['cell']): ref_key(r['location'])
+                  for r in (policy.get('placeHolds') or {}).get('cells', [])}
+    hold_place = ref_holds(plugins, win, hold_planned, hold_rooms)
+    sources = quest_sources()
+    hold_off, hold_left, hold_server = [], {'deleted': [], 'alreadyOff': []}, []
+    hold_by_produce = {r['produce']: r for r in hold_rows}
+    hold_count = {r['produce']: collections.Counter() for r in hold_rows}
+    for g in sorted(hold_found, key=lambda g: (canon[g[0]].lower(), g[1])):
+        e, kind = hold_found[g]
+        src = plugins[e.pi]
+        row = hold_by_produce[kind[len(HOLD_ONLY):]]
+        where = hold_place(e)
+        if where == row['holdEdid']:
+            hold_count[row['produce']]['kept'] += 1
+            continue
+        if own_plugins.is_own(canon[g[0]]) or own_plugins.is_own(src.name):
+            raise SystemExit('STOP. %s places %s %s in %s, outside %s. A Thornswood plugin\'s own placement '
+                             'is Patrick\'s to keep or take out (#3150), never switched off unasked. '
+                             'Nothing was written.' % (src.name, row['name'], desc_of(g, canon), where or 'no hold',
+                                                       row['holdEdid']))
+        if g in sources:
+            raise SystemExit('STOP. %s %s stands in %s, outside %s, and a quest or trade table draws from it '
+                             '(game/data/%s). Decide it on #3150. Nothing was written.'
+                             % (row['name'], desc_of(g, canon), where or 'no hold', row['holdEdid'],
+                                ' or '.join(SOURCE_TABLES)))
+        hold_count[row['produce']]['outside'] += 1
+        sort_off(g, e, row['name'], hold_off, hold_left, hold_server)
     # A reference whose enable parent is a floor item would go out with it, or
     # come on as it goes (the opposite flag). Neither is decided by this. Only
     # a floor item's followers count: a cut actor's go out with it, as they
     # have since #2468 (measured 21 Oct 2026: 30 references follow 11 cut
     # actors, and none follows a floor item). A follower that is switched off
     # here itself, a floor item or a cut actor, has no enable parent left.
-    items_off = {g for g, _, _ in floor}
+    # A hold-only plant or ore switched off counts the same way (#3150).
+    items_off = {g for g, _, _ in floor + hold_off}
     off_here = items_off | {plugins[e.pi].gid(e.fid) for e in actors}
     followers = sorted('%s follows %s' % (desc_of(g, canon), desc_of(p, canon))
                        for g, (e, p) in parents.items() if p in items_off and g not in off_here)
     if followers:
-        raise SystemExit('STOP. %d reference(s) have a floor item as their enable parent, and switching '
-                         'the item off would switch them too:\n  %s\nDecide them on #3077. Nothing was written.'
-                         % (len(followers), '\n  '.join(followers[:40])))
+        raise SystemExit('STOP. %d reference(s) have a floor item or a hold-only plant or ore as their enable '
+                         'parent, and switching it off would switch them too:\n  %s\nDecide them on #3077 or '
+                         '#3150. Nothing was written.' % (len(followers), '\n  '.join(followers[:40])))
 
     # The cells and worlds the actors, gates and floor items stand in, each
     # from its own winner.
@@ -1363,6 +1568,9 @@ def build(data_dir):
     # plugin copies from other authors (#2791), counted by who wins each.
     had = set(cells)
     floor_cells = {stand(e) for _, e, _ in floor} - had
+    # And the ones only the hold-only plants and ores need (#3150).
+    had = set(cells)
+    hold_only_cells = {stand(e) for _, e, _ in hold_off} - had
 
     # 5. The places given a hold (#2551). A room given a location is copied
     # like any other cell, with nothing placed under it unless an actor here
@@ -1371,6 +1579,7 @@ def build(data_dir):
     for g, (e, le, row) in hold_cells.items():
         cells[g] = e
     floor_cells -= set(hold_cells)
+    hold_only_cells -= set(hold_cells)
 
     # 5. The re-costed smith recipes (#613).
     recipes = recost_entries(json.load(open(RECOST, encoding='utf-8')), plugins, win)
@@ -1443,7 +1652,8 @@ def build(data_dir):
             flags = (e.flags & ~(COMPRESSED | DELETED)) | DISABLED
             out['achr'].append((fid, flags, pack_subrecords(keep), e))
         # A floor item the same way: its base and its place, nothing else.
-        for g, e, kind in floor:
+        # A hold-only plant or ore outside its hold too (#3150).
+        for g, e, kind in floor + hold_off:
             src = plugins[e.pi]
             what = '%s REFR 0x%08X' % (src.name, e.fid)
             keep = []
@@ -1589,6 +1799,21 @@ def build(data_dir):
         },
     }
     manifest['counts']['floorItemsOff'] = len(floor)
+    # The hold-only plants and ores (#3150): each with how many of its
+    # placements stand in its hold and stay, and how many stand outside it,
+    # and every one switched off here, listed, with the ones left as they are
+    # and the ones the server holds off.
+    manifest['holdOnly'] = {
+        'resources': [{'produce': r['produce'], 'name': r['name'], 'kind': r['kind'], 'hold': r['holdEdid'],
+                       'bases': len(r['bases']), 'kept': hold_count[r['produce']]['kept'],
+                       'outside': hold_count[r['produce']]['outside']} for r in hold_rows],
+        'off': sorted(desc_of(g, canon) for g, _, _ in hold_off),
+        'deleted': sorted(hold_left['deleted']),
+        'alreadyOff': sorted(hold_left['alreadyOff']),
+        'heldByServer': sorted(desc_of(g, canon) for g, _ in hold_server),
+        'cellsAdded': len(hold_only_cells),
+    }
+    manifest['counts']['holdOnlyOff'] = len(hold_off)
     # The cells and worlds a never-copied plugin wins, copied from the plugin
     # below it, whose record that plugin does not change (step 6), and the
     # records the policy carries from it.
@@ -1955,9 +2180,38 @@ def verify(data_dir, plugin_bytes, manifest):
     if here != floor.get('off'):
         fails.append('%d floor items are off by this plugin, and the manifest says %s' % (here, floor.get('off')))
     mine = {g for g, (e, _) in found.items() if e.pi == last.index}
+    # No hold-only plant or ore (#3150) is left able to show outside its hold,
+    # and none in its hold is switched off here. The holds are read off the
+    # records in the load order with the plugin at its end, so the places it
+    # gives a hold count without the policy.
+    hold_bases, _ = hold_only_rows(json.load(open(POLICY, encoding='utf-8')))
+    hold_scan = {g: HOLD_ONLY + r['produce'] for g, r in hold_bases.items()}
+    hold_found, _ = floor_scan(plugins, win, hold_scan)
+    hold_place = ref_holds(plugins, win)
+    held_off = set((manifest.get('holdOnly') or {}).get('heldByServer') or [])
+    hold_here = 0
+    for g, (e, kind) in hold_found.items():
+        src = plugins[e.pi]
+        row = hold_bases[src.gid(struct.unpack('<I', dict(subrecords(src.data(e)))[b'NAME'])[0])]
+        tags = [t for t, _ in subrecords(src.data(e))]
+        off = bool(e.flags & DELETED) or (e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags)
+        if hold_place(e) == row['holdEdid']:
+            if e.pi == last.index:
+                fails.append('%s %s stands in %s and is switched off here' % (row['name'], desc_of(g, canon),
+                                                                                row['holdEdid']))
+            continue
+        hold_here += e.pi == last.index and off
+        if not off and desc_of(g, canon) not in held_off:
+            fails.append('%s %s is left able to show outside %s' % (row['name'], desc_of(g, canon), row['holdEdid']))
+        if e.pi == last.index:
+            mine.add(g)
+    if hold_here != len((manifest.get('holdOnly') or {}).get('off') or []):
+        fails.append('%d hold-only plants and ores are off by this plugin, and the manifest says %d'
+                     % (hold_here, len((manifest.get('holdOnly') or {}).get('off') or [])))
     for g, (e, p) in parents.items():
         if p in mine:
-            fails.append('%s has the floor item %s as its enable parent' % (desc_of(g, canon), desc_of(p, canon)))
+            fails.append('%s has the floor item or hold-only placement %s as its enable parent'
+                         % (desc_of(g, canon), desc_of(p, canon)))
     return fails
 
 
@@ -1997,6 +2251,8 @@ def main():
               % (c.get('placeLocations', 0), c.get('placeRooms', 0)))
         print('  ok    %d smith recipes ask the counts recost.json gives' % c.get('recipesRecosted', 0))
         print('  ok    %d floor items are off and nothing can switch them on' % c.get('floorItemsOff', 0))
+        print('  ok    %d hold-only plants and ores are off outside their hold, and none in it'
+              % c.get('holdOnlyOff', 0))
         print('  ok    %d mod quests carry the script properties the policy sets'
               % c.get('questScriptProperties', 0))
         return 0
@@ -2028,6 +2284,13 @@ def main():
     fl = manifest['floorItems']
     print('  %d floor items off (%s); left as they are: %d deleted by a plugin, %d already off'
           % (fl['off'], ', '.join('%d %s' % (n, k) for k, n in fl['byType'].items()), fl['deleted'], fl['alreadyOff']))
+    ho = manifest['holdOnly']
+    for row in ho['resources']:
+        print('  hold-only %s %s in %s: %d stay, %d outside it' % (row['kind'], row['name'], row['hold'],
+                                                                  row['kept'], row['outside']))
+    print('  %d hold-only plants and ores off; left as they are: %d deleted by a plugin, %d already off; '
+          '%d held off by the server; %d cells copied only for them'
+          % (len(ho['off']), len(ho['deleted']), len(ho['alreadyOff']), len(ho['heldByServer']), ho['cellsAdded']))
     print('  %d cells copied only for the floor items, by the plugin that wins each:' % fl['cellsAdded'])
     for name, n in sorted(fl['cellsAddedByWinner'].items(), key=lambda x: -x[1]):
         print('    %6d  %s%s' % (n, name, '' if name.lower() in committed else
@@ -2073,10 +2336,12 @@ def held_block(manifest, gamemode):
         raise SystemExit('STOP. no HELD_BY_SERVER markers in game/gamemode.js. Nothing was written.')
     block = '\n'.join([
         HELD_BLOCK[0],
-        '// Generated by scripts\\mods\\Build-LastPlugin.py (game\\data\\last-plugin.json: floorItems.heldByServer',
-        '// and refs.heldByServer); do not hand edit. Placed by, or standing where, a plugin it never copies from.',
+        '// Generated by scripts\\mods\\Build-LastPlugin.py (game\\data\\last-plugin.json: floorItems.heldByServer,',
+        '// refs.heldByServer and holdOnly.heldByServer); do not hand edit. Placed by, or standing where, a plugin',
+        '// it never copies from.',
         'var HELD_BY_SERVER = %s;' % json.dumps(sorted(manifest['floorItems']['heldByServer'] +
-                                                     manifest['refs']['heldByServer'])),
+                                                     manifest['refs']['heldByServer'] +
+                                                     (manifest.get('holdOnly') or {}).get('heldByServer', []))),
         HELD_BLOCK[1]])
     return gamemode[:a] + block + gamemode[b + len(HELD_BLOCK[1]):]
 
