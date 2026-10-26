@@ -433,8 +433,9 @@ CONTENTS = (
     (r'(KYWD|FURN) ThornswoodCraftingWoodworking', 'own', 'woodworking benches'),
     (r'FURN ThornswoodFurnitureSaltMine$', 'own', 'salt quarries'),
     (r'FLOR ThornswoodFloraBeehive$', 'own', 'beehives'),
-    (r'ACTI ThornswoodActivator(Well|Water)Bucket$', 'own', 'well and water buckets'),
-    (r'ACTI ThornswoodActivatorStudyDesk$', 'own', 'study desks'),
+    # One row for the well and water buckets (#1382) and the study desk (#1387):
+    # a row of its own for the desk took the description to 515 bytes.
+    (r'ACTI ThornswoodActivator(WellBucket|WaterBucket|StudyDesk)$', 'own', 'water buckets and study desks'),
     # The placements, and the cells and worlds they stand in, are the stations
     # above and the quest sites below put in the world (the tool refuses any
     # other placement), so those rows' words already say them.
