@@ -291,7 +291,7 @@ function guard(name, fn) {
     others are the thing acted on. onDeath and onRespawn are not a person
     acting and are left. Inside guard() so it goes wherever guard() does.
   */
-  const ACTS_AS = { onActivate: 1, onCraft: 0, onReadBook: 0, onPutItem: 1, onTakeItem: 1,
+  const ACTS_AS = { onActivate: 1, onCraft: 0, onCraftWork: 0, onReadBook: 0, onPutItem: 1, onTakeItem: 1,
                     onDropItem: 0, onUpdateAppearanceAttempt: 0 };
   const acts = Object.prototype.hasOwnProperty.call(ACTS_AS, name) ? ACTS_AS[name] : -1;
   return function () {
@@ -28933,6 +28933,97 @@ function unfitToMake(actorId, workbenchId) {
   const needs = globalThis.__thornswoodNeeds;
   return (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
 }
+
+/*
+  HOW LONG A CRAFT TAKES AT THE BENCH (#3161).
+
+  Patrick, 22 Oct 2026, his B on the report page: "small 1 s, medium 5 s,
+  large 15 s", with an animation, and moving away stops it (docs/DECIDED.md).
+
+  The game makes the item on the person's machine the moment they press
+  craft, so the wait is the engine's (engine/skymp CraftService, fork #115):
+  it asks mp.onCraftWork before anything else, with mp.onCraft's own
+  arguments, and holds the craft for the time named here. The bench's own
+  working animation plays behind its menu while they stay, the item lands in
+  the pack when the time is up, and only then is mp.onCraft asked and
+  anything taken. Getting up from the bench closes its menu, which stops the
+  work with nothing taken; so does being found away from the bench when a
+  time is up. An engine with no onCraftWork never asks, and a craft there is
+  made at once as before.
+
+  WHICH SIZE. A row's family is what kind of thing it makes (recipes.json,
+  "family"), and that is the size: a meal, an ingot or a bundle of arrows is
+  small, a blade, a bow, a helmet, boots or a garment is medium, and a
+  two-handed weapon, a cuirass or a shield is large. The amount of material a
+  row takes is no measure: a gilded ring takes more pieces than an iron
+  cuirass. A family nobody has sized is medium, and a craft with no row is
+  sized by its bench: a brew at an alchemy lab is small, an enchantment
+  medium.
+*/
+const CRAFT_WORK_MS = { small: 1000, medium: 5000, large: 15000 };
+const CRAFT_SIZE_BY_FAMILY = {
+  'Arrows and bolts': 'small', 'Ingots': 'small', 'Leather': 'small', 'Ingredients': 'small', 'Books': 'small',
+  'Bread': 'small', 'Cheese': 'small', 'Chowders': 'small', 'Crab dishes': 'small', 'Desserts': 'small',
+  'Fish dishes': 'small', 'Meat dishes': 'small', 'Other food and drink': 'small', 'Soups': 'small',
+  'Stews': 'small', 'Vegetable dishes': 'small',
+  'Daggers': 'medium', 'Swords': 'medium', 'War axes': 'medium', 'Maces': 'medium', 'Bows': 'medium',
+  'Staves': 'medium', 'Other weapons': 'medium', 'Helmets': 'medium', 'Hats and hoods': 'medium',
+  'Gauntlets': 'medium', 'Gloves': 'medium', 'Armoured boots': 'medium', 'Shoes and light boots': 'medium',
+  'Robes and body wear': 'medium', 'Other armour and clothing': 'medium', 'Other goods': 'medium',
+  'Greatswords': 'large', 'Battleaxes': 'large', 'Warhammers': 'large', 'Body armour': 'large', 'Shields': 'large'
+};
+const CRAFT_SIZE_BY_BENCH = { alchemy: 'small', enchanting: 'medium' };
+const CRAFT_SIZE_WORDS = { small: '1 second', medium: '5 seconds', large: '15 seconds' };
+
+/** small, medium or large: by the row's family, or with no row by the bench. */
+function craftSize(row, workbenchId) {
+  const own = Object.prototype.hasOwnProperty;
+  if (row && typeof row === 'object') {
+    return own.call(CRAFT_SIZE_BY_FAMILY, row.family) ? CRAFT_SIZE_BY_FAMILY[row.family] : 'medium';
+  }
+  let bench = '';
+  try {
+    const base = mp.get(workbenchId, 'baseDesc');
+    if (base && own.call(BENCH_BY_BASE, base)) { bench = String(BENCH_BY_BASE[base]); }
+  } catch (e) {
+    log('bench', (workbenchId || 0).toString(16), 'has no base to size a craft by, so it is medium:', e);
+  }
+  return own.call(CRAFT_SIZE_BY_BENCH, bench) ? CRAFT_SIZE_BY_BENCH[bench] : 'medium';
+}
+
+mp.onCraftWork = guard('onCraftWork', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
+  /*
+    Too sick, too hurt or too tired is said now, before any time passes, by
+    the gate every way of making something asks (#1733). mp.onCraft asks it
+    again when the time is up, since a craft of 15 seconds is long enough to
+    change the answer.
+  */
+  const unfit = unfitToMake(actorId, workbenchId);
+  if (unfit) {
+    notify(actorId, unfit);
+    say(actorId, unfit);
+    log(actorId.toString(16), 'was refused a craft at bench', (workbenchId || 0).toString(16) + ':', unfit);
+    return false;
+  }
+
+  // The row, found the way mp.onCraft finds it: by the recipe, or for a
+  // recipe set in each game (#613) by its output, bench and counts.
+  let desc = null;
+  if (recipeId) {
+    try { desc = mp.getDescFromId(recipeId); } catch (e) { desc = null; }
+  } else {
+    desc = recipeSetInGame(craftedItemBaseId, workbenchId, arguments[6]);
+  }
+  const row = (desc && typeof desc === 'string') ? craftRow(desc) : null;
+  const size = craftSize(row, workbenchId);
+  mp.set(actorId, 'craftWork', { ms: CRAFT_WORK_MS[size] });
+
+  if (size !== 'small') {
+    const what = (row && row.name) ? String(row.name).trim() : 'That';
+    notify(actorId, what + ' takes ' + CRAFT_SIZE_WORDS[size] + '. Stay at the bench until it is made; ' +
+                    'getting up stops the work and keeps your materials.');
+  }
+});
 
 mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
   /*
