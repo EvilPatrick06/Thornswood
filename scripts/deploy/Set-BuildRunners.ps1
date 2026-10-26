@@ -9,6 +9,18 @@
       pwsh scripts/deploy/Set-BuildRunners.ps1            make GitHub match main's records
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Check     change nothing; exit 1 when GitHub differs
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Run <id>  the answer of a run that had not ended
+      pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings [-Check | -Run <id>]
+                                                         the same for main's repository settings
+
+  REPOSITORY SETTINGS (#3683, Patrick's answers of 26 Oct 2026). With
+  -RepoSettings it asks for records\github-repo-settings.json instead, which
+  names Thornswood and the engine fork, EvilPatrick06/skymp, and for each its
+  rulesets and, where it says, private vulnerability reporting: each ruleset
+  is made on GitHub, or put back, with exactly its target, enforcement,
+  conditions, rules and bypass list, and reporting is switched on or off as
+  the record says. A ruleset GitHub has that the record does not name stops
+  it and is left as it is. The same App, the same run, the same rule: what to
+  change comes from main, never from here.
 
   A record is { "label": ..., "runners": [1, 2] }: the runners it lists
   (thornswood-vps is 1, thornswood-vps-<n> is n) carry the label and no other
@@ -72,6 +84,8 @@ param(
     # OIDC token. -Check comes from ADMIN_CHECK there.
     [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
     [switch]$OnGitHub,
+    # main's repository settings (records\github-repo-settings.json) rather than its runner records.
+    [switch]$RepoSettings,
     [int]$WaitMinutes = 15,
     [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
 )
@@ -81,7 +95,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\ops\WorkflowRun.ps1')
 
 $workflow = 'github-admin.yml'
-$title = 'Set-BuildRunners'
+$what = if ($RepoSettings) { 'repo-settings' } else { 'runner-labels' }
+$title = if ($RepoSettings) { 'Set-RepoSettings' } else { 'Set-BuildRunners' }
+$records = if ($RepoSettings) { 'main''s repository settings record' } else { 'main''s runner records' }
 # The audience admin.js takes, and nothing else does.
 $audience = 'thornswood-admin'
 
@@ -106,7 +122,7 @@ if ($OnGitHub) {
     # The service is on this machine; nothing between here and it.
     $a = Invoke-WebRequest -Method POST -Uri "http://127.0.0.1:$port/converge" -SkipHttpErrorCheck -NoProxy -TimeoutSec 120 `
         -Headers @{ Authorization = "Bearer $token" } -ContentType 'application/json' `
-        -Body (ConvertTo-Json -Compress @{ what = 'runner-labels'; check = $askCheck })
+        -Body (ConvertTo-Json -Compress @{ what = $what; check = $askCheck })
     $code = [int]$a.StatusCode
     $r = $null
     try { $r = [string]$a.Content | ConvertFrom-Json } catch { $r = $null }
@@ -126,7 +142,7 @@ if ($OnGitHub) {
 
 # ======================================================= the session half ===
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die "there is no gh here to start $workflow with. Install GitHub CLI from https://cli.github.com and run gh auth login. Nothing was changed." }
-$again = 'pwsh scripts/deploy/Set-BuildRunners.ps1 -Run '
+$again = 'pwsh scripts/deploy/Set-BuildRunners.ps1 ' + $(if ($RepoSettings) { '-RepoSettings ' } else { '' }) + '-Run '
 
 function Read-Answer([long]$id, [switch]$Started) {
     $a = Read-ThornswoodRunAnswer -Repo $GitHubRepo -Workflow $workflow -Run $id -Title $title -WaitMinutes $WaitMinutes -Started:$Started -Say { param($m) Say $m 'DarkGray' }
@@ -153,7 +169,7 @@ function Read-Answer([long]$id, [switch]$Started) {
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $answer = Read-Answer $Run
 } else {
-    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs ([ordered]@{ check = $(if ($Check) { 'true' } else { 'false' }) }) }
+    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs ([ordered]@{ check = $(if ($Check) { 'true' } else { 'false' }); what = $what }) }
     catch { Die ($_.Exception.Message + '. Nothing was changed.') }
     if (-not $started.Run) {
         Say ("GitHub started $workflow, but named no run" + ', so its answer cannot be read here. Its runs: ' + $started.Url) 'Yellow'
@@ -166,8 +182,8 @@ if ($PSCmdlet.ParameterSetName -eq 'Run') {
 $said = @("$answer" -split "`n")
 foreach ($l in @($said | Select-Object -Skip 1)) { Say "  $l" }
 switch -Regex ($said[0]) {
-    '^MATCHES$' { Say 'GitHub matches main''s runner records.' 'Green'; exit 0 }
-    '^CHANGED (\d+)$' { Say ('GitHub matches main''s runner records now; ' + $Matches[1] + ' label(s) changed.') 'Green'; exit 0 }
-    '^DIFFERS (\d+)$' { Say ('GitHub differs from main''s runner records in ' + $Matches[1] + ' place(s), above. pwsh scripts/deploy/Set-BuildRunners.ps1 puts it right.') 'Yellow'; exit 1 }
+    '^MATCHES$' { Say "GitHub matches $records." 'Green'; exit 0 }
+    '^CHANGED (\d+)$' { Say ("GitHub matches $records now; " + $Matches[1] + ' change(s) made.') 'Green'; exit 0 }
+    '^DIFFERS (\d+)$' { Say ("GitHub differs from $records in " + $Matches[1] + ' place(s), above. pwsh scripts/deploy/Set-BuildRunners.ps1' + $(if ($RepoSettings) { ' -RepoSettings' } else { '' }) + ' puts it right.') 'Yellow'; exit 1 }
 }
 Die ("the run answered '" + $said[0] + "', which is none of the answers this knows.")

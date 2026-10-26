@@ -4,8 +4,11 @@
   Puts the box's GitHub admin service on the VPS (#3107, Patrick's A of 22 Oct
   2026): scripts\vps\admin\admin.js, as the task "Thornswood Admin",
   listening on 127.0.0.1:7791. It holds the key of a GitHub App made for
-  Thornswood, and makes the runners' labels on GitHub match main's runner
-  records when a run of .github\workflows\github-admin.yml on main asks
+  Thornswood, and makes the runners' labels, and the rulesets and private
+  vulnerability reporting of Thornswood and the engine fork, on GitHub
+  match main's records (records\*-runners.json, and since #3683
+  records\github-repo-settings.json) when a run of
+  .github\workflows\github-admin.yml on main asks
   with its OIDC token (admin.js says how it checks that, and why nothing else
   may ask). That is how Set-BuildRunners.ps1 works from anywhere, a cloud
   thread included. Run it from a machine whose way in already works; it does
@@ -30,7 +33,10 @@
   App and sends the browser back to /github-app/setup/done, where the service
   trades GitHub's one-time code for the App's key and keeps it in
   state\key.pem. The key is never shown, logged or copied. Last, install the
-  App on Thornswood only, from the link the page gives. An App held already
+  App on Thornswood and skymp only, from the link the page gives (skymp, the
+  engine fork, since #3683, for its rulesets and private reporting; an App
+  already installed on Thornswood alone takes skymp from its installation's
+  settings, github.com/settings/installations). An App held already
   stops -Setup; -Forget drops it first (delete the old App on GitHub too:
   github.com/settings/apps).
 
