@@ -24,6 +24,7 @@ at the root.
 | [RESTORING.md](RESTORING.md) | Bringing the server, the site and the bot back from a backup. |
 | [SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md) | What working means for the site, feed, game servers, voice, bot and backups (#2183): each metric, threshold, the check that measures it, the alert, and the proposed owner. |
 | [MOVING-THE-SERVER.md](MOVING-THE-SERVER.md) | Growing the VPS, or moving everything to a new box. |
+| [studies/in-game-ui](studies/in-game-ui/README.md) | The options for voice, chat, emotes and the in-game UI without a browser (#3208): today's voice measured by room size, a box forwarder measured, each option's pros and cons, and the recommendations Patrick picks from. |
 | [AFFECTED-HARNESSES.md](AFFECTED-HARNESSES.md) | Running only the gate harnesses a pull request can affect (#3114): the Linux study, the read map, the rules, and the trace of the gate on the VPS. |
 | [DEPLOY-IDENTITIES.md](DEPLOY-IDENTITIES.md) | The VPS access audit (#2182): who can get in and as what today, and a restricted deploy identity design with migration, rollback and the decisions it needs. |
 | [OWNERSHIP.md](OWNERSHIP.md) | Who holds each credential, account and build, and who the second holder is. |
