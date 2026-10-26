@@ -9555,7 +9555,7 @@ function showsPick(refrId) {
      reached. Where part of the list is produced by nobody, that is a floor
      and what the output sells for can hold the row higher; where none of it
      is, the price ranks it inside its own half. On this build that is
-     1692 row(s) by what their inputs cost, 216 by price and 0 by how long
+     1690 row(s) by what their inputs cost, 218 by price and 0 by how long
      the shopping list is. That last rule is used for a whole half at a time
      and only where the first two leave a rung with nothing on it, which no
      half in this build did.

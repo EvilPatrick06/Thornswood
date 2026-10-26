@@ -1733,7 +1733,7 @@
   "trespass": "0x400",
   "werewolf": "0x10000"
  },
- "readFrom": "102 active plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "readFrom": "101 active plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
  "scripts": {
   "read": 15496,
   "rule": "records/papyrus-events.json at f1e18a4ad64471f649ae53cb74019d98d797deed",
@@ -2036,13 +2036,15 @@
     "why": "every event it waits on is blocked"
    },
    "TGTQ03LetterActivation": {
-    "attachedBy": [],
+    "attachedBy": [
+     "Skyrim.esm"
+    ],
     "canFire": [],
     "natives": [
      "sendstealalarm"
     ],
     "source": "Skyrim - Misc.bsa",
-    "why": "no record in the load order carries it"
+    "why": "every event it waits on is blocked"
    },
    "TGTQ03RegistryScript": {
     "attachedBy": [
