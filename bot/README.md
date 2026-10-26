@@ -137,24 +137,22 @@ token for that repository's issues. No token, none is kept, said once in the
 log.
 
 - `#known-issues`, read only: one post per open issue labelled Dev Findings
-  or Main Findings that nothing has been done about yet, tagged Dev or Main
-  (Patrick, 22 Oct). An issue with a merged pull request that is work on it,
-  or with a `Test task:` comment, is not a known issue: its post goes at once.
-  A pull request is work on an issue when its title, body or a commit says
-  `Refs #N` or a closing word (`Closes`, `Fixes`, `Resolves`) before it; one
-  that only names the issue, say in a list of what it found, is not (#3140:
-  a body that listed five findings took all five posts down). Each post taken
-  down says why in the log, `known issues: took #N down:`.
-  A merge does not change the issue's update time, so each finding's
-  timeline is read every pass until a merged pull request is found in it,
-  and that is remembered (`known_changed` in `data\known-issues.json`). Its title and body are the issue's
+  or Main Findings whose fix has not landed yet, tagged Dev or Main
+  (Patrick, 22 Oct). Its fix has landed once the issue has a `Test task:`
+  comment or is on the board as Done (`board: Done`, which
+  done-on-merge.yml puts on a merged fix with its test task); then it is not
+  a known issue and its post goes at once. A merged pull request alone does
+  not take a post down (#3140): when any merged pull request that named the
+  issue did, a measuring step on the scripts finding, partial fixes and a
+  `Refs` written by mistake kept bugs people still meet off the list. Each
+  post taken down says why in the log, `known issues: took #N down:`. Its title and body are the issue's
   last comment that starts `Known issue:` (a short title, at most 45
   characters, then what goes wrong, where, and how to avoid it), the same
   shape as a test task below; until somebody writes one, the issue's own title
   and a plain line. No issue number and no link, because testers have no
   GitHub. The post is deleted the moment the issue is no longer an open
-  finding: fixed and closed, closed any other way, its label taken off, a
-  change for it merged, or a test task written on it.
+  finding: fixed and closed, closed any other way, its label taken off,
+  moved to Done, or a test task written on it.
   Its tag says where it was found and stays Dev or Main as before.
 - `#test-tasks`: one post for each issue closed as fixed from the day this
   began, always tagged Main. Its title and body are the issue's last
