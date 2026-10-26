@@ -63,7 +63,7 @@
   { "tool": "scripts/dev/Build-MarketStalls.py", "data": "--data", "plugins": null,
     "reads": ["game/data/last-plugin.json"], "writes": ["game/data/market-stalls.json"] },
   { "tool": "scripts/dev/Build-MarketStallsGamemode.js", "data": null, "plugins": null,
-    "reads": ["game/data/market-stalls.json"], "writes": ["game/gamemode.js", "game/plugins/thornswood-front.js"] },
+    "reads": ["game/data/market-stalls.json"], "uses": ["game/market-stalls.js"], "writes": ["game/gamemode.js", "game/plugins/thornswood-front.js"] },
   { "tool": "scripts/dev/Build-MerchantRoleTables.py", "data": "--data", "plugins": null,
     "reads": ["game/data/recipes.json", "game/data/harvests.json", "game/data/hunts.json", "docs/systems/cut-items.json", "game/data/npc-population.json"],
     "writes": ["game/data/merchant-role-tables.json"] },
