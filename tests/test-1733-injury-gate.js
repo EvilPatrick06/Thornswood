@@ -176,10 +176,11 @@ function key(r, parts, pressed) {
   const gave = [];
   const near = { far: 120 };
   const pieces = new Function('mp', 'BENCH_BY_BASE', 'FORGE', 'MOLD_REACH', 'DOOR_MEMORY_MS',
-    'BENCH_PROPERTY', 'DOOR_PROPERTY', 'distanceTo',
+    'BENCH_PROPERTY', 'DOOR_PROPERTY', 'distanceTo', 'nameBenchStock',
     FORGE_HERE_SRC + AT_FORGE_SRC + TOUCHED_SRC + '\nreturn { forgeHere: forgeHere, touchedBench: touchedBench };')(
     r.mp, BENCH_BY_BASE, FORGE, MOLD_REACH, DOOR_MEMORY_MS, 'thornswoodBench', 'thornswoodDoor',
-    function () { return near.far; });
+    // The bench's chests (#3159) are tests/test-3159-bench-stock.js's.
+    function () { return near.far; }, function () { });
   if (pressed) { pieces.touchedBench(ME, pressed.base, pressed.ref); }
   const run = new Function('g', 'isSmith', 'forgeHere', 'moldInHand', 'heldBy', 'here', 'takeItem',
     'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'plog', 'unfitToMake',

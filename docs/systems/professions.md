@@ -146,6 +146,15 @@ daggers, bows, and staves do not. The handle is novice
 does not move the rank. The plugin rows still omit it. The server
 already removes one when the craft goes through.
 
+A bench in a building you hold also draws from the chests in that
+building (#3159, Patrick, 22 Oct). While you are at it, the crafting
+menu lists what the chests hold beside what you carry, and a craft
+takes from your pack first and from the chests, nearest the bench
+first, for the rest. The charcoal and the handle come from the chests
+too when your pack has none. A guest, a partner with the master key
+and a bench outdoors get the pack alone. [Property](property.md) says
+which chests are yours.
+
 ## The book on K
 
 Press K. The recipe book has a column for your half, a column for the

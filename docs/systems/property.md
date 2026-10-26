@@ -226,6 +226,14 @@ Chests and barrels in the building are storage. A claim does not add
 slots. The server already owns containers. When a claim ends, the
 containers stay as they are for the next holder.
 
+A crafting bench in a building you hold draws from its chests (#3159,
+Patrick, 22 Oct). Every chest and barrel in the building counts,
+furniture chests you set down included, and only for the holder: a
+guest or a partner with the master key works from their own pack. If
+the building changes hands while you are at the bench, a craft that
+needs the chests is refused and the bench has only what you carry.
+[Professions](professions.md) says how a craft takes from them.
+
 An outhouse or a pot would be relief for the optional meter on
 [The body](body.md). That meter is not built unless a vote after the
 server is fully live says to add it. Until then the server does not
