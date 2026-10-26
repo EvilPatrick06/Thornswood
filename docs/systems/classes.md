@@ -40,10 +40,13 @@ Nothing hands you a free replacement.
 | --- | --- |
 | Miner | Any pickaxe except a war pick. The ancient Nordic pick and the Notched Pickaxe both count. A smith makes the next one |
 | Farmer | A shovel. Skyrim has no hoe. Two shovels that look alike both count. A smith makes the next one |
-| Woodworker | A woodcutter's axe. This is the profession, not a class. It is named here because it is the same 50 uses |
+| Woodworker | A woodcutter's axe. This is the profession, not a class. It is named here because it is the same 50 uses, and it is the tool of their bench work too |
 | Fisher | A fishing pole. Crude for novice water, Fine through expert, Master for all of it. A woodwright makes the next one |
 
-Gathering and hunting need your hands.
+Gathering and hunting need your hands. The other bench trades carry a
+tool of their own, the same 50 uses: a smith a hammer, a tailor a pair
+of shears, a cook a wooden ladle, an alchemist an alembic and an
+enchanter a rune knife. See [Professions](professions.md).
 
 You are handed the tool at the moment the pick is made, and a farmer
 is also handed seed. See [Creation](creation.md).

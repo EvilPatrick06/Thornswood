@@ -9,7 +9,9 @@ Fire, handles, bows, and instruments.
 
 The tool is a woodcutter's axe in the pack, 50 uses, handed when the
 profession is picked. Chopping a block is this profession's work in
-the world. The emote called Chop wood is an animation. It does not
+the world, and the axe is also the tool every woodworker's recipe asks
+for at a bench (#3162). A woodwright makes the cook's wooden ladle from
+firewood. The emote called Chop wood is an animation. It does not
 fell a log and it does not count.
 
 ## Master Carver

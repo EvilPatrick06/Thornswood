@@ -123,13 +123,13 @@ function person(prof, half, rank) {
       TOOLS.smith.give === '5cae1:Skyrim.esm' && TOOLS.cook.give === '319e5:Skyrim.esm');
   // Thornswood-Content.esp's own: the form id Add-ContentRecords.py gives a
   // MISC record of that name, so the descriptor is one the plugin really has.
-  const own = ['tailor', 'alchemist', 'enchanter'];
-  own.forEach(function (k) {
+  const own = { tailor: 'Shears', alchemist: 'Alembic', enchanter: 'Rune Knife' };
+  Object.keys(own).forEach(function (k) {
     const m = /^([0-9a-f]+):Thornswood-Content\.esp$/.exec(TOOLS[k].give);
-    const fid = m ? '0x5' + ('000000' + m[1]).slice(-6).toUpperCase() : '';
-    const words = TOOLS[k].name.split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
-    const rec = fid ? new RegExp("misc\\(" + fid + ", '[A-Za-z0-9]+', '" + words + "'", 'i').test(addContent) : false;
-    yes('T4 the ' + TOOLS[k].name + ' is Thornswood-Content.esp\'s own MISC record, ' + fid, rec);
+    const name = m ? (new RegExp('^([A-Z_]+) = 0x5' + ('000000' + m[1]).slice(-6) + '$', 'mi').exec(addContent) || [])[1] : '';
+    const rec = name ? new RegExp('misc\\(' + name + ", 'ThornswoodMiscTool[A-Za-z]+', '" + own[k] + "'").test(addContent) : false;
+    yes('T4 the ' + TOOLS[k].name + ' is Thornswood-Content.esp\'s own MISC record ' + (name || '?') + ', named ' + own[k],
+        rec && TOOLS[k].name.toLowerCase().indexOf(own[k].toLowerCase()) !== -1);
   });
   // Every tool has a recipe in the plugin, made at a bench by a trade whose
   // own tool is not the thing being made, except the hammer itself.
@@ -138,14 +138,14 @@ function person(prof, half, rank) {
     enchanter: ['RUNE_KNIFE', 'FORGE_KEYWORD'], cook: ['LADLE', 'WOODWORKING_KEYWORD']
   };
   Object.keys(makes).forEach(function (k) {
-    const re = new RegExp('cobj\\([^)]*\\b' + makes[k][0] + '\\b[^)]*\\b' + makes[k][1] + '\\b');
+    const re = new RegExp('cobj\\(RECIPE_' + makes[k][0] + ", 'ThornswoodRecipeTool\\w+', \\[[^\\]]*\\],\\s*" + makes[k][0] + ', ' + makes[k][1] + '\\)');
     yes('T5 the ' + TOOLS[k].name + ' has a recipe in Add-ContentRecords.py, at the ' +
         (makes[k][1] === 'FORGE_KEYWORD' ? 'forge' : 'woodworking bench'), re.test(addContent));
   });
   yes('T6 Build-RecipeTable.ps1 names an owner for every tool\'s recipe (smith for four, woodworker for the ladle)',
-      ['TSHammerRecipe', 'TSShearsRecipe', 'TSAlembicRecipe', 'TSRuneKnifeRecipe'].every(function (e) {
-        return new RegExp("'" + e + "'\\s*=\\s*@\\(\\s*'Smith'").test(recipeTable);
-      }) && /'TSLadleRecipe'\s*=\s*@\(\s*'Woodworker'/.test(recipeTable));
+      ['Hammer', 'Shears', 'Alembic', 'RuneKnife'].every(function (e) {
+        return new RegExp("'ThornswoodRecipeTool" + e + "'\\s*=\\s*@\\{ Owner = 'Smith'; Half = 'Edgewright'").test(recipeTable);
+      }) && /'ThornswoodRecipeToolLadle'\s*=\s*@\{ Owner = 'Woodworker'; Half = 'Woodwright'/.test(recipeTable));
 }
 
 // ---------------------------------------------------------------- the rig

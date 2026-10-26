@@ -441,7 +441,8 @@ CONTENTS = (
     (r'ACTI ThornswoodMessageBoard$', 'own', 'notice boards'),
     (r'ACTI ThornswoodDropBox$', 'own', 'drop boxes'),
     (r'(MISC ThornswoodCharcoalTier|COBJ ThornswoodRecipeCharcoalTier)\d$', 'own', 'charcoal'),
-    (r'(MISC ThornswoodMiscToolHandle|COBJ ThornswoodRecipe(ToolHandle|ToolShovel|WeaponPickaxe|WeaponAxe))$',
+    (r'(MISC ThornswoodMiscTool(Handle|Shears|Alembic|RuneKnife)|'
+     r'COBJ ThornswoodRecipe(Tool(Handle|Shovel|Hammer|Shears|Alembic|RuneKnife|Ladle)|WeaponPickaxe|WeaponAxe))$',
      'own', 'tools and handles'),
     (r'BOOK ThornswoodBookDeed$', 'own', 'deeds'),
     (r'(MISC ThornswoodMisc(Master)?Key(Mold)?|COBJ ThornswoodRecipeKey(Mold)?)$', 'own', 'keys and molds'),
@@ -1006,6 +1007,44 @@ RECIPE_AXE = 0x501548E
 PICKAXE = 0x000E3C16      # Skyrim's Pickaxe
 WOODCUTTERS_AXE = 0x0002F2F4  # Skyrim's Woodcutter's Axe
 
+# THE BENCH TRADES' TOOLS (#3162). Patrick's A, 22 October 2026: each bench
+# trade needs its own tool, worn out after 50 uses like a gathering tool
+# (TOOLS in game/gamemode.js). The smith's hammer and the cook's ladle are
+# Skyrim's own MISC records and only want a recipe. Skyrim has no shears, no
+# alembic and no enchanter's blade a person could carry under a name that
+# fits, so those three are this plugin's own, each on the model of a Skyrim
+# MISC that has one. Model, bounds, value and weight read off Skyrim.esm on
+# the box with scripts/dev/List-ToolRecords.py, 26 October 2026:
+#   RuinsScissor 0x034CD4   Clutter\Ruins\RuinsScissor01.nif     (-21, -6, -1, 21, 6, 1)    3, 0.5
+#   MGR01Alembic 0x026C31   Clutter\TolfdirsAlembic01\AlchemyTolfdirsAlembic01.nif
+#                                                               (-15, -13, 0, 20, 10, 23)  0, 2.0
+#   RuinsScalpel 0x034CCE   Clutter\Ruins\RuinsScalpel01.nif     (-14, -2, 0, 14, 2, 1)     3, 0.5
+# Tolfdir's own alembic is a quest item and keeps its name; this is another
+# record on the same mesh, so carrying one is never carrying his.
+#
+# Recipes: the hammer, the shears, the alembic and the rune knife at a forge,
+# a smith's; the ladle at the woodworking bench from firewood, a woodwright's
+# (Build-RecipeTable.ps1 RECIPE_OWNER names both). The hammer takes the
+# handle the pickaxe, the axe and the shovel take. The forge row that makes
+# a hammer asks for no hammer (benchToolKey), so a smith whose hammer broke
+# can forge another. Form ids follow the woodworking bench's, 0x50154E2, with a gap.
+HAMMER = 0x0005CAE1       # Skyrim's BlacksmithHammer01, TOOLS.smith.give
+LADLE = 0x000319E5        # Skyrim's WoodenLadle01, TOOLS.cook.give
+SHEARS = 0x50154F0
+ALEMBIC = 0x50154F1
+RUNE_KNIFE = 0x50154F2
+RECIPE_HAMMER = 0x50154F3
+RECIPE_SHEARS = 0x50154F4
+RECIPE_ALEMBIC = 0x50154F5
+RECIPE_RUNE_KNIFE = 0x50154F6
+RECIPE_LADLE = 0x50154F7
+SHEARS_MODEL = 'Clutter\\Ruins\\RuinsScissor01.nif'
+SHEARS_BOUNDS = (-21, -6, -1, 21, 6, 1)
+ALEMBIC_MODEL = 'Clutter\\TolfdirsAlembic01\\AlchemyTolfdirsAlembic01.nif'
+ALEMBIC_BOUNDS = (-15, -13, 0, 20, 10, 23)
+RUNE_KNIFE_MODEL = 'Clutter\\Ruins\\RuinsScalpel01.nif'
+RUNE_KNIFE_BOUNDS = (-14, -2, 0, 14, 2, 1)
+
 # THE STATIONS.
 #
 # The charcoal kiln (charburner.md) is Skyrim's smelter marker furniture
@@ -1322,6 +1361,16 @@ def thornswood_records(passage, clam, passages):
              POLE_MASTER, WOODWORKING_KEYWORD),
         cobj(RECIPE_TRAP, 'ThornswoodRecipeFishTrap',
              [(FIREWOOD, 3), (LEATHER_STRIPS, 2), (IRON_INGOT, 1)], FISH_TRAP, WOODWORKING_KEYWORD),
+        # The bench trades' tools (#3162), THE BENCH TRADES' TOOLS above.
+        misc(SHEARS, 'ThornswoodMiscToolShears', 'Shears', SHEARS_MODEL, SHEARS_BOUNDS, 3, 0.5),
+        misc(ALEMBIC, 'ThornswoodMiscToolAlembic', 'Alembic', ALEMBIC_MODEL, ALEMBIC_BOUNDS, 0, 2.0),
+        misc(RUNE_KNIFE, 'ThornswoodMiscToolRuneKnife', 'Rune Knife', RUNE_KNIFE_MODEL, RUNE_KNIFE_BOUNDS, 3, 0.5),
+        cobj(RECIPE_HAMMER, 'ThornswoodRecipeToolHammer', [(IRON_INGOT, 1), (HANDLE, 1)], HAMMER, FORGE_KEYWORD),
+        cobj(RECIPE_SHEARS, 'ThornswoodRecipeToolShears', [(IRON_INGOT, 1)], SHEARS, FORGE_KEYWORD),
+        cobj(RECIPE_ALEMBIC, 'ThornswoodRecipeToolAlembic', [(IRON_INGOT, 2)], ALEMBIC, FORGE_KEYWORD),
+        cobj(RECIPE_RUNE_KNIFE, 'ThornswoodRecipeToolRuneKnife', [(IRON_INGOT, 1), (LEATHER_STRIPS, 1)],
+             RUNE_KNIFE, FORGE_KEYWORD),
+        cobj(RECIPE_LADLE, 'ThornswoodRecipeToolLadle', [(FIREWOOD, 1)], LADLE, WOODWORKING_KEYWORD),
     ]
 
     def catch(fid, edid, name, produce):

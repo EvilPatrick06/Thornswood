@@ -1918,6 +1918,15 @@ $RECIPE_OWNER = [ordered]@{
     # rule further down; the trap is a MISC with no pole in its name, so the
     # forge rule leaves it to anybody unless it is named here.
     'ThornswoodRecipeFishTrap'   = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the fish trap is a woodwright novice good, made with the poles (docs/systems/classes/fisher.md, issue #1379). A MISC at a forge with no pole in its name, so neither the forge rule nor the spear rule can see it.' }
+    # The bench trades' tools (#3162, Add-ContentRecords.py THE BENCH TRADES'
+    # TOOLS). Every output is a MISC, so the forge rule, which settles ownership
+    # by the output being a WEAP, cannot see the four at the forge, and the
+    # ladle at the woodworking bench is not a bow, an arrow or a pole.
+    'ThornswoodRecipeToolHammer'    = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the hammer is the smith''s own tool (#3162), forged like the pickaxe, the axe and the shovel from an iron ingot and a handle. A MISC, so the forge rule cannot see it. The one forge row that asks for no hammer (benchToolKey in game/gamemode.js), so a smith whose hammer broke can make another.' }
+    'ThornswoodRecipeToolShears'    = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the tailor''s shears (#3162). A smith forges a tailor''s tool as a smith forges a miner''s pickaxe: a tool is a smith''s work (Patrick, 21 September: a broken tool is replaced by "a smith making them"). A MISC, so the forge rule cannot see it.' }
+    'ThornswoodRecipeToolAlembic'   = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the alchemist''s alembic (#3162), forged from two iron ingots for the same reason as the shears. A MISC, so the forge rule cannot see it.' }
+    'ThornswoodRecipeToolRuneKnife' = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the enchanter''s rune knife (#3162), a blade and so an Edgewright''s, forged from an iron ingot with a leather strip for the grip. A MISC, so the forge rule cannot see it.' }
+    'ThornswoodRecipeToolLadle'     = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the cook''s wooden ladle (#3162), Skyrim''s WoodenLadle01, carved from firewood at the woodworking bench like the poles. A MISC with no pole in its name, so the spear rule cannot see it.' }
     # ONE SMELT ROW PER INGOT AND ONE ROW FOR LEATHER (#1391, #1400). Smelting an
     # ingot is smith work and tanning a hide is the Platewright's
     # (docs/systems/cut-items.md, "Smelting and tanning are not anybody's work").

@@ -146,6 +146,35 @@ daggers, bows, and staves do not. The handle is novice
 does not move the rank. The plugin rows still omit it. The server
 already removes one when the craft goes through.
 
+## The tool of each trade
+
+Each bench trade needs its own tool in the pack, 50 uses, like a
+gathering tool (Patrick, 22 Oct 2026,
+[#3162](https://github.com/EvilPatrick06/Thornswood/issues/3162)). It
+is handed at the moment the profession is picked.
+
+| Trade | Tool | Who makes the next one |
+| --- | --- | --- |
+| Smith | A hammer (Skyrim's own) | A smith, at a forge, from an iron ingot and a handle |
+| Tailor | A pair of shears | A smith, at a forge, from an iron ingot |
+| Cook | A wooden ladle (Skyrim's own) | A woodwright, at the woodworking bench, from firewood |
+| Alchemist | An alembic | A smith, at a forge, from two iron ingots |
+| Enchanter | A rune knife | A smith, at a forge, from an iron ingot and a leather strip |
+| Woodworker | The woodcutter's axe, the same one they chop with | A smith |
+
+The tool is the trade's, not the bench's: a recipe asks for the tool of
+the trade that owns it, so a smith making a tailor's novice row they
+were taught needs the shears. A recipe nobody owns asks for none. A
+bench opens only for somebody holding the tool of at least one recipe
+there they may make, and otherwise says which tool they need and who
+makes one. Every craft that goes through takes one use off it, brews
+and enchantments included, and a key cut at a forge takes one off the
+hammer. You are told when it is worn thin, and the 50th use breaks it.
+
+The hammer is the one thing at a forge that needs no hammer, so a smith
+whose hammer broke can always forge another. Every other tool is
+another trade's work, so the chain always ends at a smith.
+
 ## The book on K
 
 Press K. The recipe book has a column for your half, a column for the
@@ -166,7 +195,7 @@ grant no recipe, no verb and no rank. Bardic rest is on
 
 The eight professions, the halves, the ladder with the count resetting,
 the sister half at novice, the bench table, the charcoal and the
-handle, and the recipe lists are in the server. Smelting is a smith's
+handle, each trade's tool, and the recipe lists are in the server. Smelting is a smith's
 and tanning is the Platewright's, as above, and neither is one of the
 two outside trades. A master takes someone on in the sister half or
 in an outside trade from the look prompt, and either of them ends it on
