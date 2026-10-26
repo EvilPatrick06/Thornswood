@@ -20,6 +20,14 @@ puts up a new one and nobody moves one. Which stalls there are is read
 out of the game's own records, the same way the woodworking benches and
 the stations are placed ([Where the stations stand](station-placement.md)).
 
+A stall is one of the market counters Skyrim's cities have, wherever the
+game stands one in a town: in a city's market, at Solitude's docks, in
+Winterhold's or Granite Hill's square. A counter in somebody's yard is
+that house's, not the market's, and a counter out on a road is in no
+town; neither is a stall. On 26 October that came to 50 stalls: 12 in
+Windhelm, 11 in Solitude, 7 in Riften, 7 in Winterhold, 6 in Whiterun,
+3 in Markarth, 2 in Granite Hill and 2 in Markarth Side.
+
 Stand at a stall's counter and a line names the lock key, X unless you
 changed it: Market stall. Press it and the stall's panel opens. Nothing
 is typed. Walk away and the panel closes.
@@ -123,6 +131,9 @@ receipt the box keeps, so it never goes in twice.
 real property and market stalls blocks.
 
 Which stalls there are is `game/data/market-stalls.json`, one row a
-stall with the point in front of its counter and how near counts as at
-the stall. The table is empty until it is read out of the game's
-records, so until then no stall opens.
+stall with the middle of its counter and how near counts as at the
+stall: anywhere round the counter and an arm beyond it. Where two stalls
+stand side by side, the nearer one is the one at hand.
+`scripts/dev/Build-MarketStalls.py` writes it out of the plugins, and
+its header says the rule, and the table lists every counter it left
+out and why.

@@ -12,8 +12,7 @@ towns' markets, nobody puts one up, and which they are is read out of the
 game's records, the way the stations and the benches are
 (docs\\systems\\station-placement.md).
 
-WHAT A STALL IS, measured on 26 October over this load order with
-scripts\\dev\\Probe-MarketStalls.py's run (#3160):
+WHAT A STALL IS, measured on 26 October over this load order (#3160):
 
   A stall is a placed static whose mesh is one of the market stall counters
   Skyrim ships, STALL_MESHES below, whichever record places it: mods place
