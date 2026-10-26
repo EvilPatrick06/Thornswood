@@ -439,6 +439,7 @@ foreach ($l in $out) { Say "  $l" 'DarkGray' }
 
 Head 'Done'
 Say '  The old storage is beside the new one with today''s date on it.' 'Green'
-Say '  Leave it a week. Clean-Everything.ps1 will offer it once you are sure.' 'DarkGray'
+Say '  The game server deletes it 30 days from today and says so in server.log;' 'DarkGray'
+Say '  until then it can be put back, as docs\RESTORING.md says.' 'DarkGray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

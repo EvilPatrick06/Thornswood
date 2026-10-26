@@ -146,6 +146,8 @@ try {
       /set aside on the server for 30 days, so it can be undone, and then deleted/.test(page));
   yes('Wipe-Saves.ps1 no longer says the old storage sits there until somebody decides',
       !/until you decide it can go/.test(read('scripts/ops/Wipe-Saves.ps1')) && /30 days/.test(read('scripts/ops/Wipe-Saves.ps1')));
+  yes('  and its last words no longer send the operator to Clean-Everything.ps1, which has no part for these copies',
+      !/Clean-Everything/.test(read('scripts/ops/Wipe-Saves.ps1')) && /deletes it 30 days from today/.test(read('scripts/ops/Wipe-Saves.ps1')));
   yes('Restore-Server.ps1 no longer says the copy is never deleted', !/world-before-restore-<stamp> inside it, never deleted/.test(read('scripts/vps/Restore-Server.ps1')));
   yes('Reset-Character.ps1 and Reset-Appearance.ps1 say their copies go after 30 days',
       /30 days/.test(read('scripts/ops/Reset-Character.ps1')) && /30 days/.test(read('scripts/ops/Reset-Appearance.ps1')));
