@@ -1,0 +1,58 @@
+name: The game or the launcher crashed
+description: Skyrim, the launcher or the installer closed by itself, froze, or showed an error box.
+labels: ["triage", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting it. Everybody can read an issue, so leave out anything private: passwords, keys, your email, other people's names. A log names your Windows user folder; blank that out if you like.
+  - type: dropdown
+    id: what-crashed
+    attributes:
+      label: What crashed?
+      options:
+        - The game (Skyrim)
+        - The launcher
+        - The installer
+    validations:
+      required: true
+  - type: dropdown
+    id: when
+    attributes:
+      label: When did it happen?
+      options:
+        - While starting
+        - While loading into the world
+        - While in the world
+        - While updating or installing
+        - When closing
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What were you doing?
+      description: The last few things you did before it crashed, and any error text you saw. A screenshot of an error box helps.
+    validations:
+      required: true
+  - type: dropdown
+    id: again
+    attributes:
+      label: Does it happen again?
+      options:
+        - Every time
+        - Sometimes
+        - Only once so far
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Launcher version
+      description: The launcher shows it near the bottom of its side bar. Leave it empty if you do not know.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The launcher writes Profile\launcher.log in the folder you installed Thornswood to. Drag the file in here, or paste the last lines.
