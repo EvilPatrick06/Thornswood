@@ -272,7 +272,7 @@ fork wherever the fork has a copy.
 |---|---|---|
 | `Data\Scripts\MpClientPlugin.pex` | Byte for byte the fork's `client-deps\common\Data\Scripts\MpClientPlugin.pex`. | `client-deps` has no licence file of its own. Upstream's `TERMS.md` says SkyMP is "primarily distributed under the GPLv3 and AGPLv3 licenses". |
 | `Data\Platform\Fonts\Tavern.ttf` and `Tavern.spritefont` | Byte for byte the fork's `client-deps\common\Data\Platform\Fonts` copies. The font calls itself Typey McTypeface, by Paul J. Miller (2016) and Dieter Steffmann (1995). | SIL Open Font License, by the font's own licence field and by upstream's `THIRD_PARTY_LICENSES`. Neither gives the version. |
-| `Data\Platform\Fonts\DIN-Pro-bold.spritefont` | Byte for byte the fork's `client-deps` copy: a sprite font whose name says DIN Pro Bold. | None found. DIN Pro is FSI FontShop's typeface, whose own files point at FontFont's end user licence (below), and upstream names no licence for this file. |
+| `Data\Platform\Fonts\DIN-Pro-bold.spritefont`, until #1317 | Byte for byte the fork's `client-deps` copy: a sprite font whose name says DIN Pro Bold. | None found. DIN Pro is FSI FontShop's typeface, whose own files point at FontFont's end user licence (below), and upstream names no licence for this file. It stops shipping and every pack deletes it from installs (`$ShipCommercialFonts` in Ship-Rules.ps1, and OwnGame.Foreign); the voice mark that drew in it draws in `Barlow-SemiBold.spritefont` ("Thornswood's own sprite font", below). |
 | `Data\Platform\Modules\skyrimPlatform.ts` | skyrim-platform's TypeScript declarations, an older copy (136,561 bytes) than the fork builds (136,768). | GPL-3.0 |
 | `Data\Platform\UI\build.js`, in main's releases until its next one | A development build of `skymp5-front`, dated 13 September 04:33 in the game folder. It was not built here, and nobody recorded the commit it came from. It bundles npm packages under their own licences, among them React 16.13.1 and 17.0.2, MIT by the `@license` comments inside it. Since 20 October every release carries the fork's own build in its place ("SkyMP's interface, built from the fork", below). | GPL-3.0 |
 | The files beside that build.js that it names by hash | Its fonts, sounds and pictures. 26 are byte for byte files in the fork's `skymp5-front\src`. Ship parses the names from build.js at pack time (#1318); it does not keep a count by hand. | As build.js, except the fonts below. |
@@ -292,9 +292,9 @@ byte for byte the files in upstream's `skymp5-front\src\fonts`:
 Futura PT and DIN Pro point at their foundries' end user licences. This file
 found nothing that gives SkyMP or Thornswood the right to hand them on, and
 upstream names none. Upstream SkyMP ships them the same way. The fork's own
-build has none of the four (below), so they leave with main's next release;
-installs that already have them keep them until a release lists them as gone,
-which is #1317.
+build has none of the four (below), so they leave with main's next release,
+and `records\ui-gone.json` lists all four, so every pack deletes them from
+the installs that took them and no release carries them again (#1317).
 
 Bankir-Retro and icomoon keep shipping, credited to SkyMP and to their makers
 (Patrick, 15 Oct 2026, #2177): they came to Thornswood with SkyMP's
@@ -348,6 +348,25 @@ Pro, from Google Fonts' `google/fonts` at `2eb0b48d`, and the same change
 took out the Futura PT and DIN Pro faces. The OFL lets a font travel with its
 copyright notice and licence in its own metadata, which this one carries;
 the fork keeps the full text beside it as `skymp5-front\src\fonts\OFL.txt`.
+
+## Thornswood's own sprite font
+
+`Data\Platform\Fonts\Barlow-SemiBold.spritefont` is Barlow SemiBold drawn
+into a Skyrim Platform sprite font: printable ASCII, Latin-1, dashes, curly
+quotes, the bullet and the ellipsis, at 30 pixels. The overhead voice mark
+draws its dot in it (#1317), in place of `DIN-Pro-bold.spritefont`. It is in
+this repository at `game\ours\Data\Platform\Fonts`, and
+`scripts\mods\Build-SpriteFont.py` makes it from the fork's
+`skymp5-front\src\fonts\Barlow-SemiBold.ttf`, the same file as the front's
+`dc3cbd21104d40477da6.ttf` above (sha256 `86577cb3`).
+
+A sprite font is a picture of the font, so it is a copy of Barlow as the OFL
+means it, and goes out under the OFL 1.1. Barlow names no Reserved Font Name,
+so the name may stay. A sprite font has no field to carry the licence in, so
+`Barlow-SemiBold-OFL.txt` goes out beside it in the same folder: the fork's
+`OFL.txt`, byte for byte, with Barlow's copyright line ("Copyright 2017 The
+Barlow Project Authors (https://github.com/jpt/barlow)") and the licence's
+full text.
 
 ## Thornswood Client Runtime, Thornswood's mod on Nexus Mods
 
@@ -631,7 +650,8 @@ no licence this file can name.
   four, one and one glyphs, stop shipping and every pack deletes them from
   installs (Patrick, 15 Oct 2026, #2177; `$ShipPlatformUnused` in
   Ship-Rules.ps1, and OwnGame.Foreign so a refresh cannot bring them back).
-  Futura.spritefont still ships, with #1317.
+  Futura.spritefont, by its name ParaType's Futura PT, goes the same way with
+  DIN-Pro-bold.spritefont (#1317, `$ShipCommercialFonts`).
 - `Data\Platform\Images\lock.png` and `speaking.png`, dated 12 September 13:40.
   They are not in the fork, and nothing names them. They stop shipping and
   every pack deletes them from installs the same way (#2177).
@@ -1027,12 +1047,13 @@ beside its `___systemPolyfill.js`.
 
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).
-- The Futura PT and DIN Pro fonts in main's older build.js, the Bankir-Retro
-  and icomoon fonts in both builds, and `Futura.spritefont` under "Shipped
-  today with no licence this file can name", ship with no licence found. The 37 Daedric Online menu files do not:
-  they are removed and deleted from installs (#1318), and so are the two
-  pictures in `Images` and the ChainLink, NoticeIcon and VoiceIcon sprite
-  fonts (#2177).
+- The Bankir-Retro and icomoon fonts in both front builds ship with no
+  licence found (fork pull request 41 swaps them). The 37 Daedric Online menu
+  files do not: they are removed and deleted from installs (#1318), and so
+  are the two pictures in `Images` and the ChainLink, NoticeIcon and
+  VoiceIcon sprite fonts (#2177), and the Futura PT and DIN Pro faces, as the
+  four ttf files in main's older build.js and as `DIN-Pro-bold.spritefont` and
+  `Futura.spritefont` (#1317).
 - `Data\Interface\startmenu.swf` is Bethesda's file, edited, and the notice
   board and drop box meshes are built from Bethesda's ("Bethesda's own files,
   made on each machine"). Bethesda's terms for mods were read on 19 October

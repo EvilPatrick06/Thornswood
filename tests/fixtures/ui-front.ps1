@@ -3,7 +3,11 @@
   or Package-Thornswood. Save-ShipUiHashedAssets refuses a game folder whose
   build.js is missing or names nothing (#1318). Font names are derived from
   the real shipped build.js fixture (tests/fixtures/ui-front-build.js), so
-  they follow that file when Futura hashes change after #1317.
+  they follow that file. They are the two that build.js and the front built
+  from the fork both still ship, Bankir-Retro and icomoon: its four Futura PT
+  and DIN Pro faces are on records\ui-gone.json since #1317, so they are
+  never ours, and a harness that packed them would be testing a file no
+  release carries.
 #>
 $script:UiFrontFixtureRoot = $PSScriptRoot
 $script:UiFrontFixtureFonts = $null
@@ -29,14 +33,18 @@ function Get-UiFrontFixtureFontNames {
     $text = [IO.File]::ReadAllText($js)
     $book = $null
     $medium = $null
-    $bookRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/futura-pt-cond-book'
-    $mediumRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/futura-pt-cond-medium'
+    $bookRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/Bankir-Retro\.ttf'
+    $mediumRe = '\.p \+ \\"([0-9a-f]{8,32}\.ttf)\\";\\n\\n//# sourceURL=webpack://ui_webpack/\./src/fonts/icomoon\.ttf'
     $m = [regex]::Match($text, $bookRe)
     if ($m.Success) { $book = $m.Groups[1].Value }
     $m = [regex]::Match($text, $mediumRe)
     if ($m.Success) { $medium = $m.Groups[1].Value }
+    # Never a name records\ui-gone.json lists: no release ships those.
+    $gone = @((Get-Content -LiteralPath (Join-Path $script:UiFrontFixtureRoot '..\..\records\ui-gone.json') -Raw | ConvertFrom-Json).unused)
+    if ($book -and $gone -contains $book) { $book = $null }
+    if ($medium -and $gone -contains $medium) { $medium = $null }
     if (-not $book -or -not $medium) {
-        $fromList = @(Get-UiFrontFixtureExpectedNames | Where-Object { $_ -like '*.ttf' } | Sort-Object { $_.ToLowerInvariant() })
+        $fromList = @(Get-UiFrontFixtureExpectedNames | Where-Object { $_ -like '*.ttf' -and $gone -notcontains $_ } | Sort-Object { $_.ToLowerInvariant() })
         if (-not $book -and $fromList.Count) { $book = [string]$fromList[0] }
         if (-not $medium) {
             $medium = [string](@($fromList | Where-Object { $_ -ne $book } | Select-Object -First 1)[0])

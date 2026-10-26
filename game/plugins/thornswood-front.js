@@ -6714,8 +6714,10 @@
     the same three colours your own microphone takes while you speak
     (docs/systems/voice.md): whisper pale blue, ordinary white, yell amber.
     Never the party's green, which is the name's alone. It is a round dot
-    out of DIN-Pro-bold, a font the fork ships with Skyrim Platform, because
-    the asterisk in the client's own Tavern was eleven pixels high.
+    out of Barlow-SemiBold, Thornswood's own sprite font from the OFL face
+    (game\ours, scripts\mods\Build-SpriteFont.py), because the asterisk in
+    the client's own Tavern was eleven pixels high. Until #1317 it was
+    DIN-Pro-bold, a picture of a commercial face nobody may hand on.
   */
   const HEAD_MS = 6000;
   const HEAD_COLOUR = [0.95, 0.91, 0.82, 0.95];
@@ -6724,9 +6726,9 @@
     local: [1, 1, 1, 0.95],
     yell: [0.93, 0.68, 0.22, 0.95]
   };
-  const MARK_TEXT = '\u2022';            // a bullet, in DIN-Pro-bold.spritefont
-  const MARK_FONT = 'DIN-Pro-bold';      // client-deps\common\Data\Platform\Fonts in the fork
-  const MARK_SIZE = 1.6;                 // ten pixels of dot at 1.0, so sixteen
+  const MARK_TEXT = '\u2022';            // a bullet, in Barlow-SemiBold.spritefont
+  const MARK_FONT = 'Barlow-SemiBold';   // game\ours\Data\Platform\Fonts (#1317)
+  const MARK_SIZE = 1.8;                 // nine pixels of dot at 1.0, so sixteen
   const MARK_BEAT_MS = 1150;             // twPulse's 1.15s
   const MARK_LOW = 0.58;                 // twPulse's low point
   const overheadHeads = {};

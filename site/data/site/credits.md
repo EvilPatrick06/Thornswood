@@ -158,7 +158,9 @@ that interface draws the dots of a hidden password with, was made with
 IcoMoon. Both come with SkyMP, in its `skymp5-front`. **Barlow SemiBold**, the
 font that interface draws the rest of its text in since 20 October 2026, is by
 Jeremy Tribby and the Barlow Project Authors, under the SIL Open Font License,
-version 1.1.
+version 1.1. Thornswood also draws the dot over somebody who is speaking in
+Barlow SemiBold, made into a Skyrim Platform font, and its licence goes with
+it into your game folder.
 
 **This site** is set in Cinzel, by the Cinzel Project Authors, and Spectral,
 by the Spectral Project Authors, both under the SIL Open Font License. It
