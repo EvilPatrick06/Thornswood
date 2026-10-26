@@ -299,14 +299,5 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Enforce.Set, " + file, ex); }
             return false;
         }
-
-        /// <summary>What the table above is holding in place, for the Help page.</summary>
-        public static string[] Describe()
-        {
-            var l = new List<string>();
-            foreach (Rule r in Rules())
-                l.Add(Path.GetFileName(r.File) + "  ->  " + r.Key + " = " + r.Value + "   (" + r.Why + ")");
-            return l.ToArray();
-        }
     }
 }

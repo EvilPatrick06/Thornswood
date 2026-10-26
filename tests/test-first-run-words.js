@@ -16,7 +16,9 @@
 // The same name advice was in the Help page's first Joining item, two pages
 // away, and its third item still explained saving by what the old
 // multiplayer mod used to refuse. Fixing the card alone would have left the launcher telling
-// two different stories, so this reads both files and checks they agree.
+// two different stories, so this reads both and checks they agree. The
+// launcher's Help page went with #3146 (help before the game is the site's,
+// in the game it is F7), so the other half is the site's help now.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -27,7 +29,6 @@ function read(rel) {
   return fs.readFileSync(path.join(REPO_DIR, rel), 'utf8').split(CR).join('');
 }
 const xaml = read('launcher/ui.xaml');
-const help = read(path.join('launcher', 'app', 'Help.cs'));
 const site = read(path.join('site', 'data', 'help.md'));
 const shell = read(path.join('launcher', 'app', 'Shell.cs'));
 
@@ -49,7 +50,7 @@ const RULE_NOT_OWN = 'not your own';
 // Found by its name alone: the tag has since gained a Margin, and whatever
 // else it gains is not what this is about.
 const a = xaml.search(/<StackPanel x:Name="FirstRunCard"[\s>]/);
-const b = a < 0 ? -1 : xaml.indexOf('<StackPanel x:Name="QuickKeysCard"', a);
+const b = a < 0 ? -1 : xaml.indexOf('</Border>', a);
 const card = (a >= 0 && b > a) ? xaml.slice(a, b) : '';
 yes('ui.xaml still has the FirstRunCard StackPanel', card !== '');
 yes('Shell.cs still looks the card up by that name',
@@ -73,52 +74,32 @@ yes('the card still says the name cannot be changed later',
 yes('the separator that stood between the two lines went with the save line',
     card.indexOf('<Rectangle') < 0);
 
-// ------------------------------------------------------ the Joining items
-// new HelpItem("Joining", "title",
-//     "body"),
-const joining = [];
-help.replace(/new HelpItem\("Joining",\s*"((?:[^"\\]|\\.)*)",\s*"((?:[^"\\]|\\.)*)"\)/g,
-  function (m, title, body) { joining.push({ title: title, body: body }); return m; });
-yes('Help.cs has its Joining items, ' + joining.length + ' of them', joining.length >= 5);
-
-// Found by its title rather than its place. It was the first item while the
-// items were numbered; entry 164 rebuilt the page so Joining runs in the order
-// things happen (open the launcher, Discord, Play, then the menu), which puts
-// the character pick fourth. The rule it has to give is the same either way.
-const picks = joining.filter(function (j) { return /pick your character/i.test(j.title); });
-const first = picks.length ? picks[0] : { title: '', body: '' };
-yes('one Joining item is the one about picking a character', picks.length === 1);
-yes('no Joining item says to name the character after yourself',
-    joining.every(function (j) { return !/after yourself/i.test(j.title + ' ' + j.body); }));
-yes('the character pick item gives the same rule as the card: ' + RULE_SKYRIM,
-    first.body.indexOf(RULE_SKYRIM) >= 0);
-yes('the character pick item gives the same rule as the card: ' + RULE_SHAPE,
-    first.body.indexOf(RULE_SHAPE) >= 0);
-yes('the character pick item gives the same rule as the card: ' + RULE_NOT_OWN,
-    first.body.indexOf(RULE_NOT_OWN) >= 0);
-
-// The save item: it has to say what the site says, and it cannot start from
-// what the old engine did. The entry allowed deleting it rather than
-// rewriting it, so a Help page with no save item at all is not a failure; one
-// that still has one has to agree with the site.
-const saving = joining.filter(function (j) { return /\bsav(e|ed|ing)\b/i.test(j.title); });
-yes('at most one Joining item is about saving', saving.length <= 1);
-yes('the site still says there is no saving, so there is something to agree with',
+// ------------------------------------------------------- the site's help
+// Its Your first character section, where a new character is made, gives
+// the rule in the card's words.
+function mdSection(title) {
+  const at = site.indexOf('\n## ' + title + '\n');
+  if (at < 0) { return ''; }
+  const end = site.indexOf('\n## ', at + 5);
+  return site.slice(at, end < 0 ? undefined : end);
+}
+// Read as one line: the page wraps where it likes.
+const first = mdSection('Your first character').replace(/\s+/g, ' ');
+yes('the site\'s help has its Your first character section', first !== '');
+yes('it gives the same rule as the card: ' + RULE_SKYRIM, first.indexOf(RULE_SKYRIM) >= 0);
+yes('it gives the same rule as the card: ' + RULE_SHAPE, first.indexOf(RULE_SHAPE) >= 0);
+yes('it gives the same rule as the card: ' + RULE_NOT_OWN, first.indexOf(RULE_NOT_OWN) >= 0);
+yes('nothing in the site\'s help says to name the character after yourself', !/after yourself/i.test(site));
+yes('the site still says there is no saving',
     /No saving\. The server holds your character\./.test(site));
-yes('any Joining item about saving says there is no saving, as the site does',
-    saving.every(function (j) { return /no saving/i.test(j.title + ' ' + j.body); }));
-yes('any Joining item about saving says the server holds the character',
-    saving.every(function (j) { return /server holds your character/i.test(j.body); }));
-yes('no Joining item is explained by the old multiplayer mod',
-    joining.every(function (j) { return !/Skyrim\s*Together|\bTogether\b/.test(j.title + ' ' + j.body); }));
-yes('no Joining item calls saving worth doing',
-    joining.every(function (j) { return !/saving is still worth/i.test(j.body); }));
+yes('the section explains nothing by the old multiplayer mod',
+    !/Skyrim\s*Together|\bTogether\b/.test(first));
 
 // ------------------------------------------------------------- the words
 // People read all of this. No em dash, and nobody is a player.
-const shown = [cardText].concat(joining.map(function (j) { return j.title + ' ' + j.body; })).join(' ');
-yes('no em dash in the card or the Joining items', shown.indexOf(String.fromCharCode(0x2014)) < 0);
-yes('nobody is called a player in the card or the Joining items', !/\bplayers?\b/i.test(shown));
+const shown = [cardText, first].join(' ');
+yes('no em dash in the card or the section', shown.indexOf(String.fromCharCode(0x2014)) < 0);
+yes('nobody is called a player in the card or the section', !/\bplayers?\b/i.test(shown));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

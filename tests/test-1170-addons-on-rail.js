@@ -18,8 +18,9 @@
 //     array and the PageXxx constant, are on a page the rail does not hide;
 //   - opening that page runs the builder that fills both hosts, and the
 //     builder fills them: the collection card, then DrawAddons;
-//   - DrawAddons draws a row per pack in the feed's optional list with the
-//     same PackRow the Mods tab uses, and draws nothing without one;
+//   - DrawAddons draws a row per pack in the feed's optional list with
+//     PackRow, and draws nothing without one (the Mods page and its tab
+//     were cut with the other pages #599 hid, #3146);
 //   - installing or removing a pack, and every update check, redraws it;
 //   - Publish-Pack, the scripts index, the feed doc, the join page, the help
 //     page and the installer's read me name that page, never the Add-ons tab
@@ -62,7 +63,7 @@ function method(src, decl) {
 const consts = {};
 const cm = /const int (PagePlay[^;]*);/.exec(shell);
 if (cm) cm[1].replace(/(Page\w+)\s*=\s*(\d+)/g, function (m, n, v) { consts[n] = +v; return m; });
-yes('the PageXxx constants are readable', Object.keys(consts).length >= 10);
+yes('the PageXxx constants are readable', Object.keys(consts).length >= 5);
 const byIndex = {};
 Object.keys(consts).forEach(function (k) { byIndex[consts[k]] = k; });
 
@@ -75,10 +76,15 @@ const titles = /PageTitles\s*=\s*\{([\s\S]*?)\};/.exec(shell);
 const titleList = [];
 if (titles) titles[1].replace(/"([^"]*)"/g, function (m, t) { titleList.push(t); return m; });
 
-const hm = /int\[\] hiddenNav = \{([^}]*)\};/.exec(shell);
-const hidden = hm ? hm[1].split(',').map(function (s) { return s.trim(); }) : [];
-yes('Shell.cs hides pages from the rail (' + hidden.join(', ') + ')', hidden.length > 0);
-yes('the Mods page is one of them, which is why this test exists', hidden.indexOf('PageMods') >= 0);
+// #599 hid five pages by collapsing their rail buttons; #3146 cut them, so
+// every page in the arrays has its button on the rail. A page is on the rail
+// while the rail names a button for it and nothing collapses one again.
+const navArr = /navButtons = new Button\[\] \{([\s\S]*?)\};/.exec(shell);
+const navs = [];
+if (navArr) navArr[1].replace(/F<Button>\("(\w+)"\)/g, function (m, n) { navs.push(n); return m; });
+yes('the rail names a button for every page (' + navs.length + ')', navs.length > 0 && navs.length === grids.length);
+yes('nothing collapses a rail button', !/navButtons\[[^\]]+\]\.Visibility\s*=\s*Visibility\.Collapsed/.test(shell) && !/hiddenNav/.test(shell));
+const hidden = [];
 
 // The page Grid a named control sits in: the nearest Grid named in the pages
 // array that opens before it.
@@ -133,12 +139,11 @@ yes('it does nothing when the page has no host, so a missing control cannot take
 yes('it clears the host before drawing, so a redraw never doubles the rows',
     addons.indexOf('diagAddons.Children.Clear();') > 0 &&
     addons.indexOf('diagAddons.Children.Clear();') < addons.indexOf('PackRow('));
-yes('it reads the feed\'s optional list, the one the Mods tab reads',
-    /pendingDoc == null \? null : pendingDoc\.optional/.test(addons) &&
-    /pendingDoc == null \? null : pendingDoc\.optional/.test(method(packs, 'static void BuildPackRows()')));
-yes('a row per pack, from the same PackRow the Mods tab draws, with its installed state',
+yes('it reads the feed\'s optional list',
+    /pendingDoc == null \? null : pendingDoc\.optional/.test(addons));
+yes('a row per pack, from PackRow, with its installed state',
     /PackRow\(p, Updater\.IsInstalled\(p\.id\)\)/.test(addons));
-yes('a pack with no id is skipped, as the tab skips it', /if \(p == null \|\| string\.IsNullOrEmpty\(p\.id\)\) continue;/.test(addons));
+yes('a pack with no id is skipped', /if \(p == null \|\| string\.IsNullOrEmpty\(p\.id\)\) continue;/.test(addons));
 yes('nothing is drawn before the feed answers or when it lists no pack',
     /if \(have == null\) return;/.test(addons) && /if \(rows\.Count == 0\) return;/.test(addons) &&
     addons.indexOf('if (rows.Count == 0) return;') < addons.indexOf('head.Text = "Add-ons";'));

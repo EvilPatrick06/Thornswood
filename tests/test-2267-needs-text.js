@@ -205,8 +205,6 @@ function typed(N, word, actorId) {
   const help = read('game', 'ui', 'thornswood-help.js');
   yes('D1 the help panel\'s Living names /needs for the bars as text',
       /\/needs in the chat says all four as a line of text/.test(help));
-  const helpCs = read('launcher', 'app', 'Help.cs');
-  yes('D2 the launcher\'s Help item on the needs names it', /hidden on Settings in the game, \/needs in the chat says all four/.test(helpCs));
   // The needs bars are shown or hidden on Settings in the game since #3126.
   const settingsPage = read('game', 'ui', 'thornswood-settings.js');
   yes('D3 the line under the needs bars on Settings in the game names it',
@@ -225,7 +223,7 @@ function typed(N, word, actorId) {
   const commands = read('docs', 'systems', 'commands.md');
   yes('D6 docs/systems/commands.md has its row: anybody, on the list, stays a command',
       /^\| `\/needs`, `\/need` \| Anybody \|[^\n]*\| The list;[^\n]*\| Stays a command[^\n]*\| #2267 \|$/m.test(commands));
-  const all = [help, helpCs, settingsPage, buttons, rule].join('\n');
+  const all = [help, settingsPage, buttons, rule].join('\n');
   yes('D7 none of it says the word the house rules forbid, or has an em dash',
       !/\bplayers?\b/i.test(textOf(branch) + textOf(slice(needsBlock, '  function textView(actorId) {', '\n  }\n') || '')) &&
       all.indexOf(String.fromCharCode(0x2014)) === -1);

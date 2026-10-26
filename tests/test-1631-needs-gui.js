@@ -56,7 +56,6 @@ function helpTopic(id) {
 }
 const skills = read('game', 'ui', 'thornswood-skills.js');
 const emotes = read('game', 'plugins', 'thornswood-emotes.js');
-const helpCs = read('launcher', 'app', 'Help.cs');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -132,11 +131,6 @@ const GONE = ['/eat', '/drink', '/bard'];
   yes('A5 and names no word to type but /needs, for the bars as text (#2267)',
       text.length > 0 && (text.match(/\/[a-z]*/g) || []).every(function (w) { return w === '/needs'; }));
 
-  yes('A6 the launcher\'s Help page tells nobody to type /eat, /drink, /bard or /rest',
-      !/\/(eat|drink|bard|rest)\b/.test(helpCs));
-  const needsItem = (/new HelpItem\("In game", "You will get hungry, thirsty and cold",\s*"((?:[^"\\]|\\.)*)"\)/.exec(helpCs) || [])[1] || '';
-  yes('A6 and its needs item points at the Body page on K, the wheel\'s Sit and Sing',
-      /Body page on K/.test(needsItem) && /Sit on the emote wheel/.test(needsItem) && /Sing/.test(needsItem));
 
   // The pages the issue names. Patrick's own words are quoted on some of them
   // and say /bard; a word to type is written as code.
@@ -472,7 +466,6 @@ function needsRig() {
   yes('E1 the wheel has Sing, and the list is still in alphabetical order',
       by.Sing === 'IdleDialogueHappyStart' &&
       names.join('|') === names.slice().sort(function (x, y) { return x.toLowerCase() < y.toLowerCase() ? -1 : 1; }).join('|'));
-  yes('E2 the launcher\'s Help page counts the wheel as it is', helpCs.indexOf('G opens a wheel of ' + EMOTES.length + ' emotes') !== -1);
   const plays = /var BARD_PLAYS = (\{[\s\S]*?\});/.exec(needsBlock);
   let P = null;
   try { P = plays ? new Function('return ' + plays[1])() : null; } catch (e) { P = null; }

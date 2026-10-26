@@ -148,7 +148,6 @@ try {
     # the tree carries a stand-in one and the pages name it.
     Put $tmp 'launcher/app/Updater.cs' @('        public const string ExpectedSigner = "Ada Signer";')
     Put $tmp 'CONTRIBUTING.md' @('Never "player".', 'And a player here is not the rule.')
-    Put $tmp 'launcher/app/Help.cs' @('new HelpItem("x", "fine"),', 'new HelpItem("y", "a single-player game"),')
     # With a byte order mark, which the check has to read through.
     Put $tmp 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>', ('<TextBlock Text="one' + $em + 'two"/>')) $utf8bom
     Put $tmp 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', 'TODO say hello', '"""')
@@ -180,7 +179,6 @@ try {
         'README.md:2:em-dash', 'README.md:3:banned-word', 'README.md:4:banned-word', 'README.md:7:old-owner', 'README.md:8:names-person',
         'SECURITY.md:2:em-dash', 'SECURITY.md:3:em-dash', 'SECURITY.md:4:em-dash', 'SECURITY.md:5:signer-name',
         'CONTRIBUTING.md:2:banned-word',
-        'launcher/app/Help.cs:2:banned-word',
         'launcher/ui.xaml:2:em-dash',
         'bot/content.py:3:placeholder',
         'site/data/site/a.md:2:em-dash',
@@ -245,7 +243,6 @@ try {
     Put $tmp 'README.md' @('# Seeded', 'A multiplayer engine, a playtest, getPlayer() and PlayerCharacter.', 'Clone https://github.com/EvilPatrick06/Thornswood to start.')
     Put $tmp 'SECURITY.md' @('Fine.', 'Signed as the name on the signing certificate; the oldest branches use the gavin/ prefix.', 'Patrick holds the key, and this page may say so.')
     Put $tmp 'CONTRIBUTING.md' @('Never "player".', 'And people here are customers.')
-    Put $tmp 'launcher/app/Help.cs' @('new HelpItem("x", "fine"),')
     Put $tmp 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
     Put $tmp 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', '"""')
     Put $tmp 'site/data/site/a.md' @('Fine.')

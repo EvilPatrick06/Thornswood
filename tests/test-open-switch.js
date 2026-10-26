@@ -244,7 +244,7 @@ function standingWith(open, roleIds) {
   // -------------------------------------- nothing people read says it --
   const PEOPLE = ['README.md', 'SECURITY.md', 'installer/READ ME FIRST.txt', 'site/data/help.md',
                   'site/public/home.html', 'site/public/home.js', 'bot/content.py',
-                  'launcher/app/Help.cs', 'launcher/ui.xaml', 'launcher/app/ShellPacks.cs']
+                  'launcher/ui.xaml', 'launcher/app/ShellPacks.cs']
     .concat(fs.readdirSync(path.join(ROOT, 'site/data/site')).filter((n) => /\.md$/.test(n))
       .map((n) => 'site/data/site/' + n));
   const said = PEOPLE.filter((rel) => fs.existsSync(path.join(ROOT, rel)) &&

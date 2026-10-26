@@ -183,7 +183,6 @@ namespace Thornswood
             if (moved)
             {
                 cfg.Save(Paths.CfgFile);
-                PaintServerBoxes();
                 Log("The server moved. The launcher already has the new address.");
                 StartPing();
             }
@@ -224,16 +223,13 @@ namespace Thornswood
             if (quiet)
             {
                 cfg.Save(Paths.CfgFile);
-                if (txtUpdateSource != null) txtUpdateSource.Text = Updater.FeedUrl(cfg);
-                DrawVoiceState();
+                CheckVoice();
             }
             ShowNotice(v);
             BuildNews();
 
             // The add-ons are drawn straight from this document, so redraw
-            // them when the check lands: the Mods page's tab if somebody is
-            // sitting on it, and their place on Diagnostics (#1170).
-            if (modTab == 3) BuildModList();
+            // their place on Diagnostics when the check lands (#1170).
             DrawAddons();
 
             // Packs a launcher before 1.1.32 marked as applied on a collection
@@ -506,7 +502,7 @@ namespace Thornswood
                         btnUpdate.IsEnabled = true;
                         PlayProgress.End();
                         updatePending = false;
-                        DrawStatus(); BuildModList();
+                        DrawStatus();
                         Log("Update finished.");
                         if (after != null) after();
                     }));

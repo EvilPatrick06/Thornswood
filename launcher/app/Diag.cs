@@ -56,7 +56,13 @@ namespace Thornswood
             return "";
         }
 
-        public static List<Reading> Readings(Config cfg, bool serverUp, string pingText)
+        // serverServing: the server's resources port took a connection, which
+        // is the only thing that proves the server is running rather than its
+        // machine merely being switched on. voiceUp: whether the voice
+        // service's /health answered, null before it has been asked. Both
+        // were on the Server page until it was cut (#3146).
+        public static List<Reading> Readings(Config cfg, bool serverUp, bool serverServing, string pingText,
+                                             bool? voiceUp, string talkKey)
         {
             var l = new List<Reading>();
 
@@ -78,10 +84,10 @@ namespace Thornswood
             try { foreach (Issue i in Verify.Run()) { total++; if (i.Blocking) blocking++; } } catch (Exception ex) { Swallow.Note("Diag.Readings, Verify.Run", ex); }
             if (blocking > 0)
                 l.Add(new Reading(2, blocking == 1 ? "1 problem with your mod list" : blocking + " problems with your mod list",
-                    "The server compares your plugin list against the one this build shipped with and will refuse the connection. Mods, then Fix."));
+                    "The server compares your plugin list against the one this build shipped with and will refuse the connection. Press Fix above."));
             else if (total > 0)
                 l.Add(new Reading(1, total == 1 ? "1 note about your mod list" : total + " notes about your mod list",
-                    "Nothing that stops you connecting. Mods, then Scan, to read them."));
+                    "Nothing that stops you connecting. Press Scan above to read them."));
             else
                 l.Add(new Reading(0, "Your mod list matches the server", Checks.EnabledPlugins() + " plugins, in the order it expects."));
 
@@ -101,10 +107,23 @@ namespace Thornswood
             }
 
             // ---- server
-            l.Add(serverUp
-                ? new Reading(0, "The server answers", "round trip " + pingText + ".")
-                : new Reading(1, "The server did not answer",
+            if (serverUp && serverServing)
+                l.Add(new Reading(0, "The server answers", "round trip " + pingText + "."));
+            else if (serverUp)
+                l.Add(new Reading(1, "The server's machine answers, but the server is not listening",
+                    "Round trip " + pingText + ". The server is probably not running. It is not something on this PC."));
+            else
+                l.Add(new Reading(1, "The server did not answer",
                     "That is not always a problem. Plenty of hosts drop the kind of packet this test uses, so try connecting before assuming it is down."));
+
+            // ---- voice
+            if (voiceUp == true)
+                l.Add(new Reading(0, "Voice answers",
+                    "The server's voice service is running. Keep this launcher open while you play: voice runs in it." +
+                    (string.IsNullOrEmpty(talkKey) ? "" : " Hold " + talkKey + " to talk.")));
+            else if (voiceUp == false)
+                l.Add(new Reading(1, "Voice did not answer",
+                    "The server's voice service is not running, so nobody will hear anybody until it is. It is not something on this PC."));
 
             // ---- steam
             l.Add(Checks.SteamRunning()

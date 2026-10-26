@@ -98,6 +98,10 @@ The game loads to its main menu and lists your characters, with an empty slot
 for a new one. Pick the empty slot to make a character. Nothing about a
 character is chosen in the launcher.
 
+Give your character a name that belongs in Skyrim: a first name and a family
+name or a byname, and not your own. That name is what other people see above
+your head, and it cannot be changed later without a new character.
+
 You arrive dressed in a plain tunic and boots in a quiet stone hall.
 The race menu opens there to make your face, with your clothes kept on as you
 change race. When you are done, the panel behind **K** opens by itself. That panel is
@@ -117,9 +121,9 @@ a crude fishing pole. Each tool is handed over at the moment its pick is made.
 
 ## Keys
 
-These are the keys a fresh install has. The launcher's **Controls** page lists
-every key and changes them: press Change, then the key you want, with Skyrim
-closed.
+These are the keys a fresh install has. Every one is changed in the game, on
+**Settings** at the foot of the help panel and of the K, P and J panels: press
+Change beside it, then the key you want. It takes effect at once.
 
 - **Enter** opens the chat, and **/** opens it with the slash already typed.
 - **K** your character panel, **P** your friends and party, **J** your journals.
@@ -189,8 +193,8 @@ play.
 
 Hold **V** to talk, or press **O** to keep the microphone open for a song or a
 long speech. **B** steps between a whisper, about 7 metres, your normal voice,
-about 30, and a yell, about 85. The voice card on the launcher's Play page
-says whether it is working.
+about 30, and a yell, about 85. **Diagnostics** on the launcher says whether
+the server's voice is answering.
 
 If nobody can hear you, check that the launcher is still open and that Windows
 has not handed your microphone to something else.

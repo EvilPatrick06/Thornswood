@@ -1176,7 +1176,7 @@ if ($repeats.Count) {
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
 # The words in the files people read, not only the notes. Note-Rules above
-# reads the release notes. Check-Words reads the launcher help and window,
+# reads the release notes. Check-Words reads the launcher window,
 # and every other page a Ship sends out (issue #1081). A dev Ship may be run
 # from any branch, including one whose pull request build never ran or went
 # red, so this runs here, before anything is built, and on a dry run too.

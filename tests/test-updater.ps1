@@ -251,7 +251,7 @@ function Run {
     $opened = @([regex]::Matches($shellAll, 'updatePending = false')).Count
     $upd = [IO.File]::ReadAllText((Join-Path $Src 'ShellUpdate.cs'))
     $inDoc = $upd.Substring($upd.IndexOf('static void OnVersionDoc('), $upd.IndexOf('static void CheckUpdatesInPlay(') - $upd.IndexOf('static void OnVersionDoc('))
-    $installed = @([regex]::Matches($upd, 'updatePending = false;\s*DrawStatus\(\); BuildModList\(\);\s*Log\("Update finished\."\);')).Count
+    $installed = @([regex]::Matches($upd, 'updatePending = false;\s*DrawStatus\(\);\s*Log\("Update finished\."\);')).Count
     Yes 'Play is let through only by a feed that was read: every updatePending = false is in OnVersionDoc or after its packs went in' (
         $opened -gt 0 -and $opened -eq (@([regex]::Matches($inDoc, 'updatePending = false')).Count + $installed))
 

@@ -258,19 +258,16 @@ if (block) {
 // ------------------------------------------------ what people read
 
 {
-  const help = read("launcher", "app", "Help.cs");
+  // The launcher's Help page went with #3146: help is F7 in the game and
+  // help.md on the site, so the site's copy is the one held here.
   const join = read("site", "data", "site", "join.md");
   const known = require("./fixtures/known-page").knownPage() || "";  // the page /known writes, from the bot's list (#3140)
   const md = read("site", "data", "help.md");
-  yes("the launcher's help says Fix fetches only our own plugin and names the Vortex mod for another's",
-      /downloads the server's copy of Thornswood's own plugin when its bytes differ, names the mod to update or reinstall in Vortex when another author's plugin differs/.test(help));
-  yes("the LOAD ORDER ERROR help no longer says nothing in Vortex has to change",
-      !/Nothing in Vortex has to change/.test(help) && /Scan names the mod to update or reinstall in Vortex/.test(help));
   yes("the join page says the same", /For Thornswood's own plugin \*\*Fix\*\* downloads the server's copy; for\s+another author's mod it names the mod to update or reinstall in Vortex\./.test(join));
   yes("the known issues page leaves the load order to the help (#3137)", known.length > 0 && !/LOAD ORDER ERROR/.test(known));
   yes("the site's help says the same", /the server hands out Thornswood's own plugin\s+and nobody else's/.test(md));
   yes("nothing people read still says Fix downloads the server's copy of any plugin",
-      [help, join, known, md].every(function (t) { return !/server's copy of\s+(any|that) plugin/.test(t); }));
+      [join, known, md].every(function (t) { return !/server's copy of\s+(any|that) plugin/.test(t); }));
 }
 
 console.log("");

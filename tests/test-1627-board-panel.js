@@ -253,9 +253,6 @@ attempt('the words', function () {
     });
   });
   yes('W6 the pages name no board word for people' + named, named === '');
-  const helpCs = read('launcher/app/Help.cs');
-  yes('W7 the launcher\'s Help names none, and says J has the boards',
-      !NAMES_A_WORD.test(helpCs) && /Under Boards, J also shows any town's notice board/.test(helpCs));
   const commands = read('docs/systems/commands.md');
   yes('W8 the commands page says nobody is told of them now',
       /\| `\/jobs` \| Nobody \| Gone\./.test(commands) &&

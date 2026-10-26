@@ -273,7 +273,7 @@ def scan(app, depth=1):
     HOW FAR TO FOLLOW, AND WHY NOT ALL THE WAY.
 
     Following every call to the end was tried first and it is useless: it reports
-    248 places, nearly all of them page builders like BuildModList and BuildDiag
+    248 places, nearly all of them page builders like BuildDiag and BuildNews
     that only ever run on the window's thread. The reason is that a widely used
     helper gets seeded once and then everything IT calls is background too, and
     within three hops that is most of a WPF launcher.

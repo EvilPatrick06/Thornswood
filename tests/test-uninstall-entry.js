@@ -266,9 +266,8 @@ const MUST_NOT = [
   ['HealClientBackground', 'the client repair, which can download into the game folder about to be deleted'],
   ['AutoDisplayOnce', 'the first-run display settings'],
   ['ClearLeftovers', 'ending a stuck game on the way in'],
-  ['BuildModList', 'the mod list'],
   ['RefreshDiscord', 'the Discord card'],
-  ['DrawVoiceState', 'the voice service health probe'],
+  ['CheckVoice', 'the voice service health probe'],
   ['OwnGameAtStart', 'the own game folder check'],
   ['StartOwnGame', 'the own game folder being made or brought up to date'],
   ['AskOwnGame', 'the offer to make the own game folder'],
@@ -362,8 +361,8 @@ yes('the uninstall is scrolled into view, not focused', /btnUninstall\s*\.\s*Bri
 
 // ---- a normal start keeps all of it ------------------------------------------
 const play = walk(shell, false);
-const MUST = ['CheckUpdatesBackground', 'StartPing', 'RunScan', 'HealClientBackground', 'BuildModList',
-              'RefreshDiscord', 'DrawVoiceState', 'Register.Ensure', 'Voice.Prepare', 'Voice.Start',
+const MUST = ['CheckUpdatesBackground', 'StartPing', 'RunScan', 'HealClientBackground',
+              'RefreshDiscord', 'CheckVoice', 'Register.Ensure', 'Voice.Prepare', 'Voice.Start',
               'Keep.Seed', 'AutoJoin.Ensure', 'Discord.SendPendingLogs', 'SteamUpdates.Report'];
 for (const name of MUST) yes('a normal start still reaches ' + name, play.calls.has(name));
 yes('a normal start still plays the theme', play.calls.has('MenuMusic.Start'));

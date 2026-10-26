@@ -11,48 +11,36 @@ using Rectangle = System.Windows.Shapes.Rectangle;
 
 namespace Thornswood
 {
-    // The pages that are only ever read, never operated: the server, what
-    // is installed, and what the launcher can see about this machine. The
-    // controls page went into the game as Settings (#3126). They live apart from Shell.cs because none of them share
-    // anything with the pages that do work, and Shell.cs was long enough.
+    // Diagnostics: what the launcher can see about this machine, and the
+    // report it builds. It lives apart from Shell.cs because it shares
+    // nothing with the pages that do work, and Shell.cs was long enough. The
+    // other read-only pages, Server and What is installed, were cut with
+    // the rest of what #599 had taken off the rail (#3146), and the controls
+    // page went into the game as Settings (#3126).
     static partial class Shell
     {
-        static TextBlock txtSrvAddress, txtSrvState, txtSrvPingNote,
-                         txtBuildHead, txtBuildSummary, txtDiagNote, txtThemeNote;
-        static StackPanel srvPingBars, srvRows, buildBars, buildRows, diagReadings, diagCollection, diagAddons;
-        static Button btnSrvCopy, btnSrvRetest, btnBuildRefresh, btnDiagBundle, btnDiagOpen;
+        static TextBlock txtDiagNote, txtThemeNote;
+        static StackPanel diagReadings, diagCollection, diagAddons;
+        static Button btnDiagBundle, btnDiagOpen;
 
-        // -1 marks a test that got no answer, which is worth drawing as a gap
-        // rather than dropping, because a row of gaps is the actual diagnosis.
-        static readonly List<long> pingHistory = new List<long>();
+        // The last server test: its round trip in ms, -1 when nothing
+        // answered, -2 before the first. The Server page drew the last forty
+        // as bars; Diagnostics names only the last (#3146).
+        static long lastPing = -2;
         static bool serverUp;
         static int pingTicks;
 
         static void BindPages()
         {
-            txtSrvAddress = F<TextBlock>("TxtSrvAddress"); txtSrvState = F<TextBlock>("TxtSrvState");
-            txtSrvPingNote = F<TextBlock>("TxtSrvPingNote");
-            txtBuildHead = F<TextBlock>("TxtBuildHead"); txtBuildSummary = F<TextBlock>("TxtBuildSummary");
             txtDiagNote = F<TextBlock>("TxtDiagNote"); txtThemeNote = F<TextBlock>("TxtThemeNote");
-            srvPingBars = F<StackPanel>("SrvPingBars"); srvRows = F<StackPanel>("SrvRows");
-            buildBars = F<StackPanel>("BuildBars"); buildRows = F<StackPanel>("BuildRows");
             diagReadings = F<StackPanel>("DiagReadings");
             diagCollection = F<StackPanel>("DiagCollection");
             diagAddons = F<StackPanel>("DiagAddons");
-            btnSrvCopy = F<Button>("BtnSrvCopy"); btnSrvRetest = F<Button>("BtnSrvRetest");
-            btnBuildRefresh = F<Button>("BtnBuildRefresh");
             btnDiagBundle = F<Button>("BtnDiagBundle"); btnDiagOpen = F<Button>("BtnDiagOpen");
         }
 
         static void WirePages()
         {
-            // Nobody needs the address. The launcher does the connecting, and an
-            // address on screen is only ever one screenshot away from being
-            // somewhere it should not be. It stays in config.json where it is
-            // needed and off every page where it is not.
-            btnSrvCopy.Visibility = Visibility.Collapsed;
-            btnSrvRetest.Click += delegate { StartPing(); Log("Testing the server."); };
-            btnBuildRefresh.Click += delegate { buildSizes = null; BuildInstalled(); };
             btnDiagOpen.Click += delegate
             {
                 Directory.CreateDirectory(Diag.ReportDir);
@@ -66,226 +54,11 @@ namespace Thornswood
         // merely being switched on.
         static bool serverServing;
 
-        static void RecordPing(long ms) { RecordPing(ms, false); }
-
         static void RecordPing(long ms, bool serving)
         {
-            pingHistory.Add(ms);
-            while (pingHistory.Count > 40) pingHistory.RemoveAt(0);
+            lastPing = ms;
             serverUp = ms >= 0;
             serverServing = serving;
-            if (pages != null && pages[PageServer].Visibility == Visibility.Visible) BuildServer();
-        }
-
-        // ----------------------------------------------------------- server
-        static void BuildServer()
-        {
-            if (srvRows == null) return;
-
-            txtSrvAddress.Text = "ThornsWood";
-
-            // The voice card lives on this page now, so it is re-tested
-            // whenever the page is opened rather than only at startup.
-            DrawVoiceState();
-
-            long last = pingHistory.Count > 0 ? pingHistory[pingHistory.Count - 1] : -2;
-            if (last == -2) txtSrvState.Text = "Not tested yet.";
-            else if (last < 0) txtSrvState.Text = "Nothing answered. The server is not running, or nothing can reach it from here.";
-            else if (serverServing) txtSrvState.Text = "Up and serving, " + last + " ms away.";
-            else txtSrvState.Text = "The machine answered in " + last + " ms, but the server is not listening on it. It is probably not running.";
-            txtSrvState.Foreground = Res(last == -2 ? "Faint" : last < 0 ? "Warn" : serverServing ? "Muted" : "Warn");
-
-            DrawPingBars();
-
-            srvRows.Children.Clear();
-            srvRows.Children.Add(Fact("Status",
-                last == -2 ? "not tested yet"
-                : last < 0 ? "no answer"
-                : serverServing ? "up" : "reachable, but not serving", false));
-            srvRows.Children.Add(Fact("Joining",
-                cfg.AutoJoin ? "the launcher writes the address in before the game starts, and it connects on its own"
-                             : "off, so the game will not connect", false));
-
-            long best = long.MaxValue, worst = 0; int answered = 0;
-            foreach (long p in pingHistory) { if (p < 0) continue; answered++; if (p < best) best = p; if (p > worst) worst = p; }
-            srvRows.Children.Add(Fact("Best round trip", answered > 0 ? best + " ms" : "not measured", false));
-            srvRows.Children.Add(Fact("Worst round trip", answered > 0 ? worst + " ms" : "not measured", false));
-            srvRows.Children.Add(Fact("Tests answered",
-                pingHistory.Count == 0 ? "none yet" : answered + " of " + pingHistory.Count, false));
-        }
-
-        static void DrawPingBars()
-        {
-            srvPingBars.Children.Clear();
-            if (pingHistory.Count == 0)
-            {
-                txtSrvPingNote.Text = "Nothing measured yet. The launcher tests the server every half minute while it is open.";
-                return;
-            }
-
-            long top = 40;
-            foreach (long p in pingHistory) if (p > top) top = p;
-
-            foreach (long p in pingHistory)
-            {
-                var col = new StackPanel();
-                col.Width = 13;
-                col.VerticalAlignment = VerticalAlignment.Bottom;
-
-                var r = new Rectangle();
-                r.Width = 7;
-                r.HorizontalAlignment = HorizontalAlignment.Center;
-                if (p < 0)
-                {
-                    r.Height = 3;
-                    r.Fill = Res("Bad");
-                }
-                else
-                {
-                    r.Height = Math.Max(3, 64.0 * p / top);
-                    r.Fill = Res(p < 90 ? "Ok" : p < 180 ? "Warn" : "Bad");
-                }
-                col.Children.Add(r);
-                srvPingBars.Children.Add(col);
-            }
-
-            txtSrvPingNote.Text = "Newest on the right, one bar per test, tallest bar is " + top + " ms. "
-                                + "Under 90 ms is comfortable, over 180 and you will feel it.";
-        }
-
-        // ------------------------------------------------------ what is installed
-        class Slice { public string Name; public long Bytes; }
-        static List<Slice> buildSizes;
-        static bool buildCounting;
-
-        static void BuildInstalled()
-        {
-            if (buildRows == null) return;
-
-            int plugins = Checks.EnabledPlugins();
-            // The game's facts come from Paths.Skyrim, which is the Steam copy
-            // while the own folder is chosen and not made: Paths.Game is then
-            // Profile\Payload, and read there the game and the script extender
-            // were "missing" until the folder was made (#1235).
-            int skse = 0;
-            try
-            {
-                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (string d in Paths.SksePluginDirs)
-                    if (Directory.Exists(d))
-                        foreach (string f in Directory.GetFiles(d, "*.dll")) names.Add(Path.GetFileName(f));
-                skse = names.Count;
-            }
-            catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, SKSE plugins", ex); }
-
-            txtBuildHead.Text = plugins + " plugins and " + skse + " script extender plugins";
-            txtBuildSummary.Text = "Everything here was installed by the setup program and is kept in step by the launcher. "
-                                 + "Nothing in this folder is shared with your own Skyrim, which is why your other mods keep working.";
-
-            buildRows.Children.Clear();
-            long exe = 0;
-            try { exe = new FileInfo(Paths.SkyrimExe).Length; } catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, game exe size", ex); }
-            buildRows.Children.Add(Fact("Skyrim", exe == cfg.ExpectedExeBytes ? "1.6.1170, the version the mods expect" : "not the expected build", false));
-            buildRows.Children.Add(Fact("Script extender",
-                File.Exists(Path.Combine(Paths.Skyrim, "skse64_1_6_1170.dll")) ? "skse64 2.2.6" : "missing", false));
-            buildRows.Children.Add(Fact("Multiplayer client", File.Exists(Paths.MpClient) ? "SkyMP" : "missing", false));
-            buildRows.Children.Add(Fact("Plugins the server sees", plugins.ToString(), false));
-            buildRows.Children.Add(Fact("Script extender plugins", skse.ToString(), false));
-
-            int mine = 0;
-            try { mine = Verify.PersonalFiles().Length; } catch (Exception ex) { Swallow.Note("Pages.BuildInstalled, PersonalFiles", ex); }
-            buildRows.Children.Add(Fact("Files of your own", mine == 0 ? "none" : mine.ToString(), false));
-            buildRows.Children.Add(Fact("Last update", string.IsNullOrEmpty(Stats.LastUpdate) ? "never" : Stats.LastUpdate, false));
-            buildRows.Children.Add(Fact("Installed at", Paths.Root, true));
-
-            DrawBuildBars();
-        }
-
-        static void DrawBuildBars()
-        {
-            buildBars.Children.Clear();
-
-            if (buildSizes == null)
-            {
-                var note = new TextBlock();
-                note.Text = buildCounting ? "Counting..." : "Adding up about 27,000 files. This takes a moment.";
-                note.Foreground = Res("Faint"); note.FontSize = 12;
-                buildBars.Children.Add(note);
-                if (!buildCounting) StartSizeCount();
-                return;
-            }
-
-            long total = 0;
-            foreach (Slice s in buildSizes) total += s.Bytes;
-            if (total <= 0) total = 1;
-
-            foreach (Slice s in buildSizes)
-                buildBars.Children.Add(Bar(s.Name, Human(s.Bytes), (double)s.Bytes / total));
-
-            var sum = new TextBlock();
-            sum.Text = Human(total) + " in total";
-            sum.Foreground = Res("Muted"); sum.FontSize = 12;
-            sum.Margin = new Thickness(0, 12, 0, 0);
-            buildBars.Children.Add(sum);
-        }
-
-        static void StartSizeCount()
-        {
-            buildCounting = true;
-            ThreadPool.QueueUserWorkItem(delegate
-            {
-                var found = new List<Slice>();
-                try
-                {
-                    string data = Path.Combine(Paths.Game, "Data");
-                    if (Directory.Exists(data))
-                    {
-                        long loose = 0;
-                        foreach (string f in Directory.GetFiles(data))
-                        { try { loose += new FileInfo(f).Length; } catch (Exception ex) { Swallow.Note("Pages.StartSizeCount, loose file size", ex); } }
-                        if (loose > 0) found.Add(new Slice { Name = "Archives and plugins", Bytes = loose });
-
-                        foreach (string dir in Directory.GetDirectories(data))
-                        {
-                            long n = 0;
-                            try
-                            {
-                                foreach (string f in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
-                                { try { n += new FileInfo(f).Length; } catch (Exception ex) { Swallow.Note("Pages.StartSizeCount, folder file size", ex); } }
-                            }
-                            catch (Exception ex) { Swallow.Note("Pages.StartSizeCount, enumerating " + dir, ex); }
-                            if (n > 0) found.Add(new Slice { Name = Path.GetFileName(dir), Bytes = n });
-                        }
-                    }
-                }
-                catch (Exception ex) { Swallow.Note("Pages.StartSizeCount", ex); }
-
-                found.Sort(delegate(Slice a, Slice b) { return b.Bytes.CompareTo(a.Bytes); });
-
-                // Past the sixth slice the bars are too short to read, so the
-                // tail is added up rather than drawn one hair at a time.
-                if (found.Count > 6)
-                {
-                    long rest = 0;
-                    for (int i = 6; i < found.Count; i++) rest += found[i].Bytes;
-                    found.RemoveRange(6, found.Count - 6);
-                    found.Add(new Slice { Name = "Everything else", Bytes = rest });
-                }
-
-                win.Dispatcher.BeginInvoke(new Action(delegate
-                {
-                    buildSizes = found;
-                    buildCounting = false;
-                    DrawBuildBars();
-                }));
-            });
-        }
-
-        static string Human(long b)
-        {
-            if (b < 1024L * 1024) return (b / 1024) + " KB";
-            if (b < 1024L * 1024 * 1024) return (b / (1024.0 * 1024.0)).ToString("F0") + " MB";
-            return (b / (1024.0 * 1024.0 * 1024.0)).ToString("F1") + " GB";
         }
 
         // ------------------------------------------------------- diagnostics
@@ -318,13 +91,10 @@ namespace Thornswood
             // The optional packs, under the collection card (#1170).
             DrawAddons();
 
-            diagReadings.Children.Clear();
-
-            string ping = pingHistory.Count > 0 && pingHistory[pingHistory.Count - 1] >= 0
-                        ? pingHistory[pingHistory.Count - 1] + " ms" : "not measured";
-
-            foreach (Reading r in Diag.Readings(cfg, serverUp, ping))
-                diagReadings.Children.Add(ReadingRow(r));
+            DrawReadings();
+            // Voice is asked again whenever the page opens, the way its card
+            // on the Server page was; the answer redraws the readings.
+            CheckVoice();
 
             string newest = "";
             try
@@ -340,6 +110,31 @@ namespace Thornswood
             txtDiagNote.Text = newest.Length > 0
                 ? "Last report: " + newest + ", in Profile, Reports."
                 : "No report built yet.";
+        }
+
+        /// <summary>What the launcher can see right now, one row each.</summary>
+        static void DrawReadings()
+        {
+            if (diagReadings == null) return;
+            diagReadings.Children.Clear();
+
+            string ping = lastPing >= 0 ? lastPing + " ms" : "not measured";
+
+            foreach (Reading r in Diag.Readings(cfg, serverUp, serverServing, ping, voiceUp, VoiceKey()))
+                diagReadings.Children.Add(ReadingRow(r));
+        }
+
+        // The key the voice reading names, as Thornswood.ini has it bound, or
+        // "" when it cannot be read.
+        static string VoiceKey()
+        {
+            try
+            {
+                foreach (Keys.Binding b in Keys.All())
+                    if (b.Id == "ptt") return b.Value ?? "";
+            }
+            catch (Exception ex) { Swallow.Note("Pages.VoiceKey", ex); }
+            return "";
         }
 
         static void MakeReport()
@@ -396,79 +191,6 @@ namespace Thornswood
             card.Margin = new Thickness(0, 0, 0, 8);
             card.Child = g;
             return card;
-        }
-
-        // ------------------------------------------------------------ shared
-        static UIElement Fact(string label, string value, bool mono)
-        {
-            var g = new Grid();
-            var c0 = new ColumnDefinition(); c0.Width = new GridLength(210);
-            var c1 = new ColumnDefinition(); c1.Width = new GridLength(1, GridUnitType.Star);
-            g.ColumnDefinitions.Add(c0); g.ColumnDefinitions.Add(c1);
-
-            var l = new TextBlock();
-            l.Text = label; l.FontSize = 12.5; l.Foreground = Res("Faint");
-            l.VerticalAlignment = VerticalAlignment.Center;
-            l.Margin = new Thickness(0, 0, 16, 0);
-            Grid.SetColumn(l, 0); g.Children.Add(l);
-
-            var v = new TextBlock();
-            v.Text = value; v.FontSize = 12.5; v.Foreground = Res("Ink");
-            v.TextWrapping = TextWrapping.Wrap; v.LineHeight = 19;
-            if (mono) { v.FontFamily = new FontFamily("Cascadia Mono, Consolas"); v.FontSize = 12; }
-            Grid.SetColumn(v, 1); g.Children.Add(v);
-
-            var b = new Border();
-            b.Padding = new Thickness(16, 11, 16, 11);
-            b.Background = Res("Panel");
-            b.Margin = new Thickness(0, 0, 0, 3);
-            b.Child = g;
-            return b;
-        }
-
-        static UIElement Bar(string label, string value, double frac)
-        {
-            if (frac < 0.003) frac = 0.003;
-            if (frac > 1) frac = 1;
-
-            var head = new Grid();
-            var h0 = new ColumnDefinition(); h0.Width = new GridLength(1, GridUnitType.Star);
-            var h1 = new ColumnDefinition(); h1.Width = GridLength.Auto;
-            head.ColumnDefinitions.Add(h0); head.ColumnDefinitions.Add(h1);
-
-            var l = new TextBlock();
-            l.Text = label; l.FontSize = 12.5; l.Foreground = Res("Ink");
-            l.TextTrimming = TextTrimming.CharacterEllipsis;
-            Grid.SetColumn(l, 0); head.Children.Add(l);
-
-            var v = new TextBlock();
-            v.Text = value; v.FontSize = 11.5; v.Foreground = Res("Muted");
-            v.FontFamily = new FontFamily("Cascadia Mono, Consolas");
-            v.Margin = new Thickness(12, 0, 0, 0);
-            Grid.SetColumn(v, 1); head.Children.Add(v);
-
-            // Two star columns rather than a fixed width, so the bar keeps its
-            // proportion when the window is resized.
-            var track = new Grid();
-            track.Height = 7;
-            track.Margin = new Thickness(0, 7, 0, 0);
-            var t0 = new ColumnDefinition(); t0.Width = new GridLength(frac, GridUnitType.Star);
-            var t1 = new ColumnDefinition(); t1.Width = new GridLength(1 - frac, GridUnitType.Star);
-            track.ColumnDefinitions.Add(t0); track.ColumnDefinitions.Add(t1);
-
-            var back = new Rectangle();
-            back.Fill = Res("Line");
-            Grid.SetColumn(back, 0); Grid.SetColumnSpan(back, 2); track.Children.Add(back);
-
-            var fill = new Rectangle();
-            fill.Fill = Res("Accent");
-            Grid.SetColumn(fill, 0); track.Children.Add(fill);
-
-            var sp = new StackPanel();
-            sp.Margin = new Thickness(0, 0, 0, 15);
-            sp.Children.Add(head);
-            sp.Children.Add(track);
-            return sp;
         }
     }
 }

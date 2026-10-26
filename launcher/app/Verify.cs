@@ -1440,15 +1440,5 @@ namespace Thornswood
             }
             return n;
         }
-
-        public static string[] PersonalFiles()
-        {
-            try
-            {
-                if (!Directory.Exists(Paths.Personal)) return new string[0];
-                return Directory.GetFiles(Paths.Personal, "*.*", SearchOption.AllDirectories);
-            }
-            catch { return new string[0]; }
-        }
     }
 }

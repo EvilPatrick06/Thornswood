@@ -16,11 +16,12 @@
 //   - the page the refusal opens (ShowPage(PageX) in the refusal block),
 //     followed through the PageX constant and the pages array to its Grid in
 //     ui.xaml, is the Grid that holds BtnScan and BtnFix;
-//   - that page is not one the rail hides;
-//   - the refusal's boxes name that page by its title and no hidden page, and
-//     never the Add-ons page (a tab of the hidden Mods page);
+//   - that page has its button on the rail;
+//   - the refusal's boxes name that page by its title and none of the pages
+//     #599 hid and #3146 cut, and never the Add-ons page (a tab of the cut
+//     Mods page);
 //   - the missing mods box offers the collection's page instead;
-//   - the comment over hiddenNav says where a blocked Play goes.
+//   - the comment under the page arrays says where a blocked Play goes.
 //
 // Read only.
 'use strict';
@@ -55,7 +56,7 @@ const target = shows[0] || '';
 const consts = {};
 const cm = /const int (PagePlay[^;]*);/.exec(shell);
 if (cm) cm[1].replace(/(Page\w+)\s*=\s*(\d+)/g, function (m, n, v) { consts[n] = +v; return m; });
-yes('the PageXxx constants are readable', Object.keys(consts).length >= 10);
+yes('the PageXxx constants are readable', Object.keys(consts).length >= 5);
 const index = consts[target];
 yes(target + ' is a page constant (' + index + ')', typeof index === 'number');
 
@@ -98,21 +99,25 @@ yes('BtnFix is in ui.xaml once, so it is not also somewhere else', (xaml.match(/
 yes('the Mods page does not hold BtnFix, as #607 left it', !/x:Name="BtnFix"/.test(element('PageMods')));
 
 // ---- the rail ---------------------------------------------------------------
-const hm = /int\[\] hiddenNav = \{([^}]*)\};/.exec(shell);
-const hidden = hm ? hm[1].split(',').map(function (s) { return s.trim(); }) : [];
-yes('Shell.cs hides pages from the rail (' + hidden.join(', ') + ')', hidden.length > 0);
-yes('the page a refused Play opens is on the rail', target && hidden.indexOf(target) < 0);
+// Every page in the arrays has its rail button since #3146 cut the five #599
+// had hidden by collapsing theirs.
+const navArr = /navButtons = new Button\[\] \{([\s\S]*?)\};/.exec(shell);
+const navs = [];
+if (navArr) navArr[1].replace(/F<Button>\("(\w+)"\)/g, function (m, n) { navs.push(n); return m; });
+yes('the page a refused Play opens is on the rail',
+    target && typeof index === 'number' && !!navs[index] && navs.length === grids.length &&
+    !/navButtons\[[^\]]+\]\.Visibility\s*=\s*Visibility\.Collapsed/.test(shell));
+const CUT = ['Server', 'Mods', 'What is installed', 'Saves', 'Logs', 'Help'];
 
 // ---- what the boxes say -----------------------------------------------------
 const said = [];
 block.replace(/"((?:[^"\\]|\\.)*)"/g, function (m, s) { said.push(s); return m; });
 const words = said.join('');
 yes('the box names the page it opened, "' + title + ' page"', title && words.indexOf(title + ' page') >= 0);
-hidden.forEach(function (p) {
-  const t = titleList[consts[p]];
-  yes('the refusal sends nobody to the ' + t + ' page, which the rail hides', !new RegExp('\\b' + t + ' page\\b').test(words));
+CUT.forEach(function (t) {
+  yes('the refusal sends nobody to the ' + t + ' page, which is gone', !new RegExp('\\b' + t + ' page\\b').test(words));
 });
-yes('nor to the Add-ons page, a tab of the hidden Mods page', words.indexOf('Add-ons') < 0);
+yes('nor to the Add-ons page, a tab of the cut Mods page', words.indexOf('Add-ons') < 0);
 yes('the missing mods box offers to open the collection\'s page',
     /MessageBoxButton\.YesNo/.test(block) && /Process\.Start\(new ProcessStartInfo\(cfg\.CollectionUrl\)/.test(block) &&
     words.indexOf('press Yes to open its page') >= 0);
@@ -120,8 +125,10 @@ yes('and says Fix will not help with a mod that is not installed', words.indexOf
 yes('no em dash and never the word the project does not use in the boxes', !/—/.test(words) && !/player/i.test(words));
 
 // ---- the comment ------------------------------------------------------------
-const note = hm ? shell.slice(shell.lastIndexOf('/*', hm.index), hm.index) : '';
-yes('the comment over hiddenNav says a blocked Play goes to ShowPage(' + target + ')', note.indexOf('ShowPage(' + target + ')') >= 0);
+const pa = shell.indexOf('pages = new UIElement[] {');
+const na = pa < 0 ? -1 : shell.indexOf('/*', pa);
+const note = na < 0 ? '' : shell.slice(na, shell.indexOf('*/', na));
+yes('the comment under the page arrays says a blocked Play goes to ShowPage(' + target + ')', note.indexOf('ShowPage(' + target + ')') >= 0);
 yes('and no longer says it goes to ShowPage(PageMods)', note.indexOf('sends people to it (ShowPage(PageMods))') < 0);
 
 console.log('');

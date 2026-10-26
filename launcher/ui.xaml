@@ -571,49 +571,7 @@
                   <TextBlock Text="News" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
-              <Button x:Name="NavServer" Style="{StaticResource Nav}">
-                <StackPanel Orientation="Horizontal">
-                  <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
-                        Data="M 1.5,2.5 H 13.5 V 6 H 1.5 Z M 1.5,9 H 13.5 V 12.5 H 1.5 Z M 3.6,4.2 H 4.4 M 3.6,10.7 H 4.4" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/>
-                  <TextBlock Text="Server" VerticalAlignment="Center"/>
-                </StackPanel>
-              </Button>
-                <!-- The whole of "Your build" (Mods, What is installed, Saves)
-                     is hidden now, so its heading is too (issue #599). The
-                     buttons themselves are collapsed in Shell.cs rather than
-                     cut here, because navButtons/pages/PageTitles are parallel
-                     arrays indexed by number and renumbering them is the bug
-                     the PageXxx comment warns about. -->
-                <TextBlock Text="Your build" Style="{StaticResource NavGroup}" Visibility="Collapsed"/>
-              <Button x:Name="NavMods" Style="{StaticResource Nav}">
-                <StackPanel Orientation="Horizontal">
-                  <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
-                        Data="M 7.5,0.5 L 14.5,4.2 L 7.5,7.9 L 0.5,4.2 Z M 0.5,7.6 L 7.5,11.3 L 14.5,7.6 L 7.5,3.9 Z M 0.5,11 L 7.5,14.7 L 14.5,11 L 7.5,7.3 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                  <TextBlock Text="Mods" VerticalAlignment="Center"/>
-                </StackPanel>
-              </Button>
-              <Button x:Name="NavBuild" Style="{StaticResource Nav}">
-                <StackPanel Orientation="Horizontal">
-                  <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
-                        Data="M 7.5,1 L 14,4.6 V 10.4 L 7.5,14 L 1,10.4 V 4.6 Z M 1,4.6 L 7.5,8.2 L 14,4.6 M 7.5,8.2 V 14" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/>
-                  <TextBlock Text="What is installed" VerticalAlignment="Center"/>
-                </StackPanel>
-              </Button>
-              <Button x:Name="NavSaves" Style="{StaticResource Nav}">
-                <StackPanel Orientation="Horizontal">
-                  <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
-                        Data="M 1.5,1.5 H 11 L 13.5,4 V 13.5 H 1.5 Z M 4.5,1.5 V 6 H 10.5 V 1.5 M 4,9.5 H 11" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/>
-                  <TextBlock Text="Saves" VerticalAlignment="Center"/>
-                </StackPanel>
-              </Button>
                 <TextBlock Text="When it breaks" Style="{StaticResource NavGroup}"/>
-              <Button x:Name="NavLogs" Style="{StaticResource Nav}">
-                <StackPanel Orientation="Horizontal">
-                  <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
-                        Data="M 1,3 H 14 M 1,7.5 H 14 M 1,12 H 9" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/>
-                  <TextBlock Text="Logs" VerticalAlignment="Center"/>
-                </StackPanel>
-              </Button>
               <Button x:Name="NavDiag" Style="{StaticResource Nav}">
                 <StackPanel Orientation="Horizontal">
                   <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
@@ -621,7 +579,9 @@
                   <TextBlock Text="Diagnostics" VerticalAlignment="Center"/>
                 </StackPanel>
               </Button>
-              <Button x:Name="NavHelp" Style="{StaticResource Nav}">
+              <!-- Help is the site's help page, opened in the browser (#3146).
+                   In the game it is F7; the launcher keeps no third copy. -->
+              <Button x:Name="NavHelp" Style="{StaticResource Nav}" ToolTip="Opens the help on the site">
                 <StackPanel Orientation="Horizontal">
                   <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
                         Data="M 4.6,4.8 A 3,3 0 1 1 7.6,8.4 L 7.6,10.2 M 7.6,12.6 L 7.6,13.2" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/>
@@ -789,9 +749,9 @@
                        from the old multiplayer mod. The name is what everybody sees over
                        your head in a roleplay world, so a person who followed the
                        card walked into Whiterun under their own name. And there is
-                       no saving: the server holds the character. Help.cs gives the
-                       same name rule in its Joining items, and
-                       tools/test-first-run-words.js keeps the two saying the same
+                       no saving: the server holds the character. The site's help
+                       gives the same name rule under Your first character, and
+                       tests/test-first-run-words.js keeps the two saying the same
                        thing. -->
                   <StackPanel x:Name="FirstRunCard" Margin="0,18,0,0">
                     <TextBlock Text="First time" Style="{StaticResource Eyebrow}"/>
@@ -801,15 +761,6 @@
                                    Text="Give your character a name that belongs in Skyrim: a first name and a family name or a byname, and not your own. That name is what other people see above your head, and it cannot be changed later without a new character."/>
                       </StackPanel>
                     </Border>
-                  </StackPanel>
-
-                  <StackPanel x:Name="QuickKeysCard" Visibility="Collapsed" Margin="0,18,0,0">
-                    <TextBlock Text="In game" Style="{StaticResource Eyebrow}"/>
-                    <Border Style="{StaticResource Slab}" Padding="14,12">
-                      <StackPanel x:Name="QuickKeys"/>
-                    </Border>
-                    <TextBlock Style="{StaticResource Small}" Margin="0,8,0,0" TextWrapping="Wrap"
-                               Text="Every key is changed in the game, on Settings at the foot of the help panel and of the K, P and J panels."/>
                   </StackPanel>
                 </StackPanel>
             </Grid>
@@ -949,203 +900,6 @@
           <Grid x:Name="PageNews" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
               <StackPanel x:Name="NewsList" Margin="36,30,36,30" MaxWidth="840" HorizontalAlignment="Left"/>
-            </ScrollViewer>
-          </Grid>
-
-          <!-- ================ SERVER ================ -->
-          <Grid x:Name="PageServer" Visibility="Collapsed">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-              <StackPanel Margin="36,30,36,30" MaxWidth="900" HorizontalAlignment="Left">
-
-                <Border Style="{StaticResource Slab}" Padding="24,22">
-                  <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Text="The server" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/>
-                      <TextBlock x:Name="TxtSrvAddress" Style="{StaticResource Mono}" FontSize="21"
-                                 Foreground="{DynamicResource Ink}"/>
-                      <TextBlock x:Name="TxtSrvState" Style="{StaticResource Body}" Margin="0,8,0,0"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                      <Button x:Name="BtnSrvRetest" Style="{StaticResource Ghost}" Content="Test again" Margin="0,0,8,0"/>
-                      <Button x:Name="BtnSrvCopy"   Style="{StaticResource Ghost}" Content="Copy address"/>
-                    </StackPanel>
-                  </Grid>
-                </Border>
-
-                <Border Style="{StaticResource Slab}" Padding="24,20" Margin="0,14,0,0">
-                  <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Style="{StaticResource H2}" Text="Proximity voice"/>
-                      <TextBlock x:Name="TxtVoiceState" Style="{StaticResource Small}" Margin="0,3,0,0" TextWrapping="Wrap"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                      <Button x:Name="BtnVoiceTest" Style="{StaticResource Ghost}" Content="Test again"/>
-                    </StackPanel>
-                  </Grid>
-                </Border>
-
-                <TextBlock Text="Round trip" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
-                <Border Style="{StaticResource Well}" Padding="18,16">
-                  <StackPanel>
-                    <Grid Height="74">
-                      <StackPanel x:Name="SrvPingBars" Orientation="Horizontal" VerticalAlignment="Bottom"/>
-                    </Grid>
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,10,0,9"/>
-                    <TextBlock x:Name="TxtSrvPingNote" Style="{StaticResource Small}"/>
-                  </StackPanel>
-                </Border>
-
-                <TextBlock Text="Facts" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
-                <StackPanel x:Name="SrvRows"/>
-
-                <TextBlock Text="What the server keeps" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
-                <Border Style="{StaticResource Slab}">
-                  <StackPanel>
-                    <TextBlock Style="{StaticResource Body}" Text="Your character. Not your save file, your character: the server holds your body, your face, your inventory and where you are stood, and hands them back when you connect. That is why New Game in Skyrim&apos;s own menu gives you the same person again, and why a new one comes from the character list on the game&apos;s main menu, which this launcher writes before Play. The save file on this machine is scratch, and deleting it changes nothing about who you are on the server."/>
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,15,0,15"/>
-                    <TextBlock Style="{StaticResource Body}" Text="It does check your mod list. If yours does not match what this build shipped with, the server refuses the connection rather than letting you desync everyone. That check is the reason the launcher will not let you press Play with a broken list."/>
-                  </StackPanel>
-                </Border>
-              </StackPanel>
-            </ScrollViewer>
-          </Grid>
-
-          <!-- ================ MODS ================ -->
-          <Grid x:Name="PageMods" Visibility="Collapsed" Margin="36,28,36,22">
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <!-- The Scan and Fix card moved to the Diagnostics page (#607). This
-                 page is now the mod browser; the checks that gate Play, and the
-                 buttons that put things right, live together under Diagnostics. -->
-
-            <Grid Grid.Row="1" Margin="0,22,0,0">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button x:Name="TabPlugins" Style="{StaticResource Ghost}" Content="Server list" Margin="0,0,8,0"/>
-                <Button x:Name="TabSkse"    Style="{StaticResource Ghost}" Content="Script extender" Margin="0,0,8,0"/>
-                <Button x:Name="TabMine"    Style="{StaticResource Ghost}" Content="Your own" Margin="0,0,8,0"/>
-                <Button x:Name="TabAddons"  Style="{StaticResource Ghost}" Content="Add-ons"/>
-              </StackPanel>
-              <TextBox x:Name="BoxSearch" Grid.Column="1" Style="{StaticResource Field}" Margin="18,0,0,0" MaxWidth="340" HorizontalAlignment="Right"/>
-            </Grid>
-
-            <StackPanel Grid.Row="2" Margin="0,15,0,0">
-              <TextBlock x:Name="TxtModCount" Style="{StaticResource Small}"/>
-              <Border x:Name="AddonsCard" Style="{StaticResource Slab}" Margin="0,13,0,0" Visibility="Collapsed">
-                <StackPanel>
-                  <TextBlock Style="{StaticResource Body}" Text="Extras you can have if you want them and skip if you do not. These are textures, meshes, weather and shaders, never a plugin, which is why they are safe: the server compares plugin lists and never looks at anything in here. Nobody is at a disadvantage for leaving them off, and the installer does not carry them, so it stays small."/>
-                  <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
-                    <Button x:Name="BtnRefreshAddons" Style="{StaticResource Ghost}" Content="Check for add-ons"/>
-                  </StackPanel>
-                </StackPanel>
-              </Border>
-              <Border x:Name="MineCard" Style="{StaticResource Slab}" Margin="0,13,0,0" Visibility="Collapsed">
-                <StackPanel>
-                  <TextBlock Style="{StaticResource Body}" Text="Anything you drop in the folder below is copied into the game every time you press Play. Textures, meshes, sounds and music are safe, because the server only compares plugin lists and never sees them. A plugin here (.esp, .esm or .esl) will get you rejected when you connect, and the scan above will flag it."/>
-                  <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
-                    <Button x:Name="BtnOpenMine" Style="{StaticResource Ghost}" Content="Open the folder" Margin="0,0,8,0"/>
-                    <Button x:Name="BtnRefreshMine" Style="{StaticResource Ghost}" Content="Refresh"/>
-                  </StackPanel>
-                </StackPanel>
-              </Border>
-            </StackPanel>
-
-            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Margin="0,15,0,0">
-              <StackPanel x:Name="ModList"/>
-            </ScrollViewer>
-          </Grid>
-
-          <!-- ================ WHAT IS INSTALLED ================ -->
-          <Grid x:Name="PageBuild" Visibility="Collapsed">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-              <StackPanel Margin="36,30,36,30" MaxWidth="920" HorizontalAlignment="Left">
-
-                <Border Style="{StaticResource Slab}" Padding="24,22">
-                  <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                      <TextBlock Text="This build" Style="{StaticResource Eyebrow}" Margin="0,0,0,7"/>
-                      <TextBlock x:Name="TxtBuildHead" Style="{StaticResource H1}" FontSize="21"/>
-                      <TextBlock x:Name="TxtBuildSummary" Style="{StaticResource Body}" Margin="0,7,0,0"/>
-                    </StackPanel>
-                    <Button x:Name="BtnBuildRefresh" Grid.Column="1" Style="{StaticResource Ghost}" Content="Recount" VerticalAlignment="Center" Margin="16,0,0,0"/>
-                  </Grid>
-                </Border>
-
-                <TextBlock Text="Where the space went" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
-                <Border Style="{StaticResource Well}">
-                  <StackPanel x:Name="BuildBars"/>
-                </Border>
-
-                <TextBlock Text="Parts" Style="{StaticResource Eyebrow}" Margin="0,30,0,11"/>
-                <StackPanel x:Name="BuildRows"/>
-              </StackPanel>
-            </ScrollViewer>
-          </Grid>
-
-          <!-- ================ SAVES ================ -->
-          <Grid x:Name="PageSaves" Visibility="Collapsed" Margin="36,28,36,22">
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <Border Grid.Row="0" Style="{StaticResource Slab}" Padding="20,17">
-              <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                  <TextBlock Style="{StaticResource H2}" Text="Your saves live in this build, not with your other Skyrim"/>
-                  <TextBlock x:Name="TxtSaveNote" Style="{StaticResource Small}" Margin="0,2,0,0"/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                  <Button x:Name="BtnBackupSaves" Style="{StaticResource Solid}" Content="Back up now" Margin="0,0,8,0"/>
-                  <Button x:Name="BtnOpenSaveFolder" Style="{StaticResource Ghost}" Content="Open folder"/>
-                </StackPanel>
-              </Grid>
-            </Border>
-
-            <TextBlock x:Name="TxtSaveCount" Grid.Row="1" Style="{StaticResource Small}" Margin="0,20,0,0"/>
-
-            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,13,0,0">
-              <StackPanel x:Name="SaveList"/>
-            </ScrollViewer>
-          </Grid>
-
-          <!-- ================ LOGS ================ -->
-          <Grid x:Name="PageLogs" Visibility="Collapsed" Margin="36,28,36,22">
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="Auto"/>
-              <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <Border Grid.Row="0" Style="{StaticResource Slab}" Padding="20,17">
-              <Grid>
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                  <TextBlock Style="{StaticResource H2}" Text="Crashed? Send the newest one"/>
-                  <TextBlock Style="{StaticResource Small}" Margin="0,2,0,0"
-                             Text="Copy newest puts the most recent crash log on your clipboard, ready to paste into Discord. It names the mod that fell over, which is the difference between a fix and guesswork. Diagnostics packs it up with everything else worth having."/>
-                </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                  <Button x:Name="BtnCopyCrash" Style="{StaticResource Solid}" Content="Copy newest" Margin="0,0,8,0"/>
-                  <Button x:Name="BtnOpenLogFolder" Style="{StaticResource Ghost}" Content="Open folder"/>
-                </StackPanel>
-              </Grid>
-            </Border>
-
-            <TextBlock x:Name="TxtLogCount" Grid.Row="1" Style="{StaticResource Small}" Margin="0,20,0,0"/>
-
-            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,13,0,0">
-              <StackPanel x:Name="LogList"/>
             </ScrollViewer>
           </Grid>
 
@@ -1307,13 +1061,6 @@
             </ScrollViewer>
           </Grid>
 
-          <!-- ================ HELP ================ -->
-          <Grid x:Name="PageHelp" Visibility="Collapsed">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-              <StackPanel x:Name="HelpList" Margin="36,30,36,30" MaxWidth="820" HorizontalAlignment="Left"/>
-            </ScrollViewer>
-          </Grid>
-
           <!-- ================ SETTINGS ================ -->
           <Grid x:Name="PageSettings" Visibility="Collapsed">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -1359,6 +1106,10 @@
 
                 <TextBlock Text="Display" Style="{StaticResource Eyebrow}"/>
                 <StackPanel Margin="0,0,0,30">
+                  <!-- Where the rest went (#3126, #3146). Its own line, not
+                       TxtDisplayNote: BuildDisplay rewrites that one. -->
+                  <TextBlock Style="{StaticResource Small}" TextWrapping="Wrap" Margin="0,0,0,14"
+                             Text="Every key, the field of view, the chat and the needs bars are set in the game, on Settings at the foot of the help panel and of the K, P and J panels."/>
                   <StackPanel x:Name="DisplayModeRow" Orientation="Horizontal" Margin="0,0,0,15"/>
                   <Grid Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>

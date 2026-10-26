@@ -295,9 +295,6 @@ attempt('the words', function () {
   const commands = read('docs/systems/commands.md');
   yes('W5 the commands page says nobody is told of either',
       /\| `\/letter "<name>" <words>`, `\/deliver <id>` \| Anybody \|[^\n]*\| Nowhere\.[^\n]*Never in the list or the help\. \| #1595 \|/.test(commands));
-  const help = read('launcher/app/Help.cs');
-  yes('W6 the launcher\'s Help says E hands over a letter, and names no letter command',
-      /the prompt also shows E, Hand over the letter/.test(help) && !NAMES_A_LETTER_WORD.test(help));
   yes('W7 the systems page lists E on the look prompt',
       /E to hand over a letter you carry for\s+them/.test(read('docs/GAME-SYSTEMS.md')));
 });

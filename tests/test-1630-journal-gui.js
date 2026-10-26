@@ -102,11 +102,10 @@ function list(name) {
     'docs/systems/journal.md': read('docs', 'systems', 'journal.md'),
     'docs/systems/factions.md': read('docs', 'systems', 'factions.md'),
     'docs/systems/chat.md': read('docs', 'systems', 'chat.md'),
-    'launcher/app/Help.cs': read('launcher', 'app', 'Help.cs'),
     'site/data/help.md': read('site', 'data', 'help.md')
   };
   const naming = Object.keys(pages).filter(function (p) { return /\/journal\b|\/book\b/.test(pages[p]); });
-  yes('A6: the pages and the Help page name neither' + (naming.length ? ' (' + naming.join(', ') + ')' : ''),
+  yes('A6: the pages and the site\'s help name neither' + (naming.length ? ' (' + naming.join(', ') + ')' : ''),
       naming.length === 0);
   yes('A7: factions.md says the person in front of you is invited on J, and the P prompt names the book',
       /Open J while\s+looking at them/.test(pages['docs/systems/factions.md']) &&
