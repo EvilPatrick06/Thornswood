@@ -240,7 +240,10 @@ Discord message. Do not send a government identity document.
 
 What deletion means here: your Discord link, your session records, your chat,
 your character, your answer to the rules, the applications and calls for
-help you sent, your gallery pictures and your join number. What cannot be undone is something you said that somebody
+help you sent through the site, your gallery pictures and your join number.
+A ticket in the Discord, and the bot's lines about it in the staff ticket
+log, are not deleted by a request: each stays until its 365 days above are
+up, because it is the record of what you were told. What cannot be undone is something you said that somebody
 else has already quoted in a report, because that now belongs to the report.
 Staff's own records stay for the same reason: a ban, a note, a character
 killed for good, a report you made or one made about you, a line in a staff

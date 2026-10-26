@@ -293,6 +293,8 @@ yes('the privacy page says a closed ticket goes after 365 days',
     'closed, for 365 days, then the bot deletes it' in page)
 yes('and when one nobody closed goes', 'A ticket nobody closes is closed by Discord after a week' in page)
 yes('and no longer that it stays until staff delete it', 'until staff delete it' not in page)
+yes('and that a deletion request leaves a ticket and its log lines until their 365 days are up (#3634, B)',
+    'are not deleted by a request: each stays until its 365 days above are up' in page)
 yes('the privacy page names the staff ticket log and its 365 days (#3634)',
     'a line in a staff only ticket log naming the ticket' in page and
     'goes into that log whole instead. Each of those goes 365 days after it was written' in page)

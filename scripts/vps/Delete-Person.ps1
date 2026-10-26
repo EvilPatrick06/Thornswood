@@ -64,7 +64,11 @@
                     when the request was made
     the bot         their join number (joins.json; the last number given out
                     stays, so nobody is handed theirs again) and their open
-                    ticket (open-tickets.json)
+                    ticket (open-tickets.json). Their ticket threads in the
+                    Discord and the bot's lines about them in the staff
+                    ticket log stay until their 365 days are up (Patrick's B
+                    on #3634: the record of what they were told), which the
+                    privacy page says
 
   WHAT IT LEAVES, counted and said:
     - staff's records about them: bans, PKs and notes (bans.json, pk.json,
