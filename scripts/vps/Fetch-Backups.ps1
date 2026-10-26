@@ -56,6 +56,12 @@
   month ago does not quietly lose its last good ones here too. Only files
   named the way the box names them are ever considered.
 
+  And the whole-server copies Backup-Server.ps1 takes by hand into the same
+  folder (thornswood-backup-<yyyyMMdd-HHmm>.zip.enc, and the plain .zip it
+  made until #3582), each deleted -KeepDays days after the day in its name.
+  They are no part of the nightly series, so the newest seven are not
+  counted among them and none is kept past its days for that.
+
   Every run adds to fetch.log in the -To folder, because a task that runs
   unattended says nothing to anybody otherwise.
 
@@ -146,6 +152,28 @@ function Prune {
     }
   }
   Say ("  kept {0} backup(s) here" -f ($mine.Count - $dropped)) 'DarkGray'
+
+  # Backup-Server.ps1's copies taken by hand (#3582), by the day in the name.
+  $byHand = @(Get-ChildItem -LiteralPath $To -File -EA SilentlyContinue |
+              Where-Object { $_.Name -match '^thornswood-backup-(\d{8})-(\d{4})\.zip(\.enc)?$' } |
+              Sort-Object Name)
+  $kept = 0
+  foreach ($f in $byHand) {
+    $d = [datetime]::ParseExact($f.Name.Substring(18, 8), 'yyyyMMdd', $null)
+    if ($d -ge $cut) { $kept++; continue }
+    try {
+      Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
+      if (Test-Path -LiteralPath $f.FullName) { throw [IO.IOException]::new('still there after the delete') }
+      Say ("  dropped {0}, a copy taken by hand, older than {1} days" -f $f.Name, $KeepDays) 'DarkGray'
+    } catch {
+      $ex = $_.Exception
+      $kind = $ex.GetType().Name
+      if ($ex.HResult) { $kind += (' 0x{0:X8}' -f $ex.HResult) }
+      Say ("  NOT DROPPED {0}: {1}. It is a copy taken by hand, older than {2} days, and is still here." -f $f.Name, $kind, $KeepDays) 'Red'
+      $script:pruneFailed++
+    }
+  }
+  if ($byHand.Count) { Say ("  kept {0} copy(ies) taken by hand here" -f $kept) 'DarkGray' }
 }
 $script:pruneFailed = 0
 

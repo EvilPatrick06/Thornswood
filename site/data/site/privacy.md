@@ -218,7 +218,9 @@ until 24 September 2026, and both are served from here now.
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the
 operator's computer are kept for 30 days, with at least seven retained for
-recovery. These are private recovery copies, not public downloads. Removing
+recovery. A whole copy of the server taken by hand, before moving it to a
+new machine, is encrypted the same way and kept on the operator's computer
+for 30 days. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
 retention schedule. The game server's log is not in them. Staff must
 reapply completed deletion requests before putting an older backup back
