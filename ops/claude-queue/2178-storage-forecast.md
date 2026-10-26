@@ -25,11 +25,11 @@ From the shared clone `C:\Thornswood-Repo`, detached at a current origin/main th
 
 3. Test the alert without touching any data. This writes one test line into the watchdog's outbox and nothing else (no sample, no level):
 
-       ssh Administrator@192.135.112.23 "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Thornswood-Watch\forecast-storage.ps1 -TestAlert -Alerts C:\Thornswood-Watch\alerts.jsonl"
+       ssh Administrator@play.thornswood.net "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Thornswood-Watch\forecast-storage.ps1 -TestAlert -Alerts C:\Thornswood-Watch\alerts.jsonl"
 
    Prints `told      <id> into C:\Thornswood-Watch\alerts.jsonl`, the id ending `-diskforecast-test`. Within about three minutes the staff channel shows "**Test of the disk forecast alert.** Nothing is wrong with the disk. ..." Confirm the bot (or the webhook) delivered it:
 
-       ssh Administrator@192.135.112.23 "findstr diskforecast-test C:\Thornswood-Watch\alerts-sent-bot.txt C:\Thornswood-Watch\alerts-sent-webhook.txt"
+       ssh Administrator@play.thornswood.net "findstr diskforecast-test C:\Thornswood-Watch\alerts-sent-bot.txt C:\Thornswood-Watch\alerts-sent-webhook.txt"
 
    One of the two files names the id. Neither after five minutes: the delivery path is broken. That is its own issue (the watchdog outbox, #447), and it is not fixed here.
 
@@ -43,7 +43,7 @@ From the shared clone `C:\Thornswood-Repo`, detached at a current origin/main th
 
 ## Risks and how to put it back
 - Low. It reads free space and appends one short line a day (about 100 bytes). It deletes nothing and touches no service. Its alert is one line in the outbox the bot already reads, and only when the forecast turns.
-- Take it off: `.\scripts\vps\Forecast-Storage.ps1 -Remove -NoPause` (prints `the task is gone`; the history stays). To remove the script file too: `ssh Administrator@192.135.112.23 "del C:\Thornswood-Watch\forecast-storage.ps1"`.
+- Take it off: `.\scripts\vps\Forecast-Storage.ps1 -Remove -NoPause` (prints `the task is gone`; the history stays). To remove the script file too: `ssh Administrator@play.thornswood.net "del C:\Thornswood-Watch\forecast-storage.ps1"`.
 - 04:00 is the box's own clock; the backup runs at 03:15 on the same clock, so every sample is taken at the same point after it.
 
 ## Release notes (draft)

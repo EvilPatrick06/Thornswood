@@ -139,9 +139,9 @@ The common case, and it does not need the server stopped for long.
    no good here for the same reason, because it never leaves the server down
    long enough to copy into.
    ```powershell
-   ssh Administrator@192.135.112.23 "powershell -NoProfile -Command \"Stop-ScheduledTask -TaskName 'Thornswood Server'\""
-   scp C:\restore-check\game\world\changeForms\<slot>.json Administrator@192.135.112.23:C:/Thornswood-Server/world/changeForms/<slot>.json
-   ssh Administrator@192.135.112.23 "powershell -NoProfile -Command \"Start-ScheduledTask -TaskName 'Thornswood Server'\""
+   ssh Administrator@play.thornswood.net "powershell -NoProfile -Command \"Stop-ScheduledTask -TaskName 'Thornswood Server'\""
+   scp C:\restore-check\game\world\changeForms\<slot>.json Administrator@play.thornswood.net:C:/Thornswood-Server/world/changeForms/<slot>.json
+   ssh Administrator@play.thornswood.net "powershell -NoProfile -Command \"Start-ScheduledTask -TaskName 'Thornswood Server'\""
    ```
    Check nobody is on first. `scripts\vps\Restart-Server.ps1` refuses while people
    are online and is the polite way to find out.
@@ -161,8 +161,8 @@ in the same file is how to try it for an afternoon without touching the real
 one. During the alpha all world and character data is throwaway, so a
 rehearsal, or a real move, that loses it is acceptable. In short:
 
-1. **A new box**, steps 1 to 8 there: the box, its ssh server, Set-Vps, the
-   key, Bootstrap-VPS, the live server program installed and not started,
+1. **A new box**, steps 1 to 8 there: the box, its ssh server, this machine
+   pointed at it, the key, Bootstrap-VPS, the live server program installed and not started,
    voice, and the dev instance. Start nothing else.
 2. **The newest backup that opens**, from `local\backups` in the repository
    folder on Patrick's machine, where Fetch-Backups.ps1 brings them every day:
@@ -313,8 +313,8 @@ under Windows PowerShell 5.1. The three scripts were copied up first, because
 the box has no repo:
 
 ```powershell
-scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/deploy/
-scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Server-Log.js Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
+scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 Administrator@play.thornswood.net:C:/Thornswood-RestoreTest/scripts/deploy/
+scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Server-Log.js Administrator@play.thornswood.net:C:/Thornswood-RestoreTest/scripts/vps/
 ```
 
 and then, on the box:
@@ -370,7 +370,7 @@ alone (`tests	est-install-server.ps1` holds it to that).
   `roster.json`.
 - The restored load order is the one each server serves, name for name and in
   order: live's against
-  `http://192.135.112.23:3000/api/servers/thornswood/manifest.json`, dev's
+  `http://play.thornswood.net:3000/api/servers/thornswood/manifest.json`, dev's
   against the same path on port 7788.
 - All 1,287 JSON files restored (both worlds, private and data folders, the
   site's data, the bot's and the voice service's files) parse, both

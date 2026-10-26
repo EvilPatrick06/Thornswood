@@ -1,0 +1,87 @@
+# Watches thornswood.net and the things around it from outside the VPS,
+# every five minutes, and tells #staff-updates when one breaks and when it is
+# fixed (scripts/vps/Watch-Outside.ps1, whose header says what each check
+# asks and why).
+#
+# FOLDED IN FROM THE PUBLIC REPOSITORY (#3690). Until now this ran from
+# EvilPatrick06/thornswood-watch-outside, a public repository of its own,
+# because a public repository's Actions minutes are not billed and this one
+# was private. Once this repository is public it runs here for free, and the
+# other one is archived. While this repository is private every run would
+# be billed, every five minutes, so the job runs only when the repository
+# variable WATCH_OUTSIDE is "here". Set it at the flip, in the same step as
+# archiving the old repository, so exactly one watcher posts:
+#
+#     gh variable set WATCH_OUTSIDE --body here --repo EvilPatrick06/Thornswood
+#
+# It needs two repository secrets, the same two the old repository holds:
+# STAFF_WEBHOOK, the Discord webhook in #staff-updates that the VPS watchdog
+# also posts through, and RUNNER_TOKEN, a fine-grained token whose only
+# permission is Administration: Read-only on this repository, so it can read
+# the build runners and nothing else.
+#
+# What it remembers between runs (what is down, the outbox) is in the Actions
+# cache: restored from the newest one, saved under a new key at the end. Not
+# committed and not an artifact, because both are public and the messages
+# name private things. A fork's pull request workflow can read the default
+# branch's cache, which is why outside contributors' workflows need approval
+# (#3685). The run log is public: the script prints only what anybody can
+# already see.
+name: Watch outside
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      test:
+        description: 'Post one test message in #staff-updates instead of watching'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One at a time, so two runs never judge the same state at once.
+concurrency:
+  group: watch-outside
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    if: ${{ vars.WATCH_OUTSIDE == 'here' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Bring back what it remembers
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: state
+          key: watch-outside-${{ github.run_id }}
+          restore-keys: watch-outside-
+
+      - name: Post a test message
+        if: ${{ inputs.test }}
+        shell: pwsh
+        env:
+          WATCH_WEBHOOK: ${{ secrets.STAFF_WEBHOOK }}
+        run: ./scripts/vps/Watch-Outside.ps1 -TestPost -Minutes 5
+
+      - name: Watch
+        if: ${{ !inputs.test }}
+        shell: pwsh
+        env:
+          WATCH_WEBHOOK: ${{ secrets.STAFF_WEBHOOK }}
+          WATCH_RUNNER_TOKEN: ${{ secrets.RUNNER_TOKEN }}
+        run: ./scripts/vps/Watch-Outside.ps1 -Run -Folder state -Minutes 5
+
+      - name: Keep what it remembers
+        if: ${{ !inputs.test }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: state
+          key: watch-outside-${{ github.run_id }}-${{ github.run_attempt }}

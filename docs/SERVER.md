@@ -14,7 +14,7 @@ Developer-Guide.md is the long form and the rules.
 | --- | --- | --- |
 | A tester's PC | The launcher, Skyrim from Thornswood's own game folder, Vortex, Steam | The person playing; the launcher looks after its own files |
 | Any developer's machine that can sign | The repo, the SkyMP fork build, `Ship.ps1`, `Publish-*`, `Deploy-*`, `Install-*` | Developers. Any of them may ship dev and main (Developer-Guide.md) |
-| The VPS, 192.135.112.23, Windows, user Administrator | Both game servers, both voice services, the site, Caddy, the bot, the watchdog, the nightly backup | Reached over ssh by the scripts; nobody edits it by hand |
+| The VPS, play.thornswood.net, Windows, user Administrator | Both game servers, both voice services, the site, Caddy, the bot, the watchdog, the nightly backup | Reached over ssh by the scripts; nobody edits it by hand |
 
 <!-- VPS address: "address" in scripts/vps/vps.json, which the scripts that reach the box over ssh read through `Vps.ps1:Get-ThornswoodVpsAddress`; `launcher/app/Config.cs:ServerAddress` -->
 
@@ -32,7 +32,7 @@ flowchart LR
     L -->|builds, patches, starts| G
   end
 
-  subgraph VPS["VPS 192.135.112.23"]
+  subgraph VPS["VPS play.thornswood.net"]
     C["Caddy :80 :443<br/>thornswood.net"]
     W["Site node 127.0.0.1:3001"]
     F["Feed and downloads<br/>/feed and /feed-dev<br/>version.json, assets by sha256<br/>baseline and history, not served"]

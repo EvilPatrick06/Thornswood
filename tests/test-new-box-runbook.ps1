@@ -35,9 +35,10 @@
     4. no command carries a secret, and every secret the steps need says where
        it comes from, with the passphrase's file the one Restore-Box.ps1 and
        Install-Backup.ps1 actually default to.
-    5. what can run here does: Where.ps1 knows the payload it names, the Ship
-       note passes Ship's own rules, and Restore-Box.ps1 refuses a backup it
-       cannot use before it reaches for ssh.
+    5. what can run here does: Where.ps1 knows the payload it names, a move
+       ships nothing and rewrites no address (#3690: the box is reached by its
+       name, which step 18 points at the new box), and Restore-Box.ps1
+       refuses a backup it cannot use before it reaches for ssh.
     6. the box-side half, under Windows PowerShell 5.1 as on the VPS: the real
        vps-nightly-backup.ps1 takes every site upload even over its advisory
        threshold, and the feed store (not its downloads)
@@ -281,7 +282,6 @@ function First($list, [string]$leaf, [scriptblock]$also) {
 }
 function Has($r, [string]$p) { return @($r.Params | Where-Object { $_ -eq $p }).Count -gt 0 }
 $steps = @(
-    @{ Say = 'Set-Vps points the branch at the new box';             Leaf = 'Set-Vps.ps1' },
     @{ Say = 'Setup-SshKey puts the key on it';                      Leaf = 'Setup-SshKey.ps1' },
     @{ Say = 'Bootstrap-VPS, carried there by Remote.ps1';           Leaf = 'Bootstrap-VPS.ps1'; Also = { param($r) $r.Via -eq 'Remote.ps1' } },
     @{ Say = 'Install-ThornswoodServer, run on the box';             Leaf = 'Install-ThornswoodServer.ps1'; Also = { param($r) $r.Via -eq 'ssh' } },
@@ -301,9 +301,8 @@ $steps = @(
     @{ Say = 'Install-Backup';                                       Leaf = 'Install-Backup.ps1' },
     @{ Say = 'Install-Runner';                                       Leaf = 'Install-Runner.ps1' },
     @{ Say = 'Harden-VPS, once key login works (issue #450)';        Leaf = 'Harden-VPS.ps1' },
-    @{ Say = 'Set-Server moves everybody';                           Leaf = 'Set-Server.ps1' },
-    @{ Say = 'the main Ship';                                        Leaf = 'Ship.ps1' },
-    @{ Say = 'the outside watch exported with the new address';      Leaf = 'Watch-Outside.ps1'; Also = { param($r) Has $r 'Export' } }
+    @{ Say = 'Setup-SshKey again, by the name, once it points at the new box (#3690)'; Leaf = 'Setup-SshKey.ps1'; Also = { param($r) -not (Has $r 'NewBox') -and -not (Has $r 'Test') } },
+    @{ Say = 'Fetch-Backups scheduled from the new box';             Leaf = 'Fetch-Backups.ps1'; Also = { param($r) Has $r 'Schedule' } }
 )
 $prev = -1; $prevSay = 'the start'; $inOrder = $true
 foreach ($s in $steps) {
@@ -464,23 +463,11 @@ $whereOut = $null
 try { $whereOut = & (Join-Path $scriptsDir 'release\Where.ps1') ServerZip } catch { $whereOut = $null }
 Yes "Where.ps1 knows ServerZip, the payload step 6 sends ($whereOut)" ([bool]$whereOut -and "$whereOut".EndsWith('.zip'))
 
-$ship = @($moving | Where-Object { $_.Leaf -eq 'Ship.ps1' })
-$note = ''
-if ($ship.Count) {
-    $ast = [System.Management.Automation.Language.Parser]::ParseInput($ship[0].Text, [ref]$null, [ref]$null)
-    $sc = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -like '*Ship.ps1' }, $true)
-    $s = @($sc.CommandElements | Select-Object -Skip 1 | Where-Object { $_ -is [System.Management.Automation.Language.StringConstantExpressionAst] -or $_ -is [System.Management.Automation.Language.ExpandableStringExpressionAst] })
-    if ($s.Count) { $note = $s[0].Value }
-}
-. (Join-Path $scriptsDir 'release\Note-Rules.ps1')
-$noteLines = @($note -split "`r?`n")
-$title = (@($noteLines | Where-Object { $_.Trim() }) + @(''))[0].Trim()
-$bullets = @($noteLines | Where-Object { $_ -match '^\s*-\s*\S' -and ($_ -replace '^\s*-\s*', '').Trim().Length -ge 12 })
-Yes ('the Ship note has a title of three words or more and a detail line, as Ship.ps1 requires: ' + $title) (
-    @($title -split '\s+' | Where-Object { $_ }).Count -ge 3 -and $bullets.Count -ge 1)
-$problems = @(Get-NoteProblems $note)
-Yes '  and passes Note-Rules.ps1' ($note -and $problems.Count -eq 0)
-foreach ($p in $problems) { Write-Host "        $p" }
+# A move changes no file a launcher carries: every launcher, the game and the
+# scripts reach the box by its name, and step 18 points the name at the new
+# box (#3690). So it ships nothing, and has no Ship note to hold to Ship's rules.
+$ship = @($moving | Where-Object { $_.Leaf -eq 'Ship.ps1' -or $_.Leaf -eq 'Set-Server.ps1' -or $_.Leaf -eq 'Set-Vps.ps1' })
+Yes ('a move ships nothing and rewrites no address: the launcher reaches the box by its name (' + (@($ship | ForEach-Object { $_.Leaf }) -join ', ') + ')') ($ship.Count -eq 0)
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-newbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
 [void](New-Item -ItemType Directory -Path $work -Force)

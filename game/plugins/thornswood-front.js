@@ -35,8 +35,9 @@
   // ours: this file does nothing at all. Unreadable: carry on, as before.
   //
   // Ours is the address in Thornswood.ini's ServerAddress line when there is
-  // one, so a server move is an ini edit, and the fixed address below when
-  // there is not.
+  // one, and the game's own name below when there is not: the launcher writes
+  // that name into server-ip, never the box's address (#3690), so a server
+  // move is a DNS record and nothing here.
   //
   // This is the one copy (issue #485). The other plugins in game/plugins hold
   // no check of their own: this file publishes it below as
@@ -45,7 +46,7 @@
   // tests/test-whose-game-gate.js holds that together.
   if (!thornswoodGame()) { return; }
   function thornswoodGame() {
-    const ours = ['192.135.112.23'];
+    const ours = ['play.thornswood.net'];
     let ip = '';
     try {
       const fs = require('fs');

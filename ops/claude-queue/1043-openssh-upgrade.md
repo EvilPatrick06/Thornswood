@@ -43,8 +43,8 @@ On One, or in a cloud thread after `pwsh scripts/vps/Setup-CloudSsh.ps1`.
 
 1. **Nobody on, and the box settled.**
 
-       curl -sS http://192.135.112.23:3000/online.json
-       curl -sS http://192.135.112.23:7788/online.json
+       curl -sS http://play.thornswood.net:3000/online.json
+       curl -sS http://play.thornswood.net:7788/online.json
        pwsh scripts/vps/Remote.ps1 "(Get-CimInstance Win32_OperatingSystem).LastBootUpTime; (Get-ScheduledTask -TaskPath '\Microsoft\Windows\UpdateOrchestrator\' -TaskName Reboot_AC | Get-ScheduledTaskInfo).NextRunTime"
 
    Expect 0 online on both, and no `Reboot_AC` set for the next hour. If one
@@ -86,7 +86,7 @@ On One, or in a cloud thread after `pwsh scripts/vps/Setup-CloudSsh.ps1`.
 
 1. From One (the machine that saw the warning), one ssh with no warning:
 
-       ssh -v Administrator@192.135.112.23 exit 2>&1 | Select-String 'kex: algorithm|post-quantum|remote software'
+       ssh -v Administrator@play.thornswood.net exit 2>&1 | Select-String 'kex: algorithm|post-quantum|remote software'
 
    Expect `kex: algorithm: mlkem768x25519-sha256`,
    `remote software version OpenSSH_for_Windows_10.4`, and no `post-quantum`

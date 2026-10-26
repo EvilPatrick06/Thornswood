@@ -1,5 +1,5 @@
 {
-    "ServerAddress":  "192.135.112.23",
+    "ServerAddress":  "play.thornswood.net",
     "ServerPort":  "7777",
     "ExpectedExeBytes":  37157144,
     "UpdateFeedUrl":  "https://thornswood.net/feed/version.json",

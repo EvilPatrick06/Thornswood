@@ -1,24 +1,25 @@
 <#
   Set-Vps.ps1
 
-  Points everything at a different server box.
+  Renames the game's own name, the one name everything reaches the box by.
 
       .\scripts\vps\Set-Vps.ps1
 
-  It asks for the new address, shows you what it is about to change, and waits
+  It asks for the new name, shows you what it is about to change, and waits
   for a yes before touching anything.
 
-  Why this exists: the address of the box lives in scripts\vps\vps.json, and
-  the admin scripts read it through Vps.ps1. The same address is still written
-  into 18 other files that genuinely embed it: the launcher source, the
-  plugins, the docs, and a few config examples. Changing those by hand is how
-  you end up with a website that deploys to a dead box for two days without
-  anybody noticing. This script walks the repo (vps.json included) so one
-  address change stays one address change.
+  Why this exists: the name lives in scripts\vps\vps.json, and the admin
+  scripts read it through Vps.ps1. The same name is written into the few
+  files that cannot read vps.json at run time: the launcher source, the
+  whose-game plugin, the example config and the docs. This script walks the
+  repo (vps.json included) so one rename stays one rename.
 
-  It also adds a line to the launcher so that every copy already installed on
-  somebody's machine moves itself across the first time it runs. The old
-  address becomes a redirect rather than a dead end.
+  A BOX MOVE IS NOT THIS (#3690). The repository names the box only by its
+  name, a DNS record in Cloudflare, and never by its address, because the
+  repository is going public. A new box is that record pointed at its
+  address (docs\MOVING-THE-SERVER.md), and no file changes. So this refuses
+  an IP address. Launchers already installed take a new name from the feed
+  (Set-Server.ps1), so nothing is written into the launcher to move them.
 
   What it does NOT do, because Set-Server.ps1 already does it properly:
   config.json on this machine, and version.json for everyone else's launcher.
@@ -77,16 +78,17 @@ Say "  now       $Old" 'DarkGray'
 # ------------------------------------------------------ what it becomes ---
 if (-not $Address) {
   Write-Host ''
-  $Address = (Read-Host '  New address (the IP of the new box)').Trim()
+  $Address = (Read-Host '  New name (a DNS name that points at the box)').Trim()
 }
 $Address = "$Address".Trim()
 if (-not $Address) { Die 'No address given. Nothing has been changed.' }
 
-$looksIp = $false
 $parsed = $null
-if ([Net.IPAddress]::TryParse($Address, [ref]$parsed)) { $looksIp = $true }
-if (-not $looksIp -and $Address -notmatch '^[A-Za-z0-9]([A-Za-z0-9\-\.]*[A-Za-z0-9])?$') {
-  Die "That is not an address: $Address"
+if ([Net.IPAddress]::TryParse($Address, [ref]$parsed)) {
+  Die "That is an IP address. The repository names the box only by a DNS name (#3690); a new box is the record for $Old pointed at its address, which docs\MOVING-THE-SERVER.md walks through. Nothing has been changed."
+}
+if ($Address -notmatch '^[A-Za-z0-9]([A-Za-z0-9\-\.]*[A-Za-z0-9])?$') {
+  Die "That is not a name: $Address"
 }
 if ($Address -eq $Old) { Die "That is already the address. Nothing has been changed." }
 
@@ -157,69 +159,22 @@ foreach ($h in ($hits | Sort-Object Rel)) {
   Say ("  {0}" -f $h.Rel) 'Green'
 }
 
-# ------------------------------------------- the redirect for old copies ---
-# Every launcher already installed has the old address sitting in its own
-# config.json. Most of them will pick the new one up from version.json on the
-# next update check. This is for the ones that do not get that far, and for
-# anyone who installs an old copy of the installer months from now.
-Head 'Old installs'
-
-$cs = ReadText $ConfigCs
-$line = '            if (ServerAddress == "' + $Old + '") ServerAddress = "' + $Address + '";'
-
-if ($cs.IndexOf($line, [StringComparison]::Ordinal) -ge 0) {
-  Say '  the redirect was already there' 'DarkGray'
-}
-else {
-  $anchor = [regex]::Match($cs, '(?m)^[ \t]*if \(ServerAddress == "[^"]+"\) ServerAddress = "[^"]+";[ \t]*\r?\n')
-  if ($anchor.Success) {
-    $at = $anchor.Index + $anchor.Length
-    $nl = if ($cs.Contains("`r`n")) { "`r`n" } else { "`n" }
-    $cs = $cs.Substring(0, $at) + $line + $nl + $cs.Substring($at)
-  }
-  else {
-    $anchor = [regex]::Match($cs, '(?m)^[ \t]*if \(ServerPort == "[^"]+"\) ServerPort = "[^"]+";[ \t]*\r?\n')
-    if (-not $anchor.Success) {
-      Say '  Could not find where to put it in app\Config.cs.' 'Yellow'
-      Say '  Everything else is changed. Old installs will rely on version.json alone,' 'Yellow'
-      Say '  which is usually enough. Worth a look when you have a minute.' 'Yellow'
-      $anchor = $null
-    }
-    else {
-      $at = $anchor.Index + $anchor.Length
-      $nl = if ($cs.Contains("`r`n")) { "`r`n" } else { "`n" }
-      $cs = $cs.Substring(0, $at) + $line + $nl + $cs.Substring($at)
-    }
-  }
-
-  if ($anchor -and $anchor.Success) {
-    # The comment above those lines counted them. It is wrong now.
-    $cs = $cs.Replace('Only these two exact values are moved:', 'Only these exact values are moved:')
-    WriteText $ConfigCs $cs
-    Say ("  a launcher still pointed at {0} now moves itself to {1} on its next run" -f $Old, $Address) 'Green'
-  }
-}
-
 # ------------------------------------------------------------ what next ---
 Head 'What is left'
-Say '  The repo is pointed at the new box. Three things are not, and they are' 'DarkGray'
-Say '  the three that people actually connect through.' 'DarkGray'
+Say '  The repo says the new name. Two things do not:' 'DarkGray'
 Write-Host ''
-Say '  1. This machine and everyone else, in one go:' 'White'
+Say '  1. The name itself: in Cloudflare, DNS, Records, an A record for it to' 'White'
+Say '     the box, DNS only (the grey cloud), because the game port is UDP.' 'White'
+Write-Host ''
+Say '  2. This machine and everyone else, in one go, once the name resolves:' 'White'
 # Say has no -NoNewline (a stray one went to $args and split this line in
-# two, issue #1086), so the command and its address are one Write-Host pair.
+# two, issue #1086), so the command and its name are one Write-Host pair.
 Write-Host '       .\scripts\ops\Set-Server.ps1 -Address ' -NoNewline -ForegroundColor Gray
 Write-Host $Address -ForegroundColor Green
-Say '     Run it once the new box is up and answering, not before. It checks.' 'DarkGray'
+Say '     It checks the box answers by that name first.' 'DarkGray'
 Write-Host ''
-Say '  2. A launcher build carrying the new default, so fresh installs are right:' 'White'
-Say '       .\scripts\release\Ship.ps1 "Server moved"' 'Gray'
-Write-Host ''
-Say '  3. The website, which is on the box and has to be put on the new one:' 'White'
-Say '       .\scripts\deploy\Deploy-Docs.ps1 -Site' 'Gray'
-Write-Host ''
-Say '  And the DNS record for thornswood.net has to point at the new address,' 'DarkGray'
-Say '  or the site and the Discord sign in both keep going to the old box.' 'DarkGray'
+Say '  Then on every machine that reaches the box over ssh, so its Host block' 'DarkGray'
+Say '  and known_hosts line carry the new name: .\scripts\vps\Setup-SshKey.ps1' 'DarkGray'
 
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

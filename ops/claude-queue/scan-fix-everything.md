@@ -33,11 +33,11 @@ With the main Ship that carries this, on Patrick's word, and not before (the sit
 ## Check afterwards
 - After step 1, over http, nothing over ssh:
 
-      (Invoke-WebRequest http://192.135.112.23:7788/api/servers/thornswood/manifest.json -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -ExpandProperty served
+      (Invoke-WebRequest http://play.thornswood.net:7788/api/servers/thornswood/manifest.json -UseBasicParsing).Content | ConvertFrom-Json | Select-Object -ExpandProperty served
       # Expect Thornswood-Content.esp and Thornswood-Last.esp
-      $m = (Invoke-WebRequest http://192.135.112.23:7788/api/servers/thornswood/manifest.json -UseBasicParsing).Content | ConvertFrom-Json
+      $m = (Invoke-WebRequest http://play.thornswood.net:7788/api/servers/thornswood/manifest.json -UseBasicParsing).Content | ConvertFrom-Json
       $i = [array]::IndexOf(@($m.light | ForEach-Object { $_.filename }), 'Thornswood-Last.esp'); $i
-      (Invoke-WebRequest ("http://192.135.112.23:7788/api/servers/thornswood/plugins/light-" + $i + ".bin") -UseBasicParsing).RawContentLength
+      (Invoke-WebRequest ("http://play.thornswood.net:7788/api/servers/thornswood/plugins/light-" + $i + ".bin") -UseBasicParsing).RawContentLength
       # Expect the size the manifest's light entry for Thornswood-Last.esp gives
 
   The dev server's log says "[thornswood] 2 of our plugin files published at /api/servers/thornswood/plugins/ for the launcher".

@@ -4,7 +4,7 @@ Written 15 September 2026, while working out whether to upgrade the box.
 
 ## What the box is now
 
-BisectHosting, KVM, VirtFusion panel, `192.135.112.23`, on the 8GB plan at
+BisectHosting, KVM, VirtFusion panel, reached as `play.thornswood.net`, on the 8GB plan at
 $32 a month. What is actually on it, read off the box on 15 September 2026:
 
     Windows Server 2022 Standard
@@ -142,7 +142,7 @@ typed on a command line or written on this page.
 | The staff channel webhook | Discord: #staff-updates, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
 | Patrick's GitHub sign in | `gh auth login` on One | the build runner's registration, step 24 |
 | The DNS records | Patrick's own Cloudflare login, which he signs in to with GitHub, where thornswood.net is registered | step 18 |
-| Code signing | `records\signing\signing.json` on One and the Azure account behind it | the installer, step 17, and the main Ship, step 29 |
+| Code signing | `records\signing\signing.json` on One and the Azure account behind it | the installer, step 17 |
 
 ### Standing it up, while the old box still serves
 
@@ -167,17 +167,21 @@ typed on a command line or written on this page.
    Get-ChildItem C:\ProgramData\ssh\ssh_host_*_key.pub | ForEach-Object { ssh-keygen -lf $_.FullName }
    ```
    They are public; the private halves never leave the box.
-3. **Point this branch at the new box:**
-   `.\scripts\vps\Set-Vps.ps1 -Address <new address>`. It rewrites
-   `scripts\vps\vps.json` and every other file that carries the old address,
-   and adds a line to the launcher so installed copies move themselves across.
-   From here on every script talks to the new box without being told, and the
-   old box is reached only where a step says `-VpsHost <old address>`. Then
-   add the `SHA256:...` values from step 2 to `hostKeys` in
+3. **Point this machine at the new box, and pin its key on this branch.**
+   No file in the repository names either box's address (#3690): everything
+   reaches the box by the game's name, `play.thornswood.net`, which keeps
+   pointing at the old box until step 18. So this machine alone is pointed
+   at the new one, with its own file that git never carries (issue #459,
+   `scripts\vps\Vps.ps1`): `%LOCALAPPDATA%\Thornswood\vps.json` holding
+   only `{"address": "<new address>"}`. From here on every script run on
+   this machine talks to the new box without being told, and the old box is
+   reached only where a step says `-VpsHost play.thornswood.net`. Then add
+   the `SHA256:...` values from step 2 to `hostKeys` in
    `scripts\vps\vps.json`, beside the old box's, which stay until the move is
    done: every script runs ssh with StrictHostKeyChecking=yes (issue #450), so
-   a box whose key is not pinned there is refused. The changed files stay on
-   this branch until step 27.
+   a box whose key is not pinned there is refused. That change stays on this
+   branch until step 27. Set-Vps is not part of a move: it renames the
+   name, and refuses an address.
 4. **This machine's key on the box:** `.\scripts\vps\Setup-SshKey.ps1 -NewBox`. It
    writes the box into known_hosts only when it shows a key step 3 pinned,
    then asks for the Administrator password once and points ssh straight at
@@ -252,13 +256,13 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
 10. **Tell people** in Discord that the server is going down to move, and for
     about how long.
 11. **Freeze the old box and take its last backup:**
-    `.\scripts\vps\Remote.ps1 -VpsHost <old address> -File .\scripts\vps\vps-freeze.ps1`.
+    `.\scripts\vps\Remote.ps1 -VpsHost play.thornswood.net -File .\scripts\vps\vps-freeze.ps1`.
     It turns the watchdog off, stops both game servers, the site, the bot and
     both voice services, runs the nightly backup once and names the file, and
     says which account the site ran as. It should end `FROZEN`. If the move is
     called off, the same line with `-Arguments '-Undo'` puts the old box back.
 12. **Bring that backup here:**
-    `.\scripts\vps\Fetch-Backups.ps1 -VpsHost <old address>`, from the
+    `.\scripts\vps\Fetch-Backups.ps1 -VpsHost play.thornswood.net`, from the
     repository folder itself, not a worktree (it stops in one). It lands in
     `local\backups` there and is opened to check it.
 13. **Put it back:** `.\scripts\vps\Restore-Box.ps1 -Backup <the backup from step 12>`,
@@ -299,13 +303,16 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     lacks and whether this machine has the bytes; the same two without `-Check`
     send them. For any this machine does not have, bring the old box's copy
     down first with
-    `scp -r Administrator@<old address>:C:/Thornswood-Docs/feed/assets "C:\Thornswood-Repo\temp\move\feed-assets"`
+    `scp -r Administrator@play.thornswood.net:C:/Thornswood-Docs/feed/assets "C:\Thornswood-Repo\temp\move\feed-assets"`
     (and `feed-dev/assets` for the dev feed) and add
     `-AssetDir "C:\Thornswood-Repo\temp\move\feed-assets"`. Then
     `.\scripts\release\Publish-Installer.ps1` puts the installer from the last
     package build back on the site.
 18. **The name:** in Patrick's Cloudflare login, point the A records for
-    `thornswood.net` and `www` at the new address. Leave them Proxied when
+    `thornswood.net` and `www` at the new address, and `play` too, which
+    stays DNS only (the grey cloud) because the game port is UDP and the
+    free plan cannot proxy it. From the moment `play` changes, every launcher,
+    the game and every script on every machine reach the new box. Leave them Proxied when
     Caddy's certificate came back with the restore (`C:\Thornswood-Caddy\data`
     holds `certificates`); otherwise set them to DNS only for now, because with
     SSL/TLS on Full (strict) Cloudflare refuses a box with no certificate yet,
@@ -369,31 +376,23 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
 
 ### Moving everybody
 
-26. **Everybody's launcher:** `.\scripts\ops\Set-Server.ps1 -Address <new address>`.
-    It checks the new box answers, then moves this machine's launcher and the
-    feed every other launcher reads. Then tell people in Discord it is back.
+26. **Everybody's launcher** follows the name, so nothing is sent to
+    anybody: step 18 moved it. On this machine, delete the file from step 3
+    so it reaches the box by its name again, then
+    `.\scripts\vps\Setup-SshKey.ps1`, which writes the Host block and the
+    known_hosts line for the name with the new box's key. Every other machine
+    that reaches the box over ssh runs it once too. Then tell people in
+    Discord it is back.
 27. **The repository:** take the old box's fingerprints out of `hostKeys`,
-    then commit what Set-Vps and step 3 changed on this branch, push it, open
+    then commit what step 3 changed on this branch, push it, open
     a pull request and merge it once `Launcher builds` is green.
 28. **The version:** `.\scripts\release\Bump-Version.ps1` through its own pull
     request, merged on green.
-29. **A launcher with the new address built in**, so a fresh install is right:
-    a main Ship from a machine that can sign, as Developer-Guide.md says. A move is one
-    of the main releases that does not wait for dev, because the old address
-    is going away:
-    ```powershell
-    .\scripts\release\Ship.ps1 "Thornswood has moved to a new server
-    - The launcher finds the new server by itself after this update, so there is nothing to change on your side.
-    - If it cannot connect straight away, close the launcher and open it again so it picks up the new address."
-    ```
-30. **The watchers on this machine**, last, from a checkout of main that has
-    step 27 in it, because each keeps its own copy of the address:
+29. **The watchers on this machine**, last, from a checkout of main that has
+    step 27 in it, because each keeps its own copy of the pinned keys:
     `.\scripts\vps\Fetch-Backups.ps1 -Schedule` brings the new box's backups
-    here every day. The outside watcher runs on GitHub's runners from its own
-    public repository and asks for the address it was exported with, so
-    `.\scripts\vps\Watch-Outside.ps1 -Export "C:\Thornswood-Repo\temp\watch-outside"`
-    into a clone of that repository, then commit and push it there, and its
-    dns check expects the new box.
+    here every day. The outside watcher asks for the name, so it follows the
+    move by itself.
 
 ## Then leave the old box alone for a week
 
@@ -444,7 +443,7 @@ The steps, in order:
    the people on it: step 3 (the override stands in for it), steps 10 to 12
    (they freeze the real box), step 18 (the name stays on the real box),
    steps 20 to 22 and 24 (a second watchdog, alert poster and build runner
-   would answer for the real ones), and steps 26 to 30 (they move everybody).
+   would answer for the real ones), and steps 26 to 29 (they move everybody).
    Install the bot in step 15 to see it start, then stop it at once
    (`.\scripts\vps\Remote.ps1 "Stop-Service ThornswoodBot"`): it holds the same
    token as the real bot, and two of them answer everything twice. Check the
@@ -514,6 +513,6 @@ and are listed below.
   the crash session included, is still on the page. A session older than 30
   days has no server lines left.
 - Whether the gamemode can write its log at all is at
-  `http://192.135.112.23:3000/thornswood-log.json`, and on 7788 for dev.
+  `http://play.thornswood.net:3000/thornswood-log.json`, and on 7788 for dev.
   `"ok": false` means thornswood.log has stopped, and `why` says what the
   write was refused with.

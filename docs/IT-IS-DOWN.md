@@ -59,14 +59,14 @@ the console, `Set-NetFirewallRule -DisplayName 'Thornswood Web 80','Thornswood W
 then the two records set to DNS only in Cloudflare.
 
 ```powershell
-ssh Administrator@192.135.112.23 'tasklist /fi "imagename eq caddy.exe"'
+ssh Administrator@play.thornswood.net 'tasklist /fi "imagename eq caddy.exe"'
 ```
 
 No `caddy.exe` in that list is the whole answer.
 
 ```powershell
-ssh Administrator@192.135.112.23 'schtasks /end /tn "Thornswood Web"'
-ssh Administrator@192.135.112.23 'schtasks /run /tn "Thornswood Web"'
+ssh Administrator@play.thornswood.net 'schtasks /end /tn "Thornswood Web"'
+ssh Administrator@play.thornswood.net 'schtasks /run /tn "Thornswood Web"'
 ```
 
 **Both of those change the box.** End first, then run: `schtasks /run` on a

@@ -6,7 +6,7 @@ PR #2637 (Refs #2183), squash commit 956c9ad9 on main, adds scripts\vps\Read-Ava
 
 1. On One, from the repository folder (not a worktree, so Where.ps1 Backups is the real local\backups), on main at 956c9ad9 or later: .\scripts\vps\Watch-Outside.ps1 -Install. The running task uses the installed copy at %LOCALAPPDATA%\Thornswood\Watch-Outside\Watch-Outside.ps1, which on 17 Oct still had no Check-OffBox. This also finishes step 1 of 2183-offbox-check.md. Expect the first hourly run to say whether the newest copy in local\backups is over 26 hours old; if it is, run .\scripts\vps\Fetch-Backups.ps1 as that note says.
 2. Start the baseline: run the reader on the box's C:\Thornswood-Watch\alerts.jsonl. Either copy it down first and read the copy on One:
-       scp Administrator@192.135.112.23:C:/Thornswood-Watch/alerts.jsonl $env:TEMP\alerts.jsonl
+       scp Administrator@play.thornswood.net:C:/Thornswood-Watch/alerts.jsonl $env:TEMP\alerts.jsonl
        .\scripts\vps\Read-Availability.ps1 -Path $env:TEMP\alerts.jsonl -NoPause
        Remove-Item $env:TEMP\alerts.jsonl
    or copy the script to the box and run it there with no -Path. The date and time of this first run is the start of the baseline.

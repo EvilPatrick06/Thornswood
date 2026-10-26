@@ -207,7 +207,7 @@ application id (`Config.cs:DiscordAppId`).
   "launcherVersion": "1.1.95",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/591560398",
   "launcherSha256": "8dc36e32eb3dde35691e7a68e46195c6354968c3ea01585d03eb53289dca3070",
-  "serverAddress": "192.135.112.23",
+  "serverAddress": "play.thornswood.net",
   "serverPort": "7777",
   "message": "",
   "packs": [
@@ -471,7 +471,7 @@ its card; the note is on its News tab as before. After it, version.json is:
   "launcherVersion": "1.1.103", "minLauncher": "1.1.103",
   "launcherUrl": "https://thornswood.net/feed/assets/<sha256>", "launcherSha256": "<sha256>",
   "launcherInputs": "<sha256>",
-  "serverAddress": "192.135.112.23", "serverPort": "7777", "voicePort": "7778",
+  "serverAddress": "play.thornswood.net", "serverPort": "7777", "voicePort": "7778",
   "voiceUrl": "https://thornswood.net/voice", "updateFeedUrl": "https://thornswood.net/feed/version.json",
   "collectionUrl": "...", "collectionRevision": 1, "maxOnline": 25,
   "discordAppId": "...", "siteUrl": "https://thornswood.net", "presenceImage": "...",

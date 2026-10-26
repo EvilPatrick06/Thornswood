@@ -13,10 +13,12 @@
        vps.json.
     3. The address, from vps.json, is in no tracked file outside the one
        place, except what cannot read vps.json at run time: the launcher's
-       default (Config.cs, config.example.json) and the four game plugins
-       that check whose server they are on, which Set-Vps.ps1 rewrites. Prose
-       (the .md files and the site's board) may name it. Those baked copies
-       must say the same address as vps.json.
+       default (Config.cs, config.example.json) and the game plugin that
+       checks whose server it is on. Prose (the .md files and the site's
+       board) may name it. Those baked copies must say the same address as
+       vps.json. Since #3690 that address is the game's own name, never the
+       box's address, and the box's address (what the name resolves to now)
+       is in no tracked file at all, prose included.
     4. Vps.ps1 resolves the same address with an empty default and with an
        explicit override (the fill pattern every script uses).
     5. Per machine: THORNSWOOD_VPS_LOCAL or %LOCALAPPDATA%\Thornswood\vps.json
@@ -136,8 +138,6 @@ $baked = @(
     # The whose-game gate's one copy (#485); the other plugins read it from front.
     'game/plugins/thornswood-front.js'
 )
-# Prose that names the box for a person reading it.
-$prose = @('site/data/board.json')
 
 Push-Location $Repo
 try {
@@ -146,6 +146,9 @@ try {
     $ErrorActionPreference = $old
 } finally { Pop-Location }
 Yes 'vps.json is among the files carrying the address' ($carriers -contains 'scripts/vps/vps.json')
+# Prose that names the box for a person reading it: the .md files, and the
+# site's copy of the board, a record of what was said.
+$prose = @('site/data/board.json')
 $outside = @($carriers | Where-Object {
         $_ -ne 'scripts/vps/vps.json' -and $baked -notcontains $_ -and $prose -notcontains $_ -and $_ -notmatch '\.md$'
     })
@@ -154,6 +157,28 @@ foreach ($u in $outside) { Write-Host "  hardcoded: $u" -ForegroundColor Red }
 $drifted = @($baked | Where-Object { $carriers -notcontains $_ })
 Yes 'every baked copy says the address vps.json says, so they have not drifted apart' ($drifted.Count -eq 0)
 foreach ($d in $drifted) { Write-Host "  not $($expectedAddress): $d" -ForegroundColor Red }
+
+# #3690: the repository is going public, so what vps.json holds is a name, and
+# the box's address is written nowhere. Which address that is gets asked of
+# DNS here, so this file does not name it either.
+$parsedIp = $null
+Yes ('vps.json''s address is a name, not an IP address (' + $expectedAddress + ')') (-not [Net.IPAddress]::TryParse($expectedAddress, [ref]$parsedIp))
+$boxAddresses = @()
+$dnsSaid = ''
+try { $boxAddresses = @([Net.Dns]::GetHostAddresses($expectedAddress) | ForEach-Object { $_.IPAddressToString }) } catch { $dnsSaid = $_.Exception.Message }
+Yes ('the name resolves, so the launcher, the game and the scripts can reach the box by it' + $(if ($dnsSaid) { ' (' + $dnsSaid + ')' } else { '' })) ($boxAddresses.Count -gt 0)
+$naming = @()
+Push-Location $Repo
+try {
+    foreach ($a in $boxAddresses) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $naming += @(git grep -F -l -e $a 2>$null | ForEach-Object { ([string]$_).Replace('\', '/') })
+        $ErrorActionPreference = $old
+    }
+} finally { Pop-Location }
+$naming = @($naming | Sort-Object -Unique)
+Yes ('no tracked file names the box''s address (' + $naming.Count + ' do)') ($boxAddresses.Count -gt 0 -and $naming.Count -eq 0)
+foreach ($n in $naming) { Write-Host "  names the box's address: $n" -ForegroundColor Red }
 
 # ---- 4. fill pattern: empty default vs explicit -Vps -----------------------
 . $VpsPs1
