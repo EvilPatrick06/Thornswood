@@ -4382,7 +4382,25 @@ const GIVEUP_MS = 300000;
 const FACE_SEEN_MS = 150000;
 const FACE_CAP_MS = 1800000;
 
-const firstSeen = new Map();
+/*
+  WHO IS IN THE WORLD, AND SINCE WHEN: actorId -> the time the chargen tick
+  first saw them online this session. Its first sight is the login, and the
+  per-session hook rides on it (chargenTick).
+
+  ON globalThis, SO A HOT RELOAD IS NOT A LOGIN (#3154). A reload runs this
+  file again in a fresh module (requireTemp in the fork's gamemodeLoad.ts),
+  and while this was a const of the module every reload emptied it. So every
+  gamemode deploy logged in again everybody on: the login hook ran for each
+  of them (their profession said again, the known spells and the K panel
+  sent again), and somebody in the hall read as a reconnect, which starts
+  the creation wait over. Measured by tests\test-3154-login-restore.js, which
+  runs the whole file and reloads it under a character in the world. The
+  needs block already keeps who has arrived on globalThis for the same
+  reason. A restart is a new process, so everybody is new again, which is
+  right: they all log in again.
+*/
+if (!(globalThis.__thornswoodFirstSeen instanceof Map)) { globalThis.__thornswoodFirstSeen = new Map(); }
+const firstSeen = globalThis.__thornswoodFirstSeen;
 
 /* Skyrim Unbound's own character generation room, which is where a new game
  * already puts everybody, and the marker it stands them on. Falling back to the
@@ -5149,10 +5167,10 @@ function setChargen(actorId, state) {
   kept spamming the same message every like 5 seconds". The old creation line
   was said from the choosing reminder, which runs on a timer and runs again
   straight away every time the tick sees somebody afresh (a reconnect, a drop
-  out of onlinePlayers, a hot reload emptying firstSeen). A line that rides a
-  timer or a first sighting repeats; a line that rides a stage change should
-  not, but only while the stage write sticks, and chargenTick re-reads the
-  record every 500 ms.
+  out of onlinePlayers, and until #3154 a hot reload emptying firstSeen). A
+  line that rides a timer or a first sighting repeats; a line that rides a
+  stage change should not, but only while the stage write sticks, and
+  chargenTick re-reads the record every 500 ms.
 
   So the step is written on the record (told) BEFORE the line goes, and the
   line goes only when the record read back says so. A step already told is
@@ -51849,8 +51867,11 @@ return module.exports;
 
   /*
     SOMEBODY HAS COME INTO THE WORLD (#1642): the K panel's view, worked out
-    now. Called from the chargen tick's first sight of them after a load or a
-    login, the hook the spells and the clothes ride on.
+    now. Called from the chargen tick's first sight of them after a server
+    start or a login, the hook the spells and the clothes ride on. A hot
+    reload is neither (#3154): the running effects' state is on globalThis
+    (__thornswoodPerkState, __thornswoodManeuverState), so the view they
+    were last sent still holds.
 
     The view is kept on the character, and the map the client applies is in
     it (effects): the tree, what the needs take off, and what a running
@@ -63149,13 +63170,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       standing in a fire moved the meter barely a point in ten seconds, which
       is the whole of "fire is still not changing temp".
     */
-    var target = warmthTarget(actorId, n);
-    var half = (target > n.temp)
-      ? (NEEDS.settleWarmMinutes || NEEDS.settleMinutes)
-      : NEEDS.settleMinutes;
-    var k = 1 - Math.pow(0.5, (hours * 60) / half);
-    if (k > 1) { k = 1; }
-    if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
+    /*
+      THE TIME AWAY MOVES NO TEMPERATURE (#3154). On an arrival the place in
+      n is still the one they logged out in, and they were not standing in it
+      while they were gone: the same reason the cold band above does not
+      speed the clocks for the time away, and the time away gains no rest
+      (#1764). Until this, the whole time away was settled toward that place,
+      so somebody who logged out at 45 in the snow at night came back six
+      hours later at 10, freezing, with the cold band on both clocks and the
+      chill's hour already counting (tests\test-3154-login-restore.js). They
+      come back at the temperature they left with, and it moves from there
+      toward wherever they stand now, from their game's first /place.
+    */
+    if (!arriving) {
+      var target = warmthTarget(actorId, n);
+      var half = (target > n.temp)
+        ? (NEEDS.settleWarmMinutes || NEEDS.settleMinutes)
+        : NEEDS.settleMinutes;
+      var k = 1 - Math.pow(0.5, (hours * 60) / half);
+      if (k > 1) { k = 1; }
+      if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
+    }
 
     // A night in a bed, on top of the time away settled above (#1606).
     // Three ales or more still counting when they left (#1382).
