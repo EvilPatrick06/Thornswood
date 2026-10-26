@@ -1,100 +1,151 @@
 using System;
 using System.IO;
-using System.Text;
-using System.Windows;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace Thornswood
 {
     /// <summary>
-    /// Menu theme for the launcher. WPF MediaPlayer needs Windows Media Player
-    /// / the Media Feature Pack. On the ship PC that pack is missing, so Open
-    /// succeeds and Play fails with "Windows Media Player version 10 or later
-    /// is required." Mixer then shows no Thornswood.exe audio. Voice already
-    /// works through WebView2 on the same machine, so the theme plays in a
-    /// separate hidden WebView2 with HTML5 audio. Voice's host and WebView2
-    /// instance are never touched.
+    /// Menu theme for the launcher, played by the launcher's own process.
     ///
-    /// The page is a real file next to the track under Profile\Music. A
-    /// NavigateToString document cannot load a file:// audio src (Chromium
-    /// blocks it); that showed up in launcher.log as "HTML5 audio failed"
-    /// after the ApplicationIdle deferral fixed the earlier event-loop error.
-    /// Autoplay uses WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS so play() works in a hidden host.
+    /// Windows' Volume Mixer lists sound by the process that plays it. Until
+    /// #3207 the theme played as HTML5 audio in a hidden WebView2, and WebView2
+    /// renders its sound in its own msedgewebview2.exe processes, so the mixer
+    /// showed "Microsoft Edge WebView2" with Edge's icon, or nothing that said
+    /// Thornswood, and turning the theme down there meant turning down every
+    /// WebView2 program on the machine. WebView2 has no setting for this:
+    /// github.com/MicrosoftEdge/WebView2Feedback/issues/2236, open since
+    /// March 2022.
+    ///
+    /// So the theme is decoded here, by NLayer (a managed MP3 decoder, MIT,
+    /// embedded like the WebView2 files, THIRD-PARTY.md), and handed to
+    /// waveOut, which every Windows has. The sound then belongs to
+    /// Thornswood.exe: the mixer shows the launcher's own entry, and this
+    /// build names it ("Thornswood" or "Thornswood Dev", with the build's own
+    /// icon) on its own audio session. The WPF MediaPlayer that came before
+    /// WebView2 needed the Windows Media component the ship PC does not have
+    /// ("Windows Media Player version 10 or later is required"), and Media
+    /// Foundation is missing on N editions without the Media Feature Pack;
+    /// neither is used.
+    ///
+    /// The Settings slider scales the samples, so it and the mixer's slider
+    /// are two separate controls, the way they are for any program.
     /// </summary>
     static class MenuMusic
     {
-        const string HostFile = "menu-music-host.html";
+        const string DecoderDll = "NLayer.dll";
 
-        static Microsoft.Web.WebView2.Wpf.WebView2 view;
-        static Window host;
-        static bool ready;
+        static Playback playback;
         static bool wantPlay;
         static double wantVol = 0.5;
         static string trackPath;
+        static string mixerName = "Thornswood";
+        static string mixerIcon;
         static Action<string> log;
+        static bool hooked;
 
         /// <summary>
-        /// Bumped every time the browser is made or closed, so an answer from
-        /// the browser that was closed (its environment arriving late, say)
-        /// finds it is no longer the current one and does nothing.
-        /// </summary>
-        static int generation;
-
-        /// <summary>
-        /// How many times the browser has been made this session, and closed.
+        /// How many times the playback has been made this session, and closed.
         /// For tests\test-963-perf-settings.ps1 and the log line.
         /// </summary>
         public static int Opened, Closed;
 
         /// <summary>
-        /// Remembers the track and the volume. The browser itself is made the
-        /// first time Decide asks for the music, not here: a launcher that
-        /// starts while the game runs, or with the music off in Settings,
-        /// never makes one at all.
+        /// Remembers the track, the volume and what the mixer calls this
+        /// build. The playback itself is made the first time Decide asks for the
+        /// music, not here: a launcher that starts while the game runs, or
+        /// with the music off in Settings, never makes one at all.
         /// </summary>
-        public static void Start(string file, double volume, Action<string> say)
+        public static void Start(string file, double volume, string name, string icon, Action<string> say)
         {
             log = say;
             trackPath = file;
             wantVol = Clamp(volume);
-            try { Voice.Prepare(); }
-            catch (Exception ex)
-            {
-                Stamp("Menu music: WebView2 path did not start (" + ex.Message + ")");
-            }
-        }
-
-        static void Open()
-        {
-            try { Begin(); }
-            catch (Exception ex)
-            {
-                Stamp("Menu music: WebView2 path did not start (" + ex.Message + ")");
-            }
+            if (!string.IsNullOrEmpty(name)) mixerName = name;
+            mixerIcon = icon;
+            Hook();
         }
 
         /// <summary>
-        /// Closes the browser that plays the theme, which ends its own WebView2
-        /// processes (it has a profile folder of its own, MusicBrowser, so none
-        /// of voice's). Called when the game starts. Patrick, 28 September
-        /// (#963): the paused browser stayed alive for the whole session, a
-        /// second Chromium sitting beside the game doing nothing. Decide makes
-        /// a new one when the music is wanted again after the game closes.
-        /// Safe to call any time, as often as wanted.
+        /// Hands the CLR the decoder out of this exe's resources. Installed
+        /// before anything touches an NLayer type: the CLR binds an assembly
+        /// the first time a method using it is compiled, and only Playback's
+        /// methods use it.
+        /// </summary>
+        static void Hook()
+        {
+            if (hooked) return;
+            hooked = true;
+            AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs e)
+            {
+                if (new AssemblyName(e.Name).Name != "NLayer") return null;
+                try
+                {
+                    using (Stream st = Assembly.GetExecutingAssembly().GetManifestResourceStream(DecoderDll))
+                    {
+                        if (st == null) { Stamp("Menu music: " + DecoderDll + " is not embedded in this build"); return null; }
+                        var ms = new MemoryStream();
+                        st.CopyTo(ms);
+                        return Assembly.Load(ms.ToArray());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Stamp("Menu music: could not load " + DecoderDll + " (" + ex.Message + ")");
+                    return null;
+                }
+            };
+        }
+
+        /// <summary>
+        /// Stops the theme and closes its sound output. Called when the game
+        /// starts: Patrick, 28 September (#963), nothing of the launcher's
+        /// music stays open beside the game. Decide makes a new playback when
+        /// the music is wanted again after the game closes. Safe to call any
+        /// time, as often as wanted.
         /// </summary>
         public static void Close()
         {
             wantPlay = false;
-            if (view == null && host == null) return;
-            generation++;
-            ready = false;
-            var v = view;
-            var h = host;
-            view = null;
-            host = null;
-            try { if (v != null) v.Dispose(); } catch (Exception ex) { Swallow.Note("MenuMusic.Close, view", ex); }
-            try { if (h != null) h.Close(); } catch (Exception ex) { Swallow.Note("MenuMusic.Close, host", ex); }
+            if (playback == null) return;
+            var p = playback;
+            playback = null;
+            p.Stop();
             Closed++;
-            Stamp("Menu music: closed its browser while the game runs");
+            Stamp("Menu music: closed its sound output while the game runs");
+        }
+
+        /// <summary>
+        /// Plays or pauses the theme. A pause keeps the output open, so coming
+        /// back from a minimised window is instant; only Close ends it. When
+        /// the music is wanted and there is no playback (the first time, or
+        /// after the game closed), one is made and starts at once.
+        /// </summary>
+        public static void Decide(bool play, double volume)
+        {
+            wantPlay = play;
+            wantVol = Clamp(volume);
+            if (play && playback == null) { Open(); return; }
+            if (playback != null) playback.Set(wantPlay, wantVol);
+        }
+
+        static void Open()
+        {
+            if (string.IsNullOrEmpty(trackPath)) return;
+            try
+            {
+                var p = new Playback(trackPath, mixerName, mixerIcon);
+                p.Set(wantPlay, wantVol);
+                playback = p;
+                Opened++;
+                p.Begin();
+            }
+            catch (Exception ex)
+            {
+                playback = null;
+                Stamp("Menu music: did not start (" + ex.Message + ")");
+            }
         }
 
         static double Clamp(double v)
@@ -110,251 +161,329 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Writes the HTML5 host beside the track so the audio src is a same-
-        /// folder relative name. Returns the host path, or null on failure.
+        /// One open sound output and the thread that feeds it. The thread owns
+        /// the decoder and every waveOut call; the shell only sets what it
+        /// wants and wakes it. Stop does not wait for the thread: it lets go of
+        /// the device on its own, so the window never waits on a sound driver.
         /// </summary>
-        static string PlaceHost(string trackFile)
+        sealed class Playback
         {
-            try
+            // Four buffers of a tenth of a second: a volume change is heard
+            // within about 0.4 s, and a busy launcher has 0.3 s to spare
+            // before the theme stutters.
+            const int Buffers = 4;
+            const int FramesPerBuffer = 4410;
+
+            readonly string path, name, icon;
+            readonly AutoResetEvent done = new AutoResetEvent(false);
+            readonly AutoResetEvent wake = new AutoResetEvent(false);
+            volatile bool play, stop;
+            double vol;
+
+            public Playback(string path, string name, string icon)
             {
-                string dir = Path.GetDirectoryName(trackFile);
-                if (string.IsNullOrEmpty(dir)) return null;
-                Directory.CreateDirectory(dir);
-                string name = Path.GetFileName(trackFile);
-                // Attribute-safe: our track names are plain ASCII.
-                string safe = name.Replace("&", "&amp;").Replace("\"", "&quot;").Replace("'", "&#39;");
-                string html =
-                    "<!doctype html><html><head><meta charset='utf-8'></head>" +
-                    "<body style='background:#000;margin:0'>" +
-                    "<audio id='a' loop preload='auto' src='" + safe + "'></audio>" +
-                    "<script>" +
-                    "const a=document.getElementById('a');" +
-                    "window.chrome.webview.addEventListener('message',ev=>{" +
-                    "try{const m=JSON.parse(ev.data);" +
-                    "if(m.cmd==='vol')a.volume=Math.max(0,Math.min(1,+m.v||0));" +
-                    "if(m.cmd==='play'){a.volume=Math.max(0,Math.min(1,+m.v||0));" +
-                    "a.play().then(()=>{}).catch(err=>window.chrome.webview.postMessage('playfail:'+String(err&&err.message||err)));}" +
-                    "if(m.cmd==='pause')a.pause();" +
-                    "}catch(err){/*ignore*/}" +
-                    "});" +
-                    "a.addEventListener('error',()=>{" +
-                    "var c=(a.error&&a.error.code)||0;" +
-                    "window.chrome.webview.postMessage('err:'+c);" +
-                    "});" +
-                    "a.addEventListener('playing',()=>window.chrome.webview.postMessage('ok'));" +
-                    "</script></body></html>";
-                string path = Path.Combine(dir, HostFile);
-                File.WriteAllText(path, html, new UTF8Encoding(false));
-                return path;
+                this.path = path;
+                this.name = name;
+                this.icon = icon;
             }
-            catch (Exception ex)
+
+            public void Set(bool play, double volume)
             {
-                Stamp("Menu music: could not write the host page (" + ex.Message + ")");
-                return null;
+                Interlocked.Exchange(ref vol, volume);
+                this.play = play;
+                wake.Set();
             }
-        }
 
-        static void Begin()
-        {
-            if (view != null) return;
-            if (string.IsNullOrEmpty(trackPath)) return;
-
-            string hostPath = PlaceHost(trackPath);
-            if (hostPath == null) return;
-
-            // This browser's own handles. Everything below that runs later
-            // (the environment arriving, the page loading) checks it is still
-            // the current one first: Close may have come in between.
-            int gen = ++generation;
-            Opened++;
-            var h = new Window
+            public void Stop()
             {
-                Width = 64,
-                Height = 64,
-                ShowInTaskbar = false,
-                WindowStyle = WindowStyle.None,
-                ShowActivated = false,
-                Visibility = Visibility.Hidden,
-                Title = "Thornswood music"
-            };
-            var v = new Microsoft.Web.WebView2.Wpf.WebView2();
-            host = h;
-            view = v;
-            h.Content = v;
-            h.Left = -10000;
-            h.Top = -10000;
-            // Shown offscreen then hidden so the control actually creates its
-            // browser (same pattern as Voice).
-            h.Show();
-            h.Hide();
+                stop = true;
+                wake.Set();
+            }
 
-            string pageUri = new Uri(hostPath).AbsoluteUri;
-
-            v.CoreWebView2InitializationCompleted += delegate (
-                object s,
-                Microsoft.Web.WebView2.Core.CoreWebView2InitializationCompletedEventArgs e)
+            public void Begin()
             {
+                var t = new Thread(Run);
+                t.IsBackground = true;
+                t.Name = "Menu music";
+                t.SetApartmentState(ApartmentState.MTA);
+                t.Start();
+            }
+
+            void Run()
+            {
+                NLayer.MpegFile file = null;
+                IntPtr dev = IntPtr.Zero;
+                var heads = new IntPtr[Buffers];
+                var datas = new IntPtr[Buffers];
+                bool paused = false;
                 try
                 {
-                    if (gen != generation) return;
-                    if (!e.IsSuccess || v.CoreWebView2 == null)
+                    file = new NLayer.MpegFile(path);
+                    int channels = file.Channels;
+                    int rate = file.SampleRate;
+                    int bytes = FramesPerBuffer * channels * 2;
+
+                    var fmt = new WaveFormat
                     {
-                        string detail = e.InitializationException == null
-                            ? "no reason given"
-                            : e.InitializationException.Message;
-                        Stamp("Menu music: WebView2 failed to initialise (" + detail + ")");
+                        Tag = 1,
+                        Channels = (short)channels,
+                        Rate = rate,
+                        BytesPerSecond = rate * channels * 2,
+                        BlockAlign = (short)(channels * 2),
+                        Bits = 16,
+                        Extra = 0
+                    };
+                    int r = waveOutOpen(out dev, WaveMapper, ref fmt, done.SafeWaitHandle.DangerousGetHandle(), IntPtr.Zero, CallbackEvent);
+                    if (r != 0)
+                    {
+                        dev = IntPtr.Zero;
+                        Stamp("Menu music: Windows would not open a sound output (waveOutOpen " + r + ")");
                         return;
                     }
+                    MixerEntry.Name(name, icon, Stamp);
 
-                    var core = v.CoreWebView2;
-                    core.WebMessageReceived += delegate (
-                        object s2,
-                        Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs a)
+                    var floats = new float[FramesPerBuffer * channels];
+                    var pcm = new short[FramesPerBuffer * channels];
+                    for (int i = 0; i < Buffers; i++)
                     {
-                        try
-                        {
-                            string msg = a.TryGetWebMessageAsString();
-                            if (msg == null) return;
-                            if (msg == "ok")
-                                Stamp("Menu music: the theme is on (WebView2), from " + trackPath);
-                            else if (msg.StartsWith("err", StringComparison.Ordinal))
-                                Stamp("Menu music: HTML5 audio failed for " + trackPath + " (" + msg + ")");
-                            else if (msg.StartsWith("playfail", StringComparison.Ordinal))
-                                Stamp("Menu music: play() refused (" + msg + ")");
-                        }
-                        catch (Exception ex) { Swallow.Note("MenuMusic.WebMessageReceived", ex); }
-                    };
+                        datas[i] = Marshal.AllocHGlobal(bytes);
+                        heads[i] = Marshal.AllocHGlobal(HeaderSize);
+                        var h = new WaveHeader { Data = datas[i], Length = bytes };
+                        Marshal.StructureToPtr(h, heads[i], false);
+                        r = waveOutPrepareHeader(dev, heads[i], HeaderSize);
+                        if (r != 0) { Stamp("Menu music: waveOutPrepareHeader " + r); return; }
+                    }
 
-                    // Apply only after the page script is listening; a play
-                    // message posted during Navigate is dropped.
-                    core.NavigationCompleted += delegate (
-                        object s3,
-                        Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs nav)
+                    if (!play) { waveOutPause(dev); paused = true; }
+                    for (int i = 0; i < Buffers; i++)
                     {
-                        try
-                        {
-                            if (gen != generation) return;
-                            if (!nav.IsSuccess)
-                            {
-                                Stamp("Menu music: host page did not load");
-                                return;
-                            }
-                            ready = true;
-                            Apply();
-                        }
-                        catch (Exception ex) { Swallow.Note("MenuMusic.NavigationCompleted", ex); }
-                    };
+                        if (!Fill(file, floats, pcm, heads[i], datas[i])) return;
+                        r = waveOutWrite(dev, heads[i], HeaderSize);
+                        if (r != 0) { Stamp("Menu music: waveOutWrite " + r); return; }
+                    }
+                    Stamp("Menu music: the theme is on, from " + path);
 
-                    core.Navigate(pageUri);
+                    var waits = new WaitHandle[] { done, wake };
+                    while (true)
+                    {
+                        WaitHandle.WaitAny(waits);
+                        if (stop) return;
+                        if (play == paused)
+                        {
+                            if (play) waveOutRestart(dev); else waveOutPause(dev);
+                            paused = !play;
+                        }
+                        for (int i = 0; i < Buffers; i++)
+                        {
+                            if ((Marshal.ReadInt32(heads[i], FlagsAt) & HeaderDone) == 0) continue;
+                            if (!Fill(file, floats, pcm, heads[i], datas[i])) return;
+                            r = waveOutWrite(dev, heads[i], HeaderSize);
+                            if (r != 0) { Stamp("Menu music: waveOutWrite " + r); return; }
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Stamp("Menu music: " + ex.Message);
+                    Stamp("Menu music: stopped (" + ex.Message + ")");
                 }
-            };
-
-            if (!Voice.EnsureLoader(Stamp))
-            {
-                Stamp("Menu music: WebView2Loader.dll is not beside the exe");
-                return;
-            }
-
-            string profile = Path.Combine(Paths.ProfileDir, "MusicBrowser");
-            try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("MenuMusic.CreateProfile", ex); }
-
-            // Hidden host has no user gesture. CoreWebView2EnvironmentOptions
-            // with AdditionalBrowserArguments makes CreateAsync fault on the
-            // ship PC (launcher.log: "no WebView2 runtime") while Voice's
-            // null-options CreateAsync succeeds on the same run. Set the
-            // documented WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS env var instead,
-            // then create the environment the same way Voice does.
-            try
-            {
-                string key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
-                string cur = Environment.GetEnvironmentVariable(key);
-                string flag = "--autoplay-policy=no-user-gesture-required";
-                if (string.IsNullOrEmpty(cur))
-                    Environment.SetEnvironmentVariable(key, flag);
-                else if (cur.IndexOf("autoplay-policy", StringComparison.OrdinalIgnoreCase) < 0)
-                    Environment.SetEnvironmentVariable(key, cur + " " + flag);
-            }
-            catch (Exception ex)
-            {
-                Stamp("Menu music: could not set autoplay env (" + ex.Message + ")");
-            }
-
-            var envTask = Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
-                null, profile, null);
-
-            envTask.ContinueWith(delegate (
-                System.Threading.Tasks.Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment> t)
-            {
-                if (t.IsFaulted)
+                finally
                 {
-                    string why = "unknown";
-                    try
+                    if (dev != IntPtr.Zero)
                     {
-                        if (t.Exception != null)
-                            why = t.Exception.GetBaseException().Message;
+                        // Reset hands every queued buffer back, so each can be
+                        // unprepared and freed before the device closes.
+                        waveOutReset(dev);
+                        for (int i = 0; i < Buffers; i++)
+                            if (heads[i] != IntPtr.Zero) waveOutUnprepareHeader(dev, heads[i], HeaderSize);
+                        waveOutClose(dev);
                     }
-                    catch (Exception ex) { Swallow.Note("MenuMusic.CreateAsyncFault", ex); }
-                    Stamp("Menu music: WebView2 environment failed (" + why + "); trying default");
-                    h.Dispatcher.BeginInvoke(new Action(delegate
+                    for (int i = 0; i < Buffers; i++)
                     {
-                        if (gen != generation) return;
-                        try { v.EnsureCoreWebView2Async(); }
-                        catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
-                    }));
-                    return;
+                        if (heads[i] != IntPtr.Zero) Marshal.FreeHGlobal(heads[i]);
+                        if (datas[i] != IntPtr.Zero) Marshal.FreeHGlobal(datas[i]);
+                    }
+                    // The two events are left to the collector: the shell may
+                    // still Set wake on a playback whose thread has ended.
+                    if (file != null) { try { file.Dispose(); } catch (Exception ex) { Swallow.Note("MenuMusic.Playback, dispose", ex); } }
                 }
-                if (t.Result == null)
+            }
+
+            /// <summary>
+            /// Decodes the next tenth of a second into one buffer at the
+            /// Settings volume, going back to the start at the end of the
+            /// track, since the theme loops. False when the track gives no
+            /// sound at all, which is said in the log.
+            /// </summary>
+            bool Fill(NLayer.MpegFile file, float[] floats, short[] pcm, IntPtr head, IntPtr data)
+            {
+                int got = 0;
+                bool rewound = false;
+                while (got < floats.Length)
                 {
-                    Stamp("Menu music: WebView2 environment was empty; trying default");
-                    h.Dispatcher.BeginInvoke(new Action(delegate
+                    int n = file.ReadSamples(floats, got, floats.Length - got);
+                    if (n > 0) { got += n; rewound = false; continue; }
+                    if (rewound)
                     {
-                        if (gen != generation) return;
-                        try { v.EnsureCoreWebView2Async(); }
-                        catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
-                    }));
-                    return;
+                        Stamp("Menu music: " + path + " has no sound in it to play");
+                        return false;
+                    }
+                    file.Position = 0;
+                    rewound = true;
                 }
-                h.Dispatcher.BeginInvoke(new Action(delegate
+                double v = Interlocked.CompareExchange(ref vol, 0, 0);
+                for (int i = 0; i < floats.Length; i++)
                 {
-                    // Closed before the environment arrived: nothing to put
-                    // it in, and the browser it would start is not wanted.
-                    if (gen != generation) return;
-                    try { v.EnsureCoreWebView2Async(t.Result); }
-                    catch (Exception ex) { Stamp("Menu music: " + ex.Message); }
-                }));
-            });
+                    double s = floats[i] * v;
+                    if (s > 1) s = 1; else if (s < -1) s = -1;
+                    pcm[i] = (short)(s * 32767);
+                }
+                Marshal.Copy(pcm, 0, data, pcm.Length);
+                int flags = Marshal.ReadInt32(head, FlagsAt);
+                Marshal.WriteInt32(head, FlagsAt, flags & ~HeaderDone);
+                return true;
+            }
         }
 
         /// <summary>
-        /// Plays or pauses the theme. A pause keeps the browser, so coming
-        /// back from a minimised window is instant; only Close ends it. When
-        /// the music is wanted and there is no browser (the first time, or
-        /// after the game closed), one is made and plays once its page is up.
+        /// The name and icon of this process's audio session, which is what
+        /// the Volume Mixer shows for it. Set on the default output for
+        /// programs and for media, the two a waveOut stream can be sent to,
+        /// each time a playback opens. Only this process's own session is
+        /// touched, never another program's.
         /// </summary>
-        public static void Decide(bool play, double volume)
+        static class MixerEntry
         {
-            wantPlay = play;
-            wantVol = Clamp(volume);
-            if (play && view == null) { Open(); return; }
-            Apply();
+            public static void Name(string name, string icon, Action<string> say)
+            {
+                object enumerator = null;
+                try
+                {
+                    enumerator = new MMDeviceEnumeratorCom();
+                    var devices = (IMMDeviceEnumerator)enumerator;
+                    foreach (int role in new[] { RoleConsole, RoleMultimedia })
+                    {
+                        IMMDevice device;
+                        if (devices.GetDefaultAudioEndpoint(DataFlowRender, role, out device) != 0 || device == null) continue;
+                        try
+                        {
+                            Guid iid = typeof(IAudioSessionManager).GUID;
+                            object o;
+                            if (device.Activate(ref iid, ClsCtxAll, IntPtr.Zero, out o) != 0 || o == null) continue;
+                            var manager = (IAudioSessionManager)o;
+                            IAudioSessionControl session;
+                            Guid none = Guid.Empty;
+                            if (manager.GetAudioSessionControl(ref none, 0, out session) == 0 && session != null)
+                            {
+                                Guid context = Guid.Empty;
+                                int a = session.SetDisplayName(name, ref context);
+                                int b = string.IsNullOrEmpty(icon) ? 0 : session.SetIconPath(icon, ref context);
+                                if (a != 0 || b != 0)
+                                    say("Menu music: the mixer entry kept its default name or icon (SetDisplayName " + a + ", SetIconPath " + b + ")");
+                                Marshal.ReleaseComObject(session);
+                            }
+                            Marshal.ReleaseComObject(manager);
+                        }
+                        finally { Marshal.ReleaseComObject(device); }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    say("Menu music: could not name the mixer entry (" + ex.Message + ")");
+                }
+                finally
+                {
+                    if (enumerator != null) Marshal.ReleaseComObject(enumerator);
+                }
+            }
+
+            const int DataFlowRender = 0;
+            const int RoleConsole = 0;
+            const int RoleMultimedia = 1;
+            const int ClsCtxAll = 0x17;
+
+            [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+            class MMDeviceEnumeratorCom { }
+
+            // Each interface lists its methods in vtable order up to the last
+            // one called here.
+            [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IMMDeviceEnumerator
+            {
+                [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
+                [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint);
+            }
+
+            [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IMMDevice
+            {
+                [PreserveSig] int Activate(ref Guid iid, int clsCtx, IntPtr activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object iface);
+            }
+
+            [ComImport, Guid("BFA971F1-4D5E-40BB-935E-967039BFBEE4"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IAudioSessionManager
+            {
+                [PreserveSig] int GetAudioSessionControl(ref Guid sessionGuid, int streamFlags, out IAudioSessionControl session);
+            }
+
+            [ComImport, Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+            interface IAudioSessionControl
+            {
+                [PreserveSig] int GetState(out int state);
+                [PreserveSig] int GetDisplayName(out IntPtr name);
+                [PreserveSig] int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string name, ref Guid eventContext);
+                [PreserveSig] int GetIconPath(out IntPtr path);
+                [PreserveSig] int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string path, ref Guid eventContext);
+            }
         }
 
-        static void Apply()
+        // ------------------------------------------------------------ waveOut
+
+        const int WaveMapper = -1;
+        const int CallbackEvent = 0x00050000;
+        const int HeaderDone = 0x00000001;
+        static readonly int HeaderSize = Marshal.SizeOf(typeof(WaveHeader));
+        static readonly int FlagsAt = (int)Marshal.OffsetOf(typeof(WaveHeader), "Flags");
+
+        [StructLayout(LayoutKind.Sequential, Pack = 2)]
+        struct WaveFormat
         {
-            if (!ready || view == null || view.CoreWebView2 == null) return;
-            try
-            {
-                string v = wantVol.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                if (wantPlay)
-                    view.CoreWebView2.PostWebMessageAsString("{\"cmd\":\"play\",\"v\":" + v + "}");
-                else
-                    view.CoreWebView2.PostWebMessageAsString("{\"cmd\":\"pause\",\"v\":" + v + "}");
-            }
-            catch (Exception ex) { Swallow.Note("MenuMusic.Apply", ex); }
+            public short Tag;
+            public short Channels;
+            public int Rate;
+            public int BytesPerSecond;
+            public short BlockAlign;
+            public short Bits;
+            public short Extra;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct WaveHeader
+        {
+            public IntPtr Data;
+            public int Length;
+            public int Recorded;
+            public IntPtr User;
+            public int Flags;
+            public int Loops;
+            public IntPtr Next;
+            public IntPtr Reserved;
+        }
+
+        [DllImport("winmm.dll")]
+        static extern int waveOutOpen(out IntPtr device, int deviceId, ref WaveFormat format, IntPtr callback, IntPtr instance, int flags);
+        [DllImport("winmm.dll")]
+        static extern int waveOutPrepareHeader(IntPtr device, IntPtr header, int size);
+        [DllImport("winmm.dll")]
+        static extern int waveOutUnprepareHeader(IntPtr device, IntPtr header, int size);
+        [DllImport("winmm.dll")]
+        static extern int waveOutWrite(IntPtr device, IntPtr header, int size);
+        [DllImport("winmm.dll")]
+        static extern int waveOutPause(IntPtr device);
+        [DllImport("winmm.dll")]
+        static extern int waveOutRestart(IntPtr device);
+        [DllImport("winmm.dll")]
+        static extern int waveOutReset(IntPtr device);
+        [DllImport("winmm.dll")]
+        static extern int waveOutClose(IntPtr device);
     }
 }

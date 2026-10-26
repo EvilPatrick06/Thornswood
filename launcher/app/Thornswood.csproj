@@ -37,8 +37,8 @@
     "What this is" lists them.
 
   Nothing goes beside the exe. The update system publishes one file, so the
-  WebView2 DLLs are referenced with Private false (never copied) and travel
-  inside the exe as resources, as they always have.
+  WebView2 DLLs and NLayer (the menu theme's decoder) are referenced with
+  Private false (never copied) and travel inside the exe as resources.
 -->
 <Project ToolsVersion="Current" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
@@ -111,6 +111,12 @@
       <HintPath>..\lib\webview2\Microsoft.Web.WebView2.Wpf.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- The menu theme's MP3 decoder (MenuMusic.cs, #3207), embedded and
+         never copied, the same way as WebView2. -->
+    <Reference Include="NLayer">
+      <HintPath>..\lib\nlayer\NLayer.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
@@ -132,6 +138,7 @@
     <EmbeddedResource Include="..\lib\webview2\Microsoft.Web.WebView2.Core.dll"><LogicalName>Microsoft.Web.WebView2.Core.dll</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\lib\webview2\Microsoft.Web.WebView2.Wpf.dll"><LogicalName>Microsoft.Web.WebView2.Wpf.dll</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\lib\webview2\WebView2Loader.dll"><LogicalName>WebView2Loader.dll</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\lib\nlayer\NLayer.dll"><LogicalName>NLayer.dll</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\voice-host.html"><LogicalName>voice-host.html</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\Thornswood.ini"><LogicalName>Thornswood.ini</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\records\client-build.json"><LogicalName>client-build.json</LogicalName></EmbeddedResource>
@@ -145,7 +152,7 @@
        MSBuild's own error about a file. -->
   <Target Name="ThornswoodCheckInputs" BeforeTargets="BeforeBuild">
     <Error Condition="!Exists('%(EmbeddedResource.FullPath)')" Text="%(EmbeddedResource.Identity) is not in the repository folder where it should be. Every resource is tracked, so the path is wrong; nothing was built." />
-    <Error Condition="!Exists('%(Reference.HintPath)') And '%(Reference.HintPath)' != ''" Text="WebView2 is missing from launcher\lib\webview2: %(Reference.HintPath)" />
+    <Error Condition="!Exists('%(Reference.HintPath)') And '%(Reference.HintPath)' != ''" Text="A library the launcher embeds is missing from launcher\lib: %(Reference.HintPath)" />
     <Error Condition="'$(ThornswoodVersionLine)' == ''" Text="Updater.cs has no Version = &quot;...&quot; line, so the exe would carry no version." />
   </Target>
 

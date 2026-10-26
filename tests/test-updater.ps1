@@ -76,7 +76,7 @@ function Known([string]$what) { Write-Host "KNOWN $what" }
 # ---- the compiler and the references the build uses (Launcher-Csc.ps1) ------
 
 $needed = @($LauncherNeeded)
-$wv2 = @($LauncherWv2Managed)
+$wv2 = @($LauncherLib)
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsupdater-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
@@ -93,9 +93,9 @@ function Run {
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
-        # Where Build-Launcher.ps1 reads them, launcher\lib\webview2, since the
-        # launcher moved out of tools\.
-        $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
+        # Where the project file's HintPath has them, under launcher\lib
+        # (tests\Launcher-Csc.ps1 works the path out).
+        $p = $n
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every one of them is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) (

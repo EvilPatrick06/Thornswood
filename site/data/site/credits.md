@@ -111,7 +111,11 @@ shows every line of it.
 
 **The launcher** carries three files from Microsoft's WebView2 SDK, version
 1.0.2903.40. They give it the browser that voice runs in. Microsoft's licence
-for them is at the bottom of this page.
+for them is at the bottom of this page. It also carries NLayer 3.0.0, by Mark
+Heath, Andrew Ward and contributors, the MP3 decoder it plays its menu theme
+with, under the MIT licence, which is at the bottom of this page too. Its
+source is [on GitHub](https://github.com/naudio/NLayer), at commit
+`046c7ce4`.
 
 **The Thornswood Client Runtime** is Thornswood's own mod on
 [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/192762), and
@@ -197,4 +201,30 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## NLayer licence
+
+```
+MIT License
+
+Copyright (c) 2018 Mark Heath, Andrew Ward & Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```

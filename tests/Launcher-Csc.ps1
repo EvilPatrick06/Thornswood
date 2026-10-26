@@ -12,8 +12,9 @@
     $LauncherLangVersion  the LangVersion launcher\app\Thornswood.csproj says.
     $LauncherNeeded       the framework assemblies it references, as file
                           names (System.dll, PresentationFramework.dll, ...).
-    $LauncherWv2Managed   the WebView2 assemblies it references, as their
-                          file names under launcher\lib\webview2.
+    $LauncherLib          the libraries it references out of launcher\lib
+                          (WebView2's two, and NLayer, the menu theme's
+                          decoder, #3207), as full paths.
     $LauncherRefDir       the .NET Framework 4.8.1 reference assemblies the
                           project builds against, the WPF ones included.
 
@@ -88,15 +89,21 @@ $LauncherLangVersion = $launcherLang.Groups[1].Value.Trim()
 
 # The assemblies the launcher compiles against, read from the same project
 # file: the framework ones as file names (System.dll, ...) for a harness's own
-# lookup, and the WebView2 ones as the file names under launcher\lib\webview2.
+# lookup, and the ones out of launcher\lib by the path each HintPath names.
 # Until the switch these were lists inside Build-Launcher.ps1 ($needed and
 # $wv2Managed), which the harnesses read out of it; the project file is their
-# only home now.
+# only home now. Until #3207 the library list was file names that every
+# harness joined onto launcher\lib\webview2 itself, so a library anywhere
+# else in launcher\lib would have been missing from thirteen harnesses at
+# once; the path is worked out here, once.
 $launcherProjXml = [xml]$launcherProj
 $launcherNs = New-Object Xml.XmlNamespaceManager($launcherProjXml.NameTable)
 $launcherNs.AddNamespace('m', 'http://schemas.microsoft.com/developer/msbuild/2003')
 $LauncherNeeded = @($launcherProjXml.SelectNodes('//m:Reference[not(m:HintPath)]/@Include', $launcherNs) | ForEach-Object { $_.Value.Trim() + '.dll' })
-$LauncherWv2Managed = @($launcherProjXml.SelectNodes('//m:Reference/m:HintPath', $launcherNs) | ForEach-Object { [IO.Path]::GetFileName($_.InnerText.Trim()) })
+$launcherAppDir = Join-Path $PSScriptRoot '..\launcher\app'
+$LauncherLib = @($launcherProjXml.SelectNodes('//m:Reference/m:HintPath', $launcherNs) | ForEach-Object {
+    [IO.Path]::GetFullPath((Join-Path $launcherAppDir ($_.InnerText.Trim() -replace '\\', [IO.Path]::DirectorySeparatorChar)))
+})
 
 function Add-LauncherType {
     param(

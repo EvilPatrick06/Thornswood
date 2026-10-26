@@ -69,7 +69,7 @@ function Yes([string]$what, [bool]$cond) {
 # ---- the compiler and the references the build uses (Launcher-Csc.ps1) ------
 
 $needed = @($LauncherNeeded)
-$wv2 = @($LauncherWv2Managed)
+$wv2 = @($LauncherLib)
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsfeedcond-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
@@ -246,7 +246,7 @@ function Run {
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
-        $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
+        $p = $n
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every reference is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)

@@ -165,8 +165,8 @@ function Run {
     Yes 'the compiler the build runs is on this machine' (Test-Path -LiteralPath $LauncherCsc)
     $refs = @(); $missing = @()
     foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
-    foreach ($n in @($LauncherWv2Managed)) {
-        $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
+    foreach ($n in @($LauncherLib)) {
+        $p = $n
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every reference is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)

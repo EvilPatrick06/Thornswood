@@ -69,14 +69,14 @@ $NewsSha = ('0326733ddbbd921d59a0506d00cdf313cfb422de3263b9958133a37e09984b63')
 # ============================================================================
 if ($ParseFeed) {
     $needed = @($LauncherNeeded)
-    $wv2 = @($LauncherWv2Managed)
+    $wv2 = @($LauncherLib)
 
     Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
     if (-not (Test-Path -LiteralPath $LauncherCsc) -or $needed.Count -eq 0) { Yes 'Thornswood.csproj names the references' $false; Done }
     $refs = @(); $missing = @()
     foreach ($n in $needed) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
     foreach ($n in $wv2) {
-        $p = Join-Path $Repo ('launcher\lib\webview2\' + $n)
+        $p = $n
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every reference is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)

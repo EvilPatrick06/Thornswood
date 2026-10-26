@@ -71,9 +71,10 @@ namespace Thornswood
         /// <summary>
         /// Writes the icon out beside the launcher under a name that changes
         /// only when the artwork does. Returns the path, or null when this
-        /// build carries no icon resource and the exe has to do.
+        /// build carries no icon resource and the exe has to do. The menu
+        /// music's Volume Mixer entry shows the same file (MenuMusic.cs).
         /// </summary>
-        static string IconFile()
+        public static string IconFile()
         {
             try
             {
