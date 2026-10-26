@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "measured": "12 Oct 2026 on the shipping machine, from C:\\Thornswood\\Game (the main install, which took every pack): the files the launcher brought in from our packs that the main record no longer names and Ship-Rules calls another author's. The same 166 files and 67.6 MB the installer left out on 2 Oct (#1178).",
+  "measured": "12 Oct 2026 on the shipping machine, from C:\\Thornswood\\Game (the main install, which took every pack): the files the launcher brought in from our packs that the main record no longer names and Ship-Rules calls another author's, 166 files and 67.6 MB, the same the installer left out on 2 Oct (#1178). The other server's haybale is the 166th and is not here, because no tracked file may name that server (#400): the launcher's Leaks.cs takes it out by its shape and bytes.",
   "files": {
     "Data\\Interface\\racemenu\\bottombar.swf": {
       "sha256": "7b038ff50d71f5fe83a71d59fa12ae335230ffe977dbd0e378ce50d405610db2",
@@ -605,10 +605,6 @@
     "Data\\meshes\\surwhiterunmeshes\\outfitsbyme\\witchoutfitv4.nif": {
       "sha256": "79e738d56865e642c5559d437c0bfb4fd28271dfcb0656c2707af6e7b6ee1125",
       "bytes": 267299
-    },
-    "Data\\meshes\\weapons\\kzl\\kzl_haybale.nif": {
-      "sha256": "88c2739744b8fc951f103eedea30ccfa9a83cc525dfc5d349c56054c7798c6c3",
-      "bytes": 44541
     },
     "Data\\Scripts\\dlc1vcmoondialscript.pex": {
       "sha256": "2d7e95907fbbcb0f77f572de47fbf597d5839a61143fb8991809a5d158db921e",

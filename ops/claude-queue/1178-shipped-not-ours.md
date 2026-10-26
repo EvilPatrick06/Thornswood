@@ -5,7 +5,7 @@
 - **Box:** One (the Steam copy step), then the next dev Ship and the next main Ship.
 - **Needs first:** the pull request merged. Patrick approved the Steam-copy scrub, its removal and the in-game check on 21 Oct (board review #3192).
 
-What changed: `records\shipped-not-ours.json` names the 166 files (67.6 MB) of other authors that our packs shipped until the scrub of 29 Sep, each at the sha256 it had. Publish-Update now puts every one in each release record as `:gone:<path>` at that sha256. The launcher's sync (#1261) deletes such a file only while it still has those bytes and Vortex does not deploy the path, so a copy somebody installed themselves is never touched. No release before this one listed them, so every install the old packs reached still has them, One's main install `C:\Thornswood\Game` included.
+What changed: `records\shipped-not-ours.json` names 165 of the 166 files (67.6 MB) of other authors that our packs shipped until the scrub of 29 Sep, each at the sha256 it had. The 166th, the other server's haybale, cannot be named in any tracked file (#400), so the launcher's `Leaks.cs` takes it out of Thornswood's own folder by its shape and bytes at every start; that part needs the new launcher, which the dev Ship carries. Publish-Update now puts every one in each release record as `:gone:<path>` at that sha256. The launcher's sync (#1261) deletes such a file only while it still has those bytes and Vortex does not deploy the path, so a copy somebody installed themselves is never touched. No release before this one listed them, so every install the old packs reached still has them, One's main install `C:\Thornswood\Game` included.
 
 ## Order and risk
 
@@ -34,8 +34,8 @@ It prints one line per file it found. On 12 Oct the Steam copy still had the two
 
 ## Check afterwards
 
-- The dev record the next dev Ship writes has `:gone:` lines at a 64 hex value for the 166 paths (`Data\meshes\weapons\kzl\kzl_haybale.nif` = `88c27397...`), less any path the release ships.
-- On a dev install that took the old packs, the dev launcher's log says `removed Data\...` for each such file it had, and the files are gone.
+- The dev record the next dev Ship writes has `:gone:` lines at a 64 hex value for the 165 paths of the record (`Data\Scripts\MCM_ConfigBase.pex` = `0bf7f4e5...`), less any path the release ships.
+- On a dev install that took the old packs, the dev launcher's log says `removed Data\...` for each such file it had, and a line that it removed a file another server made, and the files are gone.
 - In game on dev, the check the issue still owes: nothing visible changed (male faces and beards, hoods and robes, the noble end table, travel clothes, the character menu). That needs a human dev client; post it as a Dev test task.
 
 ## Draft release notes

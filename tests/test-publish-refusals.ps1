@@ -152,7 +152,7 @@ try {
                    # Dot-sourced for the signed manifest (#2163); -NoUpload signs nothing.
                    'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-ReleaseCatalog.ps1', 'scripts\release\Sign-OnGitHub.ps1', 'scripts\release\ShippedBytes.ps1', 'scripts\release\Assert-PublishSigned.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json',
+                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json', 'records\shipped-not-ours.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json',
                    # LoadOrder.ps1 compiles the Vortex state reader from the
                    # launcher's source since #1416, and the publish reads the

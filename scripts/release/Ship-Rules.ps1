@@ -1711,10 +1711,12 @@ function Test-ShipNotOurs([string]$rel, [int]$Revision = $ShipCollectionRevision
 # the file, and after the scrub none did. So every install the old packs reached
 # kept them: 166 files, 67.6 MB, on the main install on 12 October, among them
 # old MCM Helper scripts over the collection's newer ones and the other server's
-# haybale. records\shipped-not-ours.json names each with those bytes, and
-# Publish-Update puts every one in the record as gone. The launcher deletes one
-# only while it still has those bytes and Vortex does not deploy the path, so a
-# copy somebody installed themselves is never touched.
+# haybale. records\shipped-not-ours.json names 165 of them with those bytes,
+# and Publish-Update puts every one in the record as gone. The haybale's path
+# would name the other server, which no tracked file may (#400), so the
+# launcher's Leaks.cs takes that one out by its shape and bytes. The launcher
+# deletes one only while it still has those bytes and Vortex does not deploy
+# the path, so a copy somebody installed themselves is never touched.
 #
 # Returns path -> lowercase sha256. Stops, naming them, on a record that does
 # not read, or on a path Ship-Rules does not call another author's: a delete
