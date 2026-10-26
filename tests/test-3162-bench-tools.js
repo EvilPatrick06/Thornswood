@@ -17,8 +17,8 @@
 //   C  mp.onCraft: refused with the sentence and nothing taken with no tool,
 //      made with it, one use off per craft, worn thin at 15 left, and broken
 //      and taken at 50. A plugin missing from the load order asks for nothing.
-//   B  benchGate: the forge stays shut for a smith with no hammer and says
-//      why, and opens with one; the alchemy lab and the arcane enchanter the
+//   B  benchGate: the forge stays shut for a tailor with no shears and says
+//      why, and opens with them; a smith with no hammer gets in to forge one; the alchemy lab and the arcane enchanter the
 //      same with the alembic and the rune knife.
 //   R  recipelessCraft, cutKey and cutMasterKey ask the tool before anything
 //      is taken and wear it after.
@@ -306,12 +306,26 @@ function baseFor(key) {
 attempt('the bench doors', function () {
   const forge = baseFor('88105:Skyrim.esm');
   yes('the forge has a base in BENCH_BY_BASE', !!forge);
-  const r = rig(person('smith', 'edgewright', 'master'));
-  const shut = r.api.benchGate(r.A, forge);
-  yes('B1 a smith with no hammer is turned away from the forge, told which tool and who makes one (' + shut + ')',
-      shut === 'You need a hammer in your pack for that. ' + TOOLS.smith.where);
-  r.give(TOOLS.smith.give, 1);
-  yes('B1 and the forge opens with a hammer in the pack', r.api.benchGate(r.A, forge) === null);
+  // The forge holds the hammer's own row, which asks for no hammer, so a
+  // smith whose hammer broke still gets in to forge another (C1 holds the
+  // refusal of everything else they reach for there).
+  const hammerRow = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].out === TOOLS.smith.give && RECIPES[k].owner === 'Smith'; })[0];
+  yes('B1 the recipe table has the hammer\'s row, a novice Edgewright\'s at the forge (' + hammerRow + ')',
+      !!hammerRow && RECIPES[hammerRow].rank === 'novice' && RECIPES[hammerRow].half === 'Edgewright' &&
+      (BENCH_ACCESS['88105:Skyrim.esm'].rows || []).indexOf(hammerRow) !== -1);
+  const r = rig(person('smith', 'platewright', 'novice'));
+  yes('B1 so a smith with no hammer is let in to the forge, the sister half included',
+      r.api.benchGate(r.A, forge) === null);
+  r.give(ITEMS.charcoalT1, 1);
+  r.give(ITEMS.ironIngot || '5ace4:Skyrim.esm', 1);
+  r.give(lineOf(/^const HANDLE_DESC = '([^']+)'/m).split("'")[1], 1);
+  yes('B1 and forges a hammer there with none in the pack', r.craft(hammerRow) !== false && r.count(TOOLS.smith.give) === 1);
+  const t = rig(person('tailor', 'haberdasher', 'novice'));
+  const shut = t.api.benchGate(t.A, forge);
+  yes('B1 a tailor with no shears is turned away from the forge, told which tool and who makes one (' + shut + ')',
+      shut === 'You need a pair of shears in your pack for that. ' + TOOLS.tailor.where);
+  t.give(TOOLS.tailor.give, 1);
+  yes('B1 and the forge opens with a pair in the pack', t.api.benchGate(t.A, forge) === null);
 
   const lab = baseFor('alchemy');
   const ench = baseFor('enchanting');

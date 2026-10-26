@@ -212,10 +212,13 @@ const atBench = Object.keys(recipes.recipes || {}).concat(Object.keys(recipes.un
 const furnitureDoc = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'furniture.json'), 'utf8').replace(/^\uFEFF/, ''));
 const furnitureOuts = furnitureDoc.pieces.filter((p) => furnitureDoc.limits.types[p.type])
   .map((p) => p.item + ':Thornswood-Content.esp');
-const movedAt = atBench.length - furnitureOuts.length;
-yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, and one for each piece of furniture (' +
-    atBench.length + ', ' + furnitureOuts.length + ' of them furniture)',
-    movedAt === 26 && furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
+// And the cook's wooden ladle (#3162), a woodwright's, written by
+// Add-ContentRecords.py at the same bench.
+const ladles = atBench.filter((r) => r.editorId === 'ThornswoodRecipeToolLadle');
+const movedAt = atBench.length - furnitureOuts.length - ladles.length;
+yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, one for each piece of furniture and the ladle (' +
+    atBench.length + ', ' + furnitureOuts.length + ' of them furniture, ' + ladles.length + ' ladle)',
+    movedAt === 26 && ladles.length === 1 && furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
     atBench.every((r) => r.benchName === 'ThornswoodCraftingWoodworking'));
 const bbb = /const BENCH_BY_BASE = (\{.*\});/.exec(gm);
 const bac = /const BENCH_ACCESS = (\{.*\});/.exec(gm);
