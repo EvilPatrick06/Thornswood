@@ -299,11 +299,11 @@ whole file at once.
 
 - The known list is the `#known-issues` posts above, word for word, with where
   each was found. Nothing is typed into the site for it.
-- The roadmap has four lanes: Being built now, Next, Later and Done. An open
+- The roadmap has three lanes: Being built now, Next and Later. An open
   issue labelled `roadmap: now`, `roadmap: next` or `roadmap: later` is in
-  that lane; once it is closed as done it is in Done, newest first, whatever
-  its lane was. Closed as not planned, it is nowhere. Its words are the
-  issue's last comment that starts `Roadmap:`:
+  that lane. Once it closes, however, it leaves the roadmap: there is no
+  Done section (Patrick, 26 Oct, "Done section needs removed from the
+  roadmap"). Its words are the issue's last comment that starts `Roadmap:`:
 
       Roadmap: <what, at most 45 characters>
       <where it stands, in a sentence or two>

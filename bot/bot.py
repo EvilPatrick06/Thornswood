@@ -5633,8 +5633,9 @@ def adopt_task(number, thread_id, path=None):
 #   known    the posts that are up in #known-issues, the same list, each as
 #            its title, its words and where it was found (Main, Dev). One
 #            rule decides both: known_issues_once.
-#   roadmap  every issue labelled "roadmap: now", "roadmap: next" or
-#            "roadmap: later", open, in that lane; closed as done, in Done.
+#   roadmap  every open issue labelled "roadmap: now", "roadmap: next" or
+#            "roadmap: later", in that lane. A closed one is off the
+#            roadmap: it has no Done lane (Patrick, 26 Oct).
 #            Its words are its last "Roadmap:" comment: the first line is
 #            what is being built (45 characters at most), the lines under it
 #            where it stands. The rules of a known issue hold for it (no
@@ -5653,7 +5654,6 @@ def adopt_task(number, thread_id, path=None):
 PUBLIC_LISTS_FILE = os.environ.get(
     'PUBLIC_LISTS_FILE', r'C:\Thornswood-Docs\data\from-bot\lists.json')
 ROADMAP_LANES = (('now', 'Being built now'), ('next', 'Next'), ('later', 'Later'))
-ROADMAP_DONE = 'Done'
 ROADMAP_MARK = re.compile(r'^\s*roadmap\s*:\s*(.*)$', re.I)
 
 
@@ -5705,31 +5705,27 @@ def roadmap_once(state, get=None, say=None):
     labelled issue's row by its updated_at, so comments are read only for an
     issue that changed (a label, a close and a comment all move it). Returns
     the roadmap as the site draws it: {lanes: [{name, rows: [{title, text}]}]},
-    the open lanes in order and Done last, each lane by issue number and Done
-    newest close first.
+    the lanes in order, each by issue number. Only open issues are read: the
+    roadmap has no Done lane (Patrick, 26 Oct, "Done section needs removed
+    from the roadmap"), so an issue that closes leaves it.
     """
     seen = {}
     for lane, _name in ROADMAP_LANES:
-        for state_ in ('open', 'closed'):
-            for num, issue in github_labelled(roadmap_label(lane), state_, get).items():
-                seen[num] = issue
+        for num, issue in github_labelled(roadmap_label(lane), 'open', get).items():
+            seen[num] = issue
     rec = state.setdefault('roadmap', {})
     for key in [k for k in rec if int(k) not in seen]:
         rec.pop(key, None)
         state['_dirty'] = True
     rows = dict((name, []) for _lane, name in ROADMAP_LANES)
-    rows[ROADMAP_DONE] = []
     for num in sorted(seen):
         issue = seen[num]
         key = str(num)
-        closed = str(issue.get('state')) != 'open'
-        if closed and str(issue.get('state_reason') or 'completed') != 'completed':
-            continue        # dropped or a duplicate: never built, so not Done
         have = rec.get(key)
         if not have or have.get('updated') != issue.get('updated_at'):
             title, body, problems = roadmap_of(issue, github_comments(num, get))
             lanes = roadmap_lanes_of(issue)
-            if len(lanes) > 1 and not closed:
+            if len(lanes) > 1:
                 problems = problems + ['Roadmap: the issue is in %s at once; '
                                        'one lane only.' % ', '.join(
                                            roadmap_label(l) for l in lanes)]
@@ -5739,17 +5735,10 @@ def roadmap_once(state, get=None, say=None):
             state['_dirty'] = True
         if refuse(state, 'roadmap', num, have.get('problems') or [], say):
             continue
-        row = {'title': have['title'], 'text': have['text'],
-               'closed': str(issue.get('closed_at') or '')}
-        if closed:
-            rows[ROADMAP_DONE].append(row)
-        else:
-            rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(row)
-    rows[ROADMAP_DONE].sort(key=lambda r: r['closed'], reverse=True)
-    lanes = [name for _lane, name in ROADMAP_LANES] + [ROADMAP_DONE]
-    return {'lanes': [{'name': name,
-                       'rows': [{'title': r['title'], 'text': r['text']}
-                                for r in rows[name]]} for name in lanes]}
+        rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(
+            {'title': have['title'], 'text': have['text']})
+    return {'lanes': [{'name': name, 'rows': rows[name]}
+                      for _lane, name in ROADMAP_LANES]}
 
 
 def known_list(state):

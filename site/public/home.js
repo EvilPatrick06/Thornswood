@@ -259,9 +259,9 @@ if (AGE_PATHS[here] && !ageOk()) {
     // Rendered by the server, like the written pages.
     if (b.introHtml) out += b.introHtml;
     else if (b.intro) out += '<p>' + esc(b.intro) + '</p>';
-    // Every section is drawn, Done included (#2560). Done used to be hidden
-    // here, so the finished work #2561 moved into it never reached the page.
-    // Done is last in the data, so it is drawn last.
+    // Every section is drawn, in its order, none filtered by name (#2560: a
+    // Done filter here once kept finished work off the page). Which lanes
+    // there are is the bot's to say, and since 26 Oct it writes no Done.
     var live = b.sections || [];
     live.forEach(function (sec) {
       var cols = sec.columns || [], rows = sec.rows || [];

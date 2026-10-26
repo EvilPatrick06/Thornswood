@@ -1010,8 +1010,9 @@ How to use it:
   main and on dev, and the bot keeps #known-issues and the site's Known
   Issues page from them. `roadmap: now`, `roadmap: next` and `roadmap: later`
   put an issue on the site's roadmap in that lane, in the words of its last
-  `Roadmap:` comment, and under Done once it closes as done (#3140; bot
-  README, "The site's known issues and roadmap"). `area: triage`
+  `Roadmap:` comment, while it is open; the roadmap has no Done section
+  (#3140, Patrick 26 Oct; bot README, "The site's known issues and
+  roadmap"). `area: triage`
   marks an issue whose title did not say which part it is:
   `.github\workflows\area-label.yml` gives a new issue with no `area:` label
   the one its title names, or this one, and a person swaps it for the right
