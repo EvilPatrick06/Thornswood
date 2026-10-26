@@ -222,7 +222,9 @@ recovery. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
 retention schedule. The game server's log is not in them. Staff must
 reapply completed deletion requests before putting an older backup back
-into service.
+into service. What putting a backup back replaces (the site's records and
+uploads, the bot's join numbers, characters) is set aside on the server for
+30 days, so it can be undone, and then deleted.
 
 ## Deleting it
 

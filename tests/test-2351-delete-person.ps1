@@ -251,6 +251,8 @@ function Build {
     Put (Join-Path $Vl 'chat\2026-10-02.jsonl') ($yours + "`n")
     Put (Join-Path $Vd 'chat\2026-10-01.jsonl') ($mine + "`n" + $inKept + "`n")
     Put (Join-Path $Bot 'data\joins.json') ('{"900":{"last":40,"members":{"' + $ME + '":39,"' + $YOU + '":40}}}')
+    # The joins.json a restore set aside beside it (#3620), written by nobody.
+    Put (Join-Path $Bot 'data\joins.json-before-restore-20261020-101500') ('{"900":{"last":38,"members":{"' + $ME + '":37,"' + $YOU + '":38}}}')
     Put (Join-Path $Bot 'data\open-tickets.json') ('{"900:' + $ME + '":123,"900:' + $YOU + '":456}')
 }
 
@@ -505,6 +507,8 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
         $day -eq ('{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}' + "`n" + '{"at":150000,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"kept"}' + "`n" + '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}' + "`n"))
     Yes '  a day with none of theirs is not touched' ($before['\Thornswood-Voice\chat\2026-10-02.jsonl'] -eq (Get-FileHash (Join-Path $Vl 'chat\2026-10-02.jsonl')).Hash)
     Yes '  and a dev day of only theirs is left empty, not deleted' ((Get (Join-Path $Vd 'chat\2026-10-01.jsonl')) -eq '')
+    $ja = J (Join-Path $Bot 'data\joins.json-before-restore-20261020-101500')
+    Yes 'their join number is gone from the joins.json a restore set aside, at once, and the others stay' ($null -eq $ja.'900'.members.$ME -and $ja.'900'.members.$YOU -eq 38 -and $ja.'900'.last -eq 38)
     if ($botRan) {
         $jn = J (Join-Path $Bot 'data\joins.json')
         Yes 'their join number is gone and the last number given out stays' ($null -eq $jn.'900'.members.$ME -and $jn.'900'.members.$YOU -eq 40 -and $jn.'900'.last -eq 40)

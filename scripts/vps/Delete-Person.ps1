@@ -63,8 +63,9 @@
                     voice starts, and the record keeps each day's line count
                     when the request was made
     the bot         their join number (joins.json; the last number given out
-                    stays, so nobody is handed theirs again) and their open
-                    ticket (open-tickets.json)
+                    stays, so nobody is handed theirs again), and in the
+                    joins.json-before-restore-<stamp> copies a restore set
+                    aside beside it, and their open ticket (open-tickets.json)
 
   WHAT IT LEAVES, counted and said:
     - staff's records about them: bans, PKs and notes (bans.json, pk.json,
@@ -925,6 +926,17 @@ for (const person of people) {
   if (want(joins, 'object')) {
     for (const gv of Object.values(joins.value)) {
       if (isObj(gv) && isObj(gv.members) && has(gv.members, id)) { delete gv.members[id]; dirty(joins); removed('bot: join number', 1); }
+    }
+  }
+  // A restore moves the joins.json it replaces to
+  // joins.json-before-restore-<stamp>[-n] beside it (vps-restore-services.ps1),
+  // kept 30 days and written by nobody, so edited here at once (#3620).
+  for (const n of names(bd).sort()) {
+    if (!/^joins\.json-before-restore-\d{8}-\d{6}(-\d+)?$/.test(n)) continue;
+    const old = json(path.join(bd, n), null);
+    if (!want(old, 'object')) continue;
+    for (const gv of Object.values(old.value)) {
+      if (isObj(gv) && isObj(gv.members) && has(gv.members, id)) { delete gv.members[id]; dirty(old); removed('bot: join number in a copy a restore set aside', 1); }
     }
   }
   const tickets = json(path.join(bd, 'open-tickets.json'), 'bot');

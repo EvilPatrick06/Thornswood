@@ -26,6 +26,10 @@
       never looked at
     - a real start under server-log.js deletes them before the program runs
       and says so in server.log
+    - the site's retention sweep, lifted out of site\server.js, deletes the
+      data, uploads and config.json a restore (vps-restore-services.ps1) set
+      aside beside them 30 days on, and nothing else in the site's folder
+      (the bot's joins.json copies: tests\test-2353-join-keeping.py)
     - the privacy page and the scripts that set copies aside say how long
   Nothing leaves this machine.
 */
@@ -139,6 +143,41 @@ try {
       /\[server-log\] set-aside copies: deleted world-before-/.test(log));
   const src = fs.readFileSync(WRITER, 'utf8');
   yes('  and the hourly pass runs it too', /setInterval\([\s\S]*?ageAside\(process\.cwd\(\), t\)[\s\S]*?SWEEP_MS\)/.test(src));
+
+  // The site's half of a restore (vps-restore-services.ps1): data, uploads and
+  // config.json set aside beside them in the site's folder, aged by the
+  // site's retention sweep, lifted out of site\server.js.
+  const SITE = read('site/server.js').split(String.fromCharCode(13)).join('');
+  const from = SITE.indexOf('const RESTORE_ASIDE_DAYS'), to = SITE.indexOf('function retentionSweep()');
+  yes('site\\server.js has the restore-copy sweep', from > 0 && to > from);
+  const siteSaid = [];
+  const sweep = new Function('fs', 'path', 'ROOT', 'retentionSay',
+    SITE.slice(from, to) + '\nreturn { sweepRestoreCopies, RESTORE_ASIDE_DAYS };')(fs, path, '/nowhere', (w, o) => siteSaid.push(w + ' ' + JSON.stringify(o)));
+  yes('  keeping them 30 days', sweep.RESTORE_ASIDE_DAYS === 30);
+  const SR = path.join(scratch, 'site');
+  for (const s of [OLD, NEW]) {
+    put(path.join(SR, 'data-before-restore-' + s, 'signins.json'), { a: 1 });
+    put(path.join(SR, 'uploads-before-restore-' + s, 'x.png'), 'x');
+    put(path.join(SR, 'config.json-before-restore-' + s), { clientSecret: 'not-a-real-one' });
+  }
+  put(path.join(SR, 'data-before-restore-' + OLD + '-2', 'signins.json'), { a: 1 });
+  put(path.join(SR, 'data', 'signins.json'), { live: 1 });
+  put(path.join(SR, 'config.json'), { live: 1 });
+  put(path.join(SR, 'feed-before-restore-' + OLD, 'published.json'), {});
+  put(path.join(SR, 'config.json-before-restore-' + stamp(NOW - 50 * DAY), 'a-folder.txt'), 'x');
+  const got = sweep.sweepRestoreCopies(NOW, SR);
+  yes('the site deletes the data, uploads and config.json a restore set aside 31 days ago, and a second in that second',
+      got.deleted === 4 && !there(path.join(SR, 'data-before-restore-' + OLD)) && !there(path.join(SR, 'uploads-before-restore-' + OLD)) &&
+      !there(path.join(SR, 'config.json-before-restore-' + OLD)) && !there(path.join(SR, 'data-before-restore-' + OLD + '-2')));
+  yes('  keeps the ones set aside 29 days ago',
+      there(path.join(SR, 'data-before-restore-' + NEW, 'signins.json')) && there(path.join(SR, 'uploads-before-restore-' + NEW)) && there(path.join(SR, 'config.json-before-restore-' + NEW)));
+  yes('  never touches the live data and config.json, the feed\'s copy, or a folder where config.json\'s copy should be a file',
+      there(path.join(SR, 'data', 'signins.json')) && there(path.join(SR, 'config.json')) && there(path.join(SR, 'feed-before-restore-' + OLD)) &&
+      there(path.join(SR, 'config.json-before-restore-' + stamp(NOW - 50 * DAY))));
+  yes('  says each one it deleted, by name and never what was in it',
+      siteSaid.filter((l) => /^restore-copy .*"event":"deleted"/.test(l)).length === 4 && !siteSaid.some((l) => /not-a-real-one/.test(l)));
+  yes('  and the hourly retention sweep, which also runs as the site starts, runs it',
+      /restoreCopies: sweepRestoreCopies\(now\)/.test(SITE.slice(to, to + 2000)));
 
   // What people and staff read says the same.
   const page = read('site/data/site/privacy.md').split(/\s+/).join(' ');

@@ -97,7 +97,10 @@ the two lines above with that server still stopped, before it starts. The
 and `*.json.bak-*` copies inside a game server's folder are kept 30 days by the
 date in their name, then the server's `server-log.js` deletes them at its
 start or within the hour (#3620), so one older than that is not there to put
-back; the nightly backups are. "Deletion requests" in
+back; the nightly backups are. The same holds for what `vps-restore-services.ps1`
+sets aside: the site's `data-`, `uploads-` and `config.json-before-restore-*`
+go by the site's hourly retention sweep, the bot's
+`data\joins.json-before-restore-*` by its hourly join-number watch. "Deletion requests" in
 `docs\WEBSITE-OPERATIONS.md` is the whole procedure. Restrict the rehearsal
 destination to the operators: an unpacked archive contains credentials and
 private records. A restore rehearsal must use a disposable destination, never

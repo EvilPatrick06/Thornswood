@@ -29,7 +29,15 @@
   read it since the voice service's character choices went on 20 September.
 
   Whatever was already in a place is moved aside to <name>-before-restore-
-  <stamp> beside it, never deleted. The site's data folder, its config and the
+  <stamp> beside it. Decided by Patrick on 26 Oct (#3620, B): those that hold
+  people are kept 30 days by the stamp in their name, so a restore can be
+  undone, then deleted by what owns them: the site's data, uploads and
+  config.json by the site's hourly retention sweep (site\server.js), the
+  bot's joins.json by the bot's hourly join-number watch (bot\bot.py).
+  Delete-Person.ps1 takes a deleted person out of both while they are there.
+  The Caddyfile, the feed's files and bot.env.json hold nobody and are left;
+  each is named on its 'kept' line, to be deleted by hand once the restore is
+  good. The site's data folder, its config and the
   bot's settings are the ones a restore is for: when any of those three is not
   in the backup this ends SERVICES INCOMPLETE with exit 1, after placing the
   rest. It refuses to start while the site or the bot is running from those
