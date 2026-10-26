@@ -35,7 +35,7 @@ What it does:
 
        pwsh scripts/vps/Watch-Outside.ps1 -Export ../thornswood-watch-outside -NoPause
 
-   It should print `wrote the watcher, watch-outside.json, its two workflows and the README`. Commit and push there: `watch-outside.json` now holds `GameHost` and no address. Its old commits still hold the address; that history is part of the archive decision at the flip.
+   It should print `wrote the watcher, watch-outside.json, its two workflows and the README`. Commit and push there: `watch-outside.json` now holds `GameHost` and no address. Its old commits still hold the address until the repository is deleted at the flip (Patrick, 26 Oct, B on the page).
 
 ## Check afterwards
 

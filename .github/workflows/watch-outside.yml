@@ -7,10 +7,11 @@
 # EvilPatrick06/thornswood-watch-outside, a public repository of its own,
 # because a public repository's Actions minutes are not billed and this one
 # was private. Once this repository is public it runs here for free, and the
-# other one is archived. While this repository is private every run would
-# be billed, every five minutes, so the job runs only when the repository
-# variable WATCH_OUTSIDE is "here". Set it at the flip, in the same step as
-# archiving the old repository, so exactly one watcher posts:
+# other one is deleted (Patrick, 26 Oct, B on the page). While this
+# repository is private every run would be billed, every five minutes, so
+# the job runs only when the repository variable WATCH_OUTSIDE is "here".
+# Set it at the flip, just before deleting the old repository, so exactly
+# one watcher posts:
 #
 #     gh variable set WATCH_OUTSIDE --body here --repo EvilPatrick06/Thornswood
 #
