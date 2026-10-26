@@ -52193,6 +52193,10 @@ return module.exports;
     var id = 0;
     try { id = Number(mp.getIdFromDesc(cook.ref)) >>> 0; } catch (e) { id = 0; }
     if (!id || id !== (Number(npcId) >>> 0) || !near(actorId, id)) { return null; }
+    // A Cook lying dead says nothing; the authored Cook comes back on the NPC clock.
+    var dead = false;
+    try { dead = !!mp.get(id, 'isDead'); } catch (e) { dead = false; }
+    if (dead) { return null; }
     var town = townOf(rec.town);
     var townName = town ? town.name : rec.town;
     if (!rec.took) {

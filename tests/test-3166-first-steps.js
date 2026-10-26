@@ -21,8 +21,8 @@
        carries all five, none done, naming the Cook's building and the town;
        a character made before this is shown nothing
     B  E on the Cook: from out of reach nothing; in reach the errand and the
-       Cook step ticks; E on another person in reach is nothing; the Cook
-       again says what is still to do
+       Cook step ticks; E on another person in reach, or on the Cook lying
+       dead, is nothing; the Cook again says what is still to do
     R  a relog, a reload and a restart in the middle keep every step
     C  the notice board ticks the board step; its drop box does not
     D  work before a class is nothing; the picks tick the pick step and hand
@@ -305,6 +305,10 @@ store.get(ME).pos = [COOK_POS[0] + 150, COOK_POS[1] + 150, COOK_POS[2]];
 at = heard(PID).length;
 press(PID, OTHER);
 yes('B2 E on somebody else in reach is nothing', cookSaid(PID, at).length === 0 && !rec(ME).took);
+store.get(COOK).isDead = true;
+press(PID, COOK);
+yes('B2 a Cook lying dead says nothing', cookSaid(PID, at).length === 0 && !rec(ME).took);
+store.get(COOK).isDead = false;
 press(PID, COOK);
 const first = cookSaid(PID, at);
 yes('B3 E on the Cook in reach gives the errand (' + first.join(' | ') + ')',
