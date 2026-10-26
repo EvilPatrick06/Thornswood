@@ -19,12 +19,21 @@ What it does:
 
    It should end with the swap and PASS.
 
+2. **#3539 takes over what #613's known post still warns about**, once the bot log shows #613 taken down (the forge list's unsorted rows, the six Dwarven Metal Ingot rows and the pack popup, which #3302 did not fix). Write the comment first, then the labels, so the first pass that sees the issue posts these words:
+
+       gh api -X POST repos/EvilPatrick06/Thornswood/issues/3539/comments -f body="Known issue: Forge menu repeats rows, unsorted
+       The forge menu lists every recipe, including ones your character cannot make yet, in no helpful order. Dwarven Metal Ingot shows up six times, because six kinds of scrap each have their own recipe, and the box that pops up when something goes into your pack is too wide and sits in the wrong place. A recipe your character cannot make is refused when you try it, and nothing is used up. No need to report these again, but a recipe that gets made when it should have been refused is still worth a post."
+       gh api -X POST repos/EvilPatrick06/Thornswood/issues/3539/labels -f "labels[]=Main Findings" -f "labels[]=Dev Findings"
+
+   Each prints the comment or the labels as JSON.
+
 ## Check afterwards
 
 - https://thornswood.net/api/roadmap within five minutes lists the lanes Being built now, Next and Later and no Done.
 - https://thornswood.net/roadmap shows no Done section.
 - `pwsh scripts/vps/Show-BotLog.ps1` shows `known issues: took #613 down` and `took #1626 down`, each with "done-on-merge wrote its merged fix on it", and https://thornswood.net/api/page/known no longer lists "Forge list is messy" or "Cheat Death perk never saves you".
-- Then delete this note and put what ran on #3140.
+- Within five minutes of step 2, https://thornswood.net/api/page/known lists "Forge menu repeats rows, unsorted".
+- Then delete this note and put what ran on #3140 and #3539.
 
 ## Risks
 
