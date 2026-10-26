@@ -57,4 +57,4 @@ the release, and each launcher replaces itself when its feed has a newer one;
 the dev build, on the dev feed, gets it first. The voice page is written out
 beside the exe on start, when the copy there is missing or a different size,
 and loaded from there. Moved here from `tools\` on 25 September (issue #440,
-phase 7); the comments in the C# still say `tools\` in places.
+phase 7).
