@@ -92,7 +92,12 @@ go of what its restored registers say about them (#2351): its
 part is done. Putting back a folder an install or a
 wipe set aside (`C:\Thornswood-Server.prev-<date>`, `world-before-<date>`
 and the `*-before-<date>.json` registers in `private`) is a restore too: run
-the two lines above with that server still stopped, before it starts. "Deletion requests" in
+the two lines above with that server still stopped, before it starts. The
+`world-before-*`, `world-before-restore-*`, `*-before-*.json`, `_discarded-*`
+and `*.json.bak-*` copies inside a game server's folder are kept 30 days by the
+date in their name, then the server's `server-log.js` deletes them at its
+start or within the hour (#3620), so one older than that is not there to put
+back; the nightly backups are. "Deletion requests" in
 `docs\WEBSITE-OPERATIONS.md` is the whole procedure. Restrict the rehearsal
 destination to the operators: an unpacked archive contains credentials and
 private records. A restore rehearsal must use a disposable destination, never

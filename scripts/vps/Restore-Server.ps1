@@ -35,7 +35,8 @@
              choice. Those three are named and their values never printed.
 
   Whatever world and private the folder already had is moved aside into
-  world-before-restore-<stamp> inside it, never deleted.
+  world-before-restore-<stamp> inside it, kept 30 days so the restore can be
+  undone, then deleted by the server's server-log.js (#3620).
 
   -Root must already hold the server program and its plugins: on a new box,
   Install-ThornswoodServer.ps1 -Zip <payload> -Root <it> -NoTask first. The

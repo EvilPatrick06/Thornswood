@@ -172,7 +172,10 @@ until 24 September 2026, and both are served from here now.
   they change, this line changes with them.
 
 - **Your character** is kept until you ask for it to be deleted, or until a
-  wipe, which is announced first.
+  wipe, which is announced first. A wipe, a character reset or putting a
+  backup back leaves the characters it replaced set aside on the server for
+  30 days, so it can be undone, and then deleted. The server checks every
+  hour.
 - **Launcher logs** are kept for 365 days, like session records, unless staff
   mark the session kept.
 - **A gallery submission that is removed** has its file deleted then. One

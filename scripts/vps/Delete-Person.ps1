@@ -495,6 +495,15 @@ function serverSets(s) {
     if (l.indexOf(leaf + '.') !== 0 || !/^\.(prev|undone|failed)-\d{8}-\d{6}$/.test(l.slice(leaf.length))) continue;
     if (isDir(path.join(parent, n))) out.push({ tag: s.tag + ' game server, set aside as ' + n, root: path.join(parent, n), writer: null });
   }
+  // Restore-Server.ps1 moves the world and private it replaces into
+  // world-before-restore-<stamp> inside the server's folder, a folder of the
+  // same shape as the server's own, which a world-before-* match never read
+  // into (#3620).
+  for (const n of names(s.root).sort()) {
+    if (/^world-before-restore-\d{8}-\d{6}$/i.test(n) && isDir(path.join(s.root, n))) {
+      out.push({ tag: s.tag + ' game server, restore set aside as ' + n, root: path.join(s.root, n), writer: null });
+    }
+  }
   return out;
 }
 
@@ -765,14 +774,19 @@ for (const person of people) {
                  'and which could write a character back. Delete that copy, or put it back and start it once, then run this again. Nothing was changed');
           }
           for (const f of fl) {
-            if (!/\.json$/i.test(f) || f[0] === '.') continue;
+            // <id>.json.bak-<stamp> is Reset-Appearance.ps1's whole copy of a
+            // character (#3620), which the engine never loads but which holds
+            // them just the same. Nothing runs from it, so it goes now even in
+            // a live server's folder.
+            const bak = /\.json\.bak-\d{8}-\d{6}$/i.test(f);
+            if ((!bak && !/\.json$/i.test(f)) || f[0] === '.') continue;
             const p = path.join(dir, f);
             if (!P.size) continue;
             let o = null;
             try { o = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { left(T + ': change forms that would not parse, so were not read', 1); continue; }
             if (isObj(o) && Number(o.profileId) > 0 && hasP(o.profileId) && !unlinks.has(p)) {
-              unlink(p, live ? g.writer : null);
-              removed(T + ': characters' + (w === 'world' && dir === forms ? '' : ' in ' + path.relative(R, dir)), 1);
+              unlink(p, live && !bak ? g.writer : null);
+              removed(T + ': characters' + (bak ? ' in copies an appearance reset kept' : w === 'world' && dir === forms ? '' : ' in ' + path.relative(R, dir)), 1);
               // A character made in the world has a form id of its own, no plugin (FormDesc::ToString).
               if (/^[0-9a-f]{1,8}$/i.test(String(o.formDesc || ''))) A.add(parseInt(o.formDesc, 16));
             }

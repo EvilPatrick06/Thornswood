@@ -96,9 +96,11 @@
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
-  The old storage sits beside the new one until you decide it can go, which
-  means a wipe you regret at midnight is a rename away from being undone
-  instead of gone.
+  The old storage sits beside the new one for 30 days, which means a wipe you
+  regret at midnight is a rename away from being undone instead of gone. Then
+  the game server's server-log.js deletes it, by the date in its name, and
+  says so in server.log (#3620, Patrick's B: the privacy page says a
+  character is kept until a wipe, and the copy is a character too).
 
   Why a wipe is on the table at all: taking a plugin out of the middle of the
   load order shifts the index of every plugin below it, and SkyMP turns a form
