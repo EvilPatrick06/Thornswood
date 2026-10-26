@@ -347,6 +347,7 @@ const WRITERS = {
   'property/boxLeave': [1, 'takes a stack off the pack into the drop box record, and refuses gold, which goes in through takeGold (#2298); it never adds'],
   'trade ships/packTake': [1, 'the dock\'s load (#2700): a stack off the pack onto a trade ship\'s manifest, coin refused before the pack is read; it only takes away (test-2700-trade-ship-dock.js)'],
   'trade ships/packGive': [1, 'the dock\'s hand out (#2700): only a piece the manifest begin() hands back, or the piece a refused load just took, each first debited off a pack, so never coin (trade-cargo refuses base 0xF aboard) and never more than was loaded (test-2700-trade-ship-dock.js)'],
+  'market stalls/writePack': [1, 'the market stalls (#3160): packTake lays a stack out of the keeper\'s pack and refuses coin; packPay takes a price out of the buyer\'s pack; packGive puts in only what the stall book hands back, a piece laid out (the book refuses coin on a stall), or the very pieces packPay just took, to the keeper or back to the buyer when the sale cannot finish. No count grows (test-3160-market-stalls.js)'],
   'property/boxTake': [1, 'hands back a thing out of the drop box record, which holds only what boxLeave took off a pack; gold comes out through payOut, never more than the row holds, and the row goes down by the same (#2298, test-2298-dropbox.js)']
 };
 
@@ -770,11 +771,22 @@ function goldDescriptors(text) {
       writes nothing.
     */
     const names = bodyOf('property/itemName') || '';
-    const inNames = function (name) { return (names.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length; };
-    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box only for a name',
+    /*
+      And a market stall's Find (#3160): the names a goods price can ask
+      for, so the buyer pays with something out of their own pack. It hands
+      back names and records, coin left out, never a thing, and writes
+      nothing.
+    */
+    const stallFind = bodyOf('market stalls/find') || '';
+    const inNames = function (name) {
+      return (names.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length +
+        (stallFind.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length;
+    };
+    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box and a stall\'s Find only for a name',
         refs('ITEM_NAMES') === (build.match(/\bITEM_NAMES\b/g) || []).length + inNames('ITEM_NAMES') &&
         refs('ADMIN_ITEMS') === (build.match(/\bADMIN_ITEMS\b/g) || []).length + inNames('ADMIN_ITEMS') &&
-        refs('ADMIN_ITEMS') > 0 && !!names && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names));
+        refs('ADMIN_ITEMS') > 0 && !!names && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names) &&
+        !!stallFind && !/\bmp\.set\(|\baddItem\(|\bpayOut\(|\bpackGive\(|\bwritePack\(/.test(stallFind) && /BOOK\.isCoin\(base\)/.test(stallFind));
     yes('ADMIN_ACTORS is read by the /spawn index and nothing else',
         refs('ADMIN_ACTORS') > 0 && refs('ADMIN_ACTORS') === (beasts.match(/\bADMIN_ACTORS\b/g) || []).length);
     yes('and /give and /spawn still refuse anybody who is not a playtester',

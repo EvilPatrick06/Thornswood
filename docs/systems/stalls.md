@@ -80,7 +80,8 @@ whoever is standing at the stall is who sells there.
 Buy takes the price out of the buyer's pack, gold or the goods named,
 and puts the piece in it. The price goes into the keeper's pack, because
 the keeper is standing there, and they are told in their chat what
-sold.
+sold. When the buyer's pack will not take the piece, the sale stands and
+the piece waits in the hold's drop box for them.
 
 A stall sells only while its keeper is at it, in the world, as the
 character who claimed it. With the keeper away, Buy is greyed, the panel
@@ -90,15 +91,18 @@ moves.
 ## When a keeping ends
 
 A keeping ends when it lapses, when its keeper lets it go, when a
-steward or staff end it, or when the keeper's character is deleted.
+steward or staff end it, or when the keeper's character is deleted or
+reset.
 The stall is free at once.
 
 What was on it goes into the hold's drop box on the notice board
 ([Notice boards](noticeboards.md), The drop box), for its keeper, who
-takes it back there like anything they put in themselves. When the
-keeper's character was deleted, it goes in with no name on it, for the
-hold's officers to hand out, the way the box keeps the coin of a deleted
-character.
+takes it back there like anything they put in themselves. A stall is
+kept by the character who claimed it, so a character that is reset ends
+its stalls too, and their goods go in for the person, who takes them
+back there. When the person is deleted, it goes in with no name on it,
+for the hold's officers to hand out, the way the box keeps the coin of a
+deleted character.
 
 ## Stewards and staff
 
@@ -121,10 +125,11 @@ register is `private/market-stalls.json`. The panel is
 `game/plugins/thornswood-front.js` (`stallNow`). The lines the panel
 sends are in [Chat commands](commands.md), and no help names them.
 
-The order of every move is written so a failure never makes a piece or
-a coin: what is laid out leaves the pack before the book is written,
-what leaves the stall leaves the book before it reaches a pack, and a
-write that fails puts it back. What goes to a drop box carries a
+The order of every move is written so a failure never makes or loses a
+piece or a coin: what is laid out leaves the pack before the book is
+written, what leaves the stall leaves the book before it reaches a pack,
+the keeper is paid before the piece moves, and a write that fails puts
+it back. What goes to a drop box carries a
 receipt the box keeps, so it never goes in twice.
 
 `tests/test-3160-market-stalls.js` drives every rule above through the

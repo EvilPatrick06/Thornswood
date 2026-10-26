@@ -49880,7 +49880,7 @@ function emptyState() { return { stalls: {}, out: [], next: 1 }; }
 */
 function openRegister(text) {
   if (text === null || text === undefined || text === '') { return emptyState(); }
-  var o = JSON.parse(String(text).replace(/^﻿/, ''));
+  var o = JSON.parse(String(text).replace(/^\uFEFF/, ''));
   if (!isObj(o) || o.version !== 1 || !isObj(o.state)) { throw new Error('It is not a stall book.'); }
   var s = o.state;
   if (!isObj(s.stalls) || !Array.isArray(s.out) || !whole(s.next)) { throw new Error('It is not a stall book.'); }
@@ -50001,7 +50001,7 @@ function takeOff(state, id, n, count) {
   return { piece: piece, price: copy(l.price), line: before };
 }
 
-/* The keeper takes goods back off their own stall: the piece, and the line as it was for putBack. */
+/* The keeper takes goods back off their own stall: the piece, and the line as it was for restoreLine. */
 function takeBack(state, id, who, n, count) {
   mine(state, id, who);
   var off = takeOff(state, id, n, count);
@@ -50021,7 +50021,7 @@ function sell(state, id, n, count) {
 }
 
 /* A line put back as it was, when the rest of a sale or a take back could not be done. */
-function putBack(state, id, line) {
+function restoreLine(state, id, line) {
   var r = rec(state, id);
   if (!r || !r.keeper) { throw new Error('Nobody keeps this stall now.'); }
   var at = lineOf(r, line.n);
@@ -50047,6 +50047,18 @@ function end(state, id, why, keepName) {
   return n;
 }
 
+/*
+  A piece bought whose buyer's pack would not take it: on its way to the
+  hold's drop box for them, with a receipt like a stall's goods.
+*/
+function toBox(state, hold, piece, of, why) {
+  if (HOLDS.indexOf(hold) < 0) { throw new Error('That is in no hold.'); }
+  var entry = copy(piece);
+  delete entry.count;
+  if (!entryOk(entry) || !whole(piece.count)) { throw new Error('That piece cannot go to a drop box.'); }
+  state.out.push({ receipt: 'stall:' + (state.next++), hold: hold, entry: entry, count: piece.count, of: of ? copy(of) : null, why: String(why || '') });
+}
+
 /* The receipt is in the drop box: off the book. */
 function delivered(state, receipt) {
   var before = state.out.length;
@@ -50064,18 +50076,23 @@ function lapsed(state, now, days) {
 }
 
 /*
-  A deleted, reset or replaced character (#2351, #2668): every stall they
-  kept ends, its goods to the hold's box with their name off, and a piece
-  already on its way loses their name too. who is the release's
-  { actor(n), profile(n) }.
+  A deleted person, or a character reset or wiped (#2351, #2668); who is the
+  release's { actor(n), profile(n) }. A stall is kept by the character who
+  claimed it, so it ends when either is listed. When the person is deleted
+  (their profile is listed) its goods go to the hold's box with their name
+  off, and a piece already on its way loses it too, the way the box keeps a
+  deleted character's coin. When only the character goes and the person
+  stays, its goods go to the box for them, and they take them back there.
 */
 function release(state, who) {
   var counts = { stalls: 0, pieces: 0 };
-  var gone = function (p) { return !!p && (who.actor(p.actor) || who.profile(p.profile)); };
+  var person = function (p) { return !!p && who.profile(p.profile); };
+  var character = function (p) { return !!p && (who.actor(p.actor) || who.profile(p.profile)); };
   Object.keys(state.stalls).forEach(function (id) {
-    if (gone(state.stalls[id].keeper)) { counts.stalls++; end(state, id, 'its keeper is gone', false); }
+    var k = state.stalls[id].keeper;
+    if (character(k)) { counts.stalls++; end(state, id, 'its keeper is gone', !person(k)); }
   });
-  state.out.forEach(function (x) { if (gone(x.of)) { x.of = null; counts.pieces++; } });
+  state.out.forEach(function (x) { if (person(x.of)) { x.of = null; counts.pieces++; } });
   return counts;
 }
 
@@ -50186,7 +50203,7 @@ module.exports = {
   checkTable: checkTable, priceOf: priceOf, costOf: costOf, priceWords: priceWords,
   openRegister: openRegister, saveRegister: saveRegister, emptyState: emptyState,
   keeperOf: keeperOf, keeps: keeps, claim: claim, touch: touch, lay: lay, setPrice: setPrice,
-  takeBack: takeBack, sell: sell, putBack: putBack, end: end, delivered: delivered, lapsed: lapsed,
+  takeBack: takeBack, sell: sell, restoreLine: restoreLine, end: end, toBox: toBox, delivered: delivered, lapsed: lapsed,
   release: release, countsOf: countsOf, parse: parse, stallView: stallView
 };
 return module.exports;
@@ -50216,7 +50233,7 @@ var MARKET_STALL_TABLE = [{"id":"falkreath-e0b1","hold":"falkreath","place":"Gra
   var privDir = 'private';
   var settingsWhy = '';
   try {
-    var cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^﻿/, ''));
+    var cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^\uFEFF/, ''));
     if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
   } catch (e) { settingsWhy = String((e && (e.code || e.message)) || e); }
   var FILE = path.resolve(privDir, 'market-stalls.json');
@@ -50543,7 +50560,7 @@ var MARKET_STALL_TABLE = [{"id":"falkreath-e0b1","hold":"falkreath","place":"Gra
     var id = sessions[actorId].id, me = partyOf(actorId);
     var off = change(function (next) { return BOOK.takeBack(next, id, me, w.line, w.count); });
     try { packGive(actorId, [off.piece]); } catch (e) {
-      change(function (next) { BOOK.putBack(next, id, off.line); });
+      change(function (next) { BOOK.restoreLine(next, id, off.line); });
       throw new Error('It could not be put in your pack, so it stays on the stall.');
     }
     return 'Taken back.';
@@ -50570,24 +50587,30 @@ var MARKET_STALL_TABLE = [{"id":"falkreath-e0b1","hold":"falkreath","place":"Gra
     var done = null;
     try { done = change(function (next) { return BOOK.sell(next, id, w.line, w.count); }); }
     catch (e) { packGive(actorId, paid); throw e; }
-    try { packGive(actorId, [done.piece]); }
-    catch (eGive) {
-      change(function (next) { BOOK.putBack(next, id, done.line); });
-      packGive(actorId, paid);
-      throw new Error('It could not be put in your pack, so nothing was sold.');
-    }
+    // The keeper is paid before the piece moves, so a pack that will not take
+    // the price undoes the whole sale and nothing is lost.
     try { packGive(done.keeper.actor, paid); }
     catch (ePay) {
-      slog('a sale at', id, 'could not pay its keeper', JSON.stringify(paid), ':', (ePay && ePay.message) || ePay);
-      throw new Error('You have it, but the keeper\'s pack could not take the price. Say so in the dev channel.');
+      change(function (next) { BOOK.restoreLine(next, id, done.line); });
+      packGive(actorId, paid);
+      throw new Error('The keeper\'s pack could not take the price, so nothing was sold.');
     }
     var whatName = itemName(done.piece);
+    var boxed = false;
+    try { packGive(actorId, [done.piece]); }
+    catch (eGive) {
+      // Paid for and the keeper paid: it waits in the hold's drop box for the buyer.
+      change(function (next) { BOOK.toBox(next, stalls[id].hold, done.piece, me, 'bought at a stall, and your pack would not take it'); });
+      sendOut();
+      boxed = true;
+    }
     var keeperNote = (w.count > 1 ? w.count + ' ' : '') + whatName + ' sold for ' + (sale.cost.gold ? owed + ' gold.' : owed + ' ' + sale.cost.goods.name + '.');
     var sayLine = g.__thornswoodSayLine;
     if (typeof sayLine === 'function') { try { sayLine(done.keeper.profile, keeperNote); } catch (eSay) { } }
     if (sessions[done.keeper.actor] && sessions[done.keeper.actor].id === id) {
       show(done.keeper.actor, done.keeper.profile, keeperNote);
     }
+    if (boxed) { return 'Bought ' + (w.count > 1 ? w.count + ' ' : '') + whatName + '. Your pack would not take it, so it is in this hold\'s drop box for you.'; }
     return 'Bought ' + (w.count > 1 ? w.count + ' ' : '') + whatName + '.';
   }
 

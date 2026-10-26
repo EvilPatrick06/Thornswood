@@ -81,7 +81,7 @@ const DAY = 86400000;
   const sale = BOOK.sell(s, 'whiterun-1', n, 2);
   yes('B5 a sale takes the pieces off the line and names the price for that many',
       sale.piece.count === 2 && sale.cost.gold === 60 && s.stalls['whiterun-1'].lines[0].count === 1 && BOOK.same(sale.keeper, A));
-  BOOK.putBack(s, 'whiterun-1', sale.line);
+  BOOK.restoreLine(s, 'whiterun-1', sale.line);
   yes('  and a sale that could not finish puts the line back as it was', s.stalls['whiterun-1'].lines[0].count === 3);
   yes('B6 the book is written and read back whole', JSON.stringify(BOOK.openRegister(BOOK.saveRegister(s))) === JSON.stringify(s));
   yes('  a book that does not read is refused, never opened empty',
@@ -96,9 +96,15 @@ const DAY = 86400000;
       !s.stalls['whiterun-1'] && s.out.length === lines && s.out.every(function (x) { return x.hold === 'whiterun' && BOOK.same(x.of, A) && /^stall:\d+$/.test(x.receipt); }));
   BOOK.claim(s, T['whiterun-1'], A, 2000);
   BOOK.lay(s, 'whiterun-1', A, { baseId: SWORD, count: 1 }, { gold: 30 });
-  const c = BOOK.release(s, { actor: function (x) { return x === A.actor; }, profile: function () { return false; } });
-  yes('B9 a deleted character\'s stall ends, its goods to the box with their name off, and pieces on the way lose it too',
+  const c = BOOK.release(s, { actor: function (x) { return x === A.actor; }, profile: function (x) { return x === A.profile; } });
+  yes('B9 a deleted person\'s stall ends, its goods to the box with their name off, and pieces on the way lose it too',
       c.stalls === 1 && !s.stalls['whiterun-1'] && s.out.every(function (x) { return x.of === null; }));
+  BOOK.claim(s, T['whiterun-1'], A, 3000);
+  BOOK.lay(s, 'whiterun-1', A, { baseId: SWORD, count: 1 }, { gold: 30 });
+  const was = s.out.length;
+  const c2 = BOOK.release(s, { actor: function (x) { return x === A.actor; }, profile: function () { return false; } });
+  yes('B9 a reset character\'s stall ends too, and its goods go to the box for the person, who stays',
+      c2.stalls === 1 && c2.pieces === 0 && !s.stalls['whiterun-1'] && s.out.length === was + 1 && BOOK.same(s.out[was].of, A));
   yes('B10 the panel\'s words are read strictly',
       BOOK.parse(['/stall', 'lay', '12eb7', '0', '2', 'gold', '30']).price.gold === 30 &&
       BOOK.parse(['/stall', 'lay', '12eb7', '0', '2', 'goods', '5ace4', '2']).price.goods.base === INGOT &&
@@ -147,6 +153,8 @@ refs[BOB.a].inventory.entries.push({ baseId: INGOT, count: 1 });
 const shown = {};
 const said = {};
 const staffLog = [];
+// A pack that will not take a write: the id, after skip writes to it go through.
+let failPack = null;
 function makeMp() {
   return {
     makeProperty: function () { },
@@ -158,6 +166,9 @@ function makeMp() {
     },
     set: function (id, key, v) {
       if (key === 'thornswoodStallView' || key === 'thornswoodBoxView') { shown[id] = JSON.parse(JSON.stringify(v)); return; }
+      if (key === 'inventory' && failPack && failPack.id === id) {
+        if (failPack.skip > 0) { failPack.skip--; } else { throw new Error('the pack would not take it'); }
+      }
       if (!refs[id]) { refs[id] = {}; }
       refs[id][key] = JSON.parse(JSON.stringify(v));
     },
@@ -383,12 +394,35 @@ stall(ALICE, ['claim']);
 r = stall(ALICE, ['letgo']);
 yes('S21 she lets it go, and it is free', r.view.free === true && /You let the stall go/.test(r.view.said));
 
+// ------------------------------------------------ a pack that will not take it
+stall(ALICE, ['claim']);
+stall(ALICE, ['lay', SALT.toString(16), '0', '1', 'gold', '5']);
+const line5 = bookFile().stalls['whiterun-1'].lines[0].n;
+const g0 = { bob: count(BOB, GOLD), alice: count(ALICE, GOLD), salt: count(BOB, SALT) };
+failPack = { id: ALICE.a, skip: 0 };
+r = stall(BOB, ['buy', String(line5), '1']);
+failPack = null;
+yes('S24 when the keeper\'s pack will not take the price, nothing is sold and nothing moves',
+    /could not take the price, so nothing was sold/.test(r.view.said) && count(BOB, GOLD) === g0.bob && count(ALICE, GOLD) === g0.alice &&
+    count(BOB, SALT) === g0.salt && bookFile().stalls['whiterun-1'].lines.length === 1 && bookFile().stalls['whiterun-1'].lines[0].count === 1);
+const boxWas = ((W.__thornswoodProperty.dropbox().whiterun || {}).items || []).length;
+failPack = { id: BOB.a, skip: 1 };
+r = stall(BOB, ['buy', String(line5), '1']);
+failPack = null;
+const boxNow = W.__thornswoodProperty.dropbox().whiterun.items;
+yes('S25 when the buyer\'s pack will not take the piece, the sale stands and it waits in the hold\'s drop box for him',
+    /in this hold's drop box for you/.test(r.view.said) && count(BOB, GOLD) === g0.bob - 5 && count(ALICE, GOLD) === g0.alice + 5 &&
+    count(BOB, SALT) === g0.salt && bookFile().stalls['whiterun-1'].lines.length === 0 && bookFile().out.length === 0 &&
+    boxNow.length === boxWas + 1 && boxNow[boxNow.length - 1].by === BOB.pid && boxNow[boxNow.length - 1].baseId === SALT &&
+    boxNow[boxNow.length - 1].count === 1);
+stall(ALICE, ['letgo']);
+
 // --------------------------------------------------------------- the release
 stall(ALICE, ['claim']);
 stall(ALICE, ['lay', SWORD.toString(16), '0', '1', 'gold', '5']);
 const boxBefore = W.__thornswoodProperty.dropbox().whiterun.items.length;
-W = makeWorld({ actor: function (x) { return x === ALICE.a; }, profile: function () { return false; } });
-yes('S22 when her character is deleted her stall ends at the next start, and the sword is in the box with no name on it',
+W = makeWorld({ actor: function (x) { return x === ALICE.a; }, profile: function (x) { return x === ALICE.pid; } });
+yes('S22 when she is deleted her stall ends at the next start, and the sword is in the box with no name on it',
     !!released && released.saved && released.counts.stalls === 1 && !bookFile().stalls['whiterun-1'] &&
     W.__thornswoodProperty.dropbox().whiterun.items.length === boxBefore + 1 &&
     W.__thornswoodProperty.dropbox().whiterun.items.slice(-1)[0].by === 0);

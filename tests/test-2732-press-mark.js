@@ -170,6 +170,7 @@ const PANELS = {
   'thornswood-ride.js': { say: 1 },
   'thornswood-ship.js': { say: 1 },
   'thornswood-skills.js': { say: 3 },
+  'thornswood-stall.js': { say: 1 },
   'thornswood-trade.js': { say: 1 },
   'thornswood-treat.js': { say: 1 }
 };

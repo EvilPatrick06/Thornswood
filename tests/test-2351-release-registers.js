@@ -40,10 +40,13 @@
        embassy row with no profile, a dungeon chest's reservation, a trader's
        supply waits and a trade waiting on it) and nothing a profile holds is
        touched: every claim, office, bed, farm, book and roll place held by a
-       profile stays byte for byte
+       profile stays; a market stall, kept by the character who claimed it,
+       ends, and its goods go into the drop box for the profile (#3160)
     S  the trade ships' manifest (#511): the character off every line and
        hand out, by form id or by profile, every piece where it was; on a
        list of characters only, a profile's other character stays
+    T  the market stalls (#3160): the stall they kept is free, its goods in
+       the hold's drop box with no name on them, somebody else's stays
     X  a wipe's list, every part but the merchants' marked done: only the
        merchant ledger lets go, and the list is gone
 
@@ -80,6 +83,7 @@ const parts = {
   ledger: slice('function createPrivateMerchantLedger(', 'function npcMerchantManifest('),
   dungeon: slice('// ==== thornswood dungeon loot ====', '// ==== end thornswood dungeon loot ===='),
   ships: slice('// ==== thornswood trade ships ====', '// ==== end thornswood trade ships ===='),
+  stalls: slice('// ==== thornswood market stalls ====', '// ==== end thornswood market stalls ===='),
   books: slice('/* BOOKS-START */', '// ==== thornswood chat commands ===='),
   purses: slice('function npcMerchantManifest(', '// NPC MERCHANT PURSES END'),
   startup: slice('// NPC SERVER STARTUP BEGIN', '// NPC SERVER STARTUP END', true),
@@ -98,6 +102,10 @@ for (const [part, where] of [['farms', parts.farming], ['property', parts.proper
 yes('R2 the trade ships block asks for its part once, as it loads (#511)', parts.ships.indexOf("g.__thornswoodRelease('cargo', release)") >= 0 &&
     gm.indexOf('// ==== thornswood trade ships ====') > gm.indexOf('// ==== end thornswood dungeon loot ====') &&
     gm.indexOf('// ==== end thornswood trade ships ====') < gm.indexOf('/* BOOKS-START */'));
+yes('R2 the market stalls block asks for its part once, as it loads, after the ships (#3160)',
+    parts.stalls.split("g.__thornswoodRelease('stalls', release)").length === 2 &&
+    gm.indexOf('// ==== thornswood market stalls ====') > gm.indexOf('// ==== end thornswood trade ships ====') &&
+    gm.indexOf('// ==== end thornswood market stalls ====') < gm.indexOf('/* BOOKS-START */'));
 yes('R2 the books ask for theirs as they start', parts.books.indexOf("g.__thornswoodRelease('books', api.release)") >= 0);
 yes('R3 property lets go before rolesRead, which would name the character in the log',
     parts.property.indexOf("g.__thornswoodRelease('property', release)") < parts.property.lastIndexOf('rolesRead();'));
@@ -255,6 +263,13 @@ function registers(dir) {
   fs.writeFileSync(path.join(P, 'merchant-ledger.json'), JSON.stringify({ version: merchants.version, entries: merchants.entries, sha256: checksum(merchants) }));
   fs.writeFileSync(path.join(P, 'merchant-ledger.initialized'), '1');
   w('trade-cargo.json', JSON.parse(cargoRegister()));
+  // The market stalls (#3160): A1 (P1) keeps a Riften stall with a sword laid
+  // out, AY (PY) keeps one in Windhelm.
+  w('market-stalls.json', { version: 1, state: { next: 3, out: [], stalls: {
+    'riften-1dd1': { keeper: { actor: A1, profile: P1 }, hold: 'riften', since: NOW, last: NOW,
+                     lines: [{ n: 1, entry: { baseId: 0x12eb7 }, count: 1, price: { gold: 30 } }] },
+    'windhelm-383a6': { keeper: { actor: AY, profile: PY }, hold: 'windhelm', since: NOW, last: NOW,
+                        lines: [{ n: 2, entry: { baseId: 0x5ace4 }, count: 4, price: { gold: 2 } }] } } } });
   // Its saves already taken by server-log.js before the engine started (#2758).
   w('deleted-characters.json', { profiles: [P1, P2], actors: [A1, A2], done: { saves: NOW } });
   return P;
@@ -317,7 +332,7 @@ function start(dir, opt) {
   const was = process.cwd();
   process.chdir(dir);
   try {
-    for (const k of ['release', 'crops', 'farming', 'property', 'embassy', 'ledger', 'dungeon', 'ships', 'books', 'purses']) {
+    for (const k of ['release', 'crops', 'farming', 'property', 'embassy', 'ledger', 'dungeon', 'ships', 'stalls', 'books', 'purses']) {
       vm.runInContext(parts[k], box, { filename: 'gamemode.js (' + k + ')' });
     }
     // The NPC startup as far as its part (#2652): the real purse service on
@@ -366,11 +381,11 @@ try {
   const L = run.logged.filter(function (l) { return /^release: /.test(l); });
 
   yes('R5 the list is read once and every part is let go at this start (' + L.length + ' lines)',
-      L.length === 9 && /a list of 2 profile\(s\) and 2 character\(s\) to let go, at server start/.test(L[0]));
-  yes('R6 in the order the blocks load', ['farms', 'property', 'embassy', 'dungeon', 'cargo', 'books', 'merchants'].every(function (p, i) {
+      L.length === 10 && /a list of 2 profile\(s\) and 2 character\(s\) to let go, at server start/.test(L[0]));
+  yes('R6 in the order the blocks load', ['farms', 'property', 'embassy', 'dungeon', 'cargo', 'stalls', 'books', 'merchants'].every(function (p, i) {
     return new RegExp('^release: ' + p + ': ').test(L[i + 1]);
   }));
-  yes('R7 and then the list is gone', /every part is done, and the list is gone/.test(L[8]) &&
+  yes('R7 and then the list is gone', /every part is done, and the list is gone/.test(L[9]) &&
       !fs.existsSync(path.join(dir, 'private', 'deleted-characters.json')));
 
   // ---- F
@@ -468,7 +483,17 @@ try {
   yes('M3 a trade waiting on somebody else is as it was',
       JSON.stringify(ml.entries['8:Skyrim.esm']) === JSON.stringify(mWas.entries['8:Skyrim.esm']));
   yes('M4 the ledger still verifies', ml.sha256 === checksum(ml));
-  yes('M5 the log says counts: ' + (L[7] || '').replace('release: merchants: ', ''), L[7] === 'release: merchants: merchants 1, supply 2, trades 1');
+  yes('M5 the log says counts: ' + (L[8] || '').replace('release: merchants: ', ''), L[8] === 'release: merchants: merchants 1, supply 2, trades 1');
+
+  // ---- T (#3160)
+  const st = j(dir, 'market-stalls.json').state;
+  yes('T1 the stall they kept is free, and somebody else\'s stays with its goods',
+      !st.stalls['riften-1dd1'] && !!st.stalls['windhelm-383a6'] && st.stalls['windhelm-383a6'].keeper.profile === PY &&
+      st.stalls['windhelm-383a6'].lines.length === 1 && st.out.length === 0);
+  const rb = prop.dropbox.riften;
+  yes('T2 the sword on it is in Riften\'s drop box with no name on it, for the hold\'s officers',
+      !!rb && rb.items.length === 1 && rb.items[0].baseId === 0x12eb7 && rb.items[0].count === 1 && rb.items[0].by === 0 && rb.items[0].kind === 'stall');
+  yes('T3 the log says counts: ' + (L[6] || '').replace('release: stalls: ', ''), L[6] === 'release: stalls: stalls 1');
 
   // ---- S
   const sc = j(dir, 'trade-cargo.json'), sh = sc.cargo.holds['ship-1'];
@@ -508,7 +533,7 @@ try {
       w1.logged.some(function (l) { return l === 'release: embassy could not write what it let go, so its part waits for the next start'; }) &&
       w1.logged.some(function (l) { return l === 'release: embassy did not let go at this start, so the list waits for the next one'; }));
   yes('W2 the list stays with every other part marked done',
-      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'cargo', 'dungeon', 'farms', 'merchants', 'property', 'saves']) &&
+      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'cargo', 'dungeon', 'farms', 'merchants', 'property', 'saves', 'stalls']) &&
       JSON.stringify(list1.profiles) === JSON.stringify([P1, P2]));
   // A claim made by a listed profile after the first start is not a released one.
   const p2 = j(dir2, 'property.json');
@@ -566,7 +591,7 @@ try {
   const s1 = start(dir4);
   const list4 = j(dir4, 'deleted-characters.json');
   yes('S1 with the saves not taken, every register part is done and the list stays',
-      JSON.stringify(Object.keys(list4.done).sort()) === JSON.stringify(['books', 'cargo', 'dungeon', 'embassy', 'farms', 'merchants', 'property']));
+      JSON.stringify(Object.keys(list4.done).sort()) === JSON.stringify(['books', 'cargo', 'dungeon', 'embassy', 'farms', 'merchants', 'property', 'stalls']));
   yes('S2 and the log says the saves wait for the next start',
       s1.logged.some(function (l) { return l === 'release: saves did not let go at this start, so the list waits for the next one'; }));
   // ============================================================ C: characters only (#2668)
@@ -594,10 +619,26 @@ try {
       /a list of 0 profile\(s\) and 2 character\(s\) to let go, at server start/.test(c.lines[0] || '') &&
       /every part is done, and the list is gone/.test(c.lines[c.lines.length - 1] || '') &&
       !fs.existsSync(path.join(c.dir, 'private', 'deleted-characters.json')));
-  yes('C2 only the rolls, the merchant ledger and the trade ships\' manifest are written (' + c.changed.join(', ') + ')',
-      JSON.stringify(c.changed) === JSON.stringify(['embassy.json', 'merchant-ledger.json', 'trade-cargo.json']));
-  const profileHeld = ['property.json', 'law.json', 'beds.json', 'farm-claims.json', 'books.json', 'last-left.json'];
-  yes('C3 nothing a profile holds is touched: claims, keys, offices, posts, the drop box, beds, the farm, books and when they last left, byte for byte',
+  yes('C2 only the rolls, the merchant ledger, the trade ships\' manifest, the stall book and the drop box are written (' + c.changed.join(', ') + ')',
+      JSON.stringify(c.changed) === JSON.stringify(['embassy.json', 'market-stalls.json', 'merchant-ledger.json', 'property.json', 'trade-cargo.json']));
+  // A stall is kept by the character who claimed it (#3160): it ends, and its
+  // sword goes into Riften's drop box for the person, whose profile stays.
+  const cp = j(c.dir, 'property.json'), cpWas = JSON.parse(c.keep['property.json']);
+  const crb = cp.dropbox.riften;
+  yes('C9 the character\'s stall ends, and its sword is in Riften\'s drop box for the person, under their profile',
+      !j(c.dir, 'market-stalls.json').state.stalls['riften-1dd1'] && !!crb && crb.items.length === 1 && crb.items[0].by === P1 &&
+      crb.items[0].baseId === 0x12eb7);
+  delete cp.dropbox.riften;
+  // Writing the register fills in its defaults (a claim's locked, Raven Rock's
+  // board), so what a person holds is compared, not the bytes.
+  const holdings = function (q) {
+    return JSON.stringify([Object.keys(q.claims).sort().map(function (k) { return [k, q.claims[k].by, q.claims[k].master || null, q.claims[k].rent || null]; }),
+                           q.notices, q.funds, q.dropbox]);
+  };
+  yes('C10 and nothing else a person holds in property.json moves: claims, keys, rent, posts, the other drop boxes and the funds',
+      holdings(cp) === holdings(cpWas));
+  const profileHeld = ['law.json', 'beds.json', 'farm-claims.json', 'books.json', 'last-left.json'];
+  yes('C3 nothing else a profile holds is touched: offices, beds, the farm, books and when they last left, byte for byte',
       profileHeld.every(function (f) { return fs.readFileSync(path.join(c.dir, 'private', f), 'utf8') === c.keep[f]; }));
   yes('C4 the parts that keep those say they found nothing of the characters\'',
       ['farms', 'property', 'books'].every(function (p) { return c.lines.indexOf('release: ' + p + ': nothing of theirs') >= 0; }));
@@ -620,7 +661,7 @@ try {
 
   // ============================================================ X: a wipe's list (#2668)
   const x = charactersOnly('wipe-list', { profiles: [], actors: [A1],
-    done: { saves: NOW, farms: NOW, property: NOW, embassy: NOW, dungeon: NOW, cargo: NOW, books: NOW } });
+    done: { saves: NOW, farms: NOW, property: NOW, embassy: NOW, dungeon: NOW, cargo: NOW, stalls: NOW, books: NOW } });
   yes('X1 only the merchants\' part runs, and then the list is gone (' + x.lines.join(' / ') + ')',
       x.lines.length === 3 && /^release: merchants: /.test(x.lines[1]) && /the list is gone/.test(x.lines[2]) &&
       !fs.existsSync(path.join(x.dir, 'private', 'deleted-characters.json')));
