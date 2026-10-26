@@ -178,10 +178,10 @@ if (reg) {
     (reg.notInRepo || []).filter((a) => a.status === 'made-from-game' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromGame')
       .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 3 &&
     shipList(shipRules, 'ShipMadeFromGame').length === 3);
-  yes('the five menus the launcher makes from the collection\'s mods are registered, held out by the Ship-Rules.ps1 list (#3113)',
+  yes('the six menus the launcher makes from the collection\'s mods are registered, held out by the Ship-Rules.ps1 list (#3113, #3127)',
     (reg.notInRepo || []).filter((a) => a.status === 'made-from-mods' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromMods')
-      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 5 &&
-    shipList(shipRules, 'ShipMadeFromMods').length === 5);
+      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 6 &&
+    shipList(shipRules, 'ShipMadeFromMods').length === 6);
   yes('community uploads and the collection\'s mods are dispositioned', (reg.dispositions || []).length >= 2 && (reg.dispositions || []).some((d) => /gallery/i.test(d.what)) && (reg.dispositions || []).some((d) => /collection/i.test(d.what)));
 }
 

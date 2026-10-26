@@ -1011,6 +1011,23 @@
         "Data\\Interface\\exported\\AHZHudInfo.swf"
       ],
       "issue": 3113
+    },
+    {
+      "path": "Data\\Interface\\quest_journal.swf",
+      "what": "SkyUI's journal with no Quick Save, Save, Load, Help, Creations or Installed Content on its System page (#3127): Settings, Mod Configuration, Controls and Quit stay (314,065 bytes, sha256 e1dbd80f11b83d4ee346dc6f02f4eafefc280831cc74b3d622a3b69827c77ed8).",
+      "published": "Never: the launcher makes it before every Play from the person's own SkyUI_SE.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
+      "source": "SkyUI's interface\\quest_journal.swf (SkyUI_SE.bsa, Nexus Mods mod 12604, file 749043), the file collection 7essxf installs, edited. What the repository holds is the edits, as the bytes that change, pinned to the sha256 of SkyUI's own file (launcher\\app\\FromGameModMenus.cs, written by scripts\\mods\\Build-ModMenus.py), not the file",
+      "creator": "SkyUI's authors; edited for Thornswood on 26 Oct 2026 by scripts\\mods\\Build-ModMenus.py",
+      "licence": "SkyUI's own terms on its Nexus Mods page, which do not let Thornswood hand the file on, edited or not, so it is made on each machine from the person's own copy",
+      "attribution": "The site's credits page says Thornswood ships none of SkyUI's files and makes this one from the person's own copy (#3127)",
+      "approved": "Patrick, 21 Oct 2026, #3127: remove the vanilla Skyrim menus and pieces Thornswood does not use, such as the vanilla help",
+      "evidence": "The measurement on #3127, 26 Oct 2026; launcher\\app\\FromGame.cs, FromGameModMenus.cs and MadeFromGame.cs; scripts\\mods\\Build-ModMenus.py; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromMods; tests\\test-2827-from-game.ps1; THIRD-PARTY.md, The collection's menus, with no gold values.",
+      "status": "made-from-mods",
+      "record": "scripts/release/Ship-Rules.ps1#ShipMadeFromMods",
+      "paths": [
+        "Data\\Interface\\quest_journal.swf"
+      ],
+      "issue": 3127
     }
   ],
   "dispositions": [

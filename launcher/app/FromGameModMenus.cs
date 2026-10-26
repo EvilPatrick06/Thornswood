@@ -131,7 +131,33 @@ namespace Thornswood
             },
         };
 
+        public static readonly MenuRecipe SkyUIJournal = new MenuRecipe
+        {
+            Mod = "SkyUI",
+            Archive = "SkyUI_SE.bsa",
+            Source = "interface\\quest_journal.swf",
+            SourceSize = 314053,
+            SourceSha256 = "0f5a76185c3db9701645dd46f8295d77e19bedee4593e4c641a20c103fb04b01",
+            Path = "Data\\Interface\\quest_journal.swf",
+            Size = 314065,
+            Sha256 = "e1dbd80f11b83d4ee346dc6f02f4eafefc280831cc74b3d622a3b69827c77ed8",
+            Edits = new[]
+            {
+                new MenuEdit(406597, 1, "99"),
+                new MenuEdit(406600, 1, "94"),
+                new MenuEdit(406601, 1, "00"),
+                new MenuEdit(406903, 1, "99"),
+                new MenuEdit(406906, 1, "2e"),
+                new MenuEdit(406907, 1, "00"),
+                new MenuEdit(408655, 1, "05"),
+                new MenuEdit(408656, 1, "00"),
+                new MenuEdit(409035, 1, "99"),
+                new MenuEdit(409038, 1, "6c"),
+                new MenuEdit(409039, 1, "00"),
+            },
+        };
+
         /// <summary>Every mod menu FromGame makes, in this order.</summary>
-        public static readonly MenuRecipe[] Mods = { SkyUIConfig, SkyUIItemCard, SkyHUDMenu, MoreHUDInfo, MoreHUDInfoExported };
+        public static readonly MenuRecipe[] Mods = { SkyUIConfig, SkyUIItemCard, SkyHUDMenu, MoreHUDInfo, MoreHUDInfoExported, SkyUIJournal };
     }
 }

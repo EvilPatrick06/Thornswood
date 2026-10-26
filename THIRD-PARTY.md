@@ -736,6 +736,14 @@ version of the file (`launcher\app\FromGameModMenus.cs`, written by
 `$ShipMadeFromMods` keeps the five out of every pack, release record and
 installer.
 
+SkyUI's journal (`interface\quest_journal.swf` in the same `SkyUI_SE.bsa`),
+the book Escape opens, is made the same way with six entries taken off its
+System page that Thornswood does not use (#3127): Quick Save, Save and Load,
+because a character lives on the server and not in a save; Help, Skyrim's own,
+which Thornswood's help panel replaced; and Creations and Installed Content,
+the Creation Club, since Thornswood is Special Edition only. It ships no more
+than the five above do, and `$ShipMadeFromMods` keeps it out the same way.
+
 `Data\SKSE\Plugins\QuickLootIE.json` does ship: QuickLoot IE 4.1.3's own
 settings file (Nexus Mods mod 120075, file 806802) with one line added, which
 sets its loot menu's columns to weight only. QuickLoot IE is under the GNU

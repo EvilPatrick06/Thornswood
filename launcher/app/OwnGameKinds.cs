@@ -441,6 +441,8 @@ namespace Thornswood
             "Data\\Interface\\hudmenu.swf",
             "Data\\Interface\\AHZHudInfo.swf",
             "Data\\Interface\\exported\\AHZHudInfo.swf",
+            // SkyUI's journal with no saving, loading, help or Creation Club (#3127).
+            "Data\\Interface\\quest_journal.swf",
         };
 
         /// <summary>Thornswood's by its name alone: NamedOurs, WrittenInGame, MadeInGame, or the client runtime.</summary>

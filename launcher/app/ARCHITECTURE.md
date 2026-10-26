@@ -398,7 +398,7 @@ or starts the Downgrade, each of which asks first or restarts the launcher.
 
 **MadeFromGame and FromGame** (MadeFromGame.cs, FromGame.cs,
 FromGameArchive.cs, FromGameDeflate.cs, FromGameMath.cs, and the recipes
-FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113). The main menu with no Bethesda
+FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113, #3127). The main menu with no Bethesda
 logo (`Data\Interface\startmenu.swf`) and the notice board and drop box
 meshes (`Data\meshes\thornswood\noticeboard01.nif`, `dropbox01.nif`) are
 Bethesda's files edited or put together, so Thornswood ships none of them:
@@ -426,7 +426,11 @@ own archives (`SkyUI_SE.bsa`, `SkyHUD.bsa`, `AHZmoreHUD.bsa`) with the edits
 `scripts\mods\Build-ModMenus.py` wrote into FromGameModMenus.cs, each pinned
 to the sha256 of the collection's version. `Ship-Rules.ps1
 $ShipMadeFromMods` keeps them out of every pack. QuickLoot IE's columns are
-set by its own settings file instead, which ships from `game\ours`.
+set by its own settings file instead, which ships from `game\ours`. SkyUI's
+journal (`Data\Interface\quest_journal.swf`, from `SkyUI_SE.bsa`) is made the
+same way with Quick Save, Save, Load, Help and the Creation Club entries taken
+off its System page (#3127), since a character lives on the server and the
+help panel replaced Skyrim's help.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile and the
@@ -731,7 +735,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 16 | `ShellPlay.cs:289 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
 | 17 | `ShellPlay.cs:298 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:301 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
-| 18b | `ShellPlay.cs:311 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf` |
+| 18b | `ShellPlay.cs:311 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Interface\quest_journal.swf` (#3127) |
 | 19 | `ShellPlay.cs:318 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
 | 20 | `ShellPlay.cs:325 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
 | 21 | `ShellPlay.cs:327 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |

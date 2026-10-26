@@ -33,15 +33,15 @@
        09d8ae92...).
     6. The same files compile at C# 5, which is what Windows PowerShell 5.1's
        Add-Type compiles, because scripts\release\Go.ps1 runs them there.
-    7. By the source: the three, then the collection's five menus, are
+    7. By the source: the three, then the collection's six menus, are
        FromGame.Files, Ship-Rules.ps1 $ShipMadeFromGame then
        $ShipMadeFromMods, and OwnGameKinds.cs MadeInGame alike; no release list
        ships them and no file at their paths is in the repository; Play, Scan
        and Fix, the own folder and Go.ps1 all make or keep them.
-    8. The collection's menus with no gold values (#3113, FromGameModMenus.cs,
+    8. The collection's menus with no gold values (#3113) and the journal (#3127, FromGameModMenus.cs,
        written by scripts\mods\Build-ModMenus.py from the mods' own archives,
        which no test machine has): on the made-up game, which has none of the
-       mods, each of the five says which archive it needs and nothing is made;
+       mods, each of the six says which archive it needs and nothing is made;
        each names its mod and both sha256s; a recipe for a file that is not a
        SWF takes its edits on the bytes as they are; and a mod file that is not
        the pinned one names the mod.
@@ -247,8 +247,8 @@ namespace Thornswood
             File.WriteAllBytes(Path.Combine(gone, FromGame.MenuFile), menu.Bytes);
             Yes("nor is one with other bytes", !FromGame.IsCurrent(gone, FromGame.MenuFile));
 
-            // The collection's menus with no gold values (#3113). The made-up
-            // game has none of the mods' archives, so each of the five says
+            // The collection's menus with no gold values (#3113) and the journal
+            // (#3127). The made-up game has none of the mods' archives, so each of the six says
             // which one it could not read, and nothing is made.
             List<FromGameFile> all = FromGame.Build(game);
             int mods = 0; bool named = true, pinned = true;
@@ -260,8 +260,8 @@ namespace Thornswood
                 if (f.Bytes != null || f.Problem == null || f.Problem.IndexOf(m.Archive, StringComparison.OrdinalIgnoreCase) < 0) named = false;
                 if (string.IsNullOrEmpty(m.Mod) || FromGame.Expected(m.Path) != m.Sha256 || m.Sha256.Length != 64 || m.SourceSha256.Length != 64 || m.Edits.Length == 0) pinned = false;
             }
-            Yes("a game with none of the collection's mods makes none of their five menus, and each reason names the archive it needs", mods == 5 && named);
-            Yes("each of the five names its mod, the sha256 of the mod's own file it is made from, and the sha256 it must come out at", pinned);
+            Yes("a game with none of the collection's mods makes none of their six menus, and each reason names the archive it needs", mods == 6 && named);
+            Yes("each of the six names its mod, the sha256 of the mod's own file it is made from, and the sha256 it must come out at", pinned);
 
             // A recipe for a file that is not a SWF (SkyUI's config.txt) takes
             // its edits on the bytes as they are. Tried on the made-up game's

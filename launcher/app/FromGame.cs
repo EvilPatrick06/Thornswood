@@ -42,7 +42,9 @@ namespace Thornswood
     /// one: SkyUI's item lists (interface\skyui\config.txt) and item card
     /// (itemcard.swf), SkyHUD's line under an item somebody looks at
     /// (hudmenu.swf), and moreHUD's value to weight beside it (AHZHudInfo.swf
-    /// and its copy under exported). Those are their authors' files, so they
+    /// and its copy under exported). SkyUI's journal (quest_journal.swf) is
+    /// made the same way with the System page entries Thornswood does not use
+    /// taken off (#3127). Those are their authors' files, so they
     /// are not handed on either: the edits (MenuRecipe.Mods, FromGameModMenus.cs,
     /// written by scripts\mods\Build-ModMenus.py) are made here against the
     /// person's own copy of each mod, out of its archive. A loose file at the

@@ -7753,7 +7753,7 @@
 
     And the game's journal cannot be switched off as a whole, because the
     Journal Menu is also what Escape opens, at its System page, which is where
-    people save, change settings and quit. The journal flag on
+    people change settings and quit (#3127 took saving off it). The journal flag on
     DisablePlayerControls is documented as leaving only the System page of
     the book, which takes the quest log mods still write to away from Escape
     as well, and the controls watchdog above turns every control back on
