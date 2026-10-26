@@ -1,0 +1,36 @@
+name: Work for the team
+description: For the Thornswood team. One piece of work for the board. To report a problem or an idea, pick one of the forms above.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What is wrong or wanted
+      description: What was seen or measured, and where. Quote the log line, or the file and line.
+    validations:
+      required: true
+  - type: textarea
+    id: cause
+    attributes:
+      label: What causes it
+      description: The cause, and how it was measured. If it is not known yet, say so; finding it is the work, and no fix goes out before it is known. A fix that hides the problem without removing its cause is not a fix (Developer-Guide.md, "Fix the cause, no band-aids").
+  - type: textarea
+    id: where
+    attributes:
+      label: Where it lives
+      description: Files, scripts, VPS folders.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      value: |
+        - [ ] 
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: What somebody can check to know it is finished.
+  - type: textarea
+    id: careful
+    attributes:
+      label: Be careful of
+      description: Anything that looks right and is not.

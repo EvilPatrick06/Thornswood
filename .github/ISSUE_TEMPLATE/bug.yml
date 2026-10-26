@@ -1,0 +1,54 @@
+name: Something is broken
+description: Something in the game, the launcher, the installer, the website, the bot or voice does not work as it should.
+labels: ["triage", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting it. Everybody can read an issue, so leave out anything private: passwords, keys, your email, other people's names. Read the [known issues](https://thornswood.net/known) first, in case it is there already. If the game or the launcher closes by itself, use the crash form instead.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where is it?
+      options:
+        - In the game
+        - The launcher
+        - The installer
+        - The website
+        - The Discord bot
+        - Voice
+        - Somewhere else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, in your own words. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: The steps, in the order you did them. If it only happened once, say so.
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: input
+    id: version
+    attributes:
+      label: Launcher version
+      description: The launcher shows it near the bottom of its side bar. Leave it empty if you do not know.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Logs, the time it happened, what you were doing before. A log names your Windows user folder; blank that out if you like.
