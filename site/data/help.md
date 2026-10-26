@@ -25,9 +25,9 @@ first. Anniversary Edition is not required.
 Thornswood leaves the Skyrim you already have alone. The launcher builds a
 game folder of its own, `C:\Thornswood\Game`, out of your Steam copy and what
 Vortex put into it. Most of it is hard links to your own files, which take no
-extra space, and the few files other programs rewrite are real copies. Vortex keeps the mods in a profile of their own, so
-switching back to your usual profile and running Purge Mods leaves your own
-Skyrim the way it was.
+extra space, and the few files other programs rewrite are real copies. Vortex
+keeps the mods in a profile of their own, so switching back to your usual
+profile and running Purge Mods leaves your own Skyrim the way it was.
 
 1. From the [Downloads](/downloads) page take the installer. One file. Run it.
    It fetches Thornswood's own content while you watch, about half a gigabyte,
@@ -40,7 +40,7 @@ Skyrim the way it was.
 3. Install the collection in Vortex. The link is on the Downloads page and on
    the launcher's Diagnostics page. Not optional: without it you have a launcher
    and no mods, and the server turns you away when you press Play.
-4. Press **Connect Discord** on the launcher's front page. Your browser opens,
+4. Press **Connect Discord** on the launcher's Play page. Your browser opens,
    you say yes, and it closes itself. You never do this again.
 <!-- alpha -->
    It works once your application has been accepted; before that it says
@@ -48,24 +48,20 @@ Skyrim the way it was.
    fix.
 <!-- /alpha -->
 
-## Updating to collection revision 2
+## When the mods need updating
+
+The mods are a collection on Nexus, and the collection has revisions. When the
+server moves to a new one, the launcher says **Your mods need updating** above
+Play and names the revision.
 
 Close the game, select the Thornswood profile in Vortex, and update the
-collection to **revision 2**. Let Vortex finish installing and deploying it.
-Then open the Thornswood launcher and let its update finish before pressing
-Play. The collection supplies the mod baseline; the launcher supplies
-Thornswood's newer content and generated behavior and covered body files.
+collection to that revision. Let Vortex finish installing and deploying it,
+then open the launcher and let its own update finish before you press Play.
+The collection brings the other authors' mods; the launcher brings
+Thornswood's own files.
 
-Keep **CBBE.esp** and **RaceMenuMorphsCBBE.esp** switched off. In the 3BA
-installer use the Nevernude body, leave prebuilt meshes off, choose Full SMP
-and No SOS, and do not install the optional CBPC configuration. The mandatory
-base component can remain selected; the separate CBPC physics mod is absent
-from this revision.
-
-If the launcher reports a plugin mismatch, open **Diagnostics**, press
-**Scan**, then **Fix**. Use the Thornswood shortcut for the main world and the
-Dev shortcut for testing. Each has its own game folder and update source, so
-updating one keeps the other separate.
+If the launcher reports a plugin mismatch after that, open **Diagnostics**,
+press **Scan**, then **Fix**.
 
 <a id='defender'></a>
 
@@ -98,26 +94,26 @@ when it starts. If one differs it says so. See LOAD ORDER ERROR below.
 
 ## Your first character
 
-The game loads to its main menu and asks who you are today. Pick an empty slot
-to make a new character. Nothing about a character is chosen in the launcher.
+The game loads to its main menu and lists your characters, with an empty slot
+for a new one. Pick the empty slot to make a character. Nothing about a
+character is chosen in the launcher.
 
 You arrive dressed in a plain tunic and boots in a quiet stone hall.
 The race menu opens there to make your face, with your clothes kept on as you
-change race. When you are done, the panel behind **K** opens by itself.
-That panel is where the rest is
-chosen: your profession and the half of it you will make your own, your class,
-and your Home, which is the town you wake up in. Those are the choices on the
-[Professions](/classes) page.
+change race. When you are done, the panel behind **K** opens by itself. That panel is
+where the rest is chosen: your profession and the half of it you will make your
+own, your class, and your Home, the town you start in. Those are the choices
+on the [Professions](/classes) page.
 
 Only the town has to be chosen before you leave the hall. Your class and
 profession can wait, and can be picked later in the world from the same panel.
-Press **Confirm** on the Review page and you wake up at the inn in the town you
-chose.
+Press **Confirm** on the Review page and you are sent to a quiet spot in or
+near the town you chose, not its inn.
 
-Nothing else is handed out at the start, except a tool to the four picks whose
-work needs one: a Miner is handed a pickaxe, a Woodworker a woodcutter's axe
-and a Farmer a shovel and seed to sow. A Fisher is handed a crude fishing pole.
-Each tool is supplied at the moment its pick is made.
+You start with forty gold, once, and nothing else is handed out, except a tool
+to the four picks whose work needs one: a Miner is handed a pickaxe, a
+Woodworker a woodcutter's axe, a Farmer a shovel and seed to sow, and a Fisher
+a crude fishing pole. Each tool is handed over at the moment its pick is made.
 
 ## Keys
 
@@ -142,6 +138,28 @@ closed.
   K, P and J panels opens it too.
 - **F1** turns the names over heads off and on, and **F2** hides and shows the
   overlay.
+
+## Talking
+
+A line typed in the chat reaches the people near you, in the same place and
+within about 60 metres, the same as the line drawn over your head. Treat it as
+the room rather than the whole server. Text chat is kept, with the name and
+the time. Voice is not recorded.
+
+A few ways of saying a line are typed at the start of it:
+
+- **/me** and what your character does, or **/do** and what there is to see.
+  **/me** draws a sword is an attempt: whether it lands is the other person's.
+- **/w** whispers it to the people closest to you, and **/s** or **/y** shouts
+  it further.
+- **/ooc** and what you meant, out of character, in double brackets with your
+  name on it. `/ooc can we not` ends any scene at once; the [rules](/rules)
+  say what that means.
+- **/roll 20** rolls one twenty sided die, and **/roll 6x3** three six sided
+  ones. The server rolls it, and the same people /ooc reaches see the result.
+
+Everything else you do in the world is a key, a button or a panel, never a
+line in the chat.
 
 ## Dyeing your hair
 
@@ -194,13 +212,20 @@ using it to get out of a fight or to travel can mean a warning or a ban.
 
 ## When something goes wrong
 
-1. Look at [Known Issues](/known) first. A lot of what looks like a bug is a
-   limit of how a shared Skyrim works, and it is written down there with the
-   reason.
+1. Look at [Known Issues](/known) first. It lists what is broken right now
+   that the team already knows about. What works the way it does on purpose
+   is under Things that are normal here, below.
 2. If it is not there, [report it](/report). One line about what happened is
    enough to start with.
 3. If you have a screenshot or a crash log, drag it into your ticket in the
    Discord, or say in the report that you have one. Where the logs are is below.
+
+A launcher last opened before 26 September says it cannot read the update
+source, or never offers an update. Updates come only from thornswood.net now,
+and a launcher that old still looks for them where they used to be, so it
+cannot find the new place by itself. Take the installer again from the
+[Downloads](/downloads) page and run it over your install. Your characters live
+on the server and nothing is lost.
 
 ## LOAD ORDER ERROR
 
@@ -255,24 +280,38 @@ opens the launcher log on its own.
 ## Things that are normal here
 
 - No saving. The server holds your character. Quitting is safe.
-- Most mod settings menus keep your choices: MCM Helper menus in a file on
-  your machine, and Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and
-  chfshVariousActions on the server, with your character. QuickLoot, the
-  instrument menu, MCM Recorder and SkyUI's favourite group and unequip options
-  still forget themselves every session, because there is no save to write
-  them to.
 - No levelling, no fast travel, and the difficulty is fixed at Expert.
+- Sleeping and waiting do not move the clock. Time is shared, so it runs at
+  the server's pace for everybody.
+- Menus do not pause the world: the inventory, the crafting menu and the map
+  all keep it running.
+- The console opens for a moment and shuts again. It is the same for
+  everybody, and the [rules](/rules) say why.
 - The creation hall is a bare room. Your face is made there, and everything
   else is chosen on the panel that opens by itself once it is done.
+- The server owns where you are, your health, magicka and stamina, death and
+  respawn, your inventory and what you wear, what is in every container,
+  whether a door is open, which plants are picked, and your character's
+  values. A mod that changes one of those on your own machine is put back.
+- Fishing is the Fisher's trade. With a pole a woodwright makes, press **E**
+  at the fish in the water. The [Professions](/classes) page has the rest.
+- Mods are added in batches rather than one at a time, because every addition
+  moves the load order for everybody at once.
 
 All of that is deliberate. None of it is worth reporting. [Known Issues](/known)
-covers the rest of what a shared Skyrim cannot do, and which of it is going to
-change.
+lists what is broken right now.
+
+## When you die
+
+You wake at the temple of the hold you died in. A hold with no temple of its
+own sends you to the nearest temple or Hall of the Dead, and anywhere on
+Solstheim sends you to Raven Rock. Nobody else can end your character without
+your agreement; the [rules](/rules) say how that works.
 
 ## Restart warnings
 
-A countdown in the chat comes first. A notice means the world freezes for a few
-seconds and your game does not close. For an update, your launcher closes the
-game when the count runs out, installs it and puts you back in, unless it
-already has it. A restart means the server is going down: get somewhere safe
-and log out before then.
+A countdown in the chat and on screen comes first. A notice means the world
+freezes for a few seconds and your game does not close. For an update, your
+launcher closes the game when the count runs out, installs it and puts you
+back in, unless it already has it. A restart means the server is going down:
+get somewhere safe and log out before then.

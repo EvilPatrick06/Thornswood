@@ -153,7 +153,7 @@ Skyrim, except everybody's in the same one.
 It lives on the site, so it can't go stale in here.
 
 **<https://thornswood.net/help>** installing, joining, where your logs are
-**<https://thornswood.net/known>** what's broken on purpose, and why
+**<https://thornswood.net/known>** what's broken right now that we know about
 **<https://thornswood.net/roadmap>** what's being built
 **<https://thornswood.net/credits>** who made what
 
@@ -338,24 +338,20 @@ all.
 
 **Why can't I save?**
 Your character lives on the server, so quit whenever you like, nothing is lost.
-The annoying part is that mod settings menus reset every session. There's no
-save file for them to write to.
+A few mod settings menus still reset every session, because there's no save
+file for them to write to. **https://thornswood.net/known** names them.
 
 **Why is that NPC just standing there?**
-You're not close enough. Whoever is nearest is the one running them. Nobody
-nearby, nobody home.
-
-**We fought the same bandit and he did completely different things.**
-Yep. Hosting swaps every couple of seconds, so whoever had him at that moment
-decided what he did. It's the price of the world being shared.
+The server runs the NPCs, so they carry on whether anybody is near or not. One
+frozen in place that never moves is worth a report in <#RESULTS>.
 
 **Fast travel?**
 Off. So is levelling. Difficulty is locked.
-**https://thornswood.net/known** says why, for all three.
+**https://thornswood.net/help** lists what works this way on purpose.
 
 **Something's broken.**
-Check **https://thornswood.net/known** first. A lot of it is on that list and a
-lot of that is on purpose. If it isn't there, <#RESULTS>.
+Check **https://thornswood.net/known** first. It lists what is broken right now
+that we already know about. If it isn't there, <#RESULTS>.
 
 """ + (_FAQ_IN_OPEN if OPEN else _FAQ_IN_ALPHA) + "\n"
 
@@ -366,7 +362,7 @@ LINKS = """\
 Everything in one place: the installer, help, what is broken, what is coming.
 
 **Install help** https://thornswood.net/help
-**What is broken on purpose** https://thornswood.net/known
+**What is broken right now** https://thornswood.net/known
 **What is coming** https://thornswood.net/roadmap
 **Report something** https://thornswood.net/report
 **Send a screenshot or a log** https://thornswood.net/uploads
@@ -590,10 +586,14 @@ CHANGES = {
     'WELCOME': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '4a290d7afd52'),
         ('2026-10-22', 'The help, known issues, roadmap and credits lines are links you can click, and the playtest application is in its own channel now.', 'a290f9d3bc8f'),
+        ('2026-10-26', 'The known issues link now says what that page is: what is broken right now that we know about. What works that way on purpose is on the help page.', 'ce6ac2b915a6'),
+        ('2026-10-26', 'Only the line breaks of the Vortex profile sentence moved; no words changed.', '938f8250a962'),
     ],
     'START': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Logs and crash files now go in #test-findings, since #logs-and-crashes is gone.', '8a49f1c3335b'),
         ('2026-10-22', 'Step 1, the playtest application, is in its own channel now.', '9464b08ac76a'),
+        ('2026-10-26', 'If it goes wrong: the known issues page lists what is broken right now, and the help page has what works that way on purpose.', 'ca32544d805a'),
+        ('2026-10-26', 'Your first character has its own section: the stone hall, the nine towns you can start in and where you arrive, what waits on a class or a profession, and the tool a Miner, a Farmer, a Fisher or a Woodworker is handed. Connect Discord is on the Play page, and voice names its keys: hold V to talk, O keeps the microphone open, B steps between whisper, normal and yell.', 'e4e76eaea6bf'),
     ],
     'NEWS': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '90be4dab837f'),
@@ -601,10 +601,13 @@ CHANGES = {
     'FAQ': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Something broken now points at #test-findings, since #bugs is gone.', '199e5f79c8af'),
         ('2026-10-22', 'The playtest application and help tickets are each in their own channel now.', 'f4cf53ba6ce4'),
+        ('2026-10-26', 'NPCs carry on with nobody near now, so the answers about NPCs standing still and the same bandit acting differently are gone. Only a few mod menus still reset, and the known issues page lists only what is actually broken.', 'a2dbef6430b1'),
+        ('2026-10-26', 'Only a comma and some line breaks moved; no answer changed.', '91bab9b34c87'),
     ],
     'GAMERULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '037bba896ff5'),
         ('2026-10-22', 'Titles: a Jarl seat is asked for on the Jarl application, which lists only the holds with no Jarl, and a Jarl names their hold\'s steward, court and guards.', '859039c7cdd4'),
+        ('2026-10-26', 'The chat log is read only by the Owner, the Co-Owner and the Dev rank, and is kept for 365 days, then dropped.', '755ede28b88f'),
     ],
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),
