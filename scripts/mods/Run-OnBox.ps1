@@ -36,9 +36,10 @@
 
   WHAT GOES UP. The commit, never the working tree: the tools, the plugins
   and the tables they read (scripts\mods, scripts\dev, game\content,
-  game\data, records, layout.json, and every other file a Python builder of
-  scripts\mods\content-tables.json reads or writes, game\gamemode.js among
-  them) as one artifact (Artifact.ps1, #459), so
+  game\data, records, layout.json, and every other file a builder of
+  scripts\mods\content-tables.json reads, uses or writes, game\gamemode.js
+  and the K panel's book in game\ui among them) as one artifact
+  (Artifact.ps1, #459), so
   an uncommitted change under those folders refuses the run before the box
   is asked anything. Commit it first; what ran is then a commit anyone can
   name.
@@ -67,11 +68,13 @@
   priority, because the box is also where both game servers run.
 
   WHAT COMES BACK. Every file under game\, records\ and docs\systems\ that
-  the tool wrote or changed, by sha256 against what was sent, and nothing
-  else (Rebuild-ContentTables.ps1 writes the cut item list into
-  docs\systems). It is put into this checkout at the same path, and listed,
-  so git diff shows what the run did. A tool that changed nothing brings
-  nothing back.
+  the tool wrote or changed, by sha256 against what was sent, and every
+  other file a builder of the chain writes (Build-MerchantRetrievalSources.py
+  writes tests\fixtures\merchant-retrieval-records.json, which until #3425
+  a box run rewrote and never brought back), and nothing else
+  (Rebuild-ContentTables.ps1 writes the cut item list into docs\systems).
+  It is put into this checkout at the same path, and listed, so git diff
+  shows what the run did. A tool that changed nothing brings nothing back.
 
   The tools themselves are unchanged: run on One, they read
   C:\Thornswood\Game\Data as before.
@@ -121,27 +124,41 @@ foreach ($a in $Arguments) {
 
 $serverRoot = $(if ($Server -eq 'main') { 'C:\Thornswood-Server' } else { 'C:\Thornswood-Server-Dev' })
 $paths = @('scripts/mods', 'scripts/dev', 'game/content', 'game/data', 'records', 'layout.json')
-# And whatever else a builder of the content chain reads or writes
+# And whatever else a builder of the content chain reads, uses or writes
 # (scripts\mods\content-tables.json). Until #2962 the artifact held only the
 # folders above, so every builder that writes its table into game\gamemode.js
 # (the building holds, the woodworking benches, the doors and five more)
 # stopped on the box with "No such file" for gamemode.js, and the one that
 # reads docs\systems\cut-items.json would have too. Every builder since
-# #3100, not only the Python ones, because the whole chain runs here.
+# #3100, not only the Python ones, because the whole chain runs here. Until
+# #3425 the list named only the tables, so the K panel's book that
+# Build-SpellTable.ps1 reads (game\ui) and the game scripts
+# Build-MerchantGamemode.js embeds never went up, and the run stopped at the
+# spell table; their uses name them now.
 $chainFiles = [IO.File]::ReadAllText((Join-Path $Here 'content-tables.json')) | ConvertFrom-Json
 foreach ($s in @($chainFiles.steps)) {
-    foreach ($p in @(@($s.reads) + @($s.readsBack) + @($s.writes) | Where-Object { $_ })) {
+    foreach ($p in @(@($s.reads) + @($s.readsBack) + @($s.uses) + @($s.writes) | Where-Object { $_ })) {
         $p = [string]$p
         if (-not @($paths | Where-Object { $p -eq $_ -or $p.StartsWith($_ + '/') }).Count) { $paths += $p }
     }
+}
+# What comes back: game\, records\ and docs\systems\, and every file a
+# step writes outside them, so a table a builder writes is never left on
+# the box (#3425).
+$watch = @('game', 'records', 'docs/systems')
+foreach ($p in @($chainFiles.steps | ForEach-Object { @($_.writes) } | Where-Object { $_ })) {
+    $p = [string]$p
+    if (-not @($watch | Where-Object { $p -eq $_ -or $p.StartsWith($_ + '/') }).Count) { $watch += $p }
 }
 # And every script a builder, or this run's own tool, loads from beside it
 # outside the folders above, and what that one loads in turn: a .ps1's
 # . (Join-Path $PSScriptRoot '<path>') and a .js's require('./<path>').
 # Build-RecipeTable.ps1 loads scripts\deploy\ServerOrder.ps1, which loads
-# scripts\release\Read-JsonFile.ps1.
+# scripts\release\Read-JsonFile.ps1. A game script a step uses is read the
+# same way: game\merchant-commissions.js requires
+# .\merchant-commission-state.js beside it.
 $load = New-Object 'Collections.Generic.Queue[string]'
-foreach ($t in @(@($chainFiles.steps | ForEach-Object { [string]$_.tool }) + $tool)) { $load.Enqueue($t) }
+foreach ($t in @(@($chainFiles.steps | ForEach-Object { [string]$_.tool }) + @($chainFiles.steps | ForEach-Object { @($_.uses) } | Where-Object { $_ -like '*.js' -or $_ -like '*.ps1' }) + $tool)) { $load.Enqueue([string]$t) }
 $seen = @{}
 while ($load.Count) {
     $t = $load.Dequeue()
@@ -158,7 +175,7 @@ while ($load.Count) {
         }
         $p = $parts -join '/'
         if ($t -like '*.js' -and -not [IO.Path]::GetExtension($p)) { $p += '.js' }
-        if ($p -notmatch '^scripts/') { continue }
+        if ($p -notmatch '^(scripts|game)/' -or -not (Test-Path -LiteralPath (Join-Path $repo $p) -PathType Leaf)) { continue }
         if (-not @($paths | Where-Object { $p -eq $_ -or $p.StartsWith($_ + '/') }).Count) { $paths += $p }
         $load.Enqueue($p)
     }
@@ -179,7 +196,7 @@ try {
     $runFar = $box.Far
     foreach ($l in $box.Said) { Say ('box  ' + $l) 'DarkGray' }
     if (-not $box.Made) { throw ('could not make ' + $run + ' on the box. What ssh said is above.') }
-    $farRun = Get-ThornswoodOnBoxScript -Run $run -ServerRoot $serverRoot -Tool $tool -Arguments $Arguments
+    $farRun = Get-ThornswoodOnBoxScript -Run $run -ServerRoot $serverRoot -Tool $tool -Arguments $Arguments -Watch $watch
     # The run's own script goes into its folder, so it goes with the folder.
     $farFile = Join-Path $local 'run.ps1'
     [IO.File]::WriteAllText($farFile, $farRun, (New-Object Text.UTF8Encoding($true)))
@@ -208,11 +225,12 @@ try {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $zip = [IO.Compression.ZipFile]::OpenRead($back)
         try {
-            # Only what the box listed, and only under game/, records/ and docs/systems/.
+            # Only what the box listed, and only what it watches (game/,
+            # records/, docs/systems/ and the chain's other writes).
             foreach ($e in $zip.Entries) {
                 $p = $e.FullName.Replace('\', '/')
-                if ($changed -notcontains $p -or $p -notmatch '^(game|records|docs/systems)/' -or $p -match '(^|/)\.\.(/|$)') {
-                    throw ("the box sent back $p, which it did not list as written under game/, records/ or docs/systems/. This checkout was not changed.")
+                if ($changed -notcontains $p -or -not @($watch | Where-Object { $p -eq $_ -or $p.StartsWith($_ + '/') }).Count -or $p -match '(^|/)\.\.(/|$)') {
+                    throw ("the box sent back $p, which it did not list as written under " + ($watch -join ', ') + '. This checkout was not changed.')
                 }
             }
             Say ''
@@ -226,7 +244,7 @@ try {
         } finally { $zip.Dispose() }
     } else {
         Say ''
-        Say 'the tool wrote nothing under game/, records/ or docs/systems/' 'DarkGray'
+        Say ('the tool wrote nothing under ' + ($watch -join ', ')) 'DarkGray'
     }
 } finally {
     if ($box) {
