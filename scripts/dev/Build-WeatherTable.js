@@ -23,6 +23,14 @@
 //   kind   DATA byte 11, the classification flags: 1 pleasant, 2 cloudy,
 //          4 rainy, 8 snow, and 16 on top of any of them for a permanent
 //          aurora. The same bits Weather.getClassification answers from.
+//   storm  a rainy or snowy weather whose editor id names it a storm (#3176):
+//          the blizzards and the heavy storms that slow travel. The record
+//          has no storm flag, and neither of the two numbers above can tell
+//          one: Cathedral Weathers gives SkyrimStormRain and
+//          SkyrimOvercastRain the same wind of 85, and both are rainy. The
+//          only place the record says which is a storm is its name, which is
+//          how Bethesda (SkyrimStormRain, SkyrimStormSnow) and Cathedral
+//          Weathers (xStormRain, xStormSnow) both tell them apart.
 //
 // WHAT IT IS WORTH is balance and lives in NEEDS.weather in gamemode.js, the
 // same split as the warmth table.
@@ -34,9 +42,11 @@
 //   node scripts\dev\Build-WeatherTable.js
 //   node scripts\dev\Build-WeatherTable.js --print
 //
-// Exit code 1 if a plugin will not parse, if no weather is found, or if the
+// Exit code 1 if a plugin will not parse, if no weather is found, if the
 // known blizzard does not come out as the windiest thing in the base game,
-// which is the one check that says the byte offset is still right.
+// which is the one check that says the byte offset is still right, or if
+// Bethesda's own storms stop reading as storms and its overcast rain starts
+// to.
 const fs = require('fs');
 const path = require('path');
 const { pluginPath, loadedOrder } = require('./OwnPlugins.js');
@@ -56,6 +66,14 @@ const PRINT = args.indexOf('--print') !== -1;
 // blizzard stops being the windiest weather in Skyrim.esm, byte 0 is not the
 // wind any more and every number in this table is noise.
 const CANARY = 'SkyrimStormSnow';
+
+// The storm rule, and the four records that prove it still sorts the load
+// order the way the name says: Bethesda's storm rain and blizzard are storms,
+// its overcast rain and overcast snow are not.
+const STORM_NAME = /Storm/;
+const STORMS = ['SkyrimStormRain', 'SkyrimStormSnow'];
+const CALM = ['SkyrimOvercastRain', 'SkyrimOvercastSnow'];
+function isStorm(k, e) { return (k & 12) !== 0 && STORM_NAME.test(e || ''); }
 
 function fail(msg) { console.error('FAIL  ' + msg); process.exitCode = 1; }
 
@@ -121,11 +139,10 @@ function walk(b, start, end, mast, self) {
               : b.slice(j + 24, j + 24 + dataSize);
             const s = subrecords(rec);
             if (s.DATA && s.DATA.length >= 12) {
-              items[descOf(formId, mast, self)] = {
-                w: s.DATA[0],
-                k: s.DATA[11],
-                e: s.EDID ? s.EDID.toString('latin1', 0, s.EDID.length - 1) : ''
-              };
+              const e = s.EDID ? s.EDID.toString('latin1', 0, s.EDID.length - 1) : '';
+              const row = { w: s.DATA[0], k: s.DATA[11], e: e };
+              if (isStorm(row.k, e)) { row.s = 1; }
+              items[descOf(formId, mast, self)] = row;
             }
           } catch (e) { /* one unreadable weather is not the end of it */ }
         }
@@ -162,6 +179,10 @@ for (const r of rows) {
 }
 if (!canary) { fail('the canary weather ' + CANARY + ' is not in this load order'); }
 else if (canary.w < 100) { fail(CANARY + ' reads a wind of ' + canary.w + ', which is not a blizzard'); }
+for (const r of rows) {
+  if (STORMS.indexOf(r.e) !== -1 && !r.s) { fail(r.e + ' does not read as a storm'); }
+  if (CALM.indexOf(r.e) !== -1 && r.s) { fail(r.e + ' reads as a storm'); }
+}
 
 const maxWind = windiest ? windiest.w : 0;
 
@@ -197,7 +218,10 @@ function install() {
   let src;
   try { src = fs.readFileSync(gm, 'utf8'); } catch (e) { fail('no gamemode.js to install into'); return; }
   const thin = {};
-  Object.keys(items).sort().forEach(function (d) { thin[d] = { w: items[d].w, k: items[d].k }; });
+  Object.keys(items).sort().forEach(function (d) {
+    thin[d] = { w: items[d].w, k: items[d].k };
+    if (items[d].s) { thin[d].s = 1; }
+  });
   const line = 'const WEATHER = ' + JSON.stringify({ most: maxWind, mid: midWind, items: thin }) + ';';
   const re = /^const WEATHER = .*;$/m;
   const next = re.test(src)
@@ -222,7 +246,8 @@ if (process.exitCode === 1) {
     builtBy: 'scripts\\dev\\Build-WeatherTable.js',
     builtAt: new Date().toISOString(),
     source: 'the WTHR records of ' + parsed + ' plugins in load order',
-    readFrom: 'DATA byte 0 for the wind speed, DATA byte 11 for the classification flags',
+    readFrom: 'DATA byte 0 for the wind speed, DATA byte 11 for the classification flags, ' +
+              'and s for a rainy or snowy weather whose editor id names it a storm',
     note: 'what a wind is WORTH is balance and lives in NEEDS.weather in gamemode.js',
     canary: CANARY + ' at ' + (canary ? canary.w : '-'),
     most: maxWind,

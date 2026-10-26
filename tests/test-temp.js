@@ -750,6 +750,64 @@ if (block) {
         yes('a client that sends the word alone still gets a temperature',
             api.view(21).temp < 30);
       }
+
+      /*
+        A BLIZZARD OR A HEAVY STORM SLOWS TRAVEL BY 15 PER CENT (#3176).
+
+        Patrick's page answer of 22 Oct, B. The record has no storm flag and
+        the two numbers in the table cannot tell one (Cathedral's storm rain
+        and overcast rain both blow at 85 and both are rainy), so the builder
+        marks a rainy or snowy weather whose name says Storm, and these are the
+        records that prove which way that sorts.
+      */
+      if (sky && sky.items) {
+        const byName = {};
+        for (const d of Object.keys(sky.items)) { byName[sky.items[d].e] = d; }
+        const marked = function (e) { return !!(byName[e] && W.items[byName[e]] && W.items[byName[e]].s); };
+        yes('Bethesda\'s blizzard and storm rain are storms in the installed table',
+            marked('SkyrimStormSnow') && marked('SkyrimStormRain'));
+        yes('and so are the storms the season roll picks, Cathedral\'s',
+            marked('xStormSnow') && marked('xStormRain') && marked('SkyrimStormSnow_WildernessOnly'));
+        yes('but overcast rain and overcast snow are not',
+            byName.SkyrimOvercastRain && byName.xOvercastRain && byName.SkyrimOvercastSnow &&
+            !marked('SkyrimOvercastRain') && !marked('xOvercastRain') && !marked('SkyrimOvercastSnow'));
+        const odd = Object.keys(W.items).filter(function (d) {
+          return W.items[d].s && !(W.items[d].k & 12);
+        });
+        yes('every storm is rainy or snowy' + (odd.length ? ' (not ' + odd.join(', ') + ')' : ''),
+            odd.length === 0);
+        const drift = Object.keys(sky.items).filter(function (d) {
+          return !!sky.items[d].s !== !!(W.items[d] && W.items[d].s);
+        });
+        yes('and the gamemode marks the same storms weather.json does' +
+            (drift.length ? ' (not ' + drift.join(', ') + ')' : ''), drift.length === 0);
+
+        function speedIn(opts) {
+          const api = rig();
+          api.view(22);
+          const id = opts.sky ? api.idOf(opts.sky).toString(16) : '-';
+          api.place(22, opts.place || 'outdoors', id, '0', opts.roof ? '1' : '0', '0');
+          if (opts.wear) { api.dress(22, opts.wear); }
+          api.minutes(1);
+          const n = api.settle(22);
+          return { speed: Number(api.effects(22, n).speedMult) || 0, view: api.view(22) };
+        }
+        const stormRain = byName.xStormRain, calmRain = byName.xOvercastRain;
+        const blizzard = byName.xStormSnow, calmSnow = byName.xOvercastSnow;
+        if (stormRain && calmRain && blizzard && calmSnow) {
+          yes('a heavy storm is 15 slower than rain in the same place',
+              speedIn({ place: 'rain', sky: stormRain }).speed - speedIn({ place: 'rain', sky: calmRain }).speed === -15);
+          yes('and a blizzard is 15 slower than falling snow',
+              speedIn({ place: 'snow', sky: blizzard }).speed - speedIn({ place: 'snow', sky: calmSnow }).speed === -15);
+          yes('but none of it reaches somebody under a roof',
+              speedIn({ place: 'indoors', sky: blizzard, roof: true }).speed ===
+              speedIn({ place: 'indoors', sky: calmSnow, roof: true }).speed);
+          yes('the Body page is told the storm slows them by 15',
+              speedIn({ place: 'snow', sky: blizzard }).view.storm === 15 &&
+              speedIn({ place: 'snow', sky: calmSnow }).view.storm === 0 &&
+              speedIn({ place: 'indoors', sky: blizzard, roof: true }).view.storm === 0);
+        }
+      }
     }
   }
 

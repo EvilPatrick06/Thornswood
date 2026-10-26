@@ -2,7 +2,7 @@
   "builtBy": "scripts\\dev\\Build-WeatherTable.js",
   "builtAt": "2026-10-21T09:37:26.577Z",
   "source": "the WTHR records of 101 plugins in load order",
-  "readFrom": "DATA byte 0 for the wind speed, DATA byte 11 for the classification flags",
+  "readFrom": "DATA byte 0 for the wind speed, DATA byte 11 for the classification flags, and s for a rainy or snowy weather whose editor id names it a storm",
   "note": "what a wind is WORTH is balance and lives in NEEDS.weather in gamemode.js",
   "canary": "SkyrimStormSnow at 150",
   "most": 200,
@@ -117,7 +117,8 @@
     "10c32f:Skyrim.esm": {
       "w": 102,
       "k": 20,
-      "e": "FXSkyrimStormBlowingGrass"
+      "e": "FXSkyrimStormBlowingGrass",
+      "s": 1
     },
     "10a7a8:Skyrim.esm": {
       "w": 38,
@@ -162,7 +163,8 @@
     "10a241:Skyrim.esm": {
       "w": 85,
       "k": 4,
-      "e": "SkyrimStormRainTU"
+      "e": "SkyrimStormRainTU",
+      "s": 1
     },
     "10a240:Skyrim.esm": {
       "w": 25,
@@ -187,7 +189,8 @@
     "10a23c:Skyrim.esm": {
       "w": 85,
       "k": 4,
-      "e": "SkyrimStormRainFF"
+      "e": "SkyrimStormRainFF",
+      "s": 1
     },
     "10a23b:Skyrim.esm": {
       "w": 150,
@@ -327,7 +330,8 @@
     "d4886:Skyrim.esm": {
       "w": 125,
       "k": 20,
-      "e": "FXMagicStormRain"
+      "e": "FXMagicStormRain",
+      "s": 1
     },
     "d299e:Skyrim.esm": {
       "w": 102,
@@ -337,12 +341,14 @@
     "c8221:Skyrim.esm": {
       "w": 150,
       "k": 8,
-      "e": "SkyrimStormSnow"
+      "e": "SkyrimStormSnow",
+      "s": 1
     },
     "c8220:Skyrim.esm": {
       "w": 85,
       "k": 4,
-      "e": "SkyrimStormRain"
+      "e": "SkyrimStormRain",
+      "s": 1
     },
     "c821f:Skyrim.esm": {
       "w": 85,
@@ -527,7 +533,8 @@
     "32336:Dragonborn.esm": {
       "w": 200,
       "k": 8,
-      "e": "DLC02VolcanicAshStorm01"
+      "e": "DLC02VolcanicAshStorm01",
+      "s": 1
     },
     "31ac0:Dragonborn.esm": {
       "w": 43,
@@ -552,7 +559,8 @@
     "808:Cathedral Weathers.esp": {
       "w": 200,
       "k": 8,
-      "e": "SkyrimStormSnow_WildernessOnly"
+      "e": "SkyrimStormSnow_WildernessOnly",
+      "s": 1
     },
     "817:Cathedral Weathers.esp": {
       "w": 44,
@@ -572,12 +580,14 @@
     "81b:Cathedral Weathers.esp": {
       "w": 150,
       "k": 8,
-      "e": "xStormSnow"
+      "e": "xStormSnow",
+      "s": 1
     },
     "81c:Cathedral Weathers.esp": {
       "w": 200,
       "k": 8,
-      "e": "xStormSnow_WildernessOnly"
+      "e": "xStormSnow_WildernessOnly",
+      "s": 1
     },
     "81d:Cathedral Weathers.esp": {
       "w": 25,
@@ -592,7 +602,8 @@
     "88a:Cathedral Weathers.esp": {
       "w": 85,
       "k": 4,
-      "e": "xStormRain"
+      "e": "xStormRain",
+      "s": 1
     }
   }
 }

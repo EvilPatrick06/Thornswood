@@ -1893,6 +1893,8 @@
       'You are ' + (PLACE_WORDS[v.place] || 'somewhere the server does not know yet') +
       (v.roof ? ', under a roof' : ', with no roof') + (v.night ? ', at night' : '') + ', with ' + fire + '. ' +
       'Weather and height are worth ' + (Number(v.exposure) || 0) + '. ' +
+      // A blizzard or a heavy storm (#3176), the server's own number.
+      (Number(v.storm) > 0 ? 'The storm slows you by ' + Number(v.storm) + ' per cent while you are out in it. ' : '') +
       'What you are wearing covers ' + (Number(v.cover) || 0) + ' per cent of you.'));
     var worn = Array.isArray(v.worn) ? v.worn : [];
     if (!worn.length) {

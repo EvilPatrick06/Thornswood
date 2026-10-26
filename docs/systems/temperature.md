@@ -87,6 +87,28 @@ place fades across those 3 minutes. It does not snap off at the door.
 There is no temperature by hold. The Pale is cold when it is high, it
 is night, and it is snowing.
 
+## Storms on the road
+
+A blizzard or a heavy storm makes travel 15% slower while you are out
+in it with no roof over you. That is 15 off a speed of 100, on top of
+anything the cold already takes. Under a roof it stops at once.
+
+The cold and the wet are the lines above: a blizzard is snow, falling
+snow and the wind; a heavy storm is rain. The right gear is what keeps
+those out, the same as any other weather. No coat takes away the
+slowdown, because that is the storm and not the cold.
+
+A storm is a rainy or snowy weather whose record is named a storm.
+The weather record has no storm mark of its own, and its wind and kind
+cannot tell one: in this load order a heavy storm and overcast rain
+both blow at 85 and both are rain. The names can: `SkyrimStormRain`
+and `SkyrimStormSnow` are storms, and `SkyrimOvercastRain` and
+`SkyrimOvercastSnow` are not. Of the skies the season rolls, the
+storms are Cathedral's storm rain and its three storm snows, so about
+half of rain and over half of snow is a storm. The Body page on K says
+so when you are in one. The slowdown is on the person: a horse keeps
+its own pace, because nothing in the server sets a horse's speed yet.
+
 ## The season and the sky
 
 The season is the one on [Farmer](classes/farmer.md): four of them, 7
@@ -243,5 +265,6 @@ page on K are in the server.
 
 In it: the season shift on an outdoor target, the roll of the sky, the
 master woodworker's 48, the master tailor's 4 degrees, the cold link
-into hunger and thirst, and the 3 minutes of wet. Not in it: the burn
+into hunger and thirst, the 3 minutes of wet, and a storm's 15% on
+the road. Not in it: the burn
 cutting clothing, and the meal's warmth.
