@@ -374,5 +374,44 @@ check('with no claims in private, the copy in data is not carried across',
 check('and holds nobody\'s farm',
       /held by Cadwell/.test(say(function () { F.command('/plant', [], 211, 32, toProfile); })) ? 'held' : 'free', 'free');
 
+// 10. The season's share of a bring-in (#3144): the real season block behind
+// the farming block, a quarter more in summer and a quarter less in winter.
+eval(slice('// ==== thornswood season ====', '// ==== end thornswood season ===='));
+var S = globalThis.__thornswoodSeason;
+function seasonOf(name, unit) {
+  var at = { spring: 0, summer: 1, autumn: 2, winter: 3 }[name];
+  S.setEpoch(Date.now() - at * S.WEEK - 1000);
+  globalThis.__thornswoodSeasonUnit = function () { return unit; };
+}
+function ripeMaster(ref) {
+  objects = {}; actors = {};
+  addActor(120, 41, 'Sigrun', 'farmer', 3, CELL, [FAR * 2, 0, 0]);
+  addPlot(ref, CABBAGE, CELL, [FAR * 2 + 50, 0, 0]);
+  addItem(120, CROPS[CABBAGE].produce, 1);
+  say(function () { F.command('/plant', [], 120, 41, toProfile); });
+  // Sown in spring, an hour back, so the clock ran for the whole wait.
+  objects[ref].props.thornswoodPlot.at = S.epoch() - 60 * 60000;
+}
+seasonOf('spring', 0);
+ripeMaster(501);
+check('a master brings in 5 in spring, with nothing said about it',
+      F.activate(120, 501, CABBAGE) + '|', 'You bring in 5 Cabbage.|');
+seasonOf('summer', 0.1);
+ripeMaster(502);
+check('a quarter more in summer: 5 is 6 or 7, and 7 a quarter of the time',
+      F.activate(120, 502, CABBAGE), 'You bring in 7 Cabbage. Summer gives more.');
+seasonOf('summer', 0.9);
+ripeMaster(503);
+check('and 6 the rest', F.activate(120, 503, CABBAGE), 'You bring in 6 Cabbage. Summer gives more.');
+seasonOf('winter', 0.1);
+ripeMaster(504);
+check('a quarter less in winter: 5 is 3 or 4, and 4 three times in four',
+      F.activate(120, 504, CABBAGE), 'You bring in 4 Cabbage. Winter gives less.');
+seasonOf('winter', 0.9);
+ripeMaster(505);
+check('and 3 the rest', F.activate(120, 505, CABBAGE), 'You bring in 3 Cabbage. Winter gives less.');
+delete globalThis.__thornswoodSeasonUnit;
+delete globalThis.__thornswoodSeason;
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

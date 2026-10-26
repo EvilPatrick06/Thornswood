@@ -36,7 +36,10 @@ speeds hunger and thirst. See [Hunger](hunger.md) and [Thirst](thirst.md).
 ## How fast it moves
 
 Warming covers half the remaining gap in 30 seconds. Cooling covers
-half the gap in 90 seconds. A fire is obvious while you stand in it.
+half the gap in 90 seconds. In winter, under the sky, cooling is a
+quarter faster: half the gap in 72 seconds. A roof ignores the
+winter, the same way it ignores the sky. Warming is the same in every
+season. A fire is obvious while you stand in it.
 Snow is not an emergency in the first few seconds. An unknown place is
 comfortable. A room nobody has classified is not a trap.
 
@@ -90,8 +93,12 @@ is night, and it is snowing.
 ## The season and the sky
 
 The season is the one on [Farmer](classes/farmer.md): four of them, 7
-real days each, one for the whole province. It changes two things. It
-does not pick a single sky and hold it for the week.
+real days each, one for the whole province. It changes three things:
+the outdoor target, the sky, and in winter how fast you cool (above).
+It does not pick a single sky and hold it for the week. It also
+changes what a harvest gives: a quarter more in summer and a quarter
+less in winter, on [Farmer](classes/farmer.md),
+[Gatherer](classes/gatherer.md) and [Fisher](classes/fisher.md).
 
 A season shifts the outdoor target, before clothing, fire, and the
 sky. Indoors ignores it, the same way a roof ignores the sky.
@@ -242,6 +249,7 @@ of 0.5, the settle times, the on-fire damage, the spread, and the Body
 page on K are in the server.
 
 In it: the season shift on an outdoor target, the roll of the sky, the
+winter's quarter faster cooling under the sky (#3144), the
 master woodworker's 48, the master tailor's 4 degrees, the cold link
 into hunger and thirst, and the 3 minutes of wet. Not in it: the burn
 cutting clothing, and the meal's warmth.

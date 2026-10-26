@@ -7585,10 +7585,24 @@ function harvest(actorId, refrId, baseDesc) {
   if (Date.now() - prev < HARVEST_COOLDOWN_MS) {
     return 'This one has already been picked.';
   }
-  if (!addItem(actorId, plant.produce, 1)) return null;
+  /*
+    The season's share of the one a pick gives (#3144): a second a quarter of
+    the time in summer, nothing a quarter of the time in winter. A bare plant
+    still waits its ten minutes, or pressing it again would take the quarter
+    back, and nothing picked is no piece of work.
+  */
+  const season = globalThis.__thornswoodSeason;
+  const got = (season && season.seasonYield) ? season.seasonYield(1) : 1;
+  const word = (season && season.yieldWord) ? season.yieldWord() : '';
+  if (got <= 0) {
+    stampCooldown('plant', refrId);
+    return 'The ' + plant.name + ' has nothing to pick this time.' + (word ? ' ' + word : '');
+  }
+  if (!addItem(actorId, plant.produce, got)) return null;
   stampCooldown('plant', refrId);
   const rank = creditWork(actorId, 'harvest');
-  return 'You pick the ' + plant.name + '.' + (rank ? ' ' + rank : '');
+  const took = got === 1 ? 'You pick the ' + plant.name + '.' : 'You pick ' + got + ' ' + plant.name + '.';
+  return took + (got !== 1 && word ? ' ' + word : '') + (rank ? ' ' + rank : '');
 }
 
 /**
@@ -7809,7 +7823,23 @@ function fish(actorId, refrId, baseDesc) {
       if(!result || !result.ok)return result && result.text || unavailable;
       got=result.count;
     }catch(error){return unavailable;}
-  }else result=stock.take(refrId,span,()=>addItemsAtomic(actorId,[{item:caught.produce,count:got}]));
+  }else{
+    /*
+      The season's share of the catch (#3144), on ordinary water only: the
+      pearl bed and the longfin count what their quest hands over. A catch
+      that comes to nothing in winter still fishes the water out for its wait,
+      and is no piece of work.
+    */
+    const season=globalThis.__thornswoodSeason;
+    if(season && season.seasonYield)got=season.seasonYield(got);
+    if(got<=0) {
+      const word=season && season.yieldWord ? season.yieldWord() : '';
+      const empty=stock.take(refrId,span,()=>true);
+      if(!empty.ok)return 'This water is unavailable for now.';
+      return 'Nothing comes out of the water this time.' + (word ? ' ' + word : '');
+    }
+    result=stock.take(refrId,span,()=>addItemsAtomic(actorId,[{item:caught.produce,count:got}]));
+  }
   if (!result.ok) {
     return 'There is ' + caught.name + ' here and nothing in this load order to ' +
            'put in your hands. Say so in the dev channel.';
@@ -7825,8 +7855,10 @@ function fish(actorId, refrId, baseDesc) {
   */
   const doubled = String(caught.from).toLowerCase() === String(caught.name).toLowerCase();
   const where = doubled ? 'the water' : 'the ' + caught.from;
+  const season=selected ? null : globalThis.__thornswoodSeason;
+  const word=season && season.yieldWord ? season.yieldWord() : '';
   return 'You take ' + got + ' ' + caught.name + ' out of ' + where + '.' +
-         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
+         (word ? ' ' + word : '') + (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
 }
 
 /**
@@ -35028,12 +35060,24 @@ log('gamemode loaded:',
   later from where the clock stopped. Time before the first season
   count is spring, so a crop already in the ground is not thrown back
   to the start.
+
+  Yields and cooling (#3144). Patrick, 22 Oct, A: seasons are mild,
+  yields up or down a quarter, winter cold a quarter faster. A crop
+  brought in, a plant picked and a fish caught give a quarter more in
+  summer and a quarter less in winter; spring and autumn give what the
+  rank gives. The season is the one at the moment of the harvest. The
+  share is a whole number out on average: 2 and a half is 2 or 3, half
+  the time each, so a winter plant that gives 1 is bare a quarter of
+  the time. Out under the sky in winter the meter cools a quarter
+  faster; warming does not change, and a roof ignores it.
 */
 (function () {
   var g = (typeof globalThis !== 'undefined') ? globalThis : this;
   var WEEK = 7 * 24 * 60 * 60 * 1000;
   var SEASONS = ['spring', 'summer', 'autumn', 'winter'];
   var SHIFT = { spring: 0, summer: 4, autumn: -2, winter: -6 };
+  var YIELD = { spring: 1, summer: 1.25, autumn: 1, winter: 0.75 };
+  var COOLING = { spring: 1, summer: 1, autumn: 1, winter: 1.25 };
   var TABLE = {
     spring: { clear: 30, cloudy: 30, rain: 35, snow: 5 },
     summer: { clear: 40, cloudy: 30, rain: 28, snow: 2 },
@@ -35172,6 +35216,29 @@ log('gamemode loaded:',
       t = end;
     }
     return total;
+  }
+
+  /*
+    A harvest's count for the season (#3144). The quarter is kept on
+    average: the whole part always, and one more as often as the part
+    left over, so 3 in winter is 2 three times in four and 3 once.
+  */
+  function seasonYield(count, now) {
+    count = Math.floor(Number(count) || 0);
+    if (count <= 0) { return 0; }
+    var exact = count * (YIELD[seasonName(now || Date.now())] || 1);
+    var whole = Math.floor(exact);
+    if (exact > whole && unit() < exact - whole) { whole++; }
+    return whole;
+  }
+
+  // The words a harvest line adds, '' in a season that changes nothing.
+  function yieldWord(now) {
+    var season = seasonName(now || Date.now());
+    var share = YIELD[season] || 1;
+    if (share === 1) { return ''; }
+    var name = season.charAt(0).toUpperCase() + season.slice(1);
+    return share > 1 ? name + ' gives more.' : name + ' gives less.';
   }
 
   function copyOdds(season) {
@@ -35363,6 +35430,11 @@ log('gamemode loaded:',
     SHIFT: SHIFT,
     seasonAt: seasonName,
     outdoorShift: function (now) { return SHIFT[seasonName(now || Date.now())]; },
+    YIELD: YIELD,
+    COOLING: COOLING,
+    seasonYield: seasonYield,
+    yieldWord: yieldWord,
+    coolingShare: function (now) { return COOLING[seasonName(now || Date.now())]; },
     allows: allows,
     grownMs: grownMs,
     odds: adjusted,
@@ -37156,7 +37228,15 @@ log('gamemode loaded:',
       return 'The ' + crop.name + ' comes up and there is nothing in this load ' +
              'order to put in your hands. Say so in the dev channel.';
     }
+    /*
+      The sower's yield, then the season's share of it (#3144): a quarter more
+      in summer and a quarter less in winter, on average, at the bring-in.
+      The least a rank brings in is 2, so a winter plot still gives 1.
+    */
+    var S = g.__thornswoodSeason;
     var n = yieldAt(plot.step);
+    if (S && S.seasonYield) { n = S.seasonYield(n); }
+    var word = (S && S.yieldWord) ? S.yieldWord() : '';
     if (grant ? !awardQuestCrop(actorId,refrId,baseDesc,crop,n,original,plot,grant) : !clearPlot(refrId,original)) {
       return 'The ' + crop.name + ' will not come out of the ground. Try it again in a moment.';
     }
@@ -37186,8 +37266,8 @@ log('gamemode loaded:',
     if(grant && !grant.current())return 'The orchard work has changed.';
     var worn = wearTool(actorId, 'farmer');
     flog(actorId.toString(16), 'brought in', n, crop.name, 'at', refrId.toString(16));
-    return 'You bring in ' + n + ' ' + crop.name + '.' + (rank ? ' ' + rank : '') +
-           (worn ? ' ' + worn : '');
+    return 'You bring in ' + n + ' ' + crop.name + '.' + (word ? ' ' + word : '') +
+           (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
   }
 
   // ----------------------------------------------------------- the commands --
@@ -63150,9 +63230,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       is the whole of "fire is still not changing temp".
     */
     var target = warmthTarget(actorId, n);
+    // Winter out under the sky cools a quarter faster (#3144), so its half
+    // life is the cooling one cut by that share. Warming is left alone.
     var half = (target > n.temp)
       ? (NEEDS.settleWarmMinutes || NEEDS.settleMinutes)
-      : NEEDS.settleMinutes;
+      : NEEDS.settleMinutes / outdoorCooling(n);
     var k = 1 - Math.pow(0.5, (hours * 60) / half);
     if (k > 1) { k = 1; }
     if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
@@ -63206,14 +63288,30 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     blizzard is the worst thing to wear at a smelter and there is no outfit
     that wins everywhere. That is NEEDS.wear.heat.
   */
+  function underSeason(n) {
+    if (!n || n.place === 'indoors' || n.roof) { return false; }
+    return n.place === 'outdoors' || n.place === 'rain' || n.place === 'snow' ||
+           n.place === 'water' || n.place === 'shallow';
+  }
+
   function outdoorSeason(n) {
-    if (!n || n.place === 'indoors' || n.roof) { return 0; }
-    if (n.place !== 'outdoors' && n.place !== 'rain' && n.place !== 'snow' &&
-        n.place !== 'water' && n.place !== 'shallow') { return 0; }
+    if (!underSeason(n)) { return 0; }
     var S = g.__thornswoodSeason;
     if (!S || !S.outdoorShift) { return 0; }
-    try { return Number(S.outdoorShift(Date.now())) || 0; }
-    catch (e) { return 0; }
+    return Number(S.outdoorShift(Date.now())) || 0;
+  }
+
+  /*
+    How much faster the meter cools than the written half life, in the same
+    places the season shifts the target (#3144): 1.25 in winter out under the
+    sky, 1 everywhere and every season else.
+  */
+  function outdoorCooling(n) {
+    if (!underSeason(n)) { return 1; }
+    var S = g.__thornswoodSeason;
+    if (!S || !S.coolingShare) { return 1; }
+    var share = Number(S.coolingShare(Date.now()));
+    return share > 0 ? share : 1;
   }
 
   /*

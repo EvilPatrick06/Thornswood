@@ -130,7 +130,9 @@ is not built.
 
 [Temperature and weather](systems/temperature.md). One meter, 0 to 100,
 comfort at 50. Place, wind, sky, night, height, fire, water and clothing.
-A season changes the odds of the sky. Winter is not all snow.
+A season changes the odds of the sky. Winter is not all snow. Winter
+cools a quarter faster under the sky, and a harvest gives a quarter
+more in summer and a quarter less in winter.
 
 [Injury](systems/injury.md). Cuts, breaks, burns, bites, and going down
 before a death. Lasting harm is part of this, not a separate switch.

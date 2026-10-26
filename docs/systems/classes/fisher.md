@@ -105,6 +105,15 @@ A novice takes the one the game would have given. Every rank above
 takes more of the same thing. A novice cannot press the pearl or the
 egg. The line tells them the rank.
 
+The season moves the catch by a quarter, on average (#3144): a quarter
+more in summer, a quarter less in winter, and as written in spring and
+autumn. What is left over after the whole number comes up as often as
+it is worth, so a novice's 1 is 2 a quarter of the time in summer, and
+nothing a quarter of the time in winter. A catch of nothing still
+fishes the water out for its wait and is no piece of work. The line
+says "Summer gives more." or "Winter gives less." The pearl bed and
+the longfin water count what their work hands over, not the season.
+
 One successful press is one piece of work, whatever the yield. 100,
 then 250, then 600.
 
@@ -144,7 +153,8 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 ## Where this is
 
-The fifteen records, the waits and the yields are in the server. The
+The fifteen records, the waits, the yields and the season's quarter
+on them are in the server. The
 wait is kept on the water, shared by everyone who fishes it and kept
 through a restart (#1413), and a fished-out water says how long is left
 in minutes and hours (#1826). Until 5 October this page said the wait

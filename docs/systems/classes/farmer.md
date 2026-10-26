@@ -54,6 +54,16 @@ What you bring in is more than the one you sowed:
 | Expert | 4 |
 | Master | 5 |
 
+The season at the bring-in moves that by a quarter, on average: a
+quarter more in summer, a quarter less in winter, and as written in
+spring and autumn. What is left over after the whole number comes up
+as often as it is worth. A master's 5 in summer is 6.25, so 6 three
+times in four and 7 once; in winter it is 3.75, so 4 three times in
+four and 3 once. A novice's 2 in winter is 1 or 2, half the time
+each, and never nothing. The line says "Summer gives more." or
+"Winter gives less." A plot that ripened before winter can still be
+brought in during it, at the winter share.
+
 ## The claim
 
 At a plot on ground nobody holds, the line names the lock key, X
@@ -85,12 +95,12 @@ Four seasons, 7 real days each, the same week as rent. The province
 shares one season. It starts in spring the first time the server
 counts one. The hold's name does not pick it.
 
-| Season | What grows |
-| --- | --- |
-| Spring | Every rank. The grow clock runs. |
-| Summer | Every rank. |
-| Autumn | Novice and advanced. An expert crop waits. |
-| Winter | No rank. A sown plot stays sown. The clock does not run. |
+| Season | What grows | What a bring-in gives |
+| --- | --- | --- |
+| Spring | Every rank. The grow clock runs. | As written |
+| Summer | Every rank. | A quarter more |
+| Autumn | Novice and advanced. An expert crop waits. | As written |
+| Winter | No rank. A sown plot stays sown. The clock does not run. | A quarter less |
 
 Winter stops a crop even on a warm day. It does not lock the sky to
 snow. The odds, and the colder outdoor target, are on
@@ -179,7 +189,8 @@ and a shovel of 50 uses are in the server.
 A farmer is handed 3 cabbage, 3 leek and 3 potato as seed. A cook
 is not handed a pack, in the plan or on the server. The season is
 in the server: four of them, 7 real days each, starting in spring.
-Winter stops the crop clock and the plot stays sown. A placed hive
+Winter stops the crop clock and the plot stays sown. The season's
+quarter on a bring-in is in the server (#3144). A placed hive
 is a farmer verb: 1 Honeycomb, 10 minutes, one piece of work, no rank
 gate. Spring, summer and autumn do not yet stop a crop for temperature.
 The page names that and gives no degree. The cold link into hunger
