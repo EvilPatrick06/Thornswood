@@ -29,8 +29,11 @@ scripts\\dev\\Probe-MarketStalls.py's run (#3160):
   (the location rule of scripts\\dev\\Build-BuildingHolds.py: an exterior
   cell's XLCN, or its worldspace's, or a room's, reaching a hold through its
   parents), and that location, or one it is inside, is one Skyrim marks as a
-  town (TOWN_KEYWORDS). A stall standing anywhere else, at a house or on a
-  road, is refused and listed with why.
+  town (TOWN_KEYWORDS), and no location between the stall and the town is a
+  house (HOUSE_KEYWORDS). So Solitude's docks count (SolitudeDocksLocation,
+  no keyword, inside SolitudeLocation) and Elysium Estate's yard does not
+  (LocTypeHouse, inside WhiterunLocation). A stall standing anywhere else,
+  at a house or on a road, is refused and listed with why.
 
   The same counter placed twice at one spot (two plugins each placing it, a
   few units apart) is one stall: references closer than SAME_SPOT units
@@ -99,6 +102,10 @@ STALL_MESHES = {
 # The location keywords Skyrim marks a town with: a hold's walled city, a
 # town, a settlement.
 TOWN_KEYWORDS = {'LocTypeCity', 'LocTypeTown', 'LocTypeSettlement'}
+
+# A place inside a town that is somebody's house and its yard: a stall there
+# is the house's, not the market's (Elysium Estate's yard outside Whiterun).
+HOUSE_KEYWORDS = {'LocTypeHouse', 'LocTypeDwelling', 'LocTypePlayerHouse'}
 
 # Two references of one counter closer than this across the ground are one
 # stall placed twice. Two counters side by side stand a counter's width apart,
@@ -257,9 +264,10 @@ def main():
         print('STOP. the hold locations are not all in this load order')
         return 1
     town_kw = set(k for k, e in kywd.items() if e in TOWN_KEYWORDS)
-    if len(town_kw) != len(TOWN_KEYWORDS):
-        print('STOP. the town keywords are not all in this load order: found %s'
-              % ', '.join(sorted(kywd[k] for k in town_kw)))
+    house_kw = set(k for k, e in kywd.items() if e in HOUSE_KEYWORDS)
+    if len(town_kw) != len(TOWN_KEYWORDS) or len(house_kw) != len(HOUSE_KEYWORDS):
+        print('STOP. the town and house keywords are not all in this load order: found %s'
+              % ', '.join(sorted(kywd[k] for k in town_kw | house_kw)))
         return 1
 
     def chain(loc):
@@ -319,15 +327,18 @@ def main():
                 where = desc(w) if w else None
             ch = chain(loc)
             hold = next((holds[x] for x in ch if x in holds), None)
-            town = ch[0] if ch and town_kw & set((locs.get(ch[0]) or {}).get('kw', [])) else None
+            town = next((x for x in ch if town_kw & set((locs.get(x) or {}).get('kw', []))), None)
+            inside = ch[:ch.index(town)] if town else []
+            house = next((x for x in inside if house_kw & set((locs.get(x) or {}).get('kw', []))), None)
             edids = [(lctn.get(x) or {}).get('edid') or desc(x) for x in ch]
             if not where:
                 why = 'it stands in no world or cell'
             elif not hold:
                 why = 'its place (%s) is in no hold' % (' < '.join(edids) or 'no location')
             elif not town:
-                why = 'its place (%s) is in %s but is not a town\'s own ground; %s has keywords %s' % (
-                    ' < '.join(edids), hold, edids[0], ', '.join(kywd.get(x, desc(x)) for x in (locs.get(ch[0]) or {}).get('kw', [])) or 'none')
+                why = 'its place (%s) is in %s but in no town' % (' < '.join(edids), hold)
+            elif house:
+                why = 'its place (%s) is a house\'s ground in %s' % (' < '.join(edids), lctn[town]['edid'])
         if why:
             refused[desc(k)] = {'base': b['edid'], 'by': r['by'], 'why': why}
             continue
@@ -378,7 +389,7 @@ def main():
         'issue': 3160,
         'rule': ('A stall is a placed static whose mesh is one of Skyrim\'s market stall counters, placed at the start, '
                  'standing in a place whose location reaches a hold and is, or is inside, a location marked as a city, '
-                 'a town or a settlement. References of one counter closer than %d units across the ground are one '
+                 'a town or a settlement, with no house\'s location between. References of one counter closer than %d units across the ground are one '
                  'stall, kept from the earlier plugin. The point is the middle of the counter\'s bounds on the ground '
                  'it stands on; the reach is half the bounds\' diagonal and %d units more.' % (SAME_SPOT, ARM)),
         'stalls': [{k: s[k] for k in ('id', 'hold', 'place', 'world', 'pos', 'reach', 'location', 'ref', 'base', 'by',
