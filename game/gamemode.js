@@ -7019,7 +7019,7 @@ function isGame(baseDesc) {
                       in their village. A body, so the hunter's, at the rank the
                       hunter's own horker body asks (lists/hunter.md: advanced).
     17b9e1, 17ba31,   WHOarFish, WHOarFishHanging, WHOarFishHangingBig: fish
-    19648b Windhelm   landed and hung at the docks. A catch, so the fisher's,
+    19648b Windhelm   laid out and hung up in Windhelm. A catch, so the fisher's,
                       at novice, the rank of the fisher's commonest water. It
                       is taken by hand like hanging game, so no pole is asked.
 
@@ -8059,7 +8059,7 @@ function fish(actorId, refrId, baseDesc) {
  * record's own wait, then the count for the hunter's rank.
  *
  * Since #3141 it answers the racks in RACKS_BY_HAND as well: a horker for the
- * hunter and the landed fish for the fisher, each through its owner's gate,
+ * hunter and the fish laid out in Windhelm for the fisher, each through its owner's gate,
  * ladder, waits and yields (RACK_OWNERS).
  */
 function game(actorId, refrId, baseDesc) {

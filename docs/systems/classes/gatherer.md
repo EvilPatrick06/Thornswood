@@ -81,8 +81,8 @@ Edition only, so nobody gathers them.
 Cabbage, carrot, gourds, leek, potato, and wheat are the farmer's
 crops, in a homestead's garden planter as much as in a field. A
 chickens' nest and a churn are farmer verbs. A beehive is the
-farmer's. See [Farmer](farmer.md). A clam and the catch landed at
-the Windhelm docks are the fisher's. A dead horker in the Skaal
+farmer's. See [Farmer](farmer.md). A clam and the fish laid out
+and hung up in Windhelm are the fisher's. A dead horker in the Skaal
 village is the hunter's. A coin purse and an estate key are not a
 harvest. A bowl of mammoth cheese is anybody's. A mead barrel and
 Bashir's clam at Oar's Rest are nobody's: nothing comes away.
