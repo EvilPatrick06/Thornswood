@@ -1276,12 +1276,18 @@ try {
     $L = Pair @($P, $Q, $D)
     Yes ("a game port for the live Publish-Server runs, {0}, and {1} above it, both bound and let go" -f $L, ($L + 1)) ($L -gt 0)
     if ($L -gt 0 -and $D -gt 0) {
-        # Beside the same Thornswood-Docs as the dev root, as C:\Thornswood-Server
-        # and C:\Thornswood-Server-Dev both are on the box: since #3398 a
-        # deploy writes deployed-build.json into the Thornswood-Docs beside
-        # the root it deployed, so the one file names both servers. Not
-        # Thornswood-Server itself, which the Install-Server runs above hold.
-        $liveRoot = Join-Path $box 'Thornswood-Server-Live'
+        # Named Thornswood-Server, as on the box, so the box files it as the
+        # live server's part; under Live\ because the Install-Server runs
+        # above hold $box\Thornswood-Server. On the box the live and dev roots
+        # sit beside one site, and since #3398 a deploy writes
+        # deployed-build.json into the Thornswood-Docs beside the root it
+        # deployed, so Live\Thornswood-Docs is a junction to the dev root's
+        # site: one site, as there.
+        $liveRoot = Join-Path $box 'Live\Thornswood-Server'
+        $liveSite = Join-Path $box 'Live\Thornswood-Docs'
+        $null = New-Item -ItemType Directory -Force -Path (Join-Path $box 'Live')
+        $null = New-Item -ItemType Junction -Path $liveSite -Target (Join-Path $box 'Thornswood-Docs')
+        Yes 'the live root''s Thornswood-Docs is the dev root''s site' ((Test-Path -LiteralPath (Join-Path $liveSite 'data\deployed-build.json')) -and (Get-Item -LiteralPath $liveSite).LinkType -eq 'Junction')
         $script:PayloadStampFor = 'main'
         $code = Publish (Payload -Port $L -ForRoot $liveRoot -Shipped 'shipped live v1') @() 'main' $liveRoot ($TaskPrefix + ' Live') $L
         $failed = $script:fail
