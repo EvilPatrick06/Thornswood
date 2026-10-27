@@ -270,6 +270,9 @@ the dearest of them:
                                   at the alchemy lab. Alchemist, Physicker.
                                   Advanced: the flower is a gatherer's at
                                   advanced, and the chitin cures disease.
+    ThornswoodRecipePotion...     the ten potions the dungeon pile used to pay,
+                                  at the alchemy lab. Alchemist, Physicker
+                                  (#3470, THE PHYSICKER'S POTIONS below).
 
 THE LOOM IS A MOD'S BENCH, AND THIS PLUGIN CAN STILL NAME IT. The loom's
 keyword is MCE_CraftingLoom, which MoreCraftableEquipment.esp injects into
@@ -448,7 +451,10 @@ CONTENTS = (
     (r'(MISC ThornswoodMisc(Pole\w+|FishTrap)|FLOR ThornswoodFish\w+|COBJ ThornswoodRecipe(Pole\w+|FishTrap))$',
      'own', 'fishing'),
     (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Weapon|Armor|Sewing)Kit$', 'own', 'repair kits'),
-    (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$', 'own', 'treatments'),
+    # The treatments and the Physicker's potion recipes (#3470) are one word,
+    # because the description has 512 bytes and a row of its own ran over.
+    (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$|COBJ ThornswoodRecipePotion\w+$',
+     'own', 'medicine'),
     (r'(MISC ThornswoodFurniture|COBJ ThornswoodRecipeFurniture)\w+$', 'own', 'furniture'),
     (r'(ALCH ThornswoodFoodTea|COBJ ThornswoodRecipeTea)\w+$|MGEF ThornswoodTeaSteepEffect$', 'own', 'teas'),
     (r'ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$|MGEF Thornswood(Burnt|Fine)Effect$', 'own',
@@ -592,6 +598,35 @@ RECIPE_SPLINT = 0x50154C5
 RECIPE_POULTICE = 0x50154C6
 RECIPE_REMEDY = 0x50154C7
 
+# THE PHYSICKER'S POTIONS (#3470). Patrick, 26 Oct 2026, A+B on the report
+# page: the dungeon pile pays ingredients instead of Skyrim's ten potion
+# records, and the Physicker gets a recipe for each record at this plugin's
+# alchemy lab. A on 27 Oct for how the strengths differ: the weakest takes two
+# ingredients that share the potion's effect and each step up takes one more,
+# and the rank climbs with it (Build-RecipeTable.ps1's RECIPE_RANK). Every
+# ingredient carries the effect by game/data/ingredients.json, which reads it
+# off the INGR records, and has a maker by scripts/dev/Check-Makers.js, at a
+# gathering rank no higher than the recipe's;
+# tests/test-3470-potion-recipes.js holds both. After a gap from the master
+# key, in numbers no version of this plugin used.
+POTION_RECIPES = (
+    # (recipe, editor id, the potion it makes, its inputs)
+    (0x50154F0, 'ThornswoodRecipePotionMinorHealing', 0x0003EADD, ('IMP_STOOL', 'EYE_OF_SABRE_CAT')),
+    (0x50154F1, 'ThornswoodRecipePotionHealing', 0x0003EADE,
+     ('BLUE_MOUNTAIN_FLOWER', 'WHEAT', 'SWAMP_FUNGAL_POD')),
+    (0x50154F2, 'ThornswoodRecipePotionPlentifulHealing', 0x0003EADF,
+     ('BLUE_MOUNTAIN_FLOWER', 'WHEAT', 'SWAMP_FUNGAL_POD', 'BLISTERWORT')),
+    (0x50154F3, 'ThornswoodRecipePotionVigorousHealing', 0x0003EAE3,
+     ('BLUE_MOUNTAIN_FLOWER', 'WHEAT', 'SWAMP_FUNGAL_POD', 'BLISTERWORT', 'EYE_OF_SABRE_CAT')),
+    (0x50154F4, 'ThornswoodRecipePotionMinorMagicka', 0x0003EAE0, ('WHITE_CAP', 'CREEP_CLUSTER')),
+    (0x50154F5, 'ThornswoodRecipePotionMagicka', 0x0003EAE1, ('RED_MOUNTAIN_FLOWER', 'GIANT_LICHEN', 'WHITE_CAP')),
+    (0x50154F6, 'ThornswoodRecipePotionMinorStamina', 0x0003EAE5, ('MUDCRAB_CHITIN', 'SABRE_CAT_TOOTH')),
+    (0x50154F7, 'ThornswoodRecipePotionStamina', 0x00039BE8,
+     ('PURPLE_MOUNTAIN_FLOWER', 'MUDCRAB_CHITIN', 'EYE_OF_SABRE_CAT')),
+    (0x50154F8, 'ThornswoodRecipePotionResistFire', 0x00039B4A, ('SNOWBERRIES', 'FIRE_SALTS')),
+    (0x50154F9, 'ThornswoodRecipePotionResistShock', 0x00039BE1, ('SNOWBERRIES', 'GLOWING_MUSHROOM')),
+)
+
 # THE NOTICE BOARD AND THE HOLD'S DROP BOX (#2298).
 #
 # ThornswoodMessageBoard, the activator every board in the world is, named a
@@ -677,6 +712,22 @@ TANNING_KEYWORD = 0x007866A  # CraftingTanningRack
 GARLIC = 0x00034D22          # a gatherer's at novice (game/data/harvests.json)
 MUDCRAB_CHITIN = 0x0006BC00  # a hunter's off a mudcrab, novice (HUNTS_BY_BASE)
 BLUE_MOUNTAIN_FLOWER = 0x00077E1C  # a gatherer's at advanced (game/data/harvests.json)
+# The Physicker's potion ingredients (#3470), each with who gathers it and at
+# what rank (game/data/harvests.json, hunts.json, ores.json).
+IMP_STOOL = 0x0004DA23               # Gatherer, novice
+WHITE_CAP = 0x0004DA22               # Gatherer, novice
+CREEP_CLUSTER = 0x000B2183           # Gatherer, novice
+EYE_OF_SABRE_CAT = 0x0006BC07        # Hunter, novice
+SABRE_CAT_TOOTH = 0x0006BC04         # Hunter, novice
+WHEAT = 0x0004B0BA                   # Farmer and Gatherer, advanced
+SWAMP_FUNGAL_POD = 0x0007E8B7        # Gatherer, advanced
+RED_MOUNTAIN_FLOWER = 0x00077E1D     # Gatherer, advanced
+PURPLE_MOUNTAIN_FLOWER = 0x00077E1E  # Gatherer, advanced
+GIANT_LICHEN = 0x0007E8C1            # Gatherer, advanced
+SNOWBERRIES = 0x0001B3BD             # Gatherer, advanced
+GLOWING_MUSHROOM = 0x0007EE01        # Gatherer, advanced
+BLISTERWORT = 0x0004DA25             # Gatherer, expert
+FIRE_SALTS = 0x0003AD5E              # Miner, expert, at the quarry
 # MCE_CraftingLoom: MoreCraftableEquipment.esp's keyword, injected as Update.esm's
 # 0x6CE000. Update.esm is this plugin's master 01. See THE LOOM at the top.
 LOOM_KEYWORD = 0x016CE000
@@ -1356,6 +1407,10 @@ def thornswood_records(passage, clam, passages):
              POULTICE, ALCHEMY_KEYWORD),
         cobj(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)],
              REMEDY, ALCHEMY_KEYWORD),
+    ] + [
+        cobj(fid, edid, [(globals()[name], 1) for name in inputs], potion, ALCHEMY_KEYWORD)
+        for fid, edid, potion, inputs in POTION_RECIPES
+    ] + [
         misc(MASTER_KEY, 'ThornswoodMiscMasterKey', 'Master Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
     ]
     # Tea, its recipes and the drunk screen (#1382).
