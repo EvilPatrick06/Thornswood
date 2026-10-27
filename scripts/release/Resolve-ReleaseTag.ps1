@@ -13,9 +13,9 @@
 
   The tag has to be named v<version>, exist as a tag (refs/tags, not a branch
   or a SHA), point at a commit, and that commit has to be on -MainRef. With
-  -ExpectedSha (a tag push passes its own GITHUB_SHA; a manual run may pass
-  one) the commit has to be that one as well. Anything else throws, naming the
-  tag and why. Returns the full commit SHA. Reads git only; changes nothing.
+  -ExpectedSha (a tag push's handover passes the commit the tag named when it
+  was pushed, #3930; a manual run may pass one) the commit has to be that one
+  as well. Anything else throws, naming the tag and why. Returns the full commit SHA. Reads git only; changes nothing.
   Works on Windows PowerShell 5.1 and PowerShell 7.
 
   NO RELEASE IS BUILT FROM A COMMIT OFF MAIN (#3890). An expected SHA used to

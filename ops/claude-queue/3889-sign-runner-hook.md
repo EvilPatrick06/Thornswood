@@ -1,10 +1,10 @@
-# 3889 the signing runner refuses any job but main's and a v tag's
+# 3889 the signing runner refuses any job but main's
 
 - **Lane:** Claude (cloud thread, 27 Oct)
 - **Issue / PR:** #3889, the pull request that adds this note
 - **Channel:** the box (runner 3 only); no game server, site, bot or voice change
 - **Staff status updates:** none (nothing staff see or do changes)
-- **Needs first:** this pull request merged, and #3908 (#3550) merged. #3908 holds every job a workflow on main can send to runner 3 to main or a v tag; until it is in, harnesses.yml dispatched on a branch can still land on runner 3, and with the hook on that job would be refused and fail instead of running. Steps 1 and 2 need One (ssh to the box, and gh signed in as a repository admin for the registration token, which the cloud proxy refuses). Steps 3 and 4 run anywhere.
+- **Needs first:** this pull request merged, and #3908 (#3550) merged. #3908 holds every job a workflow on main can send to runner 3 to main or a v tag, and since #3930 release.yml sends no tag's job there (a tag push is handed to main's workflow), so main's jobs are all runner 3 takes; until it is in, harnesses.yml dispatched on a branch can still land on runner 3, and with the hook on that job would be refused and fail instead of running. Steps 1 and 2 need One (ssh to the box, and gh signed in as a repository admin for the registration token, which the cloud proxy refuses). Steps 3 and 4 run anywhere.
 
 ## Run
 From a clean checkout of main with this pull request in it, in PowerShell 7.
@@ -13,13 +13,13 @@ From a clean checkout of main with this pull request in it, in PowerShell 7.
 
        .\scripts\deploy\Install-Runner.ps1 -Number 3 -NoPause
 
-   It must print `C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1: the signing runner's job-started hook, which only SYSTEM and Administrators may change`, then `C:\Thornswood-Runner3 now refuses any job but main's and a v tag's, through C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1` (or `... already`), `service Running`, `thornswood-vps-3 is online`, and in the lock of every runner after it, `C:\Thornswood-Runner has no job-started hook, as a runner that does not sign already` and the same for `C:\Thornswood-Runner2`. Any `HOOK NOT WRITTEN` or `HOOK NOT SET` line is a failure: the hook is not on, and what it printed is the cause to fix.
+   It must print `C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1: the signing runner's job-started hook, which only SYSTEM and Administrators may change`, then `C:\Thornswood-Runner3 now refuses any job but main's, through C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1` (or `... already`), `service Running`, `thornswood-vps-3 is online`, and in the lock of every runner after it, `C:\Thornswood-Runner has no job-started hook, as a runner that does not sign already` and the same for `C:\Thornswood-Runner2`. Any `HOOK NOT WRITTEN` or `HOOK NOT SET` line is a failure: the hook is not on, and what it printed is the cause to fix.
 
 2. Read it back:
 
        .\scripts\deploy\Install-Runner.ps1 -Number 3 -Status -NoPause
 
-   It must print `hook      C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1, refuses any job but main's and a v tag's (#3889)`.
+   It must print `hook      C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1, refuses any job but main's (#3889)`.
 
 3. The proof that it refuses, which is the measurement #3889's step 1 asked for. From any machine, push a throwaway branch with one workflow that asks for runner 3 and has a step marked `if: always()`:
 
@@ -42,11 +42,11 @@ From a clean checkout of main with this pull request in it, in PowerShell 7.
 
        pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch claude/proof-3889 -Commit (git rev-parse claude/proof-3889)
 
-4. The proof that it still takes main's jobs: the next job of main on runner 3 (`gh api "repos/EvilPatrick06/Thornswood/actions/runs?branch=main&per_page=20" --jq '.workflow_runs[].id'`, then each run's jobs as in step 3, until one has `runner_name` `thornswood-vps-3`) must have `conclusion` `success`, and its `Set up runner` log must say `The signing runner takes this job: EvilPatrick06/Thornswood/.github/workflows/<file>@refs/heads/main is main's or a v tag's (#3889).`
+4. The proof that it still takes main's jobs: the next job of main on runner 3 (`gh api "repos/EvilPatrick06/Thornswood/actions/runs?branch=main&per_page=20" --jq '.workflow_runs[].id'`, then each run's jobs as in step 3, until one has `runner_name` `thornswood-vps-3`) must have `conclusion` `success`, and its `Set up runner` log must say `The signing runner takes this job: EvilPatrick06/Thornswood/.github/workflows/<file>@refs/heads/main is main's (#3889).`
 
 ## Risks
 - Step 1 stops a job runner 3 is running, so it waits for idle. The service is down for the few seconds config.cmd takes; GitHub hands a waiting light job to runner 1 or 2 meanwhile, and a waiting signing job waits for runner 3.
-- After it, any job on runner 3 that is not main's or a v tag's fails at `Set up runner`. With #3908 in, no workflow on main sends one there.
+- After it, any job on runner 3 that is not main's fails at `Set up runner`. With #3908 in, no workflow on main sends one there.
 - Runner 3 keeps the folder and profile it had: branch jobs ran there before #3550 (nine harnesses.yml runs of claude/* branches, 22 to 26 Oct). A clean slate needs `-Remove`, a box restart for the profile (A REMOVED ACCOUNT'S PROFILE in Install-Runner.ps1), and an install; this note does not do that.
 
 ## Afterwards

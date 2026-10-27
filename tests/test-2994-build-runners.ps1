@@ -51,9 +51,11 @@ $heavy = @{
     'nightly.yml'  = @('harnesses')
     # The gate, run as build.yml runs it, under a trace (#3114).
     'trace-gate.yml' = @('trace')
-    # Light, but it asks for a build runner because those are never the
-    # runner that signs a release launcher (records\sign-runners.json, #3312).
-    'release.yml'  = @('verify')
+    # Light, but they ask for a build runner because those are never the
+    # runner that signs a release launcher (records\sign-runners.json, #3312),
+    # which takes main's jobs alone (#3889), and a tag push's handover runs
+    # on a tag ref (#3930).
+    'release.yml'  = @('verify', 'handoff')
 }
 function Get-Jobs([string]$text) {
     $text = $text -replace "`r`n", "`n"

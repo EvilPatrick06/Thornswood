@@ -14,8 +14,8 @@ Status: WAITING on GitHub's hosted minutes (Patrick's 3.A, 18 Oct). Issue #2163 
 ## What to run, in order
 
 1. **The hosted pilot**, once Patrick says the minutes are back, or the billing month turns over. Tag on main's commit, so no `expected_sha`:
-   - `git tag v0.0.2163-pilot3 origin/main` then `git push origin refs/tags/v0.0.2163-pilot3` (leaves the machine). The push starts the usual VPS build. **Let it finish. Never cancel a VPS job**: a cancel during checkout leaves git locks that break that runner (#2751).
-   - `gh workflow run release.yml --ref v0.0.2163-pilot3 -f tag=v0.0.2163-pilot3 -f runner=hosted` (leaves the machine).
+   - `git tag v0.0.2163-pilot3 origin/main` then `git push origin refs/tags/v0.0.2163-pilot3` (leaves the machine). The push hands the tag to main's release.yml, which builds it (#3930). **Let it finish. Never cancel a VPS job**: a cancel during checkout leaves git locks that break that runner (#2751).
+   - `gh workflow run release.yml --ref main -f tag=v0.0.2163-pilot3 -f runner=hosted` (leaves the machine; only a run of main's workflow signs, #3930).
    - Pass: the hosted job's log says "building with MSBuild on a github-hosted runner", the Azure sign in, "signed by" ThornswoodRelease; `verify` is green; the draft's notes say signed. Rename the draft "PILOT 2163, not a release" while it exists. Then delete the draft (`gh api -X DELETE repos/EvilPatrick06/Thornswood/releases/<id>`) and the tag (`git push origin --delete refs/tags/v0.0.2163-pilot3`).
    - Refused on billing again: delete the VPS draft and the tag, write the date here and on #2163.
 2. **The switch-over PR**, after a green pilot (docs/SIGNED-RELEASES.md section 7): the hosted job's `if` becomes `${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}`, the runner input's default becomes hosted, and the two "until the switch-over" checks in tests/test-release-workflow.ps1 change. Note: while `BUILD_RUNNER` is `vps` (Patrick's 3.A) releases stay on the box even after it, so this also needs a way for releases to go hosted while pull requests stay on the VPS. That is a release.yml change to its own `if`, not `BUILD_RUNNER`.

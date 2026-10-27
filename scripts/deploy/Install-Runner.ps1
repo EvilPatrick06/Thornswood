@@ -74,7 +74,7 @@
   actions list is. The install registers such a runner with the record's
   label too, the way a build runner gets its label.
 
-  THE SIGNING RUNNER TAKES ONLY MAIN'S AND A V TAG'S JOBS (#3889). A runner
+  THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS (#3889). A runner
   takes any job whose labels it all carries, and the labels come from the
   workflow file of the ref that runs, so a branch's own copy of a workflow
   could ask for the signing runner's labels and run there, whatever the
@@ -86,7 +86,7 @@
   (ACTIONS_RUNNER_HOOK_JOB_STARTED in its .env, read when its service
   starts). The hook lets a job through only when its
   repository is this one and its ref and its workflow's ref are both
-  refs/heads/main or a refs/tags/v tag. Those are the job's github context,
+  refs/heads/main. Those are the job's github context,
   which the runner writes over any env a workflow sets (actions/runner
   v2.337.0, Handlers\ScriptHandler.cs). Refusing ends the job: a failed hook
   is only a failed step, and a later step marked if: always() still runs
@@ -97,11 +97,12 @@
   writes the hook and the .env line before the service first starts, and
   -Lock writes both again for every signing runner on the box (and takes the
   line off any other runner, whose branch jobs it would refuse); a runner
-  already running takes the line at its next start. What it does not do: a
-  v tag pushed on a commit that is not on main runs that commit's copy of
-  the workflow on a refs/tags/v ref, and the hook lets it through, since
-  nothing it can read says whether a commit is on main. Main's release.yml
-  refuses such a tag (#3890); a branch's own copy need not (#3930).
+  already running takes the line at its next start. Main alone, not v tags
+  as well (#3930, Patrick, 27 Oct): a v tag push runs the tagged commit's
+  own copy of a workflow, and a tag can be pushed on any commit, while
+  release.yml now signs only in a run of main's own workflow and hands a
+  tag push over to one, so no job a signing runner should take runs on a
+  tag ref.
 
   WHAT A PULL REQUEST JOB MAY REACH (-OffBox, or -NetworkOnly for the network
   alone). Two guards, put on by the
@@ -379,7 +380,7 @@ if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
 $signRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\sign-runners.json') -Raw | ConvertFrom-Json
 $signs = (-not $OffBox) -and (@($signRecord.runners | ForEach-Object { [int]$_ }) -contains $Number)
 if ($signs -and -not $PSBoundParameters.ContainsKey('Label')) { $registerLabels = $registerLabels + ',' + $signRecord.label }
-# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S AND A V TAG'S JOBS
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
 # (#3889): where the hook lives on the box, and the accounts of the runners
 # the record lists, by the names -Number gives them, for -Lock.
 $hookPath = 'C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1'
@@ -511,7 +512,7 @@ function Set-RunnerTemp([string]$root, [string]$svcName) {
   if ($svc -and $svc.State -eq 'Running') { $line += '; its runner is running, so this takes effect when ' + $svcName + ' next starts' }
   return $line
 }
-# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S AND A V TAG'S JOBS
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
 # (#3889). Set-RunnerHook names $hook as the runner's job-started hook in its
 # .env, or, given '', takes that line off; lines of the runner's own and
 # TEMP and TMP are kept. Like TEMP, the runner reads it when its service
@@ -522,7 +523,7 @@ function Set-RunnerHook([string]$root, [string]$svcName, [string]$hook) {
   if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
   $new = @($had | Where-Object { $_ -notmatch '^ACTIONS_RUNNER_HOOK_JOB_STARTED=' })
   if ($hook) { $new += ('ACTIONS_RUNNER_HOOK_JOB_STARTED=' + $hook) }
-  $what = $(if ($hook) { ' refuses any job but main''s and a v tag''s, through ' + $hook } else { ' has no job-started hook, as a runner that does not sign' })
+  $what = $(if ($hook) { ' refuses any job but main''s, through ' + $hook } else { ' has no job-started hook, as a runner that does not sign' })
   if (($had -join "`n") -eq ($new -join "`n")) { return ($root + $what + ' already') }
   [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
   $line = $root + ' now' + $what
@@ -747,7 +748,7 @@ function Remove-RunnerWatchers([string]$prefix = 'Thornswood Runner') {
 '@
 
 # ------------------------------------------------- the signing runner's hook --
-# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S AND A V TAG'S JOBS
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
 # (#3889). $hookLib decides; tests\test-runner-hook.ps1 lifts it out and
 # runs it against every kind of ref. $hookText is the whole hook as the box
 # gets it, for this repository.
@@ -756,11 +757,12 @@ $hookLib = @'
 # Repository names are matched as GitHub matches them, without case; a ref
 # is matched as git does, with case. GITHUB_WORKFLOW_REF has to be a file
 # of this repository's .github/workflows, then @ and the job's own ref: a
-# run of main's copy of the workflow, or of a v tag's.
+# run of main's copy of the workflow (#3930: a v tag's copy is the tagged
+# commit's own, which nothing reviewed).
 function Test-SignJobRef([string]$repo, [string]$repository, [string]$ref, [string]$workflowRef) {
   if (-not $repository -or -not $ref -or -not $workflowRef) { return 'the job does not say its repository, its ref and its workflow (GITHUB_REPOSITORY, GITHUB_REF, GITHUB_WORKFLOW_REF)' }
   if ($repository -ne $repo) { return ('it is a job of ' + $repository + ', and this runner signs for ' + $repo + ' alone') }
-  if ($ref -cne 'refs/heads/main' -and $ref -cnotmatch '^refs/tags/v') { return ('it runs ' + $ref + ', which is neither main nor a v tag') }
+  if ($ref -cne 'refs/heads/main') { return ('it runs ' + $ref + ', which is not main') }
   if (-not $workflowRef.EndsWith('@' + $ref, [StringComparison]::Ordinal)) { return ('its workflow, ' + $workflowRef + ', is not the copy on ' + $ref) }
   $file = $workflowRef.Substring(0, $workflowRef.Length - $ref.Length - 1)
   if (-not $file.StartsWith($repo + '/.github/workflows/', [StringComparison]::OrdinalIgnoreCase) -or $file.Contains('@')) { return ('its workflow, ' + $file + ', is not one of ' + $repo + '''s') }
@@ -779,7 +781,7 @@ $hookText = @'
 # workflow could ask for this runner. actions/runner runs this first in
 # every job, before any of the job's own steps, and it lets a job through
 # only when the job is this repository's and its ref and its workflow's ref
-# are both main or a v tag. GITHUB_REPOSITORY, GITHUB_REF and
+# are both main. GITHUB_REPOSITORY, GITHUB_REF and
 # GITHUB_WORKFLOW_REF are the job's github context, which the runner writes
 # over any env a workflow sets.
 #
@@ -790,7 +792,7 @@ $hookText = @'
 '@ + "`n`$repo = '" + $Repo.Replace("'", "''") + "'`n" + $hookLib + @'
 $why = Test-SignJobRef $repo $env:GITHUB_REPOSITORY $env:GITHUB_REF $env:GITHUB_WORKFLOW_REF
 if (-not $why) {
-  'The signing runner takes this job: ' + $env:GITHUB_WORKFLOW_REF + ' is main''s or a v tag''s (#3889).'
+  'The signing runner takes this job: ' + $env:GITHUB_WORKFLOW_REF + ' is main''s (#3889).'
   exit 0
 }
 '::error::REFUSED on the signing runner (#3889): ' + $why + '. The job is ended here, before any of its steps.'
@@ -1158,7 +1160,7 @@ if (Test-Path '$Root') {
   if (`$a.AreAccessRulesProtected -and -not `$wide.Count) { 'folder    locked: takes nothing from C:\' } else { 'folder    OPEN to every account on the box: -Lock locks it' }
 }
 `$hl = @(Get-Content -LiteralPath '$Root\.env' -EA SilentlyContinue | Where-Object { `$_ -like 'ACTIONS_RUNNER_HOOK_JOB_STARTED=*' } | ForEach-Object { `$_.Substring(32) })
-if (`$hl.Count) { 'hook      ' + `$hl[-1] + `$(if (Test-Path -LiteralPath `$hl[-1]) { ', refuses any job but main''s and a v tag''s (#3889)' } else { ': THE FILE IS NOT THERE. -Lock writes it' }) }
+if (`$hl.Count) { 'hook      ' + `$hl[-1] + `$(if (Test-Path -LiteralPath `$hl[-1]) { ', refuses any job but main''s (#3889)' } else { ': THE FILE IS NOT THERE. -Lock writes it' }) }
 elseif ('$signs' -eq 'True') { 'hook      NONE: this runner signs and takes a branch''s job. -Lock gives it the hook (#3889)' }
 else { 'hook      none, as a runner that does not sign' }
 `$old = @(Get-RunnerWatchers)
@@ -1314,7 +1316,7 @@ if ($OffBox) {
 }
 
 Head "Installing it on $where"
-# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S AND A V TAG'S JOBS
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
 # (#3889). A signing runner's .env names the hook only once the hook is
 # written and read back.
 $installHook = $(if ($signs) { "`$hookText = " + $hookLiteral + "`nSet-RunnerHookFile '" + $hookPath + "' `$hookText`nSet-RunnerHook `$root '" + $service + "' '" + $hookPath + "'" } else { "Set-RunnerHook `$root '" + $service + "' ''" })

@@ -70,20 +70,21 @@ try {
     $wf = $me + '/.github/workflows/release.yml'
     $take = @(
         @('main, by dispatch, schedule or push', $me, 'refs/heads/main', "$wf@refs/heads/main"),
-        @('a v tag', $me, 'refs/tags/v1.2.7', "$wf@refs/tags/v1.2.7"),
-        @('a v tag with a suffix', $me, 'refs/tags/v0.0.2163-pilot1', "$wf@refs/tags/v0.0.2163-pilot1"),
         @('the repository named in another case, as GitHub matches names', 'evilpatrick06/thornswood', 'refs/heads/main', 'evilpatrick06/thornswood/.github/workflows/nightly.yml@refs/heads/main'))
     foreach ($c in $take) {
         $why = Test-SignJobRef $me $c[1] $c[2] $c[3]
         Yes ('takes ' + $c[0]) ($why -eq '')
     }
     $refuse = @(
-        @('a branch dispatch or push, the branch''s own workflow', $me, 'refs/heads/claude/x', "$wf@refs/heads/claude/x", 'neither main nor a v tag'),
-        @('a pull request', $me, 'refs/pull/12/merge', "$wf@refs/pull/12/merge", 'neither main nor a v tag'),
-        @('a tag that is not a v tag', $me, 'refs/tags/release-1', "$wf@refs/tags/release-1", 'neither main nor a v tag'),
-        @('a V tag, since refs are matched with case', $me, 'refs/tags/V1.2.7', "$wf@refs/tags/V1.2.7", 'neither main nor a v tag'),
-        @('a branch called Main', $me, 'refs/heads/Main', "$wf@refs/heads/Main", 'neither main nor a v tag'),
-        @('a branch whose name starts with main', $me, 'refs/heads/main-old', "$wf@refs/heads/main-old", 'neither main nor a v tag'),
+        # #3930: a v tag runs the tagged commit's own copy, so main alone.
+        @('a v tag, whose workflow is the tagged commit''s own copy (#3930)', $me, 'refs/tags/v1.2.7', "$wf@refs/tags/v1.2.7", 'which is not main'),
+        @('a v tag with a suffix', $me, 'refs/tags/v0.0.2163-pilot1', "$wf@refs/tags/v0.0.2163-pilot1", 'which is not main'),
+        @('a branch dispatch or push, the branch''s own workflow', $me, 'refs/heads/claude/x', "$wf@refs/heads/claude/x", 'which is not main'),
+        @('a pull request', $me, 'refs/pull/12/merge', "$wf@refs/pull/12/merge", 'which is not main'),
+        @('a tag that is not a v tag', $me, 'refs/tags/release-1', "$wf@refs/tags/release-1", 'which is not main'),
+        @('a V tag, since refs are matched with case', $me, 'refs/tags/V1.2.7', "$wf@refs/tags/V1.2.7", 'which is not main'),
+        @('a branch called Main', $me, 'refs/heads/Main', "$wf@refs/heads/Main", 'which is not main'),
+        @('a branch whose name starts with main', $me, 'refs/heads/main-old', "$wf@refs/heads/main-old", 'which is not main'),
         @('main''s ref with a branch''s workflow', $me, 'refs/heads/main', "$wf@refs/heads/claude/x", 'not the copy on refs/heads/main'),
         @('a workflow ref that hides another @ in its path', $me, 'refs/heads/main', "$wf@refs/heads/claude/x@refs/heads/main", 'is not one of'),
         @('another repository''s job (the fork)', 'EvilPatrick06/skymp', 'refs/heads/main', 'EvilPatrick06/skymp/.github/workflows/x.yml@refs/heads/main', 'signs for EvilPatrick06/Thornswood alone'),
@@ -149,8 +150,10 @@ try {
         $o = @(& $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $hookFile 2>&1 | ForEach-Object { "$_" })
         return @{ Code = $LASTEXITCODE; Out = ($o -join "`n") }
     }
+    $h = Hook $me 'refs/heads/main' "$wf@refs/heads/main"
+    Yes "the hook takes main's job and ends 0 (got $($h.Code))" ($h.Code -eq 0 -and $h.Out -match 'takes this job')
     $h = Hook $me 'refs/tags/v1.2.7' "$wf@refs/tags/v1.2.7"
-    Yes "the hook takes a v tag's job and ends 0 (got $($h.Code))" ($h.Code -eq 0 -and $h.Out -match 'takes this job')
+    Yes "the hook refuses a v tag's job and ends 1 (#3930; got $($h.Code))" ($h.Code -eq 1 -and $h.Out -match 'REFUSED on the signing runner \(#3889\): it runs refs/tags/v1\.2\.7, which is not main')
     $h = Hook $me 'refs/heads/claude/x' "$wf@refs/heads/claude/x"
     Yes "the hook refuses a branch's job and ends 1 (got $($h.Code))" ($h.Code -eq 1 -and $h.Out -match '::error::REFUSED on the signing runner \(#3889\): it runs refs/heads/claude/x')
     Yes '  and stops no process that is not Runner.Worker.exe: this harness started it, and is still here' ($h.Out -match 'the job could not be ended')
