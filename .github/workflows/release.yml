@@ -37,10 +37,15 @@
 # thornswood-vps, and only the runners records\sign-runners.json lists carry
 # it (a push that changes the record puts GitHub right by itself, and
 # scripts\deploy\Set-BuildRunners.ps1 asks again, #3107). Runner 3 is the
-# light runner (docs\DECIDED.md), never a build runner, so the job that can
-# sign never shares a runner with pull request code, and the "verify" job,
-# on the check runners (records\check-runners.json, none of them runner 3),
-# never runs where the launcher was signed.
+# light runner (docs\DECIDED.md), never a build runner, and every job a
+# workflow on main can send there runs main's code or a v tag's alone, this
+# one included (#3550; scripts\vps\Check-RunnerIsolation.ps1 reads every
+# job for it). So no workflow on main puts pull request or branch code where
+# a launcher is signed, and a branch's own copy of a workflow that asks for
+# runner 3 is ended there before its first step: runner 3 takes main's jobs
+# alone (#3889, #3930; scripts\deploy\Install-Runner.ps1).
+# The "verify" job, on the check runners (records\check-runners.json, none
+# of them runner 3), never runs where the launcher was signed.
 #
 # HOW IT BUILDS (#498, Patrick's option C, switched 15 Oct). On both runners
 # the launcher and setup program are built by MSBuild from

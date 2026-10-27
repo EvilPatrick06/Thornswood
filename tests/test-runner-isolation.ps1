@@ -2,7 +2,9 @@
 # Issue #2161. Offline: scripts\vps\Check-RunnerIsolation.ps1 against made-up
 # runner facts and the repository's own workflows, and the ACL reading in
 # scripts\vps\Get-RunnerFacts.ps1 against stand-in rules. Nothing reaches the
-# VPS or GitHub.
+# VPS or GitHub. Since #3550 it also fails when a job of the real workflows
+# can put any ref but main's or a v tag's on the runner that signs
+# (records\sign-runners.json): before, it held only pull request triggers.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 # What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
@@ -78,18 +80,18 @@ try {
     T ($x.Report -match 'loopback \| tcp 3001') 'loopback services every local account can reach are listed from the #2165 facts'
     T ($x.Report -match "not Windows' effective access") 'the report says rights come from reading ACLs'
 
-    # The real build.yml, whichever way it stands (Patrick, 11 Oct 2026: hosted
-    # runners by default, VPS runners as a backup, Codex lane). Any pull request
-    # job left on the VPS, a fallback included, is a risk row to read, never a hard fail without -Strict.
+    # The real workflows (#3550). No job that can run any ref but main and a
+    # v tag can land on a runner records\sign-runners.json lists: harnesses.yml,
+    # dispatched on claude/* branches, put their code on runner 3 nine times
+    # from 22 to 26 Oct, and this check read it as ok because it had no pull
+    # request trigger. And no pull request job is on the production label
+    # without the same-repository condition, read job by job.
     $x = Run (Facts) ''
-    $bt = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
-    $prOnProd = ($bt -match '(?m)^  pull_request:') -and ($bt -match 'runs-on:\s*\[[^\]]*\bthornswood-vps\b')
-    if ($prOnProd) {
-        T ($x.Out -match 'RISK  workflow build\.yml runs on: expected not thornswood-vps for untrusted code') 'the real build.yml still runs pull requests on the production runners, and the check says so (until the Codex move)'
-    } else {
-        T ($x.Out -notmatch 'RISK  workflow build\.yml runs on' -and $x.Report -match '\| workflow \| build\.yml runs on \|[^\n]*\| ok \|') 'the real build.yml runs no pull request on the production runners, and the check says ok'
-    }
-    T ($x.Out -notmatch 'RISK  workflow (nightly|release|drop-claims)\.yml runs on') 'nightly, release and drop-claims stay on the VPS and are not risks (no pull request trigger)'
+    $signRisk = @([regex]::Matches($x.Out, 'RISK  workflow \S+ job \S+ on a signing runner[^\r\n]*') | ForEach-Object { $_.Value })
+    T ($signRisk.Count -eq 0) ("no job of the real workflows can put another ref's code on the signing runner" + $(if ($signRisk.Count) { ":`n      " + ($signRisk -join "`n      ") } else { '' }))
+    T ($x.Out -notmatch 'RISK  workflow \S+ runs on') 'no real workflow runs a pull request on the production runners without the same-repository condition'
+    T ($x.Report -match '\| workflow \| nightly\.yml job board on a signing runner \|[^\n]*held to main[^\n]*\| ok \|' -and $x.Report -match '\| workflow \| release\.yml job launcher-vps on a signing runner \|[^\n]*held to main[^\n]*\| ok \|') 'the nightly''s board job and the release fallback that signs are read, and held to main and v tags'
+    T ($x.Report -notmatch '\| harnesses\.yml job harnesses on a signing runner') 'harnesses.yml asks for a build runner, which never signs'
     T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*same-repository pull requests only[^\n]*\| ok \|') 'the real build-pr.yml falls back to the VPS for same-repository pull requests only, and the check says ok (Patrick, 12 Oct 2026)'
 
     # A pull request on the production label without the same-repository
@@ -104,6 +106,57 @@ try {
     Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request_target:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
     $x = Run (Facts) $wfPr
     T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'pull_request_target on the production label stays a risk, condition or not'
+    # Two pull request jobs on the production label, one limited to this
+    # repository: the other is still a risk (#3550, the condition used to be
+    # matched against the whole file).
+    Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]`n  b:`n    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]`n"
+    $x = Run (Facts) $wfPr
+    T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'one job limited to this repository does not cover the job beside it'
+
+    # ---- the signing runner (#3550) ----------------------------------------
+    $wfS = Join-Path $scratch 'wfsign'
+    function Sign([string]$yaml, $facts) {
+        Remove-Item -LiteralPath $wfS -Recurse -Force -EA SilentlyContinue
+        New-Item -ItemType Directory -Path $wfS | Out-Null
+        Set-Content (Join-Path $wfS 'w.yml') ("permissions:`n  contents: read`n" + $yaml)
+        if (-not $facts) { $facts = Facts }
+        Run $facts $wfS
+    }
+    $vps = 'runs-on: [self-hosted, Windows, thornswood-vps]'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    $vps`n"
+    T ($x.Out -match 'RISK  workflow w\.yml job a on a signing runner') 'a job any dispatch can start, on the VPS label alone, can put a branch on the signing runner (harnesses.yml before #3550)'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    if: github.ref == 'refs/heads/main'`n    $vps`n"
+    T ($x.Out -notmatch 'job a on a signing runner') 'held to main by its if, it is not'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    if: `${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}`n    $vps`n"
+    T ($x.Out -match 'RISK  workflow w\.yml job a on a signing runner') 'an if that lets a dispatch through on any ref does not hold it'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    if: `${{ !cancelled() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}`n    runs-on: [self-hosted, Windows, X64, thornswood-vps, thornswood-sign]`n"
+    T ($x.Out -notmatch 'job a on a signing runner') 'main or a v tag, beside other conditions, holds it (release.yml''s launcher-vps)'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    if: github.ref == 'refs/heads/main'`n    $vps`n  b:`n    needs: a`n    $vps`n"
+    T ($x.Out -match 'RISK  workflow w\.yml job b on a signing runner' -and $x.Out -notmatch 'job a on a signing runner') 'job by job: a guard on one job does not cover the next'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]`n  b:`n    runs-on: windows-latest`n"
+    T ($x.Out -notmatch 'on a signing runner') 'a job asking for a label the signing runner lacks, or a hosted runner, cannot land there'
+    $x = Sign "on:`n  pull_request:`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    $vps`n"
+    T ($x.Out -match 'RISK  workflow w\.yml job a on a signing runner' -and $x.Out -notmatch 'RISK  workflow w\.yml runs on') 'a same-repository pull request is fine for the box but not for the signing runner'
+    $x = Sign "on:`n  push:`n    branches: [main]`n  workflow_dispatch:`njobs:`n  a:`n    if: `${{ github.event_name == 'push' }}`n    $vps`n"
+    T ($x.Out -notmatch 'job a on a signing runner') 'held to a push of main, by the event, it is not (build.yml''s tested-vps, #3883)'
+    $x = Sign "on:`n  push:`n    paths:`n      - 'x/**'`njobs:`n  a:`n    $vps`n"
+    T ($x.Out -match 'RISK  workflow w\.yml job a on a signing runner') 'a push of any branch is another ref'
+    $x = Sign "on:`n  push:`n    tags:`n      - 'v*'`n  schedule:`n    - cron: '0 9 * * *'`n  issues:`n    types: [opened]`njobs:`n  a:`n    $vps`n"
+    T ($x.Out -notmatch 'on a signing runner') 'a v tag, a schedule and an issue run main''s code or a release tag''s'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    environment: board`n    $vps`n  b:`n    environment:`n      name: elsewhere`n    $vps`n"
+    T ($x.Out -notmatch 'job a on a signing runner' -and $x.Out -match 'RISK  workflow w\.yml job b on a signing runner') 'an environment the record lists as main only holds a job; any other does not'
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    runs-on: `${{ fromJSON(inputs.where) }}`n"
+    T ($x.Out -match 'RISK  workflow w\.yml job a on a signing runner') 'a runs-on worked out at run time can be any runner'
+    $g = Facts
+    $g.github.runners = @(@{ name = 'thornswood-vps-3'; labels = @('self-hosted', 'Windows', 'X64', 'thornswood-vps', 'thornswood-sign', 'thornswood-extra') })
+    $x = Sign "on:`n  workflow_dispatch:`njobs:`n  a:`n    runs-on: [self-hosted, thornswood-extra]`n" $g
+    T ($x.Out -match 'RISK  workflow w\.yml job a on a signing runner') 'with the collected facts, a label GitHub says the signing runner carries counts too'
+    $g.github.environments = @([ordered]@{ name = 'board'; policy = 'custom'; refs = @('branch:main') }, [ordered]@{ name = 'notices'; policy = 'any'; refs = @() })
+    $x = Run $g $wfOk
+    T ($x.Out -match 'RISK  github environment notices admits' -and $x.Out -notmatch 'RISK  github environment board') 'an environment the record counts as main only that GitHub says lets in other refs is a risk'
+    $srec = Get-Content (Join-Path $repo 'records\sign-runners.json') -Raw
+    T ($srec -match '#3550' -and $srec -match '#3889' -and $srec -notmatch 'never shares a runner with pull request code') 'records\sign-runners.json says what is held now, and what is not yet'
+
     $rec0 = Get-Content (Join-Path $repo 'records\runner-isolation.json') -Raw | ConvertFrom-Json
     T ([string]$rec0.decision -match 'GitHub-hosted' -and [string]$rec0.decision -match '11 Oct 2026' -and [string]$rec0.decision -match 'outbound' -and [string]$rec0.decision -notmatch 'residual') 'the record carries the decision'
 

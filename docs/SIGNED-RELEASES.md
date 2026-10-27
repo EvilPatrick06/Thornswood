@@ -273,8 +273,12 @@ the `release` environment presents is the one trusted. Its role is
 Artifact Signing Certificate Profile Signer, given on the signing account
 ThornswoodSigning rather than on the profile; the account has one profile,
 ThornswoodRelease, so today that is the same thing. The `release`
-environment allows tags `v*` only, and the three `AZURE_SIGNING_*`
-repository variables are set.
+environment allows tags `v*` only, and the two repository variables the
+sign step reads, `AZURE_SIGNING_CLIENT_ID` and `AZURE_SIGNING_TENANT_ID`,
+are set. No subscription id is needed: the workload identity sign in takes
+only those two and the token file, and the unused
+`AZURE_SIGNING_SUBSCRIPTION_ID` was taken off this repository (Patrick,
+27 Oct, #3717). The fork's signing keeps its own copy for its azure/login.
 
 What a run proved on 12 Oct: the default path, a `v*` tag push and a manual
 run on the box, builds on the VPS as before; a manual run asking for
