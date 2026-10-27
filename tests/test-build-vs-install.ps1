@@ -189,6 +189,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'installer\setup\Setup.manifest') -Destination (Join-Path $fakeRepo 'installer\setup')
     Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\WindowFit.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
     Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Themes.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
+    # And the path fence its unpack is held to (#3561).
+    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\PathFence.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
     Copy-Item -Path (Join-Path $realRepo 'launcher\lib\webview2\*') -Destination (Join-Path $fakeRepo 'launcher\lib\webview2')
     Copy-Item -Path (Join-Path $realRepo 'launcher\lib\nlayer\*') -Destination (Join-Path $fakeRepo 'launcher\lib\nlayer')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\client-build.json') -Destination (Join-Path $fakeRepo 'records')
