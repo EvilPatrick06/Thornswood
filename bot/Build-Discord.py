@@ -1927,39 +1927,8 @@ async def ensure_channel(guild, cat, spec, roles, found):
 
 # ------------------------------------------------------------ changelogs --
 # Every channel the build writes is a doc, and every doc keeps a changelog
-# (#3317). Its words are fingerprinted as both the alpha and the open wording
-# say them (content.py's one switch), so flipping the switch is a change that
-# needs its line as well.
-
-def doc_texts(key):
-    """(alpha words, open words) of one doc, each from a fresh read of
-       content.py with the switch set, so neither depends on how this run
-       was started."""
-    import importlib.util
-    out = []
-    old = os.environ.get('THORNSWOOD_OPEN')
-    try:
-        for flag in ('0', '1'):
-            os.environ['THORNSWOOD_OPEN'] = flag
-            spec = importlib.util.spec_from_file_location(
-                'content_' + flag, os.path.join(os.path.dirname(os.path.abspath(C.__file__)), 'content.py'))
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            out.append(mod.DOCS[key])
-    finally:
-        if old is None:
-            os.environ.pop('THORNSWOOD_OPEN', None)
-        else:
-            os.environ['THORNSWOOD_OPEN'] = old
-    return tuple(out)
-
-
-def doc_print(key):
-    """The fingerprint of a doc's words: twelve hex digits of their sha256."""
-    import hashlib
-    a, b = doc_texts(key)
-    return hashlib.sha256((a + '\0' + b).encode('utf-8')).hexdigest()[:12]
-
+# (#3317). The fingerprints are content.py's (doc_print, unrecorded), so a pull
+# request's build checks them without discord.py (#3457).
 
 def doc_keys():
     """Every PLAN key whose channel the build writes."""
@@ -1970,18 +1939,16 @@ def check_docs():
     """What stops a build: a written channel with no words, or whose words
        have no change line. [] when every doc is in order."""
     bad = []
+    keys = []
     for key in doc_keys():
         if key not in C.DOCS:
             bad.append('%s is written by the build and content.py DOCS has no words for it' % key)
-            continue
-        if key in C.DRAFTS:
-            continue
-        lines = C.CHANGES.get(key) or []
-        fp = doc_print(key)
-        if not lines or lines[-1][2] != fp:
-            bad.append('%s: its words have no change line. Add (\'<YYYY-MM-DD>\', '
-                       '\'<what changed and why>\', \'%s\') to the end of '
-                       'CHANGES[\'%s\'] in content.py' % (key, fp, key))
+        else:
+            keys.append(key)
+    for key, fp in C.unrecorded(keys):
+        bad.append('%s: its words have no change line. Add (\'<YYYY-MM-DD>\', '
+                   '\'<what changed and why>\', \'%s\') to the end of '
+                   'CHANGES[\'%s\'] in content.py' % (key, fp, key))
     return bad
 
 

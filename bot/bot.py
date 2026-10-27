@@ -2236,24 +2236,85 @@ async def age_closed_tickets(guild, bot_id, now):
     return deleted, failed
 
 
+# THE STAFF TICKET LOG IS KEPT THE SAME 365 DAYS (#3634). The bot writes two
+# things into the TICKET_LOG channel: a whole ticket whose private thread
+# would not open (its title with the opener's name, the opener's mention and
+# every answer they typed), and a Closed line naming the thread, which is the
+# opener's name, at every close. age_closed_tickets deletes the threads and
+# never read this channel, so those copies had no keeping time while the
+# privacy page said a ticket goes after 365 days. Each of the bot's own
+# messages there now goes TICKET_KEEP_DAYS after it was posted: a fallback
+# ticket the same year as a ticket in a thread, and a Closed line the same
+# year as the thread it points at, which is deleted a year after that close.
+# Only the bot's own messages, and never in a channel tickets open off, so a
+# panel is never touched if TICKET_LOG is ever pointed at one.
+async def age_ticket_log(guild, bot_id, now):
+    """
+    Deletes the bot's own messages in this server's TICKET_LOG channels that
+    were posted more than TICKET_KEEP_DAYS before now, and returns (deleted,
+    failed). Said in bot.log as counts a channel, never what a message said.
+    A history that cannot be read, or a delete Discord refuses, is a line
+    with Discord's reason, and the message stays until the next pass.
+    """
+    if bot_id is None:
+        return 0, 0
+    cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
+    deleted = failed = 0
+    for ch in getattr(guild, 'text_channels', []):
+        name = (getattr(ch, 'name', '') or '').lower()
+        if name not in TICKET_LOG or name in TICKET_NAMES:
+            continue
+        due = []
+        try:
+            async for m in ch.history(limit=None, before=cut):
+                at = getattr(m, 'created_at', None)
+                if (getattr(getattr(m, 'author', None), 'id', None) == bot_id
+                        and isinstance(at, datetime.datetime)
+                        and at.tzinfo is not None and at < cut):
+                    due.append(m)
+        except Exception as e:
+            failed += 1
+            log('ticket log: could not read #%s of "%s", so none of it was '
+                'deleted this pass: %s: %s'
+                % (ch.name, guild.name, type(e).__name__, e))
+            continue
+        gone = 0
+        for m in due:
+            try:
+                await m.delete()
+            except Exception as e:
+                failed += 1
+                log('ticket log: could not delete message %s in #%s, posted '
+                    '%s: %s: %s' % (m.id, ch.name, m.created_at.date().isoformat(),
+                                    type(e).__name__, e))
+                continue
+            gone += 1
+        if gone:
+            deleted += gone
+            log('ticket log: deleted %d of the bot\'s messages in #%s posted '
+                'more than %d days ago' % (gone, ch.name, TICKET_KEEP_DAYS))
+    return deleted, failed
+
+
 async def watch_closed_tickets():
     """
-    Runs age_closed_tickets on every server as the bot comes up and every
-    TICKET_KEEP_EVERY seconds, like watch_join_numbers. Nothing in here may
-    end the loop: a pass that fails is said in bot.log, and the threads it
-    did not reach are there for the next one.
+    Runs age_closed_tickets and age_ticket_log on every server as the bot
+    comes up and every TICKET_KEEP_EVERY seconds, like watch_join_numbers.
+    Nothing in here may end the loop: a pass that fails is said in bot.log,
+    and the threads and messages it did not reach are there for the next one.
     """
     await client.wait_until_ready()
     while not client.is_closed():
         now = datetime.datetime.now(datetime.timezone.utc)
         bot_id = getattr(client.user, 'id', None)
         for gd in list(client.guilds):
-            try:
-                await age_closed_tickets(gd, bot_id, now)
-            except Exception:
-                log('closed tickets: the pass on "%s" stopped part way, so '
-                    'what it did not reach waits for the next one:\n%s'
-                    % (gd.name, traceback.format_exc()))
+            for age in (age_closed_tickets, age_ticket_log):
+                try:
+                    await age(gd, bot_id, now)
+                except Exception:
+                    log('closed tickets: the %s pass on "%s" stopped part way, '
+                        'so what it did not reach waits for the next one:\n%s'
+                        % (age.__name__, gd.name, traceback.format_exc()))
         await asyncio.sleep(TICKET_KEEP_EVERY)
 
 

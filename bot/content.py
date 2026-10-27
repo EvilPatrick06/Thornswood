@@ -576,7 +576,8 @@ DRAFTS = ('TESTERRULES', 'DEVRULES', 'LORERULES', 'MODRULES',
 # The build posts each line once in the channel's Changelog thread and ends
 # the post with the newest one, and it refuses to run while a doc's words
 # have no line: changing a doc is adding its line here. The fingerprint to
-# write is the one the refusal prints (Build-Discord.py, check_docs).
+# write is the one the refusal prints (Build-Discord.py, check_docs), and
+# the pull request's build prints it too (tests/test-3457-doc-change-lines.py).
 CHANGES = {
     'RULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Bugs now go in #test-findings, since #bugs is gone.', '8c8eaaa1c0c2'),
@@ -618,3 +619,57 @@ CHANGES = {
         ('2026-10-22', 'The sixteen factions of 4E 252, each with who they are, where they keep and who leads them, as Patrick approved them.', '8ba2250523f8'),
     ],
 }
+
+
+# THE FINGERPRINTS (#3457). Here rather than in Build-Discord.py so a pull
+# request's build can check every doc has its change line without discord.py
+# (tests/test-3457-doc-change-lines.py). #3445 rewrote the join and rules
+# pages, which #start-here, #welcome, #faq and #game-rules are read out of, and
+# merged green because only the nightly ran the bot's harnesses; the next
+# Discord build would have refused to run. Every doc's words are fingerprinted
+# as both the alpha and the open wording say them (the one switch, OPEN), so
+# flipping the switch is a change that needs its line as well.
+
+def doc_texts(key):
+    """(alpha words, open words) of one doc, each from a fresh read of
+       this file with the switch set, so neither depends on how this run
+       was started."""
+    import importlib.util
+    out = []
+    old = os.environ.get('THORNSWOOD_OPEN')
+    try:
+        for flag in ('0', '1'):
+            os.environ['THORNSWOOD_OPEN'] = flag
+            spec = importlib.util.spec_from_file_location(
+                'content_' + flag, os.path.abspath(__file__))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            out.append(mod.DOCS[key])
+    finally:
+        if old is None:
+            os.environ.pop('THORNSWOOD_OPEN', None)
+        else:
+            os.environ['THORNSWOOD_OPEN'] = old
+    return tuple(out)
+
+
+def doc_print(key):
+    """The fingerprint of a doc's words: twelve hex digits of their sha256."""
+    import hashlib
+    a, b = doc_texts(key)
+    return hashlib.sha256((a + '\0' + b).encode('utf-8')).hexdigest()[:12]
+
+
+def unrecorded(keys):
+    """(key, fingerprint) of each doc in keys, drafts aside, whose words have
+       no change line: CHANGES has none for it, or its newest is for other
+       words. [] when every one has its line."""
+    out = []
+    for key in keys:
+        if key in DRAFTS:
+            continue
+        lines = CHANGES.get(key) or []
+        fp = doc_print(key)
+        if not lines or lines[-1][2] != fp:
+            out.append((key, fp))
+    return out
