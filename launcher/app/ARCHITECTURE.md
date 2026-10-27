@@ -456,6 +456,16 @@ them by hand, and Ship runs a dry run to ask whether the collection installed
 there can build them. `Ship-Rules.ps1 Test-ShipGenerated` keeps them out of
 every pack and off every list of removed files.
 
+**LastPlugin** (LastPlugin.cs, #2791). `Data\Thornswood-Last.esp` copies
+other authors' records out of the load order, so a release carries only its
+recipe, `Data\Thornswood-Last.recipe` (written by
+`scripts\mods\last_recipe.py`), and MadeFromGame makes the plugin from the
+plugins and string tables in `Paths.Game`'s Data, pinned by the sha256 of each
+and of the plugin, whenever a recipe is there and the plugin is missing or
+other bytes. Verify never fetches that plugin from the server, and counts it
+as ours when it puts the order right. A game folder with no recipe is left to
+the release. `tests\test-2791-last-plugin.ps1` holds it to `last_recipe.py`.
+
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile and the
 collection revision installed (#1582). The newest revision Vortex knows of
@@ -769,7 +779,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 17 | `ShellPlay.cs:297 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:300 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
 | 18a | `ShellPlay.cs:315 GeneratedHere.Ensure` | Under Waiting. The behavior files and the covered bodies (#3715), built with the collection's own Pandora and BodySlide only when `generated.txt` is missing or stale: the mod list, the files the tools read, the build list compiled into the launcher, or a built file changed. A build that stops, or any body in the folder that is nude, stops Play with a message box saying why (#405). | when it builds: `Game\Data\meshes\actors\*\behaviors`, `characters`, `animationdatasinglefile.txt` and `animationsetdatasinglefile.txt`, the six bodies in `character assets`, BodySlide's own copies of its settings, presets and groups, and `Profile\OwnGame\generated.txt`; `Profile\OwnGame\build-generated` while it runs |
-| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf` |
+| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Thornswood-Last.esp` from the release's recipe and the person's own plugins (#2791) |
 | 19 | `ShellPlay.cs:345 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
 | 20 | `ShellPlay.cs:352 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
 | 21 | `ShellPlay.cs:354 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |

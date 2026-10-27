@@ -257,16 +257,23 @@ namespace Thornswood
             var names = new List<string>();
             foreach (string rel in off) names.Add(Path.GetFileName(rel));
             string why = null;
-            bool mod = false;
-            foreach (FromGameFile f in MadeFromGame.Make())
-                if (off.Contains(f.Rel) && f.Problem != null) { why = f.Problem.TrimEnd('.'); mod = MadeFromGame.FromMod(f.Rel); break; }
+            bool mod = false, last = false;
+            foreach (FromGameFile f in MadeFromGame.Make(off))
+                if (off.Contains(f.Rel) && f.Problem != null)
+                {
+                    why = f.Problem.TrimEnd('.');
+                    mod = MadeFromGame.FromMod(f.Rel);
+                    last = f.Rel.Equals(LastPlugin.File, StringComparison.OrdinalIgnoreCase);
+                    break;
+                }
             string what = Count(names.Count, "of the files Thornswood makes from your game") + " missing or changed: " + Some(names) +
                           ". Until " + (names.Count == 1 ? "it is" : "they are") + " made, " + MadeFromGame.Shows(off) + ".";
             if (why == null)
                 l.Add(Issue.Of(IssueKind.MadeFromGame, what, "Fix makes them again from your game's own files.", CloseAndRetry, false));
             else
                 l.Add(Issue.Of(IssueKind.MadeFromGame, what + " They cannot be made from this game: " + why + ".", null,
-                    mod ? "Install the collection revision Thornswood pins in Vortex, so its SkyUI, SkyHUD and moreHUD are the ones these are made from, then press Scan."
+                    last ? "Install the collection revision Thornswood pins in Vortex and press Deploy there, so its plugins are the ones " + LastPlugin.Name + " is made from, then press Scan."
+                    : mod ? "Install the collection revision Thornswood pins in Vortex, so its SkyUI, SkyHUD and moreHUD are the ones these are made from, then press Scan."
                         : "Put the game back on the Skyrim build Thornswood pins (the Downgrade on the Play page does that), then press Scan.", false));
         }
 
