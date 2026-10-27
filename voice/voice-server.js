@@ -449,7 +449,6 @@ const PLUGIN_REPORTS = [
   /^\/face done$/,
   /^\/burn [01]$/,
   /^\/chopped$/,
-  /^\/ate [0-9a-f]+$/,
   /^\/rest (?:bed|sit|up)$/,
   /^\/tspicks \d+$/,
   /^\/tspicked [0-9a-f]+$/,
@@ -831,7 +830,7 @@ function relayCaption(me, raw, now) {
  *
  * SAID LINES ONLY. The handler asks after the slash branch, never before.
  * The plugins report gameplay down this same socket as slash lines: /chopped
- * on every fall of the axe, /place as somebody walks about, /ate, /burn, the
+ * on every fall of the axe, /place as somebody walks about, /burn, the
  * journal, the party and the trade window. A limit ahead of that branch
  * would lose somebody's firewood for talking too much.
  *
