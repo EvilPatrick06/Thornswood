@@ -260,7 +260,7 @@ link, and the old line goes.
   [#2929](https://github.com/EvilPatrick06/Thornswood/issues/2929#issuecomment-6335266070).
 - **The watchdog and maintenance tasks stay SYSTEM, by design;** the
   services that run code we deploy, and the nightly backup, run on accounts
-  of their own (docs/DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
+  of their own (the ops repo's DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6335268289),
   the backup
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6342972359).
