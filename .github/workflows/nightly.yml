@@ -7,7 +7,8 @@
 #   code      all ~380 test harnesses in tests/, plus the bot and voice harnesses, the
 #             launcher window check and the launcher build
 #   GitHub    pull requests open more than two days and branches other than
-#             main, which CONTRIBUTING.md says are merged or closed
+#             main, which CONTRIBUTING.md says are merged or closed; issues
+#             and comments of the last day not written plain (#3692)
 #   restore   whether the monthly hands-on restore rehearsal is overdue
 #             (Check-RehearsalDue.ps1, issue #1046)
 #
@@ -349,6 +350,20 @@ jobs:
           # first hundred of each (issue #1201); tests\test-nightly-stray.ps1
           # runs it against a stand-in GitHub.
           .\scripts\dev\Nightly-Stray.ps1 -Run
+
+      - name: Issues and comments written plain
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Developer-Guide.md, "How an issue and a comment are written"
+          # (#3692): every issue and comment of the last day, read through
+          # the REST API; one written the old way is named and the night is
+          # red until it is rewritten. tests\test-nightly-plain-issues.ps1
+          # runs it against a stand-in GitHub.
+          .\scripts\dev\Nightly-PlainIssues.ps1 -Run
 
   harnesses:
     # The test harnesses, in shares (#2357). One job for each entry under
