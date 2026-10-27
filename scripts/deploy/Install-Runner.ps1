@@ -164,6 +164,18 @@
   carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
 
+  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The pull request build's
+  fallback (build-pr.yml, launcher-vps) needs nothing of the box, so it asks
+  for thornswood-build alone; main's (build.yml) stays on the box, which
+  traces the gate (#3114, #3874). An -OffBox runner whose name the
+  record's offBox lists (thornswood-pr-one, thornswood-pr-one-2, ... on
+  One) is registered with thornswood-build too and takes them, on One's own
+  cores. It never carries thornswood-vps, so staff notices, the admin
+  service, the release jobs and every other job that needs the box never
+  reach it. Pass -AllowHost pypi.org,files.pythonhosted.org, or the build's
+  ruff install fails closed (WHAT A PULL REQUEST JOB MAY REACH, above).
+  -OffBox -Number n -Remove takes one off again.
+
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
        on the machine PATH, MSBuild and the .NET Framework 4.8.1 reference
@@ -364,15 +376,21 @@ if ($OffBox) {
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + [Environment]::MachineName.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
-  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
+  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: every job that needs the box itself (staff notices, the admin service, the release jobs) asks for it.' -ForegroundColor Red; exit 1 }
 }
 # HOW MANY BUILD AT ONCE (#2994). A VPS runner that records\build-runners.json
 # lists is registered with its build label as well, so a reinstall keeps the
-# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner never carries it.
+# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner carries it only
+# when the record's offBox names it (build runners on One, Patrick, 26 Oct
+# 2026), and then takes the pull request build's fallback, which asks for it alone; it
+# still never carries thornswood-vps, so no box-only job reaches it.
 $registerLabels = $Label
+$buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
 if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
-  $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
+}
+if ($OffBox -and -not $PSBoundParameters.ContainsKey('Label') -and $buildRecord.PSObject.Properties['offBox'] -and @($buildRecord.offBox) -contains $RunnerName) {
+  $registerLabels = $Label + ',' + $buildRecord.label
 }
 # THE SIGNING RUNNER (#3312). A VPS runner records\sign-runners.json lists
 # is registered with its label and, under -NetworkOnly, reaches the hosts
@@ -385,6 +403,13 @@ if ($signs -and -not $PSBoundParameters.ContainsKey('Label')) { $registerLabels 
 # the record lists, by the names -Number gives them, for -Lock.
 $hookPath = 'C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1'
 $signAccounts = @($signRecord.runners | ForEach-Object { 'thornswood-runner' + $(if ([int]$_ -gt 1) { '' + [int]$_ } else { '' }) })
+# THE CHECK RUNNERS (#3956). A VPS runner records\check-runners.json lists
+# is registered with its label, so release.yml's check of a signed draft
+# can run on it.
+if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
+  $checkRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\check-runners.json') -Raw | ConvertFrom-Json
+  if (@($checkRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $registerLabels + ',' + $checkRecord.label }
+}
 # On the box, the folders records\runner-isolation.json says no runner may
 # reach that are not C:\Thornswood-* (C:\ProgramData\ssh, the
 # administrator's profile) are denied with the Thornswood ones, at every
@@ -497,13 +522,19 @@ $broadSids = @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0')
 # job, inside the folder Defender skips. Lines of the runner's own are kept.
 # It is read when the runner's service starts, so one written while the
 # runner runs is said, and waits for its next start.
-function Set-RunnerTemp([string]$root, [string]$svcName) {
+# An off-box runner ($ownInstall) also names its own install folder,
+# THORNSWOOD_INSTALL (#3860, Where.ps1 Install): on One the install rule finds
+# Patrick's own game, C:\Thornswood, which its account is denied, and builds
+# stopped on it. Under its own root, never made here, as a box runner sees a
+# machine with no install at all, so no job looks in or writes to his game.
+function Set-RunnerTemp([string]$root, [string]$svcName, [bool]$ownInstall = $false) {
   $file = Join-Path $root '.env'
   $temp = Join-Path $root '_work\_temp'
   $want = @(('TEMP=' + $temp), ('TMP=' + $temp))
+  if ($ownInstall) { $want += ('THORNSWOOD_INSTALL=' + (Join-Path $root 'install')) }
   $had = @()
   if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
-  $keep = @($had | Where-Object { $_ -notmatch '^(TEMP|TMP)=' })
+  $keep = @($had | Where-Object { $_ -notmatch '^(TEMP|TMP|THORNSWOOD_INSTALL)=' })
   $new = @($keep) + $want
   if (($had -join "`n") -eq ($new -join "`n")) { return ($root + ' sends its jobs'' temp files to ' + $temp + ' already') }
   [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
@@ -1103,7 +1134,7 @@ foreach ($svc in $services) {
     Lock-RunnerRoot $root $acct
     Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny $leave
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
-  try { Set-RunnerTemp $root $svc.Name } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  try { Set-RunnerTemp $root $svc.Name ($acct -like 'thornswood-pr*') } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
   if ($signAccounts -contains $acct) {
     if ($hookOk) { try { Set-RunnerHook $root $svc.Name $hookPath } catch { 'HOOK NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ } }
   } else {
@@ -1293,14 +1324,23 @@ $signNeed
 $need | ForEach-Object { Say "  $_" }
 $missing = @($need | Where-Object { "$_" -like 'MISSING *' } | ForEach-Object { "$_".Substring(8) })
 if ($missing.Count) {
+  $missingNames = $missing -join ', '
   $how = @()
+  # Off the box the fix is on this machine, for all users: the runner's
+  # service account cannot use a per-user or Store install. Python 3.13,
+  # because a per-user 3.12.10 (One, 26 Oct 2026) makes the 3.12.10 installer
+  # modify that copy instead of adding one for all users; the build itself
+  # takes 3.12 from setup-python.
+  if ($OffBox -and $missing -contains 'pwsh') { $how += 'winget install --id Microsoft.PowerShell -e --installer-type wix --scope machine --accept-source-agreements --accept-package-agreements   (PowerShell 7 for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'pwsh' }) }
+  if ($OffBox -and $missing -contains 'python') { $how += 'winget install --id Python.Python.3.13 -e --scope machine --override "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Include_test=0" --accept-source-agreements --accept-package-agreements   (Python for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'python' }) }
+  if ($OffBox -and ($missing -contains 'node' -or $missing -contains 'git')) { $how += 'winget install --id OpenJS.NodeJS.LTS -e --scope machine   and   winget install --id Git.Git -e --scope machine   (in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'node' -and $_ -ne 'git' }) }
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'msbuild' -or $missing -contains 'net481refs') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeBuildTools -SkipFirewall'   (MSBuild and the .NET Framework 4.8.1 reference assemblies the launcher builds with, #498)" }
   if ($missing -contains 'signtool') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'   (signtool comes with the Windows SDK the C++ workload brings, #459)" }
   if ($missing -contains 'dotnet') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'   (the .NET runtime Microsoft's signing client runs on, #3312)" }
   if ($missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
-  Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
+  Die ("$where is missing " + $missingNames + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }
 
 Head 'Registration token'
@@ -1386,7 +1426,7 @@ if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force 
 # Locked before config.cmd writes GitHub's credentials into it.
 Lock-RunnerRoot `$root `$acct
 # Before the service first starts, so its first job already has it (#3117).
-Set-RunnerTemp `$root '$service'
+Set-RunnerTemp `$root '$service' `$$(if ($OffBox) { 'true' } else { 'false' })
 # The signing runner's hook, before the service first starts too, so it never
 # takes a job without it; any other runner has no hook line (#3889).
 $installHook

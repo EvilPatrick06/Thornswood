@@ -28,7 +28,7 @@
         A folder short of that is a stall, not a finish, and taking it as done
         writes the marker and copies truncated files over the Steam copy.
 
-  The launcher cannot be started from here (CLAUDE.md forbids it), and this
+  The launcher cannot be started from here (the ops repo's CLAUDE.md forbids it), and this
   machine has no Windows csc, so like test-downgrade-asks.js this reads the
   source and checks the shape rather than running the button.
 

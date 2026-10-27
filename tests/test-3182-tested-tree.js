@@ -239,7 +239,9 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
     'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
     'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event',
     'scripts/deploy/Install-Runner.ps1': 'writes the signing runner\'s job-started hook (#3889), which reads the ref on the box before a job\'s first step to refuse it; no check runs it',
-    'tests/test-runner-hook.ps1': 'sets those names for the hook in a scratch process, to hold which refs it takes and refuses'
+    'tests/test-runner-hook.ps1': 'sets those names for the hook in a scratch process, to hold which refs it takes and refuses',
+    'scripts/dev/Gate-Map.ps1': 'the step after the gate that hands main\'s map on (#4009): it checks nothing, never fails a build, and prints only in main\'s push build',
+    'tests/test-4009-gate-map.ps1': 'sets those names for Gate-Map.ps1 in scratch processes, to hold that only main\'s push build hands a map on'
   };
   const ENVREAD = /\b(GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR))\b/;
   const found = [];

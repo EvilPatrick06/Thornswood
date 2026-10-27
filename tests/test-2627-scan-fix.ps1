@@ -135,7 +135,7 @@ if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $refs = @(); $missing = @()
 foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherLib)) { $p = $n; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
 Yes ('every reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
 if ($missing.Count -or $refs.Count -eq 0) { Done }
 

@@ -10,8 +10,8 @@
 
     1. MaxOnline.ps1 gives the record's voice number as Voice, 0 when the
        record has none, and refuses one under the seats (people plus staff
-       seats), because somebody seated would then be kept out of voice and
-       chat. The real record has one, and it is not under its own seats.
+       seats), because somebody seated would then be kept out of voice.
+       The real record has one, and it is not under its own seats.
     2. RecordShape.ps1 refuses a voice that is not a whole number above zero.
     3. Install-Voice.ps1 reads the record through MaxOnline.ps1 and puts the
        number on the line that starts the service, before node, as

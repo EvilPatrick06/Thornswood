@@ -74,7 +74,7 @@ $hand = Get-Job 'handoff'
 Yes 'a tag push has one job, "handoff", which hands the tag to main''s workflow' ($hand -ne '' -and $hand.Contains("if: `${{ github.event_name == 'push' }}"))
 Yes '  it starts release.yml on main with the tag and the commit it named, by the repository token' ($hand.Contains("ref = 'main'; inputs = @{ tag = `$env:GITHUB_REF_NAME; expected_sha = `$env:GITHUB_SHA }") -and $hand.Contains('actions/workflows/release.yml/dispatches') -and $hand.Contains('GH_TOKEN: ${{ github.token }}'))
 Yes '  with actions: write alone, no contents, no id-token, no environment, no checkout' ($hand -match '(?m)^    permissions:\n      actions: write\n    timeout' -and -not $hand.Contains('id-token') -and -not $hand.Contains('environment:') -and -not $hand.Contains('actions/checkout'))
-Yes '  on a build runner, never the signing runner (which takes main''s jobs alone, #3889)' ($hand -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]$')
+Yes '  on a check runner, never the signing runner (which takes main''s jobs alone, #3889)' ($hand -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-check\]$')
 Yes 'no "refs/tags/v" gate is left on the environment or a sign step' (-not ($code -match "startsWith\(github\.ref, 'refs/tags/v'\)"))
 Yes 'a manual run can ask for either runner (runner input: hosted or vps)' ($top.Contains('options: [hosted, vps]'))
 Yes 'workflow-level permissions are contents: write only, no id-token for every job' ($top -match "(?m)^permissions:\n  contents: write\n" -and -not (($top -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n").Contains('id-token'))
@@ -152,7 +152,7 @@ Yes '  and with the hosted job''s own steps' ($vps -match '(?m)^    steps: \*rel
 $ver = Get-Job 'verify'
 Yes 'there is a "verify" job' ($ver -ne '')
 Yes '  it runs after whichever job drafted a signed launcher' ($ver -match '(?m)^    needs: \[launcher, launcher-vps\]$' -and $ver.Contains("(needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true') || (needs.launcher-vps.result == 'success' && needs.launcher-vps.outputs.signed == 'true')"))
-Yes '  on a build runner, never the runner that signs' ($ver -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]$')
+Yes '  on a check runner, never the runner that signs, and never waiting on a build label (#3956)' ($ver -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-check\]$')
 Yes '  without id-token or the release environment' (-not $ver.Contains('id-token') -and -not $ver.Contains('environment:'))
 Yes '  it checks out the commit the draft was built from, by the job that built it' ($ver.Contains('ref: ${{ env.DRAFT_COMMIT }}') -and $ver.Contains("DRAFT_COMMIT: `${{ needs.launcher.result == 'success' && needs.launcher.outputs.commit || needs.launcher-vps.outputs.commit }}"))
 Yes '  downloads each file by its asset id' ($ver.Contains('releases/assets/$($a[0].id)') -and $ver.Contains("Accept = 'application/octet-stream'"))
@@ -164,11 +164,20 @@ Yes '  and that script is in the repository' (Test-Path -LiteralPath (Join-Path 
 $recDir = Join-Path $repoRoot 'records'
 $signRec = Join-Path $recDir 'sign-runners.json'
 $buildRec = Join-Path $recDir 'build-runners.json'
+$checkRec = Join-Path $recDir 'check-runners.json'
 Yes 'records/sign-runners.json names the label the VPS job asks for' ((Test-Path -LiteralPath $signRec) -and ((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).label -eq 'thornswood-sign'))
 if ((Test-Path -LiteralPath $signRec) -and (Test-Path -LiteralPath $buildRec)) {
     $signers = @((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
     $builders = @((Get-Content -LiteralPath $buildRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
     Yes ("  it lists runner(s) {0}, and the build runners {1} are none of them" -f ($signers -join ', '), ($builders -join ', ')) ($signers.Count -gt 0 -and -not @($signers | Where-Object { $builders -contains $_ }).Count)
+}
+Yes 'records/check-runners.json names the label the verify job asks for (#3956)' ((Test-Path -LiteralPath $checkRec) -and ((Get-Content -LiteralPath $checkRec -Raw | ConvertFrom-Json).label -eq 'thornswood-check'))
+if ((Test-Path -LiteralPath $signRec) -and (Test-Path -LiteralPath $checkRec) -and (Test-Path -LiteralPath $buildRec)) {
+    $signers = @((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
+    $builders = @((Get-Content -LiteralPath $buildRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
+    $checkers = @((Get-Content -LiteralPath $checkRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
+    Yes ("  it lists runner(s) {0}, and the signing runner(s) {1} are none of them" -f ($checkers -join ', '), ($signers -join ', ')) ($checkers.Count -gt 0 -and -not @($checkers | Where-Object { $signers -contains $_ }).Count)
+    Yes '  and at least one of them is no build runner, so a pull request build cannot hold every one' (@($checkers | Where-Object { $builders -notcontains $_ }).Count -gt 0)
 }
 
 # ---- release-tag.yml makes the tag a cloud Ship cannot push (#3312) ------------
