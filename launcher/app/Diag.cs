@@ -214,8 +214,6 @@ namespace Thornswood
             Add("windows", Environment.OSVersion.VersionString);
             Add("64 bit", Environment.Is64BitOperatingSystem ? "yes" : "no");
             Add("processors", Environment.ProcessorCount.ToString());
-            Add("user", Environment.UserName);
-            Add("machine", Environment.MachineName);
             try
             {
                 var d = new DriveInfo(Path.GetPathRoot(Paths.Root));
