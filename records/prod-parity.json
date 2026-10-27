@@ -188,16 +188,6 @@
         "Boot"
       ],
       "why": "scripts/deploy/Install-Bridge.ps1, the box's end of ssh, LOCAL SERVICE, Limited, with a SID of its own (#2891, #2578)"
-    },
-    {
-      "name": "Thornswood Maint Update",
-      "user": "SYSTEM",
-      "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per the ops repo's DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (the ops repo's DEPLOY-IDENTITIES.md section 8)"
-    },
-    {
-      "name": "Thornswood Dev Crash Capture",
-      "user": "SYSTEM",
-      "why": "dev crash capture task found on the box in the Oct 11 run; runs as SYSTEM, Highest per the ops repo's DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     }
   ],
   "services": [
