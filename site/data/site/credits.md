@@ -112,7 +112,10 @@ shows every line of it.
 
 **The launcher** carries three files from Microsoft's WebView2 SDK, version
 1.0.2903.40. They give it the browser that voice runs in. Microsoft's licence
-for them is at the bottom of this page.
+for them is at the bottom of this page. It also carries zlib's compressor, from
+zlib 1.3 by Jean-loup Gailly and Mark Adler, under the zlib licence. It is
+translated into C# so that the main menu the launcher makes from your game
+comes out the same on every machine.
 
 **The Thornswood Client Runtime** is Thornswood's own mod on
 [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/192762), and
