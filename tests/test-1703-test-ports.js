@@ -160,10 +160,13 @@ yes('there are the twelve #1727 found, and the five that already waited for the 
     TWELVE.concat(['tests/test-deploy-records.js', 'tests/test-gallery.js', 'tests/test-hub-staff-gallery.js',
                    'tests/test-site-headers.js', 'tests/test-site-local.js']).every((f) => sites.indexOf(f) >= 0));
 // Waiting on the site's own line is "await listening(...)" here, or reading
-// the child's "listening on " line, as the five did before #1727. waitUp()
-// was the connect loop six of the twelve polled the port with.
+// the child's "listening on " line, as the five did before #1727, or its
+// ready line, which the same site says after that one and after its first
+// sweep (#4082). waitUp() was the connect loop six of the twelve polled the
+// port with.
 for (const f of sites) {
-  const own = /await listening\(\w+, \w+\)/.test(text[f]) || text[f].indexOf("'listening on ") >= 0;
+  const own = /await listening\(\w+, \w+\)/.test(text[f]) || text[f].indexOf("'listening on ") >= 0 ||
+              text[f].indexOf('/\\[thornswood-docs\\] (ready|NOT READY): /.test(out)') >= 0;
   yes(f + ' waits for its own site to say it is listening, with no waitUp() poll of the port',
       own && !/function waitUp\(/.test(text[f]));
 }
