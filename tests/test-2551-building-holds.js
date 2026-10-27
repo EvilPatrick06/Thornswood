@@ -447,7 +447,7 @@ yes('L5 the line a press arrives on reaches evict and rentCmd: handle, the chara
     prop.indexOf("if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }") !== -1);
 const bot = read(path.join(ROOT, 'bot', 'bot.py'));
 yes('L6 the bot has a sentence for each, so the staff channel says it (bot/test-moderation.py, M14)',
-    ['evict', 'rent', 'norent'].every((d) => new RegExp("\\n    '" + d + "': '[^']+%s'").test(bot)));
+    ['evict', 'rent', 'norent', 'rentpaid'].every((d) => new RegExp("\\n    '" + d + "': '[^']+%s'").test(bot)));
 
 // ---------------------------------------------------------------- rebuild
 function python(args) {

@@ -102,7 +102,9 @@ const NAMES = ['officeView', 'officeHolders', 'officeRedraw', 'officeCmd', 'offi
                'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
                'boardHere', 'holdOfBuilding', 'notStewardHere',
                // Staff at any door (#2551, Patrick, 17 Oct).
-               'isStaffHere', 'settleAs', 'settleWhere', 'staffRecord'];
+               'isStaffHere', 'settleAs', 'settleWhere', 'staffRecord',
+               // Who owes rent at the door, and Rent paid (#3893, #3895).
+               'rentOwing', 'rentPaid', 'arrearsRow', 'arrearsAdd', 'arrearsPay', 'boxLog', 'dropboxOf'];
 const lifted = {};
 const missing = [];
 NAMES.forEach(function (n) { lifted[n] = fn(n); if (!lifted[n]) { missing.push(n); } });
@@ -118,7 +120,8 @@ const VARS = [
   line(/  var DOOR_PROPERTY = '[^']*';/),
   line(/  var BOARD_REACH = \d+;/),
   line(/  var HOLD_TOWN = \{[^}]*\};/),
-  line(/  var JAIL_NAME = \{[^\n]*\};/)
+  line(/  var JAIL_NAME = \{[^\n]*\};/),
+  line(/  var BOX_LOG_KEEP = \d+;/)
 ];
 yes('and the numbers and names they read', VARS.every(function (v) { return !!v; }));
 
@@ -223,7 +226,7 @@ function server() {
                   where: h === 'ravenrock' ? 'Raven Rock' : h.charAt(0).toUpperCase() + h.slice(1) };
   });
   const body = [
-    'var claims = {}; var funds = {}; var notices = {};',
+    'var claims = {}; var funds = {}; var notices = {}; var arrears = {}; var dropbox = {};',
     // Which character of an account holds each office (#2551, Patrick, 16 Oct).
     'var law = { cells: {}, held: {} };',
     'function saveLaw() { reg.lawSaves = (reg.lawSaves || 0) + 1; }',
@@ -245,7 +248,7 @@ function server() {
   body.push('return { command: command, officeView: officeView, officeOf: officeOf, isSteward: isSteward, ' +
             'isStewardOf: isStewardOf, isJarlOf: isJarlOf, claims: claims, boards: boards, ' +
             'law: law, rolesRead: rolesRead, officesToHold: officesToHold, ' +
-            'OFFICE_AT_DOOR: OFFICE_AT_DOOR };');
+            'OFFICE_AT_DOOR: OFFICE_AT_DOOR, arrears: arrears };');
   const make = new Function('mp', 'g', 'boards', 'reg', body.join('\n'));
   const api = make(mp, g, boards, reg);
   api.people = people; api.writes = writes; api.roles = roles; api.account = account; api.clash = clash;
@@ -831,6 +834,34 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     const noRent = buttons('No rent');
     if (noRent.length) { noRent[0].onclick({}); }
     yes('H10 No rent sends /rent -', lines.join() === '/rent -');
+    // Rent paid (#3895) beside each who owes, the holder and anybody before them (#3893).
+    srv.claims[HOUSE].rent.owed = 30;
+    srv.arrears[HOUSE] = [{ by: P_ALICE2, name: 'Alice', owed: 15, at: Date.now() }];
+    show(srv.view(STEW));
+    goOffice();
+    const paidRows = rowWith(/gold owed/, /Rent paid/);
+    yes('H10b each who owes has a row with what they owe and Rent paid: the holder, and who held it before (' +
+        paidRows.map(function (n) { return n.textContent; }).join(' | ') + ')',
+        paidRows.length === 2 && /^Alice 30 gold owed/.test(paidRows[0].textContent) &&
+        /^Alice 15 gold owed, from when they held it/.test(paidRows[1].textContent));
+    const paidButtons = buttons('Rent paid');
+    const paidInputs = paidRows.map(function (n) { return n.children.filter(function (c) { return c.tag === 'input'; })[0]; });
+    lines.length = 0;
+    if (paidButtons.length === 2) { paidButtons[0].onclick({}); }
+    yes('H10c Rent paid with nothing typed sends all the holder owes, with their profile (' + lines.join(' | ') + ')',
+        lines.join() === '/rent paid ' + P_ALICE + ' 30');
+    lines.length = 0;
+    if (paidButtons.length === 2 && paidInputs[1]) { paidInputs[1].value = '10'; paidInputs[1].onkeydown({ key: 'Enter' }); }
+    yes('H10d Enter in the box beside who held it before sends what was typed (' + lines.join(' | ') + ')',
+        lines.join() === '/rent paid ' + P_ALICE2 + ' 10');
+    lines.length = 0;
+    if (paidButtons.length === 2 && paidInputs[1]) { paidInputs[1].value = 'some'; paidButtons[1].onclick({}); }
+    yes('H10e gold that is not a whole number is not sent, and the page says why (' + status.textContent + ')',
+        lines.length === 0 && /whole number above 0/.test(status.textContent));
+    delete srv.arrears[HOUSE];
+    srv.claims[HOUSE].rent.owed = 0;
+    show(srv.view(STEW));
+    goOffice();
     lines.length = 0;
     const whiterun = buttons('Whiterun');
     yes('H11 the only town on the page is the boards card\'s Whiterun: there is no box card (#2298)', whiterun.length === 1 &&

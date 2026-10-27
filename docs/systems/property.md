@@ -60,6 +60,16 @@ carrier's from then on, sold, given or stolen alike, and the server
 does not tell those apart. A book somebody renamed by hand is not a
 deed, because the server never issued it.
 
+A deed changing hands keeps the rent and the debt (Patrick, 27 Oct,
+#3893). The building keeps the rent its steward set, at the same amount
+and on the same clock, so the next rent falls due on the day it would
+have. The new holder starts at nothing owed. What the old holder owed
+stays theirs: the steward sees it at the door on the Office page, the
+old holder sees it on their property page of K and at the door with
+the rent, and it is paid the same ways as any rent (see Stewards and
+rent). So handing the deed to another of your characters, or to a
+friend, does not clear a debt.
+
 ## Locks and keys
 
 The holder locks and unlocks it with the same key at the door. On an
@@ -147,13 +157,29 @@ person's problem, handled like a person.
 
 Rent is optional. A steward opens the door, then on the Office page
 sets 50 and the place owes 50 gold every 7 real days, or presses No
-rent and it owes nothing. The page shows the steward what is owed
-there.
+rent and it owes nothing. Setting a new amount on a place that already
+pays rent changes what the coming weeks cost: what is owed stays owed,
+and the clock goes on. The page shows the steward who owes what there:
+the holder, and anybody who held it before and still owes from then.
 
 The server counts the debt. It does not take the gold out of a pack.
 Rent is handed to a steward, or put in the hold's drop box. Gold put in
-the drop box pays rent owed by that person first. Taking it back out
-makes that rent owed again.
+the drop box pays rent owed by that person first, what they owe on a
+place they no longer hold before the rest. Taking it back out makes
+that rent owed again, by them.
+
+Rent handed to a steward in person is counted with Rent paid (Patrick,
+27 Oct, #3895). On the Office page, beside each person who owes at
+that door, the steward types how much they were handed, or leaves it
+empty for all of it, and presses Rent paid. What that person owes goes
+down by it, never below nothing. It is one line in the hold's drop box
+record, beside the box's own payments: who was handed it, by whom, how
+much and for which building. Staff who press it at a door are in the
+staff log too.
+
+Paying never moves the rent clock (#3891, #3895). The next rent falls
+due 7 days after the last one did, however early or late it was paid,
+and taking gold back out of the box does not move it either.
 
 ## The hold's box
 
@@ -319,7 +345,8 @@ transfer. All of these numbers are staff data.
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
 stewards, eviction, rent, the hold's drop box and furniture are in the server. The register
-is `private/property.json`, and the furniture's is `private/furniture.json`, which
+is `private/property.json`, with the rent still owed by somebody who no longer holds the place
+under `arrears` (#3893), and the furniture's is `private/furniture.json`, which
 names no person (the furniture block in `game/gamemode.js`). Eviction and the rent are
 the Office page of the K panel, for a steward (the Steward or the Jarl
 of a hold, by the Discord role); see
@@ -348,9 +375,9 @@ steward of the building's hold acts as its steward, and anybody else
 must be staff by the chat block's `isStaff` (`__thornswoodIsStaff`) and
 pass the staff block's `unproven` on the line the press arrived on.
 `staffRecord` writes the press through the staff block's `record`:
-thornswood.log, and `for-bot\moderation.log` with `did` evict, rent or
-norent, `by`, `byName`, `who`, `whoName`, `why` (the building and its
-hold, and the rent set), `building`, `buildingName`, `hold` and `at`.
+thornswood.log, and `for-bot\moderation.log` with `did` evict, rent,
+norent or rentpaid, `by`, `byName`, `who`, `whoName`, `why` (the building and its
+hold, and the rent set or paid), `building`, `buildingName`, `hold` and `at`.
 A press is refused when that log cannot be reached.
 `tests\test-2551-building-holds.js` drives it at all 850 buildings.
 
