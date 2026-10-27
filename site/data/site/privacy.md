@@ -82,14 +82,19 @@ the game: which mods are installed, what failed to start, which version you
 are on, and how long the launcher took to open. It is how somebody who cannot play gets helped without a conversation.
 
 **Gallery submissions.** The picture or recording, your signed-in account,
-the name for its caption and any note for staff are kept for review. Only
-approved submissions appear publicly. Their caption and media then become
-public too. With a picture, your browser or the launcher also sends smaller
-copies of it, which are shown in its place on smaller screens and deleted
-with it. Submit only material you have permission to share, without
-private information about other people. Ask in the Discord to have a
-submission removed. Removing one deletes its file from the site. See
-[Terms](/terms) for publication permissions.
+the name for its caption and any note for staff are kept for review. A
+picture or recording can also say inside the file where it was taken (a
+phone or camera often writes the GPS position), when, and with which camera
+or program. The site takes all of that out as the file arrives, so none of
+it is kept or shown. Of the file, only the picture or recording itself is
+kept, with its colours and which way up it is shown. Only approved
+submissions appear publicly. Their caption and media then become public too.
+With a picture, your browser or the launcher also sends smaller copies of
+it, which are shown in its place on smaller screens and deleted with it.
+Submit only material you have permission to share, without private
+information about other people. Ask in the Discord to have a submission
+removed. Removing one deletes its file from the site. See [Terms](/terms)
+for publication permissions.
 
 ## What is not stored
 
