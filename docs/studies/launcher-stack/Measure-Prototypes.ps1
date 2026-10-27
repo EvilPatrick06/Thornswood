@@ -80,10 +80,19 @@ $WebViewData = @(
 
 # Remove-Item stalls on a path with an ampersand in it, and the work folder
 # sits under C:\ThornswoodTemps&Worktrees, so folders and files are removed
-# through .NET instead.
+# through .NET instead. .NET refuses a read-only file (the .NET SDK's
+# hostfxr.dll, Flutter's .gitignore: the -Clean of 27 Oct stopped on them), so
+# every attribute is cleared first.
 function Remove-Tree([string]$path) {
-    if ([IO.Directory]::Exists($path)) { [IO.Directory]::Delete($path, $true) }
-    elseif ([IO.File]::Exists($path)) { [IO.File]::Delete($path) }
+    if ([IO.Directory]::Exists($path)) {
+        $d = [IO.DirectoryInfo]::new($path)
+        foreach ($e in $d.EnumerateFileSystemInfos('*', [IO.SearchOption]::AllDirectories)) { $e.Attributes = [IO.FileAttributes]::Normal }
+        $d.Attributes = [IO.FileAttributes]::Normal
+        $d.Delete($true)
+    } elseif ([IO.File]::Exists($path)) {
+        [IO.File]::SetAttributes($path, [IO.FileAttributes]::Normal)
+        [IO.File]::Delete($path)
+    }
 }
 
 if ($Clean) {
@@ -91,6 +100,35 @@ if ($Clean) {
         if (Test-Path -LiteralPath $p) { Remove-Tree $p; Write-Host "removed $p" }
     }
     return
+}
+
+# cmd.exe splits a command line at an ampersand, and npm's npx.cmd, Flutter's
+# flutter.bat and the batch steps of Flutter's Visual Studio build all go
+# through cmd, so under C:\ThornswoodTemps&Worktrees Electron and Flutter
+# stopped on 27 Oct with '"C:\ThornswoodTemps"' is not recognized. The folder
+# whose name has the ampersand gets a drive letter of its own (subst, for this
+# sign in only), every path below goes through it, and it is taken away at the
+# end.
+$script:Substs = @()
+function Use-Drive([string]$path) {
+    $full = [IO.Path]::GetFullPath($path)
+    $amp = $full.IndexOf('&')
+    if ($amp -lt 0) { return $full }
+    $cut = $full.IndexOf('\', $amp)
+    $root = if ($cut -lt 0) { $full } else { $full.Substring(0, $cut) }
+    $have = $script:Substs | Where-Object { $_.Root -eq $root } | Select-Object -First 1
+    if (-not $have) {
+        $used = @([IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1).ToUpperInvariant() })
+        $letter = [char[]]'TSRQPONMLKJIHG' | Where-Object { "$_" -notin $used } | Select-Object -First 1
+        if (-not $letter) { throw "No free drive letter to stand for $root." }
+        & subst.exe "$($letter):" $root | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "subst $($letter): $root failed with exit code $LASTEXITCODE" }
+        $have = [pscustomobject]@{ Root = $root; Drive = "$($letter):" }
+        $script:Substs += $have
+        Say "$($have.Drive) stands for $root until the run ends"
+    }
+    $rest = $full.Substring($root.Length)
+    $have.Drive + $(if ($rest) { $rest } else { '\' })
 }
 
 function Say([string]$text) { Write-Host ("[{0:HH:mm:ss}] {1}" -f (Get-Date), $text) }
@@ -142,6 +180,19 @@ function Install-Tools {
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
     $env:DOTNET_NOLOGO = '1'
     $env:PATH = "$dotnet;$env:PATH"
+    # A NuGet source of the run's own: One's user NuGet.Config has an empty
+    # packageSources, and every .NET restore stopped there with NU1100 on 27
+    # Oct. The packages go under -Work too.
+    $script:NuGetConfig = Join-Path $Tools 'NuGet.Config'
+    Set-Content -LiteralPath $script:NuGetConfig -Encoding utf8 -Value @(
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<configuration>',
+        '  <packageSources>',
+        '    <clear />',
+        '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />',
+        '  </packageSources>',
+        '</configuration>')
+    $env:NUGET_PACKAGES = Join-Path $Tools 'nuget-packages'
 
     $env:RUSTUP_HOME = Join-Path $Tools 'rustup'
     $env:CARGO_HOME = Join-Path $Tools 'cargo'
@@ -242,37 +293,37 @@ function Reset-Dir([string]$dir) {
 $Builds = [ordered]@{
     'wpf-net481-webview2' = {
         $o = Join-Path $Out 'wpf-net481-webview2'; Reset-Dir $o
-        Invoke-Checked 'build wpf-net481-webview2' { dotnet publish (Join-Path $Proto 'wpf\wpf-net481-webview2.csproj') -c Release -o $o }
+        Invoke-Checked 'build wpf-net481-webview2' { dotnet publish "-p:RestoreConfigFile=$($script:NuGetConfig)" (Join-Path $Proto 'wpf\wpf-net481-webview2.csproj') -c Release -o $o }
         Add-Assets $o -Page
     }
     'wpf-net10' = {
         $o = Join-Path $Out 'wpf-net10'; Reset-Dir $o
-        Invoke-Checked 'build wpf-net10 (needs the .NET 10 Desktop Runtime)' { dotnet publish (Join-Path $Proto 'wpf\wpf-net10.csproj') -c Release -r win-x64 --self-contained false -o $o }
+        Invoke-Checked 'build wpf-net10 (needs the .NET 10 Desktop Runtime)' { dotnet publish "-p:RestoreConfigFile=$($script:NuGetConfig)" (Join-Path $Proto 'wpf\wpf-net10.csproj') -c Release -r win-x64 --self-contained false -o $o }
         Add-Assets $o
     }
     'wpf-net10-sc' = {
         $o = Join-Path $Out 'wpf-net10-sc'; Reset-Dir $o
-        Invoke-Checked 'build wpf-net10-sc (self-contained, one file)' { dotnet publish (Join-Path $Proto 'wpf\wpf-net10.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $o }
+        Invoke-Checked 'build wpf-net10-sc (self-contained, one file)' { dotnet publish "-p:RestoreConfigFile=$($script:NuGetConfig)" (Join-Path $Proto 'wpf\wpf-net10.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $o }
         Add-Assets $o
     }
     'wpf-net10-webview2-sc' = {
         $o = Join-Path $Out 'wpf-net10-webview2-sc'; Reset-Dir $o
-        Invoke-Checked 'build wpf-net10-webview2-sc' { dotnet publish (Join-Path $Proto 'wpf\wpf-net10-webview2.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $o }
+        Invoke-Checked 'build wpf-net10-webview2-sc' { dotnet publish "-p:RestoreConfigFile=$($script:NuGetConfig)" (Join-Path $Proto 'wpf\wpf-net10-webview2.csproj') -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $o }
         Add-Assets $o -Page
     }
     'winui3' = {
         $o = Join-Path $Out 'winui3'; Reset-Dir $o
-        Invoke-Checked 'build winui3 (unpackaged, self-contained)' { dotnet publish (Join-Path $Proto 'winui3\proto-winui3.csproj') -c Release -o $o }
+        Invoke-Checked 'build winui3 (unpackaged, self-contained)' { dotnet publish "-p:RestoreConfigFile=$($script:NuGetConfig)" (Join-Path $Proto 'winui3\proto-winui3.csproj') -c Release -o $o }
         Add-Assets $o
     }
     'avalonia' = {
         $o = Join-Path $Out 'avalonia'; Reset-Dir $o
-        Invoke-Checked 'build avalonia (self-contained, trimmed, one file)' { dotnet publish (Join-Path $Proto 'avalonia\proto-avalonia.csproj') -c Release -r win-x64 --self-contained true -p:PublishTrimmed=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $o }
+        Invoke-Checked 'build avalonia (self-contained, trimmed, one file)' { dotnet publish "-p:RestoreConfigFile=$($script:NuGetConfig)" (Join-Path $Proto 'avalonia\proto-avalonia.csproj') -c Release -r win-x64 --self-contained true -p:PublishTrimmed=true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o $o }
         Add-Assets $o
     }
     'avalonia-aot' = {
         $o = Join-Path $Out 'avalonia-aot'; Reset-Dir $o
-        Invoke-Checked 'build avalonia-aot (native code, no JIT)' { dotnet publish (Join-Path $Proto 'avalonia\proto-avalonia.csproj') -c Release -r win-x64 -p:PublishAot=true -o $o }
+        Invoke-Checked 'build avalonia-aot (native code, no JIT)' { dotnet publish "-p:RestoreConfigFile=$($script:NuGetConfig)" (Join-Path $Proto 'avalonia\proto-avalonia.csproj') -c Release -r win-x64 -p:PublishAot=true -o $o }
         Add-Assets $o
     }
     'tauri' = {
@@ -284,7 +335,7 @@ $Builds = [ordered]@{
             Invoke-Checked 'build tauri (weighed, page only)' { cargo build --release }
             Copy-Item -LiteralPath 'target\release\proto-tauri.exe' -Destination $w
             Add-Assets $dist
-            (Get-Item 'src\main.rs').LastWriteTime = Get-Date
+            (Get-Item 'main.rs').LastWriteTime = Get-Date
             Invoke-Checked 'build tauri (run, page with art and music)' { cargo build --release }
             Copy-Item -LiteralPath 'target\release\proto-tauri.exe' -Destination $o
         } finally { Pop-Location }
@@ -520,16 +571,19 @@ function Get-Size([string]$dir) {
 
 function Measure-One([string]$name) {
     $dir = Join-Path $Out $name
-    $exe = Join-Path $dir $Exe[$name]
-    if (-not (Test-Path -LiteralPath $exe)) { throw "$name has no build at $exe" }
+    # PowerShell names are not case sensitive: a local $runs or $exe would be
+    # the script's $Runs and $Exe (the run of 27 Oct compared 1 to an empty
+    # list for that reason), so the locals here have names of their own.
+    $exePath = Join-Path $dir $Exe[$name]
+    if (-not (Test-Path -LiteralPath $exePath)) { throw "$name has no build at $exePath" }
     $weigh = Join-Path $Out "$name-weigh"
     $size = Get-Size $(if (Test-Path -LiteralPath $weigh) { $weigh } else { $dir })
-    $runs = @()
+    $done = @()
     for ($r = 1; $r -le $Runs; $r++) {
         $ready = Join-Path $Work "ready-$name-$r"
         Remove-Tree $ready; Remove-Tree "$ready.active"
-        $psi = [Diagnostics.ProcessStartInfo]::new($exe)
-        $psi.WorkingDirectory = Split-Path $exe
+        $psi = [Diagnostics.ProcessStartInfo]::new($exePath)
+        $psi.WorkingDirectory = Split-Path $exePath
         $psi.UseShellExecute = $false
         $psi.EnvironmentVariables['PROTO_READY'] = $ready
         $psi.EnvironmentVariables['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = '--autoplay-policy=no-user-gesture-required'
@@ -551,24 +605,24 @@ function Measure-One([string]$name) {
         }
         Stop-Tree $p.Id
         Remove-Tree $ready; Remove-Tree "$ready.active"
-        $runs += [pscustomobject]$run
+        $done += [pscustomobject]$run
         Say ("{0} run {1}: ready {2} ms" -f $name, $r, $readyMs)
         Start-Sleep -Milliseconds 1000
     }
-    $warm = @($runs | Select-Object -Skip 1 | Where-Object ReadyMs)
+    $warm = @($done | Select-Object -Skip 1 | Where-Object ReadyMs)
     function Median($xs) { $s = @($xs | Sort-Object); if ($s.Count) { $s[[int][math]::Floor(($s.Count - 1) / 2)] } }
     [pscustomobject]@{
         Name = $name
         Size = $size
-        FirstReadyMs = $runs[0].ReadyMs
+        FirstReadyMs = $done[0].ReadyMs
         WarmReadyMs = Median ($warm | ForEach-Object ReadyMs)
         IdlePrivateMB = Median ($warm | ForEach-Object IdlePrivateMB)
         IdleWorkingSetMB = Median ($warm | ForEach-Object IdleWorkingSetMB)
         ActivePrivateMB = Median ($warm | ForEach-Object ActivePrivateMB)
         ActiveWorkingSetMB = Median ($warm | ForEach-Object ActiveWorkingSetMB)
         Processes = Median ($warm | ForEach-Object Processes)
-        Mixer = $runs[0].Mixer
-        Runs = $runs
+        Mixer = $done[0].Mixer
+        Runs = $done
     }
 }
 
@@ -582,6 +636,15 @@ function Assert-NoGame {
     if ($game) { throw "Skyrim is running here (pid $($game.Id -join ', ')); measure once it is closed." }
 }
 Assert-NoGame
+
+try {
+$Study = Use-Drive $Study
+$Work = Use-Drive $Work
+$Proto = Join-Path $Study 'prototypes'
+$Repo = (Resolve-Path (Join-Path $Study '..\..\..')).Path
+$Tools = Join-Path $Work 'tools'
+$Out = Join-Path $Work 'out'
+$Art = Join-Path $Repo 'launcher\art\thornswood-art-1536.png'
 
 New-Item -ItemType Directory -Force -Path $Work, $Out | Out-Null
 $script:Wav = Join-Path $Work 'loop.wav'
@@ -630,3 +693,7 @@ foreach ($k in $failed.Keys) { $md.Add(''); $md.Add("$k did not finish: $($faile
 $md | Set-Content -LiteralPath (Join-Path $Work 'results.md') -Encoding utf8
 Say "wrote $(Join-Path $Work 'results.md')"
 Get-Content -LiteralPath (Join-Path $Work 'results.md')
+}
+finally {
+    foreach ($s in $script:Substs) { & subst.exe $s.Drive /d; Say "$($s.Drive) taken away" }
+}
