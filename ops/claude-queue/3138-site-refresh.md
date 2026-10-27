@@ -1,7 +1,7 @@
 # 3138 Every site page says how the world works on main, with one copy of each text
 
 - **Issue / PR:** #3138, the pull request this note came in with.
-- **Where:** the live site (Deploy-Docs). No game server, no bot install, no Discord.
+- **Where:** the live site (Deploy-Docs). No game server, no bot install. #start-here, #welcome and #faq are read out of join.md and #game-rules out of rules.md, so these words reach Discord with 3137-known-board.md's step 2, which waits on the same main Ship (#3457).
 - **Needs first:** the next main Ship, the first one cut from main at or after this pull request's merge. The pages describe main's game (the nine town start spots, kits that mend, tempering cut, the apprentice prompt, the cut town fillers), and the live server runs release 1.2.5 until that Ship, so the pages go live with it, not before. Step 1's `-Docs help` also puts #2705's hair dye section live, so it waits on 2705-hair-dye-help.md's first step as well (see step 1).
 - **Staff notice:** no. Pages change, and nothing staff do.
 
