@@ -94,7 +94,8 @@
 # with no commit, the one this branch pins. A manual run only: a pull
 # request's code reaches the box through build-pr.yml alone (#1306,
 # tests\test-1306-pr-workflow.js), so a change to this file is first run by
-# hand once it is on main.
+# hand once it is on main. A manual run on a branch runs on the build
+# runners, which never sign (#3550).
 #
 # WHY THE ACTIONS ARE PINNED. Each is a full commit SHA with its tag in a
 # comment, as in build.yml and release.yml: these steps run on the VPS.
