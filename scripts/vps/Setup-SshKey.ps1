@@ -9,7 +9,7 @@
       .\scripts\vps\Setup-SshKey.ps1          set it up, or finish setting it up
       .\scripts\vps\Setup-SshKey.ps1 -Test    only check, change nothing
       .\scripts\vps\Setup-SshKey.ps1 -NewBox  a box with no bridge yet (a move,
-                                             docs\MOVING-THE-SERVER.md)
+                                             MOVING-THE-SERVER.md in the ops repo)
 
   HOW IT GETS IN. Port 22 on the box takes no outside address, so a home
   address that changes stops nothing. ssh goes inside a WebSocket on 443
@@ -17,7 +17,7 @@
   wss://thornswood.net/box/ with this PC's token, Caddy hands it to the
   bridge on the box, and the bridge joins it to the box's own sshd. sshd
   then takes this PC's key, which the box accepts only through the bridge.
-  The person's guide is docs\BOX-ACCESS.md.
+  The person's guide is the ops repo's BOX-ACCESS.md.
 
   IN ORDER, each step skipped when it is already done, so it is run again
   until the last one passes:

@@ -137,29 +137,8 @@ jobs:
           }
           if ($failed.Count) { exit 1 }
 
-      - name: Check the ownership page
-        shell: pwsh
-        run: |
-          # Issue #752. docs\OWNERSHIP.md says where every credential file
-          # lives, who holds it and who the second holder is, and
-          # tests\test-ownership.js greps scripts\<area>\*.ps1 and
-          # launcher\app\*.cs for the file names rather than trusting the page.
-          # #697 added discord-avatar.txt with neither a row on that page nor a
-          # line saying it is not a secret, and nothing said so until #750 and
-          # #751 found it by hand. A tenth of a second, so it runs here on every
-          # pull request and not only in the nightly checks.
-          #
-          # Fail closed: no node on the runner is a check that did not happen,
-          # which is the failure this step exists to stop, so it is red.
-          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            Write-Host '::error file=tests/test-ownership.js::no node on this runner, so the ownership page was not checked'
-            exit 1
-          }
-          node tests\test-ownership.js
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=docs/OWNERSHIP.md::the ownership page does not match what the scripts and the launcher name; the FAIL lines above say which rows'
-            exit 1
-          }
+      # The ownership page check (#752) went with docs/OWNERSHIP.md to the
+      # private ops repository (#3693), which runs it against main every night.
 
       - name: Check the old mod's name stays out
         shell: pwsh
