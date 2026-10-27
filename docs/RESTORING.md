@@ -21,7 +21,7 @@ start the restored server and connect to it; see the end of that section.
 | `scripts\vps\Restore-Backup.ps1` | checks and unpacks one; `-CheckOnly` fails a backup with no characters in it |
 | `scripts\vps\Restore-Server.ps1` | puts one back into a server folder and checks the load order resolves and the characters are there |
 | `scripts\vps\Restore-Box.ps1` | run on Patrick's machine: carries one to a new box and puts all of it back there, both worlds with Restore-Server.ps1 and the rest with `vps-restore-services.ps1`, then deletes its copy (issue #454) |
-| `scripts\vps\Delete-Person.ps1` | carries out a deletion request and writes it in `C:\Thornswood-Deletions\requests.jsonl`; `-Reapply` removes everybody in that record again after a restore, from the copies nothing runs from at once and from each service's own files at its next start (#2758) (issue #2351, `docs\WEBSITE-OPERATIONS.md` "Deletion requests") |
+| `scripts\vps\Delete-Person.ps1` | carries out a deletion request and writes it in `C:\Thornswood-Deletions\requests.jsonl`; `-Reapply` removes everybody in that record again after a restore, from the copies nothing runs from at once and from each service's own files at its next start (#2758) (issue #2351, the ops repo's `WEBSITE-OPERATIONS.md` "Deletion requests") |
 | `scripts\vps\vps-freeze.ps1` | run on the old box through Remote.ps1 on the day of a move: stops everything and takes the last backup |
 | `tests\test-backup-restore.ps1` | backs up a scratch server, restores it into another, and checks it, every night in the build checks |
 | `tests\test-backup-streaming.ps1` | verifies large uploads, old archive compatibility, tampering, stream failures and publication collisions with disposable data |
@@ -93,7 +93,7 @@ part is done. Putting back a folder an install or a
 wipe set aside (`C:\Thornswood-Server.prev-<date>`, `world-before-<date>`
 and the `*-before-<date>.json` registers in `private`) is a restore too: run
 the two lines above with that server still stopped, before it starts. "Deletion requests" in
-`docs\WEBSITE-OPERATIONS.md` is the whole procedure. Restrict the rehearsal
+the ops repo's `WEBSITE-OPERATIONS.md` is the whole procedure. Restrict the rehearsal
 destination to the operators: an unpacked archive contains credentials and
 private records. A restore rehearsal must use a disposable destination, never
 the live service folder.

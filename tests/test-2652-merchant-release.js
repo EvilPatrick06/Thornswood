@@ -79,9 +79,9 @@ yes('S4 the parts still waiting are said once, after the NPC startup',
 yes('S5 the purse service answers release beside compareAndCommit', /return \{prepare,read,commit,compareAndCommit,pendingRecords,ledgerStates,release,/.test(purseSrc));
 const dp = fs.readFileSync(path.join(REPO, 'scripts', 'vps', 'Delete-Person.ps1'), 'utf8');
 yes('S6 Delete-Person counts the merchant ledger as released', /const RELEASED = \/\^\([^)]*\|merchant-ledger\)\\\.json\$\/i;/.test(dp));
-const ops = fs.readFileSync(path.join(REPO, 'docs', 'WEBSITE-OPERATIONS.md'), 'utf8');
-yes('S7 the deletion runbook says the ledger is let go, not left',
-    /The dry run counts those as `release`, and the game server lets\s+go of them/.test(ops) && !/merchant-ledger\.json`\) keys a supply wait, and a trade still waiting\s+on a character, by that character's form id and profile; the dry run counts\s+those as `left`/.test(ops));
+// S7, that the deletion runbook says the ledger is let go, left with
+// WEBSITE-OPERATIONS.md for the private ops repo (#3693), whose
+// tests/test-ops-docs.js holds it.
 
 // ---------------------------------------------------------------- stand-ins
 const NOW = Date.now();

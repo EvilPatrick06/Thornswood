@@ -11,7 +11,7 @@
   minimum a Continue or Cancel dialog saying exactly what will be typed and
   that Steam's window will come to the front".
 
-  The button cannot be pressed from here (CLAUDE.md forbids starting the
+  The button cannot be pressed from here (the ops repo's CLAUDE.md forbids starting the
   launcher), so this reads the source and checks the shape that makes the
   question impossible to go around:
 

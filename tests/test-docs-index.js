@@ -78,7 +78,7 @@ topPages.forEach(function (name) {
 });
 yes('COLLECTION-REBUILD-7ESSXF.md is in the index (#1103)', targets.has('COLLECTION-REBUILD-7ESSXF.md'));
 yes('docs/README.md has a systems/ row', targets.has('systems/') || targets.has('systems'));
-yes('docs/README.md has an archive row', targets.has('archive') || targets.has('archive/'));
+// The archive row went with docs/archive, to the private ops repo (#3693).
 
 // ------------------------------------------------- every file is found (#2801)
 // Every file under docs/ outside archive/, as a path from the repository.

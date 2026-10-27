@@ -47,7 +47,7 @@ Primary sources checked16Oct2026:
 - https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/dispatchflushbuffers-routines (FlushFileBuffers dispatch)
 - https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/fltkernel/nf-fltkernel-fltflushbuffers (volume data and metadata barrier)
 
-Repository evidence: Developer-Guide.md VPS section and docs/DEPLOY-IDENTITIES.md are recorded source evidence, not a fresh live verification of current server privileges. All execution, privilege checks and actual stopped-world evidence belong to Claude. Do not change operational rules or pretend this design already works.
+Repository evidence: Developer-Guide.md VPS section and the ops repo's DEPLOY-IDENTITIES.md are recorded source evidence, not a fresh live verification of current server privileges. All execution, privilege checks and actual stopped-world evidence belong to Claude. Do not change operational rules or pretend this design already works.
 
 ## 17Oct native runtime producer audit
 

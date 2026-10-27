@@ -17,7 +17,7 @@
   wss://thornswood.net/box/ with this PC's token, Caddy hands it to the
   bridge on the box, and the bridge joins it to the box's own sshd. sshd
   then takes this PC's key, which the box accepts only through the bridge.
-  The person's guide is docs\BOX-ACCESS.md.
+  The person's guide is the ops repo's BOX-ACCESS.md.
 
   IN ORDER, each step skipped when it is already done, so it is run again
   until the last one passes:

@@ -185,7 +185,7 @@ typed on a command line or written on this page.
    its Caddyfile, `.\scripts\deploy\Install-Bridge.ps1` and then
    `.\scripts\vps\Grant-BoxAccess.ps1 -Name one -ThisMachine` move this
    machine onto the bridge, and every other machine and person is given
-   their way in with `Grant-BoxAccess.ps1` (`docs\BOX-ACCESS.md`).
+   their way in with `Grant-BoxAccess.ps1` (the ops repo's `BOX-ACCESS.md`).
 5. **PowerShell 7, Node, Git and the Build Tools on the box**, and the
    firewall for the live game:
    `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit -IncludeBuildTools'`.
@@ -353,7 +353,7 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     old box registered, so `Launcher builds` runs on the new box from the next
     pull request. Then `.\scripts\deploy\Install-Runner.ps1 -NetworkOnly -Number N
     -AllowHost pypi.org,files.pythonhosted.org,registry.npmjs.org` for each
-    of the three (docs\RUNNER-ISOLATION.md section 6). Then
+    of the three (the ops repo's RUNNER-ISOLATION.md section 6). Then
     `.\scripts\vps\Keep-RunnerLogs.ps1 -Install`, the daily task that removes
     the runners' own logs once they are two weeks old (#3184).
 25. **Close it to all but ssh with a key**, once every machine that deploys

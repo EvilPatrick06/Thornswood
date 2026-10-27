@@ -6,8 +6,6 @@ at the root.
 
 | Page | What it answers |
 | --- | --- |
-| [WEBSITE-AUDIT.md](WEBSITE-AUDIT.md) | Public website discovery, accessibility, privacy and reliability checks, with verification and remaining operator risks. |
-| [WEBSITE-OPERATIONS.md](WEBSITE-OPERATIONS.md) | Confirmed operator facts, legal applicability questions, public asset permission evidence and recovery procedures. |
 | [SERVER.md](SERVER.md) | What runs where, what talks to what, and which script puts each piece in place: every VPS service with its folder, port and task. |
 | [FEED.md](FEED.md) | The update feed launchers read: every field of version.json, who writes it, who reads it, and what happens when it is wrong. |
 | [JSON-STATE-INVENTORY.md](JSON-STATE-INVENTORY.md) | Every critical JSON file, who writes and reads it, how it is checked, and the four records held to a version and shape (#2180). |
@@ -26,10 +24,6 @@ at the root.
 | [MOVING-THE-SERVER.md](MOVING-THE-SERVER.md) | Growing the VPS, or moving everything to a new box. |
 | [studies/in-game-ui](studies/in-game-ui/README.md) | The options for voice, chat, emotes and the in-game UI without a browser (#3208): today's voice measured by room size, a box forwarder measured, each option's pros and cons, and the recommendations Patrick picks from. |
 | [AFFECTED-HARNESSES.md](AFFECTED-HARNESSES.md) | Running only the gate harnesses a pull request can affect (#3114): the Linux study, the read map, the rules, and the trace of the gate on the VPS. |
-| [DEPLOY-IDENTITIES.md](DEPLOY-IDENTITIES.md) | The VPS access audit (#2182): who can get in and as what today, and a restricted deploy identity design with migration, rollback and the decisions it needs. |
-| [OWNERSHIP.md](OWNERSHIP.md) | Who holds each credential, account and build, and who the second holder is. |
-| [BOX-ACCESS.md](BOX-ACCESS.md) | Reaching the box over ssh from your own PC, through the bridge with your own key and token (#2891), and how Patrick gives and takes that access one person at a time. |
-| [RUNNER-ISOLATION.md](RUNNER-ISOLATION.md) | The GitHub Actions runners on the VPS (#2161): what they can reach, who can run code on them, the findings, the read-only check, and the risk decision it needs. |
 | [SIGNED-RELEASES.md](SIGNED-RELEASES.md) | The signed release design (#2163): what gets signed and how, custody, rotation, revocation, the rollout that keeps every checksum, and the test-only pilot. |
 | [CLEAN-INSTALL-RUN.md](CLEAN-INSTALL-RUN.md) | The checklist for a stranger's first install, and what each step should show. |
 | [COLLECTION-REVISION-2.md](COLLECTION-REVISION-2.md) | The Vortex pass for collection revision 2, step by step, and the exact plugin order a clean install must land in. |
@@ -43,7 +37,10 @@ at the root.
 | [NPC-SERVER-ACTIVITY.md](NPC-SERVER-ACTIVITY.md) | Shared NPC activity on dev and main: who owns placed identities, movement, combat and return. |
 | [npc-server-runtime.md](npc-server-runtime.md) | Dev NPC loading and first unattended activity. |
 | [NPC-WORLD-PLAN.md](NPC-WORLD-PLAN.md) | NPC world work: town cut, habitat rules, rates and merchant quests. |
-| [archive](archive) | Dated snapshots, history only. |
+
+The pages about who holds each account and key, how the box is reached, the
+runners on it, the site's operator facts, and the dated notes from before
+the repository went public are kept by the team in a private repository.
 
 Every page cites file and line for what it says. When a page and the code
 disagree, the code is right: fix the page in the same pull request.

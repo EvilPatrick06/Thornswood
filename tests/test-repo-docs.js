@@ -175,7 +175,9 @@ if (tracked) {
       tracked.indexOf('site/config.sample.json') < 0);
   yes('site/config.example.json is tracked (same suffix as root config.example.json)',
       tracked.indexOf('site/config.example.json') >= 0);
-  ['CLAUDE.md', 'Developer-Guide.md'].forEach(function (rel) {
+  // The long CLAUDE.md is in the private ops repo since #3693; its
+  // tests/test-ops-docs.js holds the same check of it there.
+  ['Developer-Guide.md'].forEach(function (rel) {
     const t = read(rel);
     yes(rel + ' is there', t !== null);
     if (t !== null) {

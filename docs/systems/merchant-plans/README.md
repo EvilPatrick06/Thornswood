@@ -10,8 +10,8 @@ behind [../merchants-guild.md](../merchants-guild.md),
 Patrick stopped ChatGPT on 22 Oct and gave its remaining work to Claude
 (#3079, #1373). Read each page's own first lines for what merged and what is
 still only a plan: several are proposals that never ran, and their dated
-reports are history, not the state of the servers ([../../../ops/status.md](../../../ops/status.md)
-is that). Alpha stock, purses and pending trades are throwaway, so no plan
+reports are history, not the state of the servers (`ops/status.md` in the
+private ops repo is that). Alpha stock, purses and pending trades are throwaway, so no plan
 here is a reason to carry data over a change.
 
 | Page | What it is |

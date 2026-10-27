@@ -14,7 +14,7 @@ period").
 
 The owners below were **decided by Patrick on 12 October 2026**: he took the
 proposed list as written (issue #2183). Behind every row is still Patrick's
-own accounts ([OWNERSHIP.md](OWNERSHIP.md)).
+own accounts (the ops repo's OWNERSHIP.md).
 
 ## How the checks work
 

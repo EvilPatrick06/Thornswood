@@ -178,7 +178,7 @@ and #2612). The live game server's task moves at the first live
 `Publish-Server.ps1` since #2578. The site runs as LOCAL SERVICE and the bot
 as `NT SERVICE\ThornswoodBot`. The watchdog and the tasks that keep or repair
 the box stay SYSTEM by design (Patrick, 22 Oct 2026):
-`docs\DEPLOY-IDENTITIES.md` section 8 lists each and why.
+The ops repo's `DEPLOY-IDENTITIES.md` section 8 lists each and why.
 `records\prod-parity.json` names every task's account, and
 `Check-ProdParity.ps1` checks the box against it.
 
