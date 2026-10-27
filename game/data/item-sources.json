@@ -33,14 +33,14 @@
   "game/gamemode.js",
   "scripts/dev/MerchantScarceLongfinSources.js"
  ],
- "count": 1057,
+ "count": 1058,
  "counts": {
   "crafted": 719,
   "race": 38,
   "company": 13,
   "faction": 24,
   "quest": 21,
-  "gathered": 137,
+  "gathered": 138,
   "found": 180,
   "start": 11
  },
@@ -50,7 +50,7 @@
   "company": 0,
   "faction": 24,
   "quest": 11,
-  "gathered": 112,
+  "gathered": 113,
   "found": 112,
   "start": 0
  },
@@ -1050,6 +1050,7 @@
   "cee82:Skyrim.esm": {"name":"Fine Boots","type":"ARMO","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","recipe":"97d:MoreCraftableEquipment.esp"}]},
   "cee84:Skyrim.esm": {"name":"Fine Hat","type":"ARMO","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","recipe":"982:MoreCraftableEquipment.esp"}]},
   "d099:Dawnguard.esm": {"name":"Dwarven Bolt","type":"AMMO","sources":["crafted"],"via":[{"kind":"crafted","by":"Woodworker/Woodwright","rank":"novice","recipe":"f814:Dawnguard.esm"}]},
+  "d0:_ResourcePack.esl": {"name":"Aloe Vera Leaves","type":"INGR","sources":["gathered"],"via":[{"kind":"gathered","by":"gatherer","rank":"novice","table":"harvests.json harvests","records":2}]},
   "d191f:Skyrim.esm": {"name":"Tavern Clothes","type":"ARMO","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","recipe":"9d2:MoreCraftableEquipment.esp"}]},
   "d1921:Skyrim.esm": {"name":"Boots","type":"ARMO","sources":["crafted"],"via":[{"kind":"crafted","by":"Tailor/Haberdasher","rank":"novice","recipe":"928:MoreCraftableEquipment.esp"}]},
   "d284d:Skyrim.esm": {"name":"Deer Hide","type":"MISC","sources":["gathered"],"via":[{"kind":"gathered","by":"hunter","rank":"novice","table":"hunts.json","records":4}]},

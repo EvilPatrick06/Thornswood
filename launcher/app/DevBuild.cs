@@ -29,7 +29,7 @@ namespace Thornswood
         /// <summary>
         /// The dev voice service's address behind Caddy, from the main one.
         /// Caddy carries /voice/ to the live service and /voice-dev/ to the
-        /// dev one (tools\Caddyfile), and the dev gamemode collects chat
+        /// dev one (scripts\deploy\Caddyfile), and the dev gamemode collects chat
         /// commands from the dev service only. Until 20 September the dev
         /// build kept the main address, so its chat lines, /pick among them,
         /// went to the live service and were answered by the live gamemode,

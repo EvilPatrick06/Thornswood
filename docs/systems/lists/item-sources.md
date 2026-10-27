@@ -1,6 +1,6 @@
 # Where every item comes from
 
-Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1057 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
+Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1058 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
@@ -9,7 +9,7 @@ Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.j
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
 | faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
 | quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 11 |
-| gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 137 | 112 |
+| gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 138 | 113 |
 | found | created by a dungeon chest or a body | 180 | 112 |
 | start | handed to a new character: first clothes, a class's tool, a farmer's first seeds | 11 | 0 |
 
