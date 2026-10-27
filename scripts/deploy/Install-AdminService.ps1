@@ -344,7 +344,8 @@ try {
   `$tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
   `$admins = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')
   `$taskSid = ''
-  try { `$taskSid = (New-Object Security.Principal.NTAccount('NT TASK', '$TaskName')).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+  # A task that is there has a SID; one that cannot be looked up stops the lock.
+  if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { `$taskSid = (New-Object Security.Principal.NTAccount('NT TASK', '$TaskName')).Translate([Security.Principal.SecurityIdentifier]).Value }
   `$rules = @(@('S-1-5-18', 'FullControl'), @('S-1-5-32-544', 'FullControl'), @('S-1-3-4', 'Synchronize'))
   if (`$taskSid) { `$rules += ,@(`$taskSid, 'Modify') }
   `$acl = Get-Acl -LiteralPath '$state'
