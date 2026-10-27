@@ -20,10 +20,10 @@ const pr = read(path.join(WF, 'build-pr.yml'));
 
 yes('build.yml no longer runs on a pull request', build && triggers(build).indexOf('pull_request') < 0);
 yes('build.yml still runs a push to main and a manual run', /push:\n    branches: \[main\]/.test(build) && triggers(build).indexOf('workflow_dispatch') >= 0);
-yes('main builds default to GitHub\'s hosted runner, unless its pull request already passed the tree (#3182)', /\n  launcher:\n    name: Launcher builds\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}\n    runs-on: windows-latest\n/.test(build));
+yes('main builds default to GitHub\'s hosted runner, unless its pull request already passed the tree (#3182)', /\n  launcher:\n    name: Launcher builds\n    needs: \[tested, tested-vps\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}\n    runs-on: windows-latest\n/.test(build));
 yes('the VPS is a fallback job, on the box\'s build runners (#2994)', /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\n/.test(build));
 yes('  run only when the hosted job did not succeed (skipped by BUILD_RUNNER or a manual vps run, or failed)',
-    /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, launcher\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' \}\}\n/.test(build));
+    /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, tested-vps, launcher\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' \}\}\n/.test(build));
 yes('  with the same steps as the hosted job (one anchor)', /steps: &checks\n/.test(build) && /steps: \*checks\n/.test(build));
 yes('a manual run can pick the box', /runner:\n[\s\S]*?options: \[hosted, vps\]/.test(build));
 yes('build-pr.yml exists', !!pr);
