@@ -214,7 +214,7 @@ if (-not $To -and -not $Unschedule) {
 # backslash (C:\...) or \\server\share. Each is used as given, and the task
 # -Schedule registers is handed both word for word, so anything else means a
 # different folder depending on where it runs. Measured 12 Oct (#2199): -To
-# given through Git Bash unquoted arrived as C:UsersevilpDownloadsThornswood-
+# given through Git Bash unquoted arrived as C:Users<you>DownloadsThornswood-
 # Repolocalbackups, a path relative to the current folder on C:. This script
 # made that folder inside the worktree it ran from and registered the task
 # with it, so the next 4:15 AM run would have fetched into a new folder under
