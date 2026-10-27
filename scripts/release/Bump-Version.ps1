@@ -10,7 +10,7 @@
   WHY THIS EXISTS AS ITS OWN STEP.
 
   Ship used to bump the version itself and then, after publishing, `git add -A`
-  and push the result straight to main. That is why enforce_admins has to stay
+  and push the result straight to main. That is why enforce_admins had to stay
   off in branch protection: turning it on refuses that push, and the release
   would go out to every launcher while the source commit never landed, leaving
   the repo saying something different from what shipped. The worst possible
@@ -176,51 +176,20 @@ Write-Host ('  ' + ('=' * 68)) -ForegroundColor DarkGray
 Say '  Next, in this order:' 'White'
 Write-Host ''
 if ($branch -eq 'main') {
-  # Whether a push to main is possible at all depends on enforce_admins in
-  # branch protection, which was turned on on 22 September. With it on, NOBODY
-  # pushes to main, owner included, and this commit has to go through a pull
-  # request like any other. Asked rather than assumed, because the setting can
-  # be changed at any time and a wrong instruction here sends somebody into a
-  # refused push with a release half prepared.
-  # Three answers, not two: GitHub says on, GitHub says off, or GitHub could
-  # not be asked (no gh, no sign in, no network). The third used to read as
-  # off and printed a direct push as allowed. It now takes the branch, which
-  # works whichever way the setting is.
-  $enforced = ''
-  $askWhy = ''
-  if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    $askWhy = 'gh is not on the path'
-  } else {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-      $said = @(& gh api repos/EvilPatrick06/Thornswood/branches/main/protection --jq '.enforce_admins.enabled' 2>&1)
-      $rc = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $old }
-    $text = (($said | ForEach-Object { [string]$_ }) -join ' ').Trim()
-    if ($rc -ne 0) { $askWhy = 'gh api answered exit ' + $rc + $(if ($text) { ': ' + $text } else { '' }) }
-    elseif ($text -eq 'true' -or $text -eq 'false') { $enforced = $text }
-    else { $askWhy = 'GitHub answered "' + $text + '", not true or false' }
-  }
-  if ($askWhy -or $enforced -eq 'true') {
-    if ($askWhy) {
-      Say ('  Could not ask GitHub whether main is protected against everybody (' + $askWhy + ').') 'Yellow'
-      Say '  The branch below works whichever way that setting is:' 'Yellow'
-    } else {
-      Say '  main is protected against everybody, including you, so this cannot be' 'Yellow'
-      Say '  pushed straight there. Put it on a branch:' 'Yellow'
-    }
-    Write-Host ''
-    Say ("      git branch -f patrick/launcher-$target; git reset --hard HEAD~1; git checkout patrick/launcher-$target") 'White'
-    Say '  Moves the commit you just made onto a branch and takes main back.' 'DarkGray'
-    Write-Host ''
-    Say ("      git push -u origin patrick/launcher-$target") 'White'
-    Say '      gh pr create --fill' 'White'
-    Say '  LEAVE THIS MACHINE. Merge it, then git checkout main and git pull.' 'DarkGray'
-  } else {
-    Say '      git push' 'White'
-    Say '  LEAVES THIS MACHINE. Sends the version commit.' 'DarkGray'
-    Say '  (enforce_admins is off, so a direct push to main is still allowed.)' 'DarkGray'
-  }
+  # Every change reaches main through a pull request, the owner's included
+  # (Developer-Guide.md). GitHub refuses a push to main from write access but
+  # not from the admin account while enforce_admins is off, so for the admin
+  # the rule is kept by hand. These steps used to ask GitHub for enforce_admins
+  # and print a direct push when it was off, which handed the admin the one
+  # step the rule forbids (#3617). The branch works whatever the setting is.
+  Say '  Every change reaches main through a pull request, yours included. Put it on a branch:' 'Yellow'
+  Write-Host ''
+  Say ("      git branch -f patrick/launcher-$target; git reset --hard HEAD~1; git checkout patrick/launcher-$target") 'White'
+  Say '  Moves the commit you just made onto a branch and takes main back.' 'DarkGray'
+  Write-Host ''
+  Say ("      git push -u origin patrick/launcher-$target") 'White'
+  Say '      gh pr create --fill' 'White'
+  Say '  LEAVE THIS MACHINE. Merge it, then git checkout main and git pull.' 'DarkGray'
 } else {
   Say ("      git push -u origin $branch") 'White'
   Say ("      gh pr create --fill") 'White'

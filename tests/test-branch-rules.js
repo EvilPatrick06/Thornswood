@@ -22,11 +22,18 @@
 // the files that decide them: build.yml has one job and it is "Launcher
 // builds"; Ship.ps1 never writes to the source repository; Bump-Version.ps1
 // commits Updater.cs and nothing else; CODEOWNERS names files that exist and
-// covers the six shared ones CLAUDE.md lists. Then the documents: each states
+// covers the six shared ones the ops repo's CLAUDE.md lists. Then the documents: each states
 // the four settings (since 25 September: enforce_admins off, no required
 // check, since the build check on GitHub is off), gives
 // the command that reads the live settings, and says none of the things that
 // stopped being true.
+//
+// #3617: with enforce_admins off, GitHub holds the admin account to none of
+// main's rules, yet the guide still said "GitHub refuses it" of a push to main
+// and that enforce_admins "went on". So the documents must also say who a push
+// or force push to main is refused for, and must not say any of the lines that
+// claimed GitHub refuses everybody. With --live it reads the rulesets too,
+// since a ruleset can hold an admin even with enforce_admins off.
 //
 //     node tests/test-branch-rules.js           the files only, no network
 //     node tests/test-branch-rules.js --live    also reads branch protection
@@ -239,6 +246,26 @@ docs.forEach(function (d) {
 });
 
 const sd = docs[0].text;
+// #3617. While enforce_admins is off, "GitHub refuses it" is true only for
+// write access. These are the lines that said it of everybody.
+[
+  [/GitHub refuses it[.;]/, '"GitHub refuses it." of a push to main, with nobody named'],
+  [/Main refuses a force push\./, '"Main refuses a force push." with nobody named'],
+  [/stopped holding the moment it went on/, 'that enforce_admins went on and stayed on'],
+  [/went on, because Ship writes nothing/, 'that enforce_admins went on, as if it still is'],
+  [/refuses a push from everybody/i, 'that main refuses a push from everybody']
+].forEach(function (b) {
+  yes('Developer-Guide.md does not say ' + b[1], !b[0].test(sd));
+});
+yes('Developer-Guide.md says GitHub holds an admin to none of main\'s rules while enforce_admins is off',
+    /enforce_admins off, GitHub holds an admin to none of main's rules/.test(sd));
+yes('Developer-Guide.md says for whom a push to main is refused: write access, not the admin account',
+    /GitHub refuses a push to main from write access\. It does not refuse one from the admin account/.test(sd) &&
+    /GitHub refuses it from write access; from the admin account it does not/.test(sd));
+yes('Developer-Guide.md says for whom a force push to main is refused',
+    /Never force push main: GitHub refuses it from write access, but not from the admin account/.test(sd));
+yes('Ship.ps1 does not say main refuses a push from everybody',
+    !/refuses a push from everybody|refuses a\s+#?\s*push from everybody/i.test(flat(shipSrc, true)));
 yes('Developer-Guide.md does not say Ship bumps the version; Bump-Version.ps1 does, as its own commit',
     !/Ship bumps/i.test(sd) && /Bump-Version\.ps1/.test(sd));
 yes('Developer-Guide.md does not say Ship patches the client; it checks it with Sync-Client.ps1 -Check',
@@ -273,6 +300,21 @@ if (!LIVE) {
         (reviews.required_approving_review_count || 0) === 0);
     yes('live: the code owner review is off', !reviews.require_code_owner_reviews);
     yes('live: force pushes are refused', !(p.allow_force_pushes && p.allow_force_pushes.enabled));
+    yes('live: deleting main is refused', !(p.allow_deletions && p.allow_deletions.enabled));
+    yes('live: write access has to come through a pull request, as the documents say', !!p.required_pull_request_reviews);
+  }
+  // Rulesets hold an admin whatever enforce_admins says, so the guide's "GitHub
+  // holds an admin to none of main's rules" is true only while none reaches main.
+  let rs = null;
+  try {
+    rs = JSON.parse(execSync('gh api repos/EvilPatrick06/Thornswood/rules/branches/main', { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString('utf8'));
+  } catch (e) {
+    console.log('      ' + String(e.message).split('\n')[0]);
+  }
+  yes('gh read the ruleset rules on main', Array.isArray(rs));
+  if (Array.isArray(rs)) {
+    yes('live: no ruleset reaches main, so the admin account is held to nothing, as the documents say (GitHub says ' +
+        JSON.stringify(rs.map(function (r) { return r.type; })) + ')', rs.length === 0);
   }
   let auto = null;
   try {

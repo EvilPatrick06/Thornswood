@@ -21,7 +21,7 @@
   what had been done. Patrick decided on 12 October 2026 (option A on #2351): a
   staff script that finds, shows counts, deletes with a dry run first, and
   records each request so a restore reapplies it. "Deletion requests" in
-  docs\WEBSITE-OPERATIONS.md is the procedure around it.
+  the ops repo's WEBSITE-OPERATIONS.md is the procedure around it.
 
   A DRY RUN IS THE DEFAULT. Without -Delete nothing is changed or written.
   It prints, for every store, how many of the person's records are there and
@@ -141,7 +141,7 @@
   its own, after a crash and after a reboot, which in October 2026 was about
   a day for the game servers and the site and up to a week for voice and the
   bot (#2758 has the count). Until it does, its copy still holds the records;
-  the procedure (docs\WEBSITE-OPERATIONS.md) says when the person is told.
+  the procedure (the ops repo's WEBSITE-OPERATIONS.md) says when the person is told.
   A copy set aside with an unfinished save (.pending-batch in changeForms)
   is refused: the engine would replay it if that copy were put back, and
   could write a deleted character back. Every file is read and checked
@@ -161,7 +161,7 @@
   -Reapply reads that record and asks for every request in it again, the same
   way: after a backup is put back and before anything starts, so each service
   takes them at the start that puts it back in service (Restore-Box.ps1 runs
-  it, and docs\RESTORING.md says when by hand). -Merge names other copies of
+  it, and RESTORING.md in the ops repo says when by hand). -Merge names other copies of
   the record (the one in the backup being put back, or one from a newer
   backup); lines the box's record does not have are added to it first.
   -Reapply never adds a line of its own.

@@ -76,8 +76,11 @@ Frida with GLib, and Node.js. Every download that carries one of the four
 has a `licences` folder with each library's own licence, and its note lists
 which library is in which file. The installer puts that folder in your
 Thornswood folder. Frida is Frida's own build, with other libraries inside
-it, and the note names where their source is: Thornswood's copies of
-Frida's repositories, at the commits Frida built them from.
+it, and the note names where their source is: one archive of each, at the
+commit Frida built it from, on
+**[Thornswood's release of Frida's sources](https://github.com/EvilPatrick06/Thornswood/releases/tag/frida-sources-16.0.19)**.
+Until that repository is public, the same commits are in Thornswood's
+copies of Frida's repositories, which the note names too.
 
 SkyMP's in-game interface, `build.js` with the fonts, pictures and sounds
 beside it, is built from the same public copy too: from its `skymp5-front`
@@ -145,13 +148,14 @@ it is for, and nothing else of SkyHUD's comes with it.
 
 **QuickLoot IE's settings**, `Data\SKSE\Plugins\QuickLootIE.json`, are
 QuickLoot IE 4.1.3's own settings file with one line added by Thornswood, so
-its loot menu shows weight and no gold value. QuickLoot IE is under the GNU
-General Public License version 3, and so is this file.
+its loot menu shows weight and no gold value. QuickLoot IE is released under
+the GPL-3.0-or-later, and so is this file.
 
 **SkyUI's item lists and item card, SkyHUD's line under an item and moreHUD's
 value to weight** show no gold value on Thornswood, because an item here has
-no gold price. Thornswood ships none of those files: the launcher makes them
-on your computer from your own copy of each mod.
+no gold price. They are the work of the SkyUI Team, the SkyHUD Team and
+Ahzaab, moreHUD's author. Thornswood ships none of those files: the launcher
+makes them on your computer from your own copy of each mod.
 
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
