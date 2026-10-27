@@ -148,6 +148,7 @@ function Step([scriptblock]$b) { try { return (& $b) } catch { Die $_.Exception.
 
 if ($PSVersionTable.PSVersion.Major -lt 7) { Die 'This needs PowerShell 7 (pwsh): NexusLayout.cs reads collection.json with System.Text.Json, which Windows PowerShell 5.1 does not have.' }
 . (Join-Path $Here 'Nexus.ps1')
+. (Join-Path $Here '..\mods\PluginRuleLoops.ps1')
 
 # A program run with its output kept apart from its errors.
 function Invoke-Tool([string]$exe, [string[]]$arguments) {
@@ -533,6 +534,30 @@ foreach ($r in $col.PluginRules) {
   foreach ($a in $r.After) { $ak = ([string]$a).ToLowerInvariant(); if ($pos.ContainsKey($ak) -and $pos[$ak] -gt $pos[$k]) { $broken += ($r.Name + ' is to load after ' + $a) } }
 }
 if ($broken.Count) { Die ('The collection''s plugin order breaks its own plugin rules: ' + ($broken -join '; ') + '.') }
+# The list is not the game's order: the game puts every master first, and
+# LOOT holds that as hard as a rule. Revision 5's list had
+# cheddars_mashups.esl at the end, after the three plugins its rule named,
+# and the rule held to the list; on a clean install LOOT found it going round
+# with the game's own order (27 Oct). So the rules are read against the
+# plugins' headers too (PluginRuleLoops.ps1).
+# A file with no TES4 header is placed by its name alone: the game loads an
+# .esm or .esl as a master whatever is in it.
+$headers = @{}
+$byName = @()
+foreach ($x in $placed) {
+  if ($x.Rel -notmatch '^Data\\([^\\]+\.(esp|esm|esl))$') { continue }
+  $nm = $Matches[1]
+  if (-not $pos.ContainsKey($nm.ToLowerInvariant())) { continue }
+  $h = Read-PluginRuleHeader $x.Full
+  if ($null -eq $h) {
+    $byName += $nm
+    $h = [pscustomobject]@{ Master = ($nm -match '\.(esm|esl)$'); Light = ($nm -match '\.esl$'); Masters = [string[]]@() }
+  }
+  $headers[$nm] = $h
+}
+if ($byName.Count) { Say ('  no TES4 header, so placed by name alone: ' + ($byName -join ', ')) 'Yellow' }
+$loops = @(Get-PluginRuleLoops $col.PluginRules $headers)
+if ($loops.Count) { Die ('The collection''s plugin rules go round in a circle with the order the game sets, which LOOT reports as a cyclic interaction on every install: ' + (($loops | ForEach-Object { $_.Loop + ' (' + ($_.Why -join '; ') + ')' }) -join '; ') + '.') }
 Say ('  ' + $order.Count + ' plugins: ' + @($order | Where-Object { $_.Enabled }).Count + ' enabled in the collection''s order' + $(if ($unlisted.Count) { ', ' + $unlisted.Count + ' it does not list, disabled: ' + ($unlisted -join ', ') } else { '' }))
 
 Say '  working out every file''s sha256' 'DarkGray'

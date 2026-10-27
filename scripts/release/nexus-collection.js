@@ -92,6 +92,18 @@
 // It refuses a file the entry already patches. "patches" goes after the
 // installer answers and file hashes, where Vortex writes it.
 // On stdout: <entry name>\tpatch\t\t<path> CRC-32 <crc>.
+//
+// A RULE (27 Oct). An entry with "rule": true gives a plugin the list already
+// names a new "load after" rule in place of the one it has:
+//   { "rule": true, "name": "cheddars_mashups.esl", "after": ["RaceCompatibility.esm"] }
+// Every "after" has to be a plugin the list names, or one of the five base
+// masters. The plugin moves in the list to straight after the last plugin its
+// "after" names, so the list keeps its own rules. Revision 5's rule for
+// cheddars_mashups.esl named three plugins the game always loads after it,
+// because it loads an .esl as a master, and LOOT reported each as a cyclic
+// interaction; Install-NexusRevision.ps1 reads a revision's rules against the
+// plugins' headers (PluginRuleLoops.ps1) and stops on one.
+// On stdout: <plugin>\trule\tafter <old names>\tafter <new names>.
 
 'use strict';
 const fs = require('fs');
@@ -186,6 +198,7 @@ function applySwaps(collection, swaps) {
   for (const sw of swaps) {
     if (sw.add === true) { applyAdd(collection, sw, lines); continue; }
     if (sw.patch === true) { applyPatch(collection, sw, lines); continue; }
+    if (sw.rule === true) { applyRule(collection, sw, lines); continue; }
     for (const k of ['modId', 'fileId', 'version', 'md5', 'fileSize', 'logicalFilename']) {
       if (sw[k] === undefined || sw[k] === null || sw[k] === '') stop('A swap has no ' + k + '.');
     }
@@ -368,6 +381,39 @@ function applyPatch(collection, pt, lines) {
   lines.push([String(e.name), 'patch', '', String(pt.path) + ' CRC-32 ' + String(pt.crc)].join('\t'));
 }
 
+function applyRule(collection, ru, lines) {
+  if (!ru.name || !/\.es[mpl]$/i.test(String(ru.name))) stop('A rule has no plugin name (.esm, .esp or .esl).');
+  const low = String(ru.name).toLowerCase();
+  if (!Array.isArray(collection.plugins)) collection.plugins = [];
+  const at = collection.plugins.findIndex(p => String(p.name).toLowerCase() === low);
+  if (at < 0) stop('The plugin list does not name ' + ru.name + ', so there is no plugin to give a rule.');
+  const after = Array.isArray(ru.after) ? ru.after.map(a => String(a)) : [];
+  if (!after.length) stop(ru.name + ' says nothing to load after, so Vortex and LOOT would place it where they liked.');
+  const base = ['skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm', 'dragonborn.esm'];
+  let last = -1;
+  for (const a of after) {
+    const al = a.toLowerCase();
+    if (al === low) stop(ru.name + ' is to load after itself.');
+    const i = collection.plugins.findIndex(p => String(p.name).toLowerCase() === al);
+    if (i < 0 && base.indexOf(al) < 0) stop(ru.name + ' is to load after ' + a + ', which the plugin list does not name.');
+    if (i >= 0 && i !== at) last = Math.max(last, i);
+  }
+  if (!collection.pluginRules || typeof collection.pluginRules !== 'object') collection.pluginRules = { plugins: [], groups: [] };
+  if (!Array.isArray(collection.pluginRules.plugins)) collection.pluginRules.plugins = [];
+  const rules = collection.pluginRules.plugins;
+  const ri = rules.findIndex(r => String(r.name).toLowerCase() === low);
+  const was = ri >= 0 && Array.isArray(rules[ri].after) ? rules[ri].after.map(a => String(a)) : [];
+  const now = after.map(a => a.toLowerCase());
+  if (ri >= 0 && Object.keys(rules[ri]).some(k => k !== 'name' && k !== 'after')) stop(ru.name + '\'s rule says more than what it loads after (' + Object.keys(rules[ri]).join(', ') + '), which this does not change.');
+  if (JSON.stringify(was) === JSON.stringify(now)) stop(ru.name + ' already loads after ' + after.join(', ') + '.');
+  if (ri >= 0) rules[ri].after = now;
+  else rules.push({ name: low, after: now });
+  const entry = collection.plugins.splice(at, 1)[0];
+  const to = last < 0 ? 0 : (last > at ? last : last + 1);
+  collection.plugins.splice(to, 0, entry);
+  lines.push([String(ru.name), 'rule', 'after ' + was.join(', '), 'after ' + now.join(', ')].join('\t'));
+}
+
 function main(argv) {
   if (argv.length !== 4) stop('usage: node nexus-collection.js <collection.json> <swaps.json> <out collection.json> <out payload.json>');
   const [inPath, swapsPath, outPath, payloadPath] = argv;
@@ -385,4 +431,4 @@ function main(argv) {
 }
 
 if (require.main === module) main(process.argv.slice(2));
-module.exports = { payloadOf, applySwaps, applyAdd, applyPatch, filterInfo, toV3CollectionPayload };
+module.exports = { payloadOf, applySwaps, applyAdd, applyPatch, applyRule, filterInfo, toV3CollectionPayload };

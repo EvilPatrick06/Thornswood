@@ -442,6 +442,31 @@ foreach ($case in @(
     Yes ('a patch for ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
 }
 
+# 27 Oct: revision 5 gave cheddars_mashups.esl, which the game loads as a
+# master, a rule after plugins that are not, and LOOT reported each as a
+# cyclic interaction. A rule entry replaces a plugin's rule and moves it in
+# the list to straight after the last plugin it names.
+$cjRule = Join-Path $T 'rule-collection.json'
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));b.plugins=['Water for ENB.esm','RaceCompatibility.esm','Immersive Weapons.esp','cheddars_mashups.esl'].map(n=>({name:n,enabled:true}));b.pluginRules.plugins=[{name:'immersive weapons.esp',after:['racecompatibility.esm']},{name:'cheddars_mashups.esl',after:['immersive weapons.esp']}];fs.writeFileSync(process.argv[2],JSON.stringify(b,undefined,2))" $cj $cjRule
+$ruJson = Join-Path $T 'rule.json'
+Put $ruJson '[{"rule":true,"name":"cheddars_mashups.esl","after":["RaceCompatibility.esm"]}]'
+$o1 = Join-Path $T 'rule-out.json'; $o2 = Join-Path $T 'rule-payload.json'
+$said = & $node.Source $js $cjRule $ruJson $o1 $o2
+Yes 'nexus-collection.js replaces a plugin''s rule and says what it was and is' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("cheddars_mashups.esl`trule`tafter immersive weapons.esp`tafter racecompatibility.esm"))
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));if(b.plugins.map(p=>p.name).join('|')!=='Water for ENB.esm|RaceCompatibility.esm|cheddars_mashups.esl|Immersive Weapons.esp')process.exit(2);if(JSON.stringify(b.pluginRules.plugins)!==JSON.stringify([{name:'immersive weapons.esp',after:['racecompatibility.esm']},{name:'cheddars_mashups.esl',after:['racecompatibility.esm']}]))process.exit(3);a.plugins=b.plugins;a.pluginRules=b.pluginRules;process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cjRule $o1
+Yes 'the plugin moves to straight after the plugin its rule names, the rule is lower case, and nothing else changes' ($LASTEXITCODE -eq 0)
+foreach ($case in @(
+        @('{"rule":true,"name":"Nowhere.esl","after":["RaceCompatibility.esm"]}', 'a plugin the list does not name', 'does not name Nowhere\.esl'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":["Nowhere.esp"]}', 'a plugin to load after one the list does not name', 'after Nowhere\.esp, which the plugin list does not name'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":["immersive weapons.esp"]}', 'the rule the plugin has already', 'already loads after'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":["cheddars_mashups.esl"]}', 'a plugin to load after itself', 'after itself'),
+        @('{"rule":true,"name":"cheddars_mashups.esl","after":[]}', 'a rule with nothing to load after', 'says nothing to load after'))) {
+    Put $ruJson ('[' + $case[0] + ']')
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $err = (& $node.Source $js $cjRule $ruJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>&1) -join ' '
+    Yes ('a rule for ' + $case[1] + ' is refused, saying so, and nothing is written') ($LASTEXITCODE -eq 1 -and $err -match $case[2] -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+
 if (-not $sz) { Skip 'the collection revision runs: 7-Zip is not on this machine'; Done }
 $baseArchive = Join-Path $T 'vortex\collection_7essxf_2_2026-10-03T17-33-45Z.7z'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $baseArchive) | Out-Null

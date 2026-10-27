@@ -10,6 +10,7 @@
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded>
       .\scripts\release\New-NexusRevision.ps1 -Mod 192001 -FileId <new file id> -Archive <the archive uploaded> -DropPatch 192001:Thornswood-Content.esp -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Add <mods to add>.json -WhatIf
+      pwsh scripts/release/New-NexusRevision.ps1 -Rule <plugin rules>.json -WhatIf
       pwsh scripts/release/New-NexusRevision.ps1 -SetLight RaceMenu.esp,XPMSE.esp -Layout <the -Record folder> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3 -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3
@@ -71,6 +72,19 @@
   (docs\LIGHT-ORDER-DRIFT.md: a new plugin goes on the end of its own kind,
   never mid-order). Install-NexusRevision.ps1 -CollectionArchive lays the new
   archive out to check it, from One or a cloud session.
+
+  A PLUGIN RULE (27 Oct). -Rule names a JSON file of plugins whose "load
+  after" rule the revision replaces:
+      [{ "name": "cheddars_mashups.esl", "after": ["RaceCompatibility.esm"] }]
+  Each plugin has to be one the list names, and so does each "after", unless
+  it is one of the five base masters. The plugin moves in the list to
+  straight after the last plugin its "after" names. Why: revision 5's -Add
+  gave cheddars_mashups.esl "after" three plugins that are not masters, and
+  the game loads an .esl as a master, before all of them, so LOOT reported a
+  cyclic interaction for each on every install. A master goes on the end of
+  the masters (docs\LIGHT-ORDER-DRIFT.md: a new plugin goes on the end of its
+  own kind). Install-NexusRevision.ps1 -CollectionArchive reads the new
+  rules against the plugins' headers and stops on a loop.
 
   A DRAFT WAITING. Nexus keeps one draft at a time, so a real run refuses
   while there is one. -WhatIf builds on the draft instead, so the revision
@@ -137,6 +151,10 @@
 .PARAMETER Add
   A JSON file of mods to add, as ADDING A MOD above says.
 
+.PARAMETER Rule
+  A JSON file of plugins whose rule the revision replaces, as A PLUGIN RULE
+  above says.
+
 .PARAMETER SetLight
   Plugins the revision gives the ESL flag, as LIGHT FLAGS above says.
 
@@ -181,6 +199,7 @@ param(
   [string[]]$Archive = @(),
   [string[]]$DropPatch = @(),
   [string]$Add,
+  [string]$Rule,
   [string[]]$SetLight = @(),
   [string[]]$ClearLight = @(),
   [string]$Layout,
@@ -348,7 +367,7 @@ Say ('  "' + (Get-NexusField $col 'name') + '", id ' + $colId + ', revision ' + 
 
 # --------------------------------------------------------------- publish ---
 if ($Publish) {
-  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $DropPatch.Count -or $From -or $Add -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -DropPatch, -Add, -SetLight, -ClearLight or -From.' }
+  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $DropPatch.Count -or $From -or $Add -or $Rule -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -DropPatch, -Add, -Rule, -SetLight, -ClearLight or -From.' }
   $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $Publish + ', domainName: "' + $Game + '") { id revisionNumber status } }'
   $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $Publish) }) 'collectionRevision'
   $revId = [string](Get-NexusField $rev 'id')
@@ -377,7 +396,7 @@ if ($Publish) {
 }
 
 # ------------------------------------------------------- refused up front ---
-if (-not $Mod.Count -and -not $Add -and -not $SetLight.Count -and -not $ClearLight.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, which plugins get or lose the light flag with -SetLight and -ClearLight, or publish a draft with -Publish.' }
+if (-not $Mod.Count -and -not $Add -and -not $Rule -and -not $SetLight.Count -and -not $ClearLight.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, which plugins get a new rule with -Rule, which plugins get or lose the light flag with -SetLight and -ClearLight, or publish a draft with -Publish.' }
 $Mod = @($Mod | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $FileId = @($FileId | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 if ($Mod.Count -ne $FileId.Count -or $Mod.Count -ne $Archive.Count) { Die ('-Mod, -FileId and -Archive go together, one of each for every mod: ' + $Mod.Count + ', ' + $FileId.Count + ' and ' + $Archive.Count + ' were given.') }
@@ -403,6 +422,18 @@ if ($Add) {
     if ([string]$a.modId -notmatch '^\d+$') { Die ('A mod to add in ' + $Add + ' has the mod number "' + $a.modId + '".') }
     if ([string]$a.fileId -notmatch '^\d+$') { Die ('Mod ' + $a.modId + ' in ' + $Add + ' has the file id "' + $a.fileId + '".') }
     if (-not $a.archive -or -not (Test-Path -LiteralPath ([string]$a.archive) -PathType Leaf)) { Die ('Mod ' + $a.modId + ' in ' + $Add + ' names no archive that is there: "' + $a.archive + '".') }
+  }
+}
+$rules = @()
+if ($Rule) {
+  if (-not (Test-Path -LiteralPath $Rule -PathType Leaf)) { Die ('There is no file at ' + $Rule + '.') }
+  try { $rules = @(ConvertFrom-Json ([IO.File]::ReadAllText($Rule) -replace ('^' + [char]0xFEFF), '')) }
+  catch { Die ($Rule + ' is not JSON this can read: ' + $_.Exception.Message) }
+  if (-not $rules.Count) { Die ($Rule + ' names no plugin rules.') }
+  foreach ($ru in $rules) {
+    if ([string]$ru.name -notmatch '^[^\\/:*?"<>|]+\.es[mpl]$') { Die ('A rule in ' + $Rule + ' names "' + $ru.name + '", which is not a plugin file name.') }
+    if (-not @($ru.after | Where-Object { $_ }).Count) { Die ($ru.name + ' in ' + $Rule + ' says nothing to load after.') }
+    if (@($rules | Where-Object { [string]$_.name -ieq [string]$ru.name }).Count -gt 1) { Die ($ru.name + ' is named more than once in ' + $Rule + '.') }
   }
 }
 $lights = @()
@@ -654,6 +685,8 @@ if ($lights.Count) {
   foreach ($k in @($unpacked.Keys)) { Remove-Item -LiteralPath (Split-Path -Parent $unpacked[$k]) -Recurse -Force }
   if (-not ($basePaths -contains 'patches')) { $lightPaths += 'patches' }
 }
+
+foreach ($ru in $rules) { $swaps.Add([ordered]@{ rule = $true; name = [string]$ru.name; after = @(@($ru.after) | Where-Object { $_ } | ForEach-Object { [string]$_ }) }) }
 
 # --------------------------------------------------------- the new archive ---
 Head 'The new revision'

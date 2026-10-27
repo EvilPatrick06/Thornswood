@@ -209,8 +209,9 @@ $arc = [ordered]@{
     kappa = ZipExact 'Kappa' @('Data/textures/k2.dds', 'kappa two', 'Data/Textures/k1.dds', 'kappa one', 'Data\SKSE\Plugins\kappa.dll', 'kappa dll')
     lambda = ZipExact 'Lambda' @('fomod/ModuleConfig.xml', $lambdaXml, 'opt/Lambda.txt', 'lambda text')
     mu    = ZipExact 'Mu' @('Data/mu.txt', 'lower', 'Data/MU.txt', 'upper')
+    nu    = Zip 'Nu' @{ 'Data\Nu.esl' = 'nu light plugin' }
 }
-$ids = @{ alpha = 900001; beta = 900002; gamma = 900003; delta = 900004; eps = 900005; kappa = 900006; lambda = 900007; mu = 900008 }
+$ids = @{ alpha = 900001; beta = 900002; gamma = 900003; delta = 900004; eps = 900005; kappa = 900006; lambda = 900007; mu = 900008; nu = 900009 }
 $serve = @{}
 foreach ($k in $arc.Keys) { $serve[[string]$ids[$k]] = @{ path = $arc[$k]; name = (Split-Path -Leaf $arc[$k]) } }
 Control @{ serve = $serve }
@@ -414,6 +415,19 @@ $colNoRule = P $T 'col-norule'
 Write-Col $colNoRule (Collection @($alphaE, $gammaE) @())
 $r = Run (@('-CollectionArchive', $colNoRule, '-Revision', '5', '-Cache', $cache) + (To 'game3'))
 YesR 'two mods that share a file with no rule between them stop the run, and -Game (or -Record) is untouched' ($r.Code -eq 1 -and $r.Out -match 'No mod rule says which' -and $r.Out -match 'Alpha and Gamma \(1 files\)' -and -not (Test-Path -LiteralPath (P $T 'game3'))) $r
+
+# 27 Oct: revision 5 ruled cheddars_mashups.esl, which the game loads as a
+# master, to load after plugins that are not, and the list had it at the end,
+# so the rule held to the list and every install got LOOT's cyclic
+# interaction. Nu.esl has no TES4 header here, so it is placed by its name.
+$nuE = Entry 'nu' 'Nu' @{}
+$colLoop = P $T 'col-loop'
+$cLoop = Collection @($alphaE, $nuE) @()
+$cLoop.plugins = @(@{ name = 'Alpha.esp'; enabled = $true }, @{ name = 'Nu.esl'; enabled = $true })
+$cLoop.pluginRules = [ordered]@{ plugins = @([ordered]@{ name = 'nu.esl'; after = @('alpha.esp') }); groups = @() }
+Write-Col $colLoop $cLoop
+$r = Run (@('-CollectionArchive', $colLoop, '-Revision', '5', '-Cache', $cache) + (To 'game-loop'))
+YesR 'an .esl ruled to load after a plugin that is not a master stops the run, naming the loop and why, and -Game (or -Record) is untouched' ($r.Code -eq 1 -and $r.Out -match 'cyclic interaction' -and $r.Out -match 'Nu\.esl --> Alpha\.esp --> Nu\.esl \(Nu\.esl loads as a master and Alpha\.esp does not; the rule Nu\.esl loads after Alpha\.esp\)' -and $r.Out -match 'placed by name alone: Nu\.esl' -and -not (Test-Path -LiteralPath (P $T 'game-loop'))) $r
 
 # ---- 7: -Revision through the API -----------------------------------------------------------
 $colArc = P $T 'collection_6.7z'
