@@ -46,11 +46,7 @@ const { execFileSync } = require('child_process');
 
 const REPO_DIR = path.join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 
-const WAITING = [
-  ['docs/archive/WORKING-NOTES.md', '#3693, agent-only files leave the public repo'],
-  ['docs/archive/todo-list-2026-09-25.md', '#3693, agent-only files leave the public repo'],
-  ['ops/claude-queue/pillow-one-upgrade.md', '#3693, agent-only files leave the public repo'],
-];
+const WAITING = [];
 const LEFT_ALONE = [/^records\/client-licences\//, /^tests\/fixtures\/ui-front-build\.js$/];
 
 const MAIL_DOMAIN = /^(?:gmail\.com|googlemail\.com|outlook\.[a-z.]+|hotmail\.[a-z.]+|live\.[a-z.]+|msn\.com|yahoo\.[a-z.]+|ymail\.com|icloud\.com|me\.com|mac\.com|proton\.me|protonmail\.[a-z.]+|aol\.com|(?:[a-z0-9-]+\.)+edu)$/i;
