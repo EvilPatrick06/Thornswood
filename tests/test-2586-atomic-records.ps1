@@ -210,13 +210,14 @@ finally {
 }
 
 # ---- 4: the generated record --------------------------------------------------
-$gen = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\Generated.cs'))
+# As git checks it out: CRLF on Windows, LF here.
+$gen = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\Generated.cs')) -replace "`r`n", "`n"
 $fn = [regex]::Match($gen, '(?s)public static void Write\(string path, string game, GeneratedInputs inputs, List<GeneratedFile> files\)\s*\{.*?\n        \}\n')
 Yes 'GeneratedRecord.Write is in Generated.cs' $fn.Success
 Yes '...writes the new record beside the old and renames it over with GeneratedOs.Replace' ($fn.Success -and $fn.Value -match 'string tmp = path \+ "\.new";' -and
     $fn.Value -match 'GeneratedOs\.Replace\(tmp, path\);')
 Yes '...never File.Replace, and never a delete first' ($fn.Success -and $fn.Value -notmatch 'File\.Replace\(' -and $fn.Value -notmatch 'File\.Delete\(')
-$os = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\GeneratedBuild.cs'))
+$os = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\GeneratedBuild.cs')) -replace "`r`n", "`n"
 $rp = [regex]::Match($os, '(?s)public static void Replace\(string from, string to\)\s*\{.*?\n        \}\n')
 $win = ''
 if ($rp.Success) { $at = $rp.Value.IndexOf('return;'); if ($at -gt 0) { $win = $rp.Value.Substring($at) } }

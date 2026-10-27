@@ -187,7 +187,10 @@ $build.DryRun = [bool]$DryRun
 $build.Minutes = $Minutes
 $build.StallSeconds = $StallSeconds
 $build.Say = [Action[string, string]] { param($m, $c) if ($c -eq 'Head') { Head $m } else { Say $m $c } }
-$build.InUse = [Func[string[]]] { return [string[]]@(Get-FolderUsers $Root) }
+# Get-FolderUsers hands its list back whole (return , $users), so it is
+# taken as one value here and not wrapped again: @() around it made an empty
+# list one empty name, and every run stopped as in use by nobody.
+$build.InUse = [Func[string[]]] { $users = Get-FolderUsers $Root; return [string[]]@($users | Where-Object { $_ }) }
 try { $made = $build.Run() }
 catch {
     $e = $_.Exception

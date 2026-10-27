@@ -155,7 +155,11 @@ namespace Thornswood
             {
                 if (workDir.Length > 0 && Directory.Exists(workDir))
                 {
-                    try { Directory.Delete(workDir, true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+                    // The build has already stopped and says why; a folder something still holds
+                    // is emptied by the next build before it starts, which says so if it cannot.
+                    try { Directory.Delete(workDir, true); }
+                    catch (IOException) { /* still held: the next build empties it first */ }
+                    catch (UnauthorizedAccessException) { /* still held: the next build empties it first */ }
                 }
             }
         }
@@ -687,7 +691,7 @@ namespace Thornswood
                     double quiet = (DateTime.UtcNow - quietSince).TotalSeconds;
                     if (quiet >= StallSeconds || DateTime.UtcNow > deadline)
                     {
-                        try { p.Kill(); } catch (InvalidOperationException) { }
+                        try { p.Kill(); } catch (InvalidOperationException) { /* it had already exited, so there is nothing to stop */ }
                         p.WaitForExit();
                         if (quiet >= StallSeconds)
                             throw new GeneratedStop(who + " used almost no processor time and changed no file for " + StallSeconds + " seconds, so it was waiting on something nobody here can answer " +
