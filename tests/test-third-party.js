@@ -650,25 +650,36 @@ yes('THIRD-PARTY.md no longer says the vcpkg texts travel nowhere',
     !/None of those texts travels/.test(N) && !/vcpkg licence texts do not travel/.test(flat(section('What is still missing'))));
 yes('the frida-gum row says what else frida-gum.lib holds, under the LGPL',
     /glib, gobject, gnulib and libcharset \(LGPL-2\.1-or-later\)/.test(fridaRow));
-// The source of what is inside frida-gum.lib, by Thornswood's forks of
-// Frida's repositories (Patrick, A on #3287): the same six, at the same
-// commits, in Source-Notice.ps1's $SourceNoticeBundled and in "Where the
-// source is", and with the fork here, the commits its portfile fetches from.
+// The source of what is inside frida-gum.lib (#3287): records\frida-sources.json
+// names the six parts, each archive on Thornswood's own Release of them
+// (Patrick, C on #3287) and, while forksUp, Thornswood's fork of each of
+// Frida's repositories. "Where the source is" names the Release, each archive
+// and Frida's repository at the same commit, and the forks while they are up;
+// Source-Notice.ps1 reads the record rather than a list of its own; and with
+// the fork here, each commit is the one its portfile fetches from.
+let fs3287 = null;
+try { fs3287 = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'frida-sources.json'), 'utf8').replace(/^﻿/, '')); } catch (e) { fs3287 = null; }
+const bundled = fs3287 && Array.isArray(fs3287.parts) ? fs3287.parts : [];
+yes('records\\frida-sources.json names six parts of frida-gum.lib (' + bundled.length + ')', bundled.length === 6);
+yes('  of the Frida the client files carry (' + (fs3287 && fs3287.frida) + ', the row says ' + (fridaVer || 'none') + ')', !!fs3287 && fs3287.frida === fridaVer);
 const sn = read(path.join(REPO, 'scripts', 'release', 'Source-Notice.ps1')) || '';
-const bundled = [];
-(sn.match(/@\('[^']+',\s*'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'\)/g) || []).forEach(function (m) {
-  const r = /'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'/.exec(m);
-  bundled.push({ fork: r[1], commit: r[2] });
-});
-yes('Source-Notice.ps1 names the source of six libraries inside frida-gum.lib (' + bundled.length + ')', bundled.length === 6);
+yes('Source-Notice.ps1 reads where they are from records\\frida-sources.json and names no commit of its own',
+    /records\\frida-sources\.json/.test(sn) && !/'frida-[a-z0-9-]+',\s*'[0-9a-f]{40}'/.test(sn));
 const whereSec = section('Where the source is');
-const unnamed = bundled.filter(function (b) { return whereSec.indexOf('https://github.com/EvilPatrick06/' + b.fork + '/tree/' + b.commit) < 0; });
-yes('"Where the source is" names each of them by our fork and the same commit' + (unnamed.length ? ', not: ' + unnamed.map(function (b) { return b.fork; }).join(', ') : ''), bundled.length > 0 && unnamed.length === 0);
+const relUrl = fs3287 ? 'https://github.com/' + fs3287.release.repo + '/releases/tag/' + fs3287.release.tag : '';
+yes('"Where the source is" names the Release of their archives (' + relUrl + ')', !!relUrl && whereSec.indexOf(relUrl) >= 0);
+const unnamed = bundled.filter(function (b) {
+  return whereSec.indexOf('`' + b.archive + '`') < 0 || whereSec.indexOf(b.upstream + ' `' + b.commit + '`') < 0;
+});
+yes('  and each archive, with Frida\'s repository at the same commit' + (unnamed.length ? ', not: ' + unnamed.map(function (b) { return b.name; }).join(', ') : ''), bundled.length > 0 && unnamed.length === 0);
+const forkNamed = bundled.filter(function (b) { return whereSec.indexOf('https://github.com/EvilPatrick06/' + b.name + '/tree/' + b.commit) >= 0; });
+yes('  and the forks exactly while the record says they are up (' + forkNamed.length + ' named, forksUp ' + (fs3287 && fs3287.forksUp) + ')',
+    !!fs3287 && (fs3287.forksUp ? forkNamed.length === bundled.length : forkNamed.length === 0));
 if (haveFork) {
   let fp = '';
   try { fp = git(['show', commit + ':overlay_ports/frida-gum/portfile.cmake']); } catch (e) { fp = ''; }
   const off = bundled.filter(function (b) { return fp.indexOf('/' + b.commit + '/') < 0; });
-  yes('each is a commit overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches its licence from' + (off.length ? ', not: ' + off.map(function (b) { return b.fork; }).join(', ') : ''), !!fp && off.length === 0);
+  yes('each is a commit overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches its licence from' + (off.length ? ', not: ' + off.map(function (b) { return b.name; }).join(', ') : ''), !!fp && off.length === 0);
 } else {
   skip('no fork here, so the frida commits were not held to its portfile');
 }
