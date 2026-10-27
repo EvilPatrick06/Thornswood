@@ -134,6 +134,17 @@
   carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
 
+  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The two build fallbacks
+  (build.yml and build-pr.yml, launcher-vps) need nothing of the box, so
+  they ask for thornswood-build alone. An -OffBox runner whose name the
+  record's offBox lists (thornswood-pr-one, thornswood-pr-one-2, ... on
+  One) is registered with thornswood-build too and takes them, on One's own
+  cores. It never carries thornswood-vps, so staff notices, the admin
+  service, the release jobs and every other job that needs the box never
+  reach it. Pass -AllowHost pypi.org,files.pythonhosted.org, or the build's
+  ruff install fails closed (WHAT A PULL REQUEST JOB MAY REACH, above).
+  -OffBox -Number n -Remove takes one off again.
+
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
        on the machine PATH, MSBuild and the .NET Framework 4.8.1 reference
@@ -334,15 +345,21 @@ if ($OffBox) {
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + [Environment]::MachineName.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
-  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
+  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: every job that needs the box itself (staff notices, the admin service, the release jobs) asks for it.' -ForegroundColor Red; exit 1 }
 }
 # HOW MANY BUILD AT ONCE (#2994). A VPS runner that records\build-runners.json
 # lists is registered with its build label as well, so a reinstall keeps the
-# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner never carries it.
+# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner carries it only
+# when the record's offBox names it (build runners on One, Patrick, 26 Oct
+# 2026), and then takes the two build fallbacks that ask for it alone; it
+# still never carries thornswood-vps, so no box-only job reaches it.
 $registerLabels = $Label
+$buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
 if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
-  $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
+}
+if ($OffBox -and -not $PSBoundParameters.ContainsKey('Label') -and $buildRecord.PSObject.Properties['offBox'] -and @($buildRecord.offBox) -contains $RunnerName) {
+  $registerLabels = $Label + ',' + $buildRecord.label
 }
 # THE SIGNING RUNNER (#3312). A VPS runner records\sign-runners.json lists
 # is registered with its label and, under -NetworkOnly, reaches the hosts
