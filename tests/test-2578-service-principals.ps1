@@ -118,7 +118,8 @@ $sent = Get-ThornswoodServiceAccountScript
 $ok = $true
 try { $null = [scriptblock]::Create($sent) } catch { $ok = $false }
 Yes 'the functions sent to the box parse' $ok
-Yes 'and carry all six' (([regex]::Matches($sent, '(?m)^function ')).Count -eq 6)
+# Six from #2578, nine more for who owns what a service makes (#4077).
+Yes 'and carry all fifteen' (([regex]::Matches($sent, '(?m)^function ')).Count -eq 15)
 
 # ---- never reach ---------------------------------------------------------------
 if ($OnWindows) {

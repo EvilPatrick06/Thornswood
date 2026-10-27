@@ -407,8 +407,11 @@ if (-not `$AsSystem) {
     `$sid = Get-ThornswoodTaskSid '$TaskName'
     if (-not `$sid) { `$why = 'the task SID NT TASK\$TaskName could not be looked up' }
     else {
-        try { `$null = Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'state' -Files 'admin.log', 'admin.log.*' }
-        catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+        try {
+            `$null = Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'state' -Files 'admin.log', 'admin.log.*'
+            # What it makes is its own, not every service's (#4077).
+            Set-ThornswoodTaskOwner -TaskName '$TaskName' -Sid `$sid -Roots '$Root'
+        } catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
     }
     if (`$why) { `$why + ', so the task goes on SYSTEM'; Register `$true }
     else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\$TaskName' }
