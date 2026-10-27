@@ -6793,10 +6793,17 @@
     };
   }
 
-  sp.on('browserMessage', guard('overhead', (event) => {
-    const a = event.arguments;
-    if (!a || a[0] !== 'thornswood-front') { return; }
-    const what = String(a[1] || '');
+  /*
+    The chat's and voice's messages for the lines above heads: 'head:' with
+    the words somebody said near you, 'headclear:' when staff silence them,
+    and 'marks:' with who is speaking. True when the message was one of
+    those, so the browserMessage handler below returns before its last line,
+    which logs whatever nothing took (#3941). These carry other people's
+    words and ids, and thornswood-front.log goes up with the session's logs.
+    They used to have a browserMessage listener of their own, so the main
+    one never knew they were taken and logged every one.
+  */
+  function overheadMessage(what) {
     if (what.indexOf('headclear:') === 0) {
       const pid = Number(what.slice(10)) || 0;
       for (const k in overheadHeads) {
@@ -6805,12 +6812,12 @@
         overheadDrop(overheadHeads[k]);
         delete overheadHeads[k];
       }
-      return;
+      return true;
     }
     if (what.indexOf('head:') === 0) {
       let doc = null;
       try { doc = JSON.parse(what.slice(5)); } catch (e) { doc = null; }
-      if (!doc || !doc.who || !doc.text) { return; }
+      if (!doc || !doc.who || !doc.text) { return true; }
       const key = String(doc.who);
       const had = overheadHeads[key];
       if (had && had.text !== String(doc.text)) { overheadDrop(had); }
@@ -6821,12 +6828,12 @@
         id: had && had.text === String(doc.text) ? had.id : 0,
         said: had && had.text === String(doc.text) ? had.said : ''
       };
-      return;
+      return true;
     }
     if (what.indexOf('marks:') === 0) {
       let list = null;
       try { list = JSON.parse(what.slice(6)); } catch (e) { list = null; }
-      if (!Array.isArray(list)) { return; }
+      if (!Array.isArray(list)) { return true; }
       const want = {};
       for (let i = 0; i < list.length; i++) {
         const row = list[i];
@@ -6843,8 +6850,10 @@
         if (!Object.prototype.hasOwnProperty.call(want, k)) { continue; }
         if (!overheadMarks[k]) { overheadMarks[k] = { mode: want[k], id: 0, said: '' }; }
       }
+      return true;
     }
-  }));
+    return false;
+  }
 
   sp.on('update', guard('overhead', () => {
     const now = Date.now();
@@ -9358,6 +9367,9 @@
     }
     if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
+
+    // Words above heads and speaking marks, never logged (overheadMessage).
+    if (overheadMessage(what)) { return; }
 
     // A held key on the choice page asking who has the keyboard now (#591).
     if (what.indexOf('select:keycheck ') === 0) {
