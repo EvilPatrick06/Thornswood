@@ -38,7 +38,8 @@
 
 .PARAMETER Only
   Build and measure only these prototypes (names as in the table of
-  README.md, for example tauri, wpf-net10).
+  README.md, for example tauri, wpf-net10), separated by commas. It works the
+  same through pwsh -File and from a pwsh prompt.
 
 .PARAMETER Runs
   Runs per prototype, the first included. Five by default.
@@ -698,6 +699,12 @@ $Art = Join-Path $Repo 'launcher\art\thornswood-art-1536.png'
 New-Item -ItemType Directory -Force -Path $Work, $Out | Out-Null
 $script:Wav = Join-Path $Work 'loop.wav'
 Write-QuietWav $script:Wav
+# pwsh -File hands "-Only a,b,c" over as the one string 'a,b,c', and on 27
+# Oct a run that way matched no prototype and built nothing; so the list is
+# split on commas here, and a name that is not a prototype stops the run.
+$Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$unknown = @($Only | Where-Object { $_ -notin $Builds.Keys })
+if ($unknown) { throw "-Only names no prototype called $($unknown -join ', '); the prototypes are $(@($Builds.Keys) -join ', ')." }
 $names = @($Builds.Keys | Where-Object { -not $Only -or $_ -in $Only })
 $failed = [ordered]@{}
 
