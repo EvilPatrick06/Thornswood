@@ -13,9 +13,10 @@
   A record is { "label": ..., "runners": [1, 2] }: the runners it lists
   (thornswood-vps is 1, thornswood-vps-<n> is n) carry the label and no other
   runner does, an off-box runner (thornswood-pr-*) never. Changing one is a
-  pull request to the record; once it merges, .github\workflows\github-admin.yml
-  runs by itself and GitHub matches it a minute later. This script is for
-  asking again, or for -Check.
+  pull request to the record; once it merges, the Desk runs this script and
+  GitHub matches it a minute later. -Check says only what differs. The
+  workflow it starts is in the private ops repository, where the runners are
+  registered (#4013), so a push here cannot start it by itself.
 
   WHY THE BUILD LABEL (#2994). The VPS has six cores and, from 20 October,
   eight runners (#2929; three since the evening of 21 October, #3108,
@@ -34,13 +35,16 @@
   HOW (#3107, Patrick's A of 22 Oct 2026). A runner's labels can be changed
   only by somebody who administers the repository, and a cloud thread's proxy
   refuses every actions/runners path, so this no longer calls GitHub's
-  runner API itself. It starts github-admin.yml on main, waits, and prints
+  runner API itself. It starts github-admin.yml on the main of
+  EvilPatrick06/Thornswood-Ops, which checks out this repository's main
+  (#4013), waits, and prints
   the runner's answer, the way Set-Ref.ps1 does. That run hands GitHub's OIDC
   token for it to the box's admin service (scripts\vps\admin\admin.js,
   Install-AdminService.ps1), which holds the key of a GitHub App made for
   Thornswood and nothing else does. The service checks the token is that
-  workflow on main, reads the records from main itself, and makes the labels
-  match. What to change never comes from here, so nobody can label a runner
+  workflow on the ops repository's main, reads the records from this
+  repository's main itself, and makes the labels of the runners registered
+  to the ops repository match. What to change never comes from here, so nobody can label a runner
   any way main does not say. A job already running is not touched.
 
   The service refuses to leave GitHub with no registered runner carrying a
@@ -73,7 +77,8 @@ param(
     [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
     [switch]$OnGitHub,
     [int]$WaitMinutes = 15,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    # Where github-admin.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
 )
 
 Set-StrictMode -Version Latest

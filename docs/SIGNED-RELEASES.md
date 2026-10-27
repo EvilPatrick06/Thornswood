@@ -1,16 +1,16 @@
 # Signed releases and artifact provenance (issue #2163)
 
-Status: DESIGN AND PILOT, switched over on 22 Oct 2026 (#3312, Patrick:
-"it needs to work like the VPS runners where VPS is the fallback and the
-GitHub runner is first", and "for signing it will use runner 3").
-release.yml builds and signs the launcher on GitHub's hosted Windows runner
-first; when GitHub refuses the job (no minutes) or it fails, the VPS job
-builds it and signs it on runner 3 alone (the `thornswood-sign` label,
-`records\sign-runners.json`) through the same federated identity, with no
-Azure CLI and nothing kept on the box. A build runner, never runner 3,
-checks the signed draft, and for a release from the feed the engine fork
-checks the launcher again on GitHub's runner before it signs the release
-(section 7, "#3312"). Ship, Publish-Installer, the feed and every checksum
+Status: DESIGN AND PILOT, switched over on 22 Oct 2026 (#3312), and the box
+job ended with the flip to public (#4013, Patrick's A of 27 Oct 2026).
+release.yml builds and signs the launcher on GitHub's hosted Windows runner.
+From #3312 until the repository went public, when GitHub refused the job
+(no minutes) or it failed, the VPS job built and signed it on runner 3. A
+public repository has GitHub's runners free with no minute limit and no box
+runner registered to it, so that job went rather than moving to the private
+ops repository (section 7, "#4013"). A second GitHub runner checks the
+signed draft, and for a release from the feed the engine fork checks the
+launcher again on GitHub's runner before it signs the release (section 7,
+"#3312"). Ship, Publish-Installer, the feed and every checksum
 check stay as they are. Patrick's answers are in
 section 8, "Decisions", and none is pending. Section 9 sets doing nothing
 beside the change (Patrick, 15 Oct, #2168 A).
@@ -292,7 +292,8 @@ The switch-over, the last step. It waits on three things, in this order:
    the hosted job on billing before any step ran.
 2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
    with this release.yml, then
-   `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`,
+   `gh workflow run release.yml --ref <tag> -f tag=<tag>` (the runner input
+   went with the box job, #4013),
    with `-f expected_sha=<commit>` added when the tag is not on main.
    Without it `Resolve-ReleaseTag.ps1` refuses a tag whose commit is not on
    main, and the run stops before it builds. A tag on main's own commit
@@ -355,6 +356,24 @@ Measured on #3312 before choosing this: a cloud session may not create,
 edit or delete a release, nor send a request body that is not JSON, so the
 fork could not be handed the unsigned exe in a private draft (Patrick's
 first choice, C).
+
+### #4013: the box job ends with the flip, 27 Oct 2026
+
+Once this repository is public no runner of the box is registered to it
+(#3685, Patrick's A on the VPS runners card), and the jobs that need the box
+moved to the private ops repository. The signing fallback did not: a job
+there presents another subject, so Azure would need a second federated
+credential, and it would need a stored token that writes this repository's
+releases, where today no secret is stored for signing at all. A public
+repository has GitHub's runners free with no minute limit, the only cause
+the fallback ever covered. Patrick picked A on the report page
+(q-4013-signing-fallback, 27 Oct): release.yml has the hosted job alone, no
+`runner` input and no `BUILD_RUNNER` condition, and `verify` runs on a GitHub
+runner of its own, a fresh machine that never signed. If GitHub's runner
+cannot build a release, a Ship on One signs the unsigned launcher on
+download (#921). Runner 3's `thornswood-sign` label, `records/sign-runners.json`
+and the signing hosts in its outbound rules outlive the job; #4033 takes
+them off.
 
 ## 8. Decisions (Patrick)
 
@@ -482,9 +501,9 @@ the MSBuild launcher 1.2.4.5 and waits for someone to start it once.
 
 Rollback: the published bytes are signed by the same profile either way,
 so no installed launcher notices which path made them. To go back, revert
-the switch-over, or leave it and set `BUILD_RUNNER` to `vps` (or run with
-`-f runner=vps`). The VPS draft is unsigned, and Ship signs it on download
-as it does today (#921); that path stays in Ship.ps1. To stop hosted signing
+the switch-over. An unsigned draft is signed by Ship on download as it is
+today (#921); that path stays in Ship.ps1. The box job and `BUILD_RUNNER`'s
+`vps` went with the flip (#4013). To stop hosted signing
 at once, Patrick deletes the federated credential or its role (section 3).
 
 ### 9.4 Doing nothing

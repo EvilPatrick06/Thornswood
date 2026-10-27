@@ -22,8 +22,8 @@
                        an agent that only posts staff notices: a key that can
                        do nothing on the box but put one in #staff-updates
       .\scripts\vps\Grant-BoxAccess.ps1 -Name claude -MakeKey -NoticesOnly -ToEnvironment notices
-                       the same, for .github\workflows\staff-notice.yml: the
-                       key goes into that GitHub environment, not a file
+                       the same, for the ops repository's staff-notice.yml:
+                       the key goes into that GitHub environment, not a file
       .\scripts\vps\Grant-BoxAccess.ps1 -Name djinn -Remove
                        take that one name's key and token off the box
       .\scripts\vps\Grant-BoxAccess.ps1 -List
@@ -47,9 +47,10 @@
   agent's environment; scripts\ops\Say-Staff.ps1 uses them.
 
   -ToEnvironment <name> (with -MakeKey -NoticesOnly; #3045) puts the key
-  instead into the secret NOTICE_KEY_B64 of that environment on GitHub,
-  where .github\workflows\staff-notice.yml reads it: the way a cloud thread
-  posts. Before anything on the box changes, it makes the environment usable
+  instead into the secret NOTICE_KEY_B64 of that environment on GitHub, on
+  -GitHubRepo, the private ops repository EvilPatrick06/Thornswood-Ops where
+  the VPS runners are registered (#4013), whose staff-notice.yml reads it:
+  the way a cloud thread posts. Before anything on the box changes, it makes the environment usable
   by main alone (a branch policy for main and nothing else), and stops,
   changing nothing, when the environment already lets another branch in or
   gh cannot reach it. After the proof the key goes to gh secret set on its
@@ -104,7 +105,8 @@ param(
     [switch]$NoticesOnly,
     # With -MakeKey -NoticesOnly: the GitHub environment the key goes into.
     [string]$ToEnvironment = '',
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
+    # Where staff-notice.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops',
     [switch]$Remove,
     [switch]$List,
     # -ThisMachine: this machine's key, the one Setup-SshKey.ps1 makes.
@@ -540,7 +542,7 @@ try {
             $ErrorActionPreference = $old
             if ($setCode -ne 0) { Die ("GitHub refused the secret: " + ($set -join ' ') + " The key is on the box and holds nowhere else; run this again, which replaces it, or -Name $Name -Remove.") }
             Say "  NOTICE_KEY_B64 in $ToEnvironment, which only main may use. Nothing here holds it." 'Green'
-            Say "  A session with no ssh now posts with scripts/ops/Say-Staff.ps1 -Text `"...`", as $Name, through .github/workflows/staff-notice.yml." 'White'
+            Say "  A session with no ssh now posts with scripts/ops/Say-Staff.ps1 -Text `"...`", as $Name, through staff-notice.yml on $GitHubRepo." 'White'
         } elseif ($NoticesOnly) {
             Say '  ssh through the bridge with the new key got in, and it ran say-staff.ps1 and nothing else' 'Green'
             $out = Join-Path $OutDir 'notice-access.txt'

@@ -5,7 +5,7 @@
   2026): scripts\vps\admin\admin.js, as the task "Thornswood Admin",
   listening on 127.0.0.1:7791. It holds the key of a GitHub App made for
   Thornswood, and makes the runners' labels on GitHub match main's runner
-  records when a run of .github\workflows\github-admin.yml on main asks
+  records when a run of the ops repository's github-admin.yml on main asks
   with its OIDC token (admin.js says how it checks that, and why nothing else
   may ask). That is how Set-BuildRunners.ps1 works from anywhere, a cloud
   thread included. Run it from a machine whose way in already works; it does

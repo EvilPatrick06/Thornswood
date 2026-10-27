@@ -38,8 +38,9 @@
   THE LAUNCHER ITSELF (#3312). A release from the feed that carries a new
   launcher cannot build or sign it where it runs. Invoke-ReleaseLauncherOnGitHub
   asks this repository's release-tag.yml to tag main's commit v<number> and
-  start release.yml on it, which builds and signs it on GitHub's runner, or
-  on the box's runner 3 when GitHub has no minutes, and waits for that run.
+  start release.yml on it, which builds and signs it on GitHub's runner
+  (the box's fallback ended with the flip to public, #4013), and waits for
+  that run.
   Get-SignedFileRefusal then holds what it built to the launcher's own check
   here on Windows, or on the box anywhere else, the way the catalog is held.
 
@@ -319,8 +320,8 @@ function New-SignedFileCheckScript([string]$Path, [string]$ExpectedSigner, [stri
 
 # Asks $Repo's release-tag.yml to tag $Commit (on main) as $Tag and start
 # release.yml on it, then waits for that release.yml run: GitHub's runner
-# builds and signs the launcher, or the box's runner 3 when GitHub has no
-# minutes, and a build runner checks the signed draft. '' once that run is
+# builds and signs the launcher, and a second GitHub runner checks the
+# signed draft (#4013). '' once that run is
 # green, else why. The draft it made is then read the way a main Ship reads
 # one (Ship.ps1, Get-ReleaseLauncher). -WaitSeconds bounds the whole wait.
 function Invoke-ReleaseLauncherOnGitHub {

@@ -9,8 +9,8 @@ running on main and nightly. The parts are:
 - `scripts/dev/Trace-HarnessReads.js`, the Linux tracer the study used.
 - `scripts/dev/Trace-Gate.ps1` and `scripts/dev/Trace-Gate-Box.ps1`, the
   Windows tracer. An administrator runs it on the shipping machine. It
-  starts an ETW session on the box, runs the gate through
-  `.github/workflows/trace-gate.yml`, and reads each harness's opens from
+  starts an ETW session on the box, runs the gate through `trace-gate.yml`
+  in the private ops repository (#4013), and reads each harness's opens from
   the trace against `Nightly-Harnesses.ps1 -StartLog`. Its self-test passed
   on the box at 9:40 PM on 21 Oct (Patrick's time) with no events lost.
 - `scripts/dev/Affected-Harnesses.js`, which builds the map from either

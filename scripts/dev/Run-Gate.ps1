@@ -69,7 +69,7 @@
 
 .PARAMETER StartLog
   Where Nightly-Harnesses.ps1 -StartLog writes which process was which
-  harness's, for .github\workflows\trace-gate.yml, the trace taken by hand
+  harness's, for the ops repository's trace-gate.yml (#4013), the trace taken by hand
   (scripts\dev\Trace-Gate.ps1). A main build the trace task traces writes
   its own in <runner>\trace.
 #>

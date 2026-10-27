@@ -49,8 +49,9 @@ $heavy = @{
     'build-pr.yml' = @('launcher-vps')
     'engine.yml'   = @('engine-vps')
     'nightly.yml'  = @('harnesses')
-    # The gate, run as build.yml runs it, under a trace (#3114).
-    'trace-gate.yml' = @('trace')
+    # trace-gate.yml's trace job, the gate under a trace (#3114), asks for
+    # it too, in the private ops repository since #4013, where
+    # tests\test-box-workflows.ps1 holds it.
     # Light, but it asks for a build runner because those are never the
     # runner that signs a release launcher (records\sign-runners.json, #3312).
     'release.yml'  = @('verify')

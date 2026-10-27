@@ -11,12 +11,14 @@
   right, its key lives here and nowhere else, and this is the only thing
   that uses it.
 
-  WHAT IT DOES. It makes GitHub's admin settings match what main records, and
-  nothing else:
+  WHAT IT DOES. It makes GitHub's admin settings match what this
+  repository's main records, and nothing else:
     runner-labels   every records/<name>-runners.json on main, { label,
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
-                    runner does. records/build-runners.json is the build cap
+                    runner does. The runners are registered to the private
+                    ops repository, EvilPatrick06/Thornswood-Ops, since
+                    this one went public (#4013, Patrick's A on #3685). records/build-runners.json is the build cap
                     (#2994). It stops for a record whose runners GitHub does
                     not have, since every job asking for its label would
                     then wait for a runner that never comes.
@@ -24,12 +26,14 @@
   so whoever asks can only make GitHub match main. A change is a pull
   request to the record.
 
-  WHO MAY ASK. A run of .github/workflows/github-admin.yml on main, and
-  nothing else: it sends the OIDC token GitHub gave that run, for the
-  audience thornswood-admin, and this checks it against GitHub's published
-  keys (fetched each time) and its claims: GitHub's issuer, the audience,
-  not expired, this repository, refs/heads/main, that exact workflow on
-  main, started by hand or by a push. A pull request's run has another ref
+  WHO MAY ASK. A run of the ops repository's .github/workflows/
+  github-admin.yml on its main, and nothing else: it sends the OIDC token
+  GitHub gave that run, for the audience thornswood-admin, and this checks it
+  against GitHub's published keys (fetched each time) and its claims:
+  GitHub's issuer, the audience, not expired, the ops repository,
+  refs/heads/main, that exact workflow on main, started by hand. A push here
+  cannot start it there, so the Desk runs Set-BuildRunners.ps1 after a merge
+  that changes a record. A pull request's run has another ref
   and another workflow ref, so it cannot. No secret is involved: the token
   is GitHub's word for which run is asking.
 
@@ -80,15 +84,18 @@ const WEB = (process.env.THORNSWOOD_ADMIN_GITHUB_WEB || 'https://github.com').re
 const JWKS = process.env.THORNSWOOD_ADMIN_JWKS || 'https://token.actions.githubusercontent.com/.well-known/jwks';
 const PLAIN = 'box admin: not here';
 
+// Where the records are, and where the runners and the workflow that asks
+// are (#4013).
 const REPO = 'EvilPatrick06/Thornswood';
+const RUNNERS_REPO = 'EvilPatrick06/Thornswood-Ops';
 const OWNER = 'EvilPatrick06';
 const RULES = {
   iss: 'https://token.actions.githubusercontent.com',
   aud: 'thornswood-admin',
-  repository: REPO,
+  repository: RUNNERS_REPO,
   ref: 'refs/heads/main',
-  workflow: REPO + '/.github/workflows/github-admin.yml@refs/heads/main',
-  events: ['workflow_dispatch', 'push'],
+  workflow: RUNNERS_REPO + '/.github/workflows/github-admin.yml@refs/heads/main',
+  events: ['workflow_dispatch'],
 };
 // The labels every VPS runner carries, or GitHub gives itself; a record may
 // never name one, since taking it off would strand every job that asks.
@@ -229,16 +236,16 @@ function readApp() {
   return { pem: fs.readFileSync(keyPath, 'utf8'), app: JSON.parse(fs.readFileSync(appPath, 'utf8')) };
 }
 
-// A token for this repository only, with only what runner-labels needs, for
-// the hour GitHub gives it; nothing keeps it after the request.
-async function installationToken(held, now) {
+// A token for one repository only, with only the permissions given, for the
+// hour GitHub gives it; nothing keeps it after the request.
+async function installationToken(held, now, repo, permissions) {
   const jwt = appJwt(held.app.id, held.pem, now);
   const auth = { Authorization: 'Bearer ' + jwt };
-  const inst = await call('GET', API + '/repos/' + REPO + '/installation', auth);
-  if (inst.status === 404) throw new Error('the App is not installed on ' + REPO + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
+  const inst = await call('GET', API + '/repos/' + repo + '/installation', auth);
+  if (inst.status === 404) throw new Error('the App is not installed on ' + repo + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
   if (inst.status !== 200) throw new Error('GitHub would not say where the App is installed (' + said(inst) + ')');
   const tok = await call('POST', API + '/app/installations/' + inst.body.id + '/access_tokens', auth,
-    { repositories: [REPO.split('/')[1]], permissions: { administration: 'write', contents: 'read' } });
+    { repositories: [repo.split('/')[1]], permissions });
   if (tok.status !== 201) throw new Error('GitHub gave the App no token (' + said(tok) + ')');
   return tok.body.token;
 }
@@ -261,15 +268,16 @@ async function mainRecords(token) {
 }
 
 async function listRunners(token) {
-  const a = await call('GET', API + '/repos/' + REPO + '/actions/runners?per_page=100', { Authorization: 'Bearer ' + token });
+  const a = await call('GET', API + '/repos/' + RUNNERS_REPO + '/actions/runners?per_page=100', { Authorization: 'Bearer ' + token });
   if (a.status !== 200 || !a.body || !Array.isArray(a.body.runners)) throw new Error('GitHub would not list the runners (' + said(a) + ')');
   return a.body.runners;
 }
 
 // Makes the runners' labels match main's records, or with check says only
-// what differs. { ok, lines, changed, differs }.
-async function runnerLabels(token, check) {
-  const records = await mainRecords(token);
+// what differs. { ok, lines, changed, differs }. read reads the records,
+// token changes the runners.
+async function runnerLabels(read, token, check) {
+  const records = await mainRecords(read);
   if (!records.length) throw new Error('main has no records/*-runners.json, so there is nothing to match');
   checkRecords(records);
   const runners = await listRunners(token);
@@ -287,8 +295,8 @@ async function runnerLabels(token, check) {
       if (check) { lines.push(rec.file + ': ' + c.name + ' would have ' + rec.label + ' ' + (c.do === 'put on' ? 'put on' : 'taken off')); continue; }
       const auth = { Authorization: 'Bearer ' + token };
       const a = c.do === 'put on'
-        ? await call('POST', API + '/repos/' + REPO + '/actions/runners/' + c.id + '/labels', auth, { labels: [rec.label] })
-        : await call('DELETE', API + '/repos/' + REPO + '/actions/runners/' + c.id + '/labels/' + encodeURIComponent(rec.label), auth);
+        ? await call('POST', API + '/repos/' + RUNNERS_REPO + '/actions/runners/' + c.id + '/labels', auth, { labels: [rec.label] })
+        : await call('DELETE', API + '/repos/' + RUNNERS_REPO + '/actions/runners/' + c.id + '/labels/' + encodeURIComponent(rec.label), auth);
       if (a.status !== 200) { lines.push('STOP ' + c.name + ': GitHub did not ' + c.do + ' ' + rec.label + ' (' + said(a) + ')'); ok = false; continue; }
       changed++;
       lines.push(rec.file + ': ' + c.name + ', ' + rec.label + ' ' + (c.do === 'put on' ? 'put on' : 'taken off'));
@@ -371,8 +379,8 @@ async function setupDone(res, q, now) {
   log('setup: App ' + a.body.slug + ' (' + a.body.id + ') made by ' + owner + '; its key is kept here and the setup is closed');
   const install = WEB + '/apps/' + encodeURIComponent(a.body.slug) + '/installations/new';
   page(res, 200, 'Made. Now install it',
-    '<p>The App is made and its key is on the box. Last step: install it on Thornswood only.</p>' +
-    '<p><a href="' + esc(install) + '" style="font-size:1.2em">Install it</a>, choose <b>Only select repositories</b>, pick <b>Thornswood</b>, then Install.</p>');
+    '<p>The App is made and its key is on the box. Last step: install it on Thornswood and Thornswood-Ops only.</p>' +
+    '<p><a href="' + esc(install) + '" style="font-size:1.2em">Install it</a>, choose <b>Only select repositories</b>, pick <b>Thornswood</b> and <b>Thornswood-Ops</b>, then Install.</p>');
 }
 
 // ------------------------------------------------------------------ server --
@@ -415,8 +423,11 @@ async function converge(req, res, now) {
   const held = readApp();
   if (!held) { log('run ' + run + ': no App yet'); json(res, 503, { ok: false, lines: ['there is no App here yet: Install-AdminService.ps1 -Setup makes it'] }); return; }
   try {
-    const token = await installationToken(held, now);
-    const r = await runnerLabels(token, !!ask.check);
+    // Reading the records here and changing the runners there are two
+    // tokens, so neither can do the other's work.
+    const read = await installationToken(held, now, REPO, { contents: 'read' });
+    const token = await installationToken(held, now, RUNNERS_REPO, { administration: 'write' });
+    const r = await runnerLabels(read, token, !!ask.check);
     log('run ' + run + ': runner-labels' + (ask.check ? ' check' : '') + ', ' + r.changed + ' changed, ' + (r.ok ? 'ok' : 'stopped'));
     for (const l of r.lines) log('  ' + l);
     json(res, r.ok ? 200 : 409, r);
@@ -447,5 +458,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planLabels, checkRecords, runnerNumber, manifest, RULES, serve };
+module.exports = { verifyOidc, appJwt, planLabels, checkRecords, runnerNumber, manifest, RULES, REPO, RUNNERS_REPO, serve };
 if (require.main === module) serve();
