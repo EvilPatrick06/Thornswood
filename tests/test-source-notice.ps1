@@ -145,12 +145,33 @@ $implPorts = @($lr.files.($impl[0]) | Sort-Object)
 $ie = @(Get-SourceNoticeEntries $record $impl 'pack' $licences)
 Yes ('a pack carrying only SkyrimPlatformImpl.dll carries the texts of its ' + $implPorts.Count + ' libraries and no others') `
     (((@(Names $ie) | Where-Object { $_ -like 'licences/*' }) -join '|') -eq ((@($implPorts | ForEach-Object { 'licences/' + $_ + '.txt' })) -join '|'))
-# The libraries inside frida-gum's own build, by our forks at Frida's commits (#3287).
+# The libraries inside frida-gum's own build (#3287): the Release of their
+# archives, each archive, and while the record says forksUp, our forks at
+# Frida's commits, all from records\frida-sources.json.
 $implNote = Text $ie 'SOURCE CODE.txt'
-$bundled = @($SourceNoticeBundled['frida-gum'].Parts)
-$noTree = @($bundled | Where-Object { -not $implNote.Contains('https://github.com/EvilPatrick06/' + $_[1] + '/tree/' + $_[2]) } | ForEach-Object { $_[1] })
-Yes ('a pack carrying SkyrimPlatformImpl.dll names the source of the ' + $bundled.Count + ' libraries inside frida-gum''s build, by our forks and Frida''s commits' + $(if ($noTree.Count) { ', not: ' + ($noTree -join ', ') } else { '' })) `
-    ($bundled.Count -eq 6 -and $noTree.Count -eq 0 -and $readme.Contains('https://github.com/EvilPatrick06/frida-glib/tree/'))
+$fsRec = Read-Json (Join-Path $Repo 'records\frida-sources.json')
+$bundled = @($fsRec.parts)
+$relUrl = 'https://github.com/' + $fsRec.release.repo + '/releases/tag/' + $fsRec.release.tag
+$noArchive = @($bundled | Where-Object { -not ($implNote -match ('(?m)^\s{4}' + [regex]::Escape($_.archive) + '\s*$')) } | ForEach-Object { $_.name })
+Yes ('a pack carrying SkyrimPlatformImpl.dll names the Release of the ' + $bundled.Count + ' libraries inside frida-gum''s build, and each archive' + $(if ($noArchive.Count) { ', not: ' + ($noArchive -join ', ') } else { '' })) `
+    ($bundled.Count -eq 6 -and $noArchive.Count -eq 0 -and $implNote.Contains($relUrl) -and $readme.Contains($relUrl))
+$noTree = @($bundled | Where-Object { -not $implNote.Contains('https://github.com/EvilPatrick06/' + $_.name + '/tree/' + $_.commit) } | ForEach-Object { $_.name })
+Yes ('  and our forks at Frida''s commits while the record says they are up' + $(if ($noTree.Count) { ', not: ' + ($noTree -join ', ') } else { '' })) `
+    ($(if ($fsRec.forksUp) { $noTree.Count -eq 0 } else { $noTree.Count -eq $bundled.Count }))
+# With forksUp false the note names the Release alone.
+$fsCopy = Join-Path ([IO.Path]::GetTempPath()) ('ts-frida-sources-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.json')
+$down = Read-Json (Join-Path $Repo 'records\frida-sources.json'); $down.forksUp = $false
+[IO.File]::WriteAllText($fsCopy, ($down | ConvertTo-Json -Depth 6))
+$was = $SourceNoticeBundled['frida-gum'].Record
+$SourceNoticeBundled['frida-gum'].Record = $fsCopy
+$downNote = Text (Get-SourceNoticeEntries $record $impl 'pack' $licences) 'SOURCE CODE.txt'
+$SourceNoticeBundled['frida-gum'].Record = $fsCopy + '.gone'
+$threw = ''
+try { $null = Get-SourceNoticeEntries $record $impl 'pack' $licences } catch { $threw = $_.Exception.Message }
+$SourceNoticeBundled['frida-gum'].Record = $was
+Remove-Item -LiteralPath $fsCopy -Force
+Yes '  and once the forks are down, the Release alone' ($downNote.Contains($relUrl) -and -not $downNote.Contains('/frida-glib/tree/') -and -not $downNote.Contains('Until that repository'))
+Yes '  and with no record it stops, saying so' ($threw -match 'is missing\. Where the source of what is inside frida-gum is')
 Yes '  and a pack carrying only MpClientPlugin.dll names none of them' `
     (-not (Text (Get-SourceNoticeEntries $record @('Data\SKSE\Plugins\MpClientPlugin.dll') 'pack' $licences) 'SOURCE CODE.txt').Contains('frida-glib'))
 Yes '  and its note names none of the libraries only the other files have' `
