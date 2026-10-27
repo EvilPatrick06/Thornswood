@@ -30,7 +30,8 @@
   App and sends the browser back to /github-app/setup/done, where the service
   trades GitHub's one-time code for the App's key and keeps it in
   state\key.pem. The key is never shown, logged or copied. Last, install the
-  App on Thornswood only, from the link the page gives. An App held already
+  App on Thornswood, Thornswood-Ops (its github-admin, #4013) and skymp
+  (#3848), and nothing else, from the link the page gives. An App held already
   stops -Setup; -Forget drops it first (delete the old App on GitHub too:
   github.com/settings/apps).
 
@@ -221,7 +222,7 @@ if (Test-Path -LiteralPath '$state\app.json') { 'HELD: an App is held already. -
     Say '  Armed for one hour. Whoever owns the repository, signed in to GitHub as that account:' 'Green'
     Say "    1. open $url"
     Say '    2. press "Make it on GitHub", then "Create GitHub App for EvilPatrick06" on GitHub'
-    Say '    3. on the page that comes back, "Install it": Only select repositories, Thornswood, Install'
+    Say '    3. on the page that comes back, "Install it": Only select repositories, Thornswood, Thornswood-Ops and skymp, Install'
     Say '  The address works once. -Status says whether the App is held.' 'DarkGray'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
