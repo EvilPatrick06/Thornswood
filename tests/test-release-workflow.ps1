@@ -131,7 +131,7 @@ Yes '  and writes release_id and signed for the verify job' ($draft.Contains('"r
 $vps = Get-Job 'launcher-vps'
 Yes 'there is a VPS job "launcher-vps"' ($vps -ne '')
 Yes '  it needs the hosted job' ($vps -match '(?m)^    needs: launcher$')
-Yes '  it runs when the hosted job did not succeed (skipped included) and the run was not cancelled (!cancelled, #2422)' ($vps.Contains("if: `${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}"))
+Yes '  it runs when the hosted job did not succeed (skipped included) and the run was not cancelled (!cancelled, #2422), on main or a v tag only (#3550: it is on the signing runner)' ($vps.Contains("if: `${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}"))
 Yes '  on the signing runner only, by its exact labels (thornswood-sign, runner 3)' ($vps -match '(?m)^    runs-on: \[self-hosted, Windows, X64, thornswood-vps, thornswood-sign\]$')
 Yes '  with id-token: write and contents: write at job level' ($vps -match '(?m)^    permissions:\n      contents: write\n      id-token: write$')
 Yes '  the release environment only on a refs/tags/v ref, as the hosted job' ($vps.Contains("environment: `${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}"))
