@@ -766,7 +766,7 @@ git pull
 git push --force
 ```
 
-Force push replaces the remote branch. Use it on your own branch after you rewrote that branch. Main refuses a force push. If `main` moved while you were working:
+Force push replaces the remote branch. Use it on your own branch after you rewrote that branch. Never force push main: GitHub refuses it from write access, but not from the admin account while `enforce_admins` is off, so for the admin it is a team rule kept by hand. If `main` moved while you were working:
 
 ```powershell
 git fetch origin
@@ -1326,16 +1326,21 @@ The short form of the rules. The same decisions, with the dates they were made, 
   tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
-  straight to main, which held while `enforce_admins` was off and stopped
-  holding the moment it went on.
+  straight to main. GitHub refuses a push to main from write access. It does
+  not refuse one from the admin account: with `enforce_admins` off, GitHub
+  holds an admin to none of main's rules, so for the admin this is a team rule
+  kept by hand.
 - What branch protection on main actually enforces, since 25 Sep:
   `enforce_admins` is **off**, there is no required check, required
   approving reviews is **0**, and the code owner review is **off**.
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
   anybody on the team merges their own pull request once `Launcher builds`
   (the build check, on the VPS) is green and they have said what it is in
-  #staff-updates. Nobody waits for Patrick. Force pushes are refused.
-  Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
+  #staff-updates. Nobody waits for Patrick. What GitHub does hold write
+  access to on main: a change comes through a pull request (with no approval
+  needed), and a force push or deleting main is refused. None of that applies
+  to the admin account while `enforce_admins` is off.
+  Because nothing enforces the build check, it has to be kept by hand: on 25 Sep 35 pull
   requests were merged with their VPS build red and 18 with no build at all,
   and main went red with them. Wait for `Launcher builds` to say pass before
   merging, every time, including your own and including a Claude's. The last
@@ -1347,9 +1352,10 @@ The short form of the rules. The same decisions, with the dates they were made, 
   with `--admin` on every one of his own pull requests, and it is now zero.
   The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
   which had to stay off while `Ship.ps1` pushed its own version commit
-  straight to main, went on, because Ship writes nothing to the repository now:
-  `Bump-Version.ps1` moves the number first, as an ordinary commit on a
-  branch, and Ship reads it.
+  straight to main, was turned on that day, since Ship writes nothing to the
+  repository now: `Bump-Version.ps1` moves the number first, as an ordinary
+  commit on a branch, and Ship reads it. It was off again by 25 Sep and is
+  off today, which is why the admin account is not held to main's rules.
   Check which it is rather than assuming, because this paragraph was wrong
   for a day before anybody looked:
   `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
@@ -1538,14 +1544,18 @@ this is the long form.
   shipped is already on GitHub and every other machine can `git pull` exactly
   that.
 - **Every change goes through a pull request, Patrick's included.** Nobody
-  pushes to main from any machine; GitHub refuses it. `git checkout -b
+  pushes to main from any machine. GitHub refuses it from write access; from
+  the admin account it does not, so there it is our rule. `git checkout -b
   <name>/what-it-is` (your name, then a slash; a Claude uses `claude/`; older
   branches use `gavin/`), small
   commits with plain messages, `git push -u origin <branch>`, then
   `gh pr create --fill` standing on the branch. Nothing is force pushed.
 - **What GitHub enforces on main, and what it does not.** Since 25 Sep:
   `enforce_admins` is off; there is no required check; required approving
-  reviews is 0; the code owner review is off. The build check,
+  reviews is 0; the code owner review is off. For write access a change
+  still has to come through a pull request, and a force push or deleting
+  main is refused; with `enforce_admins` off, GitHub holds an admin to none
+  of main's rules. The build check,
   `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
   request on the VPS runner, and the rule is ours rather than a setting:
   merge your own pull request once it is green, and you are confident in the change. Nothing merges by itself: auto-merge is off on the repository, so
@@ -1790,8 +1800,8 @@ git pull
 
 The version moves first and on its own. `Bump-Version.ps1` changes `Version`
 in `launcher\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
-prints the rest. main refuses a push from everybody, so it prints the
-commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
+prints the rest. Every change reaches main through a pull request, the
+admin's included, so it prints the commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
 push it and open the pull request, which is then merged (see How work
 moves, the long form). Then, back on main:
 
