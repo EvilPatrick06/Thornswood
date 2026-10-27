@@ -345,8 +345,10 @@ try {
     Yes '  and the run says each chat day it asks to edit, with its line count before and after' (Said 'chat\s+live 2026-10-01\.jsonl: 5 lines before, 3 after')
 
     # ---- right after the run: no live file changed, the copies set aside did
+    # A copy a restore set aside in the bot's data folder is written by no service,
+    # so it is edited at once like the site's (#3620).
     $now = Hashes $Box
-    $liveFile = '^\\Thornswood-Docs\\(data|uploads)\\|^\\Thornswood-Server(-Dev)?\\world\\changeForms\\[^\\]+\.json$|^\\Thornswood-Server(-Dev)?\\private\\(characters|mod-settings|take-limit|last-left)\.json$|^\\Thornswood-Voice(-Dev)?\\chat\\|^\\Thornswood-Bot\\data\\'
+    $liveFile = '^\\Thornswood-Docs\\(data|uploads)\\|^\\Thornswood-Server(-Dev)?\\world\\changeForms\\[^\\]+\.json$|^\\Thornswood-Server(-Dev)?\\private\\(characters|mod-settings|take-limit|last-left)\.json$|^\\Thornswood-Voice(-Dev)?\\chat\\|^\\Thornswood-Bot\\data\\(?![^\\]*-before-restore-)'
     $changed = @($before.Keys | Where-Object { $_ -match $liveFile -and $now[$_] -ne $before[$_] })
     foreach ($k in $changed) { Write-Host "        changed: $k" }
     Yes 'no file a service writes while it runs was changed' ($changed.Count -eq 0)
