@@ -4,7 +4,7 @@
       node .\tests\test-3798-file-served.js
 
   The site's /file/ route served any name in its downloads folder. A read only
-  diagnostic put there by hand on the box, Why-Keizaal.ps1, naming a staff
+  diagnostic script put there by hand on the box, naming a staff
   member and the game server's address, went to anyone who asked for it by
   name: hidden only kept it off the Downloads page (#3798).
 
@@ -92,7 +92,7 @@ function payload() {
 }
 
 // ---- the folder: what a publish leaves, and a stray beside it --------------
-const STRAY = 'Why-Keizaal.ps1';
+const STRAY = 'Check-One-Machine.ps1';
 const strayBody = '# Give the whole output to a staff member\n$box = "203.0.113.7"\n';
 const exe = Buffer.from('the exe');
 const zip = Buffer.from('the payload zip');

@@ -2097,7 +2097,7 @@ function payloadZip(name) {
 // is served too: Ship's installer gate reads it at /file/files.json
 // (Read-SiteDownloads). Anything else in the folder is not published, and
 // answers 404. Until this the route served whatever sat in the folder, and a
-// read only diagnostic put there by hand on the box (Why-Keizaal.ps1, naming a
+// read only diagnostic put there by hand on the box (a script naming a
 // staff member and the game server's address) went to anyone who asked for it
 // by name, while the Downloads page only hid it.
 function downloadServed(name, meta) {
