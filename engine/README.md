@@ -51,7 +51,7 @@ git -C engine/skymp fetch upstream
 ```
 
 The fork at the pinned commit, then its own submodules, vcpkg among them
-(`docs\OWNERSHIP.md:38`), then the `upstream/main` the record scripts measure
+(the ops repo's `OWNERSHIP.md:38`), then the `upstream/main` the record scripts measure
 against (`New-ServerBuildRecord.ps1:62`, `New-ClientBuildRecord.ps1:87`).
 A machine that only copies server binaries can leave the fork unfetched.
 
@@ -132,9 +132,9 @@ cmake -S engine\skymp -B engine\skymp\build -G "Visual Studio 17 2022" -A x64 `
 ```
 
 These are the settings read off the shipping machine's `CMakeCache.txt` on
-24 September (`docs\OWNERSHIP.md:68-71`) and used again for the configure at
+24 September (the ops repo's `OWNERSHIP.md:68-71`) and used again for the configure at
 `engine\skymp` on 25 September, which took 24.2 seconds
-(`docs\archive\todo-list-2026-09-25.md:2987`). On 5 October (issue #1357)
+(the ops repo's `docs\archive\todo-list-2026-09-25.md:2987`). On 5 October (issue #1357)
 each one was read against the fork's own CMake files at a247ef27, the
 commit pinned that day:
 
@@ -251,7 +251,7 @@ A rebuild of the same commit is not byte for byte the same. Measured on
 25 September: `scam_native.node` rebuilt from 3cbf2f87 at the new place
 hashed `ecb029cb...`, not the recorded `de74c582...`. The recorded binary was
 put back from `local\engine-dist-3cbf2f87`, so neither record changed and
-`Deploy-Server.ps1` still takes it (`docs\archive\todo-list-2026-09-25.md:2987`).
+`Deploy-Server.ps1` still takes it (the ops repo's `docs\archive\todo-list-2026-09-25.md:2987`).
 
 From 27 September both records named `5c54e8b9`. Then the client record and
 the pin moved on (#1016 to `10841f40`, #898 to `b4543a86`) and the server record
