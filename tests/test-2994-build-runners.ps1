@@ -41,6 +41,15 @@ Yes "it lists the runners that carry it ($($nums -join ', '))" ($nums.Count -ge 
 Yes '  no more than four: past four at once the box finishes no more builds an hour, each one only takes longer' ($nums.Count -le 4)
 Yes '  and says what was measured' ("$($rec.measured)" -match 'jobs an hour' -and "$($rec.about)" -match 'Set-BuildRunners\.ps1')
 
+# The pull request builds' record (#4010, Patrick's A, 27 Oct 2026): its box
+# runners are build runners too, so the cap holds, and one build runner is
+# not among them, kept for main's build.
+$pr = Get-Content -LiteralPath (Under @('records', 'pr-build-runners.json')) -Raw | ConvertFrom-Json
+$prNums = @($pr.runners | ForEach-Object { [int]$_ })
+Yes "the pull request record names its own label ($($pr.label))" ($pr.label -eq 'thornswood-pr-build' -and $pr.label -ne $rec.label)
+Yes "  its box runners ($($prNums -join ', ')) are build runners too, so the box's cap still holds" ($prNums.Count -ge 1 -and @($prNums | Where-Object { $nums -notcontains $_ }).Count -eq 0)
+Yes '  and at least one build runner is not among them, kept for main''s build' (@($nums | Where-Object { $prNums -notcontains $_ }).Count -ge 1)
+
 # ---- 2. which jobs ask for it -----------------------------------------------------
 # Every job on the VPS, by workflow, and whether it is heavy (a build or a
 # share of the harnesses) and so asks for the build label.
@@ -102,6 +111,7 @@ $ir = [IO.File]::ReadAllText((Under @('scripts', 'deploy', 'Install-Runner.ps1')
 Yes 'Install-Runner.ps1 reads the same record' ($ir -match [regex]::Escape('records\build-runners.json'))
 Yes '  and registers with the labels it worked out' ($ir -match [regex]::Escape("--labels '`$registerLabels'"))
 Yes '  never for an off-box runner' ($ir -match [regex]::Escape("if (-not `$OffBox -and -not `$PSBoundParameters.ContainsKey('Label'))"))
+Yes '  and the pull request record too, for a box runner by number and an off-box one by name' ($ir -match [regex]::Escape('records\pr-build-runners.json') -and $ir -match [regex]::Escape("@(`$prRecord.offBox) -contains `$RunnerName") -and $ir -match [regex]::Escape("@(`$prRecord.runners | ForEach-Object { [int]`$_ }) -contains `$Number"))
 
 # ---- 4. who puts it on GitHub ------------------------------------------------------
 # Set-BuildRunners.ps1 calls no runner API itself: it starts github-admin.yml,

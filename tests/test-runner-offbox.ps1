@@ -75,7 +75,9 @@ try {
     # the test runs.
     $buildRec = Get-Content -LiteralPath (Join-Path $repo 'records\build-runners.json') -Raw | ConvertFrom-Json
     $named = $buildRec.PSObject.Properties['offBox'] -and (@($buildRec.offBox) -contains ('thornswood-pr-' + $comp))
-    $wantLabels = $(if ($named) { 'thornswood-pr,thornswood-build' } else { 'thornswood-pr' })
+    $prRec = Get-Content -LiteralPath (Join-Path $repo 'records\pr-build-runners.json') -Raw | ConvertFrom-Json
+    $prNamed = $prRec.PSObject.Properties['offBox'] -and (@($prRec.offBox) -contains ('thornswood-pr-' + $comp))
+    $wantLabels = 'thornswood-pr' + $(if ($named) { ',thornswood-build' } else { '' }) + $(if ($prNamed) { ',thornswood-pr-build' } else { '' })
     Yes "  registers thornswood-pr-$comp with the label(s) $wantLabels" ($r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "' --labels '" + [regex]::Escape($wantLabels) + "'"))
     Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps" -and $r.Text -notmatch "--labels '[^']*thornswood-vps")
     Yes '  nor the build label unless the record names it (#2994)' ($named -or $r.Text -notmatch 'thornswood-build')
@@ -106,7 +108,7 @@ try {
     # Build runners on One (Patrick, 26 Oct 2026): a name the build record's
     # offBox lists takes the build label too, and never the VPS label.
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-one-3')
-    Yes 'an off-box runner records\build-runners.json names takes the build label' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one-3' --labels 'thornswood-pr,thornswood-build'")
+    Yes 'an off-box runner records\build-runners.json and records\pr-build-runners.json name takes both labels (#4010)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one-3' --labels 'thornswood-pr,thornswood-build,thornswood-pr-build'(?!,)")
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-elsewhere')
     Yes '  and one it does not name keeps the pull request label alone' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-elsewhere' --labels 'thornswood-pr'(?!,)")
 
@@ -121,7 +123,9 @@ try {
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
-    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds but not pull request builds (#2994, #4010)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build'(?!,)" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    $r2 = Dry @('-Number', '2')
+    Yes '  runner 2 takes builds and pull request builds (#4010)' ($r2.Code -eq 0 -and $r2.Text -match "--name 'thornswood-vps-2' --labels 'thornswood-vps,thornswood-build,thornswood-pr-build'(?!,)")
     # #2161, 21 Oct: the record's no-reach folders outside C:\Thornswood-* are denied on the box too.
     $vpsAlso = "@('C:\ProgramData\ssh', 'C:\Users\Administrator')"
     Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' $vpsAlso") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
