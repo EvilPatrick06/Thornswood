@@ -39,7 +39,11 @@ has no business sitting in a checkout. From the copy:
 $env:THORNSWOOD_VOICE_PORT = '7900'; $env:THORNSWOOD_VOICE_BIND = '127.0.0.1'; node voice-server.js
 ```
 
-then open http://127.0.0.1:7900/health. It reads `THORNSWOOD_VOICE_PORT`
+then open http://127.0.0.1:7900/health. Only a caller on the same machine,
+with no forwarding header, gets the whole answer; anything Caddy carries
+(https://thornswood.net/voice/health) is told `{"ok":true}` and nothing
+more, so the build, the deploy record and the counts below are read on the
+box (#3806). It reads `THORNSWOOD_VOICE_PORT`
 (7778 when unset), `THORNSWOOD_VOICE_BIND` (loopback when unset since #1304;
 `0.0.0.0` answers every interface, and even then `/token` and the handshake
 refuse anything that did not come over TLS: straight off the network, or
@@ -67,17 +71,23 @@ for two minutes (`THORNSWOOD_TOKEN_SECONDS`, 120 when unset), so the
 launcher's voice page and the game's chat each ask the launcher for a fresh
 one whenever they connect; a token presented twice is refused and written
 down as copied (#1322).
-`THORNSWOOD_VOICE_MOST` is the most people it takes at once (#481): people,
-not sockets, so a person's voice page and chat, and a reconnect overlapping
-the socket it replaces, count once by the profile their tokens proved, and a
-profile already in is always let in. Past it a new person's socket is sent one
-chat line saying voice and chat are full, then closed with 1013, and the pages
-try again on their own backoff; `/health` gives `most`, `people` and
-`refusedFull`. Unset or 0 is no cap. Install-Voice.ps1 sets it from `voice` in
+`THORNSWOOD_VOICE_MOST` is the most people who hold a voice place at once
+(#481): on the roster, sent the roster, and let trade signalling. Only
+somebody the game server's position feed has in the world holds one
+(#3570: voice is proximity only, so nobody at the menu could be heard). Every socket a join token proves is let in and carries text chat and
+commands, so somebody waiting in line at the menu has the chat socket that
+says "/line" and no voice place, is on nobody's roster and is sent none. A
+place is the profile's, so a person's voice page and chat, and a reconnect
+overlapping the socket it replaces, share one; it is taken the moment the
+feed has them in the world, and when the feed drops them their own pages are
+sent an empty roster so they let go of every connection. Somebody in the
+world past the number keeps text chat, is told once in one chat line that
+voice is full, and takes a place when one frees; `/health` gives `most`,
+`people` (places held) and `refusedFull` (kept off voice for numbers). Unset
+or 0 is no cap. Install-Voice.ps1 sets it from `voice` in
 `records\most-online.json` (its `dev` object's for `C:\Thornswood-Voice-Dev`),
-which is never fewer than that server's seats,
-because everybody seated and everybody waiting in line at the menu holds a
-socket here. `test-most.js` covers it. `load-voice.js` is not a harness: it
+which is never fewer than that server's seats, so everybody seated has a
+place. `test-most.js` and `tests\test-3570-voice-line-room.js` cover it. `load-voice.js` is not a harness: it
 plays an evening at a copy of the service with no people (two sockets each, a
 join storm, the WebRTC signalling for every pair, walking and talk) and prints
 what the service cost at each size, which is where that number came from.
@@ -152,7 +162,7 @@ forwarding header on it, which Caddy always sets (#1797). Its clients are the
 launcher's hidden voice page (`launcher`), the in-game overlays
 (`game\ui`) and the two gamemodes. `.\scripts\deploy\Install-Voice.ps1` copies
 `voice-server.js` and `headlines.js`, restarts the task and waits
-for `/health`; the dev service is the same script with
+for `/health` on the box; the dev service is the same script with
 `-Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'`.
 `Go.ps1` without `-SkipServer` also copies this file over the live one and
 restarts it.
