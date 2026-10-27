@@ -30,6 +30,9 @@
 // WHAT IS LEFT ALONE, AND WHY.
 //   - records/client-licences/: third-party licence texts keep their
 //     authors' notices word for word, as the licences require.
+//   - tests/fixtures/ui-front-build.js: a third-party webpack build, kept
+//     as its authors built it (#3761); the profile path in it is one of
+//     theirs, from their own machine.
 //   - WAITING below: files that already hold one and leave main or change
 //     by the issue named beside them. An entry whose file is clean or gone
 //     fails this check, so the list only gets shorter: take the line out in
@@ -47,9 +50,8 @@ const WAITING = [
   ['docs/archive/WORKING-NOTES.md', '#3693, agent-only files leave the public repo'],
   ['docs/archive/todo-list-2026-09-25.md', '#3693, agent-only files leave the public repo'],
   ['ops/claude-queue/pillow-one-upgrade.md', '#3693, agent-only files leave the public repo'],
-  ['tests/fixtures/ui-front-build.js', '#3761, the third-party front build leaves tests/fixtures'],
 ];
-const LEFT_ALONE = [/^records\/client-licences\//];
+const LEFT_ALONE = [/^records\/client-licences\//, /^tests\/fixtures\/ui-front-build\.js$/];
 
 const MAIL_DOMAIN = /^(?:gmail\.com|googlemail\.com|outlook\.[a-z.]+|hotmail\.[a-z.]+|live\.[a-z.]+|msn\.com|yahoo\.[a-z.]+|ymail\.com|icloud\.com|me\.com|mac\.com|proton\.me|protonmail\.[a-z.]+|aol\.com|(?:[a-z0-9-]+\.)+edu)$/i;
 const MAIL = /[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})/g;
