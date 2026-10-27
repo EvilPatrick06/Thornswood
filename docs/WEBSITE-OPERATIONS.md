@@ -171,14 +171,19 @@ clone, in PowerShell 7.
 7. **Tell them** in the ticket once the dry run shows nothing `waiting`, that
    it is done, and what stays: staff's
    records about them (bans, PKs, notes, the staff logs), reports they made or
-   that were made about them, and a session staff marked kept. In the game,
+   that were made about them, a session staff marked kept, and their tickets
+   in the Discord with the bot's lines about them in `#ticket-log`. In the game,
    what somebody else wrote naming their character (a letter addressed to
    them, a thing left in a drop box for them) is that person's and stays,
    and gold that was held for them on a hold's ledger stays with the hold.
    Logs age out by their own rule, and the encrypted backups expire on their
    schedule; the record below is why a restore never brings the person back.
-8. **Then delete their ticket threads** in the Discord, which is the last
-   place on our side that holds what they wrote.
+8. **Leave their tickets in the Discord.** A ticket thread, and the bot's
+   lines about it in `#ticket-log` (the Closed line, and the whole ticket when
+   its thread would not open), is the record of what they were told, so a
+   request does not delete it (Patrick's B on #3634). The bot deletes each
+   365 days after it closed or was written, every hour, and the privacy page
+   says so.
 
 **The record.** `C:\Thornswood-Deletions\requests.jsonl` on the box, one line
 for each request, written when it is made: the Discord id, the profile ids,

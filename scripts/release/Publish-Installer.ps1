@@ -4,11 +4,14 @@
   Puts the current installer on the docs site so friends always have the newest
   one without anybody sending files around.
 
-  The installer is a pair: a small exe and a payload zip of about a gigabyte.
-  The exe finds the zip beside itself, so both have to land in the same folder
-  and neither is any use alone. They are published together and the page says
-  so, because "I downloaded the installer and it did nothing" is what happens
-  when somebody takes only the exe.
+  The installer comes in one of two shapes, and the site holds one at a time:
+  - One file (Package-Thornswood -OneFile, what ships now): Thornswood-Setup.exe
+    with the payload inside it. Nothing else is sent, and a Thornswood-Setup.zip
+    an earlier publish left on the site is taken off with its files.json entry
+    in the same step that lists the exe (#3560), so /api/payload answers {} and
+    no two file setup program still in circulation installs an old payload.
+  - Two files: a small Thornswood-Setup.exe and Thornswood-Setup.zip, the
+    payload, which the setup program asks /api/payload for and downloads.
 
   Called by Package-Thornswood.ps1 at the end, so a rebuilt installer publishes
   itself. Can be run on its own if a push failed.
@@ -17,9 +20,8 @@
     .\Publish-Installer.ps1 -OutDir .\out\dist\Thornswood\_dist
     .\Publish-Installer.ps1 -KeepOld     ignored (stable name; stamped leftovers always pruned)
 
-  Only the current pair is kept by default. At a gigabyte each, three
-  generations is several gigabytes of VPS disk for something nobody has ever
-  rolled back to.
+  Only the current installer is kept. At a gigabyte each, three generations is
+  several gigabytes of VPS disk for something nobody has ever rolled back to.
 
 #>
 [CmdletBinding()]
@@ -217,6 +219,8 @@ if ($single) {
 }
 $b64 = [Convert]::ToBase64String(
   [Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Depth 4 -Compress)))
+# Which shape the write below leaves on the site: 1 takes a payload zip off.
+$oneFileFlag = $(if ($single) { '1' } else { '0' })
 
 Write-Host ''
 $listWrite = @(Remote @"
@@ -233,14 +237,33 @@ if (Test-Path `$f) {
 (([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64'))) |
   ConvertFrom-Json).PSObject.Properties | ForEach-Object { `$all[`$_.Name] = `$_.Value }
 
+# A one file installer carries its payload, so a Thornswood-Setup.zip still
+# here is an older build's, and /api/payload would hand it to any two file
+# setup program (#3560). It goes with its entry, in the same write that lists
+# the exe. A two file publish has just sent its zip, and keeps it.
+if ('$oneFileFlag' -eq '1') {
+  `$old = Join-Path `$dir '$zipOut'
+  if (Test-Path -LiteralPath `$old) {
+    try { Remove-Item -LiteralPath `$old -Force -ErrorAction Stop }
+    catch { 'the old payload $zipOut could not be taken off, so files.json was left as it is: ' + (`$_.Exception.Message -replace '[\r\n]+', ' '); exit 1 }
+    'removed the two file payload $zipOut'
+  }
+  `$all.Remove('$zipOut')
+}
+
 # Stable name overwrites in place via scp. Drop any leftover stamped tips
 # (Thornswood-Setup-YYYYMMDD-HHMM.*) and their files.json keys. -KeepOld is
 # ignored for the stable name; one tip is enough.
 Get-ChildItem `$dir -Filter 'Thornswood-Setup-*.*' | ForEach-Object {
   if (`$_.Name -match '^Thornswood-Setup-\d{8}-\d{4}\.') {
-    Remove-Item `$_.FullName -Force -EA SilentlyContinue
-    `$all.Remove(`$_.Name)
-    'removed old ' + `$_.Name
+    # Until #3560 a removal that failed was passed over and its key dropped
+    # anyway, leaving a file on the site that nothing listed. Now it stops
+    # the write, the same as the payload above.
+    `$stamped = `$_
+    try { Remove-Item -LiteralPath `$stamped.FullName -Force -ErrorAction Stop }
+    catch { 'the old ' + `$stamped.Name + ' could not be taken off, so files.json was left as it is: ' + (`$_.Exception.Message -replace '[\r\n]+', ' '); exit 1 }
+    `$all.Remove(`$stamped.Name)
+    'removed old ' + `$stamped.Name
   }
 }
 
