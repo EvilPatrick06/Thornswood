@@ -571,13 +571,15 @@ checked against the list and then copied (`OwnGameKinds.cs SkyrimFrom()`,
 **SteamUpdates** (SteamUpdates.cs, with ShellSteamUpdates.cs for its
 question). Steam's Updates setting for Skyrim, `AutoUpdateBehavior` in
 `steamapps\appmanifest_489830.acf` in the library that holds it.
-At every start `ShellSteamUpdates.cs:26 HoldSteamUpdatesOnStart()` logs it
-(`SteamUpdates.cs:262 Report()`) and, when it is not "Wait until I launch the
-game" or the file is marked read only, sets it (#493): `SteamUpdates.cs:328
+At every start `ShellSteamUpdates.cs:28 HoldSteamUpdatesOnStart()` logs it
+(`SteamUpdates.cs:270 Report()`) and, when it is not "Wait until I launch the
+game" or the file is marked read only, sets it (#493): `SteamUpdates.cs:344
 OnStart()` says write it at once when Steam is closed, or put
-`ShellSteamUpdates.cs:61 AskToHoldSteamUpdates()`, whose Yes closes Steam,
-waits for it to go, writes and starts Steam again. A No is remembered in
-config.json (`SteamUpdatesDeclined`). `SteamUpdates.cs:426 Hold()` changes that one value,
+`ShellSteamUpdates.cs:64 AskToHoldSteamUpdates()`, whose Yes closes Steam,
+waits for it to go, writes and starts Steam again, and starts Steam again
+whatever happens once it was asked to exit. No means not now (#3600): nothing
+is remembered, so a later start with Steam closed writes it and one with Steam
+open asks again, and the question says so. `SteamUpdates.cs:465 Hold()` changes that one value,
 takes off a read-only mark and never writes while Steam runs. The mark is not
 what holds the version: Thornswood runs its own folder, whose exe is its own
 copy, and Steam puts an update in by moving new files into its own copy. Since

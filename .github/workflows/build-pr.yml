@@ -48,7 +48,12 @@ jobs:
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
     # the harness step alone and the limit below cancelled passing builds.
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    # Main's build stays on the box: only the box's runners have the trace
+    # task, and a main build is what leaves the gate map the next pull
+    # requests measure from (#3114, #3874). Build-PrWorkflow.js drops
+    # thornswood-vps for build-pr.yml only, so a pull request's fallback can
+    # also land on One's off-box build runners (#3860).
+    runs-on: [self-hosted, Windows, thornswood-build]
     # actions: read for the gate step off the box, which reads the map main's
     # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
     permissions:
@@ -142,29 +147,8 @@ jobs:
           }
           if ($failed.Count) { exit 1 }
 
-      - name: Check the ownership page
-        shell: pwsh
-        run: |
-          # Issue #752. docs\OWNERSHIP.md says where every credential file
-          # lives, who holds it and who the second holder is, and
-          # tests\test-ownership.js greps scripts\<area>\*.ps1 and
-          # launcher\app\*.cs for the file names rather than trusting the page.
-          # #697 added discord-avatar.txt with neither a row on that page nor a
-          # line saying it is not a secret, and nothing said so until #750 and
-          # #751 found it by hand. A tenth of a second, so it runs here on every
-          # pull request and not only in the nightly checks.
-          #
-          # Fail closed: no node on the runner is a check that did not happen,
-          # which is the failure this step exists to stop, so it is red.
-          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            Write-Host '::error file=tests/test-ownership.js::no node on this runner, so the ownership page was not checked'
-            exit 1
-          }
-          node tests\test-ownership.js
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=docs/OWNERSHIP.md::the ownership page does not match what the scripts and the launcher name; the FAIL lines above say which rows'
-            exit 1
-          }
+      # The ownership page check (#752) went with docs/OWNERSHIP.md to the
+      # private ops repository (#3693), which runs it against main every night.
 
       - name: Check the old mod's name stays out
         shell: pwsh
@@ -383,14 +367,17 @@ jobs:
           }
 
       - name: Check the launcher window
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           # The launcher builds its window from ui.xaml at startup and finds
           # every control by name, so a renamed control or a window that does
           # not parse compiles clean and is found by the person using it. This
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
-          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          # -ExecutionPolicy Bypass on both, as every harness starts 5.1:
+          # Windows 11 keeps 5.1 at Restricted, so on One's runners the plain
+          # shell: powershell could not run this step's own script (#3861).
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Check the launcher UI thread
