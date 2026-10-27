@@ -47,6 +47,18 @@ namespace Thornswood
         const int PluginSource = 0, TableSource = 1;
         const int Lit = 0, Rec = 1, Cpy = 2, Str = 3;
 
+        /// <summary>
+        /// Why the plugin cannot be made, said in a few words. NotEnglish when
+        /// an English string table the recipe reads is missing, which is a
+        /// game set to another language in Steam (#4007). Patrick's A of 27
+        /// Oct 2026: Thornswood plays in English, and Scan says how to switch.
+        /// </summary>
+        public sealed class CannotMake : Exception
+        {
+            public readonly bool NotEnglish;
+            public CannotMake(string why, bool notEnglish) : base(why) { NotEnglish = notEnglish; }
+        }
+
         /// <summary>One plugin or string table a recipe reads, as it names it.</summary>
         public sealed class Source
         {
@@ -87,7 +99,7 @@ namespace Thornswood
             try { return Hex(ReadHeader(System.IO.File.ReadAllBytes(RecipeAt(game))).Sha256); }
             catch (IOException) { return null; }
             catch (UnauthorizedAccessException) { return null; }
-            catch (InvalidDataException) { return null; }
+            catch (CannotMake) { return null; }
         }
 
         /// <summary>Whether the game folder's Thornswood-Last.esp is the plugin its recipe makes.</summary>
@@ -104,14 +116,14 @@ namespace Thornswood
         /// <summary>
         /// Makes the plugin from the recipe in <paramref name="game"/> and the
         /// plugins and string tables of its Data folder. Throws
-        /// InvalidDataException with the reason when it cannot be made.
+        /// CannotMake with the reason when it cannot be made.
         /// </summary>
         public static byte[] Make(string game)
         {
             string data = Path.Combine(game, "Data");
             byte[] recipe;
             try { recipe = System.IO.File.ReadAllBytes(RecipeAt(game)); }
-            catch (FileNotFoundException) { throw new InvalidDataException("the release's " + RecipeName + " is not in the game folder"); }
+            catch (FileNotFoundException) { throw Bad("the release's " + RecipeName + " is not in the game folder"); }
             return Apply(recipe, delegate(Source s) { return s.IsTable ? Table(data, s.Name) : Plugin(data, s.Name); });
         }
 
@@ -161,7 +173,7 @@ namespace Thornswood
 
         // ------------------------------------------------------------ reading
 
-        /// <summary>The recipe's header; InvalidDataException when it is not a version 1 recipe.</summary>
+        /// <summary>The recipe's header; CannotMake when it is not a version 1 recipe.</summary>
         public static Header ReadHeader(byte[] recipe)
         {
             if (recipe.Length < Magic.Length) throw Bad("this is not a version 1 recipe for " + Name);
@@ -187,7 +199,7 @@ namespace Thornswood
         /// <summary>
         /// The plugin a recipe makes, with each source opened by <paramref name="open"/>
         /// and held to the size and sha256 the recipe names. Throws
-        /// InvalidDataException with the reason when it cannot be made.
+        /// CannotMake with the reason when it cannot be made.
         /// </summary>
         public static byte[] Apply(byte[] recipe, Open open)
         {
@@ -259,6 +271,8 @@ namespace Thornswood
             if (got.TryGetValue(i, out st)) return st;
             Source s = h.Sources[i];
             st = open(s);
+            if (st == null && s.IsTable && s.Name.IndexOf("_english.", StringComparison.OrdinalIgnoreCase) >= 0)
+                throw new CannotMake(s.Name + " is not on this machine, which is how a Skyrim set to another language than English looks", true);
             if (st == null) throw Bad(s.Name + " is not on this machine");
             got[i] = st;
             long have = st.Length;
@@ -290,8 +304,12 @@ namespace Thornswood
             var outp = new MemoryStream((int)Math.Min(want, 64u << 20));
             // zlib: two header bytes, deflate, four bytes of Adler-32, which
             // the sha256 of the plugin made already holds to account.
-            using (var z = new DeflateStream(new MemoryStream(raw, 6, raw.Length - 6), CompressionMode.Decompress))
-                z.CopyTo(outp);
+            try
+            {
+                using (var z = new DeflateStream(new MemoryStream(raw, 6, raw.Length - 6), CompressionMode.Decompress))
+                    z.CopyTo(outp);
+            }
+            catch (InvalidDataException) { throw Bad("the record at offset " + off + " of " + name + " does not inflate"); }
             if (outp.Length != want) throw Bad("the record at offset " + off + " of " + name + " inflates to the wrong size");
             return outp.ToArray();
         }
@@ -331,7 +349,7 @@ namespace Thornswood
 
         // ------------------------------------------------------------ bytes
 
-        static InvalidDataException Bad(string why) { return new InvalidDataException(why); }
+        static CannotMake Bad(string why) { return new CannotMake(why, false); }
 
         static int Byte(byte[] b, ref int p)
         {
@@ -374,7 +392,7 @@ namespace Thornswood
             while (got < into.Length)
             {
                 int k = st.Read(into, got, into.Length - got);
-                if (k <= 0) throw new EndOfStreamException(name + " ended while it was read.");
+                if (k <= 0) throw Bad(name + " ended while it was read");
                 got += k;
             }
         }

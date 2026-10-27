@@ -66,7 +66,7 @@ namespace Thornswood
         {
             var f = new FromGameFile { Rel = LastPlugin.File, Expected = LastPlugin.Expected(Paths.Game) };
             try { f.Bytes = LastPlugin.Make(Paths.Game); f.Sha256 = f.Expected; }
-            catch (InvalidDataException ex) { f.Problem = ex.Message; }
+            catch (LastPlugin.CannotMake ex) { f.Problem = ex.Message; f.NotEnglish = ex.NotEnglish; }
             catch (IOException ex) { f.Problem = "a plugin could not be read (" + ex.Message.TrimEnd('.') + ")"; }
             catch (UnauthorizedAccessException ex) { f.Problem = "a plugin could not be read (" + ex.Message.TrimEnd('.') + ")"; }
             return f;

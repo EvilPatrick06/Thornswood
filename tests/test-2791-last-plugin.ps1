@@ -20,7 +20,9 @@
        64 KiB.
     2. A plugin that is not the copy the recipe names, a missing plugin, no
        string table, and a loose table that is another copy all make nothing,
-       and the reason names the file.
+       and the reason names the file. Only the missing English table is taken
+       for a game set to another language, for which Scan says to switch
+       Skyrim to English (#4007, Patrick's A of 27 Oct 2026).
     3. IsCurrent and Expected: no plugin, or another one, is not current; the
        one the recipe makes is. Makes names Thornswood-Last.esp only where a
        recipe is.
@@ -75,6 +77,8 @@ $mfg = Src (Join-Path $App 'MadeFromGame.cs')
 Yes 'MadeFromGame counts it out of date only when the game folder holds a recipe' ($mfg -match 'if \(LastPlugin\.HasRecipe\(Paths\.Game\) && !LastPlugin\.IsCurrent\(Paths\.Game\)\) l\.Add\(LastPlugin\.File\);')
 Yes '  and makes it only when it is out of date' ($mfg -match 'if \(rels\.Contains\(LastPlugin\.File\)\) l\.Add\(MakeLast\(\)\);' -and $mfg -match 'foreach \(FromGameFile f in Make\(off\)\)')
 $upkeep = Src (Join-Path $App 'Upkeep.cs')
+Yes 'Scan says to switch Skyrim to English when an English table is missing (#4007, Patrick''s A)' ($upkeep -match 'english = f\.NotEnglish;' -and $upkeep -match 'english \? "Thornswood plays in English: in Steam, right click Skyrim Special Edition, Properties, Language' -and
+    (Src (Join-Path $App 'MadeFromGame.cs')) -match 'catch \(LastPlugin\.CannotMake ex\) \{ f\.Problem = ex\.Message; f\.NotEnglish = ex\.NotEnglish; \}')
 Yes 'Scan names it with the collection to put right in Vortex' ($upkeep -match 'MadeFromGame\.Make\(off\)' -and $upkeep -match 'last \? "Install the collection revision Thornswood pins in Vortex and press Deploy there')
 $verify = Src (Join-Path $App 'Verify.cs')
 Yes 'Verify''s Fix never fetches it from the server' (
@@ -150,7 +154,7 @@ namespace Thornswood
                 byte[] made = null;
                 string why = null;
                 try { made = LastPlugin.Make(g); }
-                catch (InvalidDataException ex) { why = ex.Message; }
+                catch (LastPlugin.CannotMake ex) { why = ex.Message; }
                 Yes(name + ": the launcher makes the plugin last_recipe.make() wrote the recipe for, byte for byte" + (why != null ? ": " + why : ""), Same(made, want));
             }
             foreach (string name in new[] { "other", "no-plugin", "no-table", "later" })
@@ -159,10 +163,13 @@ namespace Thornswood
                 string want = File.ReadAllText(Path.Combine(g, "want.txt"));
                 string why = null;
                 byte[] made = null;
+                bool english = false;
                 try { made = LastPlugin.Make(g); }
-                catch (InvalidDataException ex) { why = ex.Message; }
+                catch (LastPlugin.CannotMake ex) { why = ex.Message; english = ex.NotEnglish; }
                 Yes(name + ": nothing is made, and the reason names the file: " + (why ?? "(it was made)"),
                     made == null && why != null && why.IndexOf(want, StringComparison.Ordinal) >= 0);
+                // #4007: only a missing English table is a game in another language.
+                Yes("  " + (name == "no-table" ? "and it is the game's language (#4007)" : "and it is not taken for the game's language"), english == (name == "no-table"));
             }
 
             string m = Path.Combine(games, "made");
