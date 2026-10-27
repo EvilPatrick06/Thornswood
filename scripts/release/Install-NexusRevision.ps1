@@ -403,6 +403,10 @@ Head 'Installing, as Vortex would'
 # Size and sha256 of each file, by its unpacked path, taken before -Record
 # deletes the unpacked copy.
 $script:Facts = @{}
+# And each plugin's TES4 header, by its unpacked path, for the plugin rules
+# check after the deploy (PluginRuleLoops.ps1), which -Record would
+# otherwise find gone.
+$script:PluginHeads = @{}
 function Remove-Unpacked($e, [string]$u) {
   [Thornswood.Layout.NexusLayout]::Forget($u)
   Remove-Tree $u
@@ -455,6 +459,7 @@ foreach ($e in $col.Entries) {
   # unpacked copy goes before the next is unpacked.
   if ($Record) {
     foreach ($s in $plan.Files.Values) { $script:Facts[$s.Full] = [pscustomobject]@{ Size = (Get-Item -LiteralPath $s.Full).Length; Sha256 = [Thornswood.Layout.NexusLayout]::Sha256Of($s.Full) } }
+    foreach ($s in $plan.Files.Values) { if ($s.Full -match '\.(esp|esm|esl)$') { $script:PluginHeads[$s.Full] = [pscustomobject]@{ Header = (Read-PluginRuleHeader $s.Full) } } }
     Remove-Unpacked $e $u
   }
   $plans.Add($plan)
@@ -541,22 +546,26 @@ if ($broken.Count) { Die ('The collection''s plugin order breaks its own plugin 
 # with the game's own order (27 Oct). So the rules are read against the
 # plugins' headers too (PluginRuleLoops.ps1).
 # A file with no TES4 header is placed by its name alone: the game loads an
-# .esm or .esl as a master whatever is in it.
-$headers = @{}
+# .esm or .esl as a master whatever is in it. A file that is not there to
+# read stops the run: -Record took the unpacked copies away mod by mod, and
+# the header read then ($script:PluginHeads) is the one used.
+$ruleHeads = @{}
 $byName = @()
 foreach ($x in $placed) {
   if ($x.Rel -notmatch '^Data\\([^\\]+\.(esp|esm|esl))$') { continue }
   $nm = $Matches[1]
   if (-not $pos.ContainsKey($nm.ToLowerInvariant())) { continue }
-  $h = Read-PluginRuleHeader $x.Full
+  if ($script:PluginHeads.ContainsKey($x.Full)) { $h = $script:PluginHeads[$x.Full].Header }
+  elseif (Test-Path -LiteralPath $x.Full -PathType Leaf) { $h = Read-PluginRuleHeader $x.Full }
+  else { Die ($x.Rel + ' was not read before its unpacked copy went, so where the game loads it is not known.') }
   if ($null -eq $h) {
     $byName += $nm
     $h = [pscustomobject]@{ Master = ($nm -match '\.(esm|esl)$'); Light = ($nm -match '\.esl$'); Masters = [string[]]@() }
   }
-  $headers[$nm] = $h
+  $ruleHeads[$nm] = $h
 }
 if ($byName.Count) { Say ('  no TES4 header, so placed by name alone: ' + ($byName -join ', ')) 'Yellow' }
-$loops = @(Get-PluginRuleLoops $col.PluginRules $headers)
+$loops = @(Get-PluginRuleLoops $col.PluginRules $ruleHeads)
 if ($loops.Count) { Die ('The collection''s plugin rules go round in a circle with the order the game sets, which LOOT reports as a cyclic interaction on every install: ' + (($loops | ForEach-Object { $_.Loop + ' (' + ($_.Why -join '; ') + ')' }) -join '; ') + '.') }
 Say ('  ' + $order.Count + ' plugins: ' + @($order | Where-Object { $_.Enabled }).Count + ' enabled in the collection''s order' + $(if ($unlisted.Count) { ', ' + $unlisted.Count + ' it does not list, disabled: ' + ($unlisted -join ', ') } else { '' }))
 
