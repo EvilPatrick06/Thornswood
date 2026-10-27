@@ -11,9 +11,10 @@ in the war about fifty years ago; delete AZURE_SIGNING_SUBSCRIPTION_ID.
 1. The World page, live site: `.\scripts\deploy\Deploy-Docs.ps1 -Site`.
    Check https://thornswood.net/world says "twenty-three years" and "served
    in the war about fifty years ago".
-2. The #lore post, live Discord:
-   `.\scripts\deploy\Setup-Discord.ps1 -OnBox -Posts -Only lore`. It rewrites
-   only the #lore post from bot\content.py. Check #lore says
+2. The #lore post, live Discord. bot\content.py changed, so first the bot's
+   code: `.\scripts\deploy\Install-Bot.ps1 -CodeOnly`. Then
+   `.\scripts\deploy\Setup-Discord.ps1 -OnBox -Posts -Only lore`, which
+   rewrites only the #lore post from bot\content.py. Check #lore says
    "who's had it twenty-three years".
 3. #3717, the repository variable (Thornswood only; the fork's own copy in its
    `thornswood-signing` environment stays):
@@ -26,7 +27,8 @@ in the war about fifty years ago; delete AZURE_SIGNING_SUBSCRIPTION_ID.
 ## Risks
 
 None of the three takes anything down. The site step reloads only the public
-pages. The Discord step edits one read only post. The variable is read by no
+pages. Install-Bot -CodeOnly restarts the bot for a few seconds. The Discord
+step edits one read only post. The variable is read by no
 workflow (tests\test-release-workflow.ps1 checks that), so signing does not
 change.
 
