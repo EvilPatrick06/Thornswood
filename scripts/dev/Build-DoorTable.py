@@ -348,7 +348,7 @@ def main():
 
     payload = {
         'builtBy': 'scripts/dev/Build-DoorTable.py',
-        'readFrom': '%d plugins, the five masters then %s' % (len(order), args.plugins),
+        'readFrom': own_plugins.load_order_name(order),
         'whatABuildingIs': 'the interior cell a door opens into. Two front doors into one '
                            'interior are two doors of one building, which is what makes a house '
                            'with a back door a single claim.',

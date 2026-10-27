@@ -28,7 +28,6 @@ param(
     [switch]$NoArchive,
     # Stop at payload.zip, with no setup program around it.
     [switch]$PayloadOnly,
-    [switch]$ReuseStage,
     [switch]$NoPause,
     # Straight onto the docs site when it is done, so nobody has to be sent a
     # file. -NoPublish builds without touching the site.
@@ -113,7 +112,6 @@ if ($FromFeed) {
     if ($Vortex -or $NoVortex -or $PSBoundParameters.ContainsKey('VortexManifest')) {
         Die '-FromFeed reads no Vortex record and no Steam copy: the release record already leaves out what the collection provides. Leave out -Vortex, -NoVortex and -VortexManifest. Nothing was built.'
     }
-    if ($ReuseStage) { Die '-FromFeed stages the release afresh every time, so -ReuseStage has nothing to reuse. Nothing was built.' }
     if (-not $Stub) {
         Die ('-FromFeed takes the setup program CI built (-Stub), not one a local Build-Launcher left in out\, ' +
              'which a machine building from the feed does not have. Nothing was built.')
@@ -413,6 +411,8 @@ if ($optionalPrefixes.Count) {
 . (Join-Path $Here 'Package-ClientRecord.ps1')
 # Get-ClientLicences and Get-ClientLicenceLines, the same as the feed's (#3099).
 . (Join-Path $Here 'Source-Notice.ps1')
+# Sync-PackageStage, Get-PackageStageBytes and Invoke-PackageZip (#3752, #3412).
+. (Join-Path $Here 'Package-Stage.ps1')
 $checkoutClientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
 $resolvedClient = Resolve-PackageClientRecord -LauncherExe (Get-LauncherExe $LaunchDir) -FeedVersion $vLive -CheckoutRecord $checkoutClientRecord
 if (-not $resolvedClient) {
@@ -706,66 +706,22 @@ if ($loose.Count) {
     Write-Host ''
 }
 if ($optionalCount) {
-    Say ("  {0:n0} more ({1:n1} GB) are in optional packs and published separately." -f `
-        $optionalCount, ($optionalBytes / 1GB)) 'DarkGray'
-}
-if ($optionalCount) {
     Say ("  {0:n0} more ({1:n1} GB) belong to optional packs and are published separately." -f `
         $optionalCount, ($optionalBytes / 1GB)) 'Green'
     Say '  Run .\Publish-Pack.ps1 after this, or nobody can get them.' 'Yellow'
 }
 
+# The stage is kept from the last build and brought level with this one: only
+# what changed is copied, what left the build is removed, and the rest of the
+# stage is written fresh below (#3752). Package-Stage.ps1 says why one path.
 $payload = Join-Path $stage 'payload'
-$reuse = $ReuseStage -and (Test-Path $payload)
-if (-not $reuse -and (Test-Path $stage)) { Remove-Item $stage -Recurse -Force }
-$null = New-Item -ItemType Directory -Force -Path $stage, $payload, (Join-Path $stage 'profile')
-
-if ($reuse) {
-    # -ReuseStage used to take the old folder as it stood, which quietly shipped
-    # yesterday's mod list the moment anything changed. It syncs now instead:
-    # same speed when nothing moved, correct when something did.
-    Say '  Checking the staged copy against the build...' 'Yellow'
-    $have = @{}
-    $listedPayload = (Get-Item -LiteralPath $payload).FullName
-    foreach ($f in (Get-ChildItem -LiteralPath $listedPayload -Recurse -File -Force)) {
-        $have[$f.FullName.Substring($listedPayload.TrimEnd('\').Length + 1)] = $f
-    }
-
-    $new = 0; $changed = 0; $gone = 0
-    foreach ($f in $ship) {
-        $old = $have[$f.Rel]
-        if ($old) {
-            $have.Remove($f.Rel)
-            # A second of slack, because copying does not preserve ticks exactly.
-            if ($old.Length -eq $f.Len -and [math]::Abs(($old.LastWriteTimeUtc - $f.Time).TotalSeconds) -lt 2) { continue }
-            $changed++
-        } else { $new++ }
-
-        $dest = Join-Path $payload $f.Rel
-        $dir  = Split-Path -Parent $dest
-        if (-not (Test-Path -LiteralPath $dir)) { $null = New-Item -ItemType Directory -Force -Path $dir }
-        Copy-Item -LiteralPath $f.Full -Destination $dest -Force
-    }
-
-    # Whatever is left in the table is no longer part of the build.
-    foreach ($leftover in $have.Values) { Remove-Item -LiteralPath $leftover.FullName -Force -EA SilentlyContinue; $gone++ }
-
-    if ($new -or $changed -or $gone) {
-        Say ("  {0:n0} new, {1:n0} changed, {2:n0} removed" -f $new, $changed, $gone) 'Green'
-    } else {
-        Say '  nothing has changed since the last package' 'Green'
-    }
+Say '  Bringing the stage level with the build...'
+try { $synced = Sync-PackageStage -Stage $stage -Ship $ship }
+catch { Die ("The stage at $stage could not be brought level with the build: " + $_.Exception.Message + ' Nothing was packaged.') }
+if ($synced.New -or $synced.Changed -or $synced.Gone) {
+    Say ("  {0:n0} new, {1:n0} changed, {2:n0} removed, {3:n0} already there" -f $synced.New, $synced.Changed, $synced.Gone, $synced.Kept) 'Green'
 } else {
-    Say '  Copying...'
-    $n = 0
-    foreach ($f in $ship) {
-        $dest = Join-Path $payload $f.Rel
-        $dir  = Split-Path -Parent $dest
-        if (-not (Test-Path -LiteralPath $dir)) { $null = New-Item -ItemType Directory -Force -Path $dir }
-        Copy-Item -LiteralPath $f.Full -Destination $dest -Force
-        $n++
-        if ($n % 2000 -eq 0) { Write-Host ("    {0:n0}/{1:n0}" -f $n, $ship.Count) -ForegroundColor DarkGray }
-    }
+    Say '  nothing has changed since the last package' 'Green'
 }
 
 $payloadDir = $payload
@@ -773,10 +729,8 @@ $shipCount = $ship.Count
 
 # Deep mod paths plus a long staging prefix push past the old Windows path
 # limit, which is what "System ERROR: The parameter is incorrect" means here.
-$longest = 0
-foreach ($f in (Get-ChildItem -LiteralPath $payloadDir -Recurse -File -Force)) {
-    if ($f.FullName.Length -gt $longest) { $longest = $f.FullName.Length; $longestPath = $f.FullName }
-}
+$longest = $synced.Longest
+$longestPath = $synced.LongestPath
 Say "  longest path is $longest characters" $(if ($longest -gt 250) { 'Yellow' } else { 'DarkGray' })
 if ($longest -gt 250) { Say "    $longestPath" 'DarkGray' }
 
@@ -1026,7 +980,6 @@ try {
     $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir -Licences $clientLicences
     [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
     $libDir = Join-Path $stage 'licences'
-    if (Test-Path -LiteralPath $libDir) { Remove-Item -LiteralPath $libDir -Recurse -Force }
     $null = New-Item -ItemType Directory -Force -Path $libDir
     foreach ($x in $clientLicences) { [IO.File]::WriteAllBytes((Join-Path $libDir ($x.Port + '.txt')), $x.Bytes) }
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
@@ -1072,7 +1025,6 @@ if (Test-Path $cfgSrc) { Copy-Item $cfgSrc $stage -Force }
 # only reads the Steam copy when C:\Thornswood\Game does not exist. So the
 # build says which shape it is and the installer does not have to guess.
 $collectionFlag = Join-Path $stage 'collection.txt'
-if (Test-Path -LiteralPath $collectionFlag) { Remove-Item $collectionFlag -Force }
 # From the feed nothing was left out here, because the release record never
 # named the collection's files; the feed naming a collection is what says the
 # release was built for it (#3412).
@@ -1196,8 +1148,7 @@ if (Test-Path $blob) { Remove-Item $blob -Force }
 # lands beside it, so this wants roughly the size of the build again. A full
 # disk part way through answers with an exception about a stream, which is not
 # a sentence anybody can act on.
-$stageBytes = (Get-ChildItem $stage -Recurse -File -EA SilentlyContinue |
-               Measure-Object -Sum Length).Sum
+$stageBytes = Get-PackageStageBytes $stage $shipBytes
 $drive = (Get-Item $OutDir).PSDrive
 $free  = $drive.Free
 $want  = [long]($stageBytes * 0.75)
@@ -1210,31 +1161,24 @@ if ($free -lt $want) {
     Say 'Two ways out:' 'Yellow'
     Say ''
     Say '  Put the archive on another drive:' 'Yellow'
-    Say '    .\scripts\release\Package-Thornswood.ps1 -ReuseStage -OutDir D:\Thornswood-dist' 'Green'
+    Say '    .\scripts\release\Package-Thornswood.ps1 -OutDir D:\Thornswood-dist' 'Green'
     Say ''
-    Say ("  Or free up space on {0}: and re-run with -ReuseStage, which skips" -f $drive.Name) 'Yellow'
-    Say '  the twenty minute copy because the staged folder is already there.' 'Yellow'
+    Say ("  Or free up space on {0}: and run it again. The stage is kept, so only" -f $drive.Name) 'Yellow'
+    Say '  what changed since is copied.' 'Yellow'
     Say ''
     Die "Not enough free space on $($drive.Name):."
 }
 
 Say '  Most of this content is already compressed, so the level is deliberately low.'
 
-# -Level as 7-Zip's -mx read it: 0 stores, 1 to 5 trade size for speed, and
-# above that .NET's best.
-$zipLevel = if ($Level -eq 0) { [IO.Compression.CompressionLevel]::NoCompression }
-            elseif ($Level -le 5) { [IO.Compression.CompressionLevel]::Fastest }
-            else { [IO.Compression.CompressionLevel]::Optimal }
-Say ("  > zip {0} into {1} ({2})" -f $stage, $blob, $zipLevel) 'DarkGray'
-try { [IO.Compression.ZipFile]::CreateFromDirectory($stage, $blob, $zipLevel, $false) }
-catch {
-    Remove-Item -LiteralPath $blob -Force -ErrorAction SilentlyContinue
+# Once (Package-Stage.ps1 says why there is no second try).
+$zipWhy = Invoke-PackageZip $stage $blob $Level
+if ($zipWhy) {
     Say ''
-    Say "The staged folder is still at $stage, so nothing is lost." 'Yellow'
-    Say 'Re-run with -ReuseStage once this is sorted and it will skip the copy.' 'Yellow'
     Say 'A full disk, or a file held open by something, is the usual cause:' 'DarkGray'
     Say '    Get-PSDrive C | Select-Object Used, Free' 'Green'
-    Die ('The archive could not be written: ' + $_.Exception.Message)
+    Say "The stage is still at $stage, and the next run copies only what changed." 'Yellow'
+    Die ('The archive could not be written: ' + $zipWhy)
 }
 Say ("  payload.zip is {0:n2} GB" -f ((Get-Item $blob).Length / 1GB)) 'Green'
 
@@ -1453,40 +1397,6 @@ $hasPayload  = $entryNames | Where-Object { $_.StartsWith('payload/', [StringCom
 foreach ($pair in @(@('Setup.bat', $hasSetup), @('the installer script', $hasInstall),
                     @('the launcher', $hasLauncher), @('the mod payload', $hasPayload))) {
     if ($pair[1]) { Say "  found $($pair[0])" 'Green' } else { Say "  MISSING $($pair[0])" 'Red'; $ok = $false }
-}
-
-# Being in the archive is not the same as being current. A file that failed to
-# copy into the stage leaves an older copy under the right name, and every
-# check above still passes. These three are the ones that decide whether a
-# friend ends up with this build or the last one, so they get pulled back out
-# and compared against what went in.
-if ($ok) {
-    $check = Join-Path $OutDir 'verify'
-    if (Test-Path $check) { Remove-Item $check -Recurse -Force }
-    $null = New-Item -ItemType Directory -Force -Path $check
-
-    $za = [IO.Compression.ZipFile]::OpenRead($zip)
-    try {
-        foreach ($name in 'Setup-Thornswood.ps1', 'Setup.bat', 'Thornswood.exe') {
-            $src = Join-Path $stage $name
-            if (-not (Test-Path $src)) { continue }
-
-            $got = Join-Path $check $name
-            $entry = $za.GetEntry($name)
-            if ($null -ne $entry) { [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $got, $true) }
-            if (-not (Test-Path $got)) {
-                Say "  could not read $name back out of the zip" 'Red'; $ok = $false; continue
-            }
-            if ((Get-Sha256 $got) -ne (Get-Sha256 $src)) {
-                Say "  $name in the zip is not the one that was just built" 'Red'
-                Say '    the archive kept an older copy. Delete payload.zip and run this again.' 'Yellow'
-                $ok = $false
-            } else {
-                Say "  $name is current" 'Green'
-            }
-        }
-    } finally { $za.Dispose() }
-    Remove-Item $check -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 if (-not $ok) { Die 'The installer did not come out right. Do not send these files.' }
