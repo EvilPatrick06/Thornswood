@@ -134,9 +134,10 @@
   carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
 
-  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The two build fallbacks
-  (build.yml and build-pr.yml, launcher-vps) need nothing of the box, so
-  they ask for thornswood-build alone. An -OffBox runner whose name the
+  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The pull request build's
+  fallback (build-pr.yml, launcher-vps) needs nothing of the box, so it asks
+  for thornswood-build alone; main's (build.yml) stays on the box, which
+  traces the gate (#3114, #3874). An -OffBox runner whose name the
   record's offBox lists (thornswood-pr-one, thornswood-pr-one-2, ... on
   One) is registered with thornswood-build too and takes them, on One's own
   cores. It never carries thornswood-vps, so staff notices, the admin
@@ -351,7 +352,7 @@ if ($OffBox) {
 # lists is registered with its build label as well, so a reinstall keeps the
 # cap Set-BuildRunners.ps1 put on GitHub. An off-box runner carries it only
 # when the record's offBox names it (build runners on One, Patrick, 26 Oct
-# 2026), and then takes the two build fallbacks that ask for it alone; it
+# 2026), and then takes the pull request build's fallback, which asks for it alone; it
 # still never carries thornswood-vps, so no box-only job reaches it.
 $registerLabels = $Label
 $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json

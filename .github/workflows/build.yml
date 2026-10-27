@@ -194,10 +194,12 @@ jobs:
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
     # the harness step alone and the limit below cancelled passing builds.
-    # Not thornswood-vps: the build needs nothing of the box, so the off-box
-    # build runners on One the record names by name take it too (Patrick,
-    # 26 Oct 2026). Box-only jobs keep asking for thornswood-vps.
-    runs-on: [self-hosted, Windows, thornswood-build]
+    # Main's build stays on the box: only the box's runners have the trace
+    # task, and a main build is what leaves the gate map the next pull
+    # requests measure from (#3114, #3874). Build-PrWorkflow.js drops
+    # thornswood-vps for build-pr.yml only, so a pull request's fallback can
+    # also land on One's off-box build runners (#3860).
+    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
     # Often past twenty minutes on the VPS (#2557): it is shared with the live
     # server and other jobs, and the harness list keeps growing (#2544 added
     # test-release-workflow.ps1, #2525 the feed-watch test, #2546 the remote

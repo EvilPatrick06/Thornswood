@@ -81,10 +81,11 @@ foreach ($f in Get-ChildItem -LiteralPath $wfDir -Filter *.yml) {
     }
 }
 Yes "every heavy job named here is on the box ($seen found)" ($seen -ge 4)
-# The two build fallbacks need nothing of the box, so they ask for the build
-# label alone and the off-box build runners on One take them too (26 Oct
-# 2026). Every other job asking for it asks for the VPS label beside it.
-$buildOnly = @{ 'build.yml' = @('launcher-vps'); 'build-pr.yml' = @('launcher-vps') }
+# The pull request build's fallback needs nothing of the box, so it asks for
+# the build label alone and the off-box build runners on One take it too (26
+# Oct 2026). Main's stays on the box, which traces the gate (#3114, #3874).
+# Every other job asking for it asks for the VPS label beside it.
+$buildOnly = @{ 'build-pr.yml' = @('launcher-vps') }
 foreach ($f in $buildOnly.Keys) {
     $jobs = Get-Jobs ([IO.File]::ReadAllText((Join-Path $wfDir $f)))
     foreach ($k in $buildOnly[$f]) {
@@ -94,7 +95,7 @@ foreach ($f in $buildOnly.Keys) {
 }
 Yes 'any other job asking for the build label asks for the VPS label too' (
     @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*thornswood-build.*$') } | Where-Object { $_.Value -notmatch 'self-hosted, Windows, thornswood-vps, thornswood-build\]' -and $_.Value -notmatch 'runs-on: \[self-hosted, Windows, thornswood-build\]' }).Count -eq 0 -and
-    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on: \[self-hosted, Windows, thornswood-build\]') }).Count -eq 2)
+    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on: \[self-hosted, Windows, thornswood-build\]') }).Count -eq 1)
 
 # ---- 3. Install-Runner.ps1 registers a listed runner with it ----------------------
 $ir = [IO.File]::ReadAllText((Under @('scripts', 'deploy', 'Install-Runner.ps1')))
