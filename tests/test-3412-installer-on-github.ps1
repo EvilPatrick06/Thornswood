@@ -5,17 +5,17 @@
 
   Issue #3412. Every main Ship needed One for its installer: it was built from
   One's game folder and signed there. installer.yml builds it from main's feed
-  (Package-Thornswood -FromFeed) and signs it on GitHub's runner, or on the
-  box's runner 3, with the identity release.yml signs the launcher with.
+  (Package-Thornswood -FromFeed) and signs it on GitHub's runner, with the
+  identity release.yml signs the launcher with.
 
   What it checks:
     1. installer.yml: started by hand only, on nothing a pull request can
        reach; the signing identity only on a v tag, through the "release"
-       environment, for the two build jobs alone; the fallback on runner 3
-       (thornswood-sign) with the hosted job's own steps; the check on a build
-       runner with no id-token; no secret, and no ${{ }} inside a script; the
-       signing setup and the build taken off the runner whatever happened;
-       Package run with -FromFeed -OneFile -NoPublish.
+       environment, for the build job alone; both jobs on GitHub's hosted
+       runner and none on the box (#4013: no VPS runner serves this
+       repository once it is public); the check on a second machine with no
+       id-token; no secret, and no ${{ }} inside a script; Package run with
+       -FromFeed -OneFile -NoPublish.
     2. Sign-Artifact.ps1's token from GitHub, lifted and run with a stand-in
        GitHub: none asked for when a token file is named or the job may not
        ask; a refusal without the Azure ids; otherwise one token, masked,
@@ -83,21 +83,16 @@ Yes 'the run''s token is contents: write and nothing else' ((Get-TopBlock $wf 'p
 Yes 'no secret is read anywhere' ($wf -notmatch 'secrets\.')
 
 $jobs = Get-Jobs $wf
-Yes ('three jobs: installer, installer-vps, verify (' + (@($jobs.Keys) -join ', ') + ')') ((@($jobs.Keys) -join ',') -eq 'installer,installer-vps,verify')
-if (@($jobs.Keys).Count -ne 3) { Done }
+Yes ('two jobs: installer, verify (' + (@($jobs.Keys) -join ', ') + ')') ((@($jobs.Keys) -join ',') -eq 'installer,verify')
+if (@($jobs.Keys).Count -ne 2) { Done }
 $envLine = "environment: `${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}"
-foreach ($k in 'installer', 'installer-vps') {
-    $j = $jobs[$k]
-    Yes "$k has the release environment only on a v tag" ($j.Contains($envLine))
-    Yes "$k asks for id-token: write" ($j -match '(?m)^      id-token: write\s*$')
-}
-Yes 'the hosted job runs on windows-latest unless the box is asked for' ($jobs['installer'] -match '(?m)^    runs-on: windows-latest\s*$' -and
-    $jobs['installer'].Contains("if: `${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}"))
-Yes 'the fallback runs on runner 3 alone (thornswood-sign)' ($jobs['installer-vps'] -match '(?m)^    runs-on: \[self-hosted, Windows, X64, thornswood-vps, thornswood-sign\]\s*$')
-Yes '  after the hosted job did not succeed, never after a cancel' ($jobs['installer-vps'].Contains("if: `${{ !cancelled() && needs.installer.result != 'success' && needs.installer.result != 'cancelled' }}"))
-Yes '  with the hosted job''s own steps' ($jobs['installer'] -match '(?m)^    steps: &installer\s*$' -and $jobs['installer-vps'] -match '(?m)^    steps: \*installer\s*$')
+Yes 'the build has the release environment only on a v tag' ($jobs['installer'].Contains($envLine))
+Yes '  and asks for id-token: write' ($jobs['installer'] -match '(?m)^      id-token: write\s*$')
+Yes 'both jobs run on GitHub''s hosted windows-latest, none on the box (#4013)' (
+    @($jobs.Values | Where-Object { $_ -match '(?m)^    runs-on: windows-latest\s*$' }).Count -eq 2 -and $wf -cnotmatch 'self-hosted|thornswood-(vps|sign|check|build)')
+Yes 'no runner to choose: the run takes no input' ($on.Trim() -eq 'workflow_dispatch:' -and $wf -notmatch 'inputs\.|BUILD_RUNNER')
 $v = $jobs['verify']
-Yes 'the check runs on a check runner, which never signs and never waits behind a build (#3956)' ($v -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-check\]\s*$')
+Yes 'the check runs after the build succeeded, never after a cancel' ($v.Contains("needs: installer") -and $v.Contains("if: `${{ !cancelled() && needs.installer.result == 'success' }}"))
 Yes '  with no signing identity' ($v -notmatch 'id-token' -and $v -notmatch 'environment:' -and $v -notmatch 'AZURE_')
 Yes '  and holds the draft to Get-InstallerDraftRefusal' ($v.Contains('Get-InstallerDraftRefusal'))
 
@@ -106,13 +101,11 @@ Yes 'the run has to be on a v tag on main' ($build.Contains("if (`$env:GITHUB_RE
 Yes '  and main is what is built' ($build.Contains('git checkout --force --detach origin/main'))
 Yes 'Package is run from the feed, one file, and never publishes' ($build -match 'Package-Thornswood\.ps1 -FromFeed -OneFile -NoPublish -NoPause ')
 Yes 'the signed installer is read back Valid with a timestamp' ($build.Contains("`$sig.Status -ne 'Valid'") -and $build.Contains('TimeStamperCertificate'))
-Yes 'the signing setup and the build go whatever happened' ($build -match ('(?s)Take the signing setup and the build off this runner\s*\n\s*if: \$\{\{ always\(\) \}\}.*' +
-    [regex]::Escape("'records\signing\signing.json', 'records\signing\client'") + '.*' + [regex]::Escape("'feed-root', 'installer'")))
 Yes 'every action is pinned to a full SHA' (@([regex]::Matches($wf, '(?m)uses:\s*(\S+)') | Where-Object { $_.Groups[1].Value -notmatch '@[0-9a-f]{40}$' }).Count -eq 0)
 # What GitHub writes into a script before it runs is the injection; inputs
 # reach the scripts through env.
 $runs = @([regex]::Matches($wf, '(?ms)^\s+run: \|\n(.*?)(?=^\s{0,6}(?:- |[a-z_-]+:)|\z)') | ForEach-Object { $_.Groups[1].Value })
-Yes ("no `${{ }} inside any of the {0} scripts" -f $runs.Count) ($runs.Count -ge 8 -and @($runs | Where-Object { $_.Contains('${{') }).Count -eq 0)
+Yes ("no `${{ }} inside any of the {0} scripts" -f $runs.Count) ($runs.Count -ge 6 -and @($runs | Where-Object { $_.Contains('${{') }).Count -eq 0)
 
 # ---- 2. Sign-Artifact's token from GitHub ---------------------------------------
 $saPath = Join-Path $Repo 'scripts\release\Sign-Artifact.ps1'

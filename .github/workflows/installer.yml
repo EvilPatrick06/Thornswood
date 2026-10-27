@@ -1,5 +1,5 @@
-# Builds the installer from main's feed and signs it, on GitHub's runner or
-# on the box's runner 3, so a main Ship needs no One for it (#3412, #2862).
+# Builds the installer from main's feed and signs it on GitHub's runner, so a
+# main Ship needs no One for it (#3412, #2862).
 #
 # WHY. Package-Thornswood.ps1 built the installer from One's game folder and
 # Vortex record and signed it there, so every main Ship needed One, and the
@@ -30,14 +30,15 @@
 # here touches the site: the Ship that publishes a release publishes its
 # installer from the draft.
 #
-# WHERE IT RUNS. As release.yml (#3312): GitHub's hosted windows-latest
-# first; the box's runner 3 (thornswood-sign, records\sign-runners.json) when
-# BUILD_RUNNER is vps, a manual run asks for the box, or the hosted job
-# failed, as a quota or billing stop fails it before any step runs. Then a
-# check runner (thornswood-check, records\check-runners.json, #3956), which
-# holds no signing setup and is never the runner that signed, downloads the
-# draft's installer and holds it to the publish gate (the "verify" job). A red verify means the draft's installer must not be
-# published.
+# WHERE IT RUNS. On GitHub's hosted windows-latest alone, as release.yml
+# signs the launcher (Patrick's answer A on #4013: releases sign on GitHub's
+# runner alone, because no VPS runner serves this repository once it is
+# public). Then a second hosted machine, which never held the signing setup,
+# downloads the draft's installer and holds it to the publish gate (the
+# "verify" job). A red verify means the draft's installer must not be
+# published. A hosted runner is a fresh machine for every job, so nothing
+# this leaves on it outlives the job. When the hosted job cannot run (no
+# minutes), the installer is built and signed on One, as before (#921).
 #
 # Every action is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
@@ -45,15 +46,9 @@ name: Release installer
 run-name: Installer from main's feed (${{ github.ref_name }})
 on:
   workflow_dispatch:
-    inputs:
-      runner:
-        description: 'hosted (GitHub, the default) or vps (the box, the fallback, signing on runner 3)'
-        type: choice
-        options: [hosted, vps]
-        default: hosted
 # The draft is read and written with the repository token, which needs write
-# (a draft is visible to nobody without push access). The build jobs add
-# id-token: write for themselves only.
+# (a draft is visible to nobody without push access). The build job adds
+# id-token: write for itself only.
 permissions:
   contents: write
 # One installer build at a time, whichever tag started it: they all build
@@ -64,7 +59,6 @@ concurrency:
 jobs:
   installer:
     name: Build and sign the installer from main's feed
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
     runs-on: windows-latest
     environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}
     permissions:
@@ -74,7 +68,7 @@ jobs:
       release_id: ${{ steps.draft.outputs.release_id }}
     # The feed's files are fetched and zipped: minutes, not an hour.
     timeout-minutes: 45
-    steps: &installer
+    steps:
       - name: Check out the repository, with every tag and main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -97,19 +91,6 @@ jobs:
           git clean -ffdx
           Write-Host ("on tag {0}; building from main at {1}" -f $env:GITHUB_REF_NAME, "$(git rev-parse HEAD)".Trim())
 
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-
       - name: Fetch the setup program beside the launcher main's feed offers
         id: stub
         shell: pwsh
@@ -128,8 +109,7 @@ jobs:
 
       # Microsoft's signing client at the version and sha256
       # Setup-ShipMachine.ps1 pins, the way release.yml fetches it, into
-      # records\signing\client of this checkout, which git ignores; "Take the
-      # signing setup off this runner" removes it again.
+      # records\signing\client of this checkout, which git ignores.
       - name: Fetch the signing client Setup-ShipMachine.ps1 pins
         shell: pwsh
         run: |
@@ -145,7 +125,7 @@ jobs:
           $why = Save-SigningClient $repo (Get-SigningClientPin) ${function:Save-Url} (Join-Path $env:RUNNER_TEMP 'signing-client')
           if ($why) { Write-Host ('::error::' + $why); exit 1 }
           # signing.json from the tracked template: paths only, no key. It is
-          # gitignored and lives on this runner for this job only.
+          # gitignored and lives on this job's machine only.
           Copy-Item -LiteralPath 'records\signing\signing.template.json' -Destination 'records\signing\signing.json' -Force
 
       # The ids are repository variables, not secrets (release.yml says why).
@@ -183,53 +163,19 @@ jobs:
           } catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('release_id=' + $id)
 
-      # A runner keeps its folder from one job to the next, so the signing
-      # setup this job put in the checkout goes again whatever happened above,
-      # and so does the build (a gigabyte of the release on the box's disk).
-      - name: Take the signing setup and the build off this runner
-        if: ${{ always() }}
-        shell: pwsh
-        run: |
-          foreach ($p in 'records\signing\signing.json', 'records\signing\client') {
-            if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force }
-          }
-          foreach ($p in 'feed-root', 'installer', 'stub', 'signing-client') {
-            $full = Join-Path $env:RUNNER_TEMP $p
-            if (Test-Path -LiteralPath $full) { Remove-Item -LiteralPath $full -Recurse -Force }
-          }
-
-  # THE VPS JOB, the fallback, as release.yml's launcher-vps (#3312): on
-  # runner 3 alone, with the same steps by the YAML anchor, so the two cannot
-  # drift. !cancelled(), not always(): a cancelled run never leaves the box
-  # building an installer nobody wants.
-  installer-vps:
-    name: Build and sign the installer from main's feed (VPS)
-    needs: installer
-    if: ${{ !cancelled() && needs.installer.result != 'success' && needs.installer.result != 'cancelled' }}
-    runs-on: [self-hosted, Windows, X64, thornswood-vps, thornswood-sign]
-    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}
-    permissions:
-      contents: write
-      id-token: write
-    outputs:
-      release_id: ${{ steps.draft.outputs.release_id }}
-    timeout-minutes: 45
-    steps: *installer
-
   # A SECOND MACHINE CHECKS THE DRAFT'S INSTALLER, as release.yml's verify:
-  # a check runner, never runner 3, holding no signing client, no
-  # signing.json and no Azure token, accepts it on its files alone. The check
-  # label, not the build label, so it never waits behind a build (#3956).
+  # another hosted machine, holding no signing client, no signing.json and no
+  # Azure token, accepts it on its files alone.
   verify:
-    name: Check the draft's installer on a second machine (VPS)
-    needs: [installer, installer-vps]
-    if: ${{ !cancelled() && (needs.installer.result == 'success' || needs.installer-vps.result == 'success') }}
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-check]
+    name: Check the draft's installer on a second machine
+    needs: installer
+    if: ${{ !cancelled() && needs.installer.result == 'success' }}
+    runs-on: windows-latest
     permissions:
       contents: write
     timeout-minutes: 15
     env:
-      DRAFT_ID: ${{ needs.installer.result == 'success' && needs.installer.outputs.release_id || needs.installer-vps.outputs.release_id }}
+      DRAFT_ID: ${{ needs.installer.outputs.release_id }}
     steps:
       - name: Check out main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -237,15 +183,6 @@ jobs:
           ref: main
           clean: true
           submodules: false
-
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Download the draft's installer and hold it to the publish gate
         shell: pwsh

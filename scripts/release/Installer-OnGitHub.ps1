@@ -15,9 +15,8 @@
   WHY. Every main Ship needed One for its installer: Package-Thornswood.ps1
   built it from One's game folder and signed it there. Package-Thornswood
   -FromFeed builds it from main's feed on any machine, and installer.yml
-  builds and signs it on GitHub's runner, or on the box's runner 3 when GitHub
-  has no minutes, with the same federated identity release.yml signs the
-  launcher with. No secret is stored anywhere.
+  builds and signs it on GitHub's runner, with the same federated identity
+  release.yml signs the launcher with. No secret is stored anywhere.
 
   WHERE IT GOES. The draft release of the launcher main's feed offers, the
   same draft release.yml put that launcher and its setup program on, so the
