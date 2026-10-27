@@ -2906,6 +2906,12 @@ const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudfl
    each answer gets a fresh one (handle() makes it). The site's own pages
    carry no inline script and never use it; a nonce is only good for the one
    answer it came with, so it opens nothing to anybody else. */
+/* What no page here may use (#2762). Nothing on this site asks for the
+   camera, the microphone, the location, a payment or a USB device, so a page
+   or a frame in it that tried would be refused. Caddy sends the same value on
+   every answer from the name (scripts\deploy\Caddyfile, its header block),
+   and tests\test-2762-door-headers.js keeps the two equal. */
+const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
 function cspFor(res) {
   const n = res && res.cspNonce;
   return n ? CSP_HEADER.replace("script-src 'self'", "script-src 'self' 'nonce-" + n + "'") : CSP_HEADER;
@@ -2924,7 +2930,8 @@ function send(res, code, payload, type, extra) {
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': cspFor(res),
-    'Referrer-Policy': 'strict-origin-when-cross-origin'
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': PERMISSIONS_POLICY
   }, extra || {}));
   res.end(payload);
 }
@@ -5997,6 +6004,7 @@ async function handle(req, res) {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', PERMISSIONS_POLICY);
   /* The address is a path on this site, so it is read as one (#929).
 
      new URL(req.url, 'http://x') read an address that starts with two slashes
