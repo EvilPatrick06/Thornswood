@@ -39,7 +39,7 @@
 # a restart or outage staff will see, or a change to how staff work. Never for
 # a release to dev or main, a merge, progress, a pull request, an issue, a
 # test task or a routine deploy
-# (Patrick, 22 Oct, 8:51 AM; CLAUDE.md "Staff notices").
+# (Patrick, 22 Oct, 8:51 AM; the ops repo's CLAUDE.md "Staff notices").
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
