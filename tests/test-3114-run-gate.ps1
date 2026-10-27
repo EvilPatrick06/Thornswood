@@ -54,7 +54,7 @@ function Gzip([string]$text) {
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('run-gate-' + [Guid]::NewGuid().ToString('N'))
 $keepEnv = @{}
-foreach ($n in 'RUNNER_ENVIRONMENT', 'RUNNER_TEMP', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_OUTPUT', 'STUB_RECORD', 'STUB_CODE') {
+foreach ($n in 'RUNNER_ENVIRONMENT', 'RUNNER_TEMP', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_OUTPUT', 'STUB_RECORD', 'STUB_CODE', 'STUB_MAP', 'STUB_TOKEN', 'GATE_MAP_TOKEN', 'RUNNER_NAME', 'COMPUTERNAME') {
     $keepEnv[$n] = [Environment]::GetEnvironmentVariable($n)
 }
 $here = Get-Location
@@ -67,9 +67,20 @@ try {
     Set-Content -LiteralPath (Join-Path $dev 'Gate-Harnesses.ps1') -Value "'test-a.js'`n'test-b.js'`n'test-c.js'`nexit 0"
     Set-Content -LiteralPath (Join-Path $dev 'Nightly-Harnesses.ps1') -Value @'
 param([string]$Only = '', [int]$Throttle = 0, [int]$Share = 0, [int]$BudgetSeconds = 0, [string]$StartLog = '')
-[IO.File]::WriteAllText($env:STUB_RECORD, (@{ Only = $Only; StartLog = $StartLog; Throttle = $Throttle; Share = $Share; Budget = $BudgetSeconds } | ConvertTo-Json -Compress))
+[IO.File]::WriteAllText($env:STUB_RECORD, (@{ Only = $Only; StartLog = $StartLog; Throttle = $Throttle; Share = $Share; Budget = $BudgetSeconds; Token = [string]$env:GATE_MAP_TOKEN } | ConvertTo-Json -Compress))
 if ($StartLog) { [IO.File]::WriteAllText($StartLog, "{`"name`":`"test-a.js`",`"pid`":1}`n") }
 exit [int]$env:STUB_CODE
+'@
+    # Gate-Map.ps1 -Fetch, standing in (#4009): copies STUB_MAP's folder,
+    # the shape main's handed-on map takes, or has none.
+    Set-Content -LiteralPath (Join-Path $dev 'Gate-Map.ps1') -Value @'
+param([string]$Fetch = '', [string]$Token = '')
+[IO.File]::WriteAllText($env:STUB_TOKEN, $Token)
+if (-not $env:STUB_MAP) { Write-Host 'no map on GitHub, standing in'; exit 1 }
+$null = New-Item -ItemType Directory -Force -Path $Fetch
+Copy-Item -Path (Join-Path $env:STUB_MAP '*') -Destination $Fetch
+Write-Host 'the handed-on map, standing in'
+exit 0
 '@
     Set-Content -LiteralPath (Join-Path (Join-Path $sr 'records') 'build-runners.json') -Value '{"runners":[1,2]}'
     foreach ($f in 'a.txt', 'b.txt', 'd.txt') { Set-Content -LiteralPath (Join-Path $sr $f) -Value $f }
@@ -100,6 +111,7 @@ exit [int]$env:STUB_CODE
     Set-Content -LiteralPath $latest -Value ('{"key":"' + $key + '","commit":"' + $base + '","read":"2026-10-22T14:00:00Z","harnesses":3}')
 
     $record = Join-Path $scratch 'nightly.json'
+    $tokenFile = Join-Path $scratch 'token.txt'
     $outFile = Join-Path $scratch 'output.txt'
     # Run-Gate.ps1 as the gate step runs it, on the event given; what it
     # printed, its exit code, what the stand-in was asked and its outputs.
@@ -109,6 +121,8 @@ exit [int]$env:STUB_CODE
         $env:GITHUB_REF = $(if ($event -eq 'push') { 'refs/heads/main' } else { 'refs/pull/7/merge' })
         $env:GITHUB_RUN_ID = '39800000002'; $env:GITHUB_RUN_ATTEMPT = '1'
         $env:GITHUB_OUTPUT = $outFile; $env:STUB_RECORD = $record; $env:STUB_CODE = [string]$code
+        $env:STUB_TOKEN = $tokenFile; $env:GATE_MAP_TOKEN = 't0ken'
+        Remove-Item -LiteralPath $tokenFile -Force -ErrorAction SilentlyContinue
         $out = @(& pwsh -NoProfile -File (Join-Path $dev 'Run-Gate.ps1') -Throttle 6 -BudgetSeconds 1800 @extra 2>&1 | ForEach-Object { "$_" })
         $rc = $LASTEXITCODE
         $asked = $null
@@ -135,7 +149,27 @@ exit [int]$env:STUB_CODE
 
     # ---- 2. the whole gate
     $r = Invoke-Gate 'pull_request' 'github-hosted'
-    Yes 'a GitHub-hosted runner, which has no map, runs the whole gate and says whole' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-b.js test-c.js' -and $r.Whole -and $r.Text -match 'The whole gate runs')
+    Yes 'a GitHub-hosted runner with no map of its own or on GitHub runs the whole gate and says whole' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-b.js test-c.js' -and $r.Whole -and $r.Text -match 'The whole gate runs: the traced map is on the VPS, and this runner is not, and none main''s build handed on')
+    Yes '  having asked Gate-Map.ps1 with the job''s token' ((Test-Path -LiteralPath $tokenFile) -and [IO.File]::ReadAllText($tokenFile) -eq 't0ken')
+    Yes '  which no harness gets' ($r.Asked -and -not $r.Asked.Token)
+
+    # ---- off the box, with the map main's build handed on (#4009)
+    $handed = Join-Path $scratch 'handed'
+    $null = New-Item -ItemType Directory -Path $handed
+    $null = & node (Join-Path $dev 'Affected-Harnesses.js') build (Join-Path $maps ($key + '.traces.jsonl.gz')) (Join-Path $handed ($key + '.map.json')) $base
+    Copy-Item -LiteralPath (Join-Path $maps ($key + '.tree.gz')), $latest -Destination $handed
+    $env:STUB_MAP = $handed
+    $null = GitOk -C $sr reset -q --hard $base
+    Set-Content -LiteralPath (Join-Path $sr 'a.txt') -Value 'a, changed'
+    $null = GitOk -C $sr commit -q -am 'change a'
+    $r = Invoke-Gate 'pull_request' 'github-hosted'
+    Yes ('a runner off the box picks from the map main''s build handed on (' + $(if ($r.Asked) { $r.Asked.Only } else { 'nothing' }) + ')') ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-c.js' -and -not $r.Whole -and $r.Text -match 'the handed-on map, standing in' -and $r.Text -match '2 of 3 gate harnesses')
+    Yes '  into the runner''s temp folder, never the box''s gate-map' (Test-Path -LiteralPath (Join-Path (Join-Path $temp 'gate-map-fetched') 'latest.json'))
+    Move-Item -LiteralPath $latest -Destination ($latest + '.away')
+    $r = Invoke-Gate 'pull_request'
+    Yes '  and so does a box runner before its first map' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-c.js' -and -not $r.Whole)
+    Move-Item -LiteralPath ($latest + '.away') -Destination $latest
+    $env:STUB_MAP = ''
     Move-Item -LiteralPath $latest -Destination ($latest + '.away')
     $r = Invoke-Gate 'pull_request'
     Yes 'so does a runner with no map yet' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-b.js test-c.js' -and $r.Whole -and $r.Text -match 'no traced map')
@@ -191,6 +225,27 @@ exit [int]$env:STUB_CODE
     # ---- 4. by hand
     $r = Invoke-Gate 'workflow_dispatch' -extra @('-StartLog', (Join-Path $scratch 'hand.jsonl'))
     Yes 'a dispatch runs the whole gate with the -StartLog it was given (trace-gate.yml)' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-b.js test-c.js' -and $r.Asked.StartLog -eq (Join-Path $scratch 'hand.jsonl') -and $r.Whole)
+
+    # ---- this build's share of the cores (#3860): the machine's cores over
+    # the builds it runs at once. One's five builds took the box's count
+    # until 27 Oct 2026, six cores each of its 22, and ran out of time.
+    $pc = [Environment]::ProcessorCount
+    function Want([int]$n) { [int][Math]::Min(6, [Math]::Max(1, [Math]::Floor($pc / $n))) }
+    $env:RUNNER_NAME = 'thornswood-vps-2'; $env:COMPUTERNAME = 'BOX'
+    $r = Invoke-Gate 'workflow_dispatch'
+    Yes ("on the box, a build's share is the cores over the box's build runners ({0} of {1})" -f $(if ($r.Asked) { $r.Asked.Share } else { '?' }), $pc) ($r.Asked -and $r.Asked.Share -eq (Want 2) -and $r.Text -match '2 build\(s\) at once on this machine')
+    Set-Content -LiteralPath (Join-Path (Join-Path $sr 'records') 'pr-build-runners.json') -Value '{"label":"x","runners":[2],"offBox":["thornswood-pr-one","thornswood-pr-one-2","thornswood-pr-one-3","thornswood-pr-elsewhere"]}'
+    Set-Content -LiteralPath (Join-Path (Join-Path $sr 'records') 'other-runners.json') -Value '{"label":"y","runners":[1],"offBox":["thornswood-pr-one-3","thornswood-pr-one-4"]}'
+    $env:RUNNER_NAME = 'thornswood-pr-one-3'; $env:COMPUTERNAME = 'ONE'
+    $r = Invoke-Gate 'workflow_dispatch'
+    Yes ("on One, over One's runners the records name, each once ({0})" -f $(if ($r.Asked) { $r.Asked.Share } else { '?' })) ($r.Asked -and $r.Asked.Share -eq (Want 4) -and $r.Text -match '4 build\(s\) at once on this machine')
+    $env:RUNNER_NAME = 'thornswood-pr-solo'; $env:COMPUTERNAME = 'SOLO'
+    $r = Invoke-Gate 'workflow_dispatch'
+    Yes '  an off-box runner no record names builds alone' ($r.Asked -and $r.Asked.Share -eq (Want 1))
+    $env:RUNNER_NAME = 'GitHub Actions 7'
+    $r = Invoke-Gate 'workflow_dispatch' 'github-hosted'
+    Yes '  and so does GitHub''s hosted runner' ($r.Asked -and $r.Asked.Share -eq (Want 1))
+    Remove-Item -LiteralPath (Join-Path (Join-Path $sr 'records') 'pr-build-runners.json'), (Join-Path (Join-Path $sr 'records') 'other-runners.json')
 } finally {
     Set-Location -LiteralPath $here
     foreach ($n in $keepEnv.Keys) { [Environment]::SetEnvironmentVariable($n, $keepEnv[$n]) }

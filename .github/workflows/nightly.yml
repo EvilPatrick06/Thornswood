@@ -42,6 +42,12 @@ concurrency:
 jobs:
   nightly:
     name: Nightly checks
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so this job and "board" never run a
+    # branch's code. A dispatch on a branch runs the harness shares alone, on
+    # the build runners, and tells the board nothing: a branch's night is not
+    # main's, and the first night that passes closes the board's issue.
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 45
     steps:
@@ -162,14 +168,17 @@ jobs:
 
       - name: Check the launcher window
         if: ${{ !cancelled() }}
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           # The launcher builds its window from ui.xaml at startup and finds
           # every control by name, so a renamed control or a window that does
           # not parse compiles clean and is found by the person using it. This
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
-          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          # -ExecutionPolicy Bypass on both, as every harness starts 5.1:
+          # Windows 11 keeps 5.1 at Restricted, so on One's runners the plain
+          # shell: powershell could not run this step's own script (#3861).
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Parse every game script
@@ -321,6 +330,23 @@ jobs:
       # The monthly restore rehearsal check (#1046) reads RESTORING.md, which
       # is in the private ops repo since #3693; that repo's nightly runs it.
 
+      - name: Is the source of what is inside frida-gum.lib where the notes say
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Issue #3287. SkyrimPlatformImpl.dll links frida-gum.lib, whose
+          # LGPL parts go out under the GPL, so their source has to stay
+          # where the note beside the file says: the Release of their
+          # archives, which stays as long as the launcher ships frida-gum, and
+          # the forks while records\frida-sources.json says they are up. Red
+          # when the Release is gone or not whole once it is made (or not
+          # made once the repository is public), when a fork's tag is not
+          # its commit, or when the client files carry another Frida.
+          .\scripts\release\Publish-FridaSources.ps1 -Check
+          exit $LASTEXITCODE
+
       - name: Stray pull requests and branches
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -413,7 +439,8 @@ jobs:
     # prints the list itself.
     name: Put the night on the board
     needs: [nightly, harnesses]
-    if: ${{ !cancelled() }}
+    # Main only, as "nightly" above says (#3550).
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 10
     steps:

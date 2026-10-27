@@ -8,7 +8,7 @@ ledgers, and some keep caves. Each has a head, and the head's word is the
 faction's word.
 
 The Legion is gone. Article the Third of the Accord says no Legion soldier
-sets foot in Skyrim under arms, and none has in thirty years. The Stormcloaks
+sets foot in Skyrim under arms, and none has in fifty years. The Stormcloaks
 are gone as well. They became the Crown, the High King's Guard and every
 hold's guard. A veteran of either side is a person with a past, not a member
 of a faction.

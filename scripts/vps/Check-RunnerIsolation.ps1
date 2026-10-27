@@ -15,6 +15,11 @@
   records\runner-isolation.json and the workflows in .github\workflows.
   That part is offline and is what tests\test-runner-isolation.ps1 runs.
 
+  The workflows are read job by job. A job that can land on a runner
+  records\sign-runners.json lists, in a workflow some trigger of which can
+  run a ref other than main or a v tag, is a risk unless its if or a
+  main-only environment holds it to those refs (#3550).
+
   Each row is ok, intentional (the record's reason), or risk. A risk row is
   a finding for the threat model in the ops repo's RUNNER-ISOLATION.md, not a change:
   this script never changes a runner, an ACL, a setting or a credential.
@@ -60,6 +65,14 @@ if ($Collect) {
         workflowToken = (gh api "repos/$slug/actions/permissions/workflow" | ConvertFrom-Json)
         runners = @((gh api "repos/$slug/actions/runners" | ConvertFrom-Json).runners | ForEach-Object { [ordered]@{ name = $_.name; labels = @($_.labels.name) } })
         collaborators = @(gh api "repos/$slug/collaborators" | ConvertFrom-Json).Count
+        # The deployment branch policy of each environment the record counts
+        # as main only (#3550): custom with only main, or what it is instead.
+        environments = @(foreach ($en in @((Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json).mainOnlyEnvironments.names)) {
+            $p = (gh api "repos/$slug/environments/$en" | ConvertFrom-Json).deployment_branch_policy
+            $refs = @()
+            if ($p -and $p.custom_branch_policies) { $refs = @((gh api "repos/$slug/environments/$en/deployment-branch-policies" | ConvertFrom-Json).branch_policies | ForEach-Object { "$($_.type):$($_.name)" }) }
+            [ordered]@{ name = $en; policy = $(if (-not $p) { 'any' } elseif ($p.protected_branches) { 'protected branches' } else { 'custom' }); refs = $refs }
+        })
     }
     $all = [ordered]@{ runner = (Get-RemoteJson 'Get-RunnerFacts.ps1'); prod = (Get-RemoteJson 'Get-ProdFacts.ps1'); github = $gh }
     $all | ConvertTo-Json -Depth 8 -Compress | Set-Content -LiteralPath $Facts -Encoding utf8
@@ -67,6 +80,9 @@ if ($Collect) {
 
 $f = Get-Content -LiteralPath $Facts -Raw | ConvertFrom-Json
 $r = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+# The label records\build-runners.json gives the box's build runners (#2994).
+$boxBuildLabel = [string](Get-Content -LiteralPath (Join-Path $Repo 'records\build-runners.json') -Raw | ConvertFrom-Json).label
+if (-not $boxBuildLabel) { throw 'records\build-runners.json names no label, so a job on the box''s build runners cannot be told from one that is not.' }
 $rows = New-Object System.Collections.Generic.List[object]
 function Row([string]$Area, [string]$Item, [string]$Expected, [string]$Actual, [bool]$Ok, [string]$Kind = 'risk') {
     $cls = 'ok'; $why = ''
@@ -78,34 +94,180 @@ function Row([string]$Area, [string]$Item, [string]$Expected, [string]$Actual, [
 }
 
 # ---- workflows: what runs on the production box, and for whom --------------
-# Read from the files, so this half needs no box and no GitHub.
+# Read from the files, so this half needs no box and no GitHub. Job by job
+# (#3550): a condition on one job says nothing about the job beside it.
+#
+# THE SIGNING RUNNER TAKES ONLY MAIN'S AND A RELEASE TAG'S CODE (#3550).
+# records\sign-runners.json lists the runners that sign a release launcher,
+# and a runner takes any job whose labels it all carries, so a job that asks
+# only for labels a signing runner has can land on it. Such a job may only
+# run what is on main or on a v tag. A trigger that can carry any other ref
+# (workflow_dispatch on a branch, a pull request, a push of a branch) needs
+# the job held to those refs by its if, or by an environment the record
+# lists as main only. Before #3550 nothing here read it: harnesses.yml,
+# dispatched on claude/* branches, put their code on runner 3 nine times.
+$sign = Get-Content -LiteralPath (Join-Path $Repo 'records\sign-runners.json') -Raw | ConvertFrom-Json
+# The labels a signing runner carries: GitHub's own three, the production
+# label and the signing label, and with -Collect's facts whatever GitHub
+# says the runners with the signing label carry.
+$signLabels = @('self-hosted', 'windows', 'x64', ([string]$r.productionLabel).ToLowerInvariant(), ([string]$sign.label).ToLowerInvariant())
+if ($f.github) {
+    foreach ($ru in @($f.github.runners)) {
+        if (@($ru.labels) -contains $sign.label) { $signLabels += @($ru.labels | ForEach-Object { ([string]$_).ToLowerInvariant() }) }
+    }
+}
+$signLabels = @($signLabels | Sort-Object -Unique)
+$mainOnlyEnv = @($r.mainOnlyEnvironments.names | ForEach-Object { [string]$_ })
+# Triggers whose run is always the default branch's code (GitHub's docs, "Events that trigger workflows").
+$defaultBranchTriggers = @('schedule', 'issues', 'issue_comment', 'workflow_run', 'repository_dispatch', 'label', 'milestone', 'watch', 'discussion', 'discussion_comment', 'gollum', 'project', 'project_card', 'project_column', 'public', 'branch_protection_rule', 'check_run', 'check_suite', 'status', 'page_build', 'registry_package', 'deployment', 'deployment_status', 'create', 'delete', 'fork')
+
+# The lines of a block: the lines after line $at indented deeper than $indent,
+# up to the first that is not. Blank lines and comments go with the block.
+function Get-Block([string[]]$ls, [int]$at, [int]$indent) {
+    $out = @()
+    for ($j = $at + 1; $j -lt $ls.Count; $j++) {
+        $l = $ls[$j]
+        if ($l -match '^\s*(#.*)?$') { continue }
+        if (($l.Length - $l.TrimStart().Length) -le $indent) { break }
+        $out += $l
+    }
+    return $out
+}
+# The keys of a mapping at exactly $indent spaces, with the line each is on.
+function Get-Keys([string[]]$ls, [int]$indent) {
+    $pad = ' ' * $indent
+    $out = [ordered]@{}
+    for ($j = 0; $j -lt $ls.Count; $j++) {
+        if ($ls[$j] -match ('^' + $pad + '([A-Za-z0-9_-]+):(.*)$')) { $out[$Matches[1]] = @{ At = $j; Value = $Matches[2].Trim() -replace '\s+#.*$', '' } }
+    }
+    return $out
+}
+# A list written [a, b] or as - lines under the key.
+function Get-List([string]$value, [string[]]$under) {
+    if ($value -match '^\[(.*)\]$') { return @($Matches[1] -split ',' | ForEach-Object { $_.Trim().Trim("'", '"') } | Where-Object { $_ }) }
+    if ($value) { return @($value.Trim("'", '"')) }
+    return @($under | Where-Object { $_ -match '^\s*-\s*(.+)$' } | ForEach-Object { ($_ -replace '^\s*-\s*', '').Trim().Trim("'", '"') })
+}
+# Whether a trigger can run code from a ref other than main or a v tag.
+function Test-AnyRef([string]$name, [string]$value, [string[]]$under) {
+    if ($defaultBranchTriggers -contains $name) { return $false }
+    if ($name -ne 'push') { return $true }
+    # A push filtered to main and v tags only. Without branches: GitHub runs
+    # a push of any branch, unless tags are given and branches are not.
+    $k = Get-Keys $under ((($under | Select-Object -First 1) -replace '^(\s*).*$', '$1').Length)
+    if ($k.Contains('branches-ignore') -or $k.Contains('tags-ignore')) { return $true }
+    if (-not $k.Contains('branches') -and -not $k.Contains('tags')) { return $true }
+    foreach ($key in 'branches', 'tags') {
+        if (-not $k.Contains($key)) { continue }
+        $items = Get-List $k[$key].Value @(Get-Block $under $k[$key].At (($under[$k[$key].At].Length - $under[$k[$key].At].TrimStart().Length)))
+        $okItem = $(if ($key -eq 'branches') { '^main$' } else { '^v' })
+        if (@($items | Where-Object { $_ -notmatch $okItem }).Count) { return $true }
+    }
+    return $false
+}
+# Splits an expression on an operator where no bracket or quote is open.
+function Split-Top([string]$x, [string]$op) {
+    $parts = @(); $depth = 0; $q = $false; $start = 0
+    for ($i = 0; $i -lt $x.Length; $i++) {
+        $c = $x[$i]
+        if ($c -eq "'") { $q = -not $q; continue }
+        if ($q) { continue }
+        if ($c -eq '(') { $depth++ } elseif ($c -eq ')') { $depth-- }
+        elseif ($depth -eq 0 -and $i + 1 -lt $x.Length -and $x.Substring($i, 2) -eq $op) { $parts += $x.Substring($start, $i - $start); $start = $i + 2; $i++ }
+    }
+    $parts += $x.Substring($start)
+    return , @($parts | ForEach-Object { $_.Trim() })
+}
+# Takes off brackets that hold the whole expression, as many pairs as there are.
+function Strip-Parens([string]$x) {
+    $x = $x.Trim()
+    while ($x.StartsWith('(') -and $x.EndsWith(')')) {
+        $depth = 0; $whole = $true
+        for ($i = 0; $i -lt $x.Length - 1; $i++) { if ($x[$i] -eq '(') { $depth++ } elseif ($x[$i] -eq ')') { $depth--; if ($depth -eq 0) { $whole = $false; break } } }
+        if (-not $whole) { break }
+        $x = $x.Substring(1, $x.Length - 2).Trim()
+    }
+    return $x
+}
+# Whether a job's if holds it to main and v tags: some part of it joined by
+# && says only those refs, every || inside that part included. github.ref
+# being main, a v tag, or the event being a trigger of this file that runs
+# only those refs.
+function Test-HeldToMain([string]$cond, [string[]]$safeEvents) {
+    if (-not $cond) { return $false }
+    $x = ($cond -replace '^\$\{\{\s*', '' -replace '\s*\}\}$', '' -replace '"', "'") -replace '\s+', ' '
+    foreach ($part in (Split-Top (Strip-Parens $x) '&&')) {
+        $alts = Split-Top (Strip-Parens $part) '||'
+        $all = $true
+        foreach ($a in $alts) {
+            $a = Strip-Parens $a
+            $ok = $a -match "^github\.ref == 'refs/heads/main'$" -or $a -match "^startsWith\(github\.ref, ?'refs/tags/v'\)$" -or
+                ($a -match "^github\.event_name == '([a-z_]+)'$" -and $safeEvents -contains $Matches[1])
+            if (-not $ok) { $all = $false; break }
+        }
+        if ($all) { return $true }
+    }
+    return $false
+}
+
 foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
     $t = [IO.File]::ReadAllText($wf.FullName)
     $lines = $t -split "\r?\n"
-    # The top level block under a key: the lines below it indented by two,
-    # comments left out, up to the next line that is not indented.
-    function Get-TopBlock([string]$key) {
-        $i = [array]::IndexOf($lines, ($lines | Where-Object { $_ -match ('^' + $key + ':\s*$') } | Select-Object -First 1))
-        if ($i -lt 0) { return @() }
-        $out = @()
-        for ($j = $i + 1; $j -lt $lines.Count; $j++) {
-            $l = $lines[$j]
-            if ($l -match '^\S') { break }
-            if ($l -match '^  [^\s#]') { $out += $l.Trim() }
-        }
-        return $out
-    }
-    $triggers = @(Get-TopBlock 'on' | ForEach-Object { ($_ -split ':')[0] })
-    $onProd = $t -match ('runs-on:\s*\[[^\]]*\b' + [regex]::Escape($r.productionLabel) + '\b')
-    $perm = (Get-TopBlock 'permissions') -join ' '
+    $top = Get-Keys $lines 0
+    $onLines = @(if ($top.Contains('on')) { Get-Block $lines $top['on'].At 0 })
+    $on = Get-Keys $onLines 2
+    $triggers = @($on.Keys)
+    if (-not $triggers.Count -and $top.Contains('on') -and $top['on'].Value) { $triggers = Get-List $top['on'].Value @() }
+    $safeEvents = @($triggers | Where-Object {
+        $under = @(if ($on.Contains($_)) { Get-Block $onLines $on[$_].At 2 })
+        -not (Test-AnyRef $_ $(if ($on.Contains($_)) { $on[$_].Value } else { '' }) $under) })
+    $anyRefTriggers = @($triggers | Where-Object { $safeEvents -notcontains $_ })
+    $perm = (@(if ($top.Contains('permissions')) { Get-Block $lines $top['permissions'].At 0 }) | ForEach-Object { $_.Trim() }) -join ' '
+    if (-not $perm -and $top.Contains('permissions')) { $perm = $top['permissions'].Value }
     $name = $wf.Name
+    $jobLines = @(if ($top.Contains('jobs')) { Get-Block $lines $top['jobs'].At 0 })
+    $jobKeys = Get-Keys $jobLines 2
+    $prodJobs = @(); $sameRepoAll = $true
+    foreach ($jk in $jobKeys.Keys) {
+        $jl = @(Get-Block $jobLines $jobKeys[$jk].At 2)
+        $k = Get-Keys $jl 4
+        $runsOn = $(if ($k.Contains('runs-on')) { $k['runs-on'].Value } else { '' })
+        # $null: a runs-on worked out at run time, or a runner group, which can be any runner.
+        $labels = $null
+        if ($k.Contains('runs-on') -and $runsOn -notmatch '\$\{\{') {
+            $ro = @(Get-List $runsOn @(Get-Block $jl $k['runs-on'].At 4) | ForEach-Object { $_.ToLowerInvariant() })
+            if ($ro.Count) { $labels = $ro }
+        }
+        $cond = $(if ($k.Contains('if')) { $k['if'].Value } else { '' })
+        $envName = $(if ($k.Contains('environment')) { $k['environment'].Value.Trim("'", '"') } else { '' })
+        if ($k.Contains('environment') -and -not $envName) {
+            $ek = Get-Keys @(Get-Block $jl $k['environment'].At 4) 6
+            if ($ek.Contains('name')) { $envName = $ek['name'].Value.Trim("'", '"') }
+        }
+        $anyRunner = $k.Contains('runs-on') -and $null -eq $labels
+        # The build label reaches the box too: its build runners carry it beside
+        # the production label, and the two build fallbacks ask for it alone so
+        # One's off-box build runners take them as well (26 Oct 2026).
+        $onProd = $anyRunner -or ($labels -and ($labels -contains ([string]$r.productionLabel).ToLowerInvariant() -or $labels -contains $boxBuildLabel.ToLowerInvariant()))
+        if ($onProd) {
+            $prodJobs += $jk
+            if ($cond -notmatch 'github\.event\.pull_request\.head\.repo\.full_name == github\.repository') { $sameRepoAll = $false }
+        }
+        $onSign = $anyRunner -or ($labels -and @($labels | Where-Object { $signLabels -notcontains $_ }).Count -eq 0)
+        if ($onSign -and $anyRefTriggers.Count) {
+            $held = (Test-HeldToMain $cond $safeEvents) -or ($envName -and $mainOnlyEnv -contains $envName)
+            $where = $(if ($anyRunner) { 'runs-on worked out at run time' } else { 'runs-on ' + ($labels -join ',') })
+            Row 'workflow' "$name job $jk on a signing runner" "only main's or a v tag's code ($($sign.label), records\sign-runners.json)" ("$where; triggers " + ($anyRefTriggers -join ',') + ' can run another ref' + $(if ($held) { '; held to main and v tags' } else { '' })) $held
+        }
+    }
     # A pull request may reach the production label only through a job that
     # names this repository as the head, so a fork never does (Patrick, 12 Oct
     # 2026: the VPS backs up pull request builds too, same-repository only).
     # pull_request_target is never allowed there.
-    $sameRepo = $t -match 'github\.event\.pull_request\.head\.repo\.full_name == github\.repository'
+    $onProd = $prodJobs.Count -gt 0
+    $sameRepo = $onProd -and $sameRepoAll
     $prOnProd = $onProd -and ($triggers -contains 'pull_request_target' -or ($triggers -contains 'pull_request' -and -not $sameRepo))
-    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($onProd -and $sameRepo) { '; same-repository pull requests only' } else { '' })) (-not $prOnProd)
+    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($sameRepo) { '; same-repository pull requests only' } else { '' })) (-not $prOnProd)
     if ($triggers -contains 'pull_request_target') { Row 'workflow' "$name pull_request_target" 'not used' 'used' $false }
     Row 'workflow' "$name token" 'permissions set per workflow, no write-all' $(if ($perm) { $perm.Trim() } else { 'not set (repository default)' }) ([bool]$perm -and $perm -notmatch 'write-all')
 }
@@ -118,6 +280,9 @@ if ($f.github) {
     Row 'github' 'default workflow token' 'read' ([string]$g.workflowToken.default_workflow_permissions) ($g.workflowToken.default_workflow_permissions -eq 'read')
     Row 'github' 'collaborators who can push and so run code on the runners' 'known and few' ([string]$g.collaborators) $true
     foreach ($ru in $g.runners) { Row 'github' "runner $($ru.name) labels" 'listed' (@($ru.labels) -join ',') $true }
+    foreach ($e in @($g.environments | Where-Object { $_ })) {
+        Row 'github' "environment $($e.name) admits" 'main only (records\runner-isolation.json mainOnlyEnvironments)' ("$($e.policy)" + $(if (@($e.refs).Count) { ': ' + (@($e.refs) -join ',') } else { '' })) ($e.policy -eq 'custom' -and (@($e.refs) -join ',') -eq 'branch:main')
+    }
 }
 
 # ---- runner accounts on the box ---------------------------------------------

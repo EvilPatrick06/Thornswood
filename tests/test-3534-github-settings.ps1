@@ -6,7 +6,7 @@
   WHY THIS EXISTS. Issue #3534. The 25 Oct 2026 weekly review could not read
   GitHub's environment and Actions settings: a cloud thread's proxy refuses
   every one of those paths. scripts\deploy\Check-GitHubSettings.ps1 starts
-  github-admin.yml with what = settings, whose run reads the environments
+  github-admin.yml with ask = settings, whose run reads the environments
   with its own token and the rest through the box's admin service, and
   compares it all with records\github-settings.json.
 
@@ -27,7 +27,7 @@
        every reading; a service older than #3534, a refusal and no token
        each stop it;
     4. the session half, against a stand-in gh: it starts github-admin.yml
-       on main with what = settings and exits 0, 1, 2 or 3 by the answer.
+       on main with ask = settings and exits 0, 1, 2 or 3 by the answer.
 
   Nothing connects anywhere. Read only.
 #>
@@ -236,7 +236,7 @@ function Session([string]$message) {
     return [pscustomobject]@{ Out = ($out -join "`n"); Code = $LASTEXITCODE; Body = $global:TSghBody }
 }
 $s = Session "MATCHES`nread sharing: access_level=none"
-Yes ("it starts github-admin.yml on main with what = settings, and exits 0 on MATCHES ($($s.Code))") ($s.Code -eq 0 -and $s.Body.ref -eq 'main' -and $s.Body.inputs.what -eq 'settings' -and $s.Out -match 'access_level=none')
+Yes ("it starts github-admin.yml on main with ask = settings, and exits 0 on MATCHES ($($s.Code))") ($s.Code -eq 0 -and $s.Body.ref -eq 'main' -and $s.Body.inputs.ask -eq 'settings' -and $s.Out -match 'access_level=none')
 $s = Session "MATCHES UNREAD 2`nnot read: secrets: x"
 Yes 'MATCHES UNREAD: exit 3' ($s.Code -eq 3)
 $s = Session "DIFFERS 1`ndiffers: x"

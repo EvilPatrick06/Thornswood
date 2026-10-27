@@ -29,7 +29,7 @@
   variable's.
 
   HOW. Like Set-BuildRunners.ps1: it starts github-admin.yml on main with
-  what = settings, waits, and reads the runner's answer, an annotation titled
+  ask = settings, waits, and reads the runner's answer, an annotation titled
   Check-GitHubSettings. That run reads the environments with its own token,
   hands GitHub's OIDC token for it to the admin service on 127.0.0.1:7791,
   which reads the rest with a read-only installation token, compares the lot
@@ -328,7 +328,7 @@ function Read-Answer([long]$id, [switch]$Started) {
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $answer = Read-Answer $Run
 } else {
-    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs ([ordered]@{ what = 'settings' }) }
+    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs ([ordered]@{ ask = 'settings' }) }
     catch { Die ($_.Exception.Message + '. Nothing was read.') }
     if (-not $started.Run) {
         Say ("GitHub started $workflow, but named no run" + ', so its answer cannot be read here. Its runs: ' + $started.Url) 'Yellow'

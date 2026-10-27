@@ -41,6 +41,11 @@ permissions: {}
 jobs:
   report:
     name: Hand the report back
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so a job on that label never runs a
+    # branch's code. Report-Clone.ps1 starts it on main; a start on a branch
+    # skips it.
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, thornswood-vps]
     # One small decode. Past this it is stuck, not slow.
     timeout-minutes: 5
