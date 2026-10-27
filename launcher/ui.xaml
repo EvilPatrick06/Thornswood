@@ -798,7 +798,7 @@
                        card walked into Whiterun under their own name. And there is
                        no saving: the server holds the character. Help.cs gives the
                        same name rule in its Joining items, and
-                       tools/test-first-run-words.js keeps the two saying the same
+                       tests/test-first-run-words.js keeps the two saying the same
                        thing. -->
                   <StackPanel x:Name="FirstRunCard" Margin="0,18,0,0">
                     <TextBlock Text="First time" Style="{StaticResource Eyebrow}"/>

@@ -41,6 +41,15 @@ function build(src) {
   body = body.replace(on[0], '\non:\n  pull_request:\n');
   body = swap(body, 'group: build-${{ github.ref }}', 'group: build-pr-${{ github.ref }}', 'its concurrency group');
   /*
+    A PULL REQUEST'S NEWER PUSH CANCELS ITS OLDER RUN (#3874). Main's builds
+    wait for each other, because each one traces the gate for the pull
+    requests after it; nothing reads a pull request's trace, so its older run
+    is a commit nobody wants.
+  */
+  const conc = /(\nconcurrency:\n(?:#.*\n|  .*\n)*?)  cancel-in-progress: false\n/.exec(body);
+  if (!conc) { fail('build.yml no longer has cancel-in-progress: false in its concurrency'); }
+  body = body.replace(conc[0], conc[1] + '  cancel-in-progress: true\n');
+  /*
     THE VPS FALLBACK STAYS, FOR THIS REPOSITORY'S OWN BRANCHES ONLY (Patrick,
     12 Oct 2026, changing the pull request half of the 11 Oct #2161 call: the
     VPS backs up everything, pull request builds included). A pull request
@@ -54,14 +63,15 @@ function build(src) {
     NO "tested" JOB ON A PULL REQUEST (#3182). build.yml's first job asks
     whether a pull request build already passed main's tree; a pull request
     is what makes that note, so its build has no such job and the two
-    launcher jobs need only each other.
+    launcher jobs need only each other. Its VPS fallback, tested-vps, sits
+    between it and the build's fallback and goes with it.
   */
   const tested = /\n  # ALREADY TESTED \(#3182[\s\S]*?\n  tested:\n[\s\S]*?\n\n(?=  # WHERE IT RUNS)/.exec(body);
   if (!tested) { fail('build.yml no longer has its "tested" job before the fallback'); }
   body = body.replace(tested[0], '\n');
-  body = swap(body, '    needs: [tested, launcher]\n', '    needs: launcher\n', 'the fallback\'s needs');
-  body = swap(body, "    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && needs.launcher.result", 'the fallback\'s tested condition');
-  body = swap(body, "    needs: tested\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && vars.BUILD_RUNNER", "    if: ${{ vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
+  body = swap(body, '    needs: [tested, tested-vps, launcher]\n', '    needs: launcher\n', 'the fallback\'s needs');
+  body = swap(body, "    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && needs.launcher.result", 'the fallback\'s tested condition');
+  body = swap(body, "    needs: [tested, tested-vps]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && vars.BUILD_RUNNER", "    if: ${{ vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
   if (/needs\.tested|needs: \[?tested|^  tested:/m.test(code(body))) { fail('the pull request build still names the tested job'); }
   const jobs = body.indexOf('\njobs:\n');
   const vps = body.indexOf('\n  launcher-vps:\n');

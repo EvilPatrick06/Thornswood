@@ -134,6 +134,10 @@ link, and the old line goes.
 - **A pack does not spoil while its owner is offline;** chests and shops
   keep spoiling. 22 Oct 2026,
   [#3163](https://github.com/EvilPatrick06/Thornswood/issues/3163#issuecomment-6335272878).
+- **A drop lies on the ground for 2 minutes, then is gone,** a restart in
+  between included, and it keeps what it carried. So food never spoils on
+  the ground. 27 Oct 2026,
+  [#3498](https://github.com/EvilPatrick06/Thornswood/issues/3498#issuecomment-6431943093).
 - **Hangover: stamina regen down 25% for 10 minutes. Withdrawal after 3 uses
   in a day: stamina and magicka regen down 10% for 30 minutes.** Drunk,
   high, hangover and withdrawal each have visual effects as well (Patrick:
@@ -166,6 +170,18 @@ link, and the old line goes.
 - **A problem report has both doors**: the Discord button and an in-game
   button. 21 Oct 2026,
   [#3155](https://github.com/EvilPatrick06/Thornswood/issues/3155#issuecomment-6333339922).
+
+## Voice and the in-game UI
+
+- **Voice leaves the browser:** a native voice engine in the launcher sends
+  one stream to the box, and the box forwards each voice only to the people
+  in range. Every launcher no longer connects to every other. 26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
+- **The in-game panels become Skyrim's own menus (Scaleform)**, chat
+  included, and the in-game browser goes once they have; the away window is
+  built first as the proof. Emotes as Q menu powers stay as #2026 decided.
+  26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
 
 ## The box
 

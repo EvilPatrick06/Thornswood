@@ -7,11 +7,12 @@
 //      renderers (home.js and server.js's server-drawn page) skipped any
 //      section named Done.
 // Since #3140 the roadmap is built from the issue board, so the first cannot
-// come back the same way: a row's words are its issue's "Roadmap:" comment,
-// and an issue that closes moves to Done by itself. What still lives here is
-// the drawing, so this holds both renderers: the bot's lists, as server.js
-// turns them into the roadmap (roadmapBoard), are drawn by home.js's /roadmap
-// branch, Done last, and server.js's /roadmap block has no Done filter.
+// come back the same way: a row's words are its issue's "Roadmap:" comment.
+// Since 26 Oct the bot writes no Done lane at all (Patrick: "Done section
+// needs removed from the roadmap"), at its source, bot.py roadmap_once. The
+// renderers still draw every lane they are given, in order, with no filter
+// by name, so the bot alone decides the lanes and a lane can never again be
+// written and not drawn: this plants a Done lane to prove that.
 'use strict';
 const fs = require('fs');
 const path = require('path');

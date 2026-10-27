@@ -106,7 +106,7 @@
   the order; a new order is Deploy-Gamemode.ps1 and a publish with -Dist.
   A build CI made and the store does not hold yet goes there first, held to
   the record here and again on the box:
-      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <engine.yml's server-<...>.zip>
+      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <the pin's server-<...>.zip>
   A machine that takes CI's engine build (Setup-ShipMachine.ps1 -EngineBuild
   ci, #3047) has no built server to pack, only the files the record names
   and the zip they came in, so there a publish that names no -Dist does this
@@ -218,8 +218,8 @@ param(
     # store, with no engine build on this machine (#459, FROM THE STORE in the
     # header).
     [switch]$FromStore,
-    # A server build zip (engine.yml's server-<...>.zip, with its .json beside
-    # it) to send to the store first, for -FromStore.
+    # A server build zip (server-<...>.zip, with its .json beside it, as
+    # Get-EngineArtifact.ps1 makes it) to send to the store first, for -FromStore.
     [string]$ServerBuild = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
@@ -869,7 +869,7 @@ if (-not $FromStore) {
     if (-not $stored.Name) {
         Die ('the store on the box keeps no server build of ' + $stored.Commit.Substring(0, 8) + ' with the record this commit holds' +
              $(if (@($stored.Others).Count) { ' (it has ' + (@($stored.Others) -join ', ') + ', from that commit with another record)' } else { '' }) +
-             '. Put it there with a publish from a machine that has that build (-Dist), or with -ServerBuild and the zip engine.yml made. Nothing was sent.')
+             '. Put it there with a publish from a machine that has that build (-Dist), or with -ServerBuild and the pin''s server zip (Where.ps1 EngineArtifact, artifact\server). Nothing was sent.')
     }
     Say ('{0,-22} {1}, in the store on the box' -f 'server build', $stored.Name) 'Green'
 }

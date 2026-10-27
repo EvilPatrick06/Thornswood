@@ -774,10 +774,10 @@ function pageHtml(md) {
       roadmap: { lanes: [{ name, rows: [{ title, text }] }] } }
 
   known is the #known-issues forum's list, word for word: an open issue
-  labelled Main Findings or Dev Findings that nothing has been done about yet,
-  in the words of its last "Known issue:" comment. roadmap is every issue
-  labelled roadmap: now, next or later, in that lane while it is open and in
-  Done once it closes as done, in the words of its last "Roadmap:" comment.
+  labelled Main Findings or Dev Findings whose fix has not landed, in the
+  words of its last "Known issue:" comment. roadmap is every open issue
+  labelled roadmap: now, next or later, in that lane, in the words of its
+  last "Roadmap:" comment; there is no Done lane (Patrick, 26 Oct).
 
   These two turn the file into what /known (and /api/page/known) and /roadmap
   (and /api/roadmap) serve. A part the file does not hold, or a file that is
@@ -788,10 +788,7 @@ function pageHtml(md) {
 // ==== thornswood lists ====
 const KNOWN_INTRO = 'What is broken right now that the team already knows about. Each one is\n' +
   'on the issue board to be fixed, and comes off this page as soon as work on\n' +
-  'it is merged.\n\n' +
-  'What works the way it does on purpose, such as no saving, no fast travel\n' +
-  'and the load order rule, is on the [Help](/help) page under Things that\n' +
-  'are normal here, not here.';
+  'it is merged.';
 const ROADMAP_INTRO = 'What is being built and roughly in what order. Nothing here has a date on it, because a date would be a guess.\n\n' +
   'Things move up this list when somebody starts on them, not when they are announced.';
 const LIST_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1100,6 +1097,139 @@ function feedFile(channel) {
 function readJsonQuiet(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { return null; }
 }
+
+/* ---- release copies (#3686) ----
+   DOWNLOADS COME FROM THIS REPOSITORY'S RELEASES (Patrick, 26 Oct, for going
+   public). Every launcher of every age asks this site for its files, at
+   /feed[-dev]/assets/<sha256>, and that never changes: a launcher from 1.2.6
+   on builds each address from the feed's own folder (feedSplit, and Sync.cs
+   AssetFolder for a record's files), and older ones were given these
+   addresses in their feeds. What moves is where the bytes come from.
+   release-files.yml puts every file a release names on a GitHub Release, on
+   the release's own tag (release/main/<id>, release/dev/<id>), each named by
+   its sha256. Here, once GitHub says publicly that the Release of the feed's
+   current release holds a file, under that name, with that sha256 as its own
+   digest and with this site's size, the asset route answers 302 to the
+   Release's copy instead of sending the bytes. Every launcher since before
+   25 Sep follows a redirect and allows github.com and its download hosts
+   (Updater.cs AllowedHosts), and still checks the sha256 of what it gets.
+
+   Only what GitHub answers without a token counts, so while the repository
+   is private, or the Release is still a draft being filled, the answer is
+   404 and the site sends the bytes itself, as it always has; the site's copy
+   is also what any release the Release does not hold is served from. A
+   Release once seen is kept: release-files.yml publishes it only after every
+   file is on it, and never replaces a file of a published one. One that is
+   not there yet is asked about again RELEASE_LOOK_MS later, never sooner,
+   which keeps the site inside GitHub's sixty unsigned calls an hour. The
+   lookup never holds a download: the request that starts it is served from
+   here. tests/test-release-copies.js drives this block. */
+const RELEASE_REPO = 'EvilPatrick06/Thornswood';
+const RELEASE_DOWNLOAD = 'https://github.com/' + RELEASE_REPO + '/releases/download/';
+const RELEASE_LOOK_MS = 10 * 60 * 1000;
+const RELEASE_TAG_RE = /^release\/(main|dev)\/\d{8}-\d{4,6}(-dev)?$/;
+const releaseCopies = {};   // tag -> { files: { sha: { url, size } }, installer, seen } once found; { at, busy } while not
+const releaseTagOf = {};    // feed generation file -> the release tag it names, or ''
+function releaseGitHub(apiPath) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const req = https.get({
+      hostname: 'api.github.com', path: '/repos/' + RELEASE_REPO + apiPath,
+      headers: { 'user-agent': 'thornswood-site', accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' }
+    }, (res) => {
+      let out = '';
+      res.setEncoding('utf8');
+      res.on('data', (d) => { out += d; });
+      res.on('error', (e) => settle({ status: 0, why: e.message }));
+      res.on('end', () => {
+        if (res.statusCode !== 200) return settle({ status: res.statusCode, why: 'GitHub answered ' + res.statusCode });
+        try { settle({ status: 200, body: JSON.parse(out) }); }
+        catch (e) { settle({ status: 0, why: 'GitHub\'s answer did not read' }); }
+      });
+    });
+    const timer = setTimeout(() => { settle({ status: 0, why: 'GitHub did not answer inside ten seconds' }); req.destroy(); }, 10000);
+    req.on('error', (e) => settle({ status: 0, why: 'could not reach GitHub: ' + e.message }));
+  });
+}
+// The files of one published Release, from GitHub without a token. Only an
+// asset whose name is the sha256 GitHub itself measured on it counts, and
+// the installer only under its own name with GitHub's sha256 beside it.
+async function lookReleaseCopies(tag) {
+  // The newest Releases rather than /releases/tags/<tag>, which a tag with
+  // slashes in it does not suit; a feed's current release is always among
+  // them, since release-files.yml makes its Release just after its Ship.
+  const list = await releaseGitHub('/releases?per_page=30');
+  if (list.status !== 200 || !Array.isArray(list.body)) return { found: false, why: list.why || 'the Release list did not read' };
+  const r = list.body.find((x) => x && x.tag_name === tag && !x.draft && Number.isInteger(x.id));
+  if (!r) return { found: false, why: '' };
+  const files = {};
+  let installer = null;
+  for (let page = 1; page <= 10; page++) {
+    const got = await releaseGitHub('/releases/' + r.id + '/assets?per_page=100&page=' + page);
+    if (got.status !== 200 || !Array.isArray(got.body)) return { found: false, why: got.why || 'the asset list did not read' };
+    for (const a of got.body) {
+      if (!a || a.state !== 'uploaded' || typeof a.name !== 'string') continue;
+      const url = String(a.browser_download_url || '');
+      if (!url.startsWith(RELEASE_DOWNLOAD) || !url.endsWith('/' + a.name) || /[\s"'<>]/.test(url)) continue;
+      const m = /^sha256:([0-9a-f]{64})$/.exec(String(a.digest || ''));
+      if (!m || !Number.isInteger(a.size)) continue;
+      if (a.name === m[1]) files[m[1]] = { url, size: a.size };
+      else if (a.name === 'Thornswood-Setup.exe') installer = { sha: m[1], url, size: a.size };
+    }
+    if (got.body.length < 100) break;
+  }
+  return { found: true, files, installer };
+}
+function askReleaseCopies(tag) {
+  const had = releaseCopies[tag];
+  if (had && (had.files || had.busy || Date.now() - had.at < RELEASE_LOOK_MS)) return;
+  releaseCopies[tag] = { at: Date.now(), busy: true };
+  lookReleaseCopies(tag).then((v) => {
+    if (v.found) {
+      releaseCopies[tag] = { files: v.files, installer: v.installer, seen: Date.now() };
+      console.log('[thornswood-docs] release copies: ' + tag + ' holds ' + Object.keys(v.files).length + ' file(s)' + (v.installer ? ' and the installer' : ''));
+    } else {
+      releaseCopies[tag] = { at: Date.now(), busy: false };
+      if (v.why && !/ 404$/.test(v.why)) console.error('[thornswood-docs] release copies: ' + tag + ': ' + v.why);
+    }
+  }, (e) => {
+    releaseCopies[tag] = { at: Date.now(), busy: false };
+    console.error('[thornswood-docs] release copies: ' + tag + ': ' + (e && e.message));
+  });
+}
+// The tag of the release a channel's newest feed names, or ''. A generation
+// file is never rewritten (#2727), so its tag is read once.
+function feedReleaseTag(channel) {
+  const file = feedFile(channel);
+  if (!file) return '';
+  if (!(file in releaseTagOf)) {
+    const doc = readJsonQuiet(file);
+    const tag = String((doc && doc.release && doc.release.tag) || '');
+    releaseTagOf[file] = RELEASE_TAG_RE.test(tag) ? tag : '';
+  }
+  return releaseTagOf[file];
+}
+// Where a feed asset of this size can be fetched instead of here, or ''.
+function releaseCopy(channel, sha, size) {
+  const tag = feedReleaseTag(channel);
+  if (!tag) return '';
+  askReleaseCopies(tag);
+  const c = releaseCopies[tag];
+  const f = c && c.files && c.files[sha];
+  return f && f.size === size ? f.url : '';
+}
+// The same for the installer on the Downloads page: the main release's copy,
+// when it is the very file this site lists (its sha256 in files.json).
+function releaseInstallerCopy(sha, size) {
+  const tag = feedReleaseTag('feed');
+  if (!tag || !/^[0-9a-f]{64}$/.test(sha)) return '';
+  askReleaseCopies(tag);
+  const c = releaseCopies[tag];
+  const i = c && c.installer;
+  return i && i.sha === sha && i.size === size ? i.url : '';
+}
+/* ---- end release copies ---- */
 function creditsFacts() {
   const feeds = {};
   for (const pair of [['public', 'feed'], ['dev', 'feed-dev']]) {
@@ -1141,7 +1271,8 @@ function publicPageBody(route) {
     if (rm.intro) body += pageHtml(rm.intro).replace(/<h1\b/g, '<h2').replace(/<\/h1>/g, '</h2>');
     let count = 0;
     for (const section of (rm.sections || [])) {
-      // Done is drawn too (#2560), last, as it sits in the data.
+      // Every lane the bot wrote is drawn, in its order, none filtered by
+      // name (#2560); the bot writes no Done lane since 26 Oct.
       if (!(section.rows || []).length) continue;
       body += '<section class="lane"><h2>' + escAttr(section.name || '') + '</h2><ul>';
       for (const row of section.rows) {
@@ -6024,10 +6155,15 @@ async function handle(req, res) {
 
   // ------------------------------------------------------- security.txt
   /* Where somebody who finds a hole in the site says so (RFC 9116, #3216,
-     Patrick's answer on 22 Oct 2026). The contact is the report page: open
-     to anybody without an account, read by staff and nobody else, and the
-     place staff already read every day, so a finding is never waiting in a
-     mailbox nobody opens.
+     Patrick's answer on 22 Oct 2026). The first contact is the report page:
+     open to anybody without an account, read by staff and nobody else, and
+     the place staff already read every day, so a finding is never waiting in
+     a mailbox nobody opens. The second is the Discord, for a direct message
+     to the owner alone. These are the routes SECURITY.md gives too (#3683,
+     Patrick's answer on 26 Oct, q-3683-report-route A), so a stranger gets
+     one answer wherever they look. GitHub's Report a vulnerability button
+     joins both, with a Policy line for SECURITY.md, once the repository is
+     public: before that both addresses answer 404 to anybody outside it.
 
      Expires is written as the file is asked for, 180 days on, inside the
      year RFC 9116 asks for. The file says what this site answers, and the
@@ -6040,6 +6176,7 @@ async function handle(req, res) {
     until.setUTCHours(0, 0, 0, 0);
     return send(res, 200, [
       'Contact: ' + PUBLIC_ORIGIN + '/report',
+      'Contact: ' + PUBLIC_ORIGIN + '/discord',
       'Expires: ' + until.toISOString(),
       'Preferred-Languages: en',
       'Canonical: ' + PUBLIC_ORIGIN + '/.well-known/security.txt',
@@ -6852,6 +6989,16 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
+    // The installer from the main release's GitHub Release, once it holds
+    // this very file publicly (release copies, #3686).
+    if (dl[1] === 'Thornswood-Setup.exe') {
+      const meta = jsonFile(path.join(FILES, 'files.json'), {});
+      const copy = releaseInstallerCopy(String((meta[dl[1]] || {}).sha256 || '').toLowerCase(), st.size);
+      if (copy) {
+        res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+        return res.end();
+      }
+    }
     /* Resumable, because the payload is hundreds of megabytes and the Join
        page says a dropped connection carries on. Accept-Ranges on the 200 so
        a client knows before it starts. The ETag and Last-Modified are what a
@@ -6989,6 +7136,13 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
+    // The Release's copy of these bytes, once GitHub holds it publicly
+    // (release copies, #3686). no-cache: the answer moves when it appears.
+    const copy = releaseCopy(feedAsset[1], feedAsset[2], st.size);
+    if (copy) {
+      res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+      return res.end();
+    }
     /* Same Range resume as /file/: packs are tens of megabytes and a drop
        must carry on. Cache-Control is long and immutable because the name
        is the bytes; a new pack is a new name. */

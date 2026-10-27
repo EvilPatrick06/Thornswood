@@ -338,8 +338,8 @@ all.
 
 **Why can't I save?**
 Your character lives on the server, so quit whenever you like, nothing is lost.
-A few mod settings menus still reset every session, because there's no save
-file for them to write to. **https://thornswood.net/known** names them.
+A few mod settings menus still forget their settings every session. That is a
+bug being fixed, and **https://thornswood.net/known** names them.
 
 **Why is that NPC just standing there?**
 The server runs the NPCs, so they carry on whether anybody is near or not. One
@@ -347,7 +347,6 @@ frozen in place that never moves is worth a report in <#RESULTS>.
 
 **Fast travel?**
 Off. So is levelling. Difficulty is locked.
-**https://thornswood.net/help** lists what works this way on purpose.
 
 **Something's broken.**
 Check **https://thornswood.net/known** first. It lists what is broken right now
@@ -577,7 +576,8 @@ DRAFTS = ('TESTERRULES', 'DEVRULES', 'LORERULES', 'MODRULES',
 # The build posts each line once in the channel's Changelog thread and ends
 # the post with the newest one, and it refuses to run while a doc's words
 # have no line: changing a doc is adding its line here. The fingerprint to
-# write is the one the refusal prints (Build-Discord.py, check_docs).
+# write is the one the refusal prints (Build-Discord.py, check_docs), and
+# the pull request's build prints it too (tests/test-3457-doc-change-lines.py).
 CHANGES = {
     'RULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Bugs now go in #test-findings, since #bugs is gone.', '8c8eaaa1c0c2'),
@@ -587,11 +587,14 @@ CHANGES = {
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '4a290d7afd52'),
         ('2026-10-22', 'The help, known issues, roadmap and credits lines are links you can click, and the playtest application is in its own channel now.', 'a290f9d3bc8f'),
         ('2026-10-26', 'The known issues link now says what that page is: what is broken right now that we know about. What works that way on purpose is on the help page.', 'ce6ac2b915a6'),
+        ('2026-10-26', 'Only the line breaks of the Vortex profile sentence moved; no words changed.', '938f8250a962'),
     ],
     'START': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Logs and crash files now go in #test-findings, since #logs-and-crashes is gone.', '8a49f1c3335b'),
         ('2026-10-22', 'Step 1, the playtest application, is in its own channel now.', '9464b08ac76a'),
         ('2026-10-26', 'If it goes wrong: the known issues page lists what is broken right now, and the help page has what works that way on purpose.', 'ca32544d805a'),
+        ('2026-10-26', 'Your first character has its own section: the stone hall, the nine towns you can start in and where you arrive, what waits on a class or a profession, and the tool a Miner, a Farmer, a Fisher or a Woodworker is handed. Connect Discord is on the Play page, and voice names its keys: hold V to talk, O keeps the microphone open, B steps between whisper, normal and yell.', 'e4e76eaea6bf'),
+        ('2026-10-26', 'If it goes wrong: the help page has the usual fixes. Its list of what works that way on purpose is gone.', '3c1f3de182b5'),
     ],
     'NEWS': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '90be4dab837f'),
@@ -600,10 +603,13 @@ CHANGES = {
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Something broken now points at #test-findings, since #bugs is gone.', '199e5f79c8af'),
         ('2026-10-22', 'The playtest application and help tickets are each in their own channel now.', 'f4cf53ba6ce4'),
         ('2026-10-26', 'NPCs carry on with nobody near now, so the answers about NPCs standing still and the same bandit acting differently are gone. Only a few mod menus still reset, and the known issues page lists only what is actually broken.', 'a2dbef6430b1'),
+        ('2026-10-26', 'Only a comma and some line breaks moved; no answer changed.', '91bab9b34c87'),
+        ('2026-10-26', 'Mod settings menus that forget their settings are a bug being fixed, not how it is meant to work. The fast travel answer no longer points at a list on the help page, which is gone.', 'b1263b3db33e'),
     ],
     'GAMERULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '037bba896ff5'),
         ('2026-10-22', 'Titles: a Jarl seat is asked for on the Jarl application, which lists only the holds with no Jarl, and a Jarl names their hold\'s steward, court and guards.', '859039c7cdd4'),
+        ('2026-10-26', 'The chat log is read only by the Owner, the Co-Owner and the Dev rank, and is kept for 365 days, then dropped.', '755ede28b88f'),
     ],
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),
@@ -613,3 +619,57 @@ CHANGES = {
         ('2026-10-22', 'The sixteen factions of 4E 252, each with who they are, where they keep and who leads them, as Patrick approved them.', '8ba2250523f8'),
     ],
 }
+
+
+# THE FINGERPRINTS (#3457). Here rather than in Build-Discord.py so a pull
+# request's build can check every doc has its change line without discord.py
+# (tests/test-3457-doc-change-lines.py). #3445 rewrote the join and rules
+# pages, which #start-here, #welcome, #faq and #game-rules are read out of, and
+# merged green because only the nightly ran the bot's harnesses; the next
+# Discord build would have refused to run. Every doc's words are fingerprinted
+# as both the alpha and the open wording say them (the one switch, OPEN), so
+# flipping the switch is a change that needs its line as well.
+
+def doc_texts(key):
+    """(alpha words, open words) of one doc, each from a fresh read of
+       this file with the switch set, so neither depends on how this run
+       was started."""
+    import importlib.util
+    out = []
+    old = os.environ.get('THORNSWOOD_OPEN')
+    try:
+        for flag in ('0', '1'):
+            os.environ['THORNSWOOD_OPEN'] = flag
+            spec = importlib.util.spec_from_file_location(
+                'content_' + flag, os.path.abspath(__file__))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            out.append(mod.DOCS[key])
+    finally:
+        if old is None:
+            os.environ.pop('THORNSWOOD_OPEN', None)
+        else:
+            os.environ['THORNSWOOD_OPEN'] = old
+    return tuple(out)
+
+
+def doc_print(key):
+    """The fingerprint of a doc's words: twelve hex digits of their sha256."""
+    import hashlib
+    a, b = doc_texts(key)
+    return hashlib.sha256((a + '\0' + b).encode('utf-8')).hexdigest()[:12]
+
+
+def unrecorded(keys):
+    """(key, fingerprint) of each doc in keys, drafts aside, whose words have
+       no change line: CHANGES has none for it, or its newest is for other
+       words. [] when every one has its line."""
+    out = []
+    for key in keys:
+        if key in DRAFTS:
+            continue
+        lines = CHANGES.get(key) or []
+        fp = doc_print(key)
+        if not lines or lines[-1][2] != fp:
+            out.append((key, fp))
+    return out
