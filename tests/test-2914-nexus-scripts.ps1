@@ -43,7 +43,10 @@
        as a draft; a second draft, a base that is not the latest and a
        publish of something that is not a draft are refused; -Publish
        publishes it;
-    6. what each mod's page allows (#3649): a revision with a mod the
+    6. taking a mod out (#3649): its entry and its plugins go and nothing
+       else changes; one with patches, no hashes or a rule naming it is
+       refused;
+    7. what each mod's page allows (#3649): a revision with a mod the
        permission record has not read, or does not have, is refused before
        anything is written, and so is publishing a draft with a mod whose
        page does not allow it in a collection; a -WhatIf says so and goes on.
@@ -422,6 +425,34 @@ foreach ($case in @(
     Yes ('a patch for ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
 }
 
+# Issue #3649: a mod taken out, with the plugins its hashes put in Data.
+$rmJson = Join-Path $T 'remove.json'
+Put $rmJson '[{"remove":true,"modId":"1111"}]'
+$o1 = Join-Path $T 'remove-collection.json'; $o2 = Join-Path $T 'remove-payload.json'
+$said = & $node.Source $js $cj $rmJson $o1 $o2
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));if(b.mods.some(m=>m.source.modId===1111))process.exit(2);a.mods=a.mods.filter(m=>m.source.modId!==1111);process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1
+Yes 'nexus-collection.js takes the hashed mod out, says so, and changes nothing else' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("A Hashed Mod`tremoved`t`tfile 2222"))
+$cjp = Join-Path $T 'remove-plugins.json'
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.plugins=[{name:'A.esp',enabled:true},{name:'b.esp',enabled:true}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+$said = & $node.Source $js $cjp $rmJson $o1 $o2
+& $node.Source -e "const b=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.exit(JSON.stringify(b.plugins)===JSON.stringify([{name:'b.esp',enabled:true}])?0:1)" $o1
+Yes 'its plugin comes off the plugin list whatever its case, and the rest stay' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("A Hashed Mod`tremoved`t`tfile 2222|A.esp`tplugin`t`tremoved"))
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.plugins=[{name:'a.esp',enabled:true},{name:'b.esp',enabled:true}];c.pluginRules.plugins=[{name:'b.esp',after:['a.esp']}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+$null = & $node.Source $js $cjp $rmJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+Yes 'taking out a mod whose plugin a plugin rule names is refused, and nothing is written' ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.mods[2].hashes=[{path:'Fishing.esp',md5:'x'}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+foreach ($case in @(
+        @($cj, '192001', 'patches'),
+        @($cj, '192762', 'no file hashes'),
+        @($cjp, '47618', 'a mod rule naming it'),
+        @($cj, '5555', 'no entry'))) {
+    Put $rmJson ('[{"remove":true,"modId":"' + $case[1] + '"}]')
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $null = & $node.Source $js $case[0] $rmJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+    Yes ('taking out a mod with ' + $case[2] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+
 if (-not $sz) { Skip 'the collection revision runs: 7-Zip is not on this machine'; Done }
 $baseArchive = Join-Path $T 'vortex\collection_7essxf_2_2026-10-03T17-33-45Z.7z'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $baseArchive) | Out-Null
@@ -443,6 +474,13 @@ $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
 $built = Join-Path $T 'scratch\nexus-revision-7essxf\out\collection_3.7z'
 YesR '-WhatIf builds collection_3.7z with the same files as revision 2 and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'source\.fileId: 809366 -> 812346' -and $r.Out -match 'the same 5 files and folders as revision 2' -and (Test-Path -LiteralPath $built) -and @(Writes @(Since $n0)).Count -eq 0) $r
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', '1111', '-WhatIf')
+YesR '-Remove -WhatIf builds the revision without the mod, with the same files, and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'A Hashed Mod, removed: file 2222' -and $r.Out -match 'the same 5 files and folders as revision 2' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', '192001', '-WhatIf')
+YesR '-Remove of a mod with patches is refused, saying so' ($r.Code -eq 1 -and $r.Out -match 'Thornswood Content carries patches') $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', 'x', '-WhatIf')
+YesR '-Remove of something that is not a mod number is refused' ($r.Code -eq 1 -and $r.Out -match '-Remove x is not a mod number') $r
 # Issue #2969: with no -From the published revision comes from Nexus, as it
 # does in a cloud session, where there is no Vortex.
 Control @{ addRevision = @{ n = 2; id = 801014; status = 'published'; archive = $baseArchive } }

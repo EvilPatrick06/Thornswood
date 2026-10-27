@@ -9,6 +9,7 @@
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded>
       .\scripts\release\New-NexusRevision.ps1 -Add <mods to add>.json -WhatIf
+      pwsh scripts/release/New-NexusRevision.ps1 -Remove 24104 -WhatIf
       pwsh scripts/release/New-NexusRevision.ps1 -SetLight RaceMenu.esp,XPMSE.esp -Layout <the -Record folder> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3 -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3
@@ -70,6 +71,14 @@
   (docs\LIGHT-ORDER-DRIFT.md: a new plugin goes on the end of its own kind,
   never mid-order). Install-NexusRevision.ps1 -CollectionArchive lays the new
   archive out to check it, from One or a cloud session.
+
+  TAKING A MOD OUT (#3649). -Remove names mods, by their numbers, that the
+  revision no longer carries: the entry goes, and so do the plugins its file
+  hashes put at the top of Data, off the plugin list. An entry with no
+  hashes, with patches, or that a mod rule or plugin rule names is refused
+  (nexus-collection.js says why); those revisions are made in Vortex on One.
+  Why: until 27 October a mod could only leave the collection in Vortex on
+  One, and Atlas Map Markers SE had to leave (Patrick, 27 October).
 
   A DRAFT WAITING. Nexus keeps one draft at a time, so a real run refuses
   while there is one. -WhatIf builds on the draft instead, so the revision
@@ -134,6 +143,10 @@
 .PARAMETER Add
   A JSON file of mods to add, as ADDING A MOD above says.
 
+.PARAMETER Remove
+  Mods to take out of the revision, by their numbers on the website, as
+  TAKING A MOD OUT above says.
+
 .PARAMETER SetLight
   Plugins the revision gives the ESL flag, as LIGHT FLAGS above says.
 
@@ -181,6 +194,7 @@ param(
   [string[]]$FileId = @(),
   [string[]]$Archive = @(),
   [string]$Add,
+  [string[]]$Remove = @(),
   [string[]]$SetLight = @(),
   [string[]]$ClearLight = @(),
   [string]$Layout,
@@ -367,7 +381,7 @@ Say ('  "' + (Get-NexusField $col 'name') + '", id ' + $colId + ', revision ' + 
 
 # --------------------------------------------------------------- publish ---
 if ($Publish) {
-  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $From -or $Add -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -Add, -SetLight, -ClearLight or -From.' }
+  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $From -or $Add -or $Remove.Count -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -Add, -Remove, -SetLight, -ClearLight or -From.' }
   $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $Publish + ', domainName: "' + $Game + '") { id revisionNumber status downloadLink } }'
   $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $Publish) }) 'collectionRevision'
   $revId = [string](Get-NexusField $rev 'id')
@@ -414,13 +428,18 @@ if ($Publish) {
 }
 
 # ------------------------------------------------------- refused up front ---
-if (-not $Mod.Count -and -not $Add -and -not $SetLight.Count -and -not $ClearLight.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, which plugins get or lose the light flag with -SetLight and -ClearLight, or publish a draft with -Publish.' }
+if (-not $Mod.Count -and -not $Add -and -not $Remove.Count -and -not $SetLight.Count -and -not $ClearLight.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, which are taken out with -Remove, which plugins get or lose the light flag with -SetLight and -ClearLight, or publish a draft with -Publish.' }
 $Mod = @($Mod | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $FileId = @($FileId | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 if ($Mod.Count -ne $FileId.Count -or $Mod.Count -ne $Archive.Count) { Die ('-Mod, -FileId and -Archive go together, one of each for every mod: ' + $Mod.Count + ', ' + $FileId.Count + ' and ' + $Archive.Count + ' were given.') }
 for ($i = 0; $i -lt $Mod.Count; $i++) {
   if ($Mod[$i] -notmatch '^\d+$') { Die ('-Mod ' + $Mod[$i] + ' is not a mod number.') }
   if ($FileId[$i] -notmatch '^\d+$') { Die ('-FileId ' + $FileId[$i] + ' is not a file id.') }
+}
+$Remove = @($Remove | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+foreach ($m in $Remove) {
+  if ($m -notmatch '^\d+$') { Die ('-Remove ' + $m + ' is not a mod number.') }
+  if (@($Remove | Where-Object { $_ -eq $m }).Count -gt 1 -or $Mod -contains $m) { Die ('Mod ' + $m + ' is named more than once in -Mod and -Remove.') }
 }
 $adds = @()
 if ($Add) {
@@ -567,6 +586,8 @@ foreach ($a in $adds) {
     logicalFilename = $fileName; name = $entryName; author = $author; category = $category; plugins = $plugins })
 }
 
+foreach ($m in $Remove) { $swaps.Add([ordered]@{ remove = $true; modId = $m }) }
+
 # ------------------------------------------------------- the light flags ---
 # LIGHT FLAGS above: each plugin found by the layout, its archive downloaded
 # and held to the revision, the patch made, read back and staged.
@@ -663,7 +684,7 @@ $r = Invoke-Tool $node.Source @((Join-Path $Here 'nexus-collection.js'), $baseJs
 if ($r.Code -ne 0) { Die ($r.Err.Trim() + ' Nothing was built.') }
 foreach ($line in ($r.Out -split "`r?`n" | Where-Object { $_ })) {
   $c = $line.Split("`t")
-  if ($c[1] -eq 'added' -or $c[1] -eq 'plugin' -or $c[1] -eq 'patch') { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[3]) }
+  if ($c[1] -eq 'added' -or $c[1] -eq 'removed' -or $c[1] -eq 'plugin' -or $c[1] -eq 'patch') { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[3]) }
   else { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[2] + ' -> ' + $c[3]) }
 }
 $newRev = $start + 1
