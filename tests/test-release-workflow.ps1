@@ -145,18 +145,10 @@ Yes '  and runs Test-ReleaseFiles.ps1 -RequireSigned, failing on a refusal' ($ve
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $WorkflowPath))
 Yes '  and that script is in the repository' (Test-Path -LiteralPath (Join-Path $repoRoot 'scripts/release/Test-ReleaseFiles.ps1'))
 
-# ---- the signing runner's record (#3312) ---------------------------------------
-# No job here asks for its label since #4013; the record, the label and its
-# firewall openings go in their own change (the board has it).
-$recDir = Join-Path $repoRoot 'records'
-$signRec = Join-Path $recDir 'sign-runners.json'
-$buildRec = Join-Path $recDir 'build-runners.json'
-Yes 'records/sign-runners.json names the signing label' ((Test-Path -LiteralPath $signRec) -and ((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).label -eq 'thornswood-sign'))
-if ((Test-Path -LiteralPath $signRec) -and (Test-Path -LiteralPath $buildRec)) {
-    $signers = @((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
-    $builders = @((Get-Content -LiteralPath $buildRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
-    Yes ("  it lists runner(s) {0}, and the build runners {1} are none of them" -f ($signers -join ', '), ($builders -join ', ')) ($signers.Count -gt 0 -and -not @($signers | Where-Object { $builders -contains $_ }).Count)
-}
+# ---- no signing runner (#4033) -------------------------------------------------
+# No job here asks for a runner's signing label since #4013, so the record that
+# gave runner 3 one, and its firewall openings, went with it.
+Yes 'no records/sign-runners.json: no runner of the box signs' (-not (Test-Path -LiteralPath (Join-Path (Join-Path $repoRoot 'records') 'sign-runners.json')))
 
 # ---- release-tag.yml makes the tag a cloud Ship cannot push (#3312) ------------
 $tpath = Join-Path (Split-Path -Parent $WorkflowPath) 'release-tag.yml'

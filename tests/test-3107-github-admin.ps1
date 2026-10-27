@@ -115,11 +115,11 @@ Yes '  it asked for this run''s token for the audience thornswood-admin, with th
     $r.Calls.Count -eq 2 -and $r.Calls[0].Uri -eq 'https://token.test/idtoken?api-version=2.0&audience=thornswood-admin' -and $r.Calls[0].Auth -eq 'bearer request-token')
 Yes '  and handed it to the box''s service on 127.0.0.1:7791 alone, past any proxy' ($r.Calls[1].Method -eq 'POST' -and $r.Calls[1].Uri -eq 'http://127.0.0.1:7791/converge' -and $r.Calls[1].Auth -eq 'Bearer oidc-for-this-run' -and $r.Calls[1].NoProxy)
 Yes '  asking for runner-labels and the check, nothing else' ($r.Calls[1].Body.what -eq 'runner-labels' -and $r.Calls[1].Body.check -eq $false -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 2)
-$r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/sign-runners.json: thornswood-vps-3, thornswood-sign put on"],"changed":1,"differs":1}' }
-Yes 'labels put right: exit 0, CHANGED 1 with the lines' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::CHANGED 1%0Arecords/sign-runners\.json: thornswood-vps-3, thornswood-sign put on')
+$r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/build-runners.json: thornswood-vps-2, thornswood-build put on"],"changed":1,"differs":1}' }
+Yes 'labels put right: exit 0, CHANGED 1 with the lines' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::CHANGED 1%0Arecords/build-runners\.json: thornswood-vps-2, thornswood-build put on')
 $r = OnGitHub @{ ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["x would have y put on"],"changed":0,"differs":2}' }
 Yes 'a check that differs: exit 0, DIFFERS 2, and the check reached the service' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::DIFFERS 2' -and $r.Calls[1].Body.check -eq $true)
-$r = OnGitHub @{} @{ code = 409; content = '{"ok":false,"lines":["STOP no runner records/sign-runners.json lists is registered on GitHub"],"changed":0,"differs":0}' }
+$r = OnGitHub @{} @{ code = 409; content = '{"ok":false,"lines":["STOP no runner records/build-runners.json lists is registered on GitHub"],"changed":0,"differs":0}' }
 Yes 'the service stopping: exit 1, an error with its lines' ($r.Code -eq 1 -and $r.Out -match '::error title=Set-BuildRunners::the box''s admin service said no \(HTTP 409\)%0ASTOP no runner')
 $r = OnGitHub @{} @{ code = 403; content = '{"ok":false,"lines":["refused: the token is from the workflow x"]}' }
 Yes 'the service refusing the token: exit 1' ($r.Code -eq 1 -and $r.Out -match 'HTTP 403\)%0Arefused')
@@ -161,9 +161,9 @@ function Session([hashtable]$a, [string]$run, [object[]]$notes) {
 }
 function Note([string]$level, [string]$message) { return @{ annotation_level = $level; title = 'Set-BuildRunners'; message = $message } }
 
-$s = Session @{} $done @((Note 'notice' "CHANGED 1`nrecords/sign-runners.json: thornswood-vps-3, thornswood-sign put on"))
+$s = Session @{} $done @((Note 'notice' "CHANGED 1`nrecords/build-runners.json: thornswood-vps-2, thornswood-build put on"))
 Yes ("it starts the ops repository's github-admin.yml on main and says GitHub matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/Thornswood-Ops/actions/workflows/github-admin\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Out -match '1 label\(s\) changed')
-Yes '  with check false, and the service''s lines' ($s.Body.inputs.check -eq 'false' -and $s.Out -match 'thornswood-sign put on')
+Yes '  with check false, and the service''s lines' ($s.Body.inputs.check -eq 'false' -and $s.Out -match 'thornswood-build put on')
 $s = Session @{ Check = $true } $done @((Note 'notice' "DIFFERS 2`nx would have y put on"))
 Yes '-Check that differs: check true, exit 1' ($s.Code -eq 1 -and $s.Body.inputs.check -eq 'true' -and $s.Out -match 'differs from main''s runner records in 2')
 $s = Session @{ Check = $true } $done @((Note 'notice' "MATCHES`nrecords/build-runners.json: GitHub matches it"))

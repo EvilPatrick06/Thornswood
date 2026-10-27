@@ -3,8 +3,9 @@
 
   Makes the labels on GitHub's VPS runners match the runner records on main
   (records\<name>-runners.json): records\build-runners.json caps how many
-  builds run on the box at once, records\sign-runners.json says which runner
-  may sign a release launcher. From One, a developer's PC or a cloud thread.
+  builds run on the box at once. A label of our own that no record names
+  comes off every runner, so taking a record off main takes its label off
+  too (#4033). From One, a developer's PC or a cloud thread.
 
       pwsh scripts/deploy/Set-BuildRunners.ps1            make GitHub match main's records
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Check     change nothing; exit 1 when GitHub differs

@@ -371,9 +371,11 @@ the fallback ever covered. Patrick picked A on the report page
 `runner` input and no `BUILD_RUNNER` condition, and `verify` runs on a GitHub
 runner of its own, a fresh machine that never signed. If GitHub's runner
 cannot build a release, a Ship on One signs the unsigned launcher on
-download (#921). Runner 3's `thornswood-sign` label, `records/sign-runners.json`
-and the signing hosts in its outbound rules outlive the job; #4033 takes
-them off.
+download (#921). #4033 took off what the job had left behind: runner 3's
+`thornswood-sign` label (the box's admin service now takes off any label
+no record names), `records/sign-runners.json`, the signing hosts in
+runner 3's outbound rules, and Bootstrap-VPS.ps1's .NET runtime for
+Microsoft's signing client, which nothing else on the box runs.
 
 ## 8. Decisions (Patrick)
 
