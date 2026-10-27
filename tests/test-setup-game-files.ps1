@@ -49,7 +49,7 @@ function Yes([string]$what, [bool]$cond) {
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($SetupPath, [ref]$tokens, [ref]$errors)
 Yes 'Setup-Thornswood.ps1 parses' ($errors.Count -eq 0)
-$want = 'Get-Libraries', 'Resolve-Depot', 'Get-Sha256', 'Get-Mismatched', 'Remove-SharedNames'
+$want = 'Get-Libraries', 'Resolve-Depot', 'Get-Sha1', 'Get-Mismatched', 'Remove-SharedNames'
 $fns = @{}
 foreach ($f in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
     if ($want -contains $f.Name -and -not $fns.ContainsKey($f.Name)) { $fns[$f.Name] = $f.Extent.Text }
@@ -116,11 +116,12 @@ try {
     Put (Join-Path $GameDir 'steam_api64.dll') 'clean dll'
     Put (Join-Path $GameDir 'skse64_loader.exe') 'clean loader'
     $doc = [pscustomobject]@{
-        'SkyrimSE.exe'      = (Get-Sha256 (Join-Path $GameDir 'SkyrimSE.exe')).ToUpper()
-        'steam_api64.dll'   = (Get-Sha256 (Join-Path $GameDir 'steam_api64.dll'))
-        'skse64_loader.exe' = (Get-Sha256 (Join-Path $GameDir 'skse64_loader.exe'))
-        'NotThere.dll'      = ('0' * 64)
+        'SkyrimSE.exe'      = (Get-Sha1 (Join-Path $GameDir 'SkyrimSE.exe')).ToUpper()
+        'steam_api64.dll'   = (Get-Sha1 (Join-Path $GameDir 'steam_api64.dll'))
+        'skse64_loader.exe' = (Get-Sha1 (Join-Path $GameDir 'skse64_loader.exe'))
+        'NotThere.dll'      = ('0' * 40)
     }
+    Yes 'the hash is SHA-1, as records\skyrim-files.json and vanilla.json name them (#3412)' ((Get-Sha1 (Join-Path $GameDir 'steam_api64.dll')) -match '^[0-9a-f]{40}$')
     $off = @(Get-Mismatched $doc)
     Yes 'a clean game has nothing mismatched (upper-case hash in the list too)' ($off.Count -eq 0)
     Yes 'a file the game does not have is not reported' (-not ($off -contains 'NotThere.dll'))

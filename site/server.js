@@ -9189,7 +9189,9 @@ http.createServer((req, res) => {
   console.log('[thornswood-docs] trusting ' + tls.getCACertificates('default').length +
               ' root certificates, leaving out ' + (LEFT_OUT.join(', ') || 'none'));
   rereadTrouble();
-  // The first retention pass, then every hour (#2350).
+  // The first retention pass, then every hour (#2350). Before the ready line
+  // below: the site harnesses read the pass's files once that line is out
+  // (#4082).
   retentionSweep();
   // The files play and identity rest on, read once on the way up (#2180).
   // Each broken one has said STATE BROKEN or BANS BROKEN above this line.
