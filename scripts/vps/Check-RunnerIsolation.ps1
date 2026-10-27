@@ -9,14 +9,14 @@
     api GET calls (visibility, fork pull request policy, default token
     permissions, the runners and their labels, how many collaborators).
   It saves them to -Facts. Collecting is a live step: Claude's
-  (claude-queue\2161-runner-isolation.md).
+  (the ops repo's ops\claude-queue\2161-runner-isolation.md).
 
   Without -Collect it compares a saved -Facts file with
   records\runner-isolation.json and the workflows in .github\workflows.
   That part is offline and is what tests\test-runner-isolation.ps1 runs.
 
   Each row is ok, intentional (the record's reason), or risk. A risk row is
-  a finding for the threat model in docs\RUNNER-ISOLATION.md, not a change:
+  a finding for the threat model in the ops repo's RUNNER-ISOLATION.md, not a change:
   this script never changes a runner, an ACL, a setting or a credential.
   Rights come from reading ACLs, not from Windows' effective access check,
   and the report says so. No file contents, setting values or tokens are
