@@ -228,7 +228,7 @@ while ($true) {
     }
     catch { Log ('ERROR ' + $_.Exception.Message) }
     finally {
-        try { if ($pipe.IsConnected) { $pipe.WaitForPipeDrain(); $pipe.Disconnect() } } catch { }
+        try { if ($pipe.IsConnected) { $pipe.WaitForPipeDrain(); $pipe.Disconnect() } } catch { Log ('HUNG UP before the answer was read: ' + $_.Exception.Message) }
         $pipe.Dispose()
     }
 }
