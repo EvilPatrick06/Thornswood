@@ -4686,51 +4686,6 @@
     return fireNearest(px, py, pz, fireSpotsHere(pc), -1);
   }
 
-  /*
-    ===================== EATING AND DRINKING ==============================
-
-    Patrick, 23 September: "I also just ate food and my food percentage
-    didn't change".
-
-    Of course it did not. The only thing that has ever fed anybody on this
-    server is typing /eat. Eating in the game is the client consuming an item
-    in its own inventory, and the server is not told: there is no eat event
-    in the four hooks a gamemode gets, and by the time the inventory sync
-    arrives the food is simply gone, which is indistinguishable from dropping
-    it.
-
-    The client can see it, because in Skyrim eating is EQUIPPING: an ALCH
-    record equipped by the player is eaten or drunk on the spot. So the equip
-    event is watched, and anything that is a Potion is reported to the server
-    with what it was, in the same one line channel everything else uses.
-
-    FOOD OR DRINK IS THE RECORD'S OWN ANSWER. Potion.isFood is the flag on
-    the ALCH, so a sweet roll is food, a bottle of ale is a drink, and a
-    potion of healing is neither and is left alone: it is not a meal and the
-    meters have no business moving for it.
-  */
-  sp.on('equip', (e) => {
-    try {
-      if (!e || !e.actor || !e.baseObj) { return; }
-      const pc = sp.Game.getPlayer();
-      if (!pc || e.actor.getFormID() !== pc.getFormID()) { return; }
-      const pot = sp.Potion.from(e.baseObj);
-      if (!pot) { return; }
-      const id = e.baseObj.getFormID();
-      if (!id) { return; }
-      /*
-        EVERYTHING THAT GOES DOWN COUNTS, and which of them it was is the
-        server's to decide off its own table. Patrick, 23 September:
-        "Potions and poisons should be counted towards thirst they are
-        liquids". So there is no filter here at all beyond it being an ALCH:
-        a sweet roll, a bottle of ale and a potion of healing all report, and
-        food.json says which is which.
-      */
-      tellServer('/ate ' + id.toString(16));
-      say('ate base ' + id.toString(16) + ' "' + (e.baseObj.getName() || '') + '"');
-    } catch (err) { }
-  });
-
   sp.on('update', guard('race read', raceReadTick));
 
   // The fire probe's cell walk, a slice a frame (#976). See walkCellSlice.
@@ -8002,7 +7957,7 @@
     READ WHEN THE JOURNAL OPENS AND CLOSES, where the menus live, and once a
     minute for the few a hotkey flips (AHZmoreHUD's widget toggle). Never per
     frame: a read is 176 native calls. Only what moved since the last read is
-    sent, as /modset Name=value lines over the chat socket like /ate, packed
+    sent, as /modset Name=value lines over the chat socket like /place, packed
     under the 400 characters the voice service keeps of a line.
 
     PUTTING THEM BACK IS THE SERVER'S: an updateOwner script on the
