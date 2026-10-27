@@ -178,8 +178,11 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   const steps = checks.split(/\n(?=      - )/).filter(s => /^      - /.test(s));
   const note = steps[steps.length - 1] || '';
   yes('the note is the last step of the checks, under the name the script looks for', note.indexOf('- name: ' + T.STEP + '\n') === 6);
-  yes('  on a pull request only, and only when its gate step ran the whole gate (#3114)',
-      /\n        if: github\.event_name == 'pull_request' && steps\.gate\.outputs\.whole == 'true'\n/.test(note));
+  // #3874: and only on GitHub's hosted runner. On the VPS a whole gate
+  // means the traced map could not serve the pull request, and a main build
+  // skipped by the note is not traced, so the map stayed stale.
+  yes('  on a pull request only, only when its gate step ran the whole gate (#3114), and only on GitHub\'s hosted runner (#3874)',
+      /\n        if: github\.event_name == 'pull_request' && steps\.gate\.outputs\.whole == 'true' && runner\.environment == 'github-hosted'\n/.test(note));
   // #3114: a pull request built on the VPS may run only the gate harnesses
   // its change can reach. Its tree is then not tested in full, so it keeps
   // no note and main builds it in full (and is traced). Run-Gate.ps1 says
