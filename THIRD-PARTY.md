@@ -740,7 +740,8 @@ work, and each mod's page, read on 26 October (#3800), says this about them:
   not be included".
 - moreHUD: the page shows no permission list and no author instructions.
 
-So none of the five ships: the launcher makes the five before every Play from
+Patrick decided on 26 October that these terms change nothing (#3800). So
+none of the five ships: the launcher makes the five before every Play from
 the person's own copy of each mod, out of its archive, the same way as
 Bethesda's files above (`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and
 `scripts\release\Go.ps1` does the same for a hand-run install. What the
