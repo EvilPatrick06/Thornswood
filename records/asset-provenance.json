@@ -398,32 +398,6 @@
       "status": "ours"
     },
     {
-      "path": "launcher/art/thornswood-art-1536.png",
-      "sha256": "995d2e3968510b21653883d4f78af8b869c64069992d5c962699ee772671127a",
-      "what": "The 16 Sep source of the backdrop (BACKDROP-SPEC.md). No build has used it since 20 Sep.",
-      "published": "nowhere",
-      "source": "not recorded",
-      "creator": "not recorded",
-      "licence": "not recorded",
-      "attribution": "not recorded",
-      "approved": "not recorded",
-      "evidence": "launcher\\art\\BACKDROP-SPEC.md.",
-      "status": "not-published"
-    },
-    {
-      "path": "launcher/art/thornswood-banner-1672.png",
-      "sha256": "7e6878a4102b8d53a1c3510ae3d4676280c5762d4ebab157bf9b3275b4d6f24c",
-      "what": "A banner picture. No script, page or document names it.",
-      "published": "nowhere",
-      "source": "not recorded",
-      "creator": "not recorded",
-      "licence": "not recorded",
-      "attribution": "not recorded",
-      "approved": "not recorded",
-      "evidence": "No file in the repository names it (searched 12 Oct).",
-      "status": "not-published"
-    },
-    {
       "path": "game/ui/thornswood-theme.mp3",
       "sha256": "fcdc3c7a715c158dfced39431ad55d41aa751d56c5e412eae7cc110c380e6a64",
       "what": "The Thornswood theme, 1 min 56 s. Plays in the launcher, the game's main menu and loading screen. No title, artist or copyright tag in the file.",

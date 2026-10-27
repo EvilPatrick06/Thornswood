@@ -54,7 +54,7 @@ function Gzip([string]$text) {
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('run-gate-' + [Guid]::NewGuid().ToString('N'))
 $keepEnv = @{}
-foreach ($n in 'RUNNER_ENVIRONMENT', 'RUNNER_TEMP', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_OUTPUT', 'STUB_RECORD', 'STUB_CODE', 'STUB_MAP', 'STUB_TOKEN', 'GATE_MAP_TOKEN') {
+foreach ($n in 'RUNNER_ENVIRONMENT', 'RUNNER_TEMP', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_OUTPUT', 'STUB_RECORD', 'STUB_CODE', 'STUB_MAP', 'STUB_TOKEN', 'GATE_MAP_TOKEN', 'RUNNER_NAME', 'COMPUTERNAME') {
     $keepEnv[$n] = [Environment]::GetEnvironmentVariable($n)
 }
 $here = Get-Location
@@ -225,6 +225,27 @@ exit 0
     # ---- 4. by hand
     $r = Invoke-Gate 'workflow_dispatch' -extra @('-StartLog', (Join-Path $scratch 'hand.jsonl'))
     Yes 'a dispatch runs the whole gate with the -StartLog it was given (trace-gate.yml)' ($r.Asked -and $r.Asked.Only -eq 'test-a.js test-b.js test-c.js' -and $r.Asked.StartLog -eq (Join-Path $scratch 'hand.jsonl') -and $r.Whole)
+
+    # ---- this build's share of the cores (#3860): the machine's cores over
+    # the builds it runs at once. One's five builds took the box's count
+    # until 27 Oct 2026, six cores each of its 22, and ran out of time.
+    $pc = [Environment]::ProcessorCount
+    function Want([int]$n) { [int][Math]::Min(6, [Math]::Max(1, [Math]::Floor($pc / $n))) }
+    $env:RUNNER_NAME = 'thornswood-vps-2'; $env:COMPUTERNAME = 'BOX'
+    $r = Invoke-Gate 'workflow_dispatch'
+    Yes ("on the box, a build's share is the cores over the box's build runners ({0} of {1})" -f $(if ($r.Asked) { $r.Asked.Share } else { '?' }), $pc) ($r.Asked -and $r.Asked.Share -eq (Want 2) -and $r.Text -match '2 build\(s\) at once on this machine')
+    Set-Content -LiteralPath (Join-Path (Join-Path $sr 'records') 'pr-build-runners.json') -Value '{"label":"x","runners":[2],"offBox":["thornswood-pr-one","thornswood-pr-one-2","thornswood-pr-one-3","thornswood-pr-elsewhere"]}'
+    Set-Content -LiteralPath (Join-Path (Join-Path $sr 'records') 'other-runners.json') -Value '{"label":"y","runners":[1],"offBox":["thornswood-pr-one-3","thornswood-pr-one-4"]}'
+    $env:RUNNER_NAME = 'thornswood-pr-one-3'; $env:COMPUTERNAME = 'ONE'
+    $r = Invoke-Gate 'workflow_dispatch'
+    Yes ("on One, over One's runners the records name, each once ({0})" -f $(if ($r.Asked) { $r.Asked.Share } else { '?' })) ($r.Asked -and $r.Asked.Share -eq (Want 4) -and $r.Text -match '4 build\(s\) at once on this machine')
+    $env:RUNNER_NAME = 'thornswood-pr-solo'; $env:COMPUTERNAME = 'SOLO'
+    $r = Invoke-Gate 'workflow_dispatch'
+    Yes '  an off-box runner no record names builds alone' ($r.Asked -and $r.Asked.Share -eq (Want 1))
+    $env:RUNNER_NAME = 'GitHub Actions 7'
+    $r = Invoke-Gate 'workflow_dispatch' 'github-hosted'
+    Yes '  and so does GitHub''s hosted runner' ($r.Asked -and $r.Asked.Share -eq (Want 1))
+    Remove-Item -LiteralPath (Join-Path (Join-Path $sr 'records') 'pr-build-runners.json'), (Join-Path (Join-Path $sr 'records') 'other-runners.json')
 } finally {
     Set-Location -LiteralPath $here
     foreach ($n in $keepEnv.Keys) { [Environment]::SetEnvironmentVariable($n, $keepEnv[$n]) }
