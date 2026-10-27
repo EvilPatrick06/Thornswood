@@ -1913,20 +1913,6 @@ $RECIPE_OWNER = [ordered]@{
     'ThornswoodRecipeSplint'     = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the splint holds a break (docs/systems/injury.md). Patrick, 4 October, on #1383: a Woodwright novice recipe at the kiln. The kiln''s own rule gives its work to the Charburner, so it is named here.' }
     'ThornswoodRecipePoultice'   = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the poultice cuts the wound fever chance (docs/systems/injury.md). Patrick, 4 October, on #1383: a Physicker recipe at novice. A MISC at the alchemy lab Thornswood-Content.esp ships, a create-object bench, which nothing else names.' }
     'ThornswoodRecipeRemedy'     = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the physicker''s remedy closes a cut and clears one ordinary disease (docs/systems/injury.md, disease.md, physicker.md). Patrick, 4 October, on #1383: a Physicker recipe at advanced, which its blue mountain flower makes it. A MISC at the same alchemy lab.' }
-    # THE PHYSICKER'S POTIONS (#3470). Patrick, 26 Oct 2026, A+B on the report
-    # page: a Physicker recipe at the alchemy lab for each of Skyrim's ten potion
-    # records the dungeon pile used to pay. An ALCH at a create-object bench
-    # nothing else names, so the half is named here.
-    'ThornswoodRecipePotionMinorHealing' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Minor Healing, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionHealing' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Healing, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionPlentifulHealing' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Plentiful Healing, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionVigorousHealing' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Vigorous Healing, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionMinorMagicka' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Minor Magicka, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionMagicka' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Magicka, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionMinorStamina' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Minor Stamina, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionStamina' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Stamina, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionResistFire' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Resist Fire, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
-    'ThornswoodRecipePotionResistShock' = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'Potion of Resist Shock, a Physicker''s at the alchemy lab Thornswood-Content.esp ships (#3470).' }
     # The fish trap (#1379). docs/systems/classes/fisher.md: "A woodwright makes
     # them", the poles and the trap. The poles reach the Woodwright by the spear
     # rule further down; the trap is a MISC with no pole in its name, so the
@@ -1998,21 +1984,6 @@ $RECIPE_RANK = [ordered]@{
     'ThornswoodRecipePoleFine'      = @{ Rank = 'expert';   Why = 'the fine pole, expert on the fisher page: it fishes novice through expert water.' }
     'ThornswoodRecipePoleMaster'    = @{ Rank = 'master';   Why = 'the master pole, master on the fisher page: it fishes all of it.' }
     'ThornswoodRecipeFishTrap'      = @{ Rank = 'novice';   Why = 'the fish trap, a woodwright novice good on the fisher page.' }
-    # THE PHYSICKER'S POTIONS (#3470). Patrick, 27 Oct 2026, A on the report
-    # page: the rank climbs with the strength, Minor novice, the plain potion
-    # advanced, Plentiful expert and Vigorous master, and the two resists are
-    # expert, the rank docs/systems/mixtures.md gives Resist Fire and Resist
-    # Shock. Input cost would put each on its dearest ingredient instead.
-    'ThornswoodRecipePotionMinorHealing' = @{ Rank = 'novice'; Why = 'Potion of Minor Healing: the weakest strength, novice (#3470).' }
-    'ThornswoodRecipePotionHealing' = @{ Rank = 'advanced'; Why = 'Potion of Healing: one step up, advanced (#3470).' }
-    'ThornswoodRecipePotionPlentifulHealing' = @{ Rank = 'expert'; Why = 'Potion of Plentiful Healing: two steps up, expert (#3470).' }
-    'ThornswoodRecipePotionVigorousHealing' = @{ Rank = 'master'; Why = 'Potion of Vigorous Healing: the strongest, master (#3470).' }
-    'ThornswoodRecipePotionMinorMagicka' = @{ Rank = 'novice'; Why = 'Potion of Minor Magicka: the weakest strength, novice (#3470).' }
-    'ThornswoodRecipePotionMagicka' = @{ Rank = 'advanced'; Why = 'Potion of Magicka: one step up, advanced (#3470).' }
-    'ThornswoodRecipePotionMinorStamina' = @{ Rank = 'novice'; Why = 'Potion of Minor Stamina: the weakest strength, novice (#3470).' }
-    'ThornswoodRecipePotionStamina' = @{ Rank = 'advanced'; Why = 'Potion of Stamina: one step up, advanced (#3470).' }
-    'ThornswoodRecipePotionResistFire' = @{ Rank = 'expert'; Why = 'Potion of Resist Fire: expert, its effect''s rank in docs/systems/mixtures.md (#3470).' }
-    'ThornswoodRecipePotionResistShock' = @{ Rank = 'expert'; Why = 'Potion of Resist Shock: expert, its effect''s rank in docs/systems/mixtures.md (#3470).' }
     # THE COLLEGE BOOK STAVES, each at its spell's rank. Patrick, 4 October,
     # answering issue #1622: "B, each college book staff at its spell's rank".
     # Heart stone is master mining (the miner page, #1380, #1586), so input

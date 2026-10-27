@@ -316,7 +316,7 @@ function run(root, write) {
   return result;
 }
 
-module.exports = { measure: measure, page: page, run: run, makers: makers };
+module.exports = { measure: measure, page: page, run: run };
 
 if (require.main === module) {
   const result = run(null, process.argv.indexOf('--write') >= 0);
