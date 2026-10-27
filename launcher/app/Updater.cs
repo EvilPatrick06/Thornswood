@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        public const string Version = "1.2.6";
+        public const string Version = "1.2.7";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
