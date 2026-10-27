@@ -69,6 +69,26 @@
 # 404 to whatever comes with X-Forwarded-For. Take it out and the App can
 # still do its work, but a new one cannot be made.
 # ---------------------------------------------------------------------------
+# THE HEADER BLOCK IS WHAT EVERY ANSWER FROM THIS NAME CARRIES (#2762).
+#
+# Until 27 Oct 2026 only the site (site\server.js) set security headers, so
+# everything else Caddy carries went out bare: on 19 Oct /voice/health
+# answered with content-type and nothing else, and the 404s of /box/ and
+# /github-app/ were the same. Nothing anywhere sent Permissions-Policy. The
+# headers that belong to the whole name are therefore set here, at the one
+# door, for every route below: HSTS, nosniff, Referrer-Policy and
+# Permissions-Policy. The CSP is not, because each service knows its own.
+#
+# defer sets them as the answer is written, over whatever the service sent,
+# so each goes out exactly once with this value. Without it a service that
+# sets one too (the site sets all four) would add a second copy beside it.
+# No page on this name uses the camera, the microphone, the location, a
+# payment or a USB device: voice takes the microphone in the launcher's own
+# page (launcher\voice-host.html), which is a file on the PC and not served
+# from here. The site sends the same values itself (PERMISSIONS_POLICY and
+# the rest in server.js), and tests\test-2762-door-headers.js keeps the two
+# equal and keeps this block at the top of the site.
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # CLOUDFLARE IS THE FRONT DOOR (#2995).
@@ -96,6 +116,14 @@
 
 thornswood.net, www.thornswood.net {
 	encode gzip
+
+	header {
+		defer
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+	}
 
 	log {
 		output file C:/Thornswood-Caddy/data/logs/box.log {
