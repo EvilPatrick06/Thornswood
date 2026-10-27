@@ -164,7 +164,7 @@ libFiles.forEach(function (p) {
   yes(name + ' (launcher\\lib) is named in THIRD-PARTY.md', N.indexOf(name) >= 0);
   yes(name + ' is in THIRD-PARTY.md by its sha256, ' + sha.slice(0, 16), N.toLowerCase().indexOf(sha) >= 0);
   const v = fileVersion(buf);
-  if (v) { versions[v] = (versions[v] || []).concat([name]); }
+  if (v && path.basename(path.dirname(p)) === 'webview2') { versions[v] = (versions[v] || []).concat([name]); }
 });
 wv2.forEach(function (n) {
   yes(n + ', which the launcher embeds, is in launcher\\lib\\webview2',
@@ -209,6 +209,41 @@ const WV2_LICENCE = [
 ].join('\n');
 yes('THIRD-PARTY.md carries the WebView2 licence word for word', flat(N).indexOf(flat(WV2_LICENCE)) >= 0);
 yes('the credits page carries the WebView2 licence word for word', flat(C).indexOf(flat(WV2_LICENCE)) >= 0);
+
+// NLayer, the menu theme's MP3 decoder (#3207): NLayer 3.0.0 from nuget.org,
+// its netstandard2.0 file, compared byte for byte on 26 October. The package
+// names MIT as its licence and commit 046c7ce4 of naudio/NLayer as its source;
+// the MIT licence wants its notice with every copy, so it is on the public
+// page too, as the repository's LICENSE at that commit has it.
+const NLAYER_DLL = path.join(REPO, 'launcher', 'lib', 'nlayer', 'NLayer.dll');
+yes('Thornswood.csproj embeds NLayer.dll, the menu theme\'s decoder', resources.indexOf('NLayer.dll') >= 0);
+yes('NLayer.dll, which the launcher embeds, is in launcher\\lib\\nlayer', fs.existsSync(NLAYER_DLL));
+if (fs.existsSync(NLAYER_DLL)) {
+  const nv = fileVersion(fs.readFileSync(NLAYER_DLL));
+  yes('NLayer.dll is file version 3.0.0.0 (' + nv + ')', nv === '3.0.0.0');
+}
+yes('THIRD-PARTY.md gives the NLayer version and its source commit', N.indexOf('Version 3.0.0') >= 0 && N.indexOf('046c7ce422970f8f0f0bc205d6c6341bcb7debf1') >= 0);
+yes('the credits page gives the NLayer version and links its source', C.indexOf('NLayer 3.0.0') >= 0 && C.indexOf('https://github.com/naudio/NLayer') >= 0);
+const NLAYER_LICENCE = [
+  'Copyright (c) 2018 Mark Heath, Andrew Ward & Contributors',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+yes('THIRD-PARTY.md carries the NLayer licence word for word', flat(N).indexOf(flat(NLAYER_LICENCE)) >= 0);
+yes('the credits page carries the NLayer licence word for word', flat(C).indexOf(flat(NLAYER_LICENCE)) >= 0);
 
 // ---------------------------------------------------------------- the site
 //
