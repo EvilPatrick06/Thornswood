@@ -31855,6 +31855,22 @@ log('gamemode loaded:',
   game login itself, checked before the engine hands over the character, is a
   fork change, written out on #1320.
 
+  ONE DISCORD ACCOUNT, ONE SEAT (#2887). Patrick, 20 Oct, on both servers,
+  dev included: a second game from an account already in the world is told
+  why and ended. The seats counted characters, so one account running a
+  second game under another of its characters took a second seat. Every pass
+  names the Discord account the site signed it for (d), so the moment a pass
+  proves a session, here in take() or at the sweep for a pass picked up at
+  the menu, it is compared with every other session in the world: one whose
+  own pass proves it, on the connection that pass proved. When one names the
+  same account, the later session is told ACCOUNT_SENTENCE and ended, its
+  pass is not kept, and the log names both profiles. The first keeps its
+  seat. A reconnect is the same profile, so it is never its own twin; a
+  connection the engine has already let go does not count, so closing one
+  game and starting another goes through once the engine sees the first one
+  gone. Staff seats are no different. The check waits for the pass, so a
+  second game sits in the world held (#410) until its pass arrives.
+
   THE SERVER'S OWN FAILURES REFUSE TOO, decided on purpose (the standing rule
   is that refusing is the secure side, #937): no passKey in door.json, a relay
   that is down, a site that would not issue a pass. Each leaves a session with
@@ -31895,6 +31911,9 @@ log('gamemode loaded:',
   var SENTENCE = 'This game was not started from an up to date Thornswood launcher, so ' +
                  'the session is being ended. Open the Thornswood launcher, let it update, ' +
                  'then press Play.';
+  var ACCOUNT_SENTENCE = 'Your Discord account already has a character in the world, so this ' +
+                         'second game is being ended: one account holds one seat. If you just ' +
+                         'closed the other game, wait a minute, then press Play again.';
   var WAIT_SAY_MS = 15000;    // held this long with no pass: told why nothing works (#410)
   var WAITING = 'Your launcher\'s pass has not reached the server yet, so nothing you do ' +
                 'counts until it does. Keep the Thornswood launcher open; if this does not ' +
@@ -32057,6 +32076,25 @@ log('gamemode loaded:',
     return e;
   }
 
+  /*
+    Another profile in the world on Discord account d (#2887), or 0: a
+    session whose own pass proves it and names d, still on the connection
+    that pass proved, and not being ended for this itself.
+  */
+  function inWorld(pid, d) {
+    if (!d) { return 0; }
+    for (var k in seen.online) {
+      if (!Object.prototype.hasOwnProperty.call(seen.online, k) || Number(k) === pid) { continue; }
+      var o = seen.online[k];
+      var h = seen.passes[k];
+      if (o.twin || !h || h.s !== o.sid || h.d !== d) { continue; }
+      var c = o.actorId ? connOf(o.actorId) : '';
+      if (!c || (o.conn && c !== o.conn)) { continue; }
+      return Number(k);
+    }
+    return 0;
+  }
+
   /* One "/joinpass <pass>" from the relay, sent under profileId. */
   function take(profileId, raw, now) {
     var r = readPass(raw, passKey(now), now, serverName());
@@ -32073,6 +32111,14 @@ log('gamemode loaded:',
       if (moved(profileId, connNow)) { begin(profileId, connNow, now).actorId = rec.actorId; }
     }
     if (r.ok) { r = bind(profileId, r); }
+    // It proves a session now, so that session is judged now (#2887); one
+    // at the menu is judged at the sweep that starts its session.
+    var twin = r.ok && r.s ? inWorld(profileId, r.d) : 0;
+    if (twin) {
+      seen.online[profileId].twin = twin;
+      if (seen.passes[profileId] && seen.passes[profileId].s === r.s) { delete seen.passes[profileId]; }
+      r = { why: 'its Discord account is already in the world as profile ' + twin, p: r.p };
+    }
     if (!r.ok) {
       if (fresh('bad ' + profileId + ' ' + r.why, now)) {
         console.log('[thornswood] join pass from profile ' + profileId + ' not taken: ' + r.why);
@@ -32089,9 +32135,9 @@ log('gamemode loaded:',
   // After the sentence, so it is on screen before the connection goes. Their
   // game is told the session ends (#1157), so it closes its side and does not
   // connect again by itself; the kick is for a game that does not.
-  function refuseLater(profileId, actorId) {
+  function refuseLater(profileId, actorId, sentence) {
     var line = g.__thornswoodSayLine;
-    if (typeof line === 'function') { line(profileId, { end: SENTENCE }); }
+    if (typeof line === 'function') { line(profileId, { end: sentence }); }
     setTimeout(function () {
       var userId = -1;
       try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
@@ -32121,7 +32167,19 @@ log('gamemode loaded:',
       e.actorId = online[i].actorId;
       if (e.judged) { continue; }
       var had = seen.passes[pid];
-      if (had && had.s === e.sid) { e.judged = true; continue; }
+      if (had && had.s === e.sid) {
+        e.twin = inWorld(pid, had.d);
+        if (!e.twin) { e.judged = true; continue; }
+        delete seen.passes[pid];
+      }
+      // A second game from an account already in the world (#2887).
+      if (e.twin) {
+        e.judged = true;
+        tell(pid, ACCOUNT_SENTENCE);
+        console.log('[thornswood] refusing profile ' + pid + ': its Discord account is already in the world as profile ' + e.twin);
+        refuseLater(pid, e.actorId, ACCOUNT_SENTENCE);
+        continue;
+      }
       // Held until then (#410): said once, after long enough that a pass on
       // its way has had time to arrive.
       if (requiring() && !e.told && now - e.joined >= WAIT_SAY_MS) {
@@ -32135,7 +32193,7 @@ log('gamemode loaded:',
                              : 'this server has no join pass key in door.json';
       tell(pid, SENTENCE);
       console.log('[thornswood] refusing profile ' + pid + ': ' + why);
-      refuseLater(pid, e.actorId);
+      refuseLater(pid, e.actorId, SENTENCE);
     }
     // Gone: the next session under that number needs a pass of its own.
     for (var k in seen.online) {
@@ -32260,6 +32318,7 @@ log('gamemode loaded:',
 
   g.__thornswoodJoinPass = { take: take, sweep: sweep, readPass: readPass,
                              grace: GRACE_MS, sentence: SENTENCE, waiting: WAITING,
+                             accountSentence: ACCOUNT_SENTENCE,
                              shown: shown, proven: proven, held: held, trusts: trusts,
                              requiring: requiring, loginProof: loginProof, onLogin: onLogin };
 
@@ -32319,6 +32378,10 @@ log('gamemode loaded:',
   and the difference is the staff seats. The deploy scripts write both from
   records\most-online.json, the one place they live (25 and 5, so maxPlayers
   30). No thornswoodMostOnline means nobody is turned away and nobody waits.
+
+  A SEAT IS AN ACCOUNT'S, NOT A CHARACTER'S (#2887). The seats count
+  characters, so the join pass block ends a second game from a Discord
+  account already in the world, on both servers. 25 seats are 25 people.
 
   WHO MAY TAKE A STAFF SEAT. Only a profile whose Discord account holds one of
   the site's staff roles (access.dev, which folds access.admin in: Owner, Dev,
@@ -36089,8 +36152,9 @@ log('gamemode loaded:',
     books     members, their book chat, books they own, when they last left
               (the books)
     merchants the guild traders' supply waits, commission promises and a
-              trade still waiting on the character (the purse service, at
-              NPC startup, #2652)
+              trade still waiting on the character, in the ledger and in
+              each trader's own saved copy, retired traders' too (the purse
+              service, at NPC startup, #2652)
 
   A part that answers that it took is marked done in the file, the time it
   ran, so it never runs again; when every part is done the file is deleted,
@@ -73353,9 +73417,15 @@ function createNpcMerchantPurses(api,data,storage) {
   // and waits for the next start, by when that trade has settled.
   // Every changed entry goes out in one acknowledged save, as
   // compareAndCommit's are, before the ledger in memory changes; a save
-  // that fails revokes this service, as a failed commit does. The trader's
-  // own mirror (property) is not written here: prepare() is its one reader
-  // and puts it right from the ledger before the trader is used.
+  // that fails revokes this service, as a failed commit does.
+  // Each trader's own saved copy (property, kept with that NPC's save) is
+  // let go of too, once the ledger is saved: a copy that still names them
+  // is written over with what the ledger now holds for that trader. A
+  // retired trader is never prepared again, so its copy would otherwise
+  // keep them for good; an active one's is put right here as well rather
+  // than waiting for prepare(). Only a copy that names them is written, so
+  // a run whose ledger was let go at an earlier start but whose copy write
+  // did not take still finds and writes that copy.
   function characterOf(desc) {
     // A runtime human's desc is its form id in hex alone (FormDesc); a
     // placed form's has a plugin and is never a character.
@@ -73363,12 +73433,30 @@ function createNpcMerchantPurses(api,data,storage) {
   }
   function release(who) {
     return mutate(()=>{
-      const counts={merchants:0,supply:0,commissions:0,trades:0};
+      const counts={merchants:0,supply:0,commissions:0,trades:0,copies:0};
       const theirs=(desc,profile)=>!!(who.profile(profile) || who.actor(characterOf(desc)));
       // A commission key is JSON [owner, job], the owner JSON [local form id, plugin, profile].
       const promisedTo=key=>{
         const row=JSON.parse(JSON.parse(key)[0]);
         return !!(who.profile(row[2]) || (!row[1] && who.actor(row[0])));
+      };
+      // Whether a trader's saved copy still names them: a supply wait, a
+      // commission promise or one cooling down, or a trade waiting on them.
+      // A key that does not read names nobody.
+      const names=copy=>{
+        if(!copy || typeof copy!=='object') return false;
+        const supply=copy.supply && typeof copy.supply==='object' ? Object.keys(copy.supply) : [];
+        if(supply.some(k=>{
+          let owner=null;
+          try {owner=JSON.parse(k);} catch(error) {owner=null;}
+          return Array.isArray(owner) && owner.length===3 && theirs(owner[0],owner[1]);
+        })) return true;
+        const books=copy.commissions && typeof copy.commissions==='object' ? copy.commissions : {};
+        if(['held','cool'].some(book=>books[book] && typeof books[book]==='object' && Object.keys(books[book]).some(k=>{
+          try {return promisedTo(k);} catch(error) {return false;}
+        }))) return true;
+        const pending=copy.pending;
+        return !!(pending && pending.human && theirs(pending.human.desc,pending.human.profileId));
       };
       const next=JSON.parse(JSON.stringify(ledger)),changed=[];
       let busy=0;
@@ -73401,13 +73489,26 @@ function createNpcMerchantPurses(api,data,storage) {
         changed.push([id,identity,state]);
       }
       if(busy) throw new Error(busy+' trader(s) holding something of theirs are waiting on a trade with somebody else, so nothing was let go');
-      if(!changed.length) return {counts,saved:true};
-      try {
+      if(changed.length) {
+        try {
+          assertOwner();
+          if(storage.save(next)!==true) throw new Error('Durable merchant save acknowledgement is missing');
+        } catch(error) {active=false;throw error;}
         assertOwner();
-        if(storage.save(next)!==true) throw new Error('Durable merchant save acknowledgement is missing');
-      } catch(error) {active=false;throw error;}
-      assertOwner();
-      ledger=next;
+        ledger=next;
+      }
+      // The traders' own saved copies, retired traders' included, from the
+      // ledger as it now is. A write that fails stops the part, which waits
+      // for the next start and finds the copy again.
+      for(const [id,identity] of catalogue) {
+        assertOwner();
+        if(!names(api.get(id,property))) continue;
+        const state=ledger.entries[identity.reference];
+        if(names(state)) throw new Error('Merchant state still names a released character');
+        api.set(id,property,state===null ? null : JSON.parse(JSON.stringify(state)));
+        assertOwner();
+        counts.copies++;
+      }
       return {counts,saved:true};
     });
   }
