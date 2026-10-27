@@ -318,12 +318,14 @@ if (block && RECIPES && ADMIN_ITEMS) {
       // The steward here keeps the building's hold: a steward settles their own
       // hold only (#2551), which test-offices.js and test-2551-building-holds.js hold.
       const fn = new Function('globalThis', 'isSteward', 'here', 'holderOf', 'nameOf', 'claims', 'save', 'pushAll', 'plog',
-        'redrawPanel', 'OFFICE_AT_DOOR', 'notStewardHere', 'isStaffHere', 'settleAs', evictSrc + '\nreturn evict;');
+        'redrawPanel', 'OFFICE_AT_DOOR', 'notStewardHere', 'isStaffHere', 'settleAs',
+        // What an evicted holder owed stays theirs (#3950): tests/test-3893-rent-arrears.js; no rent here.
+        'keepOwed', evictSrc + '\nreturn evict;');
       // Staff at any door (settleAs, #2551) is test-2551-building-holds.js's: here the steward settles as steward.
       const evict = fn({ __thornswoodEmbassy: E }, function () { return true; }, function () { return building; },
         function () { return claims[building] || null; }, function (b) { return b; }, claims,
         function () { }, function () { }, function () { }, function () { }, 'Stand at the door.', function () { return null; },
-        function () { return false; }, function () { return { as: 'steward' }; });
+        function () { return false; }, function () { return { as: 'steward' }; }, function () { });
       evict(0x14, STEWARD, function (p, line) { told.push(line); });
       return { told: told.join(' '), claims: claims };
     }
