@@ -1139,14 +1139,23 @@ $signNeed
 $need | ForEach-Object { Say "  $_" }
 $missing = @($need | Where-Object { "$_" -like 'MISSING *' } | ForEach-Object { "$_".Substring(8) })
 if ($missing.Count) {
+  $missingNames = $missing -join ', '
   $how = @()
+  # Off the box the fix is on this machine, for all users: the runner's
+  # service account cannot use a per-user or Store install. Python 3.13,
+  # because a per-user 3.12.10 (One, 26 Oct 2026) makes the 3.12.10 installer
+  # modify that copy instead of adding one for all users; the build itself
+  # takes 3.12 from setup-python.
+  if ($OffBox -and $missing -contains 'pwsh') { $how += 'winget install --id Microsoft.PowerShell -e --installer-type wix --scope machine --accept-source-agreements --accept-package-agreements   (PowerShell 7 for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'pwsh' }) }
+  if ($OffBox -and $missing -contains 'python') { $how += 'winget install --id Python.Python.3.13 -e --scope machine --override "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Include_test=0" --accept-source-agreements --accept-package-agreements   (Python for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'python' }) }
+  if ($OffBox -and ($missing -contains 'node' -or $missing -contains 'git')) { $how += 'winget install --id OpenJS.NodeJS.LTS -e --scope machine   and   winget install --id Git.Git -e --scope machine   (in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'node' -and $_ -ne 'git' }) }
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'msbuild' -or $missing -contains 'net481refs') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeBuildTools -SkipFirewall'   (MSBuild and the .NET Framework 4.8.1 reference assemblies the launcher builds with, #498)" }
   if ($missing -contains 'signtool') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'   (signtool comes with the Windows SDK the C++ workload brings, #459)" }
   if ($missing -contains 'dotnet') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'   (the .NET runtime Microsoft's signing client runs on, #3312)" }
   if ($missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
-  Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
+  Die ("$where is missing " + $missingNames + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }
 
 Head 'Registration token'
