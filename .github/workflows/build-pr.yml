@@ -596,3 +596,23 @@ jobs:
     # eighteen minutes on it, so it gets an hour.
     timeout-minutes: 60
     steps: *checks
+
+  # The one check main's ruleset requires (#3683): passes only when one of
+  # the two builds above succeeded. Written by Build-PrWorkflow.js, which
+  # says why it is on GitHub's runner and only once the repository is public.
+  result:
+    name: Build check result
+    needs: [launcher-vps, launcher]
+    if: ${{ !cancelled() && github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: One of the two builds passed
+        env:
+          HOSTED: ${{ needs.launcher.result }}
+          VPS: ${{ needs.launcher-vps.result }}
+        run: |
+          echo "Launcher builds: $HOSTED; Launcher builds (VPS fallback): $VPS"
+          if [ "$HOSTED" = success ] || [ "$VPS" = success ]; then exit 0; fi
+          echo "::error::neither build passed, so this pull request may not merge"
+          exit 1
