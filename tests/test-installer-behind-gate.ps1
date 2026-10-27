@@ -101,6 +101,13 @@ $gateAt = $src.IndexOf($gate)
 $publishAt = $src.IndexOf("Head 'Publishing'")
 Yes 'the gate runs before the publish' ($gateAt -ge 0 -and $publishAt -gt $gateAt)
 
+# The gate counts the main feed as the store holds it now, received just
+# before it, never a copy an earlier Ship left here (#3961).
+$recvAt = $src.IndexOf("Receive-FeedStore 'main' `$MainReleaseDir")
+Yes 'the main feed is received before the gate counts it' ($recvAt -ge 0 -and $gateAt -gt $recvAt)
+$condAt = if ($recvAt -ge 0) { $src.LastIndexOf('if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {', $recvAt) } else { -1 }
+Yes 'and only where the gate itself runs, a main release that is not a hotfix, a dry run or -Package' ($condAt -ge 0 -and ($recvAt - $condAt) -lt 120)
+
 # Nothing on this machine's disk stands in for the published installer (#3043):
 # no zip is looked for, and the old $Root\_dist fallback is gone.
 Yes 'Measure-Installer reads no Thornswood-Setup.zip' ($measure -and -not $measure.Contains('Thornswood-Setup.zip'))
