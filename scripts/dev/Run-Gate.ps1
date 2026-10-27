@@ -44,10 +44,13 @@
 
   THE NOTE. It writes whole=true to the step's outputs only when every gate
   harness ran. build.yml keeps the note main's build looks for (#3182, the
-  job "tested") only then, so main skips its build only for a tree a pull
-  request ran the whole gate on, and otherwise builds in full and is
-  traced. Main and the nightly run the whole gate every time, so whatever a
-  harness left out would have caught is still caught there.
+  job "tested") only then, and only on GitHub's hosted runner (#3874), so
+  main skips its build only for a tree a pull request ran the whole gate on
+  where no map is kept, and otherwise builds in full and is traced. On the
+  VPS a whole gate means the map could not serve the pull request, and a
+  skipped main build would leave it so. Main and the nightly run the whole
+  gate every time, so whatever a harness left out would have caught is
+  still caught there.
 
   The trace task, the map's folders and how they are kept from the
   runners' accounts: scripts\dev\Trace-Gate-Task.ps1. Why a map is enough:
