@@ -50,7 +50,7 @@ foreach ($root in @(Get-ChildItem -LiteralPath 'C:\' -Directory -Force | Where-O
   $owned = 0; $rules = 0; $unread = 0
   foreach ($i in @(@(Get-Item -LiteralPath $root.FullName -Force) + @(Get-ChildItem -LiteralPath $root.FullName -Recurse -Force -EA SilentlyContinue))) {
     $a = $null
-    try { $a = $i.GetAccessControl($s) } catch { }
+    try { $a = $i.GetAccessControl($s) } catch { <# counted as UNREAD below and named on its line, so it is not passed as clear #> }
     if (-not $a) { $unread++; continue }
     if ($a.GetOwner([Security.Principal.SecurityIdentifier]).Value -eq $ls) { $owned++ }
     foreach ($r in @($a.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) {
@@ -66,7 +66,7 @@ foreach ($root in @(Get-ChildItem -LiteralPath 'C:\' -Directory -Force | Where-O
 }
 foreach ($t in @(Get-ScheduledTask -TaskName 'Thornswood*' -EA SilentlyContinue | Sort-Object TaskName)) {
   $sid = ''
-  try { $sid = (New-Object Security.Principal.NTAccount([string]$t.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+  try { $sid = (New-Object Security.Principal.NTAccount([string]$t.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { <# an account that does not translate is not LOCAL SERVICE, which always does #> }
   if ($sid -ne $ls) { continue }
   $exe = [string]@($t.Actions)[0].Execute
   if ((Split-Path -Leaf $exe) -like 'thornswood-owner-*.exe') { 'owned    ' + $t.TaskName + ' starts through ' + $exe }

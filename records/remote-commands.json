@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  72,
-    "callCount":  290,
+    "scriptCount":  73,
+    "callCount":  292,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -370,10 +370,19 @@
                       "script":  "scripts/deploy/Deploy-Docs.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$swapOut = @(Remote ($vars + $siteHooks + $pick + $serviceSwapBlock) |",
+                      "anchor":  "$swapOut = @(Remote ($ownerVars + $vars + $siteHooks + $pick + $serviceSwapBlock) |",
                       "does":  "service swap of the site",
                       "class":  "swap",
-                      "reason":  "StopIt kills node.exe by pid with Stop-Process as well as stopping the task"
+                      "reason":  "StopIt kills node.exe by pid with Stop-Process as well as stopping the task. Since #4077 its StartIt also gives the site's task anything LOCAL SERVICE still owns in the site folder, which takes the restore privilege; once the site runs through the owner launcher there is none, and it only reads"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Docs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$restartOut = @(Remote ($ownerVars + $restartVars + $ThornswoodStopAndMoveText + $siteHooks + @'",
+                      "does":  "restarts the site onto the owner launcher when nothing is swapped (#4077)",
+                      "class":  "admin",
+                      "reason":  "gives the site's task what LOCAL SERVICE owns in its folder, which takes the restore privilege, then stops and starts the task"
                   },
                   {
                       "script":  "scripts/deploy/DeployedBuild.ps1",
@@ -1868,6 +1877,15 @@
                       "does":  "reads the priority the game servers and voice run at",
                       "class":  "read-status",
                       "reason":  "reads process and task settings only, changes nothing"
+                  },
+                  {
+                      "script":  "scripts/vps/Check-ServiceOwners.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $far | ForEach-Object { \"$_\".Trim() } | Where-Object { $_ })",
+                      "does":  "reads who owns what in each box folder and how each LOCAL SERVICE task starts (#4077)",
+                      "class":  "read-status",
+                      "reason":  "reads owners, rules and task actions only, changes nothing"
                   },
                   {
                       "script":  "scripts/vps/Check-Site.ps1",

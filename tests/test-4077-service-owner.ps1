@@ -122,6 +122,19 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) ('tw-4077-' + [Guid]::NewGuid().
 New-Item -ItemType Directory -Path $scratch -Force | Out-Null
 try {
     $me = [Security.Principal.WindowsIdentity]::GetCurrent()
+    # The scratch bin folder stands in for Program Files\Thornswood: it keeps
+    # nothing from the temp folder above it, where a build runner's folder
+    # gives other accounts FullControl, and has SYSTEM, Administrators and
+    # whoever runs this, the one -AlsoMay names.
+    $bin = Join-Path $scratch 'bin'
+    New-Item -ItemType Directory -Path $bin -Force | Out-Null
+    $binAcl = New-Object Security.AccessControl.DirectorySecurity
+    $binAcl.SetAccessRuleProtection($true, $false)
+    foreach ($s in @('S-1-5-18', 'S-1-5-32-544', $me.User.Value)) {
+        $binAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl',
+            [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit', [Security.AccessControl.PropagationFlags]::None, 'Allow')))
+    }
+    Set-Acl -LiteralPath $bin -AclObject $binAcl
     $exe = Install-ThornswoodOwnerLaunch -Dir (Join-Path $scratch 'bin') -AlsoMay @($me.User.Value)
     Yes 'the launcher builds with the .NET Framework compiler, named by its source''s hash' (
         (Test-Path -LiteralPath $exe) -and (Split-Path -Leaf $exe) -match '^thornswood-owner-[0-9a-f]{12}\.exe$')

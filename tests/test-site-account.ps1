@@ -459,6 +459,8 @@ try {
     Yes 'SYSTEM: the SID it compares the read-back with is SYSTEM''s' ($r.sid -eq 'S-1-5-18')
 
     # -- LOCAL SERVICE, with the real icacls on the scratch folders -------------
+    # The read every deploy before #4077 gave LOCAL SERVICE on the server folder.
+    $null = & icacls $server /grant '*S-1-5-19:(OI)(CI)R' 2>&1
     $block = BlockOf (Build 'LOCAL SERVICE' $docs)
     # The scratch box itself can be under C:\Thornswood-RunnerN (#3117), so
     # its own paths are taken out before looking for a real folder.
@@ -480,14 +482,23 @@ try {
         @($r.principal.RequiredPrivilege) -notcontains 'SeAssignPrimaryTokenPrivilege')
     Yes 'LOCAL SERVICE: with the token SID type Unrestricted' ($r.principal -and "$($r.principal.ProcessTokenSidType)" -eq 'Unrestricted')
     Yes 'LOCAL SERVICE: as a service account, so no password is kept' ($r.principal -and "$($r.principal.LogonType)" -eq 'ServiceAccount')
-    Yes 'LOCAL SERVICE: it says what it granted' ($said -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs"))
+    Yes 'LOCAL SERVICE: it says what it granted, to the site''s task (#4077)' ($said -match [regex]::Escape("granted NT TASK\Thornswood Docs (OI)(CI)M on $docs"))
     Yes 'LOCAL SERVICE: a folder that is not there is said and skipped, not failed' (
         $said -match [regex]::Escape("not here, nothing granted: $dev") -and $said -notmatch 'COULD NOT GRANT')
     Yes 'LOCAL SERVICE: no folder was made that was not there' (-not (Test-Path -LiteralPath $dev))
 
-    $ls = 'S-1-5-19'
+    # The grants and the denies name the site's task, not LOCAL SERVICE, which
+    # every box service runs as (#4077). $ls is the account they are for.
+    $ls = Get-ThornswoodTaskSidFromName 'Thornswood Docs'
     $own = RulesFor $docs $ls
-    Yes 'its own folder: LOCAL SERVICE may change it' (Modifies $own)
+    Yes 'its own folder: the site''s task may change it' (Modifies $own)
+    Yes 'and LOCAL SERVICE has no rule on its folder, the deploy records or the chat' (
+        (RulesFor $docs 'S-1-5-19').Count -eq 0 -and (RulesFor (Join-Path $docs 'config.json') 'S-1-5-19').Count -eq 0 -and
+        (RulesFor (Join-Path $deploys 'thornswood-docs.json') 'S-1-5-19').Count -eq 0 -and
+        (RulesFor (Join-Path $voice '2026-09-24.jsonl') 'S-1-5-19').Count -eq 0)
+    Yes 'the read LOCAL SERVICE had on the server folder before #4077 comes off' (
+        (RulesFor $server 'S-1-5-19').Count -eq 0 -and (RulesFor (Join-Path $server 'server.log') 'S-1-5-19').Count -eq 0)
+    Yes 'and it says so' ($said -match [regex]::Escape("LOCAL SERVICE no longer has a rule on $server"))
     Yes 'its own folder: a file that was already there, config.json, inherits it' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
     Yes 'its own folder: and one a folder down, data\board.json' (Modifies (RulesFor (Join-Path $docs 'data\board.json') $ls))
     Put (Join-Path $docs 'site.log') 'new'
@@ -497,7 +508,7 @@ try {
     # to survive that, which a grant on the file would not.
     Remove-Item -LiteralPath (Join-Path $server 'server.log') -Force
     Put (Join-Path $server 'server.log') 'after a restart'
-    Yes 'the deploy records: LOCAL SERVICE reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
+    Yes 'the deploy records: the site''s task reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
     Yes 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
     Yes 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
     Yes 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
@@ -526,7 +537,7 @@ try {
         Yes "$f`: and the deny leaves out SYNCHRONIZE and every read right, so the site still serves it" (
             $d.Count -eq 1 -and ($d[0].FileSystemRights -band ($fsr::Synchronize -bor $fsr::ReadData -bor $fsr::ReadAttributes)) -eq 0)
         Yes "$f`: and reaches what is inside it" ($d.Count -eq 1 -and "$($d[0].InheritanceFlags)" -eq 'ContainerInherit, ObjectInherit')
-        Yes "$f`: it says so" ($said -match [regex]::Escape("denied LOCAL SERVICE writing and deleting in " + (Join-Path $docs $f)))
+        Yes "$f`: it says so" ($said -match [regex]::Escape("denied NT TASK\Thornswood Docs writing and deleting in " + (Join-Path $docs $f)))
     }
     $vj = RulesFor (Join-Path $docs 'feed\version.json') $ls
     Yes 'feed\version.json inherits the deny and still the read under it' (
