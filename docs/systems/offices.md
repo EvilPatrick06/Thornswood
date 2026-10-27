@@ -196,7 +196,8 @@ the role in Discord with the bot's token; the game reads the roles back
 at once and writes the page again. In Discord the same Jarl has the office
 panel in #choose-your-hold (`bot\bot.py`). A steward sees the door they
 opened in the last minute, who holds it and the rent owed there, with
-Evict, Set rent and No rent; and their own hold's board, moved to where
+Evict, Set rent and No rent, and Rent paid beside each person who owes
+there, the holder or somebody who held it before (#3893, #3895); and their own hold's board, moved to where
 the steward stands. A steward no longer marks a container as a hold's
 box: the drop box on the board is the only one (Patrick, 15 Oct, #2298). Evict and moving a
 board ask for a second press. The Court, a Steward and a guard each see

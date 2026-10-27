@@ -30,7 +30,7 @@ yes('build-pr.yml exists', !!pr);
 yes('build-pr.yml runs on a pull request and nothing else', JSON.stringify(triggers(pr)) === '["pull_request"]');
 yes('on GitHub\'s hosted windows-latest', /\n    runs-on: windows-latest\n/.test(pr));
 const SAME = "github.event.pull_request.head.repo.full_name == github.repository";
-const prVps = /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\n/.exec(pr);
+const prVps = /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-build\]\n/.exec(pr);
 yes('a VPS fallback job builds a pull request the hosted job did not', !!prVps &&
     /\n  launcher-vps:\n    name: Launcher builds \(VPS fallback\)\n    needs: launcher\n    if: \$\{\{ !cancelled\(\) && github\.event\.repository\.private && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}\n/.test(pr));
 yes('  only for a branch of this repository, never a fork', !!prVps && code(pr).split(SAME).length - 1 === 1);

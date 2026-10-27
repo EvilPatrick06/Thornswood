@@ -60,7 +60,8 @@ in it is the server's own record, never a chest's contents.
 
 What goes in:
 
-- Gold. Gold you put in pays what you owe on your rent first.
+- Gold. Gold you put in pays what you owe on your rent first, rent you
+  still owe on a place you no longer hold before the rest (#3893).
 - Something left for somebody who was not there to take it, a Free
   Skyrim Trading Company drop off: you pick it from your pack and name who
   it is for, and the hold's steward hands it out.
@@ -81,7 +82,11 @@ Who sees and takes what:
   everything in it and may take anything. Only they get Records: every
   deposit and every take, by character name, what, how much, and when,
   newest first. An officer taking gold somebody paid rent with leaves the
-  rent paid.
+  rent paid. Rent a steward was handed in person and marked paid on the
+  Office page is in the same record (#3895).
+
+Paying rent through the box never moves the rent clock, and neither does
+taking the gold back (#3891): the next rent falls due when it would have.
 
 Nothing about the box is typed. The panel's buttons send the server lines
 nobody is told to type (Patrick, 4 Oct).
