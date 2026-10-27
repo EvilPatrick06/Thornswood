@@ -1015,7 +1015,10 @@ if ($Remove) {
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
   # The removal token goes on ssh's standard input and reaches config.cmd in
   # its environment, never on a command line (Send-Secret.ps1, issue #451).
-  Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
+  # The far side's exit code decides, as for -NetworkOnly -Remove: until
+  # #3214 it was not read, so two removals whose ssh was cut 8 minutes in
+  # ended with exit 0 and half their lines.
+  $said = @(Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if ((Test-Path '$Root\config.cmd') -and `$t) {
@@ -1043,7 +1046,10 @@ Remove-LocalUser -Name '$Account' -EA SilentlyContinue
 Remove-LeftProfiles @('$Account', '$Account.*')
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
-"@) | ForEach-Object { Say "  $_" }
+"@))
+  $code = $LASTEXITCODE
+  $said | ForEach-Object { Say "  $_" }
+  if ($code -ne 0) { Die "the removal did not say it finished (exit $code); the lines above say how far it got, and -Status says what is left." }
   Done
 }
 
