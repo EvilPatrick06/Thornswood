@@ -61,7 +61,7 @@ const FORCE = [
   // part forces (#3874): see gateShape. A change to the rest of it, which
   // cannot reach a harness's run, leaves it a file like any other.
   [/^\.github\/workflows\/(build|build-pr)\.yml$/, 'the workflow that runs the gate, its steps and its environment', 'shape'],
-  [/^scripts\/dev\/(Run-Gate\.ps1|Nightly-Harnesses\.ps1|Gate-Harnesses\.ps1|Affected-Harnesses\.js|Trace-HarnessReads\.js)$/, 'the scripts that list, choose and run the harnesses'],
+  [/^scripts\/dev\/(Run-Gate\.ps1|Gate-Map\.ps1|Nightly-Harnesses\.ps1|Gate-Harnesses\.ps1|Affected-Harnesses\.js|Trace-HarnessReads\.js)$/, 'the scripts that list, choose and run the harnesses'],
   [/^tests\/gate-excluded\.txt$/, 'the gate list'],
   // Belt and braces: a helper is read by the harnesses that use it, so it is
   // in their maps already. The rule costs little (measured) and covers a
@@ -407,8 +407,11 @@ function readGate(file) {
 // built from the traces here, by this checkout's own build, and the change
 // is measured from the traced tree's listing, so nothing is fetched. The
 // traced workflows' gate shape comes with the listing (the tree command).
+// tracesFile is the trace task's traces, or a map already built from them
+// (a .json, what main's build hands to runners off the box, #4009).
 function pick(tracesFile, treeFile, commit, gate) {
-  const map = build(tracesFile, REPO, commit);
+  const map = /\.json$/.test(tracesFile) ? JSON.parse(fs.readFileSync(tracesFile, 'utf8')) : build(tracesFile, REPO, commit);
+  if (map.commit !== commit) { throw new Error('the map is of ' + map.commit + ', not ' + commit); }
   const read = readTreeFile(require('zlib').gunzipSync(fs.readFileSync(treeFile)));
   const base = read.tree;
   const head = parseTree(git(['ls-tree', '-r', '-z', '--full-tree', 'HEAD']));
@@ -449,7 +452,7 @@ if (require.main === module) {
       for (const n of r.run) { console.log('  runs ' + n + ': ' + r.why[n]); }
     }
   } else {
-    console.error('usage: Affected-Harnesses.js build <traces> <map.json> [commit] | select <map.json> <head> [gate.txt] | tree <rev> <tree.gz> | pick <traces.jsonl.gz> <tree.gz> <commit> <gate.txt> <out.txt>');
+    console.error('usage: Affected-Harnesses.js build <traces> <map.json> [commit] | select <map.json> <head> [gate.txt] | tree <rev> <tree.gz> | pick <traces.jsonl.gz|map.json> <tree.gz> <commit> <gate.txt> <out.txt>');
     process.exit(2);
   }
 }

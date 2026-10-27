@@ -82,6 +82,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Close-Launcher.ps1](dev/Close-Launcher.ps1) | Shared by every script that writes into the build. |
 | [dev/Copy-BoxGuard.ps1](dev/Copy-BoxGuard.ps1) | Writes scripts\vps\BoxGuard.ps1's Get-ThornswoodBoxRefusal into every box script that carries a copy of it. |
 | [dev/Gate-Harnesses.ps1](dev/Gate-Harnesses.ps1) | Prints the harnesses the build check runs on every pull request: every tests\test-*.js and tests\test-*.ps1 that tests\gate-excluded.txt does not name, one a line, in name order. |
+| [dev/Gate-Map.ps1](dev/Gate-Map.ps1) | Hands the newest traced gate map from the box to runners off it, through main's build log (#4009). |
 | [dev/Install-Serena.ps1](dev/Install-Serena.ps1) | Installs Serena once, at the version in scripts\dev\serena-version.txt, and points Claude Code on this machine at the installed program, so a session start runs Serena straight away instead of resolving it first. |
 | [dev/Install-Thornswood.ps1](dev/Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
 | [dev/Lint.ps1](dev/Lint.ps1) | Reports ruff, eslint and PSScriptAnalyzer findings, warnings only, over the files it is given or the whole tree, with each pinned tool fetched once per machine. |
