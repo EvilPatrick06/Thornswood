@@ -528,7 +528,7 @@ namespace Thornswood
                 ordered == 0 && File.ReadAllText(winP) == winPBefore && File.ReadAllText(winO) == winOBefore);
             if (Paths.OwnFirst)
                 Yes(n + "Fix before the folder exists still does not write Windows' plugin list",
-                    Verify.Fix(s.Cfg, null) == 1 && File.ReadAllText(winP) == winPBefore && File.ReadAllText(winO) == winOBefore);
+                    Verify.Fix(s.Cfg, null, null) == 1 && File.ReadAllText(winP) == winPBefore && File.ReadAllText(winO) == winOBefore);
             // Make refuses a golden list whose plugins Vortex has not deployed.
             // This pack's name is not one of them. The waiting copy in
             // LocalAppData stays, and that is what the folder receives.
@@ -633,7 +633,7 @@ namespace Thornswood
             List<Issue> scan = Verify.Run(s.Cfg);
             Yes(n + "Scan says the folder is made next rather than calling the collection missing",
                 scan.Count == 1 && scan[0].Text.IndexOf("not made yet", StringComparison.Ordinal) >= 0 && !scan[0].Blocking);
-            Yes(n + "Fix makes the folder next and touches nothing else", Verify.Fix(s.Cfg, null) == 1 && Verify.OwnFolderNext && Same(before, Snap(s.Game)));
+            Yes(n + "Fix makes the folder next and touches nothing else", Verify.Fix(s.Cfg, null, null) == 1 && Verify.OwnFolderNext && Same(before, Snap(s.Game)));
             Yes(n + "Steam's Updates setting is looked at while there is no folder", SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(s.Cfg)));
             Yes(n + "the one-time clean up does nothing before the folder is made", OwnGame.CleanSteamCopy(s.Cfg) == null && !File.Exists(Cleaned));
             Yes(n + "the folder can be made", OwnGame.WhyNot(s.Cfg, OwnGame.DeploysInto(s.Cfg)) == null);
