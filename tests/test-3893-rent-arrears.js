@@ -19,6 +19,9 @@
   #3891: paying rent through the drop box never moves the rent clock, so
   taking the gold back out cannot keep the debt from growing.
 
+  #3950, Patrick, 27 Oct, A: whatever was owed when a claim ends, by an
+  eviction or a lapse, stays owed by that person, the same way.
+
   The real property block runs over a pretend engine: Breezehome in
   Whiterun with 50 gold of rent every 7 days, Whiterun's board and box,
   its Steward, and Alice, who holds the house, and Bob, who is handed its
@@ -322,6 +325,32 @@ o = owing(STEWARD);
 yes('G3 and with nobody holding it the steward still sees it, and marks it paid', o.length === 1 && o[0].pid === BOB.pid &&
     say(STEWARD, '/rent paid ' + BOB.pid + ' 50') === 'Bob paid 50 gold of rent on Breezehome. Nothing is owed now.' &&
     !W.arrears()[HOUSE]);
+
+// ------------------------------------------------- L. an eviction and a lapse keep the debt (#3950)
+// Patrick, 27 Oct, A: whatever was owed when the claim ends stays owed by that person.
+const TL = clock.t;
+W.claims()[HOUSE] = { by: ALICE.pid, name: 'Alice', at: TL, touched: TL, locked: false,
+                      rent: { amount: 10, everyDays: 7, owed: 0, since: TL } };
+clock.t = TL + 7.5 * DAY;
+door(STEWARD);
+said = say(STEWARD, '/evict');
+yes('L1 a steward evicts Alice, who owes a week: the claim ends and the 10 stays hers (' + said + ')',
+    !claim() && owedBefore(ALICE.pid) === 10);
+o = owing(STEWARD);
+yes('L2 and the steward still sees it at the door', o.length === 1 && o[0].pid === ALICE.pid && o[0].owed === 10);
+const TB = clock.t;
+W.claims()[HOUSE] = { by: BOB.pid, name: 'Bob', at: TB, touched: TB, locked: false,
+                      rent: { amount: 10, everyDays: 7, owed: 0, since: TB } };
+clock.t = TB + 30 * DAY;
+inDir(function () { W.rentDue(); });
+yes('L3 rent is never counted past the day a claim lapses, even before anything reads it: two weeks, not four',
+    claim().rent.owed === 20);
+door(STEWARD);
+o = owing(STEWARD);
+yes('L4 the claim lapses after 14 days with nobody going in, and what Bob owed up to then stays his (' +
+    JSON.stringify(o) + ')',
+    !claim() && owedBefore(BOB.pid) === 20 && owedBefore(ALICE.pid) === 10 && o.length === 2);
+inDir(function () { delete W.arrears()[HOUSE]; });
 
 // ------------------------------------------------- H. a deleted character
 inDir(function () { W.claims()[HOUSE] = undefined; delete W.claims()[HOUSE]; });

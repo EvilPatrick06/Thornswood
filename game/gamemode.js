@@ -39378,6 +39378,8 @@ module.exports = {
     var c = claims[building];
     var days = lapseDays();
     if (days > 0 && (Date.now() - c.touched) > days * 86400000) {
+      // What the holder owed, counted up to the lapse and no further, stays theirs (#3950).
+      keepOwed(building, c, c.touched + days * 86400000);
       delete claims[building];
       save();
       /*
@@ -39641,8 +39643,7 @@ module.exports = {
       */
       var keepRent = null;
       if (held && held.rent) {
-        rentDue();
-        if ((Number(held.rent.owed) || 0) > 0) { arrearsAdd(building, held.by, held.name, held.rent.owed); }
+        keepOwed(building, held, now2);
         keepRent = { amount: Number(held.rent.amount) || 0, everyDays: Number(held.rent.everyDays) || 7,
                      owed: 0, since: Number(held.rent.since) || now2 };
       }
@@ -41730,19 +41731,44 @@ module.exports = {
     var out = [];
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
-      var c = claims[b];
-      if (!c || !c.rent) { continue; }
-      var every = Number(c.rent.everyDays) || 7;
-      var since = Number(c.rent.since) || Number(c.at) || Date.now();
-      var periods = Math.floor((Date.now() - since) / (every * 86400000));
-      if (periods > 0) {
-        c.rent.owed = (Number(c.rent.owed) || 0) + periods * (Number(c.rent.amount) || 0);
-        c.rent.since = since + periods * every * 86400000;
-        out.push(b);
-      }
+      if (countRent(claims[b], Date.now())) { out.push(b); }
     }
     if (out.length) { save(); }
     return out;
+  }
+
+  /*
+    The rent on one claim, counted in whole periods up to a time, and never
+    past the moment it lapses (#3950): a claim nobody has gone into for the
+    lapse days is no longer held, so a week after that is owed by nobody,
+    even before anything reads the claim and drops it. Says whether it
+    counted a period.
+  */
+  function countRent(c, upTo) {
+    if (!c || !c.rent) { return false; }
+    var days = lapseDays();
+    var end = Number(upTo) || Date.now();
+    if (days > 0) { end = Math.min(end, (Number(c.touched) || 0) + days * 86400000); }
+    var every = Number(c.rent.everyDays) || 7;
+    var since = Number(c.rent.since) || Number(c.at) || Date.now();
+    var periods = Math.floor((end - since) / (every * 86400000));
+    if (periods <= 0) { return false; }
+    c.rent.owed = (Number(c.rent.owed) || 0) + periods * (Number(c.rent.amount) || 0);
+    c.rent.since = since + periods * every * 86400000;
+    return true;
+  }
+
+  /*
+    A CLAIM ENDING DOES NOT END A DEBT. Whatever its holder owed, counted up
+    to the moment it ends, stays theirs in arrears: when the deed goes to
+    somebody else (#3893, Patrick, 27 Oct), and when a steward evicts or the
+    claim lapses (#3950, Patrick, 27 Oct, A). The steward sees it at that
+    door, the holder on their property page, and the box or Rent paid pays it.
+  */
+  function keepOwed(building, c, upTo) {
+    if (!c || !c.rent) { return; }
+    countRent(c, upTo);
+    if ((Number(c.rent.owed) || 0) > 0) { arrearsAdd(building, c.by, c.name, c.rent.owed); }
   }
 
   // What this person owes, place by place: from before (#3893) first, then what they hold.
@@ -45729,6 +45755,8 @@ module.exports = {
       return true;
     }
     var was = held.name;
+    // An eviction ends the claim and not the debt (#3950): what they owe stays theirs.
+    keepOwed(building, held, Date.now());
     delete claims[building];
     save();
     pushAll();
@@ -45960,6 +45988,7 @@ module.exports = {
       if (officesOfProfile(claims[b].by, true).jarl.indexOf(hold) !== -1) { continue; }
       plog('law: the jail rule ends', claims[b].name + '\'s claim (profile ' + claims[b].by + ') on',
            nameOf(b) + ', made before only the Jarl of', hold, 'could hold it');
+      keepOwed(b, claims[b], Date.now());
       delete claims[b];
       ended++;
     }

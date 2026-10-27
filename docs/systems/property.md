@@ -25,7 +25,8 @@ key does not take it off them.
 The claim lapses 14 real days after the last time the holder opened one
 of its doors. Living there keeps it. When it lapses, the register drops
 the claim and the doors unlock. What is in the chests stays in the
-chests.
+chests. Rent owed on it, counted up to the day it lapsed and no further,
+stays owed by the holder (#3950, see Stewards and rent).
 
 When somebody's account is deleted at their request, the game lets go of
 what their characters held at its next start (#2351): a building or a farm
@@ -153,7 +154,16 @@ hold settle it as its steward, like anybody who keeps it.
 
 Eviction ends the claim. It does not empty the house. It does not
 take a key back, so a tenant who kept one can still walk in. That is a
-person's problem, handled like a person.
+person's problem, handled like a person. It does not end the debt
+either: rent the tenant owed stays theirs (#3950).
+
+A claim ending never ends a debt (Patrick, 27 Oct, #3893 and #3950).
+When the deed goes to somebody else, a steward evicts, or the claim
+lapses, whatever its holder owed, counted up to that moment, stays
+owed by them. Rent is never counted past the day a claim lapses. The
+steward sees it at that door on the Office page, the person sees it on
+their property page of K, and it is paid like any rent, below. A
+steward who forgives it marks it paid.
 
 Rent is optional. A steward opens the door, then on the Office page
 sets 50 and the place owes 50 gold every 7 real days, or presses No

@@ -104,7 +104,9 @@ const NAMES = ['officeView', 'officeHolders', 'officeRedraw', 'officeCmd', 'offi
                // Staff at any door (#2551, Patrick, 17 Oct).
                'isStaffHere', 'settleAs', 'settleWhere', 'staffRecord',
                // Who owes rent at the door, and Rent paid (#3893, #3895).
-               'rentOwing', 'rentPaid', 'arrearsRow', 'arrearsAdd', 'arrearsPay', 'boxLog', 'dropboxOf'];
+               'rentOwing', 'rentPaid', 'arrearsRow', 'arrearsAdd', 'arrearsPay', 'boxLog', 'dropboxOf',
+               // A claim ending keeps what was owed (#3950).
+               'countRent', 'keepOwed'];
 const lifted = {};
 const missing = [];
 NAMES.forEach(function (n) { lifted[n] = fn(n); if (!lifted[n]) { missing.push(n); } });
