@@ -123,15 +123,17 @@ function Get-MostOnline([string]$Path = '', [ValidateSet('main', 'dev')][string]
     $r.Value = $n
     $r.Staff = $staff
     $r.Seats = $n + $staff
-    # The most people the voice service takes at once (#481), which every
-    # person seated holds a socket to and every person waiting in line at the
-    # menu as well, so it is never fewer than the seats. 0 when the record
-    # has none, and Install-Voice.ps1 then leaves the service uncapped.
+    # The most people who hold a voice place at once (#481), never fewer than
+    # the seats, so everybody seated has one. Only somebody in the world
+    # holds one: somebody waiting in line at the menu has a socket for text
+    # chat and the line, and no voice place (#3570), so the line is not
+    # counted here. 0 when the record has none, and Install-Voice.ps1 then
+    # leaves the service uncapped.
     if ($nums.PSObject.Properties.Name -contains 'voice') {
         $v = 0
         [void][int]::TryParse([string]$nums.voice, [ref]$v)
         if ($v -lt $r.Seats) {
-            throw ("{0} gives voice {1}, fewer than the {2} seats ({3} people and {4} for staff roles), so somebody seated could be kept out of voice and chat. Nothing was written." -f $where, $nums.voice, $r.Seats, $n, $staff)
+            throw ("{0} gives voice {1}, fewer than the {2} seats ({3} people and {4} for staff roles), so somebody seated could be kept out of voice. Nothing was written." -f $where, $nums.voice, $r.Seats, $n, $staff)
         }
         $r.Voice = $v
     }

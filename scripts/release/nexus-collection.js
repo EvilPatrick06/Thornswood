@@ -30,16 +30,40 @@
 // file name. That is the whole of what Vortex records for a mod only when the
 // entry carries nothing worked out from the archive's contents. So it refuses
 // an entry that has hashes (the files Vortex checks after install), choices
-// (an installer's answers), patches (binary patches made against the old
-// archive's files, which would not apply to the new one) or fileOverrides,
-// and an entry any mod rule names, because those rules name the old archive
-// by its md5. Those need Vortex on One, where the collection is built from
-// what is installed (docs\COLLECTION-REVISION-2.md). Every refusal exits 1
-// with the reason on stderr and writes nothing.
+// (an installer's answers) or fileOverrides. Those need Vortex on One, where
+// the collection is built from what is installed
+// (docs\COLLECTION-REVISION-2.md). Every refusal exits 1 with the reason on
+// stderr and writes nothing.
+//
+// PATCHES AND MOD RULES ON A MOVED ENTRY (#2793). Two things Vortex records
+// against the old archive can be carried to the new one, because what they
+// need from it is known:
+//   - a binary patch is made against one file of the old archive, and
+//     Vortex checks that file's CRC-32 before it applies it. "patchCrcs" in
+//     the swap gives the CRC-32 of each patched path in the new archive
+//     (null where it has no such file), which New-NexusRevision.ps1 reads out
+//     of it. A patch whose file is the same bytes stays. A patch named in
+//     "dropPatches" goes, so the new archive's own file is what is installed
+//     (Thornswood Content 1.2's plugin patch, once the new file carries the
+//     plugin as it should be). Any other patch would not apply, and the swap
+//     is refused, saying so.
+//   - a mod rule names the old archive by its md5, its file name on Nexus
+//     ("fileExpression", the name without its extension) and its version
+//     ("versionMatch", the version as Vortex reads it, 1.2 as 1.2.0). Each
+//     side of a rule that names the moved entry is given the new archive's
+//     md5, "fileExpression" from the swap and the new version the same way,
+//     so it finds the new file as it found the old. A versionMatch that is a
+//     range and not the old version is refused, because what it should
+//     become is not known.
 //
 // swaps.json: [{ "modId": "192762", "fileId": "812345", "version": "1.0.1",
 //                "md5": "<32 hex>", "fileSize": 148896610,
-//                "logicalFilename": "Thornswood Client Runtime" }]
+//                "logicalFilename": "Thornswood Client Runtime",
+//                "fileExpression": "Thornswood Client Runtime 192762 1.0.1 2026-10-20T20-00Z abc",
+//                "patchCrcs": { "Thornswood-Content.esp": "0A1B2C3D" },
+//                "dropPatches": ["Thornswood-Content.esp"] }]
+// fileExpression is needed only when a mod rule names the entry, patchCrcs
+// and dropPatches only when it carries patches.
 // On stdout, one line per field changed: <entry name>\t<field>\t<was>\t<now>.
 //
 // ADDING A MOD (#2969). An entry with "add": true is a mod the revision does
@@ -169,7 +193,7 @@ function applySwaps(collection, swaps) {
     const hits = collection.mods.filter(m => m.source && m.source.type === 'nexus' && String(m.source.modId) === String(sw.modId));
     if (hits.length !== 1) stop('The revision has ' + hits.length + ' entries for Nexus mod ' + sw.modId + ', so there is no one entry to change.');
     const e = hits[0];
-    const carried = ['hashes', 'choices', 'patches', 'fileOverrides'].filter(k => {
+    const carried = ['hashes', 'choices', 'fileOverrides'].filter(k => {
       const v = e[k];
       if (v === undefined || v === null) return false;
       if (Array.isArray(v)) return v.length > 0;
@@ -179,10 +203,6 @@ function applySwaps(collection, swaps) {
     if (carried.length) {
       stop(e.name + ' carries ' + carried.join(' and ') + ' worked out from the archive it has now, which would not fit the new one. A new file for it is a revision made in Vortex on One.');
     }
-    const rules = (collection.modRules || []).filter(r => named(r, e));
-    if (rules.length) {
-      stop(rules.length + ' of the collection\'s mod rules name ' + e.name + ' by the archive it has now, so they would not find the new one. A new file for it is a revision made in Vortex on One.');
-    }
     if (String(e.source.fileId) === String(sw.fileId)) stop(e.name + ' is already file ' + sw.fileId + ' in this revision.');
     const set = (obj, key, val, label) => {
       const was = obj[key];
@@ -190,6 +210,8 @@ function applySwaps(collection, swaps) {
       obj[key] = val;
       lines.push([e.name, label, String(was), String(val)].join('\t'));
     };
+    movePatches(collection, e, sw, lines);
+    moveRules(collection, e, sw, lines);
     set(e, 'version', String(sw.version), 'version');
     set(e.source, 'fileId', Number(sw.fileId), 'source.fileId');
     set(e.source, 'md5', String(sw.md5), 'source.md5');
@@ -197,6 +219,70 @@ function applySwaps(collection, swaps) {
     set(e.source, 'logicalFilename', String(sw.logicalFilename), 'source.logicalFilename');
   }
   return lines;
+}
+
+// PATCHES AND MOD RULES ON A MOVED ENTRY, above.
+function movePatches(collection, e, sw, lines) {
+  const drop = Array.isArray(sw.dropPatches) ? sw.dropPatches.map(String) : [];
+  const patches = e.patches && typeof e.patches === 'object' ? e.patches : {};
+  const keys = Object.keys(patches);
+  for (const d of drop) {
+    if (!keys.some(k => k.toLowerCase() === d.toLowerCase())) stop(e.name + ' has no patch for ' + d + ' to drop.');
+  }
+  if (!keys.length) return;
+  const crcs = sw.patchCrcs && typeof sw.patchCrcs === 'object' ? sw.patchCrcs : null;
+  const crcOf = (k) => {
+    if (!crcs) return undefined;
+    const hit = Object.keys(crcs).find(c => c.toLowerCase() === k.toLowerCase());
+    return hit === undefined ? undefined : crcs[hit];
+  };
+  for (const k of keys) {
+    if (drop.some(d => d.toLowerCase() === k.toLowerCase())) {
+      lines.push([e.name, 'patches.' + k, String(patches[k]), 'dropped'].join('\t'));
+      delete patches[k];
+      continue;
+    }
+    const now = crcOf(k);
+    if (now === undefined) stop(e.name + ' patches ' + k + ', and the swap does not say what the new archive holds there.');
+    if (now !== null && String(now).toUpperCase() === String(patches[k]).toUpperCase()) continue;
+    stop(e.name + ' patches ' + k + ', made against the file with CRC-32 ' + patches[k] + ' in the archive it has now, and the new archive ' +
+      (now === null ? 'has no ' + k : 'holds ' + k + ' with CRC-32 ' + now) + ', so the patch would not apply. Drop it to install the new archive\'s own file (-DropPatch ' + sw.modId + ':' + k + ').');
+  }
+  if (!Object.keys(patches).length) delete e.patches;
+}
+
+// The version as Vortex matches it: semver's coerce, 1.2 as 1.2.0.
+function coerce(v) {
+  const m = /(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(String(v));
+  return m ? [m[1], m[2] || '0', m[3] || '0'].map(Number).join('.') : null;
+}
+
+function moveRules(collection, e, sw, lines) {
+  const s = e.source;
+  const oldVersion = coerce(e.version);
+  const newVersion = coerce(sw.version);
+  (collection.modRules || []).forEach((r, i) => {
+    for (const sideName of ['source', 'reference']) {
+      const side = r[sideName];
+      if (!side || !named({ source: side }, e)) continue;
+      const label = 'modRules[' + i + '].' + sideName + '.';
+      const put = (key, val) => {
+        if (String(side[key]) === String(val)) return;
+        lines.push([e.name, label + key, String(side[key]), String(val)].join('\t'));
+        side[key] = val;
+      };
+      if (side.fileMD5 !== undefined) put('fileMD5', String(sw.md5));
+      if (side.fileExpression !== undefined) {
+        if (!sw.fileExpression) stop('Mod rule ' + i + ' names ' + e.name + ' by its file name on Nexus, and the swap gives no fileExpression for the new one.');
+        put('fileExpression', String(sw.fileExpression));
+      }
+      if (side.logicalFileName !== undefined && side.logicalFileName === s.logicalFilename) put('logicalFileName', String(sw.logicalFilename));
+      if (side.versionMatch !== undefined && side.versionMatch !== '*') {
+        if (!oldVersion || side.versionMatch !== oldVersion || !newVersion) stop('Mod rule ' + i + ' matches ' + e.name + ' by the version "' + side.versionMatch + '", which is not its version ' + e.version + ' as Vortex reads it, so what it should become for ' + sw.version + ' is not known.');
+        put('versionMatch', newVersion);
+      }
+    }
+  });
 }
 
 // shortid's alphabet, which Vortex's reference tags are drawn from.

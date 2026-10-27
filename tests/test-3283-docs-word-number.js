@@ -12,8 +12,7 @@
 // merchant-traders.md ("after360 minutes ... existing512-unit"). The same
 // pages also carried hand-off notes saying who owns a release step.
 //
-// This holds, for every page under docs/systems except merchant-plans/ (the
-// archived plan notes, kept as written):
+// This holds, for every page under docs/systems:
 //
 //   1. no prose runs a word into a number: a lowercase word, "The", "PR",
 //      "Expert" or "Master" straight into a digit, or a word's colon or comma
@@ -42,7 +41,7 @@ function pages(dir) {
   let out = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) { if (e.name !== 'merchant-plans') out = out.concat(pages(p)); }
+    if (e.isDirectory()) out = out.concat(pages(p));
     else if (e.name.endsWith('.md')) out.push(p);
   }
   return out.sort();

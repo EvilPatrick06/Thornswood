@@ -208,6 +208,12 @@ function joinToken(port, pid) {
     req.end(body);
   });
 }
+/* The gamemode's position feed, stood in for: these profiles are in the world. */
+async function inWorld(port, pids) {
+  const body = JSON.stringify({ who: pids.map((pid) => ({ profileId: pid, pos: [0, 0, 0], angleZ: 0, cell: 'a room' })) });
+  const r = await fetch('http://127.0.0.1:' + port + '/positions', { method: 'POST', body: body });
+  if (r.status !== 204) throw new Error('/positions answered ' + r.status);
+}
 const BAD = new RegExp('[' + C(0) + '-' + C(0x1f) + C(0x7f) + '-' + C(0x9f) + C(0x61c) + C(0x200e) + C(0x200f) +
                        C(0x2028) + C(0x2029) + C(0x202a) + '-' + C(0x202e) + C(0x2066) + '-' + C(0x2069) + ']');
 const keys = (o) => Object.keys(o || {}).sort().join(',');
@@ -228,6 +234,10 @@ const keys = (o) => Object.keys(o || {}).sort().join(',');
   // Once it has gone and every line it wrote has been read ('close').
   const srvClosed = new Promise((ok) => srv.once('close', ok));
   await listening(srv, PORT);
+  // Everybody here is in the world, since only they hold a voice place and
+  // are on the roster (#3570). The rows carry no name, so the roster shows
+  // the name each join sent, which is what is checked.
+  await inWorld(PORT, [20, 21, 31, 32]);
 
   console.log('#1349, a hostile name:');
   const HOSTILE = 'Bob' + C(0x202e) + C(7) + '\n[voice] REFUSED a join for profile 1: forged' + C(0x2028);

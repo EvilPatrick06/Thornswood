@@ -8,8 +8,6 @@
 #             launcher window check and the launcher build
 #   GitHub    pull requests open more than two days and branches other than
 #             main, which CONTRIBUTING.md says are merged or closed
-#   restore   whether the monthly hands-on restore rehearsal is overdue
-#             (Check-RehearsalDue.ps1, issue #1046)
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives: a tag is a moving pointer, and this
@@ -164,14 +162,17 @@ jobs:
 
       - name: Check the launcher window
         if: ${{ !cancelled() }}
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           # The launcher builds its window from ui.xaml at startup and finds
           # every control by name, so a renamed control or a window that does
           # not parse compiles clean and is found by the person using it. This
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
-          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          # -ExecutionPolicy Bypass on both, as every harness starts 5.1:
+          # Windows 11 keeps 5.1 at Restricted, so on One's runners the plain
+          # shell: powershell could not run this step's own script (#3861).
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Parse every game script
@@ -320,22 +321,25 @@ jobs:
       # No artifact from this build: nothing read it, and the copies took most
       # of the account's Actions storage (#2163, 19 Oct; build.yml says more).
 
-      - name: Is the monthly restore rehearsal due
+      # The monthly restore rehearsal check (#1046) reads RESTORING.md, which
+      # is in the private ops repo since #3693; that repo's nightly runs it.
+
+      - name: Is the source of what is inside frida-gum.lib where the notes say
         if: ${{ !cancelled() }}
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Issue #1046. Patrick, 18 Oct 2026: the hands-on restore rehearsal
-          # runs monthly. Its record is the Last rehearsed line in
-          # docs\RESTORING.md, written by hand after a real run, and this reads
-          # it. Older than 35 days fails the night, so the board's issue says
-          # the rehearsal is overdue until one is done and the line written. A
-          # page whose line cannot be read fails too (exit 3): no record is not
-          # a pass. tests\test-1046-rehearsal-due.ps1 holds it to that.
-          .\scripts\vps\Check-RehearsalDue.ps1
-          $code = $LASTEXITCODE
-          if ($code -eq 1) { Write-Host '::error file=docs/RESTORING.md::the monthly restore rehearsal is overdue; do it ("Rehearsing it") and write the date in the Last rehearsed line' }
-          elseif ($code -ne 0) { Write-Host '::error file=docs/RESTORING.md::the Last rehearsed line could not be read; the line above says why' }
-          exit $code
+          # Issue #3287. SkyrimPlatformImpl.dll links frida-gum.lib, whose
+          # LGPL parts go out under the GPL, so their source has to stay
+          # where the note beside the file says: the Release of their
+          # archives, which stays as long as the launcher ships frida-gum, and
+          # the forks while records\frida-sources.json says they are up. Red
+          # when the Release is gone or not whole once it is made (or not
+          # made once the repository is public), when a fork's tag is not
+          # its commit, or when the client files carry another Frida.
+          .\scripts\release\Publish-FridaSources.ps1 -Check
+          exit $LASTEXITCODE
 
       - name: Stray pull requests and branches
         if: ${{ !cancelled() }}
