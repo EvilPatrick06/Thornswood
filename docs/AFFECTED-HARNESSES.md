@@ -380,7 +380,8 @@ of 570 gate harnesses. Replayed over the last 40 merges, a fresh map ran
    merge commit. Nothing is fetched. It prints why each chosen harness runs.
    It runs the whole gate when there is no map, when the map does not read,
    when the change touches a forcing rule (section 4, now with
-   `Run-Gate.ps1`), and on a GitHub-hosted runner, which has no map.
+   `Run-Gate.ps1` and `Gate-Map.ps1`). Off the box it uses the map main's
+   build handed on (item 7).
 4. **Only a whole gate keeps the note.** Run-Gate.ps1 writes `whole=true`
    only when every gate harness ran, and build.yml writes the
    `TESTED-TREE <tree>` note in its log (#3182, #3399) only then. So after a pull request that
@@ -395,7 +396,24 @@ of 570 gate harnesses. Replayed over the last 40 merges, a fresh map ran
 6. **What it does not cover.** A main build on GitHub's hosted runner is not
    traced, so once hosted minutes are back (about 1 Nov) the map refreshes
    only when main builds on the box. A pull request built on the hosted
-   runner runs the whole gate.
+   runner picks from the last map a box build handed on (item 7), so the
+   merges since count as part of its change.
+7. **Off the box (#4009).** The map is only in the box's build runners'
+   folders, so a pull request built on One's runners (#3860) or GitHub's
+   ran the whole gate: #3861's own build on thornswood-pr-one took about 13
+   minutes for it (run 40424800152). Main's push build on the box now runs
+   `scripts/dev/Gate-Map.ps1 -Hand` after its gate: it builds the map from
+   that runner's newest traces and prints it, gzipped, with the traced tree,
+   into the job's log as numbered `GATE-MAP` lines with each part's sha256.
+   About 23 KB and 75 KB gzipped. A log, because this repository's artifact
+   storage is used up (#3399) and a log costs none. A gate with no map of
+   its own runs `Gate-Map.ps1 -Fetch` with the job's token (`actions:
+   read`), which reads the newest finished build.yml runs on a push to main
+   of this repository, passes over any other run, and writes the first whole
+   map it finds in the box's folder shape, the built map in place of the
+   traces. `pick` takes either. Run-Gate.ps1 takes the token out of the
+   environment before any harness starts. `tests/test-4009-gate-map.ps1`
+   holds both halves.
 
 `tests/test-3114-run-gate.ps1` runs Run-Gate.ps1 for real in a scratch
 repository for each of those cases, and on Windows runs the task's check of

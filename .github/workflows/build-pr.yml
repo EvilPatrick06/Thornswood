@@ -49,6 +49,11 @@ jobs:
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
     # the harness step alone and the limit below cancelled passing builds.
     runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    # actions: read for the gate step off the box, which reads the map main's
+    # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
+    permissions:
+      actions: read
+      contents: read
     # Often past twenty minutes on the VPS (#2557): it is shared with the live
     # server and other jobs, and the harness list keeps growing (#2544 added
     # test-release-workflow.ps1, #2525 the feed-watch test, #2546 the remote
@@ -270,6 +275,11 @@ jobs:
       - name: Run the gate harnesses
         id: gate
         shell: pwsh
+        # Off the box a pull request's gate reads the map main's build handed
+        # on with it (#4009). Run-Gate.ps1 takes it out of the environment
+        # before any harness starts.
+        env:
+          GATE_MAP_TOKEN: ${{ github.token }}
         run: |
           # Issue #3009. The gate is every tests\test-*.js and tests\test-*.ps1
           # that tests\gate-excluded.txt does not name, read from the files by
@@ -322,6 +332,18 @@ jobs:
           }
           .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800
           exit $LASTEXITCODE
+
+      # THE MAP FOR RUNNERS OFF THE BOX (#4009). The trace task leaves the map
+      # only in the box's build runners' folders, so a pull request built on
+      # One's runners or GitHub's ran the whole gate. Main's build prints the
+      # box's newest map into this job's log, which costs no storage
+      # (artifacts do, #3399), and a gate off the box reads it from there.
+      # scripts\dev\Gate-Map.ps1 says how; it hands on only in main's push
+      # build, and never fails a build.
+      - name: Hand the traced map to runners off the box
+        if: ${{ !cancelled() && runner.environment == 'self-hosted' }}
+        shell: pwsh
+        run: .\scripts\dev\Gate-Map.ps1 -Hand
 
       - name: Run the voice service's /health harness
         shell: pwsh
@@ -570,6 +592,10 @@ jobs:
     name: Launcher builds
     if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
     runs-on: windows-latest
+    # As the fallback's: the gate step reads the map main's build handed on.
+    permissions:
+      actions: read
+      contents: read
     # The hosted runner has two cores: the harness step alone took over
     # eighteen minutes on it, so it gets an hour.
     timeout-minutes: 60
