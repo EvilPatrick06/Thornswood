@@ -78,9 +78,17 @@ $WebViewData = @(
     (Join-Path $env:TEMP 'proto-wpf-net10-webview2-webview')
 )
 
+# Remove-Item stalls on a path with an ampersand in it, and the work folder
+# sits under C:\ThornswoodTemps&Worktrees, so folders and files are removed
+# through .NET instead.
+function Remove-Tree([string]$path) {
+    if ([IO.Directory]::Exists($path)) { [IO.Directory]::Delete($path, $true) }
+    elseif ([IO.File]::Exists($path)) { [IO.File]::Delete($path) }
+}
+
 if ($Clean) {
     foreach ($p in @($Work) + $WebViewData) {
-        if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force; Write-Host "removed $p" }
+        if (Test-Path -LiteralPath $p) { Remove-Tree $p; Write-Host "removed $p" }
     }
     return
 }
@@ -223,7 +231,7 @@ function Add-Assets([string]$dir, [switch]$Page) {
 }
 
 function Reset-Dir([string]$dir) {
-    if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+    Remove-Tree $dir
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
 }
 
@@ -310,7 +318,7 @@ $Builds = [ordered]@{
         Push-Location $src
         try {
             Invoke-Checked 'install electron' { npm install --no-audit --no-fund }
-            Remove-Item -LiteralPath 'art.png', 'loop.wav' -ErrorAction SilentlyContinue
+            Remove-Tree (Join-Path $src 'art.png'); Remove-Tree (Join-Path $src 'loop.wav')
             Copy-Item -LiteralPath (Join-Path $Proto 'index.html') -Destination $src -Force
             Invoke-Checked 'package electron (weighed, page only)' { npx electron-packager . proto-electron --platform=win32 --arch=x64 --out $w --overwrite --ignore='^/node_modules' }
             Add-Assets $src
@@ -506,7 +514,7 @@ function Get-Size([string]$dir) {
         ZipMB = [math]::Round((Get-Item -LiteralPath $zip).Length / 1MB, 2)
         Files = $files.Count
     }
-    Remove-Item -LiteralPath $stage -Recurse -Force; Remove-Item -LiteralPath $zip -Force
+    Remove-Tree $stage; Remove-Tree $zip
     $r
 }
 
@@ -519,7 +527,7 @@ function Measure-One([string]$name) {
     $runs = @()
     for ($r = 1; $r -le $Runs; $r++) {
         $ready = Join-Path $Work "ready-$name-$r"
-        Remove-Item -LiteralPath $ready, "$ready.active" -ErrorAction SilentlyContinue
+        Remove-Tree $ready; Remove-Tree "$ready.active"
         $psi = [Diagnostics.ProcessStartInfo]::new($exe)
         $psi.WorkingDirectory = Split-Path $exe
         $psi.UseShellExecute = $false
@@ -542,7 +550,7 @@ function Measure-One([string]$name) {
             if ($r -eq 1) { $run.Mixer = @(Get-MixerEntries $active.Tree $p.Id) }
         }
         Stop-Tree $p.Id
-        Remove-Item -LiteralPath $ready, "$ready.active" -ErrorAction SilentlyContinue
+        Remove-Tree $ready; Remove-Tree "$ready.active"
         $runs += [pscustomobject]$run
         Say ("{0} run {1}: ready {2} ms" -f $name, $r, $readyMs)
         Start-Sleep -Milliseconds 1000
