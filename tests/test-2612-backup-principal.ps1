@@ -21,7 +21,7 @@
       that way and the list never saw them (#2578). Patrick, 22 Oct 2026:
       the tasks that watch, keep or repair the box stay SYSTEM by design;
       only the services that run code we deploy get accounts of their own
-      (docs\DEPLOY-IDENTITIES.md section 8).
+      (the ops repo's DEPLOY-IDENTITIES.md section 8).
   Windows only. Under a minute.
 #>
 $ErrorActionPreference = 'Stop'

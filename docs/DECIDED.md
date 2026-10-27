@@ -264,7 +264,7 @@ link, and the old line goes.
   [#2929](https://github.com/EvilPatrick06/Thornswood/issues/2929#issuecomment-6335266070).
 - **The watchdog and maintenance tasks stay SYSTEM, by design;** the
   services that run code we deploy, and the nightly backup, run on accounts
-  of their own (docs/DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
+  of their own (the ops repo's DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6335268289),
   the backup
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6342972359).
@@ -391,3 +391,7 @@ removal again:
   [#3158](https://github.com/EvilPatrick06/Thornswood/issues/3158#issuecomment-6333340060).
 - **Apprentices rank faster** beside a higher-rank crafter. 21 Oct 2026,
   [#3171](https://github.com/EvilPatrick06/Thornswood/issues/3171#issuecomment-6333339289).
+- **The collection's edited menu files are made from each person's own copy,
+  never shipped.** SkyUI's and SkyHUD's page terms (patches that need the
+  original file, credit for changes) change nothing. 26 Oct 2026,
+  [#3800](https://github.com/EvilPatrick06/Thornswood/issues/3800#issuecomment-6431656924).

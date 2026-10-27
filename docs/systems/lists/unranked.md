@@ -1,9 +1,10 @@
 # Unranked world plants
 
-Generated from `game/data/harvests.json` by `scripts/dev/Write-SystemLists.js`. 44 rows, 51 placed records. In the harvest file with no rank. The plan's ranks, and which of these are the farmer's, are on the gatherer page.
+Generated from `game/data/harvests.json` by `scripts/dev/Write-SystemLists.js`. 45 rows, 52 placed records. In the harvest file with no rank. The plan's ranks, and which of these are the farmer's, are on the gatherer page.
 
 | Name | Rank | Records | You receive |
 | --- | --- | --- | --- |
+| Aloe Vera |  | 1 | Aloe Vera |
 | Bashir's Clam |  | 1 | Bashir's Clam |
 | Beehive |  | 1 | Beehive |
 | Bleeding Crown |  | 1 | Bleeding Crown |
