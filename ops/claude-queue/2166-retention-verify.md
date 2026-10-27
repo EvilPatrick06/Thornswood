@@ -25,7 +25,7 @@
        .\scripts\vps\Remote.ps1 '[Environment]::GetEnvironmentVariable("THORNSWOOD_CHAT_DAYS","Machine"); [Environment]::GetEnvironmentVariable("THORNSWOOD_CHAT_DAYS","User"); Get-ScheduledTask | ? TaskName -match "Voice" | % { $_.TaskName + " : " + (($_.Actions | % Arguments) -match "CHAT_DAYS") }'
        .\scripts\vps\Remote.ps1 '"live oldest " + (Get-ChildItem C:\Thornswood-Voice\chat\*.jsonl | Sort Name | Select -First 1 | % Name); "dev oldest " + (Get-ChildItem C:\Thornswood-Voice-Dev\chat\*.jsonl | Sort Name | Select -First 1 | % Name)'
 
-   Then open `/voice/health` and note `chatRetention.overdueDays` and `pruneError`. Expected: no variable set, or 365; oldest day under 365 days old; overdueDays 0.
+   Then read voice's health on the box, `.\scripts\vps\Remote.ps1 '(Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7778/health).Content'` (7789 for dev; through the site `/voice/health` says only ok since #3806), and note `chatRetention.overdueDays` and `pruneError`. Expected: no variable set, or 365; oldest day under 365 days old; overdueDays 0.
 
 4. **Backups (rows 10-12).** Names and dates only:
 
@@ -57,7 +57,7 @@ Claude deploys this. Herald does not run Deploy-Docs or any install. Use the sha
    - Step 2 above should now show `troublePast365` 0.
    - `Select-String -Path C:\Thornswood-Docs\server.js -SimpleMatch -Pattern "COOKIE + '=; Path=/; Max-Age=0" | Measure-Object | % Count` should print 2 (sign-out and the Discord callback; 1 before this deploy).
    - `Select-String -Path C:\Thornswood-Voice\voice-server.js,C:\Thornswood-Voice-Dev\voice-server.js -Pattern "chatPruneTimer = setTimeout\(chatPrune, 3600000\)" | Measure-Object | % Count` should print 2 (one in each file).
-   - On `/voice/health`, `chatRetention.overdueDays` should be 0.
+   - Voice's health on the box (step 3's `Remote.ps1` line): `chatRetention.overdueDays` should be 0.
    - In a private window, sign in with Discord: the response sets `twa` and clears `tw` (`Max-Age=0`). Check this on the browser's cookie list, not by pasting a value anywhere.
 5. **Put back:** Deploy-Docs and Install-Voice each keep the previous files (`-PutBack` for voice). Nothing here changes data.
 
@@ -75,7 +75,7 @@ Claude deploys this, after the #2631 steps above (or with them: the site and voi
    - `Select-String -Path C:\Thornswood-Docs\data\site\privacy.md -SimpleMatch -Pattern "Nothing in" | Measure-Object | % Count`. The page should hold the line "Nothing in them is kept past 90 days".
    - `(Get-ScheduledTask -TaskName 'Thornswood Voice','Thornswood Dev Voice').Actions.Arguments -match '--days 90 --stamp' | Measure-Object | % Count` should print 2. `Test-Path C:\Thornswood-Voice\server-log.js, C:\Thornswood-Voice-Dev\server-log.js` should print True twice.
    - The newest voice.log in each voice root: the first line should start with `[2026-` (stamped). Print the first 21 characters only, no content.
-   - `/voice/health` answers on live and dev, and `chatRetention.overdueDays` is 0.
+   - Voice's health on the box answers on 7778 and 7789 (step 3's `Remote.ps1` line), and `chatRetention.overdueDays` is 0.
    - `Get-Service ThornswoodBot | % Status` should be Running. Check that `C:\Thornswood-Bot\data\bot.log` is being written (its LastWriteTime moves).
    - The next day: no `voice.log.*`, `bot.log.*` or `site.log.*` file has a LastWriteTime older than 90 days. Names and dates only.
    - After the next Publish-Server: the game server task arguments contain `--also thornswood.log`.

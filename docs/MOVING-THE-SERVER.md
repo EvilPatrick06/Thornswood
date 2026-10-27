@@ -219,9 +219,11 @@ typed on a command line or written on this page.
    step 16. Restore-Box says so too (step 13).
 7. **Live voice, set the way the old box runs it:**
    `.\scripts\deploy\Install-Voice.ps1 -Bind 127.0.0.1`. On
-   29 September `https://thornswood.net/voice/health` said auth on, bind
-   127.0.0.1, no relay and chat range off; read it again on the day and pass
-   what it says. On a new box there is nothing running for Install-Voice to
+   29 September the live service's `/health` said auth on, bind
+   127.0.0.1, no relay and chat range off; read it again on the day, on the
+   old box, and pass what it says:
+   `.\scripts\vps\Remote.ps1 "(Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:7778/health').Content"`.
+   Through the site it says only ok since #3806. On a new box there is nothing running for Install-Voice to
    keep; loopback is its default since #1304, so `-Bind 127.0.0.1` only says
    so out loud, and no firewall rule is opened for the port. Auth needs no
    flag: since #1303 the service refuses every join that cannot prove
@@ -231,7 +233,8 @@ typed on a command line or written on this page.
    chat logs or keys, and dev voice starting with auth on, on 127.0.0.1 only
    (#1082, #1083):
    `.\scripts\vps\Remote.ps1 -File .\scripts\vps\vps-dev-instance.ps1`. Then dev
-   voice set the way `https://thornswood.net/voice-dev/health` says it runs
+   voice set the way the old box's dev voice `/health` (127.0.0.1:7789, read
+   the same way) says it runs
    (auth on, bind 127.0.0.1 on 29 September), which is what the dev instance
    already starts it with:
    `.\scripts\deploy\Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice' -Bind 127.0.0.1`.
@@ -322,7 +325,8 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     Discord sign in needs nothing: the site builds its redirect from the
     name, not the address.
 19. **Check it from outside:** `.\scripts\vps\Check-Site.ps1 -NoSsh -NoPause`,
-    and `https://thornswood.net/voice/health` and `/voice-dev/health` answer.
+    and `https://thornswood.net/voice/health` and `/voice-dev/health` answer
+    `{"ok":true}` and nothing more (#3806).
     Wait for the certificate before telling anybody, or the site shows a
     warning.
 

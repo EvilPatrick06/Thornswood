@@ -39,7 +39,11 @@ has no business sitting in a checkout. From the copy:
 $env:THORNSWOOD_VOICE_PORT = '7900'; $env:THORNSWOOD_VOICE_BIND = '127.0.0.1'; node voice-server.js
 ```
 
-then open http://127.0.0.1:7900/health. It reads `THORNSWOOD_VOICE_PORT`
+then open http://127.0.0.1:7900/health. Only a caller on the same machine,
+with no forwarding header, gets the whole answer; anything Caddy carries
+(https://thornswood.net/voice/health) is told `{"ok":true}` and nothing
+more, so the build, the deploy record and the counts below are read on the
+box (#3806). It reads `THORNSWOOD_VOICE_PORT`
 (7778 when unset), `THORNSWOOD_VOICE_BIND` (loopback when unset since #1304;
 `0.0.0.0` answers every interface, and even then `/token` and the handshake
 refuse anything that did not come over TLS: straight off the network, or
@@ -152,7 +156,7 @@ forwarding header on it, which Caddy always sets (#1797). Its clients are the
 launcher's hidden voice page (`launcher`), the in-game overlays
 (`game\ui`) and the two gamemodes. `.\scripts\deploy\Install-Voice.ps1` copies
 `voice-server.js` and `headlines.js`, restarts the task and waits
-for `/health`; the dev service is the same script with
+for `/health` on the box; the dev service is the same script with
 `-Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'`.
 `Go.ps1` without `-SkipServer` also copies this file over the live one and
 restarts it.

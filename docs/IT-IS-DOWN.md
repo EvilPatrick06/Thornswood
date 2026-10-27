@@ -159,7 +159,14 @@ the box holds.
 curl https://thornswood.net/voice/health
 ```
 
-`{"ok":true,...}` and it is fine. If not:
+`{"ok":true}` and it is fine. That is all it says from outside (#3806); the
+build, the deploy record and the counts answer only on the box itself:
+
+```powershell
+.\scripts\vps\Remote.ps1 "(Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:7778/health').Content"
+```
+
+(7789 for dev voice). If it is not fine:
 
 ```powershell
 .\scripts\deploy\Install-Voice.ps1
