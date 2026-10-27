@@ -59,7 +59,21 @@ if ($start -gt 0 -and $end -gt $start) {
     Yes 'with the defaults the file sent is the tracked one' ($a -eq $cf)
     $b = Build 'example.org' 'ops@example.org'
     Yes '  -Domain puts the new name in' ($b.Contains('example.org, www.example.org {') -and -not $b.Contains('thornswood.net'))
-    Yes '  -Email replaces the address' ($b -match '(?m)^\s*email ops@example\.org\s*$')
+    Yes '  -Email puts the address in' ($b -match '(?m)^\s*email ops@example\.org\s*$')
+    Yes '  as the first line of the global options block' ($b -match '(?m)^\{\r?\n\temail ops@example\.org\r?\n\tstorage ')
+    Yes 'the tracked Caddyfile names no contact address (#3838)' (-not ($cf -match '(?m)^\s*email\s'))
+    # A Caddyfile that does carry an email line gets it replaced, not a second one.
+    $withMail = [regex]::Replace($cf, '(?m)^\{(\r?\n)', { param($m) $m.Value + "`temail old@example.org" + $m.Groups[1].Value }, 'None')
+    $mailDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-caddy-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $mailDir | Out-Null
+    try {
+        [IO.File]::WriteAllText((Join-Path $mailDir 'Caddyfile'), $withMail)
+        $Here = $mailDir; $Domain = 'thornswood.net'; $Email = 'ops@example.org'
+        . ([scriptblock]::Create($code))
+        $e = $caddyfile
+    }
+    finally { Remove-Item -LiteralPath $mailDir -Recurse -Force -ErrorAction SilentlyContinue }
+    Yes '  and an email line already there is replaced, not doubled' ((([regex]::Matches($e, '(?m)^\s*email\s')).Count -eq 1) -and ($e -match '(?m)^\temail ops@example\.org\r?$'))
     Yes '  and the voice routes survive both' ($b.Contains('handle_path /voice/*') -and $b.Contains('handle_path /voice-dev/*'))
     $threw = $false
     $saved = $cf
@@ -72,6 +86,31 @@ if ($start -gt 0 -and $end -gt $start) {
     }
     finally { Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue }
     Yes '  and a Caddyfile without the voice routes is refused' $threw
+
+    # Every route there, but not the headers the door sets (#2762).
+    $threw = $false
+    try {
+        $tmpDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-caddy-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmpDir | Out-Null
+        $bare = [regex]::Replace($cf, '(?ms)^\theader \{.*?^\t\}\r?\n', '')
+        # Only the Permissions-Policy line goes from a second copy: the
+        # comments still name it, and a comment is not a header.
+        $onlyPerms = [regex]::Replace($cf, '(?m)^\t\tPermissions-Policy .*\r?\n', '')
+        [IO.File]::WriteAllText((Join-Path $tmpDir 'Caddyfile'), $bare)
+        Yes '  (the test''s copy has every route and no header block)' ($bare.Contains('handle_path /github-app/*') -and -not $bare.Contains('Permissions-Policy "'))
+        try { $Here = $tmpDir; $Domain = 'thornswood.net'; $Email = ''; . ([scriptblock]::Create($code)) } catch { $threw = $_.Exception.Message -match '#2762' }
+    }
+    finally { Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue }
+    Yes '  and one without the headers every answer carries is refused (#2762)' $threw
+    $threw = $false
+    try {
+        $tmpDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-caddy-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmpDir | Out-Null
+        [IO.File]::WriteAllText((Join-Path $tmpDir 'Caddyfile'), $onlyPerms)
+        try { $Here = $tmpDir; $Domain = 'thornswood.net'; $Email = ''; . ([scriptblock]::Create($code)) } catch { $threw = $_.Exception.Message -match 'Permissions-Policy' }
+    }
+    finally { Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue }
+    Yes '  and so is one whose comments name Permissions-Policy but nothing sets it' $threw
 }
 
 Write-Host ''

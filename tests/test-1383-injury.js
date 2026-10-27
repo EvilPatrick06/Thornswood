@@ -634,10 +634,14 @@ if (NEEDS_SRC && HURT_SRC && P) {
     yes('mp.onCraft asks the injury block before anything else, through the one craft gate (#1733), and refuses with false',
       /hurt\.craftRefusal\(actorId, workbenchId\)/.test(gateBody) &&
       /const unfit = unfitToMake\(actorId, workbenchId\);/.test(craftBody) && /return false;/.test(craftBody));
-    yes('a potion of cure disease is heard from the engine\'s own drink, never from the /ate line',
+    // The client's /ate line is gone (#3136): nothing in the chat commands
+    // hears a drink, so the engine's is the only one.
+    const chatAt = src.indexOf('// ==== thornswood chat commands ====');
+    const chatSrc = chatAt >= 0 ? src.slice(chatAt, src.indexOf('// ==== end thornswood chat commands ====', chatAt)) : '';
+    yes('a potion of cure disease is heard from the engine\'s own drink, never from a chat line',
       (src.match(/^  mp\.onEatItem = guard\('onEatItem'/gm) || []).length === 1 &&
       /swallowed\(actorId, Number\(baseId\) \|\| 0\)/.test(HURT_SRC) &&
-      src.slice(src.indexOf("if (word === '/ate') {"), src.indexOf("if (word === '/place') {")).indexOf('swallowed') === -1);
+      !!chatSrc && chatSrc.indexOf('swallowed') === -1 && chatSrc.indexOf("word === '/ate'") === -1);
     const burn = src.indexOf("if (word === '/burn') {");
     yes('the /burn report times the fire', burn >= 0 && /burnt\.burning\(actorId,/.test(src.slice(burn, burn + 1500)));
     const death = src.indexOf("mp.onDeath = guard('onDeath'");
