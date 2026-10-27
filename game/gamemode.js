@@ -39748,7 +39748,7 @@ module.exports = {
     var inv = null;
     try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
     var entries = (inv && inv.entries) || [];
-    entries.push({ baseId: baseId, count: 1, name: 'Deed to ' + nameOf(building) });
+    entries.push({ baseId: baseId, count: 1, name: deedLabel(building) });
     try {
       mp.set(actorId, 'inventory', { entries: entries });
     } catch (e) {
@@ -39863,7 +39863,7 @@ module.exports = {
     var mine = [];
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
-      if (holderOf(b) && claims[b].by === profileId) { mine.push(nameOf(b)); }
+      if (holderOf(b) && claims[b].by === profileId) { mine.push(placeOf(b)); }
     }
     if (!mine.length) {
       toProfile(profileId, 'You hold nothing. Open the door of a building nobody holds and ' +
@@ -40030,9 +40030,91 @@ module.exports = {
     return false;
   }
 
-  function keyLabel(building) { return 'Key to ' + nameOf(building); }
-  function moldLabel(building) { return 'Key mold for ' + nameOf(building); }
-  function deedLabel(building) { return 'Deed to ' + nameOf(building); }
+  /*
+    WHAT A KEY, A MOLD AND A DEED CALL A BUILDING (#3899).
+
+    A key IS its name (holdsNamed), so the name has to be one building and no
+    other. The display name is not: BUILDING_NAME has 22 names that more than
+    one building carries, six Halls of the Dead among them, so a key cut for
+    one opened all six and a deed to one, presented at another's door, handed
+    that other one over. Patrick, 27 Oct, answer A: the hold goes on the name,
+    "Key to Hall of the Dead, Whiterun", and where name and hold still clash a
+    short number goes after it, the way the master key carries one.
+
+    LABEL_NO is those numbers. They are written down here rather than worked
+    out from the order of the table, because a key already in a pack names a
+    number and the door table is regenerated: a new building sorting in
+    front of an old one would hand the old one's number, and so its keys, to
+    the new one. So a number is never moved: a building that joins a clash
+    gets the next number of its group, and one that leaves the table has its
+    row taken out. tests/test-3899-key-labels.js fails the build whenever
+    two buildings that can be held come out with the same label, and names
+    them.
+  */
+  var LABEL_NO = {
+    // Apocrypha
+    '142f3:Dragonborn.esm': 1,
+    '142f4:Dragonborn.esm': 2,
+    '1ede2:Dragonborn.esm': 3,
+    '3109d:Dragonborn.esm': 4,
+    '3b065:Dragonborn.esm': 5,
+    // Bloodskal Barrow, Raven Rock
+    '1e8cc:Dragonborn.esm': 1,
+    '24cad:Dragonborn.esm': 2,
+    // Broken Tower Redoubt, Markarth
+    '152af:Skyrim.esm': 1,
+    '7284e:Skyrim.esm': 2,
+    // Creation Club Cell
+    '2fd1:Update.esm': 1,
+    '2fd2:Update.esm': 2,
+    '2fd3:Update.esm': 3,
+    '30e2:Update.esm': 4,
+    '30eb:Update.esm': 5,
+    '30ec:Update.esm': 6,
+    // Creation Club Cell, Raven Rock
+    '30e7:Update.esm': 1,
+    '30e8:Update.esm': 2,
+    // Guard Barracks, Whiterun
+    '36ed6:Skyrim.esm': 1,
+    '580a2:Skyrim.esm': 2,
+    // Miner's Barracks, Markarth
+    '13979:Skyrim.esm': 1,
+    '198df:Skyrim.esm': 2,
+    // Palace of the Kings, Upstairs, Windhelm
+    '97298:Skyrim.esm': 1,
+    '97299:Skyrim.esm': 2,
+    // Quick Test Cell
+    '2f99:Update.esm': 1,
+    '2f9b:Update.esm': 2,
+    // Quick Test Cell, Solitude
+    '2f9c:Update.esm': 1,
+    'b1783:Skyrim.esm': 2,
+    // Ruins of Old Haafingar, Solitude
+    '186c2:SkyrimSewers.esp': 1,
+    '64fc2:SkyrimSewers.esp': 2,
+    // Skuldafn Temple, Windhelm
+    'a0877:Skyrim.esm': 1,
+    'a73f4:Skyrim.esm': 2,
+    // Storm's Tale Dormitory, Falkreath
+    '37a28:AnotherOakwood.esp': 1,
+    '37a29:AnotherOakwood.esp': 2,
+    // Warehouse, Windhelm
+    '90232:WindhelmSSE.esp': 1,
+    '965b3:Skyrim.esm': 2
+  };
+
+  /** The building as a key, a mold and a deed name it: unique, see above. */
+  function placeOf(building) {
+    var hold = holdOfBuilding(building);
+    var place = nameOf(building);
+    if (hold && Object.prototype.hasOwnProperty.call(HOLD_TOWN, hold)) { place += ', ' + HOLD_TOWN[hold]; }
+    if (Object.prototype.hasOwnProperty.call(LABEL_NO, building)) { place += ', no. ' + LABEL_NO[building]; }
+    return place;
+  }
+
+  function keyLabel(building) { return 'Key to ' + placeOf(building); }
+  function moldLabel(building) { return 'Key mold for ' + placeOf(building); }
+  function deedLabel(building) { return 'Deed to ' + placeOf(building); }
 
   function holdsKey(actorId, building) { return holdsNamed(actorId, KEY, keyLabel(building)); }
   function holdsMold(actorId, building) { return holdsNamed(actorId, MOLD, moldLabel(building)); }
@@ -40341,10 +40423,10 @@ module.exports = {
       return true;
     }
     plog('a mold for', nameOf(building), 'was cut for', held.name);
-    toProfile(profileId, 'You cut a mold for ' + nameOf(building) + ' and hand it to ' +
+    toProfile(profileId, 'You cut a mold for ' + placeOf(building) + ' and hand it to ' +
                          held.name + '. Keys come off the mold at a forge.');
     if (owner.profileId !== profileId) {
-      toProfile(owner.profileId, 'The mold for ' + nameOf(building) + ' is yours. Bring it to ' +
+      toProfile(owner.profileId, 'The mold for ' + placeOf(building) + ' is yours. Bring it to ' +
                                  'a smith at a forge for as many keys as you want.');
     }
     return true;
@@ -40475,12 +40557,12 @@ module.exports = {
     }
     plog('a mold for', nameOf(building), 'was pressed at the door for', held.name);
     var yours = owner.actorId === actorId;
-    toProfile(profileId, 'You press the blank into the lock of ' + nameOf(building) + '. It is ' +
+    toProfile(profileId, 'You press the blank into the lock of ' + placeOf(building) + '. It is ' +
                          'the mold for it now' + (yours ? ' and it is in your pack' :
                          ', and it goes to the holder standing with you') +
                          '. Keys come off it at a forge, as many as you want.');
     if (!yours && owner.profileId && owner.profileId !== profileId) {
-      toProfile(owner.profileId, 'The mold for ' + nameOf(building) + ' is yours. Bring it to ' +
+      toProfile(owner.profileId, 'The mold for ' + placeOf(building) + ' is yours. Bring it to ' +
                                  'a smith at a forge for as many keys as you want.');
     }
     return true;
@@ -40567,7 +40649,7 @@ module.exports = {
         building = mine[0];
       } else if (mine.length > 1) {
         var names = [];
-        for (var i = 0; i < mine.length; i++) { names.push(nameOf(mine[i])); }
+        for (var i = 0; i < mine.length; i++) { names.push(placeOf(mine[i])); }
         toProfile(profileId, 'You hold ' + names.join(', ') + '. A key comes off the mold of ' +
                              'the one you mean, so press a blank key mold into its door first.');
         return true;
@@ -40597,7 +40679,7 @@ module.exports = {
       return true;
     }
     plog('a key to', nameOf(building), 'was cut');
-    toProfile(profileId, 'You cut a key to ' + nameOf(building) + '. It opens the door for ' +
+    toProfile(profileId, 'You cut a key to ' + placeOf(building) + '. It opens the door for ' +
                          'whoever is carrying it, so hand it over yourself.');
     return true;
   }
@@ -45884,7 +45966,8 @@ module.exports = {
     wordBook: function () { return wordBook; },
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
     takeBlankMold: takeBlankMold, blankMoldsExist: blankMoldsExist,
-    keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
+    keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel, placeOf: placeOf,
+    LABEL_NO: LABEL_NO,
     KEY: KEY, MOLD: MOLD, LOCK_PROPERTY: LOCK_PROPERTY,
     BENCH_PROPERTY: BENCH_PROPERTY, FORGE: FORGE,
     lapseDays: lapseDays, DEED: DEED, DOOR_MEMORY_MS: DOOR_MEMORY_MS,
@@ -50145,7 +50228,7 @@ return module.exports;
         var rent = held.rent ? { amount: Number(held.rent.amount) || 0,
                                  every: Number(held.rent.everyDays) || 7,
                                  owed: Number(held.rent.owed) || 0 } : null;
-        rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
+        rows.push({ name: W.placeOf(b), mine: true, locked: !!held.locked, rent: rent,
                     master: !!(W.holdsMasterKey && W.holdsMasterKey(actorId, b)),
                     keyed: W.holdsKey(actorId, b), b: b,
                     sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
@@ -50166,7 +50249,7 @@ return module.exports;
         if (seen[mb]) { continue; }
         seen[mb] = true;
         var mh = W.holderOf(mb);
-        rows.push({ name: W.nameOf(mb), mine: false, locked: !!(mh && mh.locked),
+        rows.push({ name: W.placeOf(mb), mine: false, locked: !!(mh && mh.locked),
                     keyed: true, master: true, by: mh ? mh.name : null });
       }
       // Then the places somebody let you into. A key to a building you already
@@ -50185,7 +50268,7 @@ return module.exports;
           if (label !== W.keyLabel(b2) || seen[b2]) { continue; }
           seen[b2] = true;
           var h2 = W.holderOf(b2);
-          rows.push({ name: W.nameOf(b2), mine: false, locked: !!(h2 && h2.locked),
+          rows.push({ name: W.placeOf(b2), mine: false, locked: !!(h2 && h2.locked),
                       keyed: true, by: h2 ? h2.name : null });
           break;
         }

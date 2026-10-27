@@ -246,7 +246,7 @@ function send(p, text) {
       Array.isArray(rows) && rows.length === 3);
   yes('A1 and not at the top of the stored value, nor anywhere the page calls DATA',
       stored && stored.property === undefined && stored.DATA === undefined);
-  const home = (rows || []).filter(function (r) { return r.name === 'Honeyside'; })[0];
+  const home = (rows || []).filter(function (r) { return r.name === W.placeOf(HOME); })[0];
   yes('A2 Honeyside is Carol\'s, with the building id and the rent owed up to now',
       !!home && home.mine === true && home.b === HOME && !!home.rent && home.rent.owed === 50);
 }

@@ -182,13 +182,14 @@ function key(r, parts, pressed) {
     function () { return near.far; });
   if (pressed) { pieces.touchedBench(ME, pressed.base, pressed.ref); }
   const run = new Function('g', 'isSmith', 'forgeHere', 'moldInHand', 'heldBy', 'here', 'takeItem',
-    'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'plog', 'unfitToMake',
+    'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'placeOf', 'plog', 'unfitToMake',
     KEY_SRC + '\nreturn cutKey;')(
     r.G, function () { return true; }, pieces.forgeHere,
     function () { return 'home:Skyrim.esm'; }, function () { return []; }, function () { return ''; },
     function (id, item, n) { took.push(n); return true; },
     function () { gave.push(1); return true; }, function () { },
     'ingot', 'key', function () { return 'Key to Honeyside'; }, function () { return 'Honeyside'; },
+    function () { return 'Honeyside'; },
     function () { }, r.gate);
   run(ME, 202, function (pid, m) { told.push(m); }, parts);
   return { said: told, made: gave.length > 0, took: took.length };
