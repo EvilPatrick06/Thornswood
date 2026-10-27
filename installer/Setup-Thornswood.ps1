@@ -534,12 +534,14 @@ if ((Get-ExeBytes) -ne $TARGET_EXE_BYTES -and -not $SkipDowngrade) {
 # another server and another server install into the Steam folder, and a patched
 # loader of exactly the right size would sail straight past it and end up in
 # this copy. So the three files that get patched are matched by content against
-# the ones this package was built from.
+# the pinned build's own, by the SHA-1 Steam's manifests list for them
+# (records\skyrim-files.json, which Package-Thornswood.ps1 writes into
+# vanilla.json, #3412), the same SHA-1 the launcher holds the Steam copy to.
 # Get-FileHash lives in a module that is not always on PSModulePath, and a
 # script started with -NoProfile can find itself without it. .NET is always
 # there, so the hashing goes straight to it.
-function Get-Sha256([string]$path) {
-    $sha = [Security.Cryptography.SHA256]::Create()
+function Get-Sha1([string]$path) {
+    $sha = [Security.Cryptography.SHA1]::Create()
     try {
         $fs = [IO.File]::OpenRead($path)
         try { return ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLower() }
@@ -558,7 +560,7 @@ if (Test-Path $vanillaList) {
         foreach ($prop in $doc.PSObject.Properties) {
             $f = Join-Path $GameDir $prop.Name
             if (-not (Test-Path -LiteralPath $f)) { continue }
-            if ((Get-Sha256 $f) -ne ([string]$prop.Value).ToLower()) { $out += $prop.Name }
+            if ((Get-Sha1 $f) -ne ([string]$prop.Value).ToLower()) { $out += $prop.Name }
         }
         return $out
     }
