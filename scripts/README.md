@@ -161,6 +161,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/BuildStamp.ps1](release/BuildStamp.ps1) | What a server's gamemode is, written down beside it. |
 | [release/Bump-Version.ps1](release/Bump-Version.ps1) | Moves the launcher's version number, commits that one file, and stops. |
 | [release/Check-Build.ps1](release/Check-Build.ps1) | The server does not check plugin names. It checks size and crc32 of every plugin it names, so the wrong version of a mod is the same to it as not having the mod. |
+| [release/Check-CollectionRevisions.ps1](release/Check-CollectionRevisions.ps1) | Holds Nexus's newest published collection revision, the record and both feeds to each other, and keeps one issue on the board for the rebuild while they part (#4068). |
 | [release/Check-Records.ps1](release/Check-Records.ps1) | Holds the committed high-risk records to their shape and version, fail closed (#2180). |
 | [release/Check-ShipReady.ps1](release/Check-ShipReady.ps1) | Whether THIS machine can run a release, and what is missing if it cannot. |
 | [release/Clean-NewsRepeats.ps1](release/Clean-NewsRepeats.ps1) | Takes out of a channel's published notes every line an older note already said, so the News tab and the site list each change once. |

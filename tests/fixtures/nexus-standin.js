@@ -29,6 +29,10 @@
 // 403 Nexus gives a free account, and addRevision adds a revision with the
 // local collection archive its download serves.
 //
+// For NexusPublished.ps1 (#4068) it answers the collection's newest
+// published revision without the key, as Nexus does, and says another
+// collection is not there.
+//
 // For New-NexusRevision.ps1 -Add (#2969) it also knows a mod of somebody
 // else's, 1932, with an optional file 8662, and answers legacyModsByDomain
 // with each mod's author and category.
@@ -268,6 +272,9 @@ function graph(req, res, json) {
     if (!r) return send(res, 200, { errors: [{ message: 'Revision not found' }] });
     return send(res, 200, { data: { collectionRevision: { id: r.id, revisionNumber: Number(m[1]), status: r.status, downloadLink: '/v2/collections/' + collection.id + '/revisions/' + r.id + '/download_link' } } });
   }
+  if (/collection\(slug: "(?!7essxf")[A-Za-z0-9]+", domainName: "skyrimspecialedition"\)/.test(q)) {
+    return send(res, 200, { data: { collection: null }, errors: [{ message: 'Collection not found' }] });
+  }
   if (/collection\(slug: "7essxf", domainName: "skyrimspecialedition"\)/.test(q)) {
     return send(res, 200, { data: { collection: { id: collection.id, name: collection.name, latestPublishedRevision: { id: Number(collection.revisions[collection.latest].id), revisionNumber: collection.latest }, draftRevisionNumber: collection.draft } } });
   }
@@ -355,6 +362,8 @@ const server = http.createServer((req, res) => {
       if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; mods[c.setStored.mod].cached = undefined; delete c.setStored; }
       // A revision whose download is a local collection archive.
       if (c.addRevision) { collection.revisions[c.addRevision.n] = { id: String(c.addRevision.id), status: c.addRevision.status || 'published', upload: null, archive: c.addRevision.archive }; delete c.addRevision; }
+      // Which published revision is the newest, as publishing one on the website would leave it.
+      if (c.setLatest) { if (collection.revisions[c.setLatest]) collection.latest = Number(c.setLatest); delete c.setLatest; }
       Object.assign(control, c);
       return send(res, 200, control);
     }
@@ -364,8 +373,13 @@ const server = http.createServer((req, res) => {
       appName: req.headers['application-name'] || '', appVersion: req.headers['application-version'] || '',
       contentMd5: req.headers['content-md5'] || '', contentDisposition: req.headers['content-disposition'] || '', contentType: req.headers['content-type'] || '',
       crc: req.headers['x-amz-checksum-crc64nvme'] || '', boundCrc: url.searchParams.get('x-amz-checksum-crc64nvme') || '', length: body.length, json: isApi ? json : null });
+    // The newest published revision is public on Nexus and answered without
+    // a key, as the real one does (NexusPublished.ps1, #4068); every other
+    // API request needs it.
+    const isPublicRead = url.pathname === '/v2/graphql' && json && typeof json.query === 'string' &&
+      /^\{ collection\(slug: "[A-Za-z0-9]+", domainName: "[a-z0-9]+"\) \{ latestPublishedRevision \{ revisionNumber \} \} \}$/.test(json.query);
     if (isApi) {
-      if (req.headers.apikey !== KEY) { violations.push('an API request without the key: ' + req.method + ' ' + url.pathname); return problem(res, 401, 'apikey'); }
+      if (req.headers.apikey !== KEY && !(isPublicRead && req.headers.apikey === undefined)) { violations.push('an API request without the key: ' + req.method + ' ' + url.pathname); return problem(res, 401, 'apikey'); }
       if (!req.headers['application-name'] || !req.headers['application-version']) { violations.push('an API request without Application-Name and Application-Version: ' + url.pathname); return problem(res, 400, 'Application headers'); }
       if (url.pathname === '/v2/graphql') return graph(req, res, json);
       return api(req, res, url, body, json);

@@ -1,0 +1,49 @@
+# Every hour: Nexus's newest published collection revision, the record and
+# both feeds held to each other, and the rebuild on the board while they
+# part (#4068).
+#
+# WHY. Collection revision 5 was published on Nexus on 21 Oct, and on 27 Oct
+# both feeds still named revision 2: nothing compared them, so a launcher on
+# revision 2 was let in and nobody was told the servers needed rebuilding.
+# Patrick, 27 Oct: the launcher is always on the newest revision, every update
+# is built on it, and the launcher refuses Play on any other. A Ship refuses
+# while the record is behind Nexus; this is what puts the rebuild in front of
+# the Desk, whoever published the revision and however.
+#
+# WHAT IT DOES. scripts\release\Check-CollectionRevisions.ps1 -Issue reads the
+# four numbers (Nexus's public read, no key; the record in this checkout; each
+# feed on the site) and keeps one open issue, "Collection revision N is
+# published: rebuild dev, then main, on it", while any is behind, and closes
+# it once all four agree. A number it cannot read changes no issue and turns
+# the run red, so a check that could not look is never a quiet green.
+#
+# WHERE IT RUNS. On the VPS runners, like expire-claims.yml: GitHub's own
+# runners have no minutes (#437), and this is four reads and at most a few
+# REST calls. The run's own token can read and edit issues and nothing else.
+name: Collection revision check
+on:
+  schedule:
+    - cron: '20 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: collection-revision
+  cancel-in-progress: false
+jobs:
+  check:
+    name: Hold Nexus, the record and both feeds to one revision
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # Four reads and a few calls to GitHub. Past this it is stuck, not slow.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Read the four revisions and keep the rebuild issue
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          & .\scripts\release\Check-CollectionRevisions.ps1 -Issue
+          exit $LASTEXITCODE
