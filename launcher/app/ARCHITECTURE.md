@@ -661,9 +661,11 @@ A new class gets a line on this page in the pull request that adds it.
 
 **ChannelWait** (ChannelWait.cs). Waits for the game to write one of the named voice files, instead of opening those files ten times a second for the whole life of the launcher. When no watcher can be made it sleeps the old 100 ms, so push to talk is never slower than the poll it replaced.
 
-**MenuMusic** (MenuMusic.cs). Plays the launcher menu theme in a hidden WebView2, because the usual WPF playback needs the Media Feature Pack and that pack is missing on the ship PC. The browser is made the first time the music is wanted and closed while the game runs.
+**MenuMusic** (MenuMusic.cs). Plays the launcher menu theme from the launcher's own process: NLayer (embedded, THIRD-PARTY.md) decodes the MP3 and waveOut plays it on a thread of its own, so the Windows Volume Mixer lists the sound as this build, by the name and icon MenuMusic gives its audio session ("Thornswood" or "Thornswood Dev", #3207). It used to play in a hidden WebView2, whose sound Windows put under Microsoft Edge WebView2; the WPF MediaPlayer before that needed a Windows Media component the ship PC does not have. The sound output is opened the first time the music is wanted and closed while the game runs.
 
 **Watched** (Watched.cs). Remembers the processes the last full look found and asks only those, by the handle each already has, whether they are still running. A full look happens again only when all of them have gone, and that look is the same one Checks.GameRunning makes.
+
+**PathFence** (PathFence.cs). The one rule for whether a resolved path is inside a folder: it compares against the folder plus its separator, so `C:\Thornswood2` is not inside `C:\Thornswood`. Every pack write and delete in Updater and Sync is fenced with it, and Setup.csproj compiles this file into the setup program as well, for its unpack into the scratch folder (#3561).
 
 **WindowFit** (WindowFit.cs). Keeps a window inside the work area of the monitor it is on, at any display scale. The size and the minimum are clamped to that work area at startup and again when the window lands on a monitor with another scale. Build-Launcher.ps1 compiles this file into the setup program as well.
 ## 3. The Play sequence

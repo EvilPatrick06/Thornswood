@@ -27584,9 +27584,112 @@ function wovenOutput(actorId, row) {
     log(actorId.toString(16), 'is weaving', row.name, 'and the engine names no craftOutput, so it comes out plain');
     return;
   }
-  const name = mark + String(row.name || 'Garment');
+  // A piece's quality (qualityOutput, #3151) is already on the name; the mark
+  // goes in front of it, where the needs and maneuvers blocks read it.
+  const name = mark + String(out.name || row.name || 'Garment');
   mp.set(actorId, 'craftOutput', { name: name });
   log(actorId.toString(16), 'is a Master Weaver:', out.count, name);
+}
+
+/*
+  WHAT A WEAPON OR AN ARMOUR PIECE COMES OUT AS (#3151).
+
+  Patrick, 22 October 2026, A on #3151: crafted things come in three tiers,
+  crude, fine and masterwork, at minus or plus 10%, decided by skill and
+  materials. Fine is the piece as its record has it, the same as every piece
+  that was not made at a bench; crude is a tenth worse and masterwork a tenth
+  better, in the one number each has: a weapon's damage and an armour piece's
+  rating. A garment, a ring, a staff, an arrow and a tool have no such number,
+  so they are not rolled.
+
+  SKILL AND MATERIALS ARE ONE QUESTION HERE. A row's rank is the rank of the
+  dearest thing it asks for (Build-RecipeTable.ps1), so how far the maker
+  stands above that rank is how much skill they bring to those materials. A
+  master beating out iron rarely makes crude work; a novice on their first
+  iron dagger often does. The rank is the maker's own in the half the row is,
+  read before this craft's work is counted, so a sister half or a taught half
+  at novice works its novice rows as a novice.
+
+  The tier is written on the piece's name, the way durability writes its
+  condition and a Master Weaver their mark: "Iron Sword (Masterwork)", and
+  with a condition "Iron Sword (Masterwork) (85%)". The engine's damage
+  formula reads it there (THORNSWOOD PATCH in TES5DamageFormula.cpp, fork
+  #114, from the engine pin that carries it), so the marks and the 10% are
+  the fork's as well as this file's. The
+  name is the craft's own, given through craftOutput before the engine adds
+  the piece, so nothing is made plain and renamed. The whole batch is one
+  roll, as a cook's is.
+
+  The odds are this file's, by how many ranks the maker stands above the row:
+  0 is working at the edge of what you can, 3 is a master on novice stock.
+*/
+const CRAFT_QUALITY = {
+  marks: { crude: ' (Crude)', masterwork: ' (Masterwork)' },
+  odds: [
+    { crude: 0.25, masterwork: 0.05 },
+    { crude: 0.10, masterwork: 0.15 },
+    { crude: 0.05, masterwork: 0.25 },
+    { crude: 0, masterwork: 0.35 }
+  ],
+  lines: {
+    crude: 'It comes out rough. This one is crude work, a tenth worse than a sound piece.',
+    masterwork: 'It comes out true. This one is masterwork, a tenth better than a sound piece.'
+  }
+};
+// The weapon families that strike: a staff casts, an instrument plays and a
+// woodcutter's axe is a tool, so none of those is rolled.
+const QUALITY_WEAPON_FAMILIES = ['Swords', 'Daggers', 'Greatswords', 'War axes', 'Battleaxes', 'Maces', 'Warhammers', 'Bows'];
+const QUALITY_RANKS = ['novice', 'advanced', 'expert', 'master'];
+
+/**
+ * The tier one roll in [0, 1) gives a maker standing `margin` ranks above
+ * the row: 'crude', 'fine' or 'masterwork'.
+ */
+function qualityTier(margin, roll) {
+  const at = Math.max(0, Math.min(CRAFT_QUALITY.odds.length - 1, Math.floor(Number(margin) || 0)));
+  const odds = CRAFT_QUALITY.odds[at];
+  if (roll < odds.crude) { return 'crude'; }
+  if (roll < odds.crude + odds.masterwork) { return 'masterwork'; }
+  return 'fine';
+}
+
+/** True when this row makes a weapon that strikes or an armour piece with a rating. */
+function qualityRolled(row, baseId) {
+  if (!row || typeof row !== 'object') { return false; }
+  const wear = globalThis.__thornswoodDurability;
+  // Not knowing what a piece is means not touching it, as durability does.
+  if (!wear || !wear.pieceKind) { return false; }
+  const kind = wear.pieceKind(baseId);
+  if (row.type === 'WEAP') { return kind === 'weapon' && QUALITY_WEAPON_FAMILIES.indexOf(String(row.family || '')) !== -1; }
+  if (row.type === 'ARMO') { return kind === 'armour'; }
+  return false;
+}
+
+/**
+ * How many ranks the maker stands above the row, in the half the row is.
+ * Read before the craft's work is credited.
+ */
+function qualityMargin(actorId, row) {
+  const C = globalThis.__thornswoodCharacter;
+  const P = globalThis.__thornswoodProgression;
+  let have = 'novice';
+  try { have = (P && C && C.stateOf) ? (P.rankOf(C.stateOf(actorId), String(row.half || '').toLowerCase()) || 'novice') : 'novice'; } catch (e) { have = 'novice'; }
+  const mine = QUALITY_RANKS.indexOf(String(have).toLowerCase());
+  const asks = QUALITY_RANKS.indexOf(String(row.rank || 'novice').toLowerCase());
+  return Math.max(0, (mine < 0 ? 0 : mine) - (asks < 0 ? 0 : asks));
+}
+
+function qualityOutput(actorId, row, margin) {
+  const out = mp.get(actorId, 'craftOutput');
+  if (!out || !(out.baseId > 0) || !(out.count > 0)) { return; }
+  if (!qualityRolled(row, out.baseId)) { return; }
+  const tier = qualityTier(margin, Math.random());
+  if (tier === 'fine') { return; }
+  const name = String(row.name || 'Piece') + CRAFT_QUALITY.marks[tier];
+  mp.set(actorId, 'craftOutput', { name: name });
+  log(actorId.toString(16), 'made', out.count, name, 'standing', margin, 'rank(s) above it');
+  notify(actorId, CRAFT_QUALITY.lines[tier]);
+  say(actorId, CRAFT_QUALITY.lines[tier]);
 }
 
 /*
@@ -29129,6 +29232,8 @@ ecipes.json are hafted, and 126 of those are rows the server is
     return false;
   }
 
+  // The skill that made the piece is the rank before this craft counts (#3151).
+  const margin = qualityMargin(actorId, row);
   if (answer.credit) {
     const raised = creditWork(actorId, answer.credit);
     if (raised) {
@@ -29137,6 +29242,7 @@ ecipes.json are hafted, and 126 of those are rows the server is
     }
   }
   cookedOutput(actorId, row);
+  qualityOutput(actorId, row, margin);
   wovenOutput(actorId, row);
   return;
 });
@@ -38591,7 +38697,7 @@ module.exports = {
       var dir = require('path').dirname(registerPath());
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
-        JSON.stringify({ claims: claims,
+        JSON.stringify({ claims: claims, arrears: arrears,
                         funds: funds, notices: notices, boards: boards, steps: steps,
                         masters: masterCut, dropbox: dropbox, word: wordBook }, null, 1));
       return true;
@@ -38602,8 +38708,94 @@ module.exports = {
   }
 
   var claims = load();
+  var arrears = loadArrears();
   var masterCut = loadMasterCut();
   var wordBook = loadWord();
+
+  /*
+    RENT STILL OWED BY SOMEBODY WHO NO LONGER HOLDS THE PLACE (#3893), from
+    the register's arrears key: by building, one row a person, with the
+    profile, the character's name, the gold and when it was first owed.
+
+    Rent owed was a field of the claim and nothing else, so the deed
+    presented at the door, which writes the building a new claim, ended the
+    debt with the old one. Patrick, 27 Oct: the debt stays owed by whoever
+    owed it, and the new holder starts at nothing owed. So what the old
+    holder owed moves here, beside the claims rather than inside one,
+    because a claim can end or be written again and a debt is a person's.
+    The drop box pays it (boxPutGold) and so does a steward's Rent paid
+    (rentPaid), and the steward sees it at the door on the Office page.
+
+    Rebuilt row by row the way the claims are: a row that is not a debt is
+    dropped and counted.
+  */
+  function loadArrears() {
+    var out = {};
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8')); } catch (e) { return out; }
+    var src = (raw && raw.arrears && typeof raw.arrears === 'object') ? raw.arrears : {};
+    var kept = 0, dropped = 0;
+    for (var b in src) {
+      if (!Object.prototype.hasOwnProperty.call(src, b) || b === '__proto__') { continue; }
+      var list = Object.prototype.toString.call(src[b]) === '[object Array]' ? src[b] : [];
+      var rows = [];
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i];
+        var by = (r && Number(r.by)) || 0;
+        var owed = (r && Number(r.owed)) || 0;
+        var at = (r && Number(r.at)) || 0;
+        if (!(by > 0) || !(owed > 0) || !(at > 0) || rows.some(function (x) { return x.by === by; })) {
+          dropped++;
+          continue;
+        }
+        rows.push({ by: by, name: String(r.name || 'somebody'), owed: owed, at: at });
+        kept++;
+      }
+      if (rows.length) { out[b] = rows; }
+    }
+    if (dropped) { plog('dropped', dropped, 'row(s) of rent still owed that were not debts'); }
+    if (kept) { plog('read', kept, 'debt(s) of rent owed by somebody who no longer holds the place'); }
+    return out;
+  }
+
+  // What this person still owes on this building from before, or null.
+  function arrearsRow(building, profileId) {
+    if (!Object.prototype.hasOwnProperty.call(arrears, building)) { return null; }
+    var list = arrears[building];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].by === Number(profileId)) { return list[i]; }
+    }
+    return null;
+  }
+
+  // Owed from before, added to whatever this person already owes here.
+  function arrearsAdd(building, profileId, name, amount) {
+    var n = Number(amount) || 0;
+    var by = Number(profileId) || 0;
+    if (!(n > 0) || !(by > 0) || building === '__proto__') { return; }
+    var row = arrearsRow(building, by);
+    if (row) {
+      row.owed += n;
+      if (name) { row.name = String(name); }
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(arrears, building)) { arrears[building] = []; }
+    arrears[building].push({ by: by, name: String(name || 'somebody'), owed: n, at: Date.now() });
+  }
+
+  // Paid down by up to amount; the row goes when nothing is left. Says how much it took.
+  function arrearsPay(building, profileId, amount) {
+    var row = arrearsRow(building, profileId);
+    var n = Number(amount) || 0;
+    if (!row || !(n > 0)) { return 0; }
+    var take = Math.min(n, row.owed);
+    row.owed -= take;
+    if (row.owed <= 0) {
+      arrears[building] = arrears[building].filter(function (x) { return x !== row; });
+      if (!arrears[building].length) { delete arrears[building]; }
+    }
+    return take;
+  }
 
   /*
     The holders' word (#2680), from the register's word key, rebuilt row by
@@ -39292,6 +39484,8 @@ module.exports = {
     var c = claims[building];
     var days = lapseDays();
     if (days > 0 && (Date.now() - c.touched) > days * 86400000) {
+      // What the holder owed, counted up to the lapse and no further, stays theirs (#3950).
+      keepOwed(building, c, c.touched + days * 86400000);
       delete claims[building];
       save();
       /*
@@ -39544,9 +39738,25 @@ module.exports = {
       // claim. Kept from the old record when there is one, so a transfer does
       // not quietly drop the field behind the house.
       var keepGround = held ? held.ground : groundHere(actorId);
+      /*
+        THE RENT STAYS ON THE BUILDING, AND WHAT WAS OWED STAYS OWED (#3893,
+        Patrick, 27 Oct). This record used to be written with no rent on it,
+        so handing the deed to another of your characters at the door ended
+        both the rent a steward set and the debt. The rent goes on at the
+        same amount and the same clock, so the next rent falls due the day it
+        would have; the new holder starts at nothing owed, and what the old
+        holder owed, counted up to now first, stays theirs in arrears.
+      */
+      var keepRent = null;
+      if (held && held.rent) {
+        keepOwed(building, held, now2);
+        keepRent = { amount: Number(held.rent.amount) || 0, everyDays: Number(held.rent.everyDays) || 7,
+                     owed: 0, since: Number(held.rent.since) || now2 };
+      }
       claims[building] = { by: mine, name: who2, at: now2, touched: now2,
                            locked: held ? !!held.locked : false,
                            ground: keepGround };
+      if (keepRent) { claims[building].rent = keepRent; }
       save();
       pushAll();
       /*
@@ -41395,6 +41605,16 @@ module.exports = {
     Gold in. Rent first, as putting gold in the box always did: what the
     payer owes on their places is paid down, and the entry remembers how much
     went to which place, so taking that gold back makes it owed again.
+    What the payer still owes on a place they no longer hold (#3893) is paid
+    first, then the places they hold.
+
+    PAYING NEVER MOVES THE RENT CLOCK (#3891). Paying off everything owed
+    used to start the clock again from the payment, which threw away the
+    part of the period already gone: taking the gold back left the debt owed
+    again on a clock that had moved, so it never grew, and paying just
+    before each charge put the next one a whole period later. rentDue keeps
+    since at the start of the period the place is in, and only rentDue
+    moves it.
   */
   function boxPutGold(hold, actorId, profileId, amount) {
     var n = Math.floor(Number(amount));
@@ -41404,15 +41624,20 @@ module.exports = {
     var left = n;
     var rent = [];
     for (var i = 0; i < owed.length && left > 0; i++) {
-      var c = claims[owed[i]];
-      if (!c || !c.rent) { continue; }
-      var due = Number(c.rent.owed) || 0;
-      var take = left >= due ? due : left;
+      var take = 0;
+      if (owed[i].before) {
+        take = arrearsPay(owed[i].building, profileId, left);
+      } else {
+        var c = claims[owed[i].building];
+        if (!c || !c.rent) { continue; }
+        var due = Number(c.rent.owed) || 0;
+        take = left >= due ? due : left;
+        c.rent.owed = due - take;
+      }
       if (take <= 0) { continue; }
-      c.rent.owed = due - take;
-      if (c.rent.owed <= 0) { c.rent.owed = 0; c.rent.since = Date.now(); }
       left -= take;
-      rent.push({ building: owed[i], amount: take });
+      rent.push(owed[i].before ? { building: owed[i].building, amount: take, before: true }
+                               : { building: owed[i].building, amount: take });
     }
     var d = dropboxOf(hold);
     var who = characterName(actorId);
@@ -41497,13 +41722,28 @@ module.exports = {
     }
     var back = 0;
     if (own && Array.isArray(it.rent)) {
-      // The rent this gold paid, owed again, newest place first, never more than was taken.
+      /*
+        The rent this gold paid, owed again, newest place first, never more
+        than was taken, by whoever put it in. On the place itself while they
+        still hold it with rent on it; on what they owe from before (#3893)
+        when it paid that, or when the place has gone to somebody else since,
+        so taking it back never lands it on the new holder. A place whose
+        steward took the rent off while they held it owes nothing again.
+      */
       var left = n;
+      var payer = Number(it.by) || 0;
       for (var r = it.rent.length - 1; r >= 0 && left > 0; r--) {
         var row = it.rent[r];
         var amt = Math.min(left, Number(row.amount) || 0);
         var c = claims[row.building];
-        if (c && c.rent && amt > 0) { c.rent.owed = (Number(c.rent.owed) || 0) + amt; back += amt; }
+        var stillHolds = !!c && c.by === payer;
+        if (amt > 0 && !row.before && stillHolds && c.rent) {
+          c.rent.owed = (Number(c.rent.owed) || 0) + amt;
+          back += amt;
+        } else if (amt > 0 && (row.before || !stillHolds)) {
+          arrearsAdd(row.building, payer, it.name, amt);
+          back += amt;
+        }
         row.amount = (Number(row.amount) || 0) - amt;
         left -= amt;
       }
@@ -41597,40 +41837,150 @@ module.exports = {
     var out = [];
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
-      var c = claims[b];
-      if (!c || !c.rent) { continue; }
-      var every = Number(c.rent.everyDays) || 7;
-      var since = Number(c.rent.since) || Number(c.at) || Date.now();
-      var periods = Math.floor((Date.now() - since) / (every * 86400000));
-      if (periods > 0) {
-        c.rent.owed = (Number(c.rent.owed) || 0) + periods * (Number(c.rent.amount) || 0);
-        c.rent.since = since + periods * every * 86400000;
-        out.push(b);
-      }
+      if (countRent(claims[b], Date.now())) { out.push(b); }
     }
     if (out.length) { save(); }
     return out;
   }
 
+  /*
+    The rent on one claim, counted in whole periods up to a time, and never
+    past the moment it lapses (#3950): a claim nobody has gone into for the
+    lapse days is no longer held, so a week after that is owed by nobody,
+    even before anything reads the claim and drops it. Says whether it
+    counted a period.
+  */
+  function countRent(c, upTo) {
+    if (!c || !c.rent) { return false; }
+    var days = lapseDays();
+    var end = Number(upTo) || Date.now();
+    if (days > 0) { end = Math.min(end, (Number(c.touched) || 0) + days * 86400000); }
+    var every = Number(c.rent.everyDays) || 7;
+    var since = Number(c.rent.since) || Number(c.at) || Date.now();
+    var periods = Math.floor((end - since) / (every * 86400000));
+    if (periods <= 0) { return false; }
+    c.rent.owed = (Number(c.rent.owed) || 0) + periods * (Number(c.rent.amount) || 0);
+    c.rent.since = since + periods * every * 86400000;
+    return true;
+  }
+
+  /*
+    A CLAIM ENDING DOES NOT END A DEBT. Whatever its holder owed, counted up
+    to the moment it ends, stays theirs in arrears: when the deed goes to
+    somebody else (#3893, Patrick, 27 Oct), and when a steward evicts or the
+    claim lapses (#3950, Patrick, 27 Oct, A). The steward sees it at that
+    door, the holder on their property page, and the box or Rent paid pays it.
+  */
+  function keepOwed(building, c, upTo) {
+    if (!c || !c.rent) { return; }
+    countRent(c, upTo);
+    if ((Number(c.rent.owed) || 0) > 0) { arrearsAdd(building, c.by, c.name, c.rent.owed); }
+  }
+
+  // What this person owes, place by place: from before (#3893) first, then what they hold.
   function rentOwedBy(profileId) {
     rentDue();
     var out = [];
+    for (var a in arrears) {
+      if (Object.prototype.hasOwnProperty.call(arrears, a) && arrearsRow(a, profileId)) {
+        out.push({ building: a, before: true });
+      }
+    }
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
       var c = claims[b];
       if (c && c.by === profileId && c.rent && (Number(c.rent.owed) || 0) > 0) {
-        out.push(b);
+        out.push({ building: b, before: false });
       }
     }
     return out;
   }
 
   /*
-    /rent            what this place costs, and what is owed on it
-    /rent 50         a steward sets it, per week
-    /rent -          a steward waives it
+    Who owes rent on this building, one row a person, for the steward at its
+    door: the holder for what is owed now, and anybody who held it before
+    for what they still owe from then (#3893). A holder who also owes from
+    an earlier time here is one row with both together.
+  */
+  function rentOwing(building) {
+    rentDue();
+    var out = [];
+    var held = holderOf(building);
+    if (held && held.rent && (Number(held.rent.owed) || 0) > 0) {
+      out.push({ pid: held.by, name: held.name, owed: Number(held.rent.owed) || 0, holds: true });
+    }
+    var list = Object.prototype.hasOwnProperty.call(arrears, building) ? arrears[building] : [];
+    for (var i = 0; i < list.length; i++) {
+      var mineToo = out.filter(function (x) { return x.pid === list[i].by; })[0];
+      if (mineToo) { mineToo.owed += list[i].owed; continue; }
+      out.push({ pid: list[i].by, name: list[i].name, owed: list[i].owed, holds: !!held && held.by === list[i].by });
+    }
+    return out;
+  }
 
-    Sent by Set rent and No rent on the Office page of the K panel (#1638),
+  /*
+    RENT HANDED TO A STEWARD IN PERSON (#3895, Patrick, 27 Oct: A, a Rent
+    paid button). The gold changes hands between two people, as the rent
+    comment above says it does; the steward then presses Rent paid beside
+    the tenant on the Office page, and this counts it. What they owe from
+    before goes first, then what is owed now. It never moves the rent clock
+    (#3891): the next rent falls due when it would have. It goes in the
+    building's hold's drop box record beside the box's own payments, and a
+    press by staff goes in the staff log as well.
+  */
+  function rentPaid(parts, actorId, profileId, toProfile, building, held, asStaff) {
+    var pid = Math.floor(Number(parts[2])) || 0;
+    var n = Number(parts[3]);
+    if (!(pid > 0)) {
+      toProfile(profileId, 'Say who paid.');
+      return true;
+    }
+    if (!(n > 0) || Math.floor(n) !== n) {
+      toProfile(profileId, 'Say how much gold was paid, as a whole number above 0.');
+      return true;
+    }
+    var row = rentOwing(building).filter(function (x) { return x.pid === pid; })[0];
+    if (!row) {
+      toProfile(profileId, 'Nobody by that name owes rent on ' + nameOf(building) + '.');
+      return true;
+    }
+    if (n > row.owed) {
+      toProfile(profileId, row.name + ' owes ' + row.owed + ' gold on ' + nameOf(building) + ', not ' + n + '.');
+      return true;
+    }
+    var left = n - arrearsPay(building, pid, n);
+    if (left > 0 && held && held.by === pid && held.rent) {
+      held.rent.owed = Math.max(0, (Number(held.rent.owed) || 0) - left);
+    }
+    var steward = personName(actorId);
+    var hold = holdOfBuilding(building);
+    if (hold && LEDGER_HOLDS.indexOf(hold) !== -1) {
+      boxLog(hold, { act: 'rent', who: profileId, whoName: steward, by: pid, byName: row.name,
+                     what: 'Gold', count: n, note: 'rent on ' + nameOf(building) + ', handed over in person' });
+    }
+    save();
+    if (asStaff) {
+      staffRecord('rentpaid', actorId, profileId, building, { by: pid, name: row.name },
+                  n + ' gold of rent handed over in person, on ' + settleWhere(building));
+    } else {
+      plog(steward, '(profile ' + profileId + ') marked', n, 'gold of rent paid by', row.name,
+           '(profile ' + pid + ') on', nameOf(building));
+    }
+    var still = row.owed - n;
+    toProfile(profileId, (asStaff ? 'As staff: ' : '') + row.name + ' paid ' + n + ' gold of rent on ' +
+              nameOf(building) + '. ' + (still > 0 ? still + ' is still owed.' : 'Nothing is owed now.') +
+              (asStaff ? ' It is in the staff log.' : ''));
+    redrawPanel(actorId);
+    return true;
+  }
+
+  /*
+    /rent                 what this place costs, and what is owed on it
+    /rent 50              a steward sets it, per week
+    /rent -               a steward waives it
+    /rent paid <pid> <n>  a steward was handed n gold of it in person (#3895)
+
+    Sent by Set rent, No rent and Rent paid on the Office page of the K panel (#1638),
     never typed; the page shows a steward what is owed at the door they just
     opened. See officeView. Only a steward of the building's hold sets or
     waives it (#2551, notStewardHere), or staff at any building, logged for
@@ -41648,14 +41998,17 @@ module.exports = {
     var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
 
     if (!arg) {
+      rentDue();
+      // And what the one asking still owes here from when they held it (#3893).
+      var mineBefore = arrearsRow(building, profileId);
+      var beforeLine = mineBefore ? ' You still owe ' + mineBefore.owed + ' gold of rent here from when you held it.' : '';
       if (!held || !held.rent) {
-        toProfile(profileId, nameOf(building) + ' has no rent on it.');
+        toProfile(profileId, nameOf(building) + ' has no rent on it.' + beforeLine);
         return true;
       }
-      rentDue();
       toProfile(profileId, nameOf(building) + ': ' + held.rent.amount + ' gold every ' +
                 (held.rent.everyDays || 7) + ' days, ' +
-                (Number(held.rent.owed) || 0) + ' owed.');
+                (Number(held.rent.owed) || 0) + ' owed.' + beforeLine);
       return true;
     }
 
@@ -41669,11 +42022,15 @@ module.exports = {
       toProfile(profileId, how.why);
       return true;
     }
+    var asStaff = how.as === 'staff';
+    // Somebody who held it before may still owe on it while nobody holds it (#3893).
+    if (arg.toLowerCase() === 'paid') {
+      return rentPaid(parts, actorId, profileId, toProfile, building, held, asStaff);
+    }
     if (!held) {
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nobody to pay.');
       return true;
     }
-    var asStaff = how.as === 'staff';
     if (arg === '-') {
       delete held.rent;
       save();
@@ -41692,7 +42049,20 @@ module.exports = {
       toProfile(profileId, 'The rent is a number of gold above 0.');
       return true;
     }
-    held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
+    /*
+      A new amount on a place that already pays rent changes what the next
+      periods cost and nothing else: what is owed, counted up to now at the
+      old amount, stays owed, and the clock goes on (#3895). Setting it again
+      used to write owed 0 and a new clock, which was the only way a steward
+      could clear rent handed to them in person; that is Rent paid now.
+    */
+    if (held.rent) {
+      rentDue();
+      held.rent.amount = amount;
+      held.rent.everyDays = 7;
+    } else {
+      held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
+    }
     save();
     if (asStaff) {
       staffRecord('rent', actorId, profileId, building, held, amount + ' gold every 7 days on ' + settleWhere(building));
@@ -45491,6 +45861,8 @@ module.exports = {
       return true;
     }
     var was = held.name;
+    // An eviction ends the claim and not the debt (#3950): what they owe stays theirs.
+    keepOwed(building, held, Date.now());
     delete claims[building];
     save();
     pushAll();
@@ -45677,7 +46049,10 @@ module.exports = {
                     ours: ours, staff: staff && !ours,
                     rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
                                                   every: Number(held.rent.everyDays) || 7,
-                                                  owed: Number(held.rent.owed) || 0 } : null };
+                                                  owed: Number(held.rent.owed) || 0 } : null,
+                    // Who owes rent here, the holder and anybody before them (#3893),
+                    // each with Rent paid beside them (#3895).
+                    owing: rentOwing(building) };
     }
     // The boards are a steward's own hold's; staff are no steward.
     if (!view.steward) { return view; }
@@ -45719,6 +46094,7 @@ module.exports = {
       if (officesOfProfile(claims[b].by, true).jarl.indexOf(hold) !== -1) { continue; }
       plog('law: the jail rule ends', claims[b].name + '\'s claim (profile ' + claims[b].by + ') on',
            nameOf(b) + ', made before only the Jarl of', hold, 'could hold it');
+      keepOwed(b, claims[b], Date.now());
       delete claims[b];
       ended++;
     }
@@ -45743,6 +46119,8 @@ module.exports = {
       claims      a building they held is free, as a steward's evict leaves
                   it; a master key record cut for them on somebody else's
                   claim is dropped (it already opens nothing, liveMaster)
+      arrears     rent they still owed on a place they no longer held goes,
+                  as a debt does when the person who owed it is gone (#3893)
       offices     law.held: the office their character held is let go, so the
                   account's role, if it is still held, is chosen again
       the boards  a post of theirs comes down, keeping its number, with its
@@ -45776,13 +46154,22 @@ module.exports = {
     var mine = function (pid) { var n = Number(pid) || 0; return n > 0 && who.profile(n); };
     var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
     var c = { claims: 0, masterKeys: 0, offices: 0, posts: 0, handedBack: 0, owed: 0, lines: 0,
-              box: 0, boxRecord: 0, guests: 0, takings: 0 };
+              box: 0, boxRecord: 0, guests: 0, takings: 0, arrears: 0 };
     var reg = false, lawChanged = false, beds = false;
     var b;
     for (b in claims) {
       if (!has(claims, b)) { continue; }
       if (mine(claims[b].by)) { delete claims[b]; c.claims++; reg = true; continue; }
       if (claims[b].master && mine(claims[b].master.for)) { delete claims[b].master; c.masterKeys++; reg = true; }
+    }
+    // Rent they still owed on a place they no longer held (#3893) goes with them.
+    for (var ab in arrears) {
+      if (!has(arrears, ab)) { continue; }
+      var debts = arrears[ab].filter(function (x) { return !mine(x.by); });
+      if (debts.length === arrears[ab].length) { continue; }
+      c.arrears += arrears[ab].length - debts.length;
+      reg = true;
+      if (debts.length) { arrears[ab] = debts; } else { delete arrears[ab]; }
     }
     for (var key in law.held) {
       if (!has(law.held, key)) { continue; }
@@ -45910,6 +46297,8 @@ module.exports = {
     haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
+    // Rent still owed on a place by somebody who no longer holds it (#3893).
+    arrears: function () { return arrears; },
     notices: function () { return notices; }, takedown: takedown,
     // A notice in an office's name, with no fee (#513). See the world stage block.
     officePost: officePost,
@@ -50136,6 +50525,19 @@ return module.exports;
         same count /rent makes, so the page and the steward agree.
       */
       if (W.rentDue) { W.rentDue(); }
+      /*
+        AND WHAT YOU STILL OWE ON A PLACE YOU NO LONGER HOLD (#3893): the
+        deed went to somebody else and the debt stayed yours, so it is here,
+        where you would look, and not only on the steward's page.
+      */
+      var before = {};
+      var arrears = W.arrears ? W.arrears() : {};
+      for (var a in arrears) {
+        if (!Object.prototype.hasOwnProperty.call(arrears, a)) { continue; }
+        for (var ai = 0; ai < arrears[a].length; ai++) {
+          if (arrears[a][ai].by === profileId) { before[a] = arrears[a][ai].owed; }
+        }
+      }
       var claims = W.claims();
       for (var b in claims) {
         if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
@@ -50146,6 +50548,7 @@ return module.exports;
                                  every: Number(held.rent.everyDays) || 7,
                                  owed: Number(held.rent.owed) || 0 } : null;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
+                    before: Object.prototype.hasOwnProperty.call(before, b) ? before[b] : 0,
                     master: !!(W.holdsMasterKey && W.holdsMasterKey(actorId, b)),
                     keyed: W.holdsKey(actorId, b), b: b,
                     sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
@@ -50167,7 +50570,7 @@ return module.exports;
         seen[mb] = true;
         var mh = W.holderOf(mb);
         rows.push({ name: W.nameOf(mb), mine: false, locked: !!(mh && mh.locked),
-                    keyed: true, master: true, by: mh ? mh.name : null });
+                    keyed: true, master: true, by: mh ? mh.name : null, b: mb });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -50186,9 +50589,19 @@ return module.exports;
           seen[b2] = true;
           var h2 = W.holderOf(b2);
           rows.push({ name: W.nameOf(b2), mine: false, locked: !!(h2 && h2.locked),
-                      keyed: true, by: h2 ? h2.name : null });
+                      keyed: true, by: h2 ? h2.name : null, b: b2 });
           break;
         }
+      }
+      // The places you owe on from before, on the row of a key you carry to one, or a row of their own.
+      for (var ob in before) {
+        if (!Object.prototype.hasOwnProperty.call(before, ob)) { continue; }
+        var onRow = rows.filter(function (x) { return !x.mine && x.b === ob; })[0];
+        if (onRow) { onRow.owes = before[ob]; continue; }
+        if (seen[ob] || rows.length >= PROPERTY_PAGE_MAX) { continue; }
+        seen[ob] = true;
+        var oh = W.holderOf(ob);
+        rows.push({ name: W.nameOf(ob), mine: false, owes: before[ob], by: oh ? oh.name : null, b: ob });
       }
     } catch (e) {
       clog('the property page threw, so it is left off:', e);
@@ -56642,8 +57055,9 @@ const WORDS = ['/ooc', '/o',
                // argued with. /rest is the plugin's, sent when somebody sits
                // or lies down, and never typed (#1603); see bedRest. Not
                // /eat, /drink or /bard (#1631): eating and drinking is the
-               // item (/ate), and the bard is somebody the server sees playing
-               // (bardSeen). /needs is back as a line of text (#2267), above.
+               // item (mp.onEatItem), and the bard is somebody the server
+               // sees playing (bardSeen). /needs is back as a line of text
+               // (#2267), above.
                '/rest',
                // The repair panel (#1384): sent by the inventory key and by
                // the panel's buttons, never typed. See the durability block,
@@ -56666,7 +57080,7 @@ const WORDS = ['/ooc', '/o',
                '/hairdye',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
-               '/place', '/burn', '/ate',
+               '/place', '/burn',
                // The client saying its race menu is still up. Never typed; see
                // FACE_SEEN_MS.
                '/racemenu',
@@ -57060,9 +57474,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       log('holding', word, 'for profile', profileId, 'until the character is in the world');
     }
     q.lines.push({ cmd: cmd, at: Date.now() });
-    // Said once, and never for the client's own lines: /face, /ate, a
-    // broken lockpick and the load order report are not things anybody typed.
-    if (!q.told && word !== '/face' && word !== '/ate' && word !== '/tspicks' &&
+    // Said once, and never for the client's own lines: /face, a broken
+    // lockpick and the load order report are not things anybody typed.
+    if (!q.told && word !== '/face' && word !== '/tspicks' &&
         word !== '/loadorder' && word !== '/loadorderlight' && word !== '/racedown') {
       q.told = true;
       toProfile(profileId, 'Your character is not back in the world yet. That will run ' +
@@ -57782,9 +58196,10 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       ------------------------------------------------- hunger, thirst, rest
 
       The world hooks replaced the words that drove the needs block, as they
-      were always meant to (#1631): eating and drinking is the item (/ate,
-      below), the meters are the four bars and the Body page on K, and the
-      bard is somebody the needs block sees playing on the emote wheel.
+      were always meant to (#1631): eating and drinking is the item (the
+      engine's mp.onEatItem, #3136), the meters are the four bars and the
+      Body page on K, and the bard is somebody the needs block sees playing
+      on the emote wheel.
 
       /rest    sent by the plugin when somebody sits or lies down, and
                /rest up when they get off; never typed (#1603). What counts
@@ -57799,30 +58214,6 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       dispatcher answers it, and kept out of PLAYER_WORDS so /help never
       invites anybody to type it.
     */
-    /*
-      SOMETHING WAS EATEN OR DRUNK IN THE GAME.
-
-      Not something anybody types, the same as /place: the server cannot see
-      a client consume its own item, and there is no eat hook. The client
-      watches the equip event, which is how Skyrim eats, and says what it
-      was. See the note over the equip handler in thornswood-front.js.
-
-      WHAT IT IS WORTH IS THE SERVER'S TO DECIDE, which is the whole reason
-      the base id travels rather than an amount: a client that could name its
-      own number could fill its meters by saying so.
-    */
-    if (word === '/ate') {
-      var needsAte = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
-      if (needsAte && actorId) {
-        try {
-          var eatenId = parseInt(String(parts[1] || ''), 16) || 0;
-          var line = needsAte.consumed(actorId, eatenId);
-          if (line) { toProfile(profileId, line); }
-        } catch (e) { }
-      }
-      return true;
-    }
-
     if (word === '/place') {
       var pl = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (pl && pl.place && actorId) {
@@ -58307,8 +58698,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       WHERE SOMEBODY IS RESTING, AND NOTHING ELSE (#1631). /rest is the
       plugin's line when somebody sits down, lies down or gets up. /eat,
       /drink and /bard are gone: eating or drinking the item is a meal
-      (/ate), and the bard is somebody the server sees playing (bardSeen, in
-      the needs block). Typed, they get the answer every unknown word gets.
+      (mp.onEatItem), and the bard is somebody the server sees playing
+      (bardSeen, in the needs block). Typed, they get the answer every
+      unknown word gets.
       /needs went with them and came back on its own (#2267), above.
     */
     if (word === '/rest') {
@@ -59821,8 +60213,8 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   checked the pack holds the thing (MpActor::OnEquip), then
                   takes one out and applies a potion's effects. mp.onEatItem
                   in the injury and disease block hears it for a potion of
-                  cure disease (#1383) and never refuses. The needs block
-                  hears about eating from the client's /ate line instead.
+                  cure disease (#1383) and never refuses, and hands every
+                  swallow to the needs block (eaten, #3136).
     onSpellCast   A cast the engine has checked (the sender's own actor or one
                   it hosts, alive, with the spell equipped), before it goes
                   out to anybody near, and not the message that interrupts a
@@ -63158,8 +63550,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
 
     // A night in a bed, on top of the time away settled above (#1606).
-    // Three ales or more still counting when they left (#1382).
-    var leftDrunk = arriving && (Number(n.ale) || 0) >= NEEDS.ale.hangoverFrom &&
+    // Three ales or more still counting when they left, and not in a bed
+    // (#1382). drink.md: "If you drank three or more and log out without a
+    // bed". Until #3136 a bed only counted once it gave a night, so lying
+    // down drunk and coming back inside 24 minutes was a hangover; now it is
+    // still being drunk, until the 45 minutes pass or a night is slept.
+    var leftDrunk = arriving && !inBed(n.resting) &&
+      (Number(n.ale) || 0) >= NEEDS.ale.hangoverFrom &&
       typeof n.aleAt === 'number' && (n.at - n.aleAt) <= NEEDS.ale.sober * 60000;
     var slept = arriving ? arrived(actorId, n, away) : '';
     // A night in a bed ends a hangover; leaving drunk without one starts it.
@@ -63701,8 +64098,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
-    Something was eaten or drunk in the game. See the /ate command and the
-    equip handler in thornswood-front.js.
+    Something was eaten or drunk in the game: eaten(), below consumed, from
+    mp.onEatItem.
   */
   /*
     WHAT THIS POTION IS WORTH, by how many came before it in the window.
@@ -63829,6 +64226,38 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var said = words[Math.min(had, words.length - 1)];
     var crossedLine = crossed(actorId, was, n);
     return said + (crossedLine ? ' ' + crossedLine : '');
+  }
+
+  /*
+    SOMETHING WENT DOWN, AS THE ENGINE SAW IT (#3136). mp.onEatItem in the
+    injury block hands every swallow here. The engine raises it only once it
+    has checked the pack holds the thing, and the same message takes it out
+    (MpActor::OnEquip), so a meter moves only for an item somebody had.
+
+    Until #3136 the meters moved on the front plugin's /ate line, which
+    anybody could type: /ate and a food's id in the chat was a meal with no
+    food, and a drug's window with no drug. Its comment said there was no eat
+    hook, which was true before the engine raised onEatItem and stopped being
+    true when it did.
+
+    Only a person's, the way the plugin only ever spoke for its own
+    character, and only an ALCH or a brewed potion, which is everything the
+    plugin reported (Potion.from on what was equipped). An ingredient is
+    INGR and was never a meal; what eating one teaches is the alchemy
+    block's. Answers the line to say, or ''.
+  */
+  function eaten(actorId, baseId) {
+    baseId = Number(baseId) || 0;
+    if (!baseId || !onlineNow(actorId)) { return ''; }
+    if (baseId < 0xff000000) {
+      var type = '';
+      try {
+        var res = mp.lookupEspmRecordById(baseId);
+        type = (res && res.record) ? String(res.record.type || '') : '';
+      } catch (e) { type = ''; }
+      if (type !== 'ALCH') { return ''; }
+    }
+    return consumed(actorId, baseId);
   }
 
   function wearRow(baseId) {
@@ -64339,20 +64768,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       boilSay(actorId, n);
       return '';
     }
-    /*
-      Leaving the rain or the water starts the 3 minutes of wet, from what
-      that place was worth with its water (#1382). Going back in ends them.
-    */
-    var wasWet = !!NEEDS.wetPlaces[n.place], nowWet = !!NEEDS.wetPlaces[kind];
-    if (wasWet && !nowWet) {
-      n.wetFrom = Date.now();
-      n.wetPlace = NEEDS.place[n.place] + waterKind(actorId, n);
-    } else if (nowWet) {
-      n.wetFrom = 0;
-      n.wetPlace = null;
-    }
-    n.place = kind;
-    n.sky = sky;
+    moveTo(actorId, n, kind, sky);
     n.night = isNight;
     n.roof = hasRoof;
     n.high = high;
@@ -64364,6 +64780,32 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // Nothing said for the change itself. Walking indoors is not news; the
     // band crossing that follows it is, and the tick says that.
     return '';
+  }
+
+  /*
+    THE PLACE AND THE SKY CHANGE HERE, AND ONLY HERE (#3136), on a record
+    already settled up to now: place() for what the client says, and the
+    tick for a new roll of the sky (the season block's skyAdjust). The record
+    is changed and not written; the caller writes it.
+
+    Leaving the rain or the water starts the 3 minutes of wet, from what
+    that place was worth with its water (#1382). Going back in ends them.
+
+    Until #3136 the tick changed the place itself, before settling, so the
+    stretch since the last settle was charged at the new place, and a roll
+    that took the rain away dried somebody at once, with no 3 minutes.
+  */
+  function moveTo(actorId, n, kind, sky) {
+    var wasWet = !!NEEDS.wetPlaces[n.place], nowWet = !!NEEDS.wetPlaces[kind];
+    if (wasWet && !nowWet) {
+      n.wetFrom = Date.now();
+      n.wetPlace = NEEDS.place[n.place] + waterKind(actorId, n);
+    } else if (nowWet) {
+      n.wetFrom = 0;
+      n.wetPlace = null;
+    }
+    n.place = kind;
+    n.sky = sky;
   }
 
   // ------------------------------------------------------------ the water --
@@ -64802,6 +65244,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
+    Whether a kind of rest is a bed or a bedroll (#3136): one whose row puts
+    rest back after a night, which is every bed and bedroll whoever's it is,
+    and no seat. The same table as the night, so the two cannot disagree.
+  */
+  function inBed(kind) {
+    return (Number(awayRow(kind).rest) || 0) > 0;
+  }
+
+  /*
     What logging out now would do, in words, for the Body page on K (#2246).
     Worked out from the same NEEDS.away row that settle and arrived read at
     the arrival, so a change of numbers changes the page with it.
@@ -64962,21 +65413,23 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       try {
         var before = read(who);
         if (!before) { settle(who); continue; }
+        var was = { food: bandOf(before.food), drink: bandOf(before.drink),
+                    rest: bandOf(before.rest), temp: tempBand(before.temp).name };
+        // Settled first, at the place the time was spent in, and then the
+        // sky's new roll moves them (#3136). See moveTo.
+        var n = settle(who, Date.now());
         try {
           var Ssn = g.__thornswoodSeason;
           if (Ssn && Ssn.skyAdjust) {
-            var rolled = Ssn.skyAdjust(who, before);
-            if (rolled && ((rolled.sky || '') !== (before.sky || '') ||
-                (rolled.place || '') !== (before.place || ''))) {
-              if (rolled.sky) { before.sky = rolled.sky; }
-              if (rolled.place) { before.place = rolled.place; }
-              write(who, before);
+            var rolled = Ssn.skyAdjust(who, n);
+            var toSky = (rolled && rolled.sky) ? rolled.sky : n.sky;
+            var toPlace = (rolled && rolled.place) ? rolled.place : n.place;
+            if (rolled && (toSky !== n.sky || toPlace !== n.place)) {
+              moveTo(who, n, toPlace, toSky);
+              write(who, n);
             }
           }
         } catch (eSky) { }
-        var was = { food: bandOf(before.food), drink: bandOf(before.drink),
-                    rest: bandOf(before.rest), temp: tempBand(before.temp).name };
-        var n = settle(who, Date.now());
         // The ale help running out changes the character, not a band (#1382).
         if (n.aleHelpUntil && Date.now() >= n.aleHelpUntil) {
           n.aleHelpUntil = 0;
@@ -65433,6 +65886,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   g.__thornswoodNeeds = {
     NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
     bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind, groupOf: foodGroup,
+    // A swallow the engine saw, from mp.onEatItem (#3136).
+    eaten: eaten,
     // Water at a well and over a cooking fire, from mp.onActivate (#1382).
     activatedWater: activatedWater, drankWater: drankWater,
     // A bottle used up by a hair dye's steep, and the fire it steeps at (#2675).
@@ -67208,7 +67663,7 @@ module.exports = {
   /*
     SOMETHING DRUNK FROM THE PACK (mp.onEatItem, below). A potion of cure
     disease clears one ordinary disease. It is still the thirst sip, which the
-    needs block gives from the client's /ate line. Answers a line, or ''.
+    needs block gives from the same event (eaten). Answers a line, or ''.
   */
   function swallowed(actorId, baseId) {
     var cure = false;
@@ -67912,12 +68367,13 @@ module.exports = {
   }
 
   /*
-    A POTION DRUNK FROM THE PACK, heard for the potion of cure disease. This
-    is the engine's own record of the drink, not the client's /ate line: it
-    is raised only once the server has checked the pack holds the potion, and
-    it is the same message that takes it out (MpActor::OnEquip). So nobody
-    cures a disease by saying they drank something. It never refuses: the
-    engine takes the potion whatever this answers.
+    A POTION DRUNK FROM THE PACK, heard for the potion of cure disease, and
+    anything eaten or drunk, heard for the needs block. This is the engine's
+    own record of the drink: it is raised only once the server has checked
+    the pack holds the thing, and it is the same message that takes it out
+    (MpActor::OnEquip). So nobody cures a disease, or fills a meter, by
+    saying they drank something. It never refuses: the engine takes the
+    thing whatever this answers.
   */
   mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
     /*
@@ -67941,6 +68397,17 @@ module.exports = {
       } catch (e) { hlog('the eat scale threw:', e); }
     }
     try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
+    /*
+      WHAT IT DOES TO HUNGER AND THIRST (#3136), the needs block's eaten(),
+      from this event and from nothing the client says. Said in the chat
+      only, the way a meal's line always was.
+    */
+    if (needsApi && needsApi.eaten) {
+      try {
+        var mealLine = needsApi.eaten(actorId, Number(baseId) || 0);
+        if (mealLine) { say(actorId, mealLine); }
+      } catch (e) { hlog('the meal threw:', e); }
+    }
     // Withered (#1387), in the college block, on its own: five potions in an hour.
     var college = g.__thornswoodCollege;
     if (college && college.drank) {
@@ -70189,7 +70656,7 @@ module.exports = {
   because they keep their 421 settings in ini files on the machine, and
   SkyUI_SE's three script values are out of reach.
 
-  THE CHANNEL IS THE ONE /ate AND /place ALREADY USE. The front plugin reads
+  THE CHANNEL IS THE ONE /place ALREADY USES. The front plugin reads
   those globals when the game's journal (where the menus live) opens and
   again when it closes, and sends what moved as /modset lines over the chat
   socket. This block keeps them per character, by profile id, in
