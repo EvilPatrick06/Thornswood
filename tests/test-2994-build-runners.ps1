@@ -60,10 +60,10 @@ $heavy = @{
     'nightly.yml'  = @('harnesses')
     # The gate, run as build.yml runs it, under a trace (#3114).
     'trace-gate.yml' = @('trace')
-    # Light, but it asks for a build runner because those are never the
-    # runner that signs a release launcher (records\sign-runners.json, #3312).
-    'release.yml'  = @('verify')
 }
+# release.yml's verify is light. It asked for a build runner until #3956,
+# since those are never the runner that signs; it asks for the check label
+# (records\check-runners.json) now, so it never waits behind a build.
 function Get-Jobs([string]$text) {
     $text = $text -replace "`r`n", "`n"
     $body = $text.Substring($text.IndexOf("`njobs:`n") + 7)
