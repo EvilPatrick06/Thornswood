@@ -611,6 +611,90 @@ if (cl) {
   });
   yes('every port in it has its text in records\\client-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
 }
+// ------------------------------------- the other code inside them (#3751)
+//
+// Code that does not come through vcpkg had no record, so its notices went
+// nowhere: Tilted Phoques' libraries, the fork's MIT folders, and the npm
+// packages webpack bundles into skymp5-client.js and build.js. Every library
+// THIRD-PARTY.md names as built into a client file with a notice of its own
+// has a row in "The other code inside the client files"; each row is the
+// record's library, text and all, or, while the record has none (a client
+// measured before #3751), is named under "What is still missing". The front's
+// table is front-build.json's packages, row for row, each with its text.
+function tableRows(head) {
+  const lines = N.split('\n');
+  const at = lines.indexOf(head);
+  const rows = [];
+  for (let i = at + 2; at >= 0 && i < lines.length && lines[i].charAt(0) === '|'; i++) rows.push(lines[i]);
+  return { at: at, rows: rows };
+}
+const OTHER_HEAD = '| Library | Version | Licence, as its folder or package gives it | In |';
+const other = tableRows(OTHER_HEAD);
+const otherNames = other.rows.map(function (r) { return r.split('|')[1].trim(); });
+yes('THIRD-PARTY.md has the table of the other code inside the client files (' + other.rows.length + ' rows)', other.at >= 0 && other.rows.length > 0);
+// What the client section says is compiled into the client files, and which
+// of it carries a notice of its own: a folder named just before a licence
+// that is not the GPL's or AGPL's, and the Tilted folder.
+const compiled = (function () {
+  const a = N.indexOf('What is compiled into them:');
+  const b = N.indexOf('### The libraries inside the client files');
+  return a >= 0 && b > a ? N.slice(a, b) : '';
+})();
+const noticed = [];
+(compiled.match(/(?:`[^`]+`(?:,\s*|\s+and\s+))*`[^`]+`\s*\((?:MIT|BSD|Apache|ISC|Zlib|BSL)/g) || []).forEach(function (m) {
+  (m.match(/`([^`]+)`/g) || []).forEach(function (t) { const n = t.replace(/`/g, ''); if (noticed.indexOf(n) < 0) noticed.push(n); });
+});
+if (/skyrim-platform\\src\\tilted/.test(compiled)) noticed.push('tilted');
+const unrowed = noticed.filter(function (n) { return otherNames.indexOf(n) < 0; });
+yes('each library the client section names with a notice of its own has a row (' + noticed.join(', ') + ')' + (unrowed.length ? ', not: ' + unrowed.join(', ') : ''),
+    noticed.length >= 4 && unrowed.length === 0);
+if (cl && cl.libraries) {
+  const want = Object.keys(cl.libraries).sort().map(function (n) {
+    const p = cl.libraries[n];
+    const ver = p.kind === 'fork' ? 'the fork\'s' : String(p.version);
+    const lic = p.licence ? p.licence : 'not declared; its text is in `' + n + '.txt`';
+    const files = (p.in || []).map(function (f) { return String(f).split('\\').pop(); }).sort().map(function (f) { return '`' + f + '`'; }).join(', ');
+    return '| ' + n + ' | ' + ver + ' | ' + lic + ' | ' + files + ' |';
+  });
+  const wrong = want.filter(function (r) { return other.rows.indexOf(r) < 0; });
+  const extra = other.rows.filter(function (r) { return want.indexOf(r) < 0; });
+  wrong.forEach(function (r) { console.log('      not in THIRD-PARTY.md: ' + r); });
+  extra.forEach(function (r) { console.log('      not in the record: ' + r); });
+  yes('the table of the other code is the record\'s libraries, row for row (' + want.length + ')', want.length > 0 && wrong.length === 0 && extra.length === 0);
+  const noText = Object.keys(cl.libraries).filter(function (n) {
+    let b = null;
+    try { b = fs.readFileSync(path.join(REPO, 'records', 'client-licences', n + '.txt')); } catch (e) { return true; }
+    return crypto.createHash('sha256').update(b).digest('hex') !== String(cl.libraries[n].sha256) || b.length !== Number(cl.libraries[n].bytes);
+  });
+  yes('every library in the record has its text in records\\client-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
+} else {
+  const missing = flat(section('What is still missing'));
+  const unsaid = otherNames.filter(function (n) { return missing.indexOf(n) < 0; });
+  yes('the client record lists no libraries (measured before #3751), so "What is still missing" names every row' + (unsaid.length ? ', not: ' + unsaid.join(', ') : ''),
+      otherNames.length > 0 && unsaid.length === 0);
+}
+let fb = null;
+try { fb = JSON.parse(read(path.join(REPO, 'records', 'front-build.json')).replace(/^﻿/, '')); } catch (e) { fb = null; }
+yes('records\\front-build.json lists the npm packages in build.js', !!(fb && fb.packages && Object.keys(fb.packages).length > 0));
+if (fb && fb.packages) {
+  const front = tableRows('| Package | Version | Licence, as its package.json declares it | Text |');
+  const want = Object.keys(fb.packages).sort().map(function (n) {
+    const p = fb.packages[n];
+    return '| ' + p.package + ' | ' + p.version + ' | ' + (p.licence || 'not declared') + ' | `' + n + '.txt` |';
+  });
+  const wrong = want.filter(function (r) { return front.rows.indexOf(r) < 0; });
+  const extra = front.rows.filter(function (r) { return want.indexOf(r) < 0; });
+  wrong.forEach(function (r) { console.log('      not in THIRD-PARTY.md: ' + r); });
+  extra.forEach(function (r) { console.log('      not in the record: ' + r); });
+  yes('THIRD-PARTY.md\'s table of the npm packages in build.js is front-build.json, row for row (' + want.length + ')',
+      front.at >= 0 && wrong.length === 0 && extra.length === 0);
+  const noText = Object.keys(fb.packages).filter(function (n) {
+    let b = null;
+    try { b = fs.readFileSync(path.join(REPO, 'records', 'front-licences', n + '.txt')); } catch (e) { return true; }
+    return crypto.createHash('sha256').update(b).digest('hex') !== String(fb.packages[n].sha256) || b.length !== Number(fb.packages[n].bytes);
+  });
+  yes('every package in it has its text in records\\front-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
+}
 yes('THIRD-PARTY.md no longer says the vcpkg texts travel nowhere',
     !/None of those texts travels/.test(N) && !/vcpkg licence texts do not travel/.test(flat(section('What is still missing'))));
 yes('the frida-gum row says what else frida-gum.lib holds, under the LGPL',

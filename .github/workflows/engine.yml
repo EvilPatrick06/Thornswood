@@ -7,7 +7,8 @@
 # records\server-build.json (New-ServerBuildRecord.ps1, which ties each file
 # to the fork's source), records\client-build.json (New-ClientBuildRecord.ps1,
 # the six client files), and records\client-licences.json with
-# records\client-licences\, the vcpkg libraries in the client files and each
+# records\client-licences\, the libraries in the client files (vcpkg ports, the
+# fork's own noticed folders and npm packages, #3751) and each
 # one's licence text (#3099, New-ClientLicenceRecord.ps1), which the fork's
 # build measures from each file's program database and keeps in
 # build\licences. It also makes the server build the box's store keeps
