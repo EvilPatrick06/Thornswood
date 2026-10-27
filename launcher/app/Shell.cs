@@ -5234,10 +5234,10 @@ namespace Thornswood
                 int wants = Updater.FeedCollectionRevision;
                 txtUpdateTitle.Text = "Your mods need updating";
                 txtUpdateNote.Text =
-                    "The collection is on revision " + wants + " and this copy is on " + mine +
-                    ", so part of what the server expects is not installed. Open it and let " +
-                    "Vortex bring it up to date. It is one button there and it takes the lot " +
-                    "in one go.";
+                    "The server was built against collection revision " + wants + " and this copy " +
+                    "is on " + mine + ", so part of what the server expects is not installed. Open " +
+                    "the collection and let Vortex bring it up to date. It is one button there and " +
+                    "it takes the lot in one go.";
             }
             else if (problem == "ahead")
             {

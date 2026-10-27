@@ -19,6 +19,8 @@
     a release over -MaxReleaseMB   refused by the size gate, nothing zipped
     the same with -AcceptSize      goes past the size gate
     a release under the cap        goes past the size gate
+    a Vortex behind the record     stops, naming both revisions (#3597)
+    a Vortex that cannot say       stops, never naming a guess
 
   Every run also checks that the feed and the baseline are byte for byte what
   they were, because a refusal that has already written either one is the
@@ -50,6 +52,8 @@ if (-not $PublishPath) { $PublishPath = Join-Path $Here 'scripts\release\Publish
 $ToolsDir = Split-Path -Parent $PublishPath
 . (Join-Path $Here 'tests\fixtures\generated-bodies.ps1')
 . (Join-Path $Here 'tests\fixtures\ui-front.ps1')
+. (Join-Path $Here 'tests\fixtures\collection-revision.ps1')
+. (Join-Path $Here 'scripts\release\CollectionRevision.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -103,8 +107,11 @@ function Invoke-Publish([string]$root, [string[]]$extra) {
         baseline = Hash (Join-Path $root 'rel\published.json')
     }
     $oldAppData = $env:LOCALAPPDATA
+    $oldRoaming = $env:APPDATA
     $oldEap = $ErrorActionPreference
     $env:LOCALAPPDATA = Join-Path $root 'appdata'
+    # The harness's own Vortex, on the recorded collection revision (#3597).
+    $env:APPDATA = $roaming
     # Windows PowerShell turns a child's stderr into a terminating error under
     # Stop, which would end this harness on the first refusal it is testing.
     $ErrorActionPreference = 'Continue'
@@ -120,6 +127,7 @@ function Invoke-Publish([string]$root, [string[]]$extra) {
     }
     finally {
         $env:LOCALAPPDATA = $oldAppData
+        $env:APPDATA = $oldRoaming
         $ErrorActionPreference = $oldEap
     }
     $zips = @(Get-ChildItem -LiteralPath (Join-Path $root 'dist') -Recurse -Filter *.zip -File -ErrorAction SilentlyContinue)
@@ -145,7 +153,7 @@ try {
     $repoRoot = Split-Path -Parent (Split-Path -Parent $ToolsDir)
     # Fresh-Checkout.ps1 too: Publish-Update loads its freshness guard under
     # Stop since #3006, where before a tree without it walked past the guard.
-    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\deploy\Fresh-Checkout.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\RepoPlugins.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\deploy\Fresh-Checkout.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\RepoPlugins.ps1', 'scripts\release\CollectionRevision.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Feed-Json.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
                    'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1',
@@ -163,6 +171,9 @@ try {
         New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
         if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $to -Force -Recurse }
     }
+    # The collection revision record, and a Vortex on it (#3597).
+    $roaming = Join-Path $work 'roaming'
+    $null = Install-CollectionRevisionFixture -From $repoRoot -RepoCopy (Split-Path -Parent $tools) -AppData $roaming
     # Publish-Update places game\required-data into the game folder before the
     # scan; without the folder the size-gate cases die before the gate.
     $reqFrom = Join-Path $repoRoot 'game\required-data'
@@ -220,6 +231,26 @@ try {
     $r = Invoke-Publish (New-Install 'under-cap' $vortex $small) @('-MaxReleaseMB', '5', '-MaxRemovals', '0')
     Yes 'a release under the cap goes past the size gate' ($r.Out -notmatch 'the cap is' -and $r.Out -match 'would delete')
     Unchanged $r
+
+    # ---- a machine on another collection revision (#3597) ------------------------
+    # Both feeds said revision 2, the one One's Vortex had, while the record and
+    # Nexus were on 5, so a launcher on 2 was let in. The same release from a
+    # Vortex one revision behind the record stops before anything is packed.
+    $recorded = Get-ShipRecordedCollectionRevision -RepoDir (Split-Path -Parent $tools)
+    $keepRoaming = $roaming
+    $roaming = Join-Path $work 'roaming-behind'
+    $null = Install-CollectionRevisionFixture -From $repoRoot -RepoCopy (Split-Path -Parent $tools) -AppData $roaming -Revision ($recorded.Revision - 1)
+    $r = Invoke-Publish (New-Install 'behind' $vortex $small) @('-MaxReleaseMB', '5', '-MaxRemovals', '0')
+    Yes 'a machine whose Vortex is a revision behind the record stops' ($r.Code -eq 1)
+    Yes '  naming both revisions' ($r.Out -match ('collection is on revision ' + $recorded.Revision) -and $r.Out -match ('Vortex is on revision ' + ($recorded.Revision - 1)))
+    Yes '  and nothing was built' ($r.Out -match 'Nothing was built')
+    Unchanged $r
+    $roaming = Join-Path $work 'roaming-none'
+    New-Item -ItemType Directory -Force -Path $roaming | Out-Null
+    $r = Invoke-Publish (New-Install 'unknown' $vortex $small) @('-MaxReleaseMB', '5', '-MaxRemovals', '0')
+    Yes 'a machine whose Vortex cannot say stops too, never naming a guess' ($r.Code -eq 1 -and $r.Out -match 'does not say which collection revision')
+    Unchanged $r
+    $roaming = $keepRoaming
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

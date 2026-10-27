@@ -35,7 +35,9 @@
       Test-ShipNotOurs $rel        another author's loose file (outside Data\Platform, not named ours); never packed, recorded or listed as removed
       Test-ShipOurs $rel           ours outside Data\Platform: the named files, the client runtime, required data, the menu, Nemesis's output, the BodySlide builds until #1259
       Test-ShipHeld $rel           a loose file that ships until the collection revision that carries its mod, or while the content plugin names it
-      Get-ShipCollectionRevision   the revision a release is built against, for $ShipCollectionRevision
+      Get-ShipCollectionRevision   the revision this machine's Vortex has installed, for $ShipCollectionRevision
+      Get-ShipRecordedCollectionRevision  the revision records\collection-plugins.json says a release is built against (CollectionRevision.ps1, #3597)
+      Get-ShipCollectionRevisionProblem   why a release built from a source on another revision may not go out naming it, or ''
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
       Get-ShipRequiredDataRoot     game\required-data in the repo
       Ensure-ShipRequiredData      place those files into Data\ before a pack or installer scan
@@ -1522,6 +1524,12 @@ $ShipCollectionRevision = 0
 # which the callers dot-source; 0 without it.
 function Get-ShipCollectionRevision([string]$Root) {
     if (-not (Get-Command Get-CollectionRevision -ErrorAction SilentlyContinue)) { return 0 }
+    return [int](Get-CollectionRevision (Get-CollectionSlug (Get-ShipCollectionUrl $Root)))
+}
+
+# The collection config.json under $Root names, or the launcher's own when it
+# names none. Throws when config.json is there and does not read.
+function Get-ShipCollectionUrl([string]$Root) {
     # No config.json, or one naming no collection, is the launcher's own
     # collection. One that is there and does not read stops whatever asked,
     # before anything is packed (Patrick, 19 Oct, #2711 decision 2 B): the
@@ -1537,8 +1545,13 @@ function Get-ShipCollectionRevision([string]$Root) {
         if ($cfgDoc -and $cfgDoc.PSObject.Properties['CollectionUrl']) { $url = [string]$cfgDoc.CollectionUrl }
     }
     if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf' }
-    return [int](Get-CollectionRevision (Get-CollectionSlug $url))
+    return $url
 }
+
+# The revision a release names is the recorded one, and the source it is built
+# from has to be on it (#3597). Vortex's number above says what this machine
+# has; it is never written to a feed in place of the record's.
+. (Join-Path $PSScriptRoot 'CollectionRevision.ps1')
 
 # Plugins game\required-data puts in Data\ before a scan (Ensure-ShipRequiredData).
 # Worked out in a child scope: this file is dot-sourced into its callers, and

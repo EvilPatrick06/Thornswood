@@ -118,7 +118,7 @@ $Scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts-dev-news-' + [Guid]::NewGui
 New-Item -ItemType Directory -Force -Path $Scratch | Out-Null
 $gitId = @('-c', 'user.name=Thornswood test', '-c', 'user.email=test@thornswood.invalid', '-c', 'commit.gpgsign=false')
 $oldEnv = @{}
-foreach ($k in 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'LOCALAPPDATA', 'THORNSWOOD_TEST_SITE_DIR') { $oldEnv[$k] = [Environment]::GetEnvironmentVariable($k) }
+foreach ($k in 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'LOCALAPPDATA', 'APPDATA', 'THORNSWOOD_TEST_SITE_DIR') { $oldEnv[$k] = [Environment]::GetEnvironmentVariable($k) }
 $env:GIT_COMMITTER_NAME = 'Thornswood test'; $env:GIT_COMMITTER_EMAIL = 'test@thornswood.invalid'
 $env:GIT_AUTHOR_NAME = 'Thornswood test'; $env:GIT_AUTHOR_EMAIL = 'test@thornswood.invalid'
 # Nothing here may reach this machine's own working folders for the feeds.
@@ -378,6 +378,10 @@ try {
         New-GeneratedBodies $inst $fake
         . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
         Install-UiFrontFixture (Join-Path $inst 'Game')
+        # The collection revision record, and a Vortex on it (#3597).
+        . (Join-Path $repo 'tests\fixtures\collection-revision.ps1')
+        $env:APPDATA = Join-Path $inst 'roaming'
+        $null = Install-CollectionRevisionFixture -From $repo -RepoCopy $fake -AppData $env:APPDATA
         $node = Get-Command node -ErrorAction SilentlyContinue
         Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
         if ($null -eq $node) { Done }

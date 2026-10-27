@@ -54,6 +54,9 @@
        (Check-CoveredBodies.ps1 exit 1): refused on dev and on main, nothing
        published, the version put back (#1956); a nude body (exit 2) on dev
        still only warns and runs to the end (#405)
+    N  this machine's Vortex a collection revision behind
+       records\collection-plugins.json, or unable to say: refused before the
+       version moves, nothing published (#3597)
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
@@ -286,7 +289,7 @@ try {
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $repo 'scripts\release\Ship.ps1') -Force
     # The real files Ship dot-sources, beside it, so it runs as it does for real.
     $realRel = Split-Path -Parent $ShipPath
-    foreach ($n in 'Ship-Rules.ps1', 'ShippedBytes.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1', 'Note-Repeats.ps1', 'Feed-News.ps1', 'Release-Baseline.ps1', 'Feed-Rules.ps1') {
+    foreach ($n in 'Ship-Rules.ps1', 'ShippedBytes.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1', 'CollectionRevision.ps1', 'Note-Repeats.ps1', 'Feed-News.ps1', 'Release-Baseline.ps1', 'Feed-Rules.ps1') {
         Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $repo ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $repo 'layout.json') -Force
@@ -323,7 +326,13 @@ function Get-PublishSignRefusal { param([string]$Path, [string]$ExpectedSigner) 
     [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\LoadOrder.ps1'), @'
 function Assert-VortexProfile([string]$Name = 'Thornswood') { return (Join-Path $env:LOCALAPPDATA 'Vortex-Thornswood') }
 function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
+function Get-CollectionSlug([string]$Url) { return '7essxf' }
+function Get-CollectionRevision([string]$Slug) { if ($env:TS_DRY_COLLECTION_REVISION) { return [int]$env:TS_DRY_COLLECTION_REVISION }; return 0 }
 '@)
+    # The collection revision record Ship holds this machine's Vortex to
+    # (#3597); the stand-in Vortex above is on it unless a case says not.
+    Copy-Item -LiteralPath (Join-Path $realRel '..\..\records\collection-plugins.json') -Destination (Join-Path $repo 'records\collection-plugins.json') -Force
+    $env:TS_DRY_COLLECTION_REVISION = [string](([IO.File]::ReadAllText((Join-Path $repo 'records\collection-plugins.json')) -replace '^\uFEFF', '') | ConvertFrom-Json).revision
     $updaterCs = Join-Path $repo 'launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
     # Issue #1081: Ship runs scripts\dev\Check-Words.ps1 before it builds.
@@ -855,6 +864,22 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         $env:TS_BODIES_EXIT = $oldBodiesExit
         Remove-Item -LiteralPath $nodeStandIn -Force -ErrorAction SilentlyContinue
     }
+
+    # ---- N: this machine's Vortex behind the collection's record (#3597) ---------------
+    # Both feeds said revision 2, One's Vortex, while the record and Nexus were
+    # on 5, so a launcher on 2 was let in. A Ship from a Vortex a revision behind
+    # stops before the version moves, naming both, and publishes nothing.
+    $recRev = [int]$env:TS_DRY_COLLECTION_REVISION
+    $env:TS_DRY_COLLECTION_REVISION = [string]($recRev - 1)
+    try {
+        $nb = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("N a Ship from a Vortex a revision behind the record is refused (exit {0})" -f $nb.Code) ($nb.Code -ne 0 -and $nb.Out -match ('collection is on revision ' + $recRev) -and $nb.Out -match ('Vortex is on revision ' + ($recRev - 1)))
+        Yes '  and nothing was built or published' ((Called $nb 'Publish-Update').Count -eq 0 -and $nb.Out -match 'Nothing was built or published')
+        Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
+        $env:TS_DRY_COLLECTION_REVISION = '0'
+        $nu = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("N a Ship from a Vortex that cannot say its revision is refused, never guessed (exit {0})" -f $nu.Code) ($nu.Code -ne 0 -and $nu.Out -match 'does not say which collection revision' -and (Called $nu 'Publish-Update').Count -eq 0)
+    } finally { $env:TS_DRY_COLLECTION_REVISION = [string]$recRev }
 }
 finally {
     $env:PATH = $oldPath
