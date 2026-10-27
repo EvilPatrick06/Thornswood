@@ -10,6 +10,14 @@ fn here() -> std::path::PathBuf {
     std::env::current_exe().unwrap().parent().unwrap().to_path_buf()
 }
 
+// file:///C:/... on Windows: egui_extras reads file://C:\... (two slashes)
+// as the network path \\C:\..., so on 27 Oct the art never loaded on One
+// and the window never counted its first frame.
+fn art_uri() -> String {
+    let path = here().join("art.png").to_string_lossy().replace('\\', "/");
+    if path.starts_with('/') { format!("file://{path}") } else { format!("file:///{path}") }
+}
+
 fn ready_file() -> Option<String> {
     std::env::var("PROTO_READY").ok().filter(|s| !s.is_empty())
 }
@@ -25,6 +33,7 @@ fn music() {
 
 struct Proto {
     art_loaded: bool,
+    art_failed: bool,
     frames: u32,
     shown: Option<Instant>,
     started: bool,
@@ -54,9 +63,16 @@ impl eframe::App for Proto {
         let ctx = root.ctx().clone();
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(0x14, 0x11, 0x0e))).show(root, |ui| {
             let rect = ui.max_rect();
-            let uri = format!("file://{}", here().join("art.png").display());
-            let art = egui::Image::new(uri);
-            self.art_loaded = matches!(art.load_for_size(ui.ctx(), rect.size()), Ok(egui::load::TexturePoll::Ready { .. }));
+            let art = egui::Image::new(art_uri());
+            match art.load_for_size(ui.ctx(), rect.size()) {
+                Ok(egui::load::TexturePoll::Ready { .. }) => self.art_loaded = true,
+                Ok(_) => {}
+                Err(e) if !self.art_failed => {
+                    self.art_failed = true;
+                    eprintln!("art.png did not load: {e}");
+                }
+                Err(_) => {}
+            }
             art.paint_at(ui, rect);
             let area = egui::Rect::from_min_size(egui::pos2(rect.left() + 48.0, rect.bottom() - 180.0), egui::vec2(260.0, 140.0));
             ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
@@ -98,6 +114,6 @@ fn main() -> eframe::Result {
     };
     eframe::run_native("Thornswood egui", options, Box::new(|cc| {
         egui_extras::install_image_loaders(&cc.egui_ctx);
-        Ok(Box::new(Proto { art_loaded: false, frames: 0, shown: None, started: false, state: "Ready to launch".into() }))
+        Ok(Box::new(Proto { art_loaded: false, art_failed: false, frames: 0, shown: None, started: false, state: "Ready to launch".into() }))
     }))
 }

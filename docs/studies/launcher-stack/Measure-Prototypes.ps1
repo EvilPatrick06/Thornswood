@@ -22,7 +22,10 @@
   (active) together with every Windows audio session that belongs to the
   prototype's processes, which is what the Volume Mixer lists. Then the
   process tree is closed. The first run of each prototype is reported on its
-  own (the first start after a build), the rest as a median.
+  own (the first start after a build), the rest as a median. For a run that
+  writes no ready file it keeps the prototype's exit code, the last lines of
+  its stdout and stderr, and what the Application event log says about it,
+  and results.md shows them.
 
   The music is a quiet hiss a few steps above silence, so a run makes an
   audio session without being heard.
@@ -165,6 +168,11 @@ function Use-VcVars([string]$bat) {
         $i = $l.IndexOf('=')
         if ($i -gt 0) { [Environment]::SetEnvironmentVariable($l.Substring(0, $i), $l.Substring($i + 1), 'Process') }
     }
+    # The NativeAOT link step (avalonia-aot) runs vswhere.exe by bare name to
+    # find the linker, and vcvars64.bat does not put the Visual Studio
+    # Installer folder on PATH: on 27 Oct that build stopped with "'vswhere.exe'
+    # is not recognized". The folder Find-VcVars took vswhere from goes on PATH.
+    $env:PATH = "$(Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer');$env:PATH"
 }
 
 function Install-Tools {
@@ -569,6 +577,23 @@ function Get-Size([string]$dir) {
     $r
 }
 
+# The last lines a prototype wrote, once its pipe has closed.
+function Get-Tail($task) {
+    if (-not $task.Wait(5000)) { return '(still open)' }
+    $lines = @($task.Result -split "`r?`n" | Where-Object { $_.Trim() })
+    ($lines | Select-Object -Last 15) -join "`n"
+}
+
+# What Windows logged about the prototype since the run started: a .NET
+# exception that ended it (.NET Runtime 1026) or a native crash (Application
+# Error 1000), with the exception and the module it happened in.
+function Get-CrashEvents([datetime]$since, [string]$exeName) {
+    $filter = @{ LogName = 'Application'; ProviderName = '.NET Runtime', 'Application Error'; StartTime = $since }
+    Get-WinEvent -FilterHashtable $filter -ErrorAction SilentlyContinue |
+        Where-Object { $_.Message -like "*$exeName*" } |
+        ForEach-Object { "$($_.ProviderName) $($_.Id): " + (($_.Message -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -First 12) -join ' | ') }
+}
+
 function Measure-One([string]$name) {
     $dir = Join-Path $Out $name
     # PowerShell names are not case sensitive: a local $runs or $exe would be
@@ -585,13 +610,31 @@ function Measure-One([string]$name) {
         $psi = [Diagnostics.ProcessStartInfo]::new($exePath)
         $psi.WorkingDirectory = Split-Path $exePath
         $psi.UseShellExecute = $false
+        # What a prototype says when it stops, kept for the runs that write no
+        # ready file (on 27 Oct winui3, egui and electron wrote none and said
+        # nothing the console kept).
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
         $psi.EnvironmentVariables['PROTO_READY'] = $ready
         $psi.EnvironmentVariables['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = '--autoplay-policy=no-user-gesture-required'
+        $psi.EnvironmentVariables['ELECTRON_ENABLE_LOGGING'] = '1'
+        $psi.EnvironmentVariables['RUST_BACKTRACE'] = '1'
+        # Set by an Electron app for the tools it starts (a Claude or a code
+        # editor running this script): with it an Electron exe runs as plain
+        # Node and opens no window. A person starting the launcher from
+        # Explorer never has it, so no prototype gets it; results.md says when
+        # this machine had it.
+        $script:RunAsNode = $psi.EnvironmentVariables['ELECTRON_RUN_AS_NODE']
+        [void]$psi.EnvironmentVariables.Remove('ELECTRON_RUN_AS_NODE')
+        $started = Get-Date
         $clock = [Diagnostics.Stopwatch]::StartNew()
         $p = [Diagnostics.Process]::Start($psi)
+        $stdout = $p.StandardOutput.ReadToEndAsync()
+        $stderr = $p.StandardError.ReadToEndAsync()
         while (-not (Test-Path -LiteralPath $ready) -and $clock.ElapsedMilliseconds -lt 30000 -and -not $p.HasExited) { Start-Sleep -Milliseconds 5 }
         $readyMs = if (Test-Path -LiteralPath $ready) { $clock.ElapsedMilliseconds } else { $null }
         $run = [ordered]@{ Run = $r; ReadyMs = $readyMs; Exited = $p.HasExited }
+        if ($p.HasExited) { $run.ExitCode = $p.ExitCode }
         if ($readyMs) {
             Start-Sleep -Milliseconds 3000
             $idle = Measure-Tree $p.Id
@@ -604,6 +647,12 @@ function Measure-One([string]$name) {
             if ($r -eq 1) { $run.Mixer = @(Get-MixerEntries $active.Tree $p.Id) }
         }
         Stop-Tree $p.Id
+        if (-not $readyMs) {
+            [void]$p.WaitForExit(5000)
+            $run.Stdout = Get-Tail $stdout
+            $run.Stderr = Get-Tail $stderr
+            $run.Crash = @(Get-CrashEvents $started (Split-Path $exePath -Leaf))
+        }
         Remove-Tree $ready; Remove-Tree "$ready.active"
         $done += [pscustomobject]$run
         Say ("{0} run {1}: ready {2} ms" -f $name, $r, $readyMs)
@@ -690,6 +739,18 @@ foreach ($r in $results) {
     $md.Add("| $($r.Name) | $($r.Size.InstallMB) | $($r.Size.ZipMB) | $($r.FirstReadyMs) | $($r.WarmReadyMs) | $($r.IdlePrivateMB) | $($r.IdleWorkingSetMB) | $($r.ActivePrivateMB) | $($r.ActiveWorkingSetMB) | $($r.Processes) | $mix |")
 }
 foreach ($k in $failed.Keys) { $md.Add(''); $md.Add("$k did not finish: $($failed[$k])") }
+if ($script:RunAsNode) { $md.Add(''); $md.Add("This session had ELECTRON_RUN_AS_NODE=$script:RunAsNode; the prototypes were started without it.") }
+foreach ($r in $results) {
+    $silent = @($r.Runs | Where-Object { -not $_.ReadyMs })
+    if (-not $silent.Count) { continue }
+    $first = $silent[0]
+    $md.Add('')
+    $md.Add("$($r.Name) wrote no ready file in $($silent.Count) of $Runs runs. Run $($first.Run): " + $(if ($first.Exited) { "it ended by itself with exit code $($first.ExitCode)." } else { 'it was still running after 30 seconds.' }))
+    foreach ($part in @(@('stdout', $first.Stdout), @('stderr', $first.Stderr))) {
+        if ($part[1]) { $md.Add(''); $md.Add("$($part[0]):"); $md.Add('```'); $md.Add($part[1]); $md.Add('```') }
+    }
+    foreach ($c in $first.Crash) { $md.Add(''); $md.Add("Event log: $c") }
+}
 $md | Set-Content -LiteralPath (Join-Path $Work 'results.md') -Encoding utf8
 Say "wrote $(Join-Path $Work 'results.md')"
 Get-Content -LiteralPath (Join-Path $Work 'results.md')

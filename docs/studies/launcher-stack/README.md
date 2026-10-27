@@ -8,8 +8,32 @@ one-time cost of rewriting is not a criterion and never a tiebreaker, what
 people who play notice comes first, and where two options are equal for them
 the differences for the team decide.
 
-This page is the comparison and the recommendation. Patrick makes the pick on
-his report page, and the pick is then split into smaller issues.
+This page is the comparison and the recommendation. Patrick made the pick on
+his report page on 26 Oct 2026 at 11:46 PM, and the pick is split into
+smaller issues.
+
+## Decided
+
+Patrick's picks, on his report page, 26 Oct 2026, 11:46 PM ([#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911)):
+
+1. **The stack is C, Avalonia on .NET 10.** The launcher and the installer
+   are rebuilt on it: [#4063](https://github.com/EvilPatrick06/Thornswood/issues/4063).
+2. **Windows only.** No Linux or Steam Deck launcher is planned. Avalonia
+   stays the pick on its other merits: C#, nothing to install on the machine,
+   bindings checked when it builds, and it builds in the cloud.
+3. **Size is no limit** on the launcher's download.
+4. **The install moves into compiled code and Velopack.** `Setup-Thornswood.ps1`,
+   `Setup.bat` and `Install.bat` retire ([#4064](https://github.com/EvilPatrick06/Thornswood/issues/4064)),
+   and Velopack installs and updates the launcher.
+5. **One update channel.** The game files update through Velopack too, with
+   the feed's release record and its checks (the sha256 of every file, the
+   signed manifest, the baseline record) rebuilt on top of it, not dropped
+   ([#4065](https://github.com/EvilPatrick06/Thornswood/issues/4065)).
+
+Still open after the pick: whether Avalonia ships compiled to native code or
+with the JIT. The One run of 26 Oct measured the JIT build's start at 6.5
+seconds against today's 3.7 ("The comparison"); the native build did not
+finish there, and the next One run measures it.
 
 ## Where things stand today, measured
 
@@ -31,8 +55,10 @@ music playing ([prototypes/README.md](prototypes/README.md) has the contract and
 native stacks play the music from their own process; the web view stacks play
 it through an HTML `<audio>` element, the way the launcher does today.
 
-- **Sizes** are measured on the Windows builds, made in a cloud session on
-  26 Oct 2026 for the eleven builds that can be made off Windows. "Install"
+- **Sizes** are measured on the Windows builds, made on One on 26 Oct 2026
+  (a cloud session made the eleven that can be made off Windows first, and
+  got the same sizes to within a few hundredths of a MB, apart from Wails,
+  10.43 MB there with another Go). "Install"
   is every file the build needs beside it, "zip" the same files compressed,
   which is about what it adds to a download. Neither counts the art, the
   music or debug symbols.
@@ -41,9 +67,7 @@ it through an HTML `<audio>` element, the way the launcher does today.
   it run there", not how fast: the display has no graphics card.
 - **Start time, memory and the Volume Mixer entry** need a real Windows
   desktop. [Measure-Prototypes.ps1](Measure-Prototypes.ps1) builds all fourteen on One and measures
-  each five times; its results go on #3209 and into the table below. The
-  three Windows-only builds (WinUI 3, Qt, Flutter, and Avalonia compiled to
-  native code) get their sizes from that run too.
+  each five times; its results go on #3209 and into the table below.
 
 ## The comparison
 
@@ -52,24 +76,51 @@ the WebView2 Runtime, which Windows 11 has; ".NET 10" means the .NET 10
 Desktop Runtime, which Windows does not have and whose installer is
 60,035,296 bytes (10.0.14, 25 Oct 2026).
 
-| Candidate | Language | Install MB | Zip MB | Needs on the machine | Start, memory, mixer | Linux | Built in the cloud |
-|---|---|---|---|---|---|---|---|
-| WPF on .NET Framework 4.8.1 with WebView2 (today) | C# | 1.17 | 0.39 | .NET Framework 4.8.1, WebView2 | from the One run | no | yes |
-| WPF on .NET 10, framework dependent | C# | 0.16 | 0.08 | .NET 10 | from the One run | no | yes |
-| WPF on .NET 10, self-contained | C# | 61.85 | 56.62 | nothing | from the One run | no | yes |
-| WPF on .NET 10, self-contained, with WebView2 | C# | 63.00 | 57.13 | WebView2 | from the One run | no | yes |
-| WinUI 3, unpackaged, self-contained | C# | from the One run | from the One run | nothing | from the One run | no | no (needs Windows tools, measured) |
-| Avalonia on .NET 10, self-contained, trimmed | C# | 19.84 | 14.87 | nothing | from the One run | yes | yes |
-| Avalonia, untrimmed | C# | 46.33 | 41.18 | nothing | | yes | yes |
-| Avalonia compiled to native code | C# | from the One run | from the One run | nothing | from the One run | yes | no (native compile needs Windows) |
-| Tauri 2 | Rust and the page in HTML | 3.20 | 1.44 | WebView2 | from the One run | yes | yes |
-| Slint | Rust | 8.19 | 4.67 | nothing | from the One run | yes | yes |
-| egui | Rust | 7.87 | 3.73 | nothing | from the One run | yes | yes |
-| Wails 2 | Go and the page in HTML | 10.43 | 4.24 | WebView2 | from the One run | yes | yes |
-| Electron 45 | TypeScript | 356.67 | 154.82 | nothing | from the One run | yes | yes |
-| Qt 6 Quick | C++ | from the One run | from the One run | nothing | from the One run | yes | no for Windows |
-| Flutter 3.47 | Dart | from the One run | from the One run | nothing | from the One run | yes | no for Windows |
-| Python (PySide6 or similar, frozen) | Python | not built | | | | | |
+| Candidate | Language | Install MB | Zip MB | Needs on the machine | First start ms | Start ms | Idle MB, private / working set | Processes | Volume Mixer shows | Linux | Built in the cloud |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| WPF on .NET Framework 4.8.1 with WebView2 (today) | C# | 1.17 | 0.39 | .NET Framework 4.8.1, WebView2 | 4051 | 3696 | 332.8 / 534.4 | 8 | Microsoft Edge WebView2 | no | yes |
+| WPF on .NET 10, framework dependent | C# | 0.16 | 0.08 | .NET 10 | 2042 | 2311 | 158.3 / 202.4 | 1 | its own name | no | yes |
+| WPF on .NET 10, self-contained | C# | 61.85 | 56.62 | nothing | 2676 | 2833 | 212.9 / 293.3 | 1 | its own name | no | yes |
+| WPF on .NET 10, self-contained, with WebView2 | C# | 63.00 | 57.13 | WebView2 | 12801 | 7324 | 372.7 / 652.1 | 8 | Microsoft Edge WebView2 | no | yes |
+| WinUI 3, unpackaged, self-contained | C# | 225.98 | 90.40 | nothing | next One run | | | | | no | no (needs Windows tools, measured) |
+| Avalonia on .NET 10, self-contained, trimmed (JIT) | C# | 19.82 | 14.87 | nothing | 7605 | 6450 | 150.2 / 200.2 | 1 | its own name | yes | yes |
+| Avalonia, untrimmed | C# | 46.33 | 41.18 | nothing | not run | | | | | yes | yes |
+| Avalonia compiled to native code | C# | next One run | | nothing | next One run | | | | | yes | no (native compile needs Windows) |
+| Tauri 2 | Rust and the page in HTML | 3.17 | 1.44 | WebView2 | 3041 | 2497 | 266.3 / 511.0 | 8 | Microsoft Edge WebView2 | yes | yes |
+| Slint | Rust | 8.21 | 4.68 | nothing | 12199 | 2275 | 79.2 / 131.5 | 1 | its exe name | yes | yes |
+| egui | Rust | 7.86 | 3.73 | nothing | next One run | | | | | yes | yes |
+| Wails 2 | Go and the page in HTML | 11.24 | 4.61 | WebView2 | 1486 | 645 | 250.8 / 432.3 | 8 | Microsoft Edge WebView2 | yes | yes |
+| Electron 45 | TypeScript | 356.67 | 154.82 | nothing | next One run | | | | | yes | yes |
+| Qt 6 Quick | C++ | 105.39 | 57.45 | nothing | 1911 | 1031 | 108.4 / 127.8 | 1 | its exe name | yes | no for Windows |
+| Flutter 3.47 | Dart | 24.55 | 10.49 | nothing | 3359 | 3330 | 224.5 / 237.2 | 1 | its own name | yes | no for Windows |
+| Python (PySide6 or similar, frozen) | Python | not built | | | | | | | | | |
+
+The Windows columns are the One run of 26 Oct 2026, 10:47 to 11:33 PM, at
+a0bddcec ([its results on #3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434615789)):
+Windows 11 Pro, an Intel Core Ultra 9 185H, an RTX 4080 laptop GPU, 31 GB,
+WebView2 Runtime 155. "First start" is the first start after the build,
+"start" the median of the four after it; memory is three seconds after the
+first frame, summed over the prototype and every process under it. "Its own
+name" in the mixer is the app's name; "its exe name" is the file name, until
+the exe is given a description. The Avalonia untrimmed row is from the cloud
+build. WinUI 3, egui and Electron built but wrote no ready file on One, and
+the native Avalonia build stopped at its link step; the script now keeps what
+each of them says and finds the linker's helper (#3428), and the next One run
+fills those rows.
+
+What the run says, for the people who play:
+- Every stack that draws its window in WebView2 (today's launcher, Tauri,
+  Wails, WPF with WebView2) runs eight processes, holds 250 to 373 MB of its
+  own, and shows in the Volume Mixer as "Microsoft Edge WebView2", not as
+  Thornswood (#3207).
+- The stacks that draw their own window run one process and hold 79 MB
+  (Slint), 108 (Qt), 150 (Avalonia), 158 to 213 (WPF on .NET 10) and 225
+  (Flutter), and the mixer names them.
+- Later starts: Wails 0.6 seconds, Qt 1.0, Slint and WPF on .NET 10 2.3 to
+  2.8, Tauri 2.5, Flutter 3.3, today 3.7, Avalonia with the JIT 6.5, and WPF
+  with WebView2 in one file 7.3. Why the Avalonia JIT build is slow is not
+  measured yet: WPF on .NET 10 is the same kind of one-file, compressed build
+  and starts in 2.8.
 
 Python was not built. Freezing a Python program into an exe (PyInstaller and
 the like) unpacks the interpreter at every start, gives a large exe once Qt
@@ -80,8 +131,7 @@ offset by anything Python does better here.
 What the launcher being open means: it stays open while the game runs (the
 feed is read every thirty seconds, `docs/FEED.md`), so its memory is taken
 from a heavily modded Skyrim for the whole session. That makes idle memory
-the number that matters most after the download, and it is the one the One
-run brings.
+the number that matters most after the download.
 
 ## The options, with pros and cons
 
@@ -119,7 +169,7 @@ For people who play:
   controls and animations.
 - Con: Windows 10 1809 or newer and Windows only.
 - Con: unpackaged and self-contained it carries the Windows App SDK runtime;
-  its size comes from the One run.
+  measured on One it is 226 MB, 90 zipped, the largest after Electron.
 
 For the team:
 - Con: measured: it cannot be built off Windows (the Windows App SDK build
@@ -132,8 +182,10 @@ For the team:
 
 For people who play:
 - Pro: self-contained and trimmed it needs nothing on the machine and is
-  15 MB zipped; compiled to native code it starts faster (sizes and times
-  from the One run).
+  15 MB zipped, and measured on One it holds 150 MB in one process. With the
+  JIT its later starts took 6.5 seconds on One, the slowest but one; the
+  build compiled to native code is meant to start faster, and the next One
+  run measures it.
 - Pro: it draws every pixel itself with Skia, so the window looks the same on
   every Windows version, and themes and animation are first class.
 - Pro: measured: it runs on Linux, so a Linux or Steam Deck launcher is a
@@ -223,7 +275,7 @@ smaller community than Tauri and its next version is still in beta.
 For people who play:
 - Pro: native speed and a mature, themeable widget and Quick (QML) set.
 - Pro: measured: runs on Linux.
-- Con: its deploy set is tens of megabytes (from the One run), and its web
+- Con: its deploy set is 105 MB, 57 zipped (measured on One), and its web
   view (Qt WebEngine) is a whole Chromium if a page is ever needed.
 
 For the team:
@@ -239,8 +291,8 @@ For the team:
 
 For people who play:
 - Pro: smooth, animated, fully themed windows; measured: runs on Linux.
-- Con: an engine and runtime of its own beside the exe (size from the One
-  run), and audio and web views only through plugins.
+- Con: an engine and runtime of its own beside the exe (25 MB, 10 zipped,
+  measured on One), and audio and web views only through plugins.
 
 For the team:
 - Con: Dart is new here; the Windows build needs Windows and Visual Studio
@@ -260,9 +312,11 @@ They apply to every option above.
 | Inno Setup or NSIS | Small, familiar installers | Their own script languages; the install logic moves from PowerShell into another scripting language |
 | MSIX | Clean install and removal through Windows | The launcher writes beside the game and into the Steam copy, which MSIX's container makes hard; Windows only |
 
-The game payload update (packs, the release record, the client runtime) is
-Thornswood's own and stays our own feed whichever stack wins; only the
-launcher's own update moves to a framework.
+The study recommended that the game payload update (packs, the release
+record, the client runtime) stay Thornswood's own feed, with only the
+launcher's own update moving to a framework. Patrick picked one channel
+instead (Decided, 5): the game files update through Velopack too, and the
+feed's release record and checks are rebuilt on top of it (#4065).
 
 ## Linux and the Steam Deck
 
@@ -272,53 +326,63 @@ collection installs through Vortex, which is Windows only, and the game
 itself runs on Linux only under Proton. So a Linux build is worth having only
 if Thornswood decides to install without Vortex, or to run its Windows
 launcher under Proton, where a self-contained build with no WebView2 and no
-.NET Framework has the best chance. That is the first question below.
+.NET Framework has the best chance. Patrick ruled a Linux launcher out
+(Decided, 2).
 
 ## Recommendation
 
-Pending the One run, which can still change it: **C. Avalonia on .NET 10,
-self-contained and compiled to native code, with the install done in compiled
-code and Velopack for the launcher's own updates, and no web view in the
-launcher once #3208 settles voice.**
+The pick is made ("Decided" above). What was recommended before it, kept as
+the record: **C. Avalonia on .NET 10, self-contained and compiled to native
+code, with the install done in compiled code and Velopack for the launcher's
+own updates, and no web view in the launcher once #3208 settles voice.**
 
 Why, for the people who play: it needs nothing on the machine, it is 15 MB
-zipped or less (WPF self-contained is 57, Electron 155), it carries no browser
-beside the game if voice and the music move out of WebView2, and it keeps the
-door to Linux and the Steam Deck open at no cost today. Why, between the
-options that are equal for them, for the team: it is C# and XAML, the language
-the launcher, the installer and the people here already use, its bindings are
-checked when it builds, and it builds on Linux, so cloud threads and Linux CI
-can build and check it while hosted Windows minutes are short.
+zipped (WPF self-contained is 57, Electron 155), it carries no browser beside
+the game if voice and the music move out of WebView2, and measured on One it
+holds 150 MB where today's launcher holds 333, in one process the Volume
+Mixer names. Why, between the options that are equal for them, for the team:
+it is C# and XAML, the language the launcher, the installer and the people
+here already use, its bindings are checked when it builds, and it builds on
+Linux, so cloud threads and Linux CI can build and check it while hosted
+Windows minutes are short.
 
-What would change it, once the One run is in:
-- If Slint's idle memory or start time is clearly better than Avalonia's
-  native build, Slint (F) is better for the people who play, and the team
-  cost of Rust is what is left to weigh.
-- If Linux and the Deck are ruled out for good, WPF on .NET 10 (A) is equal
-  for the people who play in look and close in memory, and stays easier for
-  the team.
-- If #3208 keeps a web view for voice, the launcher keeps WebView2 under any
-  stack, and Tauri's case (E) gets stronger.
+What the One run changed and did not:
+- Slint holds less than the JIT build of Avalonia (79 against 150 MB) and
+  starts faster (2.3 against 6.5 seconds). That makes Slint better on those
+  two numbers for the people who play; the native Avalonia build, which
+  the next One run measures, is the comparison that counts, and #4063 starts
+  from it.
+- Linux and the Deck are ruled out (Decided, 2), which made WPF on .NET 10
+  (A) close for the people who play: one process, 158 to 213 MB, 2.3 to 2.8
+  seconds. Patrick kept Avalonia on its other merits.
+- #3208 still decides whether a web view stays for voice. Under any stack a
+  web view costs about 250 MB and seven processes more, and the mixer entry.
 
-Whatever is picked:
+Whatever is picked, and now decided:
 1. Signing is already done (#3312).
 2. The install moves out of PowerShell into compiled code, so
-   `Setup-Thornswood.ps1`, `Setup.bat` and `Install.bat` can be retired.
-3. The launcher's own update moves to a framework (Velopack for C#), and the
-   game payload update stays our own feed (#3201, #3202).
+   `Setup-Thornswood.ps1`, `Setup.bat` and `Install.bat` retire (#4064).
+3. The launcher and the game files update through Velopack, with the feed's
+   release record and checks rebuilt on top of it (#4065, with #3201 and
+   #3202).
 4. The web view question is settled with #3208 before the window work
    starts.
 
-## Questions for Patrick
+## Questions for Patrick, answered
 
-1. Do we want a Linux or Steam Deck launcher at all, given Vortex is Windows
-   only?
-2. What download size is acceptable for the launcher on its own: about 15 MB
-   (Avalonia), about 60 MB (WPF self-contained), or over 150 MB (Electron)?
-3. The signing certificate is ThornswoodRelease (done, #3312).
-4. Can the payload update share the launcher's update channel? Recommended
-   no: the payload is Thornswood's own feed with its release record, and only
-   the launcher's own exe moves to a framework.
+All five went on his report page on 27 Oct 2026 and were answered there on
+26 Oct at 11:46 PM his time (Decided, above):
+
+1. A Linux or Steam Deck launcher, given Vortex is Windows only: no, Windows
+   only (A). The card recommended keeping the door open (B).
+2. The download size that is acceptable for the launcher on its own: any
+   size (C).
+3. The stack: Avalonia on .NET 10 (C), the one recommended.
+4. The installer: the install in compiled code, with Velopack (A), the one
+   recommended.
+5. Whether the game files share the launcher's update channel: yes, one
+   channel through the framework, with the release record and its checks
+   rebuilt on it (B). The card recommended two channels (A).
 
 ## Appendix: the Linux runs
 

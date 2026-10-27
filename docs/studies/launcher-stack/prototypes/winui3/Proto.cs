@@ -24,6 +24,10 @@ class App : Application
     [STAThread]
     static void Main()
     {
+        // On 27 Oct this window ended about two seconds after it started on
+        // One and said nothing: what ends it goes to stderr, which
+        // Measure-Prototypes.ps1 keeps for a run that writes no ready file.
+        AppDomain.CurrentDomain.UnhandledException += (s, e) => Console.Error.WriteLine(e.ExceptionObject);
         WinRT.ComWrappersSupport.InitializeComWrappers();
         Application.Start(p =>
         {
@@ -31,6 +35,11 @@ class App : Application
             System.Threading.SynchronizationContext.SetSynchronizationContext(context);
             new App();
         });
+    }
+
+    App()
+    {
+        UnhandledException += (s, e) => Console.Error.WriteLine(e.Exception);
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
