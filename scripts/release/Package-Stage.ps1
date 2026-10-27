@@ -19,6 +19,13 @@
   with no -mx, which is 7-Zip's level 5: slower, and no help against what fails
   it (a full disk, a file held open). 7-Zip's exit 1 was taken as success,
   though it means a file could not be read and is not in the archive.
+
+  WHY .NET'S ZIP (#3412). The installer is built from main's feed on any
+  machine, the cloud included, and 7-Zip was found or installed with winget,
+  which only Windows has. .NET's own zip writer is what the setup program reads
+  the payload back with (Bootstrap.cs, ZipArchive), so nothing outside .NET is
+  needed at either end, and a file it cannot read is an exception, never a
+  warning the build could take as success.
 #>
 
 # This system's separator, and a record's backslashes turned into it, so the
@@ -122,46 +129,28 @@ function Get-PackageStageBytes([string]$Stage, [long]$PayloadBytes) {
 }
 
 <#
-  Zips the stage into $Blob once, at -mx$Level, from inside the stage so the
-  archive's paths start there. Zip, not 7z, because the installer unpacks it
-  with what .NET already has and never needs 7-Zip on anybody's machine.
+  Zips the stage into $Blob once, with .NET's zip writer (the header says
+  why), from the stage itself so the archive's paths start there. -Level reads
+  as 7-Zip's -mx did: 0 stores, 1 to 5 trade size for speed, and above that
+  .NET's best.
 
-  Only exit 0 with the archive written is a zip. Returns the exit code and
-  what 7-Zip said; the caller says what the code means and stops.
-
-  A native tool writing a single line to stderr is enough to kill the whole
-  script while ErrorActionPreference is Stop, so 7-Zip runs with it relaxed.
-  Its output is kept apart from the exit code, which an earlier version
-  returned together, so the code read as an array of every line 7-Zip printed.
+  Returns '' when the archive is written, and otherwise why not, with no
+  archive left behind; the caller says it and stops.
 #>
-function Invoke-PackageZip([string]$SevenZip, [string]$Stage, [string]$Blob, [int]$Level) {
-    $zargs = @('a', '-tzip', '-y', "-mx$Level", $Blob, '*')
-    Write-Host ("  > 7z " + ($zargs -join ' ')) -ForegroundColor DarkGray
-    $old = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    Push-Location -LiteralPath $Stage
-    try {
-        $global:LASTEXITCODE = 0
-        $said = @(& $SevenZip @zargs 2>&1 | ForEach-Object { "$_" })
-        $code = [int]$LASTEXITCODE
+function Invoke-PackageZip([string]$Stage, [string]$Blob, [int]$Level) {
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+    $zipLevel = if ($Level -eq 0) { [IO.Compression.CompressionLevel]::NoCompression }
+                elseif ($Level -le 5) { [IO.Compression.CompressionLevel]::Fastest }
+                else { [IO.Compression.CompressionLevel]::Optimal }
+    Write-Host ("  > zip {0} into {1} ({2})" -f $Stage, $Blob, $zipLevel) -ForegroundColor DarkGray
+    if (Test-Path -LiteralPath $Blob) { Remove-Item -LiteralPath $Blob -Force }
+    try { [IO.Compression.ZipFile]::CreateFromDirectory($Stage, $Blob, $zipLevel, $false) }
+    catch {
+        Remove-Item -LiteralPath $Blob -Force -ErrorAction SilentlyContinue
+        $why = $_.Exception.Message
+        if ($_.Exception.InnerException) { $why = $_.Exception.InnerException.Message }
+        return $why
     }
-    finally { Pop-Location; $ErrorActionPreference = $old }
-    if ($code -eq 0 -and -not (Test-Path -LiteralPath $Blob)) { $code = -1 }
-    if ($code -ne 0 -and (Test-Path -LiteralPath $Blob)) { Remove-Item -LiteralPath $Blob -Force }
-    return [pscustomobject]@{ Code = $code; Said = $said }
-}
-
-# What a failed zip's exit code means, for the person running the build, from
-# 7-Zip's own list of codes. None of them is helped by running it again.
-function Get-PackageZipWhy([int]$Code) {
-    switch ($Code) {
-        -1 { return @('7-Zip exited 0 but wrote no archive.') }
-        1 { return @('Exit code 1 is a warning: a file could not be read, nearly always because something holds it open,',
-                     'so the archive would be missing it. The lines above name it. Close what holds it, then run this again.') }
-        2 { return @('Exit code 2 is a fatal error, nearly always the disk filling up part way through.',
-                     'Check free space first:', '    Get-PSDrive C | Select-Object Used, Free') }
-        7 { return @('Exit code 7 is a command line 7-Zip did not accept, so the line above is wrong in this script.') }
-        8 { return @('Exit code 8 is 7-Zip running out of memory.') }
-        default { return @("7-Zip exited with $Code.") }
-    }
+    if (-not (Test-Path -LiteralPath $Blob)) { return 'the zip writer returned but wrote no archive.' }
+    return ''
 }
