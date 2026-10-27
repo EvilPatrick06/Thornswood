@@ -22,7 +22,7 @@
   of anyone. That is worth running on a schedule: it is the difference between
   having backups and believing you do.
 
-  Putting what comes out back onto the server is docs\RESTORING.md. This
+  Putting what comes out back onto the server is RESTORING.md in the ops repo. This
   script deliberately does not do that part. Writing over a live world folder
   is not something a script should be able to do by accident.
 
@@ -444,7 +444,7 @@ Head 'Unpacked'
 Say "  $To" 'Green'
 Write-Host ''
 Say '  Putting this back into a server folder is Restore-Server.ps1, which' 'DarkGray'
-Say '  also checks the load order resolves; docs\RESTORING.md has the rest.' 'DarkGray'
+Say '  also checks the load order resolves; RESTORING.md in the ops repo has the rest.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0
 

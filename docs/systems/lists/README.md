@@ -18,10 +18,10 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Race locks](race-locks.md) (38)
 - [Playable races](playable-races.md) (12)
 - [Miner](miner.md) (18 rows, 581 records)
-- [Gatherer](gatherer.md) (46 rows, 105 records)
+- [Gatherer](gatherer.md) (47 rows, 107 records)
 - [Farmer](farmer.md) (10 rows, 14 records)
 - [Fisher](fisher.md) (12 rows, 21 records)
 - [Hunter](hunter.md) (96 rows, 336 records)
 - [Eggs and wild food](wild-food.md) (4)
-- [Unranked](unranked.md) (44)
+- [Unranked](unranked.md) (45)
 

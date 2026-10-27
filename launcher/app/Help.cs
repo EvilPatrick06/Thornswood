@@ -178,7 +178,7 @@ namespace Thornswood
             new HelpItem("In game", "Menus do not pause the world",
                 "Inventory, favourites, crafting and the map all keep the world running. Do not sort your bags mid fight."),
 
-            // The needs run on the server. tools\test-sunhelm-gone.js checks
+            // The needs run on the server. tests\test-sunhelm-gone.js checks
             // every bar, command and source of warmth here against the gamemode.
             new HelpItem("In game", "You will get hungry, thirsty and cold",
                 "Eat, drink, rest and stay warm. Cold bites hardest in the north, up high and at night. A fire warms you and standing in one burns you, a roof keeps the weather off, and what you wear counts: fur is the warmest thing there is and metal the worst. The four bars in the bottom left corner are Hunger, Thirst, Rest and Temp, and the Body page on K says what is behind them. With the bars hidden in Settings, /needs in the chat says all four as a line of text. Eat or drink something from your pack. Sit down or lie down and the rest counts by itself, on a seat, on the ground with Sit on the emote wheel, or in a bed: a seat by a fire beats a bare one, a bedroll by a fire beats both, an inn or temple bed beats the road, and your own bed is best. A bed in somebody else's building counts when they let you sleep there or you carry its key. Log out lying in a bed indoors, your own, one you may use, or an inn or temple bed, and nothing runs down while you are away and you come back rested; anywhere else the bars fall at half the pace while you are gone, and never below 25. A lute, flute or drum played from the wheel, with it in your pack, or Sing there, helps everybody resting in the same place."),
@@ -212,7 +212,7 @@ namespace Thornswood
                 "A long wait, a black screen, and then you are standing in Skyrim on your own. That is not a crash: nothing was answering at the server's address. The launcher checks before it starts the game and says so when the server is not answering. Watch the Discord and try again later."),
 
             new HelpItem("If it breaks", "Sending your logs",
-                "Diagnostics, then Build the report, makes one zip with the newest crash log, the script extender log, your plugin list, the launcher log and a short summary of your machine, and opens the folder it is in. Drag that zip into your ticket in the Discord, and say what you were doing. The files themselves: the launcher log is C:\\Thornswood\\Profile\\launcher.log (Settings, Open log), and crash logs are in C:\\Thornswood\\Profile\\MyGames\\SKSE."),
+                "Diagnostics, then Build the report, makes one zip with the newest crash log, the script extender log, your plugin list, the launcher log and a short summary, and opens the folder it is in. The Diagnostics page says everything that is in it, and what of it names you. Drag that zip into your ticket in the Discord, and say what you were doing. The files themselves: the launcher log is C:\\Thornswood\\Profile\\launcher.log (Settings, Open log), and crash logs are in C:\\Thornswood\\Profile\\MyGames\\SKSE."),
 
             new HelpItem("If it breaks", "Something says Skyrim is open and it is not on screen",
                 "Skyrim does not always exit when the window goes away, and the game's own browser often leaves helper processes behind. The launcher clears those when it starts and again when you press Play. If something still says it after the launcher restarts, restart the PC."),

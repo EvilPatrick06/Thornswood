@@ -83,18 +83,24 @@ $code = (@($y -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
 $on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'it is started by hand and by nothing else' ($on -match '^\s{2}workflow_dispatch:' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 1)
 $perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
-Yes ("its token writes refs and reads pull requests, nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: write`n  pull-requests: read")
+Yes ("its token writes refs, reads pull requests and starts release-files.yml (#3686), nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: write`n  pull-requests: read`n  actions: write")
 Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
 Yes 'it runs on the VPS runners' ($code -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps\]$')
 Yes '  with a timeout' ($code -match '(?m)^    timeout-minutes: \d+$')
 Yes '  in no environment, so it holds no secret' ($code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
 Yes 'the checkout keeps no token' ($code -match 'uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
 Yes '  and every file is written again after it (#3029)' ($code -match '- name: Check every tracked file out again')
-$step = [regex]::Match($code, '(?ms)- name: Make the tag or delete the branch\n(.*)$').Groups[1].Value
+$step = [regex]::Match($code, '(?ms)- name: Make the tag or delete the branch\n(.*?)(?=^\s+- name: |\z)').Groups[1].Value
 Yes 'the step is pwsh with no profile' ($step -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
 $run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes '  running main''s Set-Ref.ps1 -OnGitHub' ($run -match "scripts/ops/Set-Ref\.ps1'\) -OnGitHub")
 Yes '  with nothing pasted into its script' ($run -notmatch '\$\{\{')
+# After a release tag it made, it starts release-files.yml by name (#3686):
+# a tag the run's own token makes starts no workflow by itself.
+$next = [regex]::Match($code, '(?ms)- name: Start release-files\.yml for the release tag\n(.*?)(?=^\s+- name: |\z)').Groups[1].Value
+$nextRun = [regex]::Match($next, '(?ms)run: \|\n(.*)$').Groups[1].Value
+Yes 'then it starts release-files.yml, for a tag only' ($next -match "(?m)^\s+if: \$\{\{ inputs\.tag != '' \}\}$" -and $nextRun -match 'actions/workflows/release-files\.yml/dispatches')
+Yes '  only for a release tag, read from the environment, nothing pasted into its script' ($nextRun -match '\$env:REF_TAG -notmatch' -and $nextRun -notmatch '\$\{\{')
 foreach ($k in 'REF_TAG: ${{ inputs.tag }}', 'REF_DELETE_BRANCH: ${{ inputs.delete_branch }}', 'REF_COMMIT: ${{ inputs.commit }}', 'REF_MESSAGE: ${{ inputs.message }}', 'GH_TOKEN: ${{ github.token }}') {
     Yes "  $($k.Split(':')[0]) reaches it through the environment" ($step.Contains($k))
 }
@@ -311,7 +317,8 @@ exit [int]$env:TS_RC
     $got = if (Test-Path -LiteralPath $said) { [IO.File]::ReadAllText($said) | ConvertFrom-Json } else { $null }
     Yes ("it hands the tag and the commit to the checkout's Set-Ref.ps1 ({0})" -f $(if ($tg.Why) { $tg.Why } else { 'no complaint' })) (
         -not $tg.Why -and $got -and $got.Tag -eq "release/dev/$id" -and $got.Commit -eq $c)
-    Yes '  with the release''s own message' ($got -and ($got.Message -replace "`r`n", "`n").TrimEnd() -eq (Get-ReleaseTagMessage $doc.release 'https://thornswood.net/feed-dev/version.json'))
+    Yes '  with the release''s own message' ($got -and ($got.Message -replace "`r`n", "`n").TrimEnd() -eq (Get-ReleaseTagMessage $doc.release 'https://thornswood.net/feed-dev/version.json' $doc))
+    Yes '  which names the sha256 of the record, for release-files.yml (#3686)' ($got -and ($got.Message -replace "`r`n", "`n") -match ('(?m)^record    ' + ('c' * 64) + '$'))
     Yes '  and tags nothing in the checkout' (((& git -C $work tag -l | Out-String).Trim()) -eq '')
     $env:TS_RC = '1'
     $global:LASTEXITCODE = 0

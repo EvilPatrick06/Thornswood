@@ -301,7 +301,8 @@ function get(port, route) {
           r.status === 404 && r.body.indexOf('old page') < 0 && r.body.indexOf('Thornswood Voice') < 0);
     }
     const health = await get(PORT, '/health');
-    yes('/health still answers (' + health.status + ')', health.status === 200 && /"build"/.test(health.body));
+    // Asked the way Caddy forwards, so since #3806 it says ok and nothing more.
+    yes('/health still answers (' + health.status + ')', health.status === 200 && health.body === '{"ok":true}');
 
     console.log('\nthe page\'s way in, and the clients\':');
     let pid = 300;
