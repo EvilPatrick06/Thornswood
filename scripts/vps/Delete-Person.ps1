@@ -1059,7 +1059,9 @@ function Show([string[]]$lines, [string]$verb) {
         if (-not $any) { Say '  nothing of theirs on this box' }
     }
     Say ''
-    Say '  Not on this box, so not done here: their Discord tickets (staff delete those in the Discord),'
+    Say '  Left on purpose: their tickets in the Discord and the bot''s lines about them in #ticket-log,'
+    Say '  the record of what they were told; the bot deletes each 365 days after it closed (#3634).'
+    Say '  Not on this box, so not done here:'
     Say '  gallery pictures approved before the site kept the sending account (remove theirs in the hub by name),'
     Say '  and the encrypted backups (they expire on their schedule; the record reapplies this after a restore).'
 }
