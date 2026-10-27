@@ -54,7 +54,7 @@
   Sunday. Nothing else is deleted, ever, including anything a person put in
   that folder by hand.
 
-  Restoring one is docs\RESTORING.md, which is also how you check that any of
+  Restoring one is RESTORING.md in the ops repo, which is also how you check that any of
   this works. A backup nobody has restored is a guess.
 #>
 [CmdletBinding()]
@@ -402,7 +402,7 @@ Grab (Join-Path $DeletionRoot 'requests.jsonl')  'deletions\requests.jsonl'
 # token-key.txt is still deliberately not here, for its own reason: it makes
 # itself on first run and losing it only expires join tokens that were good
 # for an hour anyway.
-# Whatever is terminating TLS. RESTORING.md needs it on a fresh box.
+# Whatever is terminating TLS. RESTORING.md in the ops repo needs it on a fresh box.
 Grab (Join-Path $CaddyRoot 'Caddyfile')           'web\Caddyfile'
 # What was running and how, so a restore onto a fresh box is not archaeology.
 $notes = @("taken    $stamp", "host     $env:COMPUTERNAME", "windows  $([Environment]::OSVersion.Version)", '', 'scheduled tasks:')

@@ -418,7 +418,7 @@ They do not catch anyone who can write the record the hash is read from:
 - `version.json` names every pack and the client runtime by sha256, and
   whoever writes `version.json` writes those names too. That is every
   machine that Ships, and every Administrator ssh key on the VPS: five on
-  11 Oct, usable from any address (docs\DEPLOY-IDENTITIES.md section 1). On
+  11 Oct, usable from any address (the ops repo's DEPLOY-IDENTITIES.md section 1). On
   16 Oct main's feed named its client runtime (the SkyMP client files that
   load into the game on every tester's machine) by sha256 and nothing else.
 - A draft carries `Thornswood.exe` and `SHA256SUMS` side by side, so whoever
@@ -439,7 +439,7 @@ client runtime, which only phases C and D (section 5) close.
 | | Today: the VPS builds, Ship signs on One | The hosted path: release.yml signs on GitHub's runner |
 | --- | --- | --- |
 | Where a main launcher is built | A VPS runner, with MSBuild since #2550 | A fresh GitHub virtual machine for each job, thrown away after it |
-| What else runs on that machine | The same four runners build every pull request: `BUILD_RUNNER` is `vps` (set 12 Oct, still so on 16 Oct, when the two latest build checks skipped the hosted job and ran on `thornswood-vps-2` and `-3`). A job can leave files for the next one (docs\RUNNER-ISOLATION.md, F4) | Nothing |
+| What else runs on that machine | The same four runners build every pull request: `BUILD_RUNNER` is `vps` (set 12 Oct, still so on 16 Oct, when the two latest build checks skipped the hosted job and ran on `thornswood-vps-2` and `-3`). A job can leave files for the next one (the ops repo's RUNNER-ISOLATION.md, F4) | Nothing |
 | Where it is signed | On the shipping machine, at Ship, after a checksum check of bytes that machine did not build | Inside the build job, before the draft exists |
 | What the draft says | `SHA256SUMS` of the unsigned bytes. Measured: v1.2.4's draft lists `Thornswood.exe` as `8f8aefc7...`; main's feed serves 1.2.4 as `e079f4e4...`, Authenticode Valid. Nothing public ties the two. All 14 releases on GitHub, v0.0.0-ci-trial-20260926 to v1.2.4, are still drafts; none was published | `SHA256SUMS` of the signed bytes, the same hash the feed will name, checked by the `verify` job on a VPS runner |
 | Who can cause a ThornswoodRelease signature | The three people with Certificate Profile Signer (Patrick, Djinn, Four), each through their own `az login` | Those three, plus anyone who can push a `v` tag and start release.yml with `runner: hosted`. The repository has no tag rules (the rulesets API answered an empty list), the `release` environment allows `v*` tags with no required reviewer, and a tag push, or a manual run with `expected_sha`, builds a commit that is not on main |

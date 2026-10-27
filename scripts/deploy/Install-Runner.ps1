@@ -134,6 +134,18 @@
   carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
 
+  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The pull request build's
+  fallback (build-pr.yml, launcher-vps) needs nothing of the box, so it asks
+  for thornswood-build alone; main's (build.yml) stays on the box, which
+  traces the gate (#3114, #3874). An -OffBox runner whose name the
+  record's offBox lists (thornswood-pr-one, thornswood-pr-one-2, ... on
+  One) is registered with thornswood-build too and takes them, on One's own
+  cores. It never carries thornswood-vps, so staff notices, the admin
+  service, the release jobs and every other job that needs the box never
+  reach it. Pass -AllowHost pypi.org,files.pythonhosted.org, or the build's
+  ruff install fails closed (WHAT A PULL REQUEST JOB MAY REACH, above).
+  -OffBox -Number n -Remove takes one off again.
+
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
        on the machine PATH, MSBuild and the .NET Framework 4.8.1 reference
@@ -334,15 +346,21 @@ if ($OffBox) {
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + [Environment]::MachineName.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
-  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
+  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: every job that needs the box itself (staff notices, the admin service, the release jobs) asks for it.' -ForegroundColor Red; exit 1 }
 }
 # HOW MANY BUILD AT ONCE (#2994). A VPS runner that records\build-runners.json
 # lists is registered with its build label as well, so a reinstall keeps the
-# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner never carries it.
+# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner carries it only
+# when the record's offBox names it (build runners on One, Patrick, 26 Oct
+# 2026), and then takes the pull request build's fallback, which asks for it alone; it
+# still never carries thornswood-vps, so no box-only job reaches it.
 $registerLabels = $Label
+$buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
 if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
-  $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
+}
+if ($OffBox -and -not $PSBoundParameters.ContainsKey('Label') -and $buildRecord.PSObject.Properties['offBox'] -and @($buildRecord.offBox) -contains $RunnerName) {
+  $registerLabels = $Label + ',' + $buildRecord.label
 }
 # THE SIGNING RUNNER (#3312). A VPS runner records\sign-runners.json lists
 # is registered with its label and, under -NetworkOnly, reaches the hosts
@@ -1129,14 +1147,23 @@ $signNeed
 $need | ForEach-Object { Say "  $_" }
 $missing = @($need | Where-Object { "$_" -like 'MISSING *' } | ForEach-Object { "$_".Substring(8) })
 if ($missing.Count) {
+  $missingNames = $missing -join ', '
   $how = @()
+  # Off the box the fix is on this machine, for all users: the runner's
+  # service account cannot use a per-user or Store install. Python 3.13,
+  # because a per-user 3.12.10 (One, 26 Oct 2026) makes the 3.12.10 installer
+  # modify that copy instead of adding one for all users; the build itself
+  # takes 3.12 from setup-python.
+  if ($OffBox -and $missing -contains 'pwsh') { $how += 'winget install --id Microsoft.PowerShell -e --installer-type wix --scope machine --accept-source-agreements --accept-package-agreements   (PowerShell 7 for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'pwsh' }) }
+  if ($OffBox -and $missing -contains 'python') { $how += 'winget install --id Python.Python.3.13 -e --scope machine --override "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Include_test=0" --accept-source-agreements --accept-package-agreements   (Python for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'python' }) }
+  if ($OffBox -and ($missing -contains 'node' -or $missing -contains 'git')) { $how += 'winget install --id OpenJS.NodeJS.LTS -e --scope machine   and   winget install --id Git.Git -e --scope machine   (in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'node' -and $_ -ne 'git' }) }
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'msbuild' -or $missing -contains 'net481refs') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeBuildTools -SkipFirewall'   (MSBuild and the .NET Framework 4.8.1 reference assemblies the launcher builds with, #498)" }
   if ($missing -contains 'signtool') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'   (signtool comes with the Windows SDK the C++ workload brings, #459)" }
   if ($missing -contains 'dotnet') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'   (the .NET runtime Microsoft's signing client runs on, #3312)" }
   if ($missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
-  Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
+  Die ("$where is missing " + $missingNames + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }
 
 Head 'Registration token'
