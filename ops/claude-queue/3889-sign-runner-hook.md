@@ -44,10 +44,21 @@ From a clean checkout of main with this pull request in it, in PowerShell 7.
 
 4. The proof that it still takes main's jobs: the next job of main on runner 3 (`gh api "repos/EvilPatrick06/Thornswood/actions/runs?branch=main&per_page=20" --jq '.workflow_runs[].id'`, then each run's jobs as in step 3, until one has `runner_name` `thornswood-vps-3`) must have `conclusion` `success`, and its `Set up runner` log must say `The signing runner takes this job: EvilPatrick06/Thornswood/.github/workflows/<file>@refs/heads/main is main's (#3889).`
 
+5. **At the next box restart that is already planned for another reason** (Patrick, 27 Oct, page card q-3889-runner3-clean-slate, B: no restart of its own). This gives runner 3 a clean slate: new account, new profile, new folder. Branch jobs ran there before #3550, and steps 1 to 4 keep its profile. From `C:\Thornswood-Repo` on One, in PowerShell 7, right before the restart and with runner 3 idle:
+
+       .\scripts\deploy\Install-Runner.ps1 -Number 3 -Remove -NoPause
+
+   It must say runner 3's service, account and GitHub registration are gone. It may say `LEFT` for `C:\Users\thornswood-runner3`: Windows keeps a removed service account's registry loaded until the box restarts (A REMOVED ACCOUNT'S PROFILE). Then the planned restart. After it:
+
+       .\scripts\deploy\Install-Runner.ps1 -Number 3 -NoPause
+       .\scripts\deploy\Install-Runner.ps1 -Number 3 -Status -NoPause
+
+   The install must take the left profile off (no `LEFT` line) and print the same hook lines as step 1, and `-Status` the same `hook` line as step 2. Signing waits for runner 3 between the remove and the install, so do it when no release is due.
+
 ## Risks
 - Step 1 stops a job runner 3 is running, so it waits for idle. The service is down for the few seconds config.cmd takes; GitHub hands a waiting light job to runner 1 or 2 meanwhile, and a waiting signing job waits for runner 3.
 - After it, any job on runner 3 that is not main's fails at `Set up runner`. With #3908 in, no workflow on main sends one there.
-- Runner 3 keeps the folder and profile it had: branch jobs ran there before #3550 (nine harnesses.yml runs of claude/* branches, 22 to 26 Oct). A clean slate needs `-Remove`, a box restart for the profile (A REMOVED ACCOUNT'S PROFILE in Install-Runner.ps1), and an install; this note does not do that.
+- Until step 5, runner 3 keeps the profile it had: branch jobs ran there before #3550 (nine harnesses.yml runs of claude/* branches, 22 to 26 Oct). Step 5 waits for a restart planned for something else, not one of its own (Patrick's B).
 
 ## Afterwards
-Put what ran, when, what it printed and both proofs on #3889 and in `ops/status.md`, close #3889 (no test task: nothing in the game changes), and delete this note.
+After steps 1 to 4: put what ran, when, what it printed and both proofs on #3889 and in `ops/status.md`, and write in `ops/status.md` that step 5 waits for the next planned restart. After step 5: the same for it, then close #3889 (no test task: nothing in the game changes), and delete this note.
