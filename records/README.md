@@ -142,6 +142,9 @@ names. No script reads them. `THIRD-PARTY.md` and
   the files and plugins it brings, when the page was read, by whom, and the
   page's own words (issue #3649). `collections` is `allowed`, `not stated` or
   `not allowed`; Thornswood's own two mods are `ours` and need no reading.
+  Only a line against being in a collection is `not allowed`; one against
+  uploading or redistributing the files is `not stated` (Patrick, 27 Oct,
+  q-3649-no-upload-lines).
   `node scripts\release\collection-permissions.js update <collection.json>
   --revision <n>` takes the list of mods from a new revision and keeps every
   reading, so a new mod comes in unread. `New-NexusRevision.ps1` makes and

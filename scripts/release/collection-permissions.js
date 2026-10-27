@@ -23,6 +23,13 @@
 // no reading. "not stated" passes: the page says nothing against it, and a
 // collection hands out the author's own file from the author's own page.
 //
+// WHICH LINES SAY NO. Only a line against the mod being in a collection (or
+// a mod pack or list that hands it out) is "not allowed". A line against
+// uploading the files to other sites, or redistributing them, is "not
+// stated": Patrick, 27 October 2026, card q-3649-no-upload-lines, A, because
+// the collection hands out no file of the author's. Three readings first
+// marked for such a line carry that ruling.
+//
 // UPDATE rewrites the record's list of mods from a collection.json, for a new
 // revision: each mod keeps its reading, a mod the collection no longer
 // carries goes, and a new one comes in with no reading, so CHECK refuses it
