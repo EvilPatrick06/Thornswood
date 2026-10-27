@@ -76,8 +76,11 @@ Frida with GLib, and Node.js. Every download that carries one of the four
 has a `licences` folder with each library's own licence, and its note lists
 which library is in which file. The installer puts that folder in your
 Thornswood folder. Frida is Frida's own build, with other libraries inside
-it, and the note names where their source is: Thornswood's copies of
-Frida's repositories, at the commits Frida built them from.
+it, and the note names where their source is: one archive of each, at the
+commit Frida built it from, on
+**[Thornswood's release of Frida's sources](https://github.com/EvilPatrick06/Thornswood/releases/tag/frida-sources-16.0.19)**.
+Until that repository is public, the same commits are in Thornswood's
+copies of Frida's repositories, which the note names too.
 
 SkyMP's in-game interface, `build.js` with the fonts, pictures and sounds
 beside it, is built from the same public copy too: from its `skymp5-front`

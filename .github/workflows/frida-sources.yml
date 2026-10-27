@@ -1,0 +1,49 @@
+# Puts the source of what is inside frida-gum.lib on one permanent Release of
+# this repository (#3287, Patrick's answer C of 26 Oct 2026).
+#
+# WHAT IT DOES. scripts/release/Publish-FridaSources.ps1, from main: for each
+# part records/frida-sources.json names, fetches the fork's tag, checks it is
+# the recorded commit, makes the archive with git archive and checks it is
+# the recorded bytes, then uploads all six to a draft Release on the record's
+# tag and publishes it once GitHub's own digest of each is right. Never the
+# latest Release. The script's header says what it refuses.
+#
+# WHEN. By hand, once, from the Actions tab or:
+#   gh workflow run frida-sources.yml --ref main
+# Run again, it finds the Release published and whole and changes nothing. A
+# new Frida in the engine is a new record and a new run, on a new tag. The
+# nightly run checks the Release every night (Publish-FridaSources.ps1 -Check).
+#
+# WHERE IT RUNS. GitHub's hosted Ubuntu runner, never a VPS runner: it needs
+# nothing from the box, and reads only public forks. The run's own token
+# (contents: write) is all it uses; no secret.
+#
+# Every action is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Frida sources
+run-name: Frida sources by ${{ github.actor }}
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: frida-sources
+  cancel-in-progress: false
+jobs:
+  sources:
+    name: Put Frida's sources on their Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Make, upload and publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          & ./scripts/release/Publish-FridaSources.ps1
+          exit $LASTEXITCODE
