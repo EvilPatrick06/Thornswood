@@ -65,21 +65,8 @@ Yes 'door.log is listed' $doorLine.Success
 Yes 'door.log does not roll' ($doorLine.Success -and $doorLine.Value -notmatch 'Rolls')
 
 # ---- the runbook says what the script fetches (#1625) ----------------------
-# docs\MOVING-THE-SERVER.md went on saying Get-Logs read only the current
-# file for weeks after #453 made it bring the rolled ones down, so the bullet
-# there is held to the list above: every log the script rolls is named in it,
-# .1 to .5 are named, and door.log is the one that comes down current only.
-$moving = [IO.File]::ReadAllText((Join-Path $repo 'docs\MOVING-THE-SERVER.md')) -replace "`r`n", "`n"
-$bullet = [regex]::Match($moving, '(?ms)^- `\.\\scripts\\vps\\Get-Logs\.ps1` .*?(?=^- |^\s*$)').Value -replace '\s+', ' '
-Yes 'MOVING-THE-SERVER.md has a bullet on what Get-Logs.ps1 fetches' ($bullet.Length -gt 0)
-$rolling = @([regex]::Matches($text, "Name = '([\w.]+)\.log'[^`r`n]*Rolls = \`$true") | ForEach-Object { $_.Groups[1].Value })
-Yes ('the script names the logs that roll ({0})' -f ($rolling -join ', ')) ($rolling.Count -ge 5)
-foreach ($stem in $rolling) {
-    Yes ("that bullet names $stem among the logs whose rolled files come down") ($bullet -match "\(.*\b$stem\b.*\)")
-}
-Yes 'that bullet says .1 to .5 come down' ($bullet -match '`\.1` to `\.5`')
-Yes 'that bullet says door.log comes down current only' ($bullet -match '`door\.log` does not roll, so only\s+its current file')
-Yes 'that bullet no longer says Get-Logs reads only the current file' ($bullet -notmatch 'reads only the current file')
+# MOVING-THE-SERVER.md's bullet on Get-Logs is in the private ops repo since
+# #3693, and its tests\test-ops-runbooks.ps1 holds it to the list above.
 
 # ---- no parameter is given a new value (#1605) ------------------------------
 # Names ignore case, so $lines is $Lines. A parameter is only ever filled in

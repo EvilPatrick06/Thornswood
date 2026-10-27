@@ -101,6 +101,33 @@ Not shipped by Thornswood: the WebView2 Runtime itself. When a machine has
 none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 (Voice.cs) and runs it, under Microsoft's terms.
 
+## NLayer, inside the launcher
+
+`NLayer.dll` from `launcher\lib\nlayer`, the MP3 decoder the launcher plays
+its menu theme with (MenuMusic.cs, since #3207, so the theme plays from the
+launcher's own process and the Windows Volume Mixer lists it as the launcher).
+Build-Launcher.ps1 references it for the compile and embeds it as a resource,
+and MenuMusic.cs hands it to the runtime from memory, the same way as the two
+managed WebView2 files.
+
+| File | Where it sits in the package | sha256 |
+|---|---|---|
+| `NLayer.dll` | `lib\netstandard2.0` | `f1db8b641171799231aee40712b01ed439611ebdeda9324d4f5a524c34454e11` |
+
+Version 3.0.0 (file version 3.0.0.0). Byte for byte the file in NLayer 3.0.0
+as nuget.org serves it (the .nupkg's sha256 is
+`625b215f76453180d499c203f711aceedcce6e855c86a65716c0b1275afcb9c6`),
+downloaded and compared on 26 October 2026. Its source is
+https://github.com/naudio/NLayer at commit `046c7ce4` (in full,
+`046c7ce422970f8f0f0bc205d6c6341bcb7debf1`), the commit the package's nuspec
+and the file's own product version name. By Mark Heath, Andrew Ward and
+contributors.
+
+Licence: MIT, which the package's nuspec names
+(`<license type="expression">MIT</license>`). The MIT licence asks for its
+notice to go with every copy, so the repository's `LICENSE` at that commit is
+reproduced in full at the end of this file and on the public credits page.
+
 ## The SkyMP client runtime, built from the fork
 
 The six files recorded in `records\client-build.json` correspond to
@@ -724,25 +751,45 @@ the collection's mods draw one: SkyUI's item lists and item card
 Mods mod 12604, file 749043), SkyHUD 0.90B's line under an item somebody
 looks at (`interface\hudmenu.swf` in `SkyHUD.bsa`, mod 463, file 61422), and
 moreHUD 5.4.5's value to weight beside it (`interface\ahzhudinfo.swf` and its
-copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483). They are their authors' work, and nothing on
-those mods' pages lets Thornswood hand them on, so none of them ships: the
-launcher makes the five before every Play from the person's own copy of each
-mod, out of its archive, the same way as Bethesda's files above
-(`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and `scripts\release\Go.ps1`
-does the same for a hand-run install. What the repository holds is the edit,
-as the bytes that change, each pinned to the sha256 of the collection's
-version of the file (`launcher\app\FromGameModMenus.cs`, written by
+copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483), the
+files collection 7essxf installs in revisions 4 and 5. They are their authors'
+work, and each mod's page, read on 26 October (#3800), says this about them:
+
+- SkyUI: "Upload: not allowed to upload to other sites"; modification is
+  allowed "so long as you credit me as the original creator"; asset use is
+  "allowed without permission with credit; not in sold mods"; and the author
+  notes say "You may release any patches that require the original file",
+  while changing its icon files needs the further permission of Psychosteve
+  and Jeledity.
+- SkyHUD: modification and asset use are allowed with credit, and the
+  permission note lets anybody share a preset, which is how Thornswood's
+  `Data\Interface\skyhud\skyhud.txt` goes out, but "The rest of the mod must
+  not be included".
+- moreHUD: the page shows no permission list and no author instructions.
+
+Patrick decided on 26 October that these terms change nothing (#3800). So
+none of the five ships: the launcher makes the five before every Play from
+the person's own copy of each mod, out of its archive, the same way as
+Bethesda's files above (`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and
+`scripts\release\Go.ps1` does the same for a hand-run install. What the
+repository holds is the edit, as the bytes that change, each pinned to the
+sha256 of the collection's version of the file
+(`launcher\app\FromGameModMenus.cs`, written by
 `scripts\mods\Build-ModMenus.py`), not the files. `Ship-Rules.ps1`
 `$ShipMadeFromMods` keeps the five out of every pack, release record and
 installer.
 
 `Data\SKSE\Plugins\QuickLootIE.json` does ship: QuickLoot IE 4.1.3's own
-settings file (Nexus Mods mod 120075, file 806802) with one line added, which
-sets its loot menu's columns to weight only. QuickLoot IE is under the GNU
-General Public License version 3, which lets a changed copy go out under the
-same licence when it says what was changed and when; the file says both in
-its first lines, and the collection installs the licence beside it as
-`Data\QLIE-LICENSE.md`.
+settings file (Nexus Mods mod 120075, file 806802, which revisions 4 and 5
+both install) with one line added, which sets its loot menu's columns to
+weight only. QuickLoot IE is "Released under the GPL-3.0-or-later license", by
+its page, and its 4.1.0 changelog says "Changed the project license to
+GPL-3.0-or-later". That lets a changed copy go out under the same licence when
+it says what was changed and when; the file says both in its first lines, and
+the collection installs the licence text beside it as `Data\QLIE-LICENSE.md`,
+which in file 806802 is the GNU General Public License version 3 unchanged,
+byte for byte `installer\licences\GPL-3.0.txt` (sha256 3972dc97, read 27
+October).
 
 ## Made for Thornswood by somebody else
 
@@ -1111,4 +1158,32 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## NLayer licence
+
+The text of `LICENSE` in https://github.com/naudio/NLayer at commit `046c7ce4`.
+
+```
+MIT License
+
+Copyright (c) 2018 Mark Heath, Andrew Ward & Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```

@@ -462,13 +462,19 @@ $broadSids = @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0')
 # job, inside the folder Defender skips. Lines of the runner's own are kept.
 # It is read when the runner's service starts, so one written while the
 # runner runs is said, and waits for its next start.
-function Set-RunnerTemp([string]$root, [string]$svcName) {
+# An off-box runner ($ownInstall) also names its own install folder,
+# THORNSWOOD_INSTALL (#3860, Where.ps1 Install): on One the install rule finds
+# Patrick's own game, C:\Thornswood, which its account is denied, and builds
+# stopped on it. Under its own root, never made here, as a box runner sees a
+# machine with no install at all, so no job looks in or writes to his game.
+function Set-RunnerTemp([string]$root, [string]$svcName, [bool]$ownInstall = $false) {
   $file = Join-Path $root '.env'
   $temp = Join-Path $root '_work\_temp'
   $want = @(('TEMP=' + $temp), ('TMP=' + $temp))
+  if ($ownInstall) { $want += ('THORNSWOOD_INSTALL=' + (Join-Path $root 'install')) }
   $had = @()
   if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
-  $keep = @($had | Where-Object { $_ -notmatch '^(TEMP|TMP)=' })
+  $keep = @($had | Where-Object { $_ -notmatch '^(TEMP|TMP|THORNSWOOD_INSTALL)=' })
   $new = @($keep) + $want
   if (($had -join "`n") -eq ($new -join "`n")) { return ($root + ' sends its jobs'' temp files to ' + $temp + ' already') }
   [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
@@ -935,7 +941,7 @@ foreach ($svc in $services) {
     Lock-RunnerRoot $root $acct
     Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny $leave
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
-  try { Set-RunnerTemp $root $svc.Name } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  try { Set-RunnerTemp $root $svc.Name ($acct -like 'thornswood-pr*') } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
 }
 Show-LeftFolders 'C:\' $leave
 # A removed runner's profile is not a lock, so one still left is said and
@@ -1205,7 +1211,7 @@ if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force 
 # Locked before config.cmd writes GitHub's credentials into it.
 Lock-RunnerRoot `$root `$acct
 # Before the service first starts, so its first job already has it (#3117).
-Set-RunnerTemp `$root '$service'
+Set-RunnerTemp `$root '$service' `$$(if ($OffBox) { 'true' } else { 'false' })
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {

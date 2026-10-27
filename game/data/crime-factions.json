@@ -1733,7 +1733,7 @@
   "trespass": "0x400",
   "werewolf": "0x10000"
  },
- "readFrom": "102 active plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "readFrom": "103 plugins in load order (names sha256 015fd63125cf)",
  "scripts": {
   "read": 15496,
   "rule": "records/papyrus-events.json at 928485503333b18c2325fc13cbf781d254b19af0",

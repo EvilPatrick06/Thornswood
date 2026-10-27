@@ -8882,7 +8882,7 @@
  },
  "counts": {
   "buildings": 850,
-  "doorBases": 363,
+  "doorBases": 367,
   "failedToInflate": 0,
   "keyed": 333,
   "lead": 2794,
@@ -38968,6 +38968,6 @@
    }
   }
  },
- "readFrom": "102 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "readFrom": "103 plugins in load order (names sha256 015fd63125cf)",
  "whatABuildingIs": "the interior cell a door opens into. Two front doors into one interior are two doors of one building, which is what makes a house with a back door a single claim."
 }

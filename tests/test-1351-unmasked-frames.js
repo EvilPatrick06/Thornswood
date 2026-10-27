@@ -251,6 +251,13 @@ function joinToken(port, pid) {
   });
 }
 
+/* The gamemode's position feed, stood in for: these profiles are in the world. */
+async function inWorld(port, pids) {
+  const body = JSON.stringify({ who: pids.map((pid) => ({ profileId: pid, pos: [0, 0, 0], angleZ: 0, cell: 'a room' })) });
+  const r = await fetch('http://127.0.0.1:' + port + '/positions', { method: 'POST', body: body });
+  if (r.status !== 204) throw new Error('/positions answered ' + r.status);
+}
+
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-1351-'));
   fs.copyFileSync(VOICE, path.join(dir, 'voice-server.js'));
@@ -265,6 +272,10 @@ function joinToken(port, pid) {
   srv.stdout.on('data', (d) => { srvLog += d; });
   srv.stderr.on('data', (d) => { srvLog += d; });
   await listening(srv, PORT);
+  // Everybody here is in the world, since only they hold a voice place and
+  // are on the roster (#3570). The rows carry no name, so the roster shows
+  // the name each join sent.
+  await inWorld(PORT, [1, 2, 3, 4]);
 
   console.log('masked, as a browser sends it:');
   const a = await raw(PORT, 1);

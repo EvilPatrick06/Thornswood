@@ -224,13 +224,16 @@ function steward(keeps, staff) {
   };
   const make = new Function('BUILDING_HOLD', 'BUILDING_NAME', 'claims', 'here', 'isSteward', 'isStewardOf',
     'holderOf', 'save', 'pushAll', 'plog', 'redrawPanel', 'rentDue', 'globalThis', 'g', 'personName',
+    // What an evicted holder owed stays theirs (#3950): tests/test-3893-rent-arrears.js; no rent here.
+    'keepOwed',
     holdTown + '\n' + officeAtDoor[0] + '\n' + lifted.join('\n') + '\nreturn { evict: evict, rentCmd: rentCmd };');
   const f = make(inBlock, NAME, claims, function () { return at; },
     function (pid) { return pid === STEW && keeps.length > 0; },
     function (pid, hold) { return pid === STEW && keeps.indexOf(hold) !== -1; },
     function (b) { return claims[b] || null; }, function () { }, function () { },
     function () { plogged.push(Array.prototype.join.call(arguments, ' ')); }, function () { },
-    function () { }, {}, g, function (actorId) { return actorId === 1 ? 'Hadvar' : 'somebody'; });
+    function () { }, {}, g, function (actorId) { return actorId === 1 ? 'Hadvar' : 'somebody'; },
+    function () { });
   return {
     at: function (b) { at = b; claims[b] = { by: OWNER, name: 'Alice', at: 1, touched: Date.now() }; said.length = 0; },
     evict: function (pid, cmd) {
@@ -447,7 +450,7 @@ yes('L5 the line a press arrives on reaches evict and rentCmd: handle, the chara
     prop.indexOf("if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }") !== -1);
 const bot = read(path.join(ROOT, 'bot', 'bot.py'));
 yes('L6 the bot has a sentence for each, so the staff channel says it (bot/test-moderation.py, M14)',
-    ['evict', 'rent', 'norent'].every((d) => new RegExp("\\n    '" + d + "': '[^']+%s'").test(bot)));
+    ['evict', 'rent', 'norent', 'rentpaid'].every((d) => new RegExp("\\n    '" + d + "': '[^']+%s'").test(bot)));
 
 // ---------------------------------------------------------------- rebuild
 function python(args) {
