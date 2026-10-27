@@ -257,7 +257,9 @@ const SENT = ['game/content', 'game/data', 'records'];
 const under = (f, list) => list.some((d) => f === d || f.indexOf(d + '/') === 0);
 // Any step's: Write-SystemLists.js reads the spell ids Build-SpellTable.ps1
 // writes into game/gamemode.js, which later steps write other tables into.
-const listed = [].concat.apply([], steps.map((s) => (s.reads || []).concat(s.readsBack || [], s.uses || [], s.writes || [])));
+// And what a builder writes only by hand, with an option the chain does not
+// give it (writesOffChain, #3120).
+const listed = [].concat.apply([], steps.map((s) => (s.reads || []).concat(s.readsBack || [], s.uses || [], s.writes || [], s.writesOffChain || [])));
 const notListed = [];
 let named = 0;
 for (const s of steps) {

@@ -53,7 +53,9 @@ function git(args) {
 function some(list) { return list.length ? ' (' + list.slice(0, 4).join('; ') + (list.length > 4 ? '; ' + (list.length - 4) + ' more' : '') + ')' : ''; }
 
 const chain = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'mods', 'content-tables.json'), 'utf8'));
-const writes = Array.from(new Set([].concat.apply([], chain.steps.map(function (s) { return s.writes || []; })))).sort();
+// With what a step's builder writes only when run by hand (writesOffChain,
+// #3120), which is written LF as well.
+const writes = Array.from(new Set([].concat.apply([], chain.steps.map(function (s) { return (s.writes || []).concat(s.writesOffChain || []); })))).sort();
 const PLUGIN = /\.(esp|esm|esl)$/i;
 
 let tracked = null;
