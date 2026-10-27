@@ -324,6 +324,23 @@ jobs:
       # The monthly restore rehearsal check (#1046) reads RESTORING.md, which
       # is in the private ops repo since #3693; that repo's nightly runs it.
 
+      - name: Is the source of what is inside frida-gum.lib where the notes say
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Issue #3287. SkyrimPlatformImpl.dll links frida-gum.lib, whose
+          # LGPL parts go out under the GPL, so their source has to stay
+          # where the note beside the file says: the Release of their
+          # archives, which stays as long as the launcher ships frida-gum, and
+          # the forks while records\frida-sources.json says they are up. Red
+          # when the Release is gone or not whole once it is made (or not
+          # made once the repository is public), when a fork's tag is not
+          # its commit, or when the client files carry another Frida.
+          .\scripts\release\Publish-FridaSources.ps1 -Check
+          exit $LASTEXITCODE
+
       - name: Stray pull requests and branches
         if: ${{ !cancelled() }}
         shell: pwsh

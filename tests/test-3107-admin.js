@@ -29,7 +29,9 @@
 //      check says what differs and changes nothing, a run puts the labels
 //      right with the installation token GitHub gave, reads them back, and
 //      a second run changes nothing; the records come from main through the
-//      App, never from the caller; and the log holds no token;
+//      App, never from the caller; installation-repos (#4013) lists the
+//      repositories the App is on with a token that reads metadata alone,
+//      and changes nothing; and the log holds no token;
 //   5. the App's setup: no armed setup, a wrong or expired state, and an App
 //      already held are the plain 404; the armed page sends the manifest
 //      (administration write, contents read, no webhook, private) to GitHub
@@ -188,6 +190,7 @@ const gh = {
   ],
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   installed: true,
+  installRepos: ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'],
   conversion: null,
 };
 const appKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -213,6 +216,7 @@ function standIn(req, res) {
     if (P === '/repos/EvilPatrick06/Thornswood/installation') return !asApp() ? send(401, { message: 'Bad credentials' }) : gh.installed ? send(200, { id: 77 }) : send(404, { message: 'Not Found' });
     if (P === '/app/installations/77/access_tokens' && req.method === 'POST') return asApp() ? send(201, { token: gh.instToken }) : send(401, { message: 'Bad credentials' });
     if (!P.startsWith('/app-manifests/') && !asInst()) return send(401, { message: 'Bad credentials' });
+    if (P === '/installation/repositories') return send(200, { total_count: gh.installRepos.length, repositories: gh.installRepos.map(n => ({ full_name: n })) });
     if (P === '/repos/EvilPatrick06/Thornswood/contents/records') {
       if (u.searchParams.get('ref') !== 'main') return send(404, { message: 'No commit found for the ref' });
       return send(200, Object.keys(gh.records).concat(['README.md']).map(n => ({ type: 'file', name: n })));
@@ -306,7 +310,7 @@ function start(stateDir, ghPort) {
     r = await ask4(bearer(sign(good())));
     yes('with no App yet it says how to make one (503)', r.status === 503 && /Install-AdminService\.ps1 -Setup/.test(r.text));
     r = await ask4(bearer(sign(good())), { what: 'secrets' });
-    yes('anything but runner-labels is refused (400)', r.status === 400);
+    yes('anything but runner-labels and installation-repos is refused (400)', r.status === 400 && /runner-labels and installation-repos/.test(r.text));
 
     // The App, as the setup would leave it.
     fs.writeFileSync(path.join(state, 'key.pem'), appKeyPem);
@@ -341,6 +345,19 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await ask4(bearer(sign(good())));
     yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && writes().length === 0);
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'installation-repos', check: false });
+    const repoTok = gh.calls.find(c => /access_tokens$/.test(c.path));
+    yes('installation-repos lists the repositories the App is on, sorted (200)',
+      r.status === 200 && r.json.ok && JSON.stringify(r.json.repos) === '["EvilPatrick06/Thornswood","EvilPatrick06/Thornswood-Ops"]' && r.json.lines.includes('installed on EvilPatrick06/Thornswood-Ops'));
+    yes('  with a token that reads metadata alone, for no one repository',
+      repoTok && repoTok.body.repositories === undefined && JSON.stringify(repoTok.body.permissions) === '{"metadata":"read"}');
+    yes('  asked with that token, and changing nothing, reading no record and no runner',
+      gh.calls.some(c => c.path.startsWith('/installation/repositories') && c.auth === 'Bearer ' + gh.instToken) && writes().length === 0 && !gh.calls.some(c => /contents\/records|actions\/runners/.test(c.path)));
+    gh.installRepos = [];
+    r = await ask4(bearer(sign(good())), { what: 'installation-repos' });
+    yes('  an installation on no repository says so', r.status === 200 && r.json.repos.length === 0 && r.json.lines[0] === 'installed on no repository');
+    gh.installRepos = ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'];
     r = await ask4(bearer(sign(good())), { what: 'runner-labels', records: { 'x-runners.json': { label: 'thornswood-x', runners: [4] } } });
     yes('records sent by the caller are not used', r.status === 200 && r.json.changed === 0 && !labels('thornswood-vps-4').includes('thornswood-x'));
 
