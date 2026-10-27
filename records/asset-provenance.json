@@ -1025,15 +1025,15 @@
           "sha256": "31b0fee7b2aba7d1d6ad26df96995698603a5d021cc35d14fb52a05cfb6b85fb"
         }
       ],
-      "what": "The face meshes and face tints of the two people Fishing In Skyrim adds, Rybek Kupiecski (FishingVendorPolish, 00025905) and Lillani (FISLillani, 0002A07C), exported again in the Creation Kit from that mod's records and dated 26 Sep 2026, four days after the 22 Sep crash in Rybek's face (docs\\archive\\todo-list-2026-09-25.md). Fishing In Skyrim's own archive (file 194634, 1.0) carries its own four for the same two people, dated 27 Mar 2021, and Vortex deploys Thornswood Content's over them (the 21 Oct deployment record). Being made from that mod's NPC records, they cannot be rebuilt as Thornswood's own.",
+      "what": "The face meshes and face tints of the two people Fishing In Skyrim adds, Rybek Kupiecski (FishingVendorPolish, 00025905) and Lillani (FISLillani, 0002A07C), exported again in the Creation Kit from that mod's records and dated 26 Sep 2026, four days after the 22 Sep crash in Rybek's face (docs\\archive\\todo-list-2026-09-25.md). Fishing In Skyrim's own archive (file 194634, 1.0) carries its own four for the same two people, dated 27 Mar 2021, and Vortex deploys Thornswood Content's over them (the 21 Oct deployment record). Being made from that mod's NPC records, they cannot be rebuilt as Thornswood's own, so the next Thornswood Content file leaves them out for good (Patrick, 26 Oct 2026, B on #2793: those NPCs are not enabled on Thornswood anyway).",
       "published": "Nexus Mods, Thornswood Content 1.2 (file 811029), to everybody who installs the collection",
       "source": "Fishing In Skyrim Special Edition (Nexus SE 47618), its two NPC records, exported in the Creation Kit; https://www.nexusmods.com/skyrimspecialedition/mods/47618",
       "creator": "Fishing In Skyrim's authors (created by Arodicus Snaux, ported to Special Edition by diablo0307 with his permission); exported for Thornswood, by whom is not recorded",
       "licence": "The mod page, read 26 Oct 2026 (#2793): 'You must get permission from me before you are allowed to use any of the assets in this file', the same for modifying its files, no upload to other sites, and 'This author has not provided any additional notes regarding file permissions'. No permission is recorded",
       "attribution": "not recorded",
-      "approved": "Patrick, 22 Oct 2026 (#2793, A): any with no permission is rebuilt as ours. These cannot be, so what happens to them is his decision on #2793",
+      "approved": "Patrick, 22 Oct 2026 (#2793, A): any with no permission is rebuilt as ours; Patrick, 26 Oct 2026 (#2793, B): these cannot be, so they leave for good and nobody asks the mod's author",
       "evidence": "Thornswood Content 1.2 (file 811029) downloaded 27 Oct 2026 through the Nexus Mods API, the bytes and sha256 in THIRD-PARTY.md, Thornswood Content; Fishing In Skyrim Special Edition 1.0 (194634) downloaded the same day; the collection's 21 Oct deployment record; the mod's Permissions and credits, read 26 Oct 2026 (#2793).",
-      "status": "no-licence-found",
+      "status": "leaving",
       "issue": 2793
     },
     {

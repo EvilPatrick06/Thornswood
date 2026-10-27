@@ -578,7 +578,8 @@ each file:
   you are allowed to use any of the assets in this file", the same for
   modifying its files, and no upload to other sites. No permission is
   recorded, and faces made from its records cannot be rebuilt as Thornswood's
-  own. What happens to them is Patrick's decision on #2793.
+  own, so the next Thornswood Content file leaves the four out for good
+  (Patrick, 26 October, #2793).
 - The plugin: the next Thornswood Content file carries the repository's
   `game\content\Thornswood-Content.esp` in place of the copy from before
   #2553, and the collection revision that pins it drops the patch.
