@@ -27,10 +27,23 @@
   three that are left out and why. tests\test-2923-own-plugins.js holds that
   list to the builders and its order to what they read. The first builder
   that fails stops the chain; what the ones before it changed is still
-  listed. -Data and -PluginsTxt are handed to every builder that takes them;
-  left out, each builder uses its own default, which on One is the game at
-  C:\Thornswood (most read the Default profile's plugin list, the hunt,
-  harvest, worldspace, wake and /give tables the OwnGame one).
+  listed. -Data is handed to every builder that takes it; left out, each
+  builder uses its own default, which on One is the game at C:\Thornswood.
+
+  THE LOAD ORDER IS THE ONE THE COMMIT RECORDS (#3105). Every builder that
+  takes a plugin list is given the load order game\data\npc-population.json
+  records, the one both game servers run (Build-NpcPopulation.py reads it
+  out of a server's settings when the collection's load order moves), as a
+  plugins.txt in a temp folder. Until #3105 each builder read the profile
+  list of the PC it ran on: One's Default list held 101 plugins and both
+  servers load 103 (Thornswood-Last.esp and _ResourcePack.esl), so main's
+  door table still called the gates Last.esp unlocks locked, and a box run,
+  given the dev server's list, wrote different tables from One's. Now a PC
+  and the box build the same tables from the same commit. -PluginsTxt (the
+  box's '{plugins}', the dev server's load order) is held to that record: a
+  list that is not the same plugins in the same order stops the run before
+  any builder, because the record and the server disagree and the record is
+  rebuilt first.
 
   AFTER THE BUILDERS. records\asset-provenance.json holds each of Thornswood's
   own plugins by sha256, and tests\test-asset-provenance.js refuses a file
@@ -53,7 +66,8 @@
 param(
     # The game's Data folder, for every builder that reads one.
     [string]$Data = '',
-    # The plugin list, for every builder that takes one.
+    # A plugin list to check against the load order the commit records; the
+    # builders are given that record's load order either way.
     [string]$PluginsTxt = '',
     [switch]$List
 )
@@ -101,6 +115,31 @@ if (-not $node) { $need += 'node' }
 if (-not $python) { $need += 'python' }
 if ($need.Count -and -not $List) { throw ('not found on this machine: ' + ($need -join ', ') + '. Nothing was run.') }
 
+# The load order the commit records, as the game's plugins.txt: the five
+# masters are never written to it (OwnPlugins.ps1).
+. (Join-Path $repo 'scripts\dev\OwnPlugins.ps1')
+$populationPath = Join-Path $repo 'game\data\npc-population.json'
+$recorded = @(([IO.File]::ReadAllText($populationPath) | ConvertFrom-Json).loadOrder | ForEach-Object { [string]$_.name })
+$masters = @('skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm', 'dragonborn.esm')
+if ($recorded.Count -lt 6 -or (@($recorded[0..4] | ForEach-Object { $_.ToLowerInvariant() }) -join '|') -ne ($masters -join '|')) {
+    throw ('game\data\npc-population.json records no load order that starts with the five masters. Nothing was run.')
+}
+if ($PluginsTxt) {
+    if (-not (Test-Path -LiteralPath $PluginsTxt)) { throw "not found: $PluginsTxt. Nothing was run." }
+    $given = @(Get-LoadOrder $PluginsTxt)
+    $at = -1
+    for ($i = 0; $i -lt [Math]::Max($given.Count, $recorded.Count); $i++) {
+        if ($i -ge $given.Count -or $i -ge $recorded.Count -or $given[$i] -ine $recorded[$i]) { $at = $i; break }
+    }
+    if ($at -ge 0) {
+        $g = $(if ($at -lt $given.Count) { $given[$at] } else { 'nothing' })
+        $r = $(if ($at -lt $recorded.Count) { $recorded[$at] } else { 'nothing' })
+        throw ("$PluginsTxt is not the load order game\data\npc-population.json records: $($given.Count) plugins against $($recorded.Count), and at place $($at + 1) it has $g where the record has $r. When the servers' load order moved, rebuild the record first (Build-NpcPopulation.py, then Build-ResourceLocations.py, content-tables.json's notInChain says why). Nothing was run.")
+    }
+}
+$orderFolder = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-loadorder-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
+$orderList = Join-Path $orderFolder 'plugins.txt'
+
 $steps = @($chain.steps)
 $runs = @()
 foreach ($s in $steps) {
@@ -108,7 +147,7 @@ foreach ($s in $steps) {
     if (-not (Test-Path -LiteralPath $tool)) { throw ("content-tables.json names $($s.tool), which is not in this checkout. Nothing was run.") }
     $a = @()
     if ($Data -and $s.data) { $a += @($s.data, $Data) }
-    if ($PluginsTxt -and $s.plugins) { $a += @($s.plugins, $PluginsTxt) }
+    if ($s.plugins) { $a += @($s.plugins, $orderList) }
     switch ([IO.Path]::GetExtension($tool).ToLowerInvariant()) {
         '.js'  { $runs += , @($node, (@($tool) + $a)) }
         '.py'  { $runs += , @($python, (@($tool) + $a)) }
@@ -121,20 +160,28 @@ if ($List) {
     for ($i = 0; $i -lt $steps.Count; $i++) {
         Say ('{0,2}. {1} {2}' -f ($i + 1), $steps[$i].tool, (@($runs[$i][1] | Select-Object -Skip ($(if ($steps[$i].tool -like '*.ps1') { 5 } else { 1 }))) -join ' '))
     }
-    Say ('{0} steps, then the hashes of game\content in records\asset-provenance.json. Nothing was run.' -f $steps.Count)
+    Say ('{0} steps, then the hashes of game\content in records\asset-provenance.json, each list {1}: {2}. Nothing was run.' -f $steps.Count, $orderList, (Get-LoadOrderName $recorded))
     exit 0
 }
+
+New-Item -ItemType Directory -Force -Path $orderFolder | Out-Null
+[IO.File]::WriteAllLines($orderList, [string[]]@($recorded | Select-Object -Skip 5 | ForEach-Object { '*' + $_ }), (New-Object Text.UTF8Encoding($false)))
+Say ('the load order: ' + (Get-LoadOrderName $recorded) + ', from game\data\npc-population.json') 'Cyan'
 
 $before = Get-TreePrint
 $stopped = $null
 $unregistered = @()
-for ($i = 0; $i -lt $steps.Count; $i++) {
-    Say ''
-    Say ('[{0}/{1}] {2}' -f ($i + 1), $steps.Count, $steps[$i].tool) 'Cyan'
-    $exe = $runs[$i][0]
-    $line = $runs[$i][1]
-    & $exe @line
-    if ($LASTEXITCODE -ne 0) { $stopped = '{0} ended with exit {1}' -f $steps[$i].tool, $LASTEXITCODE; break }
+try {
+    for ($i = 0; $i -lt $steps.Count; $i++) {
+        Say ''
+        Say ('[{0}/{1}] {2}' -f ($i + 1), $steps.Count, $steps[$i].tool) 'Cyan'
+        $exe = $runs[$i][0]
+        $line = $runs[$i][1]
+        & $exe @line
+        if ($LASTEXITCODE -ne 0) { $stopped = '{0} ended with exit {1}' -f $steps[$i].tool, $LASTEXITCODE; break }
+    }
+} finally {
+    try { Remove-Item -LiteralPath $orderFolder -Recurse -Force } catch { Say ('could not remove ' + $orderFolder + ': ' + $_.Exception.Message) 'Yellow' }
 }
 
 if (-not $stopped) {
