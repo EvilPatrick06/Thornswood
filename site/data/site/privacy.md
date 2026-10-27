@@ -246,9 +246,10 @@ it leaves your PC except as this page says above.
   sign-in itself is locked so only your Windows account can read it, and your
   Discord name and picture are kept beside it in plain files, for the Discord
   card at the top of the launcher. They are kept until you uninstall.
-- **The voice and music browsers' data.** Voice and the menu music each run
-  in a small built-in browser, Microsoft Edge WebView2, which keeps its cache
-  and storage in a folder of its own. They are kept until you uninstall.
+- **The voice browser's data.** Voice runs in a small built-in browser,
+  Microsoft Edge WebView2, which keeps its cache and storage in a folder of
+  its own. It is kept until you uninstall. An older launcher ran the menu
+  music in one as well, and that folder goes the same way.
 - **Your characters, saves and settings**, and the launcher's record of what
   it installed, kept until you uninstall.
 
@@ -256,7 +257,7 @@ it leaves your PC except as this page says above.
 "Keep this build's saves and settings" ticked, as it is unless you untick it,
 only your characters, saves and settings and the launcher's record of what it
 installed stay. The log, the Discord sign-in, name and picture, the support
-reports and the browsers' data go either way, and if one of them cannot be
+reports and the browser data go either way, and if one of them cannot be
 removed, the launcher's last message names it so you can delete it yourself.
 Deleting the install folder yourself removes everything as well.
 

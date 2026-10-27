@@ -485,8 +485,8 @@ namespace Thornswood
             {
                 // The box keeps saves and settings, and Profile holds more
                 // than those: the log, the Discord sign-in with the name and
-                // picture beside it, the support zips and both WebView2
-                // browsers' folders. Keeping all of Profile kept them on the PC
+                // picture beside it, the support zips and the WebView2
+                // browser folders. Keeping all of Profile kept them on the PC
                 // under a box that named none of them (#3679). They go here,
                 // and the farewell names any that are still there.
                 leave.AddRange(LocalKeep.NotSaves());

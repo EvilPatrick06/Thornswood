@@ -36,20 +36,7 @@ namespace Thornswood
     {
         const string DecoderDll = "NLayer.dll";
 
-<<<<<<< HEAD
-        /// <summary>
-        /// The music browser's own WebView2 folder: its cache and storage, kept
-        /// while the launcher is installed and removed by every uninstall
-        /// (LocalKeep.NotSaves, #3679).
-        /// </summary>
-        public static string BrowserDir { get { return Path.Combine(Paths.ProfileDir, "MusicBrowser"); } }
-
-        static Microsoft.Web.WebView2.Wpf.WebView2 view;
-        static Window host;
-        static bool ready;
-=======
         static Playback playback;
->>>>>>> origin/main
         static bool wantPlay;
         static double wantVol = 0.5;
         static string trackPath;
@@ -299,49 +286,7 @@ namespace Thornswood
                 {
                     Stamp("Menu music: stopped (" + ex.Message + ")");
                 }
-<<<<<<< HEAD
-            };
-
-            if (!Voice.EnsureLoader(Stamp))
-            {
-                Stamp("Menu music: WebView2Loader.dll is not beside the exe");
-                return;
-            }
-
-            string profile = BrowserDir;
-            try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("MenuMusic.CreateProfile", ex); }
-
-            // Hidden host has no user gesture. CoreWebView2EnvironmentOptions
-            // with AdditionalBrowserArguments makes CreateAsync fault on the
-            // ship PC (launcher.log: "no WebView2 runtime") while Voice's
-            // null-options CreateAsync succeeds on the same run. Set the
-            // documented WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS env var instead,
-            // then create the environment the same way Voice does.
-            try
-            {
-                string key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
-                string cur = Environment.GetEnvironmentVariable(key);
-                string flag = "--autoplay-policy=no-user-gesture-required";
-                if (string.IsNullOrEmpty(cur))
-                    Environment.SetEnvironmentVariable(key, flag);
-                else if (cur.IndexOf("autoplay-policy", StringComparison.OrdinalIgnoreCase) < 0)
-                    Environment.SetEnvironmentVariable(key, cur + " " + flag);
-            }
-            catch (Exception ex)
-            {
-                Stamp("Menu music: could not set autoplay env (" + ex.Message + ")");
-            }
-
-            var envTask = Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
-                null, profile, null);
-
-            envTask.ContinueWith(delegate (
-                System.Threading.Tasks.Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment> t)
-            {
-                if (t.IsFaulted)
-=======
                 finally
->>>>>>> origin/main
                 {
                     if (dev != IntPtr.Zero)
                     {

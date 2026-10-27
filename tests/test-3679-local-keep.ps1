@@ -4,7 +4,7 @@
       pwsh -NoProfile -File .\tests\test-3679-local-keep.ps1
 
   Issue #3679: the launcher kept launcher.log, the support zips, the Discord
-  sign-in with the name and picture beside it, and both WebView2 browser
+  sign-in with the name and picture beside it, and the WebView2 browser
   folders on the PC with no time limit. Uninstall's "Keep this build's saves
   and settings", ticked by default, kept the whole Profile folder and so all
   of them, and the privacy page said nothing about any of it. Measured on one
@@ -93,13 +93,13 @@ $targets = [regex]::Match($uninstallSrc, '(?s)public static string\[\] Targets\(
 Yes 'Uninstall.Targets is the list Begin hands back' ($targets.Success -and $uninstallSrc -match 'return Targets\(keepSaves, deleteMods\);')
 Yes 'and with the saves kept it takes LocalKeep.NotSaves' ($targets.Groups[1].Value -match '(?s)if \(!keepSaves\)\s*\{[^}]*ProfileDir[^}]*\}\s*else\s*\{[^}]*leave\.AddRange\(LocalKeep\.NotSaves\(\)\);')
 Yes 'Discord.Forget deletes the same files the uninstall does (Discord.AccountFiles)' ($discordSrc -match '(?s)public static void Forget\(\)\s*\{\s*foreach \(string f in AccountFiles\(Folder\)\)')
-Yes 'NotSaves takes the Discord files from Discord.AccountFiles, the browser folders from Voice and MenuMusic' ($keepSrc -match 'Discord\.AccountFiles\(Paths\.ProfileDir\)' -and $keepSrc -match 'Voice\.BrowserDir' -and $keepSrc -match 'MenuMusic\.BrowserDir')
+Yes 'NotSaves takes the Discord files from Discord.AccountFiles, the voice browser''s folder from Voice, and the old music browser''s folder' ($keepSrc -match 'Discord\.AccountFiles\(Paths\.ProfileDir\)' -and $keepSrc -match 'Voice\.BrowserDir' -and $keepSrc -match 'Path\.Combine\(Paths\.ProfileDir, "MusicBrowser"\)')
 
 # ---- 4: the words -------------------------------------------------------------
 $box = [regex]::Match($xaml, 'x:Name="ChkKeepSaves"[^>]*/>\s*<TextBlock[^>]*Text="([^"]*)"')
 Yes 'the uninstall box has its small print' $box.Success
 $small = [Net.WebUtility]::HtmlDecode($box.Groups[1].Value)
-foreach ($w in @('log', 'Discord sign-in, name and picture', 'support reports', 'voice and music browsers')) {
+foreach ($w in @('log', 'Discord sign-in, name and picture', 'support reports', 'voice browser''s data')) {
     Yes ("the small print under the box says the $w go either way") ($small.Contains($w) -and $small.Contains('go either way'))
 }
 $words = [regex]::Match($keepSrc, 'NotSavesInWords =\s*"([^"]*)"')
@@ -109,7 +109,7 @@ Yes 'the privacy page has a section on what the launcher keeps on the PC' $onPc.
 $sec = $onPc.Groups[1].Value -replace '\s+', ' '
 Yes ('it says the log keeps each line for ' + $days + ' days') ($sec -match ('launcher\.log, the one described above\. Each line is kept for ' + $days + ' days'))
 Yes ('and the support reports are kept for ' + $days + ' days') ($sec -match ('Support reports.*Each is kept for ' + $days + ' days'))
-Yes 'it names the Discord sign-in, name and picture, and the browsers'' data, until uninstall' ($sec -match 'Your Discord sign-in.*name and picture.*until you uninstall' -and $sec -match 'voice and music browsers'' data.*until you uninstall')
+Yes 'it names the Discord sign-in, name and picture, and the browsers'' data, until uninstall' ($sec -match 'Your Discord sign-in.*name and picture.*until you uninstall' -and $sec -match 'voice browser''s data.*until you uninstall')
 Yes 'it says the box keeps only the saves and settings and the rest goes either way' ($sec -match 'Keep this build''s saves and settings' -and $sec -match 'go either way')
 $logPara = [regex]::Match($privacy, '(?s)\*\*The launcher''s own log\.\*\*(.*?)\n\n').Groups[1].Value -replace '\s+', ' '
 Yes 'the log''s paragraph names the voice address and port, the profile number and the microphone' ($logPara -match 'address and port' -and $logPara -match 'profile number' -and $logPara -match 'microphone')
@@ -254,7 +254,7 @@ namespace Thornswood
             Put(Paths.LogFile, "2026-10-26 12:00:00  a line\r\n");
             foreach (string f in Discord.AccountFiles(p)) Put(f, "account");
             Put(Path.Combine(Voice.BrowserDir, "EBWebView\\Default\\Cache\\data_0"), "cache");
-            Put(Path.Combine(MenuMusic.BrowserDir, "EBWebView\\Local State"), "state");
+            Put(Path.Combine(p, "MusicBrowser\\EBWebView\\Local State"), "state");
             Put(Path.Combine(Diag.ReportDir, "thornswood-20261026-1200.zip"), "zip");
             saves = new string[]
             {
@@ -301,7 +301,7 @@ namespace Thornswood
             foreach (string f in Discord.AccountFiles(Paths.ProfileDir))
                 Yes("Profile\\" + Path.GetFileName(f) + " is gone", Gone(f));
             Yes("Profile\\VoiceBrowser is gone", Gone(Voice.BrowserDir));
-            Yes("Profile\\MusicBrowser is gone", Gone(MenuMusic.BrowserDir));
+            Yes("Profile\\MusicBrowser, the old music browser's folder, is gone", Gone(Path.Combine(Paths.ProfileDir, "MusicBrowser")));
             Yes("Profile\\Reports is gone", Gone(Diag.ReportDir));
             foreach (string s in saves)
                 Yes(s.Substring(root.Length + 1) + " is still there", File.Exists(s) && Text(s) == (s == Paths.CfgFile ? "{}" : "kept"));

@@ -4885,7 +4885,7 @@ namespace Thornswood
                 stays.AppendLine("    " + Paths.CfgFile);
                 // Kept saves and settings are only that (#3679): the log, the
                 // Discord sign-in, name and picture, the support reports and
-                // the two browsers' folders inside Profile go either way.
+                // the browser folders inside Profile go either way.
                 goes.AppendLine("    From " + Paths.ProfileDir + ": " + LocalKeep.NotSavesInWords);
             }
 

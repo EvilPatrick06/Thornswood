@@ -636,7 +636,7 @@ the PC: `Profile\launcher.log` lines and the support zips for `Days` (30)
 days, cut at every start, which is what the privacy page promises. NotSaves
 lists what is in Profile that is not a save or a setting (the log, the
 reports, the Discord sign-in, name and picture from `Discord.AccountFiles`,
-and the voice and music browsers' folders); Uninstall removes those even when
+and the voice browser's folder, and the old music browser's); Uninstall removes those even when
 it keeps the saves and settings, and its farewell names any it could not.
 
 **DevBuild** (DevBuild.cs). The second launcher in `<Root>-DevBuild`, made
