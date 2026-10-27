@@ -6,7 +6,7 @@
   RESTORE-SERVER.PS1 -REHEARSE (issue #1046). A restore makes a folder be the
   server it came from: its ports, its name and private\door.json, which names
   the live site and holds the site key and the join pass key. Starting a
-  restored folder safely was four hand steps in docs\RESTORING.md that nobody
+  restored folder safely was four hand steps in RESTORING.md in the ops repo that nobody
   had done. -Rehearse does them.
 
   It proves:
