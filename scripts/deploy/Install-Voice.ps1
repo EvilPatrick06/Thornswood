@@ -188,7 +188,8 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 <#
-  HOW MANY PEOPLE IT TAKES AT ONCE (#481). records\most-online.json is the one
+  HOW MANY PEOPLE HOLD A VOICE PLACE AT ONCE (#481; only somebody in the world
+  holds one, #3570). records\most-online.json is the one
   place the numbers live, the world's seats and voice's, read through
   MaxOnline.ps1 the way the deploys read the seats, before anything is sent:
   a voice number under the seats stops here with the box untouched. It goes
