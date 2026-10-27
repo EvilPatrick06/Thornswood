@@ -15,7 +15,9 @@
 //
 // What it checks:
 //   1. the page is there and the old note is gone;
-//   2. CLAUDE.md and Developer-Guide.md point at the page, and no tracked
+//   2. Developer-Guide.md points at the page (the long CLAUDE.md that did
+//      too is in the private ops repo since #3693, and its
+//      tests/test-ops-docs.js checks it there), and no tracked
 //      document still points at the old note (docs/archive is exempt:
 //      it is the dated 17 September audit, a record of what was true then);
 //   3. Shell.cs carries a class summary that names the page;
@@ -25,7 +27,7 @@
 //   5. under each heading, references into the same method are in the order
 //      the code runs them, so a step moved in Play is a step moved on the page;
 //   6. the page has the four sections the entry asked for, says which
-//      install it describes, and lists every file CLAUDE.md's #dev rule names.
+//      install it describes, and lists every file Developer-Guide.md's #dev rule names.
 //
 // A line that has only moved is reported, not failed: every edit above it
 // moves it, and the name is the anchor the page tells people to search for.
@@ -63,7 +65,7 @@ yes('launcher/app/HOOKUP.md, the finished Discord wiring note, is gone',
     !fs.existsSync(path.join(APP, 'HOOKUP.md')));
 
 // ------------------------------------------------------------ 2. the pointers
-['CLAUDE.md', 'Developer-Guide.md'].forEach(function (doc) {
+['Developer-Guide.md'].forEach(function (doc) {
   const t = read(path.join(ROOT, doc)) || '';
   yes(doc + ' points at launcher\\app\\ARCHITECTURE.md', t.indexOf('launcher\\app\\ARCHITECTURE.md') >= 0);
   yes(doc + ' no longer names HOOKUP.md', !/HOOKUP/i.test(t));
