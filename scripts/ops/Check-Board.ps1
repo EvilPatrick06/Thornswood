@@ -19,7 +19,10 @@
   WHAT IT HOLDS EACH CARD TO (Developer-Guide.md, "Everything we need to do
   goes on the board"):
     no order      an open issue with no Order. "Order is the do-order. A new
-                  issue gets the Order of where it belongs."
+                  issue gets the Order of where it belongs." Every open issue
+                  carries one (Patrick, 27 Oct 2026, #3534): order-on-filing.yml
+                  gives a new issue 10000 plus its number, and the board
+                  review moves it to where it belongs in the queue.
     shared order  two open cards with the same Order, so neither is first.
     no status     an open card with no Status. The options are Todo, In
                   Progress and Done.
