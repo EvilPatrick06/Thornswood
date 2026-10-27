@@ -86,7 +86,11 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 # The functions Windows PowerShell already has, so the phase file below
-# carries only this script's own.
+# carries only this script's own. A module's functions are left out as well:
+# NetSecurity and ScheduledTasks load while the plan runs, and their commands
+# are CDXML functions that only work inside their module, so copied into the
+# phase file they shadowed the real ones and the swap stopped at the firewall
+# (#1043, 26 Oct 2026).
 $ThornswoodBuiltIn = @(Get-ChildItem function: | ForEach-Object { $_.Name })
 
 # The release (#1043). SHA256 read on 26 Oct 2026 from the release asset;
@@ -342,7 +346,7 @@ function Get-PhaseScript {
     [void]$b.AppendLine('$ProgressPreference = ''SilentlyContinue''')
     [void]$b.AppendLine('$DryRun = $false; $Pins = ''''; $Layer = ''''; $LogName = ''''; $changes = 0; $stopped = $false')
     [void]$b.AppendLine('foreach ($p in (''' + $json + ''' | ConvertFrom-Json).PSObject.Properties) { Set-Variable -Name $p.Name -Value $p.Value -Scope Script }')
-    foreach ($f in @(Get-ChildItem function: | Where-Object { $ThornswoodBuiltIn -notcontains $_.Name } | Sort-Object Name)) {
+    foreach ($f in @(Get-ChildItem function: | Where-Object { -not $_.ModuleName -and $ThornswoodBuiltIn -notcontains $_.Name } | Sort-Object Name)) {
         [void]$b.AppendLine('function ' + $f.Name + ' {')
         [void]$b.AppendLine($f.ScriptBlock.ToString())
         [void]$b.AppendLine('}')

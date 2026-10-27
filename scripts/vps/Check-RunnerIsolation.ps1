@@ -9,14 +9,14 @@
     api GET calls (visibility, fork pull request policy, default token
     permissions, the runners and their labels, how many collaborators).
   It saves them to -Facts. Collecting is a live step: Claude's
-  (claude-queue\2161-runner-isolation.md).
+  (the ops repo's ops\claude-queue\2161-runner-isolation.md).
 
   Without -Collect it compares a saved -Facts file with
   records\runner-isolation.json and the workflows in .github\workflows.
   That part is offline and is what tests\test-runner-isolation.ps1 runs.
 
   Each row is ok, intentional (the record's reason), or risk. A risk row is
-  a finding for the threat model in docs\RUNNER-ISOLATION.md, not a change:
+  a finding for the threat model in the ops repo's RUNNER-ISOLATION.md, not a change:
   this script never changes a runner, an ACL, a setting or a credential.
   Rights come from reading ACLs, not from Windows' effective access check,
   and the report says so. No file contents, setting values or tokens are
@@ -67,6 +67,9 @@ if ($Collect) {
 
 $f = Get-Content -LiteralPath $Facts -Raw | ConvertFrom-Json
 $r = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+# The label records\build-runners.json gives the box's build runners (#2994).
+$boxBuildLabel = [string](Get-Content -LiteralPath (Join-Path $Repo 'records\build-runners.json') -Raw | ConvertFrom-Json).label
+if (-not $boxBuildLabel) { throw 'records\build-runners.json names no label, so a job on the box''s build runners cannot be told from one that is not.' }
 $rows = New-Object System.Collections.Generic.List[object]
 function Row([string]$Area, [string]$Item, [string]$Expected, [string]$Actual, [bool]$Ok, [string]$Kind = 'risk') {
     $cls = 'ok'; $why = ''
@@ -96,7 +99,10 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
         return $out
     }
     $triggers = @(Get-TopBlock 'on' | ForEach-Object { ($_ -split ':')[0] })
-    $onProd = $t -match ('runs-on:\s*\[[^\]]*\b' + [regex]::Escape($r.productionLabel) + '\b')
+    # The build label reaches the box too: its build runners carry it beside
+    # the production label, and the two build fallbacks ask for it alone so
+    # One's off-box build runners take them as well (26 Oct 2026).
+    $onProd = $t -match ('runs-on:\s*\[[^\]]*\b(' + [regex]::Escape($r.productionLabel) + '|' + [regex]::Escape($boxBuildLabel) + ')\b')
     $perm = (Get-TopBlock 'permissions') -join ' '
     $name = $wf.Name
     # A pull request may reach the production label only through a job that

@@ -628,7 +628,7 @@ try {
     if ($script:fail -gt $failed) { Show }
 
     # ---- a scratch root whose settings name another server's port ------------
-    # docs\RESTORING.md installs into C:\Thornswood-RestoreTest\server with
+    # RESTORING.md in the ops repo installs into C:\Thornswood-RestoreTest\server with
     # -NoTask, from a payload whose settings are the live server's. The stop
     # must be by this root's own processes: the one on that port is live.
     $Q = Pair @($P)

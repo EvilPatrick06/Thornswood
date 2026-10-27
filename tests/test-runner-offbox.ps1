@@ -70,9 +70,15 @@ try {
     $r = Dry @('-OffBox')
     Yes "-OffBox dry run ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  it ran nothing: every step says DRY RUN' ($r.Said -match 'DRY RUN, nothing ran' -and $r.Said -match 'on this machine')
-    Yes "  registers thornswood-pr-$comp with the label thornswood-pr" ($r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "' --labels 'thornswood-pr'"))
-    Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps")
-    Yes '  nor the build label, which only VPS runners carry (#2994)' ($r.Text -notmatch 'thornswood-build')
+    # The build label only when records\build-runners.json names this
+    # machine's runner (One's, 26 Oct 2026), so the answer depends on where
+    # the test runs.
+    $buildRec = Get-Content -LiteralPath (Join-Path $repo 'records\build-runners.json') -Raw | ConvertFrom-Json
+    $named = $buildRec.PSObject.Properties['offBox'] -and (@($buildRec.offBox) -contains ('thornswood-pr-' + $comp))
+    $wantLabels = $(if ($named) { 'thornswood-pr,thornswood-build' } else { 'thornswood-pr' })
+    Yes "  registers thornswood-pr-$comp with the label(s) $wantLabels" ($r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "' --labels '" + [regex]::Escape($wantLabels) + "'"))
+    Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps" -and $r.Text -notmatch "--labels '[^']*thornswood-vps")
+    Yes '  nor the build label unless the record names it (#2994)' ($named -or $r.Text -notmatch 'thornswood-build')
     Yes '  in C:\Thornswood-RunnerPR, as the account thornswood-pr' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr'"))
     Yes '  its own folder is still locked before config.cmd writes into it' ($r.Text -match '(?m)^Lock-RunnerRoot \$root \$acct')
     Yes '  the install shuts it out of every C:\Thornswood* folder, hyphen or not, Dumps included (#2488)' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood*' @() @()"))
@@ -90,6 +96,20 @@ try {
     $r = Dry @('-OffBox', '-Number', '2')
     Yes '-OffBox -Number 2 numbers its folder, account and name' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR2'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr2'") -and $r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "-2'"))
 
+    # Its own install folder (#3860), never Patrick's game: the .env it writes
+    # names one under its root.
+    $r = Dry @('-OffBox', '-Number', '3')
+    Yes '-OffBox writes THORNSWOOD_INSTALL into its .env, under its own root' ($r.Code -eq 0 -and $r.Text -match "(?m)^Set-RunnerTemp \`$root '[^']+' \`$true\s*$" -and $r.Text -match [regex]::Escape("`$want += ('THORNSWOOD_INSTALL=' + (Join-Path `$root 'install'))"))
+    $r = Dry @()
+    Yes '  and a VPS runner does not' ($r.Code -eq 0 -and $r.Text -match "(?m)^Set-RunnerTemp \`$root '[^']+' \`$false\s*$")
+
+    # Build runners on One (Patrick, 26 Oct 2026): a name the build record's
+    # offBox lists takes the build label too, and never the VPS label.
+    $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-one-3')
+    Yes 'an off-box runner records\build-runners.json names takes the build label' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one-3' --labels 'thornswood-pr,thornswood-build'")
+    $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-elsewhere')
+    Yes '  and one it does not name keeps the pull request label alone' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-elsewhere' --labels 'thornswood-pr'(?!,)")
+
     $r = Dry @('-OffBox', '-Label', 'thornswood-vps')
     Yes "-OffBox refuses the VPS label (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'never takes the VPS label' -and -not $r.Text)
 
@@ -101,7 +121,9 @@ try {
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
-    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994) and checks signed drafts (#3956)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    $r = Dry @('-Number', '4')
+    Yes "  runner 4, the light one, takes no builds and checks signed drafts (#3956, exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-4' --labels 'thornswood-vps,thornswood-check'")
     # #2161, 21 Oct: the record's no-reach folders outside C:\Thornswood-* are denied on the box too.
     $vpsAlso = "@('C:\ProgramData\ssh', 'C:\Users\Administrator')"
     Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' $vpsAlso") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
