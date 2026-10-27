@@ -30,6 +30,13 @@
 // WHAT IS LEFT ALONE, AND WHY.
 //   - records/client-licences/: third-party licence texts keep their
 //     authors' notices word for word, as the licences require.
+//   - the same notice lines copied into our own source: a line that is,
+//     past its comment marks, word for word a line of one of those texts
+//     that holds an address. zlib's licence says its notice "may not be
+//     removed or altered from any source distribution", and
+//     launcher/app/FromGameDeflate.cs, zlib translated into C#, carries it
+//     with its authors' addresses (#3668). Any other address in that file,
+//     or the same address on a line of its own, is still found.
 //   - tests/fixtures/ui-front-build.js: a third-party webpack build, kept
 //     as its authors built it (#3761); the profile path in it is one of
 //     theirs, from their own machine.
@@ -48,6 +55,15 @@ const REPO_DIR = path.join(__dirname, '..'); // the tests are in tests\, the rep
 
 const WAITING = [];
 const LEFT_ALONE = [/^records\/client-licences\//, /^tests\/fixtures\/ui-front-build\.js$/];
+
+// Every line of a recorded licence text that holds an address, with its
+// spacing collapsed, so a notice copied into a source comment is known.
+const LIC_DIR = path.join(REPO_DIR, 'records', 'client-licences');
+const flatLine = (l) => l.replace(/^\s*(?:\/\/+|#+|\*+|;+|--)?/, '').replace(/\s+/g, ' ').trim();
+const NOTICE_LINES = new Set();
+for (const n of (fs.existsSync(LIC_DIR) ? fs.readdirSync(LIC_DIR) : [])) {
+  for (const l of fs.readFileSync(path.join(LIC_DIR, n), 'utf8').split(/\r?\n/)) if (/@/.test(l)) NOTICE_LINES.add(flatLine(l));
+}
 
 const MAIL_DOMAIN = /^(?:gmail\.com|googlemail\.com|outlook\.[a-z.]+|hotmail\.[a-z.]+|live\.[a-z.]+|msn\.com|yahoo\.[a-z.]+|ymail\.com|icloud\.com|me\.com|mac\.com|proton\.me|protonmail\.[a-z.]+|aol\.com|(?:[a-z0-9-]+\.)+edu)$/i;
 const MAIL = /[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})/g;
@@ -82,7 +98,8 @@ function findings(text) {
     const l = lines[i];
     let m;
     MAIL.lastIndex = 0;
-    while ((m = MAIL.exec(l))) if (MAIL_DOMAIN.test(m[1])) out.push({ kind: 'a personal mail address', line: i + 1, col: m.index + 1 });
+    const notice = NOTICE_LINES.has(flatLine(l));
+    while ((m = MAIL.exec(l))) if (MAIL_DOMAIN.test(m[1]) && !notice) out.push({ kind: 'a personal mail address', line: i + 1, col: m.index + 1 });
     TENANT.lastIndex = 0;
     while ((m = TENANT.exec(l))) out.push({ kind: 'a Microsoft tenant name', line: i + 1, col: m.index + 1 });
     for (const re of PROFILE) {
@@ -105,6 +122,10 @@ yes('  and an Outlook one', plant('it names someone' + at + 'outlook.com and') =
 yes('  and a school one', plant('a' + at + 'student.example.edu') === 1);
 yes('  and a tenant name, with or without an address', plant('domain `someone' + ms + '`') === 1 && plant('x' + at + 'someone' + ms) === 1);
 yes('  but not a role address, a noreply or a .invalid one', plant('a' + at + 'thornswood.net b' + at + 'users.noreply.github.com c' + at + 'thornswood.invalid') === 0);
+yes('the recorded licence texts give their notice lines (' + NOTICE_LINES.size + ')', NOTICE_LINES.size > 0);
+const zlibAuthors = [...NOTICE_LINES].filter((l) => /caltech\.edu/.test(l))[0] || '';
+yes('  a licence\'s own notice line, copied into a comment, is left alone', zlibAuthors !== '' && plant('//   ' + zlibAuthors.replace(/ /g, '        ')) === 0);
+yes('  but its address on a line of its own is still found', plant('// mail ' + zlibAuthors.split(' ').pop()) === 1);
 yes('a profile path is found', plant('C:' + bs + 'Users' + bs + 'someone' + bs + 'Downloads') === 1);
 yes('  and with forward slashes, doubled backslashes, Git Bash and WSL', plant('C:/' + U + '/someone/x') === 1 && plant("'C:" + bs + bs + 'Users' + bs + bs + "someone'") === 1 && plant('cd /c/' + U + '/someone/x') === 1 && plant('/mnt/c/' + U + '/someone/x') === 1 && plant('"/' + U + '/someone/github/x"') === 1);
 yes('  but not a placeholder or the box\'s own accounts', plant('C:' + bs + 'Users' + bs + '<you>' + bs + 'x C:' + bs + 'Users' + bs + 'Administrator' + bs + 'x C:' + bs + 'Users' + bs + 'thornswood-runner5' + bs + 'x C:' + bs + 'Users' + bs + '%USERNAME%') === 0);
