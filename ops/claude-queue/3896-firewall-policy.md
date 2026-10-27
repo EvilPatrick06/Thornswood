@@ -83,16 +83,19 @@ In a cloud thread, `pwsh scripts/vps/Setup-CloudSsh.ps1` first.
    other line ALREADY (two more WOULD lines if #3213's note has not run yet).
    The real run expects the same as `CHANGED`, with Edge's setup exit code,
    and step 5's PASS lines. sshd_config is already as it wants, so sshd is
-   not restarted. A `STOP Microsoft Edge ... is still installed` line gives
-   the exit code and where Edge's log is; put both on #3896 and leave the
-   rest (nothing after Edge ran).
+   not restarted. If Edge's setup refuses the uninstall, the run says
+   `KEPT Microsoft Edge ... is still installed` with the exit code and where
+   Edge's log is, and goes on: Edge stays unused and blocked from coming
+   back (Patrick, 27 Oct, q-3896-edge-uninstall-refused, A). Put the KEPT
+   line and its exit code on #3896.
 
 5. **Parity.**
 
        pwsh -NoProfile -File scripts/vps/Check-ProdParity.ps1
 
    Expect each profile's `local rules` row ignored, `Microsoft Edge` not
-   installed, and no inbound rule row outside the list.
+   installed (or, after a KEPT line in step 4, installed with the updater
+   told never to install it, which is not a review row), and no inbound rule row outside the list.
 
 Put what each step printed on #3896. Close #3896 once steps 3 and 5 are clean.
 

@@ -27,8 +27,13 @@
                      updater never installs it again. The WebView2 Runtime and
                      the updater stay: the Visual Studio C++ workload the
                      runners build with requires WebView2, and the updater
-                     keeps it patched. An uninstall that leaves Edge there
-                     stops the run, with what its setup said.
+                     keeps it patched. Should Edge's setup refuse the
+                     uninstall (Microsoft lets it on some Windows versions),
+                     Edge stays, unused, with the updater told never to install
+                     it again, and the run says KEPT with the exit code and
+                     where its log is and goes on: the box's own firewall
+                     policy ignores the rules its setup adds (Patrick, 27 Oct,
+                     q-3896-edge-uninstall-refused, A).
     telemetry        the scheduled tasks in $TelemetryTasks below
                      (DiskSnapshot.exe, CompatTelRunner.exe and the Customer
                      Experience Improvement Program) set to Disabled, and
@@ -523,12 +528,10 @@ function Invoke-Harden {
     else {
         $code = Remove-EdgeInstall $edge
         $left = Get-EdgeInstall
-        if ($left) {
-            $script:stopped = $true
-            Say 'STOP' ('Microsoft Edge ' + $left.Version + ' is still installed after its setup ran (exit ' + $code + '). Its log is msedge_installer.log in C:\Windows\SystemTemp or C:\Windows\Temp. The WebView2 Runtime and everything after this step were left as they were.')
-            return
-        }
-        Change ('Microsoft Edge ' + $edge.Version + ' uninstalled with its own setup (exit ' + $code + '): nothing on the box runs it, and its setup added an inbound firewall rule with every version (#3896)')
+        # Patrick, 27 Oct, q-3896-edge-uninstall-refused, A: a refused uninstall
+        # keeps Edge, blocked from coming back, and the run goes on.
+        if ($left) { Say 'KEPT' ('Microsoft Edge ' + $left.Version + ' is still installed: its setup refused the uninstall (exit ' + $code + '; its log is msedge_installer.log in C:\Windows\SystemTemp or C:\Windows\Temp). It stays unused, the updater is told never to install it again, and the box''s own firewall policy ignores the rules its setup adds (#3896).') }
+        else { Change ('Microsoft Edge ' + $edge.Version + ' uninstalled with its own setup (exit ' + $code + '): nothing on the box runs it, and its setup added an inbound firewall rule with every version (#3896)') }
     }
 
     # ---------------------------------------------------- Windows Update ---

@@ -73,6 +73,7 @@ function Facts { [ordered]@{
     # #3896: the box's policy holds the rules, and Edge is gone.
     firewallProfiles = @(@{ name = 'Domain'; allowLocalRules = 'False' }, @{ name = 'Private'; allowLocalRules = 'False' }, @{ name = 'Public'; allowLocalRules = 'False' })
     edgeVersion = ''
+    edgeInstallBlocked = $true
 } }
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('prod-parity-' + [guid]::NewGuid().ToString('N'))
@@ -163,9 +164,12 @@ try {
     $g = Facts; $g.firewallProfiles[2] = @{ name = 'Public'; allowLocalRules = 'NotConfigured' }
     $x = Run $g ''
     T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  firewall Public profile, local rules: expected ignored \(AllowLocalFirewallRules False\), found taken \(NotConfigured\)') 'a profile that still takes local rules is caught'
+    $g = Facts; $g.edgeVersion = '156.0.4314.42'; $g.edgeInstallBlocked = $false
+    $x = Run $g ''
+    T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  program Microsoft Edge: .*found installed, 156\.0\.4314\.42, and nothing stops the updater') 'Edge back on the box, with nothing stopping its updater, is caught'
     $g = Facts; $g.edgeVersion = '156.0.4314.42'
     $x = Run $g ''
-    T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  program Microsoft Edge: expected not installed, found installed, 156\.0\.4314\.42') 'Edge back on the box is caught'
+    T ($x.Out -notmatch 'REVIEW  program Microsoft Edge') 'Edge kept because its setup refused the uninstall, with its updater told never to install it, is expected (q-3896-edge-uninstall-refused, A)'
     $g = Facts; $g.Remove('firewallProfiles'); $g.Remove('edgeVersion')
     $x = Run $g ''
     T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  firewall local rules' -and $x.Out -match 'REVIEW  program Microsoft Edge') 'facts that carry neither are not taken for a clean box'

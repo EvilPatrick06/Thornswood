@@ -112,12 +112,15 @@ function Get-ProdFacts {
     $fwProfiles = @(Get-NetFirewallProfile -PolicyStore ActiveStore | ForEach-Object { [ordered]@{ name = [string]$_.Name; allowLocalRules = [string]$_.AllowLocalFirewallRules } })
     $edgeKey = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge' -ErrorAction SilentlyContinue
     $edge = if ($edgeKey) { [string]$edgeKey.DisplayVersion } else { '' }
+    # Whether the Edge updater is told never to install Edge (vps-harden.ps1, #3896).
+    $edgePol = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Name 'Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}' -ErrorAction SilentlyContinue
+    $edgeBlocked = ($null -ne $edgePol -and [string]$edgePol.'Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}' -eq '0')
     $envNames = @([Environment]::GetEnvironmentVariables('Machine').Keys | Where-Object { $_ -like 'THORNSWOOD_*' } | Sort-Object)
     [ordered]@{
         takenUtc = (Get-Date).ToUniversalTime().ToString('o'); host = $env:COMPUTERNAME
         listeners = $listen; tasks = $tasks; services = $svcs; files = $files; fileBodies = $fileBodies
         certs = $certs; versions = $versions; settings = $settings; machineEnvNames = $envNames; inboundRules = $inbound
-        firewallProfiles = $fwProfiles; edgeVersion = $edge
+        firewallProfiles = $fwProfiles; edgeVersion = $edge; edgeInstallBlocked = $edgeBlocked
     }
 }
 

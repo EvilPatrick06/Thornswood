@@ -167,14 +167,18 @@ if ($f.PSObject.Properties.Name -contains 'inboundRules') {
 # The firewall takes rules only from the box's policy store
 # (scripts\vps\BoxFirewall.ps1), so no installer can open a port, and the
 # in-box Edge, whose setup added an inbound rule with every version, is gone
-# (vps-harden.ps1).
+# (vps-harden.ps1). Should its setup refuse the uninstall, Edge stays with its
+# updater told never to install it again, and that is expected too (Patrick,
+# 27 Oct, on the report page: q-3896-edge-uninstall-refused, A).
 if ($f.PSObject.Properties.Name -contains 'firewallProfiles') {
     foreach ($p in @($f.firewallProfiles)) {
         Row 'firewall' ([string]$p.name + ' profile, local rules') 'ignored (AllowLocalFirewallRules False)' $(if ([string]$p.allowLocalRules -eq 'False') { 'ignored' } else { 'taken (' + $p.allowLocalRules + ')' }) ([string]$p.allowLocalRules -eq 'False')
     }
 } else { Row 'firewall' 'local rules' 'collected' 'facts from before #3896 carry none' $false }
 if ($f.PSObject.Properties.Name -contains 'edgeVersion') {
-    Row 'program' 'Microsoft Edge' 'not installed' $(if ($f.edgeVersion) { 'installed, ' + $f.edgeVersion } else { 'not installed' }) (-not $f.edgeVersion)
+    $edgeBlocked = ($f.PSObject.Properties.Name -contains 'edgeInstallBlocked') -and [bool]$f.edgeInstallBlocked
+    $edgeSaid = $(if (-not $f.edgeVersion) { 'not installed' } elseif ($edgeBlocked) { 'installed, ' + $f.edgeVersion + ', its setup refused the uninstall and the updater is told never to install it' } else { 'installed, ' + $f.edgeVersion + ', and nothing stops the updater putting it back' })
+    Row 'program' 'Microsoft Edge' 'not installed, or kept with the updater told never to install it where its setup refuses the uninstall' $edgeSaid ((-not $f.edgeVersion) -or $edgeBlocked)
 } else { Row 'program' 'Microsoft Edge' 'collected' 'facts from before #3896 carry none' $false }
 
 # ---- TLS -------------------------------------------------------------------

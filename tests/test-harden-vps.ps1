@@ -454,11 +454,15 @@ try {
     New-Item -ItemType Directory -Path (Split-Path $cfg5) -Force | Out-Null
     [IO.File]::WriteAllText($cfg5, $defaultCfg, $utf8)
     $r = Invoke-BoxHere $cfg5
-    Yes 'Edge still installed after its setup ran: exit 1, STOP with the exit code and where its log is' ($r.Code -eq 1 -and
-        (Has $r.Lines '^STOP Microsoft Edge 130\.0\.2849\.80 is still installed after its setup ran \(exit 93\)\. Its log is msedge_installer\.log'))
-    Yes '  the install policy kept, and nothing after it done: no update values, sshd_config as it was, no restart' ($global:Fake.reg.ContainsKey('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate|Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}') -and
-        (Reg '\WindowsUpdate\AU' 'AUOptions') -eq 7 -and [IO.File]::ReadAllText($cfg5) -eq $defaultCfg -and $global:Fake.restarts -eq 0 -and -not $global:Fake.rollback)
-    Yes '  and the last line says it stopped' ($r.Lines[-1] -match '^DONE \d+ change\(s\) made before it stopped\.$')
+    # Patrick, 27 Oct, q-3896-edge-uninstall-refused, A: Edge stays, blocked, and the run goes on.
+    Yes 'Edge still installed after its setup ran: KEPT with the exit code and where its log is, exit 0' ($r.Code -eq 0 -and
+        (Has $r.Lines '^KEPT Microsoft Edge 130\.0\.2849\.80 is still installed: its setup refused the uninstall \(exit 93; its log is msedge_installer\.log'))
+    Yes '  the install policy set, and the rest of the run done: the update values, sshd_config and its restart' ($global:Fake.reg.ContainsKey('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate|Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}') -and
+        (Reg '\WindowsUpdate\AU' 'AUOptions') -eq 4 -and [IO.File]::ReadAllText($cfg5) -match '(?m)^PasswordAuthentication no' -and $global:Fake.restarts -eq 1)
+    Yes '  and no CHANGED line for Edge, so it is not counted as gone' (-not (Has $r.Lines '^CHANGED Microsoft Edge') -and $r.Lines[-1] -match '^DONE \d+ change\(s\) made\.$')
+    $r2 = Invoke-BoxHere $cfg5
+    Yes '  run again: its setup asked once more, KEPT again, nothing else to change' ($r2.Code -eq 0 -and (Has $r2.Lines '^KEPT Microsoft Edge') -and $r2.Lines[-1] -eq 'DONE 0 change(s) made.' -and
+        @($global:Fake.log | Where-Object { $_ -match '^Remove-EdgeInstall' }).Count -eq 2)
 
     # ---- no Edge on the box --------------------------------------------------------------
     New-Fake
