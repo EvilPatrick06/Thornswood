@@ -86,8 +86,9 @@ function Done() { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to
 # RUNNER-DRIVE START. What the startup task runs, as SYSTEM: attach the file
 # when Windows has not, give its partition the letter back when it came up
 # without one (Get-Partition gives [char]0 for none, hence the [int]), then
-# start each runner service whose folder is on the drive. Written whole into the locked folder by step 5; tests\test-runner-drive.ps1
-# reads it from here.
+# start each runner service whose folder is on the drive. Written whole
+# into the locked folder by step 5; tests\test-runner-drive.ps1 reads it
+# from here.
 function Get-StartScript([string]$file, [string]$letter) {
   $f = $file.Replace("'", "''")
   return @"
