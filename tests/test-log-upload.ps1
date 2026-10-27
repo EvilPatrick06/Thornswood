@@ -298,24 +298,28 @@ console.log(f ? (f.level + '|' + f.why + '|' + f.line) : 'NONE');
   # a .NET error's path), and the voice log its file:// address. A made-up
   # account first, in every shape a log writes a path, then this machine's own.
   if ($T -and $have.ScrubFor) {
-    $prof = 'C:\Users\Alba Ros'
-    $S = { param($text) $T::ScrubFor($text, $prof, 'alba', 'DESKTOP-K9QX') }
-    $out = & $S 'OwnGame: Windows'' live plugins.txt differs from the Thornswood Vortex profile at C:\Users\Alba Ros\AppData\Roaming\Vortex\skyrimse\profiles\ZRT7NjhN_'
+    # Made up, and kept off C:\Users so the gate's own check for real profile
+    # accounts (test-3838-no-personal-details.js) has nothing to find here;
+    # the folder is passed in, so where it is changes nothing. tester and x
+    # are the names that check lets tests use under Users.
+    $prof = 'D:\Home\Tess Ro'
+    $S = { param($text) $T::ScrubFor($text, $prof, 'Tess Ro', 'DESKTOP-K9QX') }
+    $out = & $S 'OwnGame: Windows'' live plugins.txt differs from the Thornswood Vortex profile at D:\Home\Tess Ro\AppData\Roaming\Vortex\skyrimse\profiles\ZRT7NjhN_'
     Yes "the user folder is replaced, the rest of the path kept: $out" ($out -ceq 'OwnGame: Windows'' live plugins.txt differs from the Thornswood Vortex profile at %USERPROFILE%\AppData\Roaming\Vortex\skyrimse\profiles\ZRT7NjhN_')
-    Yes 'whatever case Windows wrote it in' ((& $S 'c:\users\ALBA ROS\Documents') -ceq '%USERPROFILE%\Documents')
-    Yes 'doubled, the way a JSON line writes it' ((& $S '"C:\\Users\\Alba Ros\\AppData\\x"') -ceq '"%USERPROFILE%\\AppData\\x"')
-    Yes 'as a file:// address, with %20 for the space' ((& $S 'page file:///C:/Users/Alba%20Ros/Thornswood/voice.html') -ceq 'page file:///%USERPROFILE%/Thornswood/voice.html')
-    Yes 'at the end of a sentence' ((& $S 'the folder is C:\Users\Alba Ros.') -ceq 'the folder is %USERPROFILE%.')
-    $out = & $S 'not C:\Users\Alba Rossi\x'
-    Yes "a longer name that starts the same is not cut short, and is taken out whole: $out" ($out -ceq 'not C:\Users\[user]\x')
-    $out = & $S 'other C:\Users\Bob\AppData\x and short C:\Users\ALBARO~1\x'
-    Yes "another account's folder and a short 8.3 name are taken out: $out" ($out -ceq 'other C:\Users\[user]\AppData\x and short C:\Users\[user]\x')
+    Yes 'whatever case Windows wrote it in' ((& $S 'd:\home\TESS RO\Documents') -ceq '%USERPROFILE%\Documents')
+    Yes 'doubled, the way a JSON line writes it' ((& $S '"D:\\Home\\Tess Ro\\AppData\\x"') -ceq '"%USERPROFILE%\\AppData\\x"')
+    Yes 'as a file:// address, with %20 for the space' ((& $S 'page file:///D:/Home/Tess%20Ro/Thornswood/voice.html') -ceq 'page file:///%USERPROFILE%/Thornswood/voice.html')
+    Yes 'at the end of a sentence' ((& $S 'the folder is D:\Home\Tess Ro.') -ceq 'the folder is %USERPROFILE%.')
+    $line = 'not D:\Home\Tess Rossi\x'
+    Yes 'a longer folder name that starts the same is not cut short' ((& $S $line) -ceq $line)
+    $out = & $S 'other C:\Users\tester\AppData\x and C:\Users\x y\z'
+    Yes "another account's folder under Users is taken out, spaces and all: $out" ($out -ceq 'other C:\Users\[user]\AppData\x and C:\Users\[user]\z')
     $line = 'public C:\Users\Public\Documents and default C:\Users\Default\x'
     Yes 'Public and Default, which belong to nobody, are left' ((& $S $line) -ceq $line)
-    Yes 'the account name as a folder elsewhere is taken out' ((& $S 'D:\Games\alba\Thornswood') -ceq 'D:\Games\[user]\Thornswood')
-    Yes 'and the name as an ordinary word is left' ((& $S 'alba said hello') -ceq 'alba said hello')
+    Yes 'the account name as a folder elsewhere is taken out' ((& $S 'D:\Games\Tess Ro\Thornswood') -ceq 'D:\Games\[user]\Thornswood')
+    Yes 'and the name as an ordinary word is left' ((& $S 'Tess Ro said hello') -ceq 'Tess Ro said hello')
     Yes 'the PC''s name is taken out as a word, and not out of a longer one' ((& $S 'on desktop-k9qx, not DESKTOP-K9QXY') -ceq 'on [pc], not DESKTOP-K9QXY')
-    $out = & $S 'C:\Users\Alba Ros\x with tk1.eyJkIjoiMTIzNDUiLCJuIjoiYSJ9.0123456789abcdef0123456789abcdef'
+    $out = & $S 'D:\Home\Tess Ro\x with tk1.eyJkIjoiMTIzNDUiLCJuIjoiYSJ9.0123456789abcdef0123456789abcdef'
     Yes "tokens still go in the same line: $out" ($out -ceq '%USERPROFILE%\x with tk1.[ticket removed]')
   }
   if ($T -and $have.Scrub) {

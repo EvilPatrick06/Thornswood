@@ -1071,7 +1071,7 @@ namespace Thornswood
             // This PC's user folder, however a log wrote it: with backslashes,
             // doubled in JSON, with forward slashes and %20 for a space in a
             // file:// address. Not when the next letter carries the name on,
-            // so C:\Users\Al is not taken out of C:\Users\Alba.
+            // so a folder named Al is not taken out of one named Alba.
             string[] parts = (profile ?? "").Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length >= 2)
             {
