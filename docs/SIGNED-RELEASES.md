@@ -292,14 +292,14 @@ The switch-over, the last step. It waits on three things, in this order:
    the hosted job on billing before any step ran.
 2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
    with this release.yml, then
-   `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`,
-   with `-f expected_sha=<commit>` added when the tag is not on main.
-   Without it `Resolve-ReleaseTag.ps1` refuses a tag whose commit is not on
-   main, and the run stops before it builds. A tag on main's own commit
-   needs no `expected_sha`. Pushing the tag starts the usual VPS build: let
-   it finish, never cancel it. Cancelling a VPS job during its checkout
-   leaves git lock files in that runner's workspace and every later job
-   there fails (#2751, 18 Oct). The hosted run then uploads into that one
+   `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`.
+   The pilot tag goes on a commit main has: `Resolve-ReleaseTag.ps1` refuses
+   a tag whose commit is not on main, with or without `expected_sha`, and
+   the run stops before it builds (#3890, Patrick, 27 Oct: a signed release
+   is never built from a commit off main). Pushing the tag starts the usual
+   VPS build: let it finish, never cancel it. Cancelling a VPS job during
+   its checkout leaves git lock files in that runner's workspace and every
+   later job there fails (#2751, 18 Oct). The hosted run then uploads into that one
    draft and writes its notes again for its own files.
    The hosted job's log says "building with MSBuild on a github-hosted
    runner", then the Azure sign in, then "signed by" the ThornswoodRelease
@@ -440,7 +440,7 @@ client runtime, which only phases C and D (section 5) close.
 | What else runs on that machine | The same four runners build every pull request: `BUILD_RUNNER` is `vps` (set 12 Oct, still so on 16 Oct, when the two latest build checks skipped the hosted job and ran on `thornswood-vps-2` and `-3`). A job can leave files for the next one (docs\RUNNER-ISOLATION.md, F4) | Nothing |
 | Where it is signed | On the shipping machine, at Ship, after a checksum check of bytes that machine did not build | Inside the build job, before the draft exists |
 | What the draft says | `SHA256SUMS` of the unsigned bytes. Measured: v1.2.4's draft lists `Thornswood.exe` as `8f8aefc7...`; main's feed serves 1.2.4 as `e079f4e4...`, Authenticode Valid. Nothing public ties the two. All 14 releases on GitHub, v0.0.0-ci-trial-20260926 to v1.2.4, are still drafts; none was published | `SHA256SUMS` of the signed bytes, the same hash the feed will name, checked by the `verify` job on a VPS runner |
-| Who can cause a ThornswoodRelease signature | The three people with Certificate Profile Signer (Patrick, Djinn, Four), each through their own `az login` | Those three, plus anyone who can push a `v` tag and start release.yml with `runner: hosted`. The repository has no tag rules (the rulesets API answered an empty list), the `release` environment allows `v*` tags with no required reviewer, and a tag push, or a manual run with `expected_sha`, builds a commit that is not on main |
+| Who can cause a ThornswoodRelease signature | The three people with Certificate Profile Signer (Patrick, Djinn, Four), each through their own `az login` | Those three, plus anyone who can push a `v` tag and start release.yml with `runner: hosted`. The repository has no tag rules (the rulesets API answered an empty list), the `release` environment allows `v*` tags with no required reviewer, and a tag on a commit that is not on main is refused by main's release.yml (#3890) but not by a branch's own copy of it, which a tag push on that branch runs (#3930) |
 | Signing left on people's machines | Every dev launcher (Build-Launcher signs it during a dev Ship; dev 1.2.4.5 reads Authenticode Valid) and every installer (`Package-Thornswood.ps1` signs the finished Setup) | The same. Only the main launcher's signature moves |
 | Packs, the client runtime, `version.json` | sha256 only | sha256 only. The signed manifest (phases B to D) is needed either way |
 

@@ -12,11 +12,18 @@
       $commit = Resolve-ThornswoodReleaseTag -Tag v1.2.3 -RepoDir . [-ExpectedSha <sha>] [-MainRef origin/main]
 
   The tag has to be named v<version>, exist as a tag (refs/tags, not a branch
-  or a SHA), and point at a commit. Then either that commit is -ExpectedSha
-  (a tag push passes its own GITHUB_SHA; a manual run may pass one), or, with
-  no -ExpectedSha, the commit is on -MainRef. Anything else throws, naming the
+  or a SHA), point at a commit, and that commit has to be on -MainRef. With
+  -ExpectedSha (a tag push passes its own GITHUB_SHA; a manual run may pass
+  one) the commit has to be that one as well. Anything else throws, naming the
   tag and why. Returns the full commit SHA. Reads git only; changes nothing.
   Works on Windows PowerShell 5.1 and PowerShell 7.
+
+  NO RELEASE IS BUILT FROM A COMMIT OFF MAIN (#3890). An expected SHA used to
+  stand in for the main check, and a tag push always passes one, so a v tag
+  pushed on a branch commit was built and signed without that commit ever
+  going through a pull request (two trial tags were, in September and
+  October). Patrick settled it on 27 Oct: never. The expected SHA now only
+  narrows which commit on main; it never lets a commit off main through.
 #>
 
 function Invoke-ThornswoodReleaseGit([string]$RepoDir, [string[]]$GitArgs) {
@@ -52,13 +59,12 @@ function Resolve-ThornswoodReleaseTag {
         if (-not $commit.StartsWith($ExpectedSha)) {
             throw ("Refused: tag {0} is commit {1}, not the expected {2}. Nothing was built." -f $Tag, $commit, $ExpectedSha)
         }
-        return $commit
     }
     $m = Invoke-ThornswoodReleaseGit $RepoDir @('rev-parse', '--verify', '--quiet', ($MainRef + '^{commit}'))
     if ($m.Code -ne 0) { throw "Refused: $MainRef is not in this checkout, so it cannot be told whether tag $Tag is on it. Nothing was built." }
     $a = Invoke-ThornswoodReleaseGit $RepoDir @('merge-base', '--is-ancestor', $commit, $MainRef)
     if ($a.Code -ne 0) {
-        throw ("Refused: tag {0} is commit {1}, which is not on {2}. Pass the commit as the expected SHA if that is meant. Nothing was built." -f $Tag, $commit, $MainRef)
+        throw ("Refused: tag {0} is commit {1}, which is not on {2}. A release is only built from a commit on main (#3890). Nothing was built." -f $Tag, $commit, $MainRef)
     }
     return $commit
 }

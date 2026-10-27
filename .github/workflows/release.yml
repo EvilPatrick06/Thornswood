@@ -115,7 +115,7 @@ on:
         description: The v<version> tag to build and draft a release for
         required: true
       expected_sha:
-        description: The commit the tag must be (optional; without it the tag's commit must be on main)
+        description: The commit the tag must be (optional; the tag's commit must be on main either way)
         required: false
         default: ''
       runner:
@@ -163,9 +163,10 @@ jobs:
       # off main could be built and labelled as a release. Now the workflow's
       # own commit is checked out with every tag and main, and
       # scripts/release/Resolve-ReleaseTag.ps1 says which commit the tag is:
-      # a real v<version> tag, and either the expected SHA (a tag push's own
-      # GITHUB_SHA, or the manual run's expected_sha) or a commit on main.
-      # Anything else stops the run before anything is built. The input
+      # a real v<version> tag on a commit on main, and the expected SHA when
+      # there is one (a tag push's own GITHUB_SHA, or the manual run's
+      # expected_sha). A commit off main is refused whatever the expected SHA
+      # (#3890). Anything else stops the run before anything is built. The input
       # reaches the script through env, never pasted into the script text.
       - name: Check out the workflow's commit, with every tag and main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

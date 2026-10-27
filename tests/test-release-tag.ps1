@@ -3,10 +3,10 @@
 #     pwsh -NoProfile -File .\tests\test-release-tag.ps1
 #     powershell -NoProfile -File .\tests\test-release-tag.ps1
 #
-# The launcher release builds only a real v<version> tag on the commit meant
-# (#2202). Resolve-ThornswoodReleaseTag (scripts\release\Resolve-ReleaseTag.ps1)
-# is run against a scratch git repository with a main, tags on and off it, a
-# branch and a SHA. Then .github\workflows\release.yml is read for where it
+# The launcher release builds only a real v<version> tag on the commit meant,
+# and only on main (#2202, #3890). Resolve-ThornswoodReleaseTag
+# (scripts\release\Resolve-ReleaseTag.ps1) is run against a scratch git
+# repository with a main, tags on and off it, a branch and a SHA. Then .github\workflows\release.yml is read for where it
 # asks. Offline: nothing is fetched, built or released.
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -47,8 +47,15 @@ try {
     Yes 'refs/tags/ in front is accepted' ((Resolve-ThornswoodReleaseTag -Tag refs/tags/v1.1.0 -RepoDir $src -MainRef main) -eq $two)
     $why = Refusal { Resolve-ThornswoodReleaseTag -Tag v9.9.9 -RepoDir $src -MainRef main }
     Yes 'a tag off main is refused, naming the tag, the commit and main' ($why -match '^Refused: tag v9\.9\.9 is commit' -and $why.Contains($side) -and $why -match 'not on main')
-    Yes '  unless its commit is the expected SHA' ((Resolve-ThornswoodReleaseTag -Tag v9.9.9 -RepoDir $src -ExpectedSha $side -MainRef main) -eq $side)
-    Yes '  and a short expected SHA works too' ((Resolve-ThornswoodReleaseTag -Tag v9.9.9 -RepoDir $src -ExpectedSha $side.Substring(0, 10) -MainRef main) -eq $side)
+    # #3890 (Patrick, 27 Oct: never): the expected SHA is not a way past main.
+    # A tag push always passes its own SHA, so this is a v tag pushed on a
+    # branch commit, which used to be built and signed.
+    $why = Refusal { Resolve-ThornswoodReleaseTag -Tag v9.9.9 -RepoDir $src -ExpectedSha $side -MainRef main }
+    Yes '  even when its commit is the expected SHA (a tag pushed on a branch)' ($why -match '^Refused: tag v9\.9\.9 is commit' -and $why.Contains($side) -and $why -match 'not on main' -and $why.Contains('#3890'))
+    Yes '  and with a short expected SHA too' ((Refusal { Resolve-ThornswoodReleaseTag -Tag v9.9.9 -RepoDir $src -ExpectedSha $side.Substring(0, 10) -MainRef main }) -match 'not on main')
+    Yes '  and the refusal no longer offers the expected SHA as the way round' (-not $why.Contains('Pass the commit as the expected SHA'))
+    Yes '  and a short expected SHA on main still passes' ((Resolve-ThornswoodReleaseTag -Tag v1.1.0 -RepoDir $src -ExpectedSha $two.Substring(0, 10) -MainRef main) -eq $two)
+    Yes '  and an expected SHA with no main to check against is refused, not let by' ((Refusal { Resolve-ThornswoodReleaseTag -Tag v1.1.0 -RepoDir $src -ExpectedSha $two -MainRef origin/main }) -match 'origin/main is not in this checkout')
     $why = Refusal { Resolve-ThornswoodReleaseTag -Tag v1.1.0 -RepoDir $src -ExpectedSha $one -MainRef main }
     Yes 'a tag that is not the expected SHA is refused, even on main' ($why -match 'not the expected' -and $why.Contains($two))
     Yes 'a tag push: its own SHA is the expected one and passes' ((Resolve-ThornswoodReleaseTag -Tag v1.1.0 -RepoDir $src -ExpectedSha $two -MainRef main) -eq $two)
@@ -70,6 +77,7 @@ $ask = $wf.IndexOf('Resolve-ThornswoodReleaseTag -Tag $tag')
 $build = $wf.IndexOf('.\scripts\release\Build-Launcher.ps1 -Root')
 Yes 'release.yml checks out its own commit with every tag and main (fetch-depth 0), not the input' ($co -gt 0 -and $wf.Contains('fetch-depth: 0') -and -not $wf.Contains('ref: ${{ github.event.inputs.tag'))
 Yes '  asks Resolve-ThornswoodReleaseTag after that and before the build' ($ask -gt $co -and $build -gt $ask)
+Yes '  the expected_sha input says the tag''s commit must be on main either way (#3890)' ($wf.Contains("the tag's commit must be on main either way") -and -not $wf.Contains('without it the tag''s commit must be on main'))
 Yes '  a manual run takes the tag and expected_sha through env, a tag push its own ref and SHA' ($wf.Contains('INPUT_SHA: ${{ github.event.inputs.expected_sha }}') -and $wf.Contains('$expected = $env:GITHUB_SHA') -and $wf.Contains('expected_sha:'))
 Yes '  stops the run on a refusal and checks out exactly the commit it settled' ($wf.Contains("catch { Write-Host ('::error::' + `$_.Exception.Message); exit 1 }") -and $wf.Contains('git checkout --force --detach $commit') -and $wf.Contains('if ($head -ne $commit)'))
 Yes '  and drafts the release against that commit, not the run''s SHA' ($wf.Contains('target_commitish = $env:RELEASE_COMMIT') -and -not $wf.Contains('target_commitish = $env:GITHUB_SHA') -and $wf.Contains('RELEASE_COMMIT: ${{ steps.tag.outputs.commit }}'))

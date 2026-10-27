@@ -100,7 +100,8 @@
   already running takes the line at its next start. What it does not do: a
   v tag pushed on a commit that is not on main runs that commit's copy of
   the workflow on a refs/tags/v ref, and the hook lets it through, since
-  nothing it can read says whether a commit is on main (#3890).
+  nothing it can read says whether a commit is on main. Main's release.yml
+  refuses such a tag (#3890); a branch's own copy need not (#3930).
 
   WHAT A PULL REQUEST JOB MAY REACH (-OffBox, or -NetworkOnly for the network
   alone). Two guards, put on by the
