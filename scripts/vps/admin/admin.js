@@ -11,8 +11,8 @@
   right, its key lives here and nowhere else, and this is the only thing
   that uses it.
 
-  WHAT IT DOES. It makes GitHub's admin settings match what main records, and
-  nothing else:
+  WHAT IT DOES. It makes GitHub's admin settings match what main records, or
+  says where the App is installed, and nothing else:
     runner-labels   every records/<name>-runners.json on main, { label,
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
@@ -20,6 +20,11 @@
                     (#2994). It stops for a record whose runners GitHub does
                     not have, since every job asking for its label would
                     then wait for a runner that never comes.
+    installation-repos
+                    the repositories the App is installed on, read with a
+                    token that can read their metadata and nothing more, and
+                    nothing changed (#4013: the App has to be on
+                    Thornswood-Ops before the runners move there).
   What to do comes from main, read through the App, never from the caller,
   so whoever asks can only make GitHub match main. A change is a pull
   request to the record.
@@ -92,6 +97,9 @@ const RULES = {
 };
 // The labels every VPS runner carries, or GitHub gives itself; a record may
 // never name one, since taking it off would strand every job that asks.
+// What a run may ask for. Neither takes anything from the caller but the
+// check.
+const ASKS = ['runner-labels', 'installation-repos'];
 const RESERVED = ['self-hosted', 'windows', 'linux', 'macos', 'x64', 'arm64', 'thornswood-vps', 'thornswood-pr'];
 
 // Server-Log.js --stamp puts the time on each line, as it does for the bridge.
@@ -229,16 +237,21 @@ function readApp() {
   return { pem: fs.readFileSync(keyPath, 'utf8'), app: JSON.parse(fs.readFileSync(appPath, 'utf8')) };
 }
 
-// A token for this repository only, with only what runner-labels needs, for
-// the hour GitHub gives it; nothing keeps it after the request.
-async function installationToken(held, now) {
+// A token for the hour GitHub gives it, with only what the ask needs, and
+// nothing keeps it after the request: for runner-labels this repository
+// alone, administration write and contents read; for installation-repos the
+// metadata of the repositories the installation holds, read only, which is
+// all GitHub needs to list them.
+async function installationToken(held, now, what) {
   const jwt = appJwt(held.app.id, held.pem, now);
   const auth = { Authorization: 'Bearer ' + jwt };
   const inst = await call('GET', API + '/repos/' + REPO + '/installation', auth);
   if (inst.status === 404) throw new Error('the App is not installed on ' + REPO + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
   if (inst.status !== 200) throw new Error('GitHub would not say where the App is installed (' + said(inst) + ')');
-  const tok = await call('POST', API + '/app/installations/' + inst.body.id + '/access_tokens', auth,
-    { repositories: [REPO.split('/')[1]], permissions: { administration: 'write', contents: 'read' } });
+  const scope = what === 'installation-repos'
+    ? { permissions: { metadata: 'read' } }
+    : { repositories: [REPO.split('/')[1]], permissions: { administration: 'write', contents: 'read' } };
+  const tok = await call('POST', API + '/app/installations/' + inst.body.id + '/access_tokens', auth, scope);
   if (tok.status !== 201) throw new Error('GitHub gave the App no token (' + said(tok) + ')');
   return tok.body.token;
 }
@@ -303,6 +316,16 @@ async function runnerLabels(token, check) {
     }
   }
   return { ok, lines, changed, differs };
+}
+
+// The repositories the App's installation holds, and nothing changed.
+// { ok, lines, repos }.
+async function installationRepos(token) {
+  const a = await call('GET', API + '/installation/repositories?per_page=100', { Authorization: 'Bearer ' + token });
+  if (a.status !== 200 || !a.body || !Array.isArray(a.body.repositories)) throw new Error('GitHub would not list the App\'s repositories (' + said(a) + ')');
+  const repos = a.body.repositories.map(r => String(r.full_name)).sort();
+  const lines = repos.length ? repos.map(r => 'installed on ' + r) : ['installed on no repository'];
+  return { ok: true, lines, repos };
 }
 
 // ------------------------------------------------------------------- setup --
@@ -410,12 +433,19 @@ async function converge(req, res, now) {
   }
   let ask;
   try { ask = JSON.parse((await readBody(req, 4096)) || '{}'); } catch (e) { ask = null; }
-  if (!ask || ask.what !== 'runner-labels') { json(res, 400, { ok: false, lines: ['the only thing this does is runner-labels'] }); return; }
+  if (!ask || !ASKS.includes(ask.what)) { json(res, 400, { ok: false, lines: ['the only things this does are ' + ASKS.join(' and ')] }); return; }
   const run = claims.run_id + ' (' + claims.event_name + ' by ' + claims.actor + ')';
   const held = readApp();
   if (!held) { log('run ' + run + ': no App yet'); json(res, 503, { ok: false, lines: ['there is no App here yet: Install-AdminService.ps1 -Setup makes it'] }); return; }
   try {
-    const token = await installationToken(held, now);
+    const token = await installationToken(held, now, ask.what);
+    if (ask.what === 'installation-repos') {
+      const r = await installationRepos(token);
+      log('run ' + run + ': installation-repos, ' + r.repos.length + ' repositor' + (r.repos.length === 1 ? 'y' : 'ies'));
+      for (const l of r.lines) log('  ' + l);
+      json(res, 200, r);
+      return;
+    }
     const r = await runnerLabels(token, !!ask.check);
     log('run ' + run + ': runner-labels' + (ask.check ? ' check' : '') + ', ' + r.changed + ' changed, ' + (r.ok ? 'ok' : 'stopped'));
     for (const l of r.lines) log('  ' + l);
@@ -447,5 +477,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planLabels, checkRecords, runnerNumber, manifest, RULES, serve };
+module.exports = { verifyOidc, appJwt, planLabels, checkRecords, runnerNumber, manifest, RULES, ASKS, serve };
 if (require.main === module) serve();
