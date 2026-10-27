@@ -11,10 +11,14 @@ function yes(what, condition) {
 }
 const src = fs.readFileSync(path.join(APP, 'server.js'), 'utf8');
 const policy = src.match(/const CSP_HEADER = ("[^"\r\n]*");/);
+// Permissions-Policy (#2762): the value is checked against the Caddyfile's in
+// test-2762-door-headers.js; here, that every answer carries it once.
+const perms = src.match(/const PERMISSIONS_POLICY = '([^'\r\n]*)';/);
 const G = {
  'X-Content-Type-Options': 'nosniff',
  'X-Frame-Options': 'SAMEORIGIN',
  'Referrer-Policy': 'strict-origin-when-cross-origin',
+ 'Permissions-Policy': perms ? perms[1] : 'PERMISSIONS_POLICY is not in server.js',
  'Content-Security-Policy': policy ? JSON.parse(policy[1]) : ''
 };
 yes('the current CSP still refuses inline script and styling', !!policy && !G['Content-Security-Policy'].includes('unsafe-inline'));
@@ -69,7 +73,7 @@ function guarded(what, r) {
     for (let i = 0; i < r.raw.length; i += 2) { if (String(r.raw[i]).toLowerCase() === low) { seen++; } }
     if (seen !== 1) { twice.push(name + ' x' + seen); }
   });
-  yes(what + ' carries all four guard headers, once each' +
+  yes(what + ' carries all five guard headers, once each' +
       (missing.length ? ', missing or wrong: ' + missing.join(', ') : '') +
       (twice.length ? ', not once: ' + twice.join(', ') : ''),
       missing.length === 0 && twice.length === 0);

@@ -396,8 +396,12 @@ archived it after a week with nothing said. Every hour the bot asks Discord
 for the closed private threads in each `TICKET_CHANNEL` channel and deletes
 those it opened that closed more than a year ago, one `closed tickets:` line
 in bot.log each. Threads a Gamemaster opened there by hand are never touched.
-The `#tickets` line for a deleted ticket keeps its name, and its link stops
-working.
+The bot's own messages in the `TICKET_LOG` channels (`#ticket-log`, and an old
+`#tickets`) go the same way, 365 days after each was posted (#3634): a whole
+ticket that went there because its thread would not open, and the Closed line
+written at each close, which names the thread and so the person who opened
+it. The Closed line goes a year after that close, with the thread it points
+at. One `ticket log:` line in bot.log says how many went from each channel.
 
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes

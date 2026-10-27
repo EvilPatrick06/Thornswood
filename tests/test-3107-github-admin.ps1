@@ -18,19 +18,21 @@
        not a build runner, with a timeout; no environment and no secret; no
        token kept by the checkout, every file written again after it
        (#3029); main's Set-BuildRunners.ps1 -OnGitHub under pwsh with no
-       profile, nothing pasted into its script.
+       profile, nothing pasted into its script; an ask input that is
+       runner-labels or installation-repos, runner-labels on a push.
     2. Set-BuildRunners.ps1 -OnGitHub, against a stand-in for GitHub's token
        service and the admin service: it asks for this run's token for the
        audience thornswood-admin, hands it to 127.0.0.1:7791 with nothing
        but runner-labels and the check, and writes the answer (MATCHES,
        CHANGED <n>, DIFFERS <n>) as an annotation titled Set-BuildRunners
-       with the service's lines; a refusal, a stop, or an answer that is not
-       the service's is an error; with no OIDC token to ask for it asks
-       nothing.
+       with the service's lines; installation-repos (#4013) asks for that
+       alone and answers REPOS <n>; an ask it does not know asks nothing; a
+       refusal, a stop, or an answer that is not the service's is an error;
+       with no OIDC token to ask for it asks nothing.
     3. Set-BuildRunners.ps1 in a session, against a stand-in for gh: it
        starts github-admin.yml on main with the check, reads the runner's
-       annotation and exits 0, 1 or 2 by it, and -Run reads a run's answer
-       later.
+       annotation and exits 0, 1 or 2 by it, -AppRepos starts it with
+       installation-repos, and -Run reads a run's answer later.
     4. Install-AdminService.ps1: it parses, and every script it sends parses
        once built; a commit or nothing; LOCAL SERVICE with its own SID,
        granted its folder and its state folder, after the fail-safe; the
@@ -100,11 +102,13 @@ $run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes '  running main''s Set-BuildRunners.ps1 -OnGitHub' ($run -match "scripts/deploy/Set-BuildRunners\.ps1'\) -OnGitHub")
 Yes '  with nothing pasted into its script' ($run -notmatch '\$\{\{')
 Yes '  and the check through the environment' ($step.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
+Yes 'by hand with an ask input: runner-labels or installation-repos, runner-labels by default' ($on -match '(?ms)ask:\n\s+description:[^\n]*\n\s+type: choice\n\s+options:\n\s+- runner-labels\n\s+- installation-repos\n\s+default: runner-labels')
+Yes '  through the environment too, runner-labels on a push' ($step.Contains("ADMIN_ASK: `${{ inputs.ask || 'runner-labels' }}"))
 # The About box (#3682): its own step after the runner labels, run whatever
 # they answered, the same way.
 $about = [regex]::Match($code, '(?ms)- name: Match the About box\n(.*?)(?=\n      - name: |\z)').Groups[1].Value
 Yes 'the About box has a step of its own' ($about -ne '')
-Yes '  that runs whatever the runner labels answered' ($about -match '(?m)^\s+if: \$\{\{ !cancelled\(\) \}\}$')
+Yes '  that runs whatever the runner labels answered, but not for installation-repos' ($about -match '(?m)^\s+if: \$\{\{ !cancelled\(\) && inputs\.ask != ''installation-repos'' \}\}$')
 Yes '  under pwsh with no profile' ($about -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
 $aboutRun = [regex]::Match($about, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes '  running main''s Set-RepoAbout.ps1 -OnGitHub, nothing pasted in' ($aboutRun -match "scripts/deploy/Set-RepoAbout\.ps1'\) -OnGitHub" -and $aboutRun -notmatch '\$\{\{')
@@ -127,7 +131,7 @@ function OnGitHub([hashtable]$envs, [hashtable]$state) {
     foreach ($k in $state.Keys) { $base[$k] = $state[$k] }
     $global:TSadmin = $base
     $global:TScalls = @()
-    $all = @{ GITHUB_ACTIONS = 'true'; ACTIONS_ID_TOKEN_REQUEST_URL = 'https://token.test/idtoken?api-version=2.0'; ACTIONS_ID_TOKEN_REQUEST_TOKEN = 'request-token'; ADMIN_CHECK = 'false'; THORNSWOOD_ADMIN_PORT = '' }
+    $all = @{ GITHUB_ACTIONS = 'true'; ACTIONS_ID_TOKEN_REQUEST_URL = 'https://token.test/idtoken?api-version=2.0'; ACTIONS_ID_TOKEN_REQUEST_TOKEN = 'request-token'; ADMIN_CHECK = 'false'; ADMIN_ASK = ''; THORNSWOOD_ADMIN_PORT = '' }
     foreach ($k in $envs.Keys) { $all[$k] = $envs[$k] }
     $was = @{}
     foreach ($k in $all.Keys) { $was[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $all[$k]) }
@@ -151,6 +155,13 @@ $r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/sign-runners.json: 
 Yes 'labels put right: exit 0, CHANGED 1 with the lines' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::CHANGED 1%0Arecords/sign-runners\.json: thornswood-vps-3, thornswood-sign put on')
 $r = OnGitHub @{ ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["x would have y put on"],"changed":0,"differs":2}' }
 Yes 'a check that differs: exit 0, DIFFERS 2, and the check reached the service' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::DIFFERS 2' -and $r.Calls[1].Body.check -eq $true)
+$r = OnGitHub @{ ADMIN_ASK = 'runner-labels' } @{}
+Yes 'asking for runner-labels by name is the same' ($r.Code -eq 0 -and $r.Calls[1].Body.what -eq 'runner-labels' -and $r.Out -match 'Set-BuildRunners::MATCHES')
+$r = OnGitHub @{ ADMIN_ASK = 'installation-repos'; ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["installed on EvilPatrick06/Thornswood","installed on EvilPatrick06/Thornswood-Ops"],"repos":["EvilPatrick06/Thornswood","EvilPatrick06/Thornswood-Ops"]}' }
+Yes 'installation-repos: exit 0, REPOS 2 with a line for each' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::REPOS 2%0Ainstalled on EvilPatrick06/Thornswood%0Ainstalled on EvilPatrick06/Thornswood-Ops')
+Yes '  asking for that and nothing else' ($r.Calls[1].Body.what -eq 'installation-repos' -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 1)
+$r = OnGitHub @{ ADMIN_ASK = 'secrets' } @{}
+Yes 'an ask it does not know: exit 1, nothing asked' ($r.Code -eq 1 -and $r.Calls.Count -eq 0 -and $r.Out -match 'neither runner-labels nor installation-repos')
 $r = OnGitHub @{} @{ code = 409; content = '{"ok":false,"lines":["STOP no runner records/sign-runners.json lists is registered on GitHub"],"changed":0,"differs":0}' }
 Yes 'the service stopping: exit 1, an error with its lines' ($r.Code -eq 1 -and $r.Out -match '::error title=Set-BuildRunners::the box''s admin service said no \(HTTP 409\)%0ASTOP no runner')
 $r = OnGitHub @{} @{ code = 403; content = '{"ok":false,"lines":["refused: the token is from the workflow x"]}' }
@@ -196,6 +207,9 @@ function Note([string]$level, [string]$message) { return @{ annotation_level = $
 $s = Session @{} $done @((Note 'notice' "CHANGED 1`nrecords/sign-runners.json: thornswood-vps-3, thornswood-sign put on"))
 Yes ("it starts github-admin.yml on main and says GitHub matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/Thornswood/actions/workflows/github-admin\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Out -match '1 label\(s\) changed')
 Yes '  with check false, and the service''s lines' ($s.Body.inputs.check -eq 'false' -and $s.Out -match 'thornswood-sign put on')
+Yes '  asking for runner-labels' ($s.Body.inputs.ask -eq 'runner-labels')
+$s = Session @{ AppRepos = $true } $done @((Note 'notice' "REPOS 2`ninstalled on EvilPatrick06/Thornswood`ninstalled on EvilPatrick06/Thornswood-Ops"))
+Yes '-AppRepos asks for installation-repos and says where the App is, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.ask -eq 'installation-repos' -and $s.Out -match 'installed on EvilPatrick06/Thornswood-Ops' -and $s.Out -match 'installed on 2 repositories')
 $s = Session @{ Check = $true } $done @((Note 'notice' "DIFFERS 2`nx would have y put on"))
 Yes '-Check that differs: check true, exit 1' ($s.Code -eq 1 -and $s.Body.inputs.check -eq 'true' -and $s.Out -match 'differs from main''s runner records in 2')
 $s = Session @{ Check = $true } $done @((Note 'notice' "MATCHES`nrecords/build-runners.json: GitHub matches it"))

@@ -9,6 +9,7 @@
 
       .\scripts\mods\Send-GameArchives.ps1
       .\scripts\mods\Send-GameArchives.ps1 -Data 'D:\Steam\steamapps\common\Skyrim Special Edition\Data'
+      .\scripts\mods\Send-GameArchives.ps1 -ScriptPack <folder>\papyrus-scripts.zip
       .\scripts\mods\Send-GameArchives.ps1 -Check
 
   WHY. Patrick, 20 Oct 2026, A on #2899 (his page answer): "All needed
@@ -33,6 +34,15 @@
   other file of a mod's. A file the box already holds with those bytes is
   not sent again.
 
+  THE SCRIPT PACK (#3105). Every Papyrus script of the game's Data folder,
+  which scripts\mods\New-ScriptPack.py packs and records\papyrus-scripts.json
+  pins by size and sha256: the crime table reads every script of the load
+  order, and no archive that carries one is on the box (on 26 Oct the whole
+  rebuild stopped there with 14,553 scripts missing). -ScriptPack names the
+  pack on this machine; it goes when the box lacks those bytes, and the run
+  stops when the box lacks them and -ScriptPack names no pack, or a pack
+  that is not the recorded one.
+
   ON THE BOX. C:\Thornswood-GameData is made locked (SYSTEM's and
   Administrators' only, Lock-Folder.ps1 -Only) and nothing serves it. Each
   file arrives as .incoming-<name> at the top of the folder, is hashed there,
@@ -48,6 +58,8 @@
 param(
     # The game's Data folder on this machine.
     [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+    # The script pack New-ScriptPack.py made, when the box needs it.
+    [string]$ScriptPack = '',
     [switch]$Check,
     [string]$VpsHost = '',
     [string]$VpsUser = ''
@@ -80,18 +92,29 @@ $want = [ordered]@{}
 foreach ($n in $ThornswoodGameArchives) {
     $r = $record.files.('Data\' + $n)
     if (-not $r -or -not $r.sha1 -or -not $r.bytes) { throw "records\skyrim-files.json has no size and sha1 for Data\$n. Nothing was sent." }
-    $want[$n] = [pscustomobject]@{ Bytes = [long]$r.bytes; Algo = 'sha1'; Hash = ([string]$r.sha1).ToLowerInvariant() }
+    $want[$n] = [pscustomobject]@{ Bytes = [long]$r.bytes; Algo = 'sha1'; Hash = ([string]$r.sha1).ToLowerInvariant(); From = (Join-Path $Data $n) }
 }
 $strings = Get-Content -LiteralPath (Join-Path $Here '..\..\records\game-strings.json') -Raw | ConvertFrom-Json
 foreach ($e in $strings.files.PSObject.Properties) {
     if ($e.Name -notmatch '^Strings\\[^\\/:*?"<>|]+$' -or -not $e.Value.sha256 -or -not $e.Value.bytes) { throw "records\game-strings.json names $($e.Name) without a size and sha256, or outside Strings. Nothing was sent." }
-    $want[$e.Name] = [pscustomobject]@{ Bytes = [long]$e.Value.bytes; Algo = 'sha256'; Hash = ([string]$e.Value.sha256).ToLowerInvariant() }
+    $want[$e.Name] = [pscustomobject]@{ Bytes = [long]$e.Value.bytes; Algo = 'sha256'; Hash = ([string]$e.Value.sha256).ToLowerInvariant(); From = (Join-Path $Data $e.Name) }
+}
+$packRecord = Join-Path $Here '..\..\records\papyrus-scripts.json'
+if (Test-Path -LiteralPath $packRecord) {
+    $pr = Get-Content -LiteralPath $packRecord -Raw | ConvertFrom-Json
+    if ($pr.file -ne $ThornswoodScriptPack -or -not $pr.sha256 -or -not $pr.bytes) { throw "records\papyrus-scripts.json does not name $ThornswoodScriptPack with a size and sha256. Nothing was sent." }
+    $want[$ThornswoodScriptPack] = [pscustomobject]@{ Bytes = [long]$pr.bytes; Algo = 'sha256'; Hash = ([string]$pr.sha256).ToLowerInvariant(); From = $ScriptPack }
+} elseif ($ScriptPack) {
+    throw 'records\papyrus-scripts.json is not there, so the pack has no recorded bytes to be held to. Commit the record New-ScriptPack.py wrote beside the pack first. Nothing was sent.'
 }
 
 Say "Here, in $Data" 'Cyan'
 $bad = @()
 foreach ($n in $want.Keys) {
-    $p = Join-Path $Data $n
+    $p = $want[$n].From
+    # The pack is checked here only when -ScriptPack names it; when the box
+    # lacks it and nothing names it, the run stops below.
+    if (-not $p) { continue }
     if (-not (Test-Path -LiteralPath $p)) { $bad += "$n is not there"; continue }
     $len = (Get-Item -LiteralPath $p).Length
     if ($len -ne $want[$n].Bytes) { $bad += ("$n is {0:N0} bytes, the record says {1:N0}" -f $len, $want[$n].Bytes); continue }
@@ -101,7 +124,7 @@ foreach ($n in $want.Keys) {
 }
 if ($bad.Count) {
     foreach ($b in $bad) { Say "  STOP  $b" 'Red' }
-    throw ('These are not the files records\skyrim-files.json and records\game-strings.json name, so nothing was sent. Point -Data at the game''s own Data folder.')
+    throw ('These are not the files records\skyrim-files.json, records\game-strings.json and records\papyrus-scripts.json name, so nothing was sent. Point -Data at the game''s own Data folder, and -ScriptPack at the pack New-ScriptPack.py made.')
 }
 
 # -------------------------------------------------------------- the box ---
@@ -133,6 +156,9 @@ if (($has.Count + $needs.Count) -ne $want.Count) { throw ('the box did not answe
 foreach ($n in $has) { Say "  has   $n" }
 foreach ($n in $needs) { Say "  needs $n" 'Yellow' }
 if ($Check) { Say ''; Say '-Check, so nothing was sent.'; exit 0 }
+if (($needs -contains $ThornswoodScriptPack) -and -not $want[$ThornswoodScriptPack].From) {
+    throw ("the box needs $ThornswoodScriptPack and -ScriptPack names no pack. Make it with: python scripts\mods\New-ScriptPack.py --out <folder>, then run this with -ScriptPack <folder>\$ThornswoodScriptPack. Nothing was sent.")
+}
 if (-not $needs.Count) { Say ''; Say 'The box already holds every file, so nothing was sent.' 'Green'; exit 0 }
 
 $storeFar = $store.Replace('\', '/')
@@ -140,7 +166,7 @@ foreach ($n in $needs) {
     Say ''
     Say ("sending {0}, {1:N0} bytes" -f $n, $want[$n].Bytes)
     $incoming = '.incoming-' + (Split-Path -Leaf $n)
-    Send-ThornswoodArtifactFile (Join-Path $Data $n) $target $ssh ($storeFar + '/' + $incoming)
+    Send-ThornswoodArtifactFile $want[$n].From $target $ssh ($storeFar + '/' + $incoming)
     $place = @"
 `$ErrorActionPreference = 'Stop'
 $(Get-ThornswoodArchiveReadOnlyScript)
