@@ -159,6 +159,11 @@ async function start(env) {
   srv.stdout.on('data', (d) => { s.log += d; });
   srv.stderr.on('data', (d) => { s.log += d; });
   await listening(srv, port);
+  // The pages below are in the world, since only they hold a voice place
+  // and are sent a roster (#3570): the gamemode's position feed, stood in for.
+  const body = JSON.stringify({ who: [41, 42, 43].map((pid) => ({ profileId: pid, pos: [0, 0, 0], angleZ: 0, cell: 'a room' })) });
+  const fed = await fetch('http://127.0.0.1:' + port + '/positions', { method: 'POST', body: body });
+  if (fed.status !== 204) throw new Error('/positions answered ' + fed.status);
   return s;
 }
 /* Stopped, and resolved once its output has all been read ('close', not
