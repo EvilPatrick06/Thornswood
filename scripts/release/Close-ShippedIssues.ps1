@@ -26,12 +26,27 @@
   is closed as completed, in that order, because the bot posts a test task
   when its issue closes after the comment.
 
+  MOVED TO DONE BY HAND (#3411). A fix that spans several pull requests, a
+  pin or a box change has no single "Test task for #N" pull request, so
+  whoever moves its issue to Done by hand writes the line done-on-merge would
+  have written, as a comment of its own, from any author:
+
+      Fixed by <merge commit> (pull request #N).
+
+  then either the test task in a fenced block, as done-on-merge writes it, or
+  the line "No test task: nobody would notice this fix." This reads that line
+  as it reads done-on-merge's comment, and the newer of the two stands: when
+  the shipped commit contains the merge it names, the issue is closed with
+  its test task, or with no comment when it has none. The board review of 25
+  Oct 2026 (#3192) found 26 of the 36 open issues in Done moved by hand, none
+  of which a main Ship could close.
+
   WHAT STAYS OPEN, each said by number:
     - an issue whose merge the shipped commit does not contain: its fix is not
       on the main server yet, so the next main Ship that carries it closes it;
-    - an issue in Done with no done-on-merge comment: nothing says which merge
-      finishes it, so this cannot tell whether the release carries it, and
-      whoever moved it there closes it.
+    - an issue in Done with neither a done-on-merge comment nor a "Fixed by"
+      line: nothing says which merge finishes it, so this cannot tell whether
+      the release carries it, and whoever moved it there closes it.
 
   DEV AND MAIN. A test task is Main, for any playtester, or Dev, with
   "Server: Dev" under its first line, for what only a developer can check;
@@ -110,6 +125,10 @@ $Footer = '_Done on merge, .github/workflows/done-on-merge.yml_'
 $MergedLine = '^Pull request #(\d+) merged \(([0-9a-fA-F]{7,40})\)'
 $Robot = 'github-actions[bot]'
 $TaskMark = '^\s*test task\s*:'
+# The line a person writes for an issue moved to Done by hand (#3411), first
+# in its comment, and the line that says the fix needs no test task.
+$HandLine = '^Fixed by ([0-9a-fA-F]{7,40}) \(pull request #(\d+)\)\.'
+$NoTaskLine = '(?m)^No test task: nobody would notice this fix\.\s*$'
 # Dev when "Server: Dev" is the line under the title, as the bot reads it.
 function Kind-Of([string[]]$Lines) {
     if ($Lines.Count -gt 1 -and $Lines[1] -match '^\s*server\s*:\s*dev\s*$') { return 'Dev' }
@@ -214,22 +233,33 @@ foreach ($card in $done) {
     try { $comments = @(Get-Comments $n) }
     catch { Say "  #${n}: $($_.Exception.Message)" 'Red'; $trouble.Add("#$n"); continue }
 
-    $mark = -1
+    # The newest of done-on-merge's comment and a person's "Fixed by" line.
+    $mark = -1; $byHand = $false
     for ($i = $comments.Count - 1; $i -ge 0; $i--) {
         $c = $comments[$i]
         $body = ([string]$c.body) -replace "`r`n", "`n"
         if ([string]$c.user.login -eq $Robot -and $body.Contains($Footer) -and $body -match $MergedLine) { $mark = $i; break }
+        if ($body.TrimStart() -match $HandLine) { $mark = $i; $byHand = $true; break }
     }
     if ($mark -lt 0) { $noTask.Add("#$n"); continue }
 
     $body = ([string]$comments[$mark].body) -replace "`r`n", "`n"
-    $m = [regex]::Match($body, $MergedLine)
-    $pr = $m.Groups[1].Value
-    $merge = $m.Groups[2].Value
+    if ($byHand) {
+        $m = [regex]::Match($body.TrimStart(), $HandLine)
+        $merge = $m.Groups[1].Value
+        $pr = $m.Groups[2].Value
+        $whose = "the Fixed by line naming pull request #$pr"
+    } else {
+        $m = [regex]::Match($body, $MergedLine)
+        $pr = $m.Groups[1].Value
+        $merge = $m.Groups[2].Value
+        $whose = "the done-on-merge comment for pull request #$pr"
+    }
     $fence = [regex]::Match($body, '(?ms)^```\n(.*?)\n```\s*$')
     $task = if ($fence.Success) { $fence.Groups[1].Value.Trim() } else { '' }
-    if ($task -notmatch $TaskMark) {
-        Say "  #${n}: the done-on-merge comment for pull request #$pr holds no Test task: block, so there is nothing to close it with" 'Red'
+    $none = $byHand -and $task -notmatch $TaskMark -and $body -match $NoTaskLine
+    if ($task -notmatch $TaskMark -and -not $none) {
+        Say "  #${n}: $whose holds no Test task: block and does not say it needs none, so there is nothing to close it with" 'Red'
         $trouble.Add("#$n"); continue
     }
 
@@ -238,7 +268,7 @@ foreach ($card in $done) {
     # last one of each kind. One of the other kind changes nothing here.
     $kind = Kind-Of (@($task -split "`n"))
     $own = $false
-    for ($i = $comments.Count - 1; $i -gt $mark; $i--) {
+    for ($i = $comments.Count - 1; $i -gt $mark -and -not $none; $i--) {
         $lines = @((([string]$comments[$i].body) -replace "`r`n", "`n").Trim() -split "`n")
         if ($lines.Count -and $lines[0] -match $TaskMark -and (Kind-Of $lines) -eq $kind) { $own = $true; break }
     }
@@ -256,13 +286,13 @@ foreach ($card in $done) {
     }
 
     if ($Check) {
-        Say ("  #{0}: would close, pull request #{1}'s merge {2} is in this release{3}" -f $n, $pr, $merge, $(if ($own) { ', with the test task written on it after the merge' } else { '' })) 'Green'
+        Say ("  #{0}: would close, pull request #{1}'s merge {2} is in this release{3}" -f $n, $pr, $merge, $(if ($none) { ', with no test task, as its Fixed by line says' } elseif ($own) { ', with the test task written on it after the merge' } else { '' })) 'Green'
         $closed.Add("#$n"); continue
     }
     try {
-        if (-not $own) { $null = Invoke-GitHub 'POST' "repos/$GitHubRepo/issues/$n/comments" @{ body = $task } }
+        if (-not $own -and -not $none) { $null = Invoke-GitHub 'POST' "repos/$GitHubRepo/issues/$n/comments" @{ body = $task } }
         $null = Invoke-GitHub 'PATCH' "repos/$GitHubRepo/issues/$n" @{ state = 'closed'; state_reason = 'completed' }
-        Say ("  #{0}: closed, pull request #{1}'s merge {2} is in this release{3}" -f $n, $pr, $merge, $(if ($own) { '; its own later test task stands' } else { '; its test task is on it' })) 'Green'
+        Say ("  #{0}: closed, pull request #{1}'s merge {2} is in this release{3}" -f $n, $pr, $merge, $(if ($none) { '; it needs no test task' } elseif ($own) { '; its own later test task stands' } else { '; its test task is on it' })) 'Green'
         $closed.Add("#$n")
     } catch {
         Say "  #${n}: $($_.Exception.Message)" 'Red'
