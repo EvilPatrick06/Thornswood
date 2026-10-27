@@ -587,7 +587,7 @@ exit code $code"
     foreach ($f in $rec.Files) { if ((Get-FileHash -LiteralPath (Join-Path $game $f.Rel) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $f.Sha) { $shaOk = $false } }
     Yes 'A: each with the sha256 of what is in the folder' $shaOk
     Yes 'A: and what it was built from: the build list, the mod list, Pandora''s files, BodySlide''s' (
-        $rec.Parts.Contains('list') -and $rec.Parts.Contains('plugins') -and $rec.Parts.Contains('behaviors') -and $rec.Parts.Contains('bodyslide') -and $rec.Game -eq $game)
+        $rec.Part('list') -and $rec.Part('plugins') -and $rec.Part('behaviors') -and $rec.Part('bodyslide') -and $rec.Game -eq $game)
     Yes 'A: its work folder is gone' (-not (Test-Path -LiteralPath (Join-Path $own 'build-generated')))
     $state = Get-GeneratedState $root $list
     Yes 'A: and it reads back as current' ($state.Current)
