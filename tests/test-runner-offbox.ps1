@@ -108,7 +108,9 @@ try {
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
-    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994) and checks signed drafts (#3956)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    $r = Dry @('-Number', '4')
+    Yes "  runner 4, the light one, takes no builds and checks signed drafts (#3956, exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-4' --labels 'thornswood-vps,thornswood-check'")
     # #2161, 21 Oct: the record's no-reach folders outside C:\Thornswood-* are denied on the box too.
     $vpsAlso = "@('C:\ProgramData\ssh', 'C:\Users\Administrator')"
     Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' $vpsAlso") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
