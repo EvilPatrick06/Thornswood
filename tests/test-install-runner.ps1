@@ -50,13 +50,14 @@ Yes 'Install-Runner.ps1 parses' (-not $e -or $e.Count -eq 0)
 # ---- the label ------------------------------------------------------------------
 $label = [regex]::Match($text, "\[string\]\`$Label\s*=\s*'([^']+)'").Groups[1].Value
 Yes "Install-Runner gives the runner a label ($label)" ($label.Length -gt 0)
-$runsOn = [regex]::Match($yml, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value
-Yes "build.yml asks for a self-hosted Windows runner with that label ($runsOn)" ($runsOn -match 'self-hosted' -and $runsOn -match 'Windows' -and $runsOn -match [regex]::Escape($label))
+# Any job of build.yml: its first job asks GitHub's hosted runner since #3551.
+$runsOn = @([regex]::Matches($yml, '(?m)^\s*runs-on:\s*(.+)$') | ForEach-Object { $_.Groups[1].Value.Trim() } | Where-Object { $_ -match 'self-hosted' -and $_ -match 'Windows' -and $_ -match [regex]::Escape($label) }) | Select-Object -First 1
+Yes "build.yml asks for a self-hosted Windows runner with that label ($runsOn)" ([bool]$runsOn -and [bool]$label)
 Yes "nightly.yml runs on the same runner ($nightRunsOn)" ($nightRunsOn -match 'self-hosted' -and $nightRunsOn -match 'Windows' -and $nightRunsOn -match [regex]::Escape($label) -and $label)
 Yes '  as the fallback: GitHub''s hosted runner is the default since #1306' ($yml -match '(?m)^\s+runs-on: windows-latest\s*$')
 Yes '  while a pull request builds on GitHub''s hosted runner in build-pr.yml, never the VPS (#1306)' ([IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot) '.github\workflows\build-pr.yml')) -match '(?m)^\s+runs-on: windows-latest\s*$')
 Yes '  with a timeout' ($yml -match '(?m)^\s*timeout-minutes:\s*\d+')
-Yes '  one run per branch at a time' ($yml -match 'cancel-in-progress:\s*true')
+Yes '  one run per branch at a time, main''s newer push waiting for the one in progress (#3874)' ($yml -match '(?m)^  group: build-\$\{\{ github\.ref \}\}\s*$' -and $yml -match '(?m)^  cancel-in-progress: false\s*$')
 Yes '  and a token that can only read' ($yml -match '(?m)^permissions:\s*\r?\n\s+contents:\s*read')
 
 # ---- the bot step never touches the machine's Python ----------------------------

@@ -30,7 +30,8 @@
 //   tree:   node scripts/dev/Affected-Harnesses.js tree <rev> <tree.gz>
 //           every path in <rev>'s tree with its mode and object, gzipped
 //           (git ls-tree -r -z), so a change can be measured from that tree
-//           where the commit itself is not fetched
+//           where the commit itself is not fetched; first, the gate's shape
+//           in <rev>'s two build workflows (gateShape below)
 //   pick:   node scripts/dev/Affected-Harnesses.js pick <traces.jsonl.gz> <tree.gz> <commit> <gate.txt> <out.txt>
 //           build and select in one, measuring the change from the traced
 //           tree's listing to HEAD's tree; writes the harnesses to run to
@@ -56,8 +57,10 @@ const REPO = path.join(__dirname, '..', '..');
 // gate's own result rests on outside any one harness's reads.
 const FORCE = [
   // Only the workflow that runs the gate. Any other workflow is a file like
-  // any other: a harness that reads it has it in its map.
-  [/^\.github\/workflows\/(build|build-pr)\.yml$/, 'the workflow that runs the gate, its steps and its environment'],
+  // any other: a harness that reads it has it in its map. Only its gate
+  // part forces (#3874): see gateShape. A change to the rest of it, which
+  // cannot reach a harness's run, leaves it a file like any other.
+  [/^\.github\/workflows\/(build|build-pr)\.yml$/, 'the workflow that runs the gate, its steps and its environment', 'shape'],
   [/^scripts\/dev\/(Run-Gate\.ps1|Nightly-Harnesses\.ps1|Gate-Harnesses\.ps1|Affected-Harnesses\.js|Trace-HarnessReads\.js)$/, 'the scripts that list, choose and run the harnesses'],
   [/^tests\/gate-excluded\.txt$/, 'the gate list'],
   // Belt and braces: a helper is read by the harnesses that use it, so it is
@@ -85,6 +88,62 @@ const RUNS_IN = [
 ];
 
 function lower(p) { return p.toLowerCase(); }
+
+// ---- the gate's shape in the build workflows (#3874) ------------------------
+
+// What of the two build workflows a gate harness's run can depend on: the
+// top-level permissions, env and defaults, and the two build jobs, less
+// their name, needs and if, cut after the gate step (id: gate), all without
+// comments, blank lines or trailing spaces. The rest (the triggers, the
+// concurrency, the tested jobs, a job's condition, the steps after the gate)
+// decides whether and when the gate runs, never what a harness in it sees.
+// On 26 and 27 Oct 2026 three of five changes to build.yml (2dd37857,
+// 49f4dae9, ebdb9d0c) were all outside it, and each one sent every pull
+// request to the whole gate (611 harnesses) until a main build traced again.
+// A workflow that cannot be read this way (no gate step found) has no shape,
+// and a change to it runs the whole gate as before.
+const GATE_JOBS = ['launcher-vps', 'launcher'];
+const WORKFLOWS = ['.github/workflows/build.yml', '.github/workflows/build-pr.yml'];
+function gatePart(text) {
+  const lines = String(text).split('\r\n').join('\n').split('\n').map(l => l.replace(/\s+$/, '')).filter(l => l && !/^\s*#/.test(l));
+  const out = [];
+  let inJobs = false, sawGate = false;
+  for (let i = 0; i < lines.length;) {
+    const l = lines[i];
+    if (/^\S/.test(l)) {
+      inJobs = l === 'jobs:';
+      let j = i + 1;
+      while (j < lines.length && /^\s/.test(lines[j])) { j++; }
+      if (/^(permissions|env|defaults):/.test(l)) { out.push(...lines.slice(i, j)); }
+      i = inJobs ? i + 1 : j;
+      continue;
+    }
+    const job = /^  ([A-Za-z0-9_-]+):$/.exec(l);
+    if (!inJobs || !job) { i++; continue; }
+    let j = i + 1;
+    while (j < lines.length && !/^ {0,2}\S/.test(lines[j])) { j++; }
+    if (GATE_JOBS.indexOf(job[1]) >= 0) {
+      let body = lines.slice(i, j).filter(x => !/^    (name|needs|if):/.test(x));
+      const g = body.indexOf('        id: gate');
+      if (g >= 0) {
+        sawGate = true;
+        let k = g + 1;
+        while (k < body.length && !/^      - /.test(body[k])) { k++; }
+        body = body.slice(0, k);
+      }
+      out.push(...body);
+    }
+    i = j;
+  }
+  return sawGate ? out.join('\n') + '\n' : null;
+}
+// texts: the two workflows' text, in WORKFLOWS order. null when either has
+// no gate part.
+function gateShape(texts) {
+  const parts = texts.map(t => (t === null || t === undefined ? null : gatePart(t)));
+  if (parts.some(x => x === null)) { return null; }
+  return require('crypto').createHash('sha256').update(parts.join('\0')).digest('hex');
+}
 
 // ---- build: traces to one map ----------------------------------------------
 
@@ -185,10 +244,17 @@ function select(opts) {
   // one only means a longer change and more harnesses run.
   if (!map || map.format !== 1) { full('no read map'); }
   else if (opts.base && map.commit !== opts.base) { full('the change was not measured from the map\'s own commit ' + map.commit.slice(0, 8)); }
+  // opts.shape: {base, head}, the gate's shape (gateShape) in the traced
+  // tree's workflows and in the head's; either null when unknown.
+  const shape = opts.shape || {};
+  const sameShape = !!shape.base && shape.base === shape.head;
+  out.notes = [];
   for (const c of changes) {
     if (!/^[AMD]$/.test(c.status)) { full(c.path + ' changed as ' + c.status + ' (a type change, copy or unmerged path)'); continue; }
-    for (const [re, what] of FORCE) {
-      if (re.test(c.path)) { full(c.path + ': ' + what); }
+    for (const [re, what, kind] of FORCE) {
+      if (!re.test(c.path)) { continue; }
+      if (kind === 'shape' && sameShape && c.status === 'M') { out.notes.push(c.path + ' changed outside the gate\'s part (its gate steps, jobs\' runners and environment are as traced), so it is a file like any other'); continue; }
+      full(c.path + ': ' + what + (kind === 'shape' ? (shape.base ? ', changed from the traced one' : ', and the traced tree carries no gate shape to compare') : ''));
     }
   }
   if (out.full) { out.run = gate.slice(); for (const n of gate) { out.why[n] = 'full gate'; } return out; }
@@ -271,6 +337,24 @@ function select(opts) {
 
 // git ls-tree -r -z: "<mode> <type> <object>\t<path>" entries, NUL ended, to
 // a Map of path to "<mode> <object>".
+// A tree file as the tree command writes it: optional '#gate-shape <hex>'
+// entries first, then the listing. {tree: parseTree's Map, shape: hex or
+// null}. A file written before #3874 has no shape, and a change to a build
+// workflow measured from it runs the whole gate.
+function readTreeFile(buf) {
+  let shape = null, at = 0;
+  for (;;) {
+    if (buf[at] !== 0x23) { break; }
+    const end = buf.indexOf(0, at);
+    if (end < 0) { throw new Error('a tree file header has no end'); }
+    const m = /^#gate-shape ([0-9a-f]{64})$/.exec(buf.slice(at, end).toString('utf8'));
+    if (!m) { throw new Error('a tree file header is not "#gate-shape <sha256>": ' + JSON.stringify(buf.slice(at, Math.min(end, at + 80)).toString('utf8'))); }
+    shape = m[1];
+    at = end + 1;
+  }
+  return { tree: parseTree(buf.slice(at)), shape: shape };
+}
+
 function parseTree(buf) {
   const out = new Map();
   for (const e of buf.toString('utf8').split('\0')) {
@@ -310,6 +394,10 @@ function diff(base, head) {
   for (let i = 0; i + 1 < parts.length; i += 2) { out.push({ status: parts[i][0], path: parts[i + 1] }); }
   return out;
 }
+function showAt(rev, file) {
+  try { return cp.execFileSync('git', ['-C', REPO, 'show', rev + ':' + file], { maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8'); } catch (e) { return null; }
+}
+function shapeAt(rev) { return gateShape(WORKFLOWS.map(f => showAt(rev, f))); }
 function readGate(file) {
   const text = file ? fs.readFileSync(file, 'utf8') : cp.execFileSync('pwsh', ['-NoProfile', '-File', path.join(REPO, 'scripts', 'dev', 'Gate-Harnesses.ps1')]).toString();
   return text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
@@ -317,12 +405,15 @@ function readGate(file) {
 
 // pick: what scripts/dev/Run-Gate.ps1 runs on a pull request. The map is
 // built from the traces here, by this checkout's own build, and the change
-// is measured from the traced tree's listing, so nothing is fetched.
+// is measured from the traced tree's listing, so nothing is fetched. The
+// traced workflows' gate shape comes with the listing (the tree command).
 function pick(tracesFile, treeFile, commit, gate) {
   const map = build(tracesFile, REPO, commit);
-  const base = parseTree(require('zlib').gunzipSync(fs.readFileSync(treeFile)));
+  const read = readTreeFile(require('zlib').gunzipSync(fs.readFileSync(treeFile)));
+  const base = read.tree;
   const head = parseTree(git(['ls-tree', '-r', '-z', '--full-tree', 'HEAD']));
-  const r = select({ map: map, gate: gate, base: map.commit, changes: changesBetween(base, head), baseFiles: [...base.keys()], headFiles: [...head.keys()] });
+  const shape = { base: read.shape, head: shapeAt('HEAD') };
+  const r = select({ map: map, gate: gate, base: map.commit, changes: changesBetween(base, head), baseFiles: [...base.keys()], headFiles: [...head.keys()], shape: shape });
   r.map = map;
   return r;
 }
@@ -338,16 +429,21 @@ if (require.main === module) {
     const map = JSON.parse(fs.readFileSync(a, 'utf8'));
     const base = git(['rev-parse', map.commit]).toString().trim(), head = git(['rev-parse', b]).toString().trim();
     const gate = readGate(c);
-    const r = select({ map: map, gate: gate, base: base, changes: diff(base, head), baseFiles: treeFiles(base), headFiles: treeFiles(head) });
+    const r = select({ map: map, gate: gate, base: base, changes: diff(base, head), baseFiles: treeFiles(base), headFiles: treeFiles(head), shape: { base: shapeAt(base), head: shapeAt(head) } });
     if (r.full) { console.error('FULL ' + r.reasons.join('; ')); }
+    for (const n of r.notes) { console.error(n); }
     console.error(`${r.run.length} of ${gate.length} gate harnesses to run`);
     for (const n of r.run) { console.log(n); }
   } else if (cmd === 'tree' && a && b) {
-    fs.writeFileSync(b, require('zlib').gzipSync(git(['ls-tree', '-r', '-z', '--full-tree', a])));
+    const shape = shapeAt(a);
+    const head = shape ? Buffer.from('#gate-shape ' + shape + '\0') : Buffer.alloc(0);
+    fs.writeFileSync(b, require('zlib').gzipSync(Buffer.concat([head, git(['ls-tree', '-r', '-z', '--full-tree', a])])));
+    console.log('the gate\'s shape in ' + a + '\'s build workflows: ' + (shape || 'none, so a pull request that changes them runs the whole gate'));
   } else if (cmd === 'pick' && a && b && c && d && e) {
     const gate = readGate(d);
     const r = pick(a, b, c, gate);
     fs.writeFileSync(e, r.run.map(n => n + '\n').join(''));
+    for (const n of r.notes) { console.log(n); }
     if (r.full) { console.log('The whole gate runs: ' + r.reasons.join('; ')); } else {
       console.log(`${r.run.length} of ${gate.length} gate harnesses can be affected by this change, measured from the gate traced on ${c.slice(0, 8)}; ${r.skipped.length} cannot and do not run.`);
       for (const n of r.run) { console.log('  runs ' + n + ': ' + r.why[n]); }
@@ -357,4 +453,4 @@ if (require.main === module) {
     process.exit(2);
   }
 }
-module.exports = { build: build, readTraces: readTraces, select: select, parseTree: parseTree, changesBetween: changesBetween, pick: pick, FORCE: FORCE, PLATFORM: PLATFORM };
+module.exports = { build: build, readTraces: readTraces, select: select, parseTree: parseTree, readTreeFile: readTreeFile, changesBetween: changesBetween, pick: pick, gatePart: gatePart, gateShape: gateShape, WORKFLOWS: WORKFLOWS, FORCE: FORCE, PLATFORM: PLATFORM };
