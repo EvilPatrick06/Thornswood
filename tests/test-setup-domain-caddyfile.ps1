@@ -59,7 +59,21 @@ if ($start -gt 0 -and $end -gt $start) {
     Yes 'with the defaults the file sent is the tracked one' ($a -eq $cf)
     $b = Build 'example.org' 'ops@example.org'
     Yes '  -Domain puts the new name in' ($b.Contains('example.org, www.example.org {') -and -not $b.Contains('thornswood.net'))
-    Yes '  -Email replaces the address' ($b -match '(?m)^\s*email ops@example\.org\s*$')
+    Yes '  -Email puts the address in' ($b -match '(?m)^\s*email ops@example\.org\s*$')
+    Yes '  as the first line of the global options block' ($b -match '(?m)^\{\r?\n\temail ops@example\.org\r?\n\tstorage ')
+    Yes 'the tracked Caddyfile names no contact address (#3838)' (-not ($cf -match '(?m)^\s*email\s'))
+    # A Caddyfile that does carry an email line gets it replaced, not a second one.
+    $withMail = [regex]::Replace($cf, '(?m)^\{(\r?\n)', { param($m) $m.Value + "`temail old@example.org" + $m.Groups[1].Value }, 'None')
+    $mailDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-caddy-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $mailDir | Out-Null
+    try {
+        [IO.File]::WriteAllText((Join-Path $mailDir 'Caddyfile'), $withMail)
+        $Here = $mailDir; $Domain = 'thornswood.net'; $Email = 'ops@example.org'
+        . ([scriptblock]::Create($code))
+        $e = $caddyfile
+    }
+    finally { Remove-Item -LiteralPath $mailDir -Recurse -Force -ErrorAction SilentlyContinue }
+    Yes '  and an email line already there is replaced, not doubled' ((([regex]::Matches($e, '(?m)^\s*email\s')).Count -eq 1) -and ($e -match '(?m)^\temail ops@example\.org\r?$'))
     Yes '  and the voice routes survive both' ($b.Contains('handle_path /voice/*') -and $b.Contains('handle_path /voice-dev/*'))
     $threw = $false
     $saved = $cf

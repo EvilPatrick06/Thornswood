@@ -381,7 +381,7 @@ try {
     Yes ('no launcher file sets the read-only mark on anything' + $(if ($marks.Count) { ': ' + (($marks | ForEach-Object { $_.Name }) -join ', ') } else { '' })) ($marks.Count -eq 0)
 
     # Bytes that are not ASCII, a byte order mark, and CRLF, all kept.
-    $name = 'C:\\Users\\you' + [char]0x00EB + '\\Steam\\steam.exe'
+    $name = 'C:\\Games\\Caf' + [char]0x00E9 + '\\Steam\\steam.exe'
     $utf = [Text.Encoding]::UTF8.GetBytes((Acf 'absent' "`r`n").Replace('C:\\Program Files (x86)\\Steam\\steam.exe', $name))
     $bytes = New-Object byte[] ($utf.Length + 3)
     $bytes[0] = 0xEF; $bytes[1] = 0xBB; $bytes[2] = 0xBF
