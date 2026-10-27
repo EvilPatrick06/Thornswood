@@ -36089,8 +36089,9 @@ log('gamemode loaded:',
     books     members, their book chat, books they own, when they last left
               (the books)
     merchants the guild traders' supply waits, commission promises and a
-              trade still waiting on the character (the purse service, at
-              NPC startup, #2652)
+              trade still waiting on the character, in the ledger and in
+              each trader's own saved copy, retired traders' too (the purse
+              service, at NPC startup, #2652)
 
   A part that answers that it took is marked done in the file, the time it
   ran, so it never runs again; when every part is done the file is deleted,
@@ -73353,9 +73354,15 @@ function createNpcMerchantPurses(api,data,storage) {
   // and waits for the next start, by when that trade has settled.
   // Every changed entry goes out in one acknowledged save, as
   // compareAndCommit's are, before the ledger in memory changes; a save
-  // that fails revokes this service, as a failed commit does. The trader's
-  // own mirror (property) is not written here: prepare() is its one reader
-  // and puts it right from the ledger before the trader is used.
+  // that fails revokes this service, as a failed commit does.
+  // Each trader's own saved copy (property, kept with that NPC's save) is
+  // let go of too, once the ledger is saved: a copy that still names them
+  // is written over with what the ledger now holds for that trader. A
+  // retired trader is never prepared again, so its copy would otherwise
+  // keep them for good; an active one's is put right here as well rather
+  // than waiting for prepare(). Only a copy that names them is written, so
+  // a run whose ledger was let go at an earlier start but whose copy write
+  // did not take still finds and writes that copy.
   function characterOf(desc) {
     // A runtime human's desc is its form id in hex alone (FormDesc); a
     // placed form's has a plugin and is never a character.
@@ -73363,12 +73370,30 @@ function createNpcMerchantPurses(api,data,storage) {
   }
   function release(who) {
     return mutate(()=>{
-      const counts={merchants:0,supply:0,commissions:0,trades:0};
+      const counts={merchants:0,supply:0,commissions:0,trades:0,copies:0};
       const theirs=(desc,profile)=>!!(who.profile(profile) || who.actor(characterOf(desc)));
       // A commission key is JSON [owner, job], the owner JSON [local form id, plugin, profile].
       const promisedTo=key=>{
         const row=JSON.parse(JSON.parse(key)[0]);
         return !!(who.profile(row[2]) || (!row[1] && who.actor(row[0])));
+      };
+      // Whether a trader's saved copy still names them: a supply wait, a
+      // commission promise or one cooling down, or a trade waiting on them.
+      // A key that does not read names nobody.
+      const names=copy=>{
+        if(!copy || typeof copy!=='object') return false;
+        const supply=copy.supply && typeof copy.supply==='object' ? Object.keys(copy.supply) : [];
+        if(supply.some(k=>{
+          let owner=null;
+          try {owner=JSON.parse(k);} catch(error) {owner=null;}
+          return Array.isArray(owner) && owner.length===3 && theirs(owner[0],owner[1]);
+        })) return true;
+        const books=copy.commissions && typeof copy.commissions==='object' ? copy.commissions : {};
+        if(['held','cool'].some(book=>books[book] && typeof books[book]==='object' && Object.keys(books[book]).some(k=>{
+          try {return promisedTo(k);} catch(error) {return false;}
+        }))) return true;
+        const pending=copy.pending;
+        return !!(pending && pending.human && theirs(pending.human.desc,pending.human.profileId));
       };
       const next=JSON.parse(JSON.stringify(ledger)),changed=[];
       let busy=0;
@@ -73401,13 +73426,26 @@ function createNpcMerchantPurses(api,data,storage) {
         changed.push([id,identity,state]);
       }
       if(busy) throw new Error(busy+' trader(s) holding something of theirs are waiting on a trade with somebody else, so nothing was let go');
-      if(!changed.length) return {counts,saved:true};
-      try {
+      if(changed.length) {
+        try {
+          assertOwner();
+          if(storage.save(next)!==true) throw new Error('Durable merchant save acknowledgement is missing');
+        } catch(error) {active=false;throw error;}
         assertOwner();
-        if(storage.save(next)!==true) throw new Error('Durable merchant save acknowledgement is missing');
-      } catch(error) {active=false;throw error;}
-      assertOwner();
-      ledger=next;
+        ledger=next;
+      }
+      // The traders' own saved copies, retired traders' included, from the
+      // ledger as it now is. A write that fails stops the part, which waits
+      // for the next start and finds the copy again.
+      for(const [id,identity] of catalogue) {
+        assertOwner();
+        if(!names(api.get(id,property))) continue;
+        const state=ledger.entries[identity.reference];
+        if(names(state)) throw new Error('Merchant state still names a released character');
+        api.set(id,property,state===null ? null : JSON.parse(JSON.stringify(state)));
+        assertOwner();
+        counts.copies++;
+      }
       return {counts,saved:true};
     });
   }
