@@ -576,11 +576,14 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
     try { $rules = @((Get-Acl -LiteralPath $d.FullName -ErrorAction Stop).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) }
     catch { $acct + ': the rules on ' + $d.FullName + ' could not be read (' + $_.Exception.Message + '), so it is counted as one it could read' }
     if ($null -ne $rules -and @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }).Count) { $had++; continue }
-    # CREATOR OWNER (S-1-3-0) is not counted: Windows gives it only on what an
-    # account makes there itself, and an account that may make nothing there
-    # gets nothing from it. The admin service's folder carries one for its
-    # log and state (ServiceAccount.ps1), and on 27 Oct 2026 that alone named
-    # it as one runners 1 to 3 COULD READ, which they could not (#3956).
+    # CREATOR OWNER (S-1-3-0) is not counted for the runner's account: Windows
+    # gives it only on what an account makes there itself, and a runner
+    # account that may make nothing there gets nothing from it. The admin
+    # service's folder carries one for its log and state (ServiceAccount.ps1),
+    # and on 27 Oct 2026 that alone named it as one runners 1 to 3 COULD READ,
+    # which they could not (#3956). What it gives the service that does write
+    # there, and every other task running as that same account, is not this
+    # check's question (#4076, #4077). The deny goes on either way.
     $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $_.IdentityReference.Value -ne 'S-1-3-0' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
     $null = & icacls.exe $d.FullName /deny ($acct + ':(OI)(CI)F') /C /Q 2>&1
     if ($LASTEXITCODE -ne 0) { throw ('icacls could not shut ' + $acct + ' out of ' + $d.FullName) }
