@@ -90,6 +90,13 @@ try {
     $r = Dry @('-OffBox', '-Number', '2')
     Yes '-OffBox -Number 2 numbers its folder, account and name' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR2'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr2'") -and $r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "-2'"))
 
+    # Its own install folder (#3860), never Patrick's game: the .env it writes
+    # names one under its root.
+    $r = Dry @('-OffBox', '-Number', '3')
+    Yes '-OffBox writes THORNSWOOD_INSTALL into its .env, under its own root' ($r.Code -eq 0 -and $r.Text -match "(?m)^Set-RunnerTemp \`$root '[^']+' \`$true\s*$" -and $r.Text -match [regex]::Escape("`$want += ('THORNSWOOD_INSTALL=' + (Join-Path `$root 'install'))"))
+    $r = Dry @()
+    Yes '  and a VPS runner does not' ($r.Code -eq 0 -and $r.Text -match "(?m)^Set-RunnerTemp \`$root '[^']+' \`$false\s*$")
+
     $r = Dry @('-OffBox', '-Label', 'thornswood-vps')
     Yes "-OffBox refuses the VPS label (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'never takes the VPS label' -and -not $r.Text)
 

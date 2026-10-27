@@ -199,8 +199,11 @@
         if (!recs.length) { out += '<div class="none">Nothing has gone in or out yet.</div>'; }
         for (var k = 0; k < recs.length; k++) {
           var x = recs[k];
-          var line = esc(when(x.at)) + ': ' + esc(x.who) + (x.act === 'in' ? ' put in ' : ' took out ') +
-            esc(x.count > 1 || x.what === 'Gold' ? x.count + ' ' : '') + esc(x.what);
+          // Rent handed to a steward in person (#3895) is a payment too, kept beside the box's own.
+          var line = x.act === 'rent'
+            ? esc(when(x.at)) + ': ' + esc(x.who) + ' was handed ' + esc(x.count) + ' gold of rent by ' + esc(x.by || 'somebody')
+            : esc(when(x.at)) + ': ' + esc(x.who) + (x.act === 'in' ? ' put in ' : ' took out ') +
+              esc(x.count > 1 || x.what === 'Gold' ? x.count + ' ' : '') + esc(x.what);
           if (x.forName) { line += ' for ' + esc(x.forName); }
           if (x.act === 'out' && x.by && x.by !== x.who) { line += ', put in by ' + esc(x.by); }
           if (x.note) { line += ' (' + esc(x.note) + ')'; }

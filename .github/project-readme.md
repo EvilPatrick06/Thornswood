@@ -44,6 +44,6 @@ is not going to get done.
 
 The rules behind all of this are in
 [Developer-Guide.md](https://github.com/EvilPatrick06/Thornswood/blob/main/Developer-Guide.md).
-Every entry from before the board, finished ones included, is in
-[docs/archive/todo-list-2026-09-25.md](https://github.com/EvilPatrick06/Thornswood/blob/main/docs/archive/todo-list-2026-09-25.md);
-an "entry 243" in the code means entry 243 there.
+Every entry from before the board, finished ones included, is in the team's
+dated To Do List of 25 September, kept in the private ops repo; an "entry 243"
+in the code means entry 243 there.
