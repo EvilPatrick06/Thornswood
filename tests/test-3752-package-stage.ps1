@@ -16,8 +16,9 @@
   everything; the second copies nothing; a file changed with the same length
   and the same time is copied, alone; a file that left the build goes with
   its folder; what an earlier build left at the top of the stage goes. Then
-  Invoke-PackageZip against a stand-in 7z that notes each call: exit 2 is one
-  call, at -mx1, and no archive; exit 1 is no archive either. And it reads
+  Invoke-PackageZip, .NET's zip writer since #3412: the stage zips, over the
+  last build's archive, with its paths starting at the stage, and an archive
+  that cannot be written says why and leaves none. And it reads
   Package-Thornswood.ps1 for the parts it cannot run (it needs a recorded
   client and the live feed): it uses the stage sync and the one zip, walks the
   stage for nothing it already has, and says the optional packs once.
@@ -115,36 +116,18 @@ try {
     Put (Join-Path $stage 'licences\port.txt') '123'
     Yes 'the stage size is the payload''s bytes and what sits beside it' ((Get-PackageStageBytes $stage 1000) -eq 1008)
 
-    # ---- the zip, once
-    $calls = Join-Path $T 'calls.txt'
-    $fake = Join-Path $T 'fake7z.ps1'
+    # ---- the zip, once, with .NET's writer (#3412)
     $blob = Join-Path $T 'payload.zip'
-    Put $fake @'
-param()
-Add-Content -LiteralPath $env:TS3752_CALLS -Value ($args -join ' ')
-'some.file'
-if ([int]$env:TS3752_WRITE) { [IO.File]::WriteAllText($args[4], 'zip') }
-exit ([int]$env:TS3752_CODE)
-'@
-    $env:TS3752_CALLS = $calls
-    function Zip([int]$code, [int]$write) {
-        if (Test-Path -LiteralPath $calls) { Remove-Item -LiteralPath $calls }
-        if (Test-Path -LiteralPath $blob) { Remove-Item -LiteralPath $blob }
-        $env:TS3752_CODE = "$code"; $env:TS3752_WRITE = "$write"
-        $z = Invoke-PackageZip $fake $stage $blob 1
-        return [pscustomobject]@{ Code = $z.Code; Said = $z.Said; Calls = @(Get-Content -LiteralPath $calls); Blob = (Test-Path -LiteralPath $blob) }
-    }
-    $z = Zip 2 1
-    Yes ('a 7-Zip that exits 2 is called once, not twice (' + $z.Calls.Count + ')') ($z.Calls.Count -eq 1)
-    Yes 'at the level asked for' ($z.Calls[0] -eq "a -tzip -y -mx1 $blob *")
-    Yes 'and leaves no archive, with the code' ($z.Code -eq 2 -and -not $z.Blob)
-    Yes 'and exit 2 is said as a full disk, with the free space line' (((Get-PackageZipWhy 2) -join ' ') -match 'disk filling up' -and ((Get-PackageZipWhy 2) -join ' ') -match 'Get-PSDrive')
-    $z = Zip 1 1
-    Yes 'exit 1, a file 7-Zip could not read, is no archive either' ($z.Calls.Count -eq 1 -and $z.Code -eq 1 -and -not $z.Blob)
-    $z = Zip 0 0
-    Yes 'exit 0 with nothing written is no archive' ($z.Code -eq -1)
-    $z = Zip 0 1
-    Yes 'exit 0 with the archive written is the zip, and what 7-Zip said is kept' ($z.Code -eq 0 -and $z.Blob -and (@($z.Said) -contains 'some.file'))
+    Put $blob 'last build'
+    $why = Invoke-PackageZip $stage $blob 1
+    Yes ('the stage zips with no reason given (' + $why + ')') (-not $why -and (Test-Path -LiteralPath $blob))
+    Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+    $za = [IO.Compression.ZipFile]::OpenRead($blob)
+    try { $names = @($za.Entries | ForEach-Object { $_.FullName.Replace('\', '/') }) } finally { $za.Dispose() }
+    Yes 'and the archive is this stage, not the last build''s file, its paths starting at the stage' ($names -contains 'Setup.bat' -and $names -contains 'licences/port.txt' -and $names -contains 'payload/Data/Thornswood.esp')
+    $nowhere = Join-Path (Join-Path $T 'no-such-folder') 'payload.zip'
+    $why = Invoke-PackageZip $stage $nowhere 1
+    Yes ('an archive that cannot be written says why and leaves none (' + $why + ')') ($why -and -not (Test-Path -LiteralPath $nowhere))
 
     # ---- the packager itself
     $pkg = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Package-Thornswood.ps1'))
@@ -152,13 +135,13 @@ exit ([int]$env:TS3752_CODE)
     Yes 'Package-Thornswood loads Package-Stage.ps1' ($pkg.Contains(". (Join-Path `$Here 'Package-Stage.ps1')"))
     Yes 'and brings the stage level with the build, with no switch to remove it first' ($pkg.Contains('Sync-PackageStage -Stage $stage -Ship $ship') -and -not $pkg.Contains('ReuseStage') -and -not $pkg.Contains('Remove-Item $stage'))
     $zips = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Invoke-PackageZip' }, $true))
-    Yes 'and zips once' ($zips.Count -eq 1 -and -not $pkg.Contains('$attempts'))
+    Yes 'and zips once, with no 7-Zip' ($zips.Count -eq 1 -and -not $pkg.Contains('$attempts') -and -not $pkg.Contains('$7z'))
     $walks = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Get-ChildItem' -and $n.Extent.Text -match '\$(stage|payload|payloadDir)\b' }, $true))
     Yes ('and walks the stage for nothing it already has' + $(if ($walks.Count) { ' (' + (($walks | ForEach-Object { $_.Extent.Text }) -join '; ') + ')' } else { '' })) ($walks.Count -eq 0)
     Yes 'and does not read three files back out of a zip it just made' (-not $pkg.Contains("Join-Path `$OutDir 'verify'"))
     Yes 'and says the optional packs once' (([regex]::Matches($pkg, 'published separately\.')).Count -eq 1)
     $synced = $pkg.IndexOf('Sync-PackageStage -Stage')
-    Yes 'and still scans the finished stage for secrets after it is synced and before it is zipped' ($synced -gt 0 -and $pkg.IndexOf('-Dir $stage -ClientRecord') -gt $synced -and $pkg.IndexOf('-Dir $stage -ClientRecord') -lt $pkg.IndexOf('Invoke-PackageZip $7z'))
+    Yes 'and still scans the finished stage for secrets after it is synced and before it is zipped' ($synced -gt 0 -and $pkg.IndexOf('-Dir $stage -ClientRecord') -gt $synced -and $pkg.IndexOf('-Dir $stage -ClientRecord') -lt $pkg.IndexOf('Invoke-PackageZip $stage'))
 }
 finally {
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
