@@ -3,9 +3,9 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "83f861196601f46c874b1e3b609d2027eef7c9bb887b44cbe73e0f4ae135f548",
-    "game/data/harvests.json": "9ca477811631c8027faf92151acdc039f1879df6db2240828631dd00807b4f09",
-    "game/data/hunts.json": "de563914653ae6ec58532e5afb5b4aec1b5b18dfa3b16b2ba7907c1bc3661c24",
+    "game/data/recipes.json": "bd176062ab75e3b3f4b972d7f3f5f11a094cb03515eb330d00d85eb6d82bd0a5",
+    "game/data/harvests.json": "b977670daf535dede75a5eaa794365865953d85f554c3ca6f8cf0b6dbcb657a1",
+    "game/data/hunts.json": "6618519178eb470173f7312c56527a3bc844ed53f0f93b23f7563c77202557a2",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
     "docs/systems/cut-items.json": "fd3122104482fe441cba2e54cac3374dab42f13d6737de29ce93c8ef15b856c3"
   },
@@ -4965,6 +4965,12 @@
       "edid": "DLC1BoltDwarven",
       "winner": "Dawnguard.esm"
     },
+    "d0:_ResourcePack.esl": {
+      "type": "INGR",
+      "flags": 0,
+      "edid": "RP_AloeVeraLeaves01",
+      "winner": "_ResourcePack.esl"
+    },
     "d191f:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -7836,6 +7842,7 @@
         "b08c5:Skyrim.esm",
         "b097:Dawnguard.esm",
         "b2183:Skyrim.esm",
+        "d0:_ResourcePack.esl",
         "ec870:Skyrim.esm",
         "f1cc:HearthFires.esm"
       ],
@@ -7908,6 +7915,7 @@
         "b08c5:Skyrim.esm",
         "b097:Dawnguard.esm",
         "b2183:Skyrim.esm",
+        "d0:_ResourcePack.esl",
         "ec870:Skyrim.esm",
         "f1cc:HearthFires.esm"
       ],
@@ -7978,6 +7986,7 @@
         "b08c5:Skyrim.esm",
         "b097:Dawnguard.esm",
         "b2183:Skyrim.esm",
+        "d0:_ResourcePack.esl",
         "ec870:Skyrim.esm",
         "f1cc:HearthFires.esm"
       ]
@@ -12009,6 +12018,10 @@
     "d099:Dawnguard.esm": [
       "Woodworker:recipe:f814:Dawnguard.esm:out"
     ],
+    "d0:_ResourcePack.esl": [
+      "Alchemist:harvests:harvests:d1:_ResourcePack.esl",
+      "Alchemist:harvests:harvests:d2:_ResourcePack.esl"
+    ],
     "d191f:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:9d2:MoreCraftableEquipment.esp:out"
@@ -12464,9 +12477,9 @@
       "supply": 53
     },
     "Alchemist": {
-      "buy": 70,
-      "sell": 70,
-      "supply": 68
+      "buy": 71,
+      "sell": 71,
+      "supply": 69
     }
   }
 }
