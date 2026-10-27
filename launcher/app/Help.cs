@@ -212,7 +212,7 @@ namespace Thornswood
                 "A long wait, a black screen, and then you are standing in Skyrim on your own. That is not a crash: nothing was answering at the server's address. The launcher checks before it starts the game and says so when the server is not answering. Watch the Discord and try again later."),
 
             new HelpItem("If it breaks", "Sending your logs",
-                "Diagnostics, then Build the report, makes one zip with the newest crash log, the script extender log, your plugin list, the launcher log and a short summary of your machine, and opens the folder it is in. Drag that zip into your ticket in the Discord, and say what you were doing. The files themselves: the launcher log is C:\\Thornswood\\Profile\\launcher.log (Settings, Open log), and crash logs are in C:\\Thornswood\\Profile\\MyGames\\SKSE."),
+                "Diagnostics, then Build the report, makes one zip with the newest crash log, the script extender log, your plugin list, the launcher log and a short summary, and opens the folder it is in. The Diagnostics page says everything that is in it, and what of it names you. Drag that zip into your ticket in the Discord, and say what you were doing. The files themselves: the launcher log is C:\\Thornswood\\Profile\\launcher.log (Settings, Open log), and crash logs are in C:\\Thornswood\\Profile\\MyGames\\SKSE."),
 
             new HelpItem("If it breaks", "Something says Skyrim is open and it is not on screen",
                 "Skyrim does not always exit when the window goes away, and the game's own browser often leaves helper processes behind. The launcher clears those when it starts and again when you press Play. If something still says it after the launcher restarts, restart the PC."),
