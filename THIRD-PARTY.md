@@ -751,25 +751,45 @@ the collection's mods draw one: SkyUI's item lists and item card
 Mods mod 12604, file 749043), SkyHUD 0.90B's line under an item somebody
 looks at (`interface\hudmenu.swf` in `SkyHUD.bsa`, mod 463, file 61422), and
 moreHUD 5.4.5's value to weight beside it (`interface\ahzhudinfo.swf` and its
-copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483). They are their authors' work, and nothing on
-those mods' pages lets Thornswood hand them on, so none of them ships: the
-launcher makes the five before every Play from the person's own copy of each
-mod, out of its archive, the same way as Bethesda's files above
-(`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and `scripts\release\Go.ps1`
-does the same for a hand-run install. What the repository holds is the edit,
-as the bytes that change, each pinned to the sha256 of the collection's
-version of the file (`launcher\app\FromGameModMenus.cs`, written by
+copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483), the
+files collection 7essxf installs in revisions 4 and 5. They are their authors'
+work, and each mod's page, read on 26 October (#3800), says this about them:
+
+- SkyUI: "Upload: not allowed to upload to other sites"; modification is
+  allowed "so long as you credit me as the original creator"; asset use is
+  "allowed without permission with credit; not in sold mods"; and the author
+  notes say "You may release any patches that require the original file",
+  while changing its icon files needs the further permission of Psychosteve
+  and Jeledity.
+- SkyHUD: modification and asset use are allowed with credit, and the
+  permission note lets anybody share a preset, which is how Thornswood's
+  `Data\Interface\skyhud\skyhud.txt` goes out, but "The rest of the mod must
+  not be included".
+- moreHUD: the page shows no permission list and no author instructions.
+
+Patrick decided on 26 October that these terms change nothing (#3800). So
+none of the five ships: the launcher makes the five before every Play from
+the person's own copy of each mod, out of its archive, the same way as
+Bethesda's files above (`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and
+`scripts\release\Go.ps1` does the same for a hand-run install. What the
+repository holds is the edit, as the bytes that change, each pinned to the
+sha256 of the collection's version of the file
+(`launcher\app\FromGameModMenus.cs`, written by
 `scripts\mods\Build-ModMenus.py`), not the files. `Ship-Rules.ps1`
 `$ShipMadeFromMods` keeps the five out of every pack, release record and
 installer.
 
 `Data\SKSE\Plugins\QuickLootIE.json` does ship: QuickLoot IE 4.1.3's own
-settings file (Nexus Mods mod 120075, file 806802) with one line added, which
-sets its loot menu's columns to weight only. QuickLoot IE is under the GNU
-General Public License version 3, which lets a changed copy go out under the
-same licence when it says what was changed and when; the file says both in
-its first lines, and the collection installs the licence beside it as
-`Data\QLIE-LICENSE.md`.
+settings file (Nexus Mods mod 120075, file 806802, which revisions 4 and 5
+both install) with one line added, which sets its loot menu's columns to
+weight only. QuickLoot IE is "Released under the GPL-3.0-or-later license", by
+its page, and its 4.1.0 changelog says "Changed the project license to
+GPL-3.0-or-later". That lets a changed copy go out under the same licence when
+it says what was changed and when; the file says both in its first lines, and
+the collection installs the licence text beside it as `Data\QLIE-LICENSE.md`,
+which in file 806802 is the GNU General Public License version 3 unchanged,
+byte for byte `installer\licences\GPL-3.0.txt` (sha256 3972dc97, read 27
+October).
 
 ## Made for Thornswood by somebody else
 
