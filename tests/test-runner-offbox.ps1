@@ -121,7 +121,9 @@ try {
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
-    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994) and checks signed drafts (#3956)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    $r = Dry @('-Number', '4')
+    Yes "  runner 4, the light one, takes no builds and checks signed drafts (#3956, exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-4' --labels 'thornswood-vps,thornswood-check'")
     # #2161, 21 Oct: the record's no-reach folders outside C:\Thornswood-* are denied on the box too.
     $vpsAlso = "@('C:\ProgramData\ssh', 'C:\Users\Administrator')"
     Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' $vpsAlso") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
@@ -172,7 +174,9 @@ try {
     Yes '  blocking everything outside GitHub''s published lists (stand-in meta)' ($t -match [regex]::Escape("'0.0.0.0-4.147.255.255'") -and $t -match [regex]::Escape("'4.149.0.0-126.255.255.255'") -and $t -match [regex]::Escape("'128.0.0.0-140.82.111.255'"))
     Yes '  loopback and GitHub''s ranges are not in the block list' ($t -notmatch "'127\.0\.0\.0-" -and $t -notmatch [regex]::Escape("'140.82.112.0") -and $t -notmatch [regex]::Escape("'192.30.252.0"))
     Yes '  IPv6 too: everything but ::1 and GitHub''s 2a0a:a440::/29' ($t -match [regex]::Escape("'::'") -and $t -match [regex]::Escape("'::2-2a0a:a43f:ffff:ffff:ffff:ffff:ffff:ffff'") -and $t -match [regex]::Escape("'2a0a:a448::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'"))
-    Yes '  and shuts it out of other drives, profiles and ProgramData secrets' ($t -match [regex]::Escape('Close-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct)'))
+    Yes '  and shuts it out of other drives, profiles and ProgramData secrets' ($t -match [regex]::Escape('Close-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct -Own $grdOwn)'))
+    Yes '  every drive but C:, its folder being on C: (#3861)' ($t -match [regex]::Escape("`$grdOwn = ''"))
+    Yes '  and the service starts with Windows as before' ($t -notmatch 'start= demand')
     $iG = $t.IndexOf('Set-RunnerFirewall $grdAcct'); $iC = $t.IndexOf('.\config.cmd --unattended')
     Yes '  both before config.cmd can start the runner' ($iG -gt 0 -and $iC -gt $iG)
     Yes '  GitHub''s lists came from a stand-in: gh never called' (-not (Test-Path -LiteralPath $ghCalled))
@@ -190,7 +194,17 @@ try {
     $r = Dry @('-OffBox', '-Lock')
     Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
     $r = Dry @('-OffBox', '-Remove')
-    Yes '-OffBox -Remove takes the firewall rules and the read denies off' ($r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape('Open-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct)'))
+    Yes '-OffBox -Remove takes the firewall rules and the read denies off' ($r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape('Open-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct -Own $grdOwn)'))
+    # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, R: here.
+    $r = Dry @('-OffBox', '-Number', '3', '-Root', 'R:\Thornswood-RunnerPR3')
+    $t = $r.Text
+    Yes "-OffBox on the runner drive installs there (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$root = 'R:\Thornswood-RunnerPR3'"))
+    Yes '  shuts the account out of the other runners'' folders on that drive as on C:' ($t -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood*'") -and $t -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'R:\' 'Thornswood*'"))
+    Yes '  leaves that drive''s root out of the read denies, as New-RunnerDrive.ps1 locks it' ($t -match [regex]::Escape("`$grdOwn = 'R:'"))
+    $iD = $t.IndexOf('start= demand'); $iC = $t.IndexOf('.\config.cmd --unattended')
+    Yes '  and has the service start by hand, after config.cmd made it, for the drive''s task to start' ($iD -gt $iC -and $iC -gt 0)
+    $r = Dry @('-OffBox', '-Number', '3', '-Root', 'R:\Thornswood-RunnerPR3', '-Remove')
+    Yes '  -Remove there opens the other runners'' folders on the drive again' ($r.Text -match [regex]::Escape("Open-RunnerAccount 'thornswood-pr3' 'R:\Thornswood-RunnerPR3' 'R:\' 'Thornswood*'"))
     $r = Dry @('-OffBox', '-Status')
     Yes '-OffBox -Status says what the firewall has' ($r.Text -match [regex]::Escape('Get-RunnerFirewall $grdGroup'))
     $r = Dry @('-OffBox', '-Number', '2')
@@ -305,6 +319,9 @@ try {
     $want = @($dv, (Join-Path $u 'alice'), (Join-Path $u 'Public'), (Join-Path $pd 'ssh'), (Join-Path $pd 'Docker'))
     Yes 'the read list: other drives, other profiles and Public, ProgramData ssh and Docker' ((@($deny | Sort-Object) -join '|') -eq (@($want | Sort-Object) -join '|'))
     Yes '  not its own profile, not Default, not the rest of ProgramData' (-not ($deny -match 'thornswood-pr|Default|chocolatey'))
+    $dr = Join-Path $work 'R-root'; New-Item -ItemType Directory -Path $dr | Out-Null
+    $deny = @(Get-RunnerReadDenies 'thornswood-pr' $u $pd @($dv, $dr) -Own $dr)
+    Yes '  with its folder on the runner drive, every other drive but not that one (#3861)' (($deny -contains $dv) -and -not @($deny | Where-Object { $_.TrimEnd('\', '/') -eq $dr }).Count)
     if ($OnWindows) {
         $said = @(Close-RunnerReads '*S-1-5-7' $deny)
         Yes 'Close-RunnerReads denies the account each one' (@($deny | Where-Object { Denied $_ }).Count -eq $deny.Count -and -not ($said -match 'COULD NOT'))

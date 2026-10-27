@@ -337,8 +337,10 @@ carry a new launcher with no One in the chain:
   Windows SDK's signtool, and its outbound rules to let the signing hosts
   through (`Install-Runner.ps1 -NetworkOnly -Number 3`, from
   `records/sign-runners.json`; #3312).
-- The `verify` job runs after whichever job signed, on a build runner, so
-  it is never the runner that signed.
+- The `verify` job runs after whichever job signed, on a check runner
+  (the `thornswood-check` label, `records/check-runners.json`, #3956),
+  which is never the runner that signed. Light runner 4 carries that label
+  and no build label, so no pull request build can hold up the check.
 - A `v<a.b.c.d>` tag is a dev number: release.yml writes it into
   Updater.cs the way a dev Ship does. A `v<a.b.c>` tag must be the number
   Updater.cs already says.
