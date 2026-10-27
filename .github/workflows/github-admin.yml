@@ -18,7 +18,8 @@
 # published keys and that it is this workflow on main, reads the records from
 # main itself, and makes the runners' labels match them. Nothing the run
 # sends says what to change, so the most anybody who can start it can do is
-# make GitHub match main.
+# make GitHub match main. Set-BuildRunners.ps1 -AppRepos asks instead which
+# repositories the App is installed on, which changes nothing (#4013).
 #
 # NO SECRET. The run holds none and the service needs none from it: the OIDC
 # token is GitHub's own word for which run is asking, good for minutes, and
@@ -35,6 +36,13 @@ on:
         description: 'Change nothing; say only what differs from main'
         type: boolean
         default: false
+      ask:
+        description: 'What to ask the box: make the runner labels match main, or list the repositories the App is on (changes nothing)'
+        type: choice
+        options:
+          - runner-labels
+          - installation-repos
+        default: runner-labels
   push:
     branches: [main]
     paths:
@@ -75,6 +83,8 @@ jobs:
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
         env:
           ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
+          # A push has no inputs, so it asks for the labels.
+          ADMIN_ASK: ${{ inputs.ask || 'runner-labels' }}
         run: |
           & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-BuildRunners.ps1') -OnGitHub
           exit $LASTEXITCODE
