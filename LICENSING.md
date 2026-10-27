@@ -96,16 +96,17 @@ make from them under the same licence. That covers:
 
 It does not cover:
 
-- art whose maker is not recorded (`not-published` or `unconfirmed` in
-  `records/asset-provenance.json`, such as `launcher/art/thornswood-art-1536.png`
-  and `thornswood-banner-1672.png`). Thornswood cannot license what it cannot
-  show it owns; each goes under CC BY-NC-SA 4.0 once its maker and terms are
-  recorded.
+- art whose maker is not recorded (`unconfirmed` or `not recorded` in
+  `records/asset-provenance.json`; none today, since Patrick said on 27
+  October 2026 that Djinn made the last three). Thornswood cannot license
+  what it cannot show it owns; such a file goes under CC BY-NC-SA 4.0 once
+  its maker and terms are recorded.
 - the theme, `game/ui/thornswood-theme.mp3`. An artist made it for
   Thornswood, and the terms between Patrick and the artist are not written
-  down (`THIRD-PARTY.md`, "Made for Thornswood by somebody else"), so
+  down yet (`THIRD-PARTY.md`, "Made for Thornswood by somebody else"), so
   Thornswood does not own it to license. It stays the artist's until written
-  terms say otherwise. Thornswood owns no other music today.
+  terms say otherwise; Patrick is asking the artist for them (27 October
+  2026). Thornswood owns no other music today.
 
 `records/asset-provenance.json` records, for each picture, sound, mesh and
 plugin in the repository, who made it, under what terms, and what is still
