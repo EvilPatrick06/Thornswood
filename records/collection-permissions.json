@@ -20,7 +20,15 @@
         "RaceMenuMorphsCBBE.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/198?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not allowed",
+        "terms": {
+          "Author's notes (summary)": "Free to use the CBBE body for outfits and NPCs (not children) with credit and a link back. Re-uploading the whole mod or parts of it without notable edits, to any site including the Nexus, needs permission first. \"Distribution by, or sub-licensing to, parties not expressly given permission is disallowed.\" A modified body mesh beyond sliders needs permission. CBBE outfits and textures may go to Bethesda.net. Nothing on the page may be sold. Face Pack: no re-upload or conversion to other games; some of its parts need permission (see the page's credits). Questions go to Ousnius."
+        },
+        "version": "2.0.3"
+      }
     },
     {
       "modId": 201,
@@ -35,7 +43,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/201?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "BodySlide presets (XML) are free to use and share. Built meshes made only with sliders need permission before release. The entire mod or all body variations may not be re-uploaded, and uploading parts of the package as is needs permission. The program and its source are GPLv3+. Nothing from the archives may be sold, nor outfits using the CBBE body or CBBE/UUNP sliders. Conversions of other people's work follow those authors' permissions."
+        },
+        "version": "6.0.0"
+      }
     },
     {
       "modId": 463,
@@ -52,7 +75,22 @@
         "SkyHUD.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/463?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You must get permission to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Presets (skyhud.txt) may be shared anywhere, without the rest of the mod and naming the mod version they are for. If the author is gone from the internet for at least two years, the mod counts as abandoned and free for the public."
+        },
+        "version": "0.90.1B"
+      }
     },
     {
       "modId": 523,
@@ -69,7 +107,22 @@
         "Immersive Sounds - Compendium.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/523?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "3.0"
+      }
     },
     {
       "modId": 718,
@@ -86,7 +139,22 @@
         "Immersive Patrols II.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/718?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "3.0b"
+      }
     },
     {
       "modId": 1090,
@@ -103,7 +171,22 @@
         "Apocalypse - Magic of Skyrim.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1090?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You must get permission to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "The author is free with it: including the mod in mod packs, compatibility patches, derivative mods, forks and reusing its custom assets or scripts are all allowed without asking, with credit (a notice to the author is welcome). Assets from other authors (see the page's credits, and their folder names in the BSA) need those authors' permission. No selling for real money, and donations only for meaningful changes of your own."
+        },
+        "version": "10.3.0"
+      }
     },
     {
       "modId": 1841,
@@ -120,7 +203,15 @@
         "LSFX-SSE-Audiosettings.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1841?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's instructions": "(empty on the page: no permissions are set)"
+        },
+        "version": "v2u"
+      }
     },
     {
       "modId": 1932,
@@ -137,7 +228,15 @@
         "KS_Hairdo's_Lite_NoNPCs.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1932?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "The KS Hairdos name and assets are used with Kalilies' permission."
+        },
+        "version": "1.3"
+      }
     },
     {
       "modId": 1988,
@@ -154,7 +253,15 @@
         "XPMSE.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1988?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "Skeleton .nif and .hkx files are permission free (based on Bethesda's). Modifying them and releasing the result, or including original or modified skeletons in mods such as custom followers, needs no permission, but XPMSSE files may not be repackaged as a replacement for XPMSSE. The page asks people not to make custom races with separate skeleton paths. Animation files follow their own authors' permissions."
+        },
+        "version": "5.06"
+      }
     },
     {
       "modId": 2005,
@@ -171,7 +278,15 @@
         "Populated Cities Towns Villages Legendary.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/2005?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "\"you may do as you wish\""
+        },
+        "version": "4.5"
+      }
     },
     {
       "modId": 2019,
@@ -188,7 +303,22 @@
         "Cloaks&Capes.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/2019?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.6"
+      }
     },
     {
       "modId": 2853,
@@ -205,7 +335,22 @@
         "RaceCompatibility.esm"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/2853?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features without permission from or credit to me",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You must get permission to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Released with expired6978's permission as a Dawnguard compatibility patch. No part may be used in a commercial or paid mod."
+        },
+        "version": "2.16"
+      }
     },
     {
       "modId": 3479,
@@ -223,7 +368,22 @@
         "Hothtrooper44_ArmorCompilation.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/3479?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "8.1"
+      }
     },
     {
       "modId": 4119,
@@ -240,7 +400,22 @@
         "ElysiumEstate.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/4119?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You must get permission to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Translations may be uploaded without asking. Compatibility patches are welcome but ask before uploading. Do not copy parts of Elysium Estate and upload them as your own mod."
+        },
+        "version": "5.0.1"
+      }
     },
     {
       "modId": 5063,
@@ -262,7 +437,15 @@
         "CommonClothes.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/5063?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's instructions": "(empty on the page: no permissions are set)"
+        },
+        "version": ".99"
+      }
     },
     {
       "modId": 5513,
@@ -279,7 +462,15 @@
         "Playable Rieklings.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/5513?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "The page's Author's instructions hold only \"-\"."
+        },
+        "version": "1.3.2"
+      }
     },
     {
       "modId": 5804,
@@ -296,7 +487,15 @@
         "IcePenguinWorldMap.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/5804?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's instructions": "(empty on the page: no permissions are set)"
+        },
+        "version": "9.0.1"
+      }
     },
     {
       "modId": 6289,
@@ -313,7 +512,15 @@
         "JKs Skyrim.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/6289?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "Translations are fine if they include only the translated ESP and give credit. Authors may make patches for their own mods that require JK's Skyrim as a master, and are asked to post a comment saying so. Other requests go to the author."
+        },
+        "version": "1.7"
+      }
     },
     {
       "modId": 8379,
@@ -328,7 +535,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/8379?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "Uploading the mod to another site needs the author's OK first. Assets are available on request. Edits for personal use are fine but not to be uploaded as your own. Translations need asking first and must also be on the Nexus. If the author disappears from the Nexus, the work counts as public domain (message the author first to check)."
+        },
+        "version": "2.0"
+      }
     },
     {
       "modId": 9138,
@@ -345,7 +560,15 @@
         "ZIA_Complete Pack.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/9138?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "The author's own scripts and textures (except the spriggan sap) are free to use without permission. Translations into any language are free, with credit."
+        },
+        "version": "V1.7.4"
+      }
     },
     {
       "modId": 9320,
@@ -362,7 +585,22 @@
         "SkyrimSewers.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/9320?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "4.15"
+      }
     },
     {
       "modId": 12604,
@@ -379,7 +617,22 @@
         "SkyUI_SE.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/12604?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Patches that require the original file are allowed, including full SkyUI skins. Changing the icon files needs permission from their original authors, Psychosteve and Jeledity. Fixes and translations are best sent as pull requests on GitHub (doodlum/SkyUI-Community)."
+        },
+        "version": "6.9"
+      }
     },
     {
       "modId": 12688,
@@ -396,7 +649,15 @@
         "AHZmoreHUD.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/12688?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's instructions": "(empty on the page: no permissions are set)"
+        },
+        "version": "5.4.7.0"
+      }
     },
     {
       "modId": 12939,
@@ -413,7 +674,15 @@
         "DeadlySpellImpacts.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/12939?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Released under CC BY-NC-SA: the material may be copied and redistributed in any medium or format, and remixed, with credit, a link to the licence, and changes marked, under the same licence. No commercial use, and no legal or technical restrictions such as Patreon-only downloads. Donation Points on derived works are allowed."
+        },
+        "version": "1.9.0"
+      }
     },
     {
       "modId": 14658,
@@ -430,7 +699,22 @@
         "aaaGraniteHill.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/14658?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "6.7.1"
+      }
     },
     {
       "modId": 16788,
@@ -447,7 +731,22 @@
         "Immersive Weapons.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/16788?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2"
+      }
     },
     {
       "modId": 17230,
@@ -467,7 +766,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/17230?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You must get permission to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "7.0.20"
+      }
     },
     {
       "modId": 17561,
@@ -484,7 +798,15 @@
         "UIExtensions.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/17561?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's instructions": "(empty on the page: no permissions are set)"
+        },
+        "version": "1.2.0"
+      }
     },
     {
       "modId": 18619,
@@ -501,7 +823,22 @@
         "AHZmoreHUDInventory.esl"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/18619?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.2.4.0"
+      }
     },
     {
       "modId": 18692,
@@ -518,7 +855,22 @@
         "Solitude Arena.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/18692?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features without permission from or credit to me",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Compatibility patches, add-ons and translations may be made and published without asking."
+        },
+        "version": "1.1"
+      }
     },
     {
       "modId": 19080,
@@ -536,7 +888,15 @@
         "RaceMenuPlugin.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/19080?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not allowed",
+        "terms": {
+          "Author's notes (summary)": "\"You may not redistribute any files under any circumstances.\""
+        },
+        "version": "0.4.20.0"
+      }
     },
     {
       "modId": 19532,
@@ -551,7 +911,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/19532?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are not allowed to modify my files, including creating bug fixes or improving on features under any circumstances",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are not allowed to use assets from this file under any circumstances",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Stricter than usual. The EFA morph files (.tri) may not be included in other mods under any circumstances. NPC mods using EFA should list it as a recommended mod. Contact the author in advance to create a new file using EFA."
+        },
+        "version": "1.21"
+      }
     },
     {
       "modId": 22075,
@@ -568,7 +943,22 @@
         "Guard Dialogue Overhaul.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22075?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "The same permissions apply as on the Oldrim version's page (Skyrim mod 23390)."
+        },
+        "version": "3.0"
+      }
     },
     {
       "modId": 22243,
@@ -585,7 +975,22 @@
         "The Great City of Solitude.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22243?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.02"
+      }
     },
     {
       "modId": 22382,
@@ -602,7 +1007,15 @@
         "IA CBBE Patch.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22382?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not allowed",
+        "terms": {
+          "Author's notes (summary)": "Meshes generated by BodySlide may be used in follower and other mods as long as those stay free on the Nexus, with permission from HothTrooper44 and credit to the author and those they credit. \"You may not redistribute the BodySlide files.\" Donation Points only where the original mod's author allows them."
+        },
+        "version": "3.1.2"
+      }
     },
     {
       "modId": 22854,
@@ -617,7 +1030,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22854?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Do not bundle Papyrus Extender inside your own mods, since that breaks mods that depend on newer versions."
+        },
+        "version": "6.5.1"
+      }
     },
     {
       "modId": 22960,
@@ -634,7 +1062,22 @@
         "chfshVariousActions.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22960?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You must get permission to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.5"
+      }
     },
     {
       "modId": 24104,
@@ -681,7 +1124,15 @@
         "Cathedral Weathers.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/24791?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "JonnyWang's assets are free to use as long as the mod using them also has open permissions."
+        },
+        "version": "2.50"
+      }
     },
     {
       "modId": 25271,
@@ -698,7 +1149,22 @@
         "BetterContainerControls.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/25271?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "3.1"
+      }
     },
     {
       "modId": 27962,
@@ -721,7 +1187,22 @@
         "Skyrim Unbound.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/27962?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "3.0.18"
+      }
     },
     {
       "modId": 30174,
@@ -738,7 +1219,22 @@
         "3BBB.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/30174?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Most things are allowed if not for sale. A body mesh edited so its vertex order or count changes needs the author's OK. Everything other than the body meshes (textures, config files) is allowed if not for sale. Credit the author when used as a resource."
+        },
+        "version": "2.48"
+      }
     },
     {
       "modId": 30379,
@@ -753,7 +1249,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/30379?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are not allowed to modify my files, including creating bug fixes or improving on features under any circumstances",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are not allowed to use assets from this file under any circumstances",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.3.1"
+      }
     },
     {
       "modId": 30468,
@@ -775,7 +1286,22 @@
         "DIS_Heavy_Legion.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/30468?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You must get permission to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.0"
+      }
     },
     {
       "modId": 32117,
@@ -790,7 +1316,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/32117?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "The new mesh changes in the mod are released under CC BY-SA 4.0."
+        },
+        "version": "0.148"
+      }
     },
     {
       "modId": 32349,
@@ -805,7 +1346,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/32349?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "9"
+      }
     },
     {
       "modId": 32444,
@@ -820,7 +1376,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/32444?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "13"
+      }
     },
     {
       "modId": 34705,
@@ -835,7 +1406,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/34705?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "MIT License."
+        },
+        "version": "0.5.25"
+      }
     },
     {
       "modId": 35785,
@@ -852,7 +1431,22 @@
         "Expressive Facegen Morphs.esl"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/35785?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are not allowed to modify my files, including creating bug fixes or improving on features under any circumstances",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are not allowed to use assets from this file under any circumstances",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Stricter than usual. The EFM morph files (.tri) may not be included in other mods under any circumstances. NPC mods need no contact for FaceGen meshes, and preset mods need none either, but should name the files and versions used. EFM's mouth texture is from Fair Skin, whose permissions apply. Contact the author in advance to create a new file using EFM."
+        },
+        "version": "1.0"
+      }
     },
     {
       "modId": 37061,
@@ -871,7 +1465,22 @@
         "Water for ENB.esm"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/37061?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are not allowed to modify my files, including creating bug fixes or improving on features under any circumstances",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.21"
+      }
     },
     {
       "modId": 37085,
@@ -892,7 +1501,22 @@
         "Embers XD.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/37085?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Names people who were given particular permissions: an Xbox port, Donation Points on a patch, a Community Shaders particle lights patch, a torch edit and its Xbox port, and a PBR add-on."
+        },
+        "version": "3.3.0"
+      }
     },
     {
       "modId": 39170,
@@ -909,7 +1533,22 @@
         "Triumvirate - Mage Archetypes.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/39170?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.8.0"
+      }
     },
     {
       "modId": 40651,
@@ -929,7 +1568,15 @@
         "CFTO.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/40651?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "A patch for Carriage and Ferry Travel Overhaul, so all permissions belong to the respective mods' authors."
+        },
+        "version": "3.0"
+      }
     },
     {
       "modId": 41812,
@@ -946,7 +1593,22 @@
         "OarsRest.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/41812?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.0"
+      }
     },
     {
       "modId": 42990,
@@ -963,7 +1625,15 @@
         "WindhelmSSE.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/42990?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "Patches, ports, fixes, translations and add-ons are fine without asking, with credit and a link back. Donations and Donation Points are fine; paywalls and paid mods are not. Do not re-upload the whole mod, here or anywhere else, or claim it. Ports should say they are ports of a PC mod and that support is for the SSE PC version only. Applies to all of this author's mods."
+        },
+        "version": "1"
+      }
     },
     {
       "modId": 44666,
@@ -986,7 +1656,15 @@
         "MoreCraftableEquipment_CloaksandCapes.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/44666?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Licensed CC BY-NC-SA 4.0. Donation Points on files using its assets are still allowed. Credit all contributors of any assets used."
+        },
+        "version": "1.4.0"
+      }
     },
     {
       "modId": 46000,
@@ -1003,7 +1681,22 @@
         "Odin - Skyrim Magic Overhaul.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/46000?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "3.2.0"
+      }
     },
     {
       "modId": 46311,
@@ -1021,7 +1714,15 @@
         "RaceMenuMorphsHIMBO.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/46311?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "The main body mesh and the underwear meshes are licensed CC-BY-SA-4.0. The mod may be uploaded to Bethesda.net for PlayStation and Xbox without changing its name. Refits and original armour or clothing on the HIMBO body are allowed with credit, as long as they are free and not behind a paywall. People wanting to make HIMBO derivatives as a new body replacer are invited to message the author."
+        },
+        "version": "5.8"
+      }
     },
     {
       "modId": 47618,
@@ -1038,7 +1739,22 @@
         "FishingInSkyrim.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/47618?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.0"
+      }
     },
     {
       "modId": 49298,
@@ -1055,7 +1771,22 @@
         "CWE - JK - United.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/49298?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features without permission from or credit to me",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.0.7"
+      }
     },
     {
       "modId": 50049,
@@ -1075,7 +1806,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50049?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "MIT License."
+        },
+        "version": "1.5.9"
+      }
     },
     {
       "modId": 50129,
@@ -1090,7 +1829,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50129?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "3.4.0"
+      }
     },
     {
       "modId": 50258,
@@ -1105,7 +1859,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50258?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.5.3"
+      }
     },
     {
       "modId": 50961,
@@ -1122,7 +1891,22 @@
         "HappyLittleTrees.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50961?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are allowed to use the assets in this file in mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.03"
+      }
     },
     {
       "modId": 51073,
@@ -1137,7 +1921,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/51073?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.17.1"
+      }
     },
     {
       "modId": 51614,
@@ -1154,7 +1953,22 @@
         "TrueDirectionalMovement.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/51614?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Contributions go as pull requests on GitHub. The author wants this page to stay the main Nexus page for the mod unless they stop responding for a reasonable time."
+        },
+        "version": "2.3.1"
+      }
     },
     {
       "modId": 53000,
@@ -1171,7 +1985,15 @@
         "MCMHelper.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/53000?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Source code on GitHub, under the MIT License."
+        },
+        "version": "1.6.3"
+      }
     },
     {
       "modId": 57339,
@@ -1186,7 +2008,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/57339?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "From version 3.0 all assets are under GPL3 (MIT before, switching at commit 5a5cb88). The description is the author's own work and needs explicit permission to reuse. Notes on how Donation Points are shared between the authors."
+        },
+        "version": "4.1.1"
+      }
     },
     {
       "modId": 59818,
@@ -1206,7 +2036,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/59818?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "The open source licence on GitHub takes precedence over the Nexus permissions."
+        },
+        "version": "1.27.0"
+      }
     },
     {
       "modId": 60033,
@@ -1221,7 +2066,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/60033?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Licensed under GPL3; permissions follow that licence."
+        },
+        "version": "0.84-beta"
+      }
     },
     {
       "modId": 61007,
@@ -1238,7 +2091,22 @@
         "AnotherOakwood.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/61007?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.01.4"
+      }
     },
     {
       "modId": 61719,
@@ -1255,7 +2123,22 @@
         "McmRecorder.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/61719?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features without permission from or credit to me",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are allowed to use the assets in this file in mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Do not post translations; built-in translation support is coming."
+        },
+        "version": "1.0.7"
+      }
     },
     {
       "modId": 62775,
@@ -1272,7 +2155,22 @@
         "TrueHUD.esl"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/62775?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Contributions go as pull requests on GitHub. The author wants this page to stay the main Nexus page for the mod unless they stop responding for a reasonable time."
+        },
+        "version": "1.1.10"
+      }
     },
     {
       "modId": 64339,
@@ -1289,7 +2187,22 @@
         "BetterThirdPersonSelection.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/64339?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Fully open source: features may be lifted for your own plugin, with credit for features copied one to one. Do not re-upload the whole thing."
+        },
+        "version": "0.9.0"
+      }
     },
     {
       "modId": 72347,
@@ -1306,7 +2219,22 @@
         "Precision.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/72347?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.0.6"
+      }
     },
     {
       "modId": 76649,
@@ -1321,7 +2249,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/76649?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Licensed GPL-3.0-or-later with a Modding Exception and the GPL-3.0 Linking Exception (with Corresponding Source), the modded code being Skyrim and the modding libraries SKSE and Windows. Originally based on code under MIT."
+        },
+        "version": "1.6.1"
+      }
     },
     {
       "modId": 78351,
@@ -1338,7 +2274,22 @@
         "JK's Whiterun's Outskirts.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/78351?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.6.2"
+      }
     },
     {
       "modId": 80232,
@@ -1355,7 +2306,15 @@
         "BeardMaskFix.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/80232?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Source code on GitHub, under the MIT License."
+        },
+        "version": "1.0.2"
+      }
     },
     {
       "modId": 81409,
@@ -1370,7 +2329,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/81409?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Source code on GitHub, under the MIT License. SkyUI source and interface files may be used in other mods only as a trivial part of SkyUI; other requests go to the SkyUI authors, whose terms are linked."
+        },
+        "version": "1.2.0"
+      }
     },
     {
       "modId": 81731,
@@ -1385,7 +2352,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/81731?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are allowed to use the assets in this file in mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "GPL-3.0 License."
+        },
+        "version": "1.2.0"
+      }
     },
     {
       "modId": 82395,
@@ -1400,7 +2382,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/82395?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Contributions go as pull requests on GitHub. The author wants this page to stay the main Nexus page for the mod unless they stop responding for a reasonable time."
+        },
+        "version": "1.0.2"
+      }
     },
     {
       "modId": 83980,
@@ -1415,7 +2412,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/83980?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "Follow the permissions of the original mod."
+        },
+        "version": "1"
+      }
     },
     {
       "modId": 85260,
@@ -1430,7 +2435,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/85260?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.2.3"
+      }
     },
     {
       "modId": 85702,
@@ -1447,7 +2467,15 @@
         "I4IconAddon.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/85702?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Source code on GitHub, under the MIT License."
+        },
+        "version": "1.1.1"
+      }
     },
     {
       "modId": 90864,
@@ -1464,7 +2492,22 @@
         "JK's Riften Outskirts.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/90864?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.1"
+      }
     },
     {
       "modId": 92109,
@@ -1479,7 +2522,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/92109?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Contributions go as pull requests on GitHub. The author wants this page to stay the main Nexus page for the mod unless they stop responding for a reasonable time."
+        },
+        "version": "3.2.1"
+      }
     },
     {
       "modId": 93006,
@@ -1496,7 +2554,22 @@
         "JK's Markarth Outskirts.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/93006?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.0.1"
+      }
     },
     {
       "modId": 96876,
@@ -1514,7 +2587,22 @@
         "GourmetTables.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/96876?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.2.0"
+      }
     },
     {
       "modId": 99621,
@@ -1529,7 +2617,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/99621?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Contributions go as pull requests on GitHub. The author wants this page to stay the main Nexus page for the mod unless they stop responding for a reasonable time."
+        },
+        "version": "1.0.3"
+      }
     },
     {
       "modId": 101315,
@@ -1546,7 +2649,22 @@
         "AwBaldandShavedHair.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/101315?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.0"
+      }
     },
     {
       "modId": 106659,
@@ -1561,7 +2679,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/106659?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "8.0.0"
+      }
     },
     {
       "modId": 109194,
@@ -1581,7 +2714,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/109194?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "\"You are not permitted to include this mod in paywalled modlists.\" It says nothing about free ones."
+        },
+        "version": "6.0.1"
+      }
     },
     {
       "modId": 114252,
@@ -1598,7 +2746,22 @@
         "Arena - Markarth Side.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/114252?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.8"
+      }
     },
     {
       "modId": 114790,
@@ -1613,7 +2776,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/114790?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features without permission from or credit to me",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission or crediting me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.2.0"
+      }
     },
     {
       "modId": 114877,
@@ -1630,7 +2808,15 @@
         "PlayFluteLuteDrum.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/114877?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "Changes and reuse are fine if nobody makes money from them, but the mod is largely drain64's original work, so their permission should be sought too."
+        },
+        "version": "2.0.2"
+      }
     },
     {
       "modId": 116314,
@@ -1647,7 +2833,22 @@
         "JK's Castle Volkihar.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/116314?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.1.2"
+      }
     },
     {
       "modId": 120075,
@@ -1664,7 +2865,15 @@
         "QuickLootIE.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/120075?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Released under GPL-3.0-or-later; derivative works must provide full source under the same licence."
+        },
+        "version": "4.1.3"
+      }
     },
     {
       "modId": 120152,
@@ -1679,7 +2888,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/120152?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "The framework is licensed under Apache 2.0 (open permissions). Its images are from game-icons.net under CC-BY."
+        },
+        "version": "3.1.4"
+      }
     },
     {
       "modId": 120352,
@@ -1694,7 +2918,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/120352?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Author's notes (summary)": "Points to the LICENSE file in the QTR-Modding/SKSE-Menu-Framework-3 repository on GitHub, without naming the licence."
+        },
+        "version": "3.18"
+      }
     },
     {
       "modId": 122879,
@@ -1711,7 +2943,22 @@
         "KhisartinBeards.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/122879?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "Do not re-upload verbatim. RaceMenu presets, sculpt exports and NPC appearance mods using it may be shared freely."
+        },
+        "version": "1.1.1"
+      }
     },
     {
       "modId": 125447,
@@ -1726,7 +2973,22 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/125447?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are allowed to use the assets in this file in mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "3.4"
+      }
     },
     {
       "modId": 133232,
@@ -1743,7 +3005,15 @@
         "FNIS.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/133232?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Licensed GPLv3, copyright the Pandora Behaviour Engine contributors, with the source on GitHub."
+        },
+        "version": "5.0.0-beta"
+      }
     },
     {
       "modId": 150208,
@@ -1760,7 +3030,22 @@
         "YokuWeapons.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/150208?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "2.0"
+      }
     },
     {
       "modId": 156562,
@@ -1777,7 +3062,22 @@
         "HammerHair.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/156562?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.18"
+      }
     },
     {
       "modId": 165638,
@@ -1794,7 +3094,22 @@
         "North Keep.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/165638?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.00.2"
+      }
     },
     {
       "modId": 168629,
@@ -1817,7 +3132,22 @@
         "Riften Expansion.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/168629?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "not stated",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You are not allowed to upload this file to other sites under any circumstances",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author's notes (summary)": "FM07 may port it to Xbox. Patches need no permission. Other uses: contact the author."
+        },
+        "version": "1.9"
+      }
     },
     {
       "modId": 168741,
@@ -1836,7 +3166,22 @@
         "Hothtrooper44_ArmorCompilation.esp"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/168741?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "All the assets in this file belong to the author, or are from free-to-use modder's resources",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You are allowed to modify my files and release bug fixes or improve on the features so long as you credit me as the original creator",
+          "Conversion permission": "You can convert this file to work with other games as long as you credit me as the creator of the file",
+          "Asset use permission": "You are allowed to use the assets in this file without permission as long as you credit me",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.3.0"
+      }
     },
     {
       "modId": 175362,
@@ -1851,7 +3196,15 @@
       ],
       "plugins": [],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/175362?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Author's notes (summary)": "Versions before 3.0.1 are Apache-2.0 or MIT; from 3.0.1 GPL-3.0-or-later, with the licence files linked on GitHub."
+        },
+        "version": "3.1.1"
+      }
     },
     {
       "modId": 182534,
@@ -1873,7 +3226,22 @@
         "cheddars_mashups.esl"
       ],
       "page": "https://www.nexusmods.com/skyrimspecialedition/mods/182534?tab=description",
-      "reading": null
+      "reading": {
+        "read": "2026-10-27",
+        "by": "Local Desk on One (#3649)",
+        "collections": "allowed",
+        "terms": {
+          "Other user's assets": "Some assets in this file belong to other authors. You will need to seek permission from these authors before you can use their assets",
+          "Upload permission": "You can upload this file to other sites but you must credit me as the creator of the file",
+          "Modification permission": "You must get permission from me before you are allowed to modify my files to improve it",
+          "Conversion permission": "You are not allowed to convert this file to work on other games under any circumstances",
+          "Asset use permission": "You must get permission from me before you are allowed to use any of the assets in this file",
+          "Asset use permission in mods/files that are being sold": "You are not allowed to use assets from this file in any mods/files that are being sold, for money, on Steam Workshop or other platforms",
+          "Asset use permission in mods/files that earn donation points": "You are not allowed to earn Donation Points for your mods if they use my assets",
+          "Author notes": "This author has not provided any additional notes regarding file permissions"
+        },
+        "version": "1.8.8"
+      }
     },
     {
       "modId": 192001,
