@@ -190,6 +190,11 @@
       "why": "scripts/deploy/Install-Bridge.ps1, the box's end of ssh, LOCAL SERVICE, Limited, with a SID of its own (#2891, #2578)"
     },
     {
+      "name": "Thornswood Gate",
+      "user": "SYSTEM",
+      "why": "scripts/deploy/Install-Gate.ps1, from boot as SYSTEM (#2841): the deploy gate's broker, which runs only the verbs of scripts/vps/gate/verbs.json, each a script of main, and those reach the box as Administrator over loopback because the deploys' box halves need administrator (the ops repo's DEPLOY-IDENTITIES.md sections 2a and 9)"
+    },
+    {
       "name": "Thornswood Maint Update",
       "user": "SYSTEM",
       "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per the ops repo's DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (the ops repo's DEPLOY-IDENTITIES.md section 8)"
