@@ -110,14 +110,19 @@ jobs:
   # cannot read builds main in full, as before. A manual run always builds.
   # Only a pull request built on GitHub's hosted runner leaves that note
   # (#3874): on the VPS main builds in full so the gate is traced.
-  # It runs on any VPS runner, not a build one: it starts node and asks
-  # GitHub a few questions, which pull request a commit came from among them
-  # (pull-requests: read). tests\test-3182-tested-tree.js holds what it
-  # accepts, and why a tree is enough is in the script's header.
+  # HOSTED FIRST, LIKE THE BUILD (#3551, 27 Oct 2026). Both build jobs wait
+  # for this answer, so while this job asked only for a VPS runner the hosted
+  # build could start no sooner than a box runner was free, and not at all
+  # with the box down: on every push the box came first, not last. Nothing
+  # here needs the box. It starts node and asks GitHub a few questions, which
+  # pull request a commit came from among them (pull-requests: read), so it
+  # asks on GitHub's hosted Linux runner, and the box answers only when that
+  # did not, in "tested-vps" below. tests\test-3182-tested-tree.js holds what
+  # it accepts, and why a tree is enough is in the script's header.
   tested:
     name: Already tested in its pull request
-    if: ${{ github.event_name == 'push' }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    if: ${{ github.event_name == 'push' && vars.BUILD_RUNNER != 'vps' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       actions: read
@@ -125,7 +130,7 @@ jobs:
       pull-requests: read
     outputs:
       run: ${{ steps.look.outputs.run }}
-    steps:
+    steps: &look
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Every self-hosted checkout is written again (#3029), as below.
       - name: Check every tracked file out again
@@ -143,8 +148,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
-          node scripts\dev\Tested-Tree.js --tree $tree --commit $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
+          node scripts/dev/Tested-Tree.js --tree $tree --commit $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
           exit 0
+
+  # The same question on the box, as launcher-vps is the build's fallback.
+  # It asks only when the hosted job did not succeed: the repository variable
+  # BUILD_RUNNER is vps, which skips the hosted job outright, or a billing or
+  # quota stop refused it before any step ran. Only a push of main gets here,
+  # never a branch or a pull request, so it takes any VPS runner and needs
+  # no build runner. The steps are the hosted job's own, by the anchor look.
+  tested-vps:
+    name: Already tested in its pull request (VPS fallback)
+    needs: tested
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.tested.result != 'success' }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.look.outputs.run }}
+    steps: *look
 
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
   # GitHub's hosted windows-latest is the default, in the job "launcher"
@@ -163,8 +188,8 @@ jobs:
   # can never test different things.
   launcher-vps:
     name: Launcher builds (VPS fallback)
-    needs: [tested, launcher]
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    needs: [tested, tested-vps, launcher]
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     # thornswood-build (#2994): only the runners records/build-runners.json
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
@@ -689,8 +714,8 @@ jobs:
   # fallback above runs instead.
   launcher:
     name: Launcher builds
-    needs: tested
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    needs: [tested, tested-vps]
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
     runs-on: windows-latest
     # The hosted runner has two cores: the harness step alone took over
     # eighteen minutes on it, so it gets an hour.
