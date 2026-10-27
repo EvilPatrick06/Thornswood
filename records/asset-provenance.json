@@ -1011,6 +1011,77 @@
         "Data\\Interface\\exported\\AHZHudInfo.swf"
       ],
       "issue": 3113
+    },
+    {
+      "path": "The behavior, character and animation data files Build-Generated.ps1 makes with Pandora (Data\\meshes\\actors\\character\\behaviors\\, _1stperson\\behaviors\\, characters\\defaultmale.hkx, characters female\\defaultfemale.hkx, animationdatasinglefile.txt and animationsetdatasinglefile.txt)",
+      "what": "Skyrim's own animation graphs with the four patches records\\generated.json names merged in, so Precision's and True Directional Movement's animations and events reach the game: 35 behavior files (18 third person, 17 first person), the two character files and the two animation data files, 39 files and 10,543,930 bytes in the installer read on 27 Oct 2026. Data\\Scripts\\FNIS.pex is allowed by the same Ship-Rules.ps1 pattern and was not in that installer.",
+      "published": "Every pack and the installer, both channels, since #1247",
+      "source": "Built on the shipping machine by scripts\\mods\\Build-Generated.ps1 with Pandora Behaviour Engine+ 5.0.0-beta (Nexus SE 133232) from the game's own behavior graphs, character files and animation data, with the patch colis from Precision 2.0.6 (Nexus SE 72347) and tdmh, tdmlen and tdmv from True Directional Movement 2.3.1 (Nexus SE 51614), the versions the collection deploys. Pandora writes each graph whole: the file is the game's graph with the patches' nodes added, not the patches alone",
+      "creator": "Bethesda Game Studios (the graphs, the character files and the animation data); Ersh (Precision's and True Directional Movement's patches); merged by Pandora Behaviour Engine+, by the Pandora Behaviour Engine Team (Monitor221hz)",
+      "licence": "None found that lets Thornswood hand them on. Bethesda's part: the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, read 19 Oct 2026 for #2792) grants no right to hand on ZeniMax's own files, edited or not, the reading on which #2827 stopped shipping startmenu.swf and the board meshes. Ersh's part: Nexus answers a cloud session with a Cloudflare 403 and its API carries no permissions field, so the mod page's Permissions and credits section was not read, and neither mod's description names a licence (read through the Nexus API, 27 Oct 2026). Pandora's own licence covers the program, which does not ship, not the files it writes",
+      "attribution": "Bethesda Game Studios, Ersh for Precision and True Directional Movement, and Pandora Behaviour Engine+ on the public credits page (#3715)",
+      "approved": "Patrick, 29 Sep 2026 (#1247): build them in Thornswood's own folder before a Ship, and Ship-Rules.ps1 lets a release carry them by their generated record (#1256). Nobody has decided whether they may be handed on: that is #3715's decision",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; scripts\\mods\\Build-Generated.ps1; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies. Bethesda's terms: THIRD-PARTY.md, Bethesda's own files, made on each machine.",
+      "status": "no-licence-found",
+      "issue": 3715,
+      "paths": [
+        "Data\\meshes\\animationdatasinglefile.txt",
+        "Data\\meshes\\animationsetdatasinglefile.txt",
+        "Data\\meshes\\actors\\*\\behaviors\\*.hkx",
+        "Data\\meshes\\actors\\*\\characters\\*.hkx",
+        "Data\\meshes\\actors\\*\\characters female\\*.hkx",
+        "Data\\Scripts\\FNIS.pex"
+      ]
+    },
+    {
+      "path": "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif and femalebody_1.nif",
+      "what": "The women's body, CBBE 3BA built in BodySlide from the set CBBE 3BBB Amazing NeverNude at its own slider defaults, with underwear and nothing that shapes the breasts, the seat, the genitals or the nipples moved (#1004, #405). 3,840,722 bytes in the installer read on 27 Oct 2026.",
+      "published": "Every pack and the installer, both channels, since #1247",
+      "source": "CBBE 3BA (3BBB) 2.48 (Nexus SE 30174), its slider set file SliderSets\\SE 3BBB Amazing NeverNude.osp, as the collection deploys it; 3BA is built on CBBE (Nexus SE 198). Built on the shipping machine by scripts\\mods\\Build-Generated.ps1 with BodySlide",
+      "creator": "Acro (CBBE 3BA), on CBBE by Ousnius, Caliente and Jeir; built by BodySlide",
+      "licence": "Not read. Nexus answers a cloud session with a Cloudflare 403 and its API carries no permissions field, so the mod page's Permissions and credits section was not read. 30174's description names no licence; it thanks Ousnius, CBBE's author, for his permission to edit CBBE (read through the Nexus API, 27 Oct 2026)",
+      "attribution": "CBBE 3BA by Acro and CBBE by Ousnius, Caliente and Jeir on the public credits page (#3715)",
+      "approved": "Patrick, 29 Sep 2026 (#1247): build the covered bodies in Thornswood's own folder before a Ship. Nobody has decided whether they may be handed on: that is #3715's decision",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; scripts\\mods\\Build-Generated.ps1; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies.",
+      "status": "no-licence-found",
+      "issue": 3715,
+      "paths": [
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_1.nif"
+      ]
+    },
+    {
+      "path": "Data\\meshes\\actors\\character\\character assets\\femalebodyastrid_0.nif and femalebodyastrid_1.nif",
+      "what": "Astrid's burned body, built in BodySlide from the set CBBE Vanilla - Body - Astrid at its own slider defaults, so the old mesh with genital shapes is not used (#1004). 2,555,688 bytes in the installer read on 27 Oct 2026.",
+      "published": "Every pack and the installer, both channels, since #1247",
+      "source": "CBBE 2.0.3 (Nexus SE 198), one of its vanilla outfit slider sets (by its name SliderSets\\CBBE Vanilla.osp, the file the collection deploys from 198; the file itself was not opened here). Built on the shipping machine by scripts\\mods\\Build-Generated.ps1 with BodySlide. The collection's own prebuilt copy at the same path is CBBE 3BA Vanilla Outfits Redone's (Nexus SE 109194), which the release's file takes the place of",
+      "creator": "Ousnius, Caliente and Jeir (CBBE), over Bethesda's Astrid outfit; built by BodySlide",
+      "licence": "Not read. Nexus answers a cloud session with a Cloudflare 403 and its API carries no permissions field, so the mod page's Permissions and credits section was not read. 198's description names no licence (read through the Nexus API, 27 Oct 2026)",
+      "attribution": "CBBE by Ousnius, Caliente and Jeir on the public credits page (#3715)",
+      "approved": "Patrick, 29 Sep 2026 (#1247): build the covered bodies in Thornswood's own folder before a Ship. Nobody has decided whether they may be handed on: that is #3715's decision",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; scripts\\mods\\Build-Generated.ps1; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies.",
+      "status": "no-licence-found",
+      "issue": 3715,
+      "paths": [
+        "Data\\meshes\\actors\\character\\character assets\\femalebodyastrid_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\femalebodyastrid_1.nif"
+      ]
+    },
+    {
+      "path": "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif and malebody_1.nif",
+      "what": "The men's body, HIMBO built in BodySlide from the set HIMBO Body - Vanilla Nevernude at its own slider defaults, with underwear (#1004, #405). 1,988,322 bytes in the installer read on 27 Oct 2026.",
+      "published": "Every pack and the installer, both channels, since #1247",
+      "source": "Highly Improved Male Body Overhaul (HIMBO) 5.8 (Nexus SE 46311), its file HIMBO V5 - Core (Nevernude Body), slider set file SliderSets\\HIMBO.osp, as the collection deploys it. Built on the shipping machine by scripts\\mods\\Build-Generated.ps1 with BodySlide",
+      "creator": "Kreiste and Novelyst (HIMBO), which credits Better Males Remesh (Nexus SE 3672) by FavoredSoul, Chris57, Ratrace and Honkman and High Poly Hands (Nexus SE 37485) by zzjay; built by BodySlide",
+      "licence": "CC BY-SA 4.0, named by the author in the mod's description under Permission (read through the Nexus API, 27 Oct 2026): \"The main body mesh along with the undies meshes are licensed CC-BY-SA-4.0.\" and \"You are allowed to make refits and/or original armors/clothings using HIMBO body as long as you credit me and your files are available for free and not behind any kind of paywalls.\" A body built from it is an adaptation: it goes out under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/), free, with credit and a note that it was changed. Nexus answers a cloud session with a Cloudflare 403 and its API carries no permissions field, so the mod page's Permissions and credits section was not read, so whether it says more than the description is not known",
+      "attribution": "HIMBO by Kreiste and Novelyst, CC BY-SA 4.0, built in BodySlide for Thornswood, on the public credits page (#3715)",
+      "approved": "Not needed: an open licence, kept by crediting it and handing it on free under the same licence",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; scripts\\mods\\Build-Generated.ps1; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies. HIMBO's description, Permission, through the Nexus API (legacyMods, gameId 1704, modId 46311).",
+      "status": "cleared",
+      "paths": [
+        "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\malebody_1.nif"
+      ]
     }
   ],
   "dispositions": [

@@ -134,6 +134,22 @@ board and drop box meshes are put together from pieces of Skyrim's own meshes
 with the game's own textures. Thornswood ships none of the three: the launcher
 makes them on your computer from your own copy of the game.
 
+**The animation files** in `Data\meshes\actors\character` (its `behaviors`
+and `characters` folders) and `Data\meshes\animationdatasinglefile.txt` and
+`animationsetdatasinglefile.txt` are Skyrim's own, with the animation patches
+of Precision and True Directional Movement, both by Ersh, merged in by Pandora
+Behaviour Engine+, by the Pandora Behaviour Engine Team. Thornswood runs
+Pandora; it wrote none of them.
+
+**The bodies** are built in BodySlide for Thornswood, each with underwear, at
+its own slider defaults. The women's is CBBE 3BA, by Acro, and Astrid's is
+CBBE's, both on CBBE by Ousnius, Caliente and Jeir. The men's,
+`malebody_0.nif` and `malebody_1.nif`, is Highly Improved Male Body Overhaul
+(HIMBO), by Kreiste and Novelyst, changed only by that build. HIMBO's body is
+under the
+[Creative Commons Attribution-ShareAlike 4.0 licence](https://creativecommons.org/licenses/by-sa/4.0/),
+and so are these two files.
+
 **SkyHUD's settings**, `Data\Interface\skyhud\skyhud.txt`, are Thornswood's
 preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection
 installs. SkyHUD's author lets anybody share a preset that says which version

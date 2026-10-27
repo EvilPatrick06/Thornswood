@@ -661,6 +661,72 @@ no licence this file can name.
   (Test-ShipBethesdaLeftAlone) without deleting anybody's copy, so builds made
   after that change no longer carry it.
 
+## Built here from other people's work: behaviors and bodies
+
+Every pack and the installer, on both channels, carry 45 files that
+`scripts\mods\Build-Generated.ps1` builds on the shipping machine before a
+Ship (#1247), from the recipe in `records\generated.json`. Ship-Rules.ps1 lets
+a release carry them by their generated record (`$ShipGeneratedBodyFiles` and
+`$ShipGeneratedPatterns`, #1256). That record says who built them, not whose
+work they are: every one of them is made from somebody else's. Read on
+27 October 2026 (#3715) from the installer on thornswood.net (76,735,000
+bytes, sha256 starting eefa15c5, payload built 26 October 18:24 UTC): the same
+45 files and 18,928,662 bytes the 18 October installer carried.
+`tests\fixtures\3715-generated.txt` lists each with its sha256. Which mod
+deploys each slider set, patch and Pandora was read from the collection's
+Vortex deployment record of 21 October.
+
+- **Behavior files, 39 files, 10,543,930 bytes.** 18 behavior files in
+  `Data\meshes\actors\character\behaviors`, 17 in
+  `_1stperson\behaviors`, `characters\defaultmale.hkx`,
+  `characters female\defaultfemale.hkx`, and
+  `Data\meshes\animationdatasinglefile.txt` and
+  `animationsetdatasinglefile.txt`. Pandora Behaviour Engine+ 5.0.0-beta
+  (Nexus SE 133232, by the Pandora Behaviour Engine Team) writes them from the
+  game's own animation graphs, character files and animation data, with four
+  patches merged in: `colis` from Precision 2.0.6 (Nexus SE 72347) and
+  `tdmh`, `tdmlen` and `tdmv` from True Directional Movement 2.3.1 (Nexus SE
+  51614), both by Ersh. Pandora writes each graph whole, so each file is the
+  game's graph with the patches added. Bethesda's terms for mods grant no right
+  to hand on ZeniMax's own files, edited or not ("Bethesda's own files, made on
+  each machine" below), the reading on which #2827 stopped shipping three
+  other files. Precision's and True Directional Movement's permissions were
+  not read, and neither mod's description names a licence. Pandora's own
+  licence covers the program, which does not ship, not what it writes.
+  `Data\Scripts\FNIS.pex` is allowed by the same pattern and was not in the
+  installer read.
+- **The women's body, `femalebody_0.nif` and `femalebody_1.nif`, 3,840,722
+  bytes**, in `Data\meshes\actors\character\character assets`. BodySlide
+  builds it from the set CBBE 3BBB Amazing NeverNude of CBBE 3BA (3BBB) 2.48
+  (Nexus SE 30174, by Acro), which is built on CBBE (Nexus SE 198, by Ousnius,
+  Caliente and Jeir). Its permissions were not read, and its description
+  names no licence.
+- **Astrid's body, `femalebodyastrid_0.nif` and `femalebodyastrid_1.nif`,
+  2,555,688 bytes.** BodySlide builds it from the set CBBE Vanilla - Body -
+  Astrid of CBBE 2.0.3 (Nexus SE 198), over Bethesda's Astrid outfit. Its
+  permissions were not read, and its description names no licence.
+- **The men's body, `malebody_0.nif` and `malebody_1.nif`, 1,988,322 bytes.**
+  BodySlide builds it from the set HIMBO Body - Vanilla Nevernude of
+  Highly Improved Male Body Overhaul (HIMBO) 5.8 (Nexus SE 46311, by Kreiste
+  and Novelyst). HIMBO's description, under Permission: "The main body mesh
+  along with the undies meshes are licensed CC-BY-SA-4.0." and "You are
+  allowed to make refits and/or original armors/clothings using HIMBO body as
+  long as you credit me and your files are available for free and not behind
+  any kind of paywalls." So these two go out under the Creative Commons
+  Attribution-ShareAlike 4.0 licence
+  (https://creativecommons.org/licenses/by-sa/4.0/), free, as HIMBO built in
+  BodySlide for Thornswood, credited on the public credits page. LICENSE's
+  all rights reserved does not cover them.
+
+Nexus answers a cloud session with a Cloudflare 403 and its API has no
+permissions field, so the Permissions and credits sections of 30174, 198,
+72347, 51614 and 133232 were read only as far as each mod's description goes.
+`records\asset-provenance.json` has an entry for each group, and
+`tests\test-third-party.js` holds every path Ship-Rules.ps1 lets through as
+generated, and every file in the stand-in record, to an entry there. Whether
+the 43 with no permission found go on shipping, or are made on each machine
+the way the files below are, is Patrick's decision on #3715.
+
 ## Bethesda's own files, made on each machine
 
 `Data\Interface\startmenu.swf` is Skyrim's own `interface\startmenu.swf` from
@@ -1063,6 +1129,13 @@ also installs
 beside its `___systemPolyfill.js`.
 
 ## What is still missing
+
+- The 39 behavior files and the four women's body meshes Build-Generated.ps1
+  builds ship with no permission found ("Built here from other people's work:
+  behaviors and bodies"): the behavior files are the game's own graphs with
+  Precision's and True Directional Movement's patches merged in, and the
+  bodies are CBBE 3BA's and CBBE's. Patrick decides on #3715 whether they go
+  on shipping or are made on each machine.
 
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).

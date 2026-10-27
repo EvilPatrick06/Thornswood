@@ -1159,7 +1159,7 @@ function Test-ShipMachine([string]$rel) {
 # the Vortex record keeps them out when the game is the Steam copy.
 #
 # Except what scripts\mods\Build-Generated.ps1 built in the folder (#1247):
-# the behavior files Pandora makes and the BodySlide bodies are Thornswood's and
+# the behavior files Pandora makes and the BodySlide bodies are built here and
 # ship, though several sit where Vortex deploys a file of the same name
 # (Vortex's 3BA body, a mod's own behavior file), and files.txt goes on
 # saying V for those paths. Get-ShipGeneratedFiles reads its record.
@@ -1206,7 +1206,9 @@ function Get-ShipGeneratedFiles([string]$ProfileDir) {
 # out of packs, records and the installer, so this report should name nothing.
 # It stays as the alarm: a row here means a file reached what is about to ship
 # that the rule did not stop. Generated behavior files and BodySlide bodies
-# are Thornswood's by their generated record (#1247), rather than loose art.
+# ship by their generated record (#1247), rather than as loose art. Built here
+# is not Thornswood's own work: THIRD-PARTY.md, "Built here from other
+# people's work", says whose each is and what permission is on record (#3715).
 #
 # Ours is the main menu backdrop: the three files Go.ps1 writes from
 # game\menu ($menuPairs there; change the two together).
@@ -1337,7 +1339,10 @@ $ShipOursFiles = @(
     'Data\SKSE\Plugins\QuickLootIE.json'
 )
 
-# NEMESIS'S OUTPUT IS OURS, because we generate it from the collection.
+# NEMESIS'S OUTPUT SHIPS, because we generate it from the collection. It is
+# the game's graphs with the mods' patches merged in, and the bodies are
+# CBBE 3BA's, CBBE's and HIMBO's: whose each is, and what permission is on
+# record, is THIRD-PARTY.md's (#3715).
 # Measured 29 September in Data\Nemesis_Engine\cache\mod settings: the patches
 # chosen are Precision (Nexus 72347) and True Directional Movement's 360 Horse
 # Archery, Procedural Leaning and Headtracking (Nexus 51614), all three mods in

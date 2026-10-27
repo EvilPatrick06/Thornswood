@@ -890,6 +890,93 @@ if (filesTxt === null) {
   }
 }
 
+// ------------------------------------- built here from other people's work
+//
+// Issue #3715. Build-Generated.ps1 builds behavior files with Pandora and
+// bodies with BodySlide, and Ship-Rules.ps1 lets every pack and the installer
+// carry whatever its record lists ($ShipGeneratedBodyFiles,
+// $ShipGeneratedOutfitFiles and the patterns $ShipGeneratedPatterns adds).
+// The installer of 18 October carried 45 of them with nothing saying whose
+// they were. Every path and pattern that lets a file through as generated is
+// named by an entry of records\asset-provenance.json, and every file of a
+// generated record matches one: tests\fixtures\3715-generated.txt, the 45 the
+// installer carried on 27 October, and the launcher's own
+// Profile\OwnGame\generated.txt where it is on this machine.
+const shipRulesText = read(path.join(REPO, 'scripts', 'release', 'Ship-Rules.ps1')) || '';
+function shipPaths(text, name) {
+  // @() on one line is an empty list, not the start of one that ends further down.
+  const m = new RegExp('^\\$' + name + ' = (?:[$\\w]+ \\+ )*@\\((?:\\)|([\\s\\S]*?)^\\))', 'm').exec(text);
+  return m ? ((m[1] || '').match(/'[^']+'/g) || []).map(function (q) { return q.slice(1, -1); }) : [];
+}
+// PowerShell's -like, as Test-ShipGenerated uses it: * and ?, any case.
+function like(rel, pattern) {
+  const rx = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp('^' + rx + '$', 'i').test(rel);
+}
+function generatedRows(text) {
+  return String(text || '').split('\n').map(function (l) { return /^file [0-9a-f]{64} (.+)$/.exec(l.trim()); })
+    .filter(Boolean).map(function (m) { return m[1].replace(/\//g, '\\'); });
+}
+// Each finding is one line saying what has no entry.
+function generatedAudit(reg, rules, rows) {
+  const bad = [];
+  const entries = ((reg && reg.notInRepo) || []).filter(function (e) { return Array.isArray(e.paths); });
+  const named = function (p) {
+    return entries.filter(function (e) { return e.paths.some(function (q) { return q.toLowerCase() === p.toLowerCase(); }); });
+  };
+  const lets = shipPaths(rules, 'ShipGeneratedBodyFiles').concat(shipPaths(rules, 'ShipGeneratedOutfitFiles'), shipPaths(rules, 'ShipGeneratedPatterns'));
+  lets.forEach(function (p) {
+    const by = named(p);
+    if (by.length === 0) bad.push(p + ': Ship-Rules.ps1 lets it ship as generated, and no records\\asset-provenance.json entry names it');
+    by.forEach(function (e) {
+      if (!e.licence || !e.status) bad.push(p + ': its entry has no licence or status');
+      if (e.status === 'no-licence-found' && !(Number.isInteger(e.issue) && e.issue > 0)) bad.push(p + ': no licence found, and no issue carries the decision');
+    });
+  });
+  rows.forEach(function (rel) {
+    const by = entries.filter(function (e) { return e.paths.some(function (q) { return like(rel, q); }); });
+    if (by.length === 0) bad.push(rel + ': in a generated record, and no records\\asset-provenance.json entry covers it');
+  });
+  return { bad: bad, lets: lets };
+}
+let provenance = null;
+try { provenance = JSON.parse(read(path.join(REPO, 'records', 'asset-provenance.json'))); } catch (e) { }
+yes('records\\asset-provenance.json reads, for the generated files', provenance !== null);
+const standIn = generatedRows(read(path.join(REPO, 'tests', 'fixtures', '3715-generated.txt')));
+yes('the stand-in generated record lists the 45 files the installer carried (' + standIn.length + ')', standIn.length === 45);
+const gen = generatedAudit(provenance, shipRulesText, standIn);
+gen.bad.forEach(function (b) { console.log('      ' + b); });
+yes('Ship-Rules.ps1 names what may ship as generated (' + gen.lets.length + ' paths and patterns, each once)', gen.lets.length === new Set(gen.lets.map(function (p) { return p.toLowerCase(); })).size && gen.lets.length >= 12);
+yes('every generated path and pattern, and every file in the stand-in record, has a provenance entry (' + gen.bad.length + ' finding(s))', gen.bad.length === 0);
+const ownGenerated = read(path.join(PROFILE, 'OwnGame', 'generated.txt'));
+if (ownGenerated === null) {
+  skip('no ' + path.join(PROFILE, 'OwnGame', 'generated.txt') + ' here, so this machine\'s generated files were not held to the register');
+} else {
+  const own = generatedAudit(provenance, shipRulesText, generatedRows(ownGenerated));
+  own.bad.forEach(function (b) { console.log('      ' + b); });
+  yes('every file this machine\'s generated.txt lists has a provenance entry (' + own.bad.length + ' finding(s))', own.bad.length === 0);
+}
+const builtSec = (/\n## Built here from other people's work: behaviors and bodies\n([\s\S]*?)\n## /.exec(N) || [])[1] || '';
+yes('THIRD-PARTY.md has the section on what Build-Generated.ps1 builds', builtSec.length > 0);
+['Pandora Behaviour Engine+', 'Precision', 'True Directional Movement', 'CBBE 3BA', 'HIMBO', 'Nexus SE 198'].forEach(function (w) {
+  yes('  it names ' + w, builtSec.indexOf(w) >= 0);
+});
+yes('  and "What is still missing" lists what has no permission found', /Build-Generated\.ps1[\s\S]*#3715/.test((/\n## What is still missing\n([\s\S]*?)\n## /.exec(N) || [])[1] || ''));
+// HIMBO's body goes out under CC BY-SA 4.0, which asks for the credit and the
+// licence wherever it is handed on.
+yes('the public credits page credits HIMBO and gives its licence', /HIMBO/.test(C) && /Kreiste and Novelyst/.test(C) && /creativecommons\.org\/licenses\/by-sa\/4\.0/.test(C));
+if (provenance) {
+  const without = function (test) {
+    const c = JSON.parse(JSON.stringify(provenance));
+    c.notInRepo = c.notInRepo.filter(function (e) { return !test(e); });
+    return generatedAudit(c, shipRulesText, standIn).bad;
+  };
+  let r = without(function (e) { return (e.paths || []).indexOf('Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif') >= 0; });
+  yes('a body whose provenance entry is taken out is caught', r.some(function (b) { return /^Data\\meshes\\actors\\character\\character assets\\femalebody_0\.nif: Ship-Rules\.ps1 lets it ship/.test(b); }));
+  r = without(function (e) { return (e.paths || []).indexOf('Data\\meshes\\actors\\*\\behaviors\\*.hkx') >= 0; });
+  yes('a behavior file whose provenance entry is taken out is caught', r.some(function (b) { return /^Data\\meshes\\actors\\character\\behaviors\\0_master\.hkx: in a generated record/.test(b); }));
+}
+
 // ---------------------------------------------------------------- the words
 [['THIRD-PARTY.md', N], ['credits.md', C]].forEach(function (pair) {
   yes(pair[0] + ' has no em dash', pair[1].indexOf('\u2014') < 0);
