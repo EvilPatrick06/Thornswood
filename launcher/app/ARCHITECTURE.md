@@ -665,6 +665,8 @@ A new class gets a line on this page in the pull request that adds it.
 
 **Watched** (Watched.cs). Remembers the processes the last full look found and asks only those, by the handle each already has, whether they are still running. A full look happens again only when all of them have gone, and that look is the same one Checks.GameRunning makes.
 
+**PathFence** (PathFence.cs). The one rule for whether a resolved path is inside a folder: it compares against the folder plus its separator, so `C:\Thornswood2` is not inside `C:\Thornswood`. Every pack write and delete in Updater and Sync is fenced with it, and Setup.csproj compiles this file into the setup program as well, for its unpack into the scratch folder (#3561).
+
 **WindowFit** (WindowFit.cs). Keeps a window inside the work area of the monitor it is on, at any display scale. The size and the minimum are clamped to that work area at startup and again when the window lands on a monitor with another scale. Build-Launcher.ps1 compiles this file into the setup program as well.
 ## 3. The Play sequence
 

@@ -5,7 +5,8 @@
 
   The launcher's updater, asked its own questions.
 
-  WHY THIS EXISTS. Six functions in launcher\app\Updater.cs decide what counts
+  WHY THIS EXISTS. Six functions in launcher\app\Updater.cs (Inside in
+  PathFence.cs since #3561, shared with the setup program) decide what counts
   as an update, where one may come from, and which files a pack may write or
   delete: IsNewer, Parts, Inside, ClaimedElsewhere, Pending and
   CheckUrl. Each has the incident that shaped it written above it, and until
@@ -134,8 +135,12 @@ function Run {
     $flags = [Reflection.BindingFlags]'Static, Public, NonPublic'
     $script:m = @{}
     $gone = @()
+    # Inside is PathFence's since #3561, which the setup program compiles in
+    # too, so its unpack is held to the same fence.
+    $F = $asm.GetType('Thornswood.PathFence')
     foreach ($n in 'IsNewer', 'Parts', 'Inside', 'ClaimedElsewhere', 'Pending', 'CheckUrl') {
-        $script:m[$n] = $U.GetMethod($n, $flags)
+        $from = if ($n -eq 'Inside') { $F } else { $U }
+        $script:m[$n] = if ($null -ne $from) { $from.GetMethod($n, $flags) } else { $null }
         if ($null -eq $script:m[$n]) { $gone += $n }
     }
     Yes ('the six functions under test are all there' + $(if ($gone.Count) { ', missing ' + ($gone -join ', ') } else { '' })) (
