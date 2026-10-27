@@ -39,6 +39,16 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # The runner keeps its folder between jobs, so every tracked file is
+      # written again with this checkout's line ends (#3029).
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Read the four revisions and keep the rebuild issue
         shell: pwsh
         env:
