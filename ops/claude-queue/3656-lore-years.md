@@ -22,8 +22,8 @@ in the war about fifty years ago; delete AZURE_SIGNING_SUBSCRIPTION_ID.
    `gh api -X DELETE repos/EvilPatrick06/Thornswood/actions/variables/AZURE_SIGNING_SUBSCRIPTION_ID`.
    Check: `gh api repos/EvilPatrick06/Thornswood/actions/variables --jq '.variables[].name'`
    prints AZURE_SIGNING_CLIENT_ID, AZURE_SIGNING_TENANT_ID and BUILD_RUNNER,
-   and no subscription id. This delete needs Patrick's own approval line,
-   which the coordinator holds.
+   and no subscription id. Patrick picked this delete on the report page
+   (q-3717-subscription-var, A, 27 Oct); it is covered by his standing rules.
 
 ## Risks
 
