@@ -263,7 +263,7 @@ Moot put the crown on Ulfric. He wore it twenty-six years and died in his
 bed.
 
 The Moot sat eleven days and didn't pick his kin. It picked **Eirik
-Ravensgard** of the Rift, who's had it twenty-two years and is neither loved
+Ravensgard** of the Rift, who's had it twenty-three years and is neither loved
 nor hated.
 
 There's a High King of Skyrim and nothing above him. Every hold keeps its own
@@ -614,9 +614,11 @@ CHANGES = {
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),
         ('2026-10-22', 'Rewritten without the narrator asides, so it reads as plain lore. No event in it has changed.', 'fb95f2f38532'),
+        ('2026-10-27', 'Eirik has held the crown twenty-three years, not twenty-two: Ulfric died in 4E 229 and this is 4E 252. Patrick confirmed it (#3656).', 'e33f97399598'),
     ],
     'FACTIONS': [
         ('2026-10-22', 'The sixteen factions of 4E 252, each with who they are, where they keep and who leads them, as Patrick approved them.', '8ba2250523f8'),
+        ('2026-10-27', 'No Legion soldier has been in Skyrim under arms in fifty years, not thirty: the Legion left in the thaw of 203. Patrick confirmed it (#3656).', '16480e79786c'),
     ],
 }
 
