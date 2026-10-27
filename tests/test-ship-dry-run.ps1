@@ -57,6 +57,8 @@
     N  this machine's Vortex a collection revision behind
        records\collection-plugins.json, or unable to say: refused before the
        version moves, nothing published (#3597)
+    O  Nexus on a newer revision than the record, or not answering: refused
+       before the version moves, nothing published (#4068)
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
@@ -333,6 +335,15 @@ function Get-CollectionRevision([string]$Slug) { if ($env:TS_DRY_COLLECTION_REVI
     # (#3597); the stand-in Vortex above is on it unless a case says not.
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\records\collection-plugins.json') -Destination (Join-Path $repo 'records\collection-plugins.json') -Force
     $env:TS_DRY_COLLECTION_REVISION = [string](([IO.File]::ReadAllText((Join-Path $repo 'records\collection-plugins.json')) -replace '^\uFEFF', '') | ConvertFrom-Json).revision
+    # What Nexus says is the newest published revision (#4068), without asking
+    # it: the record's, unless a case says otherwise; 'none' is a Nexus that
+    # does not answer.
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\release\NexusPublished.ps1'), @'
+param([string]$Slug, [string]$Game)
+if ($env:TS_DRY_NEXUS_PUBLISHED -eq 'none') { throw 'the stand-in Nexus did not answer' }
+if ($env:TS_DRY_NEXUS_PUBLISHED) { return [int]$env:TS_DRY_NEXUS_PUBLISHED }
+return [int]$env:TS_DRY_COLLECTION_REVISION
+'@)
     $updaterCs = Join-Path $repo 'launcher\app\Updater.cs'
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.93`";`r`n")
     # Issue #1081: Ship runs scripts\dev\Check-Words.ps1 before it builds.
@@ -879,7 +890,19 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         $env:TS_DRY_COLLECTION_REVISION = '0'
         $nu = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
         Yes ("N a Ship from a Vortex that cannot say its revision is refused, never guessed (exit {0})" -f $nu.Code) ($nu.Code -ne 0 -and $nu.Out -match 'does not say which collection revision' -and (Called $nu 'Publish-Update').Count -eq 0)
-    } finally { $env:TS_DRY_COLLECTION_REVISION = [string]$recRev }
+
+        # ---- O: the record behind the newest revision on Nexus (#4068) ------------------
+        # Vortex and the record agree, and Nexus has published the next one:
+        # a release built now would be on an old revision, so it stops.
+        $env:TS_DRY_COLLECTION_REVISION = [string]$recRev
+        $env:TS_DRY_NEXUS_PUBLISHED = [string]($recRev + 1)
+        $no = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("O a Ship while Nexus has a newer revision than the record is refused (exit {0})" -f $no.Code) ($no.Code -ne 0 -and $no.Out -match ('Collection revision ' + ($recRev + 1) + ' is published on Nexus') -and $no.Out -match ('still on ' + $recRev))
+        Yes '  and nothing was built or published, and Updater.cs did not move' ((Called $no 'Publish-Update').Count -eq 0 -and (Read-Version $updaterCs) -eq '1.1.93')
+        $env:TS_DRY_NEXUS_PUBLISHED = 'none'
+        $nn = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+        Yes ("O a Ship while Nexus does not answer is refused, never taken as current (exit {0})" -f $nn.Code) ($nn.Code -ne 0 -and $nn.Out -match 'Nexus did not say which revision' -and (Called $nn 'Publish-Update').Count -eq 0)
+    } finally { $env:TS_DRY_COLLECTION_REVISION = [string]$recRev; $env:TS_DRY_NEXUS_PUBLISHED = '' }
 }
 finally {
     $env:PATH = $oldPath

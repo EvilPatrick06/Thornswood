@@ -38,6 +38,7 @@
       Get-ShipCollectionRevision   the revision this machine's Vortex has installed, for $ShipCollectionRevision
       Get-ShipRecordedCollectionRevision  the revision records\collection-plugins.json says a release is built against (CollectionRevision.ps1, #3597)
       Get-ShipCollectionRevisionProblem   why a release built from a source on another revision may not go out naming it, or ''
+      Get-ShipNewestRevisionProblem       why no release may go out while the record is not the newest revision published on Nexus, or '' (#4068)
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
       Get-ShipRequiredDataRoot     game\required-data in the repo
       Ensure-ShipRequiredData      place those files into Data\ before a pack or installer scan

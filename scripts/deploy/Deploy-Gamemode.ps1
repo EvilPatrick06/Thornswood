@@ -69,6 +69,11 @@ param(
     [switch]$FullLoadOrder,      # list everything, indices be damned. for bisecting
     [switch]$Vortex,             # read the Steam game and the active Vortex profile
     [switch]$NewOrder,           # take the plugin list's order as it is, for a world being wiped
+    # Write only the load order this run would give the server, to this file,
+    # as { "loadOrder": [paths] }, and nothing into the build: the order a new
+    # collection revision makes, before Thornswood-Last.esp is built against
+    # it (#4068). See THE ORDER ALONE below.
+    [string]$OrderOnly = '',
     # The LIVE voice service, the one the 'Thornswood Voice' task runs on.
     # Written into server-settings.json on every deploy rather than left to
     # whatever is already in the file. See the block that writes it for why.
@@ -270,19 +275,21 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not 
 if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was written.' }
 Write-Host '  gamemode.js parses'
 
-Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js') -Force
-$kb = [math]::Round((Get-Item (Join-Path $Dist 'gamemode.js')).Length / 1KB)
-Write-Host "gamemode.js -> $Dist  ($kb KB)" -ForegroundColor Cyan
+if (-not $OrderOnly) {
+    Copy-Item -LiteralPath $Gamemode -Destination (Join-Path $Dist 'gamemode.js') -Force
+    $kb = [math]::Round((Get-Item (Join-Path $Dist 'gamemode.js')).Length / 1KB)
+    Write-Host "gamemode.js -> $Dist  ($kb KB)" -ForegroundColor Cyan
 
-# What this gamemode is, written beside it, so the server can say which build it
-# runs instead of a person hashing files to find out. Deploy-Server.ps1 carries
-# it up with gamemode.js. Written straight after the copy and from the same
-# source, so the two always agree even if something below stops this run. The
-# fields and the reasons are in BuildStamp.ps1.
-. (Join-Path $Here '..\release\BuildStamp.ps1')
-$buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) `
-                -Path (Join-Path $Dist 'thornswood-build.json')
-Write-Host ("thornswood-build.json  {0}" -f (Format-ThornswoodBuildStamp $buildStamp)) -ForegroundColor DarkGray
+    # What this gamemode is, written beside it, so the server can say which build it
+    # runs instead of a person hashing files to find out. Deploy-Server.ps1 carries
+    # it up with gamemode.js. Written straight after the copy and from the same
+    # source, so the two always agree even if something below stops this run. The
+    # fields and the reasons are in BuildStamp.ps1.
+    . (Join-Path $Here '..\release\BuildStamp.ps1')
+    $buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) `
+                    -Path (Join-Path $Dist 'thornswood-build.json')
+    Write-Host ("thornswood-build.json  {0}" -f (Format-ThornswoodBuildStamp $buildStamp)) -ForegroundColor DarkGray
+}
 
 function Read-PluginHeader([string]$path) {
     $fs = [IO.File]::OpenRead($path)
@@ -540,7 +547,9 @@ if ($loadsLight) {
     # this machine's list (ServerOrder.ps1, Get-ThornswoodRecordedSequence).
     $sequence = [string[]]$wanted
     $lastOrder = @()
-    if ($lastHeld) {
+    # -OrderOnly is the order Thornswood-Last.esp is about to be built
+    # against, so it is not held to the one the plugin was built against.
+    if ($lastHeld -and -not $OrderOnly) {
         $lastRecord = [IO.Path]::GetFullPath((Join-Path $Here '..\..\game\data\last-plugin.json'))
         if (-not (Test-Path -LiteralPath $lastRecord)) { throw "the checkout holds $lastName and no game\data\last-plugin.json saying which load order it was built against" }
         $lastOrder = @((ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($lastRecord)) $lastRecord).loadOrder | ForEach-Object { [string]$_ })
@@ -580,7 +589,7 @@ if ($loadsLight) {
     # does not go out: the plugin would undo whatever a plugin that wins in
     # this order changed. Publish-Update refuses the same at the Ship
     # (Get-ShipLastPluginProblem); this stops it before a server runs it.
-    if ($lastHeld) {
+    if ($lastHeld -and -not $OrderOnly) {
         $built = @($so.Order | Where-Object { $_ -ine $lastName })
         $at = -1
         for ($i = 0; $i -lt [Math]::Max($built.Count, $lastOrder.Count); $i++) {
@@ -650,6 +659,43 @@ if ($lastHeld) { $keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastNa
 $paths = @($keep | ForEach-Object {
     if ($lastHeld -and $_ -ieq $lastName) { $lastRepo -replace '\\', '/' } else { (Join-Path $Data $_) -replace '\\', '/' }
 })
+
+# ---- THE ORDER ALONE (-OrderOnly, #4068) -----------------------------------
+#
+# A collection revision that adds plugins moves the order, and
+# Thornswood-Last.esp has to be built against the order the servers will run
+# before any server runs it; above, a deploy stops on a plugin built against
+# another order. The NPC catalogue it is built from reads that order out of a
+# server-settings file (scripts\dev\Build-NpcPopulation.py --settings), and
+# until #4068 the only file that held it was the one this script would not
+# write: on 27 Oct, with revision 5 on One, Build-NpcPopulation could only
+# reuse revision 2's order and this stopped at it. So -OrderOnly writes the
+# order this run would give the server, with the plugin's own place last,
+# to that file and stops, having written nothing into the build:
+#
+#   Deploy-Gamemode.ps1 -NewOrder -OrderOnly temp\order\server-settings.json
+#   python scripts\dev\Build-NpcPopulation.py --settings temp\order\server-settings.json --write-runtime
+#   python scripts\dev\Build-ResourceLocations.py --settings temp\order\server-settings.json
+#   python scripts\mods\Build-LastPlugin.py --data <the same Data>
+#
+# and a deploy after that holds the order the plugin's record now names.
+# Each of Thornswood's own plugins is named at its file in game\content, the
+# one every builder reads it from (own_plugins.py, #2923), never the copy a
+# game folder holds.
+if ($OrderOnly) {
+    $ownDir = [IO.Path]::GetFullPath((Join-Path $Here '..\..\game\content'))
+    $orderPaths = @($keep | ForEach-Object {
+        $own = Join-Path $ownDir $_
+        if (Test-Path -LiteralPath $own -PathType Leaf) { $own -replace '\\', '/' } else { (Join-Path $Data $_) -replace '\\', '/' }
+    })
+    $orderFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OrderOnly)
+    $orderDir = Split-Path -Parent $orderFile
+    if (-not (Test-Path -LiteralPath $orderDir)) { [void](New-Item -ItemType Directory -Force -Path $orderDir) }
+    $orderDoc = [ordered]@{ builtBy = 'scripts/deploy/Deploy-Gamemode.ps1 -OrderOnly'; data = ($Data -replace '\\', '/'); loadOrder = $orderPaths }
+    [IO.File]::WriteAllText($orderFile, ($orderDoc | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
+    Write-Host ("  the order alone, {0} plugins, to {1}; nothing was written into {2}" -f $orderPaths.Count, $OrderOnly, $Dist) -ForegroundColor Green
+    return
+}
 
 # ---- rewrite server-settings.json -----------------------------------------
 $settingsPath = Join-Path $Dist 'server-settings.json'

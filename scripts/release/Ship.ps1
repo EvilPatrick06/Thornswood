@@ -1348,7 +1348,11 @@ if ($FromFeed) {
     $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Slug $revRead.Slug -Source "this machine's Vortex" -Remedy 'Update the collection in Vortex''s Thornswood profile to the recorded revision, let it deploy, close Vortex, then Ship again. Nothing was built or published.'
 }
 if ($revWhy) { Die $revWhy }
-Say ("  collection revision {0}, the one records\collection-plugins.json names" -f $revBuilt) 'Green'
+# And the record has to be the newest revision published on Nexus, so no
+# release is built on an old one (#4068).
+$newestWhy = Get-ShipNewestRevisionProblem -RepoDir $RepoDir
+if ($newestWhy) { Die $newestWhy }
+Say ("  collection revision {0}, the one records\collection-plugins.json names and the newest on Nexus" -f $revBuilt) 'Green'
 
 # ------------------------------------------------------------ version
 $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'

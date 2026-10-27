@@ -6,6 +6,7 @@
 
       $r = Get-ShipRecordedCollectionRevision -RepoDir <repo>
       $why = Get-ShipCollectionRevisionProblem -RepoDir <repo> -Built <n> -Slug <slug> -Source <words> -Remedy <words>
+      $why = Get-ShipNewestRevisionProblem -RepoDir <repo>
 
   records\collection-plugins.json names the collection and the revision its
   plugins are, and both deploys already hold every plugin they send to it
@@ -29,7 +30,14 @@
   revision, or cannot say which, the Ship stops, naming both numbers, before
   anything is built. It never writes the source's number instead.
 
-  Dot-sourced by Ship-Rules.ps1 and New-FeedRoot.ps1; defines functions and
+  And the record has to be the newest revision published on Nexus (#4068), so
+  a release is never built on an old one and every launcher is held to the
+  newest: Get-ShipNewestRevisionProblem asks Nexus (NexusPublished.ps1) and
+  stops a release while the record is behind it or ahead of it.
+  Check-CollectionRevisions.ps1 holds Nexus, the record and both feeds to each
+  other every hour, and files the rebuild on the board when they part.
+
+  Dot-sourced by Ship-Rules.ps1; defines functions and
   nothing else. Works on Windows PowerShell 5.1 and PowerShell 7.
 #>
 
@@ -40,7 +48,7 @@ function Get-ShipRecordedCollectionRevision([string]$RepoDir, [string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "There is no $Path, so nothing says which collection revision this release is built against."
     }
-    try { $doc = ([IO.File]::ReadAllText($Path) -replace '^﻿', '') | ConvertFrom-Json }
+    try { $doc = ([IO.File]::ReadAllText($Path) -replace ('^' + [char]0xFEFF), '') | ConvertFrom-Json }
     catch { throw ("$Path does not read as JSON, so nothing says which collection revision this release is built against: " + ($_.Exception.Message -replace '\s+', ' ')) }
     $slug = if ($doc.PSObject.Properties['collection']) { [string]$doc.collection } else { '' }
     $raw = if ($doc.PSObject.Properties['revision']) { $doc.revision } else { $null }
@@ -70,6 +78,34 @@ function Get-ShipCollectionRevisionProblem([string]$RepoDir, [int]$Built, [strin
     }
     if ($Built -gt $rec.Revision) {
         return "$Source is on collection revision $Built and records\collection-plugins.json is still on $($rec.Revision). Record revision $Built (scripts\mods\New-CollectionPluginRecord.ps1) in its own pull request first, so the deploys and this release agree on it. $Remedy"
+    }
+    return ''
+}
+
+# '' when the recorded revision is the newest one published on Nexus;
+# otherwise the reason no release may go out (#4068). Patrick, 27 Oct, when
+# revision 5 had been out six days and both feeds still said 2: "1. The
+# launcher should always be on the newest revision 2. the new updates should
+# be based on the newest revison 3. the launcher should refuse if not on the
+# latest revison". A release names the recorded revision and the launcher
+# holds Play to it, so a record behind Nexus is a release built on an old
+# revision that tells every launcher the old one is current.
+#
+# $Published is what Nexus says, for a harness; left at 0 it is asked of
+# Nexus through NexusPublished.ps1 beside this file. A Nexus that does not
+# answer is a reason too: nothing then says the record is the newest.
+function Get-ShipNewestRevisionProblem([string]$RepoDir, [int]$Published = 0, [string]$Path) {
+    try { $rec = Get-ShipRecordedCollectionRevision $RepoDir $Path }
+    catch { return $_.Exception.Message }
+    if ($Published -le 0) {
+        try { $Published = [int](& (Join-Path $PSScriptRoot 'NexusPublished.ps1') -Slug $rec.Slug) }
+        catch { return ("Nexus did not say which revision of collection $($rec.Slug) is the newest published one (" + ($_.Exception.Message -replace '\s+', ' ') + "), so nothing says this release is built on it. Run it again once Nexus answers. Nothing was built or published.") }
+    }
+    if ($Published -gt $rec.Revision) {
+        return "Collection revision $Published is published on Nexus and records\collection-plugins.json is still on $($rec.Revision), so this release would be built on revision $($rec.Revision) and tell every launcher it is current. Record revision $Published (scripts\mods\New-CollectionPluginRecord.ps1) in its own pull request, rebuild dev on it, then main, and Ship after that. Nothing was built or published."
+    }
+    if ($Published -lt $rec.Revision) {
+        return "records\collection-plugins.json is on collection revision $($rec.Revision) and the newest revision published on Nexus is $Published, so nobody can install the revision this release would name. Publish revision $($rec.Revision) (scripts\release\New-NexusRevision.ps1 -Publish $($rec.Revision)) first. Nothing was built or published."
     }
     return ''
 }

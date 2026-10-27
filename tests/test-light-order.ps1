@@ -34,6 +34,10 @@
        plugins only; and again over that order with a new light plugin and a
        new light master, the first put on the end of the light order and the
        second refused.
+       Then -OrderOnly (#4068): over a list a collection revision moved, a
+       deploy stops on a Thornswood-Last.esp built against the old order,
+       and -OrderOnly writes the new order alone, our own plugins at their
+       files in game\content, and nothing into the build.
     4. The places full and light plugins hold among each other (#2468): a
        re-sorted list keeps each kind's order and still moves those places,
        and the same list in Thornswood-Last.esp's recorded order
@@ -298,7 +302,7 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
         New-Item -ItemType Directory -Force -Path (Join-Path $t 'appdata'), (Join-Path $t 'localappdata') | Out-Null
         return $t
     }
-    function Invoke-Copy([string]$t) {
+    function Invoke-Copy([string]$t, [string[]]$More = @()) {
         $saved = @{ APPDATA = $env:APPDATA; LOCALAPPDATA = $env:LOCALAPPDATA }
         $env:APPDATA = Join-Path $t 'appdata'
         $env:LOCALAPPDATA = Join-Path $t 'localappdata'
@@ -307,7 +311,7 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
         try {
             $out = @(& $shell -NoProfile -File (Join-Path $t 'scripts\deploy\Deploy-Gamemode.ps1') `
                        -Gamemode (Join-Path $t 'game\gamemode.js') -Dist (Join-Path $t 'dist') `
-                       -Data (Join-Path $t 'Game\Data') -Plugins (Join-Path $t 'plugins.txt') 2>&1 | ForEach-Object { [string]$_ })
+                       -Data (Join-Path $t 'Game\Data') -Plugins (Join-Path $t 'plugins.txt') @More 2>&1 | ForEach-Object { [string]$_ })
             $code = $LASTEXITCODE
         } finally {
             $ErrorActionPreference = $eap
@@ -357,6 +361,36 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
     $r = Invoke-Copy $t
     Yes 'a new .esl the game loads ahead of the light plugins: the deploy stops, naming it' ($r.Code -ne 0 -and $r.Text -match 'New Master\.esl \(light\)')
     Yes '  and the server''s settings are as they were' ([IO.File]::ReadAllText((Join-Path $t 'dist\server-settings.json')) -eq $before)
+
+    # ---- the order alone (-OrderOnly, #4068) ----------------------------------------
+    # A collection revision added New Light.esp, and Thornswood-Last.esp was
+    # built against the order before it: a deploy stops on that, and the
+    # order the plugin is to be built against again is written alone, with
+    # our own plugins at their files in game\content and nothing in the build.
+    $t = New-Tree 'order-only' (ServerRecord $true)
+    $own = Join-Path $t 'game\content'
+    New-Plugin $own 'Thornswood-Content.esp' 0x0
+    New-Plugin $own 'Thornswood-Last.esp' 0x200
+    Put (Join-Path $t 'plugins.txt') ("*Water for ENB.esm`r`n*Light Beards.esp`r`n*Expressive Facegen Morphs.esl`r`n*Thornswood-Content.esp`r`n" +
+                                      "*Menu Glue.esp`r`n*Skyrim Unbound.esp`r`n*Late Light.esp`r`n*New Light.esp`r`n")
+    $stale = @($masters5 + @('_ResourcePack.esl', 'Water for ENB.esm', 'Expressive Facegen Morphs.esl', 'Light Beards.esp', 'Thornswood-Content.esp', 'Menu Glue.esp', 'Skyrim Unbound.esp', 'Late Light.esp'))
+    Put (Join-Path $t 'game\data\last-plugin.json') ([ordered]@{ version = 1; loadOrder = $stale } | ConvertTo-Json -Depth 3)
+    $r = Invoke-Copy $t @('-NewOrder')
+    Yes 'a deploy over an order Thornswood-Last.esp was not built against stops' ($r.Code -ne 0 -and $r.Text -match 'Thornswood-Last\.esp was built against another load order')
+    # That run put gamemode.js and its stamp in the build before it stopped.
+    Remove-Item -LiteralPath (Join-Path $t 'dist\gamemode.js'), (Join-Path $t 'dist\thornswood-build.json') -Force -ErrorAction SilentlyContinue
+    $before = [IO.File]::ReadAllText((Join-Path $t 'dist\server-settings.json'))
+    $orderFile = Join-Path $t 'temp\order\server-settings.json'
+    $r = Invoke-Copy $t @('-NewOrder', '-OrderOnly', $orderFile)
+    Yes '-OrderOnly over it runs' ($r.Code -eq 0)
+    if ($r.Code -ne 0) { Write-Host $r.Text }
+    $o = [IO.File]::ReadAllText($orderFile) | ConvertFrom-Json
+    $oLeaves = Leaves $o
+    Same '  and writes the order the game loads for this list, with the plugin last' $oLeaves ($masters5 + @('_ResourcePack.esl', 'Water for ENB.esm', 'Expressive Facegen Morphs.esl', 'Light Beards.esp', 'Thornswood-Content.esp', 'Menu Glue.esp', 'Skyrim Unbound.esp', 'Late Light.esp', 'New Light.esp', 'Thornswood-Last.esp'))
+    $ownAt = @($o.loadOrder | Where-Object { ([string]$_) -match 'Thornswood-(Content|Last)\.esp$' })
+    Yes '  naming our own plugins at their files in game\content' ($ownAt.Count -eq 2 -and @($ownAt | Where-Object { ([string]$_) -notmatch '/game/content/' }).Count -eq 0)
+    Yes '  and the rest in the Data folder it read' (@($o.loadOrder | Where-Object { ([string]$_) -match '/Game/Data/Water for ENB\.esm$' }).Count -eq 1)
+    Yes '  and nothing in the build: the settings as they were, no gamemode.js put there' ([IO.File]::ReadAllText((Join-Path $t 'dist\server-settings.json')) -eq $before -and -not (Test-Path -LiteralPath (Join-Path $t 'dist\gamemode.js')))
 }
 catch {
     Yes ('the harness ran to the end without an error: ' + $_.Exception.Message) $false
