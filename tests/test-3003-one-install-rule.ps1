@@ -260,8 +260,19 @@ try {
     $installDev = [string](& $where InstallDev)
 }
 catch { $threw = $_.Exception.Message }
-Yes 'Where.ps1 Install answers, on this machine too' (-not $threw -and $install -match '(?i)^[a-z]:\\Thornswood$')
+# A runner off the box names its own (THORNSWOOD_INSTALL, #3860), and the
+# answer is then that and not the rule's.
+if ($env:THORNSWOOD_INSTALL) {
+    Yes 'Where.ps1 Install answers, on this machine too: the runner''s own folder' (-not $threw -and $install -eq $env:THORNSWOOD_INSTALL)
+} else {
+    Yes 'Where.ps1 Install answers, on this machine too' (-not $threw -and $install -match '(?i)^[a-z]:\\Thornswood$')
+}
 if ($threw) { Write-Host "      $threw" }
+$saved = $env:THORNSWOOD_INSTALL
+try {
+    $env:THORNSWOOD_INSTALL = 'X:\Runner\install'
+    Yes 'THORNSWOOD_INSTALL, which an off-box runner''s .env sets, is the answer when it is set (#3860)' (([string](& $where Install)) -eq 'X:\Runner\install' -and ([string](& $where InstallDev)) -eq 'X:\Runner\install-DevBuild')
+} finally { $env:THORNSWOOD_INSTALL = $saved }
 Yes 'Where.ps1 InstallDev is Install with -DevBuild on the end' ($installDev -eq ($install + '-DevBuild'))
 
 Write-Host ''

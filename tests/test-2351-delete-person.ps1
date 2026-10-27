@@ -36,7 +36,8 @@
       asks for it all again, the same way, and adds no line; -Merge adds a
       request from another copy of the record and asks for that one too, once
     - the nightly backup takes the record, Restore-Box.ps1 reapplies it from
-      the backup before anything starts, and docs\RESTORING.md says so
+      the backup before anything starts (RESTORING.md in the private ops
+      repo says so, and that repo's tests\test-ops-runbooks.ps1 checks it)
 
   Nothing leaves this machine and nothing runs from the stand-ins.
 #>
@@ -78,17 +79,8 @@ $rmAt = $boxText.IndexOf("Head 'Taking the copy off the box'")
 Yes '  and reapplies the record, merged with the backup''s, after the restores and before the copy is taken off' (
     $reAt -gt $svAt -and $svAt -gt 0 -and $rmAt -gt $reAt -and
     $boxText -match "OnBox 'Delete-Person\.ps1' ""-Reapply -Delete -Merge \`$far\\unpacked\\deletions\\requests\.jsonl""")
-$restoring = [IO.File]::ReadAllText((Join-Path $Repo 'docs\RESTORING.md'))
-Yes 'docs\RESTORING.md names the reapply step' ($restoring -match 'Delete-Person\.ps1 -Reapply')
-$ops = [IO.File]::ReadAllText((Join-Path $Repo 'docs\WEBSITE-OPERATIONS.md'))
-$at = $ops.IndexOf("`n## Deletion requests")
-Yes 'docs\WEBSITE-OPERATIONS.md has the procedure, "Deletion requests"' ($at -ge 0)
-if ($at -ge 0) {
-    $end = $ops.IndexOf("`n## ", $at + 5)
-    $pt = if ($end -gt 0) { $ops.Substring($at, $end - $at) } else { $ops.Substring($at) }
-    Yes '  and names the dry run, the real run, the record and the reapply' (
-        $pt -match '-DiscordId' -and $pt -match '-Delete -By' -and $pt -match 'C:\\Thornswood-Deletions\\requests\.jsonl' -and $pt -match '-Reapply')
-}
+# The procedure around it, "Deletion requests" in WEBSITE-OPERATIONS.md, is in
+# the private ops repo since #3693, and its tests/test-ops-docs.js checks it.
 
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) {

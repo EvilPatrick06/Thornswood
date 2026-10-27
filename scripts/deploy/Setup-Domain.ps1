@@ -137,7 +137,7 @@ Write-Host 'Setting up Caddy on the VPS...'
 # The Caddyfile is scripts\deploy\Caddyfile, the tracked copy of the live one, and not
 # one written here. This used to write its own four line file that proxied the
 # domain to 3001 and nothing else, so a full run on a new box, as
-# MOVING-THE-SERVER.md says to do, would have taken the /voice and /voice-dev
+# MOVING-THE-SERVER.md (in the ops repo) says to do, would have taken the /voice and /voice-dev
 # routes off the site and voice from everybody (issue #543). -Domain and
 # -Email still apply: the tracked file names thornswood.net and its own
 # address, and those two are swapped for what was asked.

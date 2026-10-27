@@ -116,6 +116,8 @@ function evict(opts) {
     'actorId', 'profileId', 'toProfile', 'isSteward', 'here', 'holderOf',
     'nameOf', 'claims', 'save', 'pushAll', 'plog', 'redrawPanel', 'OFFICE_AT_DOOR',
     'isStewardOf', 'BUILDING_HOLD', 'HOLD_TOWN', 'g', 'personName',
+    // What an evicted holder owed stays theirs (#3950): tests/test-3893-rent-arrears.js; no rent here.
+    'keepOwed',
     ownHoldSrc.join('\n') + '\n' + evictBlock + '\nreturn evict;');
   const call = fn(
     null, null, null,
@@ -133,7 +135,8 @@ function evict(opts) {
     },
     buildingHold, { whiterun: 'Whiterun', riften: 'Riften' },
     // Nobody here is staff: staff at any door is test-2551-building-holds.js's.
-    { __thornswoodIsStaff: function () { return false; } }, function () { return 'somebody'; });
+    { __thornswoodIsStaff: function () { return false; } }, function () { return 'somebody'; },
+    function () { });
   call(0xff000058, opts.by, function (pid, m) { told.push(m); });
   return { told: told, claims: claims, pushes: pushed.n, redraws: pushed.redraws || 0 };
 }

@@ -49,7 +49,7 @@ Scrolls and Skyrim are their trademarks.
 - `tests/`: harnesses. The build check runs all of them on main, and on a
   pull request built on the VPS only those its change can reach
   (`docs/AFFECTED-HARNESSES.md`).
-- `docs/`: system map, update feed, glossary, and runbooks.
+- `docs/`: the update feed, the gamemode, the game's systems and a glossary.
 - `engine/skymp/`: SkyMP fork submodule. Built by
   `scripts/release/Build-Engine.ps1` (`engine/README.md`).
 - `lore/`: the world.
@@ -69,10 +69,9 @@ change it.
 - [Developer-Guide.md](Developer-Guide.md): how to get the code onto your
   computer, open a pull request, ship a dev or main release, deploy the site
   and the gamemode, and post the news. Read it before your first change.
-- [docs](docs): the system map, the update feed, the gamemode and a glossary.
+- [docs](docs): the update feed, the gamemode, the game's systems and a glossary.
   [engine/README.md](engine/README.md): building the SkyMP fork.
 - [launcher/app/ARCHITECTURE.md](launcher/app/ARCHITECTURE.md): how the launcher
   starts, what each class owns and every step between Play and the game.
-- [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md): what to do when the server is down.
 
 Everything reaches `main` through a pull request, and `main` is what ships.
