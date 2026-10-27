@@ -317,7 +317,7 @@ try {
     $discord = Read 'launcher\app\Discord.cs'
     Yes 'the session logs never carry a snapshot (only crash-*.log)' ($discord -notmatch '\.dmp' -and $discord -match 'Directory\.GetFiles\(dir, "crash-\*\.log"\)')
     $diag = Read 'launcher\app\Diag.cs'
-    $report = [regex]::Match($diag, '(?s)Entry crash = Files\.NewestCrash\(\);\s*if \(crash != null\) Grab\(work, crash\.FullPath\);')
+    $report = [regex]::Match($diag, '(?s)Entry crash = Files\.NewestCrash\(\);\s*if \(crash != null\) Grab\(work, "crash log", crash\.FullPath\);')
     Yes 'the report zip takes the crash log, not the snapshot' ($report.Success -and $diag -notmatch '\.dmp' -and $files -match '"crash-\*\.log"')
     # ------------------------------------------- 7. kept until looked at (#2319)
     $l = NewInstall 'looked'
