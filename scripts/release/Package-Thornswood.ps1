@@ -900,7 +900,7 @@ try {
     foreach ($x in $clientLicences) { [IO.File]::WriteAllBytes((Join-Path $libDir ($x.Port + '.txt')), $x.Bytes) }
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
     Say ("  licences\ holds the texts of the {0} libraries inside the client files and build.js ({1})" -f $clientLicences.Count, $(if ($licencesFrom -eq 'checkout') { 'this checkout''s record' } else { 'the record committed at ' + $licencesFrom.Substring(0, 8) })) 'Green'
-    if (-not $clientMeasured) { Say '  that record lists no library beside the vcpkg ports: its client was measured before #3751, so the Tilted, papyrus-vm, viet and libespm notices and the npm packages in skymp5-client.js are not in licences\ (THIRD-PARTY.md, What is still missing)' 'Yellow' }
+    if (-not $clientMeasured) { Say '  that record lists no library beside the vcpkg ports: its client was measured before #3751, so the Tilted, papyrus-vm and viet notices and the npm package in skymp5-client.js are not in licences\ (THIRD-PARTY.md, What is still missing)' 'Yellow' }
     if ($frontFor) { Say ("  build.js is the recorded front, and its {0} npm packages' texts are among them" -f $frontLicences.Count) 'Green' }
     elseif (Test-Path -LiteralPath $payloadFront -PathType Leaf) { Say '  build.js is not the recorded front, so no list of the npm packages in it goes with it (THIRD-PARTY.md, What is still missing)' 'Yellow' }
 } catch {

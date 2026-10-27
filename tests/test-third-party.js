@@ -647,7 +647,7 @@ const noticed = [];
 if (/skyrim-platform\\src\\tilted/.test(compiled)) noticed.push('tilted');
 const unrowed = noticed.filter(function (n) { return otherNames.indexOf(n) < 0; });
 yes('each library the client section names with a notice of its own has a row (' + noticed.join(', ') + ')' + (unrowed.length ? ', not: ' + unrowed.join(', ') : ''),
-    noticed.length >= 4 && unrowed.length === 0);
+    noticed.length >= 3 && unrowed.length === 0);
 if (cl && cl.libraries) {
   const want = Object.keys(cl.libraries).sort().map(function (n) {
     const p = cl.libraries[n];

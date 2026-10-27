@@ -149,9 +149,11 @@ What is compiled into them:
 - The fork's own libraries. SkyrimPlatformImpl links `papyrus-vm` and `viet`
   (MIT, by their LICENSE files), `savefile` (GPL-3.0) and `serialization`,
   which has no licence file of its own. MpClientPlugin links `viet`,
-  `papyrus-vm`, `libespm` (MIT, by its LICENSE file) and `serialization`
-  through `mp_common` and `server_guest_lib`.
-- The Tilted notice and the three MIT ones are under "The other code inside
+  `papyrus-vm`, `serialization` and libespm through `mp_common` and
+  `server_guest_lib`, but its program database shows code from `viet` alone
+  of those that carry a notice: none of papyrus-vm's and none of libespm's
+  (whose LICENSE is MIT as well) is in it, so neither notice is owed there.
+- The Tilted notice and the two MIT ones are under "The other code inside
   the client files", below, with the npm package inside `skymp5-client.js`.
 - The libraries in the fork's `vcpkg.json`, linked in by the build. Among them
   is the Chromium Embedded Framework (cef-prebuilt 108.4.13), which
@@ -289,19 +291,20 @@ licence files, byte for byte.
 
 | Library | Version | Licence, as its folder or package gives it | In |
 |---|---|---|---|
-| libespm | the fork's | MIT | `MpClientPlugin.dll` |
 | npm-eventemitter3-5.0.1 | 5.0.1 | MIT | `skymp5-client.js` |
-| papyrus-vm | the fork's | MIT | `MpClientPlugin.dll`, `SkyrimPlatformImpl.dll` |
+| papyrus-vm | the fork's | MIT | `SkyrimPlatformImpl.dll` |
 | tilted | the fork's | not declared; its text is in `tilted.txt` | `SkyrimPlatformCEF.exe.hidden`, `SkyrimPlatformImpl.dll` |
 | viet | the fork's | MIT | `MpClientPlugin.dll`, `SkyrimPlatformImpl.dll` |
 
-Read on 27 October from the fork at `7ae58fea`, the commit the client record
-names, and not yet from a program database: the In column is what the
-fork's build files link each folder into
-(`skyrim-platform\src\platform_se\CMakeLists.txt`,
-`skymp5-server\cpp\CMakeLists.txt`), and the eventemitter3 row is a Linux
-build of `skymp5-client` at that commit, whose only `node_modules` modules
-are eventemitter3's. The recorded client was measured before #3751, so
+Measured on 27 October by fork #124's own Windows build (its head
+`df42add4`, on `c152a452`): the program databases show code from
+`skyrim-platform\src\tilted` in SkyrimPlatformImpl (34 source files) and
+SkyrimPlatformCEF (13), from `papyrus-vm` in SkyrimPlatformImpl (11), and
+from `viet` in SkyrimPlatformImpl (5) and MpClientPlugin (1), and
+`skymp5-client.js` holds eventemitter3 5.0.1 and no other package. The same
+holds at `7ae58fea`, the commit the client record names, by its build files
+and a Linux build of `skymp5-client` there, but no program database of
+that build was read. The recorded client was measured before #3751, so
 `records\client-licences.json` has no `libraries` and these texts do not
 go out yet ("What is still missing"). Once a client measured since then is
 recorded, `tests\test-third-party.js` holds this table to the record, row
@@ -1142,7 +1145,7 @@ beside its `___systemPolyfill.js`.
 
 - The client record (`7ae58fea`) was measured before #3751, so
   `records\client-licences.json` has no `libraries`, and the notices of
-  libespm, npm-eventemitter3-5.0.1, papyrus-vm, tilted and viet ("The other
+  npm-eventemitter3-5.0.1, papyrus-vm, tilted and viet ("The other
   code inside the client files") do not go with the client files yet. The
   fork's build measures them from fork #124 on, and New-ClientLicenceRecord.ps1
   refuses a build that did not, so the first engine pin recorded from a fork
