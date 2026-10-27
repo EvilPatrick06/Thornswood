@@ -112,7 +112,9 @@ yes('what update writes has the shape the check takes', cp.shapeProblems(u).leng
 // 6. New-NexusRevision runs it on both paths
 const nnr = fs.readFileSync(path.join(ROOT, 'scripts', 'release', 'New-NexusRevision.ps1'), 'utf8');
 yes('New-NexusRevision.ps1 checks the revision it builds and the draft it publishes', (nnr.match(/^\s*Test-ModPermissions \$/gm) || []).length === 2 && /collection-permissions\.js'\), 'check'/.test(nnr));
-yes('the record is LF text that update itself would write', fs.readFileSync(cp.RECORD, 'utf8') === cp.text(record));
+// A checkout with core.autocrlf true (One, the Windows runners) holds it with
+// CRLF; git stores the LF that update writes either way.
+yes('the record is the text update itself would write', fs.readFileSync(cp.RECORD, 'utf8').replace(/\r\n/g, '\n') === cp.text(record));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
