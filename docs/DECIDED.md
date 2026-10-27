@@ -134,6 +134,10 @@ link, and the old line goes.
 - **A pack does not spoil while its owner is offline;** chests and shops
   keep spoiling. 22 Oct 2026,
   [#3163](https://github.com/EvilPatrick06/Thornswood/issues/3163#issuecomment-6335272878).
+- **A drop lies on the ground for 2 minutes, then is gone,** a restart in
+  between included, and it keeps what it carried. So food never spoils on
+  the ground. 27 Oct 2026,
+  [#3498](https://github.com/EvilPatrick06/Thornswood/issues/3498#issuecomment-6431943093).
 - **Hangover: stamina regen down 25% for 10 minutes. Withdrawal after 3 uses
   in a day: stamina and magicka regen down 10% for 30 minutes.** Drunk,
   high, hangover and withdrawal each have visual effects as well (Patrick:
