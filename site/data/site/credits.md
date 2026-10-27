@@ -141,8 +141,8 @@ it is for, and nothing else of SkyHUD's comes with it.
 
 **QuickLoot IE's settings**, `Data\SKSE\Plugins\QuickLootIE.json`, are
 QuickLoot IE 4.1.3's own settings file with one line added by Thornswood, so
-its loot menu shows weight and no gold value. QuickLoot IE is under the GNU
-General Public License version 3, and so is this file.
+its loot menu shows weight and no gold value. QuickLoot IE is released under
+the GPL-3.0-or-later, and so is this file.
 
 **SkyUI's item lists and item card, SkyHUD's line under an item and moreHUD's
 value to weight** show no gold value on Thornswood, because an item here has
