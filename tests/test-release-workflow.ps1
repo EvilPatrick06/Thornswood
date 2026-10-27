@@ -151,11 +151,20 @@ Yes '  and that script is in the repository' (Test-Path -LiteralPath (Join-Path 
 $recDir = Join-Path $repoRoot 'records'
 $signRec = Join-Path $recDir 'sign-runners.json'
 $buildRec = Join-Path $recDir 'build-runners.json'
+$checkRec = Join-Path $recDir 'check-runners.json'
 Yes 'records/sign-runners.json names the signing label' ((Test-Path -LiteralPath $signRec) -and ((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).label -eq 'thornswood-sign'))
 if ((Test-Path -LiteralPath $signRec) -and (Test-Path -LiteralPath $buildRec)) {
     $signers = @((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
     $builders = @((Get-Content -LiteralPath $buildRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
     Yes ("  it lists runner(s) {0}, and the build runners {1} are none of them" -f ($signers -join ', '), ($builders -join ', ')) ($signers.Count -gt 0 -and -not @($signers | Where-Object { $builders -contains $_ }).Count)
+}
+Yes 'records/check-runners.json names the check label (#3956), which no job here asks for since #4013' ((Test-Path -LiteralPath $checkRec) -and ((Get-Content -LiteralPath $checkRec -Raw | ConvertFrom-Json).label -eq 'thornswood-check'))
+if ((Test-Path -LiteralPath $signRec) -and (Test-Path -LiteralPath $checkRec) -and (Test-Path -LiteralPath $buildRec)) {
+    $signers = @((Get-Content -LiteralPath $signRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
+    $builders = @((Get-Content -LiteralPath $buildRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
+    $checkers = @((Get-Content -LiteralPath $checkRec -Raw | ConvertFrom-Json).runners | ForEach-Object { [int]$_ })
+    Yes ("  it lists runner(s) {0}, and the signing runner(s) {1} are none of them" -f ($checkers -join ', '), ($signers -join ', ')) ($checkers.Count -gt 0 -and -not @($checkers | Where-Object { $signers -contains $_ }).Count)
+    Yes '  and at least one of them is no build runner, so a pull request build cannot hold every one' (@($checkers | Where-Object { $builders -notcontains $_ }).Count -gt 0)
 }
 
 # ---- release-tag.yml makes the tag a cloud Ship cannot push (#3312) ------------

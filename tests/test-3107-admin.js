@@ -32,8 +32,9 @@
 //      right on the ops repository with an installation token for it alone,
 //      reads them back, and a second run changes nothing; the records come
 //      from this repository's main through the App, with a read-only token
-//      for this repository alone, never from the caller; and the log holds
-//      no token;
+//      for this repository alone, never from the caller; installation-repos
+//      (#4013) lists the repositories the App is on with a token that reads
+//      metadata alone, and changes nothing; and the log holds no token;
 //   5. the App's setup: no armed setup, a wrong or expired state, and an App
 //      already held are the plain 404; the armed page sends the manifest
 //      (administration write, contents read, no webhook, private) to GitHub
@@ -147,6 +148,15 @@ yes('  and so does an off-box runner, which never takes box jobs', did('thornswo
 yes('a runner that is right is left alone', !did('thornswood-vps') && !did('thornswood-vps-3') && p.changes.length === 3);
 yes('a listed runner GitHub does not have is named', p.lines.some(l => /runner 4 is in records\/build-runners\.json but not registered/.test(l)));
 yes('  and nothing is refused', p.refuse === '');
+// Build runners on One (26 Oct 2026): named in offBox, an off-box runner keeps it,
+// but never one that carries thornswood-vps too.
+const recOne = Object.assign({}, rec4, { offBox: ['thornswood-pr-one', 'thornswood-pr-one-2'] });
+const withVps = mixed.concat([runner(41, 'thornswood-pr-one-2', ['self-hosted', 'Windows', 'thornswood-pr', 'thornswood-vps', 'thornswood-build'])]);
+const pOne = admin.planLabels(recOne, withVps);
+const didOne = (name) => (pOne.changes.find(c => c.name === name) || {}).do;
+yes('an off-box runner the record names by name keeps the label', !didOne('thornswood-pr-one'));
+yes('  but not one that also carries thornswood-vps', didOne('thornswood-pr-one-2') === 'take off');
+yes('an off-box name with no runner under it is named', admin.planLabels(Object.assign({}, rec4, { offBox: ['thornswood-pr-one-5'] }), mixed).lines.some(l => /off-box runner thornswood-pr-one-5 is in/.test(l)));
 yes('a record whose runners GitHub has none of is refused', /never comes/.test(admin.planLabels({ file: 'r', label: 'thornswood-build', runners: [9] }, mixed).refuse));
 yes('runner numbers: thornswood-vps is 1, thornswood-vps-<n> is n, anything else none',
   admin.runnerNumber('thornswood-vps') === 1 && admin.runnerNumber('thornswood-vps-7') === 7 && admin.runnerNumber('thornswood-pr-one') === 0 && admin.runnerNumber('thornswood-vps-x') === 0);
@@ -158,6 +168,8 @@ yes('  and one naming self-hosted', /every runner carries/.test(stops([{ file: '
 yes('a record listing no runners stops', /lists no runners/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [] }])));
 yes('two records naming one label stop', /both name/.test(stops([rec4, Object.assign({}, sign3, { label: 'thornswood-build' })])));
 yes('a label that is not one lower case word stops', /one lower case word/.test(stops([{ file: 'r', label: 'a b', runners: [1] }])));
+yes('an off-box name that is not thornswood-pr-* stops', /not thornswood-pr-/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-vps-9'] })])));
+yes('an off-box name listed twice stops', /off-box runner twice/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-pr-one', 'thornswood-pr-one'] })])));
 yes('a runner number below 1 stops', /number from 1/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [0] }])));
 yes('the real records on this checkout pass', (() => {
   const dir = path.join(REPO, 'records');
@@ -184,6 +196,8 @@ const gh = {
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   readToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   installed: true,
+  repoToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
+  installRepos: ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'],
   conversion: null,
 };
 const appKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -212,9 +226,11 @@ function standIn(req, res) {
     if (P === '/repos/EvilPatrick06/Thornswood/installation' || P === '/repos/EvilPatrick06/Thornswood-Ops/installation') return !asApp() ? send(401, { message: 'Bad credentials' }) : gh.installed ? send(200, { id: 77 }) : send(404, { message: 'Not Found' });
     if (P === '/app/installations/77/access_tokens' && req.method === 'POST') {
       if (!asApp()) return send(401, { message: 'Bad credentials' });
+      if (body && body.repositories === undefined) return JSON.stringify(body.permissions) === '{"metadata":"read"}' ? send(201, { token: gh.repoToken }) : send(422, { message: 'not a metadata token' });
       const repos = JSON.stringify((body && body.repositories) || []);
       return repos === '["Thornswood-Ops"]' ? send(201, { token: gh.instToken }) : repos === '["Thornswood"]' ? send(201, { token: gh.readToken }) : send(422, { message: 'no such repositories' });
     }
+    if (P === '/installation/repositories') return req.headers.authorization === 'Bearer ' + gh.repoToken ? send(200, { total_count: gh.installRepos.length, repositories: gh.installRepos.map(n => ({ full_name: n })) }) : send(401, { message: 'Bad credentials' });
     if (P.startsWith('/repos/EvilPatrick06/Thornswood/contents/') && !asRead()) return send(401, { message: 'Bad credentials' });
     if (P.startsWith('/repos/EvilPatrick06/Thornswood-Ops/actions/') && !asInst()) return send(401, { message: 'Bad credentials' });
     if (P === '/repos/EvilPatrick06/Thornswood/contents/records') {
@@ -310,7 +326,7 @@ function start(stateDir, ghPort) {
     r = await ask4(bearer(sign(good())));
     yes('with no App yet it says how to make one (503)', r.status === 503 && /Install-AdminService\.ps1 -Setup/.test(r.text));
     r = await ask4(bearer(sign(good())), { what: 'secrets' });
-    yes('anything but runner-labels is refused (400)', r.status === 400);
+    yes('anything but runner-labels and installation-repos is refused (400)', r.status === 400 && /runner-labels and installation-repos/.test(r.text));
 
     // The App, as the setup would leave it.
     fs.writeFileSync(path.join(state, 'key.pem'), appKeyPem);
@@ -348,6 +364,19 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await ask4(bearer(sign(good())));
     yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && writes().length === 0);
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'installation-repos', check: false });
+    const repoTok = gh.calls.find(c => /access_tokens$/.test(c.path));
+    yes('installation-repos lists the repositories the App is on, sorted (200)',
+      r.status === 200 && r.json.ok && JSON.stringify(r.json.repos) === '["EvilPatrick06/Thornswood","EvilPatrick06/Thornswood-Ops"]' && r.json.lines.includes('installed on EvilPatrick06/Thornswood-Ops'));
+    yes('  with a token that reads metadata alone, for no one repository',
+      repoTok && repoTok.body.repositories === undefined && JSON.stringify(repoTok.body.permissions) === '{"metadata":"read"}');
+    yes('  asked with that token, and changing nothing, reading no record and no runner',
+      gh.calls.some(c => c.path.startsWith('/installation/repositories') && c.auth === 'Bearer ' + gh.repoToken) && writes().length === 0 && !gh.calls.some(c => /contents\/records|actions\/runners/.test(c.path)));
+    gh.installRepos = [];
+    r = await ask4(bearer(sign(good())), { what: 'installation-repos' });
+    yes('  an installation on no repository says so', r.status === 200 && r.json.repos.length === 0 && r.json.lines[0] === 'installed on no repository');
+    gh.installRepos = ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'];
     r = await ask4(bearer(sign(good())), { what: 'runner-labels', records: { 'x-runners.json': { label: 'thornswood-x', runners: [4] } } });
     yes('records sent by the caller are not used', r.status === 200 && r.json.changed === 0 && !labels('thornswood-vps-4').includes('thornswood-x'));
 
@@ -366,7 +395,7 @@ function start(stateDir, ghPort) {
     await ask4(bearer(tokenSeen));
     const log = svc.log();
     yes('the log names the run and what changed', /run 4242 \(workflow_dispatch by EvilPatrick06\)/.test(log));
-    yes('  and never a token or the key', !log.includes(tokenSeen.split('.')[2]) && !log.includes(gh.instToken) && !log.includes(gh.readToken) && !log.includes('PRIVATE KEY'));
+    yes('  and never a token or the key', !log.includes(tokenSeen.split('.')[2]) && !log.includes(gh.instToken) && !log.includes(gh.repoToken) && !log.includes(gh.readToken) && !log.includes('PRIVATE KEY'));
 
     // ---- 5. setup ----
     console.log('the App\'s setup');

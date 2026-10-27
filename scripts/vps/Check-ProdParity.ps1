@@ -8,7 +8,7 @@
   -Collect sends scripts\vps\Get-ProdFacts.ps1 to the VPS through
   Remote.ps1 and saves what it prints to -Facts. Get-ProdFacts only reads:
   no write, no start, no stop, no setting changed. Collecting is a live
-  step, so it is Claude's to run (claude-queue\2165-prod-parity.md).
+  step, so it is Claude's to run (the ops repo's ops\claude-queue\2165-prod-parity.md).
 
   Without -Collect it reads a saved -Facts file and compares it with
   records\prod-parity.json and the repository's own files. That part is

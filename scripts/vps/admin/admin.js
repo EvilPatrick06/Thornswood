@@ -12,16 +12,27 @@
   that uses it.
 
   WHAT IT DOES. It makes GitHub's admin settings match what this
-  repository's main records, and nothing else:
+  repository's main records, or says where the App is installed, and
+  nothing else:
     runner-labels   every records/<name>-runners.json on main, { label,
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
                     runner does. The runners are registered to the private
                     ops repository, EvilPatrick06/Thornswood-Ops, since
-                    this one went public (#4013, Patrick's A on #3685). records/build-runners.json is the build cap
-                    (#2994). It stops for a record whose runners GitHub does
+                    this one went public (#4013, Patrick's A on #3685).
+                    records/build-runners.json is the build cap
+                    (#2994). A record may also list off-box runners by
+                    name (offBox, thornswood-pr-*), which carry its label
+                    too (build runners on One, 26 Oct 2026); they never
+                    carry thornswood-vps, so box-only jobs never reach
+                    them. It stops for a record whose runners GitHub does
                     not have, since every job asking for its label would
                     then wait for a runner that never comes.
+    installation-repos
+                    the repositories the App is installed on, read with a
+                    token that can read their metadata and nothing more, and
+                    nothing changed (#4013: the App has to be on
+                    Thornswood-Ops before the runners move there).
   What to do comes from main, read through the App, never from the caller,
   so whoever asks can only make GitHub match main. A change is a pull
   request to the record.
@@ -99,6 +110,9 @@ const RULES = {
 };
 // The labels every VPS runner carries, or GitHub gives itself; a record may
 // never name one, since taking it off would strand every job that asks.
+// What a run may ask for. Neither takes anything from the caller but the
+// check.
+const ASKS = ['runner-labels', 'installation-repos'];
 const RESERVED = ['self-hosted', 'windows', 'linux', 'macos', 'x64', 'arm64', 'thornswood-vps', 'thornswood-pr'];
 
 // Server-Log.js --stamp puts the time on each line, as it does for the bridge.
@@ -173,6 +187,9 @@ function checkRecords(records) {
     if (!nums.length) throw new Error(r.file + ' lists no runners, so no job asking for ' + label + ' could ever run');
     if (nums.some(n => !Number.isInteger(n) || n < 1)) throw new Error(r.file + ' lists a runner that is not a number from 1');
     if (new Set(nums).size !== nums.length) throw new Error(r.file + ' lists a runner twice');
+    const off = Array.isArray(r.offBox) ? r.offBox : [];
+    if (off.some(n => !/^thornswood-pr-[a-z0-9-]{1,40}$/.test(String(n)))) throw new Error(r.file + ' lists an off-box runner whose name is not thornswood-pr-<machine>[-<n>]');
+    if (new Set(off).size !== off.length) throw new Error(r.file + ' lists an off-box runner twice');
   }
 }
 
@@ -182,19 +199,26 @@ function checkRecords(records) {
 function planLabels(record, runners) {
   const label = record.label;
   const want = record.runners;
+  const offBox = Array.isArray(record.offBox) ? record.offBox : [];
   const changes = [];
   const lines = [];
   let carry = 0;
   for (const r of runners) {
     const n = runnerNumber(r.name);
     const has = (r.labels || []).some(l => l.name === label);
-    const should = n > 0 && want.indexOf(n) >= 0;
+    // An off-box runner carries it only by its name in the record, and never
+    // one that carries thornswood-vps too, which would take box-only jobs.
+    const vps = (r.labels || []).some(l => l.name === 'thornswood-vps');
+    const should = (n > 0 && want.indexOf(n) >= 0) || (n === 0 && !vps && offBox.indexOf(r.name) >= 0);
     if (should) carry++;
     if (has && !should) changes.push({ id: r.id, name: r.name, do: 'take off' });
     else if (should && !has) changes.push({ id: r.id, name: r.name, do: 'put on' });
   }
   for (const n of want) {
     if (!runners.some(r => runnerNumber(r.name) === n)) lines.push('runner ' + n + ' is in ' + record.file + ' but not registered on GitHub');
+  }
+  for (const name of offBox) {
+    if (!runners.some(r => r.name === name)) lines.push('off-box runner ' + name + ' is in ' + record.file + ' but not registered on GitHub');
   }
   const refuse = carry ? '' : 'no runner ' + record.file + ' lists is registered on GitHub, so every job asking for ' + label + ' would wait for a runner that never comes';
   return { changes, lines, refuse };
@@ -236,16 +260,21 @@ function readApp() {
   return { pem: fs.readFileSync(keyPath, 'utf8'), app: JSON.parse(fs.readFileSync(appPath, 'utf8')) };
 }
 
-// A token for one repository only, with only the permissions given, for the
-// hour GitHub gives it; nothing keeps it after the request.
+// A token for the hour GitHub gives it, with only the permissions given,
+// for one repository, or with repo null for every repository the
+// installation holds (installation-repos, which asks for their metadata
+// alone); nothing keeps it after the request.
 async function installationToken(held, now, repo, permissions) {
   const jwt = appJwt(held.app.id, held.pem, now);
   const auth = { Authorization: 'Bearer ' + jwt };
-  const inst = await call('GET', API + '/repos/' + repo + '/installation', auth);
-  if (inst.status === 404) throw new Error('the App is not installed on ' + repo + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
+  // One App on one account has one installation, found by any repository
+  // it holds.
+  const where = repo || REPO;
+  const inst = await call('GET', API + '/repos/' + where + '/installation', auth);
+  if (inst.status === 404) throw new Error('the App is not installed on ' + where + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
   if (inst.status !== 200) throw new Error('GitHub would not say where the App is installed (' + said(inst) + ')');
   const tok = await call('POST', API + '/app/installations/' + inst.body.id + '/access_tokens', auth,
-    { repositories: [repo.split('/')[1]], permissions });
+    repo ? { repositories: [repo.split('/')[1]], permissions } : { permissions });
   if (tok.status !== 201) throw new Error('GitHub gave the App no token (' + said(tok) + ')');
   return tok.body.token;
 }
@@ -262,7 +291,7 @@ async function mainRecords(token) {
     let j;
     try { j = JSON.parse(Buffer.from(got.body.content, 'base64').toString('utf8').replace(/^﻿/, '')); }
     catch (e) { throw new Error('records/' + f.name + ' on main is not JSON'); }
-    out.push({ file: 'records/' + f.name, label: String(j.label || '').trim(), runners: Array.isArray(j.runners) ? j.runners.map(Number) : [] });
+    out.push({ file: 'records/' + f.name, label: String(j.label || '').trim(), runners: Array.isArray(j.runners) ? j.runners.map(Number) : [], offBox: Array.isArray(j.offBox) ? j.offBox.map(String) : [] });
   }
   return out;
 }
@@ -311,6 +340,16 @@ async function runnerLabels(read, token, check) {
     }
   }
   return { ok, lines, changed, differs };
+}
+
+// The repositories the App's installation holds, and nothing changed.
+// { ok, lines, repos }.
+async function installationRepos(token) {
+  const a = await call('GET', API + '/installation/repositories?per_page=100', { Authorization: 'Bearer ' + token });
+  if (a.status !== 200 || !a.body || !Array.isArray(a.body.repositories)) throw new Error('GitHub would not list the App\'s repositories (' + said(a) + ')');
+  const repos = a.body.repositories.map(r => String(r.full_name)).sort();
+  const lines = repos.length ? repos.map(r => 'installed on ' + r) : ['installed on no repository'];
+  return { ok: true, lines, repos };
 }
 
 // ------------------------------------------------------------------- setup --
@@ -418,11 +457,18 @@ async function converge(req, res, now) {
   }
   let ask;
   try { ask = JSON.parse((await readBody(req, 4096)) || '{}'); } catch (e) { ask = null; }
-  if (!ask || ask.what !== 'runner-labels') { json(res, 400, { ok: false, lines: ['the only thing this does is runner-labels'] }); return; }
+  if (!ask || !ASKS.includes(ask.what)) { json(res, 400, { ok: false, lines: ['the only things this does are ' + ASKS.join(' and ')] }); return; }
   const run = claims.run_id + ' (' + claims.event_name + ' by ' + claims.actor + ')';
   const held = readApp();
   if (!held) { log('run ' + run + ': no App yet'); json(res, 503, { ok: false, lines: ['there is no App here yet: Install-AdminService.ps1 -Setup makes it'] }); return; }
   try {
+    if (ask.what === 'installation-repos') {
+      const r = await installationRepos(await installationToken(held, now, null, { metadata: 'read' }));
+      log('run ' + run + ': installation-repos, ' + r.repos.length + ' repositor' + (r.repos.length === 1 ? 'y' : 'ies'));
+      for (const l of r.lines) log('  ' + l);
+      json(res, 200, r);
+      return;
+    }
     // Reading the records here and changing the runners there are two
     // tokens, so neither can do the other's work.
     const read = await installationToken(held, now, REPO, { contents: 'read' });
@@ -458,5 +504,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planLabels, checkRecords, runnerNumber, manifest, RULES, REPO, RUNNERS_REPO, serve };
+module.exports = { verifyOidc, appJwt, planLabels, checkRecords, runnerNumber, manifest, RULES, ASKS, REPO, RUNNERS_REPO, serve };
 if (require.main === module) serve();
