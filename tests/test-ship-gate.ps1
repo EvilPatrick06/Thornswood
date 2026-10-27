@@ -171,7 +171,7 @@ try {
     Yes "G5 ignored files under tools do not stop a main release: '$r'" ($r -eq '')
 
     # G6: untracked files outside tools do not ship, and there are always some:
-    #     CLAUDE.md names Claude outputs\ and art-latest.txt.
+    #     the ops repo's CLAUDE.md names Claude outputs\ and art-latest.txt.
     Put 'Claude outputs/notes.md' "notes`n"
     Put 'art-latest.txt' "art`n"
     $r = Gate $work $false

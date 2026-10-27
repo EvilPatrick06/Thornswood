@@ -270,40 +270,29 @@ if ($box.Code -ne 0) {
   What the service says about itself. Small, and it is the fastest way to tell
   a stale process from a fresh one, which has cost days here before.
 
-  THROUGH THE SITE FIRST, BECAUSE THAT IS HOW EVERYTHING ELSE REACHES IT.
+  ASKED ON THE BOX, BECAUSE ONLY THE BOX IS TOLD (#3806).
 
-  This asked http://<vps>:7778/health and nothing else, and on 21 and 22
-  September it printed "no answer from <live>:7778" on every pull.
-  That read as the voice service being down. It was not: measured on
-  22 September, https://thornswood.net/voice/health answers 200 and says
-
-      {"ok":true,"build":"owners-5","auth":"on","bind":"127.0.0.1", ...}
-
-  bind is 127.0.0.1. The service is deliberately on loopback with Caddy
-  carrying /voice/, which is exactly what Install-Voice's own -Bind parameter
-  describes, and the raw port is therefore shut from outside ON PURPOSE. Both
-  services were healthy the entire time this said they were not.
-
-  A check that cries wolf is worse than no check, because the next real outage
-  reads as the same yellow line everybody has learned to scroll past. So the
-  site is asked first, the raw port is the fallback for a box with no Caddy in
-  front of it, and the answer's own bind is printed so the shape of the
-  install is visible rather than inferred.
+  This asked https://thornswood.net/voice/health first, and the raw port as a
+  fallback, because the service is on loopback with Caddy carrying /voice/
+  and the raw port is shut from outside on purpose (on 21 and 22 September
+  asking only the raw port printed "no answer" while both services were
+  fine). Since #3806 the site's answer is only {"ok":true}: the build, the
+  deploy record and the counts go only to a caller on the box itself, not
+  to anything Caddy forwards. So the detail is read over the same ssh as the
+  logs, from 127.0.0.1 on the box, and the site is asked separately whether
+  it carries voice at all, which is the other half of what used to be one
+  answer. A check that cries wolf is worse than no check, so each half says
+  which one failed.
 #>
 $dest = Join-Path $Out 'health.json'
 $voicePath = if ($Dev) { 'voice-dev' } else { 'voice' }
-$tries = @(
-    @{ Url = "https://thornswood.net/$voicePath/health"; How = 'through the site' }
-    @{ Url = "http://${Vps}:$Port/health";               How = "straight at $Vps`:$Port" }
-)
-
-$h = $null; $how = ''
-foreach ($t in $tries) {
-    try {
-        $h = Invoke-RestMethod -Uri $t.Url -TimeoutSec 8
-        $how = $t.How
-        break
-    } catch { }
+$read = Read-Box ("(Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:{0}/health' -TimeoutSec 8).Content" -f $Port)
+$h = $null; $why = ''
+if ($read.Code -ne 0) {
+    $why = if ($read.Stderr.Count) { $read.Stderr -join ' | ' } else { 'nothing on stderr' }
+    $why = "ssh exit $($read.Code): $why"
+} else {
+    try { $h = ($read.Answer -join "`n") | ConvertFrom-Json } catch { $why = 'its answer was not JSON: ' + $_.Exception.Message }
 }
 
 if ($h) {
@@ -311,14 +300,22 @@ if ($h) {
     $build = if ($h.PSObject.Properties['build']) { $h.build } else { '(no build in the answer)' }
     $bind  = if ($h.PSObject.Properties['bind'])  { $h.bind }  else { '?' }
     $auth  = if ($h.PSObject.Properties['auth'])  { $h.auth }  else { '?' }
-    Say ("  {0,-12} build {1}, {2}, bound to {3}, auth {4}" -f 'health.json', $build, $how, $bind, $auth) 'Gray'
-    if ($bind -eq '127.0.0.1') {
-        Say '               loopback only, so the raw port is shut from outside on purpose' 'DarkGray'
-    }
+    Say ("  {0,-12} build {1}, asked on the box at 127.0.0.1:{2}, bound to {3}, auth {4}" -f 'health.json', $build, $Port, $bind, $auth) 'Gray'
 } else {
-    ("the voice service did not answer through the site or on the raw port. " +
-     "Both were tried.") | Set-Content -LiteralPath $dest -Encoding UTF8
-    Say ("  {0,-12} NO ANSWER through the site or on {1}:{2}. This one is real." -f 'health.json', $Vps, $Port) 'Red'
+    ("the voice service did not answer on the box at 127.0.0.1:{0}: {1}" -f $Port, $why) | Set-Content -LiteralPath $dest -Encoding UTF8
+    Say ("  {0,-12} NO ANSWER on the box at 127.0.0.1:{1}: {2}" -f 'health.json', $Port, $why) 'Red'
+}
+
+$siteUrl = "https://thornswood.net/$voicePath/health"
+try {
+    $s = Invoke-RestMethod -Uri $siteUrl -TimeoutSec 8
+    if ($s -and $s.PSObject.Properties['ok'] -and $s.ok -eq $true) {
+        Say ("  {0,-12} the site carries it: {1} says ok" -f '', $siteUrl) 'Gray'
+    } else {
+        Say ("  {0,-12} {1} answered, but not with voice's ok. Is the Caddyfile's /{2}/ block there?" -f '', $siteUrl, $voicePath) 'Red'
+    }
+} catch {
+    Say ("  {0,-12} {1} did not answer ({2}), so nothing outside reaches voice" -f '', $siteUrl, $_.Exception.Message) 'Red'
 }
 
 Head 'Where they are'

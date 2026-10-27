@@ -210,8 +210,8 @@ function Get-ThornswoodRecordProblems {
                 elseif ([int64](Get-ThornswoodRecordProp $o 'people') -gt 1000) { $out += "${pre}people is over 1000, the engine's limit" }
                 $s = Get-ThornswoodRecordProp $o 'staffSeats'
                 if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += "${pre}staffSeats is there and not a whole number" }
-                # The most the voice service takes at once (#481); MaxOnline.ps1
-                # holds it to no fewer than the seats.
+                # The most people who hold a voice place at once (#481, #3570);
+                # MaxOnline.ps1 holds it to no fewer than the seats.
                 $v = Get-ThornswoodRecordProp $o 'voice'
                 if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += "${pre}voice is there and not a whole number above zero" }
             }

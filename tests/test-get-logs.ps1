@@ -65,21 +65,8 @@ Yes 'door.log is listed' $doorLine.Success
 Yes 'door.log does not roll' ($doorLine.Success -and $doorLine.Value -notmatch 'Rolls')
 
 # ---- the runbook says what the script fetches (#1625) ----------------------
-# docs\MOVING-THE-SERVER.md went on saying Get-Logs read only the current
-# file for weeks after #453 made it bring the rolled ones down, so the bullet
-# there is held to the list above: every log the script rolls is named in it,
-# .1 to .5 are named, and door.log is the one that comes down current only.
-$moving = [IO.File]::ReadAllText((Join-Path $repo 'docs\MOVING-THE-SERVER.md')) -replace "`r`n", "`n"
-$bullet = [regex]::Match($moving, '(?ms)^- `\.\\scripts\\vps\\Get-Logs\.ps1` .*?(?=^- |^\s*$)').Value -replace '\s+', ' '
-Yes 'MOVING-THE-SERVER.md has a bullet on what Get-Logs.ps1 fetches' ($bullet.Length -gt 0)
-$rolling = @([regex]::Matches($text, "Name = '([\w.]+)\.log'[^`r`n]*Rolls = \`$true") | ForEach-Object { $_.Groups[1].Value })
-Yes ('the script names the logs that roll ({0})' -f ($rolling -join ', ')) ($rolling.Count -ge 5)
-foreach ($stem in $rolling) {
-    Yes ("that bullet names $stem among the logs whose rolled files come down") ($bullet -match "\(.*\b$stem\b.*\)")
-}
-Yes 'that bullet says .1 to .5 come down' ($bullet -match '`\.1` to `\.5`')
-Yes 'that bullet says door.log comes down current only' ($bullet -match '`door\.log` does not roll, so only\s+its current file')
-Yes 'that bullet no longer says Get-Logs reads only the current file' ($bullet -notmatch 'reads only the current file')
+# MOVING-THE-SERVER.md's bullet on Get-Logs is in the private ops repo since
+# #3693, and its tests\test-ops-runbooks.ps1 holds it to the list above.
 
 # ---- no parameter is given a new value (#1605) ------------------------------
 # Names ignore case, so $lines is $Lines. A parameter is only ever filled in
@@ -167,6 +154,14 @@ function global:ssh {
     $b64 = ([string]$args[-1] -split ' ')[-1]
     $remote = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64))
     $global:standInAsks.Add($remote)
+    # The voice service's /health on the box (#3806): no service runs here,
+    # so the box answers the way the dev service does to a caller on it.
+    if ($remote.Contains('/health')) {
+        Write-Error '** WARNING: connection is not using a post-quantum key exchange algorithm.'
+        '{"ok":true,"build":"stand-in-build","bind":"127.0.0.1","auth":"on","peers":0}'
+        $global:LASTEXITCODE = 0
+        return
+    }
     $moved = $remote.Replace("'C:", "'" + $global:standInBox)
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($moved))
     $came = @(& $global:standInPs -NoProfile -NonInteractive -EncodedCommand $enc 2>&1)
@@ -187,7 +182,9 @@ function global:ssh {
     $answer
     $global:LASTEXITCODE = $code
 }
-function global:Invoke-RestMethod { [pscustomobject]@{ ok = $true; build = 'stand-in'; bind = '127.0.0.1'; auth = 'on' } }
+# What https://thornswood.net/voice-dev/health says to anybody since #3806.
+$global:standInSiteAsks = New-Object System.Collections.Generic.List[string]
+function global:Invoke-RestMethod { param([string]$Uri, [int]$TimeoutSec) $global:standInSiteAsks.Add($Uri); [pscustomobject]@{ ok = $true } }
 try {
     # Run as a person runs it, where an error is printed and the pull goes on,
     # so every error it says is counted rather than the first one stopping this.
@@ -203,10 +200,23 @@ try {
     function Pulled([string]$name) { Join-Path $pulled $name }
 
     $listings = @($global:standInAsks | Where-Object { $_.Contains('Get-ChildItem') })
+    $healthAsks = @($global:standInAsks | Where-Object { $_.Contains('/health') })
     $reads = @($global:standInAsks | Where-Object { $_ -match "Get-Content -LiteralPath '([^']+)'" } | ForEach-Object { [regex]::Match($_, "Get-Content -LiteralPath '([^']+)'").Groups[1].Value })
     Yes 'it asks the box once which files it has' ($listings.Count -eq 1)
-    Yes ('the box names 8 files, and the pull reads those 8 and asks nothing else ({0} asks)' -f $global:standInAsks.Count) (
-        $global:standInListed.Count -eq 8 -and $reads.Count -eq 8 -and $global:standInAsks.Count -eq 9)
+    Yes ('the box names 8 files, and the pull reads those 8, asks voice once and nothing else ({0} asks)' -f $global:standInAsks.Count) (
+        $global:standInListed.Count -eq 8 -and $reads.Count -eq 8 -and $healthAsks.Count -eq 1 -and $global:standInAsks.Count -eq 10)
+
+    # ---- voice's /health, on the box (#3806) ----
+    # Only a caller on the box is told the build, so the detail is read there,
+    # on the dev port for -Dev, and the site is asked only whether it carries
+    # voice, which it answers with ok and nothing more.
+    Yes 'voice is asked on the box, at 127.0.0.1 on the dev port' ($healthAsks.Count -eq 1 -and $healthAsks[0].Contains("'http://127.0.0.1:7789/health'"))
+    Yes 'health.json holds what the box said' ((Test-Path -LiteralPath (Pulled 'health.json')) -and
+        ((Get-Content -LiteralPath (Pulled 'health.json') -Raw) | ConvertFrom-Json).build -eq 'stand-in-build')
+    Yes 'and the pull says its build and where it was asked' ($words -match '(?m)^\s*health\.json\s+build stand-in-build, asked on the box at 127\.0\.0\.1:7789')
+    Yes 'the site is asked only whether it carries dev voice' ($global:standInSiteAsks.Count -eq 1 -and $global:standInSiteAsks[0] -eq 'https://thornswood.net/voice-dev/health')
+    Yes 'and the pull says it does' ($words -match 'the site carries it: https://thornswood\.net/voice-dev/health says ok')
+    Yes 'the raw port is not asked from here any more' ($text -notmatch 'straight at')
     $unasked = @($reads | Where-Object { $global:standInListed -notcontains $_ })
     Yes 'every file it reads is one the box named' ($unasked.Count -eq 0)
 

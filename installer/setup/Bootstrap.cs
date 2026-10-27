@@ -2047,7 +2047,7 @@ namespace ThornswoodSetup
                             if (string.IsNullOrEmpty(e.Name)) continue;
                             string dest = Path.Combine(temp, e.FullName.Replace('/', '\\'));
                             string full = Path.GetFullPath(dest);
-                            if (!full.StartsWith(temp, StringComparison.OrdinalIgnoreCase)) continue;
+                            if (!Thornswood.PathFence.Inside(full, temp)) continue;
                             Directory.CreateDirectory(Path.GetDirectoryName(full));
                             e.ExtractToFile(full, true);
                             if ((n & 63) == 0 || n == total)
