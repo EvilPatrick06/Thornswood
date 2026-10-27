@@ -210,6 +210,7 @@ try {
   try { A.parseTree(Buffer.from('not a listing\0')); } catch (e) { threw = true; }
   yes('a listing that is not one is refused, so the whole gate runs', threw);
   yes('a change to Run-Gate.ps1, the gate step\'s script, runs the whole gate', A.select({ map: map, gate: gate, base: BASE, changes: [{ status: 'M', path: 'scripts/dev/Run-Gate.ps1' }], baseFiles: baseFiles, headFiles: baseFiles }).full);
+  yes('so does a change to Gate-Map.ps1, which fetches the map off the box (#4009)', A.select({ map: map, gate: gate, base: BASE, changes: [{ status: 'M', path: 'scripts/dev/Gate-Map.ps1' }], baseFiles: baseFiles, headFiles: baseFiles }).full);
 }
 
 // 7. the gate's shape in the build workflows (#3874)
