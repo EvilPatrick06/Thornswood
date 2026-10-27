@@ -43,14 +43,31 @@
   scripts\vps\Check-RunnerIsolation.ps1 checks it). -AsSystem registers it as
   SYSTEM, Highest, the way back if LOCAL SERVICE cannot run it.
 
+  THE STATE FOLDER IS LOCKED APART (#4076). The folder above gives CREATOR
+  OWNER Modify, so the service can write the logs it makes. A file a LOCAL
+  SERVICE task makes is owned by LOCAL SERVICE, not by the task's own SID,
+  so that rule became "LOCAL SERVICE: Modify" on key.pem, and every service
+  on the box that runs as LOCAL SERVICE (the game servers, voice, the site,
+  Caddy, the bridge) could read the key from 22 Oct 2026. Every install now
+  sets state's rules before anything is stopped: nothing inherited, SYSTEM
+  and Administrators Full, the task's own SID Modify, and OWNER RIGHTS only
+  Synchronize, which takes from the owner of a file the service makes later
+  (a new key from -Setup) the right to read or change that file's rules
+  that every owner has otherwise. What is in it is owned by Administrators
+  and keeps only what state gives it. After the grant, the install stops
+  the service and refuses when LOCAL SERVICE, a broad group or CREATOR
+  OWNER could still read anything there, or LOCAL SERVICE owns a file there
+  with no OWNER RIGHTS rule.
+
   WHAT IT SENDS. A commit or nothing (Artifact.ps1, #459, #1121): admin.js
   and Server-Log.js out of HEAD, checked against the commit
   (Assert-ThornswoodSourceIntegrity) before anything is sent. They go into
   -Root\.stage-<stamp>, are checked there by hash and node --check with the
   old service still running, and only then is it stopped and they are renamed
   in; what they replace goes to .prev-<stamp>. If the new one does not
-  answer, the old files and the old task go back and are started. The state
-  folder, and the App in it, are never touched by an install.
+  answer, the old files and the old task go back and are started. Nothing
+  in the state folder, the App's key included, is moved, changed or removed
+  by an install; only its rules and owner are set, as above.
 
   THE LOG. admin.log, one line per request (what was asked, by which run,
   what changed), never a token or the key, written by server-log.js with a
@@ -154,6 +171,17 @@ if (Test-Path -LiteralPath '$state\app.json') {
     `$app = Get-Content -LiteralPath '$state\app.json' -Raw | ConvertFrom-Json
     'app       ' + `$app.slug + ' (' + `$app.id + '), made ' + `$app.made + `$(if (Test-Path -LiteralPath '$state\key.pem') { ', key held' } else { ', KEY MISSING' })
 } else { 'app       NONE yet, so every ask is refused until -Setup makes one' }
+# Whether another service could read the key (#4076), the install's check.
+if (Test-Path -LiteralPath '$state') {
+    `$wide = @()
+    foreach (`$i in @(@(Get-Item -LiteralPath '$state' -Force) + @(Get-ChildItem -LiteralPath '$state' -Recurse -Force))) {
+        `$a = Get-Acl -LiteralPath `$i.FullName
+        `$sids = @(`$a.GetAccessRules(`$true, `$true, [Security.Principal.SecurityIdentifier]) | Where-Object { [string]`$_.AccessControlType -eq 'Allow' } | ForEach-Object { `$_.IdentityReference.Value })
+        if (@(`$sids | Where-Object { @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19', 'S-1-3-0') -contains `$_ }).Count -or
+            (`$a.GetOwner([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-19' -and `$sids -notcontains 'S-1-3-4')) { `$wide += `$i.Name }
+    }
+    if (`$wide.Count) { 'state     OPEN to other services: ' + (`$wide -join ', ') + '. An install locks it.' } else { 'state     locked to SYSTEM, Administrators and the task' }
+}
 if (Test-Path -LiteralPath '$state\setup.json') {
     `$s = Get-Content -LiteralPath '$state\setup.json' -Raw | ConvertFrom-Json
     `$left = [int](`$s.expires - [DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
@@ -306,8 +334,35 @@ try {
   # Only the access rules are written back (issue #1120).
   (Get-Item -LiteralPath '$Root' -Force).SetAccessControl(`$acl)
 } catch { 'COULD NOT LOCK: ' + `$_.Exception.Message; exit 1 }
-# The App's folder, made once; an install never touches what is in it.
+# The App's folder, made once; an install never moves or changes what is in it.
 if (-not (Test-Path -LiteralPath '$state')) { New-Item -ItemType Directory -Path '$state' -Force | Out-Null }
+# Locked apart from the folder above, before anything is stopped (#4076, the
+# header says why): nothing inherited, so no CREATOR OWNER; the task's own
+# SID only once the task is there (a first install's grant adds it).
+try {
+  `$tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+  `$admins = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')
+  `$taskSid = ''
+  try { `$taskSid = (New-Object Security.Principal.NTAccount('NT TASK', '$TaskName')).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+  `$rules = @(@('S-1-5-18', 'FullControl'), @('S-1-5-32-544', 'FullControl'), @('S-1-3-4', 'Synchronize'))
+  if (`$taskSid) { `$rules += ,@(`$taskSid, 'Modify') }
+  `$acl = Get-Acl -LiteralPath '$state'
+  `$acl.SetAccessRuleProtection(`$true, `$false)
+  foreach (`$r in @(`$acl.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]))) { [void]`$acl.RemoveAccessRuleSpecific(`$r) }
+  foreach (`$r in `$rules) {
+    `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier(`$r[0])), `$r[1], `$tree, 'None', 'Allow')))
+  }
+  `$acl.SetOwner(`$admins)
+  (Get-Item -LiteralPath '$state' -Force).SetAccessControl(`$acl)
+  # What is in it keeps only what state gives it, and no LOCAL SERVICE owner.
+  foreach (`$i in @(Get-ChildItem -LiteralPath '$state' -Recurse -Force)) {
+    `$a = Get-Acl -LiteralPath `$i.FullName
+    `$a.SetAccessRuleProtection(`$false, `$false)
+    foreach (`$r in @(`$a.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]))) { [void]`$a.RemoveAccessRuleSpecific(`$r) }
+    `$a.SetOwner(`$admins)
+    `$i.SetAccessControl(`$a)
+  }
+} catch { 'COULD NOT LOCK STATE: ' + `$_.Exception.Message; exit 1 }
 Get-ChildItem -LiteralPath '$Root' -Directory -Force -EA SilentlyContinue | Where-Object { `$_.Name -like '.stage-*' } |
   ForEach-Object { Remove-Item -LiteralPath `$_.FullName -Recurse -Force -EA SilentlyContinue }
 New-Item -ItemType Directory -Force -Path '$Root\$stage' | Out-Null
@@ -413,6 +468,23 @@ if (-not `$AsSystem) {
     if (`$why) { `$why + ', so the task goes on SYSTEM'; Register `$true }
     else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\$TaskName' }
 }
+# The App's key reaches no other service (#4076), checked after the grant and
+# before the service starts. CREATOR OWNER counts here: what it gives is what
+# a LOCAL SERVICE file's owner gets, and that is every service on the box.
+`$inState = @(Get-ChildItem -LiteralPath '$state' -Recurse -Force -EA SilentlyContinue)
+`$open = @(Test-ThornswoodServiceCannotReach -Paths (@('$state') + @(`$inState | ForEach-Object { `$_.FullName })) -Sids @('S-1-3-0'))
+foreach (`$i in `$inState) {
+    `$a = Get-Acl -LiteralPath `$i.FullName
+    `$capped = @(`$a.GetAccessRules(`$true, `$true, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-3-4' }).Count
+    if (`$a.GetOwner([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-19' -and -not `$capped) { `$open += (`$i.FullName + ': LOCAL SERVICE owns it with no OWNER RIGHTS rule, so any service could give itself a rule on it') }
+}
+if (`$open.Count) {
+    'ANOTHER SERVICE COULD READ THE APP''S KEY, so the admin service is left stopped and disabled:'
+    `$open
+    Disable-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue | Out-Null
+    'ADMIN REFUSED'; exit 1
+}
+'state is SYSTEM''s, Administrators'' and the task''s own, and no other service reaches it'
 try { & `$node.Source `$writer --log '$log' --days 90 --roll } catch { 'could not roll admin.log: ' + `$_.Exception.Message }
 Start-ScheduledTask -TaskName '$TaskName'
 if (Answers @('$Plain')) {
