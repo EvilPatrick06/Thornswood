@@ -13,9 +13,10 @@ in the war about fifty years ago; delete AZURE_SIGNING_SUBSCRIPTION_ID.
    in the war about fifty years ago".
 2. The #lore post, live Discord. bot\content.py changed, so first the bot's
    code: `.\scripts\deploy\Install-Bot.ps1 -CodeOnly`. Then
-   `.\scripts\deploy\Setup-Discord.ps1 -OnBox -Posts -Only lore`, which
-   rewrites only the #lore post from bot\content.py. Check #lore says
-   "who's had it twenty-three years".
+   `.\scripts\deploy\Setup-Discord.ps1 -OnBox -Posts -Only lore,factions`,
+   which rewrites only the #lore and #factions posts from bot\content.py.
+   Check #lore says "who's had it twenty-three years" and #factions says
+   "none has in fifty years".
 3. #3717, the repository variable (Thornswood only; the fork's own copy in its
    `thornswood-signing` environment stays):
    `gh api -X DELETE repos/EvilPatrick06/Thornswood/actions/variables/AZURE_SIGNING_SUBSCRIPTION_ID`.
@@ -28,7 +29,7 @@ in the war about fifty years ago; delete AZURE_SIGNING_SUBSCRIPTION_ID.
 
 None of the three takes anything down. The site step reloads only the public
 pages. Install-Bot -CodeOnly restarts the bot for a few seconds. The Discord
-step edits one read only post. The variable is read by no
+step edits two read only posts. The variable is read by no
 workflow (tests\test-release-workflow.ps1 checks that), so signing does not
 change.
 
