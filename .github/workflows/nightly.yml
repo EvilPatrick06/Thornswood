@@ -42,6 +42,12 @@ concurrency:
 jobs:
   nightly:
     name: Nightly checks
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so this job and "board" never run a
+    # branch's code. A dispatch on a branch runs the harness shares alone, on
+    # the build runners, and tells the board nothing: a branch's night is not
+    # main's, and the first night that passes closes the board's issue.
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 45
     steps:
@@ -433,7 +439,8 @@ jobs:
     # prints the list itself.
     name: Put the night on the board
     needs: [nightly, harnesses]
-    if: ${{ !cancelled() }}
+    # Main only, as "nightly" above says (#3550).
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 10
     steps:
