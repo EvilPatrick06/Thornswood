@@ -31235,16 +31235,15 @@ log('gamemode loaded:',
 
   var PLUGIN = /\.(esp|esm|esl)$/i;
 
-  // The plugins whose bytes this server hands out: Thornswood's own and
-  // nothing else (#1180). Every other plugin in the load order is somebody
-  // else's mod, which people get from its author through Vortex and the
-  // collection. Measured on 5 Oct, the main and the dev server each handed
-  // out 43 plugins to anyone who asked, 42 of them other authors' (27 MB),
-  // because the rule here named what to leave out (Bethesda's five masters)
-  // instead of what is ours. The names are the plugins
-  // scripts\release\Ship-Rules.ps1 calls ours ($ShipOursFiles), and
-  // tests\test-1180-own-plugins.js holds the two lists to each other, so a
-  // plugin the repo makes goes into both in one change.
+  // Thornswood's own plugins (#1180), which the manifest names as served so
+  // the launcher can tell ours from another author's. Every other plugin in
+  // the load order is somebody else's mod, which people get from its author
+  // through Vortex and the collection. The bytes of ours are not served here
+  // (#3386): this port is plain http, so the launcher's Fix takes them from
+  // the signed release over https, by the sha256 its record gives them.
+  // The names are the plugins scripts\release\Ship-Rules.ps1 calls ours
+  // ($ShipOursFiles), and tests\test-1180-own-plugins.js holds the two lists
+  // to each other, so a plugin the repo makes goes into both in one change.
   var OURS = { 'thornswood-content.esp': 1, 'thornswood-last.esp': 1 };
 
   // Returns '' once the manifest is published, otherwise why it was not.
@@ -31280,11 +31279,10 @@ log('gamemode loaded:',
       // The whole order, full and light together, the order the launcher
       // puts a plugin list into when there is a light list.
       loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
-      // Which of those the launcher's Fix may fetch from /plugins/ (#1180):
-      // ours, full and light (#2627). The client reads mods, loadOrder and,
-      // when it is there, light, and never this list, so a light name in it
-      // changes nothing for the client; a launcher from before #2627 marks
-      // only mods entries as served and so never asks for a light one.
+      // Which of those are ours (#1180), full and light (#2627), the ones
+      // the launcher's Fix puts in from the release (#3386). The client
+      // reads mods, loadOrder and, when it is there, light, and never this
+      // list.
       served: mods.concat(light).filter(function (m) { return OURS[m.filename.toLowerCase()]; })
                   .map(function (m) { return m.filename; })
     };
@@ -31311,84 +31309,7 @@ log('gamemode loaded:',
                 '/manifest.json, ' + mods.length + ' plugins' +
                 (light.length ? ' and ' + light.length + ' light plugins' : '') +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
-    try { publishFiles(mods, light); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
     return '';
-  }
-
-  // Our own plugins themselves, beside the manifest, for the launcher's Fix.
-  //
-  // A plugin with the right name in the right place and the wrong bytes paints
-  // LOAD ORDER ERROR over somebody's screen for the whole session (17 Sep).
-  // For Thornswood's own plugin this box has the bytes the manifest describes,
-  // and they are ours to hand out, so it is served under
-  //
-  //     /api/servers/thornswood/plugins/<file>
-  //
-  // as a hard link into the plugins folder, so there is no second copy on disk
-  // (a copy when a link is refused). Relinked at every start, because a deploy
-  // may have replaced the file behind the link.
-  //
-  // Nothing else is (#1180). Another author's plugin with the wrong bytes is
-  // put right by updating or reinstalling that mod in Vortex, which fetches it
-  // from its author; the launcher's Fix says which mod. Bethesda's masters
-  // were never served. The clearing below takes the files an older start
-  // published off this box.
-  //
-  // Our light plugins too, since #2627, as light-<index>.bin at their place
-  // in the manifest's light list, so the two lists never name one file. On
-  // 16 Oct the server's light order named Thornswood-Last.esp, which is ours
-  // and light, a machine whose launcher had not taken the release carrying
-  // it had none, and Fix had nothing to fetch: only mods entries were
-  // published, and the launcher only ever asked for those.
-
-  function publishFiles(mods, light) {
-    var order = [];
-    try { order = JSON.parse(fs.readFileSync('server-settings.json', 'utf8')).loadOrder || []; } catch (e) { return; }
-    var byName = {};
-    for (var i = 0; i < order.length; i++) {
-      byName[path.basename(String(order[i])).toLowerCase()] = String(order[i]);
-    }
-    var PLUG = path.join(DIR, 'plugins');
-    try { fs.mkdirSync(PLUG, { recursive: true }); } catch (e) { }
-    // Clear what a previous start left here. 1.1.43 published these under their
-    // real names, and the resources server refuses any file whose name contains
-    // .esp, .esm or .esl (a 403), so those never served. The name is gone now:
-    // each file is served as its position in the manifest with a .bin
-    // extension, which the resources server does hand over. The launcher
-    // fetches /plugins/<index>.bin for the manifest entry at that index.
-    // Since #1180 this is also what takes other authors' plugins, which an
-    // older start published, off this box, so a file that stays is said.
-    try {
-      var stale = fs.readdirSync(PLUG);
-      for (var s = 0; s < stale.length; s++) {
-        try { fs.unlinkSync(path.join(PLUG, stale[s])); }
-        catch (e) { console.log('[thornswood] could not take ' + stale[s] + ' off /plugins/, so it is still served: ' + e.message); }
-      }
-    } catch (e) { console.log('[thornswood] could not read /plugins/ to clear it: ' + e.message); }
-    var linked = 0, copied = 0, missing = 0, bytes = 0;
-    var lists = [[mods, ''], [light || [], 'light-']];
-    for (var k = 0; k < lists.length; k++) {
-      var list = lists[k][0], prefix = lists[k][1];
-      for (var j = 0; j < list.length; j++) {
-        var name = list[j].filename;
-        if (!OURS[name.toLowerCase()]) continue;
-        var src = byName[name.toLowerCase()];
-        if (!src || !fs.existsSync(src)) { missing++; continue; }
-        var dst = path.join(PLUG, prefix + j + '.bin');
-        try {
-          fs.linkSync(src, dst);
-          linked++;
-        } catch (e) {
-          try { fs.copyFileSync(src, dst); copied++; }
-          catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
-        }
-        bytes += Number(list[j].size) || 0;
-      }
-    }
-    console.log('[thornswood] ' + (linked + copied) + ' of our plugin files published at /api/servers/' + KEY +
-                '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +
-                (copied ? ', ' + copied + ' copied rather than linked' : '') +
-                (missing ? ', ' + missing + ' not found on this box' : ''));
   }
 
   // Once, at load, with nothing trying again (#1885). The engine's main()
