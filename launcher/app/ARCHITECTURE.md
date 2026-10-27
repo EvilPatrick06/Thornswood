@@ -102,7 +102,7 @@ it says a pool thread.
 |---|---|---|
 | 1 | `Shell.cs:192 Main()` | Takes a mutex named for this install folder (`Shell.cs:264 MutexName()`), so the main and dev builds can both be open. A second copy of the same build says so and exits. Anything thrown out of Run is appended to `Profile\launcher.log` as COULD NOT START and shown in a box. |
 | 2 | `Shell.cs:289 Run()` | Reads `-root` and `-uninstall` off the command line. |
-| 3 | `Shell.cs:297 Paths.Init` | `Paths.cs:71 Init()` works out Root, Game and every Profile path, once. Nothing recomputes them, which is why making the game folder restarts the launcher. |
+| 3 | `Shell.cs:297 Paths.Init` | `Paths.cs:71 Init()` works out Root, Game and every Profile path, once. Nothing recomputes them, which is why making the game folder restarts the launcher. Then `Shell.cs:301 LocalKeep.Tidy` cuts `Profile\launcher.log` to its last 30 days and deletes support zips in `Profile\Reports` older than that (`LocalKeep.cs:44 Tidy()`, #3679), before anything else writes the log. |
 | 4 | `Shell.cs:304 Config.Load` | Reads `<Root>\config.json` (`Config.cs:333 Load()`). Then `Stats.Load` reads `Profile\stats.txt`. |
 | 5 | `Shell.cs:315 XamlReader.Parse` | Builds the window from the embedded ui.xaml. |
 | 6 | `Shell.cs:317 Bind` | Finds the controls, and sets `Discord.Folder` to Profile. |
@@ -628,6 +628,14 @@ the last part runs from a script in the temp folder after the launcher exits.
 Uninstall under Windows' Installed apps runs the exe with `-uninstall`, and
 the launcher opens on Settings without starting up to play (startup step 10,
 ShellUninstall.cs).
+
+**LocalKeep** (LocalKeep.cs). How long the launcher keeps its own records on
+the PC: `Profile\launcher.log` lines and the support zips for `Days` (30)
+days, cut at every start, which is what the privacy page promises. NotSaves
+lists what is in Profile that is not a save or a setting (the log, the
+reports, the Discord sign-in, name and picture from `Discord.AccountFiles`,
+and the voice and music browsers' folders); Uninstall removes those even when
+it keeps the saves and settings, and its farewell names any it could not.
 
 **DevBuild** (DevBuild.cs). The second launcher in `<Root>-DevBuild`, made
 from the main one's files with the channel set to dev and the dev ports (game

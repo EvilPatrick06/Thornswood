@@ -438,6 +438,30 @@ namespace Thornswood
             say("Clearing the setup leftovers...");
             DropScratch(say);
 
+            // A collection install has no Game folder of ours, but it did write
+            // our own content into the person's Steam copy. That comes back out
+            // here, from the list the installer left, and nothing else in that
+            // folder is touched. The same for an install that began that way
+            // and then made Thornswood's own folder: the folder goes with the
+            // rest in Targets, and what the installer left in the Steam copy
+            // goes here.
+            if (deleteMods && InstalledInto(cfg).Length > 0)
+            {
+                int gone = RemoveOurGameFiles(cfg, say);
+                if (gone > 0) say(gone.ToString("n0") + " files removed from your Skyrim on Steam.");
+            }
+
+            return Targets(keepSaves, deleteMods);
+        }
+
+        /// <summary>
+        /// What the handover script deletes once the launcher has exited, and
+        /// nothing else: Begin has done everything that needs the launcher
+        /// running by the time this is asked. Deletes nothing itself, so
+        /// tests\test-3679-local-keep.ps1 runs it against a scratch install.
+        /// </summary>
+        public static string[] Targets(bool keepSaves, bool deleteMods)
+        {
             var leave = new System.Collections.Generic.List<string>();
 
             // The Game folder is only ours to delete in an install that built
@@ -451,22 +475,21 @@ namespace Thornswood
             // with the mods even when the saves in Profile stay (#1226).
             if (deleteMods && (!Paths.Collection || Paths.OwnFirst)) leave.Add(Paths.Game);
 
-            // A collection install has no Game folder of ours, but it did write
-            // our own content into the person's Steam copy. That comes back out
-            // here, from the list the installer left, and nothing else in that
-            // folder is touched. The same for an install that began that way
-            // and then made Thornswood's own folder: the folder goes above, and
-            // what the installer left in the Steam copy goes here.
-            if (deleteMods && InstalledInto(cfg).Length > 0)
-            {
-                int gone = RemoveOurGameFiles(cfg, say);
-                if (gone > 0) say(gone.ToString("n0") + " files removed from your Skyrim on Steam.");
-            }
             leave.Add(Paths.Personal);
             if (!keepSaves)
             {
                 leave.Add(Paths.ProfileDir);
                 leave.Add(Paths.CfgFile);
+            }
+            else
+            {
+                // The box keeps saves and settings, and Profile holds more
+                // than those: the log, the Discord sign-in with the name and
+                // picture beside it, the support zips and both WebView2
+                // browsers' folders. Keeping all of Profile kept them on the PC
+                // under a box that named none of them (#3679). They go here,
+                // and the farewell names any that are still there.
+                leave.AddRange(LocalKeep.NotSaves());
             }
             // The rest of what setup and updating left in the install folder.
             //
@@ -514,6 +537,39 @@ namespace Thornswood
         /// </summary>
         public static void Finish(string[] targets, bool keepSaves, bool deleteMods)
         {
+            // Said after the deletes in the script, so it reports what is
+            // actually there rather than what was expected to be.
+            string note = null;
+            try { note = WriteFarewell(keepSaves, deleteMods); }
+            catch (Exception ex) { Swallow.Note("Uninstall.Finish, farewell", ex); }
+
+            string text = Script(targets, Process.GetCurrentProcess().Id, note);
+            if (text == null)
+            {
+                try { if (note != null) File.Delete(note); } catch (Exception ex) { Swallow.Note("Uninstall.Finish, clearing the unused farewell", ex); }
+                return;
+            }
+
+            string script = Path.Combine(Path.GetTempPath(), "thornswood-uninstall.cmd");
+            // UTF-8 with no byte order mark, to match the chcp at the top. The
+            // machine's ANSI code page cannot hold every path this may name.
+            File.WriteAllText(script, text, new UTF8Encoding(false));
+
+            var psi = new ProcessStartInfo("cmd.exe", "/c \"" + script + "\"");
+            psi.CreateNoWindow = true;
+            psi.UseShellExecute = false;
+            psi.WorkingDirectory = Path.GetTempPath();
+            Process.Start(psi);
+        }
+
+        /// <summary>
+        /// The handover script's text: wait for process waitFor to exit, delete
+        /// the targets that are under Root, then run the farewell note, when
+        /// there is one. Null when Root cannot be fenced, and then nothing is
+        /// deleted at all.
+        /// </summary>
+        public static string Script(string[] targets, int waitFor, string note)
+        {
             var sb = new StringBuilder();
             sb.AppendLine("@echo off");
             // cmd reads a .cmd file in the console's OEM code page, not in the
@@ -525,8 +581,7 @@ namespace Thornswood
             sb.AppendLine("chcp 65001 >nul");
             sb.AppendLine("setlocal");
             sb.AppendLine(":wait");
-            sb.AppendLine("tasklist /fi \"PID eq " + Process.GetCurrentProcess().Id + "\" | find \"" +
-                          Process.GetCurrentProcess().Id + "\" >nul 2>&1");
+            sb.AppendLine("tasklist /fi \"PID eq " + waitFor + "\" | find \"" + waitFor + "\" >nul 2>&1");
             sb.AppendLine("if not errorlevel 1 ( timeout /t 1 /nobreak >nul & goto wait )");
 
             // Last fence. Everything this script deletes has to live under
@@ -535,8 +590,8 @@ namespace Thornswood
             // /q pointed at somebody's game or their documents.
             string root;
             try { root = Path.GetFullPath(Paths.Root).TrimEnd('\\') + "\\"; }
-            catch { return; }
-            if (root.Length < 4) return;
+            catch { return null; }
+            if (root.Length < 4) return null;
 
             foreach (string t in targets)
             {
@@ -567,11 +622,7 @@ namespace Thornswood
             // leaves an empty Thornswood behind.
             sb.AppendLine("rmdir \"" + Paths.Root + "\" 2>nul");
 
-            // Last, say what survived and why. After the deletes, so it reports
-            // what is actually there rather than what was expected to be.
-            string note = null;
-            try { note = WriteFarewell(keepSaves, deleteMods); }
-            catch (Exception ex) { Swallow.Note("Uninstall.Finish, farewell", ex); }
+            // Last, say what survived and why.
             if (note != null)
             {
                 sb.AppendLine("powershell -NoProfile -ExecutionPolicy Bypass -File \"" + note + "\" >nul 2>&1");
@@ -579,17 +630,7 @@ namespace Thornswood
             }
 
             sb.AppendLine("del /f /q \"%~f0\" >nul 2>&1");
-
-            string script = Path.Combine(Path.GetTempPath(), "thornswood-uninstall.cmd");
-            // UTF-8 with no byte order mark, to match the chcp at the top. The
-            // machine's ANSI code page cannot hold every path this may name.
-            File.WriteAllText(script, sb.ToString(), new UTF8Encoding(false));
-
-            var psi = new ProcessStartInfo("cmd.exe", "/c \"" + script + "\"");
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = false;
-            psi.WorkingDirectory = Path.GetTempPath();
-            Process.Start(psi);
+            return sb.ToString();
         }
         /// <summary>
         /// The note that comes up once everything has been deleted, listing what
@@ -604,7 +645,7 @@ namespace Thornswood
         /// at all: a person whose uninstall left nothing behind does not need a
         /// box telling them so.
         /// </summary>
-        static string WriteFarewell(bool keepSaves, bool deleteMods)
+        public static string WriteFarewell(bool keepSaves, bool deleteMods)
         {
             var ps = new StringBuilder();
             ps.AppendLine("$ErrorActionPreference = 'SilentlyContinue'");
@@ -622,8 +663,20 @@ namespace Thornswood
                 ps.AppendLine("$why['Game'] = 'Thornswood''s copy of the game. You chose to keep it, so a reinstall can reuse it.'");
             if (keepSaves)
             {
-                ps.AppendLine("$why['Profile'] = 'your characters, saves and settings. You chose to keep them.'");
+                ps.AppendLine("$why['Profile'] = 'your characters, saves and settings, and the launcher''s record of what it installed. You chose to keep them.'");
                 ps.AppendLine("$why['config.json'] = 'your settings. You chose to keep them.'");
+            }
+            ps.AppendLine();
+
+            // What the script was told to take out of a kept Profile and could
+            // not (a browser still closing, a file held open). Named one by one,
+            // because "your saves and settings" would be wrong about each of
+            // them (#3679).
+            ps.AppendLine("$stuck = @()");
+            if (keepSaves)
+            {
+                foreach (string p in LocalKeep.NotSaves())
+                    ps.AppendLine("if (Test-Path -LiteralPath " + PsQuote(p) + ") { $stuck += '  ' + " + PsQuote(p) + " }");
             }
             ps.AppendLine();
 
@@ -635,6 +688,7 @@ namespace Thornswood
             ps.AppendLine();
 
             ps.AppendLine("$msg = \"Thornswood is uninstalled.`r`n`r`nThis was left at\" + \"`r`n`r`n    \" + $root + \"`r`n`r`n\" + ($lines -join \"`r`n\") + \"`r`n`r`nDelete that folder yourself once you are done with them.\"");
+            ps.AppendLine("if ($stuck) { $msg += \"`r`n`r`nThese are not saves or settings and should have gone, but could not be removed. Delete them yourself:`r`n`r`n\" + ($stuck -join \"`r`n\") }");
             ps.AppendLine("Add-Type -AssemblyName System.Windows.Forms");
             ps.AppendLine("[void][System.Windows.Forms.MessageBox]::Show($msg, 'Thornswood', 'OK', 'Information')");
 

@@ -24,6 +24,13 @@ namespace Thornswood
     {
         const string HostFile = "menu-music-host.html";
 
+        /// <summary>
+        /// The music browser's own WebView2 folder: its cache and storage, kept
+        /// while the launcher is installed and removed by every uninstall
+        /// (LocalKeep.NotSaves, #3679).
+        /// </summary>
+        public static string BrowserDir { get { return Path.Combine(Paths.ProfileDir, "MusicBrowser"); } }
+
         static Microsoft.Web.WebView2.Wpf.WebView2 view;
         static Window host;
         static bool ready;
@@ -259,7 +266,7 @@ namespace Thornswood
                 return;
             }
 
-            string profile = Path.Combine(Paths.ProfileDir, "MusicBrowser");
+            string profile = BrowserDir;
             try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("MenuMusic.CreateProfile", ex); }
 
             // Hidden host has no user gesture. CoreWebView2EnvironmentOptions
