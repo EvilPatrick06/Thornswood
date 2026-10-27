@@ -882,7 +882,6 @@ try {
     if (Test-Path -LiteralPath $libDir) { Remove-Item -LiteralPath $libDir -Recurse -Force }
     $null = New-Item -ItemType Directory -Force -Path $libDir
     foreach ($x in $clientLicences) { [IO.File]::WriteAllBytes((Join-Path $libDir ($x.Port + '.txt')), $x.Bytes) }
-    Remove-Item -LiteralPath $clientRecordDir -Recurse -Force -ErrorAction SilentlyContinue
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
     Say ("  licences\ holds the texts of the {0} libraries inside the client files ({1})" -f $clientLicences.Count, $(if ($licencesFrom -eq 'checkout') { 'this checkout''s record' } else { 'the record committed at ' + $licencesFrom.Substring(0, 8) })) 'Green'
 } catch {
@@ -1014,8 +1013,13 @@ catch {
 # credential by name or by shape, or a file Ship-Rules says never ships, stops
 # the package. File, line and rule only, never the value. The stage of 23
 # September, 813 files with the launcher and config.json, passes.
+#
+# The six client runtime files are held to the record this installer packs,
+# the launcher's (#3099), not the checkout's, which is a later client
+# whenever the release being packaged is not main's newest.
 Head 'Checking for secrets'
-& (Join-Path $here '..\dev\Check-Secrets.ps1') -Dir $stage
+& (Join-Path $here '..\dev\Check-Secrets.ps1') -Dir $stage -ClientRecord $clientRecordPath
+Remove-Item -LiteralPath $clientRecordDir -Recurse -Force -ErrorAction SilentlyContinue
 if ($LASTEXITCODE -ne 0) { Die 'Something that must never ship is in the staged installer. The lines above name each file and rule.' }
 
 # ---- archive ---------------------------------------------------------------
