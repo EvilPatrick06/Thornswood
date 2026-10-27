@@ -187,6 +187,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Go.ps1](release/Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/Install-NexusRevision.ps1](release/Install-NexusRevision.ps1) | Lays out one revision of the Thornswood collection on Nexus Mods (slug 7essxf) into a game folder, the way Vortex installs and deploys it, without Vortex (#2754). |
+| [release/Installer-OnGitHub.ps1](release/Installer-OnGitHub.ps1) | What .github\workflows\installer.yml does with GitHub's releases, as functions a harness can drive with a stand-in GitHub (#3412). |
 | [release/LogHandBack.ps1](release/LogHandBack.ps1) | A file handed back from a workflow run in its job's log rather than as an artifact. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
 | [release/New-ClientLicenceRecord.ps1](release/New-ClientLicenceRecord.ps1) | Records which vcpkg libraries are in the client files, with each one's licence text, into records\client-licences.json and records\client-licences\. |
