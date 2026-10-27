@@ -62,6 +62,10 @@ yes('build-pr.yml is exactly what build.yml generates (run node scripts/dev/Buil
 // lets cancel-in-progress take the waiting fallback down with its run.
 yes('main\'s fallback does not use always(), so a newer run cancels it', code(build).indexOf('always()') < 0);
 yes('the pull request fallback does not use always() either', code(pr).indexOf('always()') < 0);
-yes('both workflows still cancel the older run on the same ref', /\n  cancel-in-progress: true\n/.test(build) && /\n  cancel-in-progress: true\n/.test(pr));
+// #3874: main's build traces the gate for the pull requests after it, so a
+// newer push to main waits for the build in progress rather than cancelling
+// it; a pull request's newer push still cancels its older run.
+yes('main waits for the build in progress, one group a ref', /\nconcurrency:\n(?:#.*\n)*  group: build-\$\{\{ github\.ref \}\}\n  cancel-in-progress: false\n/.test(build));
+yes('a pull request cancels its older run', /\nconcurrency:\n(?:#.*\n)*  group: build-pr-\$\{\{ github\.ref \}\}\n  cancel-in-progress: true\n/.test(pr));
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

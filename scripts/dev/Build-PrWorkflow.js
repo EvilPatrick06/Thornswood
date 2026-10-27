@@ -41,6 +41,15 @@ function build(src) {
   body = body.replace(on[0], '\non:\n  pull_request:\n');
   body = swap(body, 'group: build-${{ github.ref }}', 'group: build-pr-${{ github.ref }}', 'its concurrency group');
   /*
+    A PULL REQUEST'S NEWER PUSH CANCELS ITS OLDER RUN (#3874). Main's builds
+    wait for each other, because each one traces the gate for the pull
+    requests after it; nothing reads a pull request's trace, so its older run
+    is a commit nobody wants.
+  */
+  const conc = /(\nconcurrency:\n(?:#.*\n|  .*\n)*?)  cancel-in-progress: false\n/.exec(body);
+  if (!conc) { fail('build.yml no longer has cancel-in-progress: false in its concurrency'); }
+  body = body.replace(conc[0], conc[1] + '  cancel-in-progress: true\n');
+  /*
     THE VPS FALLBACK STAYS, FOR THIS REPOSITORY'S OWN BRANCHES ONLY (Patrick,
     12 Oct 2026, changing the pull request half of the 11 Oct #2161 call: the
     VPS backs up everything, pull request builds included). A pull request

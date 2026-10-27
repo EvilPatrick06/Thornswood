@@ -56,7 +56,7 @@ Yes "nightly.yml runs on the same runner ($nightRunsOn)" ($nightRunsOn -match 's
 Yes '  as the fallback: GitHub''s hosted runner is the default since #1306' ($yml -match '(?m)^\s+runs-on: windows-latest\s*$')
 Yes '  while a pull request builds on GitHub''s hosted runner in build-pr.yml, never the VPS (#1306)' ([IO.File]::ReadAllText((Join-Path (Split-Path $PSScriptRoot) '.github\workflows\build-pr.yml')) -match '(?m)^\s+runs-on: windows-latest\s*$')
 Yes '  with a timeout' ($yml -match '(?m)^\s*timeout-minutes:\s*\d+')
-Yes '  one run per branch at a time' ($yml -match 'cancel-in-progress:\s*true')
+Yes '  one run per branch at a time, main''s newer push waiting for the one in progress (#3874)' ($yml -match '(?m)^  group: build-\$\{\{ github\.ref \}\}\s*$' -and $yml -match '(?m)^  cancel-in-progress: false\s*$')
 Yes '  and a token that can only read' ($yml -match '(?m)^permissions:\s*\r?\n\s+contents:\s*read')
 
 # ---- the bot step never touches the machine's Python ----------------------------
