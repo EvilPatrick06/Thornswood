@@ -368,6 +368,13 @@ if ($OffBox -and -not $PSBoundParameters.ContainsKey('Label') -and $buildRecord.
 $signRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\sign-runners.json') -Raw | ConvertFrom-Json
 $signs = (-not $OffBox) -and (@($signRecord.runners | ForEach-Object { [int]$_ }) -contains $Number)
 if ($signs -and -not $PSBoundParameters.ContainsKey('Label')) { $registerLabels = $registerLabels + ',' + $signRecord.label }
+# THE CHECK RUNNERS (#3956). A VPS runner records\check-runners.json lists
+# is registered with its label, so release.yml's check of a signed draft
+# can run on it.
+if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
+  $checkRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\check-runners.json') -Raw | ConvertFrom-Json
+  if (@($checkRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $registerLabels + ',' + $checkRecord.label }
+}
 # On the box, the folders records\runner-isolation.json says no runner may
 # reach that are not C:\Thornswood-* (C:\ProgramData\ssh, the
 # administrator's profile) are denied with the Thornswood ones, at every
