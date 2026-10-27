@@ -15,7 +15,8 @@
 
   WHY THIS EXISTS. The 25 Oct 2026 weekly review listed "One's worktrees and
   stashes" under "Could not read": a cloud thread cannot reach One, and the
-  rules about them (CLAUDE.md, "On the shipping machine"; Developer-Guide.md,
+  rules about them (CLAUDE.md in the private ops repo, "On the shipping
+  machine"; Developer-Guide.md,
   "No stray branches, worktrees or pull requests") were checked by nobody.
   When the Local Desk read them by hand on 26 Oct (#3534), the shared clone
   held 29 worktrees, 7 stashes and about 96 dead branches (#3537). So One
@@ -32,7 +33,7 @@
 
   WHAT -Read HOLDS IT TO, one line each under its rule:
     clone on a branch   the shared clone is on a branch; it stays detached at
-                        origin/main (CLAUDE.md)
+                        origin/main (CLAUDE.md in the ops repo)
     stash               any stash at all; never git stash in the shared clone (#992)
     branch gone         a worktree or local branch whose branch GitHub no
                         longer has: its pull request merged or closed, so it goes
@@ -41,7 +42,14 @@
     old report          the report is more than two days old, so One has
                         not sent one since; said first
   A worktree on a branch GitHub still has is listed with its age and left to
-  the review to judge: lanes may be mid-run in it (CLAUDE.md).
+  the review to judge: lanes may be mid-run in it (CLAUDE.md in the ops
+  repo).
+
+  WHAT IT NEVER HOLDS. The repository is public (#3721), so the run's log is
+  too. The report names no machine and no path on it: the clone is "clone"
+  or "engine/skymp", a worktree is its path inside the clone, and one
+  outside it is "outside the clone: <its folder's name>". A stash is its ref
+  and time, never its message, and temp\ is a count, never its names.
 
   Exits: 0 sent, installed, or read with nothing against the rules; 3 read,
   with lines against them; 1 stopped, with why; 2 no report to read yet.
@@ -88,7 +96,17 @@ function Invoke-Git([string]$dir, [string[]]$gitArgs) {
 function Get-IsoTime([DateTime]$t) { return $t.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') }
 
 # One clone as the report holds it.
-function Get-CloneReport([string]$dir) {
+# A worktree's path as the report shows it: inside the clone, its path there;
+# outside it, only its folder's name, so no path on One leaves it.
+function Get-ShownPath([string]$root, [string]$p) {
+    $r = [IO.Path]::GetFullPath($root).TrimEnd('\', '/')
+    $f = [IO.Path]::GetFullPath($p).TrimEnd('\', '/')
+    if ($f.StartsWith($r + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $f.StartsWith($r + '/', [StringComparison]::OrdinalIgnoreCase)) { return $f.Substring($r.Length + 1).Replace('\', '/') }
+    return 'outside the clone: ' + (Split-Path -Leaf $f)
+}
+
+# One clone, as the report holds it. name is how the report calls it.
+function Get-CloneReport([string]$dir, [string]$name = 'clone') {
     $root = (Resolve-Path -LiteralPath $dir).Path
     $head = @(Invoke-Git $root @('rev-parse', 'HEAD'))[0]
     $branch = @(Invoke-Git $root @('branch', '--show-current'))
@@ -116,13 +134,17 @@ function Get-CloneReport([string]$dir) {
             }
             # The clone itself is the first entry; it is reported as the clone.
             if ([IO.Path]::GetFullPath($p).TrimEnd('\', '/') -ne [IO.Path]::GetFullPath($root).TrimEnd('\', '/')) { $worktrees.Add($cur) }
+            else { $cur = $null; continue }
+            # Kept for the folder check below, then shown without One's paths.
+            $cur.full = [IO.Path]::GetFullPath($p).TrimEnd('\', '/').ToLowerInvariant()
+            $cur.path = Get-ShownPath $root $p
             $cur = $null
         }
     }
 
-    $stashes = @(Invoke-Git $root @('stash', 'list', '--format=%gd%x09%cI%x09%gs') | Where-Object { $_ } | ForEach-Object {
-            $f = $_ -split "`t", 3
-            [ordered]@{ ref = $f[0]; at = $f[1]; message = $(if ($f.Count -gt 2) { $f[2] } else { '' }) }
+    $stashes = @(Invoke-Git $root @('stash', 'list', '--format=%gd%x09%cI') | Where-Object { $_ } | ForEach-Object {
+            $f = $_ -split "`t", 2
+            [ordered]@{ ref = $f[0]; at = $f[1] }
         })
     $archived = @(Invoke-Git $root @('for-each-ref', '--format=%(refname)', 'refs/stash-archive') | Where-Object { $_ }).Count
 
@@ -133,32 +155,31 @@ function Get-CloneReport([string]$dir) {
             [ordered]@{ name = $f[0]; at = $f[1]; upstream = $(if ($f[2]) { $f[2] } else { $null }); gone = ($f.Count -gt 3 -and $f[3] -eq '[gone]'); behind_main = $behind }
         })
 
-    $owned = @($worktrees | ForEach-Object { [IO.Path]::GetFullPath($_.path).TrimEnd('\', '/').ToLowerInvariant() })
+    $owned = @($worktrees | ForEach-Object { $_.full })
+    foreach ($w in $worktrees) { $w.Remove('full') }
     $unowned = @()
     $wtDir = Join-Path $root 'worktrees'
     if (Test-Path -LiteralPath $wtDir) {
         $unowned = @(Get-ChildItem -LiteralPath $wtDir -Directory | Where-Object { $owned -notcontains $_.FullName.TrimEnd('\', '/').ToLowerInvariant() } | ForEach-Object {
                 [ordered]@{ name = $_.Name; changed_at = (Get-IsoTime $_.LastWriteTime) } })
     }
-    $temp = @()
+    $temp = 0
     $tempDir = Join-Path $root 'temp'
-    if (Test-Path -LiteralPath $tempDir) {
-        $temp = @(Get-ChildItem -LiteralPath $tempDir -Force | ForEach-Object { [ordered]@{ name = $_.Name; folder = [bool]$_.PSIsContainer; changed_at = (Get-IsoTime $_.LastWriteTime) } })
-    }
+    if (Test-Path -LiteralPath $tempDir) { $temp = @(Get-ChildItem -LiteralPath $tempDir -Force).Count }
 
     return [ordered]@{
-        path = $root; head = $head; branch = $branch; origin_main = $main
+        path = $name; head = $head; branch = $branch; origin_main = $main
         worktrees = $worktrees.ToArray(); stashes = $stashes; stash_archive = $archived
-        branches = $branches; unowned_worktree_folders = $unowned; temp = $temp
+        branches = $branches; unowned_worktree_folders = $unowned; temp_count = $temp
     }
 }
 
 # The whole report: this clone and the engine fork in it.
 function New-CloneReport([string]$dir) {
-    $clones = @(Get-CloneReport $dir)
+    $clones = @(Get-CloneReport $dir 'clone')
     $engine = Join-Path $dir 'engine/skymp'
-    if (Test-Path -LiteralPath (Join-Path $engine '.git')) { $clones += Get-CloneReport $engine }
-    return [ordered]@{ kind = 'thornswood-clone-report'; machine = [Environment]::MachineName; made_at = (Get-IsoTime (Get-Date)); clones = $clones }
+    if (Test-Path -LiteralPath (Join-Path $engine '.git')) { $clones += Get-CloneReport $engine 'engine/skymp' }
+    return [ordered]@{ kind = 'thornswood-clone-report'; made_at = (Get-IsoTime (Get-Date)); clones = $clones }
 }
 
 # The report as clone-report.yml's input: gzip, then base64.
@@ -215,7 +236,7 @@ function Find-CloneDrift($report, [DateTime]$now) {
     foreach ($c in @($report.clones)) {
         if ($first -and $c.branch) { $out['clone on a branch'].Add(('{0} is on {1}' -f $c.path, $c.branch)) }
         $first = $false
-        foreach ($s in @($c.stashes)) { if ($s) { $out['stash'].Add(('{0}: {1} ({2}) {3}' -f $c.path, $s.ref, $s.at, $s.message)) } }
+        foreach ($s in @($c.stashes)) { if ($s) { $out['stash'].Add(('{0}: {1} ({2})' -f $c.path, $s.ref, $s.at)) } }
         $gone = @{}
         foreach ($b in @($c.branches)) { if ($b -and $b.gone) { $gone[[string]$b.name] = $true; $out['branch gone'].Add(('{0}: branch {1}' -f $c.path, $b.name)) } }
         foreach ($w in @($c.worktrees)) {
@@ -231,14 +252,14 @@ function Find-CloneDrift($report, [DateTime]$now) {
 # What the report holds, a few lines a clone.
 function Format-CloneReport($report) {
     $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add(('report from {0}, made {1}' -f $report.machine, $report.made_at))
+    $lines.Add(('report made {0}' -f $report.made_at))
     foreach ($c in @($report.clones)) {
         $wt = @($c.worktrees | Where-Object { $_ })
         $br = @($c.branches | Where-Object { $_ })
         $lines.Add(('{0}: {1}, {2} worktree(s), {3} stash(es), {4} archived, {5} local branch(es) ({6} gone from GitHub), {7} unowned folder(s) in worktrees, {8} in temp' -f
                 $c.path, $(if ($c.branch) { 'on ' + $c.branch } else { 'detached at ' + ([string]$c.head).Substring(0, [Math]::Min(8, ([string]$c.head).Length)) + $(if ($c.origin_main -and $c.head -eq $c.origin_main) { ' (origin/main)' } else { '' }) }),
                 $wt.Count, @($c.stashes | Where-Object { $_ }).Count, $c.stash_archive, $br.Count, @($br | Where-Object { $_.gone }).Count,
-                @($c.unowned_worktree_folders | Where-Object { $_ }).Count, @($c.temp | Where-Object { $_ }).Count))
+                @($c.unowned_worktree_folders | Where-Object { $_ }).Count, [int]$c.temp_count))
         foreach ($w in $wt) {
             $lines.Add(('  worktree {0}: {1}, {2} changed, last changed {3}' -f $w.path, $(if ($w.branch) { $w.branch } else { 'detached' }), $w.dirty, $w.changed_at))
         }

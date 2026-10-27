@@ -17,8 +17,11 @@
 # 4000 characters a line. A run given anything else fails and prints nothing
 # of it.
 #
-# WHAT IT HOLDS. Folder names, branch names, commit ids, stash messages and
-# times from One's clone. No secret: Report-Clone.ps1 reads git, never a file.
+# WHAT IT HOLDS. Branch names, commit ids, worktree paths inside the clone,
+# the names of folders in worktrees and times from One's clone. The log is
+# public with the repository (#3721), so the report names no machine and no
+# path on One, and leaves stash messages and the names in temp out. No secret:
+# Report-Clone.ps1 reads git, never a file.
 #
 # THE TOKEN. None. The run's own token is given no permissions, and the
 # report comes in through the environment, never pasted into the script.
@@ -59,7 +62,7 @@ jobs:
           if ($bytes.Length -gt 1048576) { throw 'the report opens to more than 1 MB, which no clone report is' }
           $report = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
           if (-not $report.PSObject.Properties['kind'] -or $report.kind -ne 'thornswood-clone-report' -or -not $report.PSObject.Properties['clones']) { throw 'the input is not a clone report' }
-          Write-Host ("a clone report from {0}, made {1}, {2} clone(s)" -f $report.machine, $report.made_at, @($report.clones).Count)
+          Write-Host ("a clone report made {0}, {1} clone(s)" -f $report.made_at, @($report.clones).Count)
           # The marker is put together here so the script's own text, which
           # the log shows first, never holds it.
           $mark = 'CLONE' + '-JSON'

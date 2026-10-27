@@ -1,5 +1,5 @@
 {
-  "why": "What GitHub's Actions settings, environments, secrets and variables for this repository are meant to be. scripts/deploy/Check-GitHubSettings.ps1 reads GitHub and names every difference (#3534); a change to a setting is a pull request to this file and the change on GitHub together. docs/RUNNER-ISOLATION.md section 1 says why each is what it is; Developer-Guide.md section P and docs/OWNERSHIP.md say what each secret is. Names only, never a value.",
+  "why": "What GitHub's Actions settings, environments, secrets and variables for this repository are meant to be. scripts/deploy/Check-GitHubSettings.ps1 reads GitHub and names every difference (#3534); a change to a setting is a pull request to this file and the change on GitHub together. docs/RUNNER-ISOLATION.md in the ops repo, section 1, says why each is what it is; Developer-Guide.md section P and docs/OWNERSHIP.md in the ops repo say what each secret is. Names only, never a value.",
   "actions": {
     "enabled": true,
     "allowed_actions": "all"

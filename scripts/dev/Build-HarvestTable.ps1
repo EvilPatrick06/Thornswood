@@ -2117,7 +2117,7 @@ $jsonEol = $Eol
 $docLines = New-Object 'System.Collections.Generic.List[string]'
 $docLines.Add('{')
 $docLines.Add('  "builtBy": ' + (JsonStr 'scripts\dev\Build-HarvestTable.ps1') + ',')
-$docLines.Add('  "source": ' + (JsonStr ('the FLOR and TREE records of ' + $order.Count + ' plugins, the 5 masters and what ' + $PluginList + ' enables')) + ',')
+$docLines.Add('  "source": ' + (JsonStr ('the FLOR and TREE records of ' + (Get-LoadOrderName $order))) + ',')
 $docLines.Add('  "language": ' + (JsonStr $LANGUAGE) + ',')
 $docLines.Add('  "rankedBy": ' + (JsonStr 'the gold value of the produce, the thresholds in RANK_MAX_VALUE at the top of the script') + ',')
 $docLines.Add('  "harvestsAre": ' + (JsonStr ('the plants whose produce is an alchemy reagent. A plant whose produce is food is not the gatherer''s: ' +

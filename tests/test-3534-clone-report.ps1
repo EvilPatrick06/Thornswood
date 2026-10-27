@@ -119,18 +119,20 @@ try {
     Yes ("-OutFile writes the report and sends nothing (exit $LASTEXITCODE)") ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $out) -and ($o -join ' ') -match 'nothing sent')
     $r = [IO.File]::ReadAllText($out) | ConvertFrom-Json
     $c = @($r.clones)[0]
-    Yes 'it is a clone report, with when and where it was made' ($r.kind -eq 'thornswood-clone-report' -and ([IO.File]::ReadAllText($out) -match '"made_at":"\d{4}-\d\d-\d\dT[\d:]+Z"') -and $r.machine)
+    $rawText = [IO.File]::ReadAllText($out)
+    Yes 'it is a clone report, with when it was made' ($r.kind -eq 'thornswood-clone-report' -and ($rawText -match '"made_at":"\d{4}-\d\d-\d\dT[\d:]+Z"'))
+    Yes 'it names no machine and no path on the machine (the log is public)' (-not $r.PSObject.Properties['machine'] -and -not $rawText.Contains([Environment]::MachineName) -and -not $rawText.Contains($clone.Replace('\', '\\')) -and -not $rawText.Contains($tmp.Replace('\', '\\')))
     Yes 'the clone is detached at origin/main' ($null -eq $c.branch -and $c.head -eq $c.origin_main)
     $wt = @($c.worktrees)
     $by = @{}; foreach ($w in $wt) { $by[(Split-Path -Leaf $w.path)] = $w }
     Yes ("three worktrees, the clone itself not among them ($($wt.Count))") ($wt.Count -eq 3 -and $by.ContainsKey('claude-merged') -and $by.ContainsKey('claude-live') -and $by.ContainsKey('scratch'))
     Yes '  each with its branch, or detached' ($by['claude-merged'].branch -eq 'claude/merged' -and $by['scratch'].detached -and $null -eq $by['scratch'].branch)
     Yes '  and its uncommitted changes counted' ($by['scratch'].dirty -eq 1 -and $by['claude-live'].dirty -eq 0)
-    Yes 'the stash, with its message, and the archived one counted' (@($c.stashes).Count -eq 1 -and @($c.stashes)[0].message -match 'wip before main refresh' -and $c.stash_archive -eq 1)
+    Yes 'the stash, without its message, and the archived one counted' (@($c.stashes).Count -eq 1 -and -not @($c.stashes)[0].PSObject.Properties['message'] -and -not $rawText.Contains('wip before main refresh') -and $c.stash_archive -eq 1)
     $bm = @($c.branches | Where-Object { $_.name -eq 'claude/merged' })
     $bl = @($c.branches | Where-Object { $_.name -eq 'claude/live' })
     Yes 'the branch GitHub deleted is gone, the live one is not' ($bm.Count -eq 1 -and $bm[0].gone -and $bl.Count -eq 1 -and -not $bl[0].gone -and $bl[0].behind_main -eq 0)
-    Yes 'the folder in worktrees\ no worktree owns, and the one in temp\' (@($c.unowned_worktree_folders | ForEach-Object { $_.name }) -join ',' -eq 'left-behind' -and @($c.temp | ForEach-Object { $_.name }) -contains '2573')
+    Yes 'the folder in worktrees\ no worktree owns, and temp\ counted without its names' (@($c.unowned_worktree_folders | ForEach-Object { $_.name }) -join ',' -eq 'left-behind' -and $c.temp_count -eq 1 -and -not $rawText.Contains('2573'))
 
     # ---- 3. the rules ----
     Write-Host ''; Write-Host 'the rules'
@@ -161,7 +163,7 @@ try {
         finally { $env:CLONE_REPORT = $was }
     }
     $s = & $runStep $packed
-    Yes 'the workflow''s step takes the packed report' ($s.Ok -and ($s.Lines -join ' ') -match 'a clone report from')
+    Yes 'the workflow''s step takes the packed report' ($s.Ok -and ($s.Lines -join ' ') -match 'a clone report made')
     Yes '  and its own text never holds the marker' ($stepScript -notmatch 'CLONE-JSON')
     $back = Read-ReportFromLog $s.Lines
     Yes 'read back from the log, it is the same report' (($back | ConvertTo-Json -Depth 8 -Compress) -eq ($r | ConvertTo-Json -Depth 8 -Compress))

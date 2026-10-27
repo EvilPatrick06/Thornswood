@@ -165,7 +165,7 @@ function constLine(src, name) {
   }
 
   const a = front.indexOf('  function localRef(serverId) {');
-  const b = front.indexOf('  sp.on(\'browserMessage\', guard(\'overhead\'');
+  const b = front.indexOf('  function overheadMessage(what) {');
   yes('the overhead block converts the id before it looks', a > 0 && b > a &&
       /refr = localRef\(key\);/.test(front.slice(a, b)));
   if (a > 0 && b > a) {
