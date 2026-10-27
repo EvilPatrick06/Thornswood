@@ -122,7 +122,8 @@ function Set-Aside($path) {
 }
 
 # Everything from the last $KeepDays days, and the newest seven whatever
-# their age. Matched by name, so nothing put here by hand is ever touched.
+# their age. Matched by name, so nothing put here by hand is ever touched,
+# except Backup-Server.ps1's own copies, aged below by the day in theirs.
 function Prune {
   if ($KeepDays -le 0) { return }
   $mine = @(Get-ChildItem -LiteralPath $To -File -EA SilentlyContinue |
