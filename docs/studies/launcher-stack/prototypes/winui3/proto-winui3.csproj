@@ -10,6 +10,10 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- Makes resources.pri, which holds WinUI's own theme resources. Without
+         it the window stopped on One (27 Oct) with "Cannot locate resource
+         from ms-appx:///Microsoft.UI.Xaml/Themes/themeresources.xaml". -->
+    <EnableMsixTooling>true</EnableMsixTooling>
     <SelfContained>true</SelfContained>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <AssemblyName>proto-winui3</AssemblyName>

@@ -30,10 +30,10 @@ Patrick's picks, on his report page, 26 Oct 2026, 11:46 PM ([#3209](https://gith
    signed manifest, the baseline record) rebuilt on top of it, not dropped
    ([#4065](https://github.com/EvilPatrick06/Thornswood/issues/4065)).
 
-Still open after the pick: whether Avalonia ships compiled to native code or
-with the JIT. The One run of 26 Oct measured the JIT build's start at 6.5
-seconds against today's 3.7 ("The comparison"); the native build did not
-finish there, and the next One run measures it.
+Settled by the One runs after the pick: Avalonia ships compiled to native
+code. Measured on One, that build starts in 0.5 seconds and holds 135 MB in
+one process; the build with the JIT took 6.5 seconds and 150 MB, and today's
+launcher takes 3.7 seconds and 333 MB in eight ("The comparison").
 
 ## Where things stand today, measured
 
@@ -82,31 +82,47 @@ Desktop Runtime, which Windows does not have and whose installer is
 | WPF on .NET 10, framework dependent | C# | 0.16 | 0.08 | .NET 10 | 2042 | 2311 | 158.3 / 202.4 | 1 | its own name | no | yes |
 | WPF on .NET 10, self-contained | C# | 61.85 | 56.62 | nothing | 2676 | 2833 | 212.9 / 293.3 | 1 | its own name | no | yes |
 | WPF on .NET 10, self-contained, with WebView2 | C# | 63.00 | 57.13 | WebView2 | 12801 | 7324 | 372.7 / 652.1 | 8 | Microsoft Edge WebView2 | no | yes |
-| WinUI 3, unpackaged, self-contained | C# | 225.98 | 90.40 | nothing | next One run | | | | | no | no (needs Windows tools, measured) |
+| WinUI 3, unpackaged, self-contained | C# | 225.98 | 90.40 | nothing | stops at start on One, see below | | | | | no | no (needs Windows tools, measured) |
 | Avalonia on .NET 10, self-contained, trimmed (JIT) | C# | 19.82 | 14.87 | nothing | 7605 | 6450 | 150.2 / 200.2 | 1 | its own name | yes | yes |
 | Avalonia, untrimmed | C# | 46.33 | 41.18 | nothing | not run | | | | | yes | yes |
-| Avalonia compiled to native code | C# | next One run | | nothing | next One run | | | | | yes | no (native compile needs Windows) |
+| Avalonia compiled to native code | C# | 34.83 | 14.32 | nothing | 1523 | 488 | 135.2 / 164.1 | 1 | its own name | yes | no (native compile needs Windows) |
 | Tauri 2 | Rust and the page in HTML | 3.17 | 1.44 | WebView2 | 3041 | 2497 | 266.3 / 511.0 | 8 | Microsoft Edge WebView2 | yes | yes |
 | Slint | Rust | 8.21 | 4.68 | nothing | 12199 | 2275 | 79.2 / 131.5 | 1 | its exe name | yes | yes |
-| egui | Rust | 7.86 | 3.73 | nothing | next One run | | | | | yes | yes |
+| egui | Rust | 7.86 | 3.73 | nothing | 2878 | 836 | 443.5 / 201.5 | 1 | its exe name | yes | yes |
 | Wails 2 | Go and the page in HTML | 11.24 | 4.61 | WebView2 | 1486 | 645 | 250.8 / 432.3 | 8 | Microsoft Edge WebView2 | yes | yes |
-| Electron 45 | TypeScript | 356.67 | 154.82 | nothing | next One run | | | | | yes | yes |
+| Electron 45 | TypeScript | 356.67 | 154.82 | nothing | no first frame in 30 s on One, see below | | | | | yes | yes |
 | Qt 6 Quick | C++ | 105.39 | 57.45 | nothing | 1911 | 1031 | 108.4 / 127.8 | 1 | its exe name | yes | no for Windows |
 | Flutter 3.47 | Dart | 24.55 | 10.49 | nothing | 3359 | 3330 | 224.5 / 237.2 | 1 | its own name | yes | no for Windows |
 | Python (PySide6 or similar, frozen) | Python | not built | | | | | | | | | |
 
-The Windows columns are the One run of 26 Oct 2026, 10:47 to 11:33 PM, at
-a0bddcec ([its results on #3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434615789)):
+The Windows columns are the One runs of 26 Oct 2026, 10:47 to 11:33 PM, at
+a0bddcec ([its results on #3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434615789)),
+and of 27 Oct, 12:11 to 12:21 AM, at 70ff2adb, for Avalonia compiled to
+native code and egui ([its results](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6435352745)):
 Windows 11 Pro, an Intel Core Ultra 9 185H, an RTX 4080 laptop GPU, 31 GB,
 WebView2 Runtime 155. "First start" is the first start after the build,
 "start" the median of the four after it; memory is three seconds after the
 first frame, summed over the prototype and every process under it. "Its own
 name" in the mixer is the app's name; "its exe name" is the file name, until
 the exe is given a description. The Avalonia untrimmed row is from the cloud
-build. WinUI 3, egui and Electron built but wrote no ready file on One, and
-the native Avalonia build stopped at its link step; the script now keeps what
-each of them says and finds the linker's helper (#3428), and the next One run
-fills those rows.
+build. egui holds more private memory than it has in memory: it has reserved
+memory it has not touched yet.
+
+Two rows have no times:
+- **WinUI 3** stopped at its start on One with "Cannot locate resource from
+  ms-appx:///Microsoft.UI.Xaml/Themes/themeresources.xaml" (exit code
+  -1073741189). Those theme resources come from the app's resources.pri,
+  which an unpackaged project makes only with `EnableMsixTooling`; the
+  prototype now sets it. That fix is not yet run on Windows.
+- **Electron** opened and was still running 30 seconds later without its
+  first frame, and said nothing on stdout or stderr. The cause is not
+  measured. The prototype now writes what happens on the way to its first
+  frame (the page loading, whether Chromium sees the window as hidden, a GPU
+  or page process ending) to a log the script keeps; on Linux that log shows
+  each step and the ready.
+
+Neither is the pick, so these two rows wait for whenever One next runs the
+script; they change nothing in the decision.
 
 What the run says, for the people who play:
 - Every stack that draws its window in WebView2 (today's launcher, Tauri,
@@ -114,13 +130,14 @@ What the run says, for the people who play:
   own, and shows in the Volume Mixer as "Microsoft Edge WebView2", not as
   Thornswood (#3207).
 - The stacks that draw their own window run one process and hold 79 MB
-  (Slint), 108 (Qt), 150 (Avalonia), 158 to 213 (WPF on .NET 10) and 225
-  (Flutter), and the mixer names them.
-- Later starts: Wails 0.6 seconds, Qt 1.0, Slint and WPF on .NET 10 2.3 to
-  2.8, Tauri 2.5, Flutter 3.3, today 3.7, Avalonia with the JIT 6.5, and WPF
-  with WebView2 in one file 7.3. Why the Avalonia JIT build is slow is not
-  measured yet: WPF on .NET 10 is the same kind of one-file, compressed build
-  and starts in 2.8.
+  (Slint), 108 (Qt), 135 (Avalonia compiled to native code), 150 (Avalonia
+  with the JIT), 158 to 213 (WPF on .NET 10), 225 (Flutter) and 444 (egui),
+  and the mixer names them.
+- Later starts: Avalonia compiled to native code 0.5 seconds, Wails 0.6,
+  egui 0.8, Qt 1.0, Slint and WPF on .NET 10 2.3 to 2.8, Tauri 2.5, Flutter
+  3.3, today 3.7, Avalonia with the JIT 6.5, and WPF with WebView2 in one file
+  7.3. Why the Avalonia JIT build is slow was not measured; the native build
+  is the one that ships, so it does not need to be.
 
 Python was not built. Freezing a Python program into an exe (PyInstaller and
 the like) unpacks the interpreter at every start, gives a large exe once Qt
@@ -182,10 +199,9 @@ For the team:
 
 For people who play:
 - Pro: self-contained and trimmed it needs nothing on the machine and is
-  15 MB zipped, and measured on One it holds 150 MB in one process. With the
-  JIT its later starts took 6.5 seconds on One, the slowest but one; the
-  build compiled to native code is meant to start faster, and the next One
-  run measures it.
+  15 MB zipped. Compiled to native code it started in 0.5 seconds on One,
+  the fastest of all, and held 135 MB in one process (with the JIT: 6.5
+  seconds and 150 MB).
 - Pro: it draws every pixel itself with Skia, so the window looks the same on
   every Windows version, and themes and animation are first class.
 - Pro: measured: it runs on Linux, so a Linux or Steam Deck launcher is a
@@ -338,8 +354,9 @@ own updates, and no web view in the launcher once #3208 settles voice.**
 
 Why, for the people who play: it needs nothing on the machine, it is 15 MB
 zipped (WPF self-contained is 57, Electron 155), it carries no browser beside
-the game if voice and the music move out of WebView2, and measured on One it
-holds 150 MB where today's launcher holds 333, in one process the Volume
+the game if voice and the music move out of WebView2, and measured on One,
+compiled to native code, it starts in 0.5 seconds and holds 135 MB where
+today's launcher takes 3.7 seconds and 333 MB, in one process the Volume
 Mixer names. Why, between the options that are equal for them, for the team:
 it is C# and XAML, the language the launcher, the installer and the people
 here already use, its bindings are checked when it builds, and it builds on
@@ -347,11 +364,11 @@ Linux, so cloud threads and Linux CI can build and check it while hosted
 Windows minutes are short.
 
 What the One run changed and did not:
-- Slint holds less than the JIT build of Avalonia (79 against 150 MB) and
-  starts faster (2.3 against 6.5 seconds). That makes Slint better on those
-  two numbers for the people who play; the native Avalonia build, which
-  the next One run measures, is the comparison that counts, and #4063 starts
-  from it.
+- Compiled to native code, Avalonia starts faster than every other stack
+  (0.5 seconds) and holds 135 MB, more than Slint (79) and Qt (108) and less
+  than everything else. Slint's 56 MB less is the one number where another
+  stack is better for the people who play; Slint starts in 2.3 seconds and
+  is Rust. #4063 starts from the native build.
 - Linux and the Deck are ruled out (Decided, 2), which made WPF on .NET 10
   (A) close for the people who play: one process, 158 to 213 MB, 2.3 to 2.8
   seconds. Patrick kept Avalonia on its other merits.

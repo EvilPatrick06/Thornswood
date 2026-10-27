@@ -24,8 +24,9 @@
   process tree is closed. The first run of each prototype is reported on its
   own (the first start after a build), the rest as a median. For a run that
   writes no ready file it keeps the prototype's exit code, the last lines of
-  its stdout and stderr, and what the Application event log says about it,
-  and results.md shows them.
+  its stdout and stderr, the log it wrote beside the ready file (Electron
+  does), and what the Application event log says about it, and results.md
+  shows them.
 
   The music is a quiet hiss a few steps above silence, so a run makes an
   audio session without being heard.
@@ -607,7 +608,7 @@ function Measure-One([string]$name) {
     $done = @()
     for ($r = 1; $r -le $Runs; $r++) {
         $ready = Join-Path $Work "ready-$name-$r"
-        Remove-Tree $ready; Remove-Tree "$ready.active"
+        Remove-Tree $ready; Remove-Tree "$ready.active"; Remove-Tree "$ready.log"
         $psi = [Diagnostics.ProcessStartInfo]::new($exePath)
         $psi.WorkingDirectory = Split-Path $exePath
         $psi.UseShellExecute = $false
@@ -653,8 +654,9 @@ function Measure-One([string]$name) {
             $run.Stdout = Get-Tail $stdout
             $run.Stderr = Get-Tail $stderr
             $run.Crash = @(Get-CrashEvents $started (Split-Path $exePath -Leaf))
+            if (Test-Path -LiteralPath "$ready.log") { $run.Log = (Get-Content -LiteralPath "$ready.log" | Select-Object -Last 25) -join "`n" }
         }
-        Remove-Tree $ready; Remove-Tree "$ready.active"
+        Remove-Tree $ready; Remove-Tree "$ready.active"; Remove-Tree "$ready.log"
         $done += [pscustomobject]$run
         Say ("{0} run {1}: ready {2} ms" -f $name, $r, $readyMs)
         Start-Sleep -Milliseconds 1000
@@ -753,7 +755,7 @@ foreach ($r in $results) {
     $first = $silent[0]
     $md.Add('')
     $md.Add("$($r.Name) wrote no ready file in $($silent.Count) of $Runs runs. Run $($first.Run): " + $(if ($first.Exited) { "it ended by itself with exit code $($first.ExitCode)." } else { 'it was still running after 30 seconds.' }))
-    foreach ($part in @(@('stdout', $first.Stdout), @('stderr', $first.Stderr))) {
+    foreach ($part in @(@('stdout', $first.Stdout), @('stderr', $first.Stderr), @('its own log', $first.Log))) {
         if ($part[1]) { $md.Add(''); $md.Add("$($part[0]):"); $md.Add('```'); $md.Add($part[1]); $md.Add('```') }
     }
     foreach ($c in $first.Crash) { $md.Add(''); $md.Add("Event log: $c") }
