@@ -38591,7 +38591,7 @@ module.exports = {
       var dir = require('path').dirname(registerPath());
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
-        JSON.stringify({ claims: claims,
+        JSON.stringify({ claims: claims, arrears: arrears,
                         funds: funds, notices: notices, boards: boards, steps: steps,
                         masters: masterCut, dropbox: dropbox, word: wordBook }, null, 1));
       return true;
@@ -38602,8 +38602,94 @@ module.exports = {
   }
 
   var claims = load();
+  var arrears = loadArrears();
   var masterCut = loadMasterCut();
   var wordBook = loadWord();
+
+  /*
+    RENT STILL OWED BY SOMEBODY WHO NO LONGER HOLDS THE PLACE (#3893), from
+    the register's arrears key: by building, one row a person, with the
+    profile, the character's name, the gold and when it was first owed.
+
+    Rent owed was a field of the claim and nothing else, so the deed
+    presented at the door, which writes the building a new claim, ended the
+    debt with the old one. Patrick, 27 Oct: the debt stays owed by whoever
+    owed it, and the new holder starts at nothing owed. So what the old
+    holder owed moves here, beside the claims rather than inside one,
+    because a claim can end or be written again and a debt is a person's.
+    The drop box pays it (boxPutGold) and so does a steward's Rent paid
+    (rentPaid), and the steward sees it at the door on the Office page.
+
+    Rebuilt row by row the way the claims are: a row that is not a debt is
+    dropped and counted.
+  */
+  function loadArrears() {
+    var out = {};
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8')); } catch (e) { return out; }
+    var src = (raw && raw.arrears && typeof raw.arrears === 'object') ? raw.arrears : {};
+    var kept = 0, dropped = 0;
+    for (var b in src) {
+      if (!Object.prototype.hasOwnProperty.call(src, b) || b === '__proto__') { continue; }
+      var list = Object.prototype.toString.call(src[b]) === '[object Array]' ? src[b] : [];
+      var rows = [];
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i];
+        var by = (r && Number(r.by)) || 0;
+        var owed = (r && Number(r.owed)) || 0;
+        var at = (r && Number(r.at)) || 0;
+        if (!(by > 0) || !(owed > 0) || !(at > 0) || rows.some(function (x) { return x.by === by; })) {
+          dropped++;
+          continue;
+        }
+        rows.push({ by: by, name: String(r.name || 'somebody'), owed: owed, at: at });
+        kept++;
+      }
+      if (rows.length) { out[b] = rows; }
+    }
+    if (dropped) { plog('dropped', dropped, 'row(s) of rent still owed that were not debts'); }
+    if (kept) { plog('read', kept, 'debt(s) of rent owed by somebody who no longer holds the place'); }
+    return out;
+  }
+
+  // What this person still owes on this building from before, or null.
+  function arrearsRow(building, profileId) {
+    if (!Object.prototype.hasOwnProperty.call(arrears, building)) { return null; }
+    var list = arrears[building];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].by === Number(profileId)) { return list[i]; }
+    }
+    return null;
+  }
+
+  // Owed from before, added to whatever this person already owes here.
+  function arrearsAdd(building, profileId, name, amount) {
+    var n = Number(amount) || 0;
+    var by = Number(profileId) || 0;
+    if (!(n > 0) || !(by > 0) || building === '__proto__') { return; }
+    var row = arrearsRow(building, by);
+    if (row) {
+      row.owed += n;
+      if (name) { row.name = String(name); }
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(arrears, building)) { arrears[building] = []; }
+    arrears[building].push({ by: by, name: String(name || 'somebody'), owed: n, at: Date.now() });
+  }
+
+  // Paid down by up to amount; the row goes when nothing is left. Says how much it took.
+  function arrearsPay(building, profileId, amount) {
+    var row = arrearsRow(building, profileId);
+    var n = Number(amount) || 0;
+    if (!row || !(n > 0)) { return 0; }
+    var take = Math.min(n, row.owed);
+    row.owed -= take;
+    if (row.owed <= 0) {
+      arrears[building] = arrears[building].filter(function (x) { return x !== row; });
+      if (!arrears[building].length) { delete arrears[building]; }
+    }
+    return take;
+  }
 
   /*
     The holders' word (#2680), from the register's word key, rebuilt row by
@@ -39292,6 +39378,8 @@ module.exports = {
     var c = claims[building];
     var days = lapseDays();
     if (days > 0 && (Date.now() - c.touched) > days * 86400000) {
+      // What the holder owed, counted up to the lapse and no further, stays theirs (#3950).
+      keepOwed(building, c, c.touched + days * 86400000);
       delete claims[building];
       save();
       /*
@@ -39544,9 +39632,25 @@ module.exports = {
       // claim. Kept from the old record when there is one, so a transfer does
       // not quietly drop the field behind the house.
       var keepGround = held ? held.ground : groundHere(actorId);
+      /*
+        THE RENT STAYS ON THE BUILDING, AND WHAT WAS OWED STAYS OWED (#3893,
+        Patrick, 27 Oct). This record used to be written with no rent on it,
+        so handing the deed to another of your characters at the door ended
+        both the rent a steward set and the debt. The rent goes on at the
+        same amount and the same clock, so the next rent falls due the day it
+        would have; the new holder starts at nothing owed, and what the old
+        holder owed, counted up to now first, stays theirs in arrears.
+      */
+      var keepRent = null;
+      if (held && held.rent) {
+        keepOwed(building, held, now2);
+        keepRent = { amount: Number(held.rent.amount) || 0, everyDays: Number(held.rent.everyDays) || 7,
+                     owed: 0, since: Number(held.rent.since) || now2 };
+      }
       claims[building] = { by: mine, name: who2, at: now2, touched: now2,
                            locked: held ? !!held.locked : false,
                            ground: keepGround };
+      if (keepRent) { claims[building].rent = keepRent; }
       save();
       pushAll();
       /*
@@ -41395,6 +41499,16 @@ module.exports = {
     Gold in. Rent first, as putting gold in the box always did: what the
     payer owes on their places is paid down, and the entry remembers how much
     went to which place, so taking that gold back makes it owed again.
+    What the payer still owes on a place they no longer hold (#3893) is paid
+    first, then the places they hold.
+
+    PAYING NEVER MOVES THE RENT CLOCK (#3891). Paying off everything owed
+    used to start the clock again from the payment, which threw away the
+    part of the period already gone: taking the gold back left the debt owed
+    again on a clock that had moved, so it never grew, and paying just
+    before each charge put the next one a whole period later. rentDue keeps
+    since at the start of the period the place is in, and only rentDue
+    moves it.
   */
   function boxPutGold(hold, actorId, profileId, amount) {
     var n = Math.floor(Number(amount));
@@ -41404,15 +41518,20 @@ module.exports = {
     var left = n;
     var rent = [];
     for (var i = 0; i < owed.length && left > 0; i++) {
-      var c = claims[owed[i]];
-      if (!c || !c.rent) { continue; }
-      var due = Number(c.rent.owed) || 0;
-      var take = left >= due ? due : left;
+      var take = 0;
+      if (owed[i].before) {
+        take = arrearsPay(owed[i].building, profileId, left);
+      } else {
+        var c = claims[owed[i].building];
+        if (!c || !c.rent) { continue; }
+        var due = Number(c.rent.owed) || 0;
+        take = left >= due ? due : left;
+        c.rent.owed = due - take;
+      }
       if (take <= 0) { continue; }
-      c.rent.owed = due - take;
-      if (c.rent.owed <= 0) { c.rent.owed = 0; c.rent.since = Date.now(); }
       left -= take;
-      rent.push({ building: owed[i], amount: take });
+      rent.push(owed[i].before ? { building: owed[i].building, amount: take, before: true }
+                               : { building: owed[i].building, amount: take });
     }
     var d = dropboxOf(hold);
     var who = characterName(actorId);
@@ -41497,13 +41616,28 @@ module.exports = {
     }
     var back = 0;
     if (own && Array.isArray(it.rent)) {
-      // The rent this gold paid, owed again, newest place first, never more than was taken.
+      /*
+        The rent this gold paid, owed again, newest place first, never more
+        than was taken, by whoever put it in. On the place itself while they
+        still hold it with rent on it; on what they owe from before (#3893)
+        when it paid that, or when the place has gone to somebody else since,
+        so taking it back never lands it on the new holder. A place whose
+        steward took the rent off while they held it owes nothing again.
+      */
       var left = n;
+      var payer = Number(it.by) || 0;
       for (var r = it.rent.length - 1; r >= 0 && left > 0; r--) {
         var row = it.rent[r];
         var amt = Math.min(left, Number(row.amount) || 0);
         var c = claims[row.building];
-        if (c && c.rent && amt > 0) { c.rent.owed = (Number(c.rent.owed) || 0) + amt; back += amt; }
+        var stillHolds = !!c && c.by === payer;
+        if (amt > 0 && !row.before && stillHolds && c.rent) {
+          c.rent.owed = (Number(c.rent.owed) || 0) + amt;
+          back += amt;
+        } else if (amt > 0 && (row.before || !stillHolds)) {
+          arrearsAdd(row.building, payer, it.name, amt);
+          back += amt;
+        }
         row.amount = (Number(row.amount) || 0) - amt;
         left -= amt;
       }
@@ -41597,40 +41731,150 @@ module.exports = {
     var out = [];
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
-      var c = claims[b];
-      if (!c || !c.rent) { continue; }
-      var every = Number(c.rent.everyDays) || 7;
-      var since = Number(c.rent.since) || Number(c.at) || Date.now();
-      var periods = Math.floor((Date.now() - since) / (every * 86400000));
-      if (periods > 0) {
-        c.rent.owed = (Number(c.rent.owed) || 0) + periods * (Number(c.rent.amount) || 0);
-        c.rent.since = since + periods * every * 86400000;
-        out.push(b);
-      }
+      if (countRent(claims[b], Date.now())) { out.push(b); }
     }
     if (out.length) { save(); }
     return out;
   }
 
+  /*
+    The rent on one claim, counted in whole periods up to a time, and never
+    past the moment it lapses (#3950): a claim nobody has gone into for the
+    lapse days is no longer held, so a week after that is owed by nobody,
+    even before anything reads the claim and drops it. Says whether it
+    counted a period.
+  */
+  function countRent(c, upTo) {
+    if (!c || !c.rent) { return false; }
+    var days = lapseDays();
+    var end = Number(upTo) || Date.now();
+    if (days > 0) { end = Math.min(end, (Number(c.touched) || 0) + days * 86400000); }
+    var every = Number(c.rent.everyDays) || 7;
+    var since = Number(c.rent.since) || Number(c.at) || Date.now();
+    var periods = Math.floor((end - since) / (every * 86400000));
+    if (periods <= 0) { return false; }
+    c.rent.owed = (Number(c.rent.owed) || 0) + periods * (Number(c.rent.amount) || 0);
+    c.rent.since = since + periods * every * 86400000;
+    return true;
+  }
+
+  /*
+    A CLAIM ENDING DOES NOT END A DEBT. Whatever its holder owed, counted up
+    to the moment it ends, stays theirs in arrears: when the deed goes to
+    somebody else (#3893, Patrick, 27 Oct), and when a steward evicts or the
+    claim lapses (#3950, Patrick, 27 Oct, A). The steward sees it at that
+    door, the holder on their property page, and the box or Rent paid pays it.
+  */
+  function keepOwed(building, c, upTo) {
+    if (!c || !c.rent) { return; }
+    countRent(c, upTo);
+    if ((Number(c.rent.owed) || 0) > 0) { arrearsAdd(building, c.by, c.name, c.rent.owed); }
+  }
+
+  // What this person owes, place by place: from before (#3893) first, then what they hold.
   function rentOwedBy(profileId) {
     rentDue();
     var out = [];
+    for (var a in arrears) {
+      if (Object.prototype.hasOwnProperty.call(arrears, a) && arrearsRow(a, profileId)) {
+        out.push({ building: a, before: true });
+      }
+    }
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
       var c = claims[b];
       if (c && c.by === profileId && c.rent && (Number(c.rent.owed) || 0) > 0) {
-        out.push(b);
+        out.push({ building: b, before: false });
       }
     }
     return out;
   }
 
   /*
-    /rent            what this place costs, and what is owed on it
-    /rent 50         a steward sets it, per week
-    /rent -          a steward waives it
+    Who owes rent on this building, one row a person, for the steward at its
+    door: the holder for what is owed now, and anybody who held it before
+    for what they still owe from then (#3893). A holder who also owes from
+    an earlier time here is one row with both together.
+  */
+  function rentOwing(building) {
+    rentDue();
+    var out = [];
+    var held = holderOf(building);
+    if (held && held.rent && (Number(held.rent.owed) || 0) > 0) {
+      out.push({ pid: held.by, name: held.name, owed: Number(held.rent.owed) || 0, holds: true });
+    }
+    var list = Object.prototype.hasOwnProperty.call(arrears, building) ? arrears[building] : [];
+    for (var i = 0; i < list.length; i++) {
+      var mineToo = out.filter(function (x) { return x.pid === list[i].by; })[0];
+      if (mineToo) { mineToo.owed += list[i].owed; continue; }
+      out.push({ pid: list[i].by, name: list[i].name, owed: list[i].owed, holds: !!held && held.by === list[i].by });
+    }
+    return out;
+  }
 
-    Sent by Set rent and No rent on the Office page of the K panel (#1638),
+  /*
+    RENT HANDED TO A STEWARD IN PERSON (#3895, Patrick, 27 Oct: A, a Rent
+    paid button). The gold changes hands between two people, as the rent
+    comment above says it does; the steward then presses Rent paid beside
+    the tenant on the Office page, and this counts it. What they owe from
+    before goes first, then what is owed now. It never moves the rent clock
+    (#3891): the next rent falls due when it would have. It goes in the
+    building's hold's drop box record beside the box's own payments, and a
+    press by staff goes in the staff log as well.
+  */
+  function rentPaid(parts, actorId, profileId, toProfile, building, held, asStaff) {
+    var pid = Math.floor(Number(parts[2])) || 0;
+    var n = Number(parts[3]);
+    if (!(pid > 0)) {
+      toProfile(profileId, 'Say who paid.');
+      return true;
+    }
+    if (!(n > 0) || Math.floor(n) !== n) {
+      toProfile(profileId, 'Say how much gold was paid, as a whole number above 0.');
+      return true;
+    }
+    var row = rentOwing(building).filter(function (x) { return x.pid === pid; })[0];
+    if (!row) {
+      toProfile(profileId, 'Nobody by that name owes rent on ' + nameOf(building) + '.');
+      return true;
+    }
+    if (n > row.owed) {
+      toProfile(profileId, row.name + ' owes ' + row.owed + ' gold on ' + nameOf(building) + ', not ' + n + '.');
+      return true;
+    }
+    var left = n - arrearsPay(building, pid, n);
+    if (left > 0 && held && held.by === pid && held.rent) {
+      held.rent.owed = Math.max(0, (Number(held.rent.owed) || 0) - left);
+    }
+    var steward = personName(actorId);
+    var hold = holdOfBuilding(building);
+    if (hold && LEDGER_HOLDS.indexOf(hold) !== -1) {
+      boxLog(hold, { act: 'rent', who: profileId, whoName: steward, by: pid, byName: row.name,
+                     what: 'Gold', count: n, note: 'rent on ' + nameOf(building) + ', handed over in person' });
+    }
+    save();
+    if (asStaff) {
+      staffRecord('rentpaid', actorId, profileId, building, { by: pid, name: row.name },
+                  n + ' gold of rent handed over in person, on ' + settleWhere(building));
+    } else {
+      plog(steward, '(profile ' + profileId + ') marked', n, 'gold of rent paid by', row.name,
+           '(profile ' + pid + ') on', nameOf(building));
+    }
+    var still = row.owed - n;
+    toProfile(profileId, (asStaff ? 'As staff: ' : '') + row.name + ' paid ' + n + ' gold of rent on ' +
+              nameOf(building) + '. ' + (still > 0 ? still + ' is still owed.' : 'Nothing is owed now.') +
+              (asStaff ? ' It is in the staff log.' : ''));
+    redrawPanel(actorId);
+    return true;
+  }
+
+  /*
+    /rent                 what this place costs, and what is owed on it
+    /rent 50              a steward sets it, per week
+    /rent -               a steward waives it
+    /rent paid <pid> <n>  a steward was handed n gold of it in person (#3895)
+
+    Sent by Set rent, No rent and Rent paid on the Office page of the K panel (#1638),
     never typed; the page shows a steward what is owed at the door they just
     opened. See officeView. Only a steward of the building's hold sets or
     waives it (#2551, notStewardHere), or staff at any building, logged for
@@ -41648,14 +41892,17 @@ module.exports = {
     var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
 
     if (!arg) {
+      rentDue();
+      // And what the one asking still owes here from when they held it (#3893).
+      var mineBefore = arrearsRow(building, profileId);
+      var beforeLine = mineBefore ? ' You still owe ' + mineBefore.owed + ' gold of rent here from when you held it.' : '';
       if (!held || !held.rent) {
-        toProfile(profileId, nameOf(building) + ' has no rent on it.');
+        toProfile(profileId, nameOf(building) + ' has no rent on it.' + beforeLine);
         return true;
       }
-      rentDue();
       toProfile(profileId, nameOf(building) + ': ' + held.rent.amount + ' gold every ' +
                 (held.rent.everyDays || 7) + ' days, ' +
-                (Number(held.rent.owed) || 0) + ' owed.');
+                (Number(held.rent.owed) || 0) + ' owed.' + beforeLine);
       return true;
     }
 
@@ -41669,11 +41916,15 @@ module.exports = {
       toProfile(profileId, how.why);
       return true;
     }
+    var asStaff = how.as === 'staff';
+    // Somebody who held it before may still owe on it while nobody holds it (#3893).
+    if (arg.toLowerCase() === 'paid') {
+      return rentPaid(parts, actorId, profileId, toProfile, building, held, asStaff);
+    }
     if (!held) {
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nobody to pay.');
       return true;
     }
-    var asStaff = how.as === 'staff';
     if (arg === '-') {
       delete held.rent;
       save();
@@ -41692,7 +41943,20 @@ module.exports = {
       toProfile(profileId, 'The rent is a number of gold above 0.');
       return true;
     }
-    held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
+    /*
+      A new amount on a place that already pays rent changes what the next
+      periods cost and nothing else: what is owed, counted up to now at the
+      old amount, stays owed, and the clock goes on (#3895). Setting it again
+      used to write owed 0 and a new clock, which was the only way a steward
+      could clear rent handed to them in person; that is Rent paid now.
+    */
+    if (held.rent) {
+      rentDue();
+      held.rent.amount = amount;
+      held.rent.everyDays = 7;
+    } else {
+      held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
+    }
     save();
     if (asStaff) {
       staffRecord('rent', actorId, profileId, building, held, amount + ' gold every 7 days on ' + settleWhere(building));
@@ -45491,6 +45755,8 @@ module.exports = {
       return true;
     }
     var was = held.name;
+    // An eviction ends the claim and not the debt (#3950): what they owe stays theirs.
+    keepOwed(building, held, Date.now());
     delete claims[building];
     save();
     pushAll();
@@ -45677,7 +45943,10 @@ module.exports = {
                     ours: ours, staff: staff && !ours,
                     rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
                                                   every: Number(held.rent.everyDays) || 7,
-                                                  owed: Number(held.rent.owed) || 0 } : null };
+                                                  owed: Number(held.rent.owed) || 0 } : null,
+                    // Who owes rent here, the holder and anybody before them (#3893),
+                    // each with Rent paid beside them (#3895).
+                    owing: rentOwing(building) };
     }
     // The boards are a steward's own hold's; staff are no steward.
     if (!view.steward) { return view; }
@@ -45719,6 +45988,7 @@ module.exports = {
       if (officesOfProfile(claims[b].by, true).jarl.indexOf(hold) !== -1) { continue; }
       plog('law: the jail rule ends', claims[b].name + '\'s claim (profile ' + claims[b].by + ') on',
            nameOf(b) + ', made before only the Jarl of', hold, 'could hold it');
+      keepOwed(b, claims[b], Date.now());
       delete claims[b];
       ended++;
     }
@@ -45743,6 +46013,8 @@ module.exports = {
       claims      a building they held is free, as a steward's evict leaves
                   it; a master key record cut for them on somebody else's
                   claim is dropped (it already opens nothing, liveMaster)
+      arrears     rent they still owed on a place they no longer held goes,
+                  as a debt does when the person who owed it is gone (#3893)
       offices     law.held: the office their character held is let go, so the
                   account's role, if it is still held, is chosen again
       the boards  a post of theirs comes down, keeping its number, with its
@@ -45776,13 +46048,22 @@ module.exports = {
     var mine = function (pid) { var n = Number(pid) || 0; return n > 0 && who.profile(n); };
     var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
     var c = { claims: 0, masterKeys: 0, offices: 0, posts: 0, handedBack: 0, owed: 0, lines: 0,
-              box: 0, boxRecord: 0, guests: 0, takings: 0 };
+              box: 0, boxRecord: 0, guests: 0, takings: 0, arrears: 0 };
     var reg = false, lawChanged = false, beds = false;
     var b;
     for (b in claims) {
       if (!has(claims, b)) { continue; }
       if (mine(claims[b].by)) { delete claims[b]; c.claims++; reg = true; continue; }
       if (claims[b].master && mine(claims[b].master.for)) { delete claims[b].master; c.masterKeys++; reg = true; }
+    }
+    // Rent they still owed on a place they no longer held (#3893) goes with them.
+    for (var ab in arrears) {
+      if (!has(arrears, ab)) { continue; }
+      var debts = arrears[ab].filter(function (x) { return !mine(x.by); });
+      if (debts.length === arrears[ab].length) { continue; }
+      c.arrears += arrears[ab].length - debts.length;
+      reg = true;
+      if (debts.length) { arrears[ab] = debts; } else { delete arrears[ab]; }
     }
     for (var key in law.held) {
       if (!has(law.held, key)) { continue; }
@@ -45910,6 +46191,8 @@ module.exports = {
     haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
+    // Rent still owed on a place by somebody who no longer holds it (#3893).
+    arrears: function () { return arrears; },
     notices: function () { return notices; }, takedown: takedown,
     // A notice in an office's name, with no fee (#513). See the world stage block.
     officePost: officePost,
@@ -50136,6 +50419,19 @@ return module.exports;
         same count /rent makes, so the page and the steward agree.
       */
       if (W.rentDue) { W.rentDue(); }
+      /*
+        AND WHAT YOU STILL OWE ON A PLACE YOU NO LONGER HOLD (#3893): the
+        deed went to somebody else and the debt stayed yours, so it is here,
+        where you would look, and not only on the steward's page.
+      */
+      var before = {};
+      var arrears = W.arrears ? W.arrears() : {};
+      for (var a in arrears) {
+        if (!Object.prototype.hasOwnProperty.call(arrears, a)) { continue; }
+        for (var ai = 0; ai < arrears[a].length; ai++) {
+          if (arrears[a][ai].by === profileId) { before[a] = arrears[a][ai].owed; }
+        }
+      }
       var claims = W.claims();
       for (var b in claims) {
         if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
@@ -50146,6 +50442,7 @@ return module.exports;
                                  every: Number(held.rent.everyDays) || 7,
                                  owed: Number(held.rent.owed) || 0 } : null;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
+                    before: Object.prototype.hasOwnProperty.call(before, b) ? before[b] : 0,
                     master: !!(W.holdsMasterKey && W.holdsMasterKey(actorId, b)),
                     keyed: W.holdsKey(actorId, b), b: b,
                     sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
@@ -50167,7 +50464,7 @@ return module.exports;
         seen[mb] = true;
         var mh = W.holderOf(mb);
         rows.push({ name: W.nameOf(mb), mine: false, locked: !!(mh && mh.locked),
-                    keyed: true, master: true, by: mh ? mh.name : null });
+                    keyed: true, master: true, by: mh ? mh.name : null, b: mb });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -50186,9 +50483,19 @@ return module.exports;
           seen[b2] = true;
           var h2 = W.holderOf(b2);
           rows.push({ name: W.nameOf(b2), mine: false, locked: !!(h2 && h2.locked),
-                      keyed: true, by: h2 ? h2.name : null });
+                      keyed: true, by: h2 ? h2.name : null, b: b2 });
           break;
         }
+      }
+      // The places you owe on from before, on the row of a key you carry to one, or a row of their own.
+      for (var ob in before) {
+        if (!Object.prototype.hasOwnProperty.call(before, ob)) { continue; }
+        var onRow = rows.filter(function (x) { return !x.mine && x.b === ob; })[0];
+        if (onRow) { onRow.owes = before[ob]; continue; }
+        if (seen[ob] || rows.length >= PROPERTY_PAGE_MAX) { continue; }
+        seen[ob] = true;
+        var oh = W.holderOf(ob);
+        rows.push({ name: W.nameOf(ob), mine: false, owes: before[ob], by: oh ? oh.name : null, b: ob });
       }
     } catch (e) {
       clog('the property page threw, so it is left off:', e);
