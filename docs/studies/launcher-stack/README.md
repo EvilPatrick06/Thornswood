@@ -122,7 +122,7 @@ Two rows have no times:
   each step and the ready.
 
 Neither is the pick, so these two rows wait for whenever One next runs the
-script; they change nothing in the decision.
+script (#4073); they change nothing in the decision.
 
 What the run says, for the people who play:
 - Every stack that draws its window in WebView2 (today's launcher, Tauri,
