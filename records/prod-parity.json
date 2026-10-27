@@ -192,6 +192,9 @@
     {
       "name": "Thornswood Gate",
       "user": "SYSTEM",
+      "triggers": [
+        "Boot"
+      ],
       "why": "scripts/deploy/Install-Gate.ps1, from boot as SYSTEM (#2841): the deploy gate's broker, which runs only the verbs of scripts/vps/gate/verbs.json, each a script of main, and those reach the box as Administrator over loopback because the deploys' box halves need administrator (the ops repo's DEPLOY-IDENTITIES.md sections 2a and 9)"
     },
     {
