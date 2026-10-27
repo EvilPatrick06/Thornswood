@@ -107,11 +107,24 @@ function Get-ThornswoodBoxRefusal {
 }
 # ---- end BoxGuard.ps1 ----
 
-# Every enabled inbound Allow rule: Name, DisplayName, Protocol, Ports,
-# Program, Package (the app container, '' when none), Service ('Any' when
-# not bound to one) and Remote ('Any' when open to all).
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
+
+# Every enabled inbound Allow rule the firewall takes: Name, DisplayName,
+# Protocol, Ports, Program, Package (the app container, '' when none), Service
+# ('Any' when not bound to one) and Remote ('Any' when open to all).
 function Get-AllowRules {
-    foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
+    foreach ($r in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
         $pf = $r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
         $af = $r | Get-NetFirewallAddressFilter -ErrorAction SilentlyContinue
         $ap = $r | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue
@@ -127,17 +140,25 @@ function Get-AllowRules {
         }
     }
 }
-# One of the two web rules by its display name, enabled or not, as Name and
-# Remote, or $null when there is none.
+# One of the two web rules by its display name, enabled or not, as the
+# firewall takes it: Name, Remote and Store (GroupPolicy for the box's own
+# policy, Local for the local store; #3896), or $null when there is none.
 function Get-WebRule([string]$DisplayName) {
-    $r = @(Get-NetFirewallRule -DisplayName $DisplayName -ErrorAction SilentlyContinue)
+    $r = @(Get-NetFirewallRule -PolicyStore ActiveStore -DisplayName $DisplayName -ErrorAction SilentlyContinue)
     if (-not $r.Count) { return $null }
     $af = $r[0] | Get-NetFirewallAddressFilter
-    return [pscustomobject]@{ Name = [string]$r[0].Name; Enabled = [string]$r[0].Enabled; Count = $r.Count; Remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ }) }
+    return [pscustomobject]@{ Name = [string]$r[0].Name; Enabled = [string]$r[0].Enabled; Count = $r.Count; Remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ }); Store = [string]$r[0].PolicyStoreSourceType }
 }
-function Set-RuleRemote([string]$Name, [string[]]$Remote) { Set-NetFirewallRule -Name $Name -RemoteAddress $Remote }
+# A rule's remote addresses, changed in the store the firewall took it from:
+# the box's own policy (then Group Policy refreshed, scripts\vps\BoxFirewall.ps1,
+# #3896), or the local store for a rule from before Set-InboundRules.ps1 -Own.
+function Set-RuleRemote([string]$Name, [string[]]$Remote, [string]$Store = 'GroupPolicy') {
+    if ($Store -eq 'Local') { Set-NetFirewallRule -PolicyStore PersistentStore -Name $Name -RemoteAddress $Remote; return }
+    Set-NetFirewallRule -PolicyStore localhost -Name $Name -RemoteAddress $Remote
+    Sync-ThornswoodFirewall
+}
 function Get-Profiles {
-    foreach ($p in @(Get-NetFirewallProfile)) { [pscustomobject]@{ Name = [string]$p.Name; Enabled = [string]$p.Enabled; Inbound = [string]$p.DefaultInboundAction } }
+    foreach ($p in @(Get-NetFirewallProfile -PolicyStore ActiveStore)) { [pscustomobject]@{ Name = [string]$p.Name; Enabled = [string]$p.Enabled; Inbound = [string]$p.DefaultInboundAction } }
 }
 # The A and AAAA answers for a name from one resolver, fresh from that
 # resolver rather than this machine's cache.
@@ -321,7 +342,7 @@ function Invoke-WebFirewall {
         $now = @($r.Remote | Sort-Object)
         if ((Get-AddressKey $now) -eq (Get-AddressKey $target)) { Say 'ALREADY' ("rule '" + $WebRules[$port] + "' takes " + $port + ' from ' + $what); continue }
         if (-not $DryRun) {
-            Set-RuleRemote $r.Name $target
+            Set-RuleRemote $r.Name $target $r.Store
             $back = @((Get-WebRule $WebRules[$port]).Remote | Sort-Object)
             if ((Get-AddressKey $back) -ne (Get-AddressKey $target)) { $script:stopped = $true; Say 'STOP' ("rule '" + $WebRules[$port] + "' reads back as " + ($back -join ' ') + ', not ' + $what + '. Run Set-WebFirewall.ps1 -Open to put both back.'); return }
         }

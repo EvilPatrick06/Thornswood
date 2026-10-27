@@ -103,12 +103,19 @@ function Get-RdpDeny { return [int]$global:Fake.fDeny }
 function Set-RdpDeny { $global:Fake.fDeny = 1; $global:Fake.log.Add('Set-RdpDeny') }
 function Get-InboundRules {
     foreach ($r in $global:Fake.rules) {
-        if ($r.Enabled) { [pscustomobject]@{ Name = $r.Name; DisplayName = $r.DisplayName; Action = $r.Action; Group = $r.Group; Ports = @($r.Ports) } }
+        if ($r.Enabled) { [pscustomobject]@{ Name = $r.Name; DisplayName = $r.DisplayName; Action = $r.Action; Group = $r.Group; Ports = @($r.Ports); Store = $r.Store } }
     }
 }
-function Disable-InboundRule([string]$Name) {
+function Disable-InboundRule([string]$Name, [string]$Store) {
     foreach ($r in $global:Fake.rules) { if ($r.Name -eq $Name) { $r.Enabled = $false } }
     $global:Fake.log.Add('Disable-InboundRule ' + $Name)
+    $global:Fake.stores[$Name] = $Store
+}
+function Get-EdgeInstall { return $global:Fake.edge }
+function Remove-EdgeInstall($Edge) {
+    $global:Fake.log.Add('Remove-EdgeInstall ' + $Edge.Setup + ' ' + $Edge.Arguments)
+    if (-not $global:Fake.edgeRefuses) { $global:Fake.edge = $null }
+    return [int]$global:Fake.edgeCode
 }
 function Get-TermService {
     if (-not $global:Fake.term) { return $null }
@@ -161,14 +168,20 @@ function New-Fake {
     $global:Fake = @{
         fDeny = 0
         rules = @(
-            @{ Name = 'RemoteDesktop-UserMode-In-TCP'; DisplayName = 'Remote Desktop - User Mode (TCP-In)'; Action = 'Allow'; Group = '@FirewallAPI.dll,-28752'; Ports = @('3389'); Enabled = $true },
-            @{ Name = 'RemoteDesktop-Shadow-In-TCP'; DisplayName = 'Remote Desktop - Shadow (TCP-In)'; Action = 'Allow'; Group = '@FirewallAPI.dll,-28752'; Ports = @('Any'); Enabled = $true },
-            @{ Name = 'Custom-RDP'; DisplayName = 'RDP from anywhere'; Action = 'Allow'; Group = ''; Ports = @('3389'); Enabled = $true },
-            @{ Name = 'Both-22-3389'; DisplayName = 'ssh and rdp together'; Action = 'Allow'; Group = ''; Ports = @('22', '3389'); Enabled = $true },
-            @{ Name = 'OpenSSH-Server-In-TCP'; DisplayName = 'OpenSSH SSH Server (sshd)'; Action = 'Allow'; Group = 'OpenSSH Server'; Ports = @('22'); Enabled = $true },
-            @{ Name = 'Block-RDP'; DisplayName = 'Thornswood: block RDP from outside'; Action = 'Block'; Group = ''; Ports = @('3389'); Enabled = $true },
-            @{ Name = 'Thornswood-Game'; DisplayName = 'Thornswood game'; Action = 'Allow'; Group = ''; Ports = @('7777'); Enabled = $true }
+            @{ Name = 'RemoteDesktop-UserMode-In-TCP'; DisplayName = 'Remote Desktop - User Mode (TCP-In)'; Action = 'Allow'; Group = '@FirewallAPI.dll,-28752'; Ports = @('3389'); Enabled = $true; Store = 'Local' },
+            @{ Name = 'RemoteDesktop-Shadow-In-TCP'; DisplayName = 'Remote Desktop - Shadow (TCP-In)'; Action = 'Allow'; Group = '@FirewallAPI.dll,-28752'; Ports = @('Any'); Enabled = $true; Store = 'Local' },
+            @{ Name = 'Custom-RDP'; DisplayName = 'RDP from anywhere'; Action = 'Allow'; Group = ''; Ports = @('3389'); Enabled = $true; Store = 'GroupPolicy' },
+            @{ Name = 'Both-22-3389'; DisplayName = 'ssh and rdp together'; Action = 'Allow'; Group = ''; Ports = @('22', '3389'); Enabled = $true; Store = 'GroupPolicy' },
+            @{ Name = 'OpenSSH-Server-In-TCP'; DisplayName = 'OpenSSH SSH Server (sshd)'; Action = 'Allow'; Group = 'OpenSSH Server'; Ports = @('22'); Enabled = $true; Store = 'GroupPolicy' },
+            @{ Name = 'Block-RDP'; DisplayName = 'Thornswood: block RDP from outside'; Action = 'Block'; Group = ''; Ports = @('3389'); Enabled = $true; Store = 'GroupPolicy' },
+            @{ Name = 'Thornswood-Game'; DisplayName = 'Thornswood game'; Action = 'Allow'; Group = ''; Ports = @('7777'); Enabled = $true; Store = 'GroupPolicy' }
         )
+        # Which store each rule was turned off in, by its name.
+        stores = @{}
+        # The in-box Edge as its uninstall entry gave it on 26 Oct 2026 (#3896).
+        edge = [pscustomobject]@{ Version = '130.0.2849.80'; Setup = 'C:\Program Files (x86)\Microsoft\Edge\Application\130.0.2849.80\Installer\setup.exe'; Arguments = '--uninstall --msedge --channel=stable --system-level --verbose-logging' }
+        edgeRefuses = $false
+        edgeCode = 19
         term = @{ Status = 'Running'; StartType = 'Manual' }
         # As the box had them on 21 Oct 2026 (#3186), less ShellHWDetection,
         # which stands for one a box may not have installed, and Themes
@@ -253,7 +266,7 @@ try {
     Yes 'vps-harden.ps1 parses' (-not $errs -or $errs.Count -eq 0)
     Yes '  and is plain ASCII, which Windows PowerShell on the box reads right without a byte order mark' (-not ($boxText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Get-IdleService', 'Stop-IdleService', 'Disable-IdleService', 'Get-WindowsTask', 'Disable-WindowsTask', 'Get-PolicyValue', 'Set-PolicyValue', 'Get-BoxTimeZone', 'Get-TaskNextRun', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
+    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Get-IdleService', 'Stop-IdleService', 'Disable-IdleService', 'Get-WindowsTask', 'Disable-WindowsTask', 'Get-PolicyValue', 'Set-PolicyValue', 'Get-BoxTimeZone', 'Get-TaskNextRun', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile', 'Get-EdgeInstall', 'Remove-EdgeInstall')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -262,7 +275,7 @@ try {
 
     $touchers = 'Set-ItemProperty', 'Get-ItemProperty', 'Get-NetFirewallRule', 'Get-NetFirewallPortFilter', 'Disable-NetFirewallRule', 'Enable-NetFirewallRule',
                 'Get-Service', 'Stop-Service', 'Set-Service', 'Restart-Service', 'Register-ScheduledTask', 'Start-ScheduledTask', 'Unregister-ScheduledTask', 'New-ItemProperty', 'Remove-NetFirewallRule',
-                'Get-ScheduledTask', 'Disable-ScheduledTask', 'Enable-ScheduledTask', 'Stop-ScheduledTask', 'New-Item', 'Remove-ItemProperty', 'Get-TimeZone', 'Set-TimeZone', 'Restart-Computer'
+                'Get-ScheduledTask', 'Disable-ScheduledTask', 'Enable-ScheduledTask', 'Stop-ScheduledTask', 'New-Item', 'Remove-ItemProperty', 'Get-TimeZone', 'Set-TimeZone', 'Restart-Computer', 'Start-Process'
     $loose = @()
     foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
         $name = $c.GetCommandName()
@@ -300,6 +313,9 @@ try {
         (Has $r.Lines '^WOULD AllowTelemetry set to 0 \(was not set\)') -and (Has $r.Lines '^WOULD AUOptions set to 4 \(was 7\)') -and (Has $r.Lines '^WOULD Activation Boundary set to 2000-01-01T04:00:00'))
     Yes '  and changes none of them' (@($telemetry | Where-Object { $global:Fake.tasks[$_].State -ne 'Ready' }).Count -eq 0 -and
         $global:Fake.reg.Count -eq 1 -and (Reg '\WindowsUpdate\AU' 'AUOptions') -eq 7)
+    Yes '  says WOULD set the Edge install policy and uninstall Edge with its own setup (#3896)' ((Has $r.Lines '^WOULD Install\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062\} set to 0 \(was not set\)') -and
+        (Has $r.Lines '^WOULD Microsoft Edge 130\.0\.2849\.80 uninstalled with its own setup'))
+    Yes '  and leaves Edge installed' ($null -ne $global:Fake.edge -and -not (Has $global:Fake.log '^Remove-EdgeInstall'))
 
     # ---- a real run -------------------------------------------------------------------
     $r = Invoke-BoxHere $cfg
@@ -323,6 +339,22 @@ try {
     Yes '  a rule that covers 22 as well as 3389 left on, and said so' ((Rule 'Both-22-3389').Enabled -and (Has $r.Lines "^KEPT firewall rule 'ssh and rdp together' covers port 22"))
     Yes '  the block rule and the game''s rule not touched' ((Rule 'Block-RDP').Enabled -and (Rule 'Thornswood-Game').Enabled)
     Yes '  its service stopped and Disabled' ($global:Fake.term.Status -eq 'Stopped' -and $global:Fake.term.StartType -eq 'Disabled')
+    Yes '  each rule turned off in the store it comes from, the box''s policy or the local one (#3896)' ($global:Fake.stores['RemoteDesktop-UserMode-In-TCP'] -eq 'Local' -and
+        $global:Fake.stores['Custom-RDP'] -eq 'GroupPolicy')
+
+    # ---- Edge off the box (#3896) ------------------------------------------------------
+    $edgeKey = 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate|Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
+    Yes '  the Edge updater told never to install Edge again: Install{Edge''s app id} 0, a DWord, and no Update value' ($global:Fake.reg.ContainsKey($edgeKey) -and
+        $global:Fake.reg[$edgeKey].Value -eq 0 -and $global:Fake.reg[$edgeKey].Type -eq 'DWord' -and @($global:Fake.reg.Keys | Where-Object { $_ -match 'EdgeUpdate\|Update' }).Count -eq 0)
+    Yes '  set before Edge is uninstalled, so nothing puts it back between the two' ($global:Fake.log.IndexOf('Set-PolicyValue Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}') -ge 0 -and
+        $global:Fake.log.IndexOf('Set-PolicyValue Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}') -lt @($global:Fake.log).IndexOf(@($global:Fake.log | Where-Object { $_ -match '^Remove-EdgeInstall' })[0]))
+    Yes '  Edge uninstalled with its own setup and arguments, plus --force-uninstall, once' (@($global:Fake.log | Where-Object { $_ -match '^Remove-EdgeInstall ' }).Count -eq 1 -and
+        (Has $global:Fake.log '^Remove-EdgeInstall C:\\Program Files \(x86\)\\Microsoft\\Edge\\Application\\130\.0\.2849\.80\\Installer\\setup\.exe --uninstall --msedge --channel=stable --system-level --verbose-logging$') -and
+        $null -eq $global:Fake.edge -and (Has $r.Lines '^CHANGED Microsoft Edge 130\.0\.2849\.80 uninstalled with its own setup \(exit 19\)'))
+    $layerFns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Remove-EdgeInstall' }, $true))
+    Yes '  and the real Remove-EdgeInstall adds --force-uninstall and waits for setup to end' ($layerFns.Count -eq 1 -and $layerFns[0].Extent.Text -match "' --force-uninstall'" -and $layerFns[0].Extent.Text -match '-Wait -PassThru')
+    Yes '  the WebView2 Runtime not touched: its app id, its folder and its uninstall entry named nowhere, and Edge''s entry is Edge''s own' ($boxText -notmatch '(?i)F3017226-FE2A-4295-8BDF-00C3A9A7E4C5|EdgeWebView' -and
+        $boxText -match "(?m)^\`$EdgeUninstallKey = 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Microsoft Edge'$")
     Yes '  the rollback armed with the old file, then the restart, in that order' ($global:Fake.rollback -eq $backups[0].FullName -and
         $global:Fake.restarts -eq 1 -and $global:Fake.log.IndexOf('Register-Rollback') -lt $global:Fake.log.IndexOf('Start-SshdRestart'))
     Yes '  Remote Desktop before sshd, so a restart that cut the session off would come last' ($global:Fake.log.IndexOf('Disable-TermService') -lt $global:Fake.log.IndexOf('Register-Rollback'))
@@ -395,6 +427,8 @@ try {
     # ---- a second run -----------------------------------------------------------------
     $r2 = Invoke-BoxHere $cfg
     Yes 'second run: nothing to change' ($r2.Code -eq 0 -and $r2.Lines[-1] -eq 'DONE 0 change(s) made.' -and -not (Has $r2.Lines '^(CHANGED|WOULD) '))
+    Yes '  Edge said not installed and its policy ALREADY, no second uninstall (#3896)' ((Has $r2.Lines '^ALREADY Microsoft Edge is not installed') -and
+        (Has $r2.Lines '^ALREADY Install\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062\} is 0') -and @($global:Fake.log | Where-Object { $_ -match '^Remove-EdgeInstall' }).Count -eq 1)
 
     # ---- a restart Windows set before the policy (#3213, 23 Oct) ------------------------
     # As the box had it at 6:26 AM on 23 Oct: Reboot_AC set for 2:33:33 AM.
@@ -411,6 +445,26 @@ try {
     Yes '  says ALREADY for the telemetry tasks and the update values (#3213)' ((Has $r2.Lines '^ALREADY \\Microsoft\\Windows\\DiskFootprint\\Diagnostics Disabled') -and
         (Has $r2.Lines '^ALREADY AllowTelemetry is 0') -and (Has $r2.Lines '^ALREADY AUOptions is 4') -and (Has $r2.Lines '^ALREADY Activation Boundary is 2000-01-01T04:00:00') -and
         -not @($global:Fake.log | Select-Object -Skip $global:Fake.log.IndexOf('Start-SshdRestart') | Where-Object { $_ -match 'WindowsTask|PolicyValue' }).Count)
+
+    # ---- Edge's setup leaves it installed (#3896) ----------------------------------------
+    New-Fake
+    $global:Fake.edgeRefuses = $true
+    $global:Fake.edgeCode = 93
+    $cfg5 = Join-Path $tmp 'edge\sshd_config'
+    New-Item -ItemType Directory -Path (Split-Path $cfg5) -Force | Out-Null
+    [IO.File]::WriteAllText($cfg5, $defaultCfg, $utf8)
+    $r = Invoke-BoxHere $cfg5
+    Yes 'Edge still installed after its setup ran: exit 1, STOP with the exit code and where its log is' ($r.Code -eq 1 -and
+        (Has $r.Lines '^STOP Microsoft Edge 130\.0\.2849\.80 is still installed after its setup ran \(exit 93\)\. Its log is msedge_installer\.log'))
+    Yes '  the install policy kept, and nothing after it done: no update values, sshd_config as it was, no restart' ($global:Fake.reg.ContainsKey('HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate|Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}') -and
+        (Reg '\WindowsUpdate\AU' 'AUOptions') -eq 7 -and [IO.File]::ReadAllText($cfg5) -eq $defaultCfg -and $global:Fake.restarts -eq 0 -and -not $global:Fake.rollback)
+    Yes '  and the last line says it stopped' ($r.Lines[-1] -match '^DONE \d+ change\(s\) made before it stopped\.$')
+
+    # ---- no Edge on the box --------------------------------------------------------------
+    New-Fake
+    $global:Fake.edge = $null
+    $r = Invoke-BoxHere $cfg -Dry
+    Yes 'no Edge on the box: said ALREADY, no uninstall' ($r.Code -eq 0 -and (Has $r.Lines '^ALREADY Microsoft Edge is not installed \(#3896\)') -and -not (Has $r.Lines 'Microsoft Edge .* uninstalled'))
 
     # ---- sshd -t refuses the new file ---------------------------------------------------
     New-Fake

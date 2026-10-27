@@ -75,14 +75,22 @@
     each value), for example:
       Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' AUOptions 7
 
-    Remote Desktop back:
+    Remote Desktop back (the firewall takes rules only from the box's own
+    policy store since #3896, scripts\vps\BoxFirewall.ps1):
       Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' fDenyTSConnections 0
-      Enable-NetFirewallRule -Group '@FirewallAPI.dll,-28752'
+      Copy-NetFirewallRule -Group '@FirewallAPI.dll,-28752' -NewPolicyStore localhost
+      Enable-NetFirewallRule -PolicyStore localhost -Group '@FirewallAPI.dll,-28752'
+      gpupdate /target:computer /force
       Set-Service TermService -StartupType Manual
       Start-Service TermService
     The two "Thornswood: block RDP from outside" rules put on the box by hand
     before this script existed still block port 3389; turn those off too
-    (Disable-NetFirewallRule -DisplayName 'Thornswood: block RDP from outside*').
+    (Disable-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood: block RDP from outside*',
+    then gpupdate /target:computer /force).
+
+    Microsoft Edge back (#3896; the WebView2 Runtime never went):
+      Remove-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' 'Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
+    then install Edge from https://www.microsoft.com/edge/business/download.
 
   HOW TO CONFIRM IT WORKED, by hand, from your machine:
       .\scripts\vps\Setup-SshKey.ps1 -Test

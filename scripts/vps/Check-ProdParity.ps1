@@ -163,6 +163,20 @@ if ($f.PSObject.Properties.Name -contains 'inboundRules') {
     }
 } else { Row 'firewall' 'inbound rules' 'collected' 'facts from before #3807 carry none' $false }
 
+# ---- the box's own firewall policy, and Edge (#3896) ------------------------
+# The firewall takes rules only from the box's policy store
+# (scripts\vps\BoxFirewall.ps1), so no installer can open a port, and the
+# in-box Edge, whose setup added an inbound rule with every version, is gone
+# (vps-harden.ps1).
+if ($f.PSObject.Properties.Name -contains 'firewallProfiles') {
+    foreach ($p in @($f.firewallProfiles)) {
+        Row 'firewall' ([string]$p.name + ' profile, local rules') 'ignored (AllowLocalFirewallRules False)' $(if ([string]$p.allowLocalRules -eq 'False') { 'ignored' } else { 'taken (' + $p.allowLocalRules + ')' }) ([string]$p.allowLocalRules -eq 'False')
+    }
+} else { Row 'firewall' 'local rules' 'collected' 'facts from before #3896 carry none' $false }
+if ($f.PSObject.Properties.Name -contains 'edgeVersion') {
+    Row 'program' 'Microsoft Edge' 'not installed' $(if ($f.edgeVersion) { 'installed, ' + $f.edgeVersion } else { 'not installed' }) (-not $f.edgeVersion)
+} else { Row 'program' 'Microsoft Edge' 'collected' 'facts from before #3896 carry none' $false }
+
 # ---- TLS -------------------------------------------------------------------
 $site = @($f.certs | Where-Object { $_.subject -match 'thornswood\.net' })
 if (-not $site) { Row 'tls' 'thornswood.net' "valid, $($r.certMinDays)+ days" 'no certificate found' $false }

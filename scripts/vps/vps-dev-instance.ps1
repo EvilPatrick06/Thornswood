@@ -322,22 +322,41 @@ if ($FilesOnly) { Say 'done, files only'; return }
 
 # ---------------------------------------------------------------- firewall
 # Not the dev voice port: it answers on loopback only, behind Caddy. A rule
-# an earlier run of this left open is taken down.
+# an earlier run of this left open is taken down. The rules live in the box's
+# own policy store, the only place the firewall takes a rule from once
+# Set-InboundRules.ps1 -Own has run, and Group Policy is refreshed after a
+# change (scripts\vps\BoxFirewall.ps1, #3896).
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
 $rules = @(
     @{ Name = 'Thornswood Dev game (UDP)';      Protocol = 'UDP'; Port = $devPort },
     @{ Name = 'Thornswood Dev game (TCP)';      Protocol = 'TCP'; Port = $devPort },
     @{ Name = 'Thornswood Dev resources (TCP)'; Protocol = 'TCP'; Port = ($devPort + 1) }
 )
+$fwChanged = 0
 foreach ($r in $rules) {
-    if (-not (Get-NetFirewallRule -DisplayName $r.Name -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -Action Allow -Protocol $r.Protocol -LocalPort $r.Port | Out-Null
+    if (-not (Get-NetFirewallRule -PolicyStore localhost -DisplayName $r.Name -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule -PolicyStore localhost -DisplayName $r.Name -Direction Inbound -Action Allow -Protocol $r.Protocol -LocalPort $r.Port | Out-Null
+        $fwChanged++
         Say ("  firewall: {0} open" -f $r.Name)
     }
 }
-if (Get-NetFirewallRule -DisplayName 'Thornswood Dev Voice' -ErrorAction SilentlyContinue) {
-    Remove-NetFirewallRule -DisplayName 'Thornswood Dev Voice'
+if (Get-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood Dev Voice' -ErrorAction SilentlyContinue) {
+    Remove-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood Dev Voice'
+    $fwChanged++
     Say '  firewall: Thornswood Dev Voice closed, dev voice is on loopback'
 }
+if ($fwChanged) { Sync-ThornswoodFirewall; Say '  firewall: taken (Group Policy refreshed)' }
 
 # ---------------------------------------------------------------- watchdog
 # The dev checks are in Watch-Services.ps1's own list, and its -Install is

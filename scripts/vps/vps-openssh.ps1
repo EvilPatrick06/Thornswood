@@ -197,18 +197,32 @@ function Invoke-Msi([string[]]$Arguments) {
     return [int](Start-Process -FilePath 'msiexec.exe' -ArgumentList $quoted -Wait -PassThru).ExitCode
 }
 
-# Enabled inbound allow rules on port 22, each as Name, DisplayName, Remote.
+# Enabled inbound allow rules on port 22 the firewall takes, each as Name,
+# DisplayName, Remote and Store (GroupPolicy for the box's own policy, Local
+# for the local store, where an installer puts its rule; #3896).
 function Get-Port22Rules {
-    foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
+    foreach ($r in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
         $pf = $r | Get-NetFirewallPortFilter
         if (@($pf.LocalPort) -notcontains '22') { continue }
         $af = $r | Get-NetFirewallAddressFilter
-        [pscustomobject]@{ Name = [string]$r.Name; DisplayName = [string]$r.DisplayName; Remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ }) }
+        [pscustomobject]@{ Name = [string]$r.Name; DisplayName = [string]$r.DisplayName; Remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ }); Store = [string]$r.PolicyStoreSourceType }
     }
 }
-function Test-Rule([string]$Name) { return [bool](Get-NetFirewallRule -Name $Name -ErrorAction SilentlyContinue) }
-function Set-RuleRemote([string]$Name, [string[]]$Remote) { Set-NetFirewallRule -Name $Name -RemoteAddress $Remote }
-function Remove-Rule([string]$Name) { Remove-NetFirewallRule -Name $Name }
+function Test-Rule([string]$Name) { return [bool](Get-NetFirewallRule -PolicyStore ActiveStore -Name $Name -ErrorAction SilentlyContinue) }
+# A change goes to the store the firewall took the rule from: the box's own
+# policy, then Group Policy refreshed (scripts\vps\BoxFirewall.ps1, #3896), or
+# the local store for an installer's rule or one from before
+# Set-InboundRules.ps1 -Own.
+function Set-RuleRemote([string]$Name, [string[]]$Remote, [string]$Store = 'GroupPolicy') {
+    if ($Store -eq 'Local') { Set-NetFirewallRule -PolicyStore PersistentStore -Name $Name -RemoteAddress $Remote; return }
+    Set-NetFirewallRule -PolicyStore localhost -Name $Name -RemoteAddress $Remote
+    Sync-ThornswoodFirewall
+}
+function Remove-Rule([string]$Name, [string]$Store = 'GroupPolicy') {
+    if ($Store -eq 'Local') { Remove-NetFirewallRule -PolicyStore PersistentStore -Name $Name; return }
+    Remove-NetFirewallRule -PolicyStore localhost -Name $Name
+    Sync-ThornswoodFirewall
+}
 
 # The work folder, which only SYSTEM and Administrators may open: it holds the
 # box's state and the program the tasks run.
@@ -254,6 +268,19 @@ function Get-ThornswoodBoxRefusal {
     return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
 }
 # ---- end BoxGuard.ps1 ----
+
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
 
 # ------------------------------------------------------------ the reading ---
 $changes = 0
@@ -382,7 +409,7 @@ function Invoke-Plan {
         sshd = @{ Path = $svc.Path; StartMode = $svc.StartMode }
         agent = $(if ($agent) { @{ StartMode = $agent.StartMode; State = $agent.State } } else { $null })
         caps = $caps
-        rules = @($rules | ForEach-Object { @{ Name = $_.Name; DisplayName = $_.DisplayName; Remote = @($_.Remote) } })
+        rules = @($rules | ForEach-Object { @{ Name = $_.Name; DisplayName = $_.DisplayName; Remote = @($_.Remote); Store = $_.Store } })
         prints = @($pinned)
     }
     Write-WorkFile 'before.json' ($state | ConvertTo-Json -Depth 5)
@@ -451,7 +478,7 @@ function Invoke-Swap {
         $had = @(@($b.rules) | ForEach-Object { [string]$_.Name })
         foreach ($r in @(Get-Port22Rules)) {
             if ($had -contains $r.Name) { continue }
-            Remove-Rule $r.Name
+            Remove-Rule $r.Name $r.Store
             Say 'CHANGED' ("firewall rule '" + $r.DisplayName + "' the install made (from " + ($r.Remote -join ', ') + ') removed; port 22 keeps the rules it had')
         }
         foreach ($r in @($b.rules)) {
@@ -502,10 +529,10 @@ function Invoke-PutBack {
     }
     $had = @(@($b.rules) | ForEach-Object { [string]$_.Name })
     foreach ($r in @(Get-Port22Rules)) {
-        if ($had -notcontains $r.Name) { Remove-Rule $r.Name; Say 'CHANGED' ("firewall rule '" + $r.DisplayName + "' removed; port 22 keeps the rules it had") }
+        if ($had -notcontains $r.Name) { Remove-Rule $r.Name $r.Store; Say 'CHANGED' ("firewall rule '" + $r.DisplayName + "' removed; port 22 keeps the rules it had") }
     }
     foreach ($r in @($b.rules)) {
-        if (Test-Rule ([string]$r.Name)) { Set-RuleRemote ([string]$r.Name) @($r.Remote) }
+        if (Test-Rule ([string]$r.Name)) { Set-RuleRemote ([string]$r.Name) @($r.Remote) ([string]$r.Store) }
         else { Say 'WARN' ("firewall rule '" + $r.DisplayName + "' is gone") }
     }
     Set-OpenSshStartMode 'sshd' ([string]$b.sshd.StartMode)

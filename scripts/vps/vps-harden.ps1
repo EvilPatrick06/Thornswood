@@ -20,6 +20,15 @@
                      runners with nobody signed in never uses, each stopped
                      and set to Disabled, with the reason beside it (#3186).
                      One that is not installed is said and left.
+    Edge             the in-box Microsoft Edge, which nothing on the box runs
+                     and whose setup adds an inbound firewall rule with every
+                     version (#3896), uninstalled with its own setup, and the
+                     EdgeUpdate policy in $EdgePolicies below set so its
+                     updater never installs it again. The WebView2 Runtime and
+                     the updater stay: the Visual Studio C++ workload the
+                     runners build with requires WebView2, and the updater
+                     keeps it patched. An uninstall that leaves Edge there
+                     stops the run, with what its setup said.
     telemetry        the scheduled tasks in $TelemetryTasks below
                      (DiskSnapshot.exe, CompatTelRunner.exe and the Customer
                      Experience Improvement Program) set to Disabled, and
@@ -50,6 +59,10 @@
                      unless Harden-VPS.ps1 cancels it after proving key login
                      still works: if the change ever locked the key out, the
                      box undoes it on its own.
+
+  Firewall rules are read as the firewall takes them and turned off in the
+  store they came from: the box's own policy, then Group Policy refreshed
+  (scripts\vps\BoxFirewall.ps1, #3896), or the local store.
 
   Every line of output starts with one word: CHANGED, WOULD (with -DryRun),
   ALREADY, KEPT, WARN or STOP. STOP means nothing after it was done, and the
@@ -95,8 +108,8 @@ $RestartTask = 'Thornswood sshd restart'
 # together used about 0.03 of a core, so each of these is a little memory
 # and processor time, and the print spooler is attack surface with a history
 # (PrintNightmare). Microsoft Edge's update tasks stay: the same updater
-# keeps the WebView2 runtime patched, and an Edge left unpatched on the box
-# is worse than a few seconds an hour.
+# keeps the WebView2 runtime patched, and WebView2 stays because the Visual
+# Studio C++ workload requires it (#3896). Edge itself goes, below.
 $IdleServices = @(
     @{ Name = 'Spooler'; Why = 'print spooler: nothing prints from the box, and it is the PrintNightmare service' },
     @{ Name = 'DiagTrack'; Why = 'Connected User Experiences and Telemetry: sends usage data to Microsoft' },
@@ -195,6 +208,23 @@ $BoxTimeZone = 'Mountain Standard Time'
 $RestartTask = @{ Path = '\Microsoft\Windows\UpdateOrchestrator\'; Name = 'Reboot_AC' }
 $RollbackTask = 'Thornswood harden rollback'
 
+# Microsoft Edge (#3896). Measured on 26 Oct 2026: the in-box Edge (EdgeUpdate
+# brand INBX), which nothing on the box runs (one profile, Administrator's,
+# last written 12 Sep 2026; no process loads it), and whose setup adds an
+# inbound "Microsoft Edge (mDNS-In)" rule on UDP 5353 with every new version
+# (one added 24 Oct 2026). Chromium's installer adds that rule with no policy
+# or check in its way, so the browser goes. Patrick, 27 Oct 2026 (B). Its
+# updater stays for the WebView2 Runtime, so the updater's own policy keeps it
+# from putting Edge back: Install{<Edge's app id>} 0 is "do not allow
+# installation" in Microsoft's EdgeUpdate policy, for that app only.
+# Update{...} is not set: should the uninstall ever be refused, an Edge left on
+# the box must still be patched.
+$EdgeAppId = '{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}'
+$EdgeUninstallKey = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge'
+$EdgePolicies = @(
+    @{ Key = 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate'; Name = ('Install' + $EdgeAppId); Type = 'DWord'; Value = 0; Why = 'the Edge updater never installs Edge on the box again; it still updates the WebView2 Runtime' }
+)
+
 # ---------------------------------------------------------------- the layer ---
 # Everything that touches Windows goes through these, so the harness can put
 # stand-ins in their place with -Layer and run the rest of this for real.
@@ -206,17 +236,41 @@ function Get-RdpDeny {
 }
 function Set-RdpDeny { Set-ItemProperty -LiteralPath $TsKey -Name fDenyTSConnections -Value 1 -Type DWord }
 
-# Enabled inbound rules, each as Name, DisplayName, Action, Group, Ports.
+# Enabled inbound rules the firewall takes, each as Name, DisplayName,
+# Action, Group, Ports and Store (GroupPolicy for the box's own policy, Local
+# for the local store; #3896).
 function Get-InboundRules {
-    foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -ErrorAction SilentlyContinue)) {
+    foreach ($r in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -ErrorAction SilentlyContinue)) {
         $pf = $r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
         [pscustomobject]@{
             Name = [string]$r.Name; DisplayName = [string]$r.DisplayName; Action = [string]$r.Action
             Group = [string]$r.Group; Ports = @(@($pf.LocalPort) | ForEach-Object { [string]$_ })
+            Store = [string]$r.PolicyStoreSourceType
         }
     }
 }
-function Disable-InboundRule([string]$Name) { Disable-NetFirewallRule -Name $Name }
+function Disable-InboundRule([string]$Name, [string]$Store = 'GroupPolicy') {
+    if ($Store -eq 'Local') { Disable-NetFirewallRule -PolicyStore PersistentStore -Name $Name; return }
+    Disable-NetFirewallRule -PolicyStore localhost -Name $Name
+    Sync-ThornswoodFirewall
+}
+
+# The in-box Edge as its uninstall entry says it, Version and Setup (its
+# setup.exe) and Arguments (what its uninstall entry runs it with), or $null
+# when it is not installed.
+function Get-EdgeInstall {
+    $v = Get-ItemProperty -LiteralPath $EdgeUninstallKey -ErrorAction SilentlyContinue
+    if ($null -eq $v -or -not $v.UninstallString) { return $null }
+    $s = [string]$v.UninstallString
+    $exe = $s; $rest = ''
+    if ($s.StartsWith('"')) { $end = $s.IndexOf('"', 1); $exe = $s.Substring(1, $end - 1); $rest = $s.Substring($end + 1).Trim() }
+    return [pscustomobject]@{ Version = [string]$v.DisplayVersion; Setup = $exe; Arguments = $rest }
+}
+# Runs Edge's own uninstall, with --force-uninstall so it does not stop to
+# ask, and returns its exit code.
+function Remove-EdgeInstall($Edge) {
+    return [int](Start-Process -FilePath $Edge.Setup -ArgumentList ($Edge.Arguments + ' --force-uninstall') -Wait -PassThru).ExitCode
+}
 
 function Get-TermService {
     $s = Get-Service -Name TermService -ErrorAction SilentlyContinue
@@ -324,6 +378,19 @@ function New-PrivateFile([string]$Path) {
     if (-not $got.AreAccessRulesProtected -or ($who -join ',') -ne 'S-1-5-18,S-1-5-32-544') { throw ($Path + ' did not take SYSTEM and Administrators alone: ' + ($who -join ', ')) }
 }
 
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
+
 if ($Layer) { . $Layer }
 
 # ---- BoxGuard.ps1 (copy) ----
@@ -401,7 +468,7 @@ function Invoke-Harden {
     $rdpRules = @($rules | Where-Object { $_.Action -eq 'Allow' -and ($_.Group -eq $RdpGroup -or $_.Ports -contains '3389') })
     foreach ($r in $rdpRules) {
         if ($r.Ports -contains '22') { Say 'KEPT' ("firewall rule '" + $r.DisplayName + "' covers port 22 as well as Remote Desktop, so it was left on. Look at it by hand."); continue }
-        if (-not $DryRun) { Disable-InboundRule $r.Name }
+        if (-not $DryRun) { Disable-InboundRule $r.Name $r.Store }
         Change ("firewall rule '" + $r.DisplayName + "' turned off (allowed " + (($r.Ports | Where-Object { $_ }) -join ',') + ')')
     }
     if (-not $rdpRules.Count) { Say 'ALREADY' 'no enabled firewall rule lets Remote Desktop in' }
@@ -441,6 +508,27 @@ function Invoke-Harden {
         if ($state -eq 'Disabled') { Say 'ALREADY' ($full + ' Disabled'); continue }
         if (-not $DryRun) { Disable-WindowsTask $t.Path $t.Name }
         Change ($full + ' set to Disabled (was ' + $state + '): ' + $t.Why)
+    }
+
+    # -------------------------------------------------------------- Edge ---
+    foreach ($v in $EdgePolicies) {
+        $have = Get-PolicyValue $v.Key $v.Name
+        if ($null -ne $have -and [string]$have -eq [string]$v.Value) { Say 'ALREADY' ($v.Name + ' is ' + $v.Value); continue }
+        if (-not $DryRun) { Set-PolicyValue $v.Key $v.Name $v.Value $v.Type }
+        Change ($v.Name + ' set to ' + $v.Value + ' (was ' + $(if ($null -eq $have) { 'not set' } else { [string]$have }) + '): ' + $v.Why)
+    }
+    $edge = Get-EdgeInstall
+    if (-not $edge) { Say 'ALREADY' 'Microsoft Edge is not installed (#3896)' }
+    elseif ($DryRun) { Change ('Microsoft Edge ' + $edge.Version + ' uninstalled with its own setup (' + $edge.Setup + '): nothing on the box runs it, and its setup adds an inbound firewall rule with every version (#3896)') }
+    else {
+        $code = Remove-EdgeInstall $edge
+        $left = Get-EdgeInstall
+        if ($left) {
+            $script:stopped = $true
+            Say 'STOP' ('Microsoft Edge ' + $left.Version + ' is still installed after its setup ran (exit ' + $code + '). Its log is msedge_installer.log in C:\Windows\SystemTemp or C:\Windows\Temp. The WebView2 Runtime and everything after this step were left as they were.')
+            return
+        }
+        Change ('Microsoft Edge ' + $edge.Version + ' uninstalled with its own setup (exit ' + $code + '): nothing on the box runs it, and its setup added an inbound firewall rule with every version (#3896)')
     }
 
     # ---------------------------------------------------- Windows Update ---

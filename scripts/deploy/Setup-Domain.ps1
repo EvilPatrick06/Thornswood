@@ -86,6 +86,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Lock-Folder.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+# Where the box keeps its firewall rules, and the refresh that makes the
+# firewall take a change to them (#3896).
+. (Join-Path $Here '..\vps\BoxFirewall.ps1')
 . (Join-Path $Here 'CloudflareRanges.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
@@ -199,14 +202,21 @@ if (Test-Path -LiteralPath `$cf) {
 [IO.File]::WriteAllBytes(`$cf, `$bytes)
 'Caddyfile written, from scripts\deploy\Caddyfile'
 
+# The web rules live in the box's own policy store, the only one the firewall
+# takes rules from, and Group Policy is refreshed after a change
+# (scripts\vps\BoxFirewall.ps1, #3896).
+$(Get-ThornswoodFirewallScript)
+`$fwMade = 0
 foreach (`$p in 80,443) {
   `$n = 'Thornswood Web ' + `$p
-  if (-not (Get-NetFirewallRule -DisplayName `$n -EA SilentlyContinue)) {
-    New-NetFirewallRule -DisplayName `$n -Direction Inbound -Protocol TCP ``
+  if (-not (Get-NetFirewallRule -PolicyStore localhost -DisplayName `$n -EA SilentlyContinue)) {
+    New-NetFirewallRule -PolicyStore localhost -DisplayName `$n -Direction Inbound -Protocol TCP ``
       -LocalPort `$p -Action Allow | Out-Null
+    `$fwMade++
     'opened ' + `$p + ' to any address. Once the name is behind Cloudflare, Set-WebFirewall.ps1 takes it to Cloudflare''s ranges only (#2995)'
   }
 }
+if (`$fwMade) { Sync-ThornswoodFirewall }
 "@ | ForEach-Object { "  $_" }
 
 # The docs site moves to loopback, so 3001 is no longer a plain HTTP way in.
@@ -214,8 +224,11 @@ Write-Host ''
 Write-Host 'Closing port 3001 to the outside...'
 Remote @"
 `$ErrorActionPreference = 'Continue'
-Get-NetFirewallRule -DisplayName 'Thornswood Docs' -EA SilentlyContinue |
-  Remove-NetFirewallRule -EA SilentlyContinue
+$(Get-ThornswoodFirewallScript)
+if (Get-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood Docs' -EA SilentlyContinue) {
+  Remove-NetFirewallRule -PolicyStore localhost -DisplayName 'Thornswood Docs'
+  Sync-ThornswoodFirewall
+}
 
 `$t = Get-ScheduledTask -TaskName 'Thornswood Docs' -EA SilentlyContinue
 if (`$t) {

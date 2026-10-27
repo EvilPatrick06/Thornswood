@@ -122,6 +122,9 @@ Yes 'the install here-string is there' $remote.Success
 # stands in as nothing. Without it the expansion threw before any check after
 # it ran (found while checking the voice line for #2166).
 function Get-ThornswoodServiceAccountScript { return '' }
+# It also pastes in scripts\vps\BoxFirewall.ps1's Sync-ThornswoodFirewall
+# (#3896), loaded here the way Install-Voice.ps1 loads it.
+. (Join-Path $RepoDir 'scripts\vps\BoxFirewall.ps1')
 function StartLine([string]$most) {
     $Root = 'C:\Thornswood-Voice'; $Port = 7778; $TaskName = 'Thornswood Voice'; $Site = 'https://thornswood.net'
     $Bind = '127.0.0.1'; $ChatRange = 'on'; $expectBuild = 'most-1'; $turnSet = ''

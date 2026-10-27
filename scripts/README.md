@@ -237,6 +237,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Backup-Server.ps1](vps/Backup-Server.ps1) | Pulls everything off the server that could not be rebuilt from the repo, and puts it in a dated zip on this machine: in local\backups in the repository (Where.ps1 Backups), or the folder -Out names. |
 | [vps/Bootstrap-VPS.ps1](vps/Bootstrap-VPS.ps1) | Run this ON THE VPS, once, in the PowerShell 5.1 that ships with Windows Server 2022. |
 | [vps/Bot-Service.ps1](vps/Bot-Service.ps1) | Runs the Thornswood bot as a Windows service under its own account, and stops and starts it by name (issue #465). |
+| [vps/BoxFirewall.ps1](vps/BoxFirewall.ps1) | Where the box keeps its firewall rules, and how a change to them takes effect (#3896). |
 | [vps/BoxGuard.ps1](vps/BoxGuard.ps1) | What a box script asks before it changes anything: is this the box? |
 | [vps/Check-LiveGamemode.ps1](vps/Check-LiveGamemode.ps1) | Says whether the gamemode running on the VPS is the one in this repo. |
 | [vps/Check-Load.ps1](vps/Check-Load.ps1) | Answers the only question worth asking before paying for a bigger server: what is this one actually running out of. |
@@ -273,7 +274,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Seal.ps1](vps/Seal.ps1) | How a secret held by GitHub reaches the box without passing through any session, chat or log in a form anybody can read (#3216, Patrick's A of 22 Oct 2026). |
 | [vps/Send-Script.ps1](vps/Send-Script.ps1) | The one way a script here runs PowerShell on the VPS. |
 | [vps/Send-Secret.ps1](vps/Send-Secret.ps1) | How a secret goes to the VPS: on ssh's standard input, never on a command line. |
-| [vps/Set-InboundRules.ps1](vps/Set-InboundRules.ps1) | Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807). |
+| [vps/Set-InboundRules.ps1](vps/Set-InboundRules.ps1) | Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807); with -Own, moves the rules the box keeps into its own firewall policy and has the firewall ignore local rules (#3896). |
 | [vps/Set-SshScope.ps1](vps/Set-SshScope.ps1) | Limits which addresses may reach ssh on the VPS (port 22), after proving key login, refusing a list that leaves this machine out, and with a put back the box runs by itself if the new login fails. |
 | [vps/Set-TimeWait.ps1](vps/Set-TimeWait.ps1) | Sets TcpTimedWaitDelay to 30 seconds on the VPS, so the box stops dropping connections from the cloud before TLS (#2946), and restarts the box for it when asked and nobody is on either server. |
 | [vps/Set-Vps.ps1](vps/Set-Vps.ps1) | Points everything at a different server box. |
@@ -284,6 +285,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Upgrade-OpenSsh.ps1](vps/Upgrade-OpenSsh.ps1) | Upgrades the box's OpenSSH for Windows to a release with a post-quantum key exchange, keeping the pinned host keys: proves key login, swaps sshd on the box, proves a new login with the pinned key negotiates a post-quantum key exchange, and only then keeps it. |
 | [vps/vps-capture-443.ps1](vps/vps-capture-443.ps1) | Captures the SYN and RST packets on port 443 at the box's network card for a set time, so #2946 can see whether the TLS connects from a cloud session that stall and then reset ever reach the box, and whether the box answers them. |
 | [vps/vps-dev-instance.ps1](vps/vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks and firewall rules. |
+| [vps/vps-firewall-policy.ps1](vps/vps-firewall-policy.ps1) | Runs ON THE VPS, sent there by Set-InboundRules.ps1 -Own: moves every rule the box keeps into its own firewall policy and tells the firewall to ignore local rules, so no installer can open a port on the box (#3896). |
 | [vps/vps-freeze.ps1](vps/vps-freeze.ps1) | Runs ON the old VPS on the day the server moves: stops everything that writes what a backup takes, then takes the last backup. |
 | [vps/vps-harden.ps1](vps/vps-harden.ps1) | Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off, turns Remote Desktop off and the Windows services and telemetry the box never uses, and moves Windows Update and its maintenance to 4 AM, leaving ssh on port 22 alone. |
 | [vps/vps-inbound-rules.ps1](vps/vps-inbound-rules.ps1) | Runs ON THE VPS, sent there by Set-InboundRules.ps1: turns off every enabled inbound Allow firewall rule that is not on the box's list, and says which (#3807). |

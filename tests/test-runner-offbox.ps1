@@ -256,14 +256,20 @@ try {
     Yes 'Get-RunnerReachMisses: an address outside every range is named, IPv4 or IPv6, and one inside is not' (($miss -join ',') -eq '48.192.88.101,2603:1006:2001::1')
 
     # ---- the guards themselves, on stand-ins and scratch folders -----------
-    $gl = [regex]::Match($src, "(?s)\`$guardLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+    $gl = [regex]::Match($src, "(?s)\`$guardLib = \(Get-ThornswoodFirewallScript\) \+ @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the guard library is where it was' ($gl -match 'function Set-RunnerFirewall')
     $script:fw = New-Object Collections.ArrayList
     $script:gone = New-Object Collections.ArrayList
     # Stand-ins: functions win over the cmdlets, so no real rule is read or made.
-    function New-NetFirewallRule { param($DisplayName, $Group, $Direction, $Action, $Profile, $LocalUser, $RemoteAddress, $Description, $ErrorAction) [void]$script:fw.Add(@{ Name = $DisplayName; Group = $Group; Direction = $Direction; Action = $Action; LocalUser = $LocalUser; Remote = @($RemoteAddress) }) }
-    function Get-NetFirewallRule { param($Group, $ErrorAction) @($script:fw | Where-Object { $_.Group -eq $Group } | ForEach-Object { New-Object PSObject -Property @{ Name = $_.Name; Enabled = 'True' } }) }
-    function Remove-NetFirewallRule { param($Name) [void]$script:gone.Add($Name); $keep = @($script:fw | Where-Object { $_.Name -ne $Name }); $script:fw.Clear(); foreach ($k in $keep) { [void]$script:fw.Add($k) } }
+    # Every store each one is asked for, and each refresh, are kept (#3896).
+    $script:stores = New-Object Collections.ArrayList
+    $script:syncs = 0
+    function New-NetFirewallRule { param($PolicyStore, $DisplayName, $Group, $Direction, $Action, $Profile, $LocalUser, $RemoteAddress, $Description, $ErrorAction) [void]$script:stores.Add($PolicyStore); [void]$script:fw.Add(@{ Name = $DisplayName; Group = $Group; Direction = $Direction; Action = $Action; LocalUser = $LocalUser; Remote = @($RemoteAddress) }) }
+    function Get-NetFirewallRule { param($PolicyStore, $Group, $ErrorAction) [void]$script:stores.Add($PolicyStore); @($script:fw | Where-Object { $_.Group -eq $Group } | ForEach-Object { New-Object PSObject -Property @{ Name = $_.Name; Enabled = 'True' } }) }
+    function Remove-NetFirewallRule { param($PolicyStore, $Name) [void]$script:stores.Add($PolicyStore); [void]$script:gone.Add($Name); $keep = @($script:fw | Where-Object { $_.Name -ne $Name }); $script:fw.Clear(); foreach ($k in $keep) { [void]$script:fw.Add($k) } }
+    function Sync-ThornswoodFirewall { $script:syncs++ }
+    # On the box the head sets the box's policy store, the only one its firewall takes rules from.
+    $grdStore = 'localhost'
     . ([scriptblock]::Create($gl))
     $many = @(1..1203 | ForEach-Object { '10.0.' + [int][Math]::Floor($_ / 256) + '.' + ($_ % 256) })
     $said = Set-RunnerFirewall '*S-1-5-7' 'TS test group' $many
@@ -276,6 +282,8 @@ try {
     Yes '  an empty list changes nothing and says so' ($threw -and $script:fw.Count -eq 1)
     $null = Remove-RunnerFirewall 'TS test group'
     Yes 'Remove-RunnerFirewall takes the group off' ($script:fw.Count -eq 0 -and (Get-RunnerFirewall 'TS test group') -match 'NO RULES')
+    Yes '  every rule read, made and taken away in the store the head names, and the policy refreshed after each change (#3896)' (
+        @($script:stores | Where-Object { $_ -ne 'localhost' }).Count -eq 0 -and $script:stores.Count -gt 0 -and $script:syncs -eq 3)
 
     $u = Join-Path $work 'Users'; $pd = Join-Path $work 'ProgramData'; $dv = Join-Path $work 'D-root'
     foreach ($n in 'alice', 'Public', 'Default', 'thornswood-pr', 'thornswood-pr.ONE') { New-Item -ItemType Directory -Path (Join-Path $u $n) | Out-Null }
