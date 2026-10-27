@@ -44,7 +44,6 @@ const { execFileSync } = require('child_process');
 const REPO_DIR = path.join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 
 const WAITING = [
-  ['Developer-Guide.md', '#3838, Patrick\'s edit: the replacement lines are on the report page'],
   ['docs/archive/WORKING-NOTES.md', '#3693, agent-only files leave the public repo'],
   ['docs/archive/todo-list-2026-09-25.md', '#3693, agent-only files leave the public repo'],
   ['ops/claude-queue/pillow-one-upgrade.md', '#3693, agent-only files leave the public repo'],

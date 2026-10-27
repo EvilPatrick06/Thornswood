@@ -186,7 +186,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 
 Do this once on a new Windows PC. Stay in order. On every PC is the steps. Setting up a machine and Shipping from another machine are for a PC that will publish a release. You can read those two after the clone works.
 
-Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
+Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSING.md` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Each pull request then says whose work it is, on the template's "Whose work" line. Use your own clone. The shared clone on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
 ### On every PC
 
@@ -463,14 +463,14 @@ by hand, and no secret is written into the repository.
 Until 4 Oct only Patrick's Azure account could sign (29 Sep, #1121), so a
 second machine signed only while he sat at it and signed in. Since 4 Oct each
 person who ships signs in as themselves, with an account of their own in the
-signing tenant, Default Directory (`5a096034-ce55-40d2-b313-10ee86efe26a`, domain
-`evilpatrick06outlook.onmicrosoft.com`), that holds the Artifact Signing Certificate
+signing tenant, Default Directory (`5a096034-ce55-40d2-b313-10ee86efe26a`), that
+holds the Artifact Signing Certificate
 Profile Signer role on the ThornswoodRelease profile (Patrick, 4 Oct; #1740).
 The role is on that profile only, so the account can sign and can do nothing
 else in the subscription. What it signs carries the same publisher name as
 what Patrick signs, because the certificate comes from his identity
 validation. Accounts that can sign, 4 Oct: Patrick's own, and
-`djinn@evilpatrick06outlook.onmicrosoft.com`.
+Djinn's.
 
 ##### Patrick, once for each person
 
@@ -480,7 +480,7 @@ On a machine where `az` is signed in as Patrick, in PowerShell 7:
 az account show --query "{user:user.name, tenant:tenantId}" -o table
 ```
 
-It names evilpatrick06@outlook.com and the tenant above. Then:
+It names Patrick's own sign-in and the tenant above. Then:
 
 ```powershell
 $scope = (az resource list --name ThornswoodSigning --resource-type Microsoft.CodeSigning/codeSigningAccounts --query "[0].id" -o tsv) + "/certificateProfiles/ThornswoodRelease"; $scope
@@ -812,8 +812,10 @@ Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 Nothing here assumes you use Claude: this file is the rules for everybody, and a Claude
 reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
 is added as a collaborator on the repository, and on CODEOWNERS beside the
-shared files, and agrees once to the contributor terms in `LICENSE`.
-Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
+shared files, and agrees once to the contributor terms in `LICENSING.md`.
+Thornswood's own code is under MIT, in `LICENSE`, and its lore, art, music and
+game content under CC BY-NC-SA 4.0; the name and logo stay all rights reserved
+(Patrick, 26 Oct, #3688). `LICENSING.md` says what each covers.
 
 Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
 Vortex) also work here, on the shipping machine, under his GitHub account.
