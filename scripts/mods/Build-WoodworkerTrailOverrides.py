@@ -17,7 +17,7 @@ Usage:
 
 --check only verifies every listed recipe is readable from --masters and prints
 what would ship. A real write needs every master esp/esm present in --masters.
-Collection Nexus upload and load-order pin are Claude's (claude-queue/516).
+Collection Nexus upload and load-order pin are Claude's (the ops repo's ops/claude-queue, #516).
 """
 from __future__ import print_function
 

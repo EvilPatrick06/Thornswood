@@ -4,7 +4,7 @@
   Runs ON the VPS, sent there by Restore-Box.ps1: puts the site's, the bot's
   and Caddy's half of an unpacked nightly backup back into their folders. The
   game servers' half is Restore-Server.ps1; this is everything else
-  docs\RESTORING.md used to leave to hand copying on a box that has no repo
+  RESTORING.md in the ops repo used to leave to hand copying on a box that has no repo
   (issue #454).
 
       vps-restore-services.ps1 -From C:\Thornswood-Restore\unpacked
@@ -143,7 +143,7 @@ Place 'site\uploads'     (Join-Path $SiteRoot 'uploads')
 # are merged: nothing already there is replaced, as nothing there ever is.
 foreach ($feed in 'feed', 'feed-dev') {
   if (-not (Test-Path -LiteralPath (Join-Path $From "site\$feed"))) {
-    'missing   site\' + $feed + ' is not in this backup (backups before issue #454 do not carry the feed; see docs\MOVING-THE-SERVER.md)'
+    'missing   site\' + $feed + ' is not in this backup (backups before issue #454 do not carry the feed; see MOVING-THE-SERVER.md in the ops repo)'
     $missing += "site\$feed"
     continue
   }
@@ -198,7 +198,7 @@ foreach ($g in @(@{ Tag = 'game'; Root = $GameRoot }, @{ Tag = 'game-dev'; Root 
   if ((Get-FileHash -LiteralPath $had).Hash -eq (Get-FileHash -LiteralPath $has).Hash) {
     'gamemode  ' + $has + ' is the one the backup''s ' + $g.Tag + ' ran'
   } else {
-    'GAMEMODE DIFFERS  ' + $has + ' is not the one the backup''s ' + $g.Tag + ' ran. Ask before starting it (docs\MOVING-THE-SERVER.md).'
+    'GAMEMODE DIFFERS  ' + $has + ' is not the one the backup''s ' + $g.Tag + ' ran. Ask before starting it (MOVING-THE-SERVER.md in the ops repo).'
   }
 }
 

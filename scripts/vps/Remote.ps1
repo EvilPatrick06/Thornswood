@@ -33,7 +33,7 @@
   answer in a block of CLIXML progress records, which is the other thing that
   has eaten an afternoon.
 
-  READ ONLY IS NOT ASSUMED. This will run whatever it is given. CLAUDE.md is
+  READ ONLY IS NOT ASSUMED. This will run whatever it is given. The ops repo's CLAUDE.md is
   clear that the person runs what touches the VPS, so this is a tool for the
   person, not a way around that.
 #>

@@ -258,7 +258,7 @@ try:
     # block's staff presses come through the staff block's record with the
     # building and its hold in the why, and each reads as who did what where.
     yes('M14 the property block records each staff press at a door, and each has a sentence here',
-        all(("staffRecord('%s'" % d) in gm and d in bot._MOD_DID for d in ('evict', 'rent', 'norent')))
+        all(("staffRecord('%s'" % d) in gm and d in bot._MOD_DID for d in ('evict', 'rent', 'norent', 'rentpaid')))
     ev = bot.moderation_text('dev', json.loads(row('evict', who='Alice', why='Breezehome, in Whiterun')))
     yes('M14 an eviction by staff says who, whose claim and where',
         ev == '**Staff on the dev server:** Aela (profile 1001) ended the claim of Alice (profile 2002): '

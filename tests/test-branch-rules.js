@@ -22,7 +22,7 @@
 // the files that decide them: build.yml has one job and it is "Launcher
 // builds"; Ship.ps1 never writes to the source repository; Bump-Version.ps1
 // commits Updater.cs and nothing else; CODEOWNERS names files that exist and
-// covers the six shared ones CLAUDE.md lists. Then the documents: each states
+// covers the six shared ones the ops repo's CLAUDE.md lists. Then the documents: each states
 // the four settings (since 25 September: enforce_admins off, no required
 // check, since the build check on GitHub is off), gives
 // the command that reads the live settings, and says none of the things that
@@ -81,7 +81,8 @@ yml.forEach(function (l) {
 // when the hosted one is skipped or fails, and never on a pull request.
 // #3182: "tested" builds nothing either; it only asks whether a pull request
 // build already passed main's tree, and both build jobs wait for its answer.
-const main = jobs.filter(function (j) { return j.id !== 'launcher-vps' && j.id !== 'tested'; });
+// #3551: so does its VPS fallback, tested-vps.
+const main = jobs.filter(function (j) { return j.id !== 'launcher-vps' && j.id !== 'tested' && j.id !== 'tested-vps'; });
 yes('build.yml has exactly one build job besides the VPS fallback, so one required check covers it (found ' + main.length + ')', main.length === 1);
 const CHECK = main.length ? main[0].name : null;
 yes('that job is named "Launcher builds" (found "' + CHECK + '")', CHECK === 'Launcher builds');

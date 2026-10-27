@@ -7,7 +7,7 @@
   to prove the line it writes.
 
   WHY THIS EXISTS. The website, the game server, the voice service and the bot
-  all run on one five core box (MOVING-THE-SERVER.md), and until this nothing
+  all run on one five core box (MOVING-THE-SERVER.md in the ops repo), and until this nothing
   kept a number for any of them. Check-Load.ps1 takes a reading while somebody
   sits and watches it, and Watch-Services.ps1 knocks on seven ports and
   restarts whatever does not answer. Neither writes anything down. So the

@@ -11,7 +11,7 @@
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <throwaway folder> -Rehearse [-Port 7800 -VoicePort 7802]
 
   Restore-Backup.ps1 checks the signature and unpacks; this is the step after
-  it that docs\RESTORING.md used to leave to hand copying. It takes the
+  it that RESTORING.md in the ops repo used to leave to hand copying. It takes the
   backup's game (live) or game-dev (dev) half and lays it into -Root:
 
     world    whole, because the backup is the truth about who exists
@@ -68,7 +68,7 @@
   server it came from: its port, its name and private\door.json, which names
   the live site and holds the key the site trusts and the join pass key. That
   is right for a real restore and wrong for a throwaway folder somebody means
-  to start and connect to, and docs\RESTORING.md left making it safe to four
+  to start and connect to, and RESTORING.md in the ops repo left making it safe to four
   hand steps nobody had done. -Rehearse does them after every check above has
   passed, and refuses before anything is put back when -Root is one of the
   server folders on this machine (C:\Thornswood-Server,
@@ -92,7 +92,7 @@
              ports, and what was taken out. Each -Rehearse is a whole new
              restore and writes it again.
   It prints REHEARSAL READY with the start line and the launcher settings.
-  It never writes docs\RESTORING.md's Last rehearsed line: that waits for a
+  It never writes the Last rehearsed line of RESTORING.md in the ops repo: that waits for a
   person who started it and loaded a character.
 
   -Work is the folder the decrypted zip and the unpacked backup sit in while
@@ -546,10 +546,10 @@ if ($rh) {
   Say ("  Start it by hand:   cd '{0}'; node dist_back/skymp5-server.js" -f $Root) 'DarkGray'
   Say ('  Point a launcher at it: in that launcher''s config.json, ServerAddress this machine (127.0.0.1 on it), ServerPort "{0}"' -f $rh.Port) 'DarkGray'
   Say '  and load a character from the backup while thornswood.log says it connected.' 'DarkGray'
-  Say ("  End it: stop node, then Remove-Item -LiteralPath '{0}' -Recurse -Force. docs\RESTORING.md has the rest." -f $Root) 'DarkGray'
+  Say ("  End it: stop node, then Remove-Item -LiteralPath '{0}' -Recurse -Force. RESTORING.md in the ops repo has the rest." -f $Root) 'DarkGray'
 } else {
   Say '  Start it with its scheduled task, Start-ScheduledTask -TaskName <its task>, which runs node High (#2491); node started by hand runs Normal and outside the task' 'DarkGray'
-  Say '  and watch thornswood.log until a character connects. docs\RESTORING.md has the rest.' 'DarkGray'
+  Say '  and watch thornswood.log until a character connects. RESTORING.md in the ops repo has the rest.' 'DarkGray'
 }
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0

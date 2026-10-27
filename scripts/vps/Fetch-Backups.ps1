@@ -390,7 +390,7 @@ Prune
 if ($checked) { Send-OffBoxMark } else { Say '  the box was not told of these, because none of them was opened' 'Yellow' }
 Write-Host ''
 Say "  They are in $To" 'DarkGray'
-Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
+Say '  Restoring one for real is RESTORING.md in the ops repo.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 if ($failed -or $script:pruneFailed -or $script:markFailed) { exit 1 }
 exit 0
