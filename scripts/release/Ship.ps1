@@ -591,8 +591,8 @@ function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
 # its own notes announced. And records\client-build.json is compiled into the
 # exe, so the stale launcher called the new client runtime in that same pack
 # "not the recorded build" and put the old skymp5-client.js back.
-# Returns the changed paths under launcher\ and records\client-build.json
-# between the tag and HEAD, or nothing when the tag is not here to compare
+# Returns the changed paths under launcher\ and the records compiled in
+# (client-build.json, ui-gone.json and, since #3715, generated.json) between the tag and HEAD, or nothing when the tag is not here to compare
 # with (Get-ReleaseLauncher stops that Ship anyway). Markdown is not built.
 function Get-LauncherDrift([string]$repoDir, [string]$tag) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -603,7 +603,7 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
             & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
             if ($LASTEXITCODE -ne 0) { return @() }
         }
-        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json records/ui-gone.json ':(exclude,glob)**/*.md' 2>$null |
+        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json records/ui-gone.json records/generated.json ':(exclude,glob)**/*.md' 2>$null |
                    Where-Object { $_ })
         if ($LASTEXITCODE -ne 0) { return @() }
         return $paths
@@ -669,7 +669,8 @@ function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$ex
 # WHAT THE LAUNCHER IS COMPILED FROM, as one sha256, issue #921. Every file
 # under launcher\ but the Markdown (the code, ui.xaml, the art, the video, the
 # WebView2 loader, the manifest), records\client-build.json and
-# records\ui-gone.json, which are compiled in, and Build-Launcher.ps1, which
+# records\ui-gone.json and records\generated.json (#3715), which are compiled
+# in, and Build-Launcher.ps1, which
 # writes the version resource and picks what goes in. Read off the working tree, not git, so a dev Ship of uncommitted
 # work counts it. Paths with / and sorted ordinally, so the same tree gives the
 # same answer on any machine; a line ending changed by git's autocrlf gives a
@@ -686,7 +687,7 @@ function Get-LauncherInputHash([string]$repoDir) {
             $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))
         }
     }
-    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'scripts/release/Build-Launcher.ps1') {
+    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'records/generated.json', 'scripts/release/Build-Launcher.ps1') {
         $p = Join-Path $repoDir $rel
         $h = 'missing'
         if (Test-Path -LiteralPath $p) { $h = Get-ThornswoodShippedSha256 $p }
