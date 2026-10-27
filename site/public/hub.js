@@ -23,16 +23,15 @@ var S = {
 
 var ROUTES = {
   '/hub':'home',
-  '/uploads':'uploads', '/linked':'linked', '/sessions':'sessions', '/inbox':'inbox',
-  '/hub/known':'known'
+  '/uploads':'uploads', '/linked':'linked', '/sessions':'sessions', '/inbox':'inbox'
 };
 var PATHS = {};
 Object.keys(ROUTES).forEach(function (u) { PATHS[ROUTES[u]] = u; });
 
-/* The hub stopped editing the issue boards in #433. Known Issues is the one
-   board it edits (#2414): the public /known page is written from it, so it is
-   the only copy of that text there is. */
-var BOARDKEYS = ['known'];
+/* The hub stopped editing the issue boards in #433, and the Known Issues
+   board, the last one it edited (#2414), went in #3140: /known is written
+   from the issue board now. So no page here is a board. */
+var BOARDKEYS = [];
 var isBoard = function (k) { return BOARDKEYS.indexOf(k) >= 0; };
 
 var ABOUT = {
@@ -41,18 +40,15 @@ var ABOUT = {
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
                'Open one for every session they have had, with its logs and ' +
-               'what they said in it.',
-  known:       'The public Known Issues page at /known is written from this board, ' +
-               'and nowhere else. Click a cell, the intro or a section\'s note to change it. ' +
-               'Tick a row once it is fixed and it leaves the page.'
+               'what they said in it.'
 };
 
-/* Hub trimmed (#433): Gallery, Sessions, Linked Accounts, Inbox, and since
-   #2414 the Known Issues board. Other issue boards and work pages left the
-   hub. No site theme/appearance prefs. */
+/* Hub trimmed (#433): Gallery, Sessions, Linked Accounts, Inbox. Issue
+   boards and work pages left the hub, the Known Issues board last (#3140).
+   No site theme/appearance prefs. */
 var GROUPS = [
   { label:'',     keys:['home'] },
-  { label:'Hub',  keys:['uploads','sessions','linked','inbox','known'] }
+  { label:'Hub',  keys:['uploads','sessions','linked','inbox'] }
 ];
 
 var el = function (id) { return document.getElementById(id); };
@@ -1646,7 +1642,7 @@ function drawHome() {
     '<div class="hero">' +
       '<img src="/logo.png" alt="Thornswood">' +
       '<div><h1>Hub</h1>' +
-      '<div class="sub">Gallery, sessions, linked accounts, the report inbox, and the Known Issues page. ' +
+      '<div class="sub">Gallery, sessions, linked accounts and the report inbox. ' +
       'The public site is at <a href="/">thornswood.net</a>.</div></div>' +
     '</div>' +
     '<div class="rule"></div>';
@@ -1655,7 +1651,7 @@ function drawHome() {
   // a Gamemaster lands on a home page with Gallery on it and nothing else.
   if (inHub()) {
     out += '<div class="cards">' +
-      card('uploads') + card('sessions') + card('linked') + card('inbox') + card('known') +
+      card('uploads') + card('sessions') + card('linked') + card('inbox') +
       '</div>';
   } else {
     out += '<p class="lede">Signing in with Discord opens the hub.</p>' +

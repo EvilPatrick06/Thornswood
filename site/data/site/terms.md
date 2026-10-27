@@ -3,9 +3,9 @@
 The agreement between you and Thornswood, in the shortest form that is still
 honest.
 
-Last changed: 19 October 2026.
+Last changed: 26 October 2026.
 
-Thornswood is a free fan project run by two people in their own time. Using the
+Thornswood is a free fan project run by a small team in their own time. Using the
 site, the launcher, the Discord or the server means you accept what is below.
 If you do not, do not use them, and nothing else happens.
 
@@ -51,8 +51,8 @@ against your Discord account. Applying means accepting them.
 <!-- /alpha -->
 
 Staff can remove access from anybody, at any time, for breaking those or for
-making the place worse. You will be told why. There is no appeal body, because
-there are two of us. A ban is a decision, not a punishment we enjoy handing
+making the place worse. You will be told why. There is no separate appeal body,
+because the team is small. A ban is a decision, not a punishment we enjoy handing
 out, and asking about it calmly in the Discord is always allowed.
 
 ## Your account

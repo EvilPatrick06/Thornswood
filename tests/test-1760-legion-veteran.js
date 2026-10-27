@@ -10,19 +10,19 @@
 // Skyrim under arms, the embassy guard are not Legion, and you cannot play a
 // Legion soldier. Patrick, 5 Oct: the site says a person can play a Legion
 // veteran and must not say "certain events may allow it"; the lore is right
-// about the embassy.
+// about the embassy. Since #3138 the world page is the Accord's only copy, and
+// lore/accord.md points at it, so the page is read against the ban itself.
 //
 // What it checks:
 //   1. site/data/site/world.md says you can play a Legion veteran, and never
 //      that you can play a Legion soldier;
-//   2. its Article the Third says what lore/accord.md's says: no Legion
-//      soldier sets foot in Skyrim under arms, and the embassy guard are not
-//      Legion;
+//   2. its Article the Third says no Legion soldier sets foot in Skyrim
+//      under arms, and the embassy guard are not Legion;
 //   3. no public page (every site/data/site/*.md, the site's own HTML, the
 //      launcher's help and the bot's channel posts) says "certain events may
 //      allow", or that a person can play a Legion soldier;
-//   4. lore/accord.md and docs/systems/embassy.md still say the six are not
-//      Legion and a veteran is a different thing.
+//   4. docs/systems/embassy.md still says the six are not Legion and a
+//      veteran can be played.
 //
 // Read only.
 'use strict';
@@ -45,19 +45,16 @@ function slice(text, start, end) {
 }
 
 const world = flat(read('site/data/site/world.md'));
-const lore = flat(read('lore/accord.md'));
 
 // 1. what you can play
 yes('the world page says you can play a Legion veteran', /You can play a Legion veteran\./.test(world));
 yes('and never that you can play a Legion soldier', !/can play a (serving )?Legion soldier/i.test(world));
 yes('and says you cannot play a serving one', /You cannot play a serving Legion soldier/.test(world));
 
-// 2. Article the Third, the same on the site as in the lore
+// 2. Article the Third bans every Legion soldier
 const siteThird = slice(world, 'Article the Third', 'Article the Fourth');
-const loreThird = slice(lore, 'Article the Third', 'Article the Fourth');
 const ban = 'No Legion soldier may set foot in Skyrim under arms. The embassy guard are not Legion and are not to be called so.';
-yes('the lore\'s Article the Third bans every Legion soldier and says the embassy guard are not Legion', loreThird.indexOf(ban) >= 0);
-yes('the site\'s Article the Third says the same', siteThird.indexOf(ban) >= 0);
+yes('the site\'s Article the Third bans every Legion soldier and says the embassy guard are not Legion', siteThird.indexOf(ban) >= 0);
 yes('and no longer makes the six armed an exception to the Legion ban',
   !/whole of the exception/.test(siteThird) && !/armed anywhere in Skyrim outside the embassy walls/.test(siteThird));
 yes('the page says the six armed at the embassy are its own guard, not Legion', /its own guard, not Legion/.test(world));
@@ -77,9 +74,7 @@ for (const rel of pages) {
 yes('no public page (' + pages.length + ' read) says certain events may allow it, or that you can play a Legion soldier' +
   (said.length ? ' (' + said.join('; ') + ')' : ''), said.length === 0);
 
-// 4. the lore and the embassy page agree
-yes('lore/accord.md says you cannot play a Legion soldier and a veteran is a different thing',
-  /You cannot play a Legion soldier in Skyrim\./.test(lore) && /A veteran who served forty years ago and lives here now is a different thing/.test(lore));
+// 4. the embassy page agrees
 const embassy = flat(read('docs/systems/embassy.md'));
 yes('docs/systems/embassy.md says the 6 armed are the embassy\'s own guard, not Legion', /The 6 are the embassy's own guard, not Legion/.test(embassy));
 yes('and that a Legion veteran can be played', /A Legion veteran who served decades ago and settled in a hold can be played/.test(embassy));

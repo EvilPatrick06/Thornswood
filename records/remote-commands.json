@@ -1,6 +1,6 @@
 {
     "issue":  2182,
-    "what":  "Every call under scripts\\ that reaches the VPS, what it sends, and the class it needs. Read from the code, not from script names. docs\\DEPLOY-IDENTITIES.md section 2 is corrected from this. tests\\test-remote-command-map.ps1 keeps it in step with the scripts.",
+    "what":  "Every call under scripts\\ that reaches the VPS, what it sends, and the class it needs. Read from the code, not from script names. The ops repo's DEPLOY-IDENTITIES.md section 2 is corrected from this. tests\\test-remote-command-map.ps1 keeps it in step with the scripts.",
     "key":  "script|scope|via plus anchor: scope is the function the call sits in (\u003ctop\u003e outside one); anchor is text that belongs to the call, from the whole lines it spans or, when those are not unique, from the 3 lines above it, and it names exactly one call with that script, scope and via (#2498). No position number, so a call inserted elsewhere moves no row.",
     "classes":  {
                     "stage":  "write or check a stage folder or a file the deploy owns",
@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  72,
-    "callCount":  289,
+    "callCount":  290,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -659,6 +659,15 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "$forBot = @(Remote \"if (Test-Path -LiteralPath \u0027$docsWin\\data\\for-bot\u0027) { \u0027FOR-BOT THERE\u0027 } else { \u0027NO FOR-BOT\u0027 }\" | ForEach-Object { \"$_\".Trim() })",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bot.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$fromBot = @(Remote \"if (Test-Path -LiteralPath \u0027$docsWin\\data\\from-bot\u0027) { \u0027FROM-BOT THERE\u0027 } else { \u0027NO FROM-BOT\u0027 }\" | ForEach-Object { \"$_\".Trim() })",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
@@ -2539,8 +2548,8 @@
                       "script":  "scripts/mods/Send-GameArchives.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Send-ThornswoodArtifactFile",
-                      "anchor":  "Send-ThornswoodArtifactFile (Join-Path $Data $n) $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
-                      "does":  "uploads one Skyrim archive to C:\\Thornswood-GameData",
+                      "anchor":  "Send-ThornswoodArtifactFile $want[$n].From $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
+                      "does":  "uploads one Skyrim archive, or the script pack (#3105), to C:\\Thornswood-GameData",
                       "class":  "admin",
                       "reason":  "writes into a folder only SYSTEM and Administrators reach"
                   },

@@ -49,8 +49,8 @@ what it does not is under "Checks on every download".
   old fallback asks a repository that answers 404 while the site is down, and
   the site answering is all it needs. A launcher last run before 26 Sep reads
   only GitHub, so once the repository is deleted it finds no feed and has to be
-  reinstalled from the site; the Known Issues page (the known board in
-  `site\data\board.json`, #2414) says so to the person.
+  reinstalled from the site; the Known Issues page (written from the issue
+  board, #3140) says so to the person.
 
 ### Downloads come from the site (#897)
 
@@ -93,6 +93,65 @@ use the website".
   host allow list since before 25 Sep, and a download is checked for https, the
   host and the sha256, plus the signer for a launcher exe (see "Checks on every
   download").
+
+### And from this repository's Releases (#3686)
+
+Patrick decided on 26 Oct, for going public: downloads and updates move to
+this repository's Releases. The addresses a launcher asks do not move.
+
+- **Every launcher keeps asking the site.** `thornswood.net/feed[-dev]/version.json`
+  and `/feed[-dev]/assets/<sha256>` stay the only addresses. A launcher from
+  1.2.6 on builds every asset address from the feed's own folder (the split
+  feed above, and `Sync.cs` `AssetFolder` for a record's files), so a feed
+  that named github.com instead would not reach it; older ones were given
+  these site addresses in their feeds.
+- **The site sends them to the Release.** `release-files.yml` puts every file
+  a release names on a GitHub Release on the release's own tag
+  (`release/main/<id>`, `release/dev/<id>`, the tag Ship already makes), each
+  named by its sha256, plus `Thornswood-Setup.exe` on a main one. Once GitHub,
+  asked without a token, lists that Release with a file under its sha256,
+  with that sha256 as GitHub's own digest and the site's size, the site
+  answers the asset with a 302 to the Release's copy (`site/server.js`,
+  "release copies"); `/file/Thornswood-Setup.exe` does the same for the
+  installer the site lists. The Downloads page, the bot's links and the
+  installer keep their thornswood.net addresses and follow the same
+  redirect.
+- **Old launchers.** Read in the code of launchers 1.1.103, 1.1.105 and 1.2.5
+  (their tags) and of main: each fetches with .NET's WebClient or
+  HttpWebRequest, which follow a redirect, allows `github.com`,
+  `objects.githubusercontent.com` and `release-assets.githubusercontent.com`
+  (`Updater.cs` `AllowedHosts`), checks the address it was given before it
+  asks, and checks the sha256 of what arrives, and the signer of a launcher
+  exe. A dropped Range on the redirect is a whole new download, which every
+  one of them already handles.
+- **The site's copy stays.** Every file still goes to the site first
+  (`Publish-Update.ps1`), and the site sends it itself whenever the Release
+  does not hold it: before the Release is made, for a release the Release
+  list has not shown yet, after a rollback (no tag), and for the `settings`
+  asset, which only the site has.
+- **Only while the repository is public.** A private repository's Release
+  answers 404 to a launcher, and one made now would go public with the
+  repository, with whatever it holds. So `release-files.yml` is skipped while
+  the repository is private, and the site keeps sending every file. The first
+  Releases are made after Patrick makes the repository public, which he does
+  after #3721's blockers, the files other people own among them (#2454,
+  #3602, #3715, #2791), are cleared. Right after the flip, run it for the
+  live releases by hand (the tag names are in the feeds' `release.tag`):
+  `gh workflow run release-files.yml --ref main -f tag=release/main/<id>`
+  and the same for dev's.
+- **What starts it.** A release tag pushed from One (`push: tags`), and
+  `git-ref.yml` after a release tag it made for a cloud Ship, since a tag the
+  run's own token makes starts no workflow. Since #3686 the tag's message
+  names the sha256 of the record, the launcher, the client runtime, the
+  notes and the signed manifest with its catalog (`Get-ReleaseFileShas`,
+  `Release-Name.ps1`), so the files of an older release are still known
+  after later Ships; a tag from before names none, and then the channel's
+  live feed is read while it still names that release.
+- **What it never does.** It never changes a published Release: one that
+  lacks a file stops the run. It publishes a Release only after GitHub's own
+  digest of every file is right. It runs on GitHub's hosted runner, never on
+  the box. `tests\test-3686-release-files.ps1` and `tests\test-release-copies.js`
+  hold both halves.
 
 ### The feed store on the VPS (#907)
 

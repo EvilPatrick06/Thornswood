@@ -559,11 +559,12 @@ if ($OnWindows) {
     $gWatch = Join-Path $g 'Thornswood-Watch'
     $gData = Join-Path $g 'Thornswood-Docs\data'
     $gForBot = Join-Path $gData 'for-bot'
+    $gFromBot = Join-Path $gData 'from-bot'
     # A game server with private\moderation.log from before #2321, which had the
     # bot's read on that one file, and no for-bot yet.
     $gServer = Join-Path $g 'Thornswood-Server'
     $gMod = Join-Path $gServer 'private\moderation.log'
-    foreach ($d in @($gRoot, (Join-Path $gRoot 'service'), (Join-Path $gRoot 'webhooks'), $gWatch, (Join-Path $gData 'session-logs'), $gForBot, (Split-Path -Parent $gMod))) { $null = New-Item -ItemType Directory -Force -Path $d }
+    foreach ($d in @($gRoot, (Join-Path $gRoot 'service'), (Join-Path $gRoot 'webhooks'), $gWatch, (Join-Path $gData 'session-logs'), $gForBot, $gFromBot, (Split-Path -Parent $gMod))) { $null = New-Item -ItemType Directory -Force -Path $d }
     foreach ($f in @((Join-Path $gRoot 'bot.py'), (Join-Path $gRoot 'bot.env.json'), (Join-Path $gRoot 'service\host.json'), (Join-Path $gRoot 'webhooks\news.txt'), (Join-Path $gWatch 'alerts.jsonl'),
                      (Join-Path $gWatch 'alerts-webhook.txt'), (Join-Path $gData 'sessions.json'), (Join-Path $gForBot 'trouble.json'), (Join-Path $gData 'session-logs\one.log'), $gMod,
                      (Join-Path (Split-Path -Parent $gMod) 'door.json'))) { [IO.File]::WriteAllText($f, 'x') }
@@ -624,6 +625,8 @@ if ($OnWindows) {
     $sent = Join-Path $gWatch 'alerts-sent-bot.txt'
     Yes 'alerts-sent-bot.txt is made when it is not there, and the bot''s account may write it' ((Test-Path -LiteralPath $sent) -and @(Rules $sent | Where-Object { -not $_.IsInherited -and "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
     Yes 'the site''s for-bot folder: read on what the site writes for the bot' ((Rules (Join-Path $gForBot 'trouble.json')).Count -eq 1 -and "$((Rules (Join-Path $gForBot 'trouble.json'))[0].FileSystemRights)" -notmatch 'Modify|Write')
+    $x = Rules $gFromBot
+    Yes 'the site''s from-bot folder: Modify, for the known issues and roadmap the bot writes for the site (#3140)' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match 'Modify' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
     Yes 'and the bot''s account cannot read sessions.json, or anything else of the site''s' ((Rules (Join-Path $gData 'sessions.json')).Count -eq 0 -and (Rules $gData).Count -eq 0)
     Yes 'nor anything below the site''s data' ((Rules (Join-Path $gData 'session-logs\one.log')).Count -eq 0 -and (Rules (Join-Path $gData 'session-logs')).Count -eq 0)
     # The game servers' staff log (#2321): read on the for-bot folder beside
@@ -644,11 +647,12 @@ if ($OnWindows) {
     Yes 'a server folder that is not on the box is said, and nothing is made' (($said -join "`n") -match [regex]::Escape('no game server at ' + $missing) -and -not (Test-Path -LiteralPath $missing))
     $null = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ServerRoots @($gServer))
     function Own([string]$path) { return @(Rules $path | Where-Object { -not $_.IsInherited }).Count }
-    Yes 'given again, nothing is doubled' ((Own $gRoot) -eq 1 -and (Own (Join-Path $gRoot 'data')) -eq 1 -and (Own $gForBot) -eq 1 -and (Own (Join-Path $gRoot 'bot.env.json')) -eq 1 -and (Own $gWatch) -eq 1 -and (Own $sent) -eq 1 -and (Own $gFb) -eq 1)
+    Yes 'given again, nothing is doubled' ((Own $gRoot) -eq 1 -and (Own (Join-Path $gRoot 'data')) -eq 1 -and (Own $gForBot) -eq 1 -and (Own $gFromBot) -eq 1 -and (Own (Join-Path $gRoot 'bot.env.json')) -eq 1 -and (Own $gWatch) -eq 1 -and (Own $sent) -eq 1 -and (Own $gFb) -eq 1)
     $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-site\data') -ServerRoots @())
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $g 'no-forbot\data')
     $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-forbot\data') -ServerRoots @())
     Yes 'a site with no for-bot yet: said, with what to run, and nothing made' (($said -join ' ') -match 'for-bot\. Run Deploy-Docs\.ps1' -and -not (Test-Path -LiteralPath (Join-Path $g 'no-forbot\data\for-bot')))
+    Yes 'nor from-bot: said the same way, and nothing made' (($said -join ' ') -match 'from-bot\. Run Deploy-Docs\.ps1' -and -not (Test-Path -LiteralPath (Join-Path $g 'no-forbot\data\from-bot')))
 
     # -- the records move out of the code folder --------------------------------------
     $mv = Join-Path $g 'move-records'
