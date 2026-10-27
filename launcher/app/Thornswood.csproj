@@ -137,6 +137,7 @@
     <EmbeddedResource Include="..\..\records\client-build.json"><LogicalName>client-build.json</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\records\skyrim-files.json"><LogicalName>skyrim-files.json</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="..\..\records\ui-gone.json"><LogicalName>ui-gone.json</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\records\generated.json"><LogicalName>generated.json</LogicalName></EmbeddedResource>
   </ItemGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

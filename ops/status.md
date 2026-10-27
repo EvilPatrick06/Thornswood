@@ -159,8 +159,9 @@ moved the run notes here.
 - A fresh engine build's `server-settings.json` lists only the five masters;
   give it the server's own order first.
 - An engine pin changes both halves: Publish-Server, then the gamemode, then
-  the Ship. After a ship root refresh, run `Build-Generated.ps1 -Channel
-  <channel>` before the Ship.
+  the Ship. The animation and body files are not built before a Ship any
+  more: every launcher builds them on its own computer before Play (#3715),
+  and Ship only asks, with a dry run, whether the collection can build them.
 - Thornswood-Last.esp's order includes the Skyrim.ccc plugins after the five
   masters.
 - Deploy-Docs, Trace-Gate, Deploy-DevGamemode and Setup-Discord take no

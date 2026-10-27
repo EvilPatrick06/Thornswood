@@ -10,10 +10,10 @@ Patrick, 15 Oct: build the Bosmer armour from the collection's Immersive Armours
 ## Order and risk
 1. Run 2454-ccaa-3ba-mce-bodyslide.md (Vortex deploy of the two BodySlide projects). Tell Anvil on #2454 so part two can be coded and pushed to PR #2570.
 2. After PR #2570 is merged (freeze lifted), refresh the dev release folder per #2019. It still holds the 3 Oct CBBE 3BA install, so building before the refresh would fit outfits to the wrong body.
-3. Run Build-Generated in that folder (below). It refuses on its own if a set breaks the body rules, writes a body, builds a .tri file, or builds a missing or stray outfit file. Nothing is recorded then.
-4. Next dev Ship. Ship-Rules refuses unless generated.txt lists every body and fitted outfit .nif with a matching sha.
+3. Run Build-Generated in that folder (below), to see the outfits build. It refuses on its own if a set breaks the body rules, writes a body, builds a .tri file, or builds a missing or stray outfit file. Nothing is recorded then.
+4. Next dev Ship. Since #3715 (27 Oct) no release carries what Build-Generated builds: every launcher builds the bodies and fitted outfits on its own computer before Play, from records\generated.json compiled into it. Ship's dry run stops when the collection installed here cannot build them.
 
-Risk: if step 4 runs without step 3, Ship refuses (generated files are stale), which is safe. Once part two deletes built-until-1259.txt, the old travel clothes and executioner meshes stop shipping, so step 3 has to come before the first Ship after that merge.
+Risk: if the collection cannot build an outfit set, Ship stops at its dry run, which is safe. Once part two deletes built-until-1259.txt, the old travel clothes and executioner meshes stop shipping, and every launcher builds them instead.
 
 ## Run
 From a worktree at the merge commit or later:
@@ -28,7 +28,7 @@ Check that the dry run lists one BodySlide group for each of the 9 IA CBBE - Bos
 
 ## Check afterwards
 - Profile\OwnGame\generated.txt lists the 18 files under Data\meshes\armor\bosmerarmormaty743 (torsof, torsofengraved, torsometalf, bracersf, bracersengravedf, metalglovesf, cape\fullcapef, cape\shouldercapef, cape\shoulderengravedcapef, each _0 and _1).
-- No .tri under bosmerarmormaty743 is in the release record.
+- None of those 18 and no .tri under bosmerarmormaty743 is in the release record (#3715).
 - In game on dev: the Bosmer armour (all variants, capes, bracers, gauntlets) fits the body with no gaps or clipping, women's and men's. The travel clothes and executioner checks go in the closing Test task comment once part two lands.
 
 ## Draft release notes

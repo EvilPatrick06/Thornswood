@@ -3556,7 +3556,7 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Files a Thornswood update, the installer or Build-Generated put into
+        /// Files a Thornswood update, the installer or GeneratedBuild put into
         /// the game, which a refresh leaves as they are. What the installer laid
         /// down that Vortex also deploys stays Vortex's, so collection updates
         /// still reach it.

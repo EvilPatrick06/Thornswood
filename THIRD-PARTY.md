@@ -62,8 +62,10 @@ own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
 `launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
 `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
-depot manifests (no Bethesda file is in it), and `ui-gone.json`, the Daedric
-menu set and unused fork assets a refresh must not copy back. `logo-dev.png` is the emblem the dev
+depot manifests (no Bethesda file is in it), `ui-gone.json`, the Daedric
+menu set and unused fork assets a refresh must not copy back, and
+`generated.json`, the build list of the animation and body files the launcher
+makes on each computer (#3715). `logo-dev.png` is the emblem the dev
 build shows in place of `logo.png` (Art.cs) and `app-dev.ico` is the icon its
 shortcuts carry in place of `app.ico` (Icons.cs); both are drawn for
 Thornswood, the same as the two they stand in for. The setup stub,
@@ -663,13 +665,18 @@ no licence this file can name.
 
 ## Built here from other people's work: behaviors and bodies
 
-Every pack and the installer, on both channels, carry 45 files that
-`scripts\mods\Build-Generated.ps1` builds on the shipping machine before a
-Ship (#1247), from the recipe in `records\generated.json`. Ship-Rules.ps1 lets
-a release carry them by their generated record (`$ShipGeneratedBodyFiles` and
-`$ShipGeneratedPatterns`, #1256). That record says who built them, not whose
-work they are: every one of them is made from somebody else's. Read on
-27 October 2026 (#3715) from the installer on thornswood.net (76,735,000
+The launcher builds 45 files on each computer, in Thornswood's own game
+folder, before Play and from Fix, with the collection's own Pandora and
+BodySlide, from the recipe in `records\generated.json`, which is compiled into
+it (`launcher\app\GeneratedBuild.cs` and `GeneratedHere.cs`, #1247, #3715).
+No pack and no installer carries them since 27 October 2026 (Patrick, option
+A on #3715: "The launcher makes all 45 files on each computer"): Ship-Rules.ps1
+names them (`$ShipGeneratedBodyFiles` and `$ShipGeneratedPatterns`,
+`Test-ShipGenerated`) as built on each computer, never shipped and never
+listed as removed. Until then every release carried them, as the shipping
+machine built them, and every one of them is made from somebody else's work.
+What follows is whose. Read on 27 October 2026 (#3715) from the installer on
+thornswood.net (76,735,000
 bytes, sha256 starting eefa15c5, payload built 26 October 18:24 UTC): the same
 45 files and 18,928,662 bytes the 18 October installer carried.
 `tests\fixtures\3715-generated.txt` lists each with its sha256. Which mod
@@ -690,21 +697,29 @@ Vortex deployment record of 21 October.
   game's graph with the patches added. Bethesda's terms for mods grant no right
   to hand on ZeniMax's own files, edited or not ("Bethesda's own files, made on
   each machine" below), the reading on which #2827 stopped shipping three
-  other files. Precision's and True Directional Movement's permissions were
-  not read, and neither mod's description names a licence. Pandora's own
-  licence covers the program, which does not ship, not what it writes.
+  other files. Precision's and True Directional Movement's pages set the
+  same permissions: their assets may be used without asking, with credit to
+  Ersh and never in anything sold, the files may not be uploaded elsewhere,
+  and modifying them needs Ersh's permission. Pandora is under the GNU GPL
+  v3, which covers the program, run from the collection, not what it
+  writes.
   `Data\Scripts\FNIS.pex` is allowed by the same pattern and was not in the
   installer read.
 - **The women's body, `femalebody_0.nif` and `femalebody_1.nif`, 3,840,722
   bytes**, in `Data\meshes\actors\character\character assets`. BodySlide
   builds it from the set CBBE 3BBB Amazing NeverNude of CBBE 3BA (3BBB) 2.48
   (Nexus SE 30174, by Acro), which is built on CBBE (Nexus SE 198, by Ousnius,
-  Caliente and Jeir). Its permissions were not read, and its description
-  names no licence.
+  Caliente and Jeir). 3BA's page lets its assets be used without asking,
+  with credit to Acro and never in anything sold, forbids uploading the file
+  elsewhere, and asks for the author's OK for a body mesh edited so its
+  vertex order or count changes. CBBE's own terms are below.
 - **Astrid's body, `femalebodyastrid_0.nif` and `femalebodyastrid_1.nif`,
   2,555,688 bytes.** BodySlide builds it from the set CBBE Vanilla - Body -
-  Astrid of CBBE 2.0.3 (Nexus SE 198), over Bethesda's Astrid outfit. Its
-  permissions were not read, and its description names no licence.
+  Astrid of CBBE 2.0.3 (Nexus SE 198), over Bethesda's Astrid outfit. CBBE's
+  page sets no permission lines; its author's instructions let the body be
+  used for outfits and NPCs with credit and a link back, and say "Distribution
+  by, or sub-licensing to, parties not expressly given permission is
+  disallowed." Handing a CBBE body on would have needed Ousnius' permission.
 - **The men's body, `malebody_0.nif` and `malebody_1.nif`, 1,988,322 bytes.**
   BodySlide builds it from the set HIMBO Body - Vanilla Nevernude of
   Highly Improved Male Body Overhaul (HIMBO) 5.8 (Nexus SE 46311, by Kreiste
@@ -712,20 +727,21 @@ Vortex deployment record of 21 October.
   along with the undies meshes are licensed CC-BY-SA-4.0." and "You are
   allowed to make refits and/or original armors/clothings using HIMBO body as
   long as you credit me and your files are available for free and not behind
-  any kind of paywalls." So these two go out under the Creative Commons
+  any kind of paywalls." So these two are under the Creative Commons
   Attribution-ShareAlike 4.0 licence
-  (https://creativecommons.org/licenses/by-sa/4.0/), free, as HIMBO built in
-  BodySlide for Thornswood, credited on the public credits page. LICENSE's
-  all rights reserved does not cover them.
+  (https://creativecommons.org/licenses/by-sa/4.0/), as HIMBO built in
+  BodySlide, credited on the public credits page. LICENSE's all rights
+  reserved does not cover them.
 
-Nexus answers a cloud session with a Cloudflare 403 and its API has no
-permissions field, so the Permissions and credits sections of 30174, 198,
-72347, 51614 and 133232 were read only as far as each mod's description goes.
+The Permissions and credits sections of 30174, 198, 72347, 51614 and 133232
+were read on 27 October 2026 on One, in a signed-in browser, onto #3715 (Nexus
+answers a cloud session with a Cloudflare 403, and its API has no permissions
+field).
 `records\asset-provenance.json` has an entry for each group, and
-`tests\test-third-party.js` holds every path Ship-Rules.ps1 lets through as
-generated, and every file in the stand-in record, to an entry there. Whether
-the 43 with no permission found go on shipping, or are made on each machine
-the way the files below are, is Patrick's decision on #3715.
+`tests\test-third-party.js` holds every path Ship-Rules.ps1 names as built on
+each computer, and every file in the stand-in record, to an entry there. Made
+on each computer, nothing of theirs leaves anybody's machine, the way the
+files below are made from the person's own game.
 
 ## Bethesda's own files, made on each machine
 
@@ -1130,12 +1146,13 @@ beside its `___systemPolyfill.js`.
 
 ## What is still missing
 
-- The 39 behavior files and the four women's body meshes Build-Generated.ps1
-  builds ship with no permission found ("Built here from other people's work:
-  behaviors and bodies"): the behavior files are the game's own graphs with
-  Precision's and True Directional Movement's patches merged in, and the
-  bodies are CBBE 3BA's and CBBE's. Patrick decides on #3715 whether they go
-  on shipping or are made on each machine.
+- The packs and the installer published up to 27 October 2026 carry the 39
+  behavior files and the four women's body meshes, which nothing lets
+  Thornswood hand on ("Built here from other people's work: behaviors and
+  bodies"; CBBE's terms disallow distribution without permission). Since
+  #3715 the launcher makes them on each computer and no new release carries
+  them; the installer on thornswood.net carries them until the first main
+  release after #3715 replaces it.
 
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).

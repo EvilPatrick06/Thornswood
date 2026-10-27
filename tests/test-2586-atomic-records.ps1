@@ -34,9 +34,12 @@
        the way OwnGame wrote before, is killed 20 times the same way and
        leaves the record cut short at least once, so the test can see the
        fault it guards against.
-    4. Write-GeneratedRecord (scripts\mods\Generated.ps1) renames over the
-       record with the same MoveFileEx, never File.Replace and never a delete
-       first, and writes and rewrites a record that reads back.
+    4. The generated record (GeneratedRecord.Write in launcher\app\Generated.cs,
+       which the launcher and Write-GeneratedRecord in scripts\mods\Generated.ps1
+       both use since #3715) renames over the record with the same MoveFileEx
+       (GeneratedOs.Replace in GeneratedBuild.cs), never File.Replace on
+       Windows and never a delete first, and writes and rewrites a record that
+       reads back.
 
   Nothing outside its own scratch folder is read or written, besides the
   repository's own sources.
@@ -207,13 +210,19 @@ finally {
 }
 
 # ---- 4: the generated record --------------------------------------------------
-$gen = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\mods\Generated.ps1'))
-# To the next function's comment: the C# inside it closes with a brace at the margin of its own.
-$fn = [regex]::Match($gen, '(?s)function Write-GeneratedRecord\(.*?(?=\r?\n# records\\generated\.json)')
-Yes 'Write-GeneratedRecord is in Generated.ps1' $fn.Success
-Yes '...renames the new record over the old with one MoveFileEx, replacing it' ($fn.Success -and $fn.Value -match '\[Thornswood\.RecordSwap\]::Into\(\$tmp, \$Path\)' -and
-    $fn.Value -match 'MoveFileEx\(from, to, 0x1 \| 0x8\)')
-Yes '...never File.Replace, and never a delete first' ($fn.Success -and $fn.Value -notmatch '::Replace\(' -and $fn.Value -notmatch 'Delete\(\$Path\)' -and $fn.Value -notmatch 'Remove-Item')
+$gen = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\Generated.cs'))
+$fn = [regex]::Match($gen, '(?s)public static void Write\(string path, string game, GeneratedInputs inputs, List<GeneratedFile> files\)\s*\{.*?\n        \}\n')
+Yes 'GeneratedRecord.Write is in Generated.cs' $fn.Success
+Yes '...writes the new record beside the old and renames it over with GeneratedOs.Replace' ($fn.Success -and $fn.Value -match 'string tmp = path \+ "\.new";' -and
+    $fn.Value -match 'GeneratedOs\.Replace\(tmp, path\);')
+Yes '...never File.Replace, and never a delete first' ($fn.Success -and $fn.Value -notmatch 'File\.Replace\(' -and $fn.Value -notmatch 'File\.Delete\(')
+$os = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\GeneratedBuild.cs'))
+$rp = [regex]::Match($os, '(?s)public static void Replace\(string from, string to\)\s*\{.*?\n        \}\n')
+$win = ''
+if ($rp.Success) { $at = $rp.Value.IndexOf('return;'); if ($at -gt 0) { $win = $rp.Value.Substring($at) } }
+Yes 'GeneratedOs.Replace renames with one MoveFileEx, replacing it' ($rp.Success -and $win -match 'MoveFileEx\(from, to, MoveReplaceExisting \| MoveWriteThrough\)' -and
+    $os -match 'const int MoveReplaceExisting = 0x1;' -and $os -match 'const int MoveWriteThrough = 0x8;')
+Yes '...and on Windows never File.Replace and never a delete first' ($win.Length -gt 0 -and $win -notmatch 'File\.Replace\(' -and $win -notmatch 'File\.Delete\(')
 . (Join-Path $Repo 'scripts\mods\Generated.ps1')
 $gw = Join-Path $Scratch ('thornswood-2586-gen-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 try {

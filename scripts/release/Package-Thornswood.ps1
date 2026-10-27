@@ -415,12 +415,11 @@ elseif (-not $NoVortex) {
     }
 }
 
-$shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
-Assert-ShipGeneratedBodies $GameDir $ProfileDir
+# The behavior files and bodies are built on each computer by the launcher
+# since #3715 and never go in an installer (Ship-Rules Test-ShipGenerated).
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if (Test-ThornswoodRepoPlugin $rel) { return $false }
-    if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
 

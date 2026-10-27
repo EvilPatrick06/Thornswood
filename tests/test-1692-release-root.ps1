@@ -23,8 +23,9 @@
   3. Ship.ps1, Check-ShipReady.ps1, Setup-ShipMachine.ps1 and
      Build-Generated.ps1 all ask Where.ps1 and none keeps its own rule; Ship
      refuses a folder Vortex deploys into before the version moves or
-     anything is built, and checks the generated files before the launcher
-     is built or installed. tests\test-ship-dry-run.ps1 runs Ship on both
+     anything is built, and asks whether the collection builds the
+     animation and body files (#3715) before the launcher is built or
+     installed. tests\test-ship-dry-run.ps1 runs Ship on both
      (G, H and I).
   4. Check-ShipReady.ps1 run whole: -Root is the folder it checks, and a
      folder Vortex deploys into is a gap; since #2662 the recorded folder,
@@ -139,8 +140,8 @@ try {
     Yes 'Ship refuses a folder Vortex deploys into' ($vortex -gt 0)
     Yes '  before the version moves and before anything is built' (
         $vortex -gt 0 -and $vortex -lt $ship.IndexOf('function Unbump') -and $vortex -lt $ship.IndexOf("'Build-Launcher.ps1') -Root"))
-    $gen = $ship.IndexOf("Head 'Generated files'")
-    Yes 'Ship checks the generated files before the launcher is built or installed' (
+    $gen = $ship.IndexOf("Head 'Animation and body files'")
+    Yes 'Ship asks whether the collection builds the animation and body files before the launcher is built or installed' (
         $gen -gt 0 -and $gen -lt $ship.IndexOf("'Build-Launcher.ps1') -Root") -and $gen -lt $ship.IndexOf("'Install-Launcher.ps1')") -and
         $gen -lt $ship.IndexOf('Get-ReleaseLauncher $srcRepo'))
     Yes 'Check-ShipReady and Setup-ShipMachine take -Root' (

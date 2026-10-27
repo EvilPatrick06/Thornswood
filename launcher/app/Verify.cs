@@ -103,6 +103,7 @@ namespace Thornswood
         public const string ScriptExtender = "script-extender";
         public const string BuildFiles = "build-files";
         public const string MadeFromGame = "made-from-game";
+        public const string Generated = "generated";
         public const string WindowsFolders = "windows-folders";
         public const string Icon = "shortcut-icon";
         public const string Client = "client";

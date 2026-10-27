@@ -428,6 +428,32 @@ to the sha256 of the collection's version. `Ship-Rules.ps1
 $ShipMadeFromMods` keeps them out of every pack. QuickLoot IE's columns are
 set by its own settings file instead, which ships from `game\ours`.
 
+**GeneratedHere and GeneratedBuild** (GeneratedHere.cs, GeneratedBuild.cs,
+Generated.cs, CoveredBodies.cs, #1247, #3715). The behavior files Pandora
+Behaviour Engine+ makes and the bodies BodySlide builds are the game's graphs
+with Precision's and True Directional Movement's patches merged in, and CBBE
+3BA's, CBBE's and HIMBO's bodies: other people's work, so no release carries
+them (Patrick, 27 Oct 2026, option A on #3715). The launcher builds them on
+each computer, in the own folder, with the collection's own Pandora and
+BodySlide, from `records\generated.json`, which is compiled into it
+(`generated.json`). Generated reads `Profile\OwnGame\generated.txt`, the
+record of the last build, and says whether the files are current: the mod
+list, the files each tool reads (by files.txt), the build list and every
+built file's sha256. GeneratedHere builds them before every Play (step 18a)
+and from Fix (the Generated card, Upkeep) only when they are not, inside
+`OwnGame.Alone`. GeneratedBuild is the build: Pandora from a copy in
+`Profile\OwnGame\build-generated` with its own Settings.json naming this
+folder's Data, BodySlide into folders of its own at each set's slider
+defaults under the body rules (#1004, #405), each file put in place as a new
+file of the folder's own so nothing is written through a link into Vortex's
+staging or the Steam copy, and CoveredBodies reading every body in the folder
+for its underwear before the record is written. A build that stops, or a nude
+body, stops Play. `scripts\mods\Build-Generated.ps1` and
+`Check-CoveredBodies.ps1` compile the same files (`Generated.ps1`) to run
+them by hand, and Ship runs a dry run to ask whether the collection installed
+there can build them. `Ship-Rules.ps1 Test-ShipGenerated` keeps them out of
+every pack and off every list of removed files.
+
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile and the
 collection revision installed (#1582). The newest revision Vortex knows of
@@ -532,9 +558,8 @@ The records are in `Profile\OwnGame`: `files.txt` (every file, linked
 or copied, and which kind it is, V Vortex's, O Skyrim's own, T Thornswood's;
 Publish-Update reads the V lines), `installed-kept.txt` (the installer's list,
 kept by the clean up before it empties it), `generated.txt` (what
-`scripts\mods\Build-Generated.ps1` made in the folder on the machine that
-ships, the behavior files Pandora makes and the BodySlide bodies, #1247: Thornswood's
-own, kept as made by a refresh even where Vortex deploys a file of the same
+GeneratedBuild made in the folder, the behavior files Pandora makes and the
+BodySlide bodies, #1247, #3715: Thornswood's own, kept as made by a refresh even where Vortex deploys a file of the same
 name (`Owned`), and forgotten when the folder is made anew),
 `shared.txt`, `differs.txt` and `changed.txt` (the archives, OwnGameShare.cs),
 `made.txt`, `left-out.txt`, `declined.txt`, and Vortex's `plugins.txt` and
@@ -727,25 +752,26 @@ configured at all, which is a developer's own build and never a tester's.
 | 12 | `ShellPlay.cs:201 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Diagnostics page (Scan and Fix) opens with a message saying what to do, and Play stops. | nothing |
 | 13 | `ShellPlay.cs:259 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
 | 14 | `ShellPlay.cs:273 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, each only when it changes |
-| 15 | `ShellPlay.cs:278 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). Then `ShellPlay.cs:282 CrashDump.Apply`: the full crash snapshot on only when the person ticked it in Settings (#2626), and with it on, those whose crash staff marked looked at deleted, and any past the newest two (#2319). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `CrashLogger.ini`, `Profile\MyGames\SkyrimPrefs.ini`; old `crash-*.dmp` in `Profile\MyGames\SKSE` deleted |
-| 16 | `ShellPlay.cs:289 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
-| 17 | `ShellPlay.cs:298 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
-| 18 | `ShellPlay.cs:301 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
-| 18b | `ShellPlay.cs:311 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf` |
-| 19 | `ShellPlay.cs:318 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
-| 20 | `ShellPlay.cs:325 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
-| 21 | `ShellPlay.cs:327 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |
-| 22 | `ShellPlay.cs:333 Hold.Take` | Read only handles on every kept file and the client settings, and an empty held stand-in where each parked plugin was. | locks, and the stand-ins |
-| 23 | `ShellPlay.cs:337 Swap.Apply` | Windows' two Skyrim folders pointed at Profile. Throws, with the folder named, when Windows will not let one go. On the next line `playing` goes true, the theme music and the video behind the title stop, the button reads RUNNING and Quit game appears. | two junctions, two `.st-backup` folders, `Profile\swap.json` |
-| 24 | `ShellPlay.cs:356 ProcessStartInfo` | For `Game\skse64_loader.exe`, with Game as the working directory and no arguments, started at `ShellPlay.cs:379 Process.Start`. The loader starts `SkyrimSE.exe` beside it. Then one log line names the launcher version, the newest pack applied and the display mode. | |
-| 25 | `ShellPlay.cs:406 Discord.NewSession` | An id for this session, then `ShellPlay.cs:410 Discord.SessionStart` on a pool thread posts it to `/api/play/start`. | `Profile\logs-pending.txt` |
-| 26 | `ShellPlay.cs:417 Presence.Start` | The Discord card, on its own thread. | |
-| 27 | `ShellPlay.cs:419 PlayedFile` | Then `ShellPlay.cs:421 Stats.StartedPlaying`, a pause of 1.2 seconds, and the window minimises unless Keep launcher open is ticked. | `Profile\played.flag`, `Profile\stats.txt` |
+| 15 | `ShellPlay.cs:277 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). Then `ShellPlay.cs:281 CrashDump.Apply`: the full crash snapshot on only when the person ticked it in Settings (#2626), and with it on, those whose crash staff marked looked at deleted, and any past the newest two (#2319). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `CrashLogger.ini`, `Profile\MyGames\SkyrimPrefs.ini`; old `crash-*.dmp` in `Profile\MyGames\SKSE` deleted |
+| 16 | `ShellPlay.cs:288 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
+| 17 | `ShellPlay.cs:297 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
+| 18 | `ShellPlay.cs:300 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
+| 18a | `ShellPlay.cs:315 GeneratedHere.Ensure` | Under Waiting. The behavior files and the covered bodies (#3715), built with the collection's own Pandora and BodySlide only when `generated.txt` is missing or stale: the mod list, the files the tools read, the build list compiled into the launcher, or a built file changed. A build that stops, or any body in the folder that is nude, stops Play with a message box saying why (#405). | when it builds: `Game\Data\meshes\actors\*\behaviors`, `characters`, `animationdatasinglefile.txt` and `animationsetdatasinglefile.txt`, the six bodies in `character assets`, BodySlide's own copies of its settings, presets and groups, and `Profile\OwnGame\generated.txt`; `Profile\OwnGame\build-generated` while it runs |
+| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf` |
+| 19 | `ShellPlay.cs:345 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
+| 20 | `ShellPlay.cs:352 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
+| 21 | `ShellPlay.cs:354 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |
+| 22 | `ShellPlay.cs:360 Hold.Take` | Read only handles on every kept file and the client settings, and an empty held stand-in where each parked plugin was. | locks, and the stand-ins |
+| 23 | `ShellPlay.cs:364 Swap.Apply` | Windows' two Skyrim folders pointed at Profile. Throws, with the folder named, when Windows will not let one go. On the next line `playing` goes true, the theme music and the video behind the title stop, the button reads RUNNING and Quit game appears. | two junctions, two `.st-backup` folders, `Profile\swap.json` |
+| 24 | `ShellPlay.cs:383 ProcessStartInfo` | For `Game\skse64_loader.exe`, with Game as the working directory and no arguments, started at `ShellPlay.cs:406 Process.Start`. The loader starts `SkyrimSE.exe` beside it. Then one log line names the launcher version, the newest pack applied and the display mode. | |
+| 25 | `ShellPlay.cs:433 Discord.NewSession` | An id for this session, then `ShellPlay.cs:437 Discord.SessionStart` on a pool thread posts it to `/api/play/start`. | `Profile\logs-pending.txt` |
+| 26 | `ShellPlay.cs:444 Presence.Start` | The Discord card, on its own thread. | |
+| 27 | `ShellPlay.cs:446 PlayedFile` | Then `ShellPlay.cs:448 Stats.StartedPlaying`, a pause of 1.2 seconds, and the window minimises unless Keep launcher open is ticked. | `Profile\played.flag`, `Profile\stats.txt` |
 
 If anything in Play throws, the catch at the end of it undoes the work in
-this order: `ShellPlay.cs:435 Swap.Restore`, `ShellPlay.cs:436 Hold.Release`,
-`ShellPlay.cs:437 Keep.Unpark`, `ShellPlay.cs:438 Presence.Stop`,
-`ShellPlay.cs:439 Keep.TakeNote`. A reason longer than one line is shown in a
+this order: `ShellPlay.cs:462 Swap.Restore`, `ShellPlay.cs:463 Hold.Release`,
+`ShellPlay.cs:464 Keep.Unpark`, `ShellPlay.cs:465 Presence.Stop`,
+`ShellPlay.cs:466 Keep.TakeNote`. A reason longer than one line is shown in a
 box.
 
 ### Inside Chars.Prepare (step 7)
@@ -777,7 +803,8 @@ Written or rewritten, when anything needed changing:
   `SSEDisplayTweaks.ini`, `SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`,
   `Thornswood.ini`.
 - The files made from the game and the collection's mods (MadeFromGame),
-  and anything from `<Root>\Your Mods`.
+  the behavior files and bodies built with the collection's Pandora and
+  BodySlide (GeneratedHere), and anything from `<Root>\Your Mods`.
 - Windows' `Documents\My Games\Skyrim Special Edition` and
   `%LOCALAPPDATA%\Skyrim Special Edition` are junctions into Profile, with the
   real folders beside them as `.st-backup`.

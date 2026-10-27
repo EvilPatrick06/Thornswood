@@ -27,7 +27,7 @@
 
 ## Permissions (never repack)
 - Collection links the Nexus downloads only. Never put these projects or their source meshes in our packs.
-- Our BUILT output does ship (Anvil's PR). Common Clothes and Armors allows asset use with credit (Nexus 21305; meshes by Franklin Zunge). The 3BA BodySlide says "follow the permissions of the original mod" and credits 3BA Vanilla Clothes and Armor (51610). MCE's permissions for built meshes were not read: Anvil records that in records\asset-provenance.json before the first release that ships them.
+- Our BUILT output does not ship either, since #3715 (27 Oct): every launcher builds it on its own computer from these projects. Common Clothes and Armors allows asset use with credit (Nexus 21305; meshes by Franklin Zunge). The 3BA BodySlide says "follow the permissions of the original mod" and credits 3BA Vanilla Clothes and Armor (51610). MCE's permissions for built meshes were not read: Anvil records them in records\asset-provenance.json for the credits.
 
 ## Release notes (draft)
 none from this step (Anvil's build PR carries the notes)
