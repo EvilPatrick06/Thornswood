@@ -2906,6 +2906,12 @@ const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudfl
    each answer gets a fresh one (handle() makes it). The site's own pages
    carry no inline script and never use it; a nonce is only good for the one
    answer it came with, so it opens nothing to anybody else. */
+/* What no page here may use (#2762). Nothing on this site asks for the
+   camera, the microphone, the location, a payment or a USB device, so a page
+   or a frame in it that tried would be refused. Caddy sends the same value on
+   every answer from the name (scripts\deploy\Caddyfile, its header block),
+   and tests\test-2762-door-headers.js keeps the two equal. */
+const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
 function cspFor(res) {
   const n = res && res.cspNonce;
   return n ? CSP_HEADER.replace("script-src 'self'", "script-src 'self' 'nonce-" + n + "'") : CSP_HEADER;
@@ -2924,7 +2930,8 @@ function send(res, code, payload, type, extra) {
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': cspFor(res),
-    'Referrer-Policy': 'strict-origin-when-cross-origin'
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': PERMISSIONS_POLICY
   }, extra || {}));
   res.end(payload);
 }
@@ -5997,6 +6004,7 @@ async function handle(req, res) {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', PERMISSIONS_POLICY);
   /* The address is a path on this site, so it is read as one (#929).
 
      new URL(req.url, 'http://x') read an address that starts with two slashes
@@ -8098,17 +8106,56 @@ async function handle(req, res) {
     const who = (o.who && typeof o.who === 'object') ? o.who : {};
     const store = jsonFile(ROSTER, { who: {} });
     if (!store.who || typeof store.who !== 'object') store.who = {};
+    const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
+    if (!store.sent || typeof store.sent !== 'object' || Array.isArray(store.sent)) store.sent = {};
+    store.sent[srv] = Date.now();
+    /*
+      A deleted person's characters stay off the roster (#3677).
+
+      The site takes a deletion request out of roster.json as it starts and
+      then deletes the request, but a game server takes its own part only at
+      its own next start (#2758), and until then it still holds their rows
+      and sends its whole book here every five minutes. So the site's start
+      leaves a mark in roster.json's deleted for each of their character
+      numbers, { at, clear }: at is when the site removed them, and nothing
+      else about them is kept. A row for a marked number is refused unless
+      the game server wrote it after that (row.at, which moves only while
+      somebody is playing it), so a character the number is played as again
+      comes back and the deleted one does not. Each server whose book no
+      longer has the old row, and whose held list does not name it, is added
+      to clear, and the mark goes once every server that has ever sent a book
+      (sent, and servers for a box older than sent) is there, which is when
+      no server can send it back.
+    */
+    const marks = (store.deleted && typeof store.deleted === 'object' && !Array.isArray(store.deleted)) ? store.deleted : {};
+    const stale = (pid) => {
+      const m = marks[String(pid)];
+      const row = who[String(pid)];
+      return !!m && !(row && typeof row === 'object' && Number(row.at) > (Number(m.at) || 0));
+    };
     // Which of the profiles it looked at that server holds a character for,
     // kept per server (#955). /api/play/roster reads it back as "gone".
     if (Array.isArray(o.checked) && Array.isArray(o.held)) {
-      const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
-      const ints = (a) => a.map(Number).filter((x) => x > 0 && Number.isInteger(x)).slice(0, 100000);
+      const ints = (a) => a.map(Number).filter((x) => x > 0 && Number.isInteger(x) && !stale(x)).slice(0, 100000);
       if (!store.servers || typeof store.servers !== 'object') store.servers = {};
       store.servers[srv] = { at: Date.now(), checked: ints(o.checked), held: ints(o.held) };
     }
+    const held = new Set(Array.isArray(o.held) ? o.held.map(Number) : []);
+    const known = ['main'].concat(Object.keys(store.servers || {}), Object.keys(store.sent));
+    const refused = new Set();
+    for (const pid of Object.keys(marks)) {
+      const m = marks[pid];
+      if (!m || typeof m !== 'object') { delete marks[pid]; continue; }
+      if (stale(pid) && (who[pid] || held.has(Number(pid)))) { refused.add(pid); continue; }
+      const clear = Array.isArray(m.clear) ? m.clear.map(String) : [];
+      if (clear.indexOf(srv) < 0) clear.push(srv);
+      m.clear = clear;
+      if (known.every((s) => clear.indexOf(s) >= 0)) delete marks[pid];
+    }
+    if (Object.keys(marks).length) store.deleted = marks; else delete store.deleted;
     let n = 0;
     for (const pid of Object.keys(who)) {
-      if (!/^\d+$/.test(pid)) continue;
+      if (!/^\d+$/.test(pid) || refused.has(pid)) continue;
       const row = who[pid];
       if (!row || typeof row !== 'object') continue;
       store.who[pid] = {
@@ -8948,7 +8995,10 @@ async function handle(req, res) {
   approved, with the file. What stays: a session staff marked kept with its
   logs and alerts, reports they made or that were made about them, and a
   picture held while a report about it is looked into (#2352). Staff's own
-  records (bans, notes, PKs, the staff log) are never read here.
+  records (bans, notes, PKs, the staff log) are never read here. What is
+  added: a mark in roster.json for each of their character numbers, with the
+  time and nothing else, which /api/roster refuses a running game server's
+  old rows by until every server has let go (#3677).
 
   Every file is read before any is written; one that is there and will not
   parse leaves the request where it is, and the start goes on. A write that
@@ -9044,6 +9094,14 @@ function applyDeletionRequests() {
     }, 'failed-session alerts');
     const R = f.roster.v;
     if (isObj(R.who)) for (const k of Object.keys(R.who)) if (mine(k)) { delete R.who[k]; f.roster.dirty = true; gone('roster rows', 1); }
+    // A game server that has not started since still holds their rows and
+    // sends them every five minutes; this mark is what /api/roster refuses
+    // them by, until every server has let go (#3677).
+    if (P.size) {
+      if (!isObj(R.deleted)) R.deleted = {};
+      for (const n of P) R.deleted[String(n)] = { at: now, clear: [] };
+      f.roster.dirty = true;
+    }
     if (isObj(R.servers)) {
       for (const sv of Object.values(R.servers)) {
         if (!isObj(sv)) continue;

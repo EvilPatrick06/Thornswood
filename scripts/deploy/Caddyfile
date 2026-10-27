@@ -7,8 +7,14 @@
 # it here. It lived only on the box until 18 September, which meant the only
 # record of how the site was reachable was the box itself.
 #
-# Caddy gets the certificate and renews it on its own. The email below is what
-# Let's Encrypt writes to if one is about to lapse.
+# Caddy gets the certificate and renews it on its own, from 30 days before it
+# runs out. There is no contact address (#3838): Let's Encrypt stopped sending
+# expiry mail in June 2025 and keeps no address on an account, and the
+# personal one this file named would have gone public with the repository. A
+# certificate that does lapse shows as the site failing Watch-Outside.ps1's
+# HTTPS check, since Cloudflare (Full, strict) then refuses the origin. In
+# Caddy an address also adds ZeroSSL as a second CA; Setup-Domain.ps1 -Email
+# puts one in for a box that wants that.
 #
 # Keep it in caddy fmt shape. `caddy fmt --overwrite .\Caddyfile` does it, and
 # validate complains about the line if you do not.
@@ -63,6 +69,26 @@
 # 404 to whatever comes with X-Forwarded-For. Take it out and the App can
 # still do its work, but a new one cannot be made.
 # ---------------------------------------------------------------------------
+# THE HEADER BLOCK IS WHAT EVERY ANSWER FROM THIS NAME CARRIES (#2762).
+#
+# Until 27 Oct 2026 only the site (site\server.js) set security headers, so
+# everything else Caddy carries went out bare: on 19 Oct /voice/health
+# answered with content-type and nothing else, and the 404s of /box/ and
+# /github-app/ were the same. Nothing anywhere sent Permissions-Policy. The
+# headers that belong to the whole name are therefore set here, at the one
+# door, for every route below: HSTS, nosniff, Referrer-Policy and
+# Permissions-Policy. The CSP is not, because each service knows its own.
+#
+# defer sets them as the answer is written, over whatever the service sent,
+# so each goes out exactly once with this value. Without it a service that
+# sets one too (the site sets all four) would add a second copy beside it.
+# No page on this name uses the camera, the microphone, the location, a
+# payment or a USB device: voice takes the microphone in the launcher's own
+# page (launcher\voice-host.html), which is a file on the PC and not served
+# from here. The site sends the same values itself (PERMISSIONS_POLICY and
+# the rest in server.js), and tests\test-2762-door-headers.js keeps the two
+# equal and keeps this block at the top of the site.
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # CLOUDFLARE IS THE FRONT DOOR (#2995).
@@ -81,7 +107,6 @@
 # kept equal to this line by tests\test-2995-cloudflare-front.ps1.
 # ---------------------------------------------------------------------------
 {
-	email datdude365d@gmail.com
 	storage file_system C:/Thornswood-Caddy/data
 	servers {
 		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
@@ -91,6 +116,14 @@
 
 thornswood.net, www.thornswood.net {
 	encode gzip
+
+	header {
+		defer
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+	}
 
 	log {
 		output file C:/Thornswood-Caddy/data/logs/box.log {

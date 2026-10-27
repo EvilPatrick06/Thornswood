@@ -47,7 +47,8 @@ const HERE = __dirname;
 
 /*
  * Stamped into /health so that "is the VPS running the copy I just sent it"
- * is one request rather than an afternoon.
+ * is one request rather than an afternoon. Asked on the box itself: from
+ * anywhere else /health says only ok (#3806).
  *
  * Node does not reload a file it has already required, so copying this up
  * changes nothing until the scheduled task is restarted, and every symptom of
@@ -57,16 +58,17 @@ const HERE = __dirname;
  * Bump it whenever anything in this file changes behaviour.
  */
 // Bumped whenever what this serves changes, because /health reports it and
-// that string is the only way to tell from outside which copy is running. It
+// that string is the only way to tell which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1-own-reports-1-seated-voice-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1-own-reports-1-seated-voice-1-health-here-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
 // artifact's record beside this file as thornswood-deploy.json once the files
-// are in place, and /health hands back its commit, zip and hash. null when no
-// deploy has written one, which is every copy sent before the artifacts.
+// are in place, and /health hands back its commit, zip and hash, to a caller
+// on the box only (#3806). null when no deploy has written one, which is
+// every copy sent before the artifacts.
 function deployRecord(dir) {
   try {
     const r = JSON.parse(fs.readFileSync(path.join(dir, 'thornswood-deploy.json'), 'utf8').replace(/^﻿/, ''));
@@ -2531,6 +2533,28 @@ const server = http.createServer((req, res) => {
   }
 
   if (route === '/health') {
+    /*
+      ONLY OK TO ANYBODY BUT THIS MACHINE (#3806).
+
+      This answered every field below to whoever asked, and Caddy carries
+      https://thornswood.net/voice/health and /voice-dev/health, so anybody on
+      the internet could read the build, the deploy record's commit, zip and
+      hash, and the live counts. With the source public, a commit is a map of
+      exactly what a server runs. Patrick, 26 Oct (q-3721-voice-health, A):
+      the public answer says only ok, and the detail answers only on the box.
+
+      Every request Caddy forwards comes from 127.0.0.1 too, so where the
+      socket is from says nothing; isLoopback (#1797) also wants no
+      X-Forwarded-* header, which Caddy writes on everything it carries.
+      Anybody else, the launcher's voice check and the site check in Go.ps1
+      among them, is told the service is up and nothing more. The box's own
+      readers (Get-Logs, Install-Voice, the watchdog) ask 127.0.0.1.
+    */
+    if (!isLoopback(req)) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
     /*
       uptime is here so a watchdog can tell a RESTART from a HANG. Everything
       else in this payload looks identical either way: a service that has just
