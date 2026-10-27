@@ -211,7 +211,7 @@ Yes 'engine\README.md says a fork under a path with an & builds, and how' ($read
 $pu = Get-Content -LiteralPath (Join-Path $root 'scripts\release\Publish-Update.ps1') -Raw
 Yes 'Publish-Update hashes the launcher source from launcher\' ($pu -match "\`$srcDir = Join-Path \`$RepoDir 'launcher'")
 $cv = Get-Content -LiteralPath (Join-Path $root 'scripts\vps\Check-VoiceInstall.ps1') -Raw
-Yes 'Check-VoiceInstall reads Install-Voice beside it, not a Downloads folder' ($cv -notmatch 'Users\\evilp' -and $cv.Contains("Join-Path `$PSScriptRoot '..\deploy\Install-Voice.ps1'"))
+Yes 'Check-VoiceInstall reads Install-Voice beside it, not a Downloads folder' ($cv -notmatch 'Users\\[^\\]+\\Downloads' -and $cv.Contains("Join-Path `$PSScriptRoot '..\deploy\Install-Voice.ps1'"))
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
