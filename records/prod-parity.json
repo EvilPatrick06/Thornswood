@@ -1,5 +1,5 @@
 {
-  "about": "What the VPS should look like, read off the repository (docs/SERVER.md, scripts/deploy/Caddyfile, site/server.js, voice/README.md, the Install scripts). scripts/vps/Check-ProdParity.ps1 compares Get-ProdFacts.ps1 output against it. Issue #2165. No secret belongs here.",
+  "about": "What the VPS should look like, read off the repository (SERVER.md in the ops repo, scripts/deploy/Caddyfile, site/server.js, voice/README.md, the Install scripts). scripts/vps/Check-ProdParity.ps1 compares Get-ProdFacts.ps1 output against it. Issue #2165. No secret belongs here.",
   "listeners": [
     {
       "proto": "tcp",
@@ -20,7 +20,7 @@
       "port": 22,
       "bind": "public",
       "process": "sshd",
-      "why": "docs/DEPLOY-IDENTITIES.md"
+      "why": "the ops repo's DEPLOY-IDENTITIES.md"
     },
     {
       "proto": "tcp",
@@ -150,7 +150,7 @@
     {
       "name": "Thornswood Watch",
       "user": "SYSTEM",
-      "why": "Watch-Services.ps1 -Install, every five minutes as SYSTEM, by design: it restarts and reads services and tasks of every other account (#2578, docs/DEPLOY-IDENTITIES.md section 8)"
+      "why": "Watch-Services.ps1 -Install, every five minutes as SYSTEM, by design: it restarts and reads services and tasks of every other account (#2578, the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Backup",
@@ -163,7 +163,7 @@
     {
       "name": "Thornswood Load",
       "user": "SYSTEM",
-      "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061), by design: it reads the processes of every other account (docs/DEPLOY-IDENTITIES.md section 8)"
+      "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061), by design: it reads the processes of every other account (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Disk History",
@@ -171,7 +171,7 @@
       "triggers": [
         "Daily"
       ],
-      "why": "scripts/vps/Forecast-Storage.ps1 -Install, one disk sample a day at 04:00 as SYSTEM, and the forecast told to staff when it turns (#2178), by design: it writes into the watchdog's folder and outbox (docs/DEPLOY-IDENTITIES.md section 8)"
+      "why": "scripts/vps/Forecast-Storage.ps1 -Install, one disk sample a day at 04:00 as SYSTEM, and the forecast told to staff when it turns (#2178), by design: it writes into the watchdog's folder and outbox (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Runner Logs",
@@ -179,7 +179,7 @@
       "triggers": [
         "Daily"
       ],
-      "why": "scripts/vps/Keep-RunnerLogs.ps1 -Install, daily at 4:30 AM as SYSTEM (#3184), by design: it removes old logs from every runner account's _diag folder (docs/DEPLOY-IDENTITIES.md section 8)"
+      "why": "scripts/vps/Keep-RunnerLogs.ps1 -Install, daily at 4:30 AM as SYSTEM (#3184), by design: it removes old logs from every runner account's _diag folder (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Bridge",
@@ -192,12 +192,12 @@
     {
       "name": "Thornswood Maint Update",
       "user": "SYSTEM",
-      "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (docs/DEPLOY-IDENTITIES.md section 8)"
+      "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per the ops repo's DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Dev Crash Capture",
       "user": "SYSTEM",
-      "why": "dev crash capture task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (docs/DEPLOY-IDENTITIES.md section 8)"
+      "why": "dev crash capture task found on the box in the Oct 11 run; runs as SYSTEM, Highest per the ops repo's DEPLOY-IDENTITIES.md section 1; no script in the repository makes it (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     }
   ],
   "services": [

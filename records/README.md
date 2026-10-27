@@ -75,9 +75,10 @@ read it (issue #440, phase 8):
 - `most-online.json`: the most people in the world at once (`people`) and
   the seats over it that only the Discord staff roles may take
   (`staffSeats`), with Patrick's decisions in its `note` (issue #481), and
-  the most people the voice service takes at once (`voice`), never fewer than
-  the two together, since everybody seated and everybody waiting in line at
-  the menu holds a socket to it. Those are main's. Its `dev` object holds the
+  the most people who hold a voice place at once (`voice`), never fewer than
+  the two together, so everybody seated has one. Only somebody in the world
+  holds one: somebody waiting in line at the menu holds a socket for text
+  chat and the line, and no voice place (#3570). Those are main's. Its `dev` object holds the
   same three for the dev server and dev voice (Patrick, 12 Oct: 5, 0 and 5),
   and a record without one gives dev main's numbers.
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
@@ -134,7 +135,7 @@ names. No script reads them. `THIRD-PARTY.md` and
   built for the starting clothes in character creation (fork commit
   75cb6ca1, 3 October).
 - `runner-isolation.json`: what a runner account on the VPS must not reach (production paths, groups), the crash dump folder it may only write, the age limit for files left in its temp folder, and differences agreed as intentional. `scripts\vps\Check-RunnerIsolation.ps1` compares the runners against it (issue #2161).
-- `remote-commands.json`: every call under `scripts\` that reaches the VPS (ssh, scp, Invoke-ThornswoodRemote and its wrappers, Remote.ps1), what it sends, and the class it needs: a gate verb, admin, or transport. Read from the code; `docs\DEPLOY-IDENTITIES.md` section 2a is its summary. `tests\test-remote-command-map.ps1` fails when a remote call has no row or a row has no call (issue #2182). A row names its call by script, function, command and an anchor, a line of text from the call (or just above it), never by its place in the file, so a call put in elsewhere moves no row (#2498).
+- `remote-commands.json`: every call under `scripts\` that reaches the VPS (ssh, scp, Invoke-ThornswoodRemote and its wrappers, Remote.ps1), what it sends, and the class it needs: a gate verb, admin, or transport. Read from the code; the ops repo's `DEPLOY-IDENTITIES.md` section 2a is its summary. `tests\test-remote-command-map.ps1` fails when a remote call has no row or a row has no call (issue #2182). A row names its call by script, function, command and an anchor, a line of text from the call (or just above it), never by its place in the file, so a call put in elsewhere moves no row (#2498).
 - `prod-parity.json`: what the VPS should look like (which ports listen where and as which program, each task's account and triggers, the services' accounts, which live files must match which repository file, the TLS margin, environment variables that must not be set) and the differences agreed as intentional, each with its reason. `scripts\vps\Check-ProdParity.ps1` compares the box against it; no secret belongs in it (issue #2165).
 - `asset-provenance.json`: the asset provenance register (issue #2177). Every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them: where it came from, who made it, its licence or permission, the credit it asks for, who approved it and when, where it is published and its sha256, or which of those is not recorded and who can answer. Files that ship from the game folder but are not in the repository are in it by name, and gallery uploads and the collection's mods are dispositioned. Operator only: nothing that builds a pack, the installer, the launcher or the site reads it. A permission itself is never written in it; an entry says where it is kept. No script writes it: it is changed by hand in the pull request that adds or changes an asset, and `tests	est-asset-provenance.js` fails on a tracked asset with no entry or a changed hash.
 - `merchant-runtime-provenance.md`: the server module built for merchant
