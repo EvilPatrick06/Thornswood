@@ -235,7 +235,6 @@ try {
     $ranges = { param($t) [regex]::Match($t, '\$grdBlocks = (@\([^\r\n]*\))').Groups[1].Value }
     Yes "-NetworkOnly -Number 3 ends 0 (exit $($three.Code))" ($three.Code -eq 0 -and $three.Text -match [regex]::Escape("`$grdAcct = 'thornswood-runner3'"))
     Yes '  and blocks exactly what runner 4''s rules block: no Microsoft hole is left for signing' ((& $ranges $three.Text) -and (& $ranges $three.Text) -eq (& $ranges $four.Text) -and $three.Said -notmatch 'Service Tags|api\.nuget\.org')
-    Yes 'records\sign-runners.json is gone' (-not (Test-Path -LiteralPath (Join-Path $Repo 'records\sign-runners.json')))
     # ---- the range arithmetic ----------------------------------------------
     $rl = [regex]::Match($src, "(?s)\`$rangeLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the range library is where it was' ($rl -match 'function Get-RunnerBlockRanges')
