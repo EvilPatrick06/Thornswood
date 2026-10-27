@@ -650,25 +650,36 @@ yes('THIRD-PARTY.md no longer says the vcpkg texts travel nowhere',
     !/None of those texts travels/.test(N) && !/vcpkg licence texts do not travel/.test(flat(section('What is still missing'))));
 yes('the frida-gum row says what else frida-gum.lib holds, under the LGPL',
     /glib, gobject, gnulib and libcharset \(LGPL-2\.1-or-later\)/.test(fridaRow));
-// The source of what is inside frida-gum.lib, by Thornswood's forks of
-// Frida's repositories (Patrick, A on #3287): the same six, at the same
-// commits, in Source-Notice.ps1's $SourceNoticeBundled and in "Where the
-// source is", and with the fork here, the commits its portfile fetches from.
+// The source of what is inside frida-gum.lib (#3287): records\frida-sources.json
+// names the six parts, each archive on Thornswood's own Release of them
+// (Patrick, C on #3287) and, while forksUp, Thornswood's fork of each of
+// Frida's repositories. "Where the source is" names the Release, each archive
+// and Frida's repository at the same commit, and the forks while they are up;
+// Source-Notice.ps1 reads the record rather than a list of its own; and with
+// the fork here, each commit is the one its portfile fetches from.
+let fs3287 = null;
+try { fs3287 = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'frida-sources.json'), 'utf8').replace(/^﻿/, '')); } catch (e) { fs3287 = null; }
+const bundled = fs3287 && Array.isArray(fs3287.parts) ? fs3287.parts : [];
+yes('records\\frida-sources.json names six parts of frida-gum.lib (' + bundled.length + ')', bundled.length === 6);
+yes('  of the Frida the client files carry (' + (fs3287 && fs3287.frida) + ', the row says ' + (fridaVer || 'none') + ')', !!fs3287 && fs3287.frida === fridaVer);
 const sn = read(path.join(REPO, 'scripts', 'release', 'Source-Notice.ps1')) || '';
-const bundled = [];
-(sn.match(/@\('[^']+',\s*'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'\)/g) || []).forEach(function (m) {
-  const r = /'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'/.exec(m);
-  bundled.push({ fork: r[1], commit: r[2] });
-});
-yes('Source-Notice.ps1 names the source of six libraries inside frida-gum.lib (' + bundled.length + ')', bundled.length === 6);
+yes('Source-Notice.ps1 reads where they are from records\\frida-sources.json and names no commit of its own',
+    /records\\frida-sources\.json/.test(sn) && !/'frida-[a-z0-9-]+',\s*'[0-9a-f]{40}'/.test(sn));
 const whereSec = section('Where the source is');
-const unnamed = bundled.filter(function (b) { return whereSec.indexOf('https://github.com/EvilPatrick06/' + b.fork + '/tree/' + b.commit) < 0; });
-yes('"Where the source is" names each of them by our fork and the same commit' + (unnamed.length ? ', not: ' + unnamed.map(function (b) { return b.fork; }).join(', ') : ''), bundled.length > 0 && unnamed.length === 0);
+const relUrl = fs3287 ? 'https://github.com/' + fs3287.release.repo + '/releases/tag/' + fs3287.release.tag : '';
+yes('"Where the source is" names the Release of their archives (' + relUrl + ')', !!relUrl && whereSec.indexOf(relUrl) >= 0);
+const unnamed = bundled.filter(function (b) {
+  return whereSec.indexOf('`' + b.archive + '`') < 0 || whereSec.indexOf(b.upstream + ' `' + b.commit + '`') < 0;
+});
+yes('  and each archive, with Frida\'s repository at the same commit' + (unnamed.length ? ', not: ' + unnamed.map(function (b) { return b.name; }).join(', ') : ''), bundled.length > 0 && unnamed.length === 0);
+const forkNamed = bundled.filter(function (b) { return whereSec.indexOf('https://github.com/EvilPatrick06/' + b.name + '/tree/' + b.commit) >= 0; });
+yes('  and the forks exactly while the record says they are up (' + forkNamed.length + ' named, forksUp ' + (fs3287 && fs3287.forksUp) + ')',
+    !!fs3287 && (fs3287.forksUp ? forkNamed.length === bundled.length : forkNamed.length === 0));
 if (haveFork) {
   let fp = '';
   try { fp = git(['show', commit + ':overlay_ports/frida-gum/portfile.cmake']); } catch (e) { fp = ''; }
   const off = bundled.filter(function (b) { return fp.indexOf('/' + b.commit + '/') < 0; });
-  yes('each is a commit overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches its licence from' + (off.length ? ', not: ' + off.map(function (b) { return b.fork; }).join(', ') : ''), !!fp && off.length === 0);
+  yes('each is a commit overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches its licence from' + (off.length ? ', not: ' + off.map(function (b) { return b.name; }).join(', ') : ''), !!fp && off.length === 0);
 } else {
   skip('no fork here, so the frida commits were not held to its portfile');
 }
@@ -923,6 +934,41 @@ if (filesTxt === null) {
     yes('the section says ' + fromCollection.length + ' files, as files.txt does',
         runtimeFlat.indexOf(fromCollection.length + ' files') >= 0);
   }
+}
+
+// ------------------------------------------------- the collection's menus
+// QuickLoot IE's Nexus page says "Released under the GPL-3.0-or-later
+// license", and its 4.1.0 changelog "Changed the project license to
+// GPL-3.0-or-later"; all four records said "version 3" or "GPL 3" until
+// #3800. SkyUI's, SkyHUD's and moreHUD's pages each say something different
+// about their files, and the record had them as one ("nothing on those mods'
+// pages"), so each is held to its own page's words.
+{
+  const ql = read(path.join(REPO, 'game', 'ours', 'Data', 'SKSE', 'Plugins', 'QuickLootIE.json')) || '';
+  const prov = JSON.parse(read(path.join(REPO, 'records', 'asset-provenance.json')) || '{"assets":[]}');
+  const all = JSON.stringify(prov);
+  const qlEntry = (prov.assets || []).find(function (a) { return a.path === 'game/ours/Data/SKSE/Plugins/QuickLootIE.json'; });
+  const menuEntry = (prov.notInRepo || []).find(function (a) { return /skyui\\itemcard\.swf/.test(a.path); });
+  const qlSection = flat(N.slice(N.indexOf('`Data\\SKSE\\Plugins\\QuickLootIE.json` does ship'), N.indexOf('## Made for Thornswood by somebody else')));
+  const qlCredits = flat(C.slice(C.indexOf('**QuickLoot IE\'s settings**'), C.indexOf('**SkyUI\'s item lists')));
+  [['THIRD-PARTY.md', qlSection], ['the credits page', qlCredits], ['QuickLootIE.json', flat(ql.split('"logLevel"')[0])],
+   ['its provenance licence', qlEntry ? qlEntry.licence : ''], ['its provenance attribution', qlEntry ? qlEntry.attribution : '']]
+    .forEach(function (pair) {
+      yes(pair[0] + ' names QuickLoot IE\'s licence GPL-3.0-or-later', pair[1].indexOf('GPL-3.0-or-later') >= 0);
+      yes('  and never the GPL 3 or version 3 alone', !/GPL 3\b|General Public License version 3(?! unchanged)/.test(pair[1]));
+    });
+  const menus = flat(N.slice(N.indexOf('## The collection\'s menus, with no gold values'), N.indexOf('`Data\\SKSE\\Plugins\\QuickLootIE.json` does ship')));
+  yes('THIRD-PARTY.md no longer says nothing on the menu mods\' pages lets them be handed on',
+      menus.indexOf('nothing on those mods\' pages') < 0 && all.indexOf('none of them lets Thornswood hand these files on') < 0);
+  yes('  it quotes SkyUI\'s page on uploads and patches',
+      menus.indexOf('"Upload: not allowed to upload to other sites"') >= 0 && menus.indexOf('"You may release any patches that require the original file"') >= 0);
+  yes('  SkyHUD\'s on the rest of the mod', menus.indexOf('"The rest of the mod must not be included"') >= 0);
+  yes('  and says moreHUD\'s page has no permission list', /moreHUD: the page shows no permission list/.test(menus));
+  yes('  with the date the pages were read', /read on 26 October/.test(menus));
+  yes('the provenance menu entry quotes each page too', !!menuEntry &&
+      menuEntry.licence.indexOf('read 26 Oct 2026') >= 0 && menuEntry.licence.indexOf('Upload: not allowed to upload to other sites') >= 0 &&
+      menuEntry.licence.indexOf('The rest of the mod must not be included') >= 0 && /moreHUD \(12688\): the page shows no permission list/.test(menuEntry.licence));
+  yes('no record says only revision 4 installs the menu mods\' files', all.indexOf('revision 4 installs') < 0 && N.indexOf('revision 4 installs') < 0);
 }
 
 // ---------------------------------------------------------------- the words
