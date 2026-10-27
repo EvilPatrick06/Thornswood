@@ -925,6 +925,41 @@ if (filesTxt === null) {
   }
 }
 
+// ------------------------------------------------- the collection's menus
+// QuickLoot IE's Nexus page says "Released under the GPL-3.0-or-later
+// license", and its 4.1.0 changelog "Changed the project license to
+// GPL-3.0-or-later"; all four records said "version 3" or "GPL 3" until
+// #3800. SkyUI's, SkyHUD's and moreHUD's pages each say something different
+// about their files, and the record had them as one ("nothing on those mods'
+// pages"), so each is held to its own page's words.
+{
+  const ql = read(path.join(REPO, 'game', 'ours', 'Data', 'SKSE', 'Plugins', 'QuickLootIE.json')) || '';
+  const prov = JSON.parse(read(path.join(REPO, 'records', 'asset-provenance.json')) || '{"assets":[]}');
+  const all = JSON.stringify(prov);
+  const qlEntry = (prov.assets || []).find(function (a) { return a.path === 'game/ours/Data/SKSE/Plugins/QuickLootIE.json'; });
+  const menuEntry = (prov.notInRepo || []).find(function (a) { return /skyui\\itemcard\.swf/.test(a.path); });
+  const qlSection = flat(N.slice(N.indexOf('`Data\\SKSE\\Plugins\\QuickLootIE.json` does ship'), N.indexOf('## Made for Thornswood by somebody else')));
+  const qlCredits = flat(C.slice(C.indexOf('**QuickLoot IE\'s settings**'), C.indexOf('**SkyUI\'s item lists')));
+  [['THIRD-PARTY.md', qlSection], ['the credits page', qlCredits], ['QuickLootIE.json', flat(ql.split('"logLevel"')[0])],
+   ['its provenance licence', qlEntry ? qlEntry.licence : ''], ['its provenance attribution', qlEntry ? qlEntry.attribution : '']]
+    .forEach(function (pair) {
+      yes(pair[0] + ' names QuickLoot IE\'s licence GPL-3.0-or-later', pair[1].indexOf('GPL-3.0-or-later') >= 0);
+      yes('  and never the GPL 3 or version 3 alone', !/GPL 3\b|General Public License version 3(?! unchanged)/.test(pair[1]));
+    });
+  const menus = flat(N.slice(N.indexOf('## The collection\'s menus, with no gold values'), N.indexOf('`Data\\SKSE\\Plugins\\QuickLootIE.json` does ship')));
+  yes('THIRD-PARTY.md no longer says nothing on the menu mods\' pages lets them be handed on',
+      menus.indexOf('nothing on those mods\' pages') < 0 && all.indexOf('none of them lets Thornswood hand these files on') < 0);
+  yes('  it quotes SkyUI\'s page on uploads and patches',
+      menus.indexOf('"Upload: not allowed to upload to other sites"') >= 0 && menus.indexOf('"You may release any patches that require the original file"') >= 0);
+  yes('  SkyHUD\'s on the rest of the mod', menus.indexOf('"The rest of the mod must not be included"') >= 0);
+  yes('  and says moreHUD\'s page has no permission list', /moreHUD: the page shows no permission list/.test(menus));
+  yes('  with the date the pages were read', /read on 26 October/.test(menus));
+  yes('the provenance menu entry quotes each page too', !!menuEntry &&
+      menuEntry.licence.indexOf('read 26 Oct 2026') >= 0 && menuEntry.licence.indexOf('Upload: not allowed to upload to other sites') >= 0 &&
+      menuEntry.licence.indexOf('The rest of the mod must not be included') >= 0 && /moreHUD \(12688\): the page shows no permission list/.test(menuEntry.licence));
+  yes('no record says only revision 4 installs the menu mods\' files', all.indexOf('revision 4 installs') < 0 && N.indexOf('revision 4 installs') < 0);
+}
+
 // ---------------------------------------------------------------- the words
 [['THIRD-PARTY.md', N], ['credits.md', C]].forEach(function (pair) {
   yes(pair[0] + ' has no em dash', pair[1].indexOf('\u2014') < 0);
