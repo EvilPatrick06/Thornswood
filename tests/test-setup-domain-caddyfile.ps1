@@ -72,6 +72,31 @@ if ($start -gt 0 -and $end -gt $start) {
     }
     finally { Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue }
     Yes '  and a Caddyfile without the voice routes is refused' $threw
+
+    # Every route there, but not the headers the door sets (#2762).
+    $threw = $false
+    try {
+        $tmpDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-caddy-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmpDir | Out-Null
+        $bare = [regex]::Replace($cf, '(?ms)^\theader \{.*?^\t\}\r?\n', '')
+        # Only the Permissions-Policy line goes from a second copy: the
+        # comments still name it, and a comment is not a header.
+        $onlyPerms = [regex]::Replace($cf, '(?m)^\t\tPermissions-Policy .*\r?\n', '')
+        [IO.File]::WriteAllText((Join-Path $tmpDir 'Caddyfile'), $bare)
+        Yes '  (the test''s copy has every route and no header block)' ($bare.Contains('handle_path /github-app/*') -and -not $bare.Contains('Permissions-Policy "'))
+        try { $Here = $tmpDir; $Domain = 'thornswood.net'; $Email = ''; . ([scriptblock]::Create($code)) } catch { $threw = $_.Exception.Message -match '#2762' }
+    }
+    finally { Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue }
+    Yes '  and one without the headers every answer carries is refused (#2762)' $threw
+    $threw = $false
+    try {
+        $tmpDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-caddy-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmpDir | Out-Null
+        [IO.File]::WriteAllText((Join-Path $tmpDir 'Caddyfile'), $onlyPerms)
+        try { $Here = $tmpDir; $Domain = 'thornswood.net'; $Email = ''; . ([scriptblock]::Create($code)) } catch { $threw = $_.Exception.Message -match 'Permissions-Policy' }
+    }
+    finally { Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue }
+    Yes '  and so is one whose comments name Permissions-Policy but nothing sets it' $threw
 }
 
 Write-Host ''

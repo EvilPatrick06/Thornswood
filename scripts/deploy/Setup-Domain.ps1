@@ -149,6 +149,13 @@ if ($Email) { $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+',
 foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'handle_path /box/*', 'handle_path /github-app/*', 'reverse_proxy 127.0.0.1:3001')) {
   if ($caddyfile.IndexOf($need) -lt 0) { throw "scripts\deploy\Caddyfile has no '$need' line, so it would take part of the site away. Nothing was sent." }
 }
+# The headers every answer from the name carries are set at the door (#2762),
+# so a Caddyfile without them would send voice, the box bridge and the admin
+# App's answers out bare again.
+foreach ($need in @('Strict-Transport-Security', 'X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy')) {
+  # A line that sets it, not a comment that names it.
+  if (-not [regex]::IsMatch($caddyfile, '(?m)^\s*' + [regex]::Escape($need) + '\s')) { throw "scripts\deploy\Caddyfile sets no $need header, so what Caddy carries would go out without it (#2762). Nothing was sent." }
+}
 $cfg64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caddyfile))
 
 Remote @"
