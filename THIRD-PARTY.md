@@ -285,10 +285,11 @@ file too. glib, gobject and proxy-libintl are the LGPL with no such
 exception. Since #3099 the port's copyright file carries each one's licence
 at the commit Frida pins, so their texts go with the file. The LGPL lets a
 copy go out under the GPL instead, which `SkyrimPlatformImpl.dll` does, and
-the GPL then asks for their source too. Thornswood keeps its own fork of each
-of Frida's six repositories, tagged `thornswood-frida-16.0.19` at the commit
-Frida built from (Patrick, A on #3287), and the note beside the files names
-them; "Where the source is", below, has the list.
+the GPL then asks for their source too. Each part's source, at the commit
+Frida built it from, is an archive on Thornswood's own Release of them
+(Patrick, C on #3287), and until this repository is public, Thornswood's own
+fork of each of Frida's six repositories as well. The note beside the files
+names them; "Where the source is", below, has the list.
 
 ## From upstream SkyMP, not built here
 
@@ -1031,11 +1032,29 @@ vcpkg from the fork's `vcpkg.json`. The licence texts are in that tree:
 
 What Frida built and the fork links in is not in that tree: frida-gum's
 devkit, with the libraries inside its `frida-gum.lib` ("The SkyMP client
-runtime, built from the fork"). Their source is Thornswood's fork of each
-of Frida's repositories, at the commit Frida 16.0.19 built from, tagged
-`thornswood-frida-16.0.19` there (#3287):
+runtime, built from the fork"). Their source, at the commits Frida 16.0.19
+built them from, is one archive each on Thornswood's own Release of them,
+which stays as long as the launcher ships frida-gum (Patrick, C on #3287):
 
-| Inside `frida-gum.lib` | Source |
+https://github.com/EvilPatrick06/Thornswood/releases/tag/frida-sources-16.0.19
+
+| Inside `frida-gum.lib` | Archive | Frida's repository, at |
+|---|---|---|
+| gum | `frida-gum-698b356fef0ecfc3ac2818f0b387be90e93deeda.tar` | frida/frida-gum `698b356fef0ecfc3ac2818f0b387be90e93deeda` |
+| glib, gobject, gnulib, libcharset | `frida-glib-f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f.tar` | frida/glib `f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f` |
+| proxy-libintl | `frida-proxy-libintl-c03e1a74b17fa7ec467e110130775409e4828a4c.tar` | frida/proxy-libintl `c03e1a74b17fa7ec467e110130775409e4828a4c` |
+| pcre2 | `frida-pcre2-b47486922fdc3486499b310dc9cf903449700474.tar` | frida/pcre2 `b47486922fdc3486499b310dc9cf903449700474` |
+| capstone | `frida-capstone-22d317042ee4d251280d2960f5cf294433977db4.tar` | frida/capstone `22d317042ee4d251280d2960f5cf294433977db4` |
+| libffi | `frida-libffi-938b07aa8280bcc4f92f08a0fdbb4ad81024bde0.tar` | frida/libffi `938b07aa8280bcc4f92f08a0fdbb4ad81024bde0` |
+
+`records\frida-sources.json` holds each archive's sha256 and size, and
+`scripts\release\Publish-FridaSources.ps1` makes the Release from it and checks
+it every night. Until this repository is public a stranger cannot open the
+Release, so until then the same commits are also in Thornswood's fork of
+each of Frida's repositories, tagged `thornswood-frida-16.0.19`, and every
+note beside the files names both:
+
+| Inside `frida-gum.lib` | Source until the repository is public |
 |---|---|
 | gum | https://github.com/EvilPatrick06/frida-gum/tree/698b356fef0ecfc3ac2818f0b387be90e93deeda |
 | glib, gobject, gnulib, libcharset | https://github.com/EvilPatrick06/frida-glib/tree/f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f |
@@ -1043,6 +1062,10 @@ of Frida's repositories, at the commit Frida 16.0.19 built from, tagged
 | pcre2 | https://github.com/EvilPatrick06/frida-pcre2/tree/b47486922fdc3486499b310dc9cf903449700474 |
 | capstone | https://github.com/EvilPatrick06/frida-capstone/tree/22d317042ee4d251280d2960f5cf294433977db4 |
 | libffi | https://github.com/EvilPatrick06/frida-libffi/tree/938b07aa8280bcc4f92f08a0fdbb4ad81024bde0 |
+
+The forks are deleted only when `Publish-FridaSources.ps1 -ForksMayGo` says
+nothing offered still names only them: notes made before the Release
+existed name the forks alone.
 
 That covers what Thornswood built, and since 20 October that includes
 `Data\Platform\UI\build.js` and the files beside it: `records\front-build.json`
