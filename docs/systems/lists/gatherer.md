@@ -1,9 +1,10 @@
 # Gatherer
 
-Generated from `game/data/harvests.json` by `scripts/dev/Write-SystemLists.js`. 46 rows, 105 placed records. Reagents. One pick is one of the produce. The rank is the rank on the row. A plant has no gold price. Wheat is in this table and is a crop: the server treats it as the farmer's.
+Generated from `game/data/harvests.json` by `scripts/dev/Write-SystemLists.js`. 47 rows, 107 placed records. Reagents. One pick is one of the produce. The rank is the rank on the row. A plant has no gold price. Wheat is in this table and is a crop: the server treats it as the farmer's.
 
 | Name | Rank | Records | You receive | In the world |
 | --- | --- | --- | --- | --- |
+| Aloe Vera Leaves | novice | 2 | Aloe Vera Leaves | Aloe Vera |
 | Ashen Grass Pod | novice | 2 | Ashen Grass Pod | Spiky Grass |
 | Canticle Bark | novice | 1 | Canticle Bark | This should not be visible |
 | Creep Cluster | novice | 2 | Creep Cluster | Creep Cluster |

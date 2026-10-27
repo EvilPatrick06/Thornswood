@@ -319,7 +319,7 @@ At 1920 the hardware wants mip 1, which the 16 Sep file did not have. The built 
 
 ## D. THE SCRIPT
 
-`scripts\dev\Build-Backdrop.py`. This section was written on 17 Sep as five changes to make, with the 16 Sep script's line numbers, and all five are made. Items 1 to 3, the 13 level chain and writing into the repo came on 20 Sep (f1372b0, before this repository's history starts; To Do List entry 203 in `docs\archive\todo-list-2026-09-25.md`). #987 pointed the default paths at `launcher\art` and `game\menu` on 28 Sep, and #994 made the texture BC7 through texconv the same day. Each item says what the script does now and what it replaced.
+`scripts\dev\Build-Backdrop.py`. This section was written on 17 Sep as five changes to make, with the 16 Sep script's line numbers, and all five are made. Items 1 to 3, the 13 level chain and writing into the repo came on 20 Sep (f1372b0, before this repository's history starts; To Do List entry 203 in the ops repo's `docs\archive\todo-list-2026-09-25.md`). #987 pointed the default paths at `launcher\art` and `game\menu` on 28 Sep, and #994 made the texture BC7 through texconv the same day. Each item says what the script does now and what it replaced.
 
 ### 1. The constants
 
