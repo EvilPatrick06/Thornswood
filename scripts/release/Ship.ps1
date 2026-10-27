@@ -1043,13 +1043,10 @@ if (-not $PSBoundParameters.ContainsKey('Root') -and -not $FromFeed) {
     try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
     catch { Die ($_.Exception.Message + ' Nothing was built.') }
 }
-# What a Ship from the feed cannot do, said before anything is built: the
-# installer holds the whole game, on One (#2754). A new launcher it can carry
-# since #3312, built and signed on GitHub, so -RebuildLauncher and -Version
-# mean what they mean anywhere else.
-if ($FromFeed) {
-    if ($Package) { Die '-Package builds the installer from the whole game folder, which a Ship from the feed does not have. Ship -Package from One. Nothing was built.' }
-}
+# A Ship from the feed carries a new launcher since #3312, built and signed on
+# GitHub, so -RebuildLauncher and -Version mean what they mean anywhere else,
+# and its installer since #3412, built from the feed and signed on GitHub
+# (installer.yml, Publish-InstallerFromGitHub.ps1), so -Package does too.
 
 # ------------------------------------------------------------ dev channel
 # The dev build has its own feed and baseline on the VPS (feed-dev), and its
@@ -1670,6 +1667,18 @@ if ($Package -and -not $Dev -and -not $DryRun) {
     }
     $ciStub = Join-Path $stubDir 'setup-stub.exe'
     Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
+    # From the feed the installer is built on GitHub, by installer.yml started
+    # on this tag (#3412), which a tag made before it merged does not have.
+    # Asked now, before anything is published, not after the release is out.
+    if ($FromFeed) {
+        . (Join-Path $Here 'Installer-OnGitHub.ps1')
+        $why = Get-InstallerWorkflowRefusal (Get-SourceRepo $RepoDir) ('v' + $target)
+        if ($why) {
+            Unbump 'the installer cannot be built on GitHub for this tag'
+            Die ($why + ' Nothing was published.')
+        }
+        Say ('  installer.yml is on v' + $target + ', so the installer is built and signed on GitHub after the release') 'Green'
+    }
 }
 
 # ------------------------------------------------------------ animation and body files
@@ -1891,8 +1900,9 @@ if (-not $ModsOnly) {
 # animation and body files and node checks, so nothing is installed for a release that
 # stops there (#1692), and before anything is published, so a release with no
 # launcher to package stops now and not after it is out (Package-Thornswood
-# runs after, #2243).
-if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {
+# runs after, #2243). From the feed installer.yml takes that launcher off the
+# feed itself (#3412), so nothing is put anywhere here.
+if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly -and -not $FromFeed) {
     Head 'The launcher the feed offers, for the installer'
     if ($null -eq $pubLauncher) { $pubLauncher = Get-PublishedLauncher $ReleaseDir 'main' }
     try {
@@ -2525,6 +2535,26 @@ elseif ($Package -and $DryRun) {
     Say '  dry run, so not rebuilt: Package-Thornswood.ps1 puts what it builds on the site' 'Yellow'
     Say ('  .\scripts\release\Package-Thornswood.ps1 -OneFile -NoPublish -OutDir "' + $DistDir + '"   builds it and publishes nothing') 'DarkGray'
 }
+elseif ($Package -and $FromFeed) {
+    # FROM THE FEED, ON GITHUB (#3412). installer.yml builds it from what the
+    # release just published recorded and signs it, a second runner checks it,
+    # and Publish-InstallerFromGitHub.ps1 takes it off the launcher's draft and
+    # publishes it. Not stopping the release when it fails, for the reason the
+    # One path below gives.
+    Head 'Rebuilding the installer on GitHub'
+    $pubArgs = @{ OutDir = $DistDir; Tag = ('v' + $target) }
+    if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
+    try { & (Join-Path $Here 'Publish-InstallerFromGitHub.ps1') @pubArgs }
+    catch {
+        $script:InstallerWhy = [string]$_.Exception.Message
+        $script:InstallerFailed = 1
+        Say "  THE INSTALLER DID NOT BUILD. $($script:InstallerWhy)" 'Red'
+        Say '  The release itself is already published and is fine. What is not' 'Red'
+        Say '  rebuilt is Thornswood-Setup.exe, so anybody installing from scratch' 'Red'
+        Say '  sits through this release on first launch.' 'Red'
+        Say '  .\scripts\release\Publish-InstallerFromGitHub.ps1   to put that right' 'Yellow'
+    }
+}
 elseif ($Package) {
     Head 'Rebuilding the installer'
     # THE ONE FILE SHAPE, issue #1213: the payload attached to
@@ -2833,7 +2863,7 @@ if ($script:InstallerFailed) {
     Say ("The installer did NOT rebuild (exit $script:InstallerFailed). The release went out " +
          'without it.') 'Red'
     if ($script:InstallerWhy) { Say ("  It stopped with: " + $script:InstallerWhy) 'Red' }
-    Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile' 'Yellow'
+    Say $(if ($FromFeed) { '  .\scripts\release\Publish-InstallerFromGitHub.ps1' } else { '  .\scripts\release\Package-Thornswood.ps1 -OneFile' }) 'Yellow'
     Write-Host ''
 }
 # The release is out either way, and the people who would have read the post
