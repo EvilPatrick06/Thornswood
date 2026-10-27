@@ -512,14 +512,17 @@ jobs:
           }
 
       - name: Check the launcher window
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           # The launcher builds its window from ui.xaml at startup and finds
           # every control by name, so a renamed control or a window that does
           # not parse compiles clean and is found by the person using it. This
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
-          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          # -ExecutionPolicy Bypass on both, as every harness starts 5.1:
+          # Windows 11 keeps 5.1 at Restricted, so on One's runners the plain
+          # shell: powershell could not run this step's own script (#3861).
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Check the launcher UI thread
