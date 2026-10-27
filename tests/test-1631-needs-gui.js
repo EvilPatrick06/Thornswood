@@ -143,11 +143,11 @@ const GONE = ['/eat', '/drink', '/bard'];
   const pages = [['docs', 'systems', 'exhaustion.md'], ['docs', 'systems', 'thirst.md'],
     ['docs', 'systems', 'hunger.md'], ['docs', 'systems', 'temperature.md'], ['docs', 'systems', 'emotes.md'],
     ['docs', 'systems', 'people.md'], ['docs', 'systems', 'chat.md'], ['site', 'data', 'site', 'classes.md'],
-    ['known board']];
+    ['known page']];
   const stale = [];
   pages.forEach(function (p) {
-    // Known Issues is the known board, as /known writes it (#2414).
-    const t = p[0] === 'known board' ? (require('./fixtures/known-page').knownPage() || '') : read.apply(null, p);
+    // Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
+    const t = p[0] === 'known page' ? (require('./fixtures/known-page').knownPage() || '') : read.apply(null, p);
     if (/`\/(eat|drink|bard)\b|`\/rest bed`/.test(t) || /\/needs gives/.test(t)) { stale.push(p[p.length - 1]); }
   });
   yes('A7 no page the issue names tells anybody to type them' + (stale.length ? ' (' + stale.join(', ') + ')' : ''),

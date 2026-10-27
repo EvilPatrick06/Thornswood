@@ -246,8 +246,32 @@ function Read-ReleaseListFile([string]$Path) {
     return ,@($o | Where-Object { $null -ne $_ })
 }
 
-# The annotated tag's message: the release, then everything it is known by.
-function Get-ReleaseTagMessage($r, [string]$FeedUrl) {
+# The sha256 of every file the feed in $Doc names for this release, labelled
+# as the tag message carries them (#3686): the record, whose own entries name
+# the rest of the release's files, the launcher, the client runtime, the
+# notes, and the signed manifest with its catalog. release-files.yml reads
+# these off the tag to put the release's files on its GitHub Release, so it
+# never has to find them in a feed that a later Ship has moved on. A field
+# the feed does not have, or that is not a sha256, is left out.
+function Get-ReleaseFileShas($Doc) {
+    $out = [ordered]@{}
+    if ($null -eq $Doc) { return $out }
+    $field = { param($o, [string]$n) if ($null -ne $o -and $o.PSObject.Properties[$n]) { ([string]$o.$n).ToLowerInvariant() } else { '' } }
+    $pick = [ordered]@{
+        record   = (& $field $(if ($Doc.PSObject.Properties['baseline']) { $Doc.baseline }) 'sha256')
+        exe      = (& $field $Doc 'launcherSha256')
+        runtime  = (& $field $(if ($Doc.PSObject.Properties['clientRuntime']) { $Doc.clientRuntime }) 'sha256')
+        news     = (& $field $(if ($Doc.PSObject.Properties['newsFile']) { $Doc.newsFile }) 'sha256')
+        manifest = (& $field $(if ($Doc.PSObject.Properties['signedManifest']) { $Doc.signedManifest }) 'sha256')
+        catalog  = (& $field $(if ($Doc.PSObject.Properties['signedManifest']) { $Doc.signedManifest }) 'catalogSha256')
+    }
+    foreach ($k in $pick.Keys) { if ($pick[$k] -match '^[0-9a-f]{64}$') { $out[$k] = $pick[$k] } }
+    return $out
+}
+
+# The annotated tag's message: the release, then everything it is known by,
+# then the sha256 of each file it names when the feed ($Doc) is given.
+function Get-ReleaseTagMessage($r, [string]$FeedUrl, $Doc = $null) {
     $lines = @()
     $lines += ('Thornswood ' + (Get-ReleaseField $r 'channel') + ' release ' + (Get-ReleaseField $r 'id'))
     $lines += ''
@@ -262,6 +286,8 @@ function Get-ReleaseTagMessage($r, [string]$FeedUrl) {
     $u = 0; [void][int]::TryParse((Get-ReleaseField $r 'uncommitted'), [ref]$u)
     if ($u -gt 0) { $lines += ('built with ' + $u + ' uncommitted change(s) on top of this commit') }
     if ($FeedUrl) { $lines += ('feed      ' + $FeedUrl) }
+    $shas = Get-ReleaseFileShas $Doc
+    foreach ($k in $shas.Keys) { $lines += ($k.PadRight(10) + $shas[$k]) }
     return ($lines -join "`n")
 }
 
@@ -297,7 +323,7 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
     $rcWas = $global:LASTEXITCODE
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
-        [IO.File]::WriteAllText($msgFile, (Get-ReleaseTagMessage $r $FeedUrl) + "`n", (New-Object Text.UTF8Encoding($false)))
+        [IO.File]::WriteAllText($msgFile, (Get-ReleaseTagMessage $r $FeedUrl $doc) + "`n", (New-Object Text.UTF8Encoding($false)))
         $push = "git push $Remote refs/tags/$($o.Tag)"
         $make = "git tag -a $($o.Tag) $($o.Commit) -m ""Thornswood $(Get-ReleaseField $r 'channel') release $id"""
         $g = Invoke-ReleaseGit $RepoDir @('rev-parse', '--verify', '--quiet', ($o.Commit + '^{commit}'))

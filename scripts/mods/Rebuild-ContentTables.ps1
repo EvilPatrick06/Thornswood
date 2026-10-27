@@ -39,8 +39,9 @@
   written, and the line printed for each says the entry's "what" describes
   what the plugin holds, which only the change's author can say.
 
-  WHAT IT SAYS. Every file under game, docs\systems and records that is
-  different from before it ran, by sha256. git diff then shows what each one
+  WHAT IT SAYS. Every file under game, docs\systems and records, and every
+  other file a step writes (tests\fixtures\merchant-retrieval-records.json,
+  #3425), that is different from before it ran, by sha256. git diff then shows what each one
   is. The bytes are what git stores because .gitattributes checks every
   builder's output out with LF, as the builders write it (#3029); before it,
   a checkout with autocrlf (One) listed every output a builder wrote, changed
@@ -74,12 +75,17 @@ function Find-Exe([string[]]$Names) {
 }
 
 # Every file the builders can write, by sha256, so what changed is measured.
+$watched = @('game', 'docs/systems', 'records')
+foreach ($w in @($chain.steps | ForEach-Object { @($_.writes) } | Where-Object { $_ })) {
+    $w = [string]$w
+    if (-not @($watched | Where-Object { $w -eq $_ -or $w.StartsWith($_ + '/') }).Count) { $watched += $w }
+}
 function Get-TreePrint {
     $map = @{}
-    foreach ($top in @('game', 'docs\systems', 'records')) {
+    foreach ($top in $watched) {
         $dir = Join-Path $repo $top
         if (-not (Test-Path -LiteralPath $dir)) { continue }
-        foreach ($f in Get-ChildItem -LiteralPath $dir -Recurse -File) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $dir -Recurse -File)) {
             $rel = $f.FullName.Substring($repo.Length).TrimStart('\', '/').Replace('\', '/')
             $map[$rel] = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         }

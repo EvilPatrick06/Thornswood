@@ -544,7 +544,8 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const article = text => slice(text, 'Article the Third', 'Article the Fourth') || '';
     const said = 'no more than ' + word(roll) + ' persons in service, of whom no more than ' +
                  word(armed) + ' may bear arms';
-    for (const rel of ['site/data/site/world.md', 'lore/accord.md']) {
+    // world.md is the Accord's only copy since #3138; lore/accord.md points at it.
+    for (const rel of ['site/data/site/world.md']) {
       const text = read(rel);
       yes('A2 ' + rel + ' Article the Third says ' + word(roll) + ' in service and ' + word(armed) + ' armed',
           article(text).replace(/\s+/g, ' ').indexOf(said) >= 0);

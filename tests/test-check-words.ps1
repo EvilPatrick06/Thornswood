@@ -154,8 +154,8 @@ try {
     Put $tmp 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', 'TODO say hello', '"""')
     Put $tmp 'site/data/site/a.md' @('Fine.', ('Not' + $em + 'fine.'))
     Put $tmp 'site/data/site/b.md' @('Fine, with a hyphen - and nothing else.', 'The todo list and the To Do board.')
-    # The Known Issues page is the known board in board.json (#2414).
-    Put $tmp 'site/data/board.json' @('{ "known": { "intro": "Fine.",', '  "sections": [ { "note": "a player save" } ] } }')
+    # board.json holds the hub's boards, which the site shows.
+    Put $tmp 'site/data/board.json' @('{ "active": { "intro": "Fine.",', '  "sections": [ { "note": "a player save" } ] } }')
     Put $tmp 'site/data/help.md' @('Fine.', 'Lorem ipsum dolor sit amet.')
     Put $tmp 'site/public/home.html' @('<html>', '<body>', '<p>one &mdash; two</p>', '</body>', '</html>')
     Put $tmp 'site/public/index.html' @('<p>Players Report; only staff Accept.</p>')
@@ -249,7 +249,7 @@ try {
     Put $tmp 'launcher/ui.xaml' @('<TextBlock x:Name="PlayerList" Text="the multiplayer client"/>') $utf8bom
     Put $tmp 'bot/content.py' @('WELCOME = """', 'Nothing wrong here.', '"""')
     Put $tmp 'site/data/site/a.md' @('Fine.')
-    Put $tmp 'site/data/board.json' @('{ "known": { "intro": "Fine.",', '  "sections": [ { "note": "an ordinary Skyrim save" } ] } }')
+    Put $tmp 'site/data/board.json' @('{ "active": { "intro": "Fine.",', '  "sections": [ { "note": "an ordinary Skyrim save" } ] } }')
     Put $tmp 'site/data/help.md' @('Fine.')
     Put $tmp 'site/public/home.html' @('<p>one, two</p>')
     Put $tmp 'site/public/index.html' @('<p>Anyone can Report; only staff Accept.</p>')

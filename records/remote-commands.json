@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  72,
-    "callCount":  289,
+    "callCount":  290,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -659,6 +659,15 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "anchor":  "$forBot = @(Remote \"if (Test-Path -LiteralPath \u0027$docsWin\\data\\for-bot\u0027) { \u0027FOR-BOT THERE\u0027 } else { \u0027NO FOR-BOT\u0027 }\" | ForEach-Object { \"$_\".Trim() })",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bot.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$fromBot = @(Remote \"if (Test-Path -LiteralPath \u0027$docsWin\\data\\from-bot\u0027) { \u0027FROM-BOT THERE\u0027 } else { \u0027NO FROM-BOT\u0027 }\" | ForEach-Object { \"$_\".Trim() })",
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"

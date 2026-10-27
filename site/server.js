@@ -75,6 +75,12 @@ const UP     = path.join(ROOT, 'uploads');
    granted read on this folder only (scripts\vps\Bot-Service.ps1), so it never
    reaches the site's own records beside it, sessions.json among them. */
 const FOR_BOT = path.join(DATA, 'for-bot');
+/* And the other way round (issue #3140): what the bot writes for the site and
+   nothing else, lists.json, the Known Issues page and the roadmap it builds
+   from the issue board. The bot's account is given Modify on this folder only
+   (Bot-Service.ps1), so it writes nothing else of the site's. */
+const FROM_BOT = path.join(DATA, 'from-bot');
+const LISTS = path.join(FROM_BOT, 'lists.json');
 
 // ==== thornswood site log ====
 //
@@ -501,7 +507,7 @@ if (tellPassword) {
 // A folder that cannot be made is said (#2736), by its path and the error
 // code; every read and write under it fails after this, and the line here is
 // the one that says why.
-for (const dir of [DATA, FOR_BOT, PUBLIC, FILES, UP]) {
+for (const dir of [DATA, FOR_BOT, FROM_BOT, PUBLIC, FILES, UP]) {
   try { fs.mkdirSync(dir, { recursive: true }); }
   catch (e) { console.error('[thornswood-docs] could not make ' + dir + ' (' + (e.code || e.message) + ')'); }
 }
@@ -535,17 +541,15 @@ const DOCS = {
 /* Boards. A board is sections, each section a table with its own columns, so
    a column can be added to one without touching the rest.
 
-   KNOWN ISSUES IS A BOARD, AND THE ONLY COPY (#2414). Until 12 October the
-   text was kept twice, data/known.md for /known and a known board here that
-   nothing showed and, after the hub stopped editing boards (#433), nothing
-   could edit, so it went stale (it still said NPCs stand still with nobody
-   near after #504). Patrick, 12 October: the hub board is the one source.
-   So /known and /api/page/known are this board rendered (knownMarkdown,
-   below), the hub edits it at /hub/known, and known.md is gone. */
+   KNOWN ISSUES AND THE ROADMAP ARE NOT BOARDS ANY MORE (#3140). Both were
+   typed here, and both went stale: the known board kept NPC behaviour #504
+   had fixed, and the roadmap called the emote wheel unstarted while it
+   shipped. Patrick: build them from the board's labels. The bot, which reads
+   the issue board for #known-issues, writes both into data/from-bot/lists.json
+   and the site draws them from there (THE KNOWN ISSUES PAGE AND THE ROADMAP,
+   below). */
 const BOARDS = {
   active:      'Active Issues',
-  known:       'Known Issues',
-  roadmap:     'Roadmap',
   suggestions: 'Suggestions',
   archive:     'Archive',
   todo:        'Patrick'
@@ -570,11 +574,9 @@ const BOARDS = {
    The page now matches the doors behind it. The linked accounts are 'staff'
    since #1010, because that page is where staff ban, PK and write notes, and
    every staff role may. The other two stay 'admin': the play sessions and
-   the report inbox. Known Issues is 'admin' like every board: a board is
-   saved through the admins-only door (#2414). */
+   the report inbox. */
 const LEVEL = {
-  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin',
-  known: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -586,9 +588,9 @@ const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/join',
                       // Known Issues and Help are for the person whose install
                       // will not start or who cannot sign in, so they cannot
                       // sit behind the sign in. Help is help.md in the data
-                      // folder and Known Issues is the known board rendered
-                      // (#2414), both read through /api/page like the site
-                      // pages. The hub edits Known Issues at /hub/known.
+                      // folder and Known Issues is written from the issue
+                      // board (#3140), both read through /api/page like the
+                      // site pages.
                       '/known', '/help',
                       // What is kept about somebody and what they are
                       // agreeing to cannot sit behind a sign in, because
@@ -602,26 +604,28 @@ const SITE = path.join(DATA, 'site');
 
 /* What a link to each page says when it is pasted into Discord. Every address
    used to unfurl with the same generic home text, so a link to the rules and a
-   link to the roadmap read identically in a channel. home.html carries the
-   same list for the browser tab; this is the one a crawler sees, because a
-   crawler does not run the page's script. */
+   link to the roadmap read identically in a channel. This is the only copy:
+   the page is sent with its title, description and og tags already written
+   from it (publicDiscovery and the route below), so the browser tab and a
+   crawler read the same words. home.js kept a second list for the tab until
+   #3138, and the two had drifted apart on two pages. */
 const BLURB = {
   '/':          ['Thornswood', 'A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.'],
   '/world':     ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
   '/rules':     ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
-  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
+  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and arriving in your town.'],
   '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
-  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
-  '/known':     ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
+  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make steel armour, so you find somebody who can.'],
+  '/known':     ['Known issues', 'What is broken right now that the team already knows about, each one on the board to be fixed. Read this before reporting anything.'],
   '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
   '/news':      ['Every release', 'What changed, newest first. The same list the launcher shows.'],
-  '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/report':    ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
   '/gallery':   ['From the world', 'Pictures taken by people playing.'],
   '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no tracking cookie.'],
   '/terms':     ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
-  '/cookies':   ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
+  '/cookies':   ['Cookies', 'Every cookie and piece of browser storage this site uses: sign-in and the eighteen-and-over gate. No advertising cookie.']
 };
 const escAttr = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -758,60 +762,165 @@ function pageHtml(md) {
   return '<pre class="pre-wrap">' + escAttr(md) + '</pre>';
 }
 /*
-  THE KNOWN ISSUES PAGE, WRITTEN OUT OF ITS BOARD (#2414).
+  THE KNOWN ISSUES PAGE AND THE ROADMAP, FROM THE ISSUE BOARD (#3140).
 
-  The board is the one copy and the hub edits it; this turns it into the
-  markdown /known and /api/page/known serve. Its intro under the title, then
-  each section as a heading, its note, and its table. A row ticked done in
-  the hub is fixed, so it leaves the page. A section with no note and nothing
-  left in its table is left out. A cell is one table cell whatever is typed in
-  it: a | is escaped and a line break becomes a space, so a row cannot split
-  the table (a <br> would not do: the page renderer refuses HTML and would
-  show it as typed). The seed was taken from known.md, so this writes that
-  page back byte for byte.
+  Both used to be boards typed into board.json, and both went stale. Now the
+  bot builds them from the board each time it reads it for #known-issues
+  (bot.py, "the site's known issues and roadmap") and writes them into
+  data/from-bot/lists.json:
+
+    { at: when the bot read the board,
+      known: [{ title, text, where: ['Main', 'Dev'] }],
+      roadmap: { lanes: [{ name, rows: [{ title, text }] }] } }
+
+  known is the #known-issues forum's list, word for word: an open issue
+  labelled Main Findings or Dev Findings whose fix has not landed, in the
+  words of its last "Known issue:" comment. roadmap is every open issue
+  labelled roadmap: now, next or later, in that lane, in the words of its
+  last "Roadmap:" comment; there is no Done lane (Patrick, 26 Oct).
+
+  These two turn the file into what /known (and /api/page/known) and /roadmap
+  (and /api/roadmap) serve. A part the file does not hold, or a file that is
+  not there or will not read, is said on the page as not read, never drawn as
+  an empty list: an empty list says nothing is broken. The time of the read is
+  on both pages, so a bot that stopped writing shows as an old date.
 */
-// ==== thornswood known board ====
-function knownMarkdown(title, b) {
-  const board = b && typeof b === 'object' ? b : {};
-  const text = (v) => String(v == null ? '' : v).replace(/\r\n/g, '\n').trim();
-  const cell = (v) => text(v).replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
-  const out = ['# ' + title, ''];
-  if (text(board.intro)) out.push(text(board.intro), '');
-  for (const sec of (Array.isArray(board.sections) ? board.sections : [])) {
-    if (!sec || typeof sec !== 'object') continue;
-    const cols = Array.isArray(sec.columns) ? sec.columns.filter((c) => c && c.id) : [];
-    const rows = (Array.isArray(sec.rows) ? sec.rows : []).filter((r) => r && !r.done);
-    const note = text(sec.note);
-    const table = cols.length && rows.length;
-    if (!note && !table) continue;
-    out.push('## ' + text(sec.name), '');
-    if (note) out.push(note, '');
-    if (table) {
-      out.push('| ' + cols.map((c) => cell(c.name)).join(' | ') + ' |');
-      out.push('|' + cols.map(() => '---').join('|') + '|');
-      for (const r of rows) {
-        out.push('| ' + cols.map((c) => cell((r.cells || {})[c.id])).join(' | ') + ' |');
-      }
-      out.push('');
-    }
+// ==== thornswood lists ====
+const KNOWN_INTRO = 'What is broken right now that the team already knows about. Each one is\n' +
+  'on the issue board to be fixed, and comes off this page as soon as work on\n' +
+  'it is merged.';
+const ROADMAP_INTRO = 'What is being built and roughly in what order. Nothing here has a date on it, because a date would be a guess.\n\n' +
+  'Things move up this list when somebody starts on them, not when they are announced.';
+const LIST_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// "26 Oct 2026, 8:05 AM UTC", or null for a time that will not read.
+function listTime(at) {
+  const d = new Date(String(at || ''));
+  if (!at || isNaN(d.getTime())) return null;
+  const h = d.getUTCHours(), m = d.getUTCMinutes();
+  return d.getUTCDate() + ' ' + LIST_MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear() + ', ' +
+    (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM') + ' UTC';
+}
+function listText(v) { return String(v == null ? '' : v).replace(/\r\n/g, '\n').trim(); }
+// Where a known issue was found, in words.
+function knownWhere(where) {
+  const w = (Array.isArray(where) ? where : []).map(String);
+  const words = [];
+  if (w.indexOf('Main') >= 0) words.push('main');
+  if (w.indexOf('Dev') >= 0) words.push('the dev server');
+  return words.length ? 'Found on ' + words.join(' and ') + '.' : '';
+}
+// The Known Issues page's markdown out of lists.json's contents (or null).
+function knownMarkdown(lists) {
+  const out = ['# Known Issues', '', KNOWN_INTRO, ''];
+  const at = listTime(lists && lists.at);
+  const known = lists && Array.isArray(lists.known) ? lists.known : null;
+  if (!known || !at) {
+    out.push('The list could not be read from the issue board just now. Try again in a few', 'minutes, and report a problem as usual in the meantime.');
+    return out.join('\n') + '\n';
   }
-  while (out.length && out[out.length - 1] === '') out.pop();
+  const rows = known.filter((k) => k && listText(k.title));
+  out.push('## Broken right now', '');
+  if (!rows.length) out.push('Nothing is listed right now.', '');
+  else out.push('Report one of these only if it does something this page does not describe.', '');
+  for (const k of rows) {
+    out.push('### ' + listText(k.title).replace(/\s*\n\s*/g, ' '), '');
+    if (listText(k.text)) out.push(listText(k.text), '');
+    const where = knownWhere(k.where);
+    if (where) out.push('*' + where + '*', '');
+  }
+  out.push('*Read from the issue board ' + at + '.*');
   return out.join('\n') + '\n';
 }
-// ==== end thornswood known board ====
+// The roadmap as /api/roadmap hands it to the front page and /roadmap draws
+// it: its intro, a section per lane (columns What and Where it stands, so a
+// lane reads like the board it replaced), when it was read, and unread when
+// the file held no roadmap.
+function roadmapBoard(lists) {
+  const at = listTime(lists && lists.at);
+  const rm = lists && lists.roadmap && Array.isArray(lists.roadmap.lanes) ? lists.roadmap : null;
+  const board = { intro: ROADMAP_INTRO, sections: [], at: at || '', unread: !rm || !at };
+  if (board.unread) return board;
+  rm.lanes.forEach((lane, i) => {
+    if (!lane || !listText(lane.name)) return;
+    board.sections.push({
+      id: 'lane' + i, name: listText(lane.name), note: '',
+      columns: [{ id: 'what', name: 'What' }, { id: 'where', name: 'Where it stands' }],
+      rows: (Array.isArray(lane.rows) ? lane.rows : []).filter((r) => r && listText(r.title)).map((r, j) => ({
+        id: 'lane' + i + 'r' + j, done: false,
+        cells: { what: listText(r.title), where: listText(r.text) } }))
+    });
+  });
+  return board;
+}
+// ==== end thornswood lists ====
 
 // A written page's markdown, or null. Help lives in the data folder with the
-// other documents, not under site; Known Issues is its board (#2414).
+// other documents, not under site; Known Issues is written from the issue
+// board, by way of the bot's lists.json (#3140).
 function pageMarkdown(name) {
   if (name === 'known') {
-    const b = readBoard().known;
-    if (!b || typeof b !== 'object') return null;
-    try { return forMode(knownMarkdown(BOARDS.known, b), cfg.open); } catch (e) { return null; }
+    try { return forMode(knownMarkdown(readLists()), cfg.open); } catch (e) { return null; }
   }
   const dir = PUBLIC_DOCS.indexOf(name) >= 0 ? DATA : SITE;
   const file = path.join(dir, name + '.md');
   if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
   try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
+}
+
+// The hints and lore lines (#3147): data\site\lines.md is the one copy of
+// them. The front page's lore line comes out of it as the page is served,
+// and /api/public hands the lot out, which is where the Discord bot reads its
+// status lines. The file's own comment says its rules, and
+// tests\test-3147-lines.js holds them, so nothing here checks a line again.
+// ==== thornswood lines ====
+function parseLines(md) {
+  const out = { hints: [], lore: [] };
+  let list = null, last = null;
+  String(md == null ? '' : md).replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/).forEach(function (l) {
+    const head = /^##\s+(.*?)\s*$/.exec(l);
+    if (head) {
+      list = /^hints$/i.test(head[1]) ? 'hints' : /^lore lines$/i.test(head[1]) ? 'lore' : null;
+      last = null;
+      return;
+    }
+    if (!list) return;
+    const item = /^- (.*?)\s*$/.exec(l);
+    if (item) {
+      if (list === 'hints') { out.hints.push(item[1]); last = null; }
+      else { last = { text: item[1], from: '' }; out.lore.push(last); }
+      return;
+    }
+    // The source of a lore line, on the line under it.
+    const from = /^ {2}(\S.*?)\s*$/.exec(l);
+    if (from && last && !last.from) last.from = from[1];
+  });
+  return out;
+}
+
+// home.html's lore line, the empty quote under The World, filled with one
+// line picked at pick (0 to 1, Math.random() when served). With no lore line
+// to show it stays empty and hidden.
+function fillLoreLine(html, lore, pick) {
+  const esc = function (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+  const list = Array.isArray(lore) ? lore : [];
+  if (!list.length) return html;
+  const one = list[Math.min(list.length - 1, Math.floor(pick * list.length))];
+  return html.replace('<blockquote class="chron" id="loreLine" hidden></blockquote>', () =>
+    '<blockquote class="chron" id="loreLine">' + esc(one.text) +
+    (one.from ? '<cite>' + esc(one.from) + '</cite>' : '') + '</blockquote>');
+}
+// ==== end thornswood lines ====
+
+function readLines() {
+  try {
+    return parseLines(forMode(fs.readFileSync(path.join(SITE, 'lines.md'), 'utf8'), cfg.open));
+  } catch (e) {
+    console.error('[thornswood-docs] could not read data/site/lines.md, so the front page shows ' +
+                  'no lore line and /api/public no lines: ' + e.message);
+    return { hints: [], lore: [] };
+  }
 }
 
 // The credits page says which engine each server runs. That is a fact of the
@@ -988,6 +1097,139 @@ function feedFile(channel) {
 function readJsonQuiet(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { return null; }
 }
+
+/* ---- release copies (#3686) ----
+   DOWNLOADS COME FROM THIS REPOSITORY'S RELEASES (Patrick, 26 Oct, for going
+   public). Every launcher of every age asks this site for its files, at
+   /feed[-dev]/assets/<sha256>, and that never changes: a launcher from 1.2.6
+   on builds each address from the feed's own folder (feedSplit, and Sync.cs
+   AssetFolder for a record's files), and older ones were given these
+   addresses in their feeds. What moves is where the bytes come from.
+   release-files.yml puts every file a release names on a GitHub Release, on
+   the release's own tag (release/main/<id>, release/dev/<id>), each named by
+   its sha256. Here, once GitHub says publicly that the Release of the feed's
+   current release holds a file, under that name, with that sha256 as its own
+   digest and with this site's size, the asset route answers 302 to the
+   Release's copy instead of sending the bytes. Every launcher since before
+   25 Sep follows a redirect and allows github.com and its download hosts
+   (Updater.cs AllowedHosts), and still checks the sha256 of what it gets.
+
+   Only what GitHub answers without a token counts, so while the repository
+   is private, or the Release is still a draft being filled, the answer is
+   404 and the site sends the bytes itself, as it always has; the site's copy
+   is also what any release the Release does not hold is served from. A
+   Release once seen is kept: release-files.yml publishes it only after every
+   file is on it, and never replaces a file of a published one. One that is
+   not there yet is asked about again RELEASE_LOOK_MS later, never sooner,
+   which keeps the site inside GitHub's sixty unsigned calls an hour. The
+   lookup never holds a download: the request that starts it is served from
+   here. tests/test-release-copies.js drives this block. */
+const RELEASE_REPO = 'EvilPatrick06/Thornswood';
+const RELEASE_DOWNLOAD = 'https://github.com/' + RELEASE_REPO + '/releases/download/';
+const RELEASE_LOOK_MS = 10 * 60 * 1000;
+const RELEASE_TAG_RE = /^release\/(main|dev)\/\d{8}-\d{4,6}(-dev)?$/;
+const releaseCopies = {};   // tag -> { files: { sha: { url, size } }, installer, seen } once found; { at, busy } while not
+const releaseTagOf = {};    // feed generation file -> the release tag it names, or ''
+function releaseGitHub(apiPath) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const req = https.get({
+      hostname: 'api.github.com', path: '/repos/' + RELEASE_REPO + apiPath,
+      headers: { 'user-agent': 'thornswood-site', accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' }
+    }, (res) => {
+      let out = '';
+      res.setEncoding('utf8');
+      res.on('data', (d) => { out += d; });
+      res.on('error', (e) => settle({ status: 0, why: e.message }));
+      res.on('end', () => {
+        if (res.statusCode !== 200) return settle({ status: res.statusCode, why: 'GitHub answered ' + res.statusCode });
+        try { settle({ status: 200, body: JSON.parse(out) }); }
+        catch (e) { settle({ status: 0, why: 'GitHub\'s answer did not read' }); }
+      });
+    });
+    const timer = setTimeout(() => { settle({ status: 0, why: 'GitHub did not answer inside ten seconds' }); req.destroy(); }, 10000);
+    req.on('error', (e) => settle({ status: 0, why: 'could not reach GitHub: ' + e.message }));
+  });
+}
+// The files of one published Release, from GitHub without a token. Only an
+// asset whose name is the sha256 GitHub itself measured on it counts, and
+// the installer only under its own name with GitHub's sha256 beside it.
+async function lookReleaseCopies(tag) {
+  // The newest Releases rather than /releases/tags/<tag>, which a tag with
+  // slashes in it does not suit; a feed's current release is always among
+  // them, since release-files.yml makes its Release just after its Ship.
+  const list = await releaseGitHub('/releases?per_page=30');
+  if (list.status !== 200 || !Array.isArray(list.body)) return { found: false, why: list.why || 'the Release list did not read' };
+  const r = list.body.find((x) => x && x.tag_name === tag && !x.draft && Number.isInteger(x.id));
+  if (!r) return { found: false, why: '' };
+  const files = {};
+  let installer = null;
+  for (let page = 1; page <= 10; page++) {
+    const got = await releaseGitHub('/releases/' + r.id + '/assets?per_page=100&page=' + page);
+    if (got.status !== 200 || !Array.isArray(got.body)) return { found: false, why: got.why || 'the asset list did not read' };
+    for (const a of got.body) {
+      if (!a || a.state !== 'uploaded' || typeof a.name !== 'string') continue;
+      const url = String(a.browser_download_url || '');
+      if (!url.startsWith(RELEASE_DOWNLOAD) || !url.endsWith('/' + a.name) || /[\s"'<>]/.test(url)) continue;
+      const m = /^sha256:([0-9a-f]{64})$/.exec(String(a.digest || ''));
+      if (!m || !Number.isInteger(a.size)) continue;
+      if (a.name === m[1]) files[m[1]] = { url, size: a.size };
+      else if (a.name === 'Thornswood-Setup.exe') installer = { sha: m[1], url, size: a.size };
+    }
+    if (got.body.length < 100) break;
+  }
+  return { found: true, files, installer };
+}
+function askReleaseCopies(tag) {
+  const had = releaseCopies[tag];
+  if (had && (had.files || had.busy || Date.now() - had.at < RELEASE_LOOK_MS)) return;
+  releaseCopies[tag] = { at: Date.now(), busy: true };
+  lookReleaseCopies(tag).then((v) => {
+    if (v.found) {
+      releaseCopies[tag] = { files: v.files, installer: v.installer, seen: Date.now() };
+      console.log('[thornswood-docs] release copies: ' + tag + ' holds ' + Object.keys(v.files).length + ' file(s)' + (v.installer ? ' and the installer' : ''));
+    } else {
+      releaseCopies[tag] = { at: Date.now(), busy: false };
+      if (v.why && !/ 404$/.test(v.why)) console.error('[thornswood-docs] release copies: ' + tag + ': ' + v.why);
+    }
+  }, (e) => {
+    releaseCopies[tag] = { at: Date.now(), busy: false };
+    console.error('[thornswood-docs] release copies: ' + tag + ': ' + (e && e.message));
+  });
+}
+// The tag of the release a channel's newest feed names, or ''. A generation
+// file is never rewritten (#2727), so its tag is read once.
+function feedReleaseTag(channel) {
+  const file = feedFile(channel);
+  if (!file) return '';
+  if (!(file in releaseTagOf)) {
+    const doc = readJsonQuiet(file);
+    const tag = String((doc && doc.release && doc.release.tag) || '');
+    releaseTagOf[file] = RELEASE_TAG_RE.test(tag) ? tag : '';
+  }
+  return releaseTagOf[file];
+}
+// Where a feed asset of this size can be fetched instead of here, or ''.
+function releaseCopy(channel, sha, size) {
+  const tag = feedReleaseTag(channel);
+  if (!tag) return '';
+  askReleaseCopies(tag);
+  const c = releaseCopies[tag];
+  const f = c && c.files && c.files[sha];
+  return f && f.size === size ? f.url : '';
+}
+// The same for the installer on the Downloads page: the main release's copy,
+// when it is the very file this site lists (its sha256 in files.json).
+function releaseInstallerCopy(sha, size) {
+  const tag = feedReleaseTag('feed');
+  if (!tag || !/^[0-9a-f]{64}$/.test(sha)) return '';
+  askReleaseCopies(tag);
+  const c = releaseCopies[tag];
+  const i = c && c.installer;
+  return i && i.sha === sha && i.size === size ? i.url : '';
+}
+/* ---- end release copies ---- */
 function creditsFacts() {
   const feeds = {};
   for (const pair of [['public', 'feed'], ['dev', 'feed-dev']]) {
@@ -1024,12 +1266,13 @@ function publicPageBody(route) {
     }
     if (!news.length) body += '<p>No release notes are available yet.</p>';
   } else if (route === '/roadmap') {
-    // Same public board as /api/roadmap; staff boards never enter this HTML.
-    const rm = readBoard().roadmap || {sections:[]};
+    // Same roadmap as /api/roadmap, built from the issue board (#3140).
+    const rm = roadmapBoard(readLists());
     if (rm.intro) body += pageHtml(rm.intro).replace(/<h1\b/g, '<h2').replace(/<\/h1>/g, '</h2>');
     let count = 0;
     for (const section of (rm.sections || [])) {
-      // Done is drawn too (#2560), last, as it sits in the data.
+      // Every lane the bot wrote is drawn, in its order, none filtered by
+      // name (#2560); the bot writes no Done lane since 26 Oct.
       if (!(section.rows || []).length) continue;
       body += '<section class="lane"><h2>' + escAttr(section.name || '') + '</h2><ul>';
       for (const row of section.rows) {
@@ -1038,7 +1281,9 @@ function publicPageBody(route) {
       }
       body += '</ul></section>';
     }
-    if (!count) body += '<p>No upcoming work is listed here yet. See <a href="/known">known issues</a> for current limits.</p>';
+    if (rm.unread) body += '<p>The roadmap could not be read from the issue board just now. Try again in a few minutes.</p>';
+    else if (!count) body += '<p>No upcoming work is listed here yet. See <a href="/known">known issues</a> for current limits.</p>';
+    if (rm.at) body += '<p><em>Read from the issue board ' + escAttr(rm.at) + '.</em></p>';
   } else if (route === '/gallery') {
     const shots = publicJson(GALLERY, []);
     const approved = (Array.isArray(shots) ? shots : []).slice(0, 24);
@@ -1251,9 +1496,7 @@ const PAGES = {
   '/uploads':     'uploads',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/inbox':       'inbox',
-  // The Known Issues board, which /known is written from (#2414).
-  '/hub/known':   'known'
+  '/inbox':       'inbox'
 };
 
 /*
@@ -1459,6 +1702,9 @@ function writeDoc(n, text) {
 
 const BOARDFILE = path.join(DATA, 'board.json');
 const readBoard = () => jsonFile(BOARDFILE, {});
+// The bot's lists (#3140), or null when there is no file yet or it will not
+// read (jsonFile says which).
+const readLists = () => jsonFile(LISTS, null);
 // EVERY BOARD HAS A REVISION (#2188). One board is saved at a time, so two
 // people on two boards never overwrite each other, but until 11 October two
 // people on the SAME board did, silently: last save won and the other edit
@@ -5909,10 +6155,15 @@ async function handle(req, res) {
 
   // ------------------------------------------------------- security.txt
   /* Where somebody who finds a hole in the site says so (RFC 9116, #3216,
-     Patrick's answer on 22 Oct 2026). The contact is the report page: open
-     to anybody without an account, read by staff and nobody else, and the
-     place staff already read every day, so a finding is never waiting in a
-     mailbox nobody opens.
+     Patrick's answer on 22 Oct 2026). The first contact is the report page:
+     open to anybody without an account, read by staff and nobody else, and
+     the place staff already read every day, so a finding is never waiting in
+     a mailbox nobody opens. The second is the Discord, for a direct message
+     to the owner alone. These are the routes SECURITY.md gives too (#3683,
+     Patrick's answer on 26 Oct, q-3683-report-route A), so a stranger gets
+     one answer wherever they look. GitHub's Report a vulnerability button
+     joins both, with a Policy line for SECURITY.md, once the repository is
+     public: before that both addresses answer 404 to anybody outside it.
 
      Expires is written as the file is asked for, 180 days on, inside the
      year RFC 9116 asks for. The file says what this site answers, and the
@@ -5925,6 +6176,7 @@ async function handle(req, res) {
     until.setUTCHours(0, 0, 0, 0);
     return send(res, 200, [
       'Contact: ' + PUBLIC_ORIGIN + '/report',
+      'Contact: ' + PUBLIC_ORIGIN + '/discord',
       'Expires: ' + until.toISOString(),
       'Preferred-Languages: en',
       'Canonical: ' + PUBLIC_ORIGIN + '/.well-known/security.txt',
@@ -6124,9 +6376,14 @@ async function handle(req, res) {
       // /join, never /hub. Somebody clicking Apply wants to know how to apply,
       // and sending them to the admin panel is the worst possible answer.
       html = html.split('DISCORD_URL').join(cfg.discord.invite || '/join');
+      // One lore line from lines.md under The World (#3147), a new pick each
+      // time a page is served. Every page, not only /: the front is in each
+      // one, for the page's script to show when it goes back to /. After the
+      // invite link, for the same reason as the written pages below.
+      html = fillLoreLine(html, readLines().lore, Math.random());
       // The og tags a crawler reads are the ones in the file, so the page
-      // actually being served is written into them here. home.html rewrites
-      // the same tags for the browser tab.
+      // actually being served is written into them here. The browser tab reads
+      // the same tags; home.js keeps no list of its own (#3138).
       const blurb = BLURB[route];
       let pageTitle = null;
       if (blurb) {
@@ -6207,7 +6464,9 @@ async function handle(req, res) {
       launcher: feed.launcher || '',
       collection: feed.collection || '',
       files: listFiles(),
-      news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title }))
+      news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title })),
+      // The hints and lore lines (#3147): the Discord bot's status lines.
+      lines: readLines()
     }), 'application/json; charset=utf-8', { 'Cache-Control': 'no-cache' });
   }
 
@@ -6569,10 +6828,10 @@ async function handle(req, res) {
   }
 
   if (route === '/api/roadmap' && req.method === 'GET') {
-    const all = readBoard();
-    // The intro is markdown, and it is rendered here like the written pages
-    // so the front page needs no markdown library of its own.
-    const rm = all.roadmap || { intro:'', sections:[] };
+    // Built from the issue board by the bot (#3140). The intro is markdown,
+    // and it is rendered here like the written pages so the front page needs
+    // no markdown library of its own.
+    const rm = roadmapBoard(readLists());
     return sendJson(res, 200, Object.assign({}, rm,
       { introHtml: rm.intro ? pageHtml(rm.intro) : '' }));
   }
@@ -6730,6 +6989,16 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
+    // The installer from the main release's GitHub Release, once it holds
+    // this very file publicly (release copies, #3686).
+    if (dl[1] === 'Thornswood-Setup.exe') {
+      const meta = jsonFile(path.join(FILES, 'files.json'), {});
+      const copy = releaseInstallerCopy(String((meta[dl[1]] || {}).sha256 || '').toLowerCase(), st.size);
+      if (copy) {
+        res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+        return res.end();
+      }
+    }
     /* Resumable, because the payload is hundreds of megabytes and the Join
        page says a dropped connection carries on. Accept-Ranges on the 200 so
        a client knows before it starts. The ETag and Last-Modified are what a
@@ -6867,6 +7136,13 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
+    // The Release's copy of these bytes, once GitHub holds it publicly
+    // (release copies, #3686). no-cache: the answer moves when it appears.
+    const copy = releaseCopy(feedAsset[1], feedAsset[2], st.size);
+    if (copy) {
+      res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+      return res.end();
+    }
     /* Same Range resume as /file/: packs are tens of megabytes and a drop
        must carry on. Cache-Control is long and immutable because the name
        is the bytes; a new pack is a new name. */
