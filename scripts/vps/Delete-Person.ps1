@@ -161,7 +161,7 @@
   -Reapply reads that record and asks for every request in it again, the same
   way: after a backup is put back and before anything starts, so each service
   takes them at the start that puts it back in service (Restore-Box.ps1 runs
-  it, and docs\RESTORING.md says when by hand). -Merge names other copies of
+  it, and RESTORING.md in the ops repo says when by hand). -Merge names other copies of
   the record (the one in the backup being put back, or one from a newer
   backup); lines the box's record does not have are added to it first.
   -Reapply never adds a line of its own.

@@ -13,6 +13,9 @@
 // the Desk and the threads read, and that the public repository keeps a short
 // CLAUDE.md with build and test tips only. The #3684 rewrite then takes them
 // out of the public history, which only holds if nothing puts them back.
+// His answer C on the same issue moved the box runbooks (SERVER, RESTORING,
+// IT-IS-DOWN, MOVING-THE-SERVER, SERVICE-OBJECTIVES) and the merchant work's
+// planning notes (docs/systems/merchant-plans) there too.
 //
 // What it checks:
 //   1. none of the moved paths is tracked here;
@@ -50,9 +53,10 @@ function where(text, rx) {
 }
 
 // What left for the private ops repository, as paths from the root.
-const MOVED_DIRS = ['ops/', 'docs/archive/'];
-const MOVED_PAGES = ['OWNERSHIP', 'DEPLOY-IDENTITIES', 'BOX-ACCESS', 'RUNNER-ISOLATION', 'WEBSITE-OPERATIONS', 'WEBSITE-AUDIT']
-  .map(function (n) { return 'docs/' + n + '.md'; });
+const MOVED_DIRS = ['ops/', 'docs/archive/', 'docs/systems/merchant-plans/'];
+const MOVED_NAMES = ['OWNERSHIP', 'DEPLOY-IDENTITIES', 'BOX-ACCESS', 'RUNNER-ISOLATION', 'WEBSITE-OPERATIONS', 'WEBSITE-AUDIT',
+  'SERVER', 'RESTORING', 'IT-IS-DOWN', 'MOVING-THE-SERVER', 'SERVICE-OBJECTIVES'];
+const MOVED_PAGES = MOVED_NAMES.map(function (n) { return 'docs/' + n + '.md'; });
 
 let tracked = [];
 try {
@@ -75,9 +79,9 @@ MOVED_PAGES.forEach(function (p) {
 });
 
 // ------------------------------------------------------------ 2. the links
-const NAMES = 'OWNERSHIP|DEPLOY-IDENTITIES|BOX-ACCESS|RUNNER-ISOLATION|WEBSITE-OPERATIONS|WEBSITE-AUDIT';
+const NAMES = MOVED_NAMES.join('|');
 // The same file on GitHub, wherever the link is written.
-const BLOB_LINK = new RegExp('github\\.com/EvilPatrick06/Thornswood/(?:blob|tree)/[^/\\s]+/(?:ops/|docs/archive|docs/(?:' + NAMES + ')\\.md)', 'i');
+const BLOB_LINK = new RegExp('github\\.com/EvilPatrick06/Thornswood/(?:blob|tree)/[^/\\s]+/(?:ops/|docs/archive|docs/systems/merchant-plans|docs/(?:' + NAMES + ')\\.md)', 'i');
 // A markdown link, resolved from the folder of the page it is in.
 const MD_LINK = /\]\(([^)\s]+)\)/g;
 function moved(target) {

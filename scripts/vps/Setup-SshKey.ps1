@@ -9,7 +9,7 @@
       .\scripts\vps\Setup-SshKey.ps1          set it up, or finish setting it up
       .\scripts\vps\Setup-SshKey.ps1 -Test    only check, change nothing
       .\scripts\vps\Setup-SshKey.ps1 -NewBox  a box with no bridge yet (a move,
-                                             docs\MOVING-THE-SERVER.md)
+                                             MOVING-THE-SERVER.md in the ops repo)
 
   HOW IT GETS IN. Port 22 on the box takes no outside address, so a home
   address that changes stops nothing. ssh goes inside a WebSocket on 443

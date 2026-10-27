@@ -6,7 +6,6 @@ at the root.
 
 | Page | What it answers |
 | --- | --- |
-| [SERVER.md](SERVER.md) | What runs where, what talks to what, and which script puts each piece in place: every VPS service with its folder, port and task. |
 | [FEED.md](FEED.md) | The update feed launchers read: every field of version.json, who writes it, who reads it, and what happens when it is wrong. |
 | [JSON-STATE-INVENTORY.md](JSON-STATE-INVENTORY.md) | Every critical JSON file, who writes and reads it, how it is checked, and the four records held to a version and shape (#2180). |
 | [ICONS.md](ICONS.md) | Which icon file is which: Main launcher badge, Dev launcher monogram, site favicon. |
@@ -15,13 +14,9 @@ at the root.
 | [GAMEMODE-COVERAGE.md](GAMEMODE-COVERAGE.md) | Which test drives each gamemode event handler, plugin, money function and chat word, and the gaps that were filled. |
 | [DECIDED.md](DECIDED.md) | What was decided against and the settled rules of the game, each with the link where it was decided. Read before filing an idea. |
 | [GAME-SYSTEMS.md](GAME-SYSTEMS.md) | Thornswood systems. The summary of every system, and a link from each section to the full plan. |
-| [systems/](systems/) | The finished plan for each system, one page each. Where the server is now is the last section of the page. The item lists are [systems/lists](systems/lists/README.md), and the merchant work's plans are [systems/merchant-plans](systems/merchant-plans/README.md). |
+| [systems/](systems/) | The finished plan for each system, one page each. Where the server is now is the last section of the page. The item lists are [systems/lists](systems/lists/README.md). |
 | [GLOSSARY.md](GLOSSARY.md) | The words used everywhere here, Keep, Hold, pack, baseline, door and the rest, one line each. |
 | [../engine/README.md](../engine/README.md) | Building the SkyMP fork: the submodule, the configure line, the build and the records. |
-| [IT-IS-DOWN.md](IT-IS-DOWN.md) | What to do when the server, the site or voice is down. |
-| [RESTORING.md](RESTORING.md) | Bringing the server, the site and the bot back from a backup. |
-| [SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md) | What working means for the site, feed, game servers, voice, bot and backups (#2183): each metric, threshold, the check that measures it, the alert, and the proposed owner. |
-| [MOVING-THE-SERVER.md](MOVING-THE-SERVER.md) | Growing the VPS, or moving everything to a new box. |
 | [studies/in-game-ui](studies/in-game-ui/README.md) | The options for voice, chat, emotes and the in-game UI without a browser (#3208): today's voice measured by room size, a box forwarder measured, each option's pros and cons, and the recommendations Patrick picks from. |
 | [AFFECTED-HARNESSES.md](AFFECTED-HARNESSES.md) | Running only the gate harnesses a pull request can affect (#3114): the Linux study, the read map, the rules, and the trace of the gate on the VPS. |
 | [SIGNED-RELEASES.md](SIGNED-RELEASES.md) | The signed release design (#2163): what gets signed and how, custody, rotation, revocation, the rollout that keeps every checksum, and the test-only pilot. |
@@ -38,8 +33,10 @@ at the root.
 | [npc-server-runtime.md](npc-server-runtime.md) | Dev NPC loading and first unattended activity. |
 | [NPC-WORLD-PLAN.md](NPC-WORLD-PLAN.md) | NPC world work: town cut, habitat rules, rates and merchant quests. |
 
-The pages about who holds each account and key, how the box is reached, the
-runners on it, the site's operator facts, and the dated notes from before
+The pages about running the box (what runs where, restoring it, moving it,
+what to do when it is down, its service objectives, who holds each account
+and key, how it is reached and the runners on it), the site's operator
+facts, the merchant work's planning notes, and the dated notes from before
 the repository went public are kept by the team in a private repository.
 
 Every page cites file and line for what it says. When a page and the code
