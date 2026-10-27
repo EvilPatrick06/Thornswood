@@ -22,7 +22,7 @@
 // the files that decide them: build.yml has one job and it is "Launcher
 // builds"; Ship.ps1 never writes to the source repository; Bump-Version.ps1
 // commits Updater.cs and nothing else; CODEOWNERS names files that exist and
-// covers the six shared ones CLAUDE.md lists. Then the documents: each states
+// covers the six shared ones the ops repo's CLAUDE.md lists. Then the documents: each states
 // the four settings (since 25 September: enforce_admins off, no required
 // check, since the build check on GitHub is off), gives
 // the command that reads the live settings, and says none of the things that

@@ -341,13 +341,8 @@ try {
     Yes '4. Setup-ShipMachine sends a sign in with no role to that step, not to Patrick''s own sign in' (
         $setupText.Contains('Your own signing sign in') -and $setupText.Contains('--allow-no-subscriptions') -and
         $setupText -notmatch 'as Patrick: only his Azure account' -and $setupText -notmatch 'signs only while signed in as him')
-    $own = [IO.File]::ReadAllText((Join-Path $Repo 'docs\OWNERSHIP.md'))
-    $signRow = [regex]::Match($own, '(?m)^\| Code signing \|.*$').Value
-    $domainRow = [regex]::Match($own, '(?m)^\| Domain \|.*$').Value
-    Yes 'OWNERSHIP.md: each person signs with an account of their own, which Patrick makes' (
-        $signRow -match 'an account of their own' -and $signRow -notmatch 'the only one with signing access')
-    Yes 'OWNERSHIP.md: the domain is in Patrick''s own Cloudflare login, signed in with GitHub, with no gap left' (
-        $domainRow -match "Patrick: it is registered in his own Cloudflare login, which he signs in to with GitHub" -and $domainRow -notmatch 'fill in|is the gap')
+    # The same two rows of OWNERSHIP.md are checked by tests/test-ops-docs.js
+    # in the private ops repo, where that page went with #3693.
     Yes 'Developer-Guide.md secrets table has the domain row and signing with an account of their own' (
         $dev -match '(?m)^\| The domain, thornswood\.net \| Registered at Cloudflare, in Patrick''s own Cloudflare login, which he signs in to with GitHub' -and
         $dev -match '(?m)^\| Code signing \|.*an account of their own')
