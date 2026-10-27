@@ -12,7 +12,9 @@
 
   A record is { "label": ..., "runners": [1, 2] }: the runners it lists
   (thornswood-vps is 1, thornswood-vps-<n> is n) carry the label and no other
-  runner does, an off-box runner (thornswood-pr-*) never. Changing one is a
+  runner does, an off-box runner (thornswood-pr-*) only when the record's
+  offBox names it and it does not carry thornswood-vps (build runners on
+  One, 26 Oct 2026). Changing one is a
   pull request to the record; once it merges, .github\workflows\github-admin.yml
   runs by itself and GitHub matches it a minute later. This script is for
   asking again, or for -Check.
