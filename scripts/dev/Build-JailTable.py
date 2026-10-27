@@ -293,7 +293,7 @@ def main():
 
     payload = {
         'builtBy': 'scripts/dev/Build-JailTable.py',
-        'readFrom': '%d active plugins, the five masters then %s' % (len(order), args.plugins),
+        'readFrom': own_plugins.load_order_name(order),
         'whatAJailIs': 'the interior holding the door whose teleport leads to the hold crime '
                        'faction\'s jail marker (FACT JAIL). Its doors are every door placed in it '
                        'with no teleport.',

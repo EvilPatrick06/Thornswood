@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, docs\\WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
+  "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, the ops repo's WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
   "statuses": {
     "cleared": "The licence is named by the file itself or its publisher and the evidence is cited, or the file holds nothing that could need one. Nothing to ask.",
     "ours": "Thornswood's own work: made for Thornswood by a team member under the contributor terms in LICENSE (#1331), or built here by a script in this repository from nothing but its own numbers. Who made it and who decided it are recorded. Nothing to ask.",
@@ -24,7 +24,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
       "status": "ours"
     },
     {
@@ -37,7 +37,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -50,7 +50,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -63,7 +63,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -76,7 +76,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -89,7 +89,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -186,7 +186,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -199,7 +199,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -545,15 +545,15 @@
     },
     {
       "path": "game/ours/Data/SKSE/Plugins/QuickLootIE.json",
-      "sha256": "41fdc7a0d5b38c5b91b0032843db71c06073e56a9d704ab170c9817908323627",
+      "sha256": "a38d8add4004f2c7f77b1d646939b4b95466c0a6ab5bf95741cf03074bd72354",
       "what": "QuickLoot IE 4.1.3's settings file with one override added, \"_root.lootMenu.infoColumns\": [\"weight\"], so the loot menu shows weight and no gold value column (#3113), and a comment at the top saying what Thornswood changed and when. Hash as git stores it, with LF line endings.",
       "published": "Every pack and the installer (Data\\SKSE\\Plugins)",
-      "source": "QuickLoot IE's own SKSE\\Plugins\\QuickLootIE.json (1,333 bytes, sha256 113760ff7a3fa6f31dfcef43ba82682e867bf4ea1751468bc879fbeaef119c4a), from QuickLoot IE 4.1.3 (Nexus Mods, Skyrim Special Edition mod 120075, file 806802, the file collection 7essxf revision 4 installs), with one line added",
-      "creator": "QuickLoot IE's authors: the file's settings and comments; the added line and the comment at the top are Thornswood's, 22 Oct 2026",
-      "licence": "GNU General Public License version 3: QuickLoot IE carries it as QLIE-LICENSE.md (Data\\QLIE-LICENSE.md, installed by the collection beside the file). A changed copy may go out under the same licence when it says what was changed and when, which the file's first lines do",
-      "attribution": "The credits page names it as QuickLoot IE 4.1.3's settings file with Thornswood's line, under the GPL 3 (#3113)",
+      "source": "QuickLoot IE's own SKSE\\Plugins\\QuickLootIE.json (1,333 bytes, sha256 113760ff7a3fa6f31dfcef43ba82682e867bf4ea1751468bc879fbeaef119c4a), from QuickLoot IE 4.1.3 (Nexus Mods, Skyrim Special Edition mod 120075, file 806802, the file collection 7essxf installs in revisions 4 and 5), with one line added",
+      "creator": "QuickLoot IE's authors: the file's settings and comments; the added line and the comment at the top are Thornswood's, 22 Oct 2026, the comment's licence name corrected 27 Oct 2026 (#3800)",
+      "licence": "GPL-3.0-or-later: QuickLoot IE's Nexus Mods page says \"Released under the GPL-3.0-or-later license\" (read 26 Oct 2026) and its 4.1.0 changelog \"Changed the project license to GPL-3.0-or-later\". The mod carries the licence text as QLIE-LICENSE.md (Data\\QLIE-LICENSE.md, installed by the collection beside the file), which in file 806802 is the GNU General Public License version 3 unchanged, byte for byte installer\\licences\\GPL-3.0.txt (35,149 bytes, sha256 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986). A changed copy may go out under the same licence when it says what was changed and when, which the file's first lines do",
+      "attribution": "The credits page names it as QuickLoot IE 4.1.3's settings file with Thornswood's line, under the GPL-3.0-or-later (#3113, #3800)",
       "approved": "Patrick, 21 Oct 2026: items have no gold price on Thornswood, and #3113 asks for the gold value display gone",
-      "evidence": "The collection's revision 4 file list (/mnt/project-files/handoff/2979, layout-4 files.txt) and the file itself, downloaded 21 Oct 2026 through the Nexus Mods API; QuickLoot IE's LootMenuIE.swf (infoColumns defaults to value, weight, valuePerWeight; applyOverrides sets swfConfig.overrides after the settings); scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; THIRD-PARTY.md, The collection's menus, with no gold values.",
+      "evidence": "The collection's revision 4 file list (/mnt/project-files/handoff/2979, layout-4 files.txt) and the file itself, downloaded 21 Oct 2026 through the Nexus Mods API; revisions 4 and 5 both pin file 806802 (Nexus Mods API, collectionRevision 7essxf, read 27 Oct 2026); file 806802's QLIE-LICENSE.md and the mod's changelogs, read through the Nexus Mods API 27 Oct 2026 (#3800); QuickLoot IE's LootMenuIE.swf (infoColumns defaults to value, weight, valuePerWeight; applyOverrides sets swfConfig.overrides after the settings); scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; THIRD-PARTY.md, The collection's menus, with no gold values.",
       "status": "cleared"
     },
     {
@@ -995,9 +995,9 @@
       "path": "Data\\Interface\\ (skyui\\config.txt, skyui\\itemcard.swf, hudmenu.swf, AHZHudInfo.swf and exported\\AHZHudInfo.swf)",
       "what": "The collection's item menus and HUD with no gold values (#3113): SkyUI's item list layout with no value or value to weight column in any of its twelve views (37,907 bytes, sha256 13a963540cb6b2d3d3f3de633ec517fb5c7ebe988cce8616b4173445ed3450c3); SkyUI's item card with no VALUE label or value field on any card (55,440 bytes, sha256 e08c8cc1e97c237e0cf241c5fbd421345bf1a30c7fc55122dc2b0b66b9e87aa9); SkyHUD's HUD with no VALUE under an item somebody looks at (438,631 bytes, sha256 3a9fb686511a56ec4949387d3843821b64d91b7ee4a0017cc3cfeeff7cb574f5); and moreHUD's HUD info with its value to weight off, both copies (36,077 bytes, sha256 486ac4d42a1c0b409b27412ed0471bdc57bd211eaa024bf0f816608b6bfd3c9b).",
       "published": "Never: the launcher makes them before every Play from the person's own SkyUI_SE.bsa, SkyHUD.bsa and AHZmoreHUD.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
-      "source": "SkyUI's interface\\skyui\\config.txt and itemcard.swf (SkyUI_SE.bsa, Nexus Mods mod 12604, file 749043), SkyHUD 0.90B's interface\\hudmenu.swf (SkyHUD.bsa, mod 463, file 61422) and moreHUD 5.4.5's interface\\ahzhudinfo.swf and interface\\exported\\ahzhudinfo.swf (AHZmoreHUD.bsa, mod 12688, file 803483), the files collection 7essxf revision 4 installs, edited. What the repository holds is the edits, as the bytes that change, each pinned to the sha256 of the mod's own file (launcher\\app\\FromGameModMenus.cs, written by scripts\\mods\\Build-ModMenus.py), not the files",
+      "source": "SkyUI's interface\\skyui\\config.txt and itemcard.swf (SkyUI_SE.bsa, Nexus Mods mod 12604, file 749043), SkyHUD 0.90B's interface\\hudmenu.swf (SkyHUD.bsa, mod 463, file 61422) and moreHUD 5.4.5's interface\\ahzhudinfo.swf and interface\\exported\\ahzhudinfo.swf (AHZmoreHUD.bsa, mod 12688, file 803483), the files collection 7essxf installs in revisions 4 and 5, edited. What the repository holds is the edits, as the bytes that change, each pinned to the sha256 of the mod's own file (launcher\\app\\FromGameModMenus.cs, written by scripts\\mods\\Build-ModMenus.py), not the files",
       "creator": "SkyUI's, SkyHUD's and moreHUD's authors; edited for Thornswood on 21 and 22 Oct 2026 by scripts\\mods\\Build-ModMenus.py",
-      "licence": "Each mod's own terms on its Nexus Mods page; none of them lets Thornswood hand these files on, edited or not, so they are made on each machine from the person's own copy",
+      "licence": "Each mod's own terms on its Nexus Mods page, read 26 Oct 2026 (#3800). SkyUI (12604): \"Upload: not allowed to upload to other sites\", modification allowed with credit, and its author notes \"You may release any patches that require the original file\". SkyHUD (463): modification and asset use allowed with credit, and its permission note lets anybody share a preset (skyhud.txt), but \"The rest of the mod must not be included\". moreHUD (12688): the page shows no permission list and no author instructions. So none of the five files may go out, edited or not, and they are made on each machine from the person's own copy; what Thornswood holds, and the launcher carries, is the edit, which works only on each mod's own file. Patrick, 26 Oct 2026, on #3800: these terms change nothing, and the five stay made from the person's own copy",
       "attribution": "The site's credits page says Thornswood ships none of them and makes them from the person's own copy of each mod (#3113)",
       "approved": "Patrick, 21 Oct 2026: items have no gold price on Thornswood, and #3113 asks for the gold value display gone",
       "evidence": "The measurement on #3113, 21 Oct 2026; launcher\\app\\FromGame.cs, FromGameModMenus.cs and MadeFromGame.cs; scripts\\mods\\Build-ModMenus.py; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromMods; tests\\test-2827-from-game.ps1; THIRD-PARTY.md, The collection's menus, with no gold values.",
@@ -1016,7 +1016,7 @@
   "dispositions": [
     {
       "what": "Community gallery pictures and recordings",
-      "how": "Each submission is checked by staff for permission and privacy before it is approved; submitting is not proof of ownership of somebody else's material (Terms; docs\\WEBSITE-OPERATIONS.md, Asset permission evidence). They are people's data on the VPS, so they are not listed here one by one. A removed submission's file is #2352."
+      "how": "Each submission is checked by staff for permission and privacy before it is approved; submitting is not proof of ownership of somebody else's material (Terms; the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence). They are people's data on the VPS, so they are not listed here one by one. A removed submission's file is #2352."
     },
     {
       "what": "The Nexus collection's mods",

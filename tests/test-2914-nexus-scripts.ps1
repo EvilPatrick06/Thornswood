@@ -37,7 +37,10 @@
        when Nexus keeps something else the run stops with the way back, and
        -From puts the page back;
     5. a collection revision: the collection_data is Vortex's own mapping; an
-       entry with patches, hashes or a mod rule is refused; -WhatIf builds the
+       entry with hashes is refused; a moved entry's patch stays when the new
+       archive holds the same file, goes when it is dropped and is refused
+       otherwise, and a mod rule that names it is given the new archive's md5,
+       file name and version (#2793); -WhatIf builds the
        archive and writes nothing; the real run uploads an archive with the
        same files as the published one and only the swapped entry changed,
        as a draft; a second draft, a base that is not the latest and a
@@ -345,7 +348,7 @@ $fixture = [ordered]@{
             source = [ordered]@{ type = 'nexus'; modId = 1111; fileId = 2222; md5 = '00000000000000000000000000000001'; fileSize = 10; logicalFilename = 'Hashed'; updatePolicy = 'exact'; tag = 'zzz' }
             hashes = @([ordered]@{ path = 'a.esp'; md5 = '00000000000000000000000000000002' }); author = 'Someone'; details = [ordered]@{ category = 'Gameplay'; type = '' }; phase = 1 }
     )
-    modRules = @([ordered]@{ type = 'before'; reference = [ordered]@{ fileMD5 = 'ee881bf2a869d0810113a82ca1405445'; logicalFileName = 'Thornswood Content'; versionMatch = '1.2.0' }
+    modRules = @([ordered]@{ type = 'before'; reference = [ordered]@{ fileExpression = 'Thornswood Content 192001 1.2 2026-09-26T22-15Z EwgfAezil'; fileMD5 = 'ee881bf2a869d0810113a82ca1405445'; logicalFileName = 'Thornswood Content'; versionMatch = '1.2.0' }
                            source = [ordered]@{ fileMD5 = 'fa1fe7613d21ab5826d4a3a3b258f14a'; logicalFileName = 'Fishing In Skyrim'; versionMatch = '1.0.0' } })
     tools = @(); plugins = @(); pluginRules = [ordered]@{ plugins = @(); groups = @() }; collectionConfig = [ordered]@{ recommendNewProfile = $true; referenceTagScheme = 'v1' }
 }
@@ -371,14 +374,53 @@ $wantPayload = '{"adult_content":false,"collection_manifest":{"info":{"author":"
 Yes 'the collection_data is Vortex''s mapping: empty strings to null, ids as strings, file_size dropped by filterInfo, schema 1' ((Test-Path -LiteralPath $o2) -and ([IO.File]::ReadAllText($o2, [Text.Encoding]::UTF8)) -ceq $wantPayload)
 & $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),t=fs.readFileSync(process.argv[2],'utf8'),b=JSON.parse(t);const layout=t===JSON.stringify(b,undefined,2);const r=b.mods[1];r.version='1.0.0';r.source.fileId=809366;r.source.md5='c515679068f6563750b1ca1f9260031f';r.source.fileSize=148896610;process.exit(layout&&JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1
 Yes 'and the rest of collection.json is as it was, in the layout Vortex writes' ($LASTEXITCODE -eq 0)
-foreach ($case in @(
-        @('192001', 'patches', 'Thornswood Content carries patches'),
-        @('1111', 'hashes', 'A Hashed Mod carries hashes'),
-        @('47618', 'a mod rule', 'mod rules name A Fishing Mod'))) {
-    Put $sw ('[{"modId":"' + $case[0] + '","fileId":"999","version":"9","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"x"}]')
-    $null = & $node.Source $js $cj $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
-    Yes ('an entry with ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+Put $sw ('[{"modId":"1111","fileId":"999","version":"9","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"x"}]')
+$null = & $node.Source $js $cj $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+Yes 'an entry with hashes is refused, and nothing is written' ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+
+# Issue #2793: Thornswood Content moved to a file whose plugin is not the one
+# its patch was made for. The patch stays only where the new archive holds the
+# same file, and the mod rule that names 1.2 by its archive is moved with it.
+$tcExpr = 'Thornswood Content 192001 1.3 2026-10-27T15-00Z Tok812399'
+function TcSwap([string]$crcs, [string]$drop, [string]$expr = $tcExpr) {
+    $x = if ($expr) { ',"fileExpression":"' + $expr + '"' } else { '' }
+    $c = if ($crcs) { ',"patchCrcs":' + $crcs } else { '' }
+    $d = if ($drop) { ',"dropPatches":' + $drop } else { '' }
+    return '[{"modId":"192001","fileId":"812399","version":"1.3","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"Thornswood Content"' + $x + $c + $d + '}]'
 }
+$o1 = Join-Path $T 'tc-collection.json'; $o2 = Join-Path $T 'tc-payload.json'
+Put $sw (TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' '["thornswood-content.esp"]')
+$said = & $node.Source $js $cj $sw $o1 $o2
+$want = @("patches.Thornswood-Content.esp`t023593E0`tdropped", "modRules[0].reference.fileMD5`tee881bf2a869d0810113a82ca1405445`t$md5",
+    "modRules[0].reference.fileExpression`tThornswood Content 192001 1.2 2026-09-26T22-15Z EwgfAezil`t$tcExpr", "modRules[0].reference.versionMatch`t1.2.0`t1.3.0",
+    "version`t1.2`t1.3", "source.fileId`t811029`t812399", "source.md5`tee881bf2a869d0810113a82ca1405445`t$md5", "source.fileSize`t660022`t1") | ForEach-Object { "Thornswood Content`t" + $_ }
+Yes 'a dropped patch goes, and the rule that names Thornswood Content gets the new md5, file name and version, each said' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ($want -join '|'))
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));const c=b.mods[0],r=b.modRules[0];if('patches' in c)process.exit(2);if(JSON.stringify(r.source)!==JSON.stringify(a.modRules[0].source))process.exit(3);c.patches=a.mods[0].patches;c.version='1.2';Object.assign(c.source,{fileId:811029,md5:'ee881bf2a869d0810113a82ca1405445',fileSize:660022});const k=Object.keys(c);k.splice(k.indexOf('patches'),1);k.splice(k.indexOf('source')+1,0,'patches');const o={};for(const x of k)o[x]=c[x];b.mods[0]=o;Object.assign(r.reference,{fileExpression:'Thornswood Content 192001 1.2 2026-09-26T22-15Z EwgfAezil',fileMD5:'ee881bf2a869d0810113a82ca1405445',versionMatch:'1.2.0'});process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1
+Yes 'and nothing else in collection.json changes' ($LASTEXITCODE -eq 0)
+Put $sw (TcSwap '{"Thornswood-Content.esp":"023593e0"}' '')
+$said = & $node.Source $js $cj $sw $o1 $o2
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.exit(b.mods[0].patches['Thornswood-Content.esp']==='023593E0'&&b.modRules[0].reference.versionMatch==='1.3.0'?0:1)" $o1
+Yes 'a patch whose file the new archive holds unchanged stays, with no line for it' ($LASTEXITCODE -eq 0 -and -not (@($said) -match '^Thornswood Content	patches'))
+foreach ($case in @(
+        @((TcSwap '' ''), 'a patched entry whose new archive the swap does not describe', 'does not say what the new archive holds there'),
+        @((TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' ''), 'a patch made for another file than the new archive holds', 'with CRC-32 0A1B2C3D, so the patch would not apply\. Drop it .*-DropPatch 192001:Thornswood-Content\.esp'),
+        @((TcSwap '{"Thornswood-Content.esp":null}' ''), 'a patch for a file the new archive does not have', 'the new archive has no Thornswood-Content\.esp'),
+        @((TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' '["Other.esp"]'), 'dropping a patch the entry does not have', 'has no patch for Other\.esp to drop'),
+        @((TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' '["Thornswood-Content.esp"]' ''), 'a rule that names the entry by its file name, with no new file name', 'by its file name on Nexus, and the swap gives no fileExpression'))) {
+    Put $sw $case[0]
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $err = (& $node.Source $js $cj $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>&1) -join ' '
+    Yes ('a swap of ' + $case[1] + ' is refused, saying so, and nothing is written') ($LASTEXITCODE -eq 1 -and $err -match $case[2] -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+# A rule that matches a version range, which cannot be worked out for the new one.
+$cjRange = Join-Path $T 'range-collection.json'
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));b.modRules[0].source.versionMatch='>=1.0.0';fs.writeFileSync(process.argv[2],JSON.stringify(b,undefined,2))" $cj $cjRange
+Put $sw ('[{"modId":"47618","fileId":"999","version":"9","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"Fishing In Skyrim"}]')
+Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+$err = (& $node.Source $js $cjRange $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>&1) -join ' '
+Yes 'a rule that matches the moved entry by a version range is refused, and nothing is written' ($LASTEXITCODE -eq 1 -and $err -match 'by the version ">=1\.0\.0"' -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+$said = & $node.Source $js $cj $sw $o1 $o2
+Yes 'and one that matches it by its own version moves to the new one' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -match ('modRules\[0\]\.source\.fileMD5\tfa1fe7613d21ab5826d4a3a3b258f14a\t' + $md5) -and (@($said) -join '|') -match 'modRules\[0\]\.source\.versionMatch\t1\.0\.0\t9\.0\.0')
 
 # Issue #2969: a mod the revision does not carry yet, added the way Vortex
 # writes one it put in with its basic installer.
@@ -460,11 +502,33 @@ Push-Location (Join-Path $T 'fixture'); & $sz a -t7z -y $baseArchive 'bundled' '
 Yes 'a published revision''s archive stands in for the one in Vortex''s downloads' (Test-Path -LiteralPath $baseArchive)
 $newFileArchive = $archive
 
+# Issue #2793: Thornswood Content moves to a file that carries the plugin as
+# it should be, so the patch revision 2 made for 1.2's plugin is dropped.
+$tcDir = Join-Path $T 'tc'
+New-Item -ItemType Directory -Force -Path $tcDir | Out-Null
+Put (Join-Path $tcDir 'Thornswood-Content.esp') 'TES4 remade'
+$tcArc = Join-Path $T 'Thornswood Content-next.7z'
+Push-Location $tcDir; & $sz a -t7z -y $tcArc 'Thornswood-Content.esp' | Out-Null; Pop-Location
+# 1.3 is taken when the 5.1 run above made it.
+$tcVer = if ($winps) { '1.4' } else { '1.3' }
+$r = Run 'Send-NexusFile.ps1' @('-Mod', '192001', '-Archive', $tcArc, '-Version', $tcVer, '-Category', 'main')
+$tcId = [regex]::Match($r.Out, 'File id\s+(\d+)').Groups[1].Value
+YesR ('Thornswood Content ' + $tcVer + ', an archive with the plugin in it, is uploaded') ($r.Code -eq 0 -and $tcId) $r
+$tcMd5 = (Get-FileHash -LiteralPath $tcArc -Algorithm MD5).Hash.ToLowerInvariant()
 $n0 = Count
-# Content's live file is 1.3 when the 5.1 run above made it, and 1.2 otherwise.
-$contentLive = if ($winps) { '812347' } else { '811029' }
-$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $contentLive, '-Archive', $newFileArchive, '-WhatIf')
-YesR 'a revision that moves Thornswood Content is refused, because of its patch' ($r.Code -eq 1 -and $r.Out -match 'Thornswood Content carries patches' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $tcId, '-Archive', $tcArc, '-WhatIf')
+YesR 'moving Thornswood Content with no -DropPatch is refused, naming it, because its patch was made for another plugin' ($r.Code -eq 1 -and $r.Out -match 'patches Thornswood-Content\.esp \(CRC-32 023593E0\); the new archive holds it with CRC-32 [0-9A-F]{8}' -and $r.Out -match 'so the patch would not apply' -and $r.Out -match '-DropPatch 192001:Thornswood-Content\.esp' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $tcId, '-Archive', $tcArc, '-DropPatch', '192762:Thornswood-Content.esp', '-WhatIf')
+YesR 'a -DropPatch for a mod the run does not move is refused' ($r.Code -eq 1 -and $r.Out -match 'names mod 192762, which -Mod does not move') $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $tcId, '-Archive', $tcArc, '-DropPatch', '192001:Thornswood-Content.esp', '-WhatIf')
+$built = Join-Path $T 'scratch\nexus-revision-7essxf\out\collection_3.7z'
+YesR 'with -DropPatch, -WhatIf builds collection_3.7z less the patch, says what moved and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'patches\.Thornswood-Content\.esp: 023593E0 -> dropped' -and $r.Out -match 'modRules\[0\]\.reference\.fileMD5: ee881bf2a869d0810113a82ca1405445 -> ' -and $r.Out -match 'less the dropped patches\\Thornswood Content, patches\\Thornswood Content\\Thornswood-Content\.esp\.diff' -and (Test-Path -LiteralPath $built) -and @(Writes @(Since $n0)).Count -eq 0) $r
+$x = Join-Path $T 'unpacked-tc'
+& $sz x -y ('-o' + $x) $built | Out-Null
+Yes 'its archive has no patch for Thornswood Content' ((Test-Path -LiteralPath (Join-Path $x 'collection.json')) -and -not (Test-Path -LiteralPath (Join-Path $x 'patches\Thornswood Content')))
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));const c=b.mods[0],r=b.modRules[0].reference;const x=new RegExp('^Thornswood Content 192001 '+process.argv[3].replace('.','\\.')+' \\d{4}-\\d\\d-\\d\\dT\\d\\d-\\d\\dZ Tok'+process.argv[2]+'$');process.exit(!('patches' in c)&&c.source.fileId===Number(process.argv[2])&&c.source.md5===process.argv[4]&&r.fileMD5===process.argv[4]&&x.test(r.fileExpression)&&r.versionMatch===process.argv[3]+'.0'&&r.logicalFileName==='Thornswood Content'?0:1)" (Join-Path $x 'collection.json') $tcId $tcVer $tcMd5
+Yes 'and its rule names the new archive by md5, its file name on Nexus and version, so Vortex finds it' ($LASTEXITCODE -eq 0)
+$n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812345', '-Archive', $newFileArchive, '-WhatIf')
 YesR 'a file id that has been archived is refused' ($r.Code -eq 1 -and $r.Out -match 'is archived, not a file people can download now') $r
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '811029', '-Archive', $newFileArchive, '-WhatIf')

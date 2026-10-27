@@ -8,6 +8,7 @@
 
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded>
+      .\scripts\release\New-NexusRevision.ps1 -Mod 192001 -FileId <new file id> -Archive <the archive uploaded> -DropPatch 192001:Thornswood-Content.esp -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Add <mods to add>.json -WhatIf
       pwsh scripts/release/New-NexusRevision.ps1 -Remove 24104 -WhatIf
       pwsh scripts/release/New-NexusRevision.ps1 -SetLight RaceMenu.esp,XPMSE.esp -Layout <the -Record folder> -WhatIf
@@ -43,10 +44,10 @@
     - it checks the archive is the latest published revision, and that no
       draft is waiting, before anything else;
     - it refuses an entry whose new file would need anything worked out from
-      the archive's contents (hashes, installer choices, patches, file
-      overrides) or that a mod rule names by its old archive, which today is
-      Thornswood Content (it carries a patch and a rule). Those revisions are
-      still made in Vortex on One;
+      the archive's contents that this cannot work out (file hashes, installer
+      choices, file overrides). Those revisions are still made in Vortex on
+      One. Patches and mod rules it carries over, as PATCHES AND MOD RULES
+      below says;
     - for each entry it reads the new file from Nexus (the file id has to be
       a live version of that mod) and takes the md5 and size from the archive
       that was uploaded, as Vortex does from the archive it downloaded;
@@ -83,6 +84,17 @@
   A DRAFT WAITING. Nexus keeps one draft at a time, so a real run refuses
   while there is one. -WhatIf builds on the draft instead, so the revision
   after it can be laid out and checked while the draft waits.
+
+  PATCHES AND MOD RULES (#2793). A moved entry's binary patches were made
+  against files of its old archive. Each patched file is read out of the new
+  archive: a patch whose file has the same CRC-32 there stays, a patch named
+  in -DropPatch goes (its .diff with it), so the new archive's own file is
+  what is installed, and any other is refused, because Vortex would not apply
+  it. A mod rule that names the entry by its old archive is given the new
+  archive's md5, its file name on Nexus (read from the v1 file record) and its
+  version, so it finds the new file. The first use is Thornswood Content 1.3,
+  whose archive carries the repository's own plugin, so the patch revision 2
+  made for 1.2's plugin is dropped (-DropPatch 192001:Thornswood-Content.esp).
 
   LIGHT FLAGS (#2979). -SetLight and -ClearLight name plugins whose ESL flag
   (0x200 in the TES4 header) the revision sets or clears, the way the
@@ -140,6 +152,10 @@
 .PARAMETER Archive
   Each mod's archive, the one that was uploaded as that file id.
 
+.PARAMETER DropPatch
+  Patches of the moved mods to drop, each as <mod>:<path in the mod>, as
+  PATCHES AND MOD RULES above says.
+
 .PARAMETER Add
   A JSON file of mods to add, as ADDING A MOD above says.
 
@@ -193,6 +209,7 @@ param(
   [string[]]$Mod = @(),
   [string[]]$FileId = @(),
   [string[]]$Archive = @(),
+  [string[]]$DropPatch = @(),
   [string]$Add,
   [string[]]$Remove = @(),
   [string[]]$SetLight = @(),
@@ -381,7 +398,7 @@ Say ('  "' + (Get-NexusField $col 'name') + '", id ' + $colId + ', revision ' + 
 
 # --------------------------------------------------------------- publish ---
 if ($Publish) {
-  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $From -or $Add -or $Remove.Count -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -Add, -Remove, -SetLight, -ClearLight or -From.' }
+  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $DropPatch.Count -or $From -or $Add -or $Remove.Count -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -DropPatch, -Add, -Remove, -SetLight, -ClearLight or -From.' }
   $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $Publish + ', domainName: "' + $Game + '") { id revisionNumber status downloadLink } }'
   $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $Publish) }) 'collectionRevision'
   $revId = [string](Get-NexusField $rev 'id')
@@ -440,6 +457,14 @@ $Remove = @($Remove | ForEach-Object { ([string]$_).Split(',') } | ForEach-Objec
 foreach ($m in $Remove) {
   if ($m -notmatch '^\d+$') { Die ('-Remove ' + $m + ' is not a mod number.') }
   if (@($Remove | Where-Object { $_ -eq $m }).Count -gt 1 -or $Mod -contains $m) { Die ('Mod ' + $m + ' is named more than once in -Mod and -Remove.') }
+}
+$drops = @{}
+foreach ($d in @($DropPatch | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+  $dm = [regex]::Match($d, '^(\d+):(.+)$')
+  if (-not $dm.Success) { Die ('-DropPatch ' + $d + ' is not <mod>:<path in the mod>.') }
+  if ($Mod -notcontains $dm.Groups[1].Value) { Die ('-DropPatch ' + $d + ' names mod ' + $dm.Groups[1].Value + ', which -Mod does not move.') }
+  if (-not $drops.ContainsKey($dm.Groups[1].Value)) { $drops[$dm.Groups[1].Value] = @() }
+  $drops[$dm.Groups[1].Value] += $dm.Groups[2].Value
 }
 $adds = @()
 if ($Add) {
@@ -525,6 +550,8 @@ Say ('  ' + $basePaths.Count + ' files and folders in it')
 # ------------------------------------------------------------- the swaps ---
 if ($Mod.Count) { Head 'The new files' }
 $swaps = New-Object System.Collections.Generic.List[object]
+$baseCol = Step { ConvertFrom-Json ([IO.File]::ReadAllText($baseJson)) }
+$dropped = @()
 for ($i = 0; $i -lt $Mod.Count; $i++) {
   $m = $Mod[$i]; $fid = $FileId[$i]
   $info = Step { Get-NexusField (Invoke-NexusApi 'GET' ('/v3/games/' + $Game + '/mods/' + $m) '' ('Reading mod ' + $m)) 'data' }
@@ -538,7 +565,37 @@ for ($i = 0; $i -lt $Mod.Count; $i++) {
   $facts = Step { Get-NexusArchiveFacts $Archive[$i] }
   Say ('  mod ' + $m + ' (' + (Get-NexusField $info 'name') + '): file id ' + $fid + ', "' + (Get-NexusField $v 'name') + '" ' + (Get-NexusField $v 'version') + ', ' + $cat)
   Say ('    ' + $facts.Name + ', ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex) 'DarkGray'
-  $swaps.Add([ordered]@{ modId = $m; fileId = $fid; version = [string](Get-NexusField $v 'version'); md5 = $facts.Md5Hex; fileSize = $facts.Size; logicalFilename = [string](Get-NexusField $v 'name') })
+  # Its name on Nexus, which a mod rule names it by (PATCHES AND MOD RULES).
+  $v1 = Step { Invoke-NexusApi 'GET' ('/v1/games/' + $Game + '/mods/' + $m + '/files/' + $fid + '.json') '' ('Reading file ' + $fid + '''s name') }
+  $onNexus = [string](Get-NexusField $v1 'file_name')
+  if (-not $onNexus) { Die ('Nexus gave file ' + $fid + ' of mod ' + $m + ' with no file name.') }
+  $swap = [ordered]@{ modId = $m; fileId = $fid; version = [string](Get-NexusField $v 'version'); md5 = $facts.Md5Hex; fileSize = $facts.Size; logicalFilename = [string](Get-NexusField $v 'name')
+    fileExpression = [IO.Path]::GetFileNameWithoutExtension($onNexus) }
+  # Each file the entry patches, as the new archive holds it.
+  $entry = @($baseCol.mods | Where-Object { $_.source -and [string]$_.source.modId -eq $m }) | Select-Object -First 1
+  $patched = if ($entry -and $entry.PSObject.Properties['patches'] -and $entry.patches) { @($entry.patches.PSObject.Properties | ForEach-Object { $_.Name }) } else { @() }
+  if ($patched.Count) {
+    $look = Join-Path $scratch ('patched-' + $m)
+    if (Test-Path -LiteralPath $look) { Remove-Item -LiteralPath $look -Recurse -Force }
+    $r = Invoke-Tool $sz @('x', '-y', ('-o' + $look), $Archive[$i])
+    if ($r.Code -ne 0) { Die ('7-Zip could not unpack ' + $Archive[$i] + ': ' + $r.Err.Trim()) }
+    $crcs = [ordered]@{}
+    foreach ($pp in $patched) {
+      $hit = @(Get-ChildItem -LiteralPath $look -Recurse -File | Where-Object { $_.FullName.Substring($look.Length + 1).Replace('/', '\') -ieq $pp.Replace('/', '\') }) | Select-Object -First 1
+      $crcs[$pp] = if ($hit) { Step { Get-Crc32Hex $sz $hit.FullName } } else { $null }
+      Say ('    patches ' + $pp + ' (CRC-32 ' + $entry.patches.$pp + '); the new archive ' + $(if ($hit) { 'holds it with CRC-32 ' + $crcs[$pp] } else { 'has no such file' })) 'DarkGray'
+    }
+    Remove-Item -LiteralPath $look -Recurse -Force
+    $swap.patchCrcs = $crcs
+  }
+  if ($drops.ContainsKey($m)) {
+    $swap.dropPatches = @($drops[$m])
+    foreach ($d in $drops[$m]) {
+      $k = @($patched | Where-Object { $_ -ieq $d }) | Select-Object -First 1
+      if ($k) { $dropped += ('patches\' + $entry.name + '\' + $k + '.diff') }
+    }
+  }
+  $swaps.Add($swap)
 }
 
 # ------------------------------------------------------------ the adds ---
@@ -677,6 +734,16 @@ if ($lights.Count) {
 Head 'The new revision'
 Copy-Item -Path (Join-Path $base '*') -Destination $build -Recurse -Force
 if ($lights.Count) { Copy-Item -Path (Join-Path $staged 'patches') -Destination $build -Recurse -Force }
+# A dropped patch's .diff goes, and its folder when nothing is left in it.
+foreach ($d in $dropped) {
+  $f = Join-Path $build ($d.Replace('\', [IO.Path]::DirectorySeparatorChar))
+  if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force }
+  $dir = Split-Path -Parent $f
+  if ((Test-Path -LiteralPath $dir) -and -not @(Get-ChildItem -LiteralPath $dir -Force).Count) {
+    Remove-Item -LiteralPath $dir -Force
+    $dropped += $dir.Substring($build.Length + 1).Replace('/', '\')
+  }
+}
 $swapsJson = Join-Path $scratch 'swaps.json'
 $payloadJson = Join-Path $scratch 'payload.json'
 [IO.File]::WriteAllText($swapsJson, (ConvertTo-Json -InputObject @($swaps.ToArray()) -Depth 6), (New-Object Text.UTF8Encoding($false)))
@@ -694,13 +761,14 @@ $tops = @(Get-ChildItem -LiteralPath $build -Force | ForEach-Object { $_.Name })
 $r = Invoke-Tool $sz (@('a', '-t7z', '-y', $out) + $tops) $build
 if ($r.Code -ne 0) { Die ('7-Zip could not pack the new revision: ' + $r.Err.Trim()) }
 $newPaths = @(Step { Get-ArchivePaths $sz $out })
-$gone = @($basePaths | Where-Object { $newPaths -notcontains $_ })
+$gone = @($basePaths | Where-Object { $newPaths -notcontains $_ -and $dropped -notcontains $_ })
 $extra = @($newPaths | Where-Object { $basePaths -notcontains $_ -and $lightPaths -notcontains $_ })
 if ($gone.Count -or $extra.Count) { Die ('The new archive does not hold the same files and folders as revision ' + $start + ' (missing: ' + ($gone -join ', ') + '; extra: ' + ($extra -join ', ') + '). Nothing was sent.') }
 $facts = Step { Get-NexusArchiveFacts $out }
 Say ('  ' + $out)
 $addedPaths = @($newPaths | Where-Object { $basePaths -notcontains $_ })
-Say ('  ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex + ', the same ' + ($newPaths.Count - $addedPaths.Count) + ' files and folders as revision ' + $start + $(if ($addedPaths.Count) { ' and ' + $addedPaths.Count + ' more for the light flags' } else { '' }))
+$droppedHere = @($basePaths | Where-Object { $newPaths -notcontains $_ })
+Say ('  ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex + ', the same ' + ($newPaths.Count - $addedPaths.Count) + ' files and folders as revision ' + $start + $(if ($addedPaths.Count) { ' and ' + $addedPaths.Count + ' more for the light flags' } else { '' }) + $(if ($droppedHere.Count) { ', less the dropped ' + ($droppedHere -join ', ') } else { '' }))
 $payloadText = ([IO.File]::ReadAllText($payloadJson)).Trim()
 
 if ($WhatIf) {

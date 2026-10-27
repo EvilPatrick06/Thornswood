@@ -141,6 +141,15 @@ yes('  and so does an off-box runner, which never takes box jobs', did('thornswo
 yes('a runner that is right is left alone', !did('thornswood-vps') && !did('thornswood-vps-3') && p.changes.length === 3);
 yes('a listed runner GitHub does not have is named', p.lines.some(l => /runner 4 is in records\/build-runners\.json but not registered/.test(l)));
 yes('  and nothing is refused', p.refuse === '');
+// Build runners on One (26 Oct 2026): named in offBox, an off-box runner keeps it,
+// but never one that carries thornswood-vps too.
+const recOne = Object.assign({}, rec4, { offBox: ['thornswood-pr-one', 'thornswood-pr-one-2'] });
+const withVps = mixed.concat([runner(41, 'thornswood-pr-one-2', ['self-hosted', 'Windows', 'thornswood-pr', 'thornswood-vps', 'thornswood-build'])]);
+const pOne = admin.planLabels(recOne, withVps);
+const didOne = (name) => (pOne.changes.find(c => c.name === name) || {}).do;
+yes('an off-box runner the record names by name keeps the label', !didOne('thornswood-pr-one'));
+yes('  but not one that also carries thornswood-vps', didOne('thornswood-pr-one-2') === 'take off');
+yes('an off-box name with no runner under it is named', admin.planLabels(Object.assign({}, rec4, { offBox: ['thornswood-pr-one-5'] }), mixed).lines.some(l => /off-box runner thornswood-pr-one-5 is in/.test(l)));
 yes('a record whose runners GitHub has none of is refused', /never comes/.test(admin.planLabels({ file: 'r', label: 'thornswood-build', runners: [9] }, mixed).refuse));
 yes('runner numbers: thornswood-vps is 1, thornswood-vps-<n> is n, anything else none',
   admin.runnerNumber('thornswood-vps') === 1 && admin.runnerNumber('thornswood-vps-7') === 7 && admin.runnerNumber('thornswood-pr-one') === 0 && admin.runnerNumber('thornswood-vps-x') === 0);
@@ -152,6 +161,8 @@ yes('  and one naming self-hosted', /every runner carries/.test(stops([{ file: '
 yes('a record listing no runners stops', /lists no runners/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [] }])));
 yes('two records naming one label stop', /both name/.test(stops([rec4, Object.assign({}, sign3, { label: 'thornswood-build' })])));
 yes('a label that is not one lower case word stops', /one lower case word/.test(stops([{ file: 'r', label: 'a b', runners: [1] }])));
+yes('an off-box name that is not thornswood-pr-* stops', /not thornswood-pr-/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-vps-9'] })])));
+yes('an off-box name listed twice stops', /off-box runner twice/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-pr-one', 'thornswood-pr-one'] })])));
 yes('a runner number below 1 stops', /number from 1/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [0] }])));
 yes('the real records on this checkout pass', (() => {
   const dir = path.join(REPO, 'records');

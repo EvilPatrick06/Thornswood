@@ -73,6 +73,15 @@ function build(src) {
   body = swap(body, "    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result", "    if: ${{ !cancelled() && needs.launcher.result", 'the fallback\'s tested condition');
   body = swap(body, "    needs: [tested, tested-vps]\n    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && vars.BUILD_RUNNER", "    if: ${{ vars.BUILD_RUNNER", 'the hosted job\'s tested condition');
   if (/needs\.tested|needs: \[?tested|^  tested:/m.test(code(body))) { fail('the pull request build still names the tested job'); }
+  /*
+    A PULL REQUEST'S FALLBACK MAY ALSO LAND ON ONE (#3860, Patrick, 26 Oct
+    2026). Its build needs nothing of the box, so it asks for the build label
+    alone, which the box's build runners and One's off-box ones carry. Main's
+    build keeps thornswood-vps: only the box traces the gate, and a main build
+    is what leaves the map the next pull requests measure from (#3114, #3874).
+  */
+  if (code(body).split('    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]\n').length !== 2) { fail('build.yml no longer has exactly one build-runner job, the fallback'); }
+  body = swap(body, '    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]\n', '    runs-on: [self-hosted, Windows, thornswood-build]\n', 'the fallback\'s runner labels');
   const jobs = body.indexOf('\njobs:\n');
   const vps = body.indexOf('\n  launcher-vps:\n');
   const dflt = body.indexOf('\n  # The default:');
