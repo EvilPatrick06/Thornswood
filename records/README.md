@@ -75,9 +75,10 @@ read it (issue #440, phase 8):
 - `most-online.json`: the most people in the world at once (`people`) and
   the seats over it that only the Discord staff roles may take
   (`staffSeats`), with Patrick's decisions in its `note` (issue #481), and
-  the most people the voice service takes at once (`voice`), never fewer than
-  the two together, since everybody seated and everybody waiting in line at
-  the menu holds a socket to it. Those are main's. Its `dev` object holds the
+  the most people who hold a voice place at once (`voice`), never fewer than
+  the two together, so everybody seated has one. Only somebody in the world
+  holds one: somebody waiting in line at the menu holds a socket for text
+  chat and the line, and no voice place (#3570). Those are main's. Its `dev` object holds the
   same three for the dev server and dev voice (Patrick, 12 Oct: 5, 0 and 5),
   and a record without one gives dev main's numbers.
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
