@@ -48,53 +48,12 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here 'Vps.ps1')
 . (Join-Path $Here 'gate\GateRules.ps1')
 . (Join-Path (Join-Path (Split-Path -Parent $Here) 'ops') 'WorkflowRun.ps1')
+. (Join-Path (Join-Path (Split-Path -Parent $Here) 'ops') 'Sealed.ps1')
 $Workflow = 'box-run.yml'
 $GateUser = 'thornswood-deploy'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Note([string]$level, [string]$m) { Write-ThornswoodAnnotation $level 'Box-Run' $m }
 function Die($m) { Note 'error' $m; Write-Host "STOP. $m" -ForegroundColor Red; exit 1 }
-
-# ------------------------------------------------------------- the seal ---
-# Sealed: "TWSEAL1", the wrapped key's length (2 bytes, big end first), the
-# AES key wrapped with RSA-OAEP-SHA256, the 12 byte nonce, the 16 byte tag,
-# then the zip encrypted with AES-256-GCM.
-function Protect-ThornswoodBoxRun([byte[]]$Plain, [string]$RecipientB64) {
-    $rsa = [Security.Cryptography.RSA]::Create()
-    $read = 0
-    $rsa.ImportSubjectPublicKeyInfo([Convert]::FromBase64String($RecipientB64), [ref]$read)
-    if ($rsa.KeySize -lt 3072) { throw ('the recipient key is ' + $rsa.KeySize + ' bits, under 3072') }
-    $key = New-Object byte[] 32; $nonce = New-Object byte[] 12; $tag = New-Object byte[] 16
-    [Security.Cryptography.RandomNumberGenerator]::Fill($key); [Security.Cryptography.RandomNumberGenerator]::Fill($nonce)
-    $cipher = New-Object byte[] $Plain.Length
-    $gcm = [Security.Cryptography.AesGcm]::new($key, 16)
-    $gcm.Encrypt($nonce, $Plain, $cipher, $tag)
-    $wrapped = $rsa.Encrypt($key, [Security.Cryptography.RSAEncryptionPadding]::OaepSHA256)
-    $ms = New-Object IO.MemoryStream
-    $head = [Text.Encoding]::ASCII.GetBytes('TWSEAL1')
-    $ms.Write($head, 0, $head.Length)
-    $ms.WriteByte([byte]($wrapped.Length -shr 8)); $ms.WriteByte([byte]($wrapped.Length -band 255))
-    foreach ($b in $wrapped, $nonce, $tag, $cipher) { $ms.Write($b, 0, $b.Length) }
-    return $ms.ToArray()
-}
-
-function Unprotect-ThornswoodBoxRun([byte[]]$Sealed, [string]$PrivateB64) {
-    $head = [Text.Encoding]::ASCII.GetString($Sealed, 0, 7)
-    if ($head -ne 'TWSEAL1') { throw 'the sealed file is not one Box-Run.ps1 made' }
-    $n = ([int]$Sealed[7] -shl 8) + [int]$Sealed[8]
-    $at = 9
-    $wrapped = $Sealed[$at..($at + $n - 1)]; $at += $n
-    $nonce = $Sealed[$at..($at + 11)]; $at += 12
-    $tag = $Sealed[$at..($at + 15)]; $at += 16
-    $cipher = if ($at -lt $Sealed.Length) { [byte[]]$Sealed[$at..($Sealed.Length - 1)] } else { [byte[]]@() }
-    $rsa = [Security.Cryptography.RSA]::Create()
-    $read = 0
-    $rsa.ImportPkcs8PrivateKey([Convert]::FromBase64String($PrivateB64), [ref]$read)
-    $key = $rsa.Decrypt([byte[]]$wrapped, [Security.Cryptography.RSAEncryptionPadding]::OaepSHA256)
-    $plain = New-Object byte[] $cipher.Length
-    $gcm = [Security.Cryptography.AesGcm]::new($key, 16)
-    $gcm.Decrypt([byte[]]$nonce, $cipher, [byte[]]$tag, $plain)
-    return $plain
-}
 
 # The Microsoft-signed ssh client, by its full path: a runner account runs
 # pull request code too, which could put an ssh.exe of its own earlier on
@@ -173,13 +132,9 @@ if ($OnTheBox) {
 
         # The seal, to the session that asked, or nothing leaves the runner.
         if ($recipient) {
-            $zip = Join-Path $work 'out.zip'
-            Compress-Archive -Path (Join-Path $work 'out\*') -DestinationPath $zip -Force
-            $sealed = Protect-ThornswoodBoxRun ([IO.File]::ReadAllBytes($zip)) $recipient
             $to = if ($env:BOX_RUN_SEALED) { $env:BOX_RUN_SEALED } else { Join-Path $base 'box-run.sealed' }
-            New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
-            [IO.File]::WriteAllBytes($to, $sealed)
-            Say "  $lines line(s) and $(@(Get-ChildItem -LiteralPath (Join-Path $work 'out\files') -Recurse -File).Count) file(s), sealed to the session that asked" 'Green'
+            $n = Save-ThornswoodSealed (Join-Path $work 'out') $recipient $to
+            Say "  $lines line(s) and $n file(s), sealed to the session that asked" 'Green'
         } else {
             Say '  no recipient key was given, so the output stays on the box (C:\Thornswood-Gate\runs) and nothing is uploaded' 'Yellow'
         }
@@ -202,9 +157,9 @@ if (-not $Run) {
     if ($req.Minutes) { $minutes = $req.Minutes }
     # A key for this run alone. Its public half goes with the run; its
     # private half stays here.
-    $rsa = [Security.Cryptography.RSA]::Create(3072)
-    $pub = [Convert]::ToBase64String($rsa.ExportSubjectPublicKeyInfo())
-    $priv = [Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey())
+    $k = New-ThornswoodSealKey
+    $pub = $k.Public
+    $priv = $k.Private
     Say "  asking the gate for: $Line" 'White'
     try { $s = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $Workflow -Inputs ([ordered]@{ line = $Line; recipient = $pub }) }
     catch { Die ($_.Exception.Message + ' Nothing was run.') }
@@ -221,26 +176,14 @@ if ($a.State -eq 'waiting' -or $a.State -eq 'unread') { Die ("run $Run has no an
 $keyPath = Join-Path $scratch "$Run.key"
 $dir = Join-Path $scratch "$Run"
 if (Test-Path -LiteralPath $keyPath) {
-    $dl = Join-Path $scratch "$Run.download"
-    Remove-Item -LiteralPath $dl -Recurse -Force -ErrorAction SilentlyContinue
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $got = @(& gh run download $Run -R $GitHubRepo -n 'box-run-sealed' -D $dl 2>&1 | ForEach-Object { "$_" })
-    $ErrorActionPreference = $old
-    $sealedFile = Join-Path $dl 'box-run.sealed'
-    if (Test-Path -LiteralPath $sealedFile) {
-        $plain = Unprotect-ThornswoodBoxRun ([IO.File]::ReadAllBytes($sealedFile)) ([IO.File]::ReadAllText($keyPath).Trim())
-        Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
-        $zip = Join-Path $dir 'out.zip'
-        [IO.File]::WriteAllBytes($zip, $plain)
-        Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
-        Remove-Item -LiteralPath $zip, $dl -Recurse -Force -ErrorAction SilentlyContinue
+    $o = Open-ThornswoodSealedRun -Repo $GitHubRepo -Run $Run -Artifact 'box-run-sealed' -File 'box-run.sealed' -KeyPath $keyPath -Into $dir
+    if ($o.Ok) {
         $txt = Join-Path $dir 'output.txt'
         if (Test-Path -LiteralPath $txt) { Get-Content -LiteralPath $txt | ForEach-Object { Write-Host $_ } }
         $files = @(Get-ChildItem -LiteralPath (Join-Path $dir 'files') -Recurse -File -ErrorAction SilentlyContinue)
         if ($files.Count) { Say ''; Say "  $($files.Count) file(s) in $(Join-Path $dir 'files')" 'Green' }
     } else {
-        Say ('  the run left no sealed output (' + (($got | Select-Object -Last 1) -join '') + ')') 'Yellow'
+        Say ('  the run left no sealed output (' + $o.Why + ')') 'Yellow'
     }
 } else {
     Say "  this machine has no key for run $Run ($keyPath), so only its end can be read here" 'Yellow'

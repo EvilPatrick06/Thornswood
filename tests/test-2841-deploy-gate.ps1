@@ -29,7 +29,7 @@
     7. Grant-BoxAccess.ps1 -Deploy: the line it writes, and its reader.
     8. box-run.yml: main-only environment, the key in one step's
        environment, no input pasted into a script, actions pinned by SHA.
-    9. Box-Run.ps1's seal opens with its own key only, and a changed byte
+    9. The seal (scripts\ops\Sealed.ps1) opens with its own key only, and a changed byte
        is refused; the box half uses the signed ssh.exe by full path.
   Nothing connects anywhere and nothing outside the temp folder is touched.
 #>
@@ -240,21 +240,21 @@ Yes '  every action pinned by a full commit SHA' (-not @([regex]::Matches($wf, '
 Yes '  its output leaves the runner sealed, kept a day' ($wf.Contains('name: box-run-sealed') -and $wf.Contains('retention-days: 1'))
 
 # ---- 9. the seal, and the ssh it uses -------------------------------------------
-Invoke-Expression (Import-Functions 'scripts/vps/Box-Run.ps1' @('Protect-ThornswoodBoxRun', 'Unprotect-ThornswoodBoxRun'))
+. (Join-Path $Repo 'scripts/ops/Sealed.ps1')
 $rsa = [Security.Cryptography.RSA]::Create(3072)
 $other = [Security.Cryptography.RSA]::Create(3072)
 $plain = [Text.Encoding]::UTF8.GetBytes('the servers'' logs ' + ('x' * 5000))
-$sealed = Protect-ThornswoodBoxRun $plain ([Convert]::ToBase64String($rsa.ExportSubjectPublicKeyInfo()))
-$back = Unprotect-ThornswoodBoxRun $sealed ([Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))
+$sealed = Protect-ThornswoodSealed $plain ([Convert]::ToBase64String($rsa.ExportSubjectPublicKeyInfo()))
+$back = Unprotect-ThornswoodSealed $sealed ([Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))
 Yes 'a sealed run opens with its own key to what went in' ([Convert]::ToBase64String($back) -eq [Convert]::ToBase64String($plain))
 Yes '  and holds none of it in the clear' (-not ([Text.Encoding]::UTF8.GetString($sealed)).Contains('servers'))
-$threw = $false; try { [void](Unprotect-ThornswoodBoxRun $sealed ([Convert]::ToBase64String($other.ExportPkcs8PrivateKey()))) } catch { $threw = $true }
+$threw = $false; try { [void](Unprotect-ThornswoodSealed $sealed ([Convert]::ToBase64String($other.ExportPkcs8PrivateKey()))) } catch { $threw = $true }
 Yes '  another key does not open it' $threw
 $bent = [byte[]]$sealed.Clone(); $bent[$bent.Length - 3] = $bent[$bent.Length - 3] -bxor 1
-$threw = $false; try { [void](Unprotect-ThornswoodBoxRun $bent ([Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))) } catch { $threw = $true }
+$threw = $false; try { [void](Unprotect-ThornswoodSealed $bent ([Convert]::ToBase64String($rsa.ExportPkcs8PrivateKey()))) } catch { $threw = $true }
 Yes '  and a changed byte is refused' $threw
 $small = [Security.Cryptography.RSA]::Create(2048)
-$threw = $false; try { [void](Protect-ThornswoodBoxRun $plain ([Convert]::ToBase64String($small.ExportSubjectPublicKeyInfo()))) } catch { $threw = $true }
+$threw = $false; try { [void](Protect-ThornswoodSealed $plain ([Convert]::ToBase64String($small.ExportSubjectPublicKeyInfo()))) } catch { $threw = $true }
 Yes '  a recipient key under 3072 bits is refused' $threw
 $br = Text 'scripts/vps/Box-Run.ps1'
 Yes 'the box half uses the Microsoft-signed ssh.exe by its full path' ($br.Contains("& `$sshExe @sshArgs (`$GateUser + '@127.0.0.1') `$Line") -and $br.Contains('Get-AuthenticodeSignature') -and $br.Contains("O=Microsoft Corporation"))
