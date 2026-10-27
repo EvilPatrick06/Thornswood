@@ -48,7 +48,8 @@
   -Fetch, with the job's token in GATE_MAP_TOKEN, and picks from it the same
   way. Main's build hands the box's newest map on in its log (Gate-Map.ps1
   -Hand, in build.yml after the gate). The token is taken out of the environment here,
-  before any harness starts. No map there either runs the whole gate.
+  before any harness starts, and put back only around that call (#4079). No
+  map there either runs the whole gate.
 
   THE NOTE. It writes whole=true to the step's outputs only when every gate
   harness ran. build.yml keeps the note main's build looks for (#3182, the
@@ -126,7 +127,11 @@ function Select-Affected {
         # Off the box: the map main's build handed on in its log (#4009).
         if (-not $env:RUNNER_TEMP) { Say ('The whole gate runs: ' + $why + '.'); return $null }
         $maps = Join-Path $env:RUNNER_TEMP 'gate-map-fetched'
-        & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps -Token $mapToken 2>&1 | ForEach-Object { Say ([string]$_) }
+        # The token goes in the environment for this call only, never on a
+        # command line (#4079); Gate-Map.ps1 takes it out again at once.
+        $env:GATE_MAP_TOKEN = $mapToken
+        try { & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps 2>&1 | ForEach-Object { Say ([string]$_) } }
+        finally { Remove-Item -LiteralPath Env:GATE_MAP_TOKEN -ErrorAction SilentlyContinue }
         if ($LASTEXITCODE -ne 0) { Say ('The whole gate runs: ' + $why + ', and none main''s build handed on could be used (the lines above say why).'); return $null }
     }
     $latest = Join-Path $maps 'latest.json'

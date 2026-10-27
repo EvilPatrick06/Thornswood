@@ -74,8 +74,8 @@ exit [int]$env:STUB_CODE
     # Gate-Map.ps1 -Fetch, standing in (#4009): copies STUB_MAP's folder,
     # the shape main's handed-on map takes, or has none.
     Set-Content -LiteralPath (Join-Path $dev 'Gate-Map.ps1') -Value @'
-param([string]$Fetch = '', [string]$Token = '')
-[IO.File]::WriteAllText($env:STUB_TOKEN, $Token)
+param([string]$Fetch = '')
+[IO.File]::WriteAllText($env:STUB_TOKEN, [string]$env:GATE_MAP_TOKEN)
 if (-not $env:STUB_MAP) { Write-Host 'no map on GitHub, standing in'; exit 1 }
 $null = New-Item -ItemType Directory -Force -Path $Fetch
 Copy-Item -Path (Join-Path $env:STUB_MAP '*') -Destination $Fetch
