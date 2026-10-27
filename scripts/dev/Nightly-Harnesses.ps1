@@ -63,7 +63,7 @@
 
   A SHARE, AND MORE ONLY INTO FREE CORES (#3114, 22 Oct 2026). Up to -Share
   run at once whatever the machine is doing: that is this run's part of the
-  cores beside the other builds the box runs at once. Past it, up to
+  cores beside the other builds the machine runs at once. Past it, up to
   -Throttle, another starts only into a core the machine has free: the
   processor is read every half second, and after each reading no more of
   those start than it had cores idle. So a build alone on the box uses the
