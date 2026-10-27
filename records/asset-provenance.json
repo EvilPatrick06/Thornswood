@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, docs\\WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
+  "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, the ops repo's WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
   "statuses": {
     "cleared": "The licence is named by the file itself or its publisher and the evidence is cited, or the file holds nothing that could need one. Nothing to ask.",
     "ours": "Thornswood's own work: made for Thornswood by a team member under the contributor terms in LICENSE (#1331), or built here by a script in this repository from nothing but its own numbers. Who made it and who decided it are recorded. Nothing to ask.",
@@ -24,7 +24,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
       "status": "ours"
     },
     {
@@ -37,7 +37,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -50,7 +50,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -63,7 +63,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -76,7 +76,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -89,7 +89,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -186,7 +186,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -199,7 +199,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -1016,7 +1016,7 @@
   "dispositions": [
     {
       "what": "Community gallery pictures and recordings",
-      "how": "Each submission is checked by staff for permission and privacy before it is approved; submitting is not proof of ownership of somebody else's material (Terms; docs\\WEBSITE-OPERATIONS.md, Asset permission evidence). They are people's data on the VPS, so they are not listed here one by one. A removed submission's file is #2352."
+      "how": "Each submission is checked by staff for permission and privacy before it is approved; submitting is not proof of ownership of somebody else's material (Terms; the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence). They are people's data on the VPS, so they are not listed here one by one. A removed submission's file is #2352."
     },
     {
       "what": "The Nexus collection's mods",

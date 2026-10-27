@@ -982,7 +982,7 @@ function MoveDir([string]$from, [string]$to) {
 # (whose own line is relative), and any node with the root on its line. The
 # game port alone is not proof: a scratch root holding a copy of the live
 # settings names 7777, and the process there is the live server
-# (docs\RESTORING.md installs into one). Each as its Win32_Process.
+# (RESTORING.md in the ops repo installs into one). Each as its Win32_Process.
 function ServerProcesses([string]$dir) {
     $mark = $dir + '\'
     $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine })

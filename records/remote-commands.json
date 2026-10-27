@@ -1,6 +1,6 @@
 {
     "issue":  2182,
-    "what":  "Every call under scripts\\ that reaches the VPS, what it sends, and the class it needs. Read from the code, not from script names. docs\\DEPLOY-IDENTITIES.md section 2 is corrected from this. tests\\test-remote-command-map.ps1 keeps it in step with the scripts.",
+    "what":  "Every call under scripts\\ that reaches the VPS, what it sends, and the class it needs. Read from the code, not from script names. The ops repo's DEPLOY-IDENTITIES.md section 2 is corrected from this. tests\\test-remote-command-map.ps1 keeps it in step with the scripts.",
     "key":  "script|scope|via plus anchor: scope is the function the call sits in (\u003ctop\u003e outside one); anchor is text that belongs to the call, from the whole lines it spans or, when those are not unique, from the 3 lines above it, and it names exactly one call with that script, scope and via (#2498). No position number, so a call inserted elsewhere moves no row.",
     "classes":  {
                     "stage":  "write or check a stage folder or a file the deploy owns",

@@ -234,7 +234,6 @@ test-online-names.js  not sorted yet, runs in the nightly (#2513)
 test-other-server-name-gone.js  own step in build.yml, "Check the other server's name stays out"
 test-overlay-redraw.js  not sorted yet, runs in the nightly (#2513)
 test-own-press.js  not sorted yet, runs in the nightly (#2513)
-test-ownership.js  own step in build.yml, "Check the ownership page"
 test-pack-feed.ps1  not sorted yet, runs in the nightly (#2513)
 test-pack-limit.ps1  not sorted yet, runs in the nightly (#2513)
 test-package-client-record.ps1  not sorted yet, runs in the nightly (#2513)

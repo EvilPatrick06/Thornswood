@@ -8,7 +8,7 @@ way a stranger would, with the time and every word on screen written down.
 Until somebody has walked it once on a clean virtual machine and filled in
 every row, this is a plan and not a record, and the right assumption is that
 something in it is wrong. The run is how to find out which part. It is held to
-the same standard as `docs\RESTORING.md`.
+the same standard as `RESTORING.md` in the ops repo.
 
 ## Why
 
@@ -35,7 +35,7 @@ button has been through all three.
    of what Vortex deployed: the big files as hard links, so the collection is
    not on the disk twice, and copies of everything that gets rewritten in
    place. Then it restarts into that folder (`launcher\app\OwnGame.cs`,
-   `launcher\app\ShellOwnGame.cs`). This is the settled design in CLAUDE.md, and
+   `launcher\app\ShellOwnGame.cs`). This is the settled design in the ops repo's CLAUDE.md, and
    the launcher will not start the game out of the shared Steam copy at all.
 
 The To Do entry that asked for this list named the Steam copy with Vortex as the
