@@ -17,7 +17,11 @@
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
                     runner does. records/build-runners.json is the build cap
-                    (#2994). It stops for a record whose runners GitHub does
+                    (#2994). A record may also list off-box runners by
+                    name (offBox, thornswood-pr-*), which carry its label
+                    too (build runners on One, 26 Oct 2026); they never
+                    carry thornswood-vps, so box-only jobs never reach
+                    them. It stops for a record whose runners GitHub does
                     not have, since every job asking for its label would
                     then wait for a runner that never comes.
   What to do comes from main, read through the App, never from the caller,
@@ -166,6 +170,9 @@ function checkRecords(records) {
     if (!nums.length) throw new Error(r.file + ' lists no runners, so no job asking for ' + label + ' could ever run');
     if (nums.some(n => !Number.isInteger(n) || n < 1)) throw new Error(r.file + ' lists a runner that is not a number from 1');
     if (new Set(nums).size !== nums.length) throw new Error(r.file + ' lists a runner twice');
+    const off = Array.isArray(r.offBox) ? r.offBox : [];
+    if (off.some(n => !/^thornswood-pr-[a-z0-9-]{1,40}$/.test(String(n)))) throw new Error(r.file + ' lists an off-box runner whose name is not thornswood-pr-<machine>[-<n>]');
+    if (new Set(off).size !== off.length) throw new Error(r.file + ' lists an off-box runner twice');
   }
 }
 
@@ -175,19 +182,26 @@ function checkRecords(records) {
 function planLabels(record, runners) {
   const label = record.label;
   const want = record.runners;
+  const offBox = Array.isArray(record.offBox) ? record.offBox : [];
   const changes = [];
   const lines = [];
   let carry = 0;
   for (const r of runners) {
     const n = runnerNumber(r.name);
     const has = (r.labels || []).some(l => l.name === label);
-    const should = n > 0 && want.indexOf(n) >= 0;
+    // An off-box runner carries it only by its name in the record, and never
+    // one that carries thornswood-vps too, which would take box-only jobs.
+    const vps = (r.labels || []).some(l => l.name === 'thornswood-vps');
+    const should = (n > 0 && want.indexOf(n) >= 0) || (n === 0 && !vps && offBox.indexOf(r.name) >= 0);
     if (should) carry++;
     if (has && !should) changes.push({ id: r.id, name: r.name, do: 'take off' });
     else if (should && !has) changes.push({ id: r.id, name: r.name, do: 'put on' });
   }
   for (const n of want) {
     if (!runners.some(r => runnerNumber(r.name) === n)) lines.push('runner ' + n + ' is in ' + record.file + ' but not registered on GitHub');
+  }
+  for (const name of offBox) {
+    if (!runners.some(r => r.name === name)) lines.push('off-box runner ' + name + ' is in ' + record.file + ' but not registered on GitHub');
   }
   const refuse = carry ? '' : 'no runner ' + record.file + ' lists is registered on GitHub, so every job asking for ' + label + ' would wait for a runner that never comes';
   return { changes, lines, refuse };
@@ -255,7 +269,7 @@ async function mainRecords(token) {
     let j;
     try { j = JSON.parse(Buffer.from(got.body.content, 'base64').toString('utf8').replace(/^﻿/, '')); }
     catch (e) { throw new Error('records/' + f.name + ' on main is not JSON'); }
-    out.push({ file: 'records/' + f.name, label: String(j.label || '').trim(), runners: Array.isArray(j.runners) ? j.runners.map(Number) : [] });
+    out.push({ file: 'records/' + f.name, label: String(j.label || '').trim(), runners: Array.isArray(j.runners) ? j.runners.map(Number) : [], offBox: Array.isArray(j.offBox) ? j.offBox.map(String) : [] });
   }
   return out;
 }

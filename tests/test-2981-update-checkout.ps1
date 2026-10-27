@@ -314,8 +314,7 @@ try {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
 
-# ---- 8. the written step names the script ----
-$claude = [IO.File]::ReadAllText((Join-Path $Repo 'CLAUDE.md'))
-Yes '8. CLAUDE.md moves the shared clone with Update-Checkout.ps1' ($claude -match '(?s)sits\s+detached at `origin/main`.{0,400}Update-Checkout\.ps1')
+# 8, that CLAUDE.md's written step names the script, left with CLAUDE.md for
+# the private ops repo (#3693), whose tests/test-ops-docs.js holds it.
 
 Done

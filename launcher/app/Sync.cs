@@ -383,7 +383,7 @@ namespace Thornswood
                     string leaf = k.Substring(GoldenMark.Length);
                     if (leaf.Length == 0 || leaf.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || leaf.StartsWith(".")) continue;
                     try { full = Path.GetFullPath(Path.Combine(Paths.Golden, leaf)); } catch { continue; }
-                    if (!Inside(full, Paths.Root)) continue;
+                    if (!PathFence.Inside(full, Paths.Root)) continue;
                     it.Rel = leaf;
                 }
                 else
@@ -391,7 +391,7 @@ namespace Thornswood
                     string rel = k.Replace('/', '\\');
                     // Fenced after the path is resolved, as Install does.
                     try { full = Path.GetFullPath(Path.Combine(Paths.Game, rel)); } catch { continue; }
-                    if (!Inside(full, Paths.Game)) continue;
+                    if (!PathFence.Inside(full, Paths.Game)) continue;
                     it.Rel = full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/');
                     it.InGame = true;
                     listed.Add(it.Rel);
@@ -540,7 +540,7 @@ namespace Thornswood
             {
                 string full;
                 try { full = Path.GetFullPath(Path.Combine(Paths.Game, g.Key)); } catch { continue; }
-                if (!Inside(full, Paths.Game)) continue;
+                if (!PathFence.Inside(full, Paths.Game)) continue;
                 string rel = full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/');
                 if (listed.Contains(rel) || client.Contains(rel) || !File.Exists(full)) continue;
                 bool always = string.Equals(g.Value, "always", StringComparison.OrdinalIgnoreCase);
