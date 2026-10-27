@@ -1,0 +1,1911 @@
+{
+  "version": 1,
+  "builtBy": "scripts/release/collection-permissions.js update",
+  "collection": "7essxf",
+  "revision": 5,
+  "mods": [
+    {
+      "modId": 198,
+      "name": "Caliente's Beautiful Bodies Enhancer -CBBE-",
+      "author": "Ousnius - Caliente - Jeir",
+      "files": [
+        {
+          "fileId": 489053,
+          "name": "Caliente's Beautiful Bodies Enhancer CBBE - v2.0.3",
+          "version": "2.0.3"
+        }
+      ],
+      "plugins": [
+        "CBBE.esp",
+        "RaceMenuMorphsCBBE.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/198?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 201,
+      "name": "BodySlide and Outfit Studio",
+      "author": "ousnius",
+      "files": [
+        {
+          "fileId": 767958,
+          "name": "BodySlide and Outfit Studio - v5.8.2",
+          "version": "5.8.2"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/201?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 463,
+      "name": "SkyHUD",
+      "author": "SkyHUD Team",
+      "files": [
+        {
+          "fileId": 61422,
+          "name": "SkyHUD v090B v4",
+          "version": "0.90B"
+        }
+      ],
+      "plugins": [
+        "SkyHUD.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/463?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 523,
+      "name": "Immersive Sounds - Compendium",
+      "author": "lazygecko",
+      "files": [
+        {
+          "fileId": 221873,
+          "name": "Immersive Sounds Compendium 3.0",
+          "version": "3.0"
+        }
+      ],
+      "plugins": [
+        "Immersive Sounds - Compendium.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/523?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 718,
+      "name": "Immersive Patrols SE AE",
+      "author": "Scrabbulor",
+      "files": [
+        {
+          "fileId": 481214,
+          "name": "Immersive Patrols (Main)",
+          "version": "3.0b"
+        }
+      ],
+      "plugins": [
+        "Immersive Patrols II.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/718?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 1090,
+      "name": "Apocalypse - Magic of Skyrim",
+      "author": "Enai Siaion",
+      "files": [
+        {
+          "fileId": 793875,
+          "name": "Apocalypse 10.3.0",
+          "version": "10.3.0"
+        }
+      ],
+      "plugins": [
+        "Apocalypse - Magic of Skyrim.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1090?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 1841,
+      "name": "Lucidity Sound FX SSE",
+      "author": "Foggypath",
+      "files": [
+        {
+          "fileId": 80244,
+          "name": "Lucidity Sound FX v2u",
+          "version": "v2u"
+        }
+      ],
+      "plugins": [
+        "LSFX-SSE-Audiosettings.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1841?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 1932,
+      "name": "KS Hairdos Lite SE",
+      "author": "lite version by Brataccas - KS Hairdos by Kalilies Stealthic Khaos and Shocky",
+      "files": [
+        {
+          "fileId": 8662,
+          "name": "KS Hairdos Lite SE NoNPCs",
+          "version": "1.3"
+        }
+      ],
+      "plugins": [
+        "KS_Hairdo's_Lite_NoNPCs.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1932?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 1988,
+      "name": "XP32 Maximum Skeleton Special Extended - XPMSSE",
+      "author": "Team XPMSE",
+      "files": [
+        {
+          "fileId": 469854,
+          "name": "XP32 Maximum Skeleton Special Extended",
+          "version": "5.06"
+        }
+      ],
+      "plugins": [
+        "XPMSE.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/1988?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 2005,
+      "name": "Populated Cities Towns Villages SE Edition",
+      "author": "presented by Sands of Time Team",
+      "files": [
+        {
+          "fileId": 535418,
+          "name": "Populated Cities Towns Villages SE Edition",
+          "version": "4.3"
+        }
+      ],
+      "plugins": [
+        "Populated Cities Towns Villages Legendary.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/2005?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 2019,
+      "name": "Cloaks and Capes - FSMP - XPMSSE",
+      "author": "volvaga0",
+      "files": [
+        {
+          "fileId": 35552,
+          "name": "Cloaks and Capes",
+          "version": "1.4"
+        }
+      ],
+      "plugins": [
+        "Cloaks&Capes.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/2019?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 2853,
+      "name": "RaceCompatibility for Skyrim Special Edition",
+      "author": "TMPhoenix",
+      "files": [
+        {
+          "fileId": 381971,
+          "name": "RaceCompatibilty All-In-One Scripted Installer",
+          "version": "2.16.0"
+        }
+      ],
+      "plugins": [
+        "RaceCompatibility.esm"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/2853?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 3479,
+      "name": "Immersive Armors",
+      "author": "Hothtrooper44",
+      "files": [
+        {
+          "fileId": 5924,
+          "name": "Immersive Armors 8.1 SSE",
+          "version": "8.1"
+        }
+      ],
+      "plugins": [
+        "Hothtrooper44_Armor_Ecksstra.esp",
+        "Hothtrooper44_ArmorCompilation.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/3479?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 4119,
+      "name": "Elysium Estate SSE",
+      "author": "thejadeshadow",
+      "files": [
+        {
+          "fileId": 45193,
+          "name": "Elysium Estate 4.3.5",
+          "version": "5.0.1"
+        }
+      ],
+      "plugins": [
+        "ElysiumEstate.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/4119?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 5063,
+      "name": "Common Clothes (by FranklinZunge for SSE)",
+      "author": "FranklinZunge",
+      "files": [
+        {
+          "fileId": 160449,
+          "name": "Common Clothes (by FranklinZunge for SSE) - ESP --- NPC Level List Distribution and Armor Craftable",
+          "version": ".99"
+        },
+        {
+          "fileId": 10870,
+          "name": "Common Clothes (by FranklinZunge for SSE) - 1K Assets",
+          "version": ".99"
+        }
+      ],
+      "plugins": [
+        "CommonClothes.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/5063?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 5513,
+      "name": "Playable Rieklings SSE",
+      "author": "Abbalovesyou",
+      "files": [
+        {
+          "fileId": 55245,
+          "name": "Playable Riekling SSE 1.3.2",
+          "version": "1.3.2"
+        }
+      ],
+      "plugins": [
+        "Playable Rieklings.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/5513?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 5804,
+      "name": "A Quality World Map",
+      "author": "IcePenguin",
+      "files": [
+        {
+          "fileId": 13792,
+          "name": "9.0.1 A Quality World Map - Vivid with Stone Roads",
+          "version": "9.0.1"
+        }
+      ],
+      "plugins": [
+        "IcePenguinWorldMap.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/5804?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 6289,
+      "name": "JK's Skyrim",
+      "author": "Jkrojmal and Teabag86",
+      "files": [
+        {
+          "fileId": 189705,
+          "name": "JK's Skyrim all in one",
+          "version": "1.7"
+        }
+      ],
+      "plugins": [
+        "JKs Skyrim.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/6289?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 8379,
+      "name": "Carriage and Ferry Travel Overhaul (Formerly Complete Fast Travel Overhaul)",
+      "author": "Kinaga",
+      "files": [
+        {
+          "fileId": 23767,
+          "name": "Carriage and Ferry Travel Overhaul",
+          "version": "2.0"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/8379?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 9138,
+      "name": "Zim's Immersive Artifacts",
+      "author": "Zim",
+      "files": [
+        {
+          "fileId": 307456,
+          "name": "Zim's Immersive Artifacts V1.7.4",
+          "version": "V1.7.4"
+        }
+      ],
+      "plugins": [
+        "ZIA_Complete Pack.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/9138?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 9320,
+      "name": "Skyrim Sewers 4",
+      "author": "Viltuska",
+      "files": [
+        {
+          "fileId": 81323,
+          "name": "Skyrim Sewers 415",
+          "version": "4.15"
+        }
+      ],
+      "plugins": [
+        "SkyrimSewers.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/9320?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 12604,
+      "name": "SkyUI",
+      "author": "SkyUI Team",
+      "files": [
+        {
+          "fileId": 749043,
+          "name": "SkyUI",
+          "version": "6.11"
+        }
+      ],
+      "plugins": [
+        "SkyUI_SE.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/12604?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 12688,
+      "name": "moreHUD SE",
+      "author": "Ahzaab",
+      "files": [
+        {
+          "fileId": 803483,
+          "name": "moreHUD for SE and AE",
+          "version": "5.4.5.0"
+        }
+      ],
+      "plugins": [
+        "AHZmoreHUD.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/12688?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 12939,
+      "name": "Deadly Spell Impacts",
+      "author": "isoku - Step Modifications",
+      "files": [
+        {
+          "fileId": 536557,
+          "name": "Deadly Spell Impacts v1.9",
+          "version": "1.9.0"
+        }
+      ],
+      "plugins": [
+        "DeadlySpellImpacts.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/12939?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 14658,
+      "name": "Granite Hill",
+      "author": "Skyking2020",
+      "files": [
+        {
+          "fileId": 691084,
+          "name": "Granite Hill",
+          "version": "6.7.1"
+        }
+      ],
+      "plugins": [
+        "aaaGraniteHill.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/14658?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 16788,
+      "name": "Immersive Weapons",
+      "author": "Hothtrooper44 -  Ironman5000 - Eckss",
+      "files": [
+        {
+          "fileId": 52498,
+          "name": "Immersive Weapons",
+          "version": "2"
+        }
+      ],
+      "plugins": [
+        "Immersive Weapons.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/16788?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 17230,
+      "name": "SSE Engine Fixes (skse64 plugin)",
+      "author": "aers - Nukem - Ryan",
+      "files": [
+        {
+          "fileId": 725261,
+          "name": "Engine Fixes - SKSE64 Preloader",
+          "version": "7"
+        },
+        {
+          "fileId": 725753,
+          "name": "Engine Fixes - Main File",
+          "version": "7.0.20"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/17230?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 17561,
+      "name": "UIExtensions",
+      "author": "Expired",
+      "files": [
+        {
+          "fileId": 55628,
+          "name": "UIExtensions v1-2-0",
+          "version": "1.2.0"
+        }
+      ],
+      "plugins": [
+        "UIExtensions.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/17561?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 18619,
+      "name": "moreHUD Inventory Edition",
+      "author": "Ahzaab",
+      "files": [
+        {
+          "fileId": 799923,
+          "name": "moreHUD Inventory Edition - AE and SE",
+          "version": "2.2.3.0"
+        }
+      ],
+      "plugins": [
+        "AHZmoreHUDInventory.esl"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/18619?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 18692,
+      "name": "The Solitude Arena SSE",
+      "author": "mnikjom Darluok",
+      "files": [
+        {
+          "fileId": 64440,
+          "name": "The Solitude Arena SSE 1.1",
+          "version": "1.1"
+        }
+      ],
+      "plugins": [
+        "Solitude Arena.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/18692?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 19080,
+      "name": "RaceMenu",
+      "author": "Expired",
+      "files": [
+        {
+          "fileId": 743640,
+          "name": "RaceMenu Anniversary Edition v0-4-20-0",
+          "version": "0.4.20.0"
+        }
+      ],
+      "plugins": [
+        "RaceMenu.esp",
+        "RaceMenuPlugin.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/19080?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 19532,
+      "name": "Expressive Facial Animation -Male Edition-",
+      "author": "Niroku",
+      "files": [
+        {
+          "fileId": 115593,
+          "name": "Expressive Facial Animation - Male Edition",
+          "version": "1.21"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/19532?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 22075,
+      "name": "Guard Dialogue Overhaul SE",
+      "author": "Eckss",
+      "files": [
+        {
+          "fileId": 476224,
+          "name": "Guard Dialogue Overhaul - ESL",
+          "version": "3.0"
+        }
+      ],
+      "plugins": [
+        "Guard Dialogue Overhaul.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22075?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 22243,
+      "name": "The Great City of Solitude SSE",
+      "author": "soldierofwar",
+      "files": [
+        {
+          "fileId": 123645,
+          "name": "The Great City of Solitude 2.02",
+          "version": "2.02"
+        }
+      ],
+      "plugins": [
+        "The Great City of Solitude.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22243?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 22382,
+      "name": "Immersive Armours - SSE CBBE 3BA BodySlide",
+      "author": "Jeir",
+      "files": [
+        {
+          "fileId": 461940,
+          "name": "Immersive Armours - SSE CBBE 3BA BodySlide",
+          "version": "3.1.1"
+        }
+      ],
+      "plugins": [
+        "IA CBBE Patch.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22382?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 22854,
+      "name": "powerofthree's Papyrus Extender",
+      "author": "powerofthree",
+      "files": [
+        {
+          "fileId": 800720,
+          "name": "Papyrus Extender",
+          "version": "6.5.2"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22854?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 22960,
+      "name": "Various Player Actions",
+      "author": "GoblinHours69",
+      "files": [
+        {
+          "fileId": 79992,
+          "name": "Various Player Actions - Main File",
+          "version": "1.5"
+        }
+      ],
+      "plugins": [
+        "chfshVariousActions.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/22960?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 24104,
+      "name": "Atlas Map Markers SE - Updated with MCM",
+      "author": "Kronixx and kryptopyr",
+      "files": [
+        {
+          "fileId": 609074,
+          "name": "Atlas Map Markers",
+          "version": "3.0.4"
+        }
+      ],
+      "plugins": [
+        "atlas map markers.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/24104?tab=description",
+      "reading": {
+        "read": "2026-10-26",
+        "by": "Wyrd audit (Legal), #3649",
+        "collections": "not allowed",
+        "terms": {
+          "Author's instructions": [
+            "You are not allowed to package this mod as part of a mod collection.",
+            "You are not allowed to upload or distribute this file on any other website or platform.",
+            "You are allowed to create compatibility patches for this mod as long as the patch requires that the user download the main file from this page in order to work.",
+            "For questions or to seek additional permissions, contact the author at the address on that page."
+          ]
+        },
+        "version": "3.0.4"
+      }
+    },
+    {
+      "modId": 24791,
+      "name": "Cathedral Weathers and Seasons",
+      "author": "The Community",
+      "files": [
+        {
+          "fileId": 398809,
+          "name": "Cathedral - Weathers",
+          "version": "2.23c"
+        }
+      ],
+      "plugins": [
+        "Cathedral Weathers.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/24791?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 25271,
+      "name": "Better Container Controls for SkyUI",
+      "author": "CDCooley",
+      "files": [
+        {
+          "fileId": 244865,
+          "name": "Better Container Controls for SkyUI - BCC-SkyUI-v31",
+          "version": "3.1"
+        }
+      ],
+      "plugins": [
+        "BetterContainerControls.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/25271?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 27962,
+      "name": "Skyrim Unbound Reborn (Alternate Start)",
+      "author": "chinagreenelvis - lilebonymace",
+      "files": [
+        {
+          "fileId": 773521,
+          "name": "Skyrim Unbound Reborn",
+          "version": "3.0.17"
+        }
+      ],
+      "plugins": [
+        "Skyrim Unbound - Capital Windhelm Expansion Patch.esp",
+        "Skyrim Unbound - GDO Patch.esp",
+        "Skyrim Unbound Addon - Blackreach Laboratory.esp",
+        "Skyrim Unbound Addon - Meeko's Shack.esp",
+        "Skyrim Unbound Addon - Orc Strongholds.esp",
+        "Skyrim Unbound Addon - Thalmor.esp",
+        "Skyrim Unbound.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/27962?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 30174,
+      "name": "CBBE 3BA (3BBB)",
+      "author": "Acro",
+      "files": [
+        {
+          "fileId": 600100,
+          "name": "CBBE 3BA (3BBB)",
+          "version": "2.48"
+        }
+      ],
+      "plugins": [
+        "3BBB.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/30174?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 30379,
+      "name": "Skyrim Script Extender (SKSE64)",
+      "author": "SKSE Team",
+      "files": [
+        {
+          "fileId": 792256,
+          "name": "Skyrim Script Extender (SKSE64) Steam",
+          "version": "2.2.8"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/30379?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 30468,
+      "name": "New Legion",
+      "author": "NordwarUA",
+      "files": [
+        {
+          "fileId": 113850,
+          "name": "New Legion - Base",
+          "version": "1.0"
+        },
+        {
+          "fileId": 113852,
+          "name": "New Legion - Textures Medium",
+          "version": "1.0"
+        }
+      ],
+      "plugins": [
+        "DIS_Heavy_Legion.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/30468?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 32117,
+      "name": "Assorted mesh fixes",
+      "author": "wankingSkeever",
+      "files": [
+        {
+          "fileId": 812136,
+          "name": "Assorted Mesh Fixes",
+          "version": "0.145"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/32117?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 32349,
+      "name": "Actor Limit Fix",
+      "author": "meh321",
+      "files": [
+        {
+          "fileId": 368385,
+          "name": "Actor Limit Fix - Actor Limit Fix - Anniversary Edition (1.6.629.0 and later)",
+          "version": "9"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/32349?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 32444,
+      "name": "Address Library for SKSE Plugins",
+      "author": "meh321",
+      "files": [
+        {
+          "fileId": 795954,
+          "name": "Address Library All in One (1.7.104.0) v13",
+          "version": "13"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/32444?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 34705,
+      "name": "SSE Display Tweaks",
+      "author": "SlavicPotato",
+      "files": [
+        {
+          "fileId": 797175,
+          "name": "SSE Display Tweaks",
+          "version": "0.5.25"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/34705?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 35785,
+      "name": "Expressive Facegen Morphs SE",
+      "author": "Niroku",
+      "files": [
+        {
+          "fileId": 151138,
+          "name": "Expressive Facegen Morphs SE",
+          "version": "1.0"
+        }
+      ],
+      "plugins": [
+        "Expressive Facegen Morphs.esl"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/35785?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 37061,
+      "name": "Water for ENB",
+      "author": "mindflux",
+      "files": [
+        {
+          "fileId": 784038,
+          "name": "Water for ENB",
+          "version": "2.21"
+        }
+      ],
+      "plugins": [
+        "Water for ENB (Shades of Skyrim).esp",
+        "Water for ENB - Patch - Generic Landscape Patch.esp",
+        "Water for ENB.esm"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/37061?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 37085,
+      "name": "Embers XD",
+      "author": "mindfIux",
+      "files": [
+        {
+          "fileId": 800804,
+          "name": "Embers XD",
+          "version": "3.2.8"
+        }
+      ],
+      "plugins": [
+        "Embers XD - Fire Magick Add-On.esp",
+        "Embers XD - Patch - Capital Windhelm Expansion.esp",
+        "Embers XD - Patch - Gourmet Tables.esp",
+        "Embers XD.esm",
+        "Embers XD.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/37085?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 39170,
+      "name": "Triumvirate - Mage Archetypes",
+      "author": "Enai Siaion",
+      "files": [
+        {
+          "fileId": 237933,
+          "name": "Triumvirate 1.8.0",
+          "version": "1.8.0"
+        }
+      ],
+      "plugins": [
+        "Triumvirate - Mage Archetypes.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/39170?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 40651,
+      "name": "Carriage and Ferry Travel Overhaul - Fixes and Winterhold",
+      "author": "ViktoriaLanders",
+      "files": [
+        {
+          "fileId": 231504,
+          "name": "CFTO - Fixes and Winterhold",
+          "version": "3.0"
+        }
+      ],
+      "plugins": [
+        "CFTO-CoveredCarriages.esp",
+        "CFTO-JK-Patch.esp",
+        "CFTO-Lanterns.esp",
+        "CFTO.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/40651?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 41812,
+      "name": "Oars Rest",
+      "author": "Darkfox127",
+      "files": [
+        {
+          "fileId": 168128,
+          "name": "Oars Rest",
+          "version": "1.0"
+        }
+      ],
+      "plugins": [
+        "OarsRest.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/41812?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 42990,
+      "name": "Capital Windhelm Expansion",
+      "author": "Surjamte",
+      "files": [
+        {
+          "fileId": 188036,
+          "name": "Capital Windhelm Expansion 1.3 - Normal",
+          "version": "1.3"
+        }
+      ],
+      "plugins": [
+        "WindhelmSSE.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/42990?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 44666,
+      "name": "More Craftable Equipment - Unenchanted Clothing and Specialty Gear",
+      "author": "Parapets",
+      "files": [
+        {
+          "fileId": 363683,
+          "name": "More Craftable Equipment",
+          "version": "1.4.0"
+        },
+        {
+          "fileId": 338437,
+          "name": "More Craftable Equipment - Unenchanted Clothing and Specialty Gear - More Craftable Equipment - CBBE Bodyslide",
+          "version": "1.2.0"
+        }
+      ],
+      "plugins": [
+        "MoreCraftableEquipment.esp",
+        "MoreCraftableEquipment_CloaksandCapes.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/44666?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 46000,
+      "name": "Odin - Skyrim Magic Overhaul",
+      "author": "Enai Siaion",
+      "files": [
+        {
+          "fileId": 793864,
+          "name": "Odin - Skyrim Magic Overhaul - Odin 3.2.0",
+          "version": "3.2.0"
+        }
+      ],
+      "plugins": [
+        "Odin - Skyrim Magic Overhaul.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/46000?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 46311,
+      "name": "Highly Improved Male Body Overhaul -HIMBO-",
+      "author": "Kreiste and Novelyst",
+      "files": [
+        {
+          "fileId": 728973,
+          "name": "01a) HIMBO V5 - Core (Nevernude Body)",
+          "version": "5.8"
+        }
+      ],
+      "plugins": [
+        "HIMBO.esp",
+        "RaceMenuMorphsHIMBO.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/46311?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 47618,
+      "name": "Fishing In Skyrim Special Edition",
+      "author": "Arodicus Snaux",
+      "files": [
+        {
+          "fileId": 194634,
+          "name": "Fishing In Skyrim Special Edition",
+          "version": "1.0"
+        }
+      ],
+      "plugins": [
+        "FishingInSkyrim.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/47618?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 49298,
+      "name": "Capital Windhelm Expansion and JK Skyrim - United",
+      "author": "TheNizorro",
+      "files": [
+        {
+          "fileId": 205418,
+          "name": "CWE - JK - United",
+          "version": "1.0.7"
+        }
+      ],
+      "plugins": [
+        "CWE - JK - United.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/49298?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 50049,
+      "name": "Simple Dual Sheath",
+      "author": "SlavicPotato",
+      "files": [
+        {
+          "fileId": 797176,
+          "name": "Simple Dual Sheath for 1.6.629 and newer",
+          "version": "1.5.9"
+        },
+        {
+          "fileId": 204058,
+          "name": "Simple Dual Sheath - XPMSSE Left Hand Sheath Rotation Fix",
+          "version": "4.80"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50049?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 50129,
+      "name": "Skyrim Priority SE AE - CPU Performance FPS Optimizer",
+      "author": "Boring3",
+      "files": [
+        {
+          "fileId": 355110,
+          "name": "Skyrim Priority SE AE (3.4.0)",
+          "version": "3.4.0"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50129?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 50258,
+      "name": "Animation Motion Revolution",
+      "author": "alexsylex",
+      "files": [
+        {
+          "fileId": 320113,
+          "name": "Animation Motion Revolution",
+          "version": "1.5.3"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50258?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 50961,
+      "name": "Happy Little Trees",
+      "author": "T4GTR34UM3R",
+      "files": [
+        {
+          "fileId": 320481,
+          "name": "Happy Little Trees",
+          "version": "2.03"
+        }
+      ],
+      "plugins": [
+        "HappyLittleTrees.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/50961?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 51073,
+      "name": "powerofthree's Tweaks",
+      "author": "powerofthree",
+      "files": [
+        {
+          "fileId": 794717,
+          "name": "powerofthree's Tweaks",
+          "version": "1.17.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/51073?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 51614,
+      "name": "True Directional Movement - Modernized Third Person Gameplay",
+      "author": "Ersh",
+      "files": [
+        {
+          "fileId": 798770,
+          "name": "True Directional Movement",
+          "version": "2.3.1"
+        }
+      ],
+      "plugins": [
+        "TrueDirectionalMovement.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/51614?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 53000,
+      "name": "MCM Helper",
+      "author": "Parapets",
+      "files": [
+        {
+          "fileId": 795510,
+          "name": "MCM Helper",
+          "version": "1.6.3"
+        }
+      ],
+      "plugins": [
+        "MCMHelper.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/53000?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 57339,
+      "name": "FSMP - Faster HDT-SMP",
+      "author": "Too long - see credits in description",
+      "files": [
+        {
+          "fileId": 795580,
+          "name": "FSMP 4.0.1",
+          "version": "4.1.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/57339?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 59818,
+      "name": "Crash Logger SSE AE VR - PDB support",
+      "author": "alandtse",
+      "files": [
+        {
+          "fileId": 792670,
+          "name": "CrashLogger",
+          "version": "1.25.0"
+        },
+        {
+          "fileId": 794129,
+          "name": "Crash Logger SSE AE VR - PDB support - Skyrim PDBs",
+          "version": "2026.08.23"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/59818?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 60033,
+      "name": "Project New Reign - Nemesis Unlimited Behavior Engine",
+      "author": "Shikyo Kira",
+      "files": [
+        {
+          "fileId": 248867,
+          "name": "Nemesis Unlimited Behavior Engine",
+          "version": "v0.84-beta"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/60033?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 61007,
+      "name": "Oakwood",
+      "author": "Schlitzohr",
+      "files": [
+        {
+          "fileId": 351287,
+          "name": "Oakwood",
+          "version": "1.01.4"
+        }
+      ],
+      "plugins": [
+        "AnotherOakwood.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/61007?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 61719,
+      "name": "MCM Recorder",
+      "author": "MrowrPurr",
+      "files": [
+        {
+          "fileId": 258619,
+          "name": "MCM Recorder",
+          "version": "1.0.7"
+        }
+      ],
+      "plugins": [
+        "McmRecorder.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/61719?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 62775,
+      "name": "TrueHUD - HUD Additions",
+      "author": "Ersh",
+      "files": [
+        {
+          "fileId": 798218,
+          "name": "TrueHUD",
+          "version": "1.1.10"
+        }
+      ],
+      "plugins": [
+        "TrueHUD.esl"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/62775?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 64339,
+      "name": "Better Third Person Selection - BTPS",
+      "author": "Shrimperator",
+      "files": [
+        {
+          "fileId": 635566,
+          "name": "Better Third Person Selection (AE - SE)",
+          "version": "0.8.9"
+        }
+      ],
+      "plugins": [
+        "BetterThirdPersonSelection.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/64339?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 72347,
+      "name": "Precision - Accurate Melee Collisions",
+      "author": "Ersh",
+      "files": [
+        {
+          "fileId": 798533,
+          "name": "Precision",
+          "version": "2.0.6"
+        }
+      ],
+      "plugins": [
+        "Precision.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/72347?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 76649,
+      "name": "ConsoleUtilSSE NG",
+      "author": "Ryan---VersuchDrei",
+      "files": [
+        {
+          "fileId": 793316,
+          "name": "ConsoleUtilSSE NG",
+          "version": "1.6.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/76649?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 78351,
+      "name": "JK's Whiterun Outskirts",
+      "author": "Jkrojmal",
+      "files": [
+        {
+          "fileId": 652546,
+          "name": "JK's Whiterun Outskirts",
+          "version": "1.6.2"
+        }
+      ],
+      "plugins": [
+        "JK's Whiterun's Outskirts.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/78351?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 80232,
+      "name": "Beard Mask Fix - Beards Use Slot 44 SKSE Plugin",
+      "author": "Parapets",
+      "files": [
+        {
+          "fileId": 796514,
+          "name": "Beard Mask Fix - Beards Use Slot 44 SKSE Plugin - Beard Mask Fix",
+          "version": "1.0.2"
+        }
+      ],
+      "plugins": [
+        "BeardMaskFix.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/80232?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 81409,
+      "name": "Constructible Object Custom Keyword System",
+      "author": "Parapets",
+      "files": [
+        {
+          "fileId": 493920,
+          "name": "Constructible Object Custom Keyword System - Crafting Categories for SkyUI",
+          "version": "1.1.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/81409?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 81731,
+      "name": "Constructible Object Custom Keyword System NG",
+      "author": "Parapets-Meridiano",
+      "files": [
+        {
+          "fileId": 792919,
+          "name": "Constructible Object Custom Keyword System NG",
+          "version": "1.2.0"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/81731?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 82395,
+      "name": "Animation Queue Fix",
+      "author": "Ersh",
+      "files": [
+        {
+          "fileId": 798212,
+          "name": "Animation Queue Fix",
+          "version": "1.0.2"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/82395?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 83980,
+      "name": "Common Clothes and Armors -3BA- Bodyslide",
+      "author": "JamesDogg",
+      "files": [
+        {
+          "fileId": 355184,
+          "name": "Common Clothes and Armors -3BA- Bodyslide - Common Clothes and Armors 3BA Bodyslide 1.0",
+          "version": "1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/83980?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 85260,
+      "name": "Native EditorID Fix",
+      "author": "Kitsuune",
+      "files": [
+        {
+          "fileId": 808241,
+          "name": "Native EditorID Fix",
+          "version": "1.2.3"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/85260?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 85702,
+      "name": "Inventory Interface Information Injector",
+      "author": "Parapets and Jelidity",
+      "files": [
+        {
+          "fileId": 796498,
+          "name": "Inventory Interface Information Injector (SE)",
+          "version": "1.1.1"
+        }
+      ],
+      "plugins": [
+        "I4IconAddon.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/85702?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 90864,
+      "name": "JK's Riften Outskirts",
+      "author": "Jkrojmal",
+      "files": [
+        {
+          "fileId": 464233,
+          "name": "JK's Riften Outskirts",
+          "version": "1.1"
+        }
+      ],
+      "plugins": [
+        "JK's Riften Outskirts.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/90864?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 92109,
+      "name": "Open Animation Replacer",
+      "author": "Ersh",
+      "files": [
+        {
+          "fileId": 798222,
+          "name": "Open Animation Replacer",
+          "version": "3.2.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/92109?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 93006,
+      "name": "JK's Markarth Outskirts",
+      "author": "Jkrojmal",
+      "files": [
+        {
+          "fileId": 744740,
+          "name": "JK's Markarth Outskirts",
+          "version": "2.0.1"
+        }
+      ],
+      "plugins": [
+        "JK's Markarth Outskirts.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/93006?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 96876,
+      "name": "Gourmet - A Cooking Overhaul",
+      "author": "Simon Magus Jelidity and wolll",
+      "files": [
+        {
+          "fileId": 767021,
+          "name": "Gourmet - A Cooking Overhaul",
+          "version": "1.2.0"
+        }
+      ],
+      "plugins": [
+        "Gourmet.esp",
+        "GourmetTables.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/96876?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 99621,
+      "name": "Paired Animation Improvements",
+      "author": "Ersh",
+      "files": [
+        {
+          "fileId": 798216,
+          "name": "Paired Animation Improvements",
+          "version": "1.0.3"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/99621?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 101315,
+      "name": "AW Bald and Shaved Hair for Racemenu ESPFE",
+      "author": "AllieWadeMods",
+      "files": [
+        {
+          "fileId": 428924,
+          "name": "AW Bald and Shaven Hair",
+          "version": "1.0"
+        }
+      ],
+      "plugins": [
+        "AwBaldandShavedHair.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/101315?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 106659,
+      "name": "SkyPatcher",
+      "author": "Zzyxzz",
+      "files": [
+        {
+          "fileId": 810179,
+          "name": "SkyPatcher - AE",
+          "version": "7.1.0"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/106659?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 109194,
+      "name": "CBBE 3BA Vanilla Outfits Redone",
+      "author": "brokkamuky",
+      "files": [
+        {
+          "fileId": 757366,
+          "name": "CBBE 3BA Vanilla Outfits Redone - VOR Prebuilt Meshes - CC",
+          "version": "5.5.1"
+        },
+        {
+          "fileId": 757367,
+          "name": "CBBE 3BA Vanilla Outfits Redone - VOR Prebuilt Meshes - Vanilla",
+          "version": "5.5.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/109194?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 114252,
+      "name": "Arena - Markarth Side Town",
+      "author": "Skyking2020",
+      "files": [
+        {
+          "fileId": 721874,
+          "name": "Arena - Markarth Side",
+          "version": "1.8"
+        }
+      ],
+      "plugins": [
+        "Arena - Markarth Side.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/114252?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 114790,
+      "name": "ImGui Icons",
+      "author": "powerofthree",
+      "files": [
+        {
+          "fileId": 690123,
+          "name": "imGui Icons",
+          "version": "1.2.0"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/114790?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 114877,
+      "name": "Playable Lute Flute and Drum - SSE",
+      "author": "gpp9999",
+      "files": [
+        {
+          "fileId": 581826,
+          "name": "Playable Flute Lute and Drum SSE 2.0.2",
+          "version": "2.0.2"
+        }
+      ],
+      "plugins": [
+        "PlayFluteLuteDrum.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/114877?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 116314,
+      "name": "JK's Castle Volkihar",
+      "author": "Jkrojmal",
+      "files": [
+        {
+          "fileId": 500285,
+          "name": "JK's Castle Volkihar",
+          "version": "1.1.2"
+        }
+      ],
+      "plugins": [
+        "JK's Castle Volkihar.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/116314?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 120075,
+      "name": "QuickLoot IE - A QuickLoot EE Fork",
+      "author": "Miss Corruption - AtomCrafty - Faen",
+      "files": [
+        {
+          "fileId": 806802,
+          "name": "QuickLoot IE",
+          "version": "4.1.3"
+        }
+      ],
+      "plugins": [
+        "QuickLootIE.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/120075?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 120152,
+      "name": "Container Distribution Framework",
+      "author": "SeaSparrow",
+      "files": [
+        {
+          "fileId": 754532,
+          "name": "Container Distribution Framework",
+          "version": "3.1.0"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/120152?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 120352,
+      "name": "SKSE Menu Framework",
+      "author": "Thiago",
+      "files": [
+        {
+          "fileId": 806684,
+          "name": "SKSE Menu Framework",
+          "version": "3.18"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/120352?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 122879,
+      "name": "Facial Hair by Khisartin - Standalone",
+      "author": "Khisartin and naChooey",
+      "files": [
+        {
+          "fileId": 603441,
+          "name": "Khisartin Beards - Standalone",
+          "version": "1.1.0"
+        }
+      ],
+      "plugins": [
+        "KhisartinBeards.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/122879?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 125447,
+      "name": "NirnLabUIPlatform (Chromium)",
+      "author": "kkEngine",
+      "files": [
+        {
+          "fileId": 709012,
+          "name": "NirnLabUIPlatform",
+          "version": "3.3"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/125447?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 133232,
+      "name": "Pandora Behaviour Engine Plus",
+      "author": "Pandora Behaviour Engine Team",
+      "files": [
+        {
+          "fileId": 813165,
+          "name": "Pandora Behaviour Engine v5.0.0-beta",
+          "version": "5.0.0-beta"
+        }
+      ],
+      "plugins": [
+        "FNIS.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/133232?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 150208,
+      "name": "Yoku Armory 2(Crowns and Forebears Update) - A Redguard Armor mod",
+      "author": "ENR",
+      "files": [
+        {
+          "fileId": 707926,
+          "name": "Yoku Armory 2.0 - Crowns and Forebears",
+          "version": "2.0"
+        }
+      ],
+      "plugins": [
+        "YokuWeapons.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/150208?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 156562,
+      "name": "HammerHair V1.18",
+      "author": "ENR",
+      "files": [
+        {
+          "fileId": 715151,
+          "name": "HammerHair1.18",
+          "version": "1.18"
+        }
+      ],
+      "plugins": [
+        "HammerHair.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/156562?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 165638,
+      "name": "Northkeep",
+      "author": "Schlitzohr",
+      "files": [
+        {
+          "fileId": 708964,
+          "name": "Northkeep",
+          "version": "1.00.2"
+        }
+      ],
+      "plugins": [
+        "North Keep.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/165638?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 168629,
+      "name": "The City of Crossed Daggers - Riften Expansion",
+      "author": "Marijn",
+      "files": [
+        {
+          "fileId": 720464,
+          "name": "JK's Skyrim Patch",
+          "version": "1.6"
+        },
+        {
+          "fileId": 713547,
+          "name": "The City of Crossed Daggers - Riften Expansion",
+          "version": "1.8"
+        }
+      ],
+      "plugins": [
+        "Riften Expansion - JK's Skyrim Patch.esp",
+        "Riften Expansion.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/168629?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 168741,
+      "name": "Immersive Armors - Script Free and Skypatched",
+      "author": "AizenV",
+      "files": [
+        {
+          "fileId": 740938,
+          "name": "Immersive Armors - Script Free and Skypatched",
+          "version": "1.3.0"
+        }
+      ],
+      "plugins": [
+        "AZ_IADistribution.esp",
+        "Hothtrooper44_Armor_Ecksstra.esp",
+        "Hothtrooper44_ArmorCompilation.esp"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/168741?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 175362,
+      "name": "Dyn FNIS AA functions",
+      "author": "SARDONYX",
+      "files": [
+        {
+          "fileId": 811875,
+          "name": "Dyn FNIS AA functions",
+          "version": "3.1.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/175362?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 182534,
+      "name": "Cheddar's Mashups",
+      "author": "CheddarBread",
+      "files": [
+        {
+          "fileId": 809278,
+          "name": "Cheddar's Mashups V1.8.8",
+          "version": "1.8.8"
+        },
+        {
+          "fileId": 809224,
+          "name": "Cheddar's Mashups - Cheddars Mashups ESL",
+          "version": "1.8.9"
+        }
+      ],
+      "plugins": [
+        "cheddars_mashups.esl"
+      ],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/182534?tab=description",
+      "reading": null
+    },
+    {
+      "modId": 192001,
+      "name": "Thornswood Content",
+      "author": "EvilPatrick06",
+      "files": [
+        {
+          "fileId": 811029,
+          "name": "Thornswood Content",
+          "version": "1.2"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/192001?tab=description",
+      "ours": true,
+      "reading": null
+    },
+    {
+      "modId": 192762,
+      "name": "Thornswood Client Runtime",
+      "author": "EvilPatrick06",
+      "files": [
+        {
+          "fileId": 823485,
+          "name": "Thornswood Client Runtime",
+          "version": "1.0.1"
+        }
+      ],
+      "plugins": [],
+      "page": "https://www.nexusmods.com/skyrimspecialedition/mods/192762?tab=description",
+      "ours": true,
+      "reading": null
+    }
+  ]
+}

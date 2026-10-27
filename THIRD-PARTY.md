@@ -799,7 +799,11 @@ the copy the project's own Google Fonts folder keeps with its copyright line:
   with a link to its page (`launcher\app\Links.cs`), and the public credits page
   says so. The two mods in it that Thornswood uploads itself are not in this
   group: they have their own sections above. The mod files the installer
-  carries anyway are entry 168, above.
+  carries anyway are entry 168, above. What each mod's own page says about
+  being put in a collection is read and kept, with the page's words, in
+  `records\collection-permissions.json`, and `New-NexusRevision.ps1` makes
+  and publishes no revision that carries a mod whose page nobody has read or
+  whose page says no (#3649).
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
 - The WebView2 Runtime, which comes from Microsoft.
