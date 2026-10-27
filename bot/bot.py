@@ -6167,7 +6167,7 @@ async def trouble_forget(rows, path=None):
         try:
             await ch.get_partial_message(mid).delete()
             deleted += 1
-        except discord.NotFound:
+        except discord.NotFound:  # staff deleted it already: it is gone, as wanted
             pass
         except Exception as e:
             failed += 1
@@ -6243,7 +6243,7 @@ async def trouble_backfill(rows, path=None):
             try:
                 await m.delete()
                 deleted += 1
-            except discord.NotFound:
+            except discord.NotFound:  # already gone from the channel, as wanted
                 pass
             except Exception as e:
                 failed += 1
