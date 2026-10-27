@@ -263,7 +263,7 @@ Moot put the crown on Ulfric. He wore it twenty-six years and died in his
 bed.
 
 The Moot sat eleven days and didn't pick his kin. It picked **Eirik
-Ravensgard** of the Rift, who's had it twenty-two years and is neither loved
+Ravensgard** of the Rift, who's had it twenty-three years and is neither loved
 nor hated.
 
 There's a High King of Skyrim and nothing above him. Every hold keeps its own

@@ -93,6 +93,8 @@ Yes 'the signing client is fetched on a v tag ref, on either runner' ($fetch.Con
 Yes '  with the pin from Setup-ShipMachine.ps1, not a second copy' ($fetch.Contains("'Get-SigningClientPin'") -and -not ($fetch -match '[0-9a-f]{64}'))
 Yes 'the sign step has the same gate and signs -Required' ($sign.Contains($gate) -and $sign.Contains('Sign-Artifact.ps1 -Path $exe -Required'))
 Yes '  with the app and tenant ids from repository variables, no secret' ($sign.Contains('AZURE_CLIENT_ID: ${{ vars.AZURE_SIGNING_CLIENT_ID }}') -and $sign.Contains('AZURE_TENANT_ID: ${{ vars.AZURE_SIGNING_TENANT_ID }}') -and -not ($sign -match 'secrets\.|CLIENT_SECRET|client-secret'))
+$signDoc = [IO.File]::ReadAllText((Join-Path (Split-Path -Parent $Here) 'docs/SIGNED-RELEASES.md')).Replace("`r`n", "`n")
+Yes '  and SIGNED-RELEASES.md names those two variables, not three, and no subscription id is read (#3717)' ($signDoc.Contains('`AZURE_SIGNING_CLIENT_ID` and `AZURE_SIGNING_TENANT_ID`') -and -not ($signDoc -match 'three `AZURE_SIGNING_') -and -not ($code -match 'SUBSCRIPTION_ID'))
 Yes '  asks GitHub for the OIDC token with the audience Azure trusts' ($sign.Contains("&audience=api://AzureADTokenExchange") -and $sign.Contains('ACTIONS_ID_TOKEN_REQUEST_TOKEN'))
 Yes '  masks it and names it to the signing client as a workload identity file' ($sign.Contains("'::add-mask::' + `$answer.value") -and $sign.Contains('$env:AZURE_FEDERATED_TOKEN_FILE = $tokenFile'))
 Yes '  and removes the file in a finally, whatever signtool did' ($sign -match '(?s)\} finally \{\s*Remove-Item -LiteralPath \$tokenFile')
