@@ -213,10 +213,13 @@ Set-Acl -LiteralPath `$gate -AclObject `$acl
 # ---- the keys, made here and never sent anywhere
 function New-GateKey([string]`$path, [string]`$comment) {
   if (Test-Path -LiteralPath `$path) { return }
+  # Windows PowerShell 5.1 drops an empty argument, so the empty passphrase
+  # goes as '""', which reaches ssh-keygen as an empty one; '' is tried too,
+  # and each key is proved to open with no passphrase the same way.
   foreach (`$empty in '""', '') {
     Remove-Item -LiteralPath `$path, (`$path + '.pub') -Force -EA SilentlyContinue
     & `$keygen -q -t ed25519 -N `$empty -C `$comment -f `$path 2>&1 | Out-Null
-    if (Test-Path -LiteralPath (`$path + '.pub')) { & `$keygen -y -P '' -f `$path 2>&1 | Out-Null; if (`$LASTEXITCODE -eq 0) { 'CHANGED made ' + `$path; return } }
+    if (Test-Path -LiteralPath (`$path + '.pub')) { & `$keygen -y -P `$empty -f `$path 2>&1 | Out-Null; if (`$LASTEXITCODE -eq 0) { 'CHANGED made ' + `$path; return } }
   }
   'STOP could not make a key without a passphrase at ' + `$path + '.'; exit 1
 }
@@ -224,6 +227,16 @@ function New-GateKey([string]`$path, [string]`$comment) {
 `$boxKey = Join-Path `$root 'keys\box_ed25519'
 New-GateKey `$ghKey 'thornswood-gate-github'
 New-GateKey `$boxKey 'thornswood-gate'
+# ssh, run by SYSTEM, refuses a private key any account but SYSTEM and
+# Administrators may read, and the folder lock also names whoever ran it.
+function Set-SystemAdminsOnly([string]`$path) {
+  `$a = New-Object Security.AccessControl.FileSecurity
+  `$a.SetAccessRuleProtection(`$true, `$false)
+  `$a.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+  foreach (`$s in 'S-1-5-18', 'S-1-5-32-544') { `$a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier(`$s)), 'FullControl', 'Allow'))) }
+  Set-Acl -LiteralPath `$path -AclObject `$a
+}
+foreach (`$k in `$ghKey, `$boxKey) { Set-SystemAdminsOnly `$k }
 'GITHUBKEY ' + ([IO.File]::ReadAllText(`$ghKey + '.pub').Trim())
 
 # ---- GitHub's host keys, as GitHub's API gave them to One
@@ -272,6 +285,8 @@ if (Test-Path -LiteralPath `$cfgPath) { `$old = @(Get-Content -LiteralPath `$cfg
 `$keep = @(); `$in = `$false
 foreach (`$l in `$old) { if (`$l -eq `$begin) { `$in = `$true; continue }; if (`$l -eq `$end) { `$in = `$false; continue }; if (-not `$in) { `$keep += `$l } }
 [IO.File]::WriteAllLines(`$cfgPath, [string[]](`$block + `$keep), `$utf8)
+Set-SystemAdminsOnly `$cfgPath
+foreach (`$k in 'github_known_hosts', 'box_known_hosts') { Set-SystemAdminsOnly (Join-Path `$root ('keys\' + `$k)) }
 'CHANGED SYSTEM''s ssh sends $Address to 127.0.0.1 with the gate''s key'
 
 # ---- what the broker reads
