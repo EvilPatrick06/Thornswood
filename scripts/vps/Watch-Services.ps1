@@ -853,7 +853,7 @@ foreach ($c in $tellOnly) {
 
 # Free space. Everything on this box shares one volume: both game servers, the
 # site and its uploads, voice, the bot, every log and every payload.
-# MOVING-THE-SERVER.md has it at 80 GB with 81 percent free, read off the box
+# MOVING-THE-SERVER.md in the ops repo has it at 80 GB with 81 percent free, read off the box
 # on 15 September, and all of those only grow. A full disk is not one service
 # down, it is every service at once. From the To Do List: "Free space is a
 # first-class alert, usually at twenty percent and again at ten, because it is

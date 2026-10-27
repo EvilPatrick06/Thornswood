@@ -40,7 +40,15 @@
   that change can reach, printing why each one runs. Anything that goes
   wrong on the way (no map, a map that does not read, pick failing) runs
   the whole gate and says why; so does any change to the scripts that list,
-  choose and run the harnesses, and a GitHub-hosted runner, which has no map.
+  choose and run the harnesses.
+
+  OFF THE BOX (#4009). A runner with no gate-map of its own (One's runners,
+  GitHub's hosted runner, or a box runner before its first map) takes the
+  map main's own build last handed on, through scripts\dev\Gate-Map.ps1
+  -Fetch, with the job's token in GATE_MAP_TOKEN, and picks from it the same
+  way. Main's build hands the box's newest map on in its log (Gate-Map.ps1
+  -Hand, in build.yml after the gate). The token is taken out of the environment here,
+  before any harness starts. No map there either runs the whole gate.
 
   THE NOTE. It writes whole=true to the step's outputs only when every gate
   harness ran. build.yml keeps the note main's build looks for (#3182, the
@@ -88,6 +96,9 @@ $Repo = Split-Path -Parent (Split-Path -Parent $Here)
 $Affected = Join-Path $Here 'Affected-Harnesses.js'
 
 function Say([string]$m) { Write-Host $m }
+# For Gate-Map.ps1 -Fetch only: no harness gets it (#4009).
+$mapToken = [string]$env:GATE_MAP_TOKEN
+Remove-Item -LiteralPath Env:GATE_MAP_TOKEN -ErrorAction SilentlyContinue
 function Set-StepOutput([string]$name, [string]$value) {
     if ($env:GITHUB_OUTPUT) { Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ($name + '=' + $value) }
 }
@@ -109,14 +120,22 @@ if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted' -and $env:RUNNER_TEMP) { $root = S
 
 # The harnesses a pull request's change can reach, or $null for the whole gate.
 function Select-Affected {
-    if (-not $root) { Say 'The whole gate runs: the traced map is on the VPS, and this runner is not.'; return $null }
-    $maps = Join-Path $root 'gate-map'
+    $maps = $(if ($root) { Join-Path $root 'gate-map' } else { '' })
+    if (-not $maps -or -not (Test-Path -LiteralPath (Join-Path $maps 'latest.json'))) {
+        $why = $(if ($maps) { 'there is no traced map in ' + $maps + ' yet' } else { 'the traced map is on the VPS, and this runner is not' })
+        # Off the box: the map main's build handed on in its log (#4009).
+        if (-not $env:RUNNER_TEMP) { Say ('The whole gate runs: ' + $why + '.'); return $null }
+        $maps = Join-Path $env:RUNNER_TEMP 'gate-map-fetched'
+        & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps -Token $mapToken 2>&1 | ForEach-Object { Say ([string]$_) }
+        if ($LASTEXITCODE -ne 0) { Say ('The whole gate runs: ' + $why + ', and none main''s build handed on could be used (the lines above say why).'); return $null }
+    }
     $latest = Join-Path $maps 'latest.json'
-    if (-not (Test-Path -LiteralPath $latest)) { Say ('The whole gate runs: there is no traced map in ' + $maps + ' yet.'); return $null }
     try {
         $m = [IO.File]::ReadAllText($latest) | ConvertFrom-Json
         if ([string]$m.commit -notmatch '^[0-9a-f]{40}$' -or [string]$m.key -notmatch '^\d+-\d+$') { Say ('The whole gate runs: ' + $latest + ' names no commit and run.'); return $null }
         $traces = Join-Path $maps ([string]$m.key + '.traces.jsonl.gz')
+        # Off the box, the map main's build built from them (#4009).
+        if (-not (Test-Path -LiteralPath $traces)) { $traces = Join-Path $maps ([string]$m.key + '.map.json') }
         $tree = Join-Path $maps ([string]$m.key + '.tree.gz')
         $read = $m.read
         if ($read -is [datetime]) { $read = $read.ToUniversalTime().ToString('yyyy-MM-dd HH:mm') + ' UTC' }

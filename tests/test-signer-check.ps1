@@ -61,7 +61,7 @@
   launcher runs on the .NET Framework.
 #>
 [CmdletBinding()]
-param([string]$Signed = 'C:\Thornswood-DevBuild\Launcher\Thornswood.exe')
+param([string]$Signed = (Join-Path ([string](& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') InstallDev)) 'Launcher\Thornswood.exe'))
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)

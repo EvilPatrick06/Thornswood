@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        public const string Version = "1.2.7";
+        public const string Version = "1.2.8";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -588,24 +588,6 @@ namespace Thornswood
         }
 
 
-        /// <summary>
-        /// Is this path really inside that folder?
-        ///
-        /// A plain StartsWith is not enough, and it matters most in the one
-        /// place that deletes things. "C:\Thornswood2\anything" starts with
-        /// "C:\Thornswood", so a pack whose file list contained ..\Thornswood2
-        /// would pass a prefix test and be treated as ours. Comparing against
-        /// the folder plus its separator is the whole fix.
-        /// </summary>
-        static bool Inside(string full, string folder)
-        {
-            if (string.IsNullOrEmpty(full) || string.IsNullOrEmpty(folder)) return false;
-            string fence = folder.TrimEnd(Path.DirectorySeparatorChar,
-                                          Path.AltDirectorySeparatorChar)
-                         + Path.DirectorySeparatorChar;
-            return full.StartsWith(fence, StringComparison.OrdinalIgnoreCase);
-        }
-
         static string PackListFile(string id)
         {
             var clean = new StringBuilder();
@@ -880,7 +862,7 @@ namespace Thornswood
                                 // it, outside the game.
                                 try { target = Path.GetFullPath(Path.Combine(Paths.Game, rel)); }
                                 catch { continue; }
-                                if (!Inside(target, Paths.Game)) continue;
+                                if (!PathFence.Inside(target, Paths.Game)) continue;
                                 try { if (File.Exists(target)) { File.Delete(target); log("removed " + line); } } catch (Exception ex) { Swallow.Note("Updater.Install, delete", ex); }
                                 removed.Add(rel);
                             }
@@ -932,7 +914,7 @@ namespace Thornswood
                         // game is; a profile entry has to land under Root.
                         string full = Path.GetFullPath(dest);
                         string fence = inGame ? Paths.Game : Paths.Root;
-                        if (!Inside(full, fence)) continue;
+                        if (!PathFence.Inside(full, fence)) continue;
                         Directory.CreateDirectory(Path.GetDirectoryName(full));
 
                         // Whether this file was already here decides whether
@@ -1154,7 +1136,7 @@ namespace Thornswood
                 string full;
                 try { full = Path.GetFullPath(Path.Combine(fence, rel)); }
                 catch { continue; }
-                if (!Inside(full, fence)) continue;
+                if (!PathFence.Inside(full, fence)) continue;
 
                 try
                 {
@@ -1170,7 +1152,7 @@ namespace Thornswood
                     // lands in the same place as a game\ one. Only a file that
                     // is really out of the way is recorded: one that would not
                     // delete is still in the game, so its kept copy stays.
-                    if (Inside(full, Paths.Game))
+                    if (PathFence.Inside(full, Paths.Game))
                         removed.Add(full.Substring(Paths.Game.TrimEnd('\\', '/').Length).TrimStart('\\', '/'));
                 }
                 catch { stuck++; }
@@ -1187,7 +1169,7 @@ namespace Thornswood
                 {
                     string at = d;
                     while (at.Length > fence.Length &&
-                           Inside(at, fence) &&
+                           PathFence.Inside(at, fence) &&
                            Directory.Exists(at) &&
                            Directory.GetFileSystemEntries(at).Length == 0)
                     {

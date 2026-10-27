@@ -86,12 +86,12 @@ try {
     $file = Ask 'ShipRoots'
     Yes 'ShipRoots is a file in this machine''s own data, not in the repository' (
         (Same $file (Join-Path $env:LOCALAPPDATA 'Thornswood\ship-roots.json')) -and -not $file.StartsWith($repo))
-    Yes 'with no file, ShipRoot is the launcher install, C:\Thornswood when no drive has one' ((Ask 'ShipRoot') -eq 'C:\Thornswood')
-    Yes '  and ShipRootDev that with -DevBuild on the end' ((Ask 'ShipRootDev') -eq 'C:\Thornswood-DevBuild')
+    Yes 'with no file, ShipRoot is the launcher install (C:\Thornswood when no drive has one)' ((Ask 'ShipRoot') -eq (Ask 'Install'))
+    Yes '  and ShipRootDev that with -DevBuild on the end' ((Ask 'ShipRootDev') -eq ((Ask 'Install') + '-DevBuild'))
     $relDev = Join-Path $T 'Thornswood-Release-DevBuild'
     Put $file (ConvertTo-Json -InputObject ([ordered]@{ dev = $relDev }))
     Yes 'a file naming dev: ShipRootDev is that folder' (Same (Ask 'ShipRootDev') $relDev)
-    Yes '  and ShipRoot, which it does not name, is still the install rule' ((Ask 'ShipRoot') -eq 'C:\Thornswood')
+    Yes '  and ShipRoot, which it does not name, is still the install rule' ((Ask 'ShipRoot') -eq (Ask 'Install'))
     $relMain = Join-Path $T 'Main'
     Put $file (ConvertTo-Json -InputObject ([ordered]@{ main = $relMain; dev = $relDev }))
     Yes 'a file naming both: each channel its own' ((Same (Ask 'ShipRoot') $relMain) -and (Same (Ask 'ShipRootDev') $relDev))

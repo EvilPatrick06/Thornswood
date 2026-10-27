@@ -8,7 +8,7 @@
 
   A Claude here can read the repo and run the read only scripts, and everything
   else it is asked to do it shows you instead. That is the arrangement in
-  CLAUDE.md and it is not what this changes. What this changes is the two ways
+  the ops repo's CLAUDE.md and it is not what this changes. What this changes is the two ways
   that arrangement breaks down into "I could not, ask Patrick" over things
   nobody meant to withhold:
 
@@ -27,7 +27,7 @@
 
   Nothing that leaves this machine on its own: no Ship, no push, no
   Publish-Server, no Deploy to the live server, no Rotate-ServerPassword. Those
-  stay yours to run, which is the point of that section of CLAUDE.md. The one
+  stay yours to run, which is the point of that section of the ops repo's CLAUDE.md. The one
   exception already in your settings before this ran is Deploy-DevGamemode,
   which you put there yourself.
 
@@ -61,7 +61,7 @@ param(
     # Also allow the scripts that reach the VPS and GitHub. OFF BY DEFAULT.
     # Asked for by Patrick on 21 September, in his own words: run it yourself so
     # you can, I want it all done when I wake up. It is a switch rather than the
-    # default because CLAUDE.md says these are his to run, and a rule that grants
+    # default because the ops repo's CLAUDE.md says these are his to run, and a rule that grants
     # them should be something somebody typed on purpose.
     [switch]$Live,
     # Somewhere else entirely.
@@ -93,7 +93,7 @@ function Die($m)  { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; i
 #                 plant, ore and spell tables are read out of these records
 #                 rather than typed from memory, and that only works if the
 #                 records can be read.
-#   the profile   launcher.log and plugins.txt. CLAUDE.md says to read
+#   the profile   launcher.log and plugins.txt. The ops repo's CLAUDE.md says to read
 #                 launcher.log before claiming a cause, which needs this.
 #
 $WantDirs = @(
