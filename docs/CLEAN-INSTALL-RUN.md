@@ -396,7 +396,7 @@ tester confused by a list that no longer matches.
 | 20 | `Thornswood installs anyway. Open the launcher and press Downgrade:` | `installer\Setup-Thornswood.ps1` |
 | 20 | `Your Steam copy stays on the build it is on.` | `installer\Setup-Thornswood.ps1` |
 | 21 | `the collection installs this` | `installer\Setup-Thornswood.ps1` |
-| 22 | `checks failed. Send staff a screenshot of this window in the Discord.` | `installer\Setup-Thornswood.ps1` |
+| 22 | `failed. Send staff a screenshot of this window in the Discord.` | `installer\Setup-Thornswood.ps1` |
 | 22 | `Opening Thornswood now.` | `installer\Setup-Thornswood.ps1` |
 | 22 | `Make a character named after yourself, save once, then connect.` | `installer\Setup-Thornswood.ps1` |
 | 22 | `The launcher opens on the collection if your mods are not in yet.` | `installer\Setup-Thornswood.ps1` |
