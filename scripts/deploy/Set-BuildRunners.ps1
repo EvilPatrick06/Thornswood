@@ -4,13 +4,15 @@
   Makes the labels on GitHub's VPS runners match the runner records on main
   (records\<name>-runners.json): records\build-runners.json caps how many
   builds run on the box at once, records\sign-runners.json says which runner
-  may sign a release launcher. From One, a developer's PC or a cloud thread.
+  may sign a release launcher, records\check-runners.json which runners may
+  check a signed draft (#3956). From One, a developer's PC or a cloud thread.
 
       pwsh scripts/deploy/Set-BuildRunners.ps1            make GitHub match main's records
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Check     change nothing; exit 1 when GitHub differs
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Run <id>  the answer of a run that had not ended
       pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings [-Check | -Run <id>]
                                                          the same for main's repository settings
+      pwsh scripts/deploy/Set-BuildRunners.ps1 -AppRepos  which repositories the box's App is on
 
   REPOSITORY SETTINGS (#3683, Patrick's answers of 26 Oct 2026). With
   -RepoSettings it asks for records\github-repo-settings.json instead, which
@@ -24,7 +26,9 @@
 
   A record is { "label": ..., "runners": [1, 2] }: the runners it lists
   (thornswood-vps is 1, thornswood-vps-<n> is n) carry the label and no other
-  runner does, an off-box runner (thornswood-pr-*) never. Changing one is a
+  runner does, an off-box runner (thornswood-pr-*) only when the record's
+  offBox names it and it does not carry thornswood-vps (build runners on
+  One, 26 Oct 2026). Changing one is a
   pull request to the record; once it merges, .github\workflows\github-admin.yml
   runs by itself and GitHub matches it a minute later. This script is for
   asking again, or for -Check.
@@ -64,8 +68,17 @@
   to prove one, add its number to the record in the same pull request that
   moves the rollout to it.
 
+  WHERE THE APP IS (-AppRepos, #4013). The App has to be on every repository
+  whose runners it labels, and from the flip that is Thornswood-Ops, which
+  Patrick adds to its installation by hand. A cloud thread cannot see an
+  App's installation, and gh's own sign-in cannot either (GitHub answers
+  that only to the App). So -AppRepos asks the service the same way, and the
+  service lists the installation's repositories with a token that can read
+  their metadata and nothing else. It changes nothing.
+
   WHAT IT SAYS AND EXITS.
     MATCHES, or CHANGED <n>          0, with the service's lines
+    REPOS <n> (-AppRepos)            0, one line per repository
     DIFFERS <n> (-Check)             1, with what differs
     refused, or the service stopped  1, with why
     the run had not ended            2, after -WaitMinutes; -Run <id> reads it
@@ -80,8 +93,12 @@ param(
     # A github-admin run that had not ended: read its answer.
     [Parameter(ParameterSetName = 'Run', Mandatory = $true)]
     [long]$Run,
+    # Change nothing; list the repositories the box's App is installed on.
+    [Parameter(ParameterSetName = 'AppRepos', Mandatory = $true)]
+    [switch]$AppRepos,
     # The workflow's half: asks the box's admin service with this run's
-    # OIDC token. -Check comes from ADMIN_CHECK there.
+    # OIDC token. -Check comes from ADMIN_CHECK there, and what it asks for
+    # from ADMIN_ASK (runner-labels when unset, as on a push).
     [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
     [switch]$OnGitHub,
     # main's repository settings (records\github-repo-settings.json) rather than its runner records.
@@ -95,6 +112,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\ops\WorkflowRun.ps1')
 
 $workflow = 'github-admin.yml'
+if ($AppRepos -and $RepoSettings) { Write-Host 'STOP. -AppRepos and -RepoSettings are two different asks; give one. Nothing was changed.' -ForegroundColor Red; exit 1 }
 $what = if ($RepoSettings) { 'repo-settings' } else { 'runner-labels' }
 $title = if ($RepoSettings) { 'Set-RepoSettings' } else { 'Set-BuildRunners' }
 $records = if ($RepoSettings) { 'main''s repository settings record' } else { 'main''s runner records' }
@@ -107,6 +125,10 @@ function Die($m) { Write-ThornswoodAnnotation 'error' $title $m; Write-Host "STO
 # ======================================================== the GitHub half ===
 if ($OnGitHub) {
     $askCheck = ($env:ADMIN_CHECK -eq 'true')
+    # The settings step names its ask with -RepoSettings; the other step's
+    # comes from ADMIN_ASK, and is never repo-settings.
+    $askWhat = if ($RepoSettings) { 'repo-settings' } elseif ($env:ADMIN_ASK) { [string]$env:ADMIN_ASK } else { 'runner-labels' }
+    if (-not $RepoSettings -and $askWhat -notin @('runner-labels', 'installation-repos')) { Die "the run asked for '$askWhat', which is neither runner-labels nor installation-repos. Nothing was changed." }
     if (-not $env:ACTIONS_ID_TOKEN_REQUEST_URL -or -not $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN) {
         Die 'this run has no OIDC token to ask for: github-admin.yml has to give the job id-token: write. Nothing was changed.'
     }
@@ -122,7 +144,7 @@ if ($OnGitHub) {
     # The service is on this machine; nothing between here and it.
     $a = Invoke-WebRequest -Method POST -Uri "http://127.0.0.1:$port/converge" -SkipHttpErrorCheck -NoProxy -TimeoutSec 120 `
         -Headers @{ Authorization = "Bearer $token" } -ContentType 'application/json' `
-        -Body (ConvertTo-Json -Compress @{ what = $what; check = $askCheck })
+        -Body $(if ($askWhat -eq 'installation-repos') { ConvertTo-Json -Compress @{ what = $askWhat } } else { ConvertTo-Json -Compress @{ what = $askWhat; check = $askCheck } })
     $code = [int]$a.StatusCode
     $r = $null
     try { $r = [string]$a.Content | ConvertFrom-Json } catch { $r = $null }
@@ -132,7 +154,7 @@ if ($OnGitHub) {
     $lines = @($r.lines | ForEach-Object { [string]$_ })
     foreach ($l in $lines) { Say "  $l" }
     if ($code -eq 200 -and $r.ok) {
-        $head = if ($askCheck -and [int]$r.differs) { 'DIFFERS ' + $r.differs } elseif ([int]$r.changed) { 'CHANGED ' + $r.changed } else { 'MATCHES' }
+        $head = if ($askWhat -eq 'installation-repos') { 'REPOS ' + @($r.repos).Count } elseif ($askCheck -and [int]$r.differs) { 'DIFFERS ' + $r.differs } elseif ([int]$r.changed) { 'CHANGED ' + $r.changed } else { 'MATCHES' }
         Write-ThornswoodAnnotation 'notice' $title (@($head) + $lines -join "`n")
         Say $head 'Green'
         exit 0
@@ -169,7 +191,8 @@ function Read-Answer([long]$id, [switch]$Started) {
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $answer = Read-Answer $Run
 } else {
-    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs ([ordered]@{ check = $(if ($Check) { 'true' } else { 'false' }); what = $what }) }
+    $inputs = [ordered]@{ check = $(if ($Check) { 'true' } else { 'false' }); ask = $(if ($AppRepos) { 'installation-repos' } else { $what }) }
+    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs $inputs }
     catch { Die ($_.Exception.Message + '. Nothing was changed.') }
     if (-not $started.Run) {
         Say ("GitHub started $workflow, but named no run" + ', so its answer cannot be read here. Its runs: ' + $started.Url) 'Yellow'
@@ -184,6 +207,7 @@ foreach ($l in @($said | Select-Object -Skip 1)) { Say "  $l" }
 switch -Regex ($said[0]) {
     '^MATCHES$' { Say "GitHub matches $records." 'Green'; exit 0 }
     '^CHANGED (\d+)$' { Say ("GitHub matches $records now; " + $Matches[1] + ' change(s) made.') 'Green'; exit 0 }
+    '^REPOS (\d+)$' { Say ('The box''s App is installed on ' + $Matches[1] + ' repositor' + $(if ($Matches[1] -eq '1') { 'y' } else { 'ies' }) + ', above.') 'Green'; exit 0 }
     '^DIFFERS (\d+)$' { Say ("GitHub differs from $records in " + $Matches[1] + ' place(s), above. pwsh scripts/deploy/Set-BuildRunners.ps1' + $(if ($RepoSettings) { ' -RepoSettings' } else { '' }) + ' puts it right.') 'Yellow'; exit 1 }
 }
 Die ("the run answered '" + $said[0] + "', which is none of the answers this knows.")

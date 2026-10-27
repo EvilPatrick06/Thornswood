@@ -67,6 +67,9 @@ if ($Collect) {
 
 $f = Get-Content -LiteralPath $Facts -Raw | ConvertFrom-Json
 $r = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+# The label records\build-runners.json gives the box's build runners (#2994).
+$boxBuildLabel = [string](Get-Content -LiteralPath (Join-Path $Repo 'records\build-runners.json') -Raw | ConvertFrom-Json).label
+if (-not $boxBuildLabel) { throw 'records\build-runners.json names no label, so a job on the box''s build runners cannot be told from one that is not.' }
 $rows = New-Object System.Collections.Generic.List[object]
 function Row([string]$Area, [string]$Item, [string]$Expected, [string]$Actual, [bool]$Ok, [string]$Kind = 'risk') {
     $cls = 'ok'; $why = ''
@@ -96,7 +99,10 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
         return $out
     }
     $triggers = @(Get-TopBlock 'on' | ForEach-Object { ($_ -split ':')[0] })
-    $onProd = $t -match ('runs-on:\s*\[[^\]]*\b' + [regex]::Escape($r.productionLabel) + '\b')
+    # The build label reaches the box too: its build runners carry it beside
+    # the production label, and the two build fallbacks ask for it alone so
+    # One's off-box build runners take them as well (26 Oct 2026).
+    $onProd = $t -match ('runs-on:\s*\[[^\]]*\b(' + [regex]::Escape($r.productionLabel) + '|' + [regex]::Escape($boxBuildLabel) + ')\b')
     $perm = (Get-TopBlock 'permissions') -join ' '
     $name = $wf.Name
     # A pull request may reach the production label only through a job that
