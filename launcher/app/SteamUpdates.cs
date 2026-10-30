@@ -291,8 +291,8 @@ namespace Thornswood
 
         /// <summary>
         /// True when the file is there, readable, and either not already on 1
-        /// or marked read only (issue #493). What the question after a
-        /// downgrade is asked on.
+        /// or marked read only (issue #493). What the start and the question
+        /// are asked on.
         /// </summary>
         public static bool NeedsHolding(string manifest)
         {
@@ -329,54 +329,85 @@ namespace Thornswood
         /// Steam is closed: it is Steam's own setting, one value, the one
         /// Patrick asked the launcher to write, and nothing is running to undo
         /// it. Otherwise it needs Steam closed, which is the person's to agree
-        /// to: Ask, unless Skyrim is running (closing Steam under the game) or
-        /// the person already said No, and then Nothing, with the start line
-        /// saying how to do it by hand.
+        /// to: Ask, unless Skyrim is running (closing Steam under the game),
+        /// and then Nothing, with the start line saying how to do it by hand.
+        ///
+        /// Patrick, 27 Oct (#3600): always hold. Nothing about the person's
+        /// answer goes in here, because No to the question only ever means
+        /// "do not close Steam now": the setting is still written at the next
+        /// start with Steam closed, and the question is put again at the next
+        /// start with Steam open. The question says both before No is pressed
+        /// (Question, NotNow). Until then a No was remembered and stopped the
+        /// question, while a start with Steam closed wrote the setting anyway,
+        /// against the question's "No leaves it as it is".
         /// </summary>
-        public static string OnStart(bool needsHolding, bool steamRunning, bool gameRunning, bool declined)
+        public static string OnStart(bool needsHolding, bool steamRunning, bool gameRunning)
         {
             if (!needsHolding) return Nothing;
             if (!steamRunning) return Write;
-            if (gameRunning || declined) return Nothing;
+            if (gameRunning) return Nothing;
             return Ask;
         }
 
         /// <summary>
-        /// The question, for the file as it is now. Says what Yes changes and
-        /// where, and, when Steam is open, that Yes closes Steam for the change
-        /// and starts it again, because Steam writes its own copy back when it
-        /// closes and would undo a change made under it.
+        /// What No to the question means, said the same way in the question
+        /// and in the log line after it (#3600).
         /// </summary>
-        public static string Question(string manifest, bool steamRunning)
+        public const string NotNow =
+            "No means not now: Steam stays open and nothing is changed yet. The launcher makes the change by itself the next time it starts while Steam is closed, and asks again the next time it starts while Steam is open.";
+
+        /// <summary>
+        /// Said when Steam was asked to exit after Yes and is still there a
+        /// minute later. The exit request cannot be taken back, so the
+        /// launcher keeps waiting for Steam to go, then makes the change and
+        /// starts Steam again, as Yes said (#3600). Only a launcher closed in
+        /// the meantime can leave Steam closed, and this says so.
+        /// </summary>
+        public const string StillClosing =
+            "Steam was asked to close and is still running a minute later. Once it closes, the launcher changes its Updates setting for Skyrim and starts Steam again. " +
+            "If the launcher is closed before that and Steam then closes, start Steam yourself; the launcher makes the change the next time it starts while Steam is closed.";
+
+        /// <summary>
+        /// The question, for the file as it is now, put only while Steam is
+        /// open (with Steam closed the start writes it with nothing to ask).
+        /// Says what the change is and where, that Steam has to be closed for
+        /// it because Steam writes its own copy back when it closes and would
+        /// undo a change made under it, that Yes closes Steam, makes the change
+        /// and starts it again, and what No means (NotNow, #3600).
+        /// </summary>
+        public static string Question(string manifest)
         {
-            string steam = steamRunning
-                ? "Steam has to be closed while the file changes, or it writes the old setting back when it closes. Yes closes Steam, makes the change and starts Steam again.\n\n"
-                : "";
+            const string close =
+                "Steam has to be closed while the file changes, or it writes the old setting back when it closes. Close Steam now? Yes closes Steam, makes the change and starts Steam again.\n\n" +
+                NotNow;
             if (Read(manifest) == OnLaunchOnly)
                 return "Steam's Updates setting for Skyrim is already \"" + OnLaunchWords + "\", which is what keeps Skyrim on 1.6.1170.\n\n" +
                        "But Steam's file for Skyrim is marked read only, which stops Steam saving Skyrim's state in it, so Steam logs a failure every six seconds:\n\n    " + manifest + "\n\n" +
-                       "Yes takes that mark off and changes nothing in the file.\n\n" + steam +
-                       "No leaves it as it is.";
+                       "The launcher takes that mark off and changes nothing in the file.\n\n" + close;
             return "Steam can update its copy of Skyrim by itself. Thornswood's own game folder keeps its own 1.6.1170 files whatever Steam does, but until that folder is made, an update means downloading 1.6.1170's files for it first.\n\n" +
-                   "Yes changes Steam's Updates setting for Skyrim to \"" + OnLaunchWords + "\", the same as picking it under Automatic Updates on Steam's own Properties, Updates page. " +
+                   "So the launcher changes Steam's Updates setting for Skyrim to \"" + OnLaunchWords + "\", the same as picking it under Automatic Updates on Steam's own Properties, Updates page. " +
                    "Thornswood never starts Skyrim through Steam, so Steam then leaves it on 1.6.1170. " +
                    "It changes that one value in Steam's file for Skyrim and nothing else:\n\n    " + manifest + "\n\n" +
                    (IsReadOnly(manifest)
-                       ? "That file is marked read only, which stops Steam saving Skyrim's state in it. Yes also takes that mark off; the Updates setting is what keeps Skyrim on 1.6.1170.\n\n"
+                       ? "That file is marked read only, which stops Steam saving Skyrim's state in it. The launcher also takes that mark off; the Updates setting is what keeps Skyrim on 1.6.1170.\n\n"
                        : "") +
-                   steam +
-                   "No leaves it as it is.";
+                   close;
         }
 
+        /// <summary>Waits on Steam for as long as it takes (WaitClosed).</summary>
+        public const int NoLimit = -1;
+
         /// <summary>
-        /// Waits for every steam.exe to exit, up to <paramref name="seconds"/>.
-        /// True once none is left. Waits on the processes themselves, not on a
-        /// clock: Steam saves its files for every game on the way out, and
-        /// only once it has gone is the file safe to change.
+        /// Waits for every steam.exe to exit, up to <paramref name="seconds"/>,
+        /// or for as long as it takes with NoLimit. True once none is left.
+        /// Waits on the processes themselves, not on a clock: Steam saves its
+        /// files for every game on the way out, and only once it has gone is
+        /// the file safe to change.
         /// </summary>
         public static bool WaitClosed(int seconds)
         {
-            DateTime until = DateTime.UtcNow.AddSeconds(seconds);
+            bool limited = seconds >= 0;
+            DateTime until = limited ? DateTime.UtcNow.AddSeconds(seconds) : DateTime.MaxValue;
             while (true)
             {
                 Process[] found;
@@ -384,7 +415,7 @@ namespace Thornswood
                 // Not knowing counts as still running, so nothing is written under it.
                 catch { return false; }
                 if (found.Length == 0) return true;
-                if (DateTime.UtcNow >= until)
+                if (limited && DateTime.UtcNow >= until)
                 {
                     foreach (Process p in found) p.Dispose();
                     return false;
@@ -396,7 +427,7 @@ namespace Thornswood
                 {
                     try
                     {
-                        int left = (int)Math.Max(0, (until - DateTime.UtcNow).TotalMilliseconds);
+                        int left = limited ? (int)Math.Max(0, (until - DateTime.UtcNow).TotalMilliseconds) : -1;
                         p.WaitForExit(left);
                     }
                     catch

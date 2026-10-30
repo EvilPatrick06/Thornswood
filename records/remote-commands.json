@@ -1,6 +1,6 @@
 {
     "issue":  2182,
-    "what":  "Every call under scripts\\ that reaches the VPS, what it sends, and the class it needs. Read from the code, not from script names. docs\\DEPLOY-IDENTITIES.md section 2 is corrected from this. tests\\test-remote-command-map.ps1 keeps it in step with the scripts.",
+    "what":  "Every call under scripts\\ that reaches the VPS, what it sends, and the class it needs. Read from the code, not from script names. The ops repo's DEPLOY-IDENTITIES.md section 2 is corrected from this. tests\\test-remote-command-map.ps1 keeps it in step with the scripts.",
     "key":  "script|scope|via plus anchor: scope is the function the call sits in (\u003ctop\u003e outside one); anchor is text that belongs to the call, from the whole lines it spans or, when those are not unique, from the 3 lines above it, and it names exactly one call with that script, scope and via (#2498). No position number, so a call inserted elsewhere moves no row.",
     "classes":  {
                     "stage":  "write or check a stage folder or a file the deploy owns",
@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  72,
-    "callCount":  289,
+    "scriptCount":  74,
+    "callCount":  293,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -667,6 +667,15 @@
                       "script":  "scripts/deploy/Install-Bot.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
+                      "anchor":  "$fromBot = @(Remote \"if (Test-Path -LiteralPath \u0027$docsWin\\data\\from-bot\u0027) { \u0027FROM-BOT THERE\u0027 } else { \u0027NO FROM-BOT\u0027 }\" | ForEach-Object { \"$_\".Trim() })",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bot.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
                       "anchor":  "$made = @(Remote @\"",
                       "does":  "writes or checks a stage folder",
                       "class":  "stage",
@@ -752,6 +761,24 @@
                       "does":  "builds and installs the bot service",
                       "class":  "admin",
                       "reason":  "service install"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Gate.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-GateStatusScript)",
+                      "does":  "reads the gate account, the Thornswood Gate task, the installed commit and the end of the gate\u0027s log",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Gate.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-GateInstallScript $content $commit $ghHosts $pins $VpsHost)",
+                      "does":  "makes the thornswood-deploy account and its locked .ssh, writes the gate\u0027s files into C:\\Thornswood-Gate, makes the gate\u0027s GitHub and box keys, adds the thornswood-gate line to administrators_authorized_keys, points SYSTEM\u0027s ssh at 127.0.0.1, and registers and starts the SYSTEM task Thornswood Gate (#2841)",
+                      "class":  "admin",
+                      "reason":  "account, ACL, ssh key and task registration"
                   },
                   {
                       "script":  "scripts/deploy/Install-Bridge.ps1",
@@ -2194,6 +2221,15 @@
                       "reason":  "carries what its caller hands it; each caller is mapped instead"
                   },
                   {
+                      "script":  "scripts/vps/Set-InboundRules.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs vps-inbound-rules.ps1, sent on standard input (#3035), which turns off every inbound Allow rule not on the box's list (#3807)",
+                      "class":  "admin",
+                      "reason":  "firewall change"
+                  },
+                  {
                       "script":  "scripts/vps/Set-SshScope.ps1",
                       "scope":  "Test-KeyLogin",
                       "via":  "ssh",
@@ -2539,8 +2575,8 @@
                       "script":  "scripts/mods/Send-GameArchives.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Send-ThornswoodArtifactFile",
-                      "anchor":  "Send-ThornswoodArtifactFile (Join-Path $Data $n) $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
-                      "does":  "uploads one Skyrim archive to C:\\Thornswood-GameData",
+                      "anchor":  "Send-ThornswoodArtifactFile $want[$n].From $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
+                      "does":  "uploads one Skyrim archive, or the script pack (#3105), to C:\\Thornswood-GameData",
                       "class":  "admin",
                       "reason":  "writes into a folder only SYSTEM and Administrators reach"
                   },
@@ -2557,8 +2593,8 @@
                       "script":  "scripts/vps/Grant-BoxAccess.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Invoke-ThornswoodRemote",
-                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob $(if ($NoticesOnly) { $SayStaff } else { '' }))",
-                      "does":  "saves the key file and tokens, arms a put back task, then replaces or removes one name\u0027s key line and token digest",
+                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob $need ([bool]$Deploy))",
+                      "does":  "saves the key file (Administrator\u0027s, or for a deploy key the gate account\u0027s) and tokens, arms a put back task, then replaces or removes one name\u0027s key line and token digest",
                       "class":  "admin",
                       "reason":  "sends authorized_keys; task registration"
                   },

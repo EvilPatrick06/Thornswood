@@ -59,7 +59,7 @@ In file order, top to bottom. Search for a name to find it; the sections have no
 | Crafting | `RECIPES_BY_ID`, `isRecipe`, `professionName`. |
 | Property doors | `BUILDING_BY_DOOR`, `BUILDING_NAME`, `WAY_OUT`. |
 | Benches | `BENCH_BY_BASE`, `raceOf`, `raceGate`, `BENCH_ACCESS`, `benchGate`, `craftAnswer`, `recipelessCraft`. |
-| `mp.onCraft` | Key recipe, the handler, and the "gamemode loaded" line. |
+| `mp.onCraft` | How long a craft takes at the bench (`CRAFT_WORK_MS`, `craftSize`, `mp.onCraftWork`, which the engine asks first and holds the craft for, #3161), key recipe, the handler, and the "gamemode loaded" line. |
 | Voice feed | Positions to the voice service; the `online.json` writer. |
 | Character roster | `private\characters.json`, sent to the site. |
 | The door | The allowed list. See "The door". |

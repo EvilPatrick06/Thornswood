@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Says whether the monthly hands-on restore rehearsal is due, from the Last rehearsed line in docs\RESTORING.md, and fails once it is overdue.
+  Says whether the monthly hands-on restore rehearsal is due, from the Last rehearsed line in RESTORING.md in the private ops repo, and fails once it is overdue.
 
 .DESCRIPTION
   Issue #1046. Patrick ruled on 18 October 2026 that the hands-on restore
@@ -12,7 +12,8 @@
 
       **Last rehearsed: 28 September 2026** (...)
 
-  in docs\RESTORING.md. It is written by hand only after a real run, and
+  in docs\RESTORING.md in the private ops repo (#3693), which the ops repo's
+  own nightly check runs this against. It is written by hand only after a real run, and
   this script never writes it. It reads that line, exactly once, as a day,
   a month name and a year, and counts the days to -Today.
 
@@ -28,8 +29,11 @@
   same day each month never shows as overdue. It is a number, -Days, and
   a different cadence is that number and the sentence in RESTORING.md.
 
-  It reads one file and writes nothing. -Doc and -Today stand in for the
-  real ones so tests\test-1046-rehearsal-due.ps1 can run it offline.
+  It reads one file and writes nothing. With no -Doc it reads
+  docs\RESTORING.md in the ops repo checkout THORNSWOOD_OPS names, or else
+  the one beside this checkout as ..\Thornswood-Ops. -Doc and -Today stand
+  in for the real ones so tests\test-1046-rehearsal-due.ps1 can run it
+  offline.
 
   Run by hand from the repository folder:
       .\scripts\vps\Check-RehearsalDue.ps1
@@ -40,7 +44,10 @@ param(
   [int]$Days = 35
 )
 $ErrorActionPreference = 'Stop'
-if (-not $Doc) { $Doc = Join-Path $PSScriptRoot '..\..\docs\RESTORING.md' }
+if (-not $Doc) {
+  $ops = if ($env:THORNSWOOD_OPS) { $env:THORNSWOOD_OPS } else { Join-Path $PSScriptRoot '..\..\..\Thornswood-Ops' }
+  $Doc = Join-Path $ops 'docs\RESTORING.md'
+}
 $inv = [Globalization.CultureInfo]::InvariantCulture
 
 function Unread([string]$why) {
@@ -79,5 +86,5 @@ if ($age -le $Days) {
   Write-Host ("rehearsal: ok, last rehearsed {0}, {1} day(s) ago; the next is due by {2} ({3} days)" -f $said, $age, $dueSaid, $Days)
   exit 0
 }
-Write-Host ("rehearsal: OVERDUE, last rehearsed {0}, {1} day(s) ago, due by {2} ({3} days). Do the hands-on rehearsal in docs\RESTORING.md, 'Rehearsing it', then write the date in its Last rehearsed line." -f $said, $age, $dueSaid, $Days)
+Write-Host ("rehearsal: OVERDUE, last rehearsed {0}, {1} day(s) ago, due by {2} ({3} days). Do the hands-on rehearsal in the ops repo's docs\RESTORING.md, 'Rehearsing it', then write the date in its Last rehearsed line." -f $said, $age, $dueSaid, $Days)
 exit 1

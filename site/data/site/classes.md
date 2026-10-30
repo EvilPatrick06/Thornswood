@@ -1,18 +1,8 @@
 # Professions and classes
 
 Skyrim's own levelling is switched off here. Nothing you do raises a vanilla
-skill and no perk menu opens when you sleep. What replaced it is three choices
-made once, in the game, that decide what you are for. A new character wakes
-in the creation hall, makes a face, and then the panel behind K opens on its
-own: your class, your profession and the half of it you will make your own,
-and the town you wake up in tomorrow. Only the town has to be chosen before
-you leave the hall, and choosing it sends you to that town. Your class and your
-profession can wait: leave them for later and pick them in the world, from the
-same panel. What waiting means is further down. The same panel, on K, is where
-you spend skill points
-for the rest of your character's life, and where the recipe book tells you what
-your half can make at the rank you have reached. A new character gets forty gold once, and the clothes they stand in:
-what else you carry, you earn, buy or are given.
+skill and no perk menu opens when you sleep. What replaced it is three choices,
+made once in the game, that decide what you are for.
 
 **A profession.** What you make, or how you fight.
 **A sub profession.** Which half of that you actually do.
@@ -24,6 +14,20 @@ Smith who took Hunter does not, and has to know somebody who did.
 
 What nobody gets is all of it. One profession, one half of it, one class, and
 everything outside that is another person.
+
+## Where you choose
+
+A new character wakes in the creation hall and makes a face. Then the panel
+behind K opens on its own, with your class, your profession and the half of it
+you will make your own, and the town you start in. Only the town has to be
+chosen before you leave the hall, and choosing it sends you to that town. Your
+class and your profession can wait: leave them for later and pick them in the
+world, from the same panel. What waiting means is further down.
+
+The same panel, on K, is where you spend skill points for the rest of your
+character's life, and where the recipe book tells you what your half can make
+at the rank you have reached. A new character gets forty gold once, and the
+clothes they stand in: what else you carry, you earn, make, buy or are given.
 
 ## Professions
 
@@ -53,9 +57,10 @@ teaches you. There is a way to learn a little of it and it is further down.
 ### What your half actually stops you making
 
 Your half decides what you are able to make, and the server holds you to it.
-Stand at any forge, oven, tanning rack or workbench in Skyrim and what you are
-about to make is either your half's work or it is not. If it is not, it does not
-get made and you keep your materials.
+The crafting menu at a forge, an oven, a tanning rack or a workbench lists only
+what you may make there, and a bench with nothing on it for you does not open.
+Whatever reaches the server anyway is either your half's work or it is not. If
+it is not, it does not get made and you keep your materials.
 
 Smelting ore into ingots and tanning a hide into leather are Platewright work
 at novice, so an Edgewright can do them as the novice of that sister half.
@@ -63,9 +68,9 @@ They are not open to anybody else. One row per ingot stays, and the duplicate
 rows are cut.
 
 Until you pick a profession, you cannot make anything that is somebody's work.
-Every bench tells you so and to press K and choose one. Picking a profession is what gives you a half,
-a rank to climb in it and work that is yours, and from then on the three
-answers below are the rule.
+Every bench tells you so and to press K and choose one. Picking a profession is
+what gives you a half, a rank to climb in it and work that is yours, and from
+then on the three answers below are the rule.
 
 Three answers, and every one of them names somebody.
 
@@ -100,7 +105,9 @@ clicked, marked or sent: it is what the server already knows about you, drawn.
 ### The two halves that gate nothing
 
 **Bulwark** and **Berserker**. Warriors do not make things. Their half is how
-they fight, and there is nothing at a workbench for it to be about.
+they fight, and there is nothing at a workbench for it to be about. A warrior's
+half is a set of combat maneuvers instead, on a key of its own, and more of
+them open as the rank climbs.
 
 ### The alchemy lab and the arcane enchanter
 
@@ -115,9 +122,20 @@ An **alchemy lab** works for an Alchemist, either a **Blightbrewer** or a
 Somebody who has not chosen a profession yet can use neither, and is told to
 press K and choose one.
 
-Tempering is the other gap worth knowing about. Improving a weapon or a piece of
-armour at a grindstone or an armour table never reaches the server at all, so
-the Smith's Mastercraft is on this page and not yet in the world.
+### Tempering and repair
+
+There is no tempering. The sharpening wheel and the armour table do not open
+for anybody, because nothing is made at either.
+
+A piece is mended with a kit instead: a **Weapon Kit**, an **Armor Kit** or a
+**Sewing Kit**. With one in your pack, the inventory names the key that opens
+the repair panel. The half that makes a kit mends with it to 120%, past new: an
+Edgewright with a Weapon Kit, a Platewright with an Armor Kit, a Haberdasher
+with a Sewing Kit. Anybody else, the sister half included, mends to 100%.
+
+Gear wears with use. Each hit takes 1% off the armour and clothing of the
+person hit and off the weapon that landed it, and a piece at 0% can break. Its
+condition is written on its name whenever it is not at 100%: Iron Sword (85%).
 
 ## The Mage, which is the odd one
 
@@ -159,9 +177,9 @@ A spell tome teaches its spell only to somebody who could have picked that
 spell anyway, mage or not, Enchanter or not. Reading one asks three things:
 
 - **A spell point** to spend. A mage earns them by rank, and two more with
-  each semester at the College of Winterhold, one a day. Anybody a Master
-  mage taught earns one with each semester there, and holds two spells at
-  most.
+  each semester of study at the College of Winterhold, one semester a day.
+  Anybody a Master mage taught earns one with each semester there, and holds
+  two spells at most.
 - **The rank** the spell asks for in its school. Apprentice and Adept spells
   are Advanced here, Expert spells Expert, Master spells Master.
 - **A spell from the rank below**, of the same school, already known. A
@@ -170,6 +188,10 @@ spell anyway, mage or not, Enchanter or not. Reading one asks three things:
 If any of the three is missing, nothing is learned, you keep the tome, and the
 line in chat says which ones. What a staff binds is not learned this way: see
 Staff spells, below.
+
+A semester is the **Study** button on the College page of the K panel, pressed
+inside the College. Its day is kept on your character, so logging out does not
+start it over.
 
 ### Staff spells
 
@@ -280,10 +302,11 @@ you bring in off each row is yours. That is where your first cabbage comes from,
 and your first wheat, and your first apple. Go and find the field. After that the
 row is empty, and only sowing fills it again, so a farm is full exactly once.
 
-A farmer claims a farm, one farm at a time. The claim is how the farm knows
-whose work it is. A farm nobody has claimed is open to anybody with the class,
-and that is where a new farmer starts. A claim lapses if the farm is left
-unworked, so nobody puts their name on good ground and then walks away from it.
+A farmer claims a farm, one farm at a time, with **X** at a crop. The claim is
+how the farm knows whose work it is. A farm nobody has claimed is open to
+anybody with the class, and that is where a new farmer starts. A claim lapses
+if the farm is left unworked for 14 days, so nobody puts their name on good
+ground and then walks away from it.
 
 To plant, stand at an empty plot with the crop in your pack and plant it. The
 crop is its own seed: a cabbage plants a cabbage. Then it grows in real time,
@@ -333,17 +356,12 @@ A rank never stops you carrying a crop or eating it. It decides what you may put
 in the ground and what you may bring in, and nothing else. A novice can find an
 apple. A novice cannot run an orchard.
 
-The rank a crop asks for is about how hard it is to grow and not about what it
-sells for, which sounds obvious and was not: ranking the crops by their price
-put every single one of them out of a new farmer's reach, and a new farmer with
-nothing to sow can never do the work that earns the next rank.
+The rank a crop asks for is about how hard it is to grow and not about how rare
+it is: a new farmer with nothing to sow could never do the work that earns the
+next rank.
 
-### The numbers behind it
-
-How long a crop takes to come up, how much a harvest gives back, and how long a
-claim survives unworked are all set on the server rather than settled here.
-They will move during the alpha, because the only way to find out what a
-day's farming should be worth is to watch people farm.
+How long a crop takes to come up and how much a harvest gives back are set on
+the server, and they are tuned as the team watches people farm.
 
 ## Getting better at it
 
@@ -359,7 +377,7 @@ long time.
 
 Each rank opens more of what you are able to make, inside your own half of your
 own profession and nowhere else. An Edgewright at Master still cannot make a
-steel cuirass.
+steel cuirass. Each rank also gives you one free skill point, below.
 
 ### What Master actually gets you
 
@@ -368,14 +386,14 @@ rank is worth the years rather than just a word over your head.
 
 | Profession | The Master perk |
 |---|---|
-| **Warrior** | **Warlord.** Master-tier combat maneuvers, and you can teach novice combat to people who are not warriors |
+| **Warrior** | **Warlord.** Every maneuver of your half, and you can teach novice combat to people who are not warriors |
 | **Mage** | **Archmage.** A third school of magic, and the standing to apprentice non-mages |
 | **Alchemist** | **Master Chemist.** Every batch yields two instead of one |
 | **Cook** | **Grand Chef.** Every batch yields two instead of one |
-| **Smith** | **Mastercraft.** Temper to Legendary, past what the metal should take |
+| **Smith** | **Mastercraft.** The 120% repair with your own half's kit. Every smith of that half already has it, so Master adds nothing on top of it |
 | **Enchanter** | **Twin Souls.** Two enchantments on one item |
-| **Tailor** | **Master Weaver.** Your clothing carries hidden armour, or keeps the weather off, and still weighs what clothing weighs |
-| **Woodworker** | **Master Carver.** Fires and kilns you build or work give the most warmth there is |
+| **Tailor** | **Master Weaver.** Each garment you make carries hidden armour, which gives back a tenth of every hit, or keeps the weather off; you pick which on K. It still weighs what clothing weighs |
+| **Woodworker** | **Master Carver.** Fires and kilns you work give the most warmth there is |
 
 ### Taking an apprentice
 
@@ -406,8 +424,10 @@ trades entirely. That is the ceiling, and it is deliberately low enough that you
 still need the room.
 
 The master decides who, and either of you can end it. Nobody is owed an
-apprenticeship and nobody is stuck in one. A Master takes somebody on by
-looking at them, and the K panel lists who is whose.
+apprenticeship and nobody is stuck in one. A Master looks at somebody and picks
+**Take on as apprentice** on the look prompt; that person gets Accept and
+Refuse, and nothing is recorded until they accept. The **Masters and
+apprentices** page on K lists who is whose, with End beside each.
 
 ## The skill tree
 
@@ -415,8 +435,10 @@ Your profession is what you make. This is what your body and your magicka can
 take, and it is separate from all of it. Everybody has the same fifteen, and
 nobody fills more than a few of them.
 
-Points go into fifteen sub-skills under three headings. Filling one completely
-gives you its perk, and those are the ones worth planning around.
+Points go into fifteen sub-skills under three headings. Five points fill one
+and give you its perk, and those are the ones worth planning around. Your
+picks place a few points to start with, and every rank you reach gives you one
+more to put anywhere that is not full.
 
 ### Health
 
@@ -448,11 +470,19 @@ twice about if magic is not yours.
 
 | Sub-skill | What it raises | Filled |
 |---|---|---|
-| **Endurance** | Your stamina | **Tireless.** Running and swinging cost half |
+| **Endurance** | Your stamina | **Tireless.** Sprints, power attacks and shield bashes cost half |
 | **Vigor** | How fast it comes back | **Second Wind.** Empty it and it fills, once every five minutes |
 | **Agility** | Speed | **Windwalker.** Faster on your feet, and falls do not hurt you |
 | **Burden** | What you can carry | **Pack Mule.** Being overloaded stops slowing you down |
-| **Precision** | Crits and bows | **Lethal Aim.** Arrows go through half of whatever armour is in the way |
+| **Precision** | Bows | **Lethal Aim.** Arrows go through half of whatever armour is in the way |
+
+A day, for Cheat Death, Archmage's Vessel and Font of Magic, is 24 real hours
+from when it fired, and the K panel says beside each one whether it is ready.
+Font of Magic is the one you start yourself, with the Use button beside it.
+
+Precision also raises the critical chance on your character sheet, and that
+number does nothing here: the server works out every blow, and none of them is
+a critical hit.
 
 ## None of this is for sale
 
@@ -475,22 +505,11 @@ nothing on its own.
 And nobody gets a favour. Not staff, not friends of staff, not whoever asks the
 most times.
 
-## While it is being built
+## Settled, and argued about in the Discord
 
-Character creation and the world both run now. The professions land in pieces
-rather than all at once, and the part already in place is the part that matters
-most: vanilla progression is off, so nothing you do today is being spent on a
-system that is going away.
+Everything on this page is the system, settled and not up for a quiet
+redesign. What is broken in it right now is on [Known Issues](/known), and what
+is being added next is on the [roadmap](/roadmap).
 
-Everything on this page is the system, settled and not up for redesign. It
-arrives in pieces rather than all at once, which is worth knowing before you
-plan a character around a rank that has not landed yet.
-
-The menu is in, on **K**, and it shows you the professions, the classes and the
-fifteen sub-skills. The ranks, the master perks, apprenticeship and spending
-points in the tree are being built now. If something on this page does not do
-anything yet when you press it, that is why, and somebody will say so in the
-Discord rather than leaving you guessing.
-
-Argue about the list in the Discord. Most of what ends up in it will have come
-from somebody who was already doing the thing.
+Argue about it in the Discord. Most of what ends up in it will have come from
+somebody who was already doing the thing.
