@@ -411,6 +411,14 @@
       {
         "sha256": "a348c49278947cc98c270190b07c1b17c98ac25b90c21cfc0b430fbbca789933",
         "changed": "2026-10-26"
+      },
+      {
+        "sha256": "a3913a1da7d17d9fe58b50c79bd146d4125780cac2c317adc8437b3b73fdc9b4",
+        "changed": "2026-10-27"
+      },
+      {
+        "sha256": "18c0d3f9af857e67979225cf7ec9640b399f6e7f050c61b77b126c548a740ff7",
+        "changed": "2026-10-27"
       }
     ],
     "rules": [
