@@ -143,10 +143,12 @@ function Remove-ServiceEntry([string]$Name) {
 }
 # The sessions the old sshd left running: each holds a file of the folder
 # the capability is being removed from.
+# Path asks the process again on every read, and a session can end
+# between two reads, so the filter reads it once, a gone one as "" (#4059).
 function Stop-InboxSshd {
     $dir = [string]$env:WINDIR + '\System32\OpenSSH\'
     Get-Process -Name sshd, sshd-session -ErrorAction SilentlyContinue |
-        Where-Object { $_.Path -and $_.Path.StartsWith($dir, [StringComparison]::OrdinalIgnoreCase) } |
+        Where-Object { ([string]$_.Path).StartsWith($dir, [StringComparison]::OrdinalIgnoreCase) } |
         Stop-Process -Force
 }
 
