@@ -4,13 +4,14 @@ Build-ModMenus.py
 Writes launcher\\app\\FromGameModMenus.cs: Thornswood's edits to the menus of
 three of the collection's mods, as the bytes that change, so the launcher can
 make the edited menus on each machine from that machine's own copy of those
-mods (#3113), the way it makes the main menu from the game's (#2827).
+mods (#3113, #3127), the way it makes the main menu from the game's (#2827).
 
     Data\\Interface\\skyui\\config.txt         SkyUI's item lists
     Data\\Interface\\skyui\\itemcard.swf       SkyUI's item card
     Data\\Interface\\hudmenu.swf               SkyHUD's HUD
     Data\\Interface\\AHZHudInfo.swf            moreHUD's HUD widget, and its
     Data\\Interface\\exported\\AHZHudInfo.swf  copy under exported
+    Data\\Interface\\quest_journal.swf         SkyUI's journal (#3127)
 
 WHY
 
@@ -43,6 +44,24 @@ value is drawn, and what draws it:
 QuickLoot's Val and V/W columns are the fifth; they are a setting, not a menu
 edit (game\\ours\\Data\\SKSE\\Plugins\\QuickLootIE.json).
 
+THE JOURNAL'S SYSTEM PAGE (#3127). Patrick: "remove all of the vanilla Skyrim
+GUI menus and pieces we don't use, such as the vanilla help". Escape opens the
+Journal Menu at its System page, and the movie the game draws for it is
+SkyUI's interface\\quest_journal.swf (SkyUI_SE.bsa): no other archive or loose
+file of the collection has one, so it wins over Skyrim - Interface.bsa's.
+Measured 26 Oct from SkyUI file 749043: SystemPage.onLoad pushes Quick Save,
+Save, Load, Settings, Mod Configuration, Controls, Help and Quit, and two more
+are put in at the fourth place, Creations (SetShowMod, when the game says so)
+and Installed Content (startPage, on a game at 1.1.26 or later). Four of them
+do nothing on Thornswood and two are worse than nothing: a character lives on
+the server, not in a save, so Quick Save and Save write a file nothing reads
+and Load leaves the world for a save the server never heard of; Help is
+Skyrim's own help, which the help panel (F7) replaced (#1633); Creations and
+Installed Content are the Creation Club, and Thornswood is Special Edition
+only. Settings, Mod Configuration, Controls and Quit stay. The page finds each
+entry by its text (UpdateIndices), so an entry that is never put in has no
+index, and no press can reach its action.
+
 WHAT EACH EDIT IS
 
   config.txt      valueColumn, valueWeightColumn, alchValueColumn and
@@ -57,6 +76,12 @@ WHAT EACH EDIT IS
                   If always jumps past the block. Same length, nothing moves.
   AHZHudInfo.swf  "showValueToWeight = showValueToWeightValue >= 1" reads false
                   in place of the setting, so it is always false. Same length.
+  quest_journal   onLoad jumps over the three pushes of Quick Save, Save and
+                  Load, and over the push of Help, where each block's first
+                  push was; SetShowMod stores false in place of what the game
+                  says, so Creations is never put in; startPage jumps over the
+                  block that puts in Installed Content. Same length, and every
+                  jump lands on the action after the block, so nothing moves.
 
 Each edit is checked for what it must find (how many places, which bytes) and
 stops when the mod's file is not the one it was written for. The recipe pins
@@ -261,6 +286,53 @@ def edit_morehud(plain):
     return edit_once(plain, VW_BEFORE, VW_AFTER, 'moreHUD\'s widget'), 'showValueToWeight is always false'
 
 
+# The System page's entries, in SystemPage.onLoad. Each is Push "text", the
+# entry's name; Push 1; InitObject; Push 1, register1, "CategoryList";
+# GetMember; Push "entryList"; GetMember; Push "push"; CallMethod; Pop: 51
+# bytes, the name the only byte that differs. The first push, five bytes,
+# becomes a Jump to the action after the block (Jump's offset counts from its
+# own end), so the block is never run.
+ENTRY = '9602000840' '960200%s' '9605000701000000' '43' '9605000701000000' '9602000401' '96020008024e' \
+        '96020008424e' '9602000843' '52' '17'
+
+
+def jump(n):
+    """A Jump over the n bytes that follow it."""
+    return bytes.fromhex('990200') + struct.pack('<h', n)
+
+
+QUICKSAVE, SAVE, LOAD, HELP = '0841', '0844', '0845', '0849'
+# Quick Save, Save and Load are three blocks in a row; the fourth push after
+# them is Settings ("$SETTINGS", constant 0x46).
+SAVES_BEFORE = bytes.fromhex(ENTRY % QUICKSAVE + ENTRY % SAVE + ENTRY % LOAD + '9602000840' '9602000846')
+SAVES_AFTER = jump(3 * 51 - 5) + SAVES_BEFORE[5:]
+# Help, then Quit ("$QUIT", constant 0x4a).
+HELP_BEFORE = bytes.fromhex(ENTRY % HELP + '9602000840' '960200084a')
+HELP_AFTER = jump(51 - 5) + HELP_BEFORE[5:]
+
+# SetShowMod(bshow): Push register1, "_ShowModMenu", register2 (bshow);
+# SetMember. register2 becomes false, so _ShowModMenu is false whatever the
+# game asks and the If after it never puts "$MOD MANAGER" (Creations) in.
+MOD_BEFORE = bytes.fromhex('9602000401' '960200082f' '9602000402' '4f')
+MOD_AFTER = bytes.fromhex('9602000401' '960200082f' '9602000500' '4f')
+
+# startPage: "IsVersionAtLeast1126" (constant 0x90); CallMethod; Not; If past
+# the block (113 bytes on) that splices "$INSTALLED CONTENT" (constant 0x91)
+# in. The block's first push becomes a Jump to where the If goes.
+CONTENT_BEFORE = bytes.fromhex('9602000890' '52' '12' '9d02007100' '9602000840' '9602000891')
+CONTENT_AFTER = CONTENT_BEFORE[:12] + jump(113 - 5) + CONTENT_BEFORE[17:]
+
+
+def edit_journal(plain):
+    edits = []
+    for before, after, what in ((SAVES_BEFORE, SAVES_AFTER, 'Quick Save, Save and Load'),
+                                (HELP_BEFORE, HELP_AFTER, 'Help'),
+                                (MOD_BEFORE, MOD_AFTER, 'Creations'),
+                                (CONTENT_BEFORE, CONTENT_AFTER, 'Installed Content')):
+        edits += edit_once(plain, before, after, 'SkyUI\'s journal, ' + what)
+    return edits, 'Quick Save, Save, Load, Help, Creations and Installed Content never put on the System page'
+
+
 # ---------------------------------------------------------------- the config
 
 VALUE_COLUMNS = ('valueColumn', 'valueWeightColumn', 'alchValueColumn', 'alchValueWeightColumn')
@@ -301,6 +373,7 @@ MENUS = [
     ('SkyHUDMenu', 'SkyHUD', 'SkyHUD.bsa', 'interface\\hudmenu.swf', 'Data\\Interface\\hudmenu.swf', edit_hud, 'movie'),
     ('MoreHUDInfo', 'moreHUD', 'AHZmoreHUD.bsa', 'interface\\ahzhudinfo.swf', 'Data\\Interface\\AHZHudInfo.swf', edit_morehud, 'movie'),
     ('MoreHUDInfoExported', 'moreHUD', 'AHZmoreHUD.bsa', 'interface\\exported\\ahzhudinfo.swf', 'Data\\Interface\\exported\\AHZHudInfo.swf', edit_morehud, 'movie'),
+    ('SkyUIJournal', 'SkyUI', 'SkyUI_SE.bsa', 'interface\\quest_journal.swf', 'Data\\Interface\\quest_journal.swf', edit_journal, 'movie'),
 ]
 
 

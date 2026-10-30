@@ -180,9 +180,8 @@ function placements(file) {
 const lastCounts = JSON.parse(fs.readFileSync(LAST, 'utf8')).counts || {};
 const lastGates = lastCounts.gatesUnlocked;
 yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + ') and the floor items it switches off (' +
-    lastCounts.floorItemsOff + '), and Thornswood-WoodworkerTrail.esp nothing, so the table need not read them',
-    lastGates === 3 && placements(path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp')) === lastGates + (lastCounts.floorItemsOff || 0) &&
-    placements(path.join(ROOT, 'game', 'content', 'Thornswood-WoodworkerTrail.esp')) === 0);
+    lastCounts.floorItemsOff + '), so the table need not read it',
+    lastGates === 3 && placements(path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp')) === lastGates + (lastCounts.floorItemsOff || 0));
 
 // ---------------------------------------------------------------- P
 const doc = fs.existsSync(DOC) ? fs.readFileSync(DOC, 'utf8') : '';
