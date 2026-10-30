@@ -98,6 +98,48 @@ function build(src) {
   const job = body.slice(vps, dflt);
   if (job.indexOf(IF) < 0) { fail('the fallback job no longer has its condition'); }
   body = body.slice(0, vps) + job.replace(IF, SAME) + body.slice(dflt);
+  /*
+    THE ONE CHECK MAIN'S PROTECTION REQUIRES (#3683, Patrick's A on
+    q-3683-required-check, 27 Oct 2026). GitHub counts a skipped required
+    check as passed. In box mode (BUILD_RUNNER=vps) "Launcher builds" is
+    skipped and the fallback builds; for a fork's pull request the fallback
+    is skipped too. So neither build's name can be the required one: a red
+    box build, or no build at all, would still pass. "Build check result"
+    needs both, and passes only when one of them succeeded.
+
+    It runs on GitHub's ubuntu-latest, never the box: it is a pull request's
+    job, and a fork's pull request brings its own copy of this file. It
+    runs only once the repository is public, as codeql.yml does: hosted
+    minutes are free there, and while the repository is private they are
+    the account's (gone until about 1 November 2026, measured 26 Oct), so a
+    run then would fail to start and stand red on every pull request. While
+    it is skipped it counts as passed, so main's ruleset stays disabled in
+    records/github-repo-settings.json until the flip.
+  */
+  if (/\n  result:\n/.test(body)) { fail('build.yml already has a job named result'); }
+  body = body.replace(/\n*$/, '\n') + [
+    '',
+    '  # The one check main\'s ruleset requires (#3683): passes only when one of',
+    '  # the two builds above succeeded. Written by Build-PrWorkflow.js, which',
+    '  # says why it is on GitHub\'s runner and only once the repository is public.',
+    '  result:',
+    '    name: Build check result',
+    '    needs: [launcher-vps, launcher]',
+    '    if: ${{ !cancelled() && github.event.repository.private == false }}',
+    '    runs-on: ubuntu-latest',
+    '    timeout-minutes: 5',
+    '    steps:',
+    '      - name: One of the two builds passed',
+    '        env:',
+    '          HOSTED: ${{ needs.launcher.result }}',
+    '          VPS: ${{ needs.launcher-vps.result }}',
+    '        run: |',
+    '          echo "Launcher builds: $HOSTED; Launcher builds (VPS fallback): $VPS"',
+    '          if [ "$HOSTED" = success ] || [ "$VPS" = success ]; then exit 0; fi',
+    '          echo "::error::neither build passed, so this pull request may not merge"',
+    '          exit 1',
+    '',
+  ].join('\n');
   if (code(body).split('runs-on: [self-hosted').length - 1 !== 1) { fail('the VPS label is in more than the fallback job'); }
   if (code(body).indexOf('always()') >= 0) { fail('a job uses always(), which a newer run cannot cancel'); }
   if (code(body).split('head.repo.full_name == github.repository').length - 1 !== 1) { fail('the fallback lost its same-repository condition'); }

@@ -532,6 +532,32 @@
       "status": "cleared"
     },
     {
+      "path": "game/ours/Data/Platform/Fonts/Barlow-SemiBold.spritefont",
+      "sha256": "065a8c29c35cc5611f0d30f5b3a3cdf13c35dd83a252ff54f3d1bd23296f224d",
+      "what": "Barlow SemiBold as a Skyrim Platform sprite font: printable ASCII, Latin-1, dashes, curly quotes, the bullet and the ellipsis at 30 pixels. The overhead voice mark draws its dot in it (#1317).",
+      "published": "Every pack and the installer (Data\\Platform\\Fonts)",
+      "source": "Drawn by scripts\\mods\\Build-SpriteFont.py from the fork's skymp5-front\\src\\fonts\\Barlow-SemiBold.ttf (sha256 86577cb3, the Data\\Platform\\UI\\dc3cbd21104d40477da6.ttf entry), with Pillow 12.3.0 and FreeType 2.14.3",
+      "creator": "The face: Jeremy Tribby (Tribby Type) and the Barlow Project Authors, https://github.com/jpt/barlow. The sprite font: Thornswood's script",
+      "licence": "OFL-1.1, as the font it is drawn from; Barlow names no Reserved Font Name. Its full text goes out beside it as Barlow-SemiBold-OFL.txt",
+      "attribution": "Barlow-SemiBold-OFL.txt beside it carries the copyright notice and the licence; named on the public credits page",
+      "approved": "Not needed: an open licence",
+      "evidence": "The font's name table and the fork's skymp5-front\\src\\fonts\\OFL.txt; scripts\\mods\\Build-SpriteFont.py; tests\\test-1317-fonts.ps1.",
+      "status": "cleared"
+    },
+    {
+      "path": "game/ours/Data/Platform/Fonts/Barlow-SemiBold-OFL.txt",
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+      "what": "The SIL Open Font License 1.1 with Barlow's copyright line, the licence Barlow-SemiBold.spritefont goes out under.",
+      "published": "Every pack and the installer (Data\\Platform\\Fonts)",
+      "source": "The fork's skymp5-front\\src\\fonts\\OFL.txt, byte for byte",
+      "creator": "SIL International (the licence) and the Barlow Project Authors (the copyright line)",
+      "licence": "The OFL's own text, which the OFL asks every copy of the font to carry",
+      "attribution": "None",
+      "approved": "Not needed: a licence text",
+      "evidence": "The fork's skymp5-front\\src\\fonts\\OFL.txt.",
+      "status": "cleared"
+    },
+    {
       "path": "game/ours/Data/SKSE/Plugins/CraftingCategories/Thornswood-Content.json",
       "sha256": "975ff49aecd246172497d90facb353ba455688c5787dd69a67a8b3640ab89d06",
       "what": "Thornswood's config for the collection's crafting menu, Constructible Object Custom Keyword System (#3133): three headers by item type, weapons, armour and arrows and bolts, each with its material groups inside, made of keyword names and Thornswood's own label keys. Named for Thornswood-Content.esp, so the menu reads it after the collection's own configs and it moves weapons, armour and arrows out of the one shared WEAPONS & ARMOR header. Hash as git stores it, with LF line endings.",
@@ -559,7 +585,7 @@
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "485569f77da3a0f417e055f16f14d0c2e7217237079c37303dc204f5cbba7a3d",
+      "sha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535",
       "what": "Thornswood's own plugin, 276,675 bytes on 30 Oct (#3163, the Spoiled Food record a piece of food becomes when its days run out, and its effect, written from its own numbers in the burnt meal's look; #3152, the four festival feasts, a fine record of each wearing the same vanilla dish's look, the four festival brews in the tea's cup, their eight cooking pot and oven recipes, and the feast and brew effects; #3349, the ten passage books' words, plain town lines written by the tool; #2993, its header's description built from the records it holds; #1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
       "published": "Every pack and the installer on both channels. Not on Nexus Mods yet: Thornswood Content 1.2 carries the plugin from before #2553, registered as its own entry, until the next Thornswood Content file carries this one (#2793)",
       "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records; the other server's placements, its 57 of Thornswood's stations included (Patrick, 16 Oct, A on #2553), and its changes to Skyrim's own placements are gone.",
@@ -693,55 +719,59 @@
   "notInRepo": [
     {
       "path": "Data\\Platform\\UI\\6f802bf60c545304b09e.ttf",
-      "what": "Futura PT Cond Book, in the skymp5-front build (build.js).",
-      "published": "Every pack and the installer",
+      "what": "Futura PT Cond Book, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream SkyMP's skymp5-front\\src\\fonts, byte for byte; build.js came from local\\thornswood-front.zip with no recorded source commit",
       "creator": "ParaType Ltd",
       "licence": "ParaType's end user licence (http://www.paratype.com/eula); nothing found gives SkyMP or Thornswood the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\00e4a2200c3e5ae71d67.ttf",
-      "what": "Futura PT Cond Medium, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "Futura PT Cond Medium, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "ParaType Ltd",
       "licence": "ParaType's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\268a0df3f0e2c23d1ea6.ttf",
-      "what": "DIN Pro Regular, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "DIN Pro Regular, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "FSI FontShop International GmbH",
       "licence": "FontFont's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\fdf086661e1600f95a34.ttf",
-      "what": "DIN Pro Condensed Bold Italic, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "DIN Pro Condensed Bold Italic, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "FSI FontShop International GmbH",
       "licence": "FontFont's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\855bfaf67c57745958d3.ttf",
@@ -807,29 +837,35 @@
     },
     {
       "path": "Data\\Platform\\Fonts\\DIN-Pro-bold.spritefont",
-      "what": "A sprite font whose name says DIN Pro Bold. Nothing in skymp5-client or Thornswood asks for it by name.",
-      "published": "Every pack and the installer",
+      "what": "A sprite font of FSI FontShop's DIN Pro Bold. Until #1317 the overhead voice mark drew its dot in it.",
+      "published": "Never again: every pack deletes it from installs (#1317)",
       "source": "Upstream SkyMP client-deps, byte for byte",
       "creator": "DIN Pro is FSI FontShop's typeface",
       "licence": "None found",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317 option 1.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it; the voice mark draws in Barlow-SemiBold.spritefont instead",
+      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipCommercialFonts and OwnGame.Foreign; tests\\test-1317-fonts.ps1.",
+      "status": "withheld",
+      "record": "scripts/release/Ship-Rules.ps1#ShipCommercialFonts",
+      "paths": [
+        "Data\\Platform\\Fonts\\DIN-Pro-bold.spritefont"
+      ]
     },
     {
       "path": "Data\\Platform\\Fonts\\Futura.spritefont",
-      "what": "A sprite font dated 14 Sep. Skyrim Platform loads every sprite font in the folder, but nothing asks for this one by name.",
-      "published": "Every pack and the installer",
+      "what": "A sprite font dated 14 Sep whose name says Futura, ParaType's Futura PT. Skyrim Platform loads every sprite font in the folder, but nothing asked for this one by name.",
+      "published": "Never again: every pack deletes it from installs (#1317)",
       "source": "not recorded: not in the fork",
       "creator": "not recorded",
       "licence": "None found",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, Shipped today with no licence this file can name; #1317 names Futura.spritefont.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it; the voice mark draws in Barlow-SemiBold.spritefont instead",
+      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipCommercialFonts and OwnGame.Foreign; tests\\test-1317-fonts.ps1.",
+      "status": "withheld",
+      "record": "scripts/release/Ship-Rules.ps1#ShipCommercialFonts",
+      "paths": [
+        "Data\\Platform\\Fonts\\Futura.spritefont"
+      ]
     },
     {
       "path": "Data\\Platform\\Fonts\\ChainLink.spritefont, NoticeIcon.spritefont, VoiceIcon.spritefont",

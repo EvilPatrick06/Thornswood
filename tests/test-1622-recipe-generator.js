@@ -146,8 +146,10 @@ yes("and a refused row the cut file sent there says the same sentence", ps.index
 yes("recipes.json gets book and roll on the row", ps.indexOf("', \"book\": ' + (JsonStr $r.Book)") >= 0 && ps.indexOf("', \"roll\": ' + (JsonStr $r.Roll)") >= 0);
 
 // ---- one smelt row per ingot and the leather rows (#1391, #1400) ---------
-const OWNER = knob("RECIPE_OWNER") || {};
-const RANK = knob("RECIPE_RANK") || {};
+// RECIPE_OWNER and RECIPE_RANK, which Build-RecipeTable.ps1 reads from records/recipe-owners.json.
+const NAMED = JSON.parse(read("records/recipe-owners.json"));
+const OWNER = NAMED.owner || {};
+const RANK = NAMED.rank || {};
 // Every smelt row a half owns, and the tanning rows that make leather, that
 // the cut file did not cut.
 const keptHere = Object.keys(recipes.recipes).filter(function (k) {

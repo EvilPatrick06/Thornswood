@@ -2,7 +2,7 @@
 
 Every row the recipe, harvest, ore and hunt tables currently hold. The pages that say what a profession or a class is are next to this folder. These lists are the items.
 
-- [Alchemist/Physicker](alchemist-physicker.md) (12, 12 reach the server)
+- [Alchemist/Physicker](alchemist-physicker.md) (2, 2 reach the server)
 - [Cook/Confectioner](cook-confectioner.md) (12, 12 reach the server)
 - [Cook/Hearthcook](cook-hearthcook.md) (64, 64 reach the server)
 - [Enchanter/Bladebinder](enchanter-bladebinder.md) (13, 13 reach the server)
@@ -16,7 +16,7 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Anybody](anybody.md) (588)
 - [Refused](refused.md) (235)
 - [Race locks](race-locks.md) (38)
-- [Where every item comes from](item-sources.md) (1068 items, 17 with no source)
+- [Where every item comes from](item-sources.md) (1058 items, 17 with no source)
 - [Playable races](playable-races.md) (12)
 - [Miner](miner.md) (18 rows, 581 records)
 - [Gatherer](gatherer.md) (47 rows, 107 records)

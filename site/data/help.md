@@ -293,6 +293,10 @@ extender log, your plugin list and the launcher log, and opens the folder it
 is in. Drag that zip into your ticket in the Discord. **Settings**, **Open log**
 opens the launcher log on its own.
 
+You often do not need to: when the game closes, the launcher sends the site
+that session's logs on its own, so staff may already see what went wrong.
+The [privacy](/privacy) page says which files go and what is in them.
+
 ## When you die
 
 You wake at the temple of the hold you died in. A hold with no temple of its
