@@ -371,9 +371,10 @@ try {
   const panel = fs.readFileSync(path.join(REPO, 'game', 'ui', 'thornswood-ship.js'), 'utf8');
   yes('R6 the panel sends a cart\'s lines under /cart, and draws a stop and a raid', /data\.word === '\/cart' \? '\/cart' : '\/ship'/.test(panel) &&
       /function drawStop\(\)/.test(panel) && /function drawRaid\(\)/.test(panel) && /net\(word\(\) \+ ' close'\)/.test(panel));
-  yes('R7 the release lists know the carts\' part', /var PARTS = \[[^\]]*'cargo', 'carts'/.test(gm) &&
-      /'cargo', 'carts'/.test(fs.readFileSync(path.join(REPO, 'scripts', 'vps', 'Server-Log.js'), 'utf8')) &&
-      /'cargo', 'carts'/.test(fs.readFileSync(path.join(REPO, 'scripts', 'ops', 'Wipe-Saves.ps1'), 'utf8')) &&
+  // 'carts' comes after 'cargo', with any parts whose blocks load between them (stalls) in between.
+  yes('R7 the release lists know the carts\' part', /var PARTS = \[[^\]]*'cargo', ('\w+', )*'carts'/.test(gm) &&
+      /'cargo', ('\w+', )*'carts'/.test(fs.readFileSync(path.join(REPO, 'scripts', 'vps', 'Server-Log.js'), 'utf8')) &&
+      /'cargo', ('\w+', )*'carts'/.test(fs.readFileSync(path.join(REPO, 'scripts', 'ops', 'Wipe-Saves.ps1'), 'utf8')) &&
       /trade-carts/.test(fs.readFileSync(path.join(REPO, 'scripts', 'vps', 'Delete-Person.ps1'), 'utf8')));
 
   // ================================================================== U
