@@ -739,7 +739,8 @@ exit code $code"
     Remove-Item Env:\STANDIN_HANG
     Yes ('G: a Pandora that sits using nothing and writing nothing is stopped by the stall check (' + [int]$sw.Elapsed.TotalSeconds + ' s)') (
         $r.Code -eq 1 -and $r.Out -match 'used almost no processor time and changed no file for 6 seconds' -and (Text $record) -eq $recBefore)
-    Yes 'G: and it is not left running' (@(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }).Count -eq 0)
+    # Path asks the process again on every read; read once, a process that has ended reads as "" (#4059).
+    Yes 'G: and it is not left running' (@(Get-Process -ErrorAction SilentlyContinue | Where-Object { ([string]$_.Path).StartsWith($root, [StringComparison]::OrdinalIgnoreCase) }).Count -eq 0)
     $pExe = Join-Path $game 'Data\Pandora Behaviour Engine\Pandora Behaviour Engine+.exe'
     Rename-Item -LiteralPath $pExe -NewName 'aside.exe'
     $r = Invoke-Build @()
@@ -810,7 +811,7 @@ exit code $code"
     Yes 'K: with it in Data twice (loose and in its folder), which one runs cannot be told, so it stops' ($r.Code -eq 1 -and $r.Out -match 'more than once')
 } finally {
     Remove-Item Env:\STANDIN_LOG -ErrorAction SilentlyContinue
-    Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($work, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process -ErrorAction SilentlyContinue | Where-Object { ([string]$_.Path).StartsWith($work, [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
 

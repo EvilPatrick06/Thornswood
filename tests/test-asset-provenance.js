@@ -34,7 +34,13 @@
 //      launcher or the site names it, and it is not under site\public;
 //   7. every font THIRD-PARTY.md names in the front build is registered;
 //   8. the checks themselves catch a new picture, a changed one, a missing
-//      ask and an email address, on planted copies.
+//      ask and an email address, on planted copies;
+//   9. every file of Thornswood Content, the mod Thornswood uploads to Nexus
+//      Mods, is registered by its sha256, and the register names no file of
+//      it that THIRD-PARTY.md's table does not (#2793: six files went up in
+//      1.2 with no one reading their mods' permissions, and their one entry
+//      waited on a closed issue), and the check catches a file added to the
+//      table with no entry.
 //
 // Read only.
 'use strict';
@@ -112,6 +118,7 @@ function audit(reg, files, hash, uiGone, shipRules) {
     if (statuses.indexOf(a.status) < 0) bad.push(name + ': status "' + a.status + '" is not one the register defines');
     if (NEEDS_ASK.indexOf(a.status) >= 0 && !(typeof a.ask === 'string' && /^[^:]{2,}: \S/.test(a.ask))) bad.push(name + ': ' + a.status + ' with no ask naming who can answer ("Who: what")');
     if (a.status === 'no-licence-found' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': no licence found, and no issue that carries it');
+    if (a.status === 'leaving' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': leaving, and no issue that carries the upload it leaves in');
     if (a.status === 'withheld' || a.status === 'made-from-game' || a.status === 'made-from-mods' || a.status === 'built-on-each-computer') {
       const m = /^records\/ui-gone\.json#(\w+)$/.exec(a.record || '');
       const r = /^scripts\/release\/Ship-Rules\.ps1#(\w+)$/.exec(a.record || '');
@@ -236,6 +243,47 @@ if (reg) {
   const g = copy(); g.notInRepo.find((a) => a.status === 'made-from-game').paths.push('Data\\Interface\\map.swf');
   r = audit(g, files, hashOf, uiGone, shipRules);
   yes('a file said to be made from the game that its Ship-Rules list does not hold is caught', r.some((b) => /made-from-game by Ship-Rules\.ps1 \$ShipMadeFromGame, which does not hold Data\\Interface\\map\.swf/.test(b)));
+}
+
+// ---- 9: Thornswood Content's files are registered by their sha256 ------------------
+// THIRD-PARTY.md's Thornswood Content section has one table row per file of
+// the mod's live Nexus file: | `path` | bytes | `sha256` |. Each of those
+// sha256s has to be in an entry's files, and each entry that names a file of
+// the mod (its path starts "Thornswood Content (Nexus mod 192001)") has to
+// name only files in that table, so a new upload is registered when its table
+// is written.
+function contentRows(text) {
+  const start = text.indexOf('\n## Thornswood Content');
+  if (start < 0) return [];
+  const end = text.indexOf('\n### ', start + 1);
+  const part = text.slice(start, end < 0 ? undefined : end);
+  const rows = [];
+  for (const m of part.matchAll(/^\| `?([^|`]+?)`?(?:, [^|]*)? \| [\d,]+ \| `([0-9a-f]{64})` \|$/gm)) rows.push({ path: m[1], sha256: m[2] });
+  return rows;
+}
+function contentAudit(reg, rows) {
+  const bad = [];
+  const mine = (reg.notInRepo || []).filter((a) => /^Thornswood Content \(Nexus mod 192001\)/.test(a.path || ''));
+  const named = new Map();
+  for (const a of mine) {
+    if (!Array.isArray(a.files) || !a.files.length) { bad.push(a.path + ': names no files with their sha256'); continue; }
+    for (const f of a.files) named.set(f.sha256, a);
+  }
+  for (const r of rows) if (!named.has(r.sha256)) bad.push(r.path + ' (' + r.sha256 + '): in Thornswood Content, and in no entry of records\\asset-provenance.json. Register where it came from and its mod\'s terms as read');
+  const inTable = new Set(rows.map((r) => r.sha256));
+  for (const [h, a] of named) if (!inTable.has(h)) bad.push(a.path + ': names ' + h + ', which is not in THIRD-PARTY.md\'s Thornswood Content table');
+  return bad;
+}
+const rows = contentRows(notices);
+yes('THIRD-PARTY.md\'s Thornswood Content table reads (' + rows.length + ' files)', rows.length >= 3);
+if (reg) {
+  const found9 = contentAudit(reg, rows);
+  for (const b of found9) console.log('  ' + b);
+  yes('every Thornswood Content file is registered by its sha256, and the register names none the table does not (' + found9.length + ' finding(s))', found9.length === 0);
+  const planted = rows.concat([{ path: 'SKSE\\Plugins\\SomebodysMod.ini', sha256: 'a'.repeat(64) }]);
+  yes('a file added to Thornswood Content with no entry is caught', contentAudit(reg, planted).some((b) => b.indexOf('SKSE\\Plugins\\SomebodysMod.ini (' + 'a'.repeat(64) + '): in Thornswood Content, and in no entry') === 0));
+  const c = JSON.parse(JSON.stringify(reg)); delete c.notInRepo.find((a) => a.status === 'leaving').issue;
+  yes('a leaving entry with no issue is caught', audit(c, files, hashOf, uiGone, shipRules).some((b) => /: leaving, and no issue/.test(b)));
 }
 
 console.log('');

@@ -577,12 +577,15 @@ $notOursBytes = 0; $notOursCount = 0
 # so its functions do not change anything else this script asks.
 # From the feed there is no Vortex to ask: it is the revision main's feed says
 # its release was built against, as Publish-Update -FromFeed reads it.
-if ($FromFeed) {
-    $ShipCollectionRevision = 0
-    if ($feedDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedDoc.collectionRevision, [ref]$ShipCollectionRevision) }
-    if ($ShipCollectionRevision -le 0) { Die "main's feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+# One assignment either way: tests\test-package-client-record.ps1 lifts the
+# listing below and leaves out only the statement that sets this (#4091).
+$ShipCollectionRevision = if ($FromFeed) {
+    $feedRevision = 0
+    if ($feedDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedDoc.collectionRevision, [ref]$feedRevision) }
+    if ($feedRevision -le 0) { Die "main's feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+    $feedRevision
 } else {
-    $ShipCollectionRevision = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
+    & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
 }
 Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 $clientShipped = 0

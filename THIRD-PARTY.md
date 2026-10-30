@@ -12,7 +12,8 @@ root: all rights reserved, with terms every contributor agrees to once
 (decided by Patrick on 12 Oct 2026, #1331).
 
 `tests\test-third-party.js` checks this file against the build. It covers every
-resource Build-Launcher.ps1 compiles into the launcher, every file under
+resource Build-Launcher.ps1 compiles into the launcher, the header of every
+file of the launcher's and the setup stub's source, every file under
 `launcher\lib`, every font and minified script the site serves from
 `site\public`, the six client files and the commits in
 `records\client-build.json` and `records\server-build.json`, the two
@@ -57,8 +58,12 @@ or the build check goes red.
   `site\public`, among them the fonts and the markdown renderer
   listed under "On the site".
 
-Everything else Build-Launcher.ps1 compiles into the launcher is Thornswood's
-own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
+The launcher's code is Thornswood's own but for one file: `FromGameDeflate.cs`
+is zlib's compressor translated into C#, under zlib's licence ("zlib 1.3,
+translated into C# inside the launcher", below, which also says why the other
+launcher files that name outside work are not taken from it). Of the resources
+Build-Launcher.ps1 compiles into the launcher, everything but the WebView2 files
+and `NLayer.dll` is Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
 `launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
 `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
@@ -129,6 +134,51 @@ Licence: MIT, which the package's nuspec names
 (`<license type="expression">MIT</license>`). The MIT licence asks for its
 notice to go with every copy, so the repository's `LICENSE` at that commit is
 reproduced in full at the end of this file and on the public credits page.
+
+## zlib 1.3, translated into C# inside the launcher
+
+`launcher\app\FromGameDeflate.cs` is `deflate.c` and `trees.c` of zlib 1.3
+(https://github.com/madler/zlib at the `v1.3` tag), translated into C# and cut
+down to level 6 with the default window, memory and strategy, so that the main
+menu FromGame makes compresses to the same bytes on every machine (#2827).
+Build-Launcher.ps1 compiles it into `Thornswood.exe` with the rest of the
+launcher's code. A translation of a program is a work derived from it, so the
+file is zlib's code under zlib's terms, not Thornswood's own work (#3668,
+27 Oct 2026: the licence asks nothing that costs anything, and treating the
+file as ours would claim zlib's work as Thornswood's).
+
+| Library | Version | Licence | Where its code is | Notice |
+|---|---|---|---|---|
+| zlib | 1.3 | Zlib | `launcher\app\FromGameDeflate.cs`, compiled into `Thornswood.exe` | at the top of the file, and `records\client-licences\zlib.txt` |
+
+What the licence asks, and where it is done:
+
+- The origin must not be misrepresented: the file's first line says it is
+  altered from zlib 1.3, and this section and the public credits page name
+  zlib as the launcher's.
+- Altered source must be plainly marked: the same first lines say it was
+  translated into C# by Thornswood, cut to one setting, and is not the
+  original software.
+- The notice may not be removed from a source copy: zlib.h's notice for 1.3
+  is at the top of the file word for word, with the copyright lines of
+  `deflate.c` and `trees.c`. The licence text is the one in
+  `records\client-licences\zlib.txt`, which the client's zlib 1.3.1 carries;
+  only the years on its copyright line differ.
+
+### Launcher source that names outside work
+
+Every launcher source file whose header names a project somebody else wrote,
+and whether its code is taken from that project. `tests\test-third-party.js`
+reads the header of every `.cs` file under `launcher\app` and
+`installer\setup` (its comments down to the first type it declares) and fails
+when one names an outside project and has no row here, or when a row says a
+file carries outside code and the file does not carry that project's notice.
+
+| File | Names | Carries its code | Why |
+|---|---|---|---|
+| `FromGameDeflate.cs` | zlib 1.3, `deflate.c` and `trees.c` | yes: zlib | A translation of zlib's code, above. |
+| `FromGameMath.cs` | numpy, OpenBLAS, LAPACK's `dgesv` | no | It does the arithmetic Build-NoticeBoard.py does with numpy in the same order and rounding, so the meshes come out the same bytes, and says what that order is. The order was measured from the results (19 Oct), not copied from their code: the inverse is a 3 by 3 LU solve written out by hand, and nothing in it is OpenBLAS's or LAPACK's source. |
+| `FromGameArchive.cs` | LZ4 | no | It decodes the LZ4 frame and block format the game's archives use, written from that published format and the BSA layout. Build-NoticeBoard.py calls the lz4 package for this; the launcher has its own short decoder instead, and no code of the lz4 library is in it. |
 
 ## The SkyMP client runtime, built from the fork
 
@@ -651,21 +701,51 @@ collection and Vortex's staging folder on the shipping machine:
   section gave the 1.1 file as read on 24 September, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod
-  27859) with one line changed, `bTweenMenu = false`. The rest is as that
-  mod's author wrote it. Revision 2 removed Skyrim Souls RE itself
+  27859) with one line changed, `bTweenMenu = false`. Read on 27 October
+  against the mod's own files: it is the 7,009-byte ini Skyrim Souls RE 3.1.2
+  ships (Nexus file 754726), with its byte order mark taken off and a blank
+  line added under the first line. Revision 2 removed Skyrim Souls RE itself
   (docs\COLLECTION-REVISION-2.md), so nothing in the collection reads this
   file now.
 - `SKSE\Plugins\OpenAnimationReplacer.ini`: the settings file Open Animation
   Replacer (mod 92109, in the collection) writes, holding the values Thornswood
-  wants.
+  wants. It is not one of that mod's files: its archives (3.1.6, and 3.2.1,
+  Nexus file 798222, in revision 5) hold only `OpenAnimationReplacer.dll` and
+  its `.pdb`. The two values Thornswood needs the launcher writes into it on
+  every Play (`launcher\app\Enforce.cs`).
 - The four face files: the face meshes and face tints the Creation Kit exports
   for two people Fishing In Skyrim Special Edition (mod 47618, in the
   collection) adds, Rybek Kupiecski (`FishingVendorPolish`, 00025905) and
   Lillani (`FISLillani`, 0002A07C). The four are dated 26 September and
-  are made from that mod's records.
+  are made from that mod's records. The mod's own archive (Nexus file
+  194634, 1.0) carries its own four for the same two people, dated 27 March
+  2021, and Vortex deploys these over them.
 
-The settings files and the faces belong with mods that are, or were, in the
-collection. This file did not read those mods' permissions.
+What those mods' pages say, read on 26 October (#2793), and what becomes of
+each file:
+
+- Skyrim Souls RE: 3.2.0 and later under GPL-3.0 with the modding exception,
+  and "Version 3.1.2 and earlier is released under the MIT License". The MIT
+  licence asks for its notice to go with the file, and Thornswood Content 1.2
+  carries none. The next Thornswood Content file leaves the ini out.
+- Open Animation Replacer: modifying its files needs its author's permission,
+  its assets may be used with credit, and it may not be uploaded elsewhere.
+  No part of its archive is in the ini. The next Thornswood Content file
+  leaves the ini out all the same, so the launcher is the one place those two
+  values come from.
+- Fishing In Skyrim Special Edition: "You must get permission from me before
+  you are allowed to use any of the assets in this file", the same for
+  modifying its files, and no upload to other sites. No permission is
+  recorded, and faces made from its records cannot be rebuilt as Thornswood's
+  own, so the next Thornswood Content file leaves the four out for good
+  (Patrick, 26 October, #2793).
+- The plugin: the next Thornswood Content file carries the repository's
+  `game\content\Thornswood-Content.esp` in place of the copy from before
+  #2553, and the collection revision that pins it drops the patch.
+
+`records\asset-provenance.json` registers each of these files by its sha256,
+and `tests\test-asset-provenance.js` fails while a file in the table above has
+no entry there.
 
 ### The plugin each channel carries
 
@@ -1008,7 +1088,11 @@ the copy the project's own Google Fonts folder keeps with its copyright line:
   with a link to its page (`launcher\app\Links.cs`), and the public credits page
   says so. The two mods in it that Thornswood uploads itself are not in this
   group: they have their own sections above. The mod files the installer
-  carries anyway are entry 168, above.
+  carries anyway are entry 168, above. What each mod's own page says about
+  being put in a collection is read and kept, with the page's words, in
+  `records\collection-permissions.json`, and `New-NexusRevision.ps1` makes
+  and publishes no revision that carries a mod whose page nobody has read or
+  whose page says no (#3649).
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
 - The WebView2 Runtime, which comes from Microsoft.
