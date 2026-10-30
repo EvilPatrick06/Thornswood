@@ -158,7 +158,7 @@ $envList = ConvertTo-Json -Compress -Depth 6 @{ total_count = 4; environments = 
         @{ name = 'desk'; protection_rules = @(@{ type = 'branch_policy' }); deployment_branch_policy = @{ protected_branches = $false; custom_branch_policies = $true } },
         @{ name = 'notices'; protection_rules = @(@{ type = 'branch_policy' }); deployment_branch_policy = @{ protected_branches = $false; custom_branch_policies = $true } },
         @{ name = 'release'; protection_rules = @(@{ type = 'branch_policy' }); deployment_branch_policy = @{ protected_branches = $false; custom_branch_policies = $true } }) }
-$policies = @{ board = @{ name = 'main'; type = 'branch' }; desk = @{ name = 'main'; type = 'branch' }; notices = @{ name = 'main'; type = 'branch' }; release = @{ name = 'v*'; type = 'tag' } }
+$policies = @{ board = @{ name = 'main'; type = 'branch' }; desk = @{ name = 'main'; type = 'branch' }; notices = @{ name = 'main'; type = 'branch' }; release = @{ name = 'main'; type = 'branch' } }
 $svcAll = ConvertTo-Json -Compress -Depth 8 @{ ok = $true; unread = @(); lines = @(); readings = @{
         actions = $record.actions; workflow_token = $record.workflow_token; sharing = $record.sharing; fork_pull_requests = $record.fork_pull_requests
         retention = @{ days = 90 }; runners = @(@{ name = 'thornswood-vps'; status = 'online'; labels = @('self-hosted', 'thornswood-vps') })
@@ -189,7 +189,7 @@ Yes '  the environments listed with the run''s own token' (@($r.Calls | Where-Ob
 Yes '  the service asked for settings alone, with this run''s OIDC token, past any proxy' (
     @($r.Calls | Where-Object { $_.Uri -eq 'http://127.0.0.1:7791/converge' -and $_.Method -eq 'POST' -and $_.Auth -eq 'Bearer oidc-for-this-run' -and $_.NoProxy -and $_.Body.what -eq 'settings' -and @($_.Body.PSObject.Properties).Count -eq 1 }).Count -eq 1)
 Yes '  and nothing else was called, nothing but GETs to GitHub' (@($r.Calls | Where-Object { $_.Uri -like 'https://api.test/*' -and $_.Method -ne 'GET' }).Count -eq 0 -and $r.Calls.Count -eq 7)
-Yes '  every reading is in the answer' ($r.Out -match 'read workflow_token: default_workflow_permissions=read' -and $r.Out -match 'read runner thornswood-vps: online' -and $r.Out -match 'read environment release: deploy_from tag v\*')
+Yes '  every reading is in the answer' ($r.Out -match 'read workflow_token: default_workflow_permissions=read' -and $r.Out -match 'read runner thornswood-vps: online' -and $r.Out -match 'read environment release: deploy_from branch main')
 
 $r = OnGitHub @{} @{ content = (ConvertTo-Json -Compress -Depth 8 @{ ok = $true; unread = @('secrets: the App has no Secrets permission, so GitHub gives it none of these names'); lines = @(); readings = @{ actions = $record.actions; environments = @{ board = @{}; desk = @{}; notices = @{}; release = @{} } } }) }
 Yes 'names the App may not read: exit 0, MATCHES UNREAD 1 with why' ($r.Code -eq 0 -and $r.Out -match 'Check-GitHubSettings::MATCHES UNREAD 1%0Anot read: secrets: the App has no Secrets permission')
