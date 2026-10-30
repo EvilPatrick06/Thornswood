@@ -55,7 +55,7 @@ $on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'started only by a new issue' ($on -match '(?m)^  issues:\n    types: \[opened\]\s*$' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 1)
 Yes 'the run''s token is given nothing' ($code -match '(?m)^permissions:\s*\{\}\s*$' -and $code -notmatch '(?m)^\s+permissions:' -and $code -notmatch 'github\.token')
 Yes 'the board token, from the board environment' ($code -match '(?m)^    environment: board$' -and $code.Contains('BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}') -and @([regex]::Matches($code, 'secrets\.')).Count -eq 1)
-Yes 'on any VPS runner, with a timeout' ($code -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps\]$' -and $code -match '(?m)^    timeout-minutes: \d+$')
+Yes 'on any VPS runner while the repository is private and GitHub''s once public (#3685), with a timeout' ($code -match ('(?m)^    runs-on: ' + [regex]::Escape("`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}") + '$') -and $code -match '(?m)^    timeout-minutes: \d+$')
 Yes 'no checkout and no action' ($code -notmatch 'uses:')
 Yes 'the issue comes in through the environment' ($code.Contains('ISSUE: ${{ github.event.issue.number }}') -and $code.Contains('ISSUE_NODE: ${{ github.event.issue.node_id }}'))
 $step = [regex]::Match($code, '(?ms)- name: Set the card''s Order to 10000 plus the issue''s number\n.*?run: \|\n(.*)$').Groups[1].Value

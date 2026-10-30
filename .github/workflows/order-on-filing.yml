@@ -25,9 +25,10 @@
 # as in board-status.yml (its header says why it is a classic token). The
 # run's own token is given nothing.
 #
-# WHERE IT RUNS. On the VPS runners, like board-status.yml and area-label.yml,
-# for a few seconds per new issue. Moving the board and label workflows off
-# the VPS before the repository is public is #3912; this one goes with them.
+# WHERE IT RUNS. On the VPS runners while the repository is private, like
+# board-status.yml and area-label.yml, for a few seconds per new issue, and on
+# GitHub's runner once it is public, since anyone can open an issue on a
+# public repository (#3685).
 name: Order for a new issue
 on:
   issues:
@@ -36,7 +37,7 @@ permissions: {}
 jobs:
   order:
     name: Give the new issue its Order
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     environment: board
     # A few calls to GitHub. Past this it is stuck, not slow.
     timeout-minutes: 3
