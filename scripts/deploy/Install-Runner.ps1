@@ -1505,7 +1505,9 @@ function Get-RunnerMigrationState([string]$acct, [string]$svc, [string]$root) {
   $start = Join-Path $env:ProgramData 'Thornswood-RunnerDrive\start.ps1'
   if (-not $task -or $task.State -eq 'Disabled' -or $task.Principal.UserId -notin @('SYSTEM','S-1-5-18') -or @($task.Actions).Count -ne 1 -or $task.Actions[0].Execute -notin @('powershell.exe', 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe') -or $task.Actions[0].Arguments -ne ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $start + '"') -or -not (Test-Path -LiteralPath $start -PathType Leaf)) { throw 'Runner drive startup task does not match the managed SYSTEM attach/start task' }
   Assert-RunnerMigrationPath $start
-  $rules = @(Get-NetFirewallRule -Group ('Thornswood PR runner ' + $acct) -EA Stop)
+  # -Migrate is -OffBox only, and off the box the guards are in this machine's
+  # own store (Set-RunnerFirewall's $grdStore), so that is where they are read.
+  $rules = @(Get-NetFirewallRule -PolicyStore PersistentStore -Group ('Thornswood PR runner ' + $acct) -EA Stop)
   if (-not $rules.Count -or @($rules | Where-Object { [string]$_.Enabled -ne 'True' -or [string]$_.Direction -ne 'Outbound' -or [string]$_.Action -ne 'Block' }).Count) { throw 'Selected runner firewall guards are missing or disabled' }
   $plan
 }
