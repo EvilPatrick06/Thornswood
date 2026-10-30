@@ -3387,8 +3387,7 @@ namespace Thornswood
         /// mod's folder in Vortex's mods folder, and that folder carries the
         /// mod's name. Null when there is no record or it does not list the
         /// plugin. Scan and Fix name it for another author's plugin whose
-        /// bytes are not the server's, which the server does not hand out
-        /// (#1180).
+        /// bytes are not the server's, which Fix has no copy of (#1180).
         /// </summary>
         public static string VortexModOf(Config cfg, string plugin)
         {
