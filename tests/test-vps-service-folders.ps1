@@ -4,9 +4,9 @@
       powershell -NoProfile -File .\tests\test-vps-service-folders.ps1
 
   Lock-VpsFolders.ps1 takes Users off the watchdog's, the deploy store's,
-  Caddy's, the maintenance and the dumps folders (issues #1183 and #1691), run
-  against scratch folders under %TEMP% with the real Get-Acl and Set-Acl, read
-  back. Watch, Deploys, Caddy and Maint keep their rules by name (the bot's on
+  Caddy's and the dumps folders (issues #1183 and #1691), run against scratch
+  folders under %TEMP% with the real Get-Acl and Set-Acl, read back. Watch,
+  Deploys and Caddy keep their rules by name (the bot's on
   Watch, the site's on Deploys\current, a runner's deny); Dumps is SYSTEM's and
   Administrators', with write and no read for LOCAL SERVICE and the runners
   (WER's node.exe crash dumps), every other rule by name gone, a runner's deny
@@ -65,7 +65,8 @@ function Make([string]$c) {
     Put (Join-Path $c 'Thornswood-Deploys\gamemode\a.zip') 'artifact'
     Put (Join-Path $c 'Thornswood-Caddy\caddy.exe') 'program'
     Put (Join-Path $c 'Thornswood-Caddy\Caddyfile') 'config'
-    Put (Join-Path $c 'Thornswood-Maint\update.ps1') 'runs as SYSTEM'
+    # Off the box since #3288: never touched now, like Docs.
+    Put (Join-Path $c 'Thornswood-Maint\update.ps1') 'made by hand'
     Put (Join-Path $c 'Thornswood-Dumps\crash.dmp') 'unknown'
     Put (Join-Path $c 'Thornswood-Docs\x.txt') 'not ours here'
 }
@@ -83,7 +84,7 @@ try {
     Grant (Join-Path $c 'Thornswood-Deploys') $runner 'FullControl' 'ContainerInherit, ObjectInherit' 'None' 'Deny'
     Grant (Join-Path $c 'Thornswood-Dumps') $site 'Read' 'ContainerInherit, ObjectInherit' 'None'
     Grant (Join-Path $c 'Thornswood-Dumps') $runner 'FullControl' 'ContainerInherit, ObjectInherit' 'None' 'Deny'
-    $names = 'Thornswood-Watch', 'Thornswood-Deploys', 'Thornswood-Caddy', 'Thornswood-Maint', 'Thornswood-Dumps'
+    $names = 'Thornswood-Watch', 'Thornswood-Deploys', 'Thornswood-Caddy', 'Thornswood-Dumps'
     Yes 'the scratch folders start the way C:\ leaves them, Users reaching caddy.exe' ((Broad (Join-Path $c 'Thornswood-Caddy\caddy.exe')) -gt 0)
     $before = @{}; foreach ($n in $names) { $before[$n] = (Get-Acl -LiteralPath (Join-Path $c $n)).Sddl }
     $o = Box $c $bot @('-WhatIf')
@@ -91,7 +92,7 @@ try {
     Yes '-WhatIf names the Dumps writers' ($o -match ('WOULD LOCK ' + [regex]::Escape((Join-Path $c 'Thornswood-Dumps')) + ':.*write \(no read\) for ' + [regex]::Escape($site + ', ' + $runner)))
     Yes '-WhatIf changes nothing' (@($names | Where-Object { (Get-Acl -LiteralPath (Join-Path $c $_)).Sddl -ne $before[$_] }).Count -eq 0 -and $o -match 'WHATIF: nothing was changed')
     $o = Box $c $bot @()
-    Yes ('it locks all five and refuses none (exit ' + $script:code + ')') ($script:code -eq 0 -and $o -match 'LOCKED 5 folder\(s\), 0 refused')
+    Yes ('it locks all four and refuses none (exit ' + $script:code + ')') ($script:code -eq 0 -and $o -match 'LOCKED 4 folder\(s\), 0 refused')
     foreach ($n in $names) {
         $p = Join-Path $c $n
         Yes "$n takes nothing from C:\" ((Get-Acl -LiteralPath $p).AreAccessRulesProtected -and @(All $p | Where-Object { $_.IsInherited }).Count -eq 0)
@@ -99,15 +100,15 @@ try {
             @(Named $p 'S-1-5-18' | Where-Object { "$($_.FileSystemRights)" -match 'FullControl' }).Count -ge 1 -and @(Named $p 'S-1-5-32-544' | Where-Object { "$($_.FileSystemRights)" -match 'FullControl' }).Count -ge 1)
     }
     foreach ($p in 'Thornswood-Watch\watch.ps1', 'Thornswood-Watch\alerts.jsonl', 'Thornswood-Deploys\history.log', 'Thornswood-Deploys\current\site.txt',
-                   'Thornswood-Deploys\gamemode\a.zip', 'Thornswood-Caddy\caddy.exe', 'Thornswood-Caddy\Caddyfile', 'Thornswood-Maint\update.ps1', 'Thornswood-Dumps\crash.dmp') {
+                   'Thornswood-Deploys\gamemode\a.zip', 'Thornswood-Caddy\caddy.exe', 'Thornswood-Caddy\Caddyfile', 'Thornswood-Dumps\crash.dmp') {
         Yes "no Users, Everyone or Authenticated Users rule reaches $p" ((Broad (Join-Path $c $p)) -eq 0)
     }
     Yes 'the bot keeps its read on the watchdog''s files' (@(Named (Join-Path $c 'Thornswood-Watch\watch.ps1') $bot).Count -ge 1 -and @(Named (Join-Path $c 'Thornswood-Watch\alerts.jsonl') $bot).Count -ge 1)
     Yes 'the site keeps its read on Deploys\current' (@(Named (Join-Path $c 'Thornswood-Deploys\current\site.txt') $site).Count -eq 1)
     Yes '  and reaches nothing else in the deploy store' (@(Named (Join-Path $c 'Thornswood-Deploys\history.log') $site).Count -eq 0 -and @(Named (Join-Path $c 'Thornswood-Deploys\gamemode\a.zip') $site).Count -eq 0)
     Yes 'the runner''s deny on Deploys stays' (@(Named (Join-Path $c 'Thornswood-Deploys') $runner | Where-Object { "$($_.AccessControlType)" -eq 'Deny' }).Count -eq 1)
-    Yes 'nobody but SYSTEM, Administrators and the bot reaches Caddy or Maint' (
-        @(@((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Caddy\caddy.exe')).Access) + @((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Maint\update.ps1')).Access) | Where-Object { $keep -notcontains (Sid $_) }).Count -eq 0)
+    Yes 'nobody but SYSTEM, Administrators and the bot reaches Caddy' (
+        @(@((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Caddy\caddy.exe')).Access) | Where-Object { $keep -notcontains (Sid $_) }).Count -eq 0)
     $x = @((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Dumps\crash.dmp')).Access | ForEach-Object { Sid $_ } | Sort-Object -Unique)
     Yes ('Dumps holds only SYSTEM, Administrators and the two writers, the site''s read gone (' + ($x -join ', ') + ')') (@($x | Where-Object { $keep -notcontains $_ -and @($site, $runner) -notcontains $_ }).Count -eq 0)
     $WriteBits = [Security.AccessControl.FileSystemRights]'Write'; $Rd = [Security.AccessControl.FileSystemRights]'ReadData'
@@ -121,6 +122,7 @@ try {
     }
     Yes 'each is read back' ($o -match ([regex]::Escape((Join-Path $c 'Thornswood-Caddy')) + ': takes nothing from above, no Users rule'))
     Yes 'a folder that is not ours is never touched' ((Broad (Join-Path $c 'Thornswood-Docs\x.txt')) -gt 0)
+    Yes '  and neither is Maint, which #3288 took off the list' ((Broad (Join-Path $c 'Thornswood-Maint\update.ps1')) -gt 0 -and $o -notmatch [regex]::Escape((Join-Path $c 'Thornswood-Maint')))
     $s1 = @{}; foreach ($n in $names) { $s1[$n] = (Get-Acl -LiteralPath (Join-Path $c $n)).Sddl }
     $o = Box $c $bot @()
     Yes 'run again, nothing changes' ($script:code -eq 0 -and @($names | Where-Object { (Get-Acl -LiteralPath (Join-Path $c $_)).Sddl -ne $s1[$_] }).Count -eq 0)
@@ -133,7 +135,7 @@ try {
     Yes 'Watch is refused while the bot has no rule on it, saying to run Install-Bot.ps1' ($o -match ('REFUSED ' + [regex]::Escape((Join-Path $d 'Thornswood-Watch')) + ': the bot''s account has no rule') -and $o -match 'Install-Bot\.ps1 first')
     Yes 'Deploys is refused while the site has no rule on current, saying to run Deploy-Docs.ps1' ($o -match ('REFUSED ' + [regex]::Escape((Join-Path $d 'Thornswood-Deploys')) + ': the site''s account has no rule') -and $o -match 'Deploy-Docs\.ps1 first')
     Yes '  both left exactly as they were, and it exits non-zero' ((Get-Acl -LiteralPath (Join-Path $d 'Thornswood-Watch')).Sddl -eq $bw -and (Get-Acl -LiteralPath (Join-Path $d 'Thornswood-Deploys')).Sddl -eq $bd -and $script:code -ne 0)
-    Yes '  and the other three are locked' (@('Thornswood-Caddy\caddy.exe', 'Thornswood-Maint\update.ps1', 'Thornswood-Dumps\crash.dmp' | Where-Object { (Broad (Join-Path $d $_)) -gt 0 }).Count -eq 0)
+    Yes '  and the other two are locked' (@('Thornswood-Caddy\caddy.exe', 'Thornswood-Dumps\crash.dmp' | Where-Object { (Broad (Join-Path $d $_)) -gt 0 }).Count -eq 0)
     $o = Box $d 'none' @()
     Yes 'with no bot on the box, Watch is locked without a bot rule' ($o -match ('locked ' + [regex]::Escape((Join-Path $d 'Thornswood-Watch'))) -and (Broad (Join-Path $d 'Thornswood-Watch\watch.ps1')) -eq 0)
 } finally {
