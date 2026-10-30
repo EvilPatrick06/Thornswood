@@ -43,7 +43,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Install),
     [string]$RulesPath
 )
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
@@ -265,7 +265,7 @@ Yes 'OwnGame.cs has no second hand-copied Daedric list' (
 Yes 'Build-Launcher.ps1 embeds that record' (
     ([IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Build-Launcher.ps1'))).Contains('ui-gone.json'))
 
-Yes 'the real shipped build.js is committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
+Yes 'the real shipped build.js''s asset modules are committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
 $uiExpected = Get-UiFrontFixtureExpectedNames
 $uiRealParsed = $null
 $uiRealThrew = $false
@@ -653,7 +653,6 @@ $ship = @(
     (Row 'Data\textures\lostark\b.dds' 500),
     (Row 'Data\meshes\armor\commonclothes\travel.nif' 4000),
     (Row 'Data\meshes\leftover.nif' 700),
-    (Row 'Data\meshes\animationdatasinglefile.txt' 700),
     (Row 'Data\meshes\interface\logo\logo.nif' 10562),
     (Row 'Data\meshes\interface\logo\logo01ae.nif' 10562),
     (Row 'Data\textures\interface\objects\Mainmenuwallpaper.dds' 8388736),

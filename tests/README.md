@@ -22,7 +22,7 @@ Most of them run on every pull request as well, in the build check
 #3009). A new harness is on that gate the moment it is in this folder, and
 touches no shared line; say in its header why it exists. To keep one off the
 gate, add a line to `gate-excluded.txt`, `name  reason`, in name order. A
-harness build.yml runs in a step of its own (`test-ownership.js`, issue #752)
+harness build.yml runs in a step of its own (`test-old-name-gone.js`, issue #497)
 has a line there too, "own step in build.yml", so the gate does not run it
 twice. The "not sorted yet" lines are minutes together, which is why they
 come onto the gate a few at a time.

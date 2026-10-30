@@ -1,17 +1,8 @@
 # Controls the C# still looks up that ui.xaml no longer has.
 #
-# All of these are the server address and local-server controls, whose UI was
-# taken out of the Settings page. Every use of them sits behind a null check,
-# so they cost nothing and crash nothing. They are listed here so that a name
-# that is NOT on this list stands out as new.
+# None since #3146: the server address and local-server controls, whose UI
+# was taken out of the Settings page, went with the C# that looked them up.
+# A name that is not on this list stands out as new.
 #
 # Do not add a name here to silence a real problem. The only reason a name
 # belongs on this list is that the control is genuinely gone on purpose.
-BoxAddress
-BoxPort
-BtnSaveServer
-BtnServerStart
-BtnServerStop
-BtnShowServer
-TxtServerState
-TxtUpdateSource

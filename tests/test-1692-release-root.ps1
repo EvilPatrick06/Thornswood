@@ -23,8 +23,9 @@
   3. Ship.ps1, Check-ShipReady.ps1, Setup-ShipMachine.ps1 and
      Build-Generated.ps1 all ask Where.ps1 and none keeps its own rule; Ship
      refuses a folder Vortex deploys into before the version moves or
-     anything is built, and checks the generated files before the launcher
-     is built or installed. tests\test-ship-dry-run.ps1 runs Ship on both
+     anything is built, and asks whether the collection builds the
+     animation and body files (#3715) before the launcher is built or
+     installed. tests\test-ship-dry-run.ps1 runs Ship on both
      (G, H and I).
   4. Check-ShipReady.ps1 run whole: -Root is the folder it checks, and a
      folder Vortex deploys into is a gap; since #2662 the recorded folder,
@@ -85,12 +86,12 @@ try {
     $file = Ask 'ShipRoots'
     Yes 'ShipRoots is a file in this machine''s own data, not in the repository' (
         (Same $file (Join-Path $env:LOCALAPPDATA 'Thornswood\ship-roots.json')) -and -not $file.StartsWith($repo))
-    Yes 'with no file, ShipRoot is the launcher install, C:\Thornswood when no drive has one' ((Ask 'ShipRoot') -eq 'C:\Thornswood')
-    Yes '  and ShipRootDev that with -DevBuild on the end' ((Ask 'ShipRootDev') -eq 'C:\Thornswood-DevBuild')
+    Yes 'with no file, ShipRoot is the launcher install (C:\Thornswood when no drive has one)' ((Ask 'ShipRoot') -eq (Ask 'Install'))
+    Yes '  and ShipRootDev that with -DevBuild on the end' ((Ask 'ShipRootDev') -eq ((Ask 'Install') + '-DevBuild'))
     $relDev = Join-Path $T 'Thornswood-Release-DevBuild'
     Put $file (ConvertTo-Json -InputObject ([ordered]@{ dev = $relDev }))
     Yes 'a file naming dev: ShipRootDev is that folder' (Same (Ask 'ShipRootDev') $relDev)
-    Yes '  and ShipRoot, which it does not name, is still the install rule' ((Ask 'ShipRoot') -eq 'C:\Thornswood')
+    Yes '  and ShipRoot, which it does not name, is still the install rule' ((Ask 'ShipRoot') -eq (Ask 'Install'))
     $relMain = Join-Path $T 'Main'
     Put $file (ConvertTo-Json -InputObject ([ordered]@{ main = $relMain; dev = $relDev }))
     Yes 'a file naming both: each channel its own' ((Same (Ask 'ShipRoot') $relMain) -and (Same (Ask 'ShipRootDev') $relDev))
@@ -139,8 +140,8 @@ try {
     Yes 'Ship refuses a folder Vortex deploys into' ($vortex -gt 0)
     Yes '  before the version moves and before anything is built' (
         $vortex -gt 0 -and $vortex -lt $ship.IndexOf('function Unbump') -and $vortex -lt $ship.IndexOf("'Build-Launcher.ps1') -Root"))
-    $gen = $ship.IndexOf("Head 'Generated files'")
-    Yes 'Ship checks the generated files before the launcher is built or installed' (
+    $gen = $ship.IndexOf("Head 'Animation and body files'")
+    Yes 'Ship asks whether the collection builds the animation and body files before the launcher is built or installed' (
         $gen -gt 0 -and $gen -lt $ship.IndexOf("'Build-Launcher.ps1') -Root") -and $gen -lt $ship.IndexOf("'Install-Launcher.ps1')") -and
         $gen -lt $ship.IndexOf('Get-ReleaseLauncher $srcRepo'))
     Yes 'Check-ShipReady and Setup-ShipMachine take -Root' (

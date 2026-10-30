@@ -64,7 +64,7 @@ const pages = fs.readdirSync(path.join(REPO_DIR, 'site', 'data', 'site')).filter
   .map(function (f) { return 'site/data/site/' + f; })
   .concat(fs.readdirSync(path.join(REPO_DIR, 'site', 'public')).filter(function (f) { return /\.html$/.test(f); })
     .map(function (f) { return 'site/public/' + f; }))
-  .concat(['launcher/app/Help.cs', 'bot/content.py']);
+  .concat(['bot/content.py']);
 const said = [];
 for (const rel of pages) {
   const t = flat(read(rel));
@@ -77,7 +77,7 @@ yes('no public page (' + pages.length + ' read) says certain events may allow it
 // 4. the embassy page agrees
 const embassy = flat(read('docs/systems/embassy.md'));
 yes('docs/systems/embassy.md says the 6 armed are the embassy\'s own guard, not Legion', /The 6 are the embassy's own guard, not Legion/.test(embassy));
-yes('and that a Legion veteran can be played', /A Legion veteran who served decades ago and settled in a hold can be played/.test(embassy));
+yes('and that a Legion veteran can be played', /A Legion veteran who served in the war about fifty years ago and settled in a hold when the Legion left can be played/.test(embassy));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

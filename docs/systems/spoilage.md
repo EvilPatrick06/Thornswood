@@ -12,10 +12,11 @@ page on 22 October, on
 | Fruit, vegetables and milk | 7 days |
 | Cooked dishes, soups, stews and chowders | 14 days |
 | Bread, sweets, butter and the Burnt Meal | 14 days |
+| The festival feasts | 14 days |
 | A fine dish | As its plain dish |
 | Salted or smoked food | Never spoils |
 | Honey, flour, cheese, spiced beef, Nord chocolate, taffy | Never spoils |
-| Drink, ale, tea, potions and drugs | Never spoils |
+| Drink, ale, the festival brews, tea, potions and drugs | Never spoils |
 
 ## Where the days are
 

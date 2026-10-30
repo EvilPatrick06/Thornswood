@@ -70,7 +70,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Install),
     [string]$Steam = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition'
 )
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
@@ -168,22 +168,20 @@ $fc   = [regex]::Match($pub, '(?ms)^function Test-FromCollection\(.*?^\}\r?$')
 # What Test-FromCollection reads beside the collection record: the files
 # Thornswood generated itself (#1247). It replaced $DevShipsOurs in #1177,
 # when Thornswood-Content.esp became ours on every channel.
-$sgf  = [regex]::Match($pub, '(?m)^\$shipGeneratedFiles = Get-ShipGeneratedFiles \$ProfileDir\r?$')
 $diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
 $coll = [regex]::Match($pub, '(?ms)^\$collectionRemovals = .*?^\}\r?$')
 $alw  = [regex]::Match($pub, '(?ms)^\$alwaysGone = @\(Get-ShipDeleteAlways\)\r?\nforeach \(\$d in \$alwaysGone\) \{.*?^\}\r?$')
 Yes 'Publish-Update.ps1 still has Test-Machine, Test-FromCollection, the diff, the collection filter and the always list to lift' (
-    $tm.Success -and $fc.Success -and $sgf.Success -and $diff.Success -and $coll.Success -and $alw.Success)
+    $tm.Success -and $fc.Success -and $diff.Success -and $coll.Success -and $alw.Success)
 Yes 'and its scan still leaves out what Test-Machine claims' ($pub -match 'if \(Test-Machine \$rel\) \{ continue \}')
 Yes 'and it adds the always list after the collection filter, so no record of the collection can drop it' (
     $alw.Success -and $coll.Success -and $alw.Index -gt $coll.Index)
 Yes 'and still writes every removal into delete.txt' ($pub.Contains('foreach ($rel in $removed) { $sw.WriteLine(($rel -replace ''\\'', ''/'')) }'))
-if (-not ($tm.Success -and $fc.Success -and $sgf.Success -and $diff.Success -and $coll.Success -and $alw.Success)) { Done }
+if (-not ($tm.Success -and $fc.Success -and $diff.Success -and $coll.Success -and $alw.Success)) { Done }
 . ([scriptblock]::Create($tm.Value))
 . ([scriptblock]::Create($fc.Value))
 # A profile with no generated record: nothing generated, so the list is empty.
 $ProfileDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-chargen-profile-' + [Guid]::NewGuid().ToString('N'))
-. ([scriptblock]::Create($sgf.Value))
 
 # A dev pack, as Ship -Channel dev makes one. The collection record is a made
 # up one that claims a texture and nothing of ours. The shipping machine's

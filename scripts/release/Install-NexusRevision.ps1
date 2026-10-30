@@ -69,10 +69,13 @@
   records of step 6 into that folder, placing no file anywhere. Each mod's
   unpacked copy is hashed and deleted as soon as it is worked out, so the
   scratch folder never holds more than one mod. This is how a revision is
-  laid out from a cloud session (#2969): there the Nexus key is the
-  environment variable, 7-Zip is the build Get-SevenZip.ps1 fetches, the cache is
-  $XDG_CACHE_HOME/thornswood/nexus-cache (~/.cache when that is not set), and
-  every path in the records is the Windows path the layout has on One.
+  laid out without One (#2969). Since #2841 a cloud session holds no Nexus
+  key, so it asks for it with
+      pwsh scripts/release/Nexus-Run.ps1 -Line 'Install-NexusRevision -Revision 3'
+  which runs this on a box runner with the key and sends the four records
+  back. Off Windows, 7-Zip is the build Get-SevenZip.ps1 fetches and the
+  cache is $XDG_CACHE_HOME/thornswood/nexus-cache (~/.cache when that is not
+  set); every path in the records is the Windows path the layout has on One.
   Laying files into a game folder is for Windows only, where the game runs.
 
   Needs PowerShell 7 (NexusLayout.cs reads JSON with System.Text.Json), 7-Zip
@@ -148,6 +151,7 @@ function Step([scriptblock]$b) { try { return (& $b) } catch { Die $_.Exception.
 
 if ($PSVersionTable.PSVersion.Major -lt 7) { Die 'This needs PowerShell 7 (pwsh): NexusLayout.cs reads collection.json with System.Text.Json, which Windows PowerShell 5.1 does not have.' }
 . (Join-Path $Here 'Nexus.ps1')
+. (Join-Path $Here '..\mods\PluginRuleLoops.ps1')
 
 # A program run with its output kept apart from its errors.
 function Invoke-Tool([string]$exe, [string[]]$arguments) {
@@ -394,7 +398,7 @@ $rars = @($col.Entries | Where-Object {
 if ($rars.Count) {
   Step { Use-SevenZip }
   $t = Invoke-Tool $script:SevenZip @('t', $archives[$rars[0].Index])
-  if ($t.Code -ne 0) { Die ($rars.Count + ' of the archives are RAR (' + (($rars | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', ') + $(if ($rars.Count -gt 3) { ', ...' } else { '' }) + '), and ' + $script:SevenZip + ' could not test the first of them (exit ' + $t.Code + '), so it cannot unpack them.' + $(if (-not $IsWindows) { ' 7-Zip''s own Linux build unpacks RAR: pwsh scripts/release/Get-SevenZip.ps1 puts it where this script looks first.' } else { '' })) }
+  if ($t.Code -ne 0) { Die ([string]$rars.Count + ' of the archives are RAR (' + (($rars | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', ') + $(if ($rars.Count -gt 3) { ', ...' } else { '' }) + '), and ' + $script:SevenZip + ' could not test the first of them (exit ' + $t.Code + '), so it cannot unpack them.' + $(if (-not $IsWindows) { ' 7-Zip''s own Linux build unpacks RAR: pwsh scripts/release/Get-SevenZip.ps1 puts it where this script looks first.' } else { '' })) }
 }
 
 # ---------------------------------------------------------------- the install ---
@@ -402,6 +406,10 @@ Head 'Installing, as Vortex would'
 # Size and sha256 of each file, by its unpacked path, taken before -Record
 # deletes the unpacked copy.
 $script:Facts = @{}
+# And each plugin's TES4 header, by its unpacked path, for the plugin rules
+# check after the deploy (PluginRuleLoops.ps1), which -Record would
+# otherwise find gone.
+$script:PluginHeads = @{}
 function Remove-Unpacked($e, [string]$u) {
   [Thornswood.Layout.NexusLayout]::Forget($u)
   Remove-Tree $u
@@ -454,6 +462,7 @@ foreach ($e in $col.Entries) {
   # unpacked copy goes before the next is unpacked.
   if ($Record) {
     foreach ($s in $plan.Files.Values) { $script:Facts[$s.Full] = [pscustomobject]@{ Size = (Get-Item -LiteralPath $s.Full).Length; Sha256 = [Thornswood.Layout.NexusLayout]::Sha256Of($s.Full) } }
+    foreach ($s in $plan.Files.Values) { if ($s.Full -match '\.(esp|esm|esl)$') { $script:PluginHeads[$s.Full] = [pscustomobject]@{ Header = (Read-PluginRuleHeader $s.Full) } } }
     Remove-Unpacked $e $u
   }
   $plans.Add($plan)
@@ -533,6 +542,34 @@ foreach ($r in $col.PluginRules) {
   foreach ($a in $r.After) { $ak = ([string]$a).ToLowerInvariant(); if ($pos.ContainsKey($ak) -and $pos[$ak] -gt $pos[$k]) { $broken += ($r.Name + ' is to load after ' + $a) } }
 }
 if ($broken.Count) { Die ('The collection''s plugin order breaks its own plugin rules: ' + ($broken -join '; ') + '.') }
+# The list is not the game's order: the game puts every master first, and
+# LOOT holds that as hard as a rule. Revision 5's list had
+# cheddars_mashups.esl at the end, after the three plugins its rule named,
+# and the rule held to the list; on a clean install LOOT found it going round
+# with the game's own order (27 Oct). So the rules are read against the
+# plugins' headers too (PluginRuleLoops.ps1).
+# A file with no TES4 header is placed by its name alone: the game loads an
+# .esm or .esl as a master whatever is in it. A file that is not there to
+# read stops the run: -Record took the unpacked copies away mod by mod, and
+# the header read then ($script:PluginHeads) is the one used.
+$ruleHeads = @{}
+$byName = @()
+foreach ($x in $placed) {
+  if ($x.Rel -notmatch '^Data\\([^\\]+\.(esp|esm|esl))$') { continue }
+  $nm = $Matches[1]
+  if (-not $pos.ContainsKey($nm.ToLowerInvariant())) { continue }
+  if ($script:PluginHeads.ContainsKey($x.Full)) { $h = $script:PluginHeads[$x.Full].Header }
+  elseif (Test-Path -LiteralPath $x.Full -PathType Leaf) { $h = Read-PluginRuleHeader $x.Full }
+  else { Die ($x.Rel + ' was not read before its unpacked copy went, so where the game loads it is not known.') }
+  if ($null -eq $h) {
+    $byName += $nm
+    $h = [pscustomobject]@{ Master = ($nm -match '\.(esm|esl)$'); Light = ($nm -match '\.esl$'); Masters = [string[]]@() }
+  }
+  $ruleHeads[$nm] = $h
+}
+if ($byName.Count) { Say ('  no TES4 header, so placed by name alone: ' + (@($byName | Sort-Object) -join ', ')) 'Yellow' }
+$loops = @(Get-PluginRuleLoops $col.PluginRules $ruleHeads)
+if ($loops.Count) { Die ('The collection''s plugin rules go round in a circle with the order the game sets, which LOOT reports as a cyclic interaction on every install: ' + (($loops | ForEach-Object { $_.Loop + ' (' + ($_.Why -join '; ') + ')' }) -join '; ') + '.') }
 Say ('  ' + $order.Count + ' plugins: ' + @($order | Where-Object { $_.Enabled }).Count + ' enabled in the collection''s order' + $(if ($unlisted.Count) { ', ' + $unlisted.Count + ' it does not list, disabled: ' + ($unlisted -join ', ') } else { '' }))
 
 Say '  working out every file''s sha256' 'DarkGray'

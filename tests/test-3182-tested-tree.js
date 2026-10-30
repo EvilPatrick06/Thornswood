@@ -165,21 +165,38 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   const job = /\njobs:\n(?:  #.*\n)*  tested:\n([\s\S]*?)\n\n/.exec(build);
   const tj = job ? job[1] : '';
   yes('build.yml\'s first job is "tested"', !!job);
-  yes('  on a push only, so a manual run always builds', /\n    if: \$\{\{ github\.event_name == 'push' \}\}\n/.test(tj));
-  yes('  on any VPS runner, not a build one', /\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.test(tj));
+  yes('  on a push only, so a manual run always builds, and not while BUILD_RUNNER sends builds to the box of a private repository (#3685)',
+      /\n    if: \$\{\{ github\.event_name == 'push' && \(!github\.event\.repository\.private \|\| vars\.BUILD_RUNNER != 'vps'\) \}\}\n/.test(tj));
+  // #3551: both build jobs wait for this answer. On a VPS runner alone, the
+  // hosted build waited for a free box runner, or for ever with the box down.
+  const runsOn = (/\n    runs-on: ([^\n]*)\n/.exec(tj) || ['', ''])[1];
+  yes('  on GitHub\'s hosted runner, not the box (#3551): ' + runsOn, runsOn === 'ubuntu-latest' && !/self-hosted|thornswood-/.test(runsOn));
+  const fb = /\n  tested-vps:\n([\s\S]*?)\n\n/.exec(build);
+  const fj = fb ? fb[1] : '';
+  yes('its VPS fallback, tested-vps, comes right after it', !!fb && build.indexOf('\n  tested-vps:\n') > build.indexOf('\n  tested:\n') &&
+      build.slice(build.indexOf('\n  tested:\n') + 1, build.indexOf('\n  tested-vps:\n')).split(/\n  [A-Za-z0-9_-]+:\n/).length === 1);
+  yes('  on any VPS runner, not a build one', /\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.test(fj));
+  yes('  only while the repository is private (#3685), on a push, and only when the hosted job did not succeed',
+      /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && github\.event\.repository\.private && github\.event_name == 'push' && needs\.tested\.result != 'success' \}\}\n/.test(fj));
+  yes('  with the hosted job\'s own steps, permissions and output', /\n    steps: &look\n/.test(tj) && /\n    steps: \*look$/.test(fj) &&
+      /\n    permissions:\n      actions: read\n      contents: read\n      pull-requests: read\n    outputs:\n      run: \$\{\{ steps\.look\.outputs\.run \}\}\n/.test(fj));
+  yes('  and no secrets', !/secrets\./.test(fj));
   yes('  with only actions, contents and pull-requests read', /\n    permissions:\n      actions: read\n      contents: read\n      pull-requests: read\n    outputs:/.test(tj));
   yes('  and no secrets', !/secrets\./.test(tj));
   yes('  its output is the script\'s', /\n      run: \$\{\{ steps\.look\.outputs\.run \}\}\n/.test(tj) && /id: look\n/.test(tj) &&
-      /node scripts\\dev\\Tested-Tree\.js --tree \$tree --commit \$env:GITHUB_SHA --repo \$env:GITHUB_REPOSITORY\n/.test(tj) && /git rev-parse 'HEAD\^\{tree\}'/.test(tj));
-  yes('the hosted job waits for it and builds only when it found nothing',
-      /\n  launcher:\n    name: Launcher builds\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && /.test(build));
-  yes('so does the fallback', /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, launcher\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && /.test(build));
+      /node scripts\/dev\/Tested-Tree\.js --tree \$tree --commit \$env:GITHUB_SHA --repo \$env:GITHUB_REPOSITORY\n/.test(tj) && /git rev-parse 'HEAD\^\{tree\}'/.test(tj));
+  yes('the hosted job waits for both answers and builds only when neither found anything',
+      /\n  launcher:\n    name: Launcher builds\n    needs: \[tested, tested-vps\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && /.test(build));
+  yes('so does the fallback', /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, tested-vps, launcher\]\n    if: \$\{\{ !cancelled\(\) && github\.event\.repository\.private && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && /.test(build));
   const checks = (/steps: &checks\n([\s\S]*?)\n\n  # The default:/.exec(build) || ['', ''])[1];
   const steps = checks.split(/\n(?=      - )/).filter(s => /^      - /.test(s));
   const note = steps[steps.length - 1] || '';
   yes('the note is the last step of the checks, under the name the script looks for', note.indexOf('- name: ' + T.STEP + '\n') === 6);
-  yes('  on a pull request only, and only when its gate step ran the whole gate (#3114)',
-      /\n        if: github\.event_name == 'pull_request' && steps\.gate\.outputs\.whole == 'true'\n/.test(note));
+  // #3874: and only on GitHub's hosted runner. On the VPS a whole gate
+  // means the traced map could not serve the pull request, and a main build
+  // skipped by the note is not traced, so the map stayed stale.
+  yes('  on a pull request only, only when its gate step ran the whole gate (#3114), and only on GitHub\'s hosted runner (#3874)',
+      /\n        if: github\.event_name == 'pull_request' && steps\.gate\.outputs\.whole == 'true' && runner\.environment == 'github-hosted'\n/.test(note));
   // #3114: a pull request built on the VPS may run only the gate harnesses
   // its change can reach. Its tree is then not tested in full, so it keeps
   // no note and main builds it in full (and is traced). Run-Gate.ps1 says
@@ -217,10 +234,15 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   // Every harness and every script: GitHub's event and ref variables are read
   // only where named here, each with why it is not a check of a build.
   const ALLOWED = {
-    'scripts/release/Resolve-ReleaseTag.ps1': 'release.yml\'s tag step, which no check runs: tests/test-release-tag.ps1 gives it the values itself',
+    'tests/test-release-workflow.ps1': 'reads release.yml\'s text for the names its tag push hands to main\'s run (#3930); runs nothing',
     'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process',
+    'tests/test-3412-installer-on-github.ps1': 'reads installer.yml\'s text for those names; installer.yml is started by hand on a tag and is no check of a build (#3412)',
     'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
-    'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event'
+    'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event',
+    'scripts/deploy/Install-Runner.ps1': 'writes the signing runner\'s job-started hook (#3889), which reads the ref on the box before a job\'s first step to refuse it; no check runs it',
+    'tests/test-runner-hook.ps1': 'sets those names for the hook in a scratch process, to hold which refs it takes and refuses',
+    'scripts/dev/Gate-Map.ps1': 'the step after the gate that hands main\'s map on (#4009): it checks nothing, never fails a build, and prints only in main\'s push build',
+    'tests/test-4009-gate-map.ps1': 'sets those names for Gate-Map.ps1 in scratch processes, to hold that only main\'s push build hands a map on'
   };
   const ENVREAD = /\b(GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR))\b/;
   const found = [];

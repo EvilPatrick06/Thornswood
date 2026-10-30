@@ -1,20 +1,26 @@
 # Third-party notices
 
-This file lists what Thornswood hands to people that somebody else wrote, the
-licence each part is under, and where its source is. Every row was read off the
+This file lists what Thornswood hands to people that somebody else wrote, and
+the files kept in this repository that somebody else wrote even though they
+never ship ("Kept in the repository, not shipped"), the licence each part is
+under, and where its source is. Every row was read off the
 files on 24 September 2026. Licences come from each component's own licence
 file or from a font's own name table. Where a file came from was checked by
 comparing its sha256 with the copy it came from. Where something could not be
 identified, this file says so instead of guessing.
 
-This file does not license Thornswood's own work. That is `LICENSE` at the
-root: all rights reserved, with terms every contributor agrees to once
-(decided by Patrick on 12 Oct 2026, #1331).
+This file does not license Thornswood's own work. Thornswood's own code is
+under MIT, in `LICENSE` at the root (decided by Patrick on 26 Oct 2026,
+#3688). `LICENSING.md` says what that licence does not cover, which includes
+everything this file lists, and holds the terms every contributor agrees to
+once (#1331).
 
 `tests\test-third-party.js` checks this file against the build. It covers every
-resource Build-Launcher.ps1 compiles into the launcher, every file under
+resource Build-Launcher.ps1 compiles into the launcher, the header of every
+file of the launcher's and the setup stub's source, every file under
 `launcher\lib`, every font and minified script the site serves from
-`site\public`, the six client files and the commits in
+`site\public`, every fixture under `tests\fixtures` that is large or
+carries somebody else's notice, the six client files and the commits in
 `records\client-build.json` and `records\server-build.json`, the two
 libraries the fork links that are not permissive, and the source paragraph on
 the public credits page. Where Vortex's copy of the Thornswood
@@ -57,13 +63,19 @@ or the build check goes red.
   `site\public`, among them the fonts and the markdown renderer
   listed under "On the site".
 
-Everything else Build-Launcher.ps1 compiles into the launcher is Thornswood's
-own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
+The launcher's code is Thornswood's own but for one file: `FromGameDeflate.cs`
+is zlib's compressor translated into C#, under zlib's licence ("zlib 1.3,
+translated into C# inside the launcher", below, which also says why the other
+launcher files that name outside work are not taken from it). Of the resources
+Build-Launcher.ps1 compiles into the launcher, everything but the WebView2 files
+and `NLayer.dll` is Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `launcher-header.jpg`,
 `launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
 `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
-depot manifests (no Bethesda file is in it), and `ui-gone.json`, the Daedric
-menu set and unused fork assets a refresh must not copy back. `logo-dev.png` is the emblem the dev
+depot manifests (no Bethesda file is in it), `ui-gone.json`, the Daedric
+menu set and unused fork assets a refresh must not copy back, and
+`generated.json`, the build list of the animation and body files the launcher
+makes on each computer (#3715). `logo-dev.png` is the emblem the dev
 build shows in place of `logo.png` (Art.cs) and `app-dev.ico` is the icon its
 shortcuts carry in place of `app.ico` (Icons.cs); both are drawn for
 Thornswood, the same as the two they stand in for. The setup stub,
@@ -101,19 +113,91 @@ Not shipped by Thornswood: the WebView2 Runtime itself. When a machine has
 none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 (Voice.cs) and runs it, under Microsoft's terms.
 
+## NLayer, inside the launcher
+
+`NLayer.dll` from `launcher\lib\nlayer`, the MP3 decoder the launcher plays
+its menu theme with (MenuMusic.cs, since #3207, so the theme plays from the
+launcher's own process and the Windows Volume Mixer lists it as the launcher).
+Build-Launcher.ps1 references it for the compile and embeds it as a resource,
+and MenuMusic.cs hands it to the runtime from memory, the same way as the two
+managed WebView2 files.
+
+| File | Where it sits in the package | sha256 |
+|---|---|---|
+| `NLayer.dll` | `lib\netstandard2.0` | `f1db8b641171799231aee40712b01ed439611ebdeda9324d4f5a524c34454e11` |
+
+Version 3.0.0 (file version 3.0.0.0). Byte for byte the file in NLayer 3.0.0
+as nuget.org serves it (the .nupkg's sha256 is
+`625b215f76453180d499c203f711aceedcce6e855c86a65716c0b1275afcb9c6`),
+downloaded and compared on 26 October 2026. Its source is
+https://github.com/naudio/NLayer at commit `046c7ce4` (in full,
+`046c7ce422970f8f0f0bc205d6c6341bcb7debf1`), the commit the package's nuspec
+and the file's own product version name. By Mark Heath, Andrew Ward and
+contributors.
+
+Licence: MIT, which the package's nuspec names
+(`<license type="expression">MIT</license>`). The MIT licence asks for its
+notice to go with every copy, so the repository's `LICENSE` at that commit is
+reproduced in full at the end of this file and on the public credits page.
+
+## zlib 1.3, translated into C# inside the launcher
+
+`launcher\app\FromGameDeflate.cs` is `deflate.c` and `trees.c` of zlib 1.3
+(https://github.com/madler/zlib at the `v1.3` tag), translated into C# and cut
+down to level 6 with the default window, memory and strategy, so that the main
+menu FromGame makes compresses to the same bytes on every machine (#2827).
+Build-Launcher.ps1 compiles it into `Thornswood.exe` with the rest of the
+launcher's code. A translation of a program is a work derived from it, so the
+file is zlib's code under zlib's terms, not Thornswood's own work (#3668,
+27 Oct 2026: the licence asks nothing that costs anything, and treating the
+file as ours would claim zlib's work as Thornswood's).
+
+| Library | Version | Licence | Where its code is | Notice |
+|---|---|---|---|---|
+| zlib | 1.3 | Zlib | `launcher\app\FromGameDeflate.cs`, compiled into `Thornswood.exe` | at the top of the file, and `records\client-licences\zlib.txt` |
+
+What the licence asks, and where it is done:
+
+- The origin must not be misrepresented: the file's first line says it is
+  altered from zlib 1.3, and this section and the public credits page name
+  zlib as the launcher's.
+- Altered source must be plainly marked: the same first lines say it was
+  translated into C# by Thornswood, cut to one setting, and is not the
+  original software.
+- The notice may not be removed from a source copy: zlib.h's notice for 1.3
+  is at the top of the file word for word, with the copyright lines of
+  `deflate.c` and `trees.c`. The licence text is the one in
+  `records\client-licences\zlib.txt`, which the client's zlib 1.3.1 carries;
+  only the years on its copyright line differ.
+
+### Launcher source that names outside work
+
+Every launcher source file whose header names a project somebody else wrote,
+and whether its code is taken from that project. `tests\test-third-party.js`
+reads the header of every `.cs` file under `launcher\app` and
+`installer\setup` (its comments down to the first type it declares) and fails
+when one names an outside project and has no row here, or when a row says a
+file carries outside code and the file does not carry that project's notice.
+
+| File | Names | Carries its code | Why |
+|---|---|---|---|
+| `FromGameDeflate.cs` | zlib 1.3, `deflate.c` and `trees.c` | yes: zlib | A translation of zlib's code, above. |
+| `FromGameMath.cs` | numpy, OpenBLAS, LAPACK's `dgesv` | no | It does the arithmetic Build-NoticeBoard.py does with numpy in the same order and rounding, so the meshes come out the same bytes, and says what that order is. The order was measured from the results (19 Oct), not copied from their code: the inverse is a 3 by 3 LU solve written out by hand, and nothing in it is OpenBLAS's or LAPACK's source. |
+| `FromGameArchive.cs` | LZ4 | no | It decodes the LZ4 frame and block format the game's archives use, written from that published format and the BSA layout. Build-NoticeBoard.py calls the lz4 package for this; the launcher has its own short decoder instead, and no code of the lz4 library is in it. |
+
 ## The SkyMP client runtime, built from the fork
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `7ae58fea` (in full, `7ae58feababd242c0731ec98eeeb4abe462ba4d9`). That
+commit `7af2fae8` (in full, `7af2fae85d3effc54a5969bbff4c4a5cb2a04e1f`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
 
 The six client files and the native server were built by the fork's own
-Windows build (fork run 39828191553) and recorded by Thornswood's engine.yml
-(run 39832871016, #459). The native server and its
+Windows build (fork run 40454583407) and recorded by Thornswood's engine.yml
+(run 40458174415, #459, #3399). The native server and its
 JavaScript bundle were built from the same merged source, including the
 atomic quest inventory and state transaction. The generated client and
 server records give each file's hash and source commit. The older reuse
@@ -144,10 +228,17 @@ What is compiled into them:
 - Upstream's `THIRD_PARTY_LICENSES`, at the root of the fork, names TiltedUI,
   TiltedCore, TiltedHooks and TiltedReverse: "Copyright (c) 2019 Tilted
   Phoques. All Rights Reserved.", made available "AS IS", and "Do not remove or
-  modify any license notices." Their code is under `skyrim-platform\src\tilted`.
+  modify any license notices." Their code is under `skyrim-platform\src\tilted`,
+  which the fork's build makes into SkyrimPlatformImpl and SkyrimPlatformCEF.
 - The fork's own libraries. SkyrimPlatformImpl links `papyrus-vm` and `viet`
   (MIT, by their LICENSE files), `savefile` (GPL-3.0) and `serialization`,
-  which has no licence file of its own.
+  which has no licence file of its own. MpClientPlugin links `viet`,
+  `papyrus-vm`, `serialization` and libespm through `mp_common` and
+  `server_guest_lib`, but its program database shows code from `viet` alone
+  of those that carry a notice: none of papyrus-vm's and none of libespm's
+  (whose LICENSE is MIT as well) is in it, so neither notice is owed there.
+- The Tilted notice and the two MIT ones are under "The other code inside
+  the client files", below, with the npm package inside `skymp5-client.js`.
 - The libraries in the fork's `vcpkg.json`, linked in by the build. Among them
   is the Chromium Embedded Framework (cef-prebuilt 108.4.13), which
   SkyrimPlatformCEF and SkyrimPlatformImpl link against. CEF's own runtime
@@ -258,10 +349,51 @@ file too. glib, gobject and proxy-libintl are the LGPL with no such
 exception. Since #3099 the port's copyright file carries each one's licence
 at the commit Frida pins, so their texts go with the file. The LGPL lets a
 copy go out under the GPL instead, which `SkyrimPlatformImpl.dll` does, and
-the GPL then asks for their source too. Thornswood keeps its own fork of each
-of Frida's six repositories, tagged `thornswood-frida-16.0.19` at the commit
-Frida built from (Patrick, A on #3287), and the note beside the files names
-them; "Where the source is", below, has the list.
+the GPL then asks for their source too. Each part's source, at the commit
+Frida built it from, is an archive on Thornswood's own Release of them
+(Patrick, C on #3287), and until this repository is public, Thornswood's own
+fork of each of Frida's six repositories as well. The note beside the files
+names them; "Where the source is", below, has the list.
+
+### The other code inside the client files
+
+Not everything inside the client files comes through vcpkg (#3751). Some of
+the fork's own folders carry a notice of their own, not the GPL or AGPL
+text that already goes with the files, and `skymp5-client.js` is webpack's
+build of `skymp5-client`, which bundles the npm packages it uses. Until
+27 October 2026 none of these was recorded, so none of their notices went
+anywhere. Since then the fork's build measures them with the vcpkg ports
+(fork #124, `misc\thornswood\Write-ClientLicences.ps1`): each source file
+the program database says has code in a client file is placed by its
+folder, and a folder that is neither one of these nor one of the GPL and
+AGPL folders stops the build. `skymp5-client.js` names every module it
+holds, and each npm package among them is read from the folder webpack took
+it from. They are the record's `libraries`, beside `ports`, each with its
+text in `records\client-licences\`, and go out the same way as the vcpkg
+texts. The Tilted text is the four Tilted sections of `THIRD_PARTY_LICENSES`
+as they stand, which is all the notice there is; the others are their own
+licence files, byte for byte.
+
+| Library | Version | Licence, as its folder or package gives it | In |
+|---|---|---|---|
+| npm-eventemitter3-5.0.1 | 5.0.1 | MIT | `skymp5-client.js` |
+| papyrus-vm | the fork's | MIT | `SkyrimPlatformImpl.dll` |
+| tilted | the fork's | not declared; its text is in `tilted.txt` | `SkyrimPlatformCEF.exe.hidden`, `SkyrimPlatformImpl.dll` |
+| viet | the fork's | MIT | `MpClientPlugin.dll`, `SkyrimPlatformImpl.dll` |
+
+Measured on 27 October by fork #124's own Windows build (its head
+`df42add4`, on `c152a452`): the program databases show code from
+`skyrim-platform\src\tilted` in SkyrimPlatformImpl (34 source files) and
+SkyrimPlatformCEF (13), from `papyrus-vm` in SkyrimPlatformImpl (11), and
+from `viet` in SkyrimPlatformImpl (5) and MpClientPlugin (1), and
+`skymp5-client.js` holds eventemitter3 5.0.1 and no other package. The same
+holds at `7ae58fea`, the commit the client record names, by its build files
+and a Linux build of `skymp5-client` there, but no program database of
+that build was read. The recorded client was measured before #3751, so
+`records\client-licences.json` has no `libraries` and these texts do not
+go out yet ("What is still missing"). Once a client measured since then is
+recorded, `tests\test-third-party.js` holds this table to the record, row
+for row, and until then holds each row to that list.
 
 ## From upstream SkyMP, not built here
 
@@ -322,8 +454,9 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`7ae58fea`, the commit the client record names (the same 68 files, byte for
-byte, as at `d39a9a93`, since nothing after it changed `skymp5-front`). Read on 21 October (#421):
+`7af2fae8`, the commit the client record names (the same 68 files, byte for
+byte, as at `d39a9a93`: what changed in `skymp5-front` since, the unused
+login page taken out (#3927), was never in what webpack builds). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
 bytes, sha256
 `d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae`, and every
@@ -332,8 +465,40 @@ carries the 13 September build in the table above until main's next release.
 
 The licence is skymp5-front's, `GPL-3.0` by its `package.json`, and its source
 is the fork at that commit, under "Where the source is". It bundles npm
-packages under their own licences, among them React 16.13.1 and 17.0.2, MIT
-by the `@license` comments inside it, read from the dev feed's copy.
+packages under their own licences. Until #3751 the `@license` comments some
+of them leave inside it were the only notice, and a minifier setting drops
+those. Since 27 October Build-Front.ps1 reads which packages are in it from
+build.js itself (a webpack development build names every module it holds)
+and each one's licence from the folder webpack took it from, and records
+them in `records\front-build.json` with each text in
+`records\front-licences\`; a build that holds another set, or another text,
+is refused like a build with other bytes. The installer, and every update
+that carries this build.js, put those texts in the `licences` folder beside
+`SOURCE CODE.txt`, which lists them (Source-Notice.ps1,
+Package-Thornswood.ps1). `tests\test-third-party.js` holds this table to the
+record, row for row. React itself is 18.2.0; the 16.13.1 and 17.0.2 that
+this file named before are react-is.
+
+| Package | Version | Licence, as its package.json declares it | Text |
+|---|---|---|---|
+| @babel/runtime | 7.23.9 | MIT | `npm-babel-runtime-7.23.9.txt` |
+| clsx | 1.2.1 | MIT | `npm-clsx-1.2.1.txt` |
+| css-loader | 6.10.0 | MIT | `npm-css-loader-6.10.0.txt` |
+| hoist-non-react-statics | 3.3.2 | BSD-3-Clause | `npm-hoist-non-react-statics-3.3.2.txt` |
+| object-assign | 4.1.1 | MIT | `npm-object-assign-4.1.1.txt` |
+| prop-types | 15.8.1 | MIT | `npm-prop-types-15.8.1.txt` |
+| react | 18.2.0 | MIT | `npm-react-18.2.0.txt` |
+| react-dom | 18.2.0 | MIT | `npm-react-dom-18.2.0.txt` |
+| react-draggable | 4.4.6 | MIT | `npm-react-draggable-4.4.6.txt` |
+| react-is | 16.13.1 | MIT | `npm-react-is-16.13.1.txt` |
+| react-is | 17.0.2 | MIT | `npm-react-is-17.0.2.txt` |
+| react-redux | 7.2.9 | MIT | `npm-react-redux-7.2.9.txt` |
+| react-resizable | 3.0.5 | MIT | `npm-react-resizable-3.0.5.txt` |
+| react-slider | 2.0.6 | MIT | `npm-react-slider-2.0.6.txt` |
+| redux | 4.2.1 | MIT | `npm-redux-4.2.1.txt` |
+| scheduler | 0.23.0 | MIT | `npm-scheduler-0.23.0.txt` |
+| style-loader | 3.3.4 | MIT | `npm-style-loader-3.3.4.txt` |
+| tslib | 2.6.2 | 0BSD | `npm-tslib-2.6.2.txt` |
 
 The fonts in it, from their own name tables:
 
@@ -542,21 +707,51 @@ collection and Vortex's staging folder on the shipping machine:
   section gave the 1.1 file as read on 24 September, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod
-  27859) with one line changed, `bTweenMenu = false`. The rest is as that
-  mod's author wrote it. Revision 2 removed Skyrim Souls RE itself
+  27859) with one line changed, `bTweenMenu = false`. Read on 27 October
+  against the mod's own files: it is the 7,009-byte ini Skyrim Souls RE 3.1.2
+  ships (Nexus file 754726), with its byte order mark taken off and a blank
+  line added under the first line. Revision 2 removed Skyrim Souls RE itself
   (docs\COLLECTION-REVISION-2.md), so nothing in the collection reads this
   file now.
 - `SKSE\Plugins\OpenAnimationReplacer.ini`: the settings file Open Animation
   Replacer (mod 92109, in the collection) writes, holding the values Thornswood
-  wants.
+  wants. It is not one of that mod's files: its archives (3.1.6, and 3.2.1,
+  Nexus file 798222, in revision 5) hold only `OpenAnimationReplacer.dll` and
+  its `.pdb`. The two values Thornswood needs the launcher writes into it on
+  every Play (`launcher\app\Enforce.cs`).
 - The four face files: the face meshes and face tints the Creation Kit exports
   for two people Fishing In Skyrim Special Edition (mod 47618, in the
   collection) adds, Rybek Kupiecski (`FishingVendorPolish`, 00025905) and
   Lillani (`FISLillani`, 0002A07C). The four are dated 26 September and
-  are made from that mod's records.
+  are made from that mod's records. The mod's own archive (Nexus file
+  194634, 1.0) carries its own four for the same two people, dated 27 March
+  2021, and Vortex deploys these over them.
 
-The settings files and the faces belong with mods that are, or were, in the
-collection. This file did not read those mods' permissions.
+What those mods' pages say, read on 26 October (#2793), and what becomes of
+each file:
+
+- Skyrim Souls RE: 3.2.0 and later under GPL-3.0 with the modding exception,
+  and "Version 3.1.2 and earlier is released under the MIT License". The MIT
+  licence asks for its notice to go with the file, and Thornswood Content 1.2
+  carries none. The next Thornswood Content file leaves the ini out.
+- Open Animation Replacer: modifying its files needs its author's permission,
+  its assets may be used with credit, and it may not be uploaded elsewhere.
+  No part of its archive is in the ini. The next Thornswood Content file
+  leaves the ini out all the same, so the launcher is the one place those two
+  values come from.
+- Fishing In Skyrim Special Edition: "You must get permission from me before
+  you are allowed to use any of the assets in this file", the same for
+  modifying its files, and no upload to other sites. No permission is
+  recorded, and faces made from its records cannot be rebuilt as Thornswood's
+  own, so the next Thornswood Content file leaves the four out for good
+  (Patrick, 26 October, #2793).
+- The plugin: the next Thornswood Content file carries the repository's
+  `game\content\Thornswood-Content.esp` in place of the copy from before
+  #2553, and the collection revision that pins it drops the patch.
+
+`records\asset-provenance.json` registers each of these files by its sha256,
+and `tests\test-asset-provenance.js` fails while a file in the table above has
+no entry there.
 
 ### The plugin each channel carries
 
@@ -661,6 +856,86 @@ no licence this file can name.
   (Test-ShipBethesdaLeftAlone) without deleting anybody's copy, so builds made
   after that change no longer carry it.
 
+## Built here from other people's work: behaviors and bodies
+
+The launcher builds 45 files on each computer, in Thornswood's own game
+folder, before Play and from Fix, with the collection's own Pandora and
+BodySlide, from the recipe in `records\generated.json`, which is compiled into
+it (`launcher\app\GeneratedBuild.cs` and `GeneratedHere.cs`, #1247, #3715).
+No pack and no installer carries them since 27 October 2026 (Patrick, option
+A on #3715: "The launcher makes all 45 files on each computer"): Ship-Rules.ps1
+names them (`$ShipGeneratedBodyFiles` and `$ShipGeneratedPatterns`,
+`Test-ShipGenerated`) as built on each computer, never shipped and never
+listed as removed. Until then every release carried them, as the shipping
+machine built them, and every one of them is made from somebody else's work.
+What follows is whose. Read on 27 October 2026 (#3715) from the installer on
+thornswood.net (76,735,000
+bytes, sha256 starting eefa15c5, payload built 26 October 18:24 UTC): the same
+45 files and 18,928,662 bytes the 18 October installer carried.
+`tests\fixtures\3715-generated.txt` lists each with its sha256. Which mod
+deploys each slider set, patch and Pandora was read from the collection's
+Vortex deployment record of 21 October.
+
+- **Behavior files, 39 files, 10,543,930 bytes.** 18 behavior files in
+  `Data\meshes\actors\character\behaviors`, 17 in
+  `_1stperson\behaviors`, `characters\defaultmale.hkx`,
+  `characters female\defaultfemale.hkx`, and
+  `Data\meshes\animationdatasinglefile.txt` and
+  `animationsetdatasinglefile.txt`. Pandora Behaviour Engine+ 5.0.0-beta
+  (Nexus SE 133232, by the Pandora Behaviour Engine Team) writes them from the
+  game's own animation graphs, character files and animation data, with four
+  patches merged in: `colis` from Precision 2.0.6 (Nexus SE 72347) and
+  `tdmh`, `tdmlen` and `tdmv` from True Directional Movement 2.3.1 (Nexus SE
+  51614), both by Ersh. Pandora writes each graph whole, so each file is the
+  game's graph with the patches added. Bethesda's terms for mods grant no right
+  to hand on ZeniMax's own files, edited or not ("Bethesda's own files, made on
+  each machine" below), the reading on which #2827 stopped shipping three
+  other files. Precision's and True Directional Movement's pages set the
+  same permissions: their assets may be used without asking, with credit to
+  Ersh and never in anything sold, the files may not be uploaded elsewhere,
+  and modifying them needs Ersh's permission. Pandora is under the GNU GPL
+  v3, which covers the program, run from the collection, not what it
+  writes.
+  `Data\Scripts\FNIS.pex` is allowed by the same pattern and was not in the
+  installer read.
+- **The women's body, `femalebody_0.nif` and `femalebody_1.nif`, 3,840,722
+  bytes**, in `Data\meshes\actors\character\character assets`. BodySlide
+  builds it from the set CBBE 3BBB Amazing NeverNude of CBBE 3BA (3BBB) 2.48
+  (Nexus SE 30174, by Acro), which is built on CBBE (Nexus SE 198, by Ousnius,
+  Caliente and Jeir). 3BA's page lets its assets be used without asking,
+  with credit to Acro and never in anything sold, forbids uploading the file
+  elsewhere, and asks for the author's OK for a body mesh edited so its
+  vertex order or count changes. CBBE's own terms are below.
+- **Astrid's body, `femalebodyastrid_0.nif` and `femalebodyastrid_1.nif`,
+  2,555,688 bytes.** BodySlide builds it from the set CBBE Vanilla - Body -
+  Astrid of CBBE 2.0.3 (Nexus SE 198), over Bethesda's Astrid outfit. CBBE's
+  page sets no permission lines; its author's instructions let the body be
+  used for outfits and NPCs with credit and a link back, and say "Distribution
+  by, or sub-licensing to, parties not expressly given permission is
+  disallowed." Handing a CBBE body on would have needed Ousnius' permission.
+- **The men's body, `malebody_0.nif` and `malebody_1.nif`, 1,988,322 bytes.**
+  BodySlide builds it from the set HIMBO Body - Vanilla Nevernude of
+  Highly Improved Male Body Overhaul (HIMBO) 5.8 (Nexus SE 46311, by Kreiste
+  and Novelyst). HIMBO's description, under Permission: "The main body mesh
+  along with the undies meshes are licensed CC-BY-SA-4.0." and "You are
+  allowed to make refits and/or original armors/clothings using HIMBO body as
+  long as you credit me and your files are available for free and not behind
+  any kind of paywalls." So these two are under the Creative Commons
+  Attribution-ShareAlike 4.0 licence
+  (https://creativecommons.org/licenses/by-sa/4.0/), as HIMBO built in
+  BodySlide, credited on the public credits page. LICENSE's all rights
+  reserved does not cover them.
+
+The Permissions and credits sections of 30174, 198, 72347, 51614 and 133232
+were read on 27 October 2026 on One, in a signed-in browser, onto #3715 (Nexus
+answers a cloud session with a Cloudflare 403, and its API has no permissions
+field).
+`records\asset-provenance.json` has an entry for each group, and
+`tests\test-third-party.js` holds every path Ship-Rules.ps1 names as built on
+each computer, and every file in the stand-in record, to an entry there. Made
+on each computer, nothing of theirs leaves anybody's machine, the way the
+files below are made from the person's own game.
+
 ## Bethesda's own files, made on each machine
 
 `Data\Interface\startmenu.swf` is Skyrim's own `interface\startmenu.swf` from
@@ -724,33 +999,56 @@ the collection's mods draw one: SkyUI's item lists and item card
 Mods mod 12604, file 749043), SkyHUD 0.90B's line under an item somebody
 looks at (`interface\hudmenu.swf` in `SkyHUD.bsa`, mod 463, file 61422), and
 moreHUD 5.4.5's value to weight beside it (`interface\ahzhudinfo.swf` and its
-copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483). They are their authors' work, and nothing on
-those mods' pages lets Thornswood hand them on, so none of them ships: the
-launcher makes the five before every Play from the person's own copy of each
-mod, out of its archive, the same way as Bethesda's files above
-(`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and `scripts\release\Go.ps1`
-does the same for a hand-run install. What the repository holds is the edit,
-as the bytes that change, each pinned to the sha256 of the collection's
-version of the file (`launcher\app\FromGameModMenus.cs`, written by
+copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483), the
+files collection 7essxf installs in revisions 4 and 5. They are their authors'
+work, and each mod's page, read on 26 October (#3800), says this about them:
+
+- SkyUI: "Upload: not allowed to upload to other sites"; modification is
+  allowed "so long as you credit me as the original creator"; asset use is
+  "allowed without permission with credit; not in sold mods"; and the author
+  notes say "You may release any patches that require the original file",
+  while changing its icon files needs the further permission of Psychosteve
+  and Jeledity.
+- SkyHUD: modification and asset use are allowed with credit, and the
+  permission note lets anybody share a preset, which is how Thornswood's
+  `Data\Interface\skyhud\skyhud.txt` goes out, but "The rest of the mod must
+  not be included".
+- moreHUD: the page shows no permission list and no author instructions.
+
+Patrick decided on 26 October that these terms change nothing (#3800). So
+none of the five ships: the launcher makes the five before every Play from
+the person's own copy of each mod, out of its archive, the same way as
+Bethesda's files above (`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and
+`scripts\release\Go.ps1` does the same for a hand-run install. What the
+repository holds is the edit, as the bytes that change, each pinned to the
+sha256 of the collection's version of the file
+(`launcher\app\FromGameModMenus.cs`, written by
 `scripts\mods\Build-ModMenus.py`), not the files. `Ship-Rules.ps1`
 `$ShipMadeFromMods` keeps the five out of every pack, release record and
 installer.
 
 `Data\SKSE\Plugins\QuickLootIE.json` does ship: QuickLoot IE 4.1.3's own
-settings file (Nexus Mods mod 120075, file 806802) with one line added, which
-sets its loot menu's columns to weight only. QuickLoot IE is under the GNU
-General Public License version 3, which lets a changed copy go out under the
-same licence when it says what was changed and when; the file says both in
-its first lines, and the collection installs the licence beside it as
-`Data\QLIE-LICENSE.md`.
+settings file (Nexus Mods mod 120075, file 806802, which revisions 4 and 5
+both install) with one line added, which sets its loot menu's columns to
+weight only. QuickLoot IE is "Released under the GPL-3.0-or-later license", by
+its page, and its 4.1.0 changelog says "Changed the project license to
+GPL-3.0-or-later". That lets a changed copy go out under the same licence when
+it says what was changed and when; the file says both in its first lines, and
+the collection installs the licence text beside it as `Data\QLIE-LICENSE.md`,
+which in file 806802 is the GNU General Public License version 3 unchanged,
+byte for byte `installer\licences\GPL-3.0.txt` (sha256 3972dc97, read 27
+October).
 
 ## Made for Thornswood by somebody else
 
 - `Data\Platform\UI\thornswood-theme.mp3` (in the repo as
-  `game\ui\thornswood-theme.mp3`) is the theme. It was made for Thornswood
-  by an artist this repository does not name, and it went to everybody on
-  Patrick's word of 22 September (commit ec8d113). The terms are between
-  Patrick and the artist and are not written down here.
+  `game\ui\thornswood-theme.mp3`) is the theme. Copyright its composer,
+  who is not named here. All rights reserved. Its composer gave Thornswood,
+  in writing on 28 October 2026, the right to use it, change it and earn
+  from it, with no fee and no credit asked (the grant is on #1333). That
+  right is Thornswood's only: the theme is not under the licence that
+  covers Thornswood's art, and nobody else may copy, change, share or use it,
+  even for free, from this repository, from a pack or from the installer.
 
 ## On the site
 
@@ -799,11 +1097,17 @@ the copy the project's own Google Fonts folder keeps with its copyright line:
   with a link to its page (`launcher\app\Links.cs`), and the public credits page
   says so. The two mods in it that Thornswood uploads itself are not in this
   group: they have their own sections above. The mod files the installer
-  carries anyway are entry 168, above.
+  carries anyway are entry 168, above. What each mod's own page says about
+  being put in a collection is read and kept, with the page's words, in
+  `records\collection-permissions.json`, and `New-NexusRevision.ps1` makes
+  and publishes no revision that carries a mod whose page nobody has read or
+  whose page says no (#3649).
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
 - The WebView2 Runtime, which comes from Microsoft.
 - texconv, the tool the main menu picture is built with (next section).
+- Bethesda's five master files, which the fork's build downloads to run its
+  unit tests (the section after texconv's).
 
 ## texconv, Microsoft's texture converter, used to build and not shipped
 
@@ -827,11 +1131,64 @@ Licence: MIT, by the `LICENSE` file at that tag, "Copyright (c) Microsoft
 Corporation." Nobody is handed a copy, so its notice has nothing to travel
 with.
 
+## Bethesda's master files, downloaded by the fork's build to test it and not shipped
+
+The fork's build, `.github/workflows/thornswood-pr-windows.yml` on
+`thornswood/engine-changes` of https://github.com/EvilPatrick06/skymp, runs on
+every pull request into that branch and every push to it. Through upstream's
+`pr_base` action it configures with `-DUNIT_DATA_DIR=skyrim_data_files
+-DDOWNLOAD_SKYRIM_DATA=ON`, and `cmake/download_skyrim_data.cmake` then
+downloads the five masters below from https://gitlab.com/pospelov/se-data
+(main), a copy under the GitLab account pospelov (Leonid Pospelov), for the
+unit tests that read game records. The download is upstream's: skyrim-multiplayer/skymp
+has the same file and the same two flags. The files stay on GitHub's runner
+for the run and are thrown away with it. None of them is uploaded (every
+artifact the run keeps is under `build\` or vcpkg), none is in the fork or in
+this repository, and none reaches anybody (issue #3728).
+
+| File | Bytes | sha256 |
+|---|---|---|
+| `Skyrim.esm` | 249,753,573 | `9ec6b3818bbd002487bdc4104add07f814cc067e70c79ea2d164108a6c960f04` |
+| `Update.esm` | 18,557,306 | `8502f3975a84fc4fd62c9781e867df5bb661972887c93f017db0857b20dc90f2` |
+| `Dawnguard.esm` | 25,189,548 | `501bbcf0c61c8f28396a13a2ca877f904803ef9c0002b329edde7fb741119023` |
+| `HearthFires.esm` | 3,978,606 | `30d319a8e439dbd1c5dec03860a60aaec9142642f2c9168419b424c897f592d1` |
+| `Dragonborn.esm` | 64,564,304 | `4f2fe839956db8807e07b1a0feb805130487899ce337e60ad43f15ed9f8cb988` |
+
+The sizes and sha256 values are what se-data serves on 26 October 2026
+(GitLab's own size and content sha256 for each file), and a download of
+HearthFires.esm that day hashed to the same value. Since fork pull request
+#120 the build holds each file to its sha256 and stops when one differs. They
+are an older release of the game's masters than the one Thornswood plays on:
+`records\skyrim-files.json` has Skyrim.esm at 249,753,412 bytes and Update.esm
+at 18,874,041.
+
+Licence: none. They are ZeniMax's files, and the Creation Kit End User License
+Agreement (the section "Bethesda's own files, made on each machine" above)
+reserves every right it does not grant; it grants no right to copy the game's
+own files from anywhere but the person's own copy. Whether the fork's build
+keeps downloading them is Patrick's decision on #3728.
+
+## Kept in the repository, not shipped
+
+These files sit in the repository for its tests and are never handed to
+anybody. `tests\test-third-party.js` fails when a file under `tests\fixtures`
+is over 100 KB, or carries "@license", "Copyright", "certifi" or a
+certificate, and has no row here (#3761).
+
+| File | What it is | Where it came from | Licence | Read by |
+|---|---|---|---|---|
+| `tests\fixtures\ui-front-build.js` | The 68 asset modules of the shipped `Data\Platform\UI\build.js`, verbatim: the stub webpack writes for each picture, sound and font, with the hashed name it was given and the source path it came from. 47,757 bytes. | Cut on 26 October 2026 (#3761) from the whole development build of `skymp5-front` that was the fixture until then (2,451,499 bytes, sha256 `5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2`), the build "SkyMP's interface, built from the fork" describes. The cut leaves out the front's own code and the npm code bundled with it (React, Redux and the rest, under MIT and BSD notices); `tests\fixtures\ui-front-build.assets.txt` names its sha256. | GNU General Public License version 3, `skymp5-front`'s, as the build it was cut from | `tests\fixtures\ui-front.ps1`, `tests\test-ship-rules.ps1` (#1318) |
+| `tests\fixtures\3111-roots.pem` | Eight public root certificates and their comment lines, no key. 223 lines. | Copied from certifi 2026.7.22's `cacert.pem` (#3111): four of eMudhra's emSign roots and the four the bot needs. | Mozilla Public License 2.0, certifi's, as "The Discord bot, on the VPS" gives it | `tests\test-3111-emudhra-trust.js` |
+| `tests\fixtures\webview2-setup-chain.txt` | Three public certificates, no key: the signing certificate and issuer of Microsoft's WebView2 setup program, and the root. | Read out of the Authenticode signature of `MicrosoftEdgeWebview2Setup.exe` as Microsoft handed it out on 5 October 2026, and the root from the address the issuer names (#1330). | None given: they are Microsoft's public certificates, which every copy of that program carries | `tests\test-1330-webview2-signature.js` |
+
+The whole 2.4 MB build is still in the repository's history until the history
+rewrite takes it out (#3684).
+
 ## On our servers
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `7ae58feababd242c0731ec98eeeb4abe462ba4d9` on the public fork. The
+  name `7af2fae85d3effc54a5969bbff4c4a5cb2a04e1f` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -890,10 +1247,23 @@ with.
   client file (#3099), and since `eaf9f0b9` the server says after each
   gamemode load whether it worked and whether a reload changed what
   connected games run (#3196), and since `7ae58fea` every game plugin and
-  the client share one storage again (#3333).
+  the client share one storage again (#3333), and since `7af2fae8` the
+  gamemode may refuse an item before an equipment update puts it on (#2262),
+  a character's head parts and face data come from the game's own heap (#2025),
+  the menu's page is shown from the start and drawn over the loading screen
+  (#3129, #3130), a piece's condition and quality change how hard it hits and
+  holds (#1384, #3151), a bench draws from the containers the gamemode names
+  and a craft takes the time it names (#3159, #3161), the game's year is
+  Thornswood's (#3156), the save worker stops before a drained storage
+  is read again (#1273), eating and cooking take a named stack of the
+  same item (#3163), a dropped item keeps its name and the time it is
+  deleted across a restart (#3498), the client logs only the kind of a
+  message from the in-game page, never what it says (#3941), and the
+  server's resources port refuses masters, archives and scripts and its save
+  reader reads a list's size in 64 bits (#3927).
   The server module's SHA256
-  is `2cb8859b7647c739dc0da5cfe13711ceb7ba03602eeabc0aadd67abc569622db`, built
-  2026-10-22T18:22:47Z. This is the recorded next release, not a deployment
+  is `f8509c15c712d475fa30177b11cfbd9a31ae75466b8ef5e9b8bf83c8ab559961`, built
+  2026-10-27T05:32:52Z. This is the recorded next release, not a deployment
   claim. Main remains on `3bdf3d3c9926a4dd241b1d1c09dadde808a788d5` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -928,7 +1298,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/7ae58feababd242c0731ec98eeeb4abe462ba4d9
+https://github.com/EvilPatrick06/skymp/tree/7af2fae85d3effc54a5969bbff4c4a5cb2a04e1f
 
 For the engine Main runs until then:
 
@@ -941,11 +1311,29 @@ vcpkg from the fork's `vcpkg.json`. The licence texts are in that tree:
 
 What Frida built and the fork links in is not in that tree: frida-gum's
 devkit, with the libraries inside its `frida-gum.lib` ("The SkyMP client
-runtime, built from the fork"). Their source is Thornswood's fork of each
-of Frida's repositories, at the commit Frida 16.0.19 built from, tagged
-`thornswood-frida-16.0.19` there (#3287):
+runtime, built from the fork"). Their source, at the commits Frida 16.0.19
+built them from, is one archive each on Thornswood's own Release of them,
+which stays as long as the launcher ships frida-gum (Patrick, C on #3287):
 
-| Inside `frida-gum.lib` | Source |
+https://github.com/EvilPatrick06/Thornswood/releases/tag/frida-sources-16.0.19
+
+| Inside `frida-gum.lib` | Archive | Frida's repository, at |
+|---|---|---|
+| gum | `frida-gum-698b356fef0ecfc3ac2818f0b387be90e93deeda.tar` | frida/frida-gum `698b356fef0ecfc3ac2818f0b387be90e93deeda` |
+| glib, gobject, gnulib, libcharset | `frida-glib-f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f.tar` | frida/glib `f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f` |
+| proxy-libintl | `frida-proxy-libintl-c03e1a74b17fa7ec467e110130775409e4828a4c.tar` | frida/proxy-libintl `c03e1a74b17fa7ec467e110130775409e4828a4c` |
+| pcre2 | `frida-pcre2-b47486922fdc3486499b310dc9cf903449700474.tar` | frida/pcre2 `b47486922fdc3486499b310dc9cf903449700474` |
+| capstone | `frida-capstone-22d317042ee4d251280d2960f5cf294433977db4.tar` | frida/capstone `22d317042ee4d251280d2960f5cf294433977db4` |
+| libffi | `frida-libffi-938b07aa8280bcc4f92f08a0fdbb4ad81024bde0.tar` | frida/libffi `938b07aa8280bcc4f92f08a0fdbb4ad81024bde0` |
+
+`records\frida-sources.json` holds each archive's sha256 and size, and
+`scripts\release\Publish-FridaSources.ps1` makes the Release from it and checks
+it every night. Until this repository is public a stranger cannot open the
+Release, so until then the same commits are also in Thornswood's fork of
+each of Frida's repositories, tagged `thornswood-frida-16.0.19`, and every
+note beside the files names both:
+
+| Inside `frida-gum.lib` | Source until the repository is public |
 |---|---|
 | gum | https://github.com/EvilPatrick06/frida-gum/tree/698b356fef0ecfc3ac2818f0b387be90e93deeda |
 | glib, gobject, gnulib, libcharset | https://github.com/EvilPatrick06/frida-glib/tree/f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f |
@@ -953,6 +1341,10 @@ of Frida's repositories, at the commit Frida 16.0.19 built from, tagged
 | pcre2 | https://github.com/EvilPatrick06/frida-pcre2/tree/b47486922fdc3486499b310dc9cf903449700474 |
 | capstone | https://github.com/EvilPatrick06/frida-capstone/tree/22d317042ee4d251280d2960f5cf294433977db4 |
 | libffi | https://github.com/EvilPatrick06/frida-libffi/tree/938b07aa8280bcc4f92f08a0fdbb4ad81024bde0 |
+
+The forks are deleted only when `Publish-FridaSources.ps1 -ForksMayGo` says
+nothing offered still names only them: notes made before the Release
+existed name the forks alone.
 
 That covers what Thornswood built, and since 20 October that includes
 `Data\Platform\UI\build.js` and the files beside it: `records\front-build.json`
@@ -1025,6 +1417,24 @@ beside its `___systemPolyfill.js`.
 
 ## What is still missing
 
+- The packs and the installer published up to 27 October 2026 carry the 39
+  behavior files and the four women's body meshes, which nothing lets
+  Thornswood hand on ("Built here from other people's work: behaviors and
+  bodies"; CBBE's terms disallow distribution without permission). Since
+  #3715 the launcher makes them on each computer and no new release carries
+  them; the installer on thornswood.net carries them until the first main
+  release after #3715 replaces it.
+- The client record (`7ae58fea`) was measured before #3751, so
+  `records\client-licences.json` has no `libraries`, and the notices of
+  npm-eventemitter3-5.0.1, papyrus-vm, tilted and viet ("The other
+  code inside the client files") do not go with the client files yet. The
+  fork's build measures them from fork #124 on, and New-ClientLicenceRecord.ps1
+  refuses a build that did not, so the first engine pin recorded from a fork
+  commit that has #124 brings them.
+- Main's older build.js, and packs already on the feeds that carry the
+  fork's build.js, were made before #3751 and carry no text of the npm
+  packages inside them. The next pack that carries build.js, and every
+  installer from now on that carries the recorded build, do.
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).
 - The Futura PT and DIN Pro fonts in main's older build.js, the Bankir-Retro
@@ -1072,4 +1482,32 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## NLayer licence
+
+The text of `LICENSE` in https://github.com/naudio/NLayer at commit `046c7ce4`.
+
+```
+MIT License
+
+Copyright (c) 2018 Mark Heath, Andrew Ward & Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```

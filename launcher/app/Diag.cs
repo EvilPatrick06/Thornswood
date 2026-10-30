@@ -25,6 +25,91 @@ namespace Thornswood
     {
         public static string ReportDir { get { return Path.Combine(Paths.ProfileDir, "Reports"); } }
 
+        /*
+          What the report holds, said once (#3565). The Diagnostics page used
+          to promise "nothing personal beyond your Windows user name in file
+          paths" in words written apart from Summary(), which also wrote the
+          machine's name, the user name on a line of its own and the server's
+          address. Now every file Report() puts in the zip and every line
+          Summary() writes names its part in one of these two lists, Held()
+          throws for a part that is in neither, and the page's words are made
+          from the same lists by WhatTheReportHolds(), so the page cannot say
+          less than the zip carries. tests\test-3565-report-words.js holds the
+          code to it. Several keys may share words; the page says them once.
+        */
+        class Part
+        {
+            public readonly string Key, Words;
+            public Part(string key, string words) { Key = key; Words = words; }
+        }
+
+        static readonly Part[] InTheZip =
+        {
+            new Part("crash log", "the newest crash log"),
+            new Part("skse64.log", "the script extender log"),
+            new Part("SSEDisplayTweaks.log", "SSE Display Tweaks' log"),
+            new Part("plugins.txt", "your plugin list"),
+            new Part("plugins-expected.txt", "the plugin list this build expects"),
+            new Part("launcher.log", "the launcher log"),
+            new Part("SkyrimPrefs.ini", "your game's settings file (SkyrimPrefs.ini)"),
+            new Part("summary.txt", "a short summary"),
+        };
+
+        static readonly Part[] InTheSummary =
+        {
+            new Part("built", "when the report was built"),
+            new Part("launcher", "the launcher's version"),
+            new Part("install", "the folder Thornswood is installed in"),
+            new Part("server", "which server it joins (main or dev) and its port"),
+            new Part("auto join", "your auto join, auto update and theme settings"),
+            new Part("auto update", "your auto join, auto update and theme settings"),
+            new Part("theme", "your auto join, auto update and theme settings"),
+            new Part("game read from", "which Skyrim folder was read and which one ran last"),
+            new Part("ran last from", "which Skyrim folder was read and which one ran last"),
+            new Part("game exe", "the game's size against the one expected"),
+            new Part("expected exe", "the game's size against the one expected"),
+            new Part("multiplayer client", "whether the multiplayer client is there"),
+            new Part("plugins enabled", "how many plugins are on and what is wrong with the list"),
+            new Part("mod list problems", "how many plugins are on and what is wrong with the list"),
+            new Part("script extender plugins", "the script extender plugins"),
+            new Part("windows", "the Windows version"),
+            new Part("64 bit", "whether Windows is 64 bit"),
+            new Part("processors", "the number of processors"),
+            new Part("disk free", "the free disk space"),
+        };
+
+        /// <summary>How many reports Report() keeps in ReportDir; it deletes older ones (#3565).</summary>
+        public const int KeptReports = 3;
+
+        static Part Held(Part[] list, string key)
+        {
+            foreach (Part p in list) if (p.Key == key) return p;
+            throw new InvalidOperationException("The support report would hold \"" + key +
+                "\", which Diag's lists do not name, so the Diagnostics page would not say it is in there (#3565).");
+        }
+
+        static string Said(Part[] list)
+        {
+            var words = new List<string>();
+            foreach (Part p in list) if (!words.Contains(p.Words)) words.Add(p.Words);
+            if (words.Count == 1) return words[0];
+            return string.Join(", ", words.GetRange(0, words.Count - 1).ToArray()) + " and " + words[words.Count - 1];
+        }
+
+        /// <summary>
+        /// The Diagnostics page's words under "One zip for Discord": every file
+        /// in the zip, every part of its summary, what in them names the person,
+        /// and how long the zips are kept.
+        /// </summary>
+        public static string WhatTheReportHolds()
+        {
+            return "It holds " + Said(InTheZip) + ". The summary says " + Said(InTheSummary) + ". " +
+                   "File paths in these carry your Windows user name, and the launcher log names the Discord account you linked " +
+                   "and the microphone the game used. Beyond those, nothing in it names you or this PC. " +
+                   "The " + KeptReports + " newest reports stay in Profile, Reports on this PC, and building another deletes the oldest. " +
+                   "Nothing sends them anywhere; you choose who gets one.";
+        }
+
         static string Size(long b)
         {
             if (b < 1024) return b + " B";
@@ -56,7 +141,13 @@ namespace Thornswood
             return "";
         }
 
-        public static List<Reading> Readings(Config cfg, bool serverUp, string pingText)
+        // serverServing: the server's resources port took a connection, which
+        // is the only thing that proves the server is running rather than its
+        // machine merely being switched on. voiceUp: whether the voice
+        // service's /health answered, null before it has been asked. Both
+        // were on the Server page until it was cut (#3146).
+        public static List<Reading> Readings(Config cfg, bool serverUp, bool serverServing, string pingText,
+                                             bool? voiceUp, string talkKey)
         {
             var l = new List<Reading>();
 
@@ -78,10 +169,10 @@ namespace Thornswood
             try { foreach (Issue i in Verify.Run()) { total++; if (i.Blocking) blocking++; } } catch (Exception ex) { Swallow.Note("Diag.Readings, Verify.Run", ex); }
             if (blocking > 0)
                 l.Add(new Reading(2, blocking == 1 ? "1 problem with your mod list" : blocking + " problems with your mod list",
-                    "The server compares your plugin list against the one this build shipped with and will refuse the connection. Mods, then Fix."));
+                    "The server compares your plugin list against the one this build shipped with and will refuse the connection. Press Fix above."));
             else if (total > 0)
                 l.Add(new Reading(1, total == 1 ? "1 note about your mod list" : total + " notes about your mod list",
-                    "Nothing that stops you connecting. Mods, then Scan, to read them."));
+                    "Nothing that stops you connecting. Press Scan above to read them."));
             else
                 l.Add(new Reading(0, "Your mod list matches the server", Checks.EnabledPlugins() + " plugins, in the order it expects."));
 
@@ -101,10 +192,23 @@ namespace Thornswood
             }
 
             // ---- server
-            l.Add(serverUp
-                ? new Reading(0, "The server answers", "round trip " + pingText + ".")
-                : new Reading(1, "The server did not answer",
+            if (serverUp && serverServing)
+                l.Add(new Reading(0, "The server answers", "round trip " + pingText + "."));
+            else if (serverUp)
+                l.Add(new Reading(1, "The server's machine answers, but the server is not listening",
+                    "Round trip " + pingText + ". The server is probably not running. It is not something on this PC."));
+            else
+                l.Add(new Reading(1, "The server did not answer",
                     "That is not always a problem. Plenty of hosts drop the kind of packet this test uses, so try connecting before assuming it is down."));
+
+            // ---- voice
+            if (voiceUp == true)
+                l.Add(new Reading(0, "Voice answers",
+                    "The server's voice service is running. Keep this launcher open while you play: voice runs in it." +
+                    (string.IsNullOrEmpty(talkKey) ? "" : " Hold " + talkKey + " to talk.")));
+            else if (voiceUp == false)
+                l.Add(new Reading(1, "Voice did not answer",
+                    "The server's voice service is not running, so nobody will hear anybody until it is. It is not something on this PC."));
 
             // ---- steam
             l.Add(Checks.SteamRunning()
@@ -146,21 +250,23 @@ namespace Thornswood
 
             try
             {
-                Grab(work, Path.Combine(Paths.LiveMyGames, "SKSE\\skse64.log"));
-                Grab(work, Path.Combine(Paths.LiveMyGames, "SKSE\\SSEDisplayTweaks.log"));
-                Grab(work, Path.Combine(Paths.Live, "plugins.txt"));
-                Grab(work, Path.Combine(Paths.Golden, "plugins.txt"), "plugins-expected.txt");
-                Grab(work, Paths.LogFile);
-                Grab(work, Path.Combine(Paths.LiveMyGames, "SkyrimPrefs.ini"));
+                Grab(work, "skse64.log", Path.Combine(Paths.LiveMyGames, "SKSE\\skse64.log"));
+                Grab(work, "SSEDisplayTweaks.log", Path.Combine(Paths.LiveMyGames, "SKSE\\SSEDisplayTweaks.log"));
+                Grab(work, "plugins.txt", Path.Combine(Paths.Live, "plugins.txt"));
+                Grab(work, "plugins-expected.txt", Path.Combine(Paths.Golden, "plugins.txt"), "plugins-expected.txt");
+                Grab(work, "launcher.log", Paths.LogFile);
+                Grab(work, "SkyrimPrefs.ini", Path.Combine(Paths.LiveMyGames, "SkyrimPrefs.ini"));
 
                 Entry crash = Files.NewestCrash();
-                if (crash != null) Grab(work, crash.FullPath);
+                if (crash != null) Grab(work, "crash log", crash.FullPath);
 
+                Held(InTheZip, "summary.txt");
                 File.WriteAllText(Path.Combine(work, "summary.txt"), Summary(cfg, launcherVersion));
 
                 string zip = Path.Combine(ReportDir, "thornswood-" + stamp + ".zip");
                 if (File.Exists(zip)) File.Delete(zip);
                 ZipFile.CreateFromDirectory(work, zip, CompressionLevel.Optimal, false);
+                KeepNewest();
                 return zip;
             }
             finally
@@ -169,10 +275,27 @@ namespace Thornswood
             }
         }
 
-        static void Grab(string into, string file) { Grab(into, file, null); }
-
-        static void Grab(string into, string file, string rename)
+        /// <summary>
+        /// Every press used to leave its zip in ReportDir for good (#3565).
+        /// The page says KeptReports are kept, so the older ones go. The names
+        /// carry yyyyMMdd-HHmm, so their order is the order they were built.
+        /// </summary>
+        static void KeepNewest()
         {
+            string[] made = Directory.GetFiles(ReportDir, "thornswood-*.zip");
+            Array.Sort(made, StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < made.Length - KeptReports; i++)
+            {
+                try { File.Delete(made[i]); }
+                catch (Exception ex) { Swallow.Note("Diag.KeepNewest, deleting " + Path.GetFileName(made[i]), ex); }
+            }
+        }
+
+        static void Grab(string into, string part, string file) { Grab(into, part, file, null); }
+
+        static void Grab(string into, string part, string file, string rename)
+        {
+            Held(InTheZip, part);
             try
             {
                 if (!File.Exists(file)) return;
@@ -185,16 +308,21 @@ namespace Thornswood
         static string Summary(Config cfg, string launcherVersion)
         {
             var s = new StringBuilder();
-            void Add(string k, string v) { s.AppendLine(k.PadRight(22) + v); }
+            void Add(string k, string v) { Held(InTheSummary, k); s.AppendLine(k.PadRight(22) + v); }
+            void Section(string k) { Held(InTheSummary, k); s.AppendLine(k); s.AppendLine(new string('-', k.Length)); }
 
             s.AppendLine("ThornsWood - report");
             s.AppendLine("===================");
+            Held(InTheSummary, "built");
             s.AppendLine(DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm"));
             s.AppendLine();
 
             Add("launcher", launcherVersion);
             Add("install", Paths.Root);
-            Add("server", cfg.ServerAddress + ":" + cfg.ServerPort);
+            // Which server, not its address (#3565): the launcher keeps the
+            // address off every page (Pages.WirePages), and a zip posted to
+            // Discord is a page too. Staff need to know main or dev.
+            Add("server", (cfg.IsDev ? "dev" : "main") + ", port " + cfg.ServerPort);
             Add("auto join", cfg.AutoJoin ? "on" : "off");
             Add("auto update", cfg.AutoUpdate ? "on" : "off");
             Add("theme", cfg.Theme);
@@ -214,8 +342,6 @@ namespace Thornswood
             Add("windows", Environment.OSVersion.VersionString);
             Add("64 bit", Environment.Is64BitOperatingSystem ? "yes" : "no");
             Add("processors", Environment.ProcessorCount.ToString());
-            Add("user", Environment.UserName);
-            Add("machine", Environment.MachineName);
             try
             {
                 var d = new DriveInfo(Path.GetPathRoot(Paths.Root));
@@ -224,8 +350,7 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Diag.Summary, disk free", ex); }
             s.AppendLine();
 
-            s.AppendLine("mod list problems");
-            s.AppendLine("-----------------");
+            Section("mod list problems");
             try
             {
                 var issues = Verify.Run();
@@ -235,8 +360,7 @@ namespace Thornswood
             catch (Exception ex) { s.AppendLine("could not check: " + ex.Message); }
             s.AppendLine();
 
-            s.AppendLine("script extender plugins");
-            s.AppendLine("-----------------------");
+            Section("script extender plugins");
             try
             {
                 // Two folders while the own folder is chosen and not made: the

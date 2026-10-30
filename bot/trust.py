@@ -126,6 +126,52 @@ def context(path):
     return ssl.create_default_context(cafile=path)
 
 
+def own_context():
+    """
+    The same roots for a script run beside the bot (#3604): the bundle is
+    written into a folder of its own, loaded, and the folder removed before
+    this returns, since the context holds the roots once it is made. Never
+    the bot's data folder, whose roots.pem the bot writes at every start.
+    """
+    import shutil
+    import tempfile
+    folder = tempfile.mkdtemp(prefix='thornswood-roots-')
+    try:
+        path = os.path.join(folder, 'roots.pem')
+        write_bundle(path)
+        return context(path)
+    finally:
+        shutil.rmtree(folder)
+
+
+def client_class(ctx=None):
+    """
+    A discord.Client whose every request and gateway connection verifies
+    against ctx, or against own_context() made at login when none is given
+    (#3111). discord.py makes its aiohttp session in login() with whatever
+    connector its HTTPClient holds, and a connector can only be made once the
+    event loop is running, so it is given there.
+
+    Every script in bot/ that logs in to Discord makes its client from this
+    one class (#3604: backfill.py and redraw.py made a plain discord.Client,
+    which on the box trusts LocalMachine Root and its emSign root).
+    tests\test-3111-emudhra-trust.js refuses any other client.
+
+    discord.py and aiohttp are imported here and not at the top, so the
+    filter above still runs with the standard library alone.
+    """
+    import aiohttp
+    import discord
+
+    class TrustedClient(discord.Client):
+        async def login(self, token):
+            self.http.connector = aiohttp.TCPConnector(
+                limit=0, ssl=ctx if ctx is not None else own_context())
+            await super().login(token)
+
+    return TrustedClient
+
+
 if __name__ == '__main__':
     _, count, out = split(bundle_text(sys.argv[1] if len(sys.argv) > 1 else None))
     print('trusts %d roots' % count)

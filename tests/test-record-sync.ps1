@@ -151,7 +151,7 @@ Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBui
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @(); $missing = @()
 foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherLib)) { $p = $n; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
 Yes ('every reference Thornswood.csproj names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
 if ($missing.Count) { Done }
 New-Item -ItemType Directory -Force -Path $T | Out-Null
@@ -252,10 +252,6 @@ New-Item -ItemType Directory -Force -Path $rel | Out-Null
 # ours.esp is under Data\Platform\UI, so naming it stopped every release (#1878).
 Put (Join-Path $pub 'Profile\OwnGame\plugins.txt') "*collection.esp`r`n"
 Put (Join-Path $pub 'Profile\OwnGame\loadorder.txt') "collection.esp`r`n"
-# The covered bodies a publish needs since d2519bb, as a build leaves them.
-# They are ours, so every release and the installer carry them too.
-. (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-New-GeneratedBodies $pub $fake
 . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
 Install-UiFrontFixture (Join-Path $pub 'Game')
 Put (Join-Path $pub 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($gamePort - 1) + '}')

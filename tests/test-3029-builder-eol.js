@@ -20,10 +20,11 @@
   C  and is checked out LF here, whatever core.autocrlf says: on a Windows
      runner this is the proof .gitattributes does what it says.
   D  every line of .gitattributes covers something a step writes, so the
-     list cannot drift past the chain. The one other line is
+     list cannot drift past the chain. The two other lines are
      records/client-licences/** -text: the vcpkg licence texts, held byte for
      byte by records/client-licences.json, whose line ends no checkout may
-     turn (#3099).
+     turn (#3099), and records/front-licences/** -text, the same for the npm
+     packages in build.js, held by records/front-build.json (#3751).
   E  no step takes its line ending from a file, joins with CRLF, or writes
      with the platform's ending.
   F  merchant-role-tables.json pins the bytes every checkout now has.
@@ -54,7 +55,8 @@ function some(list) { return list.length ? ' (' + list.slice(0, 4).join('; ') + 
 
 const chain = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'mods', 'content-tables.json'), 'utf8'));
 const writes = Array.from(new Set([].concat.apply([], chain.steps.map(function (s) { return s.writes || []; })))).sort();
-const PLUGIN = /\.(esp|esm|esl)$/i;
+// A plugin, or the recipe Thornswood-Last.esp is built from (#2791): bytes, not text.
+const PLUGIN = /\.(esp|esm|esl|recipe)$/i;
 
 let tracked = null;
 try { tracked = git(['ls-files', '-z']).split('\0').filter(Boolean); }
@@ -104,18 +106,20 @@ if (tracked) {
   const attrFile = path.join(ROOT, '.gitattributes');
   const lines = (fs.existsSync(attrFile) ? fs.readFileSync(attrFile, 'utf8') : '').split('\n')
     .map(function (l) { return l.trim(); }).filter(function (l) { return l && l[0] !== '#'; });
-  // #3099: the licence texts are records held by sha256, not a builder's
-  // output, and are kept byte for byte.
-  const BYTES = 'records/client-licences/** -text';
+  // #3099, #3751: the licence texts are records held by sha256, not a
+  // builder's output, and are kept byte for byte. #2791: the recipe is bytes
+  // inside game/data, whose text rule it is taken out of, so A2 holds for it
+  // like a plugin.
+  const BYTES = ['records/client-licences/** -text', 'records/front-licences/** -text', 'game/data/last-plugin.recipe -text !eol'];
   const stray = [];
   for (const l of lines) {
-    if (l === BYTES) { continue; }
+    if (BYTES.indexOf(l) >= 0) { continue; }
     const pattern = l.split(/\s+/)[0];
     const hits = git(['ls-files', '--', ':(glob)' + pattern]).split('\n').filter(Boolean);
     if (!hits.some(function (f) { return text.indexOf(f) >= 0; })) { stray.push(l); }
   }
   yes('D  each of the ' + lines.length + ' lines of .gitattributes covers a file a step writes' + some(stray), lines.length > 0 && stray.length === 0);
-  const bad = lines.filter(function (l) { return l !== BYTES && !/^\S+ text eol=lf$/.test(l); });
+  const bad = lines.filter(function (l) { return BYTES.indexOf(l) < 0 && !/^\S+ text eol=lf$/.test(l); });
   yes('D2 and says text eol=lf, nothing else' + some(bad), bad.length === 0);
 }
 

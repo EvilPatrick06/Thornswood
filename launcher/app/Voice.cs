@@ -43,6 +43,13 @@ namespace Thornswood
     /// </summary>
     static class Voice
     {
+        /// <summary>
+        /// The voice browser's own WebView2 folder: its cache and storage, kept
+        /// while the launcher is installed and removed by every uninstall
+        /// (LocalKeep.NotSaves, #3679).
+        /// </summary>
+        public static string BrowserDir { get { return Path.Combine(Paths.ProfileDir, "VoiceBrowser"); } }
+
         const string CoreDll   = "Microsoft.Web.WebView2.Core.dll";
         const string WpfDll    = "Microsoft.Web.WebView2.Wpf.dll";
         const string LoaderDll = "WebView2Loader.dll";
@@ -366,16 +373,19 @@ namespace Thornswood
                 }
             };
 
-            string profile = Path.Combine(Paths.ProfileDir, "VoiceBrowser");
+            string profile = BrowserDir;
             try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("Voice.Begin, create profile", ex); }
 
             // No mDNS responder in the voice browser, so nothing in it listens
             // on the network and Windows Firewall has nothing to ask about,
             // even on a WebView2 installed for one account, which comes with
             // no rule (#911). The environment variable, not
-            // CoreWebView2EnvironmentOptions: see MenuMusic for why options
-            // made CreateAsync fault on the shipping machine. It is read when
-            // the environment is created, which is the next line.
+            // CoreWebView2EnvironmentOptions: on the shipping machine a
+            // CreateAsync given options faulted (launcher.log: "no WebView2
+            // runtime") while one given none succeeded on the same run,
+            // measured when the menu music still had a browser of its own.
+            // It is read when the environment is created, which is the next
+            // line.
             try
             {
                 string key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";

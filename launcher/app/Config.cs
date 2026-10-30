@@ -11,7 +11,12 @@ namespace Thornswood
     [DataContract]
     public class Config
     {
-        [DataMember] public string ServerAddress = "192.135.112.23";
+        // The game's own name, a DNS only record in Cloudflare that points at
+        // the box (#3690). A name and not the box's address, so the address
+        // is written in no file, and a box move is the record and nothing
+        // here. The game client resolves it itself (SLikeNet's Connect takes
+        // a name), and so does everything else the launcher asks.
+        [DataMember] public string ServerAddress = "play.thornswood.net";
         // SkyMP's default. 25565 was the old build's, on the old box.
         [DataMember] public string ServerPort = "7777";
 
@@ -214,10 +219,6 @@ namespace Thornswood
         [DataMember] public bool CrashSnapshots = false;
         [DataMember] public string CrashSnapshotFolder = "";
 
-        // Said No to setting Steam's Updates setting for Skyrim (ShellSteamUpdates.cs,
-        // #493), so the start does not ask again. The question after a downgrade still does.
-        [DataMember] public bool SteamUpdatesDeclined = false;
-
         // Ticked, the launcher stops matching the game's resolution to the
         // screen when you press Play. For anyone deliberately running the game
         // at something other than what the monitor is set to.
@@ -307,7 +308,7 @@ namespace Thornswood
         [OnDeserialized]
         void AfterLoad(StreamingContext ctx)
         {
-            if (string.IsNullOrEmpty(ServerAddress)) ServerAddress = "192.135.112.23";
+            if (string.IsNullOrEmpty(ServerAddress)) ServerAddress = "play.thornswood.net";
             if (string.IsNullOrEmpty(ServerPort)) ServerPort = "7777";
             if (ServerFolder == null) ServerFolder = "";
             if (string.IsNullOrEmpty(CollectionUrl)) CollectionUrl = Collection;

@@ -34,7 +34,9 @@
        no end line; a missing token, an error from the board and a board with
        no Status field each fail the run and write no file;
     4. Read-Board.ps1 parses, starts board-read.yml on main and reads the
-       one job's log, not an artifact.
+       one job's log, not an artifact, passing --allow-escape-sequences when
+       gh's help names it (gh 2.92 and newer refuse a log with colours
+       without it; a main Ship's board read stopped on that, 27 Oct 2026).
 
   It never reaches GitHub. Read only apart from files under its own temp
   folder.
@@ -77,7 +79,7 @@ Yes 'the board token comes from the "board" environment, which only main may use
 $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
 $status = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\board-status.yml'))
 $statusRunsOn = [regex]::Match($status, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-Yes ("it runs on the VPS runners board-status uses ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]' -and $runsOn -eq $statusRunsOn)
+Yes ("it runs on the VPS runners board-status uses, only while the repository is private, and on GitHub's once public (#3685) ({0})" -f $runsOn) ($runsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}" -and $runsOn -eq $statusRunsOn)
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 
 Yes 'it keeps no artifact: the board comes back in the log (#3410)' ($text -notmatch 'upload-artifact' -and $text -notmatch '(?m)^\s+uses:')
@@ -277,6 +279,9 @@ if (Test-Path -LiteralPath $Reader) {
     Yes '  it starts board-read.yml on main' ($rt -match [regex]::Escape("`$workflow = 'board-read.yml'") -and $rt -match [regex]::Escape("ref = 'main'") -and $rt -match [regex]::Escape('actions/workflows/$workflow/dispatches'))
     Yes '  and reads the one job''s log, not an artifact (#3410)' (
         $rt -match [regex]::Escape('(Get-GitHub "$runPath/jobs").jobs') -and $rt -match [regex]::Escape('gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs"') -and $rt -notmatch 'gh run download' -and $rt -notmatch '/artifacts')
+    Yes '  it passes --allow-escape-sequences for the log when gh''s help names it, so gh 2.92 and newer hand the log over (27 Oct 2026)' (
+        $rt -match [regex]::Escape('-match ''--allow-escape-sequences'') { $escFlag = @(''--allow-escape-sequences'') }') -and $rt -match [regex]::Escape('/logs" @escFlag 2>&1'))
+    Yes '  and a refusal prints the log''s last lines with ESC taken out' ($rt -match [regex]::Escape('-join '' '') -replace "`e", '''')'))
     Yes '  holding it to the length and sha256 the log gives, and writing those bytes as they are' (
         $rt -match [regex]::Escape('$bytes = Read-BoardFromLog $log') -and $rt -match [regex]::Escape('[IO.File]::WriteAllBytes($OutFile, $bytes)'))
 }

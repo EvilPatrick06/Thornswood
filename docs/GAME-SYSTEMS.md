@@ -61,11 +61,11 @@ name them.
 
 The needs bars as text stay a command too. Decided by Patrick on
 11 Oct (#2267): `/needs` (and `/need`) says the four bars as one line of
-text, for somebody who hid the bars in the launcher's Settings and wants
-a quick look at them. It is another view of what the bars and the Body
-page on K already show, so it is an exception, like the ones above. The
-help in the game, the launcher's Help and the Settings line under the
-bars name it.
+text, for somebody who hid the bars on Settings in the game (#3126) and
+wants a quick look at them. It is another view of what the bars and the
+Body page on K already show, so it is an exception, like the ones above.
+The help in the game, the launcher's Help and the line under the needs
+bars on Settings in the game name it.
 
 A panel or a key may send the server the same line a command used to
 be. The look prompt already sends `/trade` and the id of the person
@@ -116,7 +116,9 @@ by a fire 35, that bed by a fire 45, a bed you are allowed in 50, and
 your own bed 80. Crafting stops under 15.
 
 [Food](systems/food.md). Raw, burnt, cooked, and a feast. Eating takes
-time. A full stomach refuses another meal's help.
+time. A full stomach refuses another meal's help. Four herbs are picked
+only in their seasons, and each season has a festival dish and brew
+made from its pair.
 
 [Drink and ale](systems/drink.md). Clean water, fouled water, and ale that
 gets worse with each one inside 45 minutes.
@@ -151,7 +153,8 @@ past novice, and the two outside trades. A master decides, and either
 of you can end it.
 
 [Durability](systems/durability.md). Weapon Kit, Armor Kit, Sewing
-Kit. The right half repairs to 120%. Anyone else repairs to 100%.
+Kit. The right half repairs to 120%, at Master for the two smith
+kits. Anyone else repairs to 100%.
 Worn gear loses 1% a hit. At 0%, a worn piece can break.
 
 [Spoilage](systems/spoilage.md). Raw food keeps a real week, a dish

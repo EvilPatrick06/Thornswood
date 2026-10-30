@@ -13,10 +13,11 @@
   What this holds, against the real launcher code:
 
     1. Patrick's case. A server whose light order names Thornswood-Last.esp,
-       ours and light, and which hands it out (the manifest's served list and
-       /plugins/light-<index>.bin, game\gamemode.js publishFiles), and a
-       machine without it whose content plugin differs. Scan finds both;
-       Fix fetches both, checked against the manifest's size and crc32, puts
+       ours and light (the manifest's served list), and a machine without it
+       whose content plugin differs. Scan finds both; Fix puts in both from
+       the release (#3386: by the sha256 its record gives them, never from
+       the server, which serves no plugin file), writes them only when they
+       are the copies the server's manifest describes, puts
        Thornswood-Last.esp into the plugin list in the server's place, and
        the scan after it finds nothing.
     2. The server's order naming a plugin that is not ours and that the list
@@ -47,8 +48,10 @@
 
   HOW. Every file in launcher\app is compiled with a driver into one program,
   with the compiler and C# version the build uses (Launcher-Csc.ps1). The
-  server is a plain HTTP listener on this machine's loopback address, in the
-  driver. Paths, Steam and the Windows folders all point into a scratch
+  server, and the site the release's files are on, are a plain HTTP listener
+  on this machine's loopback address, in the driver; the release is read
+  through Updater.ReleaseCopyAt, past the https check ReleaseCopy makes,
+  which tests\test-1180-own-plugins.js holds by its text. Paths, Steam and the Windows folders all point into a scratch
   folder; nothing outside it is written. Steam is never started and no
   shortcut is touched: the driver hands Fix's steps only the issues it means.
 #>
@@ -117,7 +120,7 @@ Yes 'the Fix button is on exactly when there is something Fix can do' ($sf.Conta
 Yes 'a log line that blocks Play keeps the words the site reads' ($sf.Contains('(i.Blocking ? "blocks Play: " : "worth knowing: ")'))
 Yes 'the bring-up-to-date tells Fix when it fails, so Fix carries on' ($own -match 'else if \(fail != null && failed != null\) failed\(\);')
 Yes 'and the update tells Fix when it is done, or failed, so Fix scans again' (([regex]::Matches($upd, 'if \(after != null\) after\(\);')).Count -eq 2)
-Yes 'Fix writes into the game folder with the folder to itself (OwnGame.Alone)' ($upkeep -match '(?s)OwnGame\.Alone\(delegate\s*\{.*?Verify\.Fix\(cfg, say\).*?\}, delegate')
+Yes 'Fix writes into the game folder with the folder to itself (OwnGame.Alone)' ($upkeep -match '(?s)OwnGame\.Alone\(delegate\s*\{.*?Verify\.Fix\(cfg, say, Updater\.ReleaseCopy\(cfg, v\)\).*?\}, delegate')
 Yes 'a game whose path cannot be read counts as ours only while our own file of that name runs (#2856)' (
     $checks -match '\(at == null && !OwnImageRunning\(n\)\)\) skip = true;')
 Yes 'Diagnostics keeps the icon refresh, which Scan cannot see' ($xaml -match 'x:Name="BtnIcons"')
@@ -135,7 +138,7 @@ if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $refs = @(); $missing = @()
 foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherLib)) { $p = $n; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
 Yes ('every reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
 if ($missing.Count -or $refs.Count -eq 0) { Done }
 
@@ -234,7 +237,8 @@ namespace Thornswood
         // ---- a server on this machine --------------------------------------
         //
         // The resources port of a SkyMP server, as far as the launcher asks it
-        // anything: the manifest, and the plugin files publishFiles writes.
+        // anything: the manifest. And the site's feed assets, where a release
+        // record and its files are kept by their sha256 (#3386).
         static readonly Dictionary<string, byte[]> served = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         static readonly List<string> asked = new List<string>();
         static TcpListener listener;
@@ -298,6 +302,42 @@ namespace Thornswood
                 sb.Append(Entry(m, File.ReadAllBytes(Path.Combine(data, m)))).Append(",");
             }
             return sb.ToString();
+        }
+
+        static string Sha(byte[] b)
+        {
+            using (var h = SHA256.Create()) return BitConverter.ToString(h.ComputeHash(b)).Replace("-", "").ToLowerInvariant();
+        }
+
+        const string Assets = "/feed/assets/";
+
+        /// <summary>
+        /// A release on the stand-in site, as Publish-Update leaves one: each
+        /// file under its sha256, and the record of them under its own. Fix
+        /// reads it the way ReleaseCopy does, past the https check alone.
+        /// </summary>
+        static Func<string, byte[]> Release(int port, Dictionary<string, byte[]> files)
+        {
+            var rec = new StringBuilder("{\":record:files\":\"1\"");
+            lock (served)
+                foreach (var f in files)
+                {
+                    served[Assets + Sha(f.Value)] = f.Value;
+                    rec.Append(",\"").Append(f.Key.Replace("\\", "\\\\")).Append("\":\"").Append(f.Value.Length).Append(":").Append(Sha(f.Value)).Append("\"");
+                }
+            rec.Append("}");
+            byte[] recBytes = Encoding.UTF8.GetBytes(rec.ToString());
+            var r = new RecordRef();
+            r.sha256 = Sha(recBytes);
+            r.id = "test";
+            lock (served) served[Assets + r.sha256] = recBytes;
+            return Updater.ReleaseCopyAt("http://127.0.0.1:" + port + Assets, r);
+        }
+
+        static bool AskedForPluginFiles()
+        {
+            lock (asked) foreach (string a in asked) if (a.IndexOf("/plugins/", StringComparison.Ordinal) >= 0) return true;
+            return false;
         }
 
         static string Entry(string name, byte[] bytes)
@@ -392,12 +432,14 @@ namespace Thornswood
                     "\"light\":[" + Entry("Beards.esl", beards) + "," + Entry("Thornswood-Last.esp", last) + "]," +
                     "\"loadOrder\":[" + MasterNames + "\"TsOne.esp\",\"Beards.esl\",\"Thornswood-Content.esp\",\"Thornswood-Last.esp\"]," +
                     "\"served\":[\"Thornswood-Content.esp\",\"Thornswood-Last.esp\"]}");
-                // publishFiles: a full plugin of ours at its place in mods
-                // (after the five masters and TsOne.esp), a light one at its
-                // place in light (#2627).
-                served[Base + "/plugins/6.bin"] = content;
-                served[Base + "/plugins/light-1.bin"] = last;
             }
+            // The release carries both of ours (#3386), and another file of
+            // ours that is not a plugin, which Fix never takes.
+            var releaseFiles = new Dictionary<string, byte[]>();
+            releaseFiles["Data\\Thornswood-Content.esp"] = content;
+            releaseFiles["Data\\Thornswood-Last.esp"] = last;
+            releaseFiles["Data\\Scripts\\MpClientPlugin.pex"] = Encoding.ASCII.GetBytes("PEX");
+            Func<string, byte[]> release = Release(port, releaseFiles);
 
             List<Issue> scan = Verify.Run(cfg);
             Show(scan);
@@ -407,18 +449,19 @@ namespace Thornswood
                 order != null && order.Text.IndexOf("the server has Thornswood-Last.esp", StringComparison.Ordinal) >= 0 && order.Blocking);
             Yes("and the content plugin that differs", bytes != null && bytes.Blocking && bytes.Served);
             Yes("both are Fixable, and say what Fix does", order != null && order.Fixable && bytes != null && bytes.Fixable &&
-                order.Text.IndexOf("Fix ", StringComparison.Ordinal) >= 0 && bytes.Text.IndexOf("Fix fetches the server's copy.", StringComparison.Ordinal) >= 0);
+                order.Text.IndexOf("Fix ", StringComparison.Ordinal) >= 0 && bytes.Text.IndexOf("Fix puts in the release's copy.", StringComparison.Ordinal) >= 0);
             Yes("each carries the problem alone and what will put it right, in the house words",
                 order != null && order.Problem.IndexOf("Fix", StringComparison.Ordinal) < 0 && !string.IsNullOrEmpty(order.WhatWill) && Clean(order.Text) && Clean(order.WhatWill));
 
             var said = new List<string>();
-            int did = Verify.Fix(cfg, Into(said));
+            int did = Verify.Fix(cfg, Into(said), release);
             string live = Text(Path.Combine(Paths.LocalAD, "plugins.txt"));
             byte[] gotContent = File.Exists(Path.Combine(data, "Thornswood-Content.esp")) ? File.ReadAllBytes(Path.Combine(data, "Thornswood-Content.esp")) : null;
             byte[] gotLast = File.Exists(Path.Combine(data, "Thornswood-Last.esp")) ? File.ReadAllBytes(Path.Combine(data, "Thornswood-Last.esp")) : null;
-            Yes("Fix fetches the server's content plugin", gotContent != null && Convert.ToBase64String(gotContent) == Convert.ToBase64String(content));
-            Yes("and Thornswood-Last.esp, which it never fetched before, from /plugins/light-1.bin",
-                gotLast != null && Convert.ToBase64String(gotLast) == Convert.ToBase64String(last) && asked.Contains(Base + "/plugins/light-1.bin"));
+            Yes("Fix puts in the release's content plugin, the server's", gotContent != null && Convert.ToBase64String(gotContent) == Convert.ToBase64String(content));
+            Yes("and Thornswood-Last.esp, from the release by its sha256",
+                gotLast != null && Convert.ToBase64String(gotLast) == Convert.ToBase64String(last) && asked.Contains(Assets + Sha(last)));
+            Yes("and asks the game server for no plugin file (#3386)", !AskedForPluginFiles());
             Yes("and switches Thornswood-Last.esp on in the server's place, last in the list", live != null &&
                 live.IndexOf("*Thornswood-Content.esp\r\n*Thornswood-Last.esp", StringComparison.Ordinal) >= 0);
             bool leftAlone = false;
@@ -433,21 +476,43 @@ namespace Thornswood
             Show(after);
             Yes("the scan after Fix finds nothing (" + after.Count + ")", after.Count == 0);
 
-            // A server that hands over another file than its manifest says:
-            // nothing is written, and the line says why.
+            // A release whose copy is not the one the server runs (a server
+            // a deploy took ahead of the last release): nothing is written,
+            // and the line says why.
             Plugin(Path.Combine(data, "Thornswood-Content.esp"), false, "CONTENT-OLD-AGAIN");
             File.Delete(Path.Combine(data, "Thornswood-Last.esp"));
-            lock (served) { served[Base + "/plugins/light-1.bin"] = PluginBytes(true, "SOMETHING-ELSE"); }
+            var older = new Dictionary<string, byte[]>(releaseFiles);
+            older["Data\\Thornswood-Last.esp"] = PluginBytes(true, "SOMETHING-ELSE");
             said.Clear();
-            Verify.Fix(cfg, Into(said));
+            Verify.Fix(cfg, Into(said), Release(port, older));
             bool refused = false;
-            foreach (string m in said) if (m.IndexOf("Thornswood-Last.esp: what the server handed over is not what its own manifest describes", StringComparison.Ordinal) >= 0) refused = true;
-            Yes("a light plugin whose bytes are not the manifest's is refused, and said", refused && !File.Exists(Path.Combine(data, "Thornswood-Last.esp")));
+            foreach (string m in said) if (m.IndexOf("Thornswood-Last.esp: the release's copy is not the one the server runs", StringComparison.Ordinal) >= 0 && Clean(m)) refused = true;
+            Yes("a light plugin whose release copy is not the server's is refused, and said", refused && !File.Exists(Path.Combine(data, "Thornswood-Last.esp")));
             List<Issue> still = Verify.Run(cfg);
             Issue stillOrder = Find(still, IssueKind.Plugins, "light position");
-            Yes("then the light order is still found, and what will put it right is the server's copy",
-                stillOrder != null && stillOrder.WhatWill.IndexOf("did not hand over its copy", StringComparison.Ordinal) >= 0);
-            lock (served) { served[Base + "/plugins/light-1.bin"] = last; }
+            Yes("then the light order is still found, and what will put it right is the next update",
+                stillOrder != null && stillOrder.WhatWill.IndexOf("does not have the copy the server runs yet", StringComparison.Ordinal) >= 0 && Clean(stillOrder.WhatWill));
+
+            // No feed, and a release that does not ship the plugin: nothing
+            // is written, and nothing is asked of the game server either.
+            said.Clear();
+            Verify.Fix(cfg, Into(said), null);
+            bool noFeed = false;
+            foreach (string m in said) if (m.IndexOf("Thornswood-Last.esp: the update feed could not be read", StringComparison.Ordinal) >= 0) noFeed = true;
+            Yes("with no feed to read, Fix puts in nothing and says so", noFeed && !File.Exists(Path.Combine(data, "Thornswood-Last.esp")));
+            var without = new Dictionary<string, byte[]>(releaseFiles);
+            without.Remove("Data\\Thornswood-Last.esp");
+            said.Clear();
+            Verify.Fix(cfg, Into(said), Release(port, without));
+            bool notShipped = false;
+            foreach (string m in said) if (m.IndexOf("Thornswood-Last.esp: the release the update feed names does not ship it", StringComparison.Ordinal) >= 0) notShipped = true;
+            Yes("with a release that does not ship it, the same", notShipped && !File.Exists(Path.Combine(data, "Thornswood-Last.esp")));
+            Yes("and the game server was never asked for a plugin file", !AskedForPluginFiles());
+
+            // The release is asked only for a plugin of ours by its bare
+            // name: the name comes from the game server's manifest.
+            Yes("the release reader hands over no file but a plugin in Data, whatever name it is asked for",
+                release("Scripts\\MpClientPlugin.pex") == null && release("..\\Data\\Thornswood-Last.esp") == null && release("x.esp") == null);
         }
 
         // ---- 2: the server names a plugin that is not ours -----------------
@@ -477,7 +542,7 @@ namespace Thornswood
             var said = new List<string>();
             int moved = Verify.PutInServerOrder(cfg, Into(said));
             bool why = false;
-            foreach (string m in said) if (m.IndexOf("names Hair.esp", StringComparison.Ordinal) >= 0 && m.IndexOf("does not hand out", StringComparison.Ordinal) >= 0 && Clean(m)) why = true;
+            foreach (string m in said) if (m.IndexOf("names Hair.esp", StringComparison.Ordinal) >= 0 && m.IndexOf("is not Thornswood's own", StringComparison.Ordinal) >= 0 && Clean(m)) why = true;
             Yes("a plugin of another author the list lacks is not switched on, and the reason says only an update or Vortex can bring it",
                 moved == 0 && why && Text(Path.Combine(Paths.LocalAD, "plugins.txt")) == list);
             Issue order = Find(Verify.Run(cfg), IssueKind.Plugins, "light position");
@@ -508,8 +573,10 @@ namespace Thornswood
                 served.Clear();
                 served[Base + "/manifest.json"] = Encoding.UTF8.GetBytes(
                     "{\"versionMajor\":1,\"mods\":[" + Entry("Thornswood-Content.esp", content) + "],\"served\":[\"Thornswood-Content.esp\"]}");
-                served[Base + "/plugins/0.bin"] = content;
             }
+            var shipped = new Dictionary<string, byte[]>();
+            shipped["Data\\Thornswood-Content.esp"] = content;
+            Func<string, byte[]> release = Release(port, shipped);
             typeof(Verify).GetField("manifestCache", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).SetValue(null, null);
 
             List<Issue> scan = Verify.Run(cfg);
@@ -520,12 +587,12 @@ namespace Thornswood
             var said = new List<string>();
             int asks;
             lock (asked) asks = asked.Count;
-            Verify.Fix(cfg, Into(said));
+            Verify.Fix(cfg, Into(said), release);
             int asksAfter;
             lock (asked) asksAfter = asked.Count;
             Yes("Fix writes nothing into the Steam copy: the Creation Club plugin stays, the content plugin is Vortex's", Same(before, Snap(steam)));
             Yes("and nothing into Windows' own plugin list", Same(windows, Snap(Path.GetDirectoryName(Paths.WinLocalAD))));
-            Yes("and asks the server for nothing", asksAfter == asks);
+            Yes("and asks the server and the release for nothing", asksAfter == asks);
             Yes("it hands on to making the folder, and says so", Verify.OwnFolderNext && said.Count > 0 && said[said.Count - 1].IndexOf("nothing is written into the Steam copy", StringComparison.Ordinal) >= 0);
         }
 

@@ -4,7 +4,7 @@
   Runs ON the old VPS on the day the server moves: stops everything that writes
   what a backup takes, then takes the last backup.
 
-  Sent there by Remote.ps1 (docs\MOVING-THE-SERVER.md), so the new box starts
+  Sent there by Remote.ps1 (MOVING-THE-SERVER.md in the ops repo), so the new box starts
   from exactly where the old one stopped and nothing anybody does afterwards
   is lost without them being told (issue #454).
 

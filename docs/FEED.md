@@ -94,6 +94,65 @@ use the website".
   host and the sha256, plus the signer for a launcher exe (see "Checks on every
   download").
 
+### And from this repository's Releases (#3686)
+
+Patrick decided on 26 Oct, for going public: downloads and updates move to
+this repository's Releases. The addresses a launcher asks do not move.
+
+- **Every launcher keeps asking the site.** `thornswood.net/feed[-dev]/version.json`
+  and `/feed[-dev]/assets/<sha256>` stay the only addresses. A launcher from
+  1.2.6 on builds every asset address from the feed's own folder (the split
+  feed above, and `Sync.cs` `AssetFolder` for a record's files), so a feed
+  that named github.com instead would not reach it; older ones were given
+  these site addresses in their feeds.
+- **The site sends them to the Release.** `release-files.yml` puts every file
+  a release names on a GitHub Release on the release's own tag
+  (`release/main/<id>`, `release/dev/<id>`, the tag Ship already makes), each
+  named by its sha256, plus `Thornswood-Setup.exe` on a main one. Once GitHub,
+  asked without a token, lists that Release with a file under its sha256,
+  with that sha256 as GitHub's own digest and the site's size, the site
+  answers the asset with a 302 to the Release's copy (`site/server.js`,
+  "release copies"); `/file/Thornswood-Setup.exe` does the same for the
+  installer the site lists. The Downloads page, the bot's links and the
+  installer keep their thornswood.net addresses and follow the same
+  redirect.
+- **Old launchers.** Read in the code of launchers 1.1.103, 1.1.105 and 1.2.5
+  (their tags) and of main: each fetches with .NET's WebClient or
+  HttpWebRequest, which follow a redirect, allows `github.com`,
+  `objects.githubusercontent.com` and `release-assets.githubusercontent.com`
+  (`Updater.cs` `AllowedHosts`), checks the address it was given before it
+  asks, and checks the sha256 of what arrives, and the signer of a launcher
+  exe. A dropped Range on the redirect is a whole new download, which every
+  one of them already handles.
+- **The site's copy stays.** Every file still goes to the site first
+  (`Publish-Update.ps1`), and the site sends it itself whenever the Release
+  does not hold it: before the Release is made, for a release the Release
+  list has not shown yet, after a rollback (no tag), and for the `settings`
+  asset, which only the site has.
+- **Only while the repository is public.** A private repository's Release
+  answers 404 to a launcher, and one made now would go public with the
+  repository, with whatever it holds. So `release-files.yml` is skipped while
+  the repository is private, and the site keeps sending every file. The first
+  Releases are made after Patrick makes the repository public, which he does
+  after #3721's blockers, the files other people own among them (#2454,
+  #3602, #3715, #2791), are cleared. Right after the flip, run it for the
+  live releases by hand (the tag names are in the feeds' `release.tag`):
+  `gh workflow run release-files.yml --ref main -f tag=release/main/<id>`
+  and the same for dev's.
+- **What starts it.** A release tag pushed from One (`push: tags`), and
+  `git-ref.yml` after a release tag it made for a cloud Ship, since a tag the
+  run's own token makes starts no workflow. Since #3686 the tag's message
+  names the sha256 of the record, the launcher, the client runtime, the
+  notes and the signed manifest with its catalog (`Get-ReleaseFileShas`,
+  `Release-Name.ps1`), so the files of an older release are still known
+  after later Ships; a tag from before names none, and then the channel's
+  live feed is read while it still names that release.
+- **What it never does.** It never changes a published Release: one that
+  lacks a file stops the run. It publishes a Release only after GitHub's own
+  digest of every file is right. It runs on GitHub's hosted runner, never on
+  the box. `tests\test-3686-release-files.ps1` and `tests\test-release-copies.js`
+  hold both halves.
+
 ### The feed store on the VPS (#907)
 
 Patrick, 28 Sep: "I just want the repo deleted in general if we won't be using
@@ -207,7 +266,7 @@ application id (`Config.cs:DiscordAppId`).
   "launcherVersion": "1.1.95",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/591560398",
   "launcherSha256": "8dc36e32eb3dde35691e7a68e46195c6354968c3ea01585d03eb53289dca3070",
-  "serverAddress": "192.135.112.23",
+  "serverAddress": "play.thornswood.net",
   "serverPort": "7777",
   "message": "",
   "packs": [
@@ -277,7 +336,7 @@ saved fields that come from elsewhere, as their rows say.
 | `serverAddress` | string | `Publish-Update.ps1:@('ServerAddress', 'serverAddress')` from config `ServerAddress`; `Set-Server.ps1:@('serverAddress', $Address)`. Not `Set-Vps.ps1`, which moves the launcher's built-in address and leaves the feed to `Set-Server.ps1` (`Set-Vps.ps1:What it does NOT do, because Set-Server.ps1 already does it properly`) | `ShellUpdate.cs:v.serverAddress != cfg.ServerAddress` | Saved. A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:-not $MoveServer -and -not $Dev`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `ShellUpdate.cs:OnVersionDoc` | Saved. Must be a string; the launcher field is a string. |
 | `maxOnline` | number | `Publish-Update.ps1`, from `records\most-online.json` by way of `scripts\deploy\MaxOnline.ps1` (#481): the channel's seats, people and staff seats together (30 on main, 5 on dev from its `dev` numbers; Patrick, 12 Oct) | `ShellUpdate.cs:v.maxOnline > 0` | Saved when above 0. Written as a number because a quoted `"30"` reads as 0. It is the M of "N of M awake". The Play page prefers the number the running server announces as `max` in its `online.json` (`Online.cs`), which is the same seats. |
-| `collectionUrl` | string | `Set-Collection.ps1:$doc.collectionUrl = $Url` only; Ship carries it forward untouched | `ShellUpdate.cs:OnVersionDoc` | Saved. Where the Collection button sends people. |
+| `collectionUrl` | string | `Set-Collection.ps1:$doc.collectionUrl = $Url` only; Ship carries it forward untouched | `ShellUpdate.cs:OnVersionDoc` | Saved. The collection the buttons send people to; they open its page for the feed's `collectionRevision` (`Checks.CollectionRevisionUrl`, `.../revisions/<N>`), never the bare page, which Nexus shows at its newest revision (#4115). |
 | `collectionRevision` | number | `Publish-Update.ps1:Set-Prop $doc 'collectionRevision' $rev`, read off the shipping machine's Vortex | `ShellUpdate.cs:Updater.FeedCollectionRevision = v.collectionRevision`, then `Shell.cs:CollectionProblem` | Not saved. 0 or missing: the launcher says nothing about the collection being behind or ahead. Wrong: tells people to reinstall a collection that is fine. |
 | `updateRepo` | string `owner/name` | Nobody since #907: `Publish-Update.ps1` takes it out of the feed | `Feed-Rules.ps1` only (a feed that still names one keeps its GitHub pack urls legal until its next Ship) | Launchers from #907 on ignore it. Older ones save it and ask that repository, via the GitHub Contents API, when the site does not answer; once it is deleted that answers 404 and they ask the site again. |
 | `updateFeedUrl` | string, https | `Publish-Update.ps1` from `UpdateFeedUrl` (defaults to the site live/dev URL by channel) | `Shell.cs`, `Updater.FeedUrl` | Saved, quietly. The one `version.json` fetch since #907. Publish the new URL under the old feed first, then move. Since #937 only an https address on thornswood.net is used; anything else in `config.json`, empty included, is the built-in live or dev address, so editing the file cannot switch the update check off. |
@@ -288,7 +347,7 @@ saved fields that come from elsewhere, as their rows say.
 | `maintenance` | string (read as on only for `true`, `1`, `yes`, `on`) | By hand | `FeedNotice.cs:On` | On: Play held, button says CLOSED FOR MAINTENANCE. Absent in the current feeds. |
 | `minLauncher` | string, dotted numbers | `Publish-Update.ps1` on every publish, as the feed's `launcherVersion` (#937) | `FeedNotice.cs:From`; the site's `/api/play/pass` | A launcher below it holds Play, and the site refuses it a join pass, so the game server ends its session. The site also refuses a launcher above `launcherVersion`, a number never published. A value that is not digits and dots is ignored by the launcher, so a typo cannot lock everybody out (`FeedNotice.cs:IsVersion`); the site reads such a value as `launcherVersion`. Updating needs no pass. |
 | `packs` | array | `Publish-Update.ps1:Set-Prop $doc 'packs' $packs` appended until #1050; `Repair-Manifest.ps1` removes. Since #1050 `[]` on a channel whose minLauncher syncs to the record (the packs gone block, `Test-FeedPacksGone`) | `Updater.Pending` (`Updater.cs:Pending`) | See below, and "When the packs can go". |
-| `optional` | array | `Publish-Pack.ps1:$optional` | Add-ons on the Diagnostics page (`ShellPacks.cs DrawAddons`, #1170); the Mods page's Add-ons tab, which nothing opens | Absent in both feeds today; `scripts/release/optional-packs.txt` lists none. |
+| `optional` | array | `Publish-Pack.ps1:$optional` | Add-ons on the Diagnostics page (`ShellPacks.cs DrawAddons`, #1170), the only place they show since the hidden Mods page went (#3146) | Absent in both feeds today; `scripts/release/optional-packs.txt` lists none. |
 | `clientRuntime` | object | `Publish-Update.ps1:Set-Prop $doc 'clientRuntime'`, only when the fork commit or its source notice changed (`Publish-Update.ps1:PUBLISHED ONLY WHEN IT CHANGES`) | `ClientRuntime.Heal` (`ClientRuntime.cs:Heal`) | Null or no `url`: a missing client file cannot be repaired from it. Same host and sha256 checks as a pack. |
 | `baseline` | object `{ id, sha256, url, entries, notes? }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run. `notes`, the release note's title (its first line), since #1050: the update card of a launcher that syncs shows it (`Sync.cs RecordDue`), the packs that used to carry it being off the feed. The whole note is the newest entry of the news file | The launcher from #1050 on, which syncs the install to it (`Updater.SyncRecord`, `launcher\app\Sync.cs`; see "Syncing to the release record"). The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | The release record: what that release left installed, every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. The launcher reads it apart from the rest of the feed (`RecordRef.FromFeed`), so a `baseline` of any other shape costs that one field and never the whole feed. |
 | `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | Gone from the feed since #1050: the list is `releases.json` in the channel's store beside the feed (see "The feed store on the VPS"), written by `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442) and by `Rollback-Feed.ps1`, with `to` naming the release a rollback went back to. A feed that still carries the field (written before #1050, or by a Ship from a branch without it) is read too, merged by id, and the next write takes it out | No launcher. `Rollback-Feed.ps1`, `Scrub-Feed.ps1`, Ship's release tag check (`Get-StoreReleases`, `Release-Baseline.ps1`; `Read-ReleaseListFile`, `Release-Name.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped ('' once the packs are gone: the record's own `:golden:` entries hold it). What a channel can be put back to; a release older than the newest thirty cannot be. The first release after #442 started the list with the `baseline` the feed already named. |
@@ -471,7 +530,7 @@ its card; the note is on its News tab as before. After it, version.json is:
   "launcherVersion": "1.1.103", "minLauncher": "1.1.103",
   "launcherUrl": "https://thornswood.net/feed/assets/<sha256>", "launcherSha256": "<sha256>",
   "launcherInputs": "<sha256>",
-  "serverAddress": "192.135.112.23", "serverPort": "7777", "voicePort": "7778",
+  "serverAddress": "play.thornswood.net", "serverPort": "7777", "voicePort": "7778",
   "voiceUrl": "https://thornswood.net/voice", "updateFeedUrl": "https://thornswood.net/feed/version.json",
   "collectionUrl": "...", "collectionRevision": 1, "maxOnline": 25,
   "discordAppId": "...", "siteUrl": "https://thornswood.net", "presenceImage": "...",

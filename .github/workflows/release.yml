@@ -6,8 +6,8 @@
 # WHAT IT DOES. On a tag v<version> it checks the tag out clean, runs
 # scripts\release\Build-Launcher.ps1 into a folder under RUNNER_TEMP so it
 # never touches a Desktop shortcut or closes a game on a real machine, signs
-# Thornswood.exe through Azure Artifact Signing (on GitHub's runner, on a v
-# tag), writes SHA256SUMS beside it, and attaches them to a DRAFT release for
+# Thornswood.exe through Azure Artifact Signing (in a run of main's own
+# workflow, below), writes SHA256SUMS beside it, and attaches them to a DRAFT release for
 # that tag. A person promotes the draft; Ship reads a draft's assets fine.
 # Ship then downloads Thornswood.exe and SHA256SUMS and refuses to ship unless
 # the checksum matches. SHA256SUMS is written AFTER signing, so it describes
@@ -37,9 +37,15 @@
 # thornswood-vps, and only the runners records\sign-runners.json lists carry
 # it (a push that changes the record puts GitHub right by itself, and
 # scripts\deploy\Set-BuildRunners.ps1 asks again, #3107). Runner 3 is the
-# light runner (docs\DECIDED.md), never a build runner, so the job that can
-# sign never shares a runner with pull request code, and the "verify" job,
-# on the build runners, never runs where the launcher was signed.
+# light runner (docs\DECIDED.md), never a build runner, and every job a
+# workflow on main can send there runs main's code or a v tag's alone, this
+# one included (#3550; scripts\vps\Check-RunnerIsolation.ps1 reads every
+# job for it). So no workflow on main puts pull request or branch code where
+# a launcher is signed, and a branch's own copy of a workflow that asks for
+# runner 3 is ended there before its first step: runner 3 takes main's jobs
+# alone (#3889, #3930; scripts\deploy\Install-Runner.ps1).
+# The "verify" job, on the check runners (records\check-runners.json, none
+# of them runner 3), never runs where the launcher was signed.
 #
 # HOW IT BUILDS (#498, Patrick's option C, switched 15 Oct). On both runners
 # the launcher and setup program are built by MSBuild from
@@ -49,7 +55,8 @@
 #
 # HOW IT SIGNS (#2163 section 8, both runners since #3312). A federated
 # (OIDC) identity, no secret stored anywhere: GitHub mints a short token for
-# this job only, and only on a v tag, through the "release" environment,
+# this job only, and only in a run of main's own workflow (below), through
+# the "release" environment,
 # whose subject is the one the Azure federated credential trusts (it names the
 # environment, not the runner, so the box's job presents the same one). Pull
 # request jobs never get it; this file has no pull_request trigger. The sign
@@ -63,7 +70,25 @@
 # ThornswoodRelease profile, the same script and profile Ship uses, with
 # Microsoft's signing client fetched at the version and sha256
 # Setup-ShipMachine.ps1 pins. A signing failure fails the job and no draft
-# gets the file. A run that is not on a v tag ref builds unsigned and says so.
+# gets the file. A run that is not main's builds unsigned and says so.
+#
+# ONLY A RUN OF MAIN'S OWN WORKFLOW SIGNS (#3930, Patrick, 27 Oct, option 1
+# on his report page). Signing used to follow a refs/tags/v ref. A v tag push
+# runs the tagged commit's OWN copy of this file, so a tag pushed on a branch
+# commit whose copy left out the tag check still got the "release"
+# environment and signed, though main's copy refuses a commit off main
+# (#3890). Now a job signs only when the run is a workflow_dispatch on
+# refs/heads/main: that is main's copy of this file and of
+# Resolve-ReleaseTag.ps1, which only a pull request changes, and it builds a
+# tag only when the tag's commit is on main. The "release" environment's
+# deployment rule names the branch main and nothing else (Settings,
+# Environments; the ops repo's ops\claude-queue\3930-sign-from-main.md), so a
+# copy on any other ref cannot reach the identity whatever it says. A v tag
+# push builds nothing itself: its one job hands the tag to main's workflow
+# (gh workflow run release.yml --ref main -f tag=<tag> -f expected_sha=<its
+# commit>), so pushing a tag still starts a signed release, through main.
+# The signing runner refuses any job that is not main's (Install-Runner.ps1,
+# #3889), so a tag's own job never reaches it.
 #
 # DEV NUMBERS (#3312). A dev Ship's launcher carries a fourth number
 # (1.2.6.7) that only ever lives in the dev feed: Ship works it out from what
@@ -98,24 +123,29 @@
 # WHY IT IS PINNED. Every action is pinned to a full-length commit SHA: a
 # moved tag on an action cannot change what runs.
 name: Release launcher
+# The tag in the run's title, so a script waiting for the run main's workflow
+# makes for a tag finds it by title and branch (Sign-OnGitHub.ps1,
+# Find-ReleaseRun): a manual run's head branch is main, not the tag (#3930).
+run-name: Release launcher ${{ inputs.tag || github.ref_name }}
 on:
   push:
     tags:
       - 'v*'
-  # So the exe can be rebuilt for a tag that already exists without moving it,
-  # for a first trial or a runner that died halfway, and so release-tag.yml
-  # can start it on a tag it made (a tag the repository token pushes starts
-  # no workflow). A signed draft needs the run started on the tag itself,
-  # because only a refs/tags/v ref gets the signing identity:
-  #   gh workflow run release.yml --ref v<version> -f tag=v<version>
-  # A run started from a branch builds unsigned.
+  # Every build is a manual run: the tag push above only hands its tag to
+  # one, and release-tag.yml starts one for a tag it made (a tag the
+  # repository token pushes starts no workflow). Also so the exe can be
+  # rebuilt for a tag that already exists without moving it, for a trial or
+  # a runner that died halfway. A signed draft needs the run started on main
+  # (header, ONLY A RUN OF MAIN'S OWN WORKFLOW SIGNS):
+  #   gh workflow run release.yml --ref main -f tag=v<version>
+  # A run started from any other ref builds unsigned, on GitHub's runner only.
   workflow_dispatch:
     inputs:
       tag:
         description: The v<version> tag to build and draft a release for
         required: true
       expected_sha:
-        description: The commit the tag must be (optional; without it the tag's commit must be on main)
+        description: The commit the tag must be (optional; the tag's commit must be on main either way)
         required: false
         default: ''
       runner:
@@ -136,16 +166,48 @@ concurrency:
   group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
+  # A V TAG PUSH IS HANDED TO MAIN'S WORKFLOW (#3930). This run is the tagged
+  # commit's own copy of this file, which nothing reviewed, so it builds and
+  # signs nothing: it asks GitHub to start main's copy for the tag, with the
+  # commit the tag named when it was pushed as the expected SHA, and main's
+  # copy checks the tag is that commit and on main before it builds. No
+  # checkout and no repository code: one REST call with the repository token
+  # (a workflow_dispatch the repository token asks for does start a run). On
+  # a check runner, as the light verify job below: the signing runner takes
+  # main's jobs alone (#3889), and GitHub's runner has no minutes to spend on
+  # a handover. On GitHub's runner once the repository is public (#3685).
+  handoff:
+    name: Hand the tag to main's release workflow
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-check"]') || 'windows-latest' }}
+    permissions:
+      actions: write
+    timeout-minutes: 5
+    steps:
+      - name: Start release.yml on main for this tag
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:GITHUB_REF -notmatch '^refs/tags/v') { Write-Host "::error::$env:GITHUB_REF is not a v tag"; exit 1 }
+          $api = "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY"
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $run = @{ ref = 'main'; inputs = @{ tag = $env:GITHUB_REF_NAME; expected_sha = $env:GITHUB_SHA } } | ConvertTo-Json
+          Invoke-RestMethod -Method Post -Uri "$api/actions/workflows/release.yml/dispatches" -Headers $headers -ContentType 'application/json' -Body $run | Out-Null
+          Write-Host ("started main's release.yml for {0} (commit {1}); it builds, signs and drafts there" -f $env:GITHUB_REF_NAME, $env:GITHUB_SHA)
+
   # GitHub's hosted Windows runner (#2163), first (header, WHERE IT RUNS).
   # Skipped when BUILD_RUNNER is vps or a manual run asked for the box, and
-  # then the VPS job below builds the release instead.
+  # then the VPS job below builds the release instead. A manual run only: a
+  # tag push is handed over above.
   launcher:
     name: Build the release launcher
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}
     runs-on: windows-latest
-    # The "release" environment only on a v tag: its subject is what the Azure
-    # federated credential trusts, and its deployment rule allows v* tags only.
-    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}
+    # The "release" environment only in a run of main's own workflow: its
+    # subject is what the Azure federated credential trusts, and its
+    # deployment rule allows the branch main only (#3930).
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && 'release' || '' }}
     permissions:
       contents: write
       id-token: write
@@ -163,10 +225,12 @@ jobs:
       # off main could be built and labelled as a release. Now the workflow's
       # own commit is checked out with every tag and main, and
       # scripts/release/Resolve-ReleaseTag.ps1 says which commit the tag is:
-      # a real v<version> tag, and either the expected SHA (a tag push's own
-      # GITHUB_SHA, or the manual run's expected_sha) or a commit on main.
-      # Anything else stops the run before anything is built. The input
-      # reaches the script through env, never pasted into the script text.
+      # a real v<version> tag on a commit on main, and the expected SHA when
+      # there is one (the commit a tag push named, which the handover passes,
+      # or a manual run's expected_sha). A commit off main is refused whatever
+      # the expected SHA (#3890). Anything else stops the run before anything
+      # is built. The input reaches the script through env, never pasted into
+      # the script text.
       - name: Check out the workflow's commit, with every tag and main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -182,8 +246,10 @@ jobs:
           INPUT_SHA: ${{ github.event.inputs.expected_sha }}
         run: |
           . .\scripts\release\Resolve-ReleaseTag.ps1
-          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $tag = $env:INPUT_TAG; $expected = $env:INPUT_SHA }
-          else { $tag = $env:GITHUB_REF_NAME; $expected = $env:GITHUB_SHA }
+          # Only a manual run builds (#3930); a tag push's handover passes the
+          # tag and the commit it named as the inputs.
+          if ($env:GITHUB_EVENT_NAME -ne 'workflow_dispatch') { Write-Host "::error::only a manual run builds a release, not a $env:GITHUB_EVENT_NAME"; exit 1 }
+          $tag = $env:INPUT_TAG; $expected = $env:INPUT_SHA
           try { $commit = Resolve-ThornswoodReleaseTag -Tag $tag -RepoDir . -ExpectedSha $expected -MainRef origin/main }
           catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
           git checkout --force --detach $commit
@@ -242,14 +308,14 @@ jobs:
           # The setup program the same build compiled (issue #932).
           if (-not (Test-Path 'out\setup-stub.exe')) { Write-Host '::error::no setup-stub.exe came out of the build'; exit 1 }
 
-      # SIGNING (#2163 section 8, both runners since #3312): a v tag, nothing
-      # else. Microsoft's signing client comes first, at the version and
+      # SIGNING (#2163 section 8, both runners since #3312): a run of main's
+      # own workflow, nothing else (#3930). Microsoft's signing client comes first, at the version and
       # sha256 Setup-ShipMachine.ps1 pins, lifted out of it by the parser so
       # the pin lives in one place; nothing is unpacked unless the bytes match.
       # It goes into records\signing\client of this checkout, which git
       # ignores; "Take the signing setup off this runner" removes it again.
       - name: Fetch the signing client Setup-ShipMachine.ps1 pins
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
         shell: pwsh
         run: |
           $src = [IO.File]::ReadAllText((Resolve-Path 'scripts\release\Setup-ShipMachine.ps1'))
@@ -276,7 +342,7 @@ jobs:
       # AZURE_FEDERATED_TOKEN_FILE beside AZURE_CLIENT_ID and AZURE_TENANT_ID
       # (header, HOW IT SIGNS).
       - name: Sign the launcher with ThornswoodRelease (OIDC, no secret)
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
         shell: pwsh
         env:
           AZURE_CLIENT_ID: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
@@ -344,7 +410,7 @@ jobs:
           $how = 'built on the VPS runner with MSBuild (#498), the fallback when GitHub''s runner did not build it (#3312)'
           if ($env:RUNNER_KIND -eq 'github-hosted') { $how = 'built on GitHub''s runner with MSBuild (#498)' }
           if ($signed) { $how += ', the launcher signed by ThornswoodRelease (#2163)' }
-          else { $how += ', UNSIGNED (not a v tag ref): Ship signs it on download (#921)' }
+          else { $how += ', UNSIGNED (not a run of main''s workflow, #3930): Ship signs it on download (#921)' }
           $notes = "Launcher exe and setup program for $tag, $how, and verified by SHA256SUMS. Ship downloads these and checks the checksums instead of compiling the shipped binaries (issues #457 and #932).`n`nSource for the SkyMP files Thornswood ships: https://thornswood.net/credits#source"
           # A draft: a person promotes it, and Ship reads a draft's assets. If a
           # run for this tag already made the draft, upload into it instead.
@@ -433,16 +499,17 @@ jobs:
   #     telling a quota stop from a build failure.
   # !cancelled(), not always() (#2422): a cancelled run never leaves the box
   # building a release nobody wants. The steps are the hosted job's own, by
-  # the YAML anchor, so the two cannot drift, the signing included: on a v
-  # tag this job has the release environment and its OIDC token the way the
-  # hosted job does, and signs on runner 3 alone (header, THE BOX SIGNS ON
-  # RUNNER 3 ONLY).
+  # the YAML anchor, so the two cannot drift, the signing included: in a run
+  # of main's own workflow this job has the release environment and its OIDC
+  # token the way the hosted job does, and signs on runner 3 alone (header,
+  # THE BOX SIGNS ON RUNNER 3 ONLY). Only then (#3930): a run on any other
+  # ref, and a tag push, never reach runner 3, which refuses them (#3889).
   launcher-vps:
     name: Build the release launcher (VPS)
     needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Windows, X64, thornswood-vps, thornswood-sign]
-    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && 'release' || '' }}
     permissions:
       contents: write
       id-token: write
@@ -455,18 +522,23 @@ jobs:
     steps: *release
 
   # A SECOND MACHINE CHECKS THE SIGNED DRAFT (#2163). After whichever job
-  # drafted a signed launcher. It asks for a build runner (thornswood-build,
-  # records\build-runners.json) though it is a light job, because those are
-  # the runners that are never runner 3, which signs, so the runner
-  # that checks holds no signing client, no signing.json and no Azure token
-  # and is not the one that signed: what it accepts it accepts on the files
-  # alone, the way an installed launcher does. contents: write only because
-  # a draft release is visible to nobody without push access.
+  # drafted a signed launcher. It asks for thornswood-check, which only the
+  # runners records\check-runners.json lists carry, and that record never
+  # names runner 3, which signs, so the runner that checks holds no signing
+  # client, no signing.json and no Azure token and is not the one that
+  # signed: what it accepts it accepts on the files alone, the way an
+  # installed launcher does. Not thornswood-build (#3956): it asked for that
+  # until 27 Oct only because the build runners are never runner 3, and the
+  # v1.2.7 check waited 49 minutes behind pull request builds for one, near
+  # the hour a Ship from the feed waits for this run. The record lists a
+  # runner no heavy job asks for, so the check starts as soon as the draft
+  # is made. contents: write only because a draft release is visible to
+  # nobody without push access.
   verify:
     name: Check the signed draft on a second machine (VPS)
     needs: [launcher, launcher-vps]
     if: ${{ !cancelled() && ((needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true') || (needs.launcher-vps.result == 'success' && needs.launcher-vps.outputs.signed == 'true')) }}
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-check"]') || 'windows-latest' }}
     permissions:
       contents: write
     timeout-minutes: 10

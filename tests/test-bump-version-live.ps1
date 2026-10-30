@@ -94,11 +94,13 @@ try {
     Yes 'with no live feed to read it bumps as before' ($r.Code -eq 0 -and $r.Out -match '1\.1\.92\s+->\s+1\.1\.93')
     Yes 'and says the number was not checked' ($r.Out -match 'not checked')
 
-    # 5. The next steps on main (#2711). Asking GitHub whether main is
-    # protected against everybody had an empty catch, and a gh that could not
-    # answer read as "off": the steps then printed a direct push as allowed.
-    # A real run here, not -WhatIf, in a scratch repository on main with a
-    # stand-in gh first on the path; the commit it makes is the scratch one's.
+    # 5. The next steps on main. Every change reaches main through a pull
+    # request, the owner's included, so the steps take a branch whatever
+    # GitHub's enforce_admins says. They used to ask GitHub and print a direct
+    # push when it was off (#2711, #3617), which is the step the rule forbids
+    # the admin account. A real run here, not -WhatIf, in a scratch repository
+    # on main with a stand-in gh first on the path that says protection is
+    # off; the commit it makes is the scratch one's.
     function RunMain([string]$ghSays, [int]$ghExit) {
         $root = Join-Path $work ([Guid]::NewGuid().ToString('N'))
         $repo = Join-Path $root 'Thornswood-Repo'
@@ -127,15 +129,10 @@ try {
         finally { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite; $env:PATH = $oldPath }
         return @{ Out = $out; Code = $code }
     }
-    $r = RunMain 'HTTP 401: Bad credentials' 1
-    Yes 'a gh that cannot answer is said, with what it said' ($r.Code -eq 0 -and $r.Out -match 'Could not ask GitHub whether main is protected' -and $r.Out -match 'exit 1' -and $r.Out -match 'Bad credentials')
-    Yes '  and the steps take the branch, never a direct push' ($r.Out -match 'git push -u origin patrick/launcher-1\.1\.95' -and $r.Out -notmatch 'direct push to main is still allowed')
-    $r = RunMain 'true' 0
-    Yes 'protection on: the branch, as before' ($r.Out -match 'protected against everybody, including you' -and $r.Out -match 'git push -u origin patrick/launcher-1\.1\.95')
     $r = RunMain 'false' 0
-    Yes 'protection off: the direct push, as before' ($r.Out -match 'direct push to main is still allowed' -and $r.Out -notmatch 'patrick/launcher-')
-    $r = RunMain 'null' 0
-    Yes 'an answer that is neither true nor false is said, and takes the branch' ($r.Out -match 'not true or false' -and $r.Out -match 'git push -u origin patrick/launcher-1\.1\.95')
+    Yes 'enforce_admins off: the steps still take the branch' ($r.Code -eq 0 -and $r.Out -match 'git push -u origin patrick/launcher-1\.1\.95' -and $r.Out -match 'gh pr create --fill')
+    Yes '  and never print a direct push to main' ($r.Out -notmatch '(?m)^\s+git push\s*$' -and $r.Out -notmatch 'direct push to main')
+    Yes '  and say why: every change reaches main through a pull request' ($r.Out -match 'through a pull request, yours included')
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

@@ -85,7 +85,8 @@ foreach ($r in $refs) {
     Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r)
 }
 
-$real = @('Steam.cs', 'OwnGame.cs', 'Verify.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs') |
+# OwnGameKinds and Verify name LastPlugin (#2791), which reads the game's archives through FromGameArchive.cs.
+$real = @('Steam.cs', 'OwnGame.cs', 'Verify.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'LastPlugin.cs', 'FromGameArchive.cs') |
     ForEach-Object { Join-Path $AppPath $_ }
 # Config.Save reports a failed write through Swallow.Note since pull request
 # 311, and Swallow needs nothing but Paths. Taken only where it exists, so the
@@ -601,7 +602,7 @@ namespace Thornswood
 
             // Fix.
             var said = new List<string>();
-            Verify.Fix(s.Cfg, delegate(string m) { said.Add(m); });
+            Verify.Fix(s.Cfg, delegate(string m) { said.Add(m); }, null);
             Config saved = Config.Load(Paths.CfgFile);
             Yes("Fix saves Other Server Online as VortexGame in config.json", saved != null && string.Equals(saved.VortexGame, k, StringComparison.OrdinalIgnoreCase));
             Yes("and hands on to making the own folder the way Make it does (Verify.OwnFolderNext)", OwnFolderNext());

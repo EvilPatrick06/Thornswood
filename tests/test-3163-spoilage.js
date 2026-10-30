@@ -412,8 +412,8 @@ const craft = slice(gm, 'mp.onCraft = guard(\'onCraft\'', '\n});');
 yes('I2 a craft with a named input that is not food is refused before anything else is done',
     !!craft && /inputRefusal\(arguments\[6\]\)/.test(craft) && /if \(namedNo\) \{[\s\S]{0,400}return false;/.test(craft) &&
     craft.indexOf('inputRefusal(arguments[6])') < craft.indexOf('recipeSetInGame('));
-yes('I3 a dish is named after cookedOutput and wovenOutput have had their say',
-    !!craft && /cookedOutput\(actorId, row\);\s*wovenOutput\(actorId, row\);\s*spoilingOutput\(actorId\);/.test(craft));
+yes('I3 a dish is named after cookedOutput, qualityOutput and wovenOutput have had their say',
+    !!craft && /cookedOutput\(actorId, row\);\s*qualityOutput\(actorId, row, margin\);\s*wovenOutput\(actorId, row\);\s*spoilingOutput\(actorId\);/.test(craft));
 const spoilingFn = slice(gm, 'function spoilingOutput(actorId) {', '\n}');
 yes('I3 spoilingOutput names only an output nobody named, through craftOutput',
     !!spoilingFn && /out\.name\) \{ return; \}/.test(spoilingFn) && /mp\.set\(actorId, 'craftOutput', \{ name: name \}\)/.test(spoilingFn));
@@ -429,8 +429,9 @@ yes('I6 cold storage is the season block\'s snowy climates and its high mountain
 
 const overlays = /const OVERLAYS = (\[[\s\S]*?\]);/.exec(front);
 yes('I7 the client loads the preserving page', !!overlays && overlays[1].indexOf('\'thornswood-preserve.js\'') >= 0);
-yes('I7 the key is the friend key, asked before the friend key\'s own work',
-    /const PRESERVE_KEY = FRIEND_KEY;/.test(front) &&
+yes('I7 the key is the friend key, read again with it from the settings (#3126), and asked before the friend key\'s own work',
+    /\n  let PRESERVE_KEY = FRIEND_KEY;/.test(front) &&
+    /function readKeys\(text\) \{[\s\S]*\n    PRESERVE_KEY = FRIEND_KEY;[\s\S]*\n    PRESERVE_NAME = keyName\(PRESERVE_KEY\);[\s\S]*?\n  \}/.test(front) &&
     front.indexOf('e.code === PRESERVE_KEY && preservePress()') >= 0 &&
     front.indexOf('e.code === PRESERVE_KEY && preservePress()') < front.indexOf('if (e.code === FRIEND_KEY) { lookVerb(\'friend\'); return; }'));
 yes('I7 the key only works in the inventory with something to preserve, and asks for the panel',

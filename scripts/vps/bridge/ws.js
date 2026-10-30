@@ -9,7 +9,8 @@
 
   What goes through it is an ssh session, which is already encrypted and
   authenticated end to end, so this layer only has to carry bytes in order
-  and say when the other end has gone.
+  and say when the other end has gone. Carry, at the end, is what lets the
+  session go on over a new WebSocket when Cloudflare ends the old one.
 */
 const crypto = require('crypto');
 
@@ -143,4 +144,70 @@ class Reader {
   }
 }
 
-module.exports = { GUID, OP, MAX_FRAME, accept, encode, Reader };
+/*
+  What one end of a session that outlives its WebSocket keeps (#3214).
+  Cloudflare, between every machine and the box since #2995, ends a long
+  WebSocket whenever it restarts the server holding it: measured 27 Oct 2026,
+  four silent 11-minute box runs from a cloud thread each lost theirs after
+  329 to 588 s, two at the same millisecond, and Cloudflare's own WebSocket
+  page says a client must expect it. The ssh inside does not have to end with
+  it. Each end counts the ssh bytes it has sent and received, keeps what it
+  sent until the other end says, in an "ack <n>" text frame, that it has the
+  first n bytes, and on a new WebSocket sends again everything past what the
+  other end says it got. bridge.js and connect.js each hold one.
+    out(chunk)   a chunk that went out, or would have with no WebSocket up
+    ack(n)       the far end has the first n bytes: what it has is let go.
+                 Throws for an n below what it said before or past what was
+                 sent, which only a broken far end says
+    since(n)     the chunks past byte n, to send again, after ack(n)
+    took(n)      n bytes came in; got is the count, owed what was not acked
+*/
+class Carry {
+  constructor() {
+    this.sent = 0;
+    this.acked = 0;
+    this.kept = [];
+    this.keptBytes = 0;
+    this.got = 0;
+    this.told = 0;
+  }
+
+  out(chunk) {
+    this.kept.push(chunk);
+    this.keptBytes += chunk.length;
+    this.sent += chunk.length;
+  }
+
+  ack(n) {
+    if (!Number.isSafeInteger(n) || n < this.acked || n > this.sent) throw new Error('an ack for byte ' + n + ', when ' + this.acked + ' were acked and ' + this.sent + ' sent');
+    let drop = n - this.acked;
+    while (drop > 0) {
+      const c = this.kept[0];
+      if (c.length <= drop) {
+        this.kept.shift();
+        drop -= c.length;
+        this.keptBytes -= c.length;
+      } else {
+        this.kept[0] = c.subarray(drop);
+        this.keptBytes -= drop;
+        drop = 0;
+      }
+    }
+    this.acked = n;
+  }
+
+  since(n) {
+    this.ack(n);
+    return this.kept.slice();
+  }
+
+  took(n) {
+    this.got += n;
+  }
+
+  get owed() {
+    return this.got - this.told;
+  }
+}
+
+module.exports = { GUID, OP, MAX_FRAME, accept, encode, Reader, Carry };

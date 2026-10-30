@@ -145,12 +145,33 @@ $implPorts = @($lr.files.($impl[0]) | Sort-Object)
 $ie = @(Get-SourceNoticeEntries $record $impl 'pack' $licences)
 Yes ('a pack carrying only SkyrimPlatformImpl.dll carries the texts of its ' + $implPorts.Count + ' libraries and no others') `
     (((@(Names $ie) | Where-Object { $_ -like 'licences/*' }) -join '|') -eq ((@($implPorts | ForEach-Object { 'licences/' + $_ + '.txt' })) -join '|'))
-# The libraries inside frida-gum's own build, by our forks at Frida's commits (#3287).
+# The libraries inside frida-gum's own build (#3287): the Release of their
+# archives, each archive, and while the record says forksUp, our forks at
+# Frida's commits, all from records\frida-sources.json.
 $implNote = Text $ie 'SOURCE CODE.txt'
-$bundled = @($SourceNoticeBundled['frida-gum'].Parts)
-$noTree = @($bundled | Where-Object { -not $implNote.Contains('https://github.com/EvilPatrick06/' + $_[1] + '/tree/' + $_[2]) } | ForEach-Object { $_[1] })
-Yes ('a pack carrying SkyrimPlatformImpl.dll names the source of the ' + $bundled.Count + ' libraries inside frida-gum''s build, by our forks and Frida''s commits' + $(if ($noTree.Count) { ', not: ' + ($noTree -join ', ') } else { '' })) `
-    ($bundled.Count -eq 6 -and $noTree.Count -eq 0 -and $readme.Contains('https://github.com/EvilPatrick06/frida-glib/tree/'))
+$fsRec = Read-Json (Join-Path $Repo 'records\frida-sources.json')
+$bundled = @($fsRec.parts)
+$relUrl = 'https://github.com/' + $fsRec.release.repo + '/releases/tag/' + $fsRec.release.tag
+$noArchive = @($bundled | Where-Object { -not ($implNote -match ('(?m)^\s{4}' + [regex]::Escape($_.archive) + '\s*$')) } | ForEach-Object { $_.name })
+Yes ('a pack carrying SkyrimPlatformImpl.dll names the Release of the ' + $bundled.Count + ' libraries inside frida-gum''s build, and each archive' + $(if ($noArchive.Count) { ', not: ' + ($noArchive -join ', ') } else { '' })) `
+    ($bundled.Count -eq 6 -and $noArchive.Count -eq 0 -and $implNote.Contains($relUrl) -and $readme.Contains($relUrl))
+$noTree = @($bundled | Where-Object { -not $implNote.Contains('https://github.com/EvilPatrick06/' + $_.name + '/tree/' + $_.commit) } | ForEach-Object { $_.name })
+Yes ('  and our forks at Frida''s commits while the record says they are up' + $(if ($noTree.Count) { ', not: ' + ($noTree -join ', ') } else { '' })) `
+    ($(if ($fsRec.forksUp) { $noTree.Count -eq 0 } else { $noTree.Count -eq $bundled.Count }))
+# With forksUp false the note names the Release alone.
+$fsCopy = Join-Path ([IO.Path]::GetTempPath()) ('ts-frida-sources-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.json')
+$down = Read-Json (Join-Path $Repo 'records\frida-sources.json'); $down.forksUp = $false
+[IO.File]::WriteAllText($fsCopy, ($down | ConvertTo-Json -Depth 6))
+$was = $SourceNoticeBundled['frida-gum'].Record
+$SourceNoticeBundled['frida-gum'].Record = $fsCopy
+$downNote = Text (Get-SourceNoticeEntries $record $impl 'pack' $licences) 'SOURCE CODE.txt'
+$SourceNoticeBundled['frida-gum'].Record = $fsCopy + '.gone'
+$threw = ''
+try { $null = Get-SourceNoticeEntries $record $impl 'pack' $licences } catch { $threw = $_.Exception.Message }
+$SourceNoticeBundled['frida-gum'].Record = $was
+Remove-Item -LiteralPath $fsCopy -Force
+Yes '  and once the forks are down, the Release alone' ($downNote.Contains($relUrl) -and -not $downNote.Contains('/frida-glib/tree/') -and -not $downNote.Contains('Until that repository'))
+Yes '  and with no record it stops, saying so' ($threw -match 'is missing\. Where the source of what is inside frida-gum is')
 Yes '  and a pack carrying only MpClientPlugin.dll names none of them' `
     (-not (Text (Get-SourceNoticeEntries $record @('Data\SKSE\Plugins\MpClientPlugin.dll') 'pack' $licences) 'SOURCE CODE.txt').Contains('frida-glib'))
 Yes '  and its note names none of the libraries only the other files have' `
@@ -252,6 +273,62 @@ try {
     $threw = $false
     try { $null = Get-SourceNoticeEntries $lbRecord $six 'runtime' $licences } catch { $threw = $_.Exception.Message -match 'missing' }
     Yes 'a missing library text stops it' $threw
+
+    # ---- the code that does not come through vcpkg (#3751) -----------------
+    # The record's libraries go with the files they are in, as the ports do.
+    $lx = Join-Path $tmp 'libs3751'
+    $null = New-Item -ItemType Directory -Force -Path $lx
+    [IO.File]::Copy($record, (Join-Path $lx 'client-build.json'))
+    Copy-Item -LiteralPath $libTexts -Destination (Join-Path $lx 'client-licences') -Recurse
+    $l3 = Read-Json $libRecord
+    $libsAdded = [ordered]@{}
+    foreach ($x in @(@('viet', 'fork', $null, 'MIT', 'Data\SKSE\Plugins\MpClientPlugin.dll'), @('npm-eventemitter3-5.0.1', 'npm', '5.0.1', 'MIT', 'Data\Platform\Plugins\skymp5-client.js'))) {
+        $tp = Join-Path $lx ('client-licences\' + $x[0] + '.txt')
+        [IO.File]::WriteAllText($tp, "The $($x[0]) notice`n")
+        $libsAdded[$x[0]] = [ordered]@{ kind = $x[1]; version = $x[2]; licence = $x[3]; from = 'somewhere'; in = @($x[4])
+            sha256 = (Get-FileHash -LiteralPath $tp -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = (Get-Item -LiteralPath $tp).Length }
+    }
+    $l3 | Add-Member -NotePropertyName libraries -NotePropertyValue ([pscustomobject]$libsAdded)
+    [IO.File]::WriteAllText((Join-Path $lx 'client-licences.json'), ($l3 | ConvertTo-Json -Depth 6))
+    $lxRecord = Join-Path $lx 'client-build.json'
+    $got = @(Get-ClientLicences $lxRecord @('Data\SKSE\Plugins\MpClientPlugin.dll'))
+    Yes '#3751: a library of the record goes with the files it is in, and with no other' (@($got.Port) -contains 'viet' -and @($got.Port) -notcontains 'npm-eventemitter3-5.0.1')
+    $rt3 = @(Get-SourceNoticeEntries $lxRecord $six 'runtime' $licences)
+    $rt3Text = Text $rt3 'README.txt'
+    Yes '#3751: the client runtime carries each library''s text in licences/ and its note lists them' (
+        @($rt3.Name) -contains 'licences/viet.txt' -and @($rt3.Name) -contains 'licences/npm-eventemitter3-5.0.1.txt' -and
+        $rt3Text -match '(?m)^\s{2}viet\.txt\s' -and $rt3Text -match '(?m)^\s{2}npm-eventemitter3-5\.0\.1\.txt\s+5\.0\.1\s+MIT' -and $rt3Text -match 'in skymp5-client\.js')
+    [IO.File]::AppendAllText((Join-Path $lx 'client-licences\viet.txt'), 'changed')
+    $threw = $false
+    try { $null = Get-SourceNoticeEntries $lxRecord $six 'runtime' $licences } catch { $threw = $_.Exception.Message -match 'not the text client-licences\.json names for viet' }
+    Yes '#3751: a library text that is not the one recorded stops it' $threw
+
+    # The npm packages in build.js go with it, from front-build.json beside
+    # the client record and its texts in front-licences.
+    $fl = @(Get-FrontLicences (Join-Path $Repo 'records\front-build.json'))
+    $fpNames = @((Read-Json (Join-Path $Repo 'records\front-build.json')).packages.PSObject.Properties.Name)
+    Yes '#3751: Get-FrontLicences gives every package front-build.json lists, each in build.js' ($fl.Count -gt 0 -and $fl.Count -eq $fpNames.Count -and @($fl | Where-Object { (@($_.Files) -join ',') -ne 'build.js' }).Count -eq 0)
+    $packText = Text (Get-SourceNoticeEntries $record @('Data\Platform\UI\build.js') 'pack' $licences) 'SOURCE CODE.txt'
+    Yes '#3751: a pack carrying build.js lists the packages in it in its note' ($packText -match '(?m)^\s{2}npm-react-[0-9.]+\.txt\s' -and $packText -match 'in build\.js')
+    $fx = Join-Path $tmp 'front3751'
+    $null = New-Item -ItemType Directory -Force -Path $fx
+    [IO.File]::Copy($record, (Join-Path $fx 'client-build.json'))
+    [IO.File]::Copy($libRecord, (Join-Path $fx 'client-licences.json'))
+    Copy-Item -LiteralPath $libTexts -Destination (Join-Path $fx 'client-licences') -Recurse
+    $f4 = Read-Json (Join-Path $Repo 'records\front-build.json')
+    $f4.PSObject.Properties.Remove('packages')
+    [IO.File]::WriteAllText((Join-Path $fx 'front-build.json'), ($f4 | ConvertTo-Json -Depth 6))
+    $threw = $false
+    try { $null = Get-SourceNoticeEntries (Join-Path $fx 'client-build.json') @('Data\Platform\UI\build.js') 'pack' $licences } catch { $threw = $_.Exception.Message -match 'lists no packages' }
+    Yes '#3751: a front record that lists no packages stops a download carrying build.js' $threw
+    $a1 = [pscustomobject]@{ Port = 'same'; Version = '1'; Licence = 'MIT'; Files = @('a.dll'); Bytes = [byte[]](1, 2) }
+    $b1 = [pscustomobject]@{ Port = 'same'; Version = '1'; Licence = 'MIT'; Files = @('build.js'); Bytes = [byte[]](1, 2) }
+    $j = @(Join-NoticeLicences @($a1) @($b1))
+    Yes '#3751: one text named in both lists is one entry, in the files of both' ($j.Count -eq 1 -and (@($j[0].Files) -join ',') -eq 'a.dll,build.js')
+    $b1.Bytes = [byte[]](3)
+    $threw = $false
+    try { $null = Join-NoticeLicences @($a1) @($b1) } catch { $threw = $_.Exception.Message -match 'two different texts' }
+    Yes '#3751: one name with two different texts stops it' $threw
     $own2 = Join-Path $tmp 'own'
     $null = New-Item -ItemType Directory -Force -Path $own2
     Write-SourceNoticeToFolder $own2 $rt
@@ -275,8 +352,12 @@ try {
     } finally { $z.Dispose() }
     $z = [IO.Compression.ZipFile]::OpenRead($zp)
     try { $names = @($z.Entries | ForEach-Object { $_.FullName }) } finally { $z.Dispose() }
-    Yes ('the pack zip holds the note and both texts at its top: ' + ($names -join ', ')) `
-        ($names -contains 'SOURCE CODE.txt' -and $names -contains 'GPL-3.0.txt' -and $names -contains 'AGPL-3.0.txt' -and $names.Count -eq 4)
+    # build.js is the recorded front, so the texts of the npm packages in it
+    # go with it, one per package front-build.json lists (#3751).
+    $frontPackages = @(((Get-Content -LiteralPath (Join-Path $Repo 'records\front-build.json') -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json).packages.PSObject.Properties.Name)
+    Yes ('the pack zip holds the note and both texts at its top, and the text of every npm package in build.js: ' + ($names -join ', ')) `
+        ($names -contains 'SOURCE CODE.txt' -and $names -contains 'GPL-3.0.txt' -and $names -contains 'AGPL-3.0.txt' -and $frontPackages.Count -gt 0 -and
+         $names.Count -eq (4 + $frontPackages.Count) -and @($frontPackages | Where-Object { $names -notcontains ('licences/' + $_ + '.txt') }).Count -eq 0)
     # A pack carrying all six, so every library text is in it for the scan.
     $zp6 = Join-Path $tmp 'pack-six.zip'
     $z = [IO.Compression.ZipFile]::Open($zp6, 'Create')

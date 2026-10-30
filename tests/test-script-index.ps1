@@ -168,7 +168,7 @@ Yes 'and nothing in it says a dry run leaves nothing behind' (
     ($dryHelp + ' ' + $dryExample) -notmatch '(?i)leaves nothing behind')
 
 # Nothing about how Ship is called moved. Notes is mandatory at position 0,
-# and every recorded command, CLAUDE.md's included, gives it first unnamed.
+# and every recorded command, the ops repo's CLAUDE.md's included, gives it first unnamed.
 $cmd = Get-Command -Name $Ship
 $notes = $cmd.Parameters['Notes']
 $set = $null
