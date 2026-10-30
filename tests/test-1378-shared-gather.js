@@ -214,7 +214,7 @@ if (harvestFn && plantAtFn && HARVESTS_BY_BASE && HARVESTS) {
     function rankStep(actorId) { return actorId === 3 ? 0 : 3; }
     const harvest = new Function(
       'classGate', 'rankStep', 'rankWord', 'RANK_LADDER', 'addItem', 'creditWork',
-      'isCrop', 'plantAt', 'lastUse', 'stampCooldown', 'HARVEST_COOLDOWN_MS', 'Date',
+      'isCrop', 'plantAt', 'lastUse', 'stampCooldown', 'HARVEST_COOLDOWN_MS', 'Date', 'outOfSeason',
       harvestFn + '\nreturn harvest;'
     )(
       classGate,
@@ -228,7 +228,9 @@ if (harvestFn && plantAtFn && HARVESTS_BY_BASE && HARVESTS) {
       lastUse,
       stampCooldown,
       600000,
-      Date
+      Date,
+      // Every plant here is in season; the seasons are test-3152's (#3152).
+      function () { return ''; }
     );
 
     adds.length = 0;
