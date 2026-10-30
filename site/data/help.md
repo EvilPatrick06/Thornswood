@@ -235,14 +235,15 @@ that message.
 Close the game, open **Diagnostics** in the launcher and press **Scan**. It
 names the plugin that differs. Then press **Fix**, and press Play again. When
 the plugin that differs is another author's mod, Scan and Fix name the mod to
-update or reinstall in Vortex: the server hands out Thornswood's own plugin
-and nobody else's.
+update or reinstall in Vortex: Fix only has a copy of Thornswood's own
+plugin, from the latest release, and nobody else's.
 
 What Fix does: it puts your plugin list in the server's order, puts back
-plugins Vortex has that the game folder lost, downloads the server's copy of
-Thornswood's own plugin when its bytes differ, names the mod to update or
-reinstall in Vortex when another author's plugin differs, and moves another
-server's files and stray Creation Club plugins aside, never deleting them.
+plugins Vortex has that the game folder lost, downloads Thornswood's own
+plugin from the latest release when its bytes differ from the server's, names
+the mod to update or reinstall in Vortex when another author's plugin differs,
+and moves another server's files and stray Creation Club plugins aside, never
+deleting them.
 
 Scan also looks at the rest of the install: an update waiting, Thornswood's
 game folder behind what Vortex has deployed or missing files, this build's own

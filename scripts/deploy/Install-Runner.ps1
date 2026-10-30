@@ -53,7 +53,10 @@
   carrying the VPS label (full -OffBox still refuses it). -NetworkOnly -Status
   counts the rules, -NetworkOnly -Remove takes only that group off (the
   rollback), and -DryRunTo writes the script instead, as everywhere else.
-  Fetch the lists again now and then the same way (run it again).
+  Fetch the lists again now and then the same way (run it again). An
+  install on the box puts the same rules on in the same run, before the
+  runner can take a job; until 27 Oct 2026 it put none on, and runner 4
+  needed a -NetworkOnly run after its install (#3956).
 
   THE SIGNING RUNNER (#3312). A runner records\sign-runners.json lists signs
   release launchers (release.yml's VPS fallback), and its sign steps reach
@@ -145,6 +148,21 @@
   reach it. Pass -AllowHost pypi.org,files.pythonhosted.org, or the build's
   ruff install fails closed (WHAT A PULL REQUEST JOB MAY REACH, above).
   -OffBox -Number n -Remove takes one off again.
+
+  ON THE RUNNER DRIVE (#4048, #3861, Patrick's A on 27 Oct 2026). Off the box
+  Defender scans each runner's folder (step 6), and a fresh runner's first
+  build on One took 7 to 11 times the box's processor time for it. So One's
+  runners live on the Dev Drive scripts\deploy\New-RunnerDrive.ps1 makes,
+  where Defender scans in performance mode instead of not at all. When a
+  volume labelled Thornswood Runners is there and -Root is not given, -OffBox
+  puts the runner in <drive>:\Thornswood-RunnerPR<n>. Its account is shut
+  out of the other runners' folders on that drive as on C:, the drive's own
+  root is left out of the read denies (New-RunnerDrive.ps1 locks it), and
+  the service starts by hand: the drive's startup task attaches the drive
+  and then starts it. -OffBox refuses a -Root on any other drive. To move a
+  runner there, one at a time, in PowerShell run as administrator:
+      .\scripts\deploy\Install-Runner.ps1 -OffBox -Number n -Remove
+      .\scripts\deploy\Install-Runner.ps1 -OffBox -Number n -AllowHost pypi.org,files.pythonhosted.org
 
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
@@ -297,8 +315,8 @@ param(
   [switch]$NetworkOnly,
   # Folders the runner's account is shut out of as well as C:\Thornswood*.
   [string[]]$AlsoDeny = @(),
-  # -OffBox or -NetworkOnly: host names a job may reach besides GitHub,
-  # resolved to addresses when it runs (WHAT A PULL REQUEST JOB MAY REACH).
+  # Host names a job may reach besides GitHub, resolved to addresses when it
+  # runs (WHAT A PULL REQUEST JOB MAY REACH), on an install, -Lock or -NetworkOnly.
   [string[]]$AllowHost = @(),
   # -OffBox only: let Defender skip the runner's folder as it does on the VPS.
   [switch]$DefenderSkip,
@@ -339,13 +357,23 @@ if ($Number -gt 1) {
 # mistaken for, or replace, a runner on the VPS. thornswood-pr99 is 15
 # characters, inside the 20 a local account may have.
 $liveFilter = 'Thornswood-*'
+$runnerDrive = ''; $onRunnerDrive = $false
 if ($OffBox) {
   $n = $(if ($Number -gt 1) { '' + $Number } else { '' })
   if (-not $PSBoundParameters.ContainsKey('Root'))       { $Root = 'C:\Thornswood-RunnerPR' + $n }
+  # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, found by
+  # its label, is where a runner goes when the command line names no folder.
+  $runnerDrive = ''
+  try { $runnerDrive = @(Get-Volume -FileSystemLabel 'Thornswood Runners' -ErrorAction Stop | Where-Object { $_.DriveLetter } | ForEach-Object { [string]$_.DriveLetter + ':' })[0] } catch { $runnerDrive = '' }
+  if (-not $runnerDrive) { $runnerDrive = '' }
+  if ($runnerDrive -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = $runnerDrive + '\Thornswood-RunnerPR' + $n }
   if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-pr' + $n }
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + [Environment]::MachineName.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
+  $rootDrive = $Root.Substring(0, 2).ToUpper()
+  $onRunnerDrive = ($rootDrive -match '^[A-Z]:$' -and $rootDrive -ne 'C:' -and ($rootDrive -eq $runnerDrive.ToUpper() -or $DryRunTo))
+  if ($rootDrive -ne 'C:' -and $rootDrive -ne $runnerDrive.ToUpper() -and -not $DryRunTo) { Write-Host ('STOP. ' + $Root + ' is on ' + $rootDrive + ', which is not the runner drive (New-RunnerDrive.ps1). A runner goes on C: or on that drive only: the read denies shut its account out of every other drive.') -ForegroundColor Red; exit 1 }
   if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: every job that needs the box itself (staff notices, the admin service, the release jobs) asks for it.' -ForegroundColor Red; exit 1 }
 }
 # HOW MANY BUILD AT ONCE (#2994). A VPS runner that records\build-runners.json
@@ -361,6 +389,16 @@ if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
 }
 if ($OffBox -and -not $PSBoundParameters.ContainsKey('Label') -and $buildRecord.PSObject.Properties['offBox'] -and @($buildRecord.offBox) -contains $RunnerName) {
   $registerLabels = $Label + ',' + $buildRecord.label
+}
+# PULL REQUEST BUILDS (#4010). records\pr-build-runners.json's label is the
+# one the pull request build's fallback asks for: a VPS runner its runners
+# list names carries it (2, not 1, which is kept for main's builds), and so
+# does an off-box runner its offBox names, which still never carries
+# thornswood-vps, so no box-only job reaches it.
+$prRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\pr-build-runners.json') -Raw | ConvertFrom-Json
+if (-not $PSBoundParameters.ContainsKey('Label')) {
+  $takesPr = $(if ($OffBox) { $prRecord.PSObject.Properties['offBox'] -and @($prRecord.offBox) -contains $RunnerName } else { @($prRecord.runners | ForEach-Object { [int]$_ }) -contains $Number })
+  if ($takesPr) { $registerLabels = $registerLabels + ',' + $prRecord.label }
 }
 # THE SIGNING RUNNER (#3312). A VPS runner records\sign-runners.json lists
 # is registered with its label and, under -NetworkOnly, reaches the hosts
@@ -573,7 +611,15 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
     try { $rules = @((Get-Acl -LiteralPath $d.FullName -ErrorAction Stop).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) }
     catch { $acct + ': the rules on ' + $d.FullName + ' could not be read (' + $_.Exception.Message + '), so it is counted as one it could read' }
     if ($null -ne $rules -and @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }).Count) { $had++; continue }
-    $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
+    # CREATOR OWNER (S-1-3-0) is not counted for the runner's account: Windows
+    # gives it only on what an account makes there itself, and a runner
+    # account that may make nothing there gets nothing from it. The admin
+    # service's folder carries one for its log and state (ServiceAccount.ps1),
+    # and on 27 Oct 2026 that alone named it as one runners 1 to 3 COULD READ,
+    # which they could not (#3956). What it gives the service that does write
+    # there, and every other task running as that same account, is not this
+    # check's question (#4076, #4077). The deny goes on either way.
+    $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $_.IdentityReference.Value -ne 'S-1-3-0' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
     $null = & icacls.exe $d.FullName /deny ($acct + ':(OI)(CI)F') /C /Q 2>&1
     if ($LASTEXITCODE -ne 0) { throw ('icacls could not shut ' + $acct + ' out of ' + $d.FullName) }
     if ($open) { $wasOpen += $d.FullName } else { $shut++ }
@@ -797,11 +843,16 @@ function Get-RunnerFirewall([string]$group) {
 # The folders outside C:\Thornswood* it is shut out of. $users, $programData
 # and $drives are C:\Users, C:\ProgramData and the other drives except in
 # tests\test-runner-offbox.ps1, which gives scratch folders.
-function Get-RunnerReadDenies([string]$acct, [string]$users = 'C:\Users', [string]$programData = $env:ProgramData, $drives = $null) {
+# $Own is the runner drive (New-RunnerDrive.ps1) when the runner's folder is
+# on it: that drive's root is locked by New-RunnerDrive.ps1 and each folder
+# on it by Lock-RunnerRoot, so its root is not denied, which would leave the
+# account unable to look at the drive its own folder is on.
+function Get-RunnerReadDenies([string]$acct, [string]$users = 'C:\Users', [string]$programData = $env:ProgramData, $drives = $null, [string]$Own = '') {
   if ($null -eq $drives) {
     $sys = '' + $env:SystemDrive
     $drives = @(Get-CimInstance Win32_LogicalDisk -EA SilentlyContinue | Where-Object { ($_.DriveType -eq 2 -or $_.DriveType -eq 3) -and $_.DeviceID -ne $sys } | ForEach-Object { $_.DeviceID + '\' })
   }
+  if ($Own) { $drives = @($drives | Where-Object { $_ -and $_.TrimEnd('\') -ne $Own.TrimEnd('\') }) }
   $name = $acct.Split('\')[-1]
   $keep = @('Default', 'Default User', 'All Users')
   $out = @($drives | Where-Object { $_ })
@@ -828,12 +879,12 @@ function Open-RunnerReads([string]$acct, [string[]]$paths) {
 # Where the runner is: the guards, as source. $mode is apply, remove or status.
 function Get-GuardScript([string]$mode, [string[]]$blocks = @()) {
   $list = '@(' + ((@($blocks) | ForEach-Object { "'" + $_ + "'" }) -join ', ') + ')'
-  $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n"
+  $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n`$grdOwn = '" + $(if ($onRunnerDrive) { $rootDrive } else { '' }) + "'`n"
   if ($mode -eq 'status') { return $head + 'Get-RunnerFirewall $grdGroup' }
   if ($mode -eq 'network-remove') { return $head + "Remove-RunnerFirewall `$grdGroup`n" }
   if ($mode -eq 'network') { return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`n" }
-  if ($mode -eq 'remove') { return $head + "Remove-RunnerFirewall `$grdGroup`nOpen-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n" }
-  return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`nClose-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n"
+  if ($mode -eq 'remove') { return $head + "Remove-RunnerFirewall `$grdGroup`nOpen-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct -Own `$grdOwn)`n" }
+  return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`nClose-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct -Own `$grdOwn)`n"
 }
 # WHERE THE LISTS ARE READ (#3312). GitHub's lists, Microsoft's Service Tags
 # and the signing hosts' addresses are read on the machine the rules go on,
@@ -960,11 +1011,13 @@ foreach ($svc in $services) {
   $exe = ('' + $svc.PathName).Trim().Trim('"')
   $root = Split-Path -Parent (Split-Path -Parent $exe)
   $acct = (('' + $svc.StartName) -split '\\')[-1]
-  if ($root -notlike 'C:\Thornswood-Runner*') { $svc.Name + ' runs from ' + $exe + ', not a C:\Thornswood-Runner folder, so it was left alone'; $bad++; continue }
+  if ($root -notmatch '^[A-Za-z]:\\Thornswood-Runner') { $svc.Name + ' runs from ' + $exe + ', not a Thornswood-Runner folder at the root of a drive, so it was left alone'; $bad++; continue }
   if (-not $acct -or $acct -match '^(LocalSystem|LocalService|NetworkService)$') { $svc.Name + ' runs as ' + $svc.StartName + ', not an account of its own, so it was left alone'; $bad++; continue }
   try {
     Lock-RunnerRoot $root $acct
     Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny $leave
+    # ON THE RUNNER DRIVE (New-RunnerDrive.ps1): the other runners' folders there too.
+    if ($root -notlike 'C:\*') { Close-RunnerAccount $acct $root $root.Substring(0, 3) $liveFilter }
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
   try { Set-RunnerTemp $root $svc.Name ($acct -like 'thornswood-pr*') } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
 }
@@ -1040,7 +1093,10 @@ if ($Remove) {
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
   # The removal token goes on ssh's standard input and reaches config.cmd in
   # its environment, never on a command line (Send-Secret.ps1, issue #451).
-  Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
+  # The far side's exit code decides, as for -NetworkOnly -Remove: until
+  # #3214 it was not read, so two removals whose ssh was cut 8 minutes in
+  # ended with exit 0 and half their lines.
+  $said = @(Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if ((Test-Path '$Root\config.cmd') -and `$t) {
@@ -1054,6 +1110,7 @@ Stop-Service -Name '$service' -Force -EA SilentlyContinue
 & sc.exe delete '$service' 2>&1 | Out-Null
 Remove-RunnerWatchers
 Open-RunnerAccount '$Account' '$Root' 'C:\' '$liveFilter' $alsoDenyList
+$(if ($onRunnerDrive) { "Open-RunnerAccount '" + $Account + "' '" + $Root + "' '" + $rootDrive + "\' '" + $liveFilter + "'" })
 $(if ($OffBox) { Get-GuardScript 'remove' } else { Get-GuardScript 'network-remove' })
 # What the install put outside the folder goes too: the Defender skip, which
 # would leave a later folder at this path unscanned, and the account's
@@ -1068,7 +1125,10 @@ Remove-LocalUser -Name '$Account' -EA SilentlyContinue
 Remove-LeftProfiles @('$Account', '$Account.*')
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
-"@) | ForEach-Object { Say "  $_" }
+"@))
+  $code = $LASTEXITCODE
+  $said | ForEach-Object { Say "  $_" }
+  if ($code -ne 0) { Die "the removal did not say it finished (exit $code); the lines above say how far it got, and -Status says what is left." }
   Done
 }
 
@@ -1171,12 +1231,13 @@ $token = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/registration-token"
 if (-not $token) { Die "GitHub gave no registration token. gh has to be signed in as somebody who administers $Repo." }
 Say '  got one, good for an hour, not shown' 'Green'
 
-$guard = ''
-if ($OffBox) {
-  Head 'What a pull request job may reach'
-  try { $guard = Get-GuardScript 'apply' @(Get-GuardBlocks) } catch { Die ('nothing was installed: ' + $_.Exception.Message) }
-  Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
-}
+# Off the box, the network and the reads (WHAT A PULL REQUEST JOB MAY REACH).
+# On the box, the network (NETWORK ONLY's rules, Patrick, 11 Oct 2026): until
+# 27 Oct 2026 an install there put none on, and runner 4 took jobs with no
+# outbound limit until a -NetworkOnly run after it (#3956).
+Head 'What a job may reach'
+try { $guard = Get-GuardScript $(if ($OffBox) { 'apply' } else { 'network' }) @(Get-GuardBlocks) } catch { Die ('nothing was installed: ' + $_.Exception.Message) }
+Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
 
 Head "Installing it on $where"
 # The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
@@ -1227,8 +1288,8 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
 # box Dumps is left to Lock-VpsFolders.ps1 (the header's CRASH DUMPS). The
 # same Close-RunnerAccount -Lock runs, so the two can never disagree again.
 Close-RunnerAccount `$acct `$root 'C:\' '$liveFilter' $alsoDenyList $leaveList
-# Off the box: the network and the reads (WHAT A PULL REQUEST JOB MAY REACH),
-# before the runner can take a job.
+$(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: the other runners' folders there as well.`nClose-RunnerAccount `$acct `$root '" + $rootDrive + "\' '" + $liveFilter + "'" })
+# The guard above, before the runner can take a job.
 $guard
 
 # A runner already here is taken off first, so a second run replaces it.
@@ -1294,6 +1355,7 @@ Pop-Location
 `$pw = `$null; `$sec = `$null; `$regToken = `$null
 `$cfg | Where-Object { "`$_" -match 'Runner successfully|Settings Saved|Service .* started|error|Error|failed' } | ForEach-Object { '  config: ' + "`$_".Trim() }
 if (`$code -ne 0) { throw ('config.cmd stopped with ' + `$code) }
+$(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: started by the drive's startup task once the drive is`n# attached, never by Windows before it is.`n& sc.exe config `$svc start= demand 2>&1 | Out-Null`n'service starts by hand; the task Thornswood Runner Drive starts it at startup'" })
 
 # Normal priority, from the service: the service control manager starts
 # RunnerService.exe at Normal, I/O priority 2 and memory priority 5, and

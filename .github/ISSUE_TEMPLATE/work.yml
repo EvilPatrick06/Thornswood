@@ -1,36 +1,21 @@
 name: Work for the team
-description: For the Thornswood team. One piece of work for the board. To report a problem or an idea, pick one of the forms above.
+description: For the Thornswood team. One piece of work for the board, written plain. To report a problem or an idea, pick one of the forms above.
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Write it the way a person would, for a stranger to read: everything here goes public with the repository. No names of who found it, no file paths with a user name, no addresses, ids or secrets, and no closing line. The evidence (files, lines, logs, what was measured) goes in the private ops repo under this issue's number, not here.
   - type: textarea
     id: what
     attributes:
       label: What is wrong or wanted
-      description: What was seen or measured, and where. Quote the log line, or the file and line.
+      description: Two to five plain lines.
     validations:
       required: true
-  - type: textarea
-    id: cause
-    attributes:
-      label: What causes it
-      description: The cause, and how it was measured. If it is not known yet, say so; finding it is the work, and no fix goes out before it is known. A fix that hides the problem without removing its cause is not a fix (Developer-Guide.md, "Fix the cause, no band-aids").
-  - type: textarea
-    id: where
-    attributes:
-      label: Where it lives
-      description: Files, scripts, VPS folders.
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps
-      value: |
-        - [ ] 
-  - type: textarea
+  - type: input
     id: done
     attributes:
       label: Done when
-      description: What somebody can check to know it is finished.
-  - type: textarea
-    id: careful
-    attributes:
-      label: Be careful of
-      description: Anything that looks right and is not.
+      description: One line somebody can check to know it is finished.
+    validations:
+      required: true

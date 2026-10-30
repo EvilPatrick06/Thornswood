@@ -5,6 +5,16 @@
   Only your mod content goes in. Every Bethesda file is left out, because the
   installer rebuilds those from each friend's own Steam copy and their own
   Steam depots.
+
+  -FromFeed (#3412) builds it from main's feed instead, on any machine, the
+  cloud included: the files main's newest release recorded, staged by
+  New-FeedRoot.ps1 from the site by their sha256, the launcher main's feed
+  offers, and the plugin list that release recorded. No Steam copy, Vortex
+  record or game folder is read, so the installer carries exactly the release
+  it names and nothing a machine's own folder has moved on to. Measured 26 Oct
+  on the installer One built that evening, level with 20261017-205912 by its
+  note: its Thornswood-Content.esp and Thornswood-Last.esp were the checkout's
+  rebuild, which no main release had carried.
 #>
 [CmdletBinding()]
 param(
@@ -16,7 +26,8 @@ param(
     [string]$OutDir  = (& (Join-Path $PSScriptRoot 'Where.ps1') Package),
     [ValidateRange(0, 9)][int]$Level = 1,
     [switch]$NoArchive,
-    [switch]$Plain7z,
+    # Stop at payload.zip, with no setup program around it.
+    [switch]$PayloadOnly,
     [switch]$NoPause,
     # Straight onto the docs site when it is done, so nobody has to be sent a
     # file. -NoPublish builds without touching the site.
@@ -59,7 +70,13 @@ param(
     # built for the tag it ships (issue #932); nothing else needs it.
     [string]$Stub = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
-    [switch]$AllowStaleCheckout
+    [switch]$AllowStaleCheckout,
+    # Build from main's feed, not a game folder (#3412, the note at the top).
+    # -Root is the folder New-FeedRoot.ps1 stages, Feed-Store.ps1
+    # Get-FeedRootDir main unless given; -Stub is the setup program CI built
+    # (Ship.ps1 Get-ReleaseStub). The installer is not signed here and not
+    # published, so it needs -NoPublish until signing from the feed lands.
+    [switch]$FromFeed
 )
 
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
@@ -83,6 +100,29 @@ Set-StrictMode -Version Latest
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+# From the feed (#3412): the folder is New-FeedRoot's, refilled below from
+# the record of main's newest release, so nothing in it is a machine's own.
+# What -FromFeed cannot do yet is said before anything is fetched.
+if ($FromFeed) {
+    . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')
+    . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
+    . (Join-Path $PSScriptRoot 'Release-Baseline.ps1')
+    if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Get-FeedRootDir 'main' }
+    if ($Vortex -or $NoVortex -or $PSBoundParameters.ContainsKey('VortexManifest')) {
+        Die '-FromFeed reads no Vortex record and no Steam copy: the release record already leaves out what the collection provides. Leave out -Vortex, -NoVortex and -VortexManifest. Nothing was built.'
+    }
+    if (-not $Stub) {
+        Die ('-FromFeed takes the setup program CI built (-Stub), not one a local Build-Launcher left in out\, ' +
+             'which a machine building from the feed does not have. Nothing was built.')
+    }
+}
+# Publishing from the feed waits on signing there (#3412): the one place this
+# publishes is the if (-not $NoPublish) at the end, which never sees -FromFeed.
+if ($FromFeed -and -not $NoPublish) {
+    Die ('-FromFeed does not sign the installer yet, and an unsigned installer is never published (#3412). ' +
+         'Add -NoPublish to build it without publishing. Nothing was built.')
+}
 
 $GameDir    = Join-Path $Root 'Game'
 $ProfileDir = Join-Path $Root 'Profile'
@@ -131,7 +171,7 @@ function Get-SkyrimPath {
     return ''
 }
 
-if ($Vortex -or -not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
+if (-not $FromFeed -and ($Vortex -or -not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe')))) {
     $steamGame = Get-SkyrimPath
     if ($steamGame) {
         $GameDir = $steamGame
@@ -140,7 +180,7 @@ if ($Vortex -or -not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
     }
 }
 
-if (-not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
+if (-not $FromFeed -and -not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
     # Build-Thornswood.ps1 used to be named here. It is deleted: run today it
     # produced a broken folder pointed at a server address that no longer
     # exists, and there is one build path now.
@@ -149,6 +189,19 @@ if (-not (Test-Path (Join-Path $GameDir 'SkyrimSE.exe'))) {
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+
+# The release feed, which the block below finds. From the feed it is main's
+# feed as the site serves it, with its settings joined back in, written into
+# the staged folder (#3412), unless a Ship hands over the copy it received.
+if ($FromFeed -and -not $ReleaseDir) {
+    $ReleaseDir = Join-Path $Root 'feed'
+    try { $siteFeed = Read-SiteFeed 'main' }
+    catch { Die ("main's feed could not be read from the site, so nothing was built: " + $_.Exception.Message) }
+    if ($null -eq $siteFeed) { Die "The site has no main feed, so there is no release to build an installer of. Nothing was built." }
+    $null = New-Item -ItemType Directory -Force -Path $ReleaseDir
+    [IO.File]::WriteAllText((Join-Path $ReleaseDir 'version.json'), ($siteFeed | ConvertTo-Json -Depth 32), (New-Object Text.UTF8Encoding($false)))
+    Remove-Item -LiteralPath (Join-Path $ReleaseDir 'releases.json') -Force -ErrorAction SilentlyContinue
+}
 
 # ==== thornswood release feed ====
 # Found and checked before anything is staged or any game is closed, because
@@ -232,8 +285,32 @@ if ($stubWhy) { Die $stubWhy }
 Head 'Packaging'
 
 # A live game rewrites files under Game and Profile while this is listing and
-# hashing them, which is how a package ends up half one version.
-$null = Stop-Game -Root $Root
+# hashing them, which is how a package ends up half one version. Nobody plays
+# from a folder staged from the feed.
+if (-not $FromFeed) { $null = Stop-Game -Root $Root }
+
+# ---- the launcher main's feed offers (#3412) ------------------------------
+# From the feed the installer packs the launcher main's feed names, fetched
+# from the site and held to its launcherSha256, the same bytes every installed
+# launcher updates to. Left alone when the folder already holds them.
+if ($FromFeed) {
+    try { $feedDoc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($vLive)) $vLive }
+    catch { Die ("main's feed at $vLive did not read, so which launcher it offers is not known: " + $_.Exception.Message) }
+    $lUrl = if ($feedDoc.PSObject.Properties['launcherUrl']) { [string]$feedDoc.launcherUrl } else { '' }
+    $lSha = if ($feedDoc.PSObject.Properties['launcherSha256']) { ([string]$feedDoc.launcherSha256).ToLowerInvariant() } else { '' }
+    if (-not $lUrl -or $lSha -notmatch '^[0-9a-f]{64}$') {
+        Die "main's feed names no whole launcher (a launcherUrl and a 64 digit launcherSha256), so there is no launcher to put in the installer. Nothing was built."
+    }
+    $lExe = Get-LauncherExe $LaunchDir
+    if ((Test-Path -LiteralPath $lExe -PathType Leaf) -and (Get-FeedStoreSha $lExe) -eq $lSha) {
+        Say ("  the launcher main's feed offers ({0}) is already in {1}" -f [string]$feedDoc.launcherVersion, $LaunchDir) 'DarkGray'
+    } else {
+        $null = New-Item -ItemType Directory -Force -Path $LaunchDir
+        try { [void](Get-FeedAssetFile $lUrl $lSha $lExe (Get-FeedStoreSiteDir '')) }
+        catch { Die ("The launcher main's feed offers could not be fetched from $lUrl, so nothing was built: " + $_.Exception.Message) }
+        Say ("  the launcher main's feed offers ({0}), held to its sha256, put in {1}" -f [string]$feedDoc.launcherVersion, $LaunchDir) 'Green'
+    }
+}
 
 # ---- stage ----------------------------------------------------------------
 # The multiplayer client's menu is a Chromium window, and it keeps a browser
@@ -334,7 +411,7 @@ if ($optionalPrefixes.Count) {
 . (Join-Path $Here 'Package-ClientRecord.ps1')
 # Get-ClientLicences and Get-ClientLicenceLines, the same as the feed's (#3099).
 . (Join-Path $Here 'Source-Notice.ps1')
-# Sync-PackageStage, Get-PackageStageBytes and Invoke-PackageZip (#3752).
+# Sync-PackageStage, Get-PackageStageBytes and Invoke-PackageZip (#3752, #3412).
 . (Join-Path $Here 'Package-Stage.ps1')
 $checkoutClientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
 $resolvedClient = Resolve-PackageClientRecord -LauncherExe (Get-LauncherExe $LaunchDir) -FeedVersion $vLive -CheckoutRecord $checkoutClientRecord
@@ -352,6 +429,29 @@ Save-PackageClientRecord $resolvedClient $clientRecordPath
 try { $licencesFrom = Save-PackageClientLicences ([string]$resolvedClient.Record.forkCommit) (Join-Path $PSScriptRoot '..\..') $clientRecordDir }
 catch { Die ($_.Exception.Message + '. Nothing was packaged.') }
 $clientFork = [string]$resolvedClient.Record.forkCommit
+
+# ---- the release, from the feed (#3412) -----------------------------------
+# Every file main's newest release recorded, from the site by its sha256,
+# into Game, with anything else in Game removed (New-FeedRoot.ps1). The six
+# client files are held to the record of the launcher this packs, the one the
+# lines above resolved, so New-FeedRoot is handed that record rather than the
+# checkout's.
+if ($FromFeed) {
+    Head "main's newest release, from the site"
+    # The record New-FeedRoot stages is the one the feed's baseline names, and
+    # the note beside the installer says it carries the newest release; the
+    # two are held to be the same release before anything is fetched.
+    $feedPtr = $null
+    try { $feedPtr = Get-FeedBaselinePointer $feedDoc } catch { Die ($_.Exception.Message + ' Nothing was built.') }
+    $ptrId = if ($null -ne $feedPtr -and $feedPtr.PSObject.Properties['id']) { [string]$feedPtr.id } else { '' }
+    if ($ptrId -ne $installerRelease) {
+        Die ("main's feed names $installerRelease as its newest release and the record of '$ptrId' as its last, so which files the installer " +
+             'carries and which release it says it carries would differ. Nothing was built.')
+    }
+    $global:LASTEXITCODE = 0
+    try { & (Join-Path $Here 'New-FeedRoot.ps1') -Channel main -Root $Root -ClientRecord $clientRecordPath }
+    catch { Die ("main's newest release could not be staged, so nothing was built: " + $_.Exception.Message) }
+}
 if ($resolvedClient.Source -eq 'launcher') {
     Say ("  {0} client runtime file(s) held to the record embedded in the launcher this installer packs ({1})" -f $shipClientFiles.Count, $clientFork) 'Green'
 } else {
@@ -372,10 +472,19 @@ $vortexFiles = $null
 # deployed there now, which may be another server's profile. The launcher's
 # own record says what in this folder is the collection.
 $ownCollection = $null
-if ([string]::Equals($GameDir.TrimEnd('\'), (Join-Path $Root 'Game').TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
+if (-not $FromFeed -and [string]::Equals($GameDir.TrimEnd('\'), (Join-Path $Root 'Game').TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
     $ownCollection = Get-ShipOwnGameCollection $ProfileDir
 }
-if ($null -ne $ownCollection) {
+# From the feed the folder is the release record, which never names a file the
+# collection provides (Publish-Update leaves them out of every release), so
+# there is nothing here to leave out and no Vortex to ask (#3412). Whether the
+# release is built for the collection is the feed's word, below.
+$feedCollection = $false
+if ($FromFeed) {
+    $feedCollection = [bool]($feedDoc.PSObject.Properties['collectionUrl'] -and [string]$feedDoc.collectionUrl)
+    Say ("  built from main's release record, which names none of the collection's files{0}" -f $(if ($feedCollection) { "; the feed names the collection " + [string]$feedDoc.collectionUrl } else { '' })) 'Green'
+}
+elseif ($null -ne $ownCollection) {
     if ($ownCollection.Count -eq 0) {
         Die "The launcher's record of what came from Vortex (Profile\OwnGame\files.txt) lists nothing, so this installer would carry every mod file. In the launcher, Settings, Maintenance, bring the folder up to date from Vortex, then package again."
     }
@@ -417,7 +526,10 @@ elseif (-not $NoVortex) {
 }
 
 $shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
-Assert-ShipGeneratedBodies $GameDir $ProfileDir
+# From the feed the bodies are the release's, each held to its sha256 by
+# New-FeedRoot; only a collection Ship builds them (as Publish-Update -FromFeed).
+if ($FromFeed) { Say '  the generated bodies are the release''s, by their sha256' 'DarkGray' }
+else { Assert-ShipGeneratedBodies $GameDir $ProfileDir }
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if (Test-ThornswoodRepoPlugin $rel) { return $false }
@@ -428,21 +540,26 @@ function Test-FromCollection([string]$rel) {
 Say '  Listing the build...'
 # Place plugins the load order names that Vortex does not deploy under that
 # name (game\required-data). Same ensure Publish-Update runs before its scan.
+# Not from the feed (#3412): this places the checkout's own plugins, which
+# between main Ships are ahead of the release, and the release record already
+# names the ones it carried, as it names the front's hashed assets below.
 $repoRoot = Join-Path $Here '..\..'
-try {
-    $req = @(Ensure-ShipRequiredData $GameDir $repoRoot)
-    if ($req.Count) {
-        Say ("  required data placed into the game folder: {0}" -f ($req -join ', ')) 'Green'
+if (-not $FromFeed) {
+    try {
+        $req = @(Ensure-ShipRequiredData $GameDir $repoRoot)
+        if ($req.Count) {
+            Say ("  required data placed into the game folder: {0}" -f ($req -join ', ')) 'Green'
+        }
+    } catch {
+        Die ("Could not place game\required-data into $GameDir : " + $_.Exception.Message)
     }
-} catch {
-    Die ("Could not place game\required-data into $GameDir : " + $_.Exception.Message)
-}
 
-try {
-    $null = Save-ShipUiHashedAssets $GameDir
-    Say ("  front hashed assets named by build.js: {0}" -f @($script:ShipUiHashedWritten).Count) 'DarkGray'
-} catch {
-    Die $_.Exception.Message
+    try {
+        $null = Save-ShipUiHashedAssets $GameDir
+        Say ("  front hashed assets named by build.js: {0}" -f @($script:ShipUiHashedWritten).Count) 'DarkGray'
+    } catch {
+        Die $_.Exception.Message
+    }
 }
 
 # Listed from the long path. $GameDir is whatever was passed, and that is
@@ -462,7 +579,15 @@ $notOursBytes = 0; $notOursCount = 0
 # What waits for the collection (Ship-Rules, #1178) is asked at the revision
 # this machine's Vortex has installed. LoadOrder.ps1 is loaded only in here,
 # so its functions do not change anything else this script asks.
-$ShipCollectionRevision = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
+# From the feed there is no Vortex to ask: it is the revision main's feed says
+# its release was built against, as Publish-Update -FromFeed reads it.
+if ($FromFeed) {
+    $ShipCollectionRevision = 0
+    if ($feedDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedDoc.collectionRevision, [ref]$ShipCollectionRevision) }
+    if ($ShipCollectionRevision -le 0) { Die "main's feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+} else {
+    $ShipCollectionRevision = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
+}
 Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 $clientShipped = 0
 $clientWrong = @()
@@ -621,7 +746,25 @@ if ($longest -gt 250) { Say "    $longestPath" 'DarkGray' }
 # plugins. A Game folder the launcher made out of Vortex's deployment reads
 # the Vortex profile's lists kept in Profile\OwnGame. Get-ShipLoadOrderDir
 # (Ship-Rules.ps1) decides, the same for the packs.
-$refProfile = Get-ShipLoadOrderDir $Root $ProfileDir
+#
+# From the feed it is the list main's release recorded as shipped (:golden:,
+# #1050), the bytes every launcher syncs to, fetched beside the record by
+# their sha256 (#3412).
+if ($FromFeed) {
+    $refProfile = Join-Path (Join-Path $Root 'record') 'golden'
+    if (Test-Path -LiteralPath $refProfile) { Remove-Item -LiteralPath $refProfile -Recurse -Force }
+    $null = New-Item -ItemType Directory -Force -Path $refProfile
+    try { $feedRecord = Read-BaselineFile (Join-Path (Join-Path $Root 'record') 'record.json') }
+    catch { Die ("The record New-FeedRoot staged did not read, so the release's plugin list is not known: " + $_.Exception.Message) }
+    foreach ($f in 'plugins.txt', 'loadorder.txt') {
+        if (-not $feedRecord.ContainsKey(":golden:$f")) { Die "Release $installerRelease recorded no $f, so this installer would carry no reference load order. Nothing was built." }
+        $gSha = ([string]$feedRecord[":golden:$f"]).Split(':')[-1].ToLowerInvariant()
+        try { [void](Get-FeedAssetFile (Get-RecordFileUrl ([string]$feedPtr.url) $gSha) $gSha (Join-Path $refProfile $f) (Get-FeedStoreSiteDir '')) }
+        catch { Die ("Release $installerRelease's $f could not be fetched from the site, so nothing was built: " + $_.Exception.Message) }
+    }
+} else {
+    $refProfile = Get-ShipLoadOrderDir $Root $ProfileDir
+}
 Say "  load order from $refProfile" 'DarkGray'
 # Only the two lists. Other launchers leave .bak copies of them beside the
 # originals (Plugins.txt.<server>-<date>.bak and the like); those are one
@@ -644,12 +787,15 @@ if (Test-Path $lexe) {
 }
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $here 'ShippedBytes.ps1')
 foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRST.txt') {
     # In installer\ since the reorganisation's phase 7 (issue #440).
     $s = Join-Path (Join-Path $here '..\..\installer') $f
     # All four are in the repository, so a missing one is a wrong path, and an
     # installer without it is broken for everybody (issue #440, phase 0).
-    if (Test-Path $s) { Copy-Item $s $stage -Force } else { Die "$f is not at $s. It is in the repository, so the path is wrong. Nothing was packaged." }
+    # As the file ships from any checkout, CRLF (ShippedBytes.ps1): a Linux
+    # checkout holds Setup.bat with LF, which cmd reads wrong (#3412).
+    if (Test-Path $s) { Copy-ThornswoodShippedFile $s (Join-Path $stage $f) } else { Die "$f is not at $s. It is in the repository, so the path is wrong. Nothing was packaged." }
 }
 
 # ---- where the source is ---------------------------------------------------
@@ -829,15 +975,34 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
 }
 $srcNote = Join-Path $stage 'SOURCE CODE.txt'
 try {
-    # Every library inside the six, with its text (#3099).
+    # Every library inside the six, with its text (#3099), and the fork's own
+    # noticed folders and npm packages the record lists beside them (#3751).
     $clientLicences = @(Get-ClientLicences $clientRecordPath @($resolvedClient.Record.files.PSObject.Properties.Name))
-    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir -Licences $clientLicences
+    $clientMeasured = [bool](((Get-Content -LiteralPath (Join-Path $clientRecordDir 'client-licences.json') -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json).PSObject.Properties['libraries'])
+    # build.js is the front Thornswood built and recorded only when it is the
+    # recorded bytes; then the note says so and the npm packages in it go in
+    # licences\ too (#3751). The client record here is a copy in a scratch
+    # folder, so the front record is named rather than looked for beside it;
+    # any other build.js (main's 13 September one) is said as not built.
+    $frontRecordPath = Join-Path $PSScriptRoot '..\..\records\front-build.json'
+    $frontFor = $null
+    $payloadFront = Join-Path $payloadDir 'Data\Platform\UI\build.js'
+    if ((Test-Path -LiteralPath $payloadFront -PathType Leaf) -and (Test-Path -LiteralPath $frontRecordPath -PathType Leaf)) {
+        $frontWant = [string]((Get-Content -LiteralPath $frontRecordPath -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json).files.'build.js'.sha256
+        if ($frontWant -and (Get-FileHash -LiteralPath $payloadFront -Algorithm SHA256).Hash.ToLowerInvariant() -eq $frontWant.ToLowerInvariant()) { $frontFor = $frontRecordPath }
+    }
+    $frontLicences = @()
+    if ($frontFor) { $frontLicences = @(Get-FrontLicences $frontFor); $clientLicences = @(Join-NoticeLicences $clientLicences $frontLicences) }
+    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir -FrontRecord $frontFor -Licences $clientLicences
     [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
     $libDir = Join-Path $stage 'licences'
     $null = New-Item -ItemType Directory -Force -Path $libDir
     foreach ($x in $clientLicences) { [IO.File]::WriteAllBytes((Join-Path $libDir ($x.Port + '.txt')), $x.Bytes) }
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
-    Say ("  licences\ holds the texts of the {0} libraries inside the client files ({1})" -f $clientLicences.Count, $(if ($licencesFrom -eq 'checkout') { 'this checkout''s record' } else { 'the record committed at ' + $licencesFrom.Substring(0, 8) })) 'Green'
+    Say ("  licences\ holds the texts of the {0} libraries inside the client files and build.js ({1})" -f $clientLicences.Count, $(if ($licencesFrom -eq 'checkout') { 'this checkout''s record' } else { 'the record committed at ' + $licencesFrom.Substring(0, 8) })) 'Green'
+    if (-not $clientMeasured) { Say '  that record lists no library beside the vcpkg ports: its client was measured before #3751, so the Tilted, papyrus-vm and viet notices and the npm package in skymp5-client.js are not in licences\ (THIRD-PARTY.md, What is still missing)' 'Yellow' }
+    if ($frontFor) { Say ("  build.js is the recorded front, and its {0} npm packages' texts are among them" -f $frontLicences.Count) 'Green' }
+    elseif (Test-Path -LiteralPath $payloadFront -PathType Leaf) { Say '  build.js is not the recorded front, so no list of the npm packages in it goes with it (THIRD-PARTY.md, What is still missing)' 'Yellow' }
 } catch {
     Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
 }
@@ -851,7 +1016,7 @@ foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'WebView2-LICENSE.txt')) {
     if (-not (Test-Path -LiteralPath $from)) {
         Die ("installer\licences\$lic is missing. The installer has to hand the GPL, AGPL and WebView2 texts with the files (#421).")
     }
-    Copy-Item -LiteralPath $from -Destination (Join-Path $stage $lic) -Force
+    Copy-ThornswoodShippedFile $from (Join-Path $stage $lic)
 }
 Say '  GPL-3.0.txt, AGPL-3.0.txt and WebView2-LICENSE.txt staged beside SOURCE CODE.txt' 'Green'
 
@@ -879,7 +1044,10 @@ if (Test-Path $cfgSrc) { Copy-Item $cfgSrc $stage -Force }
 # only reads the Steam copy when C:\Thornswood\Game does not exist. So the
 # build says which shape it is and the installer does not have to guess.
 $collectionFlag = Join-Path $stage 'collection.txt'
-if ($collectionCount -gt 0) {
+# From the feed nothing was left out here, because the release record never
+# named the collection's files; the feed naming a collection is what says the
+# release was built for it (#3412).
+if ($collectionCount -gt 0 -or $feedCollection) {
     [IO.File]::WriteAllText($collectionFlag,
         "This build leaves out everything the Nexus collection provides.`r`n" +
         "The installer puts Thornswood into the Steam copy rather than making`r`n" +
@@ -914,23 +1082,45 @@ if (Test-Path -LiteralPath $vLive) {
 }
 
 $plug = Join-Path $refProfile 'plugins.txt'
+
+# The three files the installer takes from the player's own Steam copy that a
+# multiplayer setup might have patched. Their fingerprints ride along so the
+# installer can tell a clean Steam copy from a modified one, which a size check
+# cannot. Bethesda's archives and masters are left out of this check: nothing
+# patches those.
+#
+# From records\skyrim-files.json, the pinned build's own files as Steam's
+# manifests list them (New-SkyrimFilesRecord.ps1), by the SHA-1 those
+# manifests carry and the launcher already holds the Steam copy to
+# (OwnGameKinds.cs). Until #3412 they were hashed off the Steam copy of
+# whichever machine packaged, which was clean only as long as that machine's
+# was, and a build from the feed has no Steam copy at all.
+$skyrimRecordPath = Join-Path $PSScriptRoot '..\..\records\skyrim-files.json'
+try { $skyrimRecord = ConvertFrom-Json ([IO.File]::ReadAllText($skyrimRecordPath)) }
+catch { Die ("records\skyrim-files.json did not read, so the installer could not tell a clean Steam copy: " + $_.Exception.Message) }
+$fingerprints = [ordered]@{}
+foreach ($f in 'SkyrimSE.exe', 'steam_api64.dll', 'bink2w64.dll') {
+    $pin = $skyrimRecord.files.PSObject.Properties[$f]
+    if ($null -eq $pin -or ([string]$pin.Value.sha1) -notmatch '^[0-9a-fA-F]{40}$') {
+        Die "records\skyrim-files.json names no SHA-1 for $f, so the installer could not tell a clean Steam copy. Nothing was built."
+    }
+    $fingerprints[$f] = ([string]$pin.Value.sha1).ToLowerInvariant()
+}
+$fingerprints | ConvertTo-Json | Set-Content (Join-Path $stage 'vanilla.json') -Encoding UTF8
+Say ("  {0} Steam files fingerprinted from Skyrim {1}'s record" -f $fingerprints.Count, [string]$skyrimRecord.build) 'DarkGray'
+
 $manifest = [ordered]@{
     builtAt   = (Get-Date).ToString('u')
     files     = $shipCount
     bytes     = $shipBytes
     plugins   = if (Test-Path $plug) { @(Get-Content $plug | Where-Object { $_ -match '^\*' }).Count } else { 0 }
-    exeBytes  = (Get-Item (Join-Path $GameDir 'SkyrimSE.exe')).Length
+    exeBytes  = [long]$skyrimRecord.files.'SkyrimSE.exe'.bytes
 }
 $manifest | ConvertTo-Json | Set-Content (Join-Path $stage 'manifest.json') -Encoding UTF8
 
-# The three files the installer takes from the player's own Steam copy that a
-# multiplayer setup might have patched. Their fingerprints ride along so the
-# installer can tell a clean Steam copy from a modified one, which a size check
-# cannot. Bethesda's archives and masters are left out: nothing patches those,
-# and hashing 15 GB on every package would cost more than it is worth.
-# Get-FileHash lives in a module that is not always on PSModulePath, and a
-# script started with -NoProfile can find itself without it. .NET is always
-# there, so the hashing goes straight to it.
+# Hashed with .NET for the checks below: Get-FileHash lives in a module that
+# is not always on PSModulePath, and a script started with -NoProfile can find
+# itself without it.
 function Get-Sha256([string]$path) {
     $sha = [Security.Cryptography.SHA256]::Create()
     try {
@@ -939,24 +1129,6 @@ function Get-Sha256([string]$path) {
         finally { $fs.Close() }
     }
     finally { $sha.Dispose() }
-}
-
-# Nice to have, not load bearing. If it cannot be done, the package still ships
-# and the installer simply skips the check rather than losing a long build.
-try {
-    $fingerprints = [ordered]@{}
-    foreach ($f in 'SkyrimSE.exe', 'steam_api64.dll', 'bink2w64.dll') {
-        $src = Join-Path $GameDir $f
-        if (Test-Path $src) { $fingerprints[$f] = Get-Sha256 $src }
-        else { Say "  $f is not in the build, so the installer cannot check it" 'Yellow' }
-    }
-    $fingerprints | ConvertTo-Json | Set-Content (Join-Path $stage 'vanilla.json') -Encoding UTF8
-    Say ("  {0} vanilla fingerprints recorded" -f $fingerprints.Count) 'DarkGray'
-}
-catch {
-    Remove-Item (Join-Path $stage 'vanilla.json') -Force -EA SilentlyContinue
-    Say "  Could not fingerprint the Steam files: $($_.Exception.Message)" 'Yellow'
-    Say '  Packaging carries on. The installer will skip that check.' 'DarkGray'
 }
 
 # ---- nothing that must never ship ------------------------------------------
@@ -983,32 +1155,18 @@ if ($NoArchive) {
 }
 
 Head 'Compressing'
-$7z = @(
-    "$env:ProgramFiles\7-Zip\7z.exe"
-    "${env:ProgramFiles(x86)}\7-Zip\7z.exe"
-    "$env:LOCALAPPDATA\Programs\7-Zip\7z.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-if (-not $7z) {
-    Say '  7-Zip is not installed. Getting it with winget...' 'Yellow'
-    & winget install --id 7zip.7zip -e --accept-source-agreements --accept-package-agreements 2>&1 | Out-Null
-    $7z = @("$env:ProgramFiles\7-Zip\7z.exe", "${env:ProgramFiles(x86)}\7-Zip\7z.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-}
-if (-not $7z) { Die "Could not find or install 7-Zip. Re-run with -NoArchive and zip $stage yourself." }
-
-$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$ver = (& $7z | Select-Object -First 2) -join ' '
-$ErrorActionPreference = $old
-Say "  $7z"
-Say "  $ver" 'DarkGray'
-
+# .NET's own zip writer, on every machine (#3412). It is what the setup
+# program reads the payload back with (Bootstrap.cs, ZipArchive), so nothing
+# outside .NET is needed at either end; 7-Zip was found or installed with
+# winget, which only Windows has, and a build from the feed runs anywhere.
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $blob = Join-Path $OutDir 'payload.zip'
 if (Test-Path $blob) { Remove-Item $blob -Force }
 
 # Room to write it. The stage is already a full copy of the build, and the zip
-# lands beside it, so this wants roughly the size of the build again. 7-Zip
-# answers a full disk with exit code 2 and a wall of progress text, which is
-# not a sentence anybody can act on.
+# lands beside it, so this wants roughly the size of the build again. A full
+# disk part way through answers with an exception about a stream, which is not
+# a sentence anybody can act on.
 $stageBytes = Get-PackageStageBytes $stage $shipBytes
 $drive = (Get-Item $OutDir).PSDrive
 $free  = $drive.Free
@@ -1031,24 +1189,19 @@ if ($free -lt $want) {
 }
 
 Say '  Most of this content is already compressed, so the level is deliberately low.'
-Say '  Around 18 GB in. Expect ten minutes or more.' 'DarkGray'
 
-# Once, at -mx$Level (Package-Stage.ps1 says why there is no second try).
-$zipped = Invoke-PackageZip $7z $stage $blob $Level
-if ($zipped.Code -ne 0) {
-    Say "  7-Zip exited with $($zipped.Code)" 'Yellow'
-    # The useful part of what 7-Zip said is at the end, not the start, and the
-    # start is a line per file.
-    $tail = @($zipped.Said | Where-Object { $_ -and $_ -notmatch '^\s*\d+%' }) | Select-Object -Last 8
-    foreach ($l in $tail) { Say "    $l" 'DarkGray' }
+# Once (Package-Stage.ps1 says why there is no second try).
+$zipWhy = Invoke-PackageZip $stage $blob $Level
+if ($zipWhy) {
     Say ''
-    foreach ($l in (Get-PackageZipWhy $zipped.Code)) { Say $l 'DarkGray' }
+    Say 'A full disk, or a file held open by something, is the usual cause:' 'DarkGray'
+    Say '    Get-PSDrive C | Select-Object Used, Free' 'Green'
     Say "The stage is still at $stage, and the next run copies only what changed." 'Yellow'
-    Die '7-Zip did not produce the archive.'
+    Die ('The archive could not be written: ' + $zipWhy)
 }
 Say ("  payload.zip is {0:n2} GB" -f ((Get-Item $blob).Length / 1GB)) 'Green'
 
-if ($Plain7z) {
+if ($PayloadOnly) {
     Head 'Done'
     Say "$blob" 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 0
@@ -1092,8 +1245,37 @@ Say "  stub: $stub" 'DarkGray'
 # unsigned for that reason; strip here anyway so a hand-signed stub or an older
 # out\setup-stub.exe does not break Package the way Main did on 27 September
 # (signtool 0x800700C1 after attach). Sign-Artifact below signs the final Setup.
-$preSig = Get-AuthenticodeSignature -LiteralPath $exe
-if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) {
+#
+# Whether it carries a signature is read off the file itself, its certificate
+# table (the PE's fifth data directory), so this asks the same on any machine;
+# Get-AuthenticodeSignature is Windows' own and a build from the feed runs
+# anywhere (#3412). Only signtool can take a signature off, so away from
+# Windows a signed stub stops the build.
+function Test-PeCertificateTable([string]$path) {
+    $fs = [IO.File]::OpenRead($path)
+    try {
+        $br = New-Object IO.BinaryReader($fs)
+        if ($fs.Length -lt 0x40) { return $false }
+        $fs.Position = 0x3C
+        $pe = [long]$br.ReadUInt32()
+        if ($pe + 24 + 2 -gt $fs.Length) { return $false }
+        $fs.Position = $pe
+        if ($br.ReadUInt32() -ne 0x00004550) { return $false }
+        $opt = $pe + 24
+        $fs.Position = $opt
+        $magic = $br.ReadUInt16()
+        $dirs = if ($magic -eq 0x20B) { $opt + 112 } elseif ($magic -eq 0x10B) { $opt + 96 } else { return $false }
+        if ($dirs + 5 * 8 -gt $fs.Length) { return $false }
+        $fs.Position = $dirs + 4 * 8
+        $at = $br.ReadUInt32(); $size = $br.ReadUInt32()
+        return ($at -ne 0 -and $size -ne 0)
+    } finally { $fs.Dispose() }
+}
+if (Test-PeCertificateTable $exe) {
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+        Die ('The setup program is signed, and only signtool on Windows can take the signature off before the payload is attached. ' +
+             'CI builds it unsigned (release.yml); use that one. Nothing was built.')
+    }
     $signtoolStrip = $null
     foreach ($kit in @(
         ${env:ProgramFiles(x86)} + '\Windows Kits\10\bin',
@@ -1150,7 +1332,14 @@ if ($OneFile) {
 # Does nothing without records\signing\signing.json, so a machine with no certificate
 # still produces a working, unsigned installer.
 $signer = Join-Path $here 'Sign-Artifact.ps1'
-if (Test-Path -LiteralPath $signer) {
+# From the feed nothing here can sign (no signing setup, no Windows), and an
+# unsigned installer is never published, which is why -FromFeed takes only
+# -NoPublish for now. Signing it on GitHub is #3412's next step.
+if ($FromFeed) {
+    Head 'Signing the installer'
+    Say '  not signed: built from the feed, where nothing signs yet (#3412), so it is not fit to publish' 'Yellow'
+}
+elseif (Test-Path -LiteralPath $signer) {
     Head 'Signing the installer'
     & $signer -Path $exe
     if ($LASTEXITCODE -ne 0) {
@@ -1190,9 +1379,13 @@ if ($OneFile) {
     Say '  the setup program is far bigger than it should be' 'Red'; $ok = $false
 }
 
-$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$listing = & $7z l $zip 2>&1
-$ErrorActionPreference = $old
+# The names in the archive, as the setup program will read them: entry names
+# with / between folders (Bootstrap.cs turns them into paths).
+$entryNames = @()
+try {
+    $za = [IO.Compression.ZipFile]::OpenRead($zip)
+    try { $entryNames = @($za.Entries | ForEach-Object { [string]$_.FullName }) } finally { $za.Dispose() }
+} catch { Say "  the archive does not read back: $($_.Exception.Message)" 'Red'; $ok = $false }
 # Four names, and they are the names this build actually uses.
 #
 # These were still looking for the installer script and the launcher exe
@@ -1205,24 +1398,21 @@ $ErrorActionPreference = $old
 # match found it and called it the launcher. A check that answers yes
 # whatever happens is not a check.
 #
-# So each one is anchored to the end of the line and refused if anything
-# path-like sits in front of it. 7-Zip prints the name last, and a file at
-# the root of the archive has nothing before it, which is the question
-# that was meant all along: is this file at the top of the installer.
+# So each one is asked for at the top of the archive, by its whole entry
+# name, which is the question that was meant all along: is this file at the
+# top of the installer.
 $atRoot = {
     param($name)
-    $rx = '(?<![\\/\w.-])' + [regex]::Escape($name) + '\s*$'
-    $listing | Where-Object { $_ -match $rx }
+    $entryNames | Where-Object { [string]::Equals($_, $name, [StringComparison]::OrdinalIgnoreCase) }
 }
 $hasSetup    = & $atRoot 'Setup.bat'
 $hasInstall  = & $atRoot 'Setup-Thornswood.ps1'
 $hasLauncher = & $atRoot 'Thornswood.exe'
 # The payload is a FOLDER in the archive, not a file. The staged copy is
 # built at <stage>\payload and zipped with everything else beside it, so
-# what is in here is a directory entry named payload plus 34,000 things
-# filed under payload\. Asking for payload.zip found neither. Either shape
-# counts: the directory entry on its own, or anything inside it.
-$hasPayload  = $listing | Where-Object { $_ -match '(?<![\\/\w.-])payload(\\|\s*$)' }
+# what is in here is everything filed under payload/. Asking for payload.zip
+# found nothing.
+$hasPayload  = $entryNames | Where-Object { $_.StartsWith('payload/', [StringComparison]::OrdinalIgnoreCase) -and $_.Length -gt 8 }
 foreach ($pair in @(@('Setup.bat', $hasSetup), @('the installer script', $hasInstall),
                     @('the launcher', $hasLauncher), @('the mod payload', $hasPayload))) {
     if ($pair[1]) { Say "  found $($pair[0])" 'Green' } else { Say "  MISSING $($pair[0])" 'Red'; $ok = $false }
@@ -1286,7 +1476,7 @@ if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 #
 # A PowerShell script that runs off the end does not reset $LASTEXITCODE: the
 # caller sees whatever the last native command left behind, and this script
-# runs 7z, winget and Publish-Installer. Ship.ps1 reads that code now to decide
+# runs signtool and Publish-Installer. Ship.ps1 reads that code now to decide
 # whether a release may go out, so a stray value here would either hide a
 # failure or stop a good release for no reason. Every other way out of this
 # script already exits deliberately.

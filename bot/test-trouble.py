@@ -20,6 +20,10 @@ Discord, even with a channel called staff-general right there, which is
 where it used to fall back to. And the send has every mention off. The
 client and the channels are stand-ins that record what would have been sent.
 
+Then when it goes (#3942): with its session's row in trouble.json, which the
+site keeps exactly as long as the session's logs, and the posts made before
+that, found once in the channel.
+
 Read only. Never connects to anything.
 """
 import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
@@ -179,6 +183,155 @@ yes('C7 and the bot log names that id',
 src = open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
 yes('C8 bot.py holds no channel name staff-general to fall back to',
     "'staff-general'" not in src and '"staff-general"' not in src)
+
+
+# ------------------------------------- the post goes when its row goes --
+# #3942: every post is written down against its session, and deleted once the
+# site has dropped that session's row from trouble.json (365 days, a deletion
+# request; a kept session's row stays). The channel and its messages are
+# stand-ins; the list is a file in a scratch folder.
+import json  # noqa: E402
+import tempfile  # noqa: E402
+
+BOT_ID = 4242
+
+
+class Gone(object):
+    status = 404
+    reason = 'Not Found'
+
+
+class Msg(object):
+    def __init__(self, ch, mid, content, author=BOT_ID):
+        self.channel = ch
+        self.id = mid
+        self.content = content
+        self.author = type('A', (), {'id': author})()
+
+    async def delete(self):
+        await self.channel.delete(self.id)
+
+
+class Room(object):
+    """A channel that keeps its messages, sends, deletes and lists them."""
+    def __init__(self, cid):
+        self.id = cid
+        self.name = 'staff-updates'
+        self.msgs = {}
+        self.next = 9000
+        self.refuse = set()
+
+    async def send(self, text, **kw):
+        self.next += 1
+        m = Msg(self, self.next, text)
+        self.msgs[m.id] = m
+        return m
+
+    async def delete(self, mid):
+        if mid in self.refuse:
+            raise RuntimeError('Missing Permissions')
+        if mid not in self.msgs:
+            raise discord.NotFound(Gone(), 'Unknown Message')
+        del self.msgs[mid]
+
+    def get_partial_message(self, mid):
+        room = self
+        return type('P', (), {'delete': lambda self_: room.delete(mid)})()
+
+    def history(self, limit=None):
+        msgs = list(self.msgs.values())
+
+        async def gen():
+            for m in msgs:
+                yield m
+        return gen()
+
+
+class Bot(object):
+    def __init__(self, room):
+        self.room = room
+        self.user = type('U', (), {'id': BOT_ID})()
+
+    def get_channel(self, cid):
+        return self.room if cid == self.room.id else None
+
+
+def row(sid, name, line):
+    return {'session': sid, 'who': '1', 'name': name, 'channel': 'main',
+            'start': 0, 'end': 0, 'at': 0, 'why': 'The game crashed',
+            'file': 'crash.log', 'line': line}
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+scratch = tempfile.mkdtemp(prefix='thornswood-3942-')
+posts = os.path.join(scratch, 'trouble-posts.json')
+room = Room(1549254991082946570)
+keep = bot.client, bot.TROUBLE_ID
+bot.client, bot.TROUBLE_ID = Bot(room), room.id
+try:
+    a, b = row('s-a', 'Aela', 'EXCEPTION_ACCESS_VIOLATION'), row('s-b', 'Brynjolf', 'Stack overflow')
+    for r in (a, b):
+        m = run(bot.trouble_say(bot._trouble_line(r)))
+        bot.trouble_remember(r['session'], m, posts)
+    st = json.load(open(posts, encoding='utf-8'))
+    yes('F1 each post is written down against its session',
+        sorted(st['posts']) == ['s-a', 's-b'] and len(room.msgs) == 2)
+    yes('F2 and what is written down is ids, never what the post said',
+        'Aela' not in json.dumps(st) and 'EXCEPTION' not in json.dumps(st))
+
+    got = run(bot.trouble_forget([a, b], posts))
+    yes('F3 while both rows are in trouble.json, both posts stay', got == (0, 0) and len(room.msgs) == 2)
+
+    got = run(bot.trouble_forget(None, posts))
+    yes('F4 a trouble.json that cannot be read deletes nothing', got == (0, 0) and len(room.msgs) == 2)
+
+    got = run(bot.trouble_forget([b], posts))
+    left = [m.content for m in room.msgs.values()]
+    yes('F5 a row the site dropped (aged out or a deletion request) takes its post with it',
+        got == (1, 0) and len(left) == 1 and 'Brynjolf' in left[0])
+    yes('F6 and it is off the list',
+        sorted(json.load(open(posts, encoding='utf-8'))['posts']) == ['s-b'])
+
+    bid = list(room.msgs)[0]
+    room.refuse.add(bid)
+    got = run(bot.trouble_forget([], posts))
+    yes('F7 a delete Discord refuses keeps the post on the list for the next pass',
+        got == (0, 1) and 's-b' in json.load(open(posts, encoding='utf-8'))['posts'])
+    room.refuse.clear()
+    del room.msgs[bid]
+    got = run(bot.trouble_forget([], posts))
+    yes('F8 a post staff already deleted is taken off the list, not retried',
+        got == (0, 0) and json.load(open(posts, encoding='utf-8'))['posts'] == {})
+
+    # The posts made before this: nothing written down. One still has its row
+    # (in the wording of an older bot), one has lost its row, and beside them
+    # a staff notice by the bot and somebody's own message.
+    posts2 = os.path.join(scratch, 'trouble-posts-2.json')
+    room.msgs.clear()
+    c, d = row('s-c', 'Cicero', 'Papyrus stack dump'), row('s-d', 'Delphine', 'out of memory')
+    oldc = Msg(room, 1, bot.TROUBLE_HEAD + ' Cicero, on the main build.\nThe game crashed\n```\nPapyrus stack dump\n```\nOld wording.')
+    oldd = Msg(room, 2, bot._trouble_line(d))
+    note = Msg(room, 3, '[claude] Restarting the dev server at 4:30 PM.')
+    theirs = Msg(room, 4, bot.TROUBLE_HEAD + ' somebody pasting it', author=7)
+    for m in (oldc, oldd, note, theirs):
+        room.msgs[m.id] = m
+    got = run(bot.trouble_backfill([c], posts2))
+    st = json.load(open(posts2, encoding='utf-8'))
+    yes('B1 an old post whose row is gone is deleted', got == (1, 0) and 2 not in room.msgs)
+    yes('B2 an old post whose row is still there is written down, in older wording too',
+        1 in room.msgs and st['posts'].get('s-c', {}).get('message') == 1)
+    yes('B3 a staff notice and anybody else\'s message are never touched', 3 in room.msgs and 4 in room.msgs)
+    yes('B4 the look is done once', st.get('backfilled') is True)
+    room.msgs[5] = Msg(room, 5, bot._trouble_line(d))
+    run(bot.trouble_backfill([c], posts2))
+    yes('B5 and not again', 5 in room.msgs)
+    got = run(bot.trouble_forget([], posts2))
+    yes('B6 an old post written down goes when its row goes, like a new one', got == (1, 0) and 1 not in room.msgs)
+finally:
+    bot.client, bot.TROUBLE_ID = keep
 
 print('')
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))
