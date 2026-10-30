@@ -155,22 +155,15 @@ CONTEXT = trust.context(ROOTS)
 urllib.request.install_opener(
     urllib.request.build_opener(urllib.request.HTTPSHandler(context=CONTEXT)))
 
-import aiohttp
 import discord
 
 import card
 
 
-class TrustedClient(discord.Client):
-    """
-    A discord.Client whose every request and gateway connection verifies
-    against CONTEXT (#3111). discord.py makes its aiohttp session in login()
-    with whatever connector its HTTPClient holds, and a connector can only
-    be made once the event loop is running, so it is given here.
-    """
-    async def login(self, token):
-        self.http.connector = aiohttp.TCPConnector(limit=0, ssl=CONTEXT)
-        await super().login(token)
+# A discord.Client whose every request and gateway connection verifies
+# against CONTEXT (#3111). trust.py makes the class, the one every script in
+# bot/ that logs in to Discord makes its client from (#3604).
+TrustedClient = trust.client_class(CONTEXT)
 
 
 def _load_env_file(argv):
@@ -6813,6 +6806,11 @@ _MOD_DID = {
     'worldpropose': 'proposed moving the world to %s',
     'worldconfirm': 'confirmed moving the world to %s',
     'worlddrop': 'dropped the proposal to move the world to %s',
+    # Staff on the crafting card, the Office page of K (#3167): the why says
+    # which rank from what to what, or what was given back and why.
+    'craftrank': 'raised a rank of %s',
+    'craftrecipes': 'handed the newer recipe list to the game of %s',
+    'craftgive': 'gave back to %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).

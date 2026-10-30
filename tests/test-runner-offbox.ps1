@@ -213,10 +213,19 @@ try {
     Yes '-OffBox -Status says what the firewall has' ($r.Text -match [regex]::Escape('Get-RunnerFirewall $grdGroup'))
     $r = Dry @('-OffBox', '-Number', '2')
     Yes '-Number 2 gets a firewall group of its own' ($r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-pr2'"))
-    foreach ($m in @(@(), @('-Lock'), @('-Status'))) {
+    foreach ($m in @(@('-Lock'), @('-Status'))) {
         $r = Dry $m
         Yes ("the VPS (no -OffBox) $($m -join ' ') gets no firewall rule and no read deny") ($r.Code -eq 0 -and $r.Text -notmatch 'RunnerFirewall|RunnerReads')
     }
+    # #3956: an install on the VPS puts its outbound rules on in the same run,
+    # before the runner can take a job; until 27 Oct 2026 it took a -NetworkOnly
+    # run after it. Still no read deny there.
+    $r = Dry @('-Number', '4', '-AllowHost', 'localhost')
+    $iFw = $r.Text.IndexOf('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks'); $iCfg = $r.Text.IndexOf('config.cmd --unattended')
+    Yes 'the VPS install puts the account''s outbound rules on in the same run (#3956)' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner4'") -and $iFw -gt 0)
+    Yes '  before config.cmd registers the runner, so it takes no job without them' ($iCfg -gt $iFw)
+    Yes '  with -AllowHost let through' ($r.Said -match '-AllowHost localhost: ')
+    Yes '  and no read deny on the VPS' ($r.Text -notmatch 'Close-RunnerReads \$grdAcct')
     # Since #2161 a VPS account may carry -NetworkOnly's rules, so its removal takes them off, and still no read deny.
     $r = Dry @('-Remove')
     Yes 'the VPS (no -OffBox) -Remove takes off its outbound rules and touches no read deny' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -notmatch 'Set-RunnerFirewall \$grdAcct|Open-RunnerReads \$grdAcct|Close-RunnerReads \$grdAcct')

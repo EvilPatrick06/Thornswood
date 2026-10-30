@@ -34,6 +34,16 @@
       ],
       "variables": []
     },
+    "desk": {
+      "deploy_from": [
+        "branch main"
+      ],
+      "secrets": [
+        "DESK_KEY_B64",
+        "NEXUS_API_KEY"
+      ],
+      "variables": []
+    },
     "notices": {
       "deploy_from": [
         "branch main"

@@ -9,9 +9,11 @@
 # by scripts\vps\admin\admin.js and nowhere else, and this run is the only
 # thing that service listens to.
 #
-# HOW. scripts/deploy/Set-BuildRunners.ps1 starts it by hand from anywhere,
-# One or a cloud thread, and reads its answer; a push to main that changes a
-# records/*-runners.json starts it by itself, so a merged record is on GitHub
+# HOW. scripts/deploy/Set-BuildRunners.ps1 (the runner labels) and
+# Set-RepoAbout.ps1 (the About box, #3682) start it by hand from anywhere,
+# One or a cloud thread, and read their answers; a push to main that changes
+# a records/*-runners.json or records/repo-about.json starts it by itself, so
+# a merged record is on GitHub
 # a minute later. Here Set-BuildRunners.ps1 -OnGitHub asks GitHub for this
 # run's OIDC token for the audience thornswood-admin and hands it to the
 # service on 127.0.0.1:7791. The service checks the token against GitHub's
@@ -57,6 +59,7 @@ on:
     branches: [main]
     paths:
       - 'records/*-runners.json'
+      - 'records/repo-about.json'
 permissions:
   contents: read
   id-token: write
@@ -107,6 +110,20 @@ jobs:
           ADMIN_ASK: ${{ inputs.ask || 'runner-labels' }}
         run: |
           & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-BuildRunners.ps1') -OnGitHub
+          exit $LASTEXITCODE
+
+      # The About box, records/repo-about.json, the same way (#3682). It
+      # runs whatever the runner labels answered, since neither waits on
+      # the other, and writes its own answer, titled Set-RepoAbout. Asking
+      # only which repositories the App is on, or reading the settings,
+      # changes nothing, so it does not run then.
+      - name: Match the About box
+        if: ${{ !cancelled() && inputs.ask != 'installation-repos' && inputs.ask != 'settings' }}
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-RepoAbout.ps1') -OnGitHub
           exit $LASTEXITCODE
 
       - name: Read the settings
