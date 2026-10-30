@@ -307,19 +307,24 @@ try {
     # line instead of saying who held the folder.
     $nl = Start-Process -FilePath $node.Source -ArgumentList @('-e', "`"setInterval(()=>{},1000)`n// a second line`"") -PassThru -WindowStyle Hidden
     $started += $nl
+    # Every list in the refusal holds command lines whole, line breaks and
+    # all, so the checks below read across them, each kept inside its own
+    # list: any entries, up to the next list's heading (#4924). Whichever
+    # process has the lower id, the two-line one may come first.
+    $inList = '((?:(?!; (?:handles:|could not look into |who they are:|started in the 2 minutes before:|files under it open in:)).)*; )?'
     $ok = Move-ThornswoodPath $d ($d + '-moved')
     Yes 'a folder another process has as its current directory is refused, once' ((-not $ok) -and (Test-Path -LiteralPath $d))
     Yes '  and a process started just before, whose command line holds a line break, is named among them whole (#3214)' (
-        $ThornswoodMoveWhy -match ('(?s)started in the 2 minutes before: (.*; )?pid ' + $nl.Id + ' node(\.exe)? \(.*a second line'))
+        $ThornswoodMoveWhy -match ('(?s)started in the 2 minutes before: ' + $inList + 'pid ' + $nl.Id + ' node(\.exe)? \([^\n]*\r?\n// a second line'))
     Stop-Process -Id $nl.Id -Force -EA SilentlyContinue
     Yes '  saying the folder itself would not open to be renamed (#3262)' ($ThornswoodMoveWhy -match '^the folder would not open to be renamed: .*\(0x80070020\)')
     Yes ('  and the handle list names that process, where no file under the folder is open: ' + $ThornswoodMoveWhy) (
         $ThornswoodMoveWhy -match '\(0x8007[0-9A-F]{4}\)' -and $ThornswoodMoveWhy -match 'files under it open in: no process but this one, asking, in 2 file\(s\)' -and
         $ThornswoodMoveWhy -match ('handles: .*pid ' + $c.Id + ' node: ' + [regex]::Escape($d)))
     Yes ('  and Windows''s own list of who has the folder open names it first, with its parent and start time (#3262)') (
-        $ThornswoodMoveWhy -match ('^.*?open itself in: (pid \d+ \S+, )*pid ' + $c.Id + ' node\b') -and
-        $ThornswoodMoveWhy -match ('who they are: (.*; )?pid ' + $c.Id + ' node(\.exe)? \(parent ' + $PID + ' [^,]+, started \d{4}-\d\d-\d\d \d{1,2}:\d\d:\d\d\.\d{3} [AP]M\), command line ') -and
-        $ThornswoodMoveWhy -match ('started in the 2 minutes before: (.*; )?pid ' + $c.Id + ' ') -and
+        $ThornswoodMoveWhy -match ('(?s)^.*?open itself in: (pid \d+ \S+, )*pid ' + $c.Id + ' node\b') -and
+        $ThornswoodMoveWhy -match ('(?s)who they are: ' + $inList + 'pid ' + $c.Id + ' node(\.exe)? \(parent ' + $PID + ' [^,]+, started \d{4}-\d\d-\d\d \d{1,2}:\d\d:\d\d\.\d{3} [AP]M\), command line ') -and
+        $ThornswoodMoveWhy -match ('(?s)started in the 2 minutes before: ' + $inList + 'pid ' + $c.Id + ' ') -and
         $ThornswoodMoveWhy.IndexOf('open itself in:') -lt $ThornswoodMoveWhy.IndexOf('handles:') -and
         $ThornswoodMoveWhy.IndexOf('handles:') -lt $ThornswoodMoveWhy.IndexOf('files under it open in:'))
     $held = @(Get-ThornswoodProcessHeld @($c.Id))
