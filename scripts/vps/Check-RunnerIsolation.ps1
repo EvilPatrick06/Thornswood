@@ -80,9 +80,15 @@ if ($Collect) {
 
 $f = Get-Content -LiteralPath $Facts -Raw | ConvertFrom-Json
 $r = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
-# The label records\build-runners.json gives the box's build runners (#2994).
-$boxBuildLabel = [string](Get-Content -LiteralPath (Join-Path $Repo 'records\build-runners.json') -Raw | ConvertFrom-Json).label
-if (-not $boxBuildLabel) { throw 'records\build-runners.json names no label, so a job on the box''s build runners cannot be told from one that is not.' }
+# The labels records\<name>-runners.json give runners on the box by number:
+# the build runners' (#2994), the pull request builds' (#4010) and the
+# signing runner's (#3312). Each one reaches the box.
+$boxLabels = @(Get-ChildItem -LiteralPath (Join-Path $Repo 'records') -Filter '*-runners.json' | Sort-Object Name | ForEach-Object {
+    $rr = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+    if (-not [string]$rr.label) { throw ('records\' + $_.Name + ' names no label, so a job on the runners it lists cannot be told from one that is not.') }
+    if (@($rr.runners).Count) { [string]$rr.label }
+})
+if (-not ($boxLabels -contains 'thornswood-build')) { throw 'no records\*-runners.json names thornswood-build, so a job on the box''s build runners cannot be told from one that is not.' }
 $rows = New-Object System.Collections.Generic.List[object]
 function Row([string]$Area, [string]$Item, [string]$Expected, [string]$Actual, [bool]$Ok, [string]$Kind = 'risk') {
     $cls = 'ok'; $why = ''
@@ -245,10 +251,11 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
             if ($ek.Contains('name')) { $envName = $ek['name'].Value.Trim("'", '"') }
         }
         $anyRunner = $k.Contains('runs-on') -and $null -eq $labels
-        # The build label reaches the box too: its build runners carry it beside
-        # the production label, and the two build fallbacks ask for it alone so
-        # One's off-box build runners take them as well (26 Oct 2026).
-        $onProd = $anyRunner -or ($labels -and ($labels -contains ([string]$r.productionLabel).ToLowerInvariant() -or $labels -contains $boxBuildLabel.ToLowerInvariant()))
+        # The records' labels reach the box too: its runners carry them beside
+        # the production label, and the pull request build's fallback asks for
+        # its label alone, so One's off-box runners take it as well as box
+        # runner 2 (26 Oct 2026, #4010).
+        $onProd = $anyRunner -or ($labels -and (@($labels | Where-Object { @((@($r.productionLabel) + $boxLabels) | ForEach-Object { ([string]$_).ToLowerInvariant() }) -contains $_ }).Count -gt 0))
         if ($onProd) {
             $prodJobs += $jk
             if ($cond -notmatch 'github\.event\.pull_request\.head\.repo\.full_name == github\.repository') { $sameRepoAll = $false }

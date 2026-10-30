@@ -171,10 +171,17 @@ What is compiled into them:
 - Upstream's `THIRD_PARTY_LICENSES`, at the root of the fork, names TiltedUI,
   TiltedCore, TiltedHooks and TiltedReverse: "Copyright (c) 2019 Tilted
   Phoques. All Rights Reserved.", made available "AS IS", and "Do not remove or
-  modify any license notices." Their code is under `skyrim-platform\src\tilted`.
+  modify any license notices." Their code is under `skyrim-platform\src\tilted`,
+  which the fork's build makes into SkyrimPlatformImpl and SkyrimPlatformCEF.
 - The fork's own libraries. SkyrimPlatformImpl links `papyrus-vm` and `viet`
   (MIT, by their LICENSE files), `savefile` (GPL-3.0) and `serialization`,
-  which has no licence file of its own.
+  which has no licence file of its own. MpClientPlugin links `viet`,
+  `papyrus-vm`, `serialization` and libespm through `mp_common` and
+  `server_guest_lib`, but its program database shows code from `viet` alone
+  of those that carry a notice: none of papyrus-vm's and none of libespm's
+  (whose LICENSE is MIT as well) is in it, so neither notice is owed there.
+- The Tilted notice and the two MIT ones are under "The other code inside
+  the client files", below, with the npm package inside `skymp5-client.js`.
 - The libraries in the fork's `vcpkg.json`, linked in by the build. Among them
   is the Chromium Embedded Framework (cef-prebuilt 108.4.13), which
   SkyrimPlatformCEF and SkyrimPlatformImpl link against. CEF's own runtime
@@ -291,6 +298,46 @@ Frida built it from, is an archive on Thornswood's own Release of them
 fork of each of Frida's six repositories as well. The note beside the files
 names them; "Where the source is", below, has the list.
 
+### The other code inside the client files
+
+Not everything inside the client files comes through vcpkg (#3751). Some of
+the fork's own folders carry a notice of their own, not the GPL or AGPL
+text that already goes with the files, and `skymp5-client.js` is webpack's
+build of `skymp5-client`, which bundles the npm packages it uses. Until
+27 October 2026 none of these was recorded, so none of their notices went
+anywhere. Since then the fork's build measures them with the vcpkg ports
+(fork #124, `misc\thornswood\Write-ClientLicences.ps1`): each source file
+the program database says has code in a client file is placed by its
+folder, and a folder that is neither one of these nor one of the GPL and
+AGPL folders stops the build. `skymp5-client.js` names every module it
+holds, and each npm package among them is read from the folder webpack took
+it from. They are the record's `libraries`, beside `ports`, each with its
+text in `records\client-licences\`, and go out the same way as the vcpkg
+texts. The Tilted text is the four Tilted sections of `THIRD_PARTY_LICENSES`
+as they stand, which is all the notice there is; the others are their own
+licence files, byte for byte.
+
+| Library | Version | Licence, as its folder or package gives it | In |
+|---|---|---|---|
+| npm-eventemitter3-5.0.1 | 5.0.1 | MIT | `skymp5-client.js` |
+| papyrus-vm | the fork's | MIT | `SkyrimPlatformImpl.dll` |
+| tilted | the fork's | not declared; its text is in `tilted.txt` | `SkyrimPlatformCEF.exe.hidden`, `SkyrimPlatformImpl.dll` |
+| viet | the fork's | MIT | `MpClientPlugin.dll`, `SkyrimPlatformImpl.dll` |
+
+Measured on 27 October by fork #124's own Windows build (its head
+`df42add4`, on `c152a452`): the program databases show code from
+`skyrim-platform\src\tilted` in SkyrimPlatformImpl (34 source files) and
+SkyrimPlatformCEF (13), from `papyrus-vm` in SkyrimPlatformImpl (11), and
+from `viet` in SkyrimPlatformImpl (5) and MpClientPlugin (1), and
+`skymp5-client.js` holds eventemitter3 5.0.1 and no other package. The same
+holds at `7ae58fea`, the commit the client record names, by its build files
+and a Linux build of `skymp5-client` there, but no program database of
+that build was read. The recorded client was measured before #3751, so
+`records\client-licences.json` has no `libraries` and these texts do not
+go out yet ("What is still missing"). Once a client measured since then is
+recorded, `tests\test-third-party.js` holds this table to the record, row
+for row, and until then holds each row to that list.
+
 ## From upstream SkyMP, not built here
 
 These ship in packs and the installer. Each was compared by sha256 with the
@@ -360,8 +407,40 @@ carries the 13 September build in the table above until main's next release.
 
 The licence is skymp5-front's, `GPL-3.0` by its `package.json`, and its source
 is the fork at that commit, under "Where the source is". It bundles npm
-packages under their own licences, among them React 16.13.1 and 17.0.2, MIT
-by the `@license` comments inside it, read from the dev feed's copy.
+packages under their own licences. Until #3751 the `@license` comments some
+of them leave inside it were the only notice, and a minifier setting drops
+those. Since 27 October Build-Front.ps1 reads which packages are in it from
+build.js itself (a webpack development build names every module it holds)
+and each one's licence from the folder webpack took it from, and records
+them in `records\front-build.json` with each text in
+`records\front-licences\`; a build that holds another set, or another text,
+is refused like a build with other bytes. The installer, and every update
+that carries this build.js, put those texts in the `licences` folder beside
+`SOURCE CODE.txt`, which lists them (Source-Notice.ps1,
+Package-Thornswood.ps1). `tests\test-third-party.js` holds this table to the
+record, row for row. React itself is 18.2.0; the 16.13.1 and 17.0.2 that
+this file named before are react-is.
+
+| Package | Version | Licence, as its package.json declares it | Text |
+|---|---|---|---|
+| @babel/runtime | 7.23.9 | MIT | `npm-babel-runtime-7.23.9.txt` |
+| clsx | 1.2.1 | MIT | `npm-clsx-1.2.1.txt` |
+| css-loader | 6.10.0 | MIT | `npm-css-loader-6.10.0.txt` |
+| hoist-non-react-statics | 3.3.2 | BSD-3-Clause | `npm-hoist-non-react-statics-3.3.2.txt` |
+| object-assign | 4.1.1 | MIT | `npm-object-assign-4.1.1.txt` |
+| prop-types | 15.8.1 | MIT | `npm-prop-types-15.8.1.txt` |
+| react | 18.2.0 | MIT | `npm-react-18.2.0.txt` |
+| react-dom | 18.2.0 | MIT | `npm-react-dom-18.2.0.txt` |
+| react-draggable | 4.4.6 | MIT | `npm-react-draggable-4.4.6.txt` |
+| react-is | 16.13.1 | MIT | `npm-react-is-16.13.1.txt` |
+| react-is | 17.0.2 | MIT | `npm-react-is-17.0.2.txt` |
+| react-redux | 7.2.9 | MIT | `npm-react-redux-7.2.9.txt` |
+| react-resizable | 3.0.5 | MIT | `npm-react-resizable-3.0.5.txt` |
+| react-slider | 2.0.6 | MIT | `npm-react-slider-2.0.6.txt` |
+| redux | 4.2.1 | MIT | `npm-redux-4.2.1.txt` |
+| scheduler | 0.23.0 | MIT | `npm-scheduler-0.23.0.txt` |
+| style-loader | 3.3.4 | MIT | `npm-style-loader-3.3.4.txt` |
+| tslib | 2.6.2 | 0BSD | `npm-tslib-2.6.2.txt` |
 
 The fonts in it, from their own name tables:
 
@@ -1134,6 +1213,17 @@ beside its `___systemPolyfill.js`.
 
 ## What is still missing
 
+- The client record (`7ae58fea`) was measured before #3751, so
+  `records\client-licences.json` has no `libraries`, and the notices of
+  npm-eventemitter3-5.0.1, papyrus-vm, tilted and viet ("The other
+  code inside the client files") do not go with the client files yet. The
+  fork's build measures them from fork #124 on, and New-ClientLicenceRecord.ps1
+  refuses a build that did not, so the first engine pin recorded from a fork
+  commit that has #124 brings them.
+- Main's older build.js, and packs already on the feeds that carry the
+  fork's build.js, were made before #3751 and carry no text of the npm
+  packages inside them. The next pack that carries build.js, and every
+  installer from now on that carries the recorded build, do.
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).
 - The Futura PT and DIN Pro fonts in main's older build.js, the Bankir-Retro
