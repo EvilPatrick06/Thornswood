@@ -11,8 +11,10 @@
 
   THE GATE. Every harness scripts\dev\Gate-Harnesses.ps1 lists, run through
   scripts\dev\Nightly-Harnesses.ps1 -Throttle at once with this build's
-  share of the cores: the machine's cores over the builds the box runs at
-  once, the runners records\build-runners.json lists.
+  share of the cores: the machine's cores over the builds it runs at once.
+  On the box those are the runners records\build-runners.json lists, on One
+  the off-box runners the runner records name for it (#3860), and on
+  GitHub's hosted runner one.
 
   ON MAIN, ON THE VPS. Patrick chose on 22 Oct 2026 (option A on his page,
   q-3114-map-refresh) that every main build's gate is traced, so pull
@@ -48,7 +50,8 @@
   -Fetch, with the job's token in GATE_MAP_TOKEN, and picks from it the same
   way. Main's build hands the box's newest map on in its log (Gate-Map.ps1
   -Hand, in build.yml after the gate). The token is taken out of the environment here,
-  before any harness starts. No map there either runs the whole gate.
+  before any harness starts, and put back only around that call (#4079). No
+  map there either runs the whole gate.
 
   THE NOTE. It writes whole=true to the step's outputs only when every gate
   harness ran. build.yml keeps the note main's build looks for (#3182, the
@@ -111,8 +114,30 @@ function Write-Whole([string]$file, [string]$text) {
 
 $gate = @(& (Join-Path $Here 'Gate-Harnesses.ps1'))
 if ($LASTEXITCODE -ne 0) { exit 1 }
-$builds = @((Get-Content -LiteralPath (Join-Path $Repo 'records\build-runners.json') -Raw | ConvertFrom-Json).runners).Count
+# This build's share of the cores: the machine's cores over the builds this
+# machine runs at once. On the box, the runners records\build-runners.json
+# lists (#2994). On One, the off-box runners the runner records name for this
+# machine: until 27 Oct 2026 One's builds took the box's count too, so each
+# of its five took six of its 22 cores, thirty at once; run 40455516666 on
+# thornswood-pr-one-5 had the cores 91% busy throughout and seven harnesses
+# killed at their 300 s clock (#3860). On GitHub's hosted runner, one.
+function Get-MachineBuilds {
+    if ($env:RUNNER_ENVIRONMENT -eq 'github-hosted') { return 1 }
+    $records = Join-Path $Repo 'records'
+    if ([string]$env:RUNNER_NAME -like 'thornswood-pr-*') {
+        $machine = $(if ($env:COMPUTERNAME) { [string]$env:COMPUTERNAME } else { [Environment]::MachineName })
+        $mine = '^' + [regex]::Escape('thornswood-pr-' + $machine.ToLower()) + '(-\d+)?$'
+        $named = @(Get-ChildItem -LiteralPath $records -Filter '*-runners.json' | ForEach-Object {
+            $rec = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+            if ($rec.PSObject.Properties['offBox']) { @($rec.offBox) }
+        } | ForEach-Object { [string]$_ } | Where-Object { $_ -match $mine } | Sort-Object -Unique)
+        return [Math]::Max(1, $named.Count)
+    }
+    return @((Get-Content -LiteralPath (Join-Path $records 'build-runners.json') -Raw | ConvertFrom-Json).runners).Count
+}
+$builds = Get-MachineBuilds
 $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
+Say ('{0} build(s) at once on this machine, so {1} of its {2} cores are this one''s.' -f $builds, $share, [Environment]::ProcessorCount)
 
 # The runner's own folder: RUNNER_TEMP is <runner>\_work\_temp there.
 $root = ''
@@ -126,7 +151,11 @@ function Select-Affected {
         # Off the box: the map main's build handed on in its log (#4009).
         if (-not $env:RUNNER_TEMP) { Say ('The whole gate runs: ' + $why + '.'); return $null }
         $maps = Join-Path $env:RUNNER_TEMP 'gate-map-fetched'
-        & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps -Token $mapToken 2>&1 | ForEach-Object { Say ([string]$_) }
+        # The token goes in the environment for this call only, never on a
+        # command line (#4079); Gate-Map.ps1 takes it out again at once.
+        $env:GATE_MAP_TOKEN = $mapToken
+        try { & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps 2>&1 | ForEach-Object { Say ([string]$_) } }
+        finally { Remove-Item -LiteralPath Env:GATE_MAP_TOKEN -ErrorAction SilentlyContinue }
         if ($LASTEXITCODE -ne 0) { Say ('The whole gate runs: ' + $why + ', and none main''s build handed on could be used (the lines above say why).'); return $null }
     }
     $latest = Join-Path $maps 'latest.json'

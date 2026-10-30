@@ -186,6 +186,14 @@ function Build {
         Put (Join-Path $CF '1a2b3.json') '{"formDesc":"1a2b3:Skyrim.esm","profileId":-1}'
         Put (Join-Path $CF '_discarded-20261002-000000\ff000a05.json') ('{"profileId":' + $P1 + '}')
         Put (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json') ('{"profileId":' + $P1 + '}')
+        # Reset-Appearance.ps1's whole copy of a character, beside the live one (#3620).
+        Put (Join-Path $CF 'ff000a01.json.bak-20261003-000000') ('{"formDesc":"ff000a01","profileId":' + $P1 + '}')
+        Put (Join-Path $CF 'ff000a02.json.bak-20261003-000000') ('{"formDesc":"ff000a02","profileId":' + $PY + '}')
+        # Restore-Server.ps1's set-aside world and private, inside the server's folder (#3620).
+        $RA = Join-Path $R 'world-before-restore-20261004-000000'
+        Put (Join-Path $RA 'world\changeForms\ff000a09.json') ('{"formDesc":"ff000a09","profileId":' + $P1 + '}')
+        Put (Join-Path $RA 'world\changeForms\ff000a0a.json') ('{"formDesc":"ff000a0a","profileId":' + $PY + '}')
+        Put (Join-Path $RA 'private\characters.json') ('{"who":{"' + $P1 + '":{"name":"Mine"},"' + $PY + '":{"name":"Yours"}}}')
         $PV = Join-Path $R 'private'
         Put (Join-Path $PV 'characters.json') ('{"who":{"' + $P1 + '":{"name":"Mine"},"' + $PY + '":{"name":"Yours"},"' + $PT + '":{"name":"Theirs"}}}')
         Put (Join-Path $PV 'characters-before-20260930-000000.json') ('{"who":{"' + $P1 + '":{"name":"Mine"}}}')
@@ -235,6 +243,8 @@ function Build {
     Put (Join-Path $Vl 'chat\2026-10-02.jsonl') ($yours + "`n")
     Put (Join-Path $Vd 'chat\2026-10-01.jsonl') ($mine + "`n" + $inKept + "`n")
     Put (Join-Path $Bot 'data\joins.json') ('{"900":{"last":40,"members":{"' + $ME + '":39,"' + $YOU + '":40}}}')
+    # The joins.json a restore set aside beside it (#3620), written by nobody.
+    Put (Join-Path $Bot 'data\joins.json-before-restore-20261020-101500') ('{"900":{"last":38,"members":{"' + $ME + '":37,"' + $YOU + '":38}}}')
     Put (Join-Path $Bot 'data\open-tickets.json') ('{"900:' + $ME + '":123,"900:' + $YOU + '":456}')
 }
 
@@ -327,8 +337,10 @@ try {
     Yes '  and the run says each chat day it asks to edit, with its line count before and after' (Said 'chat\s+live 2026-10-01\.jsonl: 5 lines before, 3 after')
 
     # ---- right after the run: no live file changed, the copies set aside did
+    # A copy a restore set aside in the bot's data folder is written by no service,
+    # so it is edited at once like the site's (#3620).
     $now = Hashes $Box
-    $liveFile = '^\\Thornswood-Docs\\(data|uploads)\\|^\\Thornswood-Server(-Dev)?\\world\\changeForms\\[^\\]+$|^\\Thornswood-Server(-Dev)?\\private\\(characters|mod-settings|take-limit|last-left)\.json$|^\\Thornswood-Voice(-Dev)?\\chat\\|^\\Thornswood-Bot\\data\\'
+    $liveFile = '^\\Thornswood-Docs\\(data|uploads)\\|^\\Thornswood-Server(-Dev)?\\world\\changeForms\\[^\\]+\.json$|^\\Thornswood-Server(-Dev)?\\private\\(characters|mod-settings|take-limit|last-left)\.json$|^\\Thornswood-Voice(-Dev)?\\chat\\|^\\Thornswood-Bot\\data\\(?![^\\]*-before-restore-)'
     $changed = @($before.Keys | Where-Object { $_ -match $liveFile -and $now[$_] -ne $before[$_] })
     foreach ($k in $changed) { Write-Host "        changed: $k" }
     Yes 'no file a service writes while it runs was changed' ($changed.Count -eq 0)
@@ -339,6 +351,15 @@ try {
         Yes ((Split-Path -Leaf $R) + ': the copies a reset and a wipe set aside lose them at once, and the wipe''s card and the old last-left too') (
             -not (Test-Path (Join-Path $CF '_discarded-20261002-000000\ff000a05.json')) -and -not (Test-Path (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json')) -and
             $null -eq (J (Join-Path $R 'private\characters-before-20260930-000000.json')).who."$P1" -and $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1")
+    }
+    foreach ($R in $Live, $Dev) {
+        $CF = Join-Path $R 'world\changeForms'
+        $RA = Join-Path $R 'world-before-restore-20261004-000000'
+        Yes ((Split-Path -Leaf $R) + ': an appearance reset''s copy of their character goes at once, somebody else''s stays (#3620)') (
+            -not (Test-Path (Join-Path $CF 'ff000a01.json.bak-20261003-000000')) -and (Test-Path (Join-Path $CF 'ff000a02.json.bak-20261003-000000')))
+        Yes ((Split-Path -Leaf $R) + ': the world and private a restore set aside lose them at once, somebody else''s stay (#3620)') (
+            -not (Test-Path (Join-Path $RA 'world\changeForms\ff000a09.json')) -and (Test-Path (Join-Path $RA 'world\changeForms\ff000a0a.json')) -and
+            $null -eq (J (Join-Path $RA 'private\characters.json')).who."$P1" -and $null -ne (J (Join-Path $RA 'private\characters.json')).who."$PY")
     }
     Yes 'the live server''s folder an install set aside loses their change form at once' (-not (Test-Path (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json')))
     $prevList = J (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\deleted-characters.json')
@@ -480,6 +501,8 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
         $day -eq ('{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}' + "`n" + '{"at":150000,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"kept"}' + "`n" + '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}' + "`n"))
     Yes '  a day with none of theirs is not touched' ($before['\Thornswood-Voice\chat\2026-10-02.jsonl'] -eq (Get-FileHash (Join-Path $Vl 'chat\2026-10-02.jsonl')).Hash)
     Yes '  and a dev day of only theirs is left empty, not deleted' ((Get (Join-Path $Vd 'chat\2026-10-01.jsonl')) -eq '')
+    $ja = J (Join-Path $Bot 'data\joins.json-before-restore-20261020-101500')
+    Yes 'their join number is gone from the joins.json a restore set aside, at once, and the others stay' ($null -eq $ja.'900'.members.$ME -and $ja.'900'.members.$YOU -eq 38 -and $ja.'900'.last -eq 38)
     if ($botRan) {
         $jn = J (Join-Path $Bot 'data\joins.json')
         Yes 'their join number is gone and the last number given out stays' ($null -eq $jn.'900'.members.$ME -and $jn.'900'.members.$YOU -eq 40 -and $jn.'900'.last -eq 40)

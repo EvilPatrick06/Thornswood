@@ -128,6 +128,10 @@ link, and the old line goes.
 - **Every file we ship from Nexus has its author and terms recorded;** any
   with no permission is rebuilt as ours. 22 Oct 2026,
   [#2793](https://github.com/EvilPatrick06/Thornswood/issues/2793#issuecomment-6335267215).
+  Files made from another mod's records, which cannot be rebuilt, leave for
+  good and nobody asks for permission (the four Fishing In Skyrim faces).
+  26 Oct 2026,
+  [#2793](https://github.com/EvilPatrick06/Thornswood/issues/2793#issuecomment-6433239073).
 - **Food spoils gently:** raw in 1 real week, cooked in 2, preserved never.
   22 Oct 2026,
   [#3163](https://github.com/EvilPatrick06/Thornswood/issues/3163#issuecomment-6335272878).
@@ -197,6 +201,10 @@ link, and the old line goes.
   only by the Discord staff roles; when it is full, people wait in line at
   the main menu. 29 Sep 2026,
   [#481](https://github.com/EvilPatrick06/Thornswood/issues/481).
+- **One Discord account holds one seat**, on main and on dev: a second game
+  from an account already in the world is told why and ended. Staff testing
+  two-person scenes on dev use a second Discord account. 20 Oct 2026,
+  [#2887](https://github.com/EvilPatrick06/Thornswood/issues/2887).
 - **Dev is never rolled back;** a fault on dev is fixed forward. Only main is
   rolled back, then fixed. 29 Sep 2026,
   [#1158](https://github.com/EvilPatrick06/Thornswood/issues/1158).

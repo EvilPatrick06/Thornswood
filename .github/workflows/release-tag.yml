@@ -1,15 +1,16 @@
 # Makes a launcher release's v<version> tag on main's commit and starts
-# release.yml on it (#3312).
+# main's release.yml for it (#3312, #3930).
 #
-# WHY. release.yml signs only on a refs/tags/v ref, through the "release"
-# environment, whose deployment rule allows v* tags alone. A Ship that runs
+# WHY. release.yml builds a release for a v tag, and signs it only in a run
+# of main's own workflow, through the "release" environment, whose
+# deployment rule allows the branch main alone (#3930). A Ship that runs
 # from the cloud cannot push a tag: a cloud session's git pushes only its own
 # branch, and its GitHub access refuses ref writes (measured 22 Oct 2026 on
 # #3312: POST git/refs answered "Write access to this GitHub API path is not
 # permitted"). It can start a workflow. So this workflow makes the tag with
-# the repository token and starts release.yml on it; a tag the repository
-# token pushes starts no workflow by itself, which is why it starts
-# release.yml by name.
+# the repository token and starts main's release.yml for it (--ref main,
+# the tag as an input); a tag the repository token pushes starts no workflow
+# by itself, which is why it starts release.yml by name.
 #
 # WHAT IT HOLDS before it makes anything:
 #   - the tag is v<a.b.c> (a main release, the number Updater.cs already
@@ -89,7 +90,8 @@ jobs:
             Write-Host "made $tag on commit $commit"
           }
 
-          # release.yml has GitHub's runner alone since #4013, so no runner input.
-          $run = @{ ref = $tag; inputs = @{ tag = $tag; expected_sha = $commit } } | ConvertTo-Json
+          # Main's copy of release.yml, which alone signs (#3930), on GitHub's
+          # runner alone since #4013, so no runner input.
+          $run = @{ ref = 'main'; inputs = @{ tag = $tag; expected_sha = $commit } } | ConvertTo-Json
           Invoke-RestMethod -Method Post -Uri "$api/actions/workflows/release.yml/dispatches" -Headers $headers -ContentType 'application/json' -Body $run | Out-Null
-          Write-Host "started release.yml on $tag"
+          Write-Host "started main's release.yml for $tag"

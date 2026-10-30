@@ -317,7 +317,7 @@ if ($route -eq 'github') {
 
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         $out = @(Invoke-ThornswoodNative { @($line) | & ssh @sshArgs $target $remote } 2>&1 | ForEach-Object { "$_".Trim() } |
-                 Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+                 Where-Object { $_ })
         $code = $LASTEXITCODE
         $ErrorActionPreference = $old
     }
