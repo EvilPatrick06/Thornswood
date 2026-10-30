@@ -13,6 +13,8 @@
     "reads": [], "writes": ["game/data/races.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Build-FoodTable.js", "data": "--data", "plugins": "--plugins",
     "reads": [], "writes": ["game/data/food.json", "game/gamemode.js"] },
+  { "tool": "scripts/dev/Build-IngredientTable.js", "data": "--data", "plugins": "--plugins",
+    "reads": [], "writes": ["game/data/ingredients.json"] },
   { "tool": "scripts/dev/Build-SpellTable.ps1", "data": "-Data", "plugins": null,
     "reads": [], "uses": ["game/ui/thornswood-skills.js"], "writes": ["game/data/spells.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Build-FireTable.js", "data": "--data", "plugins": "--plugins",
