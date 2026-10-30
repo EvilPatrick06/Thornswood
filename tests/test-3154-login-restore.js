@@ -48,7 +48,9 @@
     H  the login is seen once: their profession is said once for each login
        and not at all for the reload;
     X  and no other property of the character moved, apart from the views
-       the server sends their game again, worked out from what is kept.
+       the server sends their game again, worked out from what is kept, and
+       the stamp of the two records a login restamps on purpose (the alchemy
+       lesson and the pack's spoil clock), whose contents must not move.
 
   And somebody in the creation hall at a reload is not taken for a
   reconnect: their wait is not started over (the hall's own first sight).
@@ -284,6 +286,15 @@ proc.run(20000);
 
 const VIEWS = ['thornswoodCharacter', 'thornswoodNeeds', 'thornswoodNear', 'thornswoodPartyAt',
                'thornswoodSocialView', 'thornswoodSky', 'thornswoodRecipeCounts'];
+// Records whose at is a stamp that a login moves on purpose: the alchemy
+// lesson goes out under a new stamp so the game is taught it again at each
+// arrival (#3480), and the pack's spoil clock looks at the pack at a login
+// and counts none of the time away (#4978). Everything else in them is kept.
+const CLOCKS = ['thornswoodAlchemyLearn', 'thornswoodSpoilPack'];
+function unstamped(v) {
+  if (!v || typeof v !== 'object') { return v; }
+  const o = Object.assign({}, v); delete o.at; return o;
+}
 const WINDOWS = ['drugUntil', 'drugCrash', 'ale', 'aleAt', 'mealHelp', 'mealHelpUntil', 'hangover'];
 
 /* The first needs record written for them at or after t. */
@@ -342,6 +353,10 @@ function check(way, before, claims, back, away) {
   const moved = [];
   Object.keys(Object.assign({}, before, after)).forEach(function (k) {
     if (VIEWS.indexOf(k) >= 0) { return; }
+    if (CLOCKS.indexOf(k) >= 0) {
+      if (!same(unstamped(before[k]), unstamped(after[k]))) { moved.push(k); }
+      return;
+    }
     if (!same(before[k], after[k])) { moved.push(k); }
   });
   const ch = Object.assign({}, after.thornswoodCharacter), cb = Object.assign({}, before.thornswoodCharacter);
