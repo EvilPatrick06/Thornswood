@@ -13,16 +13,20 @@
   WHAT IT HOLDS THEM TO.
     1. github-admin.yml is not here: it moved to the private ops repository
        with the VPS runners (#4013), whose tests\test-box-workflows.ps1
-       holds its shape, and Set-BuildRunners.ps1 starts it there.
+       holds its shape, and Set-BuildRunners.ps1 starts it there. Its ask input
+       takes repo-settings too (#3683), which Set-BuildRunners.ps1
+       -RepoSettings sends.
     2. Set-BuildRunners.ps1 -OnGitHub, against a stand-in for GitHub's token
        service and the admin service: it asks for this run's token for the
        audience thornswood-admin, hands it to 127.0.0.1:7791 with nothing
        but runner-labels and the check, and writes the answer (MATCHES,
        CHANGED <n>, DIFFERS <n>) as an annotation titled Set-BuildRunners
-       with the service's lines; installation-repos (#4013) asks for that
-       alone and answers REPOS <n>; an ask it does not know asks nothing; a
-       refusal, a stop, or an answer that is not the service's is an error;
-       with no OIDC token to ask for it asks nothing.
+       with the service's lines; with -RepoSettings it asks for
+       repo-settings and titles its answer Set-RepoSettings;
+       installation-repos (#4013) asks for that alone and answers REPOS <n>;
+       an ask it does not know asks nothing; a refusal, a stop, or an answer
+       that is not the service's is an error; with no OIDC token to ask for
+       it asks nothing.
     3. Set-BuildRunners.ps1 in a session, against a stand-in for gh: it
        starts the ops repository's github-admin.yml on main with the check,
        reads the runner's annotation and exits 0, 1 or 2 by it, -AppRepos
@@ -101,7 +105,7 @@ function Invoke-WebRequest {
     if ([string]$Uri -eq 'http://127.0.0.1:7791/converge') { return [pscustomobject]@{ StatusCode = $s.code; Content = $s.content } }
     return [pscustomobject]@{ StatusCode = 599; Content = '' }
 }
-function OnGitHub([hashtable]$envs, [hashtable]$state) {
+function OnGitHub([hashtable]$envs, [hashtable]$state, [switch]$Rules) {
     $base = @{ tokenCode = 200; code = 200; content = '{"ok":true,"lines":["records/build-runners.json: GitHub matches it"],"changed":0,"differs":0}' }
     foreach ($k in $state.Keys) { $base[$k] = $state[$k] }
     $global:TSadmin = $base
@@ -112,7 +116,7 @@ function OnGitHub([hashtable]$envs, [hashtable]$state) {
     foreach ($k in $all.Keys) { $was[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $all[$k]) }
     try {
         $global:LASTEXITCODE = 0
-        $out = @(& $set -OnGitHub 6>&1 2>&1 | ForEach-Object { "$_" })
+        $out = @(& $set -OnGitHub -RepoSettings:$Rules 6>&1 2>&1 | ForEach-Object { "$_" })
         $rc = $LASTEXITCODE
     } finally {
         foreach ($k in $was.Keys) { [Environment]::SetEnvironmentVariable($k, $was[$k]) }
@@ -126,6 +130,11 @@ Yes '  it asked for this run''s token for the audience thornswood-admin, with th
     $r.Calls.Count -eq 2 -and $r.Calls[0].Uri -eq 'https://token.test/idtoken?api-version=2.0&audience=thornswood-admin' -and $r.Calls[0].Auth -eq 'bearer request-token')
 Yes '  and handed it to the box''s service on 127.0.0.1:7791 alone, past any proxy' ($r.Calls[1].Method -eq 'POST' -and $r.Calls[1].Uri -eq 'http://127.0.0.1:7791/converge' -and $r.Calls[1].Auth -eq 'Bearer oidc-for-this-run' -and $r.Calls[1].NoProxy)
 Yes '  asking for runner-labels and the check, nothing else' ($r.Calls[1].Body.what -eq 'runner-labels' -and $r.Calls[1].Body.check -eq $false -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 2)
+$r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/github-repo-settings.json: release tags made (active)"],"changed":1,"differs":1}' } -Rules
+Yes '-RepoSettings asks for repo-settings and the check, nothing else, and titles its answer Set-RepoSettings' (
+    $r.Code -eq 0 -and $r.Calls[1].Body.what -eq 'repo-settings' -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 2 -and $r.Out -match '::notice title=Set-RepoSettings::CHANGED 1%0Arecords/github-repo-settings\.json: release tags made')
+$r = OnGitHub @{ ADMIN_ASK = 'repo-settings' } @{ content = '{"ok":true,"lines":["records/github-repo-settings.json: GitHub matches it"],"changed":0,"differs":0}' }
+Yes '  and so does a run started for repo-settings, with no -RepoSettings' ($r.Code -eq 0 -and $r.Calls[1].Body.what -eq 'repo-settings' -and $r.Out -match '::notice title=Set-RepoSettings::MATCHES')
 $r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/build-runners.json: thornswood-vps-2, thornswood-build put on"],"changed":1,"differs":1}' }
 Yes 'labels put right: exit 0, CHANGED 1 with the lines' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::CHANGED 1%0Arecords/build-runners\.json: thornswood-vps-2, thornswood-build put on')
 $r = OnGitHub @{ ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["x would have y put on"],"changed":0,"differs":2}' }
@@ -177,14 +186,20 @@ function Session([hashtable]$a, [string]$run, [object[]]$notes) {
     $out = @(& $set @a 6>&1 2>&1 | ForEach-Object { "$_" })
     return [pscustomobject]@{ Out = ($out -join "`n"); Code = $LASTEXITCODE; Calls = @($global:TSghCalls); Body = $global:TSghBody }
 }
-function Note([string]$level, [string]$message) { return @{ annotation_level = $level; title = 'Set-BuildRunners'; message = $message } }
+function Note([string]$level, [string]$message, [string]$title = 'Set-BuildRunners') { return @{ annotation_level = $level; title = $title; message = $message } }
 
 $s = Session @{} $done @((Note 'notice' "CHANGED 1`nrecords/build-runners.json: thornswood-vps-2, thornswood-build put on"))
-Yes ("it starts the ops repository's github-admin.yml on main and says GitHub matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/Thornswood-Ops/actions/workflows/github-admin\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Out -match '1 label\(s\) changed')
+Yes ("it starts the ops repository's github-admin.yml on main and says GitHub matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/Thornswood-Ops/actions/workflows/github-admin\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Out -match 'runner records now; 1 change\(s\) made')
 Yes '  with check false, and the service''s lines' ($s.Body.inputs.check -eq 'false' -and $s.Out -match 'thornswood-build put on')
 Yes '  asking for runner-labels' ($s.Body.inputs.ask -eq 'runner-labels')
+$s = Session @{ RepoSettings = $true } $done @((Note 'notice' "CHANGED 1`nrecords/github-repo-settings.json: release tags made (active)" 'Set-RepoSettings'))
+Yes '-RepoSettings: ask repo-settings, it reads the Set-RepoSettings answer, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.ask -eq 'repo-settings' -and $s.Out -match 'matches main''s repository settings record now; 1 change' -and $s.Out -match 'release tags made')
+$s = Session @{ RepoSettings = $true; Check = $true } $done @((Note 'notice' "MATCHES`nx" 'Set-BuildRunners'), (Note 'notice' "DIFFERS 1`nrecords/github-repo-settings.json: main differs and would be put back" 'Set-RepoSettings'))
+Yes '  and with -Check reads its own answer, not the labels'' (exit 1)' ($s.Code -eq 1 -and $s.Out -match 'differs from main''s repository settings record in 1' -and $s.Out -match 'Set-BuildRunners\.ps1 -RepoSettings puts it right')
 $s = Session @{ AppRepos = $true } $done @((Note 'notice' "REPOS 2`ninstalled on EvilPatrick06/Thornswood`ninstalled on EvilPatrick06/Thornswood-Ops"))
 Yes '-AppRepos asks for installation-repos and says where the App is, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.ask -eq 'installation-repos' -and $s.Out -match 'installed on EvilPatrick06/Thornswood-Ops' -and $s.Out -match 'installed on 2 repositories')
+$s = Session @{ AppRepos = $true; RepoSettings = $true } $done @()
+Yes '-AppRepos with -RepoSettings: exit 1, nothing started' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
 $s = Session @{ Check = $true } $done @((Note 'notice' "DIFFERS 2`nx would have y put on"))
 Yes '-Check that differs: check true, exit 1' ($s.Code -eq 1 -and $s.Body.inputs.check -eq 'true' -and $s.Out -match 'differs from main''s runner records in 2')
 $s = Session @{ Check = $true } $done @((Note 'notice' "MATCHES`nrecords/build-runners.json: GitHub matches it"))
