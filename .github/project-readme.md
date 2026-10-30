@@ -19,7 +19,7 @@ is not going to get done.
 ## Working on it
 
 - Assign yourself when you start, and move the card to In Progress.
-- Found something new? Open an issue with the Work to do template and give it
+- Found something new? Open an issue with the Work for the team form and give it
   the Order of where it belongs (52.5 between 52 and 53 is fine), not the end.
 - Something that fits an existing issue goes on that issue as an edit or a
   comment, not a second issue.
@@ -44,6 +44,6 @@ is not going to get done.
 
 The rules behind all of this are in
 [Developer-Guide.md](https://github.com/EvilPatrick06/Thornswood/blob/main/Developer-Guide.md).
-Every entry from before the board, finished ones included, is in
-[docs/archive/todo-list-2026-09-25.md](https://github.com/EvilPatrick06/Thornswood/blob/main/docs/archive/todo-list-2026-09-25.md);
-an "entry 243" in the code means entry 243 there.
+Every entry from before the board, finished ones included, is in the team's
+dated To Do List of 25 September, kept in the private ops repo; an "entry 243"
+in the code means entry 243 there.

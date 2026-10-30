@@ -99,7 +99,7 @@ function unquote(c) { return /^`[^`]*`$/.test(c) ? c.slice(1, -1) : null; }
 // ---- the status line -------------------------------------------------------
 const LAST_RUN = /\*\*Last run: ([^*]+?)\.?\*\*/;
 const status = LAST_RUN.exec(doc);
-yes('there is a Last run line, the way docs\\RESTORING.md has one', !!status);
+yes('there is a Last run line, the way RESTORING.md in the ops repo has one', !!status);
 const runAt = doc.indexOf('## The run');
 yes('the Last run line comes before the run, where the reader meets it first', !!status && runAt > 0 && status.index < runAt);
 const neverRun = !!status && /^never$/i.test(status[1].trim());

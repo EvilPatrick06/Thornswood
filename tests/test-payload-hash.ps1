@@ -320,6 +320,51 @@ process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
     New-Item -ItemType Directory -Path $none -Force | Out-Null
     Yes 'no zip means an empty reply, as before' ((Reply $none) -eq '{}')
 
+    # ---- 2b. a one file publish takes the old payload off (#3560) -------------
+    #
+    # On 26 Oct the site held the one file Thornswood-Setup.exe of 18 Oct and
+    # the two file payload zip of 3 Oct, and /api/payload still handed the zip
+    # to any two file setup program: a one file publish sent the exe alone and
+    # its files.json write kept every key. Now the write takes the zip and its
+    # key off when the installer is one file, and keeps them when it is two.
+    Yes 'the files.json write knows which shape it is publishing' (
+        $pub -match '(?m)^\$oneFileFlag = \$\(if \(\$single\) \{ ''1'' \} else \{ ''0'' \}\)' -and
+        $writeBody -match "(?s)if \('\`$oneFileFlag' -eq '1'\) \{.{0,400}Remove-Item -LiteralPath .{0,400}\`$all\.Remove\('\`$zipOut'\)")
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the one file write, run: the box runs it under Windows PowerShell 5.1, and this is not Windows'
+    } elseif ($writeBody) {
+        $keepDocs = $docs
+        foreach ($shape in 'one', 'two') {
+            $docs = Join-Path $work ('docs-' + $shape)
+            $dir = Join-Path $docs 'files'
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            Copy-Item -LiteralPath $zipPath -Destination (Join-Path $dir $zipOut)
+            [IO.File]::WriteAllBytes((Join-Path $dir $exeOut), [byte[]](1, 2, 3))
+            [IO.File]::WriteAllText((Join-Path $dir 'files.json'),
+                ('{"' + $zipOut + '":{"sha256":"' + $want.ToLower() + '","hidden":true},"Other-Download.zip":{"sha256":"ab"}}'), $noBom)
+            $single = ($shape -eq 'one')
+            $oneFileFlag = $(if ($single) { '1' } else { '0' })
+            $zipItem = $(if ($single) { $null } else { Get-Item -LiteralPath $zipPath })
+            $zipSha = $null
+            if (-not $single -and $hashLine) { Invoke-Expression $hashLine }
+            $meta = $null
+            Invoke-Expression $metaBlock
+            $r = Run-Remote $writeBody
+            $after = Get-Content -LiteralPath (Join-Path $dir 'files.json') -Raw | ConvertFrom-Json
+            $zipThere = Test-Path -LiteralPath (Join-Path $dir $zipOut)
+            if ($single) {
+                Yes 'a one file publish over an old payload: the write succeeds' ($r.Code -eq 0)
+                Yes '  the zip is gone from the site' (-not $zipThere)
+                Yes '  its files.json entry is gone, every other download kept' (-not $after.PSObject.Properties[$zipOut] -and $after.PSObject.Properties['Other-Download.zip'] -and $after.PSObject.Properties[$exeOut])
+                Yes '  and /api/payload answers {}' ((Reply $dir) -eq '{}')
+            } else {
+                Yes 'a two file publish: the zip it just sent stays' ($r.Code -eq 0 -and $zipThere -and $after.PSObject.Properties[$zipOut])
+                Yes '  and /api/payload still names it' ((Field (Parse (Reply $dir)) 'name') -eq $zipOut)
+            }
+        }
+        $docs = $keepDocs
+    }
+
     # ---- 3. the installer checks it ------------------------------------------
     $bs = Get-Content -LiteralPath $BootstrapPath -Raw
 

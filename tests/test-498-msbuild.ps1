@@ -19,8 +19,8 @@
        only (no -With, no in-box csc, no Ship -LauncherWith);
     2. Build-Launcher.ps1 builds both exes, unsigned, into scratch;
     3. each embedded resource is byte for byte its file in the repository;
-    4. the references are the framework assemblies and WebView2, and nothing
-       restored;
+    4. the references are the framework assemblies, WebView2 and NLayer (the
+       menu theme's decoder, #3207), and nothing restored;
     5. the PE kind (AnyCPU, not 32 bit preferred, GUI subsystem 4.00, high
        entropy ASLR off), no TargetFrameworkAttribute, the entry point;
     6. the file details Windows shows carry Updater.cs's version, and the
@@ -92,6 +92,7 @@ $appResources = [ordered]@{
     'Microsoft.Web.WebView2.Core.dll' = 'launcher\lib\webview2\Microsoft.Web.WebView2.Core.dll'
     'Microsoft.Web.WebView2.Wpf.dll'  = 'launcher\lib\webview2\Microsoft.Web.WebView2.Wpf.dll'
     'WebView2Loader.dll'              = 'launcher\lib\webview2\WebView2Loader.dll'
+    'NLayer.dll'                      = 'launcher\lib\nlayer\NLayer.dll'
     'voice-host.html'                 = 'launcher\voice-host.html'
     'Thornswood.ini'                  = 'launcher\Thornswood.ini'
     'client-build.json'               = 'records\client-build.json'
@@ -107,11 +108,11 @@ Yes ('the launcher project embeds exactly the resources the code reads: ' + (@(N
     Same @(Names $appProj '//m:EmbeddedResource/m:LogicalName') @($appResources.Keys))
 Yes 'the setup project embeds logo-192.png as logo.png' ((Same @(Names $setupProj '//m:EmbeddedResource/m:LogicalName') @('logo.png')) -and
     (@(Attr $setupProj '//m:EmbeddedResource/@Include') -join '') -match 'logo-192\.png$')
-Yes 'the launcher project references the framework assemblies and WebView2' (
-    Same @(Attr $appProj '//m:Reference/@Include') (@($frameworkRefs) + 'Microsoft.Web.WebView2.Core', 'Microsoft.Web.WebView2.Wpf'))
+Yes 'the launcher project references the framework assemblies, WebView2 and NLayer' (
+    Same @(Attr $appProj '//m:Reference/@Include') (@($frameworkRefs) + 'Microsoft.Web.WebView2.Core', 'Microsoft.Web.WebView2.Wpf', 'NLayer'))
 Yes 'the setup project references the same framework assemblies' (Same @(Attr $setupProj '//m:Reference/@Include') $frameworkRefs)
-Yes 'WebView2 is never copied beside the exe (Private false on both)' (
-    @(Select-Xml -Xml $appProj -XPath "//m:Reference[starts-with(@Include,'Microsoft.Web.WebView2')]/m:Private" -Namespace $ns | Where-Object { $_.Node.InnerText -eq 'false' }).Count -eq 2)
+Yes 'WebView2 and NLayer are never copied beside the exe (Private false on all three)' (
+    @(Select-Xml -Xml $appProj -XPath "//m:Reference[starts-with(@Include,'Microsoft.Web.WebView2') or @Include='NLayer']/m:Private" -Namespace $ns | Where-Object { $_.Node.InnerText -eq 'false' }).Count -eq 3)
 foreach ($pair in @(@{ Doc = $appProj; Name = 'launcher' }, @{ Doc = $setupProj; Name = 'setup' })) {
     $d = $pair.Doc
     Yes "the $($pair.Name) project is at C# 13.0 (the C# 5 rule lifted with the switch)" ((Names $d '//m:LangVersion') -join '' -eq '13.0')
@@ -431,8 +432,8 @@ foreach ($kind in @(@{ Path = $exe; Name = 'the launcher'; Res = $appResources; 
     Yes "$($kind.Name): every embedded resource is byte for byte its file in the repository" ($off.Count -eq 0)
     foreach ($l in ($off | Select-Object -First 20)) { Write-Host "      differs: $l" }
     $refs = @($s | Where-Object { $_ -like 'asmref *' } | ForEach-Object { ($_ -split ' ')[1] })
-    $allowed = @('mscorlib') + $frameworkRefs + @('Microsoft.Web.WebView2.Core', 'Microsoft.Web.WebView2.Wpf')
-    Yes ("$($kind.Name): references only the framework and WebView2: " + ($refs -join ', ')) (@($refs | Where-Object { $allowed -notcontains $_ }).Count -eq 0)
+    $allowed = @('mscorlib') + $frameworkRefs + @('Microsoft.Web.WebView2.Core', 'Microsoft.Web.WebView2.Wpf', 'NLayer')
+    Yes ("$($kind.Name): references only the framework, WebView2 and NLayer: " + ($refs -join ', ')) (@($refs | Where-Object { $allowed -notcontains $_ }).Count -eq 0)
     Yes "$($kind.Name): no TargetFrameworkAttribute" (@($s | Where-Object { $_ -like '*TargetFrameworkAttribute*' }).Count -eq 0)
     Yes "$($kind.Name): AnyCPU, not 32 bit preferred, GUI subsystem 4.00, high entropy ASLR off" (
         @($s | Where-Object { $_ -eq 'pe corflags ILOnly' -or $_ -eq 'pe subsystem WindowsGui 4.0' -or $_ -eq 'pe highentropyva False' }).Count -eq 3)
