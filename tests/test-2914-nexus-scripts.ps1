@@ -45,7 +45,14 @@
        same files as the published one and only the swapped entry changed,
        as a draft; a second draft, a base that is not the latest and a
        publish of something that is not a draft are refused; -Publish
-       publishes it.
+       publishes it;
+    6. taking a mod out (#3649): its entry and its plugins go and nothing
+       else changes; one with patches, no hashes or a rule naming it is
+       refused;
+    7. what each mod's page allows (#3649): a revision with a mod the
+       permission record has not read, or does not have, is refused before
+       anything is written, and so is publishing a draft with a mod whose
+       page does not allow it in a collection; a -WhatIf says so and goes on.
 
   Needs node. The collection part needs 7-Zip and says SKIP without it; the
   5.1 runs say SKIP where there is no Windows PowerShell. Everything it writes
@@ -134,6 +141,9 @@ function Run([string]$name, [string[]]$arguments, [switch]$Win51) {
     if ($Win51) { $exe = $winps }
     $psi = New-Object Diagnostics.ProcessStartInfo
     $psi.FileName = $exe
+    # New-NexusRevision holds every mod to a permission record (#3649): the
+    # stand-in's mods are in one of the test's own, never the real one.
+    if ($name -eq 'New-NexusRevision.ps1') { $arguments = @($arguments) + @('-Permissions', $script:perm) }
     $psi.Arguments = ((@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Q (Join-Path $rel $name))) + @($arguments | ForEach-Object { Q $_ }) + @('-NoPause')) -join ' ')
     $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
     $p = [Diagnostics.Process]::Start($psi)
@@ -144,6 +154,21 @@ function Run([string]$name, [string[]]$arguments, [switch]$Win51) {
     $script:outs.Add($text)
     return [pscustomobject]@{ Code = $p.ExitCode; Out = $text }
 }
+# The permission record for the stand-in's mods (#3649), with what each
+# page says set per run: ours, a reading's collections value, or null.
+$script:perm = Join-Path $T 'collection-permissions.json'
+function Perm([hashtable]$say) {
+    $rows = foreach ($id in @(1111, 1932, 47618, 192001, 192762)) {
+        if (-not $say.ContainsKey($id)) { continue }
+        $v = $say[$id]
+        $head = '{"modId":' + $id + ',"name":"Mod ' + $id + '","author":"Someone","files":[{"fileId":1,"name":"f","version":"1"}],"plugins":[],"page":"https://www.nexusmods.com/skyrimspecialedition/mods/' + $id + '?tab=description"'
+        if ($v -eq 'ours') { $head + ',"ours":true,"reading":null}' }
+        elseif ($null -eq $v) { $head + ',"reading":null}' }
+        else { $head + ',"reading":{"read":"2026-10-27","by":"the test","collections":"' + $v + '","terms":{"Author''s instructions":"x"}}}' }
+    }
+    Put $script:perm ('{"version":1,"collection":"7essxf","revision":2,"mods":[' + (@($rows) -join ',') + ']}')
+}
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
 function Show($r) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 14) -join "`n") -ForegroundColor DarkGray }
 function YesR([string]$what, [bool]$cond, $r) { Yes $what $cond; if (-not $cond) { Show $r } }
 function Writes($reqs) { return @($reqs | Where-Object { $_.method -ne 'GET' -and -not ($_.path -eq '/v2/graphql' -and -not ([string]$_.json.query).StartsWith('mutation')) }) }
@@ -443,6 +468,34 @@ foreach ($case in @(
     Yes ('a patch for ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
 }
 
+# Issue #3649: a mod taken out, with the plugins its hashes put in Data.
+$rmJson = Join-Path $T 'remove.json'
+Put $rmJson '[{"remove":true,"modId":"1111"}]'
+$o1 = Join-Path $T 'remove-collection.json'; $o2 = Join-Path $T 'remove-payload.json'
+$said = & $node.Source $js $cj $rmJson $o1 $o2
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));if(b.mods.some(m=>m.source.modId===1111))process.exit(2);a.mods=a.mods.filter(m=>m.source.modId!==1111);process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1
+Yes 'nexus-collection.js takes the hashed mod out, says so, and changes nothing else' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("A Hashed Mod`tremoved`t`tfile 2222"))
+$cjp = Join-Path $T 'remove-plugins.json'
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.plugins=[{name:'A.esp',enabled:true},{name:'b.esp',enabled:true}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+$said = & $node.Source $js $cjp $rmJson $o1 $o2
+& $node.Source -e "const b=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.exit(JSON.stringify(b.plugins)===JSON.stringify([{name:'b.esp',enabled:true}])?0:1)" $o1
+Yes 'its plugin comes off the plugin list whatever its case, and the rest stay' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("A Hashed Mod`tremoved`t`tfile 2222|A.esp`tplugin`t`tremoved"))
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.plugins=[{name:'a.esp',enabled:true},{name:'b.esp',enabled:true}];c.pluginRules.plugins=[{name:'b.esp',after:['a.esp']}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+$null = & $node.Source $js $cjp $rmJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+Yes 'taking out a mod whose plugin a plugin rule names is refused, and nothing is written' ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.mods[2].hashes=[{path:'Fishing.esp',md5:'x'}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+foreach ($case in @(
+        @($cj, '192001', 'patches'),
+        @($cj, '192762', 'no file hashes'),
+        @($cjp, '47618', 'a mod rule naming it'),
+        @($cj, '5555', 'no entry'))) {
+    Put $rmJson ('[{"remove":true,"modId":"' + $case[1] + '"}]')
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $null = & $node.Source $js $case[0] $rmJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+    Yes ('taking out a mod with ' + $case[2] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+
 if (-not $sz) { Skip 'the collection revision runs: 7-Zip is not on this machine'; Done }
 $baseArchive = Join-Path $T 'vortex\collection_7essxf_2_2026-10-03T17-33-45Z.7z'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $baseArchive) | Out-Null
@@ -486,6 +539,13 @@ $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
 $built = Join-Path $T 'scratch\nexus-revision-7essxf\out\collection_3.7z'
 YesR '-WhatIf builds collection_3.7z with the same files as revision 2 and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'source\.fileId: 809366 -> 812346' -and $r.Out -match 'the same 5 files and folders as revision 2' -and (Test-Path -LiteralPath $built) -and @(Writes @(Since $n0)).Count -eq 0) $r
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', '1111', '-WhatIf')
+YesR '-Remove -WhatIf builds the revision without the mod, with the same files, and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'A Hashed Mod, removed: file 2222' -and $r.Out -match 'the same 5 files and folders as revision 2' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', '192001', '-WhatIf')
+YesR '-Remove of a mod with patches is refused, saying so' ($r.Code -eq 1 -and $r.Out -match 'Thornswood Content carries patches') $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', 'x', '-WhatIf')
+YesR '-Remove of something that is not a mod number is refused' ($r.Code -eq 1 -and $r.Out -match '-Remove x is not a mod number') $r
 # Issue #2969: with no -From the published revision comes from Nexus, as it
 # does in a cloud session, where there is no Vortex.
 Control @{ addRevision = @{ n = 2; id = 801014; status = 'published'; archive = $baseArchive } }
@@ -493,6 +553,22 @@ $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
 $got = @(Since $n0)
 YesR 'with no -From it downloads the published revision from Nexus, the CDN getting no key' ($r.Code -eq 0 -and $r.Out -match 'revision 2, the latest published' -and $r.Out -match 'the same 5 files and folders as revision 2' -and @($got | Where-Object { $_.path -eq '/v2/collections/515846/revisions/801014/download_link' }).Count -eq 1 -and @($got | Where-Object { $_.path -like '/cdn/collection/801014*' -and $_.key -eq 'none' }).Count -eq 1 -and @(Writes $got).Count -eq 0) $r
+
+# Issue #3649: every mod in the revision is held to what its page allows.
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = $null; 192001 = 'ours'; 192762 = 'ours' }
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
+YesR 'a revision with a mod whose page nobody has read is refused before anything is written, naming its page' ($r.Code -eq 1 -and $r.Out -match 'mod 47618 \(Mod 47618\): its page has not been read: https://www\.nexusmods\.com/skyrimspecialedition/mods/47618\?tab=description' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
+YesR 'a -WhatIf says the same, that a run that writes stops there, and still builds the revision' ($r.Code -eq 0 -and $r.Out -match 'its page has not been read' -and $r.Out -match 'A run that writes stops here' -and $r.Out -match 'the same 5 files and folders as revision 2') $r
+Perm @{ 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
+YesR 'a revision with a mod the record does not have is refused before anything is written' ($r.Code -eq 1 -and $r.Out -match 'mod 1111: not in the record' -and @(Writes @(Since $n0)).Count -eq 0) $r
+Perm @{ 1111 = 'not allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
+YesR 'a revision with a mod whose page does not allow it in a collection is refused' ($r.Code -eq 1 -and $r.Out -match 'mod 1111 \(Mod 1111\): its page, read 2026-10-27, does not allow it in a collection') $r
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
 
 $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
@@ -556,6 +632,15 @@ YesR 'an archive whose plugins are not the ones named is refused' ($r.Code -eq 1
 AddFile (Join-Path $T 'fomod.7z') $hair
 $r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
 YesR 'an archive with a FOMOD installer is refused' ($r.Code -eq 1 -and $r.Out -match 'has a FOMOD installer') $r
+AddFile $hairArc $hair
+Perm @{ 1111 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'a mod -Add puts in that the record does not have is named, and a run that writes would stop' ($r.Code -eq 0 -and $r.Out -match 'mod 1932: not in the record' -and $r.Out -match 'A run that writes stops here') $r
+Perm @{ 1111 = 'not allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-Publish', '3')
+YesR 'publishing a draft with a mod whose page does not allow it in a collection is refused, and no mutation goes' ($r.Code -eq 1 -and $r.Out -match 'mod 1111 \(Mod 1111\): its page, read 2026-10-27, does not allow it in a collection' -and @(Writes @(Since $n0)).Count -eq 0 -and (State).collection.latest -eq 2) $r
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
 $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-Publish', '3', '-WhatIf')
 YesR '-Publish -WhatIf names the revision and sends no mutation' ($r.Code -eq 0 -and $r.Out -match 'publishRevision\(revisionId: "900003"\)' -and @(Writes @(Since $n0)).Count -eq 0) $r

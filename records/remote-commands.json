@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  73,
-    "callCount":  292,
+    "scriptCount":  74,
+    "callCount":  293,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2219,6 +2219,15 @@
                       "does":  "sends a script with a secret on stdin",
                       "class":  "transport",
                       "reason":  "carries what its caller hands it; each caller is mapped instead"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-InboundRules.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs vps-inbound-rules.ps1, sent on standard input (#3035), which turns off every inbound Allow rule not on the box's list (#3807)",
+                      "class":  "admin",
+                      "reason":  "firewall change"
                   },
                   {
                       "script":  "scripts/vps/Set-SshScope.ps1",

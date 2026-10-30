@@ -91,7 +91,7 @@ $code = (@($y -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
 $on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'it is started by hand and by a push, nothing else' ($on -match '(?m)^  workflow_dispatch:' -and $on -match '(?m)^  push:' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 2)
 Yes '  by hand with a check input that is a boolean' ($on -match '(?ms)check:\n\s+description:[^\n]*\n\s+type: boolean\n\s+default: false')
-Yes '  a push to main only, and only when a runner record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n?$")
+Yes '  a push to main only, and only when a runner record or the About record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n\s+- 'records/repo-about\.json'\n?$")
 $perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
 Yes ("its token reads the repository and asks for an OIDC token, nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: read`n  id-token: write")
 Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
@@ -101,7 +101,7 @@ Yes '  with a timeout' ($code -match '(?m)^    timeout-minutes: \d+$')
 Yes '  in no environment, so it holds no secret' ($code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
 Yes 'the checkout keeps no token' ($code -match 'uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
 Yes '  and every file is written again after it (#3029)' ($code -match '- name: Check every tracked file out again')
-$step = [regex]::Match($code, '(?ms)- name: Ask the box\n(.*)$').Groups[1].Value
+$step = [regex]::Match($code, '(?ms)- name: Ask the box\n(.*?)(?=\n      - name: |\z)').Groups[1].Value
 Yes 'the step is pwsh with no profile' ($step -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
 $run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes '  running main''s Set-BuildRunners.ps1 -OnGitHub' ($run -match "scripts/deploy/Set-BuildRunners\.ps1'\) -OnGitHub")
@@ -109,6 +109,15 @@ Yes '  with nothing pasted into its script' ($run -notmatch '\$\{\{')
 Yes '  and the check through the environment' ($step.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
 Yes 'by hand with an ask input: runner-labels or installation-repos, runner-labels by default' ($on -match '(?ms)ask:\n\s+description:[^\n]*\n\s+type: choice\n\s+options:\n\s+- runner-labels\n\s+- installation-repos\n\s+default: runner-labels')
 Yes '  through the environment too, runner-labels on a push' ($step.Contains("ADMIN_ASK: `${{ inputs.ask || 'runner-labels' }}"))
+# The About box (#3682): its own step after the runner labels, run whatever
+# they answered, the same way.
+$about = [regex]::Match($code, '(?ms)- name: Match the About box\n(.*?)(?=\n      - name: |\z)').Groups[1].Value
+Yes 'the About box has a step of its own' ($about -ne '')
+Yes '  that runs whatever the runner labels answered, but not for installation-repos' ($about -match '(?m)^\s+if: \$\{\{ !cancelled\(\) && inputs\.ask != ''installation-repos'' \}\}$')
+Yes '  under pwsh with no profile' ($about -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
+$aboutRun = [regex]::Match($about, '(?ms)run: \|\n(.*)$').Groups[1].Value
+Yes '  running main''s Set-RepoAbout.ps1 -OnGitHub, nothing pasted in' ($aboutRun -match "scripts/deploy/Set-RepoAbout\.ps1'\) -OnGitHub" -and $aboutRun -notmatch '\$\{\{')
+Yes '  and the check through the environment' ($about.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
 
 # ---- 2. the GitHub half ------------------------------------------------------
 Write-Host ''; Write-Host 'the GitHub half'

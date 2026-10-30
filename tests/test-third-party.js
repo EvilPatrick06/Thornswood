@@ -118,6 +118,93 @@ resources.forEach(function (name) {
   }
 });
 
+// ---------------------------------------------------------------- launcher source
+//
+// The launcher's code is compiled into it too, and one file of it,
+// FromGameDeflate.cs, is zlib 1.3 translated into C#. It went out from #2827
+// with no zlib notice and THIRD-PARTY.md calling everything compiled in
+// Thornswood's own (#3668). So the header of every .cs file under
+// launcher\app and installer\setup (its comments down to the first type it
+// declares) is read for outside projects: the libraries in
+// records\client-licences, the numeric and compression ones the launcher's
+// work touches, and any line saying code was translated, ported, adapted or
+// copied, or carrying a copyright line. Each file that names one needs a row
+// in THIRD-PARTY.md's "Launcher source that names outside work" naming what it
+// names, and a row that says a file carries a library's code needs that
+// library's notice in the file's header word for word, the file marked as
+// altered, and THIRD-PARTY.md pointing at the licence text.
+const SRC_DIRS = [path.join('launcher', 'app'), path.join('installer', 'setup')];
+const LIC_DIR = path.join(REPO, 'records', 'client-licences');
+const licNames = (fs.existsSync(LIC_DIR) ? fs.readdirSync(LIC_DIR) : [])
+  .filter(function (n) { return /\.txt$/i.test(n); })
+  .map(function (n) { return n.replace(/\.txt$/i, ''); });
+yes('records\\client-licences has licence texts to name (' + licNames.length + ')', licNames.length > 0);
+const OUTSIDE = licNames.concat(['deflate.c', 'trees.c', 'inflate.c', 'miniz', 'LZ4', 'LZMA', '7-Zip',
+  'OpenBLAS', 'LAPACK', 'BLAS', 'numpy', 'Eigen', 'Newtonsoft', 'Json.NET', 'SharpZipLib', 'DotNetZip',
+  'BouncyCastle', 'Mono', 'corefx', 'referencesource']);
+const SAYS_OUTSIDE = /\btranslat(ed|ion)\s+(of|from|into)\b|\bport(ed)?\s+(of|from)\b|\badapted\s+from\b|\bcopied\s+from\b|\bcopyright\s*(\(C\)|©)|\(C\)\s*\d{4}/i;
+function namesIn(text, name) {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^A-Za-z0-9_-])' + esc + '($|[^A-Za-z0-9_-])', 'i').test(text);
+}
+function header(src) {
+  const out = [];
+  const lines = src.replace(/\r/g, '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (/^(\[[^\]]*\]\s*)*((public|internal|static|sealed|partial|abstract)\s+)*(class|struct|enum|interface)\s/.test(t)) { break; }
+    if (t.indexOf('//') === 0) { out.push(t.replace(/^\/+ ?/, '').replace(/<\/?summary>/g, '')); }
+  }
+  return out.join('\n');
+}
+const srcSection = (/\n### Launcher source that names outside work\n([\s\S]*?)(\n## |\n### |$)/.exec(N) || [])[1] || '';
+yes('THIRD-PARTY.md has the section "Launcher source that names outside work"', srcSection.length > 0);
+const srcRows = {};
+srcSection.split('\n').forEach(function (l) {
+  const m = /^\| `([^`]+\.cs)` \| ([^|]*) \| ([^|]*) \|/.exec(l);
+  if (m) { srcRows[m[1]] = { names: m[2], carries: m[3].trim() }; }
+});
+const srcFiles = {};
+SRC_DIRS.forEach(function (d) {
+  const full = path.join(REPO, d);
+  (fs.existsSync(full) ? fs.readdirSync(full) : []).filter(function (n) { return /\.cs$/i.test(n); })
+    .forEach(function (n) { srcFiles[n] = path.join(full, n); });
+});
+yes('there is launcher source to read (' + Object.keys(srcFiles).length + ' files)', Object.keys(srcFiles).length >= 50);
+const flagged = {};
+Object.keys(srcFiles).sort().forEach(function (n) {
+  const h = header(read(srcFiles[n]) || '');
+  const names = OUTSIDE.filter(function (o) { return namesIn(h, o); });
+  if (names.length === 0 && !SAYS_OUTSIDE.test(h)) { return; }
+  flagged[n] = true;
+  const row = srcRows[n];
+  yes(n + '\'s header names outside work (' + (names.join(', ') || 'says it was taken from somewhere') +
+      ') and THIRD-PARTY.md has its row', !!row);
+  if (!row) { return; }
+  names.forEach(function (o) {
+    yes('  its row names ' + o, namesIn(row.names, o));
+  });
+  const carried = /^yes:\s*(.+)$/i.exec(row.carries);
+  yes('  its row says whether it carries outside code ("yes: <library>" or "no")', !!carried || /^no$/i.test(row.carries));
+  if (!carried) { return; }
+  carried[1].split(',').map(function (s) { return s.trim(); }).forEach(function (lib) {
+    const text = read(path.join(LIC_DIR, lib + '.txt'));
+    yes('  ' + lib + '\'s licence text is in records\\client-licences', text !== null);
+    if (text === null) { return; }
+    const body = text.replace(/\r/g, '').split('\n')
+      .filter(function (l) { return !/copyright|\(C\)/i.test(l); }).join('\n');
+    yes('  its header carries ' + lib + '\'s notice word for word', flat(h).indexOf(flat(body)) >= 0);
+    yes('  its header says it is altered and not the original software',
+        /\baltered from\b/i.test(h) && /not the original software/i.test(h));
+    yes('  THIRD-PARTY.md points at records\\client-licences\\' + lib + '.txt',
+        N.indexOf('`records\\client-licences\\' + lib + '.txt`') >= 0);
+  });
+});
+Object.keys(srcRows).forEach(function (n) {
+  yes(n + ', in "Launcher source that names outside work", is launcher source whose header names outside work',
+      !!srcFiles[n] && !!flagged[n]);
+});
+
 // ---------------------------------------------------------------- launcher\lib
 //
 // Every file, by name and by sha256, so a newer WebView2 dropped in without a

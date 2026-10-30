@@ -68,6 +68,9 @@ function Facts { [ordered]@{
     versions = [ordered]@{ node = '22.11.0'; caddy = '2.8.4' }
     settings = [ordered]@{ 'C:\Thornswood-Docs\config.json' = [ordered]@{ botKey = 'string'; port = 'number' } }
     machineEnvNames = @()
+    # #3807: the required rules from the record, as the box had them on 26 Oct.
+    inboundRules = @(@((Get-Content (Join-Path $repo 'records\prod-parity.json') -Raw | ConvertFrom-Json).inboundRules | Where-Object { $_.required }) |
+        ForEach-Object { @{ name = ('{' + [guid]::NewGuid().ToString() + '}'); displayName = [string]$_.rule; protocol = 'TCP'; ports = @('1'); remote = @('Any') } })
 } }
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('prod-parity-' + [guid]::NewGuid().ToString('N'))
@@ -141,6 +144,20 @@ try {
     $new2165 = @(@($rj.listeners | Where-Object { "$($_.proto) $($_.port)" -in 'udp 443', 'tcp 135', 'tcp 445', 'udp 123', 'udp 5353', 'udp 5355' }) + @($rj.tasks | Where-Object { $_.name -in 'Thornswood Load', 'Thornswood Maint Update', 'Thornswood Dev Crash Capture' }))
     T ($new2165.Count -eq 9 -and -not @($new2165 | Where-Object { -not $_.why })) 'the nine rows from the Oct 11 run are recorded, each with a reason'
     T (-not @($rj.intentional)) 'expected state is recorded as expected, not as an ignore list'
+    # ---- #3807 inbound firewall rules
+    $g = Facts; $g.inboundRules += @{ name = '{7606AA2C-8B97-43D0-AB9E-BF57D54DF1A7}'; displayName = 'Allow WinRM HTTPS'; protocol = 'TCP'; ports = @('5986'); remote = @('Any') }
+    $g.inboundRules += @{ name = 'OpenSSH-Server-In-TCP'; displayName = 'OpenSSH SSH Server (sshd)'; protocol = 'TCP'; ports = @('22'); remote = @('127.0.0.1') }
+    $x = Run $g ''
+    T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  firewall Allow WinRM HTTPS: expected not listed in the record, found on, TCP 5986 from Any') 'an inbound rule on the box that the record does not list is caught'
+    T ($x.Out -notmatch 'REVIEW  firewall OpenSSH') 'one the record lists by its Name is not'
+    $g = Facts; $g.inboundRules = @($g.inboundRules | Where-Object { $_.displayName -ne 'Thornswood game (UDP)' })
+    $x = Run $g ''
+    T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  firewall Thornswood game \(UDP\): expected on \(required\), found off, or not on the box') 'a required rule that is off or gone is caught'
+    $g = Facts; $g.Remove('inboundRules')
+    $x = Run $g ''
+    T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  firewall inbound rules') 'facts that carry no inbound rules are not taken for a clean firewall'
+    T (@($rj.inboundRules).Count -ge 10 -and -not @($rj.inboundRules | Where-Object { -not $_.why })) 'records\prod-parity.json lists the inbound rules the box keeps, each with a reason'
+
     $rec2 = Get-Content (Join-Path $repo 'records\prod-parity.json') -Raw
     T ($rec2 -notmatch '(?i)password\s*[=:]|BEGIN ') 'records\prod-parity.json holds no secret'
 } finally { Remove-Item -LiteralPath $scratch -Recurse -Force -EA SilentlyContinue }
