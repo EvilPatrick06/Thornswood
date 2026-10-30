@@ -420,7 +420,8 @@ if ($OnWindows) {
     $refs = @(); $missing = @()
     foreach ($n in $LauncherNeeded) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
     Yes ('every framework reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
-    $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'DevBuild.cs') |
+    # OwnGameKinds and Verify name LastPlugin (#2791), which reads the game's archives through FromGameArchive.cs.
+    $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'DevBuild.cs', 'LastPlugin.cs', 'FromGameArchive.cs') |
         ForEach-Object { Join-Path $App $_ }
     $real += @((Join-Path $Tool 'ShipRoot.cs'), (Join-Path $Tool 'OwnGameShipRoot.cs'))
     foreach ($f in $real) { Yes ("$([IO.Path]::GetFileName($f)) is there") (Test-Path -LiteralPath $f) }

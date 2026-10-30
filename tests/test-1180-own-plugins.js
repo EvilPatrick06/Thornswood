@@ -231,12 +231,14 @@ if (block) {
       /foreach \(ServerMod\[\] list in new ServerMod\[\]\[\] \{ doc\.mods, light \}\)/.test(verify));
   const fix = slice(verify, "public static int Fix(Config cfg, Action<string> say, Func<string, byte[]> release)", "\n        }\n");
   yes("Fix's fetch of a missing plugin passes over any the server does not serve",
-      !!fix && /Storefront\.Contains\(m\.filename\) \|\| !m\.Served\) continue;/.test(fix) &&
+      !!fix && /Storefront\.Contains\(m\.filename\) \|\| !m\.Served( \|\| LastPlugin\.Makes\(Paths\.Game, m\.filename\))?\) continue;/.test(fix) &&
       /miss\.Served = true;\s*if \(FetchPlugin\(cfg, miss, release, say\)\) n\+\+;/.test(fix));
   yes("Fix fetches a missing plugin of ours from the light list as well as mods",
       !!fix && /int all = mods\.Length \+ light\.Length;/.test(fix) && /miss\.WantLight = isLight;/.test(fix));
   yes("Fix's fetch of a plugin that differs goes through FetchPlugin with Scan's issue",
-      !!fix && /foreach \(Issue i in Bytes\(cfg\)\)\s*if \(i\.Plugin != null && FetchPlugin\(cfg, i, release, say\)\) n\+\+;/.test(fix));
+      !!fix && /foreach \(Issue i in Bytes\(cfg\)\)\s*if \(i\.Plugin != null && (!LastPlugin\.Makes\(Paths\.Game, i\.Plugin\) && )?FetchPlugin\(cfg, i, release, say\)\) n\+\+;/.test(fix));
+  // #2791: the plugin the release's recipe makes here is never fetched;
+  // tests/test-2791-last-plugin.ps1 holds that.
 
   const from = slice(verify, "static string FromVortex(Config cfg, string plugin)", "\n        }\n");
   yes("what to do about another author's plugin names the mod in Vortex and says to update or reinstall it",

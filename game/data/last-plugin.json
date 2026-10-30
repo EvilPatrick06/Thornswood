@@ -25271,6 +25271,20 @@
    "atlas map markers.esp": 3
   }
  },
+ "recipe": {
+  "name": "last-plugin.recipe",
+  "size": 4122960,
+  "sha256": "a0e2f603342580bcd2b36c7245c02e3ab465d5deecc282dfbaf22aa04abac97f",
+  "sources": 68,
+  "records": 102772,
+  "ownBytes": 2724893,
+  "ownBytesInRecords": 136041,
+  "addedSubrecords": {
+   "CTDA": 2242,
+   "PNAM": 1,
+   "XLCN": 3
+  }
+ },
  "notCopiedFrom": {
   "plugins": [
    "Hothtrooper44_ArmorCompilation.esp"
