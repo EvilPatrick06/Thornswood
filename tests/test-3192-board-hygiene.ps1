@@ -81,7 +81,10 @@ function Shape([string]$name, $f, [string]$grants) {
     if ($null -eq $f) { return }
     Yes ("  its token can do only what it needs ({0})" -f $f.Grants) ($f.Grants -eq $grants)
     Yes '  and no job widens it' (@([regex]::Matches($f.Text, '(?m)^\s{2,}permissions:')).Count -eq 0)
-    Yes ("  it runs on the VPS runners, any of them ({0})" -f $f.RunsOn) ($f.RunsOn -eq '[self-hosted, Windows, thornswood-vps]')
+    # Once the repository is public, GitHub's runners are free and no VPS
+    # runner is registered to it (#3685, Patrick's A of 26 Oct 2026); while
+    # private, any of the VPS runners.
+    Yes ("  it runs on the VPS runners, any of them, only while the repository is private, and on GitHub's once public ({0})" -f $f.RunsOn) ($f.RunsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}")
     Yes '  with a timeout' ($f.Text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
     Yes '  it checks out nothing and runs no action' ($f.Text -notmatch '(?m)^\s*(-\s+)?uses:')
     Yes '  it has one script, under pwsh, with no ${{ }} inside it' ($f.Runs -eq 1 -and $f.Script.Length -gt 0 -and $f.Script -notmatch '\$\{\{' -and $f.Text -match '(?m)^\s+shell:\s*pwsh\s*$')
