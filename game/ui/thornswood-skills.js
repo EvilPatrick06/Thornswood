@@ -824,6 +824,7 @@
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
         '<div class="tsbtn ghost" data-act="help">Help</div>' +
+        '<div class="tsbtn ghost" data-act="settings">Settings</div>' +
         '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
         '<div class="tsbtn primary" data-act="confirm">Confirm</div>' +
       '</div></div>' +
@@ -840,6 +841,8 @@
   // Help (#1633), beside Close: the help panel, and this one put down. Never
   // while creating, where this panel is the whole of what there is to do.
   var elHelp = root.querySelector('[data-act="help"]');
+  // Settings beside it (#3126), and never while creating either.
+  var elSettings = root.querySelector('[data-act="settings"]');
   // The word inside the Close button, so drawFoot can say Close Skyrim while
   // creating without rebuilding the button or losing its key cap.
   var elCloseLabel = elClose.querySelector('span');
@@ -2035,6 +2038,8 @@
       'You are ' + (PLACE_WORDS[v.place] || 'somewhere the server does not know yet') +
       (v.roof ? ', under a roof' : ', with no roof') + (v.night ? ', at night' : '') + ', with ' + fire + '. ' +
       'Weather and height are worth ' + (Number(v.exposure) || 0) + '. ' +
+      // A blizzard or a heavy storm (#3176), the server's own number.
+      (Number(v.storm) > 0 ? 'The storm slows you by ' + Number(v.storm) + ' per cent while you are out in it. ' : '') +
       'What you are wearing covers ' + (Number(v.cover) || 0) + ' per cent of you.'));
     var worn = Array.isArray(v.worn) ? v.worn : [];
     if (!worn.length) {
@@ -3376,6 +3381,7 @@
     elCloseKey.textContent = keyName;
     elCloseKey.style.display = (cr || !keyName) ? 'none' : '';
     elHelp.style.display = cr ? 'none' : '';
+    elSettings.style.display = cr ? 'none' : '';
   }
 
   function hint() {
@@ -4066,6 +4072,11 @@
   elHelp.onclick = function () {
     if (creating()) return;
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('work'); } } catch (e) { }
+    api.close();
+  };
+  elSettings.onclick = function () {
+    if (creating()) return;
+    try { if (window.thornswoodSettings) { window.thornswoodSettings.open(); } } catch (e) { }
     api.close();
   };
 

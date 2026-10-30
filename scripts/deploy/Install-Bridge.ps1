@@ -14,6 +14,10 @@
       .\scripts\deploy\Install-Bridge.ps1            install it, or the newest
                                                      commit of it, and start it
       .\scripts\deploy\Install-Bridge.ps1 -Status    what is there and its log
+      .\scripts\deploy\Install-Bridge.ps1 -Record    record what runs as this
+                                                     commit, when its files
+                                                     are this commit's; it
+                                                     stops and starts nothing
       .\scripts\deploy\Install-Bridge.ps1 -Remove    take it off again
 
   Nobody gets through it until scripts\vps\Grant-BoxAccess.ps1 has given
@@ -36,6 +40,19 @@
   what they replace goes to .prev-<stamp>. If the new one does not answer,
   the old files and the old task go back and are started.
 
+  THE INSTALL RUNS ON THE BOX ON ITS OWN (#3214). Every machine's ssh to
+  the box goes through the bridge, so the session that stopped it was cut
+  by its own stop. On 30 Oct 2026 from One the box finished the swap and
+  the new bridge ran, but what it said after the stop never arrived (ssh's
+  last lines, among the far side's CLIXML, read as "Cannot process the XML
+  from the 'Error' stream"), BRIDGE OK was never seen, it said STOP, and
+  the record of what the box runs was not written. So the install goes to
+  the box as a detached run (Get-ThornswoodDetachedRun, Send-Script.ps1, as
+  Setup-Domain.ps1 restarts Caddy since #3193), which waits for the session
+  that started it to end, and fresh sessions read its report once the
+  bridge is back. -Record writes that record for a bridge already running
+  this commit's files, which it checks by hash, and touches nothing else.
+
   THE LOG. bridge.log, one line per session (opened, ended, how long, how
   many bytes), no address and nothing from inside the session, written by
   server-log.js with a time on each line and kept for 90 days, the same as
@@ -55,6 +72,7 @@ param(
     [string]$Site     = 'https://thornswood.net',
     [int]$Wait        = 20,
     [switch]$Status,
+    [switch]$Record,
     [switch]$Remove,
     [switch]$AsSystem,
     [switch]$NoPause
@@ -112,7 +130,7 @@ foreach ($t in 'ssh', 'scp') {
         Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
     }
 }
-if ($Status -and $Remove) { Die '-Status only reads and -Remove takes it off, so pass one of them. Nothing was sent.' }
+if (@($Status, $Record, $Remove | Where-Object { $_ }).Count -gt 1) { Die '-Status only reads, -Record only records and -Remove takes it off, so pass one of them. Nothing was sent.' }
 
 function Remote($script) {
     # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
@@ -181,6 +199,9 @@ function StopIt {
 # ------------------------------------------------------------------ remove --
 if ($Remove) {
     Head 'Removing'
+    # Taking the bridge off cuts the session that does it and every one after,
+    # from a machine that reaches the box only through it.
+    if (Test-ThornswoodBridgeSsh $VpsHost) { Die 'ssh to the box goes through the bridge from here, so taking it off would cut this session and leave no way back in. Run -Remove from the box itself or from a machine that reaches its port 22. Nothing was sent.' }
     $out = @(Remote @"
 $stopIt
 StopIt
@@ -212,6 +233,34 @@ foreach ($k in $send.Keys) { if (-not (Test-Path -LiteralPath $send[$k])) { Die 
 $hashes = [ordered]@{}
 foreach ($k in $send.Keys) { $hashes[$k] = (Get-FileHash -LiteralPath $send[$k] -Algorithm SHA256).Hash }
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
+
+# ----------------------------------------------------------------- record ---
+# What runs is recorded as this commit only when its three files are this
+# commit's, byte for byte, and it answers as the bridge. Nothing is stopped,
+# started or moved.
+if ($Record) {
+    Head 'Recording what runs'
+    $want = ($hashes.Keys | ForEach-Object { "'$_' = '$($hashes[$_])'" }) -join '; '
+    $out = @(Remote @"
+`$ProgressPreference = 'SilentlyContinue'
+`$want = [ordered]@{ $want }
+`$off = 0
+foreach (`$f in `$want.Keys) {
+    `$p = Join-Path '$Root' `$f
+    if (-not (Test-Path -LiteralPath `$p)) { `$f + ' is not there'; `$off++; continue }
+    if ((Get-FileHash -LiteralPath `$p -Algorithm SHA256).Hash -ne `$want[`$f]) { `$f + ' is not this commit''s'; `$off++ } else { `$f + ' is this commit''s' }
+}
+$SendPlainAnswer
+`$a = Get-PlainAnswer 'http://127.0.0.1:$Port/' 5
+if (`$a.Code -eq 404 -and `$a.Body -eq '$Plain') { 'it answers as the bridge on 127.0.0.1:$Port' } else { 'it does not answer as the bridge on 127.0.0.1:$Port'; `$off++ }
+if (`$off) { 'NOT RECORDED' } else { 'MATCHES' }
+"@ | ForEach-Object { Say "  $_"; "$_".Trim() })
+    if ($out -notcontains 'MATCHES') { Die 'what runs is not this commit, so nothing was recorded. Install-Bridge.ps1 without -Record installs it.' }
+    $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target $target -SshArgs $ssh -Root $Root
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
 
 # ----------------------------------------------------------------- stage ----
 Head 'Staging'
@@ -251,7 +300,7 @@ Say '  staged' 'Green'
 # ---------------------------------------------------------------- install ---
 Head 'Installing'
 $want = ($hashes.Keys | ForEach-Object { "'$_' = '$($hashes[$_])'" }) -join '; '
-$out = @(Remote @"
+$install = @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
 `$node = Get-Command node -EA SilentlyContinue
@@ -365,7 +414,41 @@ if (`$oldXml) {
     'there was no bridge before this, so none is left registered'
 }
 'BRIDGE ROLLED BACK'; exit 1
-"@ | ForEach-Object { Say "  $_"; "$_".Trim() })
+"@
+
+# The header's THE INSTALL RUNS ON THE BOX ON ITS OWN. The start says
+# STARTED, and nothing has been stopped by then, nor will be until the
+# session that started it has ended.
+$run = Get-ThornswoodDetachedRun -Script $install
+$started = @(Remote $run.Start)
+$startedRc = $LASTEXITCODE
+if ($startedRc -ne 0 -or -not @($started | Where-Object { $_ -is [string] -and $_ -match '^STARTED \d+$' }).Count) {
+    $started | ForEach-Object { Say "  $_" }
+    Die "the box did not start the install (exit $startedRc). The lines above say why; the bridge was not touched."
+}
+# The report, read until it ends. While the bridge restarts a session cannot
+# open, which is waited out the same as a report not yet finished. Each line
+# is shown once, as it arrives.
+$out = @()
+$shown = 0
+$endRc = $null
+$until = (Get-Date).AddSeconds(180 + 3 * $Wait)
+while ($null -eq $endRc -and (Get-Date) -lt $until) {
+    Start-Sleep -Seconds 5
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $read = @(Remote $run.Read | Where-Object { $_ -is [string] })
+    $readRc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($readRc -ne 0 -or -not $read.Count -or $read[0] -notmatch '^REPORT \d+$') { continue }
+    $lines = @($read | Select-Object -Skip 1)
+    for ($i = $shown; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^END (-?\d+)$') { $endRc = [int]$Matches[1] }
+        else { Say ('  ' + $lines[$i]); $out += $lines[$i].Trim() }
+    }
+    $shown = $lines.Count
+}
+if ($null -eq $endRc) { Die ('the install on the box had not finished after ' + (180 + 3 * $Wait) + ' s, or the box could not be read since the bridge stopped. Its report is ' + $run.Log + ' on the box; -Status says what runs, and -Record records it once it is this commit.') }
 if ($out -notcontains 'BRIDGE OK') { Die 'the bridge was not installed. The lines above say why and what is running.' }
 $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target $target -SshArgs $ssh -Root $Root
 

@@ -28,7 +28,8 @@
        OwnGame.WriteRecord, the feed store through Move-FeedStoreInto, whose
        type is its own (Thornswood.FeedSwap, a rename with POSIX semantics
        since #2727, tests\test-2727-feed-swap-readers.ps1), so it never
-       shares a name with Generated.ps1's Thornswood.RecordSwap.
+       shares a name with the generated record's Thornswood.GeneratedOs
+       (launcher\app\GeneratedBuild.cs, compiled by scripts\mods\Generated.ps1).
     2. SteamUpdates.cs compiled with the launcher's compiler: its write
        replaces a manifest, and killed 40 times while it swaps a manifest in
        a loop, the manifest is whole every time.
@@ -71,7 +72,7 @@ $steam = Text (Join-Path $App 'SteamUpdates.cs')
 $sync = Text (Join-Path $App 'Sync.cs')
 $news = Text (Join-Path $App 'FeedNews.cs')
 $store = Text (Join-Path $Repo 'scripts\release\Feed-Store.ps1')
-$gen = Text (Join-Path $Repo 'scripts\mods\Generated.ps1')
+$gen = Text (Join-Path $App 'GeneratedBuild.cs')
 
 Yes 'SteamUpdates: no File.Replace' ($steam -notmatch 'File\.Replace\(')
 Yes '...the manifest is written beside it, flushed, and renamed over it in one call' (
@@ -98,10 +99,9 @@ Yes '...and the rename goes up with every script the box runs' ($store -match '\
 Yes '...the received copy and read.json on this machine go through it too' (
     $store -match 'Move-FeedStoreInto \$down \$local' -and $store -match "Move-FeedStoreInto \(\`$f \+ '\.new'\) \`$f")
 $csStore = [regex]::Match($swap.Groups[1].Value, '(?s)namespace Thornswood\n\{.*?\n\}')
-$csGen = [regex]::Match($gen, '(?s)namespace Thornswood\n\{.*?\n\}')
-Yes '...its type is its own, not Generated.ps1''s, so neither loads the other''s rename first (#2727)' (
-    $csStore.Success -and $csGen.Success -and $csStore.Value -match 'public static class FeedSwap' -and $csStore.Value -notmatch 'class RecordSwap' -and
-    $csGen.Value -match 'public static class RecordSwap' -and $csGen.Value -notmatch 'class FeedSwap')
+Yes '...its type is its own, not the generated record''s, so neither loads the other''s rename first (#2727)' (
+    $csStore.Success -and $csStore.Value -match 'public static class FeedSwap' -and $csStore.Value -notmatch 'class (RecordSwap|GeneratedOs)' -and
+    $gen -match 'public static class GeneratedOs' -and $gen -notmatch 'class FeedSwap')
 
 $work = Join-Path $Scratch ('thornswood-2591-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work

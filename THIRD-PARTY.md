@@ -67,8 +67,10 @@ and `NLayer.dll` is Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `la
 `launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
 `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
-depot manifests (no Bethesda file is in it), and `ui-gone.json`, the Daedric
-menu set and unused fork assets a refresh must not copy back. `logo-dev.png` is the emblem the dev
+depot manifests (no Bethesda file is in it), `ui-gone.json`, the Daedric
+menu set and unused fork assets a refresh must not copy back, and
+`generated.json`, the build list of the animation and body files the launcher
+makes on each computer (#3715). `logo-dev.png` is the emblem the dev
 build shows in place of `logo.png` (Art.cs) and `app-dev.ico` is the icon its
 shortcuts carry in place of `app.ico` (Icons.cs); both are drawn for
 Thornswood, the same as the two they stand in for. The setup stub,
@@ -182,15 +184,15 @@ file carries outside code and the file does not carry that project's notice.
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `2b015d26` (in full, `2b015d2679c5efae6920e90b81ba188ec290a539`). That
+commit `20bb0b88` (in full, `20bb0b88f8d77e5835d9ec8f7a874ff79a51acc0`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
 
 The six client files and the native server were built by the fork's own
-Windows build (fork run 39828191553) and recorded by Thornswood's engine.yml
-(run 39832871016, #459). The native server and its
+Windows build (fork run 40454583407) and recorded by Thornswood's engine.yml
+(run 40458174415, #459, #3399). The native server and its
 JavaScript bundle were built from the same merged source, including the
 atomic quest inventory and state transaction. The generated client and
 server records give each file's hash and source commit. The older reuse
@@ -447,8 +449,9 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`2b015d26`, the commit the client record names (the same 68 files, byte for
-byte, as at `445ded38`, since nothing after it changed `skymp5-front`). Read on 21 October (#421):
+`20bb0b88`, the commit the client record names (the same 68 files, byte for
+byte, as at `445ded38`: what changed in `skymp5-front` since, the unused
+login page taken out (#3927), was never in what webpack builds). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
 bytes, sha256
 `d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae`, and every
@@ -848,6 +851,86 @@ no licence this file can name.
   (Test-ShipBethesdaLeftAlone) without deleting anybody's copy, so builds made
   after that change no longer carry it.
 
+## Built here from other people's work: behaviors and bodies
+
+The launcher builds 45 files on each computer, in Thornswood's own game
+folder, before Play and from Fix, with the collection's own Pandora and
+BodySlide, from the recipe in `records\generated.json`, which is compiled into
+it (`launcher\app\GeneratedBuild.cs` and `GeneratedHere.cs`, #1247, #3715).
+No pack and no installer carries them since 27 October 2026 (Patrick, option
+A on #3715: "The launcher makes all 45 files on each computer"): Ship-Rules.ps1
+names them (`$ShipGeneratedBodyFiles` and `$ShipGeneratedPatterns`,
+`Test-ShipGenerated`) as built on each computer, never shipped and never
+listed as removed. Until then every release carried them, as the shipping
+machine built them, and every one of them is made from somebody else's work.
+What follows is whose. Read on 27 October 2026 (#3715) from the installer on
+thornswood.net (76,735,000
+bytes, sha256 starting eefa15c5, payload built 26 October 18:24 UTC): the same
+45 files and 18,928,662 bytes the 18 October installer carried.
+`tests\fixtures\3715-generated.txt` lists each with its sha256. Which mod
+deploys each slider set, patch and Pandora was read from the collection's
+Vortex deployment record of 21 October.
+
+- **Behavior files, 39 files, 10,543,930 bytes.** 18 behavior files in
+  `Data\meshes\actors\character\behaviors`, 17 in
+  `_1stperson\behaviors`, `characters\defaultmale.hkx`,
+  `characters female\defaultfemale.hkx`, and
+  `Data\meshes\animationdatasinglefile.txt` and
+  `animationsetdatasinglefile.txt`. Pandora Behaviour Engine+ 5.0.0-beta
+  (Nexus SE 133232, by the Pandora Behaviour Engine Team) writes them from the
+  game's own animation graphs, character files and animation data, with four
+  patches merged in: `colis` from Precision 2.0.6 (Nexus SE 72347) and
+  `tdmh`, `tdmlen` and `tdmv` from True Directional Movement 2.3.1 (Nexus SE
+  51614), both by Ersh. Pandora writes each graph whole, so each file is the
+  game's graph with the patches added. Bethesda's terms for mods grant no right
+  to hand on ZeniMax's own files, edited or not ("Bethesda's own files, made on
+  each machine" below), the reading on which #2827 stopped shipping three
+  other files. Precision's and True Directional Movement's pages set the
+  same permissions: their assets may be used without asking, with credit to
+  Ersh and never in anything sold, the files may not be uploaded elsewhere,
+  and modifying them needs Ersh's permission. Pandora is under the GNU GPL
+  v3, which covers the program, run from the collection, not what it
+  writes.
+  `Data\Scripts\FNIS.pex` is allowed by the same pattern and was not in the
+  installer read.
+- **The women's body, `femalebody_0.nif` and `femalebody_1.nif`, 3,840,722
+  bytes**, in `Data\meshes\actors\character\character assets`. BodySlide
+  builds it from the set CBBE 3BBB Amazing NeverNude of CBBE 3BA (3BBB) 2.48
+  (Nexus SE 30174, by Acro), which is built on CBBE (Nexus SE 198, by Ousnius,
+  Caliente and Jeir). 3BA's page lets its assets be used without asking,
+  with credit to Acro and never in anything sold, forbids uploading the file
+  elsewhere, and asks for the author's OK for a body mesh edited so its
+  vertex order or count changes. CBBE's own terms are below.
+- **Astrid's body, `femalebodyastrid_0.nif` and `femalebodyastrid_1.nif`,
+  2,555,688 bytes.** BodySlide builds it from the set CBBE Vanilla - Body -
+  Astrid of CBBE 2.0.3 (Nexus SE 198), over Bethesda's Astrid outfit. CBBE's
+  page sets no permission lines; its author's instructions let the body be
+  used for outfits and NPCs with credit and a link back, and say "Distribution
+  by, or sub-licensing to, parties not expressly given permission is
+  disallowed." Handing a CBBE body on would have needed Ousnius' permission.
+- **The men's body, `malebody_0.nif` and `malebody_1.nif`, 1,988,322 bytes.**
+  BodySlide builds it from the set HIMBO Body - Vanilla Nevernude of
+  Highly Improved Male Body Overhaul (HIMBO) 5.8 (Nexus SE 46311, by Kreiste
+  and Novelyst). HIMBO's description, under Permission: "The main body mesh
+  along with the undies meshes are licensed CC-BY-SA-4.0." and "You are
+  allowed to make refits and/or original armors/clothings using HIMBO body as
+  long as you credit me and your files are available for free and not behind
+  any kind of paywalls." So these two are under the Creative Commons
+  Attribution-ShareAlike 4.0 licence
+  (https://creativecommons.org/licenses/by-sa/4.0/), as HIMBO built in
+  BodySlide, credited on the public credits page. LICENSE's all rights
+  reserved does not cover them.
+
+The Permissions and credits sections of 30174, 198, 72347, 51614 and 133232
+were read on 27 October 2026 on One, in a signed-in browser, onto #3715 (Nexus
+answers a cloud session with a Cloudflare 403, and its API has no permissions
+field).
+`records\asset-provenance.json` has an entry for each group, and
+`tests\test-third-party.js` holds every path Ship-Rules.ps1 names as built on
+each computer, and every file in the stand-in record, to an entry there. Made
+on each computer, nothing of theirs leaves anybody's machine, the way the
+files below are made from the person's own game.
+
 ## Bethesda's own files, made on each machine
 
 `Data\Interface\startmenu.swf` is Skyrim's own `interface\startmenu.swf` from
@@ -1081,7 +1164,7 @@ keeps downloading them is Patrick's decision on #3728.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `2b015d2679c5efae6920e90b81ba188ec290a539` on the public fork. The
+  name `20bb0b88f8d77e5835d9ec8f7a874ff79a51acc0` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -1140,10 +1223,23 @@ keeps downloading them is Patrick's decision on #3728.
   client file (#3099), and since `4712e3eb` the server says after each
   gamemode load whether it worked and whether a reload changed what
   connected games run (#3196), and since `2b015d26` every game plugin and
-  the client share one storage again (#3333).
+  the client share one storage again (#3333), and since `20bb0b88` the
+  gamemode may refuse an item before an equipment update puts it on (#2262),
+  a character's head parts and face data come from the game's own heap (#2025),
+  the menu's page is shown from the start and drawn over the loading screen
+  (#3129, #3130), a piece's condition and quality change how hard it hits and
+  holds (#1384, #3151), a bench draws from the containers the gamemode names
+  and a craft takes the time it names (#3159, #3161), the game's year is
+  Thornswood's (#3156), the save worker stops before a drained storage
+  is read again (#1273), eating and cooking take a named stack of the
+  same item (#3163), a dropped item keeps its name and the time it is
+  deleted across a restart (#3498), the client logs only the kind of a
+  message from the in-game page, never what it says (#3941), and the
+  server's resources port refuses masters, archives and scripts and its save
+  reader reads a list's size in 64 bits (#3927).
   The server module's SHA256
-  is `2cb8859b7647c739dc0da5cfe13711ceb7ba03602eeabc0aadd67abc569622db`, built
-  2026-10-22T18:22:47Z. This is the recorded next release, not a deployment
+  is `f8509c15c712d475fa30177b11cfbd9a31ae75466b8ef5e9b8bf83c8ab559961`, built
+  2026-10-27T05:32:52Z. This is the recorded next release, not a deployment
   claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -1178,7 +1274,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/2b015d2679c5efae6920e90b81ba188ec290a539
+https://github.com/EvilPatrick06/skymp/tree/20bb0b88f8d77e5835d9ec8f7a874ff79a51acc0
 
 For the engine Main runs until then:
 
@@ -1297,6 +1393,13 @@ beside its `___systemPolyfill.js`.
 
 ## What is still missing
 
+- The packs and the installer published up to 27 October 2026 carry the 39
+  behavior files and the four women's body meshes, which nothing lets
+  Thornswood hand on ("Built here from other people's work: behaviors and
+  bodies"; CBBE's terms disallow distribution without permission). Since
+  #3715 the launcher makes them on each computer and no new release carries
+  them; the installer on thornswood.net carries them until the first main
+  release after #3715 replaces it.
 - The client record (`2b015d26`) was measured before #3751, so
   `records\client-licences.json` has no `libraries`, and the notices of
   npm-eventemitter3-5.0.1, papyrus-vm, tilted and viet ("The other

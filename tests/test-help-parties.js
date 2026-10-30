@@ -29,7 +29,8 @@ function read(...bits) {
 const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const helpCs = read('launcher', 'app', 'Help.cs');
-const keysCs = read('launcher', 'app', 'Keys.cs');
+// The rows on Settings in the game (#3126), where the Controls page's were.
+const settingsPage = read('game', 'ui', 'thornswood-settings.js');
 const front = read('game', 'plugins', 'thornswood-front.js');
 const panel = read('game', 'ui', 'thornswood-party.js');
 
@@ -130,13 +131,13 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
 
 // ---------------------------------------------------------------- the keys
 /*
-  The letter on the page is the plugin's default and the Controls page's
-  default, read out of both. A rebind in one of them and not the other would
+  The letter on the page is the plugin's default and the default of its row
+  on Settings in the game, read out of both. A rebind in one of them and not the other would
   make the page true on one side only.
 */
 {
   const fm = front.match(/iniNumber\(ini, 'PartyKey', ([0-9]+)\)/);
-  const km = keysCs.match(/"PartyKey",\s*([0-9]+)\)/);
+  const km = settingsPage.match(/\{ ini: 'PartyKey', def: ([0-9]+),/);
   const cm = front.match(/iniNumber\(ini, 'ChatKey', ([0-9]+)\)/);
   const lm = front.match(/const letters = (\{[\s\S]*?\});/);
   const frontKey = fm ? Number(fm[1]) : NaN;
@@ -145,10 +146,10 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
   try { letters = lm ? new Function('return ' + lm[1])() : {}; } catch (e) { letters = {}; }
   const letter = letters[frontKey] || '';
 
-  yes('the plugin and the Controls page start the party key on the same key, ' + letter,
+  yes('the plugin and Settings in the game start the party key on the same key, ' + letter,
       !!letter && frontKey === keysKey);
   yes('the page names that key, and says it can be moved',
-      new RegExp('\\b' + letter + ', unless you have moved it on the Controls page').test(text));
+      new RegExp('\\b' + letter + ', unless you have moved it on Settings in the game').test(text));
   // Nothing to type: the chat is not how a party is asked or run (#1629).
   // 28 is the DirectInput scan code for Enter.
   yes('the party items never send anybody to the chat to type',

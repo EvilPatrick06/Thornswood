@@ -607,13 +607,6 @@
                 </StackPanel>
               </Button>
                 <TextBlock Text="When it breaks" Style="{StaticResource NavGroup}"/>
-              <Button x:Name="NavControls" Style="{StaticResource Nav}">
-                <StackPanel Orientation="Horizontal">
-                  <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
-                        Data="M 1,4 H 14 V 11.4 H 1 Z M 3.2,6.4 H 4.2 M 5.8,6.4 H 6.8 M 8.4,6.4 H 9.4 M 11,6.4 H 12 M 4.4,9.2 H 10.6" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4"/>
-                  <TextBlock Text="Controls" VerticalAlignment="Center"/>
-                </StackPanel>
-              </Button>
               <Button x:Name="NavLogs" Style="{StaticResource Nav}">
                 <StackPanel Orientation="Horizontal">
                   <Path Width="15" Height="15" Stretch="Uniform" Margin="0,0,13,0" VerticalAlignment="Center"
@@ -815,8 +808,8 @@
                     <Border Style="{StaticResource Slab}" Padding="14,12">
                       <StackPanel x:Name="QuickKeys"/>
                     </Border>
-                    <Button x:Name="BtnAllControls" Style="{StaticResource Link}" Content="All of the controls"
-                            HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                    <TextBlock Style="{StaticResource Small}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="Every key is changed in the game, on Settings at the foot of the help panel and of the K, P and J panels."/>
                   </StackPanel>
                 </StackPanel>
             </Grid>
@@ -1126,18 +1119,6 @@
             </ScrollViewer>
           </Grid>
 
-          <!-- ================ CONTROLS ================ -->
-          <Grid x:Name="PageControls" Visibility="Collapsed">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-              <StackPanel Margin="36,30,36,30" MaxWidth="880" HorizontalAlignment="Left">
-                <TextBlock Text="In game" Style="{StaticResource Eyebrow}"/>
-                <TextBlock Style="{StaticResource Body}" Margin="0,0,0,22"
-                           Text="Everything the multiplayer client adds on top of Skyrim's own controls. None of these are bound by Skyrim, so they will not clash with anything you have rebound in the game's own menu."/>
-                <StackPanel x:Name="ControlsList"/>
-              </StackPanel>
-            </ScrollViewer>
-          </Grid>
-
           <!-- ================ LOGS ================ -->
           <Grid x:Name="PageLogs" Visibility="Collapsed" Margin="36,28,36,22">
             <Grid.RowDefinitions>
@@ -1383,43 +1364,28 @@
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="155"/><ColumnDefinition Width="12"/>
                       <ColumnDefinition Width="112"/><ColumnDefinition Width="14"/>
-                      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="18"/>
-                      <ColumnDefinition Width="86"/><ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Style="{StaticResource Small}" Text="Resolution"/>
                     <TextBlock Grid.Column="2" Style="{StaticResource Small}" Text="Frame limit"/>
-                    <TextBlock Grid.Column="6" Style="{StaticResource Small}" Text="Field of view"/>
                   </Grid>
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="155"/><ColumnDefinition Width="12"/>
                       <ColumnDefinition Width="112"/><ColumnDefinition Width="14"/>
-                      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="18"/>
-                      <ColumnDefinition Width="86"/><ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="BoxResolution" Grid.Column="0" Style="{StaticResource Field}" FontFamily="Cascadia Mono, Consolas"/>
                     <TextBox x:Name="BoxFrameLimit" Grid.Column="2" Style="{StaticResource Field}" FontFamily="Cascadia Mono, Consolas"/>
                     <CheckBox x:Name="ChkVSync" Grid.Column="4" Content="VSync" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                    <TextBox x:Name="BoxFov" Grid.Column="6" Style="{StaticResource Field}" FontFamily="Cascadia Mono, Consolas"/>
                   </Grid>
                   <TextBlock x:Name="TxtDisplayNote" Style="{StaticResource Small}" Margin="0,10,0,0"
-                             Text="Resolution as 1920x1080, frame limit in frames per second. Blank resolution leaves it to the game. Skyrim's own field of view is 65; leave it there and nothing touches it."/>
+                             Text="Resolution as 1920x1080, frame limit in frames per second. These take effect when the game next starts. The field of view, the chat and the needs bars are set in the game, on its Settings panel."/>
                   <CheckBox x:Name="ChkLockRes" Content="Lock resolution" Margin="0,14,0,0"/>
                   <TextBlock Style="{StaticResource Body}" Margin="0,4,0,0"
                              Text="Left unticked, pressing Play sets the game to whatever your screen is currently running at. Tick it to keep the resolution you typed above, even when it does not match the monitor."/>
                   <Button x:Name="BtnSaveDisplay" Style="{StaticResource Ghost}" Content="Apply display settings" HorizontalAlignment="Left" Margin="0,14,0,0"/>
                 </StackPanel>
-
-                <TextBlock Text="Chat and needs" Style="{StaticResource Eyebrow}"/>
-                <StackPanel Margin="0,0,0,30">
-                  <TextBlock Style="{StaticResource Small}" Text="Hide the chat after a new line"/>
-                  <StackPanel x:Name="ChatFadeRow" Orientation="Horizontal" Margin="0,8,0,0"/>
-                  <TextBlock x:Name="TxtChatFadeNote" Style="{StaticResource Small}" Margin="0,8,0,0"/>
-                  <CheckBox x:Name="ChkNeedsBars" Content="Show the needs bars on screen" Margin="0,16,0,0"/>
-                  <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0"
-                             Text="Hunger, Thirst, Rest and Temp. Hidden, your needs carry on as before, the Body page on K shows all of them, and /needs in the chat says them as a line of text."/>
-                </StackPanel>
-
 
                 <TextBlock Text="Folders" Style="{StaticResource Eyebrow}"/>
                 <StackPanel x:Name="PathRows" Margin="0,0,0,8"/>

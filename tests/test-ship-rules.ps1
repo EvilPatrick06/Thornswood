@@ -653,7 +653,6 @@ $ship = @(
     (Row 'Data\textures\lostark\b.dds' 500),
     (Row 'Data\meshes\armor\commonclothes\travel.nif' 4000),
     (Row 'Data\meshes\leftover.nif' 700),
-    (Row 'Data\meshes\animationdatasinglefile.txt' 700),
     (Row 'Data\meshes\interface\logo\logo.nif' 10562),
     (Row 'Data\meshes\interface\logo\logo01ae.nif' 10562),
     (Row 'Data\textures\interface\objects\Mainmenuwallpaper.dds' 8388736),
