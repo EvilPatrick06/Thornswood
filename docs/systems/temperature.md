@@ -40,6 +40,11 @@ half the gap in 90 seconds. A fire is obvious while you stand in it.
 Snow is not an emergency in the first few seconds. An unknown place is
 comfortable. A room nobody has classified is not a trap.
 
+It does not move while you are logged out. You come back at the reading
+you left with, and it moves from there toward wherever you are standing.
+The place you logged out in is not where you spent the time away, so
+logging out in the snow does not bring you back freezing (#3154).
+
 ## The place
 
 These are the targets before clothing, fire and weather.
