@@ -175,11 +175,11 @@ jobs:
   # (a workflow_dispatch the repository token asks for does start a run). On
   # a check runner, as the light verify job below: the signing runner takes
   # main's jobs alone (#3889), and GitHub's runner has no minutes to spend on
-  # a handover.
+  # a handover. On GitHub's runner once the repository is public (#3685).
   handoff:
     name: Hand the tag to main's release workflow
     if: ${{ github.event_name == 'push' }}
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-check]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-check"]') || 'windows-latest' }}
     permissions:
       actions: write
     timeout-minutes: 5
@@ -202,7 +202,7 @@ jobs:
   # tag push is handed over above.
   launcher:
     name: Build the release launcher
-    if: ${{ github.event_name == 'workflow_dispatch' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}
     runs-on: windows-latest
     # The "release" environment only in a run of main's own workflow: its
     # subject is what the Azure federated credential trusts, and its
@@ -507,7 +507,7 @@ jobs:
   launcher-vps:
     name: Build the release launcher (VPS)
     needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Windows, X64, thornswood-vps, thornswood-sign]
     environment: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && 'release' || '' }}
     permissions:
@@ -538,7 +538,7 @@ jobs:
     name: Check the signed draft on a second machine (VPS)
     needs: [launcher, launcher-vps]
     if: ${{ !cancelled() && ((needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true') || (needs.launcher-vps.result == 'success' && needs.launcher-vps.outputs.signed == 'true')) }}
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-check]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-check"]') || 'windows-latest' }}
     permissions:
       contents: write
     timeout-minutes: 10

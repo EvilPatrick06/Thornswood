@@ -71,7 +71,7 @@ permissions:
 jobs:
   done:
     name: Move test-tasked issues to Done
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     environment: board
     # A call per commit and three per issue. Past this it is stuck, not slow.
     timeout-minutes: 3

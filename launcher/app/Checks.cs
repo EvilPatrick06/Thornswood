@@ -227,6 +227,34 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The address every collection button opens (#4115): the page of the
+        /// revision the server was built against, .../collections/7essxf/revisions/2.
+        ///
+        /// The buttons used to open the collection's own page, which names no
+        /// revision, so Nexus showed its newest and Vortex installed that. On
+        /// 30 October Nexus was on revision 5 and both feeds on 2, so following
+        /// the "your mods need updating" card, or installing fresh, took a copy
+        /// straight past the server and Play shut again on the ahead card.
+        /// Nexus keeps every published revision on a page of its own, and
+        /// Vortex installs the one on the page it is opened from.
+        ///
+        /// No revision known (0, the feed not read yet) or an address that is
+        /// not a collection's: the address as it is, the only page there is.
+        /// </summary>
+        public static string CollectionRevisionUrl(Config cfg, int revision)
+        {
+            string url = cfg == null ? "" : (cfg.CollectionUrl ?? "");
+            try
+            {
+                string slug = CollectionSlug(cfg);
+                if (revision <= 0 || slug.Length == 0) return url;
+                int at = url.LastIndexOf("/collections/", StringComparison.OrdinalIgnoreCase);
+                return url.Substring(0, at + "/collections/".Length) + slug + "/revisions/" + revision;
+            }
+            catch { return url; }
+        }
+
+        /// <summary>
         /// At or below this many enabled plugins the collection counts as not
         /// installed. Two things on screen ask it: the Mods row on the checks
         /// list and the "not installed yet" card above Play, which is

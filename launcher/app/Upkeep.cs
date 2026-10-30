@@ -76,6 +76,10 @@ namespace Thornswood
                 try { BuildFiles(l); } catch (Exception ex) { Swallow.Note("Upkeep.Look, this build's files", ex); }
             }
             try { Made(l); } catch (Exception ex) { Swallow.Note("Upkeep.Look, the files made from the game", ex); }
+            if (OwnGame.Active)
+            {
+                try { Built(l); } catch (Exception ex) { Swallow.Note("Upkeep.Look, the animation and body files", ex); }
+            }
             try { WindowsFolders(l); } catch (Exception ex) { Swallow.Note("Upkeep.Look, Windows' Skyrim folders", ex); }
             if (pressed)
             {
@@ -266,6 +270,21 @@ namespace Thornswood
                         : "Put the game back on the Skyrim build Thornswood pins (the Downgrade on the Play page does that), then press Scan.", false));
         }
 
+        /// <summary>
+        /// The behavior files and covered bodies Thornswood builds on this
+        /// computer from the collection's Pandora and BodySlide (GeneratedHere,
+        /// #3715): never built, or stale since the collection, the mod list or
+        /// the build list changed. Play builds them too; Fix builds them now.
+        /// </summary>
+        static void Built(List<Issue> l)
+        {
+            string problem = GeneratedHere.Problem();
+            if (problem == null) return;
+            l.Add(Issue.Of(IssueKind.Generated, problem,
+                "Fix builds them now with the collection's Pandora and BodySlide, which takes a few minutes; Play does the same.",
+                "Fix said what stopped the build: put that right in Vortex, deploy, then press Scan.", false));
+        }
+
         /// <summary>Windows' Skyrim folders still pointed at Thornswood while Skyrim is not running.</summary>
         static void WindowsFolders(List<Issue> l)
         {
@@ -351,6 +370,12 @@ namespace Thornswood
                 {
                     try { string made = MadeFromGame.Ensure(); if (!string.IsNullOrEmpty(made)) say(made); }
                     catch (Exception ex) { Swallow.Note("Upkeep.FixOnDisk, the files made from the game", ex); say("The files made from your game could not be written (" + ex.Message.TrimEnd('.') + ")."); }
+                }
+                if (kinds.Contains(IssueKind.Generated))
+                {
+                    try { string built = GeneratedHere.Ensure(say); if (!string.IsNullOrEmpty(built)) say(built); }
+                    catch (GeneratedStop ex) { say(ex.Message); }
+                    catch (Exception ex) { Swallow.Note("Upkeep.FixOnDisk, the animation and body files", ex); say("The animation and body files could not be built (" + ex.Message.TrimEnd('.') + ")."); }
                 }
                 if (kinds.Contains(IssueKind.Client))
                 {
