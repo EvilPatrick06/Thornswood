@@ -97,7 +97,8 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
+                    'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js',
+                    'thornswood-preserve.js', 'thornswood-furniture.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -477,6 +478,15 @@
   */
   let TREAT_SELF_KEY = TRADE_KEY;
   /*
+    "Salt or smoke your food" in the inventory (#3163). THE FRIEND KEY, Y,
+    and not a new one: every letter is already Skyrim's or ours. In the
+    inventory the social keys refuse to act and Skyrim binds nothing to Y,
+    and U, H and X, the other three keys with a line there, are other keys,
+    so all four lines can be up at once. Rebinding FriendKey moves both. See
+    preservePress.
+  */
+  let PRESERVE_KEY = FRIEND_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the game's own favourites hotkeys (and the emote slots while
     the wheel is open), and every letter is already one of ours or the game's.
@@ -538,6 +548,7 @@
   let HELP_NAME = keyName(HELP_KEY);
   let TREAT_NAME = keyName(TREAT_KEY);
   let TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+  let PRESERVE_NAME = keyName(PRESERVE_KEY);
 
   /*
     A KEY CHANGED IN THE GAME (#3126). The Settings panel writes
@@ -566,6 +577,7 @@
     HAIR_DYE_KEY = SKILLS_KEY;
     TREAT_KEY = LOCK_KEY;
     TREAT_SELF_KEY = TRADE_KEY;
+    PRESERVE_KEY = FRIEND_KEY;
     MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', SETTINGS_KEYS.ManeuverKey);
     HELP_KEY = iniNumber(ini, 'HelpKey', SETTINGS_KEYS.HelpKey);
     TALK_KEY = iniNumber(ini, 'PushToTalk', SETTINGS_KEYS.PushToTalk);
@@ -584,6 +596,7 @@
     HELP_NAME = keyName(HELP_KEY);
     TREAT_NAME = keyName(TREAT_KEY);
     TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+    PRESERVE_NAME = keyName(PRESERVE_KEY);
     CLOSE_GAME_KEY = iniNumber(ini, 'CloseGameKey', SETTINGS_KEYS.CloseGameKey);
     CLOSE_GAME_NAME = keyName(CLOSE_GAME_KEY);
   }
@@ -2253,7 +2266,7 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat', preserve: 'thornswoodPreserve',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
     help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip'
@@ -5798,7 +5811,10 @@
     ['JKs Skyrim.esp', 0x2493e], ['JKs Skyrim.esp', 0x2493d], ['JKs Skyrim.esp', 0x2c91],
     ['JKs Skyrim.esp', 0x3274], ["JK's Whiterun's Outskirts.esp", 0x1503ff],
     ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
-    ["JK's Whiterun's Outskirts.esp", 0x141088]
+    ["JK's Whiterun's Outskirts.esp", 0x141088],
+    // The HearthFires garden planters, plots since #3141.
+    ['HearthFires.esm', 0x1045e], ['HearthFires.esm', 0x1045f], ['HearthFires.esm', 0x10460],
+    ['HearthFires.esm', 0x110b9], ['HearthFires.esm', 0x110ba], ['HearthFires.esm', 0x110cd]
   ];
   const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
   const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
@@ -6254,6 +6270,84 @@
     catch (err) { say('treat: closeMenu threw on the inventory: ' + err); }
     tellServer('/treat');
     say('pressed ' + TREAT_SELF_NAME + ' in the inventory with a wound to tend, asked the server for the treatment panel');
+    return true;
+  }
+
+  /*
+    ------------------------------------- salting and smoking food, from the inventory
+
+    #3163. Food spoils (docs/systems/spoilage.md), and a cook keeps raw meat
+    and fish by salting or smoking it. There is no item to use for that, so
+    it is the repair kit's pattern: while the inventory is open and the
+    server says you may preserve something you carry, one line at the bottom
+    names a key, and that key shuts the inventory and asks the server for
+    the preserving panel (game/ui/thornswood-preserve.js), whose buttons
+    send the rest. /preserve is that ask; nobody is told to type it.
+
+    Whether there is anything to preserve is the server's: you have to be a
+    cook and carry raw food that spoils, and its spoilage block writes that
+    on the thornswoodPreserveLine property, whose owner's script sets
+    globalThis.thornswoodPreserveLine. Above the furniture line, so all four
+    can be up.
+  */
+  let preserveShown = false;
+  const PRESERVE_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:27%');
+
+  function preserveCan() {
+    try { return !!globalThis.thornswoodPreserveLine; } catch (e) { return false; }
+  }
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawPreserveLine(on) {
+    if (on === preserveShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-preserve-line");if(d){d.style.display="none";}}catch(e){}')) {
+        preserveShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + PRESERVE_NAME + '</span>' +
+      'Salt or smoke your food';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-preserve-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-preserve-line";' +
+             'd.style.cssText=' + JSON.stringify(PRESERVE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      preserveShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('preserve line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(!!T.ready && preserveCan());
+  }));
+  sp.on('menuClose', guard('preserve line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, something to preserve. Answers whether it was used, so
+    the key falls through when it was not.
+  */
+  function preservePress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!preserveCan()) { drawPreserveLine(false); return false; }
+    drawPreserveLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('preserve: closeMenu threw on the inventory: ' + err); }
+    tellServer('/preserve');
+    say('pressed ' + PRESERVE_NAME + ' in the inventory with food to preserve, asked the server for the preserving panel');
     return true;
   }
 
@@ -8703,6 +8797,8 @@
     if (e.code === TREAT_KEY && treatPress()) { return; }
     // The trade key in the inventory, with a wound to tend (#1383). See TREAT_SELF_KEY.
     if (e.code === TREAT_SELF_KEY && treatSelfPress()) { return; }
+    // The friend key in the inventory, for a cook with raw food (#3163). See PRESERVE_KEY.
+    if (e.code === PRESERVE_KEY && preservePress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
       close their own panel. Djinn on dev, 24 September: "The party menu
@@ -9685,6 +9781,9 @@
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'preserve:opened') { T.claimFocus('preserve', true); return; }
+    if (what === 'preserve:closed') { T.claimFocus('preserve', false); return; }
+    if (what === 'preserve:ready') { log('the preserving panel is in'); return; }
     if (what === 'furniture:opened') { T.claimFocus('furniture', true); return; }
     if (what === 'furniture:closed') { T.claimFocus('furniture', false); return; }
     if (what === 'furniture:ready') { log('the furniture panel is in'); return; }
@@ -9865,6 +9964,182 @@
 
     log(what);
   }));
+
+  // ------------------------------------------------- the map's calendar --
+  /*
+    THE MAP'S CALENDAR: THE DATE, THE SEASON AND THE SERVER CLOCK (#3156).
+
+    Patrick, 22 Oct 2026, on his page: C, on the map menu. A strip at the top
+    of the screen while MapMenu is up, gone the moment it closes:
+
+      26th of Frostfall, 4E 252
+      Autumn, winter in 3 days
+      Server clock 9:46 AM MDT, yours 4:46 PM
+
+    THE DATE is the game's own calendar, the globals the game's map line
+    reads (GameDay 0x37, GameMonth 0x36, GameYear 0x35), which the engine's
+    TimeService writes from today's date in UTC. It is read here rather than
+    worked out again, so this line and the game's never disagree. There is
+    no day of the week: the game counts that from GameDaysPassed, which
+    TimeService never writes (#841), so it is not the same for two people.
+
+    THE SEASON AND THE SERVER CLOCK are the server's, handed over by the
+    calendar property (gamemode.js, THE DATE, THE SEASON AND THE SERVER CLOCK
+    ON THE MAP) through globalThis.thornswoodCalendar, as the drunk screen's
+    is. The server clock is the box's zone put on this machine's own clock,
+    the clock the sky already runs on. Yours shows only when your zone is not
+    the server's. Before the server has said anything, the date shows alone.
+
+    Read once a second while the map is up, and written to the page only when
+    a line changed, which is once a minute.
+  */
+  const MAP_MENU = 'MapMenu';
+  const MAP_CAL_ID = 'ts-map-calendar';
+  const MAP_CAL_EVERY_MS = 1000;
+  // GameMonth counts from 0, Morning Star.
+  const MONTHS = ['Morning Star', 'Sun\'s Dawn', 'First Seed', 'Rain\'s Hand', 'Second Seed', 'Midyear',
+                  'Sun\'s Height', 'Last Seed', 'Hearthfire', 'Frostfall', 'Sun\'s Dusk', 'Evening Star'];
+  const GAME_DAY = 0x37;
+  const GAME_MONTH = 0x36;
+  const GAME_YEAR = 0x35;
+  let mapCalendar = null;   // what the server last handed over
+  let mapUp = false;
+  let mapCalAt = 0;
+  let mapCalShown = '';
+  let mapCalUnread = false; // the calendar could not be read, said once a map
+
+  globalThis.thornswoodCalendar = function (v) { mapCalendar = v; mapCalShown = ''; };
+
+  function ordinal(n) {
+    const t = n % 100;
+    if (t >= 11 && t <= 13) { return n + 'th'; }
+    if (n % 10 === 1) { return n + 'st'; }
+    if (n % 10 === 2) { return n + 'nd'; }
+    if (n % 10 === 3) { return n + 'rd'; }
+    return n + 'th';
+  }
+
+  function clock12(h, m) {
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return hh + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
+  }
+
+  function gameGlobal(id) {
+    const gv = sp.GlobalVariable.from(sp.Game.getFormEx(id));
+    return gv ? Math.floor(gv.getValue()) : NaN;
+  }
+
+  function mapDateLine() {
+    let day = NaN, month = NaN, year = NaN;
+    try {
+      day = gameGlobal(GAME_DAY);
+      month = gameGlobal(GAME_MONTH);
+      year = gameGlobal(GAME_YEAR);
+    } catch (e) {
+      if (!mapCalUnread) { mapCalUnread = true; log('map calendar: the game\'s calendar could not be read: ' + e); }
+      return '';
+    }
+    if (!(day >= 1 && day <= 31) || !(month >= 0 && month <= 11) || !(year >= 1)) {
+      if (!mapCalUnread) {
+        mapCalUnread = true;
+        log('map calendar: the game\'s calendar reads day ' + day + ', month ' + month + ', year ' + year + ', so no date');
+      }
+      return '';
+    }
+    return ordinal(day) + ' of ' + MONTHS[month] + ', 4E ' + year;
+  }
+
+  function untilWords(ms) {
+    const H = 3600000;
+    if (ms >= 36 * H) { return 'in ' + Math.round(ms / (24 * H)) + ' days'; }
+    if (ms >= 90 * 60000) { return 'in ' + Math.round(ms / H) + ' hours'; }
+    return 'within the hour';
+  }
+
+  function capital(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+
+  function mapSeasonLine(cal, now) {
+    if (!cal || !cal.season) { return ''; }
+    const line = capital(cal.season);
+    if (!cal.next || !(cal.turns > now)) { return line; }
+    return line + ', ' + cal.next + ' ' + untilWords(cal.turns - now);
+  }
+
+  function mapClockLine(cal, now) {
+    if (!cal || typeof cal.off !== 'number' || !isFinite(cal.off)) { return ''; }
+    const s = new Date(now + cal.off * 60000);
+    let line = 'Server clock ' + clock12(s.getUTCHours(), s.getUTCMinutes()) + (cal.tz ? ' ' + cal.tz : '');
+    const here = new Date(now);
+    if (-here.getTimezoneOffset() !== cal.off) {
+      line += ', yours ' + clock12(here.getHours(), here.getMinutes());
+    }
+    return line;
+  }
+
+  function mapCalendarLines(now) {
+    return [mapDateLine(), mapSeasonLine(mapCalendar, now), mapClockLine(mapCalendar, now)]
+      .filter(function (l) { return !!l; });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /*
+    The strip, in the needs HUD's own pixels (--ts, gamemode.js hudScript):
+    the screen's height over 720 or its width over 1280, whichever is smaller,
+    so it sits in the same place at every screen size. Centred at the top,
+    where the map has nothing of its own.
+  */
+  const MAP_CAL_CSS = '--ts:min(0.078125vw,0.1388889vh);' +
+    'position:fixed;left:50vw;top:calc(50vh - 350 * var(--ts));transform:translateX(-50%);' +
+    'z-index:2147483500;pointer-events:none;text-align:center;white-space:nowrap;' +
+    'font-family:Georgia,serif;font-size:calc(11 * var(--ts));line-height:1.35;color:#efe4cc;' +
+    'background:rgba(12,10,8,.62);border:calc(1 * var(--ts)) solid rgba(0,0,0,.65);' +
+    'border-radius:calc(4 * var(--ts));padding:calc(4 * var(--ts)) calc(10 * var(--ts));' +
+    'text-shadow:0 1px 3px rgba(0,0,0,.95)';
+
+  function drawMapCalendar(now) {
+    const lines = mapCalendarLines(now);
+    const text = lines.join('\n');
+    if (text === mapCalShown) { return; }
+    mapCalShown = text;
+    if (!lines.length) { hideMapCalendar(); return; }
+    const html = lines.map(function (l) { return '<div>' + escapeHtml(l) + '</div>'; }).join('');
+    T.js('(function(){try{' +
+         'var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(!d){d=document.createElement("div");d.id=' + JSON.stringify(MAP_CAL_ID) + ';' +
+         'd.style.cssText=' + JSON.stringify(MAP_CAL_CSS) + ';document.body.appendChild(d);}' +
+         'd.innerHTML=' + JSON.stringify(html) + ';' +
+         '}catch(e){}})();');
+  }
+
+  function hideMapCalendar() {
+    T.js('(function(){try{var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(d&&d.parentNode){d.parentNode.removeChild(d);}}catch(e){}})();');
+  }
+
+  sp.on('menuOpen', guard('map calendar open', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = true;
+    mapCalAt = 0;
+    mapCalShown = '';
+    mapCalUnread = false;
+  }));
+  sp.on('menuClose', guard('map calendar close', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = false;
+    mapCalShown = '';
+    hideMapCalendar();
+  }));
+  sp.on('update', guard('map calendar', () => {
+    if (!mapUp) { return; }
+    const now = Date.now();
+    if (now - mapCalAt < MAP_CAL_EVERY_MS) { return; }
+    mapCalAt = now;
+    drawMapCalendar(now);
+  }));
+  // ------------------------------------------------ end the map's calendar --
 
   // ------------------------------------------------------ the drunk screen --
   /*
