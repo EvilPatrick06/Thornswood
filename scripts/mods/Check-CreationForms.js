@@ -216,10 +216,12 @@ function pluginUses(buf, cc, base, self) {
   already in front of it: how warm a worn thing is (WARMTH), what a race is
   (RACES), which building a door belongs to, what that building is called
   and which hold it answers to (BUILDING_BY_DOOR, BUILDING_NAME,
-  BUILDING_HOLD, #2551). None of them hands anything out, spawns
-  anything or sends anybody anywhere, so a row for a record nobody meets is a
-  row nobody reads. And the doors and rooms are Update.esm's own: it places
-  them in every copy of Special Edition's world. Every other table (harvests,
+  BUILDING_HOLD, #2551), and the number its key and deed carry when name
+  and hold are another building's too (LABEL_NO, #3899). None of them
+  hands anything out, spawns anything or sends anybody anywhere, so a row
+  for a record nobody meets is a row nobody reads. And the doors and rooms
+  are Update.esm's own: it places them in every copy of Special Edition's
+  world. Every other table (harvests,
   hunts, /give and /spawn, recipes, kits, spawn and respawn points) hands out
   or sends, and may not name one. A game\data file is judged as the table it
   is the record of, and the list in it of what its script left out and why
@@ -243,7 +245,7 @@ function pluginUses(buf, cc, base, self) {
   of the manifest (the kept quests, the arrival talk) may not name one. A rule's
   list may sit inside an object, written as a dotted path.
 */
-const DESCRIBE_ONLY = ['WARMTH', 'RACES', 'BUILDING_BY_DOOR', 'BUILDING_NAME', 'BUILDING_HOLD'];
+const DESCRIBE_ONLY = ['WARMTH', 'RACES', 'BUILDING_BY_DOOR', 'BUILDING_NAME', 'BUILDING_HOLD', 'LABEL_NO'];
 const DESCRIBE_ONLY_FILES = ['warmth.json', 'races.json', 'doors.json', 'building-holds.json', 'harvests.json#unranked',
                              'hunts.json#skipped'];
 const LEFT_OUT_ROWS = {

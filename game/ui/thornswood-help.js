@@ -105,7 +105,8 @@
     { id: 'work', title: 'Work', text: function (k) {
       return [
         k.skills + ' opens your profession, your class and your skill tree. Work at what you ' +
-          'chose and the rank climbs on its own.',
+          'chose and the rank climbs on its own. Its Profession guides have a page for every ' +
+          'profession: what it makes, where the materials come from and how it ranks up.',
         'Your sister half stops at novice until a Master of it takes you on: a Master looks ' +
           'at you and presses ' + k.skills + ' when the prompt names it. ' + k.skills +
           ' lists who took you on and who you took on, and either of you can end it there.',
