@@ -414,7 +414,7 @@ or starts the Downgrade, each of which asks first or restarts the launcher.
 
 **MadeFromGame and FromGame** (MadeFromGame.cs, FromGame.cs,
 FromGameArchive.cs, FromGameDeflate.cs, FromGameMath.cs, and the recipes
-FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113). The main menu with no Bethesda
+FromGameMenu.cs, FromGameBoard.cs and FromGameModMenus.cs, #2827, #3113, #3127). The main menu with no Bethesda
 logo (`Data\Interface\startmenu.swf`) and the notice board and drop box
 meshes (`Data\meshes\thornswood\noticeboard01.nif`, `dropbox01.nif`) are
 Bethesda's files edited or put together, so Thornswood ships none of them:
@@ -442,7 +442,11 @@ own archives (`SkyUI_SE.bsa`, `SkyHUD.bsa`, `AHZmoreHUD.bsa`) with the edits
 `scripts\mods\Build-ModMenus.py` wrote into FromGameModMenus.cs, each pinned
 to the sha256 of the collection's version. `Ship-Rules.ps1
 $ShipMadeFromMods` keeps them out of every pack. QuickLoot IE's columns are
-set by its own settings file instead, which ships from `game\ours`.
+set by its own settings file instead, which ships from `game\ours`. SkyUI's
+journal (`Data\Interface\quest_journal.swf`, from `SkyUI_SE.bsa`) is made the
+same way with Quick Save, Save, Load, Help and the Creation Club entries taken
+off its System page (#3127), since a character lives on the server and the
+help panel replaced Skyrim's help.
 
 **GeneratedHere and GeneratedBuild** (GeneratedHere.cs, GeneratedBuild.cs,
 Generated.cs, CoveredBodies.cs, #1247, #3715). The behavior files Pandora
@@ -800,7 +804,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 17 | `ShellPlay.cs:297 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:300 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
 | 18a | `ShellPlay.cs:315 GeneratedHere.Ensure` | Under Waiting. The behavior files and the covered bodies (#3715), built with the collection's own Pandora and BodySlide only when `generated.txt` is missing or stale: the mod list, the files the tools read, the build list compiled into the launcher, or a built file changed. A build that stops, or any body in the folder that is nude, stops Play with a message box saying why (#405). | when it builds: `Game\Data\meshes\actors\*\behaviors`, `characters`, `animationdatasinglefile.txt` and `animationsetdatasinglefile.txt`, the six bodies in `character assets`, BodySlide's own copies of its settings, presets and groups, and `Profile\OwnGame\generated.txt`; `Profile\OwnGame\build-generated` while it runs |
-| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Thornswood-Last.esp` from the release's recipe and the person's own plugins (#2791) |
+| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Interface\quest_journal.swf` (#3127); `Game\Data\Thornswood-Last.esp` from the release's recipe and the person's own plugins (#2791) |
 | 19 | `ShellPlay.cs:345 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
 | 20 | `ShellPlay.cs:352 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
 | 21 | `ShellPlay.cs:354 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |

@@ -30,8 +30,7 @@ on any site that fails it:
 
   The forge. Its winning record over the load order in
   game\\data\\last-plugin.json, the repository's own Thornswood-Content.esp
-  in its place, and the repository's Thornswood-Last.esp and
-  Thornswood-WoodworkerTrail.esp after it. It has to be placed furniture
+  in its place, and the repository's Thornswood-Last.esp after it. It has to be placed furniture
   carrying CraftingSmithingForge, enabled, not deleted, with no enable
   parent, in the worldspace SITES says. The server loads furniture
   (WorldState::AttachEspmRecord) and skips disabled and deleted references.
@@ -104,7 +103,7 @@ FORGE_KEYWORD_EDID = 'CraftingSmithingForge'
 # The repository's own plugins, read from game\content rather than the game folder
 # (own_plugins.py reads every file there that way, #2923).
 OURS = ['Thornswood-Content.esp']
-AFTER = ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp']
+AFTER = ['Thornswood-Last.esp']
 
 # Where the woodworker and the bench are, in the bench's own frame (x right, y the way the woodworker faces).
 TABLE = (-75.0, 8.0, 85.0, 88.0)
