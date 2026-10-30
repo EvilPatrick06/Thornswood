@@ -53,7 +53,10 @@
   carrying the VPS label (full -OffBox still refuses it). -NetworkOnly -Status
   counts the rules, -NetworkOnly -Remove takes only that group off (the
   rollback), and -DryRunTo writes the script instead, as everywhere else.
-  Fetch the lists again now and then the same way (run it again).
+  Fetch the lists again now and then the same way (run it again). An
+  install on the box puts the same rules on in the same run, before the
+  runner can take a job; until 27 Oct 2026 it put none on, and runner 4
+  needed a -NetworkOnly run after its install (#3956).
 
   THE SIGNING RUNNER (#3312). A runner records\sign-runners.json lists signs
   release launchers (release.yml's VPS fallback), and its sign steps reach
@@ -312,8 +315,8 @@ param(
   [switch]$NetworkOnly,
   # Folders the runner's account is shut out of as well as C:\Thornswood*.
   [string[]]$AlsoDeny = @(),
-  # -OffBox or -NetworkOnly: host names a job may reach besides GitHub,
-  # resolved to addresses when it runs (WHAT A PULL REQUEST JOB MAY REACH).
+  # Host names a job may reach besides GitHub, resolved to addresses when it
+  # runs (WHAT A PULL REQUEST JOB MAY REACH), on an install, -Lock or -NetworkOnly.
   [string[]]$AllowHost = @(),
   # -OffBox only: let Defender skip the runner's folder as it does on the VPS.
   [switch]$DefenderSkip,
@@ -608,7 +611,15 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
     try { $rules = @((Get-Acl -LiteralPath $d.FullName -ErrorAction Stop).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) }
     catch { $acct + ': the rules on ' + $d.FullName + ' could not be read (' + $_.Exception.Message + '), so it is counted as one it could read' }
     if ($null -ne $rules -and @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }).Count) { $had++; continue }
-    $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
+    # CREATOR OWNER (S-1-3-0) is not counted for the runner's account: Windows
+    # gives it only on what an account makes there itself, and a runner
+    # account that may make nothing there gets nothing from it. The admin
+    # service's folder carries one for its log and state (ServiceAccount.ps1),
+    # and on 27 Oct 2026 that alone named it as one runners 1 to 3 COULD READ,
+    # which they could not (#3956). What it gives the service that does write
+    # there, and every other task running as that same account, is not this
+    # check's question (#4076, #4077). The deny goes on either way.
+    $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $_.IdentityReference.Value -ne 'S-1-3-0' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
     $null = & icacls.exe $d.FullName /deny ($acct + ':(OI)(CI)F') /C /Q 2>&1
     if ($LASTEXITCODE -ne 0) { throw ('icacls could not shut ' + $acct + ' out of ' + $d.FullName) }
     if ($open) { $wasOpen += $d.FullName } else { $shut++ }
@@ -1220,12 +1231,13 @@ $token = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/registration-token"
 if (-not $token) { Die "GitHub gave no registration token. gh has to be signed in as somebody who administers $Repo." }
 Say '  got one, good for an hour, not shown' 'Green'
 
-$guard = ''
-if ($OffBox) {
-  Head 'What a pull request job may reach'
-  try { $guard = Get-GuardScript 'apply' @(Get-GuardBlocks) } catch { Die ('nothing was installed: ' + $_.Exception.Message) }
-  Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
-}
+# Off the box, the network and the reads (WHAT A PULL REQUEST JOB MAY REACH).
+# On the box, the network (NETWORK ONLY's rules, Patrick, 11 Oct 2026): until
+# 27 Oct 2026 an install there put none on, and runner 4 took jobs with no
+# outbound limit until a -NetworkOnly run after it (#3956).
+Head 'What a job may reach'
+try { $guard = Get-GuardScript $(if ($OffBox) { 'apply' } else { 'network' }) @(Get-GuardBlocks) } catch { Die ('nothing was installed: ' + $_.Exception.Message) }
+Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
 
 Head "Installing it on $where"
 # The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
@@ -1277,8 +1289,7 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
 # same Close-RunnerAccount -Lock runs, so the two can never disagree again.
 Close-RunnerAccount `$acct `$root 'C:\' '$liveFilter' $alsoDenyList $leaveList
 $(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: the other runners' folders there as well.`nClose-RunnerAccount `$acct `$root '" + $rootDrive + "\' '" + $liveFilter + "'" })
-# Off the box: the network and the reads (WHAT A PULL REQUEST JOB MAY REACH),
-# before the runner can take a job.
+# The guard above, before the runner can take a job.
 $guard
 
 # A runner already here is taken off first, so a second run replaces it.
