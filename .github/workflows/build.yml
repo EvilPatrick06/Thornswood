@@ -50,19 +50,17 @@
 #
 # FAST, SINCE 25 SEPTEMBER: every pull request and every push to main gets
 # the checks that take seconds (secrets, every script and file parses, the
-# writing rules, the ownership page, the launcher window, the silent catch
+# writing rules, the launcher window, the silent catch
 # count) and the launcher build, about two
 # minutes on the VPS. The ~380 test harnesses in tests/ took over five minutes there
 # on their own, so they run every night instead, in nightly.yml, with the
 # rest of the security, file, GitHub and code checks (Patrick: "let's do
 # #1 and setup a nightly schedule"). A nightly failure opens an issue.
-# One of those harnesses is here as well, tests\test-ownership.js, added by
-# issue #752: it runs in a tenth of a second and what it guards, the page
-# naming where every credential lives, went wrong on a pull request that
-# nobody caught for days (#697, found in #750 and #751). A harness earns a
-# place here by being that fast and that cheap to be wrong about. Six more
-# joined it on 28 September (issue #875), under a minute between them, after
-# all six had sat red on main with this build green.
+# A harness earns a step here by being that fast and that cheap to be wrong
+# about: tests\test-ownership.js was the first (#752; it went to the private
+# ops repository with its page in #3693), and six more joined on 28 September
+# (issue #875), under a minute between them, after all six had sat red on
+# main with this build green.
 #
 # ON AGAIN, ON THE VPS, 25 SEPTEMBER. It was off for part of that day while
 # no runner existed. Then Patrick: "I want it set so they can commit+merge
@@ -84,11 +82,19 @@ on:
         default: hosted
 permissions:
   contents: read
-# One run per branch at a time. A newer push cancels the run it replaces, so
-# no runner is left building a commit nobody wants.
+# One run per branch at a time. On main a newer push waits for the run in
+# progress and does not cancel it (#3874): every main build traces the gate
+# (#3114), and pull requests choose their harnesses from the newest trace.
+# When each merge cancelled the build before it, no main build finished in a
+# busy hour, the trace fell behind, and from 4:59 PM on 26 Oct every pull
+# request ran all 608 harnesses, 8.5 minutes of a build runner for a one line
+# change to ops/status.md (run 40418651976). A third push still drops the one
+# waiting, so at most one main build runs and the newest is next. A pull
+# request's newer push cancels its older run (build-pr.yml): nothing reads a
+# pull request's trace.
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   # ALREADY TESTED (#3182, 21 Oct 2026). Main's build used to run every check
   # again on the tree its pull request had just passed: 26 minutes of a build
@@ -96,24 +102,33 @@ jobs:
   # of it cancelled by the next merge. When the pull request's build ran
   # against the main it lands on, a squash merge gives main that very tree.
   # This job asks scripts\dev\Tested-Tree.js whether a green build-pr.yml run
-  # of this repository kept a note of HEAD's tree (the last step of the checks
-  # below), and when one did it names that run and the build stops green.
-  # Any other tree, an expired note, a fork's run or a GitHub answer it cannot
-  # read builds main in full, as before. A manual run always builds. It runs
-  # on any VPS runner, not a build one: it starts node and asks GitHub three
-  # questions. tests\test-3182-tested-tree.js holds what it accepts, and why a
-  # tree is enough is in the script's header.
+  # of the pull request merged as HEAD wrote down HEAD's tree in its log (the
+  # last step of the checks below), and when one did it names that run and
+  # the build stops green. Any other tree, a fork's run or a GitHub answer it
+  # cannot read builds main in full, as before. A manual run always builds.
+  # Only a pull request built on GitHub's hosted runner leaves that note
+  # (#3874): on the VPS main builds in full so the gate is traced.
+  # HOSTED FIRST, LIKE THE BUILD (#3551, 27 Oct 2026). Both build jobs wait
+  # for this answer, so while this job asked only for a VPS runner the hosted
+  # build could start no sooner than a box runner was free, and not at all
+  # with the box down: on every push the box came first, not last. Nothing
+  # here needs the box. It starts node and asks GitHub a few questions, which
+  # pull request a commit came from among them (pull-requests: read), so it
+  # asks on GitHub's hosted Linux runner, and the box answers only when that
+  # did not, in "tested-vps" below. tests\test-3182-tested-tree.js holds what
+  # it accepts, and why a tree is enough is in the script's header.
   tested:
     name: Already tested in its pull request
-    if: ${{ github.event_name == 'push' }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    if: ${{ github.event_name == 'push' && vars.BUILD_RUNNER != 'vps' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       actions: read
       contents: read
+      pull-requests: read
     outputs:
       run: ${{ steps.look.outputs.run }}
-    steps:
+    steps: &look
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Every self-hosted checkout is written again (#3029), as below.
       - name: Check every tracked file out again
@@ -131,8 +146,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
-          node scripts\dev\Tested-Tree.js --tree $tree --repo $env:GITHUB_REPOSITORY
+          node scripts/dev/Tested-Tree.js --tree $tree --commit $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
           exit 0
+
+  # The same question on the box, as launcher-vps is the build's fallback.
+  # It asks only when the hosted job did not succeed: the repository variable
+  # BUILD_RUNNER is vps, which skips the hosted job outright, or a billing or
+  # quota stop refused it before any step ran. Only a push of main gets here,
+  # never a branch or a pull request, so it takes any VPS runner and needs
+  # no build runner. The steps are the hosted job's own, by the anchor look.
+  tested-vps:
+    name: Already tested in its pull request (VPS fallback)
+    needs: tested
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.tested.result != 'success' }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.look.outputs.run }}
+    steps: *look
 
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
   # GitHub's hosted windows-latest is the default, in the job "launcher"
@@ -151,13 +186,23 @@ jobs:
   # can never test different things.
   launcher-vps:
     name: Launcher builds (VPS fallback)
-    needs: [tested, launcher]
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    needs: [tested, tested-vps, launcher]
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     # thornswood-build (#2994): only the runners records/build-runners.json
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
     # the harness step alone and the limit below cancelled passing builds.
+    # Main's build stays on the box: only the box's runners have the trace
+    # task, and a main build is what leaves the gate map the next pull
+    # requests measure from (#3114, #3874). Build-PrWorkflow.js drops
+    # thornswood-vps for build-pr.yml only, so a pull request's fallback can
+    # also land on One's off-box build runners (#3860).
     runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    # actions: read for the gate step off the box, which reads the map main's
+    # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
+    permissions:
+      actions: read
+      contents: read
     # Often past twenty minutes on the VPS (#2557): it is shared with the live
     # server and other jobs, and the harness list keeps growing (#2544 added
     # test-release-workflow.ps1, #2525 the feed-watch test, #2546 the remote
@@ -246,29 +291,8 @@ jobs:
           }
           if ($failed.Count) { exit 1 }
 
-      - name: Check the ownership page
-        shell: pwsh
-        run: |
-          # Issue #752. docs\OWNERSHIP.md says where every credential file
-          # lives, who holds it and who the second holder is, and
-          # tests\test-ownership.js greps scripts\<area>\*.ps1 and
-          # launcher\app\*.cs for the file names rather than trusting the page.
-          # #697 added discord-avatar.txt with neither a row on that page nor a
-          # line saying it is not a secret, and nothing said so until #750 and
-          # #751 found it by hand. A tenth of a second, so it runs here on every
-          # pull request and not only in the nightly checks.
-          #
-          # Fail closed: no node on the runner is a check that did not happen,
-          # which is the failure this step exists to stop, so it is red.
-          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            Write-Host '::error file=tests/test-ownership.js::no node on this runner, so the ownership page was not checked'
-            exit 1
-          }
-          node tests\test-ownership.js
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=docs/OWNERSHIP.md::the ownership page does not match what the scripts and the launcher name; the FAIL lines above say which rows'
-            exit 1
-          }
+      # The ownership page check (#752) went with docs/OWNERSHIP.md to the
+      # private ops repository (#3693), which runs it against main every night.
 
       - name: Check the old mod's name stays out
         shell: pwsh
@@ -366,9 +390,24 @@ jobs:
           & python tests/test-retrieval-source-reader.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Check every Discord doc has its change line
+        shell: pwsh
+        run: |
+          # Issue #3457: #3445 changed the words of four Discord docs, which are
+          # read out of the join and rules pages, with no change line, and was
+          # green, since check_docs ran only in the nightly's bot harnesses.
+          # The fingerprints are in bot\content.py now, no discord.py needed.
+          & python tests/test-3457-doc-change-lines.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run the gate harnesses
         id: gate
         shell: pwsh
+        # Off the box a pull request's gate reads the map main's build handed
+        # on with it (#4009). Run-Gate.ps1 takes it out of the environment
+        # before any harness starts.
+        env:
+          GATE_MAP_TOKEN: ${{ github.token }}
         run: |
           # Issue #3009. The gate is every tests\test-*.js and tests\test-*.ps1
           # that tests\gate-excluded.txt does not name, read from the files by
@@ -422,6 +461,18 @@ jobs:
           .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800
           exit $LASTEXITCODE
 
+      # THE MAP FOR RUNNERS OFF THE BOX (#4009). The trace task leaves the map
+      # only in the box's build runners' folders, so a pull request built on
+      # One's runners or GitHub's ran the whole gate. Main's build prints the
+      # box's newest map into this job's log, which costs no storage
+      # (artifacts do, #3399), and a gate off the box reads it from there.
+      # scripts\dev\Gate-Map.ps1 says how; it hands on only in main's push
+      # build, and never fails a build.
+      - name: Hand the traced map to runners off the box
+        if: ${{ !cancelled() && runner.environment == 'self-hosted' }}
+        shell: pwsh
+        run: .\scripts\dev\Gate-Map.ps1 -Hand
+
       - name: Run the voice service's /health harness
         shell: pwsh
         run: |
@@ -460,14 +511,17 @@ jobs:
           }
 
       - name: Check the launcher window
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           # The launcher builds its window from ui.xaml at startup and finds
           # every control by name, so a renamed control or a window that does
           # not parse compiles clean and is found by the person using it. This
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
-          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          # -ExecutionPolicy Bypass on both, as every harness starts 5.1:
+          # Windows 11 keeps 5.1 at Restricted, so on One's runners the plain
+          # shell: powershell could not run this step's own script (#3861).
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Check the launcher UI thread
@@ -525,9 +579,16 @@ jobs:
           # which this already covers, is gone (#3114). The nightly keeps it.
           # ruff comes into a venv of this run's own, never the machine's
           # Python, pinned by version and hash in .github\ruff-requirements.txt.
-          # By hand, from the repository folder, in any venv:
-          #   python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
-          #   python -m ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
+          # By hand, from the repository folder, into .venv (git ignores it).
+          # With uv, which needs no python on the PATH (uv's own Python
+          # refuses pip as "externally-managed", and a uv venv has no pip):
+          #   uv venv .venv
+          #   uv pip install --python .venv --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # or with Python's own pip:
+          #   python -m venv .venv
+          #   .venv\Scripts\python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # then:
+          #   .venv\Scripts\ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
           $venv = Join-Path $env:RUNNER_TEMP 'ruff-venv'
           python -m venv $venv
           $py = Join-Path $venv 'Scripts\python.exe'
@@ -624,33 +685,35 @@ jobs:
           exit 0
 
       # The note main's build looks for (#3182, the job "tested" at the top
-      # of build.yml): the tree every step before this one passed on. Last,
-      # so it is kept only when they all did, and only when the gate step
-      # ran every gate harness (#3114): a pull request that ran only what
-      # its change can reach leaves main to build in full. A pull request's
-      # checkout is GitHub's merge of it into main, so this is the tree a
-      # squash merge gives main while main has not moved. A few hundred bytes for seven
-      # days, against the 2 GB below; nothing else reads it.
+      # of build.yml): the tree every step before this one passed on, one
+      # line of this job's log. Last, so it is written only when they all
+      # did, and only when the gate step ran every gate harness (#3114): a
+      # pull request that ran only what its change can reach leaves main to
+      # build in full. Only on GitHub's hosted runner (#3874), which has no
+      # traced map and runs every harness anyway: a main build skipped by
+      # this note is not traced either, so on the VPS, where a pull request
+      # ran the whole gate only because the map could not serve it, the note
+      # kept the map stale and every pull request after it ran the whole gate
+      # too. Without it main builds in full and is traced (Patrick's option A
+      # on q-3114-map-refresh, every main build traced), and the next pull
+      # request runs only what it can reach. A pull request's checkout is
+      # GitHub's merge of it into main, so this is the tree a squash merge
+      # gives main while main has not moved. In the log and not an artifact
+      # since #3399: this
+      # repository's artifact storage is counted by the hour, it used
+      # October's whole allowance by 23 Oct 2026, and from then the note's
+      # upload failed and took every pull request's build red. A log costs no
+      # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
       - name: Write down the tree these checks passed on
-        id: tree
-        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
+        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true' && runner.environment == 'github-hosted'
         shell: pwsh
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
           if ($tree -notmatch '^[0-9a-f]{40}$') { Write-Host "::error::git gave no tree for HEAD: $tree"; exit 1 }
-          $note = Join-Path $env:RUNNER_TEMP 'tested-tree.txt'
-          Set-Content -LiteralPath $note -Encoding utf8 -Value @(
-            "tree $tree", "commit $env:GITHUB_SHA", "pull request ${{ github.event.pull_request.number }}", "head ${{ github.event.pull_request.head.sha }}")
-          "tree=$tree" >> $env:GITHUB_OUTPUT
-          "note=$note" >> $env:GITHUB_OUTPUT
-      - name: Keep the tree these checks passed on
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
-        with:
-          name: tested-tree-${{ steps.tree.outputs.tree }}
-          path: ${{ steps.tree.outputs.note }}
-          retention-days: 7
-          overwrite: true
+          Write-Host ('TESTED-TREE {0} commit {1} pull request {2} head {3}' -f $tree, $env:GITHUB_SHA, $env:PR_NUMBER, $env:PR_HEAD)
 
       # No other artifact from this build (#2163, 19 Oct). It used to keep the exe
       # for 7 days, and nothing read it: Ship takes the launcher from
@@ -665,9 +728,13 @@ jobs:
   # fallback above runs instead.
   launcher:
     name: Launcher builds
-    needs: tested
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    needs: [tested, tested-vps]
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
     runs-on: windows-latest
+    # As the fallback's: the gate step reads the map main's build handed on.
+    permissions:
+      actions: read
+      contents: read
     # The hosted runner has two cores: the harness step alone took over
     # eighteen minutes on it, so it gets an hour.
     timeout-minutes: 60

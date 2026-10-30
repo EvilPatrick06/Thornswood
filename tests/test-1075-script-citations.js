@@ -90,7 +90,7 @@ yes('there are scripts to read them against, ' + scripts.length + ' of them', sc
 // what follows it.
 const CITE = /^((?:[\w.-]+[\\/])*)([\w.-]+\.(?:ps1|cs|js|py|md)|Caddyfile):([\s\S]+)$/i;
 const LINES = /^\s*\d[\d\s,-]*$/;
-const WIDE = ['docs/SERVER.md', 'docs/FEED.md', 'docs/GAMEMODE.md', 'docs/GLOSSARY.md',
+const WIDE = ['docs/FEED.md', 'docs/GAMEMODE.md', 'docs/GLOSSARY.md',
   'docs/VIRUSTOTAL-FALSE-POSITIVE.md', 'docs/systems/commands.md'];
 function isScript(file) { return /\.ps1$/i.test(file); }
 

@@ -10,14 +10,14 @@ namespace Thornswood
     /// plugins moved aside.
     ///
     /// Data\Platform is the one place every SkyMP server's launcher writes
-    /// into the same Skyrim. another server's launcher rewrites
+    /// into the same Skyrim. Another server's launcher rewrites
     /// Data\Platform\UI\index.html with its own page and drops its own plugin
     /// into Data\Platform\Plugins. Skyrim Platform runs every plugin it finds
     /// and the front plugin loads whatever index.html is there, so on
     /// 2026-09-16 somebody who plays both had that server's page under
     /// Thornswood's chat, and Thornswood's voice indicator over that server's
     /// menu. The plugins now stay idle when the client points at another
-    /// server; this is the other half, so a another server session cannot leave
+    /// server; this is the other half, so another server's session cannot leave
     /// Thornswood loading their page.
     ///
     /// The same mechanism keeps the main build and the dev build apart when
