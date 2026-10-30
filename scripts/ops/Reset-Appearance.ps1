@@ -15,6 +15,10 @@
   character creation again. Inventory, position, spells and everything else on
   the character are untouched.
 
+  Each change form it edits is copied first to <id>.json.bak-<stamp> beside
+  it, a whole copy of the character, which the game server's server-log.js
+  deletes 30 days later (#3620).
+
   THE SERVER MUST BE STOPPED. It holds change forms in memory and writes them
   out on its own schedule, so editing them underneath a running server just gets
   the edit overwritten.
