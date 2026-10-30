@@ -76,9 +76,11 @@ On the machine of anybody installing Thornswood for the first time.
 given `-Package`; a dev Ship never touches the installer.
 
 The site carries the one file shape: the payload attached to
-`Thornswood-Setup.exe`, nothing beside it (`/file/Thornswood-Setup.exe` was
-252,624,384 bytes on 29 September, with no `Thornswood-Setup.zip` and an empty
-`/api/payload`). A main Ship with `-Package` builds that shape, passing
+`Thornswood-Setup.exe`, nothing beside it. A one file publish takes a
+`Thornswood-Setup.zip` an earlier two file publish left on the site off, with
+its `files.json` entry, so `/api/payload` answers `{}` (#3560: on 26 October
+the 18 October exe sat beside the 3 October zip, and `/api/payload` still
+handed that zip, with launcher 1.1.105 in it, to every two file stub). A main Ship with `-Package` builds that shape, passing
 `Package-Thornswood.ps1 -OneFile` (issue #1213), and so does a hand-run
 `Package-Thornswood.ps1 -OneFile`. Without `-OneFile` it builds the two file
 shape, a small exe that downloads `Thornswood-Setup.zip` from

@@ -1,6 +1,6 @@
 {
   "forkCommit": "2b015d2679c5efae6920e90b81ba188ec290a539",
-  "builtUtc": "2026-10-22T18:37:38Z",
+  "builtUtc": "2026-10-27T01:26:25Z",
   "builtWith": "node v22.22.0, yarn@1.22.22",
   "files": {
     "02687b2110d1a50a6b4e194282ab8deb.svg": {
@@ -274,6 +274,152 @@
     "index.html": {
       "sha256": "2c2b2b99b8782e8dd29b234eb5bdd6c4092845c185ca31b86de8c9d97d54f233",
       "bytes": 237
+    }
+  },
+  "packages": {
+    "npm-babel-runtime-7.23.9": {
+      "package": "@babel/runtime",
+      "version": "7.23.9",
+      "licence": "MIT",
+      "from": "node_modules/@babel/runtime",
+      "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76",
+      "bytes": 1106
+    },
+    "npm-clsx-1.2.1": {
+      "package": "clsx",
+      "version": "1.2.1",
+      "licence": "MIT",
+      "from": "node_modules/clsx",
+      "sha256": "9a9edad7baae52622bddf3c15b2ef8a33d2c89f2d25408ad13e8a7481c6b0c97",
+      "bytes": 1104
+    },
+    "npm-css-loader-6.10.0": {
+      "package": "css-loader",
+      "version": "6.10.0",
+      "licence": "MIT",
+      "from": "node_modules/css-loader",
+      "sha256": "9068a8782d2fb4c6e432cfa25334efa56f722822180570802bf86e71b6003b1e",
+      "bytes": 1071
+    },
+    "npm-hoist-non-react-statics-3.3.2": {
+      "package": "hoist-non-react-statics",
+      "version": "3.3.2",
+      "licence": "BSD-3-Clause",
+      "from": "node_modules/hoist-non-react-statics",
+      "sha256": "eb32ff0ec52b6ea86e3d3e06c6ad1b68ee03798b6729af13919f6d5c14b368f3",
+      "bytes": 1662
+    },
+    "npm-object-assign-4.1.1": {
+      "package": "object-assign",
+      "version": "4.1.1",
+      "licence": "MIT",
+      "from": "node_modules/object-assign",
+      "sha256": "6fb9754611c20f6649f68805e8c990e83261f29316e29de9e6cedae607b8634c",
+      "bytes": 1119
+    },
+    "npm-prop-types-15.8.1": {
+      "package": "prop-types",
+      "version": "15.8.1",
+      "licence": "MIT",
+      "from": "node_modules/prop-types",
+      "sha256": "f657f99d3fb9647db92628e96007aabb46e5f04f33e49999075aab8e250ca7ce",
+      "bytes": 1080
+    },
+    "npm-react-18.2.0": {
+      "package": "react",
+      "version": "18.2.0",
+      "licence": "MIT",
+      "from": "node_modules/react",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "bytes": 1086
+    },
+    "npm-react-dom-18.2.0": {
+      "package": "react-dom",
+      "version": "18.2.0",
+      "licence": "MIT",
+      "from": "node_modules/react-dom",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "bytes": 1086
+    },
+    "npm-react-draggable-4.4.6": {
+      "package": "react-draggable",
+      "version": "4.4.6",
+      "licence": "MIT",
+      "from": "node_modules/react-draggable",
+      "sha256": "6de5c13fa4cb2cef3d111d6f43ef4958aa1b9ea3f6f623200dfe1300a8e1d3d4",
+      "bytes": 1111
+    },
+    "npm-react-is-16.13.1": {
+      "package": "react-is",
+      "version": "16.13.1",
+      "licence": "MIT",
+      "from": "node_modules/react-is",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "bytes": 1086
+    },
+    "npm-react-is-17.0.2": {
+      "package": "react-is",
+      "version": "17.0.2",
+      "licence": "MIT",
+      "from": "node_modules/react-redux/node_modules/react-is",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "bytes": 1086
+    },
+    "npm-react-redux-7.2.9": {
+      "package": "react-redux",
+      "version": "7.2.9",
+      "licence": "MIT",
+      "from": "node_modules/react-redux",
+      "sha256": "635da794c92d278f8355428be0f9922d643f556d4f75f33fe4aca6b98d27affe",
+      "bytes": 1107
+    },
+    "npm-react-resizable-3.0.5": {
+      "package": "react-resizable",
+      "version": "3.0.5",
+      "licence": "MIT",
+      "from": "node_modules/react-resizable",
+      "sha256": "dfbf6bbccb9fe67c1cf0d7721605ab81b2f2adce68ee4becf02292d899d0001c",
+      "bytes": 1083
+    },
+    "npm-react-slider-2.0.6": {
+      "package": "react-slider",
+      "version": "2.0.6",
+      "licence": "MIT",
+      "from": "node_modules/react-slider",
+      "sha256": "40f2090dde19095148d82cfa2bf835339ccc4150fb7d0f8974da3d6774eaa831",
+      "bytes": 1080
+    },
+    "npm-redux-4.2.1": {
+      "package": "redux",
+      "version": "4.2.1",
+      "licence": "MIT",
+      "from": "node_modules/redux",
+      "sha256": "f2da73c752c6b87624755edacf927cbd915fa76555d383e74494bad4a5155ab3",
+      "bytes": 1086
+    },
+    "npm-scheduler-0.23.0": {
+      "package": "scheduler",
+      "version": "0.23.0",
+      "licence": "MIT",
+      "from": "node_modules/scheduler",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "bytes": 1086
+    },
+    "npm-style-loader-3.3.4": {
+      "package": "style-loader",
+      "version": "3.3.4",
+      "licence": "MIT",
+      "from": "node_modules/style-loader",
+      "sha256": "9068a8782d2fb4c6e432cfa25334efa56f722822180570802bf86e71b6003b1e",
+      "bytes": 1071
+    },
+    "npm-tslib-2.6.2": {
+      "package": "tslib",
+      "version": "2.6.2",
+      "licence": "0BSD",
+      "from": "node_modules/tslib",
+      "sha256": "210b19e543130388c68654b7497e967119ce17145f66ab7d85688fbd70f08751",
+      "bytes": 655
     }
   }
 }

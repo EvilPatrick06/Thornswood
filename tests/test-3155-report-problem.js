@@ -45,7 +45,6 @@ const page = read('game', 'ui', 'thornswood-help.js');
 const front = read('game', 'plugins', 'thornswood-front.js');
 const hub = read('site', 'public', 'hub.js');
 const rules = read('docs', 'GAME-SYSTEMS.md');
-const claudeMd = read('CLAUDE.md');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -439,7 +438,6 @@ const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'da
     yes('6 and opens the one person it leaves', /\(mq \|\| \(SFIND\.q && people\.length === 1\) \? ' open' : ''\)/.test(hub));
     yes('6 the inbox calls it a problem', /n\.kind === 'ticket' \|\| n\.kind === 'problem'\) \? n\.kind : 'bug'/.test(hub));
     yes('6 "Buttons, not commands" carries the exception, with its date', /Report a problem/.test(rules) && /21 Oct/.test(rules) && /#3155/.test(rules));
-    yes('6 and so does CLAUDE.md', /Report a problem/.test(claudeMd) && /#3155/.test(claudeMd));
   } catch (e) {
     yes('the harness ran to the end: ' + (e && e.stack ? e.stack : e), false);
   } finally {

@@ -155,6 +155,8 @@ function boot(dir, eng) {
     'var masterCut = 0;',
     // The holders' word save() writes beside them (#2680).
     'var wordBook = { list: [] };',
+    // Rent still owed by somebody who no longer holds the place (#3893), written with them.
+    'var arrears = {};',
     // Nobody guards this board, keeps it or is its Jarl; a guard's take down
     // (#502) is tests/test-502-guard-board.js, the offices (#2551)
     // tests/test-2551-hold-offices.js.

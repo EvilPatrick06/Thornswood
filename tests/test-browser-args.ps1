@@ -81,8 +81,8 @@ Yes 'before the environment is created, which is when WebView2 reads it' ($set -
 Yes 'through WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, not the options that faulted' `
     ($voice -match 'WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS' -and $voice -notmatch 'CoreWebView2EnvironmentOptions\s*\(')
 $music = Get-Content -LiteralPath (Join-Path $app 'MenuMusic.cs') -Raw
-Yes 'menu music appends to the same variable rather than replacing it' `
-    ($music -match 'Environment\.SetEnvironmentVariable\(key, cur \+ " " \+ flag\)')
+Yes 'menu music sets no browser switches: it plays from the launcher, not a browser (#3207)' `
+    ($music -notmatch 'WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS' -and $music -notmatch 'Microsoft\.Web\.WebView2')
 
 # ------------------------------------------------ 3. listeners are loopback
 $cs = @(Get-ChildItem -LiteralPath $app -Filter *.cs -File)

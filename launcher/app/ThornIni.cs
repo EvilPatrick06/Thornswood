@@ -16,7 +16,7 @@ namespace Thornswood
     /// and its binds on everybody, and every update put them back over
     /// whatever people had set. It is on Ship-Rules' machine list now, and
     /// two things follow from that, both here: a machine with no file gets
-    /// the template (tools\emotes\Thornswood.ini, built into the exe), and the
+    /// the template (launcher\Thornswood.ini, built into the exe), and the
     /// Fov=120 those packs left behind is taken back once, the way Leaks takes
     /// back the sign in file.
     /// </summary>
@@ -48,7 +48,7 @@ namespace Thornswood
             catch { return null; }
         }
 
-        /// <summary>tools\emotes\Thornswood.ini, as Build-Launcher put it in the exe.</summary>
+        /// <summary>launcher\Thornswood.ini, as Build-Launcher put it in the exe.</summary>
         static string Template()
         {
             try

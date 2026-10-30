@@ -22,7 +22,7 @@ namespace Thornswood
     /// the keyboard away from the game. Positions, names and distances all
     /// worked there, because that is signalling. Audio never once did.
     ///
-    /// another server does not do it that way. Their in-game voice service only tracks
+    /// Another server does not do it that way. Their in-game voice service only tracks
     /// push to talk, the socket and the HUD, and reports a launcher status of
     /// connected / micOk / talking. The microphone and the audio pipeline live
     /// in their launcher, which is Electron and therefore a real browser.
@@ -373,9 +373,12 @@ namespace Thornswood
             // on the network and Windows Firewall has nothing to ask about,
             // even on a WebView2 installed for one account, which comes with
             // no rule (#911). The environment variable, not
-            // CoreWebView2EnvironmentOptions: see MenuMusic for why options
-            // made CreateAsync fault on the shipping machine. It is read when
-            // the environment is created, which is the next line.
+            // CoreWebView2EnvironmentOptions: on the shipping machine a
+            // CreateAsync given options faulted (launcher.log: "no WebView2
+            // runtime") while one given none succeeded on the same run,
+            // measured when the menu music still had a browser of its own.
+            // It is read when the environment is created, which is the next
+            // line.
             try
             {
                 string key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
