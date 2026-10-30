@@ -18,7 +18,9 @@
     3. it passes over a run that is not build.yml on a push to main of this
        repository, a job that did not get through the hand-on step, and a
        log whose pieces are missing or do not match their sha256, and says
-       why; with nothing usable, or no token, it exits 1;
+       why; with nothing usable, or no token, it exits 1; it takes the
+       token from GATE_MAP_TOKEN and leaves none in the environment, and
+       nothing hands it one on a command line (#4079);
     4. build.yml runs -Hand only on main's push builds on the box, after the
        gate, and gives the gate step the token only on a pull request.
 
@@ -43,7 +45,7 @@ $gateMap = Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Gate-Map.ps1
 $affected = Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Affected-Harnesses.js'
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('gate-map-' + [Guid]::NewGuid().ToString('N'))
 $keepEnv = @{}
-foreach ($n in 'RUNNER_ENVIRONMENT', 'RUNNER_TEMP', 'GITHUB_EVENT_NAME', 'GITHUB_REF') { $keepEnv[$n] = [Environment]::GetEnvironmentVariable($n) }
+foreach ($n in 'RUNNER_ENVIRONMENT', 'RUNNER_TEMP', 'GITHUB_EVENT_NAME', 'GITHUB_REF', 'GATE_MAP_TOKEN') { $keepEnv[$n] = [Environment]::GetEnvironmentVariable($n) }
 try {
     # ---- the box runner's folder, and the map the trace task left in it
     $root = Join-Path $scratch 'Thornswood-Runner'
@@ -117,14 +119,16 @@ try {
     $fetched = Join-Path $scratch 'fetched'
     function Invoke-Fetch([string]$token = 't0ken') {
         Remove-Item -LiteralPath $fetched -Recurse -Force -ErrorAction SilentlyContinue
-        $out = @(& $gateMap -Fetch $fetched -Token $token -Repository 'o/r' 6>&1 | ForEach-Object { "$_" })
-        [pscustomobject]@{ Code = $LASTEXITCODE; Text = ($out -join "`n") }
+        $env:GATE_MAP_TOKEN = $token
+        $out = @(& $gateMap -Fetch $fetched -Repository 'o/r' 6>&1 | ForEach-Object { "$_" })
+        [pscustomobject]@{ Code = $LASTEXITCODE; Text = ($out -join "`n"); Left = (Test-Path -LiteralPath Env:GATE_MAP_TOKEN) }
     }
     $job = { param($id, $name = 'Launcher builds (VPS fallback)', $s = $step) @(@{ id = $id; name = $name; steps = @(@{ name = 'Run the gate harnesses'; conclusion = 'success' }, $s) }) }
 
     $global:GateMapStub = @{ Runs = @((Run 900)); Jobs = @{ '900' = (& $job 9001) }; Logs = @{ '9001' = $good } }
     $f = Invoke-Fetch
     Yes ('-Fetch writes main''s newest handed-on map (exit ' + $f.Code + ')') ($f.Code -eq 0 -and $f.Text -match 'run 900 handed on' -and (Test-Path -LiteralPath (Join-Path $fetched 'latest.json')))
+    Yes '  taking its token from GATE_MAP_TOKEN, which it leaves out of the environment' (-not $f.Left)
     $lj = $null
     if (Test-Path -LiteralPath (Join-Path $fetched 'latest.json')) { $lj = [IO.File]::ReadAllText((Join-Path $fetched 'latest.json')) | ConvertFrom-Json }
     Yes '  latest.json names the box''s run and commit' ($lj -and $lj.key -eq $key -and $lj.commit -eq $commit)
@@ -173,6 +177,7 @@ Yes '  on the box, where Gate-Map.ps1 itself keeps it to main''s push builds' ($
 Yes '  and gives the gate step the job''s token' ($b.Contains('GATE_MAP_TOKEN: ${{ github.token }}'))
 Yes '  and both build jobs may read another run''s job logs' (([regex]::Matches($b, '(?m)^    permissions:\n      actions: read\n      contents: read\n')).Count -ge 2)
 $rg = [IO.File]::ReadAllText((Join-Path (Join-Path (Join-Path $repo 'scripts') 'dev') 'Run-Gate.ps1'))
+Yes 'Run-Gate.ps1 hands Gate-Map.ps1 no token on its command line (#4079)' ($rg.Contains("& (Join-Path `$Here 'Gate-Map.ps1') -Fetch `$maps 2>&1") -and -not ($rg -match '-Token\b'))
 Yes 'Run-Gate.ps1 takes the token out of the environment before any harness starts' ($rg.IndexOf('Remove-Item -LiteralPath Env:GATE_MAP_TOKEN') -gt 0 -and $rg.IndexOf('Remove-Item -LiteralPath Env:GATE_MAP_TOKEN') -lt $rg.IndexOf("& (Join-Path `$Here 'Nightly-Harnesses.ps1')"))
 
 Write-Host ''
