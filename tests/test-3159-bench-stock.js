@@ -228,16 +228,22 @@ const pieces = {
   handle: lineOf(/^const HANDLE_DESC = .*$/m),
   tools: slice(gm, 'const TOOLS = {', '\n};'),
   key: lineOf(/^const KEY_RECIPE = .*$/m),
+  // #3151: the quality a weapon or an armour piece comes out at, which onCraft
+  // names, as test-1398-fuel.js lifts it.
+  quality: [slice(gm, 'const CRAFT_QUALITY = {', '\n};'), lineOf(/^const QUALITY_WEAPON_FAMILIES = .*$/m),
+            lineOf(/^const QUALITY_RANKS = .*$/m)].join('\n'),
   fns: ['function idOf(descriptor)', 'function mintedEntry(entry)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function wovenMark(actorId)',
         'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
+        'function qualityTier(margin, roll)', 'function qualityRolled(row, baseId)',
+        'function qualityMargin(actorId, row)', 'function qualityOutput(actorId, row, margin)',
         'function unfitToMake(actorId, workbenchId)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
 const craftReady = !!RECIPES && !!KEPT && !!fuelLine && !!P && !!pieces.grades && !!pieces.hafted && !!pieces.handle &&
-  !!pieces.tools && !!pieces.key && pieces.fns.every(function (f) { return !!f; }) && !!pieces.onCraft;
+  !!pieces.tools && !!pieces.key && !!pieces.quality && pieces.fns.every(function (f) { return !!f; }) && !!pieces.onCraft;
 yes('the craft pieces are all in the gamemode', craftReady);
 yes('onCraft asks the property block for the stock with the eighth argument',
     !!pieces.onCraft && /benchStock\(actorId, workbenchId, arguments\[7\]\)/.test(pieces.onCraft));
@@ -283,7 +289,7 @@ function craftRig(state, stockAnswer) {
       }
     }
   };
-  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key]
+  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.quality]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
   const onCraft = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'guard', 'notify', 'say', 'log',
     'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork', body)(
