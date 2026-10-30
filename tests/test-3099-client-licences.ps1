@@ -85,6 +85,11 @@ try {
                  'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll' = @('frida-gum', 'nlohmann-json', 'fmt', 'spdlog')
                  'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformCEF.exe.hidden' = @('cef-prebuilt') }
     $licence = @{ 'nlohmann-json' = 'MIT'; spdlog = 'MIT'; fmt = 'MIT'; 'frida-gum' = $null; 'cef-prebuilt' = $null }
+    $library = @{
+        tilted = @{ Kind = 'fork'; Version = $null; Licence = $null; In = @('Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformCEF.exe.hidden', 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll') }
+        viet = @{ Kind = 'fork'; Version = $null; Licence = 'MIT'; In = @('Data\SKSE\Plugins\MpClientPlugin.dll', 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll') }
+        'npm-eventemitter3-5.0.1' = @{ Kind = 'npm'; Version = '5.0.1'; Licence = 'MIT'; In = @('Data\Platform\Plugins\skymp5-client.js') }
+    }
 
     # A client record and a build folder as engine.yml has them; $edit
     # changes either before the script runs. Returns the paths.
@@ -100,7 +105,16 @@ try {
                 in = @($native | Where-Object { $inFile[$_] -contains $n } | ForEach-Object { $_.Replace('\', '/') })
                 text = ($n + '.txt'); bytes = (Get-Item -LiteralPath (Join-Path $lic ($n + '.txt'))).Length; sha256 = (Sha (Join-Path $lic ($n + '.txt'))) }
         }
-        $m = [ordered]@{ commit = $commit; triplet = 'x64-windows-sp'; readWith = 'LLVM version 18.1.8'; files = $files; ports = $ports }
+        # The libraries beside the ports (#3751): two of the fork's folders
+        # and an npm package in skymp5-client.js.
+        $libs = [ordered]@{}
+        foreach ($n in @($library.Keys | Sort-Object)) {
+            Put (Join-Path $lic ($n + '.txt')) ("The $n notice`n")
+            $libs[$n] = [ordered]@{ kind = $library[$n].Kind; version = $library[$n].Version; licence = $library[$n].Licence; from = 'somewhere'
+                in = @($library[$n].In | ForEach-Object { $_.Replace('\', '/') })
+                text = ($n + '.txt'); bytes = (Get-Item -LiteralPath (Join-Path $lic ($n + '.txt'))).Length; sha256 = (Sha (Join-Path $lic ($n + '.txt'))) }
+        }
+        $m = [ordered]@{ commit = $commit; triplet = 'x64-windows-sp'; readWith = 'LLVM version 18.1.8'; files = $files; ports = $ports; libraries = $libs }
         $cfiles = [ordered]@{}
         foreach ($f in $native + @('Data\Platform\Plugins\skymp5-client.js', 'Data\Scripts\TESModPlatform.pex')) { $cfiles[$f] = [ordered]@{ sha256 = ('0' * 64); bytes = 1 } }
         $c = [ordered]@{ forkCommit = $commit.Substring(0, 8); files = $cfiles }
@@ -135,9 +149,18 @@ try {
             (@($p.in) -join ',') -ne (@($native | Where-Object { $inFile[$_] -contains $n }) -join ',')) { $portsOk = $false }
     }
     Yes '  every port with its version, declared licence, files, and its text''s sha256 and size' $portsOk
+    $libsOk = $rec -and $rec.PSObject.Properties['libraries'] -and @($rec.libraries.PSObject.Properties.Name).Count -eq 3
+    foreach ($n in $library.Keys) {
+        $p = if ($libsOk) { $rec.libraries.$n } else { $null }
+        $txt = Join-Path $k.Texts ($n + '.txt')
+        if (-not $p -or [string]$p.kind -ne $library[$n].Kind -or $p.version -ne $library[$n].Version -or $p.licence -ne $library[$n].Licence -or -not (Test-Path -LiteralPath $txt) -or
+            [string]$p.sha256 -ne (Sha $txt) -or [long]$p.bytes -ne (Get-Item -LiteralPath $txt).Length -or
+            (@($p.in) -join ',') -ne (@($library[$n].In | Sort-Object) -join ',')) { $libsOk = $false }
+    }
+    Yes '  every library (#3751) with its kind, version, declared licence, files, and its text''s sha256 and size' $libsOk
     Yes '  each text beside the record is the build''s, byte for byte, and nothing else is there' (
-        @(Get-ChildItem -LiteralPath $k.Texts -File).Count -eq 5 -and
-        @($licence.Keys | Where-Object { (Sha (Join-Path $k.Texts ($_ + '.txt'))) -ne (Sha (Join-Path $k.Licences ($_ + '.txt'))) }).Count -eq 0)
+        @(Get-ChildItem -LiteralPath $k.Texts -File).Count -eq 8 -and
+        @(@($licence.Keys) + @($library.Keys) | Where-Object { (Sha (Join-Path $k.Texts ($_ + '.txt'))) -ne (Sha (Join-Path $k.Licences ($_ + '.txt'))) }).Count -eq 0)
     Put (Join-Path $k.Texts 'old-port.txt') 'a text from an earlier pin'
     $r = Try-Case $k
     Yes '  recorded again, a text no port names any more is gone' ($r.Code -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $k.Texts 'old-port.txt')))
@@ -158,7 +181,17 @@ try {
         @{ Tag = 'notext'; What = 'a port in a file with no text'; Match = 'spdlog is in a client file and the build has no spdlog\.txt'
            Edit = { param($l, $m, $c) Remove-Item -LiteralPath (Join-Path $l 'spdlog.txt') } },
         @{ Tag = 'unlisted'; What = 'a port in a file that licences.json does not list'; Match = 'zlib is in a client file and licences\.json lists no port zlib'
-           Edit = { param($l, $m, $c) $m.files['Data/SKSE/Plugins/SkyrimPlatform.dll'].ports = @('zlib') } }
+           Edit = { param($l, $m, $c) $m.files['Data/SKSE/Plugins/SkyrimPlatform.dll'].ports = @('zlib') } },
+        @{ Tag = 'nolibs'; What = 'a build that did not measure the libraries beside the ports (#3751)'; Match = 'licences\.json has no libraries'
+           Edit = { param($l, $m, $c) $m.Remove('libraries') } },
+        @{ Tag = 'libfile'; What = 'a library in a file the client record does not record'; Match = 'library viet is in Data\\SKSE\\Plugins\\Other\.dll, which'
+           Edit = { param($l, $m, $c) $m.libraries['viet'].in = @('Data/SKSE/Plugins/Other.dll') } },
+        @{ Tag = 'libtext'; What = 'a library text that is not the one licences.json names'; Match = 'tilted\.txt is not the text licences\.json names'
+           Edit = { param($l, $m, $c) Put (Join-Path $l 'tilted.txt') 'another text' } },
+        @{ Tag = 'libnotext'; What = 'a library with no text'; Match = 'library viet is in a client file and the build has no viet\.txt'
+           Edit = { param($l, $m, $c) Remove-Item -LiteralPath (Join-Path $l 'viet.txt') } },
+        @{ Tag = 'libport'; What = 'a library named like a port'; Match = 'fmt is both a port and a library'
+           Edit = { param($l, $m, $c) $m.libraries['fmt'] = $m.libraries['viet'] } }
     )
     foreach ($case in $cases) {
         $k = New-Case $case.Tag $case.Edit

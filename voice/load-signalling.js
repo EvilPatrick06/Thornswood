@@ -172,6 +172,12 @@ async function run(n, site) {
   const counter = { got: 0 };
   const pages = [];
   try {
+    // Everybody in the world, since only they hold a voice place and are
+    // let trade signalling (#3570), each in a cell of their own so the
+    // position tick carries nothing but their own row.
+    const who = Array.from({ length: n }, (_, i) => ({ profileId: 30000 + i, pos: [0, 0, 0], angleZ: 0, cell: 'cell ' + i }));
+    const fed = await post(s.port, '/positions', JSON.stringify({ who: who }));
+    if (fed.status !== 204) throw new Error('/positions answered ' + fed.status);
     for (let i = 0; i < n; i += 50) {
       pages.push(...await Promise.all(Array.from({ length: Math.min(50, n - i) }, (_, k) => page(s, 30000 + i + k, counter))));
     }

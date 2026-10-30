@@ -145,7 +145,7 @@ function world() {
   put(HELD_BED, HELD_INN); put(ROAD_BED, TUNDRA); put(BROKEN_BED, BROKEN);
   PEOPLE.forEach(function (p) {
     const entries = [];
-    if (p === CAROL) { entries.push({ baseId: idOf(KEY_DESC), count: 1, name: 'Key to The Bee and Barb' }); }
+    if (p === CAROL) { entries.push({ baseId: idOf(KEY_DESC), count: 1, name: 'Key to The Bee and Barb, Riften' }); }
     refs[p.a] = { profileId: p.pid, appearance: { name: p.name }, worldOrCellDesc: TUNDRA,
                   pos: [90000, 90000, 0], inventory: { entries: entries } };
   });

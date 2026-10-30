@@ -96,7 +96,7 @@
   (Setup-ShipMachine.ps1 -EngineBuild ci), and EngineBuild is then
   EngineArtifact: engine-ci\<the fork commit this checkout's
   records\server-build.json names, 12> in this machine's own data, where
-  Get-EngineArtifact.ps1 puts engine.yml's artifact of that commit after
+  Get-EngineArtifact.ps1 puts the fork's build of that commit after
   holding every file to the records. It is named for the pin, so a pin move
   is a new folder and never a stale one, and each checkout reads the build
   of its own pin. Like any place it is answered whether or not it is there
@@ -201,6 +201,19 @@ function Find-InstallRoot {
     return $first
 }
 
+# A build runner off the box names its own install folder (#3860): on One the
+# rule above finds Patrick's own game, C:\Thornswood, which is his to play
+# from and which the runner's account is denied, so a build there stopped on
+# "Access to the path 'C:\Thornswood\Launcher\Thornswood.exe' is denied".
+# Install-Runner.ps1 -OffBox writes THORNSWOOD_INSTALL into the runner's .env,
+# a folder under the runner's own root, so its jobs answer from there, as a
+# box runner does from a machine with no install at all, and nothing a build
+# runs ever looks in, or writes to, the install people play from.
+function Get-InstallRoot {
+    if ($env:THORNSWOOD_INSTALL) { return $env:THORNSWOOD_INSTALL }
+    return Find-InstallRoot
+}
+
 # The folder ShipRoots names for $channel, or '' when it names none (#2662,
 # see the header): what Setup-ShipMachine.ps1 -Root recorded, and nothing
 # the install rule would answer. Get-ShipRoot asks this first.
@@ -263,8 +276,8 @@ function Get-Place([string]$name) {
         'ReleasesDev' { return Join-Path (Get-MachineData) 'feed\dev' }
         # The folder a release is built from here, and the file that names it (#1692).
         # The launcher install, and the dev build beside it (#3003).
-        'Install'     { return Find-InstallRoot }
-        'InstallDev'  { return ((Find-InstallRoot) + '-DevBuild') }
+        'Install'     { return Get-InstallRoot }
+        'InstallDev'  { return ((Get-InstallRoot) + '-DevBuild') }
         'ShipRoots'   { return Join-Path (Get-MachineData) 'ship-roots.json' }
         'ShipRoot'    { return Get-ShipRoot 'main' }
         'ShipRootDev' { return Get-ShipRoot 'dev' }

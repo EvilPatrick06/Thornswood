@@ -273,8 +273,12 @@ the `release` environment presents is the one trusted. Its role is
 Artifact Signing Certificate Profile Signer, given on the signing account
 ThornswoodSigning rather than on the profile; the account has one profile,
 ThornswoodRelease, so today that is the same thing. The `release`
-environment allows tags `v*` only, and the three `AZURE_SIGNING_*`
-repository variables are set.
+environment allows tags `v*` only, and the two repository variables the
+sign step reads, `AZURE_SIGNING_CLIENT_ID` and `AZURE_SIGNING_TENANT_ID`,
+are set. No subscription id is needed: the workload identity sign in takes
+only those two and the token file, and the unused
+`AZURE_SIGNING_SUBSCRIPTION_ID` was taken off this repository (Patrick,
+27 Oct, #3717). The fork's signing keeps its own copy for its azure/login.
 
 What a run proved on 12 Oct: the default path, a `v*` tag push and a manual
 run on the box, builds on the VPS as before; a manual run asking for
@@ -292,14 +296,15 @@ The switch-over, the last step. It waits on three things, in this order:
    the hosted job on billing before any step ran.
 2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
    with this release.yml, then
-   `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`,
-   with `-f expected_sha=<commit>` added when the tag is not on main.
-   Without it `Resolve-ReleaseTag.ps1` refuses a tag whose commit is not on
-   main, and the run stops before it builds. A tag on main's own commit
-   needs no `expected_sha`. Pushing the tag starts the usual VPS build: let
-   it finish, never cancel it. Cancelling a VPS job during its checkout
-   leaves git lock files in that runner's workspace and every later job
-   there fails (#2751, 18 Oct). The hosted run then uploads into that one
+   `gh workflow run release.yml --ref main -f tag=<tag> -f runner=hosted`
+   (only a run of main's workflow signs, #3930).
+   The pilot tag goes on a commit main has: `Resolve-ReleaseTag.ps1` refuses
+   a tag whose commit is not on main, with or without `expected_sha`, and
+   the run stops before it builds (#3890, Patrick, 27 Oct: a signed release
+   is never built from a commit off main). Pushing the tag starts the usual
+   VPS build: let it finish, never cancel it. Cancelling a VPS job during
+   its checkout leaves git lock files in that runner's workspace and every
+   later job there fails (#2751, 18 Oct). The hosted run then uploads into that one
    draft and writes its notes again for its own files.
    The hosted job's log says "building with MSBuild on a github-hosted
    runner", then the Azure sign in, then "signed by" the ThornswoodRelease
@@ -337,13 +342,16 @@ carry a new launcher with no One in the chain:
   Windows SDK's signtool, and its outbound rules to let the signing hosts
   through (`Install-Runner.ps1 -NetworkOnly -Number 3`, from
   `records/sign-runners.json`; #3312).
-- The `verify` job runs after whichever job signed, on a build runner, so
-  it is never the runner that signed.
+- The `verify` job runs after whichever job signed, on a check runner
+  (the `thornswood-check` label, `records/check-runners.json`, #3956),
+  which is never the runner that signed. Light runner 4 carries that label
+  and no build label, so no pull request build can hold up the check.
 - A `v<a.b.c.d>` tag is a dev number: release.yml writes it into
   Updater.cs the way a dev Ship does. A `v<a.b.c>` tag must be the number
   Updater.cs already says.
-- `release-tag.yml` makes the tag on main's commit and starts release.yml on
-  it, since a cloud session can push no tag (measured on #3312).
+- `release-tag.yml` makes the tag on main's commit and starts main's
+  release.yml for it (#3930), since a cloud session can push no tag
+  (measured on #3312).
 - `Ship.ps1 -FromFeed` asks for it (`Invoke-ReleaseLauncherOnGitHub`, in
   Sign-OnGitHub.ps1), takes the draft held to its `SHA256SUMS` and to the
   launcher's own check (here on Windows, on the box anywhere else), and
@@ -355,6 +363,39 @@ Measured on #3312 before choosing this: a cloud session may not create,
 edit or delete a release, nor send a request body that is not JSON, so the
 fork could not be handed the unsigned exe in a private draft (Patrick's
 first choice, C).
+
+### #3890 and #3930: only main's own workflow signs, 27 Oct 2026
+
+Signing used to follow a `refs/tags/v` ref, and the `release`
+environment's deployment rule allowed `v*` tags. A `v` tag push runs the
+tagged commit's own copy of release.yml, and an expected SHA stood in for
+the main check, so a tag pushed on a branch commit was built and signed
+without the commit going through a pull request (#3890; two trial tags
+were, in September and October). Patrick, 27 Oct, on his report page:
+never (#3890, A), and only a run of main's own workflow signs (#3930,
+option 1). So:
+
+- `Resolve-ReleaseTag.ps1` checks the tag's commit is on main on every
+  path; an expected SHA only narrows which commit.
+- A job gets the `release` environment, and the sign steps run, only in a
+  `workflow_dispatch` run on `refs/heads/main`: main's copy of release.yml
+  and of the tag check, which only a pull request changes. The `release`
+  environment's deployment rule names the branch `main` and nothing else
+  (the ops repo's run note `ops/claude-queue/3930-sign-from-main.md`), so a copy on any
+  other ref cannot reach the identity whatever it says. The federated
+  credential's subject names the environment, not the ref (section 7), so
+  Azure needs no change.
+- A `v` tag push builds nothing itself: its one job (`handoff`, on a build
+  runner) starts main's release.yml with the tag and the commit the tag
+  named. Pushing a tag still starts a signed release, through main.
+  `release-tag.yml` starts main's run (`--ref main`), and
+  `Invoke-ReleaseLauncherOnGitHub` waits for the run on main titled
+  `Release launcher <tag>`.
+- Runner 3's job-started hook takes main's jobs alone (#3889, #3930).
+
+A run on any other ref builds unsigned on GitHub's runner and never
+reaches runner 3. To build a tag by hand:
+`gh workflow run release.yml --ref main -f tag=v<version>`.
 
 ## 8. Decisions (Patrick)
 
@@ -416,7 +457,7 @@ They do not catch anyone who can write the record the hash is read from:
 - `version.json` names every pack and the client runtime by sha256, and
   whoever writes `version.json` writes those names too. That is every
   machine that Ships, and every Administrator ssh key on the VPS: five on
-  11 Oct, usable from any address (docs\DEPLOY-IDENTITIES.md section 1). On
+  11 Oct, usable from any address (the ops repo's DEPLOY-IDENTITIES.md section 1). On
   16 Oct main's feed named its client runtime (the SkyMP client files that
   load into the game on every tester's machine) by sha256 and nothing else.
 - A draft carries `Thornswood.exe` and `SHA256SUMS` side by side, so whoever
@@ -437,10 +478,10 @@ client runtime, which only phases C and D (section 5) close.
 | | Today: the VPS builds, Ship signs on One | The hosted path: release.yml signs on GitHub's runner |
 | --- | --- | --- |
 | Where a main launcher is built | A VPS runner, with MSBuild since #2550 | A fresh GitHub virtual machine for each job, thrown away after it |
-| What else runs on that machine | The same four runners build every pull request: `BUILD_RUNNER` is `vps` (set 12 Oct, still so on 16 Oct, when the two latest build checks skipped the hosted job and ran on `thornswood-vps-2` and `-3`). A job can leave files for the next one (docs\RUNNER-ISOLATION.md, F4) | Nothing |
+| What else runs on that machine | The same four runners build every pull request: `BUILD_RUNNER` is `vps` (set 12 Oct, still so on 16 Oct, when the two latest build checks skipped the hosted job and ran on `thornswood-vps-2` and `-3`). A job can leave files for the next one (the ops repo's RUNNER-ISOLATION.md, F4) | Nothing |
 | Where it is signed | On the shipping machine, at Ship, after a checksum check of bytes that machine did not build | Inside the build job, before the draft exists |
 | What the draft says | `SHA256SUMS` of the unsigned bytes. Measured: v1.2.4's draft lists `Thornswood.exe` as `8f8aefc7...`; main's feed serves 1.2.4 as `e079f4e4...`, Authenticode Valid. Nothing public ties the two. All 14 releases on GitHub, v0.0.0-ci-trial-20260926 to v1.2.4, are still drafts; none was published | `SHA256SUMS` of the signed bytes, the same hash the feed will name, checked by the `verify` job on a VPS runner |
-| Who can cause a ThornswoodRelease signature | The three people with Certificate Profile Signer (Patrick, Djinn, Four), each through their own `az login` | Those three, plus anyone who can push a `v` tag and start release.yml with `runner: hosted`. The repository has no tag rules (the rulesets API answered an empty list), the `release` environment allows `v*` tags with no required reviewer, and a tag push, or a manual run with `expected_sha`, builds a commit that is not on main |
+| Who can cause a ThornswoodRelease signature | The three people with Certificate Profile Signer (Patrick, Djinn, Four), each through their own `az login` | Those three, plus anyone who can push a `v` tag or start release.yml on main, for a tag on a commit main has. Only a run of main's own workflow reaches the identity: the `release` environment allows the branch main alone, with no required reviewer, and main's release.yml refuses a tag whose commit is not on main (#3890, #3930) |
 | Signing left on people's machines | Every dev launcher (Build-Launcher signs it during a dev Ship; dev 1.2.4.5 reads Authenticode Valid) and every installer (`Package-Thornswood.ps1` signs the finished Setup) | The same. Only the main launcher's signature moves |
 | Packs, the client runtime, `version.json` | sha256 only | sha256 only. The signed manifest (phases B to D) is needed either way |
 
@@ -497,7 +538,7 @@ pilot signature. What it keeps:
 - the draft's hash never matches the published file, so no public record
   names the launcher that shipped;
 - the hosted signing identity anyway: it exists, and any account that can
-  push a `v` tag can reach it with a manual run. Doing nothing on the
+  start release.yml on main can reach it for a tag on main (#3930). Doing nothing on the
   workflow does not remove that. Only a rule on who may start a signed run,
   or deleting the credential, does;
 - the feed's reach onto testers' machines, which the hosted path does not
