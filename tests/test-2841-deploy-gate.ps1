@@ -202,6 +202,8 @@ Yes 'every request is logged, refusals too' ($brokerCode.Contains("Log ('REFUSED
 
 # ---- 6. the installer ----------------------------------------------------------
 $inst = Text 'scripts/deploy/Install-Gate.ps1'
+$du = [regex]::Match($inst, "(?m)^\`$DeployUser\s*=\s*'([^']+)'").Groups[1].Value
+Yes "the account's name fits the 20 characters a local account may have (found '$du')" ($du.Length -ge 1 -and $du.Length -le 20)
 Yes 'the account is made in no group, and taken out of any it is in' ($inst.Contains('New-LocalUser -Name `$user') -and $inst.Contains('Remove-LocalGroupMember') -and $inst -notmatch 'Add-LocalGroupMember')
 Yes 'its .ssh and authorized_keys: only SYSTEM and Administrators change them, it reads them' (
     $inst.Contains('foreach (`$s in ''S-1-5-18'', ''S-1-5-32-544'')') -and $inst.Contains('SecurityIdentifier(`$sid)), ''ReadAndExecute''') -and $inst.Contains('SetAccessRuleProtection(`$true, `$false)'))
