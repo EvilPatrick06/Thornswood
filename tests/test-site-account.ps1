@@ -459,6 +459,23 @@ try {
     Yes 'SYSTEM: the SID it compares the read-back with is SYSTEM''s' ($r.sid -eq 'S-1-5-18')
 
     # -- LOCAL SERVICE, with the real icacls on the scratch folders -------------
+    # The grants name the site's task, NT TASK\Thornswood Docs (#4077). Windows
+    # maps a task's SID only where that task is registered, which is the box.
+    # Anywhere else (One's runners, GitHub's hosted runners, a person's PC)
+    # icacls refuses every grant with "No mapping between account names and
+    # security IDs", so the checks that need a grant made say SKIP there, and
+    # one check makes sure that was the only reason a grant was refused (#4968).
+    $script:taskMaps = $false
+    try {
+        $null = (New-Object Security.Principal.SecurityIdentifier(Get-ThornswoodTaskSidFromName 'Thornswood Docs')).Translate([Security.Principal.NTAccount])
+        $script:taskMaps = $true
+    } catch { }
+    function Granted([string]$what, [bool]$cond) {
+        if ($script:taskMaps) { Yes $what $cond }
+        else { Write-Host "SKIP  $what (no Thornswood Docs task on this machine, so its SID cannot be granted here; the box runs it, #4968)" }
+    }
+    # The read every deploy before #4077 gave LOCAL SERVICE on the server folder.
+    $null = & icacls $server /grant '*S-1-5-19:(OI)(CI)R' 2>&1
     $block = BlockOf (Build 'LOCAL SERVICE' $docs)
     # The scratch box itself can be under C:\Thornswood-RunnerN (#3117), so
     # its own paths are taken out before looking for a real folder.
@@ -480,36 +497,53 @@ try {
         @($r.principal.RequiredPrivilege) -notcontains 'SeAssignPrimaryTokenPrivilege')
     Yes 'LOCAL SERVICE: with the token SID type Unrestricted' ($r.principal -and "$($r.principal.ProcessTokenSidType)" -eq 'Unrestricted')
     Yes 'LOCAL SERVICE: as a service account, so no password is kept' ($r.principal -and "$($r.principal.LogonType)" -eq 'ServiceAccount')
-    Yes 'LOCAL SERVICE: it says what it granted' ($said -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs"))
+    Granted 'LOCAL SERVICE: it says what it granted, to the site''s task (#4077)' ($said -match [regex]::Escape("granted NT TASK\Thornswood Docs (OI)(CI)M on $docs"))
     Yes 'LOCAL SERVICE: a folder that is not there is said and skipped, not failed' (
-        $said -match [regex]::Escape("not here, nothing granted: $dev") -and $said -notmatch 'COULD NOT GRANT')
+        $said -match [regex]::Escape("not here, nothing granted: $dev") -and
+        ((-not $script:taskMaps) -or $said -notmatch 'COULD NOT GRANT'))
+    if (-not $script:taskMaps) {
+        # icacls' two lines can come in either order, so count rather than pair them.
+        $refusedHere = @([regex]::Matches($said, 'COULD NOT GRANT')).Count
+        $noMapping = @([regex]::Matches($said, 'No mapping between account names and security IDs')).Count
+        Yes ('with no Thornswood Docs task here, every grant refused was refused only because its SID has no mapping (' + $refusedHere + ' refused, ' + $noMapping + ' for that, #4968)') (
+            $refusedHere -gt 0 -and $noMapping -eq $refusedHere -and $said -notmatch 'Access is denied')
+    }
     Yes 'LOCAL SERVICE: no folder was made that was not there' (-not (Test-Path -LiteralPath $dev))
 
-    $ls = 'S-1-5-19'
+    # The grants and the denies name the site's task, not LOCAL SERVICE, which
+    # every box service runs as (#4077). $ls is the account they are for.
+    $ls = Get-ThornswoodTaskSidFromName 'Thornswood Docs'
     $own = RulesFor $docs $ls
-    Yes 'its own folder: LOCAL SERVICE may change it' (Modifies $own)
-    Yes 'its own folder: a file that was already there, config.json, inherits it' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
-    Yes 'its own folder: and one a folder down, data\board.json' (Modifies (RulesFor (Join-Path $docs 'data\board.json') $ls))
+    Granted 'its own folder: the site''s task may change it' (Modifies $own)
+    Yes 'and LOCAL SERVICE has no rule on its folder, the deploy records or the chat' (
+        (RulesFor $docs 'S-1-5-19').Count -eq 0 -and (RulesFor (Join-Path $docs 'config.json') 'S-1-5-19').Count -eq 0 -and
+        (RulesFor (Join-Path $deploys 'thornswood-docs.json') 'S-1-5-19').Count -eq 0 -and
+        (RulesFor (Join-Path $voice '2026-09-24.jsonl') 'S-1-5-19').Count -eq 0)
+    Yes 'the read LOCAL SERVICE had on the server folder before #4077 comes off' (
+        (RulesFor $server 'S-1-5-19').Count -eq 0 -and (RulesFor (Join-Path $server 'server.log') 'S-1-5-19').Count -eq 0)
+    Yes 'and it says so' ($said -match [regex]::Escape("LOCAL SERVICE no longer has a rule on $server"))
+    Granted 'its own folder: a file that was already there, config.json, inherits it' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
+    Granted 'its own folder: and one a folder down, data\board.json' (Modifies (RulesFor (Join-Path $docs 'data\board.json') $ls))
     Put (Join-Path $docs 'site.log') 'new'
-    Yes 'its own folder: site.log made afterwards inherits it, so the roll can rename it' (Modifies (RulesFor (Join-Path $docs 'site.log') $ls))
+    Granted 'its own folder: site.log made afterwards inherits it, so the roll can rename it' (Modifies (RulesFor (Join-Path $docs 'site.log') $ls))
 
     # server.log is deleted and made again at every server start. The grant has
     # to survive that, which a grant on the file would not.
     Remove-Item -LiteralPath (Join-Path $server 'server.log') -Force
     Put (Join-Path $server 'server.log') 'after a restart'
-    Yes 'the deploy records: LOCAL SERVICE reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
-    Yes 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
-    Yes 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
-    Yes 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
+    Granted 'the deploy records: the site''s task reads them and changes nothing (#459)' (ReadsOnly (RulesFor (Join-Path $deploys 'thornswood-docs.json') $ls))
+    Granted 'server.log made again after the grant can still be read' (ReadsOnly (RulesFor (Join-Path $server 'server.log') $ls))
+    Granted 'online.json can be read' (ReadsOnly (RulesFor (Join-Path $server 'data\online.json') $ls))
+    Granted 'the chat can be read' (ReadsOnly (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls))
     # The dev voice service writes its own chat folder, and a dev session on
     # /sessions reads it since main's #298.
-    Yes 'the dev chat can be read' (ReadsOnly (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls))
-    Yes 'and none of those four can be written' (
+    Granted 'the dev chat can be read' (ReadsOnly (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls))
+    Granted 'and none of those four can be written' (
         -not (Modifies (RulesFor (Join-Path $server 'server.log') $ls)) -and
         -not (Modifies (RulesFor (Join-Path $server 'data\online.json') $ls)) -and
         -not (Modifies (RulesFor (Join-Path $voice '2026-09-24.jsonl') $ls)) -and
         -not (Modifies (RulesFor (Join-Path $voiceDev '2026-09-24.jsonl') $ls)))
-    Yes 'the world data under the server folder is not reached' (
+    Granted 'the world data under the server folder is not reached' (
         (RulesFor (Join-Path $server 'world\changeForms.json') $ls).Count -eq 0 -and
         (RulesFor (Join-Path $server 'world') $ls).Count -eq 0)
 
@@ -526,10 +560,10 @@ try {
         Yes "$f`: and the deny leaves out SYNCHRONIZE and every read right, so the site still serves it" (
             $d.Count -eq 1 -and ($d[0].FileSystemRights -band ($fsr::Synchronize -bor $fsr::ReadData -bor $fsr::ReadAttributes)) -eq 0)
         Yes "$f`: and reaches what is inside it" ($d.Count -eq 1 -and "$($d[0].InheritanceFlags)" -eq 'ContainerInherit, ObjectInherit')
-        Yes "$f`: it says so" ($said -match [regex]::Escape("denied LOCAL SERVICE writing and deleting in " + (Join-Path $docs $f)))
+        Yes "$f`: it says so" ($said -match [regex]::Escape("denied NT TASK\Thornswood Docs writing and deleting in " + (Join-Path $docs $f)))
     }
     $vj = RulesFor (Join-Path $docs 'feed\version.json') $ls
-    Yes 'feed\version.json inherits the deny and still the read under it' (
+    Granted 'feed\version.json inherits the deny and still the read under it' (
         (DeniesOf $vj).Count -eq 1 -and (Modifies @($vj | Where-Object { "$($_.AccessControlType)" -eq 'Allow' })))
     Yes 'feed\assets inherits the deny too' (
         (DeniesOf (RulesFor (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') $ls)).Count -eq 1)
@@ -552,7 +586,7 @@ try {
     $meSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
     Yes 'whoever ran it keeps what they had there (Administrators on the box)' (
         (Modifies (RulesFor $docs $meSid)) -or (Modifies (RulesFor $docs 'S-1-5-32-544')))
-    Yes 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
+    Granted 'and the site account keeps Modify on its folder' (Modifies (RulesFor (Join-Path $docs 'config.json') $ls))
     Yes 'it says Users was taken off' ($said -match 'BUILTIN\\Users no longer reaches')
     # What it said instead, so a red on the build runner shows why in the log.
     foreach ($l in @(($said -split "`n") | Where-Object { $_ -match 'COULD NOT' })) { Write-Host ('      ' + $l) }
@@ -562,15 +596,15 @@ try {
     $before = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
     $r = Run $block
     $after = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
-    Yes ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
+    Granted ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
         ($before -join ',') -eq ($after -join ',') -and @($after | Where-Object { $_ -ne 1 }).Count -eq 0)
     Yes 'a second run leaves one deny on each feed folder, not two' (
         (DeniesOf (RulesFor (Join-Path $docs 'feed') $ls)).Count -eq 1 -and
         (DeniesOf (RulesFor (Join-Path $docs 'feed-dev') $ls)).Count -eq 1)
     Yes 'and BUILTIN\Users is still off, with nothing refused' (
         (RulesFor $docs $u).Count -eq 0 -and ($r.said -join "`n") -notmatch 'COULD NOT (DENY|TAKE)')
-    Yes 'and the second run still says what it granted, with nothing refused' (
-        ($r.said -join "`n") -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs") -and
+    Granted 'and the second run still says what it granted, with nothing refused' (
+        ($r.said -join "`n") -match [regex]::Escape("granted NT TASK\Thornswood Docs (OI)(CI)M on $docs") -and
         ($r.said -join "`n") -notmatch 'COULD NOT GRANT')
 
     # -- icacls refusing: said, and the rest still tried ------------------------

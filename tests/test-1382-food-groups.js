@@ -43,14 +43,16 @@ const FINE = (GROUPS && GROUPS.quality && GROUPS.quality.fine) || {};
 const FINE_IDS = new Set(Object.values(FINE));
 const count = {};
 if (GROUPS) { for (const d in GROUPS.items) { if (!FINE_IDS.has(d)) { count[GROUPS.items[d]] = (count[GROUPS.items[d]] || 0) + 1; } } }
-yes('every fine dish is in its plain dish\'s group (#2906)', FINE_IDS.size === 63 &&
+yes('every fine dish is in its plain dish\'s group (#2906), the four festival feasts\' too (#3152)', FINE_IDS.size === 67 &&
   Object.keys(FINE).every(function (plain) { return !!GROUPS.items[plain] && GROUPS.items[FINE[plain]] === GROUPS.items[plain]; }));
 yes('and the burnt meal is in no group: burnt is a quality, not a group', !!GROUPS.quality && !!GROUPS.quality.burnt &&
   !GROUPS.items[GROUPS.quality.burnt]);
 yes('the approved counts: raw 19, cooked 43, soup 30, ingredient 14, prepared 13, drugs 6',
   count.raw === 19 && count.cooked === 43 && count.soup === 30 && count.ingredient === 14 && count.prepared === 13 && count.drugs === 6);
-yes('six drinks are ale, two are drink, one is a potion', count.ale === 6 && count.drink === 2 && count.potion === 1);
-yes('no feast or burnt group', !count.feast && !count.burnt);
+// The content plugin's four festival brews are ale and its four festival
+// dishes are feasts (#3152).
+yes('ten drinks are ale, two are drink, one is a potion', count.ale === 10 && count.drink === 2 && count.potion === 1);
+yes('four feasts, and no burnt group', count.feast === 4 && !count.burnt);
 // Patrick, 12 Oct 2026, decision 4: the content plugin's three teas.
 yes('three teas, the content plugin\'s own', count.tea === 3);
 yes('Glacier Water is left to the water mechanic', !!GROUPS && !GROUPS.items['13f598:WindhelmSSE.esp']);

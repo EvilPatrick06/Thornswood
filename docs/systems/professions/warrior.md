@@ -108,8 +108,8 @@ You have the rows at your rank and below, on your half. Stamina is
 spent when the maneuver starts. If you do not have it, nothing happens.
 
 The maneuver key opens a small panel with yours, and says whether each
-one's wait is over. It is 9 unless you change it on the launcher's
-Controls page. Press a maneuver's number, or click it, and it starts.
+one's wait is over. It is 9 unless you change it on Settings in the
+game. Press a maneuver's number, or click it, and it starts.
 The key again, or Escape, closes the panel. Nobody types a maneuver
 (Patrick, 4 Oct: no chat commands for what people do). A pick reaches
 the server the way the trade and party keys do, so it starts within a

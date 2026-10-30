@@ -118,8 +118,8 @@ foreach ($f in $prOnly.Keys) {
 }
 Yes 'no other job asks for the pull request build label' (
     @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*\bthornswood-pr-build\b.*$') }).Count -eq 1)
-Yes 'every job asking for the build label asks for the VPS label too' (
-    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*\bthornswood-build\b.*$') } | Where-Object { $_.Value -notmatch 'self-hosted, Windows, thornswood-vps, thornswood-build\]' }).Count -eq 0)
+Yes 'every job asking for the build label asks for the VPS label too, the private-only form included (#3685)' (
+    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*\bthornswood-build\b.*$') } | Where-Object { $_.Value -notmatch 'self-hosted, Windows, thornswood-vps, thornswood-build\]' -and $_.Value -notmatch [regex]::Escape('"self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') }).Count -eq 0)
 
 # ---- 3. Install-Runner.ps1 registers a listed runner with it ----------------------
 $ir = [IO.File]::ReadAllText((Under @('scripts', 'deploy', 'Install-Runner.ps1')))

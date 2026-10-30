@@ -15,7 +15,8 @@ It is in alpha and open by application. To join, apply in the
 - A security hole: never as an issue. [SECURITY.md](SECURITY.md) says where.
 - Sending a change: [CONTRIBUTING.md](CONTRIBUTING.md), and
   [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we treat each other.
-- [LICENSE](LICENSE) says what Thornswood's own work is under.
+- [LICENSE](LICENSE): our code is MIT. [LICENSING.md](LICENSING.md): what it
+  does not cover, and the terms for what you contribute.
   [THIRD-PARTY.md](THIRD-PARTY.md) and the [credits](https://thornswood.net/credits)
   name everybody else whose work it is built on, under their own licences.
 

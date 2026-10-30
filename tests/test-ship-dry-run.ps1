@@ -41,8 +41,9 @@
        makes the folder (#2662)
     H  -Root naming a folder Vortex deploys into: refused before anything is
        built, installed or published (#1692)
-    I  a folder whose generated files are out of date: refused before the
-       launcher is built or installed (#1692)
+    I  a folder whose collection cannot build the animation and body files
+       (Build-Generated.ps1 -DryRun exits 1): refused before the launcher is
+       built or installed (#1692, #3715)
     J  a game folder on a machine with no node: refused before anything is
        built, installed or published, saying why (#1913)
     K  SkyUI's menus could not be read (Check-SkyUIMenus.js exit 1): refused,
@@ -50,10 +51,6 @@
     L  the same folder with a check that passes runs to the end, so J and K
        stop on node and on the check, not on the folder; and a mismatch
        (exit 2) still refuses (#960)
-    M  a body mesh the covered bodies check could not read
-       (Check-CoveredBodies.ps1 exit 1): refused on dev and on main, nothing
-       published, the version put back (#1956); a nude body (exit 2) on dev
-       still only warns and runs to the end (#405)
 
   R is there so D and V prove something: the same stand-ins, on a real Ship,
   do write down the installer going to the site, the feed and baseline going to
@@ -732,29 +729,38 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     Yes '  and nothing left the machine' (@(Away $nr | Where-Object { $_ -notmatch '^git ' }).Count -eq 0 -and @(Away $nr | Where-Object { $_ -match '\b(push|tag)\b' }).Count -eq 0)
     Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
 
-    # ---- I: generated files out of date (#1692) ------------------------------------------
-    # Generated.ps1 stood in for: this folder's files are stale. The real one
-    # is held to the folder by tests\test-build-generated.ps1.
+    # ---- I: the collection cannot build the animation and body files (#1692, #3715) ----
+    # Build-Generated.ps1 stood in for: its dry run stops, as it does when a
+    # slider set or a patch is not deployed. The real one is held to a folder
+    # by tests\test-build-generated.ps1.
     $genRoot = Join-Path $T 'Gen-DevBuild'
     New-Item -ItemType Directory -Force -Path (Join-Path $genRoot 'Launcher'), (Join-Path $genRoot 'Game') | Out-Null
     [IO.File]::WriteAllText((Join-Path $genRoot 'Launcher\Thornswood.exe'), 'the launcher as installed')
     [IO.File]::WriteAllText((Join-Path $genRoot 'Game\SkyrimSE.exe'), 'skyrim')
-    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Generated.ps1'), @'
-function Get-GeneratedState($Root, $ListPath) { return [pscustomobject]@{ Current = $false; Record = $null } }
-function Get-GeneratedStaleSays($State, [string]$Channel) { return 'The generated files here are out of date (stand-in).' }
-'@)
+    # The build's stand-in writes down what it was asked and exits with
+    # TS_GEN_EXIT, 0 when unset.
+    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Build-Generated.ps1'), (
+        'param([string]$Root, [switch]$DryRun, [switch]$NoPause)' + "`r`n" +
+        '[IO.File]::AppendAllText($env:TS_DRY_CALLS, ("Build-Generated -Root " + $Root + $(if ($DryRun) { " -DryRun" } else { "" }) + "`r`n"))' + "`r`n" +
+        'if ([int]$env:TS_GEN_EXIT) { Write-Host "STOP. No slider set named ''CBBE 3BBB Amazing NeverNude'' is in SliderSets (stand-in)." }' + "`r`n" +
+        'exit ([int]$env:TS_GEN_EXIT)' + "`r`n"))
+    $oldGenExit = $env:TS_GEN_EXIT
+    $env:TS_GEN_EXIT = '1'
     try {
         $i = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-Root', $genRoot, '-DistRoot', $dist, '-NoPause')
-    } finally { Remove-Item -LiteralPath (Join-Path $repo 'scripts\mods\Generated.ps1') -Force -ErrorAction SilentlyContinue }
-    Yes ("I a Ship whose generated files are out of date stops (exit {0})" -f $i.Code) ($i.Code -eq 1 -and $i.Out -match 'out of date \(stand-in\)')
+    } finally { $env:TS_GEN_EXIT = $oldGenExit }
+    $asked = Called $i 'Build-Generated'
+    Yes ("I a Ship whose collection cannot build the animation and body files stops (exit {0})" -f $i.Code) (
+        $i.Code -eq 1 -and $i.Out -match 'cannot build Thornswood''s animation and body files \(Build-Generated\.ps1 -DryRun exit 1' -and $i.Out -match 'stand-in')
+    Yes '  after asking the build of that folder, as a dry run that writes nothing' ($asked.Count -eq 1 -and $asked[0] -match ' -DryRun$' -and $asked[0].Contains(' -Root ' + $genRoot))
     Yes '  before the launcher is built or installed, and before anything is published' (
         (Called $i 'Build-Launcher').Count -eq 0 -and (Called $i 'Install-Launcher').Count -eq 0 -and (Called $i 'Publish-Update').Count -eq 0)
     Yes '  and the installed launcher is the one it had' ([IO.File]::ReadAllText((Join-Path $genRoot 'Launcher\Thornswood.exe')) -eq 'the launcher as installed')
 
     # ---- J, K, L: SkyUI's menus need node (#1913) ---------------------------------------
-    # A game folder that gets as far as the SkyUI menus step: generated files
-    # current, the in game plugin in place, the bodies covered (all stood in
-    # for; each has its own harness). node is a stand-in on PATH that writes
+    # A game folder that gets as far as the SkyUI menus step: a collection that
+    # builds the animation and body files (the build's stand-in above, exit 0)
+    # and the in game plugin in place (each has its own harness). node is a stand-in on PATH that writes
     # down what it was asked and exits with TS_NODE_EXIT, so these run the
     # same on a machine with node and on one without.
     $skyRoot = Join-Path $T 'Sky-DevBuild'
@@ -767,12 +773,6 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return 'The generate
     foreach ($p in (Join-Path $repo 'game\plugins\stand-in.js'), (Join-Path $skyRoot 'Game\Data\Platform\Plugins\stand-in.js')) {
         [IO.File]::WriteAllText($p, '// the in game plugin, as the source has it')
     }
-    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Generated.ps1'), @'
-function Get-GeneratedState($Root, $ListPath) { return [pscustomobject]@{ Current = $true; Record = [pscustomobject]@{ Files = @('stand-in') } } }
-function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
-'@)
-    # The covered bodies stand-in exits with TS_BODIES_EXIT, 0 when unset, for M.
-    [IO.File]::WriteAllText((Join-Path $repo 'scripts\mods\Check-CoveredBodies.ps1'), "param([string]`$Game, [switch]`$Quiet)`r`nexit ([int]`$env:TS_BODIES_EXIT)`r`n")
     $nodeStandIn = Join-Path $bin 'node.ps1'
     $nodeLine = '[IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@(''node'') + @($args | ForEach-Object { [string]$_ })) -join '' '') + "`r`n")'
     # PATH without any folder that holds a real node, for J.
@@ -784,7 +784,6 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
     $skyNote = "The map marker points at the right door`n- The marker over a house now sits on the door you walk through"
     $skyArgs = @($skyNote, '-Channel', 'dev', '-DryRun', '-Root', $skyRoot, '-DistRoot', $dist, '-NoPause')
     $oldNodeExit = $env:TS_NODE_EXIT
-    $oldBodiesExit = $env:TS_BODIES_EXIT
     try {
         # J: no node at all.
         $env:PATH = $noNodePath
@@ -827,32 +826,9 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         Yes ("L a mismatch, exit 2, is still refused (exit {0})" -f $m.Code) (
             $m.Code -eq 1 -and $m.Out -match 'not the version its script wants' -and (Called $m 'Publish-Update').Count -eq 0)
 
-        # ---- M: a body mesh the covered bodies check could not read (#1956) ----------
-        # Patrick, 5 Oct: refuse, the way the SkyUI menus step does since #1913.
-        # It used to print a yellow line and ship, on main as well as dev. The
-        # SkyUI check passes here, so M stops on the bodies and nothing else.
-        $env:TS_NODE_EXIT = '0'
-        $env:TS_BODIES_EXIT = '1'
-        $mainArgs = @($skyNote, '-DryRun', '-Root', $skyRoot, '-DistRoot', $dist, '-NoPause')
-        foreach ($case in @(@{ Name = 'dev'; Args = $skyArgs }, @{ Name = 'main'; Args = $mainArgs })) {
-            $b = Invoke-Ship $case.Args
-            Yes ("M a {0} Ship whose body meshes could not all be read is refused (exit {1})" -f $case.Name, $b.Code) (
-                $b.Code -eq 1 -and $b.Out -match 'STOP\. The body meshes in the game folder could not all be read \(Check-CoveredBodies\.ps1 exit 1\)')
-            Yes '  and no longer says it in yellow and carries on' ($b.Out -notmatch 'the body meshes could not all be read; see above' -and $b.Out -notmatch 'Dry run finished')
-            Yes '  before the SkyUI menus are read or anything is published' (
-                (Called $b 'node').Count -eq 0 -and (Called $b 'Publish-Update').Count -eq 0 -and (Away $b).Count -eq 0)
-            Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
-        }
-
-        # A nude body, exit 2, on dev still only warns (#405): M changed exit 1 only.
-        $env:TS_BODIES_EXIT = '2'
-        $n = Invoke-Ship $skyArgs
-        Yes ("M a nude body on dev still warns and runs to the end (exit {0})" -f $n.Code) (
-            $n.Code -eq 0 -and $n.Out -match 'a body in the game folder is nude \(issue #405\); shipping anyway' -and $n.Out -match 'Dry run finished')
     } finally {
         $env:PATH = $bin + $pathSep + $oldPath
         $env:TS_NODE_EXIT = $oldNodeExit
-        $env:TS_BODIES_EXIT = $oldBodiesExit
         Remove-Item -LiteralPath $nodeStandIn -Force -ErrorAction SilentlyContinue
     }
 }

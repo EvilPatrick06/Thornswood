@@ -390,7 +390,6 @@ namespace Thornswood
             }
             fixing = false;
             Report(plugins);
-            BuildModList();
 
             // Last, what asks something or restarts the launcher. With no
             // folder of its own and Skyrim on another build, the Downgrade
