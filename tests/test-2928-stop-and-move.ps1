@@ -103,6 +103,8 @@ Yes 'a refusal says who has each file under the path open and every handle under
 # #3262: the Restart Manager took 41 s over the dev server's 12,424 files and
 # was asked first, so a holder that had exited by then was named by nothing.
 $holders = FunctionText $lib 'Get-ThornswoodPathHolders'
+Yes 'a refusal keeps each process''s line under its id and never reads an id back out of a line, which a command line with a line break broke (#3214)' (
+    $holders -match '\$who\[\$id\] = \$line' -and $holders -notmatch "-replace '\^pid")
 $iOpen = $holders.IndexOf('Get-ThornswoodPathOpeners $Path')
 $iHandles = $holders.IndexOf('Get-ThornswoodPathHandles $Path')
 $iCim = $holders.IndexOf('Get-CimInstance Win32_Process')
@@ -299,8 +301,17 @@ try {
     $started += $c
     $until = (Get-Date).AddSeconds(20)
     while (-not (Test-Path -LiteralPath (Join-Path $d 'ready.txt')) -and (Get-Date) -lt $until) { [Threading.Thread]::Sleep(50) }
+    # A process started in the 2 minutes before whose command line holds a
+    # line break, as Publish-Update's -Notes does. On 30 Oct a harness beside
+    # this one ran one, and the refusal threw reading its id back out of its
+    # line instead of saying who held the folder.
+    $nl = Start-Process -FilePath $node.Source -ArgumentList @('-e', "`"setInterval(()=>{},1000)`n// a second line`"") -PassThru -WindowStyle Hidden
+    $started += $nl
     $ok = Move-ThornswoodPath $d ($d + '-moved')
     Yes 'a folder another process has as its current directory is refused, once' ((-not $ok) -and (Test-Path -LiteralPath $d))
+    Yes '  and a process started just before, whose command line holds a line break, is named among them whole (#3214)' (
+        $ThornswoodMoveWhy -match ('(?s)started in the 2 minutes before: (.*; )?pid ' + $nl.Id + ' node(\.exe)? \(.*a second line'))
+    Stop-Process -Id $nl.Id -Force -EA SilentlyContinue
     Yes '  saying the folder itself would not open to be renamed (#3262)' ($ThornswoodMoveWhy -match '^the folder would not open to be renamed: .*\(0x80070020\)')
     Yes ('  and the handle list names that process, where no file under the folder is open: ' + $ThornswoodMoveWhy) (
         $ThornswoodMoveWhy -match '\(0x8007[0-9A-F]{4}\)' -and $ThornswoodMoveWhy -match 'files under it open in: no process but this one, asking, in 2 file\(s\)' -and

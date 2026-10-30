@@ -758,7 +758,11 @@ function Get-ThornswoodPathHolders([string]$Path) {
     $p = $snap.Procs[$k]
     if ($p.Started -and ($now - $p.Started).TotalSeconds -le 120 -and $k -ne $PID) { $recent += $k }
   }
-  $who = @()
+  # Each line is kept under its id, never read back out of the line: a
+  # command line can hold a line break (a release note passed as -Notes), and
+  # an id parsed back out of such a line was the whole line, which no [int]
+  # takes, so the refusal threw where it should have said who held the path.
+  $who = @{}
   $lines = @{}
   $noLines = ''
   $named = @($ids + $recent | Sort-Object -Unique)
@@ -770,10 +774,10 @@ function Get-ThornswoodPathHolders([string]$Path) {
     $line = 'pid ' + $id + ' ' + (Get-ThornswoodProcessWords $snap.Procs $id)
     if ($lines.ContainsKey($id) -and $lines[$id]) { $line += ', command line ' + $lines[$id] }
     elseif (-not (Get-Process -Id $id -ErrorAction SilentlyContinue)) { $line += ', gone by the time its command line was asked' }
-    $who += $line
+    $who[$id] = $line
   }
-  if ($ids.Count) { $said += '; who they are: ' + ((@($who | Where-Object { $ids -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })) -join '; ') }
-  $new = @($who | Where-Object { $recent -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })
+  if ($ids.Count) { $said += '; who they are: ' + (@($named | Where-Object { $ids -contains $_ } | ForEach-Object { $who[$_] }) -join '; ') }
+  $new = @($named | Where-Object { $recent -contains $_ } | ForEach-Object { $who[$_] })
   $said += '; started in the 2 minutes before: ' + $(if ($new.Count) { $new -join '; ' } else { 'nothing' }) + $noLines
   return $said + '; files under it open in: ' + (Get-ThornswoodFileHolders $Path $snap.Procs)
 }
