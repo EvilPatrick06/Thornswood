@@ -89,6 +89,12 @@ Yes 'an enum value outside its list is refused' ((Words 'Deploy-DevGamemode -Npc
 # nothing else, never the folder it reads.
 Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-LauncherStarts -Days 7') -eq '-Days|7' -and (Words 'Read-LauncherStarts') -eq '' -and
     (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
+# Publish-Server through the gate is the dev server's, from the box's store,
+# and nothing else (#4987): main stays with a Main run Patrick approves.
+Yes 'Publish-Server is held to -Channel dev -FromStore' ((Words 'Publish-Server') -eq '-Channel|dev|-FromStore|-NoPause' -and
+    (Words 'Publish-Server -RequirePass on -Wait 300') -eq '-Channel|dev|-FromStore|-NoPause|-RequirePass|on|-Wait|300')
+Yes '  and a caller cannot name main, a build, a zip or a fresh world' ((Words 'Publish-Server -Channel main') -eq 'REFUSED' -and
+    (Words 'Publish-Server -ServerBuild x') -eq 'REFUSED' -and (Words 'Publish-Server -Zip x') -eq 'REFUSED' -and (Words 'Publish-Server -FreshWorld') -eq 'REFUSED')
 $refused = @(
     @('', 'an empty line'),
     @('Remove-Item C:\', 'a verb that is not on the list'),
@@ -173,7 +179,17 @@ foreach ($p in $verbs.verbs.PSObject.Properties) {
         $isSiteSwitch = ($p.Name -eq 'Deploy-Docs' -and $q.Name -eq 'Site')
         Yes "$($p.Name) -$($q.Name): not a host, user, folder, file, task or secret" ($isSiteSwitch -or $never -notcontains $q.Name)
     }
-    foreach ($w in @($v.fixed | Where-Object { $_ })) { Yes "$($p.Name) fixed $w`: the script takes it" ($takes -contains $w.TrimStart('-')) }
+    # A fixed word with no hyphen is the value of the fixed parameter before it,
+    # so that one is a value in the script, never a switch (Publish-Server is
+    # held to -Channel dev this way, #4987).
+    $fixedWords = @($v.fixed | Where-Object { $_ })
+    for ($k = 0; $k -lt $fixedWords.Count; $k++) {
+        $w = [string]$fixedWords[$k]
+        if ($w.StartsWith('-')) { Yes "$($p.Name) fixed $w`: the script takes it" ($takes -contains $w.TrimStart('-')); continue }
+        $before = if ($k -gt 0) { ([string]$fixedWords[$k - 1]).TrimStart('-') } else { '' }
+        Yes "$($p.Name) fixed value $w`: it follows a fixed parameter that takes a value" ($k -gt 0 -and ([string]$fixedWords[$k - 1]).StartsWith('-') -and $takes -contains $before -and -not $isSwitch[$before])
+        Yes "$($p.Name) fixed value $w`: a caller cannot give that parameter again" ($null -eq $v.params.$before)
+    }
     if ($v.out) { Yes "$($p.Name) out $($v.out): the script takes it" ($takes -contains ([string]$v.out).TrimStart('-')) }
     Yes "$($p.Name): a timeout of an hour at most, which box-run.yml's job allows" ([int]$v.timeoutMinutes -gt 0 -and [int]$v.timeoutMinutes -le 45)
 }
