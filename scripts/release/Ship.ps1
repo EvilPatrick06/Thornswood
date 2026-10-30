@@ -8,9 +8,10 @@
   launcher and mods both, in a single release.
 
   THE VERSION IS BUMPED BEFOREHAND, not here, by Bump-Version.ps1, and the bump
-  reaches main through a pull request like any other change: main refuses a
-  push from everybody, the owner included. Ship only reads this repository and
-  writes nothing back to it. A main release is refused if anything is
+  reaches main through a pull request like any other change, the owner's
+  included. GitHub refuses a push to main from write access; the admin account
+  is held to it by the team rule, since enforce_admins is off. Ship only reads
+  this repository and writes nothing back to it. A main release is refused if anything is
   uncommitted or unpushed, or if a file in a folder a release is built from is
   one git does not know, so what ships and what is written down are the same
   thing.
@@ -641,9 +642,9 @@ function Get-RemoteTagCommit([string]$repoDir, [string]$tag) {
 # THE EXE CI BUILT MAY NOT BE SIGNED, issue #921. release.yml's VPS job
 # compiles on a runner that holds no signing certificate, so its v<version>
 # draft carries an unsigned Thornswood.exe, and until #2163's switch-over
-# every release is built there. release.yml's hosted job signs the exe on a
-# v tag, and such a draft passes through here untouched ("already signed by
-# us" below).
+# every release is built there. release.yml's hosted job signs the exe in a
+# run of main's own workflow (#3930), and such a draft passes through here
+# untouched ("already signed by us" below).
 # 20260927-1633 put exactly that on Main as 1.1.101 (sha256 38d4cd5d...), an
 # hour before the publish sign gate existed. Since then the gate refuses it,
 # which is safe but means no main Ship can go out at all.
@@ -1289,8 +1290,9 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
                  "Put them through a pull request, delete them, or add them to .gitignore, then Ship.")
         }
         if ($ahead -gt 0) {
-            # Not "git push": main refuses a push from everybody since
-            # enforce_admins went on, so that advice sent people into a refusal.
+            # Not "git push": main takes commits only through a pull request.
+            # GitHub refuses the push from write access, and the admin account
+            # keeps the same rule by hand, so that advice was always wrong.
             Die ("$branch is $ahead commit(s) ahead of origin/$branch. A release has to be buildable from what " +
                  "everybody else can see, and main takes commits only through a pull request: move them to " +
                  "a branch, push that, merge its pull request, git pull, then Ship.")
@@ -1750,7 +1752,7 @@ if (-not $ModsOnly) {
         # A RELEASE FROM THE FEED TAKES ITS LAUNCHER FROM GITHUB (#3312): it
         # cannot compile or sign one where it runs. release-tag.yml tags this
         # commit (origin/main, held above) v<the number worked out above> and
-        # starts release.yml on it, which writes that number into Updater.cs,
+        # starts main's release.yml for it (#3930), which writes that number into Updater.cs,
         # builds the exe, signs it with ThornswoodRelease on GitHub's runner,
         # or on the box's runner 3 when GitHub has no minutes, and has a
         # build runner check the signed draft. The draft's exe comes down
@@ -2225,6 +2227,20 @@ function Measure-Installer {
 # not touch the installer, and its closing note still warns. A hotfix never
 # refuses either: it is the live build plus one urgent fix, and holding it for a
 # twenty-minute installer rebuild is the opposite of what a hotfix is for.
+# THE MAIN FEED AS THE STORE HOLDS IT NOW, read before the gate counts it
+# (#3961). Measure-Installer counts the releases after the installer's from
+# the main feed's working folder, and until 26 October nothing filled that
+# folder before the gate: Publish-Update receives the feed only later, inside
+# the publish. So the gate counted whatever copy the last main Ship left on
+# this machine, an old one on One, and none at all in a cloud container, where
+# the first main Ship from the feed stopped here at 8:08 PM.
+if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
+    try { [void](Receive-FeedStore 'main' $MainReleaseDir) }
+    catch {
+        Unbump 'the main feed could not be read for the installer check'
+        Die ('Could not receive the main feed from the VPS, so how far behind the installer is cannot be counted and nothing was published: ' + $_.Exception.Message)
+    }
+}
 if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
     $ins = Measure-Installer
     $rebuild = ('Rebuild it as part of this release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 -OneFile ' +

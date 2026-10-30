@@ -79,17 +79,22 @@ back.
 
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you
-are on. It is how somebody who cannot play gets helped without a conversation.
+are on, and how long the launcher took to open. It is how somebody who cannot play gets helped without a conversation.
 
 **Gallery submissions.** The picture or recording, your signed-in account,
-the name for its caption and any note for staff are kept for review. Only
-approved submissions appear publicly. Their caption and media then become
-public too. With a picture, your browser or the launcher also sends smaller
-copies of it, which are shown in its place on smaller screens and deleted
-with it. Submit only material you have permission to share, without
-private information about other people. Ask in the Discord to have a
-submission removed. Removing one deletes its file from the site. See
-[Terms](/terms) for publication permissions.
+the name for its caption and any note for staff are kept for review. A
+picture or recording can also say inside the file where it was taken (a
+phone or camera often writes the GPS position), when, and with which camera
+or program. The site takes all of that out as the file arrives, so none of
+it is kept or shown. Of the file, only the picture or recording itself is
+kept, with its colours and which way up it is shown. Only approved
+submissions appear publicly. Their caption and media then become public too.
+With a picture, your browser or the launcher also sends smaller copies of
+it, which are shown in its place on smaller screens and deleted with it.
+Submit only material you have permission to share, without private
+information about other people. Ask in the Discord to have a submission
+removed. Removing one deletes its file from the site. See [Terms](/terms)
+for publication permissions.
 
 ## What is not stored
 
@@ -172,7 +177,10 @@ until 24 September 2026, and both are served from here now.
   they change, this line changes with them.
 
 - **Your character** is kept until you ask for it to be deleted, or until a
-  wipe, which is announced first.
+  wipe, which is announced first. A wipe, a character reset or putting a
+  backup back leaves the characters it replaced set aside on the server for
+  30 days, so it can be undone, and then deleted. The server checks every
+  hour.
 - **Launcher logs** are kept for 365 days, like session records, unless staff
   mark the session kept.
 - **A gallery submission that is removed** has its file deleted then. One
@@ -188,7 +196,11 @@ until 24 September 2026, and both are served from here now.
   and it stays in the Discord, closed, for 365 days, then the bot deletes it.
   A ticket nobody closes is closed by Discord after a week with nothing said
   in it, and goes 365 days after that. Opening a ticket again starts its 365
-  days over when it next closes. The bot checks every hour.
+  days over when it next closes. Each time a ticket is closed, the bot writes
+  a line in a staff only ticket log naming the ticket, which carries your
+  name in Discord, and a ticket whose private thread cannot be opened goes
+  into that log whole instead. Each of those goes 365 days after it was
+  written. The bot checks every hour.
 - **Your answer to the rules** is kept for as long as your account is here,
   because it is the record that you agreed to them, and goes with the rest
   of your account when you ask for that to be deleted.
@@ -215,11 +227,15 @@ until 24 September 2026, and both are served from here now.
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the
 operator's computer are kept for 30 days, with at least seven retained for
-recovery. These are private recovery copies, not public downloads. Removing
+recovery. A whole copy of the server taken by hand, before moving it to a
+new machine, is encrypted the same way and kept on the operator's computer
+for 30 days. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
 retention schedule. The game server's log is not in them. Staff must
 reapply completed deletion requests before putting an older backup back
-into service.
+into service. What putting a backup back replaces (the site's records and
+uploads, the bot's join numbers, characters) is set aside on the server for
+30 days, so it can be undone, and then deleted.
 
 ## Deleting it
 
@@ -236,14 +252,20 @@ Discord message. Do not send a government identity document.
 
 What deletion means here: your Discord link, your session records, your chat,
 your character, your answer to the rules, the applications and calls for
-help you sent, your gallery pictures and your join number. What cannot be undone is something you said that somebody
+help you sent through the site, your gallery pictures and your join number.
+A ticket in the Discord, and the bot's lines about it in the staff ticket
+log, are not deleted by a request: each stays until its 365 days above are
+up, because it is the record of what you were told. What cannot be undone is something you said that somebody
 else has already quoted in a report, because that now belongs to the report.
 Staff's own records stay for the same reason: a ban, a note, a character
 killed for good, a report you made or one made about you, a line in a staff
 log, and a session staff marked kept because a report rests on it. A request
 does not delete them, and they still go when their time above is up. A completed request is written down
 with your Discord id and character numbers and nothing else, so that an older
-backup put back into service has you removed again first.
+backup put back into service has you removed again first. Until every game
+server has removed your character, the site also keeps its character numbers
+and nothing else, so that a server that has not restarted yet cannot put it
+back.
 
 ## Who can see it
 

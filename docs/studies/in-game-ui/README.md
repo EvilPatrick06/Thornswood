@@ -12,8 +12,10 @@ options are equal for them, the differences for the team decide (upkeep,
 build speed and tooling, debugging and testing, hosting, signing and running
 costs, and how well Claude threads work in it).
 
-The pick is made on the report page, one decision for voice and one for the
-rest of the UI. The work each pick needs is filed on the board (the last
+Patrick picked both recommendations on the report page on 26 Oct 2026:
+**V3** for voice and **U4** for the rest of the UI
+([#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408),
+docs/DECIDED.md). The work each pick needs is filed on the board (the last
 section).
 
 ## Where things stand today, measured
@@ -498,34 +500,18 @@ Filed now, because they stand whatever is picked:
 - #3431: the privacy page does not say voice sends each person's address to
   everybody in the voice room.
 
-Filed as issues once the picks are made, in this order, if the picks are the
-recommended ones:
+Filed on 26 Oct 2026 for the picks, in this order:
 
 Voice (V3):
 
-1. The box forwards voice: one WebRTC connection per person in
-   `voice-server.js` (node-datachannel), each voice sent only to the people in
-   range, mutes and staff silence enforced there; the UDP port on the box;
-   the privacy page says voice passes through the server and is never
-   recorded.
-2. The launcher's native voice engine: WASAPI capture through Windows' Voice
-   Capture DSP, Opus (Concentus), libdatachannel to the box, playback with
-   direction and distance; libdatachannel signed and shipped with the
-   launcher; the speakers echo test.
-3. The browser goes from voice: `voice-host.html`, WebView2 and its runtime
-   install leave the launcher, and the game's own WebRTC copy in
-   `thornswood-voice.js` goes, keeping only the speaking marks it draws.
+1. #3511: the box forwards each voice only to the people in range, and the
+   launcher's page connects once to the box meanwhile.
+2. #3513: the launcher's native voice engine.
+3. #3514: the browser goes from voice.
 
 The rest of the UI (U4):
 
-1. The Scaleform build: ActionScript 2 sources in the repository, built into
-   SWFs by the JPEXS command line on the build runners and checked by a
-   harness, and the away window as the first menu, opened from the front
-   plugin with `Ui.openCustomMenu`.
-2. The away window measured against the browser one in the game (a Dev test
-   task): frame time, memory, keyboard and controller.
-3. Then one issue per panel, the emote wheel, chat (HUD widget and text
-   field), character choice, K, P, J, trade, repair, treat, furniture, ride,
-   box, board, merchant, ship, maneuvers and help, and last the browser
-   backend set to `off` with the focus layer and its three repairs (#2131,
-   #2384, #2729) removed with it.
+1. #3515: the Scaleform build, and the away window as the first menu,
+   measured in the game against the browser one.
+2. #3516: every other panel, then the browser backend off with the focus
+   layer and its three repairs (#2131, #2384, #2729) removed.

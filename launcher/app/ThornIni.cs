@@ -16,7 +16,7 @@ namespace Thornswood
     /// of the machine that ships, so three packs put that machine's Fov=120
     /// and its binds on everybody, and every update put them back over
     /// whatever people had set. It is on Ship-Rules' machine list now, so a
-    /// machine with no file gets the template (tools\emotes\Thornswood.ini,
+    /// machine with no file gets the template (launcher\Thornswood.ini,
     /// built into the exe) here.
     /// </summary>
     static class ThornIni
@@ -47,7 +47,7 @@ namespace Thornswood
             catch { return null; }
         }
 
-        /// <summary>tools\emotes\Thornswood.ini, as Build-Launcher put it in the exe.</summary>
+        /// <summary>launcher\Thornswood.ini, as Build-Launcher put it in the exe.</summary>
         static string Template()
         {
             try

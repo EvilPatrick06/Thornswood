@@ -21,7 +21,7 @@ namespace Thornswood
 {
     /// <summary>
     /// The launcher itself: Main, the window, every button, and the Play
-    /// sequence. There is no compiled window class. Run parses tools\ui.xaml,
+    /// sequence. There is no compiled window class. Run parses launcher\ui.xaml,
     /// which Build-Launcher.ps1 embeds in the exe, into a live Window at run
     /// time; Bind finds the named controls in it and Wire attaches every
     /// handler. So this is one static class, not a Window subclass, split
@@ -31,7 +31,7 @@ namespace Thornswood
     /// each of the other classes owns on disk, and every step between the
     /// Play button and the game starting, with the file and line of each.
     /// Whoever changes one of those steps changes that page in the same pull
-    /// request; tools\test-architecture.js fails when the page names a step
+    /// request; tests\test-architecture.js fails when the page names a step
     /// that is gone or out of order.
     /// </summary>
     static partial class Shell
@@ -280,6 +280,32 @@ namespace Thornswood
         /// </summary>
         static bool askedToUninstall;
 
+        /// <summary>
+        /// How long the mod check on the way in took, for the start line
+        /// (LogStartTime). -1 until it has run.
+        /// </summary>
+        static double startScanSeconds = -1;
+
+        /// <summary>
+        /// One line in launcher.log once the window has drawn: how long after
+        /// Windows started the process, and how much of that the mod check
+        /// on the way in took (#3534). Nothing measured the launcher's start
+        /// before, so the weekly review had no number for it. The line goes to
+        /// the site with the session's launcher.log like every other line, and
+        /// scripts\vps\Read-LauncherStarts.ps1 totals a week of them on the box.
+        /// Its words are what that script reads: change both together.
+        /// </summary>
+        static void LogStartTime()
+        {
+            double window;
+            using (var me = Process.GetCurrentProcess())
+                window = (DateTime.Now - me.StartTime).TotalSeconds;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            LogOnly("Launcher start: the window was on screen " + window.ToString("F1", inv) + " s after the launcher started" +
+                    (startScanSeconds >= 0 ? ", " + startScanSeconds.ToString("F1", inv) + " s of it the mod check" : "") +
+                    ", on launcher " + Updater.Version + ".");
+        }
+
         static void Run(string[] args)
         {
             string root = null;
@@ -464,8 +490,10 @@ namespace Thornswood
             // Scan asks the server for its plugin list. The server having a bad
             // night is not a reason for the launcher to stop halfway through
             // starting, with the window built and nothing on it.
+            var scanClock = Stopwatch.StartNew();
             try { RunScan(); }
             catch (Exception ex) { Log("Could not check the mod list on the way in: " + ex.Message); }
+            startScanSeconds = scanClock.Elapsed.TotalSeconds;
             if (DrawStatus()) Log("Ready."); else Log("Something needs attention before you can play.");
             // Nobody should have to press anything to get a client file back.
             // This does nothing at all when the six are the recorded build,
@@ -497,10 +525,9 @@ namespace Thornswood
             win.Dispatcher.BeginInvoke(
                 new Action(delegate
                 {
-                    // PlaceLoader runs inside Voice.Start before CreateAsync.
-                    // Menu music must not CreateAsync until that file exists;
-                    // a separate ApplicationIdle item used to run first and
-                    // fail with "Unable to load DLL WebView2Loader.dll".
+                    // The theme starts in the same idle moment, once the
+                    // window is on screen. It plays from this process, not
+                    // from WebView2 (MenuMusic.cs, #3207).
                     Voice.Start(delegate (string m) { Log(m); }, cfg);
                     StartMenuMusic();
                 }),
@@ -512,6 +539,7 @@ namespace Thornswood
             // disappear and puts it back if this one closes first. SelfSwap.cs.
             win.ContentRendered += delegate
             {
+                try { LogStartTime(); } catch (Exception ex) { Swallow.Note("Shell.Run, saying how long the start took", ex); }
                 string self = Assembly.GetExecutingAssembly().Location;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
@@ -1223,9 +1251,8 @@ namespace Thornswood
         /// a puzzle rather than a mood. Off entirely when the person has turned
         /// it off in Settings, which is what MusicDecide reads.
         /// </summary>
-        // Menu theme plays through MenuMusic (WebView2 HTML5). WPF MediaPlayer
-        // failed on the ship PC with "Windows Media Player version 10 or later
-        // is required" while Voice's WebView2 still carried audio.
+        // Menu theme plays through MenuMusic, from this process, so the
+        // Windows Volume Mixer lists it under this build's name (#3207).
         static void StartMenuMusic()
         {
             // Not for somebody who opened this from Windows Settings to
@@ -1263,7 +1290,7 @@ namespace Thornswood
             try
             {
                 double vol = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
-                MenuMusic.Start(file, vol, Stamp);
+                MenuMusic.Start(file, vol, cfg.BuildName, Icons.IconFile(), Stamp);
                 MusicDecide();
                 win.StateChanged += delegate { MusicDecide(); };
             }
@@ -2180,8 +2207,7 @@ namespace Thornswood
                 if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
                 StartHeaderVideo();
             }
-            // Menu music starts from the Voice ApplicationIdle callback after
-            // WebView2Loader.dll is placed (see Voice.Start above).
+            // Menu music starts from the Voice ApplicationIdle callback above.
 
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
             {
