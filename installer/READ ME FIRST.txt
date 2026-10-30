@@ -45,10 +45,13 @@ Installing
    not changed, so you can keep it on any build and mod it as you like. It
    is a few gigabytes, so give it a while.
 
-3. Install the collection in Vortex. The link is on
-   https://thornswood.net/downloads and on the launcher's Diagnostics page. This
-   is not optional: without it you have a launcher and no mods, and the
-   server turns you away when you press Play.
+3. Install the collection in Vortex from the card above Play on the
+   launcher's front page, or from the launcher's Diagnostics page. The
+   button opens the revision the server was built against and says its
+   number. Install that revision, not a newer one Nexus may show first, or
+   Play stays shut until the server catches up. This is not optional:
+   without it you have a launcher and no mods, and the server turns you
+   away when you press Play.
 
 4. Press Connect Discord on the launcher's front page. Your browser opens,
    you say yes, and it closes itself. You only do this once.

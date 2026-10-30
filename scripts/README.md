@@ -26,6 +26,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | Script | What it is for |
 | --- | --- |
 | [deploy/Artifact.ps1](deploy/Artifact.ps1) | What a deploy sends, built from a commit rather than copied off a working tree, and what the box keeps to say which commit each part runs. |
+| [deploy/Check-GitHubSettings.ps1](deploy/Check-GitHubSettings.ps1) | Reads GitHub's Actions settings, environments, secrets and variables for this repository and names every way they differ from records\github-settings.json on main. |
 | [deploy/CloudflareRanges.ps1](deploy/CloudflareRanges.ps1) | Dot-sourced. Reads scripts\deploy\cloudflare-ranges.txt, the addresses Cloudflare's proxy reaches the box from, and says whether an address is inside them (#2995). |
 | [deploy/CollectionPlugins.ps1](deploy/CollectionPlugins.ps1) | Holds the plugins a deploy sends to the collection's own bytes (#2019). |
 | [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS, which loads it while it runs when nothing else changes, and otherwise restarts only that server. |
@@ -96,6 +97,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Nightly-PlainIssues.ps1](dev/Nightly-PlainIssues.ps1) | Names every issue and issue comment made in the last day that is not written plain. |
 | [dev/Nightly-Stray.ps1](dev/Nightly-Stray.ps1) | Names every pull request open more than two days and every branch other than main with no open pull request, reading every page GitHub has. |
 | [dev/OwnPlugins.ps1](dev/OwnPlugins.ps1) | Where a builder reads a plugin of the load order from (#2923). |
+| [dev/Report-Clone.ps1](dev/Report-Clone.ps1) | Says what One's clone holds that only One can see: every worktree, with its branch, whether it has changes nobody committed and when it last changed; every stash; every local branch, with whether GitHub still has it and how far behind main it is; the folders in temp\ and worktrees\ that no worktree owns. |
 | [dev/Run-Gate.ps1](dev/Run-Gate.ps1) | Runs the gate harnesses for build.yml's "Run the gate harnesses" step: every one on main, under the trace task's trace on the VPS, and on a pull request built on the VPS only those its change can reach (#3114). |
 | [dev/Start-Thornswood.ps1](dev/Start-Thornswood.ps1) | Launches the game the way the launcher's Play() does, without the launcher. |
 | [dev/Trace-Gate-Box.ps1](dev/Trace-Gate-Box.ps1) | The part of a gate trace that runs on the VPS, as an administrator: an ETW session that sees every file each gate harness opens, and the reading of it into one list of paths a harness (#3114). |
@@ -109,7 +111,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Align-LoadOrder.ps1](mods/Align-LoadOrder.ps1) | The client counts its own plugins with Game.GetModCount, which skips every ESL-flagged one because Skyrim gives those no normal index. |
 | [mods/Audit-Leftovers.ps1](mods/Audit-Leftovers.ps1) | Measures. Deletes nothing, moves nothing, renames nothing. |
 | [mods/Audit-Mods.ps1](mods/Audit-Mods.ps1) | Measures the build and says which parts carry a plugin and which are pure assets, because only the second kind can ever be optional. |
-| [mods/Build-Generated.ps1](mods/Build-Generated.ps1) | Builds Thornswood's animation and body files (the behavior files, with Pandora Behaviour Engine+, and BodySlide's body meshes) in Thornswood's own game folder, and records them as Thornswood's, so the next Ship carries them. Never writes into the Steam copy. |
+| [mods/Build-Generated.ps1](mods/Build-Generated.ps1) | Builds Thornswood's animation and body files (the behavior files, with Pandora Behaviour Engine+, and BodySlide's body meshes) in a Thornswood game folder, by hand, with the launcher's own code. Never writes into the Steam copy. |
 | [mods/Check-CleanInstall.ps1](mods/Check-CleanInstall.ps1) | After installing the Nexus collection into a clean Vortex profile: does the plugin list that install wrote give the game the load order the server checks, with the server's files? |
 | [mods/Check-CollectionRules.ps1](mods/Check-CollectionRules.ps1) | Whether the plugin rules the Nexus collection carries hold a clean install to a plugin list's order. |
 | [mods/Check-CoveredBodies.ps1](mods/Check-CoveredBodies.ps1) | Says whether every body the game folder shows people is covered by underwear, men and women alike, and exits 2 when one is not. |
@@ -124,7 +126,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Fix-Icons.ps1](mods/Fix-Icons.ps1) | Windows keeps the picture it once drew for a shortcut in a cache, and goes on showing it long after the icon inside the exe changed. |
 | [mods/Fix-MaleBody.ps1](mods/Fix-MaleBody.ps1) | RETIRED. DO NOT RUN. Issue #1179: moved the collection's HIMBO male body aside by hand. |
 | [mods/Fix-QuickLoot.ps1](mods/Fix-QuickLoot.ps1) | RETIRED. DO NOT RUN. Issue #1179: switched on MCMHelper.esp in server-settings.json and plugins.txt by hand. |
-| [mods/Generated.ps1](mods/Generated.ps1) | What Thornswood's generated files are, what they were built from, and whether the ones in a game folder are still current. Dot-sourced by Build-Generated.ps1, Ship.ps1 and Check-ShipReady.ps1. |
+| [mods/Generated.ps1](mods/Generated.ps1) | Thornswood's animation and body files, for a script: what they are, what they were built from, whether the ones in a game folder are current, and the build itself. Dot-sourced by Build-Generated.ps1, Check-CoveredBodies.ps1 and the harnesses. |
 | [mods/LoadOrder.ps1](mods/LoadOrder.ps1) | The load order as the game counts it, and how to put a plugin list into the server's order. |
 | [mods/New-CollectionPluginRecord.ps1](mods/New-CollectionPluginRecord.ps1) | Writes records\collection-plugins.json, the collection's plugins with the size and sha256 of each, which the full deploys hold the plugins they send to (#2019, CollectionPlugins.ps1). |
 | [mods/OnBox.ps1](mods/OnBox.ps1) | The two scripts Run-OnBox.ps1 sends to the box (issue #2899): the keeper, which makes the run's folder and removes it, and the run. |
@@ -137,6 +139,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Show-EslCascade.ps1](mods/Show-EslCascade.ps1) | Answers one question: if the server load order drops every ESL-flagged plugin, how much else has to go with it? |
 | [mods/Sync-LoadOrder.ps1](mods/Sync-LoadOrder.ps1) | Build the server's load order from the client's. |
 | [ops/Chargen-Log.ps1](ops/Chargen-Log.ps1) | What the server thinks is happening to your character. |
+| [ops/Check-Board.ps1](ops/Check-Board.ps1) | Holds the board's cards to the rules Developer-Guide.md gives them, from a board.json Read-Board.ps1 wrote, and names every card that breaks one. |
 | [ops/Check-Chargen.ps1](ops/Check-Chargen.ps1) | Preflight for character creation. Everything it looks at is something that silently produces a broken first join rather than an error message, so it is worth thirty seconds before starting the server. |
 | [ops/Check-DevRosterSeed.ps1](ops/Check-DevRosterSeed.ps1) | Expand the roster seed here-string exactly as Publish-Server would and parse the text that would actually be sent. |
 | [ops/Check-Roster.ps1](ops/Check-Roster.ps1) | What is in each server's private folder, by name and size only. |
@@ -254,6 +257,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Check-RehearsalDue.ps1](vps/Check-RehearsalDue.ps1) | Says whether the monthly hands-on restore rehearsal is due, from the Last rehearsed line in RESTORING.md in the private ops repo, and fails once it is overdue. |
 | [vps/Check-RunnerIsolation.ps1](vps/Check-RunnerIsolation.ps1) | Checks what the self-hosted GitHub Actions runners on the VPS can reach (accounts, groups, production paths, leftovers, firewall, which workflows and pull requests run there, the repository's Actions settings) and writes a redacted report; read-only (issue #2161). |
 | [vps/Check-ServerPriority.ps1](vps/Check-ServerPriority.ps1) | Reads, and changes nothing: the priority the live and dev game servers and the live and dev voice services run at on the VPS (#2491). |
+| [vps/Check-ServiceOwners.ps1](vps/Check-ServiceOwners.ps1) | Reads, and changes nothing: whether one box service can still reach what another makes through LOCAL SERVICE, the account they all run as (#4077). |
 | [vps/Check-Site.ps1](vps/Check-Site.ps1) | Asks whether thornswood.net is actually working: from the outside first, the way a visitor or an uptime monitor sees it, and then from the box, the way the site sees Discord. |
 | [vps/Check-VoiceInstall.ps1](vps/Check-VoiceInstall.ps1) | Expand Install-Voice's here-string exactly as the script does and look at the text that would actually be sent. |
 | [vps/Clear-OldWorldCopies.ps1](vps/Clear-OldWorldCopies.ps1) | Removes the copies of the world that every server install before #446 left in the VPS temp folder, keeping the newest of each kind (issue #1074). |
@@ -276,6 +280,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Protect-BackupZip.ps1](vps/Protect-BackupZip.ps1) | Protect-ThornswoodBackupZip encrypts a backup zip into the TSBK1 file the nightly backup writes (vps-nightly-backup.ps1, "encrypt"), the one format Restore-Backup.ps1 opens: "TSBK1", a 16 byte salt, a 16 byte IV, the zip in AES-256-CBC, then an HMAC-SHA256 over everything after the five letters. |
 | [vps/Prove-SecretOffCommandLines.ps1](vps/Prove-SecretOffCommandLines.ps1) | Proves, on one real run, that a secret-sending script keeps the value off every command line on the VPS (issue #1212, the person check of #451). |
 | [vps/Read-Availability.ps1](vps/Read-Availability.ps1) | Says how many minutes each service was down over a window, and what share of the window it was up, from the down and back lines the watchdog writes into alerts.jsonl. |
+| [vps/Read-LauncherStarts.ps1](vps/Read-LauncherStarts.ps1) | Says how long the launcher took to start on the machines of the people who played, per launcher version: how many starts, the middle one, the one slower than nine in ten, the slowest, and how much of the middle start the mod check took. |
 | [vps/Read-Load.ps1](vps/Read-Load.ps1) | Says which service is using the box, from the record vps-load.ps1 keeps on it. |
 | [vps/Remote.ps1](vps/Remote.ps1) | Runs a bit of PowerShell on the VPS, properly. |
 | [vps/Remove-HandMadeTasks.ps1](vps/Remove-HandMadeTasks.ps1) | Takes the two SYSTEM tasks somebody made by hand on the box, and the folders they run from, off the box (issue #3288). |
@@ -291,7 +296,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Set-InboundRules.ps1](vps/Set-InboundRules.ps1) | Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807). |
 | [vps/Set-SshScope.ps1](vps/Set-SshScope.ps1) | Limits which addresses may reach ssh on the VPS (port 22), after proving key login, refusing a list that leaves this machine out, and with a put back the box runs by itself if the new login fails. |
 | [vps/Set-TimeWait.ps1](vps/Set-TimeWait.ps1) | Sets TcpTimedWaitDelay to 30 seconds on the VPS, so the box stops dropping connections from the cloud before TLS (#2946), and restarts the box for it when asked and nobody is on either server. |
-| [vps/Set-Vps.ps1](vps/Set-Vps.ps1) | Points everything at a different server box. |
+| [vps/Set-Vps.ps1](vps/Set-Vps.ps1) | Renames the game's own name, the one name everything reaches the box by. |
 | [vps/Set-WebFirewall.ps1](vps/Set-WebFirewall.ps1) | Lets the box take TCP 80 and 443 only from Cloudflare's ranges, so a forged SYN from anywhere else gets no SYN-ACK back (#2995). -Open puts both back to any address. |
 | [vps/Setup-CloudSsh.ps1](vps/Setup-CloudSsh.ps1) | Sets up ssh to the box from a cloud Claude thread (#2753). |
 | [vps/Setup-SshKey.ps1](vps/Setup-SshKey.ps1) | Sets a PC up to reach the box over ssh, through the bridge, with a key and a token of its own (#2891). |
