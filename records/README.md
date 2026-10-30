@@ -11,7 +11,10 @@ read it (issue #440, phase 8):
   fork commit, every file by hash (#2754). `scripts\release\Build-Front.ps1
   -Record` writes it when the pin moves; Build-Front puts the build in
   `local\thornswood-front.zip` only when it is this one, and Go.ps1 refuses a
-  zip that is not.
+  zip that is not. Its `packages` are the npm packages webpack put in
+  build.js, each with its licence text in `front-licences\<name>.txt`
+  (#3751); the installer and every update that carries build.js carry those
+  texts.
 - `server-build.json`: every server file the fork builds the same way (the
   binary, the JavaScript half the server runs, its map and the rest
   `scripts\deploy\ServerBuild.ps1` names), and the one fork commit.

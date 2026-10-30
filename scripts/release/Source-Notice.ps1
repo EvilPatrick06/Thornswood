@@ -36,6 +36,18 @@
   beside the note, the text of every library in the files it carries, and
   the note lists them. Version 2 of the note is the first that does.
 
+  THE CODE THAT DOES NOT COME THROUGH VCPKG (#3751). The same record also
+  lists, as libraries, the fork's own folders under a notice of their own
+  (Tilted Phoques' libraries under skyrim-platform\src\tilted, papyrus-vm,
+  viet and libespm) and the npm packages webpack put in skymp5-client.js,
+  each with its text in client-licences\ under its own name; a client
+  measured before #3751 has none. build.js is webpack's build of
+  skymp5-front, and front-build.json beside the client record lists the npm
+  packages in it, each with its text in front-licences\ beside it
+  (Build-Front.ps1). A download that carries build.js as that build carries
+  those texts too, in the same licences folder, and the note lists them
+  with the rest.
+
   WHERE FRIDA'S PARTS ARE (#3287). Version 3 is the first that names the
   Release of their archives, records\frida-sources.json; see
   $SourceNoticeBundled below.
@@ -106,7 +118,9 @@ function Get-SourceNoticeBundle([string]$Port) {
   record's sha256 and size) }. Empty when $Carried holds none of those files.
   Throws a sentence when the record is missing, is of another commit than the
   client record, or a text is missing or not the one it names: those texts
-  are owed with the files (#3099), so the release stops.
+  are owed with the files (#3099), so the release stops. The record's
+  libraries (#3751) come in the same list, the same way, in name order
+  after the ports.
 #>
 function Get-ClientLicences([string]$ClientRecord, [string[]]$Carried) {
     $dir = Split-Path -Parent $ClientRecord
@@ -136,7 +150,64 @@ function Get-ClientLicences([string]$ClientRecord, [string[]]$Carried) {
             Files = @($in | ForEach-Object { $_.Substring($_.LastIndexOf('\') + 1) } | Sort-Object); Bytes = $bytes
         }
     }
+    $lp = $l.PSObject.Properties['libraries']
+    if ($lp -and $lp.Value) {
+        foreach ($p in @($lp.Value.PSObject.Properties | Sort-Object Name)) {
+            $n = [string]$p.Name
+            if ($l.ports.PSObject.Properties[$n]) { throw "$path names $n as both a port and a library" }
+            $in = @()
+            foreach ($f in @($p.Value.in)) { foreach ($x in @($Carried)) { if ($x -and $x.Equals([string]$f, [StringComparison]::OrdinalIgnoreCase)) { $in += [string]$f; break } } }
+            if (-not $in.Count) { continue }
+            $out += Read-NoticeText (Join-Path $dir ('client-licences\' + $n + '.txt')) $p.Value $n $in 'client-licences.json' '#3751'
+        }
+    }
     return $out
+}
+
+# One text a record names, held to its sha256 and size, as Get-ClientLicences
+# gives it. Throws a sentence when it is missing or another text.
+function Read-NoticeText([string]$Text, $Entry, [string]$Name, [string[]]$In, [string]$Record, [string]$Issue) {
+    if (-not (Test-Path -LiteralPath $Text -PathType Leaf)) { throw "$Text is missing. $Record names it, and it has to go with the files $Name is in ($Issue)." }
+    $bytes = [IO.File]::ReadAllBytes($Text)
+    $sha = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+    if ($sha -ne ([string]$Entry.sha256).ToLowerInvariant() -or $bytes.Length -ne [long]$Entry.bytes) { throw "$Text is not the text $Record names for $Name" }
+    return [pscustomobject]@{
+        Port = $Name; Version = [string]$Entry.version; Licence = [string]$Entry.licence
+        Files = @($In | ForEach-Object { $_.Substring($_.LastIndexOf('\') + 1) } | Sort-Object); Bytes = $bytes
+    }
+}
+
+<#
+  The npm packages inside build.js (#3751), from $FrontRecord's packages and
+  their texts in front-licences beside it, in the shape Get-ClientLicences
+  gives. Throws a sentence when the record lists none (a front recorded
+  before #3751) or a text is missing or not the one it names: those texts are
+  owed with build.js, so the release stops.
+#>
+function Get-FrontLicences([string]$FrontRecord) {
+    $raw = "$(Get-Content -LiteralPath $FrontRecord -Raw)"
+    $f = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $pk = $f.PSObject.Properties['packages']
+    if (-not $pk -or $null -eq $pk.Value) { throw "$FrontRecord lists no packages. The licences of the npm packages inside build.js have to go with it (#3751): record the front with Build-Front.ps1 -Record." }
+    $dir = Join-Path (Split-Path -Parent $FrontRecord) 'front-licences'
+    $out = @()
+    foreach ($p in @($pk.Value.PSObject.Properties | Sort-Object Name)) {
+        $out += Read-NoticeText (Join-Path $dir ([string]$p.Name + '.txt')) $p.Value ([string]$p.Name) @('Data\Platform\UI\build.js') 'front-build.json' '#3751'
+    }
+    return $out
+}
+
+# Two lists in that shape as one, by name: a name in both is one text, in
+# the files of both. Throws when one name has two texts.
+function Join-NoticeLicences($A, $B) {
+    $by = [ordered]@{}
+    foreach ($x in @(@($A) + @($B) | Where-Object { $_ })) {
+        if (-not $by.Contains($x.Port)) { $by[$x.Port] = $x; continue }
+        $have = $by[$x.Port]
+        if ([Convert]::ToBase64String($have.Bytes) -ne [Convert]::ToBase64String($x.Bytes)) { throw "$($x.Port) has two different texts, and they would go out under one name" }
+        $have.Files = @(@($have.Files) + @($x.Files) | Sort-Object -Unique)
+    }
+    return @($by.Values | Sort-Object Port)
 }
 
 <#
@@ -304,6 +375,10 @@ function Get-SourceNoticeEntries([string]$ClientRecord, [string[]]$Carried, [str
         ) + $upstream + @('')
     }
     $libs = @(Get-ClientLicences $ClientRecord $Carried)
+    # build.js as the recorded front build: the npm packages in it (#3751).
+    $frontCarried = $false
+    foreach ($x in @($Carried)) { if ($x -and $x.Equals('Data\Platform\UI\build.js', [StringComparison]::OrdinalIgnoreCase)) { $frontCarried = $true; break } }
+    if ($frontBuilt -and $frontCarried) { $libs = @(Join-NoticeLicences $libs (Get-FrontLicences $FrontRecord)) }
     $lines += @(
         'SkyMP itself is https://github.com/skyrim-multiplayer/skymp',
         '',
