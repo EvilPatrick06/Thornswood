@@ -28,9 +28,12 @@
   bytes against the record. Then a draft Release on the record's tag, every
   archive uploaded, each held to GitHub's own digest, and only then
   published, never as the latest (the newest game release stays that). Run
-  again on a published, whole Release, it says so and changes nothing. It
-  works the same in a private repository: these are other people's public
-  sources, and the Release is ready when the repository is public.
+  again on a published, whole Release, it says so and changes nothing.
+
+  ON THE DAY THE REPOSITORY GOES PUBLIC, NOT BEFORE (Patrick, B on
+  q-3287-release-when, 27 Oct 2026). While the repository is private it
+  makes nothing: it says so and exits 0. The forks are the source anybody can
+  reach until then, and -Check holds them.
 
   WHAT IT REFUSES. A fork whose tag is not the recorded commit, an archive
   that is not the recorded bytes, and a published Release that lacks an
@@ -264,6 +267,10 @@ if ($ForksMayGo) {
 $work = Join-Path ([IO.Path]::GetTempPath()) ('frida-sources-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work -Force | Out-Null
 try {
+    if (Get-Visibility) {
+        Write-Host "PRIVATE  $repo is private, so the Release $tag waits for the day it goes public; until then the forks are the source anybody can reach. Nothing was made."
+        exit 0
+    }
     $rel = Find-Release
     if ($rel -and -not $rel.draft) {
         $have = Get-Assets $rel
