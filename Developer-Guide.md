@@ -576,7 +576,7 @@ in, above). When both say READY:
 - one line for each thing a person will notice"
 ```
 
-Any developer may run a main Ship from a machine that can sign (How work moves). The same script with
+A main Ship runs only on Patrick's word, by whoever he names, from a machine that can sign (How work moves). The same script with
 `-Channel main` checks a machine for it.
 
 Ship builds a channel's release from one folder on each machine: the main
@@ -599,10 +599,9 @@ Check-ShipReady and Build-Generated then take that folder without `-Root`.
 Ship and Check-ShipReady refuse a folder Vortex deploys into, before
 anything is built.
 
-Moving a release folder means building its generated files once more
-afterwards, `.\scripts\mods\Build-Generated.ps1 -Channel dev`, because
-`generated.txt` records the game folder they were built for and Ship
-refuses them for any other.
+Moving a release folder needs nothing built afterwards: no release carries
+the animation and body files since #3715, and every launcher builds its own
+before Play.
 
 `tests\test-ship-machine.ps1` walks this section: every script it names is
 in the repository with the parameters it is given, the template holds paths
@@ -816,31 +815,32 @@ is added as a collaborator on the repository, and on CODEOWNERS beside the
 shared files, and agrees once to the contributor terms in `LICENSE`.
 Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
 
-Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
-Vortex) also work here, on the shipping machine, under his GitHub account.
-Every rule in this file binds them the same as a person. They share notes
-through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine;
-what is true now is `ops\status.md` in the private ops repo (since 22 Oct). The
-vault is for coordinating, and the board is still the one record of work. They mark what they are on with a
-`claimed: <lane>` label and the board card moved to In Progress. When the
-issue closes, `.github\workflows\drop-claims.yml` takes every `claimed:`
-label off it (#1863), so a lane's finish step need not. Their
-branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
-On the shipping machine `C:\Thornswood-Repo` is shared
-by all of them and sits detached at `origin/main`, because lanes build from
-it: branch work goes in a worktree in its ignored `worktrees` folder, removed
-with its branch once the pull request merges.
+Patrick's Grok Bot lanes (Anvil, Herald, Waystone, Wyrd, Smeagle and Codex)
+only audit now (Patrick, 30 Oct): they look over the work and file what
+they find as plain issues, unclaimed, in Todo. They claim no issue, open no
+pull request and run nothing. Every rule in this
+file binds them the same as a person. Their own notes are in an Obsidian
+vault on the shipping machine; nothing there is a rule, and what is true now
+is `ops\status.md` in the private ops repo.
 
-One rule binds the lanes and not a person (Patrick, 11 Oct): a lane only
-commits, pushes and merges. It never runs a Ship, a Deploy-*, Publish-* or
-Install-* script, a step on the live or dev server, or a Vortex step. For each
-change that needs a run, the lane writes one note in the private ops repo's
-`ops\claude-queue\` folder, naming the pull request of the change, with the exact
-command, its risks, draft release notes, and a news post when people would
-notice; `ops\README.md` there has the template. A Claude on the shipping machine runs those notes once that pull request is merged. A lane
-does not ask anybody to approve a deploy; the note is the hand-off.
+Six Hermes Bots take over the work from the Claude threads (Patrick, 30 Oct):
+Bramble picks, claims, merges and runs every release step, and Rift, Sprocket,
+Echo, Magpie and Wisp each own a part of the project. A Bot marks what it is
+on with its `claimed: <Bot>` label and the board card in In Progress, the
+way everybody claims. When the issue closes, `.github\workflows\drop-claims.yml`
+takes every `claimed:` label off it (#1863). A change that needs a run (a
+Ship, a Deploy-*, Publish-* or Install-* script, a step on the live or dev
+server, a Vortex step) is run by Bramble, from the note the change's pull
+request leaves in the private ops repo's `ops\claude-queue\` folder
+(`ops\README.md` there has the template), once that pull request is merged;
+a main or live run still waits for Patrick's word. Until the switch, the
+Claude Desk runs those notes. Bot branches carry the Bot's name
+(`wisp/3150-what-it-is`). On the shipping machine `C:\Thornswood-Repo` is
+shared and sits detached at `origin/main`: branch work goes in a worktree in
+its ignored `worktrees` folder, removed with its branch once the pull request
+merges.
 
-A lane writes test tasks the way "Test tasks and known issues" says, in
+A Bot writes test tasks the way "Test tasks and known issues" says, in
 its pull request and on the issue: Main for what any playtester can check,
 Dev only for what needs a dev, one per issue and kind, never posted by hand
 in Discord.
@@ -1022,7 +1022,7 @@ How to use it:
   `Suggestion` an idea somebody asked for, and `bug` something broken;
   nothing reads these three, they are for people sorting the board.
   `claimed: <name>` marks who is on an issue ("What this is" says how the
-  lanes use it). Assign yourself when you start one. The stage is Order and
+  Bots use it). Assign yourself when you start one. The stage is Order and
   Status: the `wave:` labels and `needs: the live server` were retired on
   22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
@@ -1274,14 +1274,17 @@ from the board, none of these three puts an issue aside:
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
   there, and a folder made before this loses such files at its next refresh,
   logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
-  Decided by Patrick on 29 Sep (#1247): the behavior files and the BodySlide
-  bodies a release carries are made in Thornswood's own folder, as a step on
-  the shipping machine before a Ship (`scripts\mods\Build-Generated.ps1`,
-  what it builds in `records\generated.json`), never in the Steam copy. The
-  behavior files come from Pandora Behaviour Engine+, which the collection
-  carries from revision 2, because Nemesis cannot generate from a command
-  line. Ship stops while they are not built for the current mod list
-  (tests\test-build-generated.ps1).
+  Decided by Patrick on 29 Sep (#1247) and changed on 27 Oct (#3715): the
+  behavior files and the BodySlide bodies are made in Thornswood's own
+  folder, never in the Steam copy, and since #3715 by every launcher on its
+  own computer before Play, never on the shipping machine for a release. No
+  release and no installer carries them, because they are other people's
+  work (CBBE's page disallows distribution without permission). What is
+  built is `records\generated.json`, compiled into the launcher
+  (`launcher\app\GeneratedBuild.cs`, which `scripts\mods\Build-Generated.ps1`
+  runs too). The behavior files come from Pandora Behaviour Engine+, which
+  the collection carries from revision 2, because Nemesis cannot generate
+  from a command line (tests\test-build-generated.ps1).
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
@@ -1344,7 +1347,13 @@ The short form of the rules. The same decisions, with the dates they were made, 
 
 ##### Main, hotfixes, and merging
 
-- main is what ships. Any developer may ship main from a machine that can sign, and Ship.ps1 refuses
+- main is what ships, and it ships only on Patrick's word for that exact
+  build (Patrick, 30 Oct). Nobody else decides that a main release, a
+  hotfix or a live server or gamemode deploy goes out: not a developer, a
+  lane, a Claude or a Bot, and nobody asks him whether main is ready.
+  Whoever he names runs it from a machine that can sign; once the Hermes
+  Bots take over, that is Bramble. Until 30 Oct any developer could ship
+  main. Ship.ps1 refuses
   a main release that is not on main, is behind or ahead of origin, has
   anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
   asks for a new number with `-Version`. A main Ship writes nothing to the
@@ -1362,8 +1371,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   above still applies, and Ship refuses a hotfix branch that is not on
   GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
   through its own pull request, or the next main release loses it. 1.1.93 was
-  the first, built from 55ac6ef. Any developer may ship a hotfix when they are confident in the fix and
-  Launcher builds is green, the same as any live release. Once it is live, its commit is kept as a tag, `live-<version>`,
+  the first, built from 55ac6ef. A hotfix goes out on Patrick's word, the same as any live release, once
+  the fix's Launcher builds is green. Once it is live, its commit is kept as a tag, `live-<version>`,
   and the branch is deleted, so no hotfix branch sits on GitHub: the next
   hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
   tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
@@ -1378,8 +1387,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   approving reviews is **0**, and the code owner review is **off**.
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
   anybody on the team merges their own pull request once `Launcher builds`
-  (the build check, on the VPS) is green and they have said what it is in
-  #staff-updates. Nobody waits for Patrick. What GitHub does hold write
+  (the build check, on the VPS) is green and they are confident in the
+  change. A merge gets no line in #staff-updates (Patrick, 22 Oct: that
+  channel is only for what staff must act on). Nobody waits for Patrick. What GitHub does hold write
   access to on main: a change comes through a pull request (with no approval
   needed), and a force push or deleting main is refused. None of that applies
   to the admin account while `enforce_admins` is off.
@@ -1556,8 +1566,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   to main whose tree a green pull request build already passed stops green at
   "Already tested in its pull request" instead of building again (#3182).
   Red means the branch would stop Ship at the build step; fix that, and merge
-  once one of the two is green, you are confident in the change, and you have
-  said so in #staff-updates. Nothing in GitHub's settings is required. Run the
+  once one of the two is green and you are confident in the change; a merge
+  gets no line in #staff-updates. Nothing in GitHub's settings is required. Run the
   test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
@@ -1580,7 +1590,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
 Several people, several machines, one repo. The short rules are above;
 this is the long form.
 
-- **main is what ships.** Any developer may ship main from a machine that can sign. `Ship.ps1`
+- **main is what ships, on Patrick's word.** It goes out only when Patrick
+  says so for that exact build, run by whoever he names from a machine that
+  can sign (Patrick, 30 Oct; until then any developer could). `Ship.ps1`
   refuses a main release that is not on the `main` branch, is behind or
   ahead of `origin/main`, has anything uncommitted, or has a file under
   `scripts` or another folder a release is built from that git does not know. It commits and pushes nothing, so what
@@ -1722,7 +1734,7 @@ Ship already posts the note. These commands send nothing. They show what a secon
 
 ### What any developer may do
 
-Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+Decided for the whole team: any developer may do every one of these, except the ones that change what is live. A main release, a hotfix and a live server or gamemode deploy go out only on Patrick's word, by whoever he names (Patrick, 30 Oct; How work moves). Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A dev release, a dev deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
 The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, in First Time Setup, says which Azure sign-in can sign.
 
@@ -1756,7 +1768,7 @@ To post the current feed again:
 
 ## 4. How to release to main
 
-A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign. A release gets no #staff-updates line; the update channel, the app and site News tabs and GitHub say it. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
+A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. It goes out only on Patrick's word for that exact build, and whoever he names runs it from a machine that can sign (Patrick, 30 Oct). Nobody asks him whether main is ready. A release gets no #staff-updates line; the update channel, the app and site News tabs and GitHub say it. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
 
 ### Move the version first
 
@@ -1860,9 +1872,9 @@ is built from that git does not know, with
 a `-Version` other than the number already on main, or with main here behind
 or ahead of `origin/main`, so what ships is what is on GitHub. It builds the
 launcher, checks that the game folder holds the recorded client build
-(`Sync-Client.ps1 -Check`) and that the behavior files and bodies in it were
-built for this mod list (`scripts\mods\Build-Generated.ps1`, run before a Ship;
-see One Skyrim of its own), then runs
+(`Sync-Client.ps1 -Check`) and that the collection there can build the
+behavior files and bodies every launcher makes before Play
+(`scripts\mods\Build-Generated.ps1 -DryRun`; see One Skyrim of its own), then runs
 `scripts\release\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this channel's baseline
@@ -1940,7 +1952,8 @@ script closes the launcher and Skyrim itself when it needs to.
 ### After a pull request is merged
 
 Merging on GitHub changes nothing anybody sees. You run the rest from the
-repository folder. Any developer may.
+repository folder. Any developer may, except a main release, a hotfix and a
+live deploy, which wait for Patrick's word.
 
 1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
    that is behind origin, so the pull comes first.
@@ -1995,7 +2008,7 @@ release, launcher, game files and server together, are in How work moves.
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
-| Game server | VPS 192.135.112.23, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
+| Game server | VPS play.thornswood.net, `C:\Thornswood-Server`, UDP/TCP 7777, resources 3000, task `Thornswood Server` | skymp5-server with `gamemode.js`; the door reads its allowed list from the site |
 | Dev game server | `C:\Thornswood-Server-Dev`, 7787, resources 7788, task `Thornswood Dev Server` | Same binaries, fresh world, door list is the staff roles only (`https://thornswood.net/dev`) |
 | Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
 | Site | `site`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
@@ -2024,7 +2037,7 @@ folder went:
 | `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
 | `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
 | `backups` | `local` | The backups brought off the VPS, since 5 Oct (`Downloads\Thornswood-Backups` before). Secrets are inside them | Fetch-Backups, Backup-Server, Clean-Everything |
-| `release-devbuild` | `local`, on One | The folder One's dev release is built from, since 5 Oct, recorded by Setup-ShipMachine -Root | Ship, Check-ShipReady, Build-Generated |
+| `release-devbuild` | `local`, on One | The folder One's dev release is built from, since 5 Oct, recorded by Setup-ShipMachine -Root | Ship, Check-ShipReady, Build-Generated -DryRun |
 | `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `docs\OWNERSHIP.md` in the private ops repo.
 
@@ -2135,57 +2148,66 @@ the Vortex profile's lists as of the folder's last update, and are the
 reference load order a release carries (`Get-ShipLoadOrderDir`). Ship checks
 the client in `<Root>\Game` against `records\client-build.json`.
 
-**The behavior files and the bodies, before a Ship.** Every release carries
-the behavior files (the animations for the mod list, Nemesis' output until
-29 September) and the bodies BodySlide builds. Decided by Patrick on
-29 September (issue #1247): they are made in
-Thornswood's own folder, as a step on the shipping machine before a Ship, and
-never in the Steam copy, which stays the person's own. Since #1232 nothing run
-into the Steam copy reaches Thornswood's folder or a release. With the game and
-the launcher closed, on the machine that ships:
+**The behavior files and the bodies, built on each computer.** The behavior
+files (the animations for the mod list, Nemesis' output until 29 September)
+and the bodies BodySlide builds are other people's work: Precision's and True
+Directional Movement's patches merged into the game's graphs, and CBBE 3BA's,
+CBBE's and HIMBO's bodies. Decided by Patrick on 27 October (issue #3715,
+changing #1247): every launcher builds them in its own folder before Play,
+and no release or installer carries them. Before that a step on the shipping
+machine built them and every release shipped them. They are never built in
+the Steam copy, which stays the person's own.
+
+The launcher's Play runs `GeneratedHere.Ensure` (launcher\app\GeneratedHere.cs)
+when `Profile\OwnGame\generated.txt` is missing or stale, and Fix offers the
+same build as a card. A failed build or a body that is not covered stops
+Play with a message saying why. `scripts\mods\Build-Generated.ps1` runs the
+same code (`launcher\app\GeneratedBuild.cs`, compiled by
+`scripts\mods\Generated.ps1`), so a developer can build or check a folder by
+hand. With the game and the launcher closed:
 
 ```
-.\scripts\mods\Build-Generated.ps1 -Channel dev      C:\Thornswood-DevBuild\Game
-.\scripts\mods\Build-Generated.ps1 -Channel main     C:\Thornswood\Game
+.\scripts\mods\Build-Generated.ps1 -Root <a Thornswood install> -NoPause
 ```
 
-Those are the defaults; on a machine that recorded its release folder with
-`Setup-ShipMachine.ps1 -Root`, `-Channel` builds in that one, the folder
-Ship packs (issue #1692).
+The build runs two tools the collection installs, with what
+`records\generated.json` names. The behavior files come from Pandora
+Behaviour Engine+ (Nexus 133232, in the collection from revision 2), with
+exactly the four patches the list names and every other patch off. Nemesis
+cannot do it: its `-generate` never starts its work (in its own source, the
+command line connects to a slot that does not exist), which is why it leaves
+the collection in the same revision. Pandora's output for the current mod
+list was compared with Nemesis' on 29 September: the same 20 behavior and
+character files with the same names in them. The build runs a copy of
+Pandora in its work folder, with a `Settings.json` beside it naming only that
+folder's Data and a work output folder: Pandora 4.4.0 ignores `-o` and
+without that file would take the registry's Skyrim, the Steam copy. It
+refuses if Pandora changed anything in the game folder or its log has an
+error, and needs the .NET 10 runtime on the machine. The bodies come from
+BodySlide's sets (the women's 3BA NeverNude body and the men's HIMBO body
+with boxers, issue #405). Each body is built at its set's own slider defaults
+and never with RaceMenu morph files; it refuses a set or a slider move that
+would shape the breasts, the seat, the genitals or the nipples (issue #1004)
+or take the underwear off, and reads every body in the folder
+(`launcher\app\CoveredBodies.cs`, which `Check-CoveredBodies.ps1` runs too)
+before the record is written. First it gives the folder its own copy of every
+file BodySlide writes in place, because the folder is mostly hard links to
+Vortex's copies and a write through one lands in Vortex's copy and the Steam
+copy too; it refuses, and records nothing, if a tool wrote through a link
+anyway. A tool that sits using no processor time and writing nothing for
+three minutes is stopped. It refuses while Skyrim or a launcher runs from
+that install, and in any folder Vortex deploys into. `-DryRun` checks all of
+it and changes nothing. What it made goes in `Profile\OwnGame\generated.txt`,
+with a sha256 each and what it was built from: the launcher keeps those files
+as Thornswood's through every refresh (`OwnGameKinds.cs`). The record is
+stale when the mod list, a file either tool reads, `records\generated.json`
+or a built file changed since, and the next Play builds them again.
 
-It runs two tools the collection installs, with what `records\generated.json`
-names. The behavior files come from Pandora Behaviour Engine+ (Nexus 133232,
-in the collection from revision 2), with exactly the four patches the list
-names and every other patch off. Nemesis cannot do it: its `-generate` never
-starts its work (in its own source, the command line connects to a slot that
-does not exist), which is why it leaves the collection in the same revision.
-Pandora's output for the current mod list was compared with Nemesis' on
-29 September: the same 20 behavior and character files with the same names in
-them. The script runs a copy of Pandora in its work folder, with a
-`Settings.json` beside it naming only that folder's Data and a work output
-folder: Pandora 4.4.0 ignores `-o` and without that file would take the
-registry's Skyrim, the Steam copy. It refuses if Pandora changed anything in
-the game folder or its log has an error, and needs the .NET 10 runtime on the
-machine. The bodies come from BodySlide's sets (the women's 3BA NeverNude body
-and the men's HIMBO body with boxers, issue #405). Each body is built at its set's own
-slider defaults and never with RaceMenu morph files; it refuses a set or a
-slider move that would shape the breasts, the seat, the genitals or the
-nipples (issue #1004) or take the underwear off, and reads every body it built
-with `Check-CoveredBodies.ps1` before one goes in. First it gives the folder
-its own copy of every file BodySlide writes in place, because the folder is
-mostly hard links to Vortex's copies and a write through one lands in Vortex's
-copy and the Steam copy too; it refuses, and records nothing, if a tool wrote
-through a link anyway. A tool that sits using no processor time and writing
-nothing for three minutes is stopped. It refuses while Skyrim or a launcher
-runs from that install, and in any folder Vortex deploys into. `-DryRun` checks all of it and
-changes nothing. What it made goes in `Profile\OwnGame\generated.txt`, with a
-sha256 each and what it was built from (`scripts\mods\Generated.ps1`): the
-launcher keeps those files as Thornswood's through every refresh
-(`OwnGameKinds.cs`), and `Ship-Rules.ps1` lets the release carry them, though
-Vortex deploys files of the same names. Ship and `Check-ShipReady.ps1` stop
-when that record is missing or stale: the mod list, a file either tool reads,
-`records\generated.json`, or a built file changed since. The fix is to run it
-again.
+`Ship-Rules.ps1` names the built files (`Test-ShipGenerated`) as machine
+files: never packed, never in the installer and never listed as removed, so
+no update deletes what an install built. Ship's "Animation and body files"
+step runs `Build-Generated.ps1 -DryRun` on the ship root and stops both
+channels when the collection installed there could not build them.
 
 **The folder a release is built from (issue #2019).** Each channel's ship root
 (`Where.ps1 ShipRoot` and `ShipRootDev`, recorded by `Setup-ShipMachine.ps1
@@ -2201,8 +2223,8 @@ up to date with Vortex's deployment. Then the recorded client goes in from the
 engine build (`engine\README.md` "One engine"), and the Ship stops with a
 sentence, before anything is built or published, when either step cannot be
 done. Main has its own root (`local\release-main` on One), so no Ship packs
-`C:\Thornswood`. After a refresh that changed the bodies' or the animations'
-sources, `Build-Generated.ps1 -Channel <channel>` runs again, and Ship says so.
+`C:\Thornswood`. Nothing is built in a ship root for a release: the
+animation and body files are every launcher's own (#3715).
 `tests\test-2019-ship-roots.ps1` holds it.
 
 A new root takes the game's own files from the Steam copy only when that copy
@@ -2628,21 +2650,21 @@ Publishing a new revision of the collection is done from Patrick's Nexus account
 
 ### L. Pandora
 
-Pandora Behaviour Engine+ builds the behavior files a release carries. The collection carries Pandora from revision 2. Nemesis cannot generate those files from a command line, which is why the shipping machine uses Pandora.
+Pandora Behaviour Engine+ builds the behavior files. The collection carries Pandora from revision 2. Nemesis cannot generate those files from a command line, which is why the launcher uses Pandora.
 
-Before a Ship, on the machine that publishes:
+Every launcher builds them on its own computer before Play, and no release carries them (#3715). To build or check a folder by hand, with the game and the launcher closed:
 
 ```powershell
-.\scripts\mods\Build-Generated.ps1
+.\scripts\mods\Build-Generated.ps1 -Root <a Thornswood install> -NoPause
 ```
 
-Ship stops while those files are not built for the current mod list. What the script builds is listed in `records\generated.json`. The behavior files are made in Thornswood's own folder, never in the Steam copy. The same rule is in [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite).
+Ship runs it with `-DryRun` and stops when the collection installed in the ship root could not build them. What it builds is listed in `records\generated.json`. The behavior files are made in Thornswood's own folder, never in the Steam copy. The same rule is in [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite).
 
 #### Learn more about Pandora
 
 - Pandora Behaviour Engine+ on the Nexus, the file the collection carries: https://www.nexusmods.com/skyrimspecialedition/mods/133232
 - Which revision added it, and the other mods beside it: [docs/COLLECTION-REVISION-2.md](docs/COLLECTION-REVISION-2.md)
-- The command that runs it: [scripts/mods/Build-Generated.ps1](scripts/mods/Build-Generated.ps1)
+- The code that runs it: [launcher/app/GeneratedBuild.cs](launcher/app/GeneratedBuild.cs), and by hand [scripts/mods/Build-Generated.ps1](scripts/mods/Build-Generated.ps1)
 
 ### M. Creation Kit
 

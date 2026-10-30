@@ -161,7 +161,7 @@ namespace Thornswood
                 // update, the pack is being fetched, and a press in that gap
                 // starts Skyrim on a half extracted build.
                 if (updatePending) { Log("An update is going in. Play comes back when it is done."); return; }
-                if (collectionBarUp) { Log("The collection is not installed yet. Open it from the card above Play, then come back."); return; }
+                if (collectionBarUp) { Log(CollectionHeldLine()); return; }
                 if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done."); return; }
                 if (OwnGameRefreshIfDue()) return;
                 if (feedNotice.Hold != null) { Log(feedNotice.Hold); return; }
@@ -237,7 +237,7 @@ namespace Thornswood
                             "Thornswood", canOpen ? MessageBoxButton.YesNo : MessageBoxButton.OK, MessageBoxImage.Warning);
                         if (canOpen && open == MessageBoxResult.Yes)
                         {
-                            try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                            try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
                             catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                         }
                     }
@@ -301,6 +301,33 @@ namespace Thornswood
                     if (!string.IsNullOrEmpty(mic)) Log("Microphone: " + mic);
                 }
                 catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
+
+                // The behavior files and the covered bodies are built here, on
+                // this computer, from the collection's Pandora and BodySlide
+                // (#3715, GeneratedHere): no release carries them. Only when
+                // the record of the last build is missing or stale, which an
+                // ordinary Play reads and runs nothing for. A build that fails
+                // or a nude body stops Play: the animations would be missing
+                // and the bodies would have no underwear (#405).
+                string notBuilt = null, built = null;
+                Waiting(delegate
+                {
+                    try { built = GeneratedHere.Ensure(SafeLog); }
+                    catch (GeneratedStop ex) { notBuilt = ex.Message; }
+                    catch (Exception ex)
+                    {
+                        Swallow.Note("Shell.Play, the animation and body files", ex);
+                        notBuilt = "Thornswood's animation and body files could not be built (" + ex.Message.TrimEnd('.') + ").";
+                    }
+                });
+                if (built != null) Log(built);
+                if (notBuilt != null)
+                {
+                    Log("Not launching. " + notBuilt);
+                    DrawStatus();
+                    MessageBox.Show(notBuilt + "\n\nThe launcher log on the Diagnostics page has each step it took.", "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
 
                 // The main menu with no Bethesda logo, the notice board's
                 // meshes and the mods' menus with no gold values are made from

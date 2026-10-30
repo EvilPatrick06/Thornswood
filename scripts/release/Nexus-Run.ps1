@@ -15,12 +15,9 @@
   default cloud environment, the same way the box key does. Until then every
   cloud session held THORNSWOOD_NEXUS_API_KEY, the key to his own Nexus
   account, whatever it was working on. Now the key is the secret
-  NEXUS_API_KEY of the GitHub environment "desk" of the private ops
-  repository, EvilPatrick06/Thornswood-Ops, which only main may use
+  NEXUS_API_KEY of the GitHub environment "desk", which only main may use
   (Set-NexusKey.ps1 -ToEnvironment desk puts it there from One), and only
-  nexus-run.yml there reads it. The VPS runners are registered there since
-  this repository went public (#4013), and the run checks out this
-  repository's main.
+  .github\workflows\nexus-run.yml reads it.
 
   WHAT RUNS. scripts\release\nexus-verbs.json is the whole list: the script,
   and every parameter it takes this way. A line outside it is refused here
@@ -58,8 +55,7 @@ param(
     [string]$Line = '',
     [long]$Run = 0,
     [switch]$OnTheRunner,
-    # Where nexus-run.yml and the VPS runners are (#4013).
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -185,7 +181,7 @@ if ($OnTheRunner) {
     $verbs = Read-ThornswoodGateVerbs $VerbsPath
     try { $req = Test-NexusRunLine ([string]$env:NEXUS_LINE) $verbs } catch { Die $_.Exception.Message }
     if (-not $env:THORNSWOOD_NEXUS_API_KEY -and -not $env:THORNSWOOD_NEXUS_STANDIN) {
-        Die 'THORNSWOOD_NEXUS_API_KEY is not set. In nexus-run.yml it is the NEXUS_API_KEY secret of the ops repository''s "desk" environment, which .\scripts\release\Set-NexusKey.ps1 -ToEnvironment desk puts there from One. Nothing was run.'
+        Die 'THORNSWOOD_NEXUS_API_KEY is not set. In nexus-run.yml it is the NEXUS_API_KEY secret of the "desk" environment, which .\scripts\release\Set-NexusKey.ps1 -ToEnvironment desk puts there from One. Nothing was run.'
     }
     . (Join-Path $Here 'Nexus.ps1')
     $recipient = ([string]$env:NEXUS_RECIPIENT).Trim()

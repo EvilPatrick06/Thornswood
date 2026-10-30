@@ -118,7 +118,7 @@ function Run-Block($settings, [hashtable]$light, $loads, [hashtable]$stage = @{}
 function Settings([string[]]$names, [string]$startAt) {
     return [ordered]@{
         port = 7787; thornswoodVoicePort = 7789; thornswoodServer = 'dev'; thornswoodRequirePass = $true
-        equipmentSlotCheckEnabled = $false; equipmentSpellCheckEnabled = $false; equipmentInventoryCheckEnabled = $false
+        equipmentSlotCheckEnabled = $false; equipmentSpellCheckEnabled = $false; equipmentInventoryCheckEnabled = $false; equipItemAttemptEnabled = $true
         npcAllowCrimeFaction = $true; npcAllowEssential = $true
         loadOrder = @($names | ForEach-Object { 'C:/Thornswood-Server-Dev/plugins/' + $_ })
         startPoints = @([ordered]@{ pos = @(1.0, 2.0, 3.0); worldOrCell = $startAt; angleZ = 90 })

@@ -23,11 +23,9 @@
        New-NexusRevision's download each run, print nothing of the script's
        output into the log, and seal it to the session's key; no key stops
        it before anything runs.
-    5. nexus-run.yml is not in this repository but in the private ops
-       repository, with the VPS runners (#4013), and Nexus-Run.ps1 and
-       Set-NexusKey.ps1 -ToEnvironment go there; the ops repository's
-       tests\test-box-workflows.ps1 holds its shape, and that the job
-       outlasts the longest verb.
+    5. nexus-run.yml: on GitHub's Windows runner (#4013), main-only environment, the key in one step's
+       environment, no input pasted into a script, actions pinned by SHA,
+       the output sealed and kept a day.
     6. Set-NexusKey -ToEnvironment holds the environment to main alone and
        sends the key on gh's standard input; Nexus.ps1 no longer tells a
        cloud session to hold the key.
@@ -193,7 +191,7 @@ function RunnerHalf([string]$line, [hashtable]$envs) {
 }
 
 $r = RunnerHalf 'Set-NexusKey' @{}
-Yes 'with no key and no stand-in the runner''s half stops before anything runs' ($r.Code -eq 1 -and $r.Log -match 'NEXUS_API_KEY secret of the ops repository''s "desk" environment' -and -not $r.Sealed)
+Yes 'with no key and no stand-in the runner''s half stops before anything runs' ($r.Code -eq 1 -and $r.Log -match 'NEXUS_API_KEY secret of the "desk" environment' -and -not $r.Sealed)
 $r = RunnerHalf 'Ship -Channel main' @{ THORNSWOOD_NEXUS_API_KEY = 'not-a-real-key' }
 Yes 'a line outside the file is refused on the runner too' ($r.Code -eq 1 -and $r.Log -match 'STOP' -and -not $r.Sealed)
 
@@ -240,11 +238,19 @@ else {
     Yes '  and a file Nexus does not have stops it before the script runs' ($r.Code -eq 1 -and $r.Out -match 'STOP\. .*830999' -and $r.Log -match 'REFUSED')
 }
 
-# ---- 5. nexus-run.yml, in the ops repository (#4013) ----------------------------
-Yes 'nexus-run.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Repo, '.github', 'workflows', 'nexus-run.yml'))))
-$nrText = Text 'scripts/release/Nexus-Run.ps1'
-Yes '  Nexus-Run.ps1 starts it in the private ops repository, where the runners are registered' ($nrText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $nrText.Contains("`$Workflow = 'nexus-run.yml'"))
-Yes '  and Set-NexusKey.ps1 -ToEnvironment puts the key in that repository''s environment' ((Text 'scripts/release/Set-NexusKey.ps1').Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'"))
+# ---- 5. nexus-run.yml -------------------------------------------------------------
+$wf = (Text '.github/workflows/nexus-run.yml') -replace "`r`n", "`n"
+Yes 'nexus-run.yml is started by hand and by nothing else' ($wf -match '(?m)^  workflow_dispatch:\s*$' -and @([regex]::Matches(([regex]::Match($wf, '(?ms)^on:\n(.*?)^\S').Groups[1].Value), '(?m)^  [a-z_]+:')).Count -eq 1)
+Yes '  on GitHub''s Windows runner, never the box (#4013), in the environment desk, from main only, reading the repository only' ($wf -match '(?m)^    runs-on: windows-latest$' -and $wf -notmatch 'self-hosted|thornswood-' -and $wf -match "(?m)^    if: github\.ref == 'refs/heads/main'$" -and $wf -match '(?m)^    environment: desk$' -and $wf -match '(?m)^permissions:\n  contents: read$')
+Yes '  the key in one step''s environment, and nowhere else' (@([regex]::Matches($wf, 'secrets\.')).Count -eq 1 -and $wf.Contains('THORNSWOOD_NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}'))
+$runBlocks = @([regex]::Matches($wf, '(?ms)^\s+run: \|\s*\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
+Yes '  no input is pasted into a script; they reach it through the environment' (-not @($runBlocks | Where-Object { $_ -match '\$\{\{' }).Count)
+Yes '  every action pinned by a full commit SHA' (-not @([regex]::Matches($wf, 'uses: [^\s@]+@(?![0-9a-f]{40}\b)')).Count)
+Yes '  its output leaves the runner sealed, kept a day' ($wf.Contains('name: nexus-run-sealed') -and $wf.Contains('retention-days: 1'))
+Yes '  one run at a time' ($wf -match '(?m)^  group: nexus-run$' -and $wf -match '(?m)^  cancel-in-progress: false$')
+$longest = (@($verbs.verbs.PSObject.Properties | ForEach-Object { [int]$_.Value.timeoutMinutes }) | Measure-Object -Maximum).Maximum
+$tm = [regex]::Match($wf, '(?m)^    timeout-minutes: (\d+)$')
+Yes "  and the job outlasts the longest script ($longest minutes)" ($tm.Success -and [int]$tm.Groups[1].Value -gt $longest)
 
 # ---- 6. Set-NexusKey -ToEnvironment, and where the key is said to be ------------------
 $sk = Text 'scripts/release/Set-NexusKey.ps1'

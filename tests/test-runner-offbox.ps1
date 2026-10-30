@@ -87,6 +87,7 @@ try {
     Yes '  Defender keeps scanning its folder' ($r.Text -match '(?m)^if \(\$false\) \{\s*$')
     Yes '  the stand-in registration token is in none of the scripts (it goes on standard input)' ($r.Text -notmatch 'DRY-RUN-TOKEN-NOT-REAL')
     Yes '  the install script is marked as taking a secret on standard input' ($r.Text -match 'with a secret on standard input')
+    Yes '  dry-run profile recovery names an approved restart of THIS PC, never a VPS script (#4048)' ($r.Text -match 'approved local PC restart' -and $r.Text -notmatch 'Set-TimeWait.ps1 -Restart')
     Yes '  GitHub was never asked (the gh on PATH was not called)' (-not (Test-Path -LiteralPath $ghCalled))
 
     $r = Dry @('-OffBox', '-DefenderSkip', '-AlsoDeny', 'D:\Somewhere Else')
@@ -128,14 +129,16 @@ try {
     Yes '  it clears the broker''s .runner_migrated and .credentials_migrated as well, and stops when any of the old configuration is left' ($r.Text -match [regex]::Escape("@('.runner', '.runner_migrated', '.credentials', '.credentials_migrated', '.credentials_rsaparams')") -and $r.Text -match [regex]::Escape("throw ('the old configuration is still there: '"))
     Yes '  and no stop is passed over silently' ($r.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue')
     Yes '  both come before the account''s password changes, so a refusal leaves the old service able to log on' ($r.Text.IndexOf("Assert-RunnerIdle `$root") -ge 0 -and $r.Text.IndexOf("Assert-RunnerIdle `$root") -lt $r.Text.IndexOf('Set-LocalUser -Name') -and $r.Text.IndexOf("Stop-RunnerHere `$root") -lt $r.Text.IndexOf('Set-LocalUser -Name'))
+    Yes '  the install names its service before anything reads it, so the read back is that one service and not every service on the box' ($r.Text -match "(?m)^\`$svc = 'actions\.runner\.[^']+thornswood-vps'\s*$" -and $r.Text.IndexOf("`$svc = 'actions.runner.") -lt $r.Text.IndexOf("`$s = Get-Service -Name `$svc"))
     Yes '  and a process list that cannot be read stops them, never reads as empty' ($r.Text -match [regex]::Escape('@(Get-CimInstance Win32_Process -EA Stop | Where-Object'))
     $rm = Dry @('-Number', '3', '-Remove')
     Yes '  -Remove refuses a runner running a job before GitHub is told, and stops it the same way' ($rm.Text -match "(?m)^Assert-RunnerIdle 'C:\\Thornswood-Runner3'" -and $rm.Text -match "(?m)^Stop-RunnerHere 'C:\\Thornswood-Runner3' " -and $rm.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue' -and $rm.Text.IndexOf('Assert-RunnerIdle ''C:\Thornswood-Runner3''') -lt $rm.Text.IndexOf('config.cmd remove'))
-    Yes '  the VPS runner keeps its label, name and folder, runner 1 takes builds (#2994), no pull request builds (#4010) and no check label (#4033)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build' --work" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    Yes '  remote VPS recovery retains VPS restart guidance (#4048)' ($r.Text -match 'Restart the VPS \(scripts\\vps\\Set-TimeWait.ps1 -Restart\)')
+    Yes '  the VPS runner keeps its label, name and folder, runner 1 takes builds (#2994) and checks signed drafts (#3956), but no pull request builds (#4010)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'(?!,)" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
     $r2 = Dry @('-Number', '2')
-    Yes '  runner 2 takes builds and pull request builds (#4010), and no check label (#4033)' ($r2.Code -eq 0 -and $r2.Text -match "--name 'thornswood-vps-2' --labels 'thornswood-vps,thornswood-build,thornswood-pr-build' --work")
+    Yes '  runner 2 takes builds, pull request builds and checks (#4010)' ($r2.Code -eq 0 -and $r2.Text -match "--name 'thornswood-vps-2' --labels 'thornswood-vps,thornswood-build,thornswood-pr-build,thornswood-check'(?!,)")
     $r = Dry @('-Number', '4')
-    Yes "  runner 4, the light one, gets the VPS label alone: no build label, and no check label since #4033 (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-4' --labels 'thornswood-vps' --work")
+    Yes "  runner 4, the light one, takes no builds and takes the check label's jobs (#3956, #4914, exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-4' --labels 'thornswood-vps,thornswood-check'(?!,)")
     # #2161, 21 Oct: the record's no-reach folders outside C:\Thornswood-* are denied on the box too.
     $vpsAlso = "@('C:\ProgramData\ssh', 'C:\Users\Administrator')"
     Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' $vpsAlso") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
@@ -148,7 +151,7 @@ try {
     # #4033: runner 3 signed until #4013; now it is a light runner like any other.
     $r = Dry @('-Number', '3')
     Yes '  runner 3 gets the VPS label alone, no signing label and no build label (#4033)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-3' --labels 'thornswood-vps' --work")
-    Yes '  and Install-Runner.ps1 reads no signing or check record' ([IO.File]::ReadAllText($script) -notmatch 'sign-runners|check-runners')
+    Yes '  and Install-Runner.ps1 reads no signing record' ([IO.File]::ReadAllText($script) -notmatch 'sign-runners')
     Yes '  GitHub still never asked' (-not (Test-Path -LiteralPath $ghCalled))
 
     # ---- Close-RunnerAccount on scratch folders, the off-box filter ---------

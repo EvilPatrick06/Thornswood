@@ -41,11 +41,14 @@
 //      from this repository's main through the App, with a read-only token
 //      for this repository alone, never from the caller; installation-repos
 //      (#4013) lists the repositories the App is on with a token that reads
-//      metadata alone, and changes nothing; and the log holds no token. The
-//      About box the same way, with a token for this repository alone: a
-//      check names what differs and writes nothing, a run sets it in one
-//      PATCH and one PUT and reads it back, a second run changes nothing,
-//      and a bad record on main stops it;
+//      metadata alone, and changes nothing; settings (#3534) only reads this
+//      repository's, with a read-only token for it alone that asks for the
+//      secret, variable and environment names only when the App holds them,
+//      says which it could not read and why, and never hands back a value;
+//      and the log holds no token. The About box the same way, with a token
+//      for this repository alone: a check names what differs and writes
+//      nothing, a run sets it in one PATCH and one PUT and reads it back, a
+//      second run changes nothing, and a bad record on main stops it;
 //   5. the App's setup: no armed setup, a wrong or expired state, and an App
 //      already held are the plain 404; the armed page sends the manifest
 //      (administration write, contents read, no webhook, private) to GitHub
@@ -239,11 +242,23 @@ const gh = {
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   readToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   aboutToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
+  settingsToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   installed: true,
   repoToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   installRepos: ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'],
   conversion: null,
+  instPerms: { administration: 'write', contents: 'read', metadata: 'read' },
+  settings: {
+    '/repos/EvilPatrick06/Thornswood/actions/permissions': { enabled: true, allowed_actions: 'all', sha_pinning_required: false },
+    '/repos/EvilPatrick06/Thornswood/actions/permissions/workflow': { default_workflow_permissions: 'read', can_approve_pull_request_reviews: false },
+    '/repos/EvilPatrick06/Thornswood/actions/permissions/access': { access_level: 'none' },
+    '/repos/EvilPatrick06/Thornswood/actions/permissions/artifact-and-log-retention': { days: 90, maximum_allowed_days: 400 },
+    '/repos/EvilPatrick06/Thornswood/actions/permissions/fork-pr-workflows-private-repos': { run_workflows_from_fork_pull_requests: false, send_write_tokens_to_workflows: false, send_secrets_and_variables: false, require_approval_for_fork_pr_workflows: false },
+  },
+  repoNames: { secrets: ['CLOUDFLARE_TURNSTILE_TOKEN'], variables: ['BUILD_RUNNER'] },
+  envNames: { board: { secrets: ['BOARD_TOKEN'], variables: [] }, notices: { secrets: ['NOTICE_KEY_B64'], variables: [] } },
 };
+gh.records['github-settings.json'] = { environments: { board: {}, notices: {}, 'bad name/../x': {} } };
 const appKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const appKeyPem = appKey.privateKey.export({ type: 'pkcs1', format: 'pem' });
 
@@ -269,20 +284,22 @@ function standIn(req, res) {
     const asAbout = () => req.headers.authorization === 'Bearer ' + gh.aboutToken;
     const P = u.pathname;
     if (P === '/jwks') return send(200, JWKS);
-    if (P === '/repos/EvilPatrick06/Thornswood/installation' || P === '/repos/EvilPatrick06/Thornswood-Ops/installation') return !asApp() ? send(401, { message: 'Bad credentials' }) : gh.installed ? send(200, { id: 77 }) : send(404, { message: 'Not Found' });
+    if (P === '/repos/EvilPatrick06/Thornswood/installation' || P === '/repos/EvilPatrick06/Thornswood-Ops/installation') return !asApp() ? send(401, { message: 'Bad credentials' }) : gh.installed ? send(200, { id: 77, permissions: gh.instPerms }) : send(404, { message: 'Not Found' });
     if (P === '/app/installations/77/access_tokens' && req.method === 'POST') {
       if (!asApp()) return send(401, { message: 'Bad credentials' });
       const perms = JSON.stringify((body && body.permissions) || {});
       if (body && body.repositories === undefined) return perms === '{"metadata":"read"}' ? send(201, { token: gh.repoToken }) : send(422, { message: 'not a metadata token' });
       const repos = JSON.stringify((body && body.repositories) || []);
       if (repos === '["Thornswood-Ops"]') return perms === '{"administration":"write"}' ? send(201, { token: gh.instToken }) : send(422, { message: 'not a runner token' });
-      if (repos === '["Thornswood"]') return perms === '{"contents":"read"}' ? send(201, { token: gh.readToken }) : perms === '{"administration":"write","contents":"read"}' ? send(201, { token: gh.aboutToken }) : send(422, { message: 'no such permissions' });
+      if (repos === '["Thornswood"]') return perms === '{"contents":"read"}' ? send(201, { token: gh.readToken }) : perms === '{"administration":"write","contents":"read"}' ? send(201, { token: gh.aboutToken }) :
+        /^\{"administration":"read","contents":"read"/.test(perms) && Object.values(body.permissions).every(v => v === 'read') ? send(201, { token: gh.settingsToken }) : send(422, { message: 'no such permissions' });
       return send(422, { message: 'no such repositories' });
     }
     if (P === '/installation/repositories') return req.headers.authorization === 'Bearer ' + gh.repoToken ? send(200, { total_count: gh.installRepos.length, repositories: gh.installRepos.map(n => ({ full_name: n })) }) : send(401, { message: 'Bad credentials' });
-    if (P.startsWith('/repos/EvilPatrick06/Thornswood/contents/') && !asRead()) return send(401, { message: 'Bad credentials' });
+    if (P.startsWith('/repos/EvilPatrick06/Thornswood/contents/') && !asRead() && req.headers.authorization !== 'Bearer ' + gh.settingsToken) return send(401, { message: 'Bad credentials' });
     if ((P === '/repos/EvilPatrick06/Thornswood' || P === '/repos/EvilPatrick06/Thornswood/topics') && !asAbout()) return send(401, { message: 'Bad credentials' });
     if (P.startsWith('/repos/EvilPatrick06/Thornswood-Ops/actions/') && !asInst()) return send(401, { message: 'Bad credentials' });
+    if (P.startsWith('/repos/EvilPatrick06/Thornswood/actions/') || P.startsWith('/repos/EvilPatrick06/Thornswood/environments/')) { if (req.headers.authorization !== 'Bearer ' + gh.settingsToken) return send(401, { message: 'Bad credentials' }); }
     if (P === '/repos/EvilPatrick06/Thornswood/contents/records') {
       if (u.searchParams.get('ref') !== 'main') return send(404, { message: 'No commit found for the ref' });
       return send(200, Object.keys(gh.records).concat(['README.md']).map(n => ({ type: 'file', name: n })));
@@ -294,6 +311,16 @@ function standIn(req, res) {
     if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'GET') return send(200, { names: gh.topics });
     if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'PUT') { gh.topics = body.names.slice(); return send(200, { names: gh.topics }); }
     if (P === '/repos/EvilPatrick06/Thornswood-Ops/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
+    // This repository's own runners, which the settings read lists.
+    if (P === '/repos/EvilPatrick06/Thornswood/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
+    if (req.method === 'GET' && gh.settings[P]) return send(200, gh.settings[P]);
+    m = /^\/repos\/EvilPatrick06\/Thornswood\/(?:environments\/([^/]+)\/)?actions\/(secrets|variables)$|^\/repos\/EvilPatrick06\/Thornswood\/environments\/([^/]+)\/(secrets|variables)$/.exec(P);
+    if (m && req.method === 'GET') {
+      const env = m[3] ? decodeURIComponent(m[3]) : '';
+      const kind = m[2] || m[4];
+      const names = env ? ((gh.envNames[env] || {})[kind] || []) : (gh.repoNames[kind] || []);
+      return send(200, { total_count: names.length, [kind]: names.map(n => ({ name: n, value: kind === 'variables' ? 'the value' : undefined })) });
+    }
     m = /^\/repos\/EvilPatrick06\/Thornswood-Ops\/actions\/runners\/(\d+)\/labels(?:\/(.+))?$/.exec(P);
     if (m) {
       const r = gh.runners.find(x => x.id === Number(m[1]));
@@ -478,7 +505,39 @@ function start(stateDir, ghPort) {
     await ask4(bearer(tokenSeen));
     const log = svc.log();
     yes('the log names the run and what changed', /run 4242 \(workflow_dispatch by EvilPatrick06\)/.test(log));
-    yes('  and never a token or the key', !log.includes(tokenSeen.split('.')[2]) && !log.includes(gh.instToken) && !log.includes(gh.repoToken) && !log.includes(gh.readToken) && !log.includes(gh.aboutToken) && !log.includes('PRIVATE KEY'));
+    yes('  and never a token or the key', !log.includes(tokenSeen.split('.')[2]) && !log.includes(gh.instToken) && !log.includes(gh.repoToken) && !log.includes(gh.readToken) && !log.includes(gh.aboutToken) && !log.includes(gh.settingsToken) && !log.includes('PRIVATE KEY'));
+
+    // ---- settings (#3534): read only ----
+    console.log('the settings read');
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'settings' });
+    const reads = () => gh.calls.filter(c => c.method !== 'GET' && !/access_tokens$/.test(c.path));
+    yes('settings answers 200 and makes no call but GETs and the token', r.status === 200 && r.json.ok && reads().length === 0);
+    let stok = gh.calls.find(c => /access_tokens$/.test(c.path));
+    yes('  its token is for Thornswood alone, administration and contents read only, while the App holds no more',
+      stok && JSON.stringify(stok.body.repositories) === '["Thornswood"]' && JSON.stringify(stok.body.permissions) === '{"administration":"read","contents":"read"}');
+    const rd = (r.json && r.json.readings) || {};
+    yes('  it reads the Actions settings, the workflow token, sharing, retention and fork pull requests',
+      rd.actions && rd.actions.allowed_actions === 'all' && rd.workflow_token.default_workflow_permissions === 'read' && rd.sharing.access_level === 'none' &&
+      rd.retention.days === 90 && rd.fork_pull_requests.send_secrets_and_variables === false);
+    yes('  and the runners, with their labels', Array.isArray(rd.runners) && rd.runners.length === 4 && rd.runners[0].labels.includes('thornswood-vps'));
+    yes('  says the secret and variable names are not read, naming the permission, and asks for none of them',
+      !rd.secrets && !rd.variables && r.json.unread.some(l => /^secrets: the App has no Secrets permission/.test(l)) &&
+      r.json.unread.some(l => /^variables: the App has no Variables permission/.test(l)) && r.json.unread.some(l => /Environments permission/.test(l)) &&
+      !gh.calls.some(c => /secrets|variables/.test(c.path)));
+    yes('  the environments are the record\'s on main, a name GitHub could not have left out', JSON.stringify(Object.keys(rd.environments)) === '["board","notices"]');
+    gh.instPerms = { administration: 'write', contents: 'read', metadata: 'read', secrets: 'read', actions_variables: 'read', environments: 'read' };
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'settings' });
+    stok = gh.calls.find(c => /access_tokens$/.test(c.path));
+    yes('with the App holding them, the token asks for secrets, variables and environments read too, and nothing more',
+      stok && JSON.stringify(stok.body.permissions) === '{"administration":"read","contents":"read","secrets":"read","actions_variables":"read","environments":"read"}');
+    const rd2 = r.json.readings;
+    yes('  and the names are read: the repository\'s and each environment\'s', r.status === 200 && JSON.stringify(rd2.secrets) === '["CLOUDFLARE_TURNSTILE_TOKEN"]' &&
+      JSON.stringify(rd2.variables) === '["BUILD_RUNNER"]' && JSON.stringify(rd2.environments.board.secrets) === '["BOARD_TOKEN"]' && r.json.unread.length === 0);
+    yes('  a variable\'s value never comes back, only its name', !r.text.includes('the value'));
+    yes('  and still nothing but GETs', reads().length === 0);
+    gh.instPerms = { administration: 'write', contents: 'read', metadata: 'read' };
 
     // ---- 5. setup ----
     console.log('the App\'s setup');
@@ -498,8 +557,8 @@ function start(stateDir, ghPort) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write and contents read only, no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read and secrets, variables and environments read only, no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"read"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
     yes('  and the page is neither kept nor passed on', /no-store/.test(r.headers['cache-control'] || '') && r.headers['referrer-policy'] === 'no-referrer');
 

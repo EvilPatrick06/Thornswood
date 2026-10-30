@@ -466,10 +466,10 @@ jobs:
   # machine that checks holds no signing client, no signing.json and no
   # Azure token and is not the one that signed: what it accepts it accepts
   # on the files alone, the way an installed launcher does. No VPS runner
-  # checks it any more (#4013), and #4033 took the check runners' record and
-  # label off with the signing runner's. contents:
-  # write only because a draft release is visible to nobody without push
-  # access.
+  # checks it any more (#4013); the check runners' label is the nightly's
+  # bot harnesses' alone now (#4914), and #4033 took the signing runner's
+  # off. contents: write only because a draft release is visible to nobody
+  # without push access.
   verify:
     name: Check the signed draft on a second machine
     needs: launcher

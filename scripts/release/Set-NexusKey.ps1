@@ -18,9 +18,8 @@
   NOT IN A CLOUD SESSION (#2841, Patrick's answer A, 27 Oct 2026). The key
   left the default cloud environment: a cloud session runs these scripts
   through scripts\release\Nexus-Run.ps1, whose workflow (nexus-run.yml) has
-  the key as the secret NEXUS_API_KEY of the GitHub environment "desk" of the
-  private ops repository, where nexus-run.yml and the VPS runners are
-  (#4013), which only main may use. -ToEnvironment desk puts it there from One, once the
+  the key as the secret NEXUS_API_KEY of the GitHub environment "desk", which
+  only main may use. -ToEnvironment desk puts it there from One, once the
   environment is there for main alone (Grant-BoxAccess.ps1 -Name desk -Deploy
   -MakeKey -ToEnvironment desk makes it), after checking the key works. The
   key goes to gh secret set on its standard input, never on a command line
@@ -43,8 +42,7 @@
 
 .PARAMETER GitHubRepo
   The repository whose environment -ToEnvironment writes to.
-  EvilPatrick06/Thornswood-Ops, where nexus-run.yml is (#4013), unless said
-  otherwise.
+  EvilPatrick06/Thornswood unless said otherwise.
 
 .PARAMETER NoPause
   Does not wait for Enter at the end or on a stop.
@@ -53,7 +51,7 @@
 param(
   [switch]$Check,
   [string]$ToEnvironment = '',
-  [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops',
+  [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
   [switch]$NoPause
 )
 

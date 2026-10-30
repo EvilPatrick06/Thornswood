@@ -86,6 +86,8 @@ $setText = [IO.File]::ReadAllText($set)
 Yes '  Set-BuildRunners.ps1 starts it in the private ops repository, where the runners are registered' ($setText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $setText.Contains("`$workflow = 'github-admin.yml'"))
 $aboutText = [IO.File]::ReadAllText((Join-Path $repo 'scripts/deploy/Set-RepoAbout.ps1'))
 Yes '  and Set-RepoAbout.ps1 starts it there too' ($aboutText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $aboutText.Contains("`$workflow = 'github-admin.yml'"))
+$settingsText = [IO.File]::ReadAllText((Join-Path $repo 'scripts/deploy/Check-GitHubSettings.ps1'))
+Yes '  and Check-GitHubSettings.ps1 starts it there, reading this repository''s settings (#3534)' ($settingsText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $settingsText.Contains("`$workflow = 'github-admin.yml'") -and $settingsText.Contains("`$Repo = 'EvilPatrick06/Thornswood'"))
 
 # ---- 2. the GitHub half ------------------------------------------------------
 Write-Host ''; Write-Host 'the GitHub half'

@@ -553,7 +553,7 @@
             "by": "",
             "cells": {
               "s2a": "**Anyone with the address can walk in**",
-              "s2b": "There is no `sPassword` in server-settings.json, nothing in gamemode.js reads a password, and SkyMP has no join screen. The field only ever existed because the old multiplayer mod had one. So `192.135.112.23:7777` is open to any SkyMP client.\n\nThe launcher asking Discord does not fix this. That only stops people using your launcher. A stranger with a stock client goes straight past it.",
+              "s2b": "There is no `sPassword` in server-settings.json, nothing in gamemode.js reads a password, and SkyMP has no join screen. The field only ever existed because the old multiplayer mod had one. So `play.thornswood.net:7777` is open to any SkyMP client.\n\nThe launcher asking Discord does not fix this. That only stops people using your launcher. A stranger with a stock client goes straight past it.",
               "s2c": "**Today.** Firewall 7777 and 3000 to the addresses that should reach them. I can write it.\n\n**Properly.** A check in gamemode.js on connect against the same ticket the site issues. That is the one that makes a ban bite."
             }
           },
@@ -1086,7 +1086,7 @@
             "cells": {
               "c1bot": "**Python on the VPS**",
               "c2bot": "The bot is Python, the site is Node, and the VPS only has Node. The installer checks first and stops rather than half doing it.",
-              "c3bot": "```\nssh Administrator@192.135.112.23\nwinget install --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements\n```\n\nSkip this if the installer says Python is already there."
+              "c3bot": "```\nssh Administrator@play.thornswood.net\nwinget install --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements\n```\n\nSkip this if the installer says Python is already there."
             }
           },
           {
@@ -1367,7 +1367,7 @@
             "by": "",
             "cells": {
               "c58g": "The VPS",
-              "c59g": "ssh Administrator@192.135.112.23"
+              "c59g": "ssh Administrator@play.thornswood.net"
             }
           }
         ]

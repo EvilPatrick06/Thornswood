@@ -144,7 +144,7 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
     $name = $wf.Name
     $jobLines = @(if ($top.Contains('jobs')) { Get-Block $lines $top['jobs'].At 0 })
     $jobKeys = Get-Keys $jobLines 2
-    $prodJobs = @(); $sameRepoAll = $true
+    $prodJobs = @(); $sameRepoAll = $true; $privateOnlyAll = $true
     foreach ($jk in $jobKeys.Keys) {
         $jl = @(Get-Block $jobLines $jobKeys[$jk].At 2)
         $k = Get-Keys $jl 4
@@ -155,6 +155,13 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
             $ro = @(Get-List $runsOn @(Get-Block $jl $k['runs-on'].At 4) | ForEach-Object { $_.ToLowerInvariant() })
             if ($ro.Count) { $labels = $ro }
         }
+        # Only while the repository is private (#3685): the box's labels inside
+        # the expression while private, a GitHub-hosted runner once public.
+        $gated = $false
+        if ($k.Contains('runs-on') -and $runsOn -match '^\$\{\{\s*github\.event\.repository\.private\s*&&\s*fromJSON\(''\[(.*?)\]''\)\s*\|\|\s*''[^'']+''\s*\}\}$') {
+            $labels = @($Matches[1] -split ',' | ForEach-Object { $_.Trim().Trim('"').ToLowerInvariant() } | Where-Object { $_ })
+            $gated = $true
+        }
         $cond = $(if ($k.Contains('if')) { $k['if'].Value } else { '' })
         $anyRunner = $k.Contains('runs-on') -and $null -eq $labels
         # The records' labels reach the box too: its runners carry them beside
@@ -164,6 +171,7 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
         $onProd = $anyRunner -or ($labels -and (@($labels | Where-Object { @((@($r.productionLabel) + $boxLabels) | ForEach-Object { ([string]$_).ToLowerInvariant() }) -contains $_ }).Count -gt 0))
         if ($onProd) {
             $prodJobs += $jk
+            if (-not $gated) { $privateOnlyAll = $false }
             if ($cond -notmatch 'github\.event\.pull_request\.head\.repo\.full_name == github\.repository') { $sameRepoAll = $false }
         }
     }
@@ -171,10 +179,30 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
     # names this repository as the head, so a fork never does (Patrick, 12 Oct
     # 2026: the VPS backs up pull request builds too, same-repository only).
     # pull_request_target is never allowed there.
+    #
+    # Once the repository is public (#3685) that condition is no guard: a pull
+    # request runs the workflow files of its own branch, so a fork can carry
+    # one with no condition, or a new one, that names the production label.
+    # Then no pull request job may be on the production label at all while
+    # a runner is still registered to the repository (Patrick's A of 26 Oct
+    # 2026: the runners move to the private ops repository).
     $onProd = $prodJobs.Count -gt 0
     $sameRepo = $onProd -and $sameRepoAll
-    $prOnProd = $onProd -and ($triggers -contains 'pull_request_target' -or ($triggers -contains 'pull_request' -and -not $sameRepo))
-    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($sameRepo) { '; same-repository pull requests only' } else { '' })) (-not $prOnProd)
+    $public = $f.github -and -not $f.github.private -and @($f.github.runners).Count -gt 0
+    $prOnProd = $onProd -and ($triggers -contains 'pull_request_target' -or ($triggers -contains 'pull_request' -and ($public -or -not $sameRepo)))
+    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($sameRepo) { '; same-repository pull requests only' } else { '' }) + $(if ($onProd -and $public -and $triggers -contains 'pull_request') { '; the repository is public' } else { '' })) (-not $prOnProd)
+    # Events anyone can cause on a public repository, with no write access:
+    # opening, closing or commenting on their own issue, a discussion, a
+    # fork, a star, a review on a pull request. A job they start may reach
+    # the production label only while the repository is private, when only
+    # collaborators can cause them (#3685). The workflow file comes from the
+    # default branch for these, so the condition in it holds.
+    $privateOnly = $onProd -and $privateOnlyAll
+    $strangerEvents = @('issues', 'issue_comment', 'discussion', 'discussion_comment', 'fork', 'watch', 'pull_request_review', 'pull_request_review_comment')
+    $byStrangers = @($triggers | Where-Object { $strangerEvents -contains $_ })
+    if ($byStrangers.Count) {
+        Row 'workflow' "$name started by anyone" "not $($r.productionLabel) once public" ("triggers " + ($byStrangers -join ',') + $(if (-not $onProd) { '; not on ' + $r.productionLabel } elseif ($privateOnly) { "; on $($r.productionLabel) only while private" } else { "; on $($r.productionLabel)" })) (-not $onProd -or $privateOnly)
+    }
     if ($triggers -contains 'pull_request_target') { Row 'workflow' "$name pull_request_target" 'not used' 'used' $false }
     Row 'workflow' "$name token" 'permissions set per workflow, no write-all' $(if ($perm) { $perm.Trim() } else { 'not set (repository default)' }) ([bool]$perm -and $perm -notmatch 'write-all')
 }
@@ -183,6 +211,9 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
 if ($f.github) {
     $g = $f.github
     Row 'github' 'visibility' 'private' $(if ($g.private) { 'private' } else { 'public' }) ([bool]$g.private)
+    # A public repository may have no self-hosted runner at all: any fork's
+    # pull request can carry a workflow that names one (#3685).
+    if (-not $g.private) { Row 'github' 'self-hosted runners on a public repository' 'none' ([string]@($g.runners).Count) (@($g.runners).Count -eq 0) }
     if ($g.forkPr) { Row 'github' 'fork pull requests run workflows' 'no' $(if ($g.forkPr.run_workflows_from_fork_pull_requests) { 'yes' } else { 'no' }) (-not $g.forkPr.run_workflows_from_fork_pull_requests) }
     Row 'github' 'default workflow token' 'read' ([string]$g.workflowToken.default_workflow_permissions) ($g.workflowToken.default_workflow_permissions -eq 'read')
     Row 'github' 'collaborators who can push and so run code on the runners' 'known and few' ([string]$g.collaborators) $true

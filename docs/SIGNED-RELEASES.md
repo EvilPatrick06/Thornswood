@@ -414,11 +414,12 @@ cannot build a release, a Ship on One signs the unsigned launcher on
 download (#921). A `v` tag push's `handoff` job, which starts main's run,
 runs on GitHub's runner too, so the box takes no part in a release. #4033
 took off what the job had left behind: runner 3's `thornswood-sign` label
-and the check runners' `thornswood-check` (the box's admin service now
-takes off any label no record names), `records/sign-runners.json` and
-`records/check-runners.json`, the signing runner's job-started hook, the
+(the box's admin service now takes off any label no record names),
+`records/sign-runners.json`, the signing runner's job-started hook, the
 signing hosts in runner 3's outbound rules, and Bootstrap-VPS.ps1's .NET
 runtime for Microsoft's signing client, which nothing else on the box runs.
+The check runners' `thornswood-check` stays: since #4914 the nightly's bot
+harnesses ask for it while the repository is private.
 
 ## 8. Decisions (Patrick)
 

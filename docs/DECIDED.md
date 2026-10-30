@@ -279,6 +279,23 @@ link, and the old line goes.
 - **Djinn's one-line crash log (fork #89) rides the next engine pin.** 22
   Oct 2026,
   [#2025](https://github.com/EvilPatrick06/Thornswood/issues/2025#issuecomment-6335269045).
+- **The launcher and the installer are rebuilt on Avalonia and .NET 10**
+  (#4063). 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The launcher is Windows only;** no Linux or Steam Deck launcher is
+  planned. 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The launcher's download size is no limit on its stack.** 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The install is done in compiled code, and Velopack installs and updates
+  the launcher;** `Setup-Thornswood.ps1`, `Setup.bat` and `Install.bat`
+  retire (#4064). 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The game files update through the same Velopack channel as the
+  launcher,** with the feed's release record and its checks (the sha256 of
+  every file, the signed manifest, the baseline record) rebuilt on top of
+  it, not dropped (#4065). 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
 
 ## Work and crafting
 

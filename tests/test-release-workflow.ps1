@@ -158,11 +158,11 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $Workflow
 Yes '  and that script is in the repository' (Test-Path -LiteralPath (Join-Path $repoRoot 'scripts/release/Test-ReleaseFiles.ps1'))
 
 # ---- no signing or check runner (#4033) ---------------------------------------
-# No job here asks for a runner's signing or check label since #4013, so the
-# records that gave runners them, and runner 3's firewall openings, went too.
-foreach ($n in 'sign-runners.json', 'check-runners.json') {
-    Yes "no records/$n`: no runner of the box signs or checks a release" (-not (Test-Path -LiteralPath (Join-Path (Join-Path $repoRoot 'records') $n)))
-}
+# No job asks for a runner's signing label since #4013, so the record that
+# gave runner 3 it, and runner 3's firewall openings, went too. The check
+# label stays while the nightly's bot harnesses ask for it (#4914).
+Yes "no records/sign-runners.json: no runner of the box signs a release" (-not (Test-Path -LiteralPath (Join-Path (Join-Path $repoRoot 'records') 'sign-runners.json')))
+Yes 'and no job here asks for the check label (#3956), which only the nightly''s bot harnesses use now (#4914)' ($code -notmatch 'thornswood-check')
 
 # ---- release-tag.yml makes the tag a cloud Ship cannot push (#3312) ------------
 $tpath = Join-Path (Split-Path -Parent $WorkflowPath) 'release-tag.yml'

@@ -1,0 +1,52 @@
+{
+  "why": "What GitHub's Actions settings, environments, secrets and variables for this repository are meant to be. scripts/deploy/Check-GitHubSettings.ps1 reads GitHub and names every difference (#3534); a change to a setting is a pull request to this file and the change on GitHub together. docs/RUNNER-ISOLATION.md in the ops repo, section 1, says why each is what it is; Developer-Guide.md section P and docs/OWNERSHIP.md in the ops repo say what each secret is. Names only, never a value. Since #4013 the box's workflows and their secrets are in the ops repository: CLOUDFLARE_TURNSTILE_TOKEN, the notices environment and the desk's DESK_KEY_B64 went there at the flip, and desk keeps NEXUS_API_KEY for nexus-run.yml, which runs here on GitHub's runner.",
+  "actions": {
+    "enabled": true,
+    "allowed_actions": "all"
+  },
+  "workflow_token": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "sharing": {
+    "access_level": "none"
+  },
+  "fork_pull_requests": {
+    "run_workflows_from_fork_pull_requests": false,
+    "send_write_tokens_to_workflows": false,
+    "send_secrets_and_variables": false
+  },
+  "secrets": [],
+  "variables": [
+    "AZURE_SIGNING_CLIENT_ID",
+    "AZURE_SIGNING_TENANT_ID",
+    "BUILD_RUNNER"
+  ],
+  "environments": {
+    "board": {
+      "deploy_from": [
+        "branch main"
+      ],
+      "secrets": [
+        "BOARD_TOKEN"
+      ],
+      "variables": []
+    },
+    "desk": {
+      "deploy_from": [
+        "branch main"
+      ],
+      "secrets": [
+        "NEXUS_API_KEY"
+      ],
+      "variables": []
+    },
+    "release": {
+      "deploy_from": [
+        "branch main"
+      ],
+      "secrets": [],
+      "variables": []
+    }
+  }
+}
