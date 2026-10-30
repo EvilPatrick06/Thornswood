@@ -29,7 +29,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$FilesList = 'C:\Thornswood\Profile\OwnGame\files.txt',
+    [string]$FilesList = (Join-Path ([string](& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Install)) 'Profile\OwnGame\files.txt'),
     [string]$AppPath
 )
 

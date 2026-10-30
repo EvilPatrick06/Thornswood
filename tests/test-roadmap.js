@@ -1,7 +1,10 @@
 // test-roadmap.js
 //
-// The roadmap does not call something unstarted that ships, and what it says
-// about the emote wheel is read off the files that decide it.
+// What the emote wheel's notes say about it is read off the files that decide
+// it. This began as a check on the roadmap's wheel row; since #3140 the
+// roadmap is built from the issue board, so that row is the "Roadmap:"
+// comment on the wheel's issue and is no longer a file here. The ini, the
+// plugin and the todo.md note it was held to still are.
 //
 // WHY THIS EXISTS. The roadmap's Later section said "Emote wheel | Wanted
 // since the start, never started", while game/plugins/thornswood-emotes.js,
@@ -57,74 +60,12 @@ function says(text, n) {
   return forms.some(function (f) { return t.indexOf(' ' + f + ' ') !== -1; });
 }
 
-// ------------------------------------------------------------- the board ----
-let board = null;
-try { board = JSON.parse(read('site/data/board.json')); }
-catch (e) { console.log('      board.json: ' + e.message); }
-yes('board.json parses', !!board);
-
-const sections = (board && board.roadmap && board.roadmap.sections) || [];
-function section(name) {
-  return sections.filter(function (s) {
-    return String(s.name || '').trim().toLowerCase() === name;
-  })[0] || null;
-}
-const later = section('later');
-const done = section('done');
-yes('the roadmap has a Later section and a Done section', !!later && !!done);
-
-/*
-  A row carries its cells keyed by its own section's column ids. A row moved
-  from Later to Done and left on Later's ids draws with no title and no text,
-  because the page reads c[cols[0].id] (public/home.html, the /roadmap route)
-  and the hub does the same. So every row is checked, not only the one moved.
-*/
-const strays = [];
-sections.forEach(function (s) {
-  const ids = (s.columns || []).map(function (c) { return c.id; });
-  (s.rows || []).forEach(function (r) {
-    const keys = Object.keys(r.cells || {});
-    const wrong = keys.filter(function (k) { return ids.indexOf(k) < 0; });
-    const titled = ids.length && String((r.cells || {})[ids[0]] || '').trim();
-    if (wrong.length || !titled) { strays.push(s.name + '/' + r.id + (wrong.length ? ' ' + wrong.join(',') : ' untitled')); }
-  });
-});
-yes('every roadmap row is keyed by its own section\'s columns and has a title' +
-    (strays.length ? ' (not: ' + strays.join('; ') + ')' : ''), sections.length && !strays.length);
-
-/* Every row id once. A move that copied instead of moved shows up here. */
-const seen = {}, twice = [];
-sections.forEach(function (s) {
-  (s.rows || []).forEach(function (r) { if (seen[r.id]) { twice.push(r.id); } seen[r.id] = true; });
-});
-yes('no roadmap row id appears twice' + (twice.length ? ' (' + twice.join(', ') + ')' : ''), !twice.length);
-
-function title(s, r) {
-  const first = (s.columns || [])[0];
-  return first ? String((r.cells || {})[first.id] || '') : '';
-}
-function whole(r) {
-  const c = r.cells || {};
-  return Object.keys(c).map(function (k) { return String(c[k] || ''); }).join(' | ');
-}
-
-const wheel = [];
-sections.forEach(function (s) {
-  (s.rows || []).forEach(function (r) {
-    if (/emote wheel/i.test(title(s, r))) { wheel.push({ section: s, row: r }); }
-  });
-});
-yes('the emote wheel is on the roadmap exactly once, found ' + wheel.length, wheel.length === 1);
-const w = wheel.length === 1 ? wheel[0] : null;
-yes('and it is under Done' + (w && w.section !== done ? ', not "' + w.section.name + '"' : ''),
-    !!w && w.section === done);
-yes('Later no longer holds it', !!later && !(later.rows || []).some(function (r) {
-  return /emote wheel/i.test(title(later, r));
-}));
-const text = w ? whole(w.row) : '';
-yes('the row does not say it was never started', !!w && !/never started/i.test(text));
-yes('the row keeps done false like every other roadmap row, since Done is the section',
-    !!w && w.row.done === false);
+// ------------------------------------------------------------ the roadmap --
+/* Since #3140 the roadmap is built from the issue board: the wheel's row is
+   the "Roadmap:" comment on its issue, and an issue that is closed as done is
+   under Done by itself, so the row this harness held to the ini and the
+   plugin is no longer a file here. What it was checked against still is, and
+   so is the note in todo.md the wrong numbers came from. */
 
 // -------------------------------------------------------------- the keys ----
 const ini = read('launcher/Thornswood.ini');
@@ -154,14 +95,10 @@ yes('WheelKey (' + WHEEL + ') and StopKey (' + STOP + ') are letters: ' +
 yes('PageKey (' + PAGE + ') is Tab by the ini\'s table', !!tab && parseInt(tab[1], 10) === PAGE);
 
 function opens(t, l) { return new RegExp('(^|[^A-Za-z])' + l + ' opens').test(t); }
-function stops(t, l) { return new RegExp('(^|[^A-Za-z])' + l + ' stops').test(t); }
-yes('the row says ' + wheelLetter + ' opens it, as the ini does', !!wheelLetter && opens(text, wheelLetter));
-yes('the row says Tab moves on, as the ini does', /\bTab\b/.test(text));
-yes('the row says ' + stopLetter + ' stops, as the ini does', !!stopLetter && stops(text, stopLetter));
 
 /* "The launcher's Controls page moves any of those keys" is a claim too. */
 const keys = read('launcher/app/Keys.cs');
-yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey, as the row says',
+yes('the launcher\'s Controls page does list WheelKey, PageKey and StopKey',
     ['WheelKey', 'PageKey', 'StopKey'].every(function (k) {
       return keys.indexOf('ThornIni, "' + k + '"') !== -1;
     }));
@@ -181,13 +118,6 @@ const nEmotes = list ? list.length : 0;
 const events = (a >= 0 && b >= 0) ? (plugin.slice(a, b).match(/event: '/g) || []).length : -1;
 yes('and it agrees with a plain count of its event lines, ' + nEmotes + ' and ' + events,
     nEmotes > 0 && nEmotes === events);
-yes('the row gives the plugin\'s count, ' + nEmotes + ' emotes', !!w && says(text, nEmotes));
-yes('the row names the eight quick slots and the search',
-    !!w && says(text, 8) && /quick slots/.test(text) && /search/.test(text));
-
-// ----------------------------------------------------------------- words ----
-yes('the row has no em dash in it', text.indexOf(String.fromCharCode(0x2014)) === -1);
-yes('the row never says player', !/\bplayers?\b/i.test(text));
 
 // -------------------------------------------------- the note in todo.md ----
 /* The note the wrong numbers were copied from, so the next copy is right. */

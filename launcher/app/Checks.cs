@@ -350,7 +350,7 @@ namespace Thornswood
         /// two are the record. Keeping NirnLab out of Thornswood's own folder
         /// is OwnGame.Foreign's job: it leaves out Data\NirnLabUIPlatform and
         /// NirnLabUIPlugin.dll when the folder is built, the same rule as
-        /// Test-ShipOtherServer in tools\Ship-Rules.ps1.
+        /// Test-ShipOtherServer in scripts\release\Ship-Rules.ps1.
         // Empty since 20 September. It held the file names of another
         // server's client probe, and Thornswood no longer looks for other
         // servers' files at all: its own folder is built from what belongs,
@@ -652,7 +652,7 @@ namespace Thornswood
         /// five masters, whatever plugins.txt says. So they are in no plugin
         /// list and every other row of the scan passes them.
         ///
-        /// Measured on 19 Sep. another server's launcher put the free ones back
+        /// Measured on 19 Sep. Another server's launcher put the free ones back
         /// into Data, Thornswood's folder took them in, and the game loaded two
         /// full masters the server does not have. Every plugin after
         /// Dragonborn.esm was two places off, the game showed LOAD ORDER ERROR,

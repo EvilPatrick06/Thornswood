@@ -372,7 +372,7 @@ def main():
 
     payload = {
         'builtBy': 'scripts/dev/Build-CrimeTable.py',
-        'readFrom': '%d active plugins, the five masters then %s' % (len(order), args.plugins),
+        'readFrom': own_plugins.load_order_name(order),
         'whatIsListed': 'every faction that tracks crime. The front plugin sets all six ignore flags on '
                         'each (murder, assault, stealing, trespass, pickpocket, werewolf), so no crime '
                         'adds a bounty. charges is what each crime costs there by the record (the game '

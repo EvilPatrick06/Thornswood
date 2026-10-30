@@ -164,7 +164,7 @@ try {
     $h = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\harnesses.yml'))
     Yes 'harnesses.yml starts only when somebody dispatches it' ($h -match '(?m)^on:\s*\r?\n  workflow_dispatch:' -and $h -notmatch '(?m)^  (push|pull_request|pull_request_target|schedule):')
     Yes '  reads the repository and nothing more' ($h -match '(?m)^permissions:\s*\r?\n  contents: read\s*\r?\n(?!  )')
-    Yes '  on the VPS runners, the same as the nightly' ($h -match '(?m)^\s+runs-on: \[self-hosted, Windows, thornswood-vps\]\s*$')
+    Yes '  on the VPS build runners, the same as the nightly''s shares, never the one that signs (#3550)' ($h -match '(?m)^\s+runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\s*$')
     Yes '  hands the names to Nightly-Harnesses.ps1 -Only through the environment' ($h -match 'HARNESSES: \$\{\{ inputs\.harnesses \}\}' -and $h -match 'Nightly-Harnesses\.ps1 -Only \$env:HARNESSES')
     $runs = @([regex]::Matches($h, '(?ms)^\s+run: \|\s*\r?\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
     Yes '  and never pastes them into a script it runs' ($runs.Count -ge 1 -and -not @($runs | Where-Object { $_ -match '\$\{\{\s*inputs\.' }).Count)

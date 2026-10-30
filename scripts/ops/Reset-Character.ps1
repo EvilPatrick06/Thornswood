@@ -11,7 +11,8 @@
 
   The change forms named with a bare number are the ones belonging to people.
   Everything else in that folder describes the world and is left alone. Nothing
-  is deleted: what is thrown away goes into a _discarded folder beside it.
+  is deleted: what is thrown away goes into a _discarded folder beside it,
+  which the game server's server-log.js deletes 30 days later (#3620).
 
       .\Reset-Character.ps1            the VPS
       .\Reset-Character.ps1 -Local     a server running on this machine
