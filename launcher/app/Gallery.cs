@@ -315,7 +315,9 @@ namespace Thornswood
         /// Blocking. Call it off the UI thread. Sends one screenshot into the
         /// site's gallery queue over /api/gallery/submit. The body IS the file;
         /// the ticket, offered name, byline and note ride in the query, matching
-        /// the site's receiveUpload path.
+        /// the site's receiveUpload path. What the file says about where and
+        /// when it was made (Exif, XMP, GPS and the like) is taken out first,
+        /// by MediaStrip, so it never leaves this machine (#3648).
         ///
         /// "" when the site took it, and a sentence to show the person when it
         /// did not. Allowed kinds match the site's GALLERY_ALLOW: png, jpg,
@@ -360,6 +362,18 @@ namespace Thornswood
                 Swallow.Note("Gallery.Submit read", ex);
                 return "Could not read that file.";
             }
+
+            // Where and when it was made stays on this machine (#3648): a
+            // phone or camera picture says so in its Exif, GPS included, and
+            // the site serves the file it is sent to anyone.
+            Exception unwalked;
+            byte[] clean = MediaStrip.Clean(data, ext, out unwalked);
+            if (clean == null)
+            {
+                if (unwalked != null) Swallow.Note("Gallery.Submit clean", unwalked);
+                return "That file could not be read to take out where and when it was made, so it was not sent.";
+            }
+            data = clean;
 
             string who = by == null ? "" : by.Trim();
             if (who.Length > 40) who = who.Substring(0, 40);

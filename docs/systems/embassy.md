@@ -24,8 +24,9 @@ marks armed has broken the Accord, and the Ambassador hands them to
 the Jarl of Haafingar rather than shelter them. That handoff is a
 scene. It is not a teleport.
 
-A Legion veteran who served decades ago and settled in a hold can be
-played, is not on this roll and is not limited by the 6.
+A Legion veteran who served in the war about fifty years ago and
+settled in a hold when the Legion left can be played, is not on this
+roll and is not limited by the 6.
 
 ## The law at the door
 
