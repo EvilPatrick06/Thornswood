@@ -1902,47 +1902,38 @@ $BENCH_UNOWNED_PREFIX = 'BYOHBuildingInteriorPart'
 # This is a knob for a recipe whose owner is a decision rather than a reading.
 # Every entry needs the measured reason it cannot be derived, and a name in here
 # that the rules WOULD have settled is worth taking out again.
-$RECIPE_OWNER = [ordered]@{
-    'ThornswoodRecipeToolShovel' = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a shovel is a tool a smith forges, and it is here rather than derived because Shovel01 is a MISC: the forge settles ownership by the output being a WEAP, so the pickaxe and the axe are covered by that rule and the shovel is not. Patrick, 21 September: a broken tool is replaced by "a smith making them".' }
-    'ThornswoodRecipeKeyMold'    = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a key mold is a smith''s work and it is here for the same reason the shovel is: the output is a MISC, so the forge rule, which settles ownership by the output being a WEAP, cannot see it. Patrick, 23 September: "make a fucking mold item craftable dude this would solve alot".' }
-    'ThornswoodRecipeKey'        = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'a key is cut by a smith off a stamped mold, and the mold is checked server side in mp.onCraft rather than as an input, because an input is taken by the engine and Patrick asked for the mold to be reusable: "it can be reused". Same MISC output as the mold, so the same reason it cannot be derived.' }
-    'ThornswoodRecipeWeaponKit'  = @{ Owner = 'Smith'; Half = 'Edgewright'; Why = 'the Weapon Kit is the Edgewright''s repair kit (docs/systems/durability.md), and the output is a MISC, so the forge rule, which settles ownership by the output being a WEAP, cannot see it. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
-    'ThornswoodRecipeArmorKit'   = @{ Owner = 'Smith'; Half = 'Platewright'; Why = 'the Armor Kit is the Platewright''s repair kit (docs/systems/durability.md). A MISC at a forge, so the forge rule cannot see it, and it would not land on the Platewright if it could. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
-    'ThornswoodRecipeSewingKit'  = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Why = 'the Sewing Kit is the Haberdasher''s repair kit (docs/systems/durability.md). A MISC at the tanning rack, which is open furniture whose own rule hands a hide into leather to the Platewright, so nothing derived would give it to a tailor. Patrick, 4 October: use a suggested recipe; this is the one picked (#1384).' }
-    'ThornswoodRecipeBandage'    = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Why = 'the bandage is a tailor''s work (docs/systems/injury.md, who treats what). Patrick, 4 October, on #1383: a Haberdasher novice recipe at the loom. A MISC, named here so its half is that answer and not a reading of the output.' }
-    'ThornswoodRecipeSplint'     = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the splint holds a break (docs/systems/injury.md). Patrick, 4 October, on #1383: a Woodwright novice recipe at the kiln. The kiln''s own rule gives its work to the Charburner, so it is named here.' }
-    'ThornswoodRecipePoultice'   = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the poultice cuts the wound fever chance (docs/systems/injury.md). Patrick, 4 October, on #1383: a Physicker recipe at novice. A MISC at the alchemy lab Thornswood-Content.esp ships, a create-object bench, which nothing else names.' }
-    'ThornswoodRecipeRemedy'     = @{ Owner = 'Alchemist'; Half = 'Physicker'; Why = 'the physicker''s remedy closes a cut and clears one ordinary disease (docs/systems/injury.md, disease.md, physicker.md). Patrick, 4 October, on #1383: a Physicker recipe at advanced, which its blue mountain flower makes it. A MISC at the same alchemy lab.' }
-    # The fish trap (#1379). docs/systems/classes/fisher.md: "A woodwright makes
-    # them", the poles and the trap. The poles reach the Woodwright by the spear
-    # rule further down; the trap is a MISC with no pole in its name, so the
-    # forge rule leaves it to anybody unless it is named here.
-    'ThornswoodRecipeFishTrap'   = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the fish trap is a woodwright novice good, made with the poles (docs/systems/classes/fisher.md, issue #1379). A MISC at a forge with no pole in its name, so neither the forge rule nor the spear rule can see it.' }
-    # ONE SMELT ROW PER INGOT AND ONE ROW FOR LEATHER (#1391, #1400). Smelting an
-    # ingot is smith work and tanning a hide is the Platewright's
-    # (docs/systems/cut-items.md, "Smelting and tanning are not anybody's work").
-    # The duplicates are cut in docs/systems/cut-items.json, which CUT_FILE reads,
-    # and these are the rows that stay. They are named here because the smelter
-    # is open furniture in BENCH_OWNER and the tanning rack is no profession's
-    # bench, so no derived rule gives either to a half. All of them are novice
-    # in RECIPE_RANK, Platewright work that the sister half reaches at novice.
-    # Family is the recipe book's group for them, Ingots and Leather, because a
-    # MISC output names no kind of thing and would land in Other goods.
-    # Until 4 October they were put in recipes.json by hand after the build,
-    # so a rebuild handed every one of them back to anybody (issue #1622).
-    'RecipeIngotCorundum'        = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotEbony'           = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'IMRIngotGlacialCrystal'     = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotGold'            = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotIron'            = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotOrichalcum'      = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotQuicksilver'     = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotMalachite'       = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotMoonstone'       = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotSilver'          = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeIngotSteel'           = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Ingots'; Why = 'The one smelt row kept for this ingot. Smith work at novice, so both halves can make it. Not anybody''s.' }
-    'RecipeLeatherDeerHide02'    = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Leather'; Why = 'The one row kept for this leather. Platewright work, as the smith page says. Not anybody''s.' }
-    'RecipeLeatherStrips'        = @{ Owner = 'Smith'; Half = 'Platewright'; Family = 'Leather'; Why = 'The one row kept for this leather. Platewright work, as the smith page says. Not anybody''s.' }
+# The entries are in records\recipe-owners.json, under "owner", each with its
+# Owner, Half, an optional Family and its Why. They are data and not code so
+# that a recipe change is the content plugin and that file and nothing else:
+# the box's Rebuild-ContentTables then rebuilds a pull request's tables with
+# main's own builders, taking only those two files from it (Patrick, 30 Oct
+# 2026, B on the report page, #3470).
+#
+# What the groups in the file are:
+#
+# The fish trap (#1379). docs/systems/classes/fisher.md: "A woodwright makes
+# them", the poles and the trap. The poles reach the Woodwright by the spear
+# rule further down; the trap is a MISC with no pole in its name, so the
+# forge rule leaves it to anybody unless it is named here.
+# ONE SMELT ROW PER INGOT AND ONE ROW FOR LEATHER (#1391, #1400). Smelting an
+# ingot is smith work and tanning a hide is the Platewright's
+# (docs/systems/cut-items.md, "Smelting and tanning are not anybody's work").
+# The duplicates are cut in docs/systems/cut-items.json, which CUT_FILE reads,
+# and these are the rows that stay. They are named here because the smelter
+# is open furniture in BENCH_OWNER and the tanning rack is no profession's
+# bench, so no derived rule gives either to a half. All of them are novice
+# in RECIPE_RANK, Platewright work that the sister half reaches at novice.
+# Family is the recipe book's group for them, Ingots and Leather, because a
+# MISC output names no kind of thing and would land in Other goods.
+# Until 4 October they were put in recipes.json by hand after the build,
+# so a rebuild handed every one of them back to anybody (issue #1622).
+$RECIPE_NAMES_FILE = Join-Path $PSScriptRoot '..\..\records\recipe-owners.json'
+$RECIPE_NAMES = [IO.File]::ReadAllText($RECIPE_NAMES_FILE) | ConvertFrom-Json
+$RECIPE_OWNER = [ordered]@{}
+foreach ($nameEntry in $RECIPE_NAMES.owner.PSObject.Properties) {
+    $knob = @{}
+    foreach ($field in $nameEntry.Value.PSObject.Properties) { $knob[$field.Name] = [string]$field.Value }
+    $RECIPE_OWNER[$nameEntry.Name] = $knob
 }
 
 # NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
@@ -1970,60 +1961,33 @@ $RECIPE_OWNER = [ordered]@{
 # THIS IS THE LAST RESORT AND IT IS CHECKED. A named rank is applied after every
 # automatic rule and BEFORE the empty-rung and standable checks, so it cannot be
 # used to write a ladder with a hole in it.
-$RECIPE_RANK = [ordered]@{
-    'ThornswoodRecipeCharcoalTier1' = @{ Rank = 'novice';   Why = 'the first of the four charcoal grades, a novice charburner''s, as the charburner page ranks it.' }
-    'ThornswoodRecipeCharcoalTier2' = @{ Rank = 'advanced'; Why = 'the second charcoal grade, an advanced charburner''s.' }
-    'ThornswoodRecipeCharcoalTier3' = @{ Rank = 'expert';   Why = 'the third charcoal grade, an expert charburner''s.' }
-    'ThornswoodRecipeCharcoalTier4' = @{ Rank = 'master';   Why = 'coke, the last charcoal grade, a master charburner''s alone.' }
-    # The poles and the trap, as docs/systems/classes/fisher.md ranks them under
-    # "The poles and the trap" (issue #1379). Input cost puts the fine pole on
-    # advanced and the master pole on expert, because a steel ingot and a
-    # refined moonstone are their dearest makings; the page ranks a pole by the
-    # water it fishes, so the rank is a decision and not a reading.
-    'ThornswoodRecipePoleCrude'     = @{ Rank = 'novice';   Why = 'the crude pole, novice on the fisher page.' }
-    'ThornswoodRecipePoleFine'      = @{ Rank = 'expert';   Why = 'the fine pole, expert on the fisher page: it fishes novice through expert water.' }
-    'ThornswoodRecipePoleMaster'    = @{ Rank = 'master';   Why = 'the master pole, master on the fisher page: it fishes all of it.' }
-    'ThornswoodRecipeFishTrap'      = @{ Rank = 'novice';   Why = 'the fish trap, a woodwright novice good on the fisher page.' }
-    # THE COLLEGE BOOK STAVES, each at its spell's rank. Patrick, 4 October,
-    # answering issue #1622: "B, each college book staff at its spell's rank".
-    # Heart stone is master mining (the miner page, #1380, #1586), so input
-    # cost puts every staff on master. A staff is not made until its spell is
-    # on you, and a Bladebinder unlocks a spell only at a rank at least the
-    # spell's (the Bladebinder page, Staff spells), so the recipe says what the
-    # spell gate already says. These are the thirteen the Bladebinder page
-    # keeps; the other 147 and the Aetherial Staff are cut and stay where input
-    # cost puts them. The rank is the spell's in the college book, the mage
-    # school pages and STAFF_SPELLS, and tests\test-1622-recipe-generator.js
-    # holds each line to it. A Bladebinder below master buys the stones from a
-    # master miner, which HALVES_WITH_AN_UNSTANDABLE_RUNG says for this half.
-    'DLC2RecipeStaffFlames'         = @{ Rank = 'novice';   Why = 'Staff of Flames, at the rank of Flames in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffFrostbite'      = @{ Rank = 'novice';   Why = 'Staff of Frostbite, at the rank of Frostbite in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffSparks'         = @{ Rank = 'novice';   Why = 'Staff of Sparks, at the rank of Sparks in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffFirebolt'       = @{ Rank = 'advanced'; Why = 'Staff of Firebolts, at the rank of Firebolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIceSpike'       = @{ Rank = 'advanced'; Why = 'Staff of Ice Spikes, at the rank of Ice Spike in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffLightningBolt'  = @{ Rank = 'advanced'; Why = 'Staff of Lightning Bolts, at the rank of Lightning Bolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIceStorm'       = @{ Rank = 'advanced'; Why = 'Staff of Ice Storms, at the rank of Ice Storm in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffSoulTrap'       = @{ Rank = 'advanced'; Why = 'Staff of Soul Trapping, at the rank of Soul Trap in the college book (conjuration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffTurnUndead'     = @{ Rank = 'advanced'; Why = 'Staff of Turning, at the rank of Turn Undead in the college book (restoration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffTurnGreaterUndead' = @{ Rank = 'expert';   Why = 'Grand Staff of Turning, at the rank of Turn Greater Undead in the college book (restoration). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIcySpear'       = @{ Rank = 'expert';   Why = 'Staff of Icy Spear, at the rank of Icy Spear in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffIncinerate'     = @{ Rank = 'expert';   Why = 'Staff of Incineration, at the rank of Incinerate in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    'DLC2RecipeStaffThunderbolt'    = @{ Rank = 'expert';   Why = 'Staff of Thunderbolts, at the rank of Thunderbolt in the college book (destruction). Patrick, 4 October (#1622): each college book staff at its spell''s rank.' }
-    # The kept smelt and tan rows named in RECIPE_OWNER (#1391, #1400): novice
-    # smith work, whatever the ore costs to dig.
-    'RecipeIngotCorundum'           = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotEbony'              = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'IMRIngotGlacialCrystal'        = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotGold'               = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotIron'               = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotOrichalcum'         = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotQuicksilver'        = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotMalachite'          = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotMoonstone'          = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotSilver'             = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeIngotSteel'              = @{ Rank = 'novice';   Why = 'the one smelt row kept for this ingot, smith work at novice (#1391, #1400).' }
-    'RecipeLeatherDeerHide02'       = @{ Rank = 'novice';   Why = 'the one row kept for this leather, Platewright work at novice (#1391, #1400).' }
-    'RecipeLeatherStrips'           = @{ Rank = 'novice';   Why = 'the one row kept for this leather, Platewright work at novice (#1391, #1400).' }
+# The entries are in records\recipe-owners.json, under "rank", each with its
+# Rank and its Why, for the reason above. What the groups in the file are:
+#
+# The poles and the trap, as docs/systems/classes/fisher.md ranks them under
+# "The poles and the trap" (issue #1379). Input cost puts the fine pole on
+# advanced and the master pole on expert, because a steel ingot and a
+# refined moonstone are their dearest makings; the page ranks a pole by the
+# water it fishes, so the rank is a decision and not a reading.
+# THE COLLEGE BOOK STAVES, each at its spell's rank. Patrick, 4 October,
+# answering issue #1622: "B, each college book staff at its spell's rank".
+# Heart stone is master mining (the miner page, #1380, #1586), so input
+# cost puts every staff on master. A staff is not made until its spell is
+# on you, and a Bladebinder unlocks a spell only at a rank at least the
+# spell's (the Bladebinder page, Staff spells), so the recipe says what the
+# spell gate already says. These are the thirteen the Bladebinder page
+# keeps; the other 147 and the Aetherial Staff are cut and stay where input
+# cost puts them. The rank is the spell's in the college book, the mage
+# school pages and STAFF_SPELLS, and tests\test-1622-recipe-generator.js
+# holds each line to it. A Bladebinder below master buys the stones from a
+# master miner, which HALVES_WITH_AN_UNSTANDABLE_RUNG says for this half.
+# The kept smelt and tan rows named in RECIPE_OWNER (#1391, #1400): novice
+# smith work, whatever the ore costs to dig.
+$RECIPE_RANK = [ordered]@{}
+foreach ($nameEntry in $RECIPE_NAMES.rank.PSObject.Properties) {
+    $knob = @{}
+    foreach ($field in $nameEntry.Value.PSObject.Properties) { $knob[$field.Name] = [string]$field.Value }
+    $RECIPE_RANK[$nameEntry.Name] = $knob
 }
 
 $BENCH_OWNER = [ordered]@{
