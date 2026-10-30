@@ -8,6 +8,13 @@
 // "served" list, and the launcher fetches only what that list names; for
 // another author's plugin Scan and Fix name the mod to put right in Vortex.
 //
+// #3386. The bytes no longer come from the server at all: its resources port
+// is plain http, and the size and crc32 that vouched for them came over the
+// same port. The server serves no plugin file now, and Fix takes ours from
+// the release the update feed names, over https, by the sha256 its record
+// gives them (Updater.ReleaseCopy). tests\test-2627-scan-fix.ps1 runs
+// that reader with Fix.
+//
 // The gamemode's server manifest block is run here against a pretend disk.
 // The launcher cannot be compiled here, so its half is held by its text.
 //
@@ -137,50 +144,31 @@ if (block) {
       !!a.manifest && JSON.stringify(a.manifest.served) === JSON.stringify(["Thornswood-Content.esp"]));
   yes("the refusal block still gets every plugin the client is compared with",
       Array.isArray(a.box.__thornswoodManifestMods) && a.box.__thornswoodManifestMods.length === ORDER.length);
-  yes("only our plugin is under /plugins/, at its manifest position (" + OUR_AT + ".bin): " + a.served.join(", "),
-      a.served.length === 1 && a.served[0] === OUR_AT + ".bin");
-  yes("it is a hard link to the server's own plugin file, not a second copy",
-      a.links.length === 1 && a.links[0][0] === "/srv/thornswood/plugins/Thornswood-Content.esp" &&
-      a.links[0][1] === "data/api/servers/thornswood/plugins/" + OUR_AT + ".bin");
-  yes("every other author's plugin an older start published is taken off the box",
-      THEIRS.concat(AFTER).every(function (n) { return a.served.indexOf(ORDER.indexOf(n) + ".bin") < 0; }));
-  yes("Bethesda's masters are not served, as before",
-      BETHESDA.every(function (n, i) { return a.served.indexOf(i + ".bin") < 0; }));
-  yes("the log says one plugin of ours was published",
-      a.log.some(function (l) { return /^\[thornswood\] 1 of our plugin files published at \/api\/servers\/thornswood\/plugins\//.test(l); }));
+  yes("no plugin file is served from the box, ours included (#3386): " + (a.served.join(", ") || "none new"),
+      a.links.length === 0 && Object.keys(a.files).every(function (f) {
+        return f.indexOf("data/api/servers/thornswood/plugins/") !== 0 || everyOld.indexOf(path.posix.basename(f)) >= 0;
+      }));
+  yes("and the log no longer says any was published",
+      !a.log.some(function (l) { return /plugin files published/.test(l); }));
   yes("the manifest was there, so no retry ran", !a.log.includes("a retry was started"));
 
-  const b = run({ stale: ["12.bin", "13.bin"], stuck: ["12.bin"] });
-  yes("an older file that cannot be taken off is said, by name, as still served",
-      b.log.some(function (l) { return /could not take 12\.bin off \/plugins\/, so it is still served: EBUSY/.test(l); }) &&
-      b.served.indexOf("13.bin") < 0);
-
-  const c = run({ without: ["Thornswood-Content.esp"] });
-  yes("with our plugin not on the box nothing is served, and the log says one was not found",
-      c.served.length === 0 && c.log.some(function (l) { return /0 of our plugin files published[\s\S]*1 not found on this box/.test(l); }));
-  yes("and the manifest still names it, so the launcher says the server did not hand it over",
-      !!c.manifest && JSON.stringify(c.manifest.served) === JSON.stringify(["Thornswood-Content.esp"]));
-
-  // #2627: our light plugin is published too. On 16 Oct the server's light
-  // order named Thornswood-Last.esp and nothing served it, so a machine
-  // without it had nothing for Fix to fetch.
+  // #2627: our light plugin is named as ours too. On 16 Oct the server's
+  // light order named Thornswood-Last.esp and nothing called it ours, so a
+  // machine without it had nothing for Fix to put in.
   const LIGHT = ["_ResourcePack.esl", "KhisartinBeards.esp", "Thornswood-Last.esp"];
   const d = run({ light: LIGHT });
   const lastAt = LIGHT.indexOf("Thornswood-Last.esp");
   yes("a server with a light list names our light plugin as served, beside our full one",
       !!d.manifest && JSON.stringify(d.manifest.served) === JSON.stringify(["Thornswood-Content.esp", "Thornswood-Last.esp"]));
-  yes("it is published as light-" + lastAt + ".bin, its place in the light list, and our full one stays at its place in mods: " + d.served.join(", "),
-      d.served.length === 2 && d.served.indexOf("light-" + lastAt + ".bin") >= 0 && d.served.indexOf(OUR_AT + ".bin") >= 0);
-  yes("the light file is a hard link to the server's own Thornswood-Last.esp",
-      d.links.some(function (l) { return l[0] === "/srv/thornswood/plugins/Thornswood-Last.esp" && l[1] === "data/api/servers/thornswood/plugins/light-" + lastAt + ".bin"; }));
-  yes("another author's light plugin is not served", d.served.every(function (f) { return f === OUR_AT + ".bin" || f === "light-" + lastAt + ".bin"; }));
-  yes("the log counts both of ours", d.log.some(function (l) { return /^\[thornswood\] 2 of our plugin files published at \/api\/servers\/thornswood\/plugins\//.test(l); }));
+  yes("and its bytes are not served either", d.links.length === 0 && d.served.length === 0);
   yes("the client's own lists are as they were: mods the full plugins, light the light ones",
       !!d.manifest && d.manifest.mods.length === ORDER.length && Array.isArray(d.manifest.light) && d.manifest.light.length === LIGHT.length);
 
   const code = block.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   yes("the rule names what is ours, not what to leave out (no STOREFRONT list in the block)",
-      !/STOREFRONT/.test(code) && /if \(!OURS\[name\.toLowerCase\(\)\]\) continue;/.test(code));
+      !/STOREFRONT/.test(code) && /return OURS\[m\.filename\.toLowerCase\(\)\];/.test(code));
+  yes("the block writes no plugin file anywhere (#3386)",
+      !/publishFiles|\blinkSync|copyFileSync|['"]plugins['"]/.test(code));
 }
 
 // ------------------------------------------------ one list of ours
@@ -207,47 +195,56 @@ if (block) {
       /m\.Served = served\.Contains\(m\.filename\);/.test(verify) &&
       (verify.match(/\bm\.Served = /g) || []).length === 1);
 
-  const fetch = slice(verify, "static bool FetchPlugin(Config cfg, Issue i, Action<string> say)", "\n        }\n");
+  const fetch = slice(verify, "static bool FetchPlugin(Config cfg, Issue i, Func<string, byte[]> release, Action<string> say)", "\n        }\n");
   yes("FetchPlugin is in Verify.cs", !!fetch);
   if (fetch) {
     const guard = fetch.indexOf("if (!i.Served)");
-    const get = fetch.indexOf("Get(ServerBase(cfg) + \"/plugins/\"");
-    yes("FetchPlugin refuses a plugin the server does not serve before it asks the server for anything",
+    const get = fetch.indexOf("bytes = release(i.Plugin);");
+    yes("FetchPlugin refuses a plugin the server does not call ours before it asks the release for anything",
         guard > 0 && get > guard && /if \(!i\.Served\)\s*\{[^}]*FromVortex\(cfg, i\.Plugin\)[^}]*return false;\s*\}/.test(fetch));
+    yes("FetchPlugin takes the bytes from the release, never from the game server (#3386)",
+        get > 0 && !/Get\(|ServerBase\(|WebRequest|http:/.test(fetch));
+    yes("and writes them only when they are the copy the server's manifest describes",
+        /if \(bytes\.LongLength != i\.WantSize \|\| crc != i\.WantCrc\)\s*\{[^}]*return false;\s*\}/.test(fetch));
   }
-  const gets = verify.match(/"\/plugins\/"/g) || [];
-  yes("the one place the launcher asks for /plugins/ is FetchPlugin's", gets.length === 1 && !!fetch && /"\/plugins\/"/.test(fetch));
-  const others = fs.readdirSync(path.join(REPO_DIR, "launcher", "app")).filter(function (f) { return /\.cs$/.test(f) && f !== "Verify.cs"; })
+  yes("nothing in Verify.cs asks the server for /plugins/ any more (#3386)", !/"\/plugins\/"/.test(verify));
+  const others = fs.readdirSync(path.join(REPO_DIR, "launcher", "app")).filter(function (f) { return /\.cs$/.test(f); })
     .filter(function (f) { return /\/plugins\/"|\/plugins\/" \+/.test(read("launcher", "app", f)); });
-  yes("no other launcher file fetches from /plugins/" + (others.length ? " (" + others.join(", ") + ")" : ""), others.length === 0);
+  yes("no launcher file fetches from /plugins/" + (others.length ? " (" + others.join(", ") + ")" : ""), others.length === 0);
+  const upkeep = read("launcher", "app", "Upkeep.cs");
+  yes("Fix is handed the release the feed names, read over https by Updater.ReleaseCopy",
+      /Verify\.Fix\(cfg, say, Updater\.ReleaseCopy\(cfg, v\)\)/.test(upkeep));
+  const sync = read("launcher", "app", "Sync.cs");
+  const copy = slice(sync, "public static Func<string, byte[]> ReleaseCopy(Config cfg, VersionDoc v)", "\n        }\n");
+  yes("ReleaseCopy checks the record's address (https, a host on the list) before it reads a byte",
+      !!copy && copy.indexOf("CheckUrl(r.url);") >= 0 && copy.indexOf("CheckUrl(r.url);") < copy.indexOf("ReleaseCopyAt("));
 
   const bytes = slice(verify, "public static List<Issue> Bytes(Config cfg)", "\n        }\n");
   yes("Scan carries served on each issue and names Vortex for another author's plugin",
       !!bytes && /i\.Served = m\.Served;/.test(bytes) &&
-      /m\.Served \? "Fix fetches the server's copy\." : null,/.test(bytes) &&
-      /m\.Served \? NotHandedOver : FromVortex\(cfg, m\.filename\)/.test(bytes));
-  // #2627: a light plugin of ours is served too, at light-<index in light>.bin.
-  yes("Scan says where a light plugin of ours is served: its place in the light list",
+      /m\.Served \? "Fix puts in the release's copy\." : null,/.test(bytes) &&
+      /m\.Served \? NotInRelease : FromVortex\(cfg, m\.filename\)/.test(bytes));
+  // #2627: a light plugin of ours is ours too, at its place in the light list.
+  yes("Scan says where a light plugin of ours is: its place in the light list",
       !!bytes && /i\.WantLight = isLight;/.test(bytes) && /i\.WantIndex = isLight \? idx - mods\.Length : idx;/.test(bytes));
   yes("Manifest marks served on the light list as well as mods",
       /foreach \(ServerMod\[\] list in new ServerMod\[\]\[\] \{ doc\.mods, light \}\)/.test(verify));
-  yes("FetchPlugin asks for light-<index>.bin for a light plugin and <index>.bin for a full one",
-      !!fetch && /"\/plugins\/" \+ \(i\.WantLight \? "light-" : ""\) \+ i\.WantIndex \+ "\.bin"/.test(fetch));
-
-  const fix = slice(verify, "public static int Fix(Config cfg, Action<string> say)", "\n        }\n");
+  const fix = slice(verify, "public static int Fix(Config cfg, Action<string> say, Func<string, byte[]> release)", "\n        }\n");
   yes("Fix's fetch of a missing plugin passes over any the server does not serve",
-      !!fix && /Storefront\.Contains\(m\.filename\) \|\| !m\.Served\) continue;/.test(fix) &&
-      /miss\.Served = true;\s*if \(FetchPlugin\(cfg, miss, say\)\) n\+\+;/.test(fix));
+      !!fix && /Storefront\.Contains\(m\.filename\) \|\| !m\.Served( \|\| LastPlugin\.Makes\(Paths\.Game, m\.filename\))?\) continue;/.test(fix) &&
+      /miss\.Served = true;\s*if \(FetchPlugin\(cfg, miss, release, say\)\) n\+\+;/.test(fix));
   yes("Fix fetches a missing plugin of ours from the light list as well as mods",
       !!fix && /int all = mods\.Length \+ light\.Length;/.test(fix) && /miss\.WantLight = isLight;/.test(fix));
   yes("Fix's fetch of a plugin that differs goes through FetchPlugin with Scan's issue",
-      !!fix && /foreach \(Issue i in Bytes\(cfg\)\)\s*if \(i\.Plugin != null && FetchPlugin\(cfg, i, say\)\) n\+\+;/.test(fix));
+      !!fix && /foreach \(Issue i in Bytes\(cfg\)\)\s*if \(i\.Plugin != null && (!LastPlugin\.Makes\(Paths\.Game, i\.Plugin\) && )?FetchPlugin\(cfg, i, release, say\)\) n\+\+;/.test(fix));
+  // #2791: the plugin the release's recipe makes here is never fetched;
+  // tests/test-2791-last-plugin.ps1 holds that.
 
   const from = slice(verify, "static string FromVortex(Config cfg, string plugin)", "\n        }\n");
   yes("what to do about another author's plugin names the mod in Vortex and says to update or reinstall it",
       !!from && /OwnGame\.VortexModOf\(cfg, plugin\)/.test(from) &&
       /update the Thornswood collection, or reinstall/.test(from) && /Reinstall\), then press Scan\./.test(from) &&
-      /the server does not hand it out/.test(from));
+      /Thornswood has no copy of it to give/.test(from));
   const mod = slice(ownGame, "public static string VortexModOf(Config cfg, string plugin)", "\n        }\n");
   yes("OwnGame.VortexModOf reads Vortex's own deployment record for the plugin's mod folder",
       !!mod && /Staged\(src\)\.From\.TryGetValue\("Data\\\\" \+ plugin, out from\)/.test(mod) &&
@@ -258,19 +255,16 @@ if (block) {
 // ------------------------------------------------ what people read
 
 {
-  const help = read("launcher", "app", "Help.cs");
+  // The launcher's Help page went with #3146: help is F7 in the game and
+  // help.md on the site, so the site's copy is the one held here.
   const join = read("site", "data", "site", "join.md");
-  const known = require("./fixtures/known-page").knownPage() || "";  // the known board, as /known writes it (#2414)
+  const known = require("./fixtures/known-page").knownPage() || "";  // the page /known writes, from the bot's list (#3140)
   const md = read("site", "data", "help.md");
-  yes("the launcher's help says Fix fetches only our own plugin and names the Vortex mod for another's",
-      /downloads the server's copy of Thornswood's own plugin when its bytes differ, names the mod to update or reinstall in Vortex when another author's plugin differs/.test(help));
-  yes("the LOAD ORDER ERROR help no longer says nothing in Vortex has to change",
-      !/Nothing in Vortex has to change/.test(help) && /Scan names the mod to update or reinstall in Vortex/.test(help));
-  yes("the join page says the same", /For Thornswood's own plugin \*\*Fix\*\* downloads the server's copy; for\s+another author's mod it names the mod to update or reinstall in Vortex\./.test(join));
-  yes("the known issues page says the same", /When it is another author's mod, the server does not hand it out/.test(known));
-  yes("the site's help says the same", /the server hands out Thornswood's own plugin\s+and nobody else's/.test(md));
-  yes("nothing people read still says Fix downloads the server's copy of any plugin",
-      [help, join, known, md].every(function (t) { return !/server's copy of\s+(any|that) plugin/.test(t); }));
+  yes("the join page says the same", /For Thornswood's own plugin \*\*Fix\*\* downloads the latest release's\s+copy; for another author's mod it names the mod to update or reinstall in\s+Vortex\./.test(join));
+  yes("the known issues page leaves the load order to the help (#3137)", known.length > 0 && !/LOAD ORDER ERROR/.test(known));
+  yes("the site's help says the same", /Fix only has a copy of Thornswood's own\s+plugin, from the latest release, and nobody else's/.test(md));
+  yes("nothing people read still says Fix downloads the server's copy of a plugin (#3386)",
+      [join, known, md].every(function (t) { return !/server's copy of\s+(any|that|Thornswood's own) plugin|downloads the server's copy/.test(t); }));
 }
 
 console.log("");

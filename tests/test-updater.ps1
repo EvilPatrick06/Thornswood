@@ -5,7 +5,8 @@
 
   The launcher's updater, asked its own questions.
 
-  WHY THIS EXISTS. Six functions in launcher\app\Updater.cs decide what counts
+  WHY THIS EXISTS. Six functions in launcher\app\Updater.cs (Inside in
+  PathFence.cs since #3561, shared with the setup program) decide what counts
   as an update, where one may come from, and which files a pack may write or
   delete: IsNewer, Parts, Inside, ClaimedElsewhere, Pending and
   CheckUrl. Each has the incident that shaped it written above it, and until
@@ -76,7 +77,7 @@ function Known([string]$what) { Write-Host "KNOWN $what" }
 # ---- the compiler and the references the build uses (Launcher-Csc.ps1) ------
 
 $needed = @($LauncherNeeded)
-$wv2 = @($LauncherWv2Managed)
+$wv2 = @($LauncherLib)
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsupdater-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
@@ -93,9 +94,9 @@ function Run {
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
-        # Where Build-Launcher.ps1 reads them, launcher\lib\webview2, since the
-        # launcher moved out of tools\.
-        $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
+        # Where the project file's HintPath has them, under launcher\lib
+        # (tests\Launcher-Csc.ps1 works the path out).
+        $p = $n
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
     }
     Yes ('every one of them is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) (
@@ -134,8 +135,12 @@ function Run {
     $flags = [Reflection.BindingFlags]'Static, Public, NonPublic'
     $script:m = @{}
     $gone = @()
+    # Inside is PathFence's since #3561, which the setup program compiles in
+    # too, so its unpack is held to the same fence.
+    $F = $asm.GetType('Thornswood.PathFence')
     foreach ($n in 'IsNewer', 'Parts', 'Inside', 'ClaimedElsewhere', 'Pending', 'CheckUrl') {
-        $script:m[$n] = $U.GetMethod($n, $flags)
+        $from = if ($n -eq 'Inside') { $F } else { $U }
+        $script:m[$n] = if ($null -ne $from) { $from.GetMethod($n, $flags) } else { $null }
         if ($null -eq $script:m[$n]) { $gone += $n }
     }
     Yes ('the six functions under test are all there' + $(if ($gone.Count) { ', missing ' + ($gone -join ', ') } else { '' })) (
@@ -251,7 +256,7 @@ function Run {
     $opened = @([regex]::Matches($shellAll, 'updatePending = false')).Count
     $upd = [IO.File]::ReadAllText((Join-Path $Src 'ShellUpdate.cs'))
     $inDoc = $upd.Substring($upd.IndexOf('static void OnVersionDoc('), $upd.IndexOf('static void CheckUpdatesInPlay(') - $upd.IndexOf('static void OnVersionDoc('))
-    $installed = @([regex]::Matches($upd, 'updatePending = false;\s*DrawStatus\(\); BuildModList\(\);\s*Log\("Update finished\."\);')).Count
+    $installed = @([regex]::Matches($upd, 'updatePending = false;\s*DrawStatus\(\);\s*Log\("Update finished\."\);')).Count
     Yes 'Play is let through only by a feed that was read: every updatePending = false is in OnVersionDoc or after its packs went in' (
         $opened -gt 0 -and $opened -eq (@([regex]::Matches($inDoc, 'updatePending = false')).Count + $installed))
 

@@ -36,9 +36,17 @@ speeds hunger and thirst. See [Hunger](hunger.md) and [Thirst](thirst.md).
 ## How fast it moves
 
 Warming covers half the remaining gap in 30 seconds. Cooling covers
-half the gap in 90 seconds. A fire is obvious while you stand in it.
+half the gap in 90 seconds. In winter, under the sky, cooling is a
+quarter faster: half the gap in 72 seconds. A roof ignores the
+winter, the same way it ignores the sky. Warming is the same in every
+season. A fire is obvious while you stand in it.
 Snow is not an emergency in the first few seconds. An unknown place is
 comfortable. A room nobody has classified is not a trap.
+
+It does not move while you are logged out. You come back at the reading
+you left with, and it moves from there toward wherever you are standing.
+The place you logged out in is not where you spent the time away, so
+logging out in the snow does not bring you back freezing (#3154).
 
 ## The place
 
@@ -77,8 +85,9 @@ The tundra is near zero. Ivarstead is about 3,000. High Hrothgar is
 about 12,000. The Throat of the World is past 25,000, and the cap of
 14 means the summit does not get colder than that from height alone.
 
-Open blizzard is the worst dry place: snow's 16 minus a gale's 14 is 2
-before clothes. Swimming beats it.
+Open blizzard is the worst place there is: snow's 16, less a gale's 14
+and the falling snow's 6, is 0 before clothes, as cold as the meter
+goes. Swimming in it is 0 as well.
 
 Rain and swimming leave you wet for 3 minutes after you are under a
 roof or out of the water. The exposure from rain or from the water
@@ -87,11 +96,37 @@ place fades across those 3 minutes. It does not snap off at the door.
 There is no temperature by hold. The Pale is cold when it is high, it
 is night, and it is snowing.
 
+## Storms on the road
+
+A blizzard or a heavy storm makes travel 15% slower while you are out
+in it with no roof over you. That is 15 off a speed of 100, on top of
+anything the cold already takes. Under a roof it stops at once.
+
+The cold and the wet are the lines above: a blizzard is snow, falling
+snow and the wind; a heavy storm is rain. The right gear is what keeps
+those out, the same as any other weather. No coat takes away the
+slowdown, because that is the storm and not the cold.
+
+A storm is a rainy or snowy weather whose record is named a storm.
+The weather record has no storm mark of its own, and its wind and kind
+cannot tell one: in this load order a heavy storm and overcast rain
+both blow at 85 and both are rain. The names can: `SkyrimStormRain`
+and `SkyrimStormSnow` are storms, and `SkyrimOvercastRain` and
+`SkyrimOvercastSnow` are not. Of the skies the season rolls, the
+storms are Cathedral's storm rain and its three storm snows, so about
+half of rain and over half of snow is a storm. The Body page on K says
+so when you are in one. The slowdown is on the person: a horse keeps
+its own pace, because nothing in the server sets a horse's speed yet.
+
 ## The season and the sky
 
 The season is the one on [Farmer](classes/farmer.md): four of them, 7
-real days each, one for the whole province. It changes two things. It
-does not pick a single sky and hold it for the week.
+real days each, one for the whole province. It changes three things:
+the outdoor target, the sky, and in winter how fast you cool (above).
+It does not pick a single sky and hold it for the week. It also
+changes what a harvest gives: a quarter more in summer and a quarter
+less in winter, on [Farmer](classes/farmer.md),
+[Gatherer](classes/gatherer.md) and [Fisher](classes/fisher.md).
 
 A season shifts the outdoor target, before clothing, fire, and the
 sky. Indoors ignores it, the same way a roof ignores the sky.
@@ -139,6 +174,21 @@ Falling snow is still the snow line in the table above, 6 colder, on
 top of the season. A clear winter day does not take that 6. The snow
 place, target 16, is standing in snow on the ground. A clear sky over
 bare ground is not that place.
+
+## On the map
+
+The map menu shows a strip at the top while it is open (#3156, Patrick's
+C of 22 Oct 2026):
+
+- The date, the game's own: the day and the month are today's in UTC,
+  and the year is 4E 252 in 2026, turning with the real year. No day of
+  the week, because the game counts that on its own for each person.
+- The season, the next one, and how long until it turns.
+- The server clock: the box's own time, Mountain time, which is the
+  clock staff give times in. Your own clock beside it when your zone is
+  different.
+
+The season does not follow the date's month. Frostfall can be spring.
 
 ## Fire
 
@@ -242,6 +292,8 @@ of 0.5, the settle times, the on-fire damage, the spread, and the Body
 page on K are in the server.
 
 In it: the season shift on an outdoor target, the roll of the sky, the
+winter's quarter faster cooling under the sky (#3144), the
 master woodworker's 48, the master tailor's 4 degrees, the cold link
-into hunger and thirst, and the 3 minutes of wet. Not in it: the burn
+into hunger and thirst, the 3 minutes of wet, and a storm's 15% on
+the road. Not in it: the burn
 cutting clothing, and the meal's warmth.

@@ -41,6 +41,9 @@ namespace Thornswood
         public string Name = "";
         public string Password = "";
         public string Why = "";        // link, guild, banned, role, offline
+        // With offline: what the request ran into and how long it waited
+        // (Discord.LastFailure), for the log line that reports it.
+        public string NetFailure = "";
         public string Message = "";
         public string Invite = "";
         public bool Admin;
@@ -58,10 +61,12 @@ namespace Thornswood
         public const string Site = "https://thornswood.net";
 
         public static string Folder = @"C:\Thornswood\Profile";
-        static string TicketFile { get { return Path.Combine(Folder, "discord.txt"); } }
-        static string NameFile   { get { return Path.Combine(Folder, "discord-name.txt"); } }
-        static string AvatarFile { get { return Path.Combine(Folder, "discord-avatar.txt"); } }
-        static string DevFile    { get { return Path.Combine(Folder, "dev-allowed.txt"); } }
+        const string TicketName = "discord.txt", NameName = "discord-name.txt",
+                     AvatarName = "discord-avatar.txt", DevName = "dev-allowed.txt";
+        static string TicketFile { get { return Path.Combine(Folder, TicketName); } }
+        static string NameFile   { get { return Path.Combine(Folder, NameName); } }
+        static string AvatarFile { get { return Path.Combine(Folder, AvatarName); } }
+        static string DevFile    { get { return Path.Combine(Folder, DevName); } }
 
         /// <summary>Which build is asking: "" for the main build, "dev" for the dev build. Set by the shell.</summary>
         public static string Channel = "";
@@ -232,23 +237,38 @@ namespace Thornswood
             catch { return ""; }
         }
 
+        /// <summary>
+        /// Every file this account leaves in folder: the sign-in ticket, the
+        /// name and picture kept beside it, the site's last staff answer and
+        /// the door's last yes or no. Forget deletes them, and so does an
+        /// uninstall that keeps the saves and settings (LocalKeep.NotSaves,
+        /// #3679), so the two cannot name different files.
+        /// </summary>
+        public static string[] AccountFiles(string folder)
+        {
+            return new string[]
+            {
+                Path.Combine(folder, TicketName),
+                Path.Combine(folder, NameName),
+                Path.Combine(folder, AvatarName),
+                // The site's last staff answer for this account. Left on disk,
+                // DevAllowed stays true for the next account until that
+                // account's first check-in, and the staff queue can show in
+                // between (#1208).
+                Path.Combine(folder, DevName),
+                // door.txt is the last yes or no the site gave for this ticket
+                // (Door.AnswerFile, kept beside the ticket).
+                Path.Combine(folder, "door.txt"),
+            };
+        }
+
         public static void Forget()
         {
-            try { if (File.Exists(TicketFile)) File.Delete(TicketFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, TicketFile", ex); }
-            try { if (File.Exists(NameFile)) File.Delete(NameFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, NameFile", ex); }
-            try { if (File.Exists(AvatarFile)) File.Delete(AvatarFile); } catch (Exception ex) { Swallow.Note("Discord.Forget", ex); }
-            // The site's last staff answer for this account. Left on disk,
-            // DevAllowed stays true for the next account until that account's
-            // first check-in, and the staff queue can show in between (#1208).
-            try { if (File.Exists(DevFile)) File.Delete(DevFile); } catch (Exception ex) { Swallow.Note("Discord.Forget, DevFile", ex); }
-            // door.txt is the last yes or no the site gave for this ticket
-            // (Door.AnswerFile, kept beside the ticket). It goes with the account.
-            try
+            foreach (string f in AccountFiles(Folder))
             {
-                string door = Path.Combine(Folder, "door.txt");
-                if (File.Exists(door)) File.Delete(door);
+                try { if (File.Exists(f)) File.Delete(f); }
+                catch (Exception ex) { Swallow.Note("Discord.Forget, " + Path.GetFileName(f), ex); }
             }
-            catch (Exception ex) { Swallow.Note("Discord.Forget, door.txt", ex); }
             ticket = ""; name = ""; avatar = "";
         }
 
@@ -494,6 +514,7 @@ namespace Thornswood
                 // implying the person is banned.
                 st.Why = "offline";
                 st.Message = "Could not reach thornswood.net to check you in.";
+                st.NetFailure = LastFailure ?? "";
                 return st;
             }
 
@@ -1098,6 +1119,17 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// Why the last Send on this thread got no answer at all, and how long
+        /// it waited, or empty when it got one. Send returns 0 for every such
+        /// failure, so until 22 October a timeout, a refused connection and a
+        /// name that would not resolve all reached the log as the same "not
+        /// answering", and a check in that failed while the game was starting
+        /// (launcher.log, 22 Oct, 13:16:06 and 13:17:44) could not say which.
+        /// Per thread, because check ins run on pool threads side by side.
+        /// </summary>
+        [ThreadStatic] public static string LastFailure;
+
+        /// <summary>
         /// One call to the site and whatever it answered: the status code, and
         /// the body in reply, refusals included. 0 is the site not reached at
         /// all, which is not a refusal and is never read as one.
@@ -1111,6 +1143,8 @@ namespace Thornswood
         public static int Send(string method, string url, string json, out string reply)
         {
             reply = "";
+            LastFailure = "";
+            var took = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
@@ -1146,11 +1180,15 @@ namespace Thornswood
                     catch (Exception ex) { Swallow.Note("Discord.Send, reading refusal body", ex); }
                     return (int)res.StatusCode;
                 }
+                // WebExceptionStatus names the kind: Timeout, ConnectFailure,
+                // NameResolutionFailure, SecureChannelFailure and the like.
+                LastFailure = we.Status + " after " + took.ElapsedMilliseconds + " ms";
                 return 0;
             }
             catch (Exception ex)
             {
                 Swallow.Note("Discord.Send", ex);
+                LastFailure = ex.GetType().Name + " after " + took.ElapsedMilliseconds + " ms";
                 return 0;
             }
         }

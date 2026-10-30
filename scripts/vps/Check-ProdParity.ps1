@@ -8,7 +8,7 @@
   -Collect sends scripts\vps\Get-ProdFacts.ps1 to the VPS through
   Remote.ps1 and saves what it prints to -Facts. Get-ProdFacts only reads:
   no write, no start, no stop, no setting changed. Collecting is a live
-  step, so it is Claude's to run (claude-queue\2165-prod-parity.md).
+  step, so it is Claude's to run (the ops repo's ops\claude-queue\2165-prod-parity.md).
 
   Without -Collect it reads a saved -Facts file and compares it with
   records\prod-parity.json and the repository's own files. That part is
@@ -143,6 +143,43 @@ foreach ($e in $r.files) {
     $ok = (Get-RepoHashes $e.repo) -contains $live
     Row 'file' $e.live "same as $($e.repo) at this checkout" $(if ($ok) { 'same' } else { 'differs (or deployed from another commit)' }) $ok
 }
+
+# ---- inbound firewall rules (#3807) ----------------------------------------
+# Every enabled inbound Allow rule is on the record's list, by Name or
+# DisplayName, and every required one is on. Set-InboundRules.ps1 turns off
+# whatever is not listed; one that shows up afterwards is a door nobody wrote
+# down. The row names a rule by its DisplayName: a Name can be a long run of
+# letters and dashes that the secret scan below refuses.
+if ($f.PSObject.Properties.Name -contains 'inboundRules') {
+    $listed = @($r.inboundRules | ForEach-Object { [string]$_.rule })
+    foreach ($e in @($r.inboundRules | Where-Object { $_.required })) {
+        $on = @($f.inboundRules | Where-Object { $_.name -eq $e.rule -or $_.displayName -eq $e.rule })
+        Row 'firewall' $e.rule 'on (required)' $(if ($on) { 'on' } else { 'off, or not on the box' }) ([bool]$on)
+    }
+    foreach ($x in @($f.inboundRules)) {
+        if ($listed -contains [string]$x.name -or $listed -contains [string]$x.displayName) { continue }
+        $ports = if (@($x.ports).Count) { @($x.ports) -join ',' } else { 'Any' }
+        Row 'firewall' $x.displayName 'not listed in the record' ('on, ' + $x.protocol + ' ' + $ports + ' from ' + (@($x.remote) -join ',')) $false
+    }
+} else { Row 'firewall' 'inbound rules' 'collected' 'facts from before #3807 carry none' $false }
+
+# ---- the box's own firewall policy, and Edge (#3896) ------------------------
+# The firewall takes rules only from the box's policy store
+# (scripts\vps\BoxFirewall.ps1), so no installer can open a port, and the
+# in-box Edge, whose setup added an inbound rule with every version, is gone
+# (vps-harden.ps1). Should its setup refuse the uninstall, Edge stays with its
+# updater told never to install it again, and that is expected too (Patrick,
+# 27 Oct, on the report page: q-3896-edge-uninstall-refused, A).
+if ($f.PSObject.Properties.Name -contains 'firewallProfiles') {
+    foreach ($p in @($f.firewallProfiles)) {
+        Row 'firewall' ([string]$p.name + ' profile, local rules') 'ignored (AllowLocalFirewallRules False)' $(if ([string]$p.allowLocalRules -eq 'False') { 'ignored' } else { 'taken (' + $p.allowLocalRules + ')' }) ([string]$p.allowLocalRules -eq 'False')
+    }
+} else { Row 'firewall' 'local rules' 'collected' 'facts from before #3896 carry none' $false }
+if ($f.PSObject.Properties.Name -contains 'edgeVersion') {
+    $edgeBlocked = ($f.PSObject.Properties.Name -contains 'edgeInstallBlocked') -and [bool]$f.edgeInstallBlocked
+    $edgeSaid = $(if (-not $f.edgeVersion) { 'not installed' } elseif ($edgeBlocked) { 'installed, ' + $f.edgeVersion + ', its setup refused the uninstall and the updater is told never to install it' } else { 'installed, ' + $f.edgeVersion + ', and nothing stops the updater putting it back' })
+    Row 'program' 'Microsoft Edge' 'not installed, or kept with the updater told never to install it where its setup refuses the uninstall' $edgeSaid ((-not $f.edgeVersion) -or $edgeBlocked)
+} else { Row 'program' 'Microsoft Edge' 'collected' 'facts from before #3896 carry none' $false }
 
 # ---- TLS -------------------------------------------------------------------
 $site = @($f.certs | Where-Object { $_.subject -match 'thornswood\.net' })

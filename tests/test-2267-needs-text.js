@@ -4,7 +4,8 @@
 //
 // Patrick, 11 Oct 2026, on the board sweep's list: planned, not ruled out.
 // /needs is for people who choose to hide their needs bars (the launcher's
-// Settings, "Show the needs bars on screen") and want a quick text version of
+// Settings, "Show the needs bars on screen", and Settings in the game since
+// #3126) and want a quick text version of
 // them. It is another view of something with a button already, the Body page
 // on K, so it is his exception to "buttons, not chat commands", like the
 // commands that rule already lists, and docs/GAME-SYSTEMS.md "Buttons, not
@@ -204,11 +205,10 @@ function typed(N, word, actorId) {
   const help = read('game', 'ui', 'thornswood-help.js');
   yes('D1 the help panel\'s Living names /needs for the bars as text',
       /\/needs in the chat says all four as a line of text/.test(help));
-  const helpCs = read('launcher', 'app', 'Help.cs');
-  yes('D2 the launcher\'s Help item on the needs names it', /hidden in Settings, \/needs in the chat says all four/.test(helpCs));
-  const xaml = read('launcher', 'ui.xaml');
-  yes('D3 the Settings line under "Show the needs bars on screen" names it',
-      /x:Name="ChkNeedsBars"[^>]*\/>\s*<TextBlock[^>]*Text="[^"]*\/needs in the chat says them as a line of text\."/.test(xaml));
+  // The needs bars are shown or hidden on Settings in the game since #3126.
+  const settingsPage = read('game', 'ui', 'thornswood-settings.js');
+  yes('D3 the line under the needs bars on Settings in the game names it',
+      /data-bars="0"[\s\S]{0,400}\/needs in the chat says them as a line of text\./.test(settingsPage));
   const systems = read('docs', 'GAME-SYSTEMS.md');
   const buttons = slice(systems, '## Buttons, not commands', '\n## ') || '';
   yes('D4 docs/GAME-SYSTEMS.md "Buttons, not commands" says /needs stays a command, and why',
@@ -216,14 +216,12 @@ function typed(N, word, actorId) {
   const guide = read('Developer-Guide.md');
   const rule = slice(guide, '#### Buttons, not chat commands', '\n#### ') || '';
   yes('D5 the Developer Guide\'s rule names it beside the other exceptions', /`\/needs`/.test(rule) && /#2267/.test(rule));
-  const claude = read('CLAUDE.md');
-  const claudeRule = slice(claude, '### Buttons, not chat commands', '\n### ') || '';
-  yes('D5b CLAUDE.md\'s list of the commands that stay names /needs and /need in the guide\'s words',
-      /`\/needs` \(and `\/need`\), the needs bars as a line of text for somebody who hid them/.test(claudeRule) && /#2267/.test(claudeRule));
+  // D5b, CLAUDE.md's list, left with CLAUDE.md for the private ops repo
+  // (#3693), whose tests/test-ops-docs.js holds it.
   const commands = read('docs', 'systems', 'commands.md');
   yes('D6 docs/systems/commands.md has its row: anybody, on the list, stays a command',
       /^\| `\/needs`, `\/need` \| Anybody \|[^\n]*\| The list;[^\n]*\| Stays a command[^\n]*\| #2267 \|$/m.test(commands));
-  const all = [help, helpCs, xaml, buttons, rule].join('\n');
+  const all = [help, settingsPage, buttons, rule].join('\n');
   yes('D7 none of it says the word the house rules forbid, or has an em dash',
       !/\bplayers?\b/i.test(textOf(branch) + textOf(slice(needsBlock, '  function textView(actorId) {', '\n  }\n') || '')) &&
       all.indexOf(String.fromCharCode(0x2014)) === -1);

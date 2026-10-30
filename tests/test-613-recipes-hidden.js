@@ -19,7 +19,10 @@
 //   - writing the character is what hands the list, and a write that changes
 //     nothing about it sends nothing;
 //   - the script hides, puts back the keyword the record had, acts once per
-//     list, and spreads a long list over frames.
+//     list, and spreads a long list over frames;
+//   - a recipe moved in each game (#3120) goes out with the list, is moved
+//     to its trade's bench once, and comes back there, not to its mod's
+//     bench, after it was hidden.
 //
 // Read only.
 'use strict';
@@ -65,6 +68,7 @@ const GATE_PARTS = [
 const HIDE_PARTS = [
   take('function recipesHiddenScript() {'),
   take('function recipesRefused(actorId) {'),
+  take('function recipesMoved() {'),
   take('function handRecipesHidden(actorId) {')
 ];
 const PER_FRAME = Number((/^var RECIPES_PER_FRAME = (\d+);$/m.exec(src) || [])[1]);
@@ -103,6 +107,8 @@ yes('the rows this test asks about are in the table',
     ALL[ROW.embassy].roll === 'embassy' && Object.keys(KEPT).length === 1);
 
 const RACE_IDS = { 0x13746: 'nordrace', 0x2b51c: 'rieklingrace' };
+// The recipes moved in each game (#3120): empty until section E fills it.
+const MOVED = {};
 
 function server(store) {
   const sets = [];
@@ -140,11 +146,11 @@ function server(store) {
   vm.runInContext(RULES, ctx, { filename: 'gamemode.js rules' });
   // The real gate and the real list block, over the same mp and the same tables.
   const made = new Function('globalThis', 'mp', 'log', 'NO_PROFESSION_AT_A_BENCH', 'RECIPES_BY_ID', 'KEPT_SMELT',
-                            'RECIPES_HIDDEN_PROPERTY', 'RECIPES_PER_FRAME', 'raceOf',
+                            'RECIPES_HIDDEN_PROPERTY', 'RECIPES_PER_FRAME', 'raceOf', 'RECIPES_MOVED_IN_GAME',
                             GATE_PARTS.concat(HIDE_PARTS).join('\n') +
                             '\nreturn { craftAnswer: craftAnswer, recipesRefused: recipesRefused, ' +
                             'handRecipesHidden: handRecipesHidden, script: recipesHiddenScript };')(
-    ctx, mp, function () { }, 'no profession', TABLE, KEPT, PROPERTY, PER_FRAME, ctx.raceOf);
+    ctx, mp, function () { }, 'no profession', TABLE, KEPT, PROPERTY, PER_FRAME, ctx.raceOf, MOVED);
   ctx.__thornswoodRolls = { has: function (id, roll) { return (rolls[roll] || []).indexOf(id) !== -1; } };
   // writeState's typeof finds it here, the way it finds the top level one on the server.
   ctx.handRecipesHidden = made.handRecipesHidden;
@@ -305,6 +311,68 @@ const COOK = person(0xff000205, 0x13746, 'cook', 'hearthcook');
     run({ value: 5, state: {}, sp: sp });
     return calls === 0;
   })());
+}
+
+// ------------------------------------- E. a recipe moved in each game (#3120) --
+{
+  // A recipe whose plugin is never copied, moved to its trade's bench in each
+  // game: the novice plate, here to a keyword of Thornswood-Content.esp.
+  const KW = '154e1:Thornswood-Content.esp';
+  MOVED[ROW.plateNovice] = { to: KW };
+  srv.sets.length = 0;
+  srv.gate.handRecipesHidden(PLATE_ADV);
+  const v = srv.mp.get(PLATE_ADV, PROPERTY);
+  yes('E1: the moves go out with the list, each to the bench it is made at now',
+      srv.sets.length === 1 && !!v.moved && v.moved[ROW.plateNovice] === KW && Object.keys(v.moved).length === 1);
+  srv.sets.length = 0;
+  srv.gate.handRecipesHidden(PLATE_ADV);
+  yes('E1: and the same list with the same moves is not sent again', srv.sets.length === 0);
+  srv.gate.handRecipesHidden(NONE);
+
+  const records = {};
+  KEYS.forEach(function (k) { records[k] = { bench: 0x88105 }; });
+  let calls = 0;
+  const sp = {
+    Game: {
+      getFormFromFile: function (id, file) {
+        calls++;
+        const k = id.toString(16) + ':' + file;
+        if (k === KW) { return { kw: 0x154e1 }; }
+        return records[k] ? { k: k } : null;
+      },
+      getFormEx: function (id) { return { kw: id }; }
+    },
+    ConstructibleObject: {
+      from: function (form) {
+        if (!form || !form.k) { return null; }
+        const r = records[form.k];
+        return {
+          getWorkbenchKeyword: function () { return r.bench ? { getFormID: function () { return r.bench; } } : null; },
+          setWorkbenchKeyword: function (kw) { r.bench = kw ? kw.id : 0; }
+        };
+      }
+    },
+    Keyword: { from: function (f) { return f ? { id: f.kw } : null; } }
+  };
+  const run = new Function('ctx', srv.gate.script());
+  const state = {};
+  // Each person's stamp is their own here, so two hands in one millisecond
+  // are still two lists.
+  function frame(id) { run({ value: Object.assign({}, srv.mp.get(id, PROPERTY), { at: id }), state: state, sp: sp }); }
+  function frames(id) { for (let i = 0; i < Math.ceil(KEYS.length / PER_FRAME) + 2; i++) { frame(id); } }
+
+  frames(PLATE_ADV);
+  yes('E2: somebody who may make it finds it at its trade\'s bench, and the rest where they were',
+      records[ROW.plateNovice].bench === 0x154e1 && records[ROW.plateAdvanced].bench === 0x88105);
+  calls = 0;
+  for (let i = 0; i < 30; i++) { frame(PLATE_ADV); }
+  yes('E3: it is moved once, and later frames touch no record', calls === 0);
+  frames(NONE);
+  yes('E4: somebody who may not make it does not see it anywhere', records[ROW.plateNovice].bench === 0);
+  frames(PLATE_ADV);
+  yes('E5: and when it is listed again it goes back to its trade\'s bench, not to the one its mod put it at',
+      records[ROW.plateNovice].bench === 0x154e1);
+  delete MOVED[ROW.plateNovice];
 }
 
 // ------------------------------------------------- D. where it is asked from --

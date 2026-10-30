@@ -26,7 +26,10 @@
        made must come back, on it and on the child processes it started,
        with nothing lost. Without -SelfTest a failed self-test stops here.
     2. Starts the gate's trace session on the box, then dispatches
-       .github\workflows\trace-gate.yml on -Ref, which runs the gate on a
+       trace-gate.yml on the main of the private ops repository,
+       EvilPatrick06/Thornswood-Ops, where the VPS runners are registered
+       (#4013), with -Ref as the branch of this repository it checks out
+       and traces. It runs the gate on a
        build runner the way build.yml does, with Nightly-Harnesses.ps1
        -StartLog saying which process was which harness's.
     3. Waits for that run, then stops the session whatever happened, so the
@@ -77,7 +80,9 @@
   Take the trace task and its folders off the box.
 
 .PARAMETER Ref
-  The branch trace-gate.yml runs on, and so the commit traced. main.
+  The branch of this repository trace-gate.yml checks out, and so the
+  commit traced. main. The workflow itself always runs from the ops
+  repository's main.
 
 .PARAMETER WaitMinutes
   How long the run may take before this stops waiting and stops the session.
@@ -93,7 +98,8 @@ param(
     [string]$PushRun = '',
     [string]$Ref = 'main',
     [int]$WaitMinutes = 50,
-    [string]$Repo = 'EvilPatrick06/Thornswood',
+    # Where trace-gate.yml and the VPS runners are (#4013).
+    [string]$Repo = 'EvilPatrick06/Thornswood-Ops',
     [string]$Vps = '',
     [string]$User = ''
 )
@@ -123,7 +129,7 @@ function Invoke-Box([string]$mode, [hashtable]$vars = @{}) {
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     $out = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Bypass -Script ($pre + [IO.File]::ReadAllText($BoxScript)) |
-        ForEach-Object { [string]$_ } | Where-Object { $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+        ForEach-Object { [string]$_ })
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     return [pscustomobject]@{ Code = $rc; Lines = $out }
@@ -259,11 +265,11 @@ $run = $null
 $conclusion = ''
 try {
     $asked = [DateTime]::UtcNow.AddSeconds(-5)
-    $null = Invoke-Gh workflow run trace-gate.yml --repo $Repo --ref $Ref
-    Say "  dispatched trace-gate.yml on $Ref"
+    $null = Invoke-Gh workflow run trace-gate.yml --repo $Repo --ref main '-f' ('ref=' + $Ref)
+    Say "  dispatched trace-gate.yml on $Repo, tracing $Ref"
     for ($i = 0; $i -lt 24 -and -not $run; $i++) {
         Start-Sleep -Seconds 5
-        $list = (Invoke-Gh run list --repo $Repo --workflow trace-gate.yml --branch $Ref --event workflow_dispatch --limit 5 --json 'databaseId,createdAt,url') -join "`n" | ConvertFrom-Json
+        $list = (Invoke-Gh run list --repo $Repo --workflow trace-gate.yml --branch main --event workflow_dispatch --limit 5 --json 'databaseId,createdAt,url') -join "`n" | ConvertFrom-Json
         $run = @($list | Where-Object { ([DateTime]$_.createdAt).ToUniversalTime() -ge $asked } | Sort-Object createdAt | Select-Object -First 1)[0]
     }
     if (-not $run) { throw 'the dispatched run did not show up within two minutes' }

@@ -208,7 +208,13 @@ if (Test-Path -LiteralPath $OldDist) {
     # A count for the person, never a reason to stop: what could not be read
     # is said as an "at least" rather than left out of the number unsaid.
     $oldUnread = @()
-    $oldMb = ([double](@(Get-ChildItem -LiteralPath $OldDist -Recurse -File -ErrorAction SilentlyContinue -ErrorVariable oldUnread) | Measure-Object Length -Sum).Sum) / 1MB
+    # Measure-Object hands back nothing at all when no file comes in, and under
+    # Set-StrictMode -Version Latest (top of this file) reading .Sum off that
+    # nothing throws "The property 'Sum' cannot be found on this object". An
+    # old folder that is there but empty did exactly that, before anything was
+    # published. Empty is 0 MB.
+    $oldMeasure = @(Get-ChildItem -LiteralPath $OldDist -Recurse -File -ErrorAction SilentlyContinue -ErrorVariable oldUnread) | Measure-Object Length -Sum
+    $oldMb = if ($oldMeasure) { [double]$oldMeasure.Sum / 1MB } else { 0 }
     Write-Host ("  releases stage in $DistDir now, not in $OldDist") -ForegroundColor DarkGray
     Write-Host ("  the old one still holds {0}{1:N1} MB. Check it with .\scripts\dev\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $(if ($oldUnread.Count) { 'at least ' } else { '' }), $oldMb) -ForegroundColor Yellow
     if ($oldUnread.Count) { Write-Host ("  {0} part(s) of it could not be read to count: {1}" -f $oldUnread.Count, $oldUnread[0].Exception.Message) -ForegroundColor DarkGray }
@@ -473,15 +479,12 @@ elseif ($null -ne $ownCollection) {
 # 3 October. Revision 2 supplies the baseline; our packs supply subsequent
 # fishing and crafting records. Updater unshares each destination before
 # extraction, preserving Vortex staging and the independently updated channel.
-$shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
-# From the feed the bodies are the bytes the last release carried, each held
-# to its sha256 there by New-FeedRoot; only a collection Ship builds them.
-if ($FromFeed) { Say '  the generated bodies are the last release''s, by their sha256' 'DarkGray' }
-else { Assert-ShipGeneratedBodies $GameDir $ProfileDir }
+# The behavior files and bodies are built on each computer by the launcher
+# since #3715 and never ship (Ship-Rules Test-ShipGenerated), so nothing here
+# reads the generated record any more.
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if (Test-ThornswoodRepoPlugin $rel) { return $false }
-    if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
 # Place plugins the load order names that Vortex does not deploy under that
@@ -1624,8 +1627,11 @@ foreach ($k in @($prev.Keys)) {
     if ($now.ContainsKey($k)) { continue }
     if (-not (Test-ShipNotOurs $k)) { continue }
     # Bethesda's, one machine's and backups never become hash-gone: a delete
-    # must not reach Steam copies of those (#1152, #1239, #1261).
-    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k)) { continue }
+    # must not reach Steam copies of those (#1152, #1239, #1261). Nor what the
+    # launcher builds on each computer (#3715): an install whose build made
+    # the very bytes a release once carried would lose them at every update
+    # and build them again at the next Play.
+    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k) -or (Test-ShipGenerated $k)) { continue }
     $m = [regex]::Match([string]$prev[$k], '^\d+:([0-9a-fA-F]{64})$')
     if ($m.Success) { $gone[$k] = $m.Groups[1].Value.ToLowerInvariant() }
 }

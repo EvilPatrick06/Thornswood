@@ -3,8 +3,8 @@
 
   Where a builder reads a plugin of the load order from (#2923).
 
-  Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp,
-  Thornswood-WoodworkerTrail.esp, and any other file in game\content) are made
+  Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp, and
+  any other file in game\content) are made
   and shipped from this repository's game\content. A game folder holds
   whichever release last reached it, so a table read from there describes a
   plugin nobody ships. Every plugin whose name is a file in game\content is
@@ -63,3 +63,13 @@ function Read-PluginsTxt([string]$Path) {
 
 function Get-LoadOrder([string]$Path) { return (Read-PluginsTxt $Path).On }
 function Get-SwitchedOff([string]$Path) { return (Read-PluginsTxt $Path).Off }
+
+# What a table says it was read from: how many plugins and the first twelve
+# hex of the sha256 of their names in order, one per line. Never the plugin
+# list's path, which names one machine (#3105).
+function Get-LoadOrderName([string[]]$Order) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes(($Order -join "`n"))
+    $hex = ([System.BitConverter]::ToString($sha.ComputeHash($bytes)) -replace '-', '').ToLowerInvariant().Substring(0, 12)
+    return ('{0} plugins in load order (names sha256 {1})' -f $Order.Count, $hex)
+}

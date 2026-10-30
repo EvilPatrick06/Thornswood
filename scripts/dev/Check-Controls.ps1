@@ -98,11 +98,11 @@ $unused  = @($named.Keys  | Where-Object { -not $lookup.ContainsKey($_) } | Sort
 #
 # An earlier version of this script tried to work out for itself whether each
 # missing name was safe, by looking for a null check earlier in the same
-# method. It got it wrong in the way that counts. BuildModList opens with
-# "if (modList == null) return;" so it called every later line safe, including
-# a deliberately planted typo in a different control. A sibling guard protects
-# against a whole page being absent, not against one name being mistyped, and
-# mistyped is the case this script exists to catch.
+# method. It got it wrong in the way that counts. The mod list's builder
+# opened with "if (modList == null) return;" so it called every later line
+# safe, including a deliberately planted typo in a different control. A
+# sibling guard protects against a whole page being absent, not against one
+# name being mistyped, and mistyped is the case this script exists to catch.
 $baseFile = Join-Path $Here 'control-baseline.txt'
 $baseline = New-Object 'System.Collections.Generic.Dictionary[string,bool]' ([StringComparer]::Ordinal)
 if (Test-Path -LiteralPath $baseFile) {

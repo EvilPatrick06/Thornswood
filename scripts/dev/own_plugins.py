@@ -3,8 +3,8 @@ own_plugins.py
 
 Where a builder reads a plugin of the load order from (#2923).
 
-Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp,
-Thornswood-WoodworkerTrail.esp, and any other file in game/content) are made
+Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp, and
+any other file in game/content) are made
 and shipped from this repository's game/content. A game folder holds whichever
 release last reached it, so a table read from there describes a plugin nobody
 ships. Every plugin whose name is a file in game/content is read from there,
@@ -26,6 +26,7 @@ on 1 Oct. Every builder takes its load order from load_order.
     path = own_plugins.plugin_path(data, 'Thornswood-Content.esp')
 """
 
+import hashlib
 import io
 import os
 
@@ -79,3 +80,12 @@ def load_order(plugins_txt):
 
 def switched_off(plugins_txt):
     return read_plugins_txt(plugins_txt)[1]
+
+
+def load_order_name(order):
+    """What a table says it was read from: how many plugins and the first
+    twelve hex of the sha256 of their names in order, one per line. Never the
+    plugin list's path, which names one machine (#3105: every box run wrote
+    its own temp folder into ten tables)."""
+    digest = hashlib.sha256('\n'.join(order).encode('utf-8')).hexdigest()[:12]
+    return '%d plugins in load order (names sha256 %s)' % (len(order), digest)

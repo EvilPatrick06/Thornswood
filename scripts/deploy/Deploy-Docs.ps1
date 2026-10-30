@@ -17,7 +17,7 @@
                                the browser, so this is safe
     .\Deploy-Docs.ps1 -Boards  also board.json, which DOES overwrite anything
                                typed into a board on the site
-    .\Deploy-Docs.ps1 -Board known
+    .\Deploy-Docs.ps1 -Board active
                                replaces just the named board inside the live
                                board.json with the repo's, .bak first, and
                                leaves every other board as it was typed. A
@@ -87,7 +87,7 @@ param(
   # Just the boards. -SeedDocs would also flatten every markdown document up
   # there, which is too big a hammer when only the runbook moved.
   [switch]$Boards,
-  # One board out of board.json, by its key (known), put in place of the
+  # One board out of board.json, by its key (active), put in place of the
   # live one while every other board stays exactly as typed on the site
   # (#2414). -Boards flattens them all. The live board.json goes to .bak
   # first, and the board's revision moves on, so a hub page still open on the
@@ -138,6 +138,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The service account helpers (#2578), sent up as text in front of the setup
 # script (#2613), so the site's principal and fail-safe are the installers'.
 . (Join-Path $Here 'ServiceAccount.ps1')
+# Where the box keeps its firewall rules, and the refresh that makes the
+# firewall take a change to them (#3896).
+. (Join-Path $Here '..\vps\BoxFirewall.ps1')
 $siteAccountHelpers = (Get-ThornswoodServiceAccountScript) + "`n"
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
@@ -199,7 +202,7 @@ if ($Board) {
   $repoBoards = Get-Content -Raw -LiteralPath (Join-Path $App 'data/board.json') | ConvertFrom-Json
   foreach ($b in @($Board)) {
     if (-not $b) { continue }
-    if ($b -notmatch '^[a-z]+$') { throw "-Board takes a board's key, such as known: $b" }
+    if ($b -notmatch '^[a-z]+$') { throw "-Board takes a board's key, such as active: $b" }
     if (-not ($repoBoards.PSObject.Properties.Name -contains $b)) { throw "no board named $b in the repo's data/board.json" }
     $boardNames += $b
   }
@@ -228,9 +231,9 @@ Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 #
 # 2>&1 means anything ssh writes to stderr comes back in the same stream as the
 # output, as an ErrorRecord rather than a string. Callers that only print are
-# fine with that. Callers that treat the result as text are not: OpenSSH now
-# warns about post-quantum key exchange on every connection, that warning
-# arrived among the filenames, and $_.Trim() stopped the deploy with "does not
+# fine with that. Callers that treat the result as text are not: until the
+# box's OpenSSH 10.4 (#1043, 26 Oct 2026) ssh warned about post-quantum key
+# exchange on every connection, that warning arrived among the filenames, and $_.Trim() stopped the deploy with "does not
 # contain a method named 'Trim'" after the files had already gone up. The two
 # places that build a list from this take only the strings.
 function Remote($script) {
@@ -556,16 +559,21 @@ $siteAccountHelpers
 # and Caddy holds 80 and 443. Opening 3001 would put a plain HTTP way straight
 # past the certificate, so the rule is opened only for a box that asked for a
 # plain listener on purpose, and torn down otherwise if a previous run left one.
+# The rule lives in the box's own policy store, the only one the firewall
+# takes rules from, and Group Policy is refreshed after a change
+# (scripts\vps\BoxFirewall.ps1, #3896).
+$(Get-ThornswoodFirewallScript)
 `$local = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','Machine')
 `$expose = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_EXPOSE','Machine')
+`$fwHas = [bool](Get-NetFirewallRule -PolicyStore localhost -DisplayName '$Task' -EA SilentlyContinue)
 if (`$local -eq '1' -or `$expose -ne '1') {
-  Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue |
-    Remove-NetFirewallRule -EA SilentlyContinue
+  if (`$fwHas) { Remove-NetFirewallRule -PolicyStore localhost -DisplayName '$Task'; Sync-ThornswoodFirewall; 'firewall rule on $Port taken away' }
   'loopback only, $Port left shut'
 }
-elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
-  New-NetFirewallRule -DisplayName '$Task' -Direction Inbound -Protocol TCP ``
+elseif (-not `$fwHas) {
+  New-NetFirewallRule -PolicyStore localhost -DisplayName '$Task' -Direction Inbound -Protocol TCP ``
     -LocalPort $Port -Action Allow | Out-Null
+  Sync-ThornswoodFirewall
   'firewall opened on $Port'
 } else { 'firewall rule already there' }
 
@@ -602,10 +610,22 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 # the process token and changes the token's default DACL "to allow only the
 # task SID and local system full control and the account SID read control",
 # which leaves every other service on the box that runs as LOCAL SERVICE
-# able to read the site's own objects and not change them. The account is
-# still the token's user, so the grants below still apply. Neither was tried
+# able to read the site's own objects and not change them. Neither was tried
 # on a registered task here, and the read-back after registering says what
 # the box kept.
+#
+# THE GRANTS NAME THE TASK, NOT LOCAL SERVICE (#4077). Until 27 Oct 2026 the
+# rules below went to LOCAL SERVICE, which every service on the box runs as,
+# so the dev server's gamemode could change the site's code and read what
+# the site reads. They go to NT TASK\<the site's task> now, its SID worked
+# out from the task's name, and each run takes the LOCAL SERVICE rules it
+# made before off, on every copy of those folders on the box. Windows maps
+# that SID only once the task is registered, so the grants are made after
+# the task is registered or updated, in the site grants block below (#4973),
+# and a grant still refused there stops the deploy. The task starts through the launcher
+# (ServiceAccount.ps1), so what the site writes is owned by that SID and not
+# by LOCAL SERVICE, and once the site is stopped, the files LOCAL SERVICE
+# owns in its folder are given to it (StartIt below).
 #
 # It is also given what the site touches and no more: Modify on its own
 # folder, where it writes config.json, data, uploads and site.log, and Read
@@ -622,6 +642,7 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 `$runAs = '$RunAs'
 `$principal = `$null
 `$sid = ''
+`$own = ''
 `$already = `$false
 if (-not `$runAs) {
   `$runAs = 'LOCAL SERVICE'
@@ -653,68 +674,7 @@ if (`$principal) {
     }
   }
   `$principal = New-ThornswoodServicePrincipal
-  foreach (`$g in @(
-      @('$rootWin', '(OI)(CI)M'),
-      @('$boxWin\Thornswood-Server\data', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Server', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Server-Dev', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Voice\chat', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
-      @('$boxWin\Thornswood-Deploys\current', '(OI)(NP)R'))) {
-    if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
-    `$said = & icacls `$g[0] /grant ('*' + `$sid + ':' + `$g[1]) 2>&1
-    if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }
-    else { 'COULD NOT GRANT ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] + ': ' + ((`$said | Out-String).Trim()) }
-  }
-
-  # #913, approved by Patrick on 28 Sep. The site reads the update feed and
-  # never writes it: only Remirror-Site-Feed and Publish-Update do, over scp
-  # as Administrator. So the site account is denied writing and deleting in
-  # feed and feed-dev, and keeps the read it inherits from the Modify above.
-  # The deny names the write rights one by one and is built in .NET, NOT with
-  # icacls (W,D,DC): icacls' W is FILE_GENERIC_WRITE, which carries
-  # SYNCHRONIZE, node opens every file asking for SYNCHRONIZE, and that deny
-  # took both feeds off the site for about four minutes on 28 Sep. A Deny rule
-  # built here leaves SYNCHRONIZE out, and adding the same rule twice keeps one.
-  `$fsr = [Security.AccessControl.FileSystemRights]
-  `$noWrite = `$fsr::WriteData -bor `$fsr::AppendData -bor `$fsr::WriteExtendedAttributes -bor ``
-    `$fsr::WriteAttributes -bor `$fsr::Delete -bor `$fsr::DeleteSubdirectoriesAndFiles
-  `$who = New-Object Security.Principal.SecurityIdentifier(`$sid)
-  foreach (`$n in 'feed', 'feed-dev') {
-    `$f = Join-Path '$rootWin' `$n
-    if (-not (Test-Path -LiteralPath `$f)) { 'not here, nothing denied: ' + `$f; continue }
-    try {
-      `$acl = Get-Acl -LiteralPath `$f
-      `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, `$noWrite,
-        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-        [Security.AccessControl.PropagationFlags]::None, [Security.AccessControl.AccessControlType]::Deny)))
-      Set-Acl -LiteralPath `$f -AclObject `$acl -ErrorAction Stop
-      'denied ' + `$runAs + ' writing and deleting in ' + `$f
-    } catch { 'COULD NOT DENY ' + `$runAs + ' writing in ' + `$f + ': ' + `$_.Exception.Message }
-  }
-
-  # BUILTIN\Users inherits read and create on C:\ and so on the whole site
-  # folder, config.json included; nothing here runs as a plain user. The
-  # folder stops inheriting, keeping a copy of what it had, and every Users
-  # rule goes. SYSTEM, Administrators and the site account above stay.
-  # Only the access rules are written back, through .NET: Set-Acl also tried
-  # to write the audit part here, which needs SeSecurityPrivilege, and an
-  # account without it (the build runner's) was refused (issue #1120).
-  function SetAccess(`$p, `$a) {
-    `$item = Get-Item -LiteralPath `$p -Force
-    if (`$PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]`$item, [Security.AccessControl.DirectorySecurity]`$a) }
-    else { `$item.SetAccessControl(`$a) }
-  }
-  try {
-    `$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
-    `$acl = Get-Acl -LiteralPath '$rootWin'
-    `$acl.SetAccessRuleProtection(`$true, `$true)
-    SetAccess '$rootWin' `$acl
-    `$acl = Get-Acl -LiteralPath '$rootWin'
-    `$acl.PurgeAccessRules(`$users)
-    SetAccess '$rootWin' `$acl
-    'BUILTIN\Users no longer reaches $rootWin'
-  } catch { 'COULD NOT TAKE BUILTIN\Users OFF ' + '$rootWin' + ': ' + `$_.Exception.Message }
+  `$own = Get-ThornswoodTaskSidFromName '$Task'
 }
 # ==== end thornswood site account ====
 
@@ -749,6 +709,17 @@ if (-not `$node) { 'NODE NOT FOUND ON THIS MACHINE'; return }
       -DontStopIfGoingOnBatteries -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) ``
       -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -Priority 4
 `$have = Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
+# Through the launcher when the site is on its own SID (#4077, the account
+# block above). OWNER NEW tells the deploy the running site still makes its
+# files as LOCAL SERVICE, so it is restarted even when no file changed.
+if (`$own) {
+  `$launcher = ''
+  try { `$launcher = Install-ThornswoodOwnerLaunch }
+  catch { 'COULD NOT BUILD THE LAUNCHER, so nothing was stopped or changed: ' + `$_.Exception.Message; return }
+  `$a = New-ThornswoodOwnedAction -Launcher `$launcher -Sid `$own -Execute `$node -Argument '$rootWin\server.js' -WorkingDirectory '$rootWin'
+  if (-not `$have -or [string]@(`$have.Actions)[0].Execute -ne `$launcher) { 'OWNER NEW' }
+  'OWNER ' + `$own
+}
 if (-not `$have) {
   `$t = New-ScheduledTaskTrigger -AtStartup
   Register-ScheduledTask -TaskName '$Task' -Action `$a -Trigger `$t -Settings `$s ``
@@ -785,6 +756,116 @@ if (-not `$have) {
     'COULD NOT UPDATE THE SCHEDULED TASK, it keeps what it had: ' + `$_.Exception.Message
   }
 }
+# ==== thornswood site grants ====
+# After the task is registered or updated, and not before (#4973). The grants
+# name NT TASK\$Task by its SID, and Windows maps a task's SID only once
+# that task is registered: on a box with no such task yet, icacls refused
+# every grant with "No mapping between account names and security IDs"
+# (#4968), the deploy carried on, and the new task ran with none of the
+# access below until a second deploy. LOCAL SERVICE's old rules come off
+# only once the grants are made. `$own is set only when the site runs on its
+# own SID: not for SYSTEM, and not for an account set by hand.
+if (`$own) {
+  `$refused = @()
+  foreach (`$g in @(
+      @('$rootWin', '(OI)(CI)M'),
+      @('$boxWin\Thornswood-Server\data', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server-Dev', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Deploys\current', '(OI)(NP)R'))) {
+    if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
+    `$said = & icacls `$g[0] /grant ('*' + `$own + ':' + `$g[1]) 2>&1
+    if (`$LASTEXITCODE -eq 0) { 'granted NT TASK\$Task ' + `$g[1] + ' on ' + `$g[0] }
+    else {
+      `$why = ((`$said | Out-String).Trim())
+      'COULD NOT GRANT NT TASK\$Task ' + `$g[1] + ' on ' + `$g[0] + ': ' + `$why
+      `$refused += `$g[1] + ' on ' + `$g[0] + ': ' + `$why
+    }
+  }
+  # A grant still refused stops the deploy (#4973): the site would start
+  # without what it needs and nothing would turn red. LOCAL SERVICE's old
+  # rules stay on, and SETUP DONE is never said, so nothing is swapped.
+  if (`$refused.Count) {
+    'GRANTS REFUSED to NT TASK\$Task, so the deploy stops here and nothing is swapped. Refused:'
+    foreach (`$x in `$refused) { '  ' + `$x }
+    'LOCAL SERVICE keeps its old rules. The task is registered; deploy again once the refusal above is mended.'
+    return
+  }
+  # The rules these grants gave LOCAL SERVICE before #4077, off every copy of
+  # those folders on the box: the ones an install moved aside keep them
+  # otherwise. The bot's and the runners' rules, and every other, stay.
+  `$was = @('$rootWin')
+  `$was += '$boxWin\Thornswood-Deploys\current'
+  foreach (`$d in @(Get-ChildItem -LiteralPath '$boxWin\' -Directory -Force -EA SilentlyContinue | Where-Object { `$_.Name -like 'Thornswood-Server*' })) {
+    `$was += `$d.FullName
+    `$was += (Join-Path `$d.FullName 'data')
+  }
+  foreach (`$d in @(Get-ChildItem -LiteralPath '$boxWin\' -Directory -Force -EA SilentlyContinue | Where-Object { `$_.Name -like 'Thornswood-Voice*' })) {
+    `$was += (Join-Path `$d.FullName 'chat')
+  }
+  foreach (`$p in `$was) {
+    if (-not (Test-Path -LiteralPath `$p)) { continue }
+    `$named = @((Get-Acl -LiteralPath `$p).GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-5-19' })
+    if (-not `$named.Count) { continue }
+    `$said = & icacls `$p /remove:g '*S-1-5-19' 2>&1
+    if (`$LASTEXITCODE -eq 0) { 'LOCAL SERVICE no longer has a rule on ' + `$p }
+    else { 'COULD NOT TAKE LOCAL SERVICE OFF ' + `$p + ': ' + ((`$said | Out-String).Trim()) }
+  }
+
+  # #913, approved by Patrick on 28 Sep. The site reads the update feed and
+  # never writes it: only Remirror-Site-Feed and Publish-Update do, over scp
+  # as Administrator. So the site account is denied writing and deleting in
+  # feed and feed-dev, and keeps the read it inherits from the Modify above.
+  # The deny names the write rights one by one and is built in .NET, NOT with
+  # icacls (W,D,DC): icacls' W is FILE_GENERIC_WRITE, which carries
+  # SYNCHRONIZE, node opens every file asking for SYNCHRONIZE, and that deny
+  # took both feeds off the site for about four minutes on 28 Sep. A Deny rule
+  # built here leaves SYNCHRONIZE out, and adding the same rule twice keeps one.
+  `$fsr = [Security.AccessControl.FileSystemRights]
+  `$noWrite = `$fsr::WriteData -bor `$fsr::AppendData -bor `$fsr::WriteExtendedAttributes -bor ``
+    `$fsr::WriteAttributes -bor `$fsr::Delete -bor `$fsr::DeleteSubdirectoriesAndFiles
+  `$who = New-Object Security.Principal.SecurityIdentifier(`$own)
+  foreach (`$n in 'feed', 'feed-dev') {
+    `$f = Join-Path '$rootWin' `$n
+    if (-not (Test-Path -LiteralPath `$f)) { 'not here, nothing denied: ' + `$f; continue }
+    try {
+      `$acl = Get-Acl -LiteralPath `$f
+      `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, `$noWrite,
+        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+        [Security.AccessControl.PropagationFlags]::None, [Security.AccessControl.AccessControlType]::Deny)))
+      # The deny that named LOCAL SERVICE before #4077 goes with its grant.
+      foreach (`$r in @(`$acl.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-5-19' })) { [void]`$acl.RemoveAccessRuleSpecific(`$r) }
+      Set-Acl -LiteralPath `$f -AclObject `$acl -ErrorAction Stop
+      'denied NT TASK\$Task writing and deleting in ' + `$f
+    } catch { 'COULD NOT DENY NT TASK\$Task writing in ' + `$f + ': ' + `$_.Exception.Message }
+  }
+
+  # BUILTIN\Users inherits read and create on C:\ and so on the whole site
+  # folder, config.json included; nothing here runs as a plain user. The
+  # folder stops inheriting, keeping a copy of what it had, and every Users
+  # rule goes. SYSTEM, Administrators and the site account above stay.
+  # Only the access rules are written back, through .NET: Set-Acl also tried
+  # to write the audit part here, which needs SeSecurityPrivilege, and an
+  # account without it (the build runner's) was refused (issue #1120).
+  function SetAccess(`$p, `$a) {
+    `$item = Get-Item -LiteralPath `$p -Force
+    if (`$PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]`$item, [Security.AccessControl.DirectorySecurity]`$a) }
+    else { `$item.SetAccessControl(`$a) }
+  }
+  try {
+    `$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+    `$acl = Get-Acl -LiteralPath '$rootWin'
+    `$acl.SetAccessRuleProtection(`$true, `$true)
+    SetAccess '$rootWin' `$acl
+    `$acl = Get-Acl -LiteralPath '$rootWin'
+    `$acl.PurgeAccessRules(`$users)
+    SetAccess '$rootWin' `$acl
+    'BUILTIN\Users no longer reaches $rootWin'
+  } catch { 'COULD NOT TAKE BUILTIN\Users OFF ' + '$rootWin' + ': ' + `$_.Exception.Message }
+}
+# ==== end thornswood site grants ====
 
 # Read back rather than assumed. Set-ScheduledTask is quiet about settings
 # it did not apply.
@@ -828,6 +909,11 @@ if (`$who) {
 foreach ($l in $setup) { Write-Host "  $l" }
 # An account that does not resolve, or no node, ends that block early. Nothing
 # has been stopped, so the stage goes and the site keeps running as it was.
+# The site's own SID when it starts through the launcher (#4077), and whether
+# the running site still writes as LOCAL SERVICE.
+$owner = ''
+foreach ($l in $setup) { if ($l -match '^\s*OWNER (S-1-[0-9-]+)\s*$') { $owner = $Matches[1] } }
+$ownerNew = @($setup | Where-Object { $_.Trim() -eq 'OWNER NEW' }).Count -gt 0
 if ($setup -notcontains 'SETUP DONE') {
   Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
   Write-Host ''
@@ -859,7 +945,18 @@ function StopIt {
   foreach ($p in $held) { 'stopped pid ' + $p.Id }
   Stop-ThornswoodProcessHeld $held
 }
-function StartIt { Start-ScheduledTask -TaskName $Task }
+# With the site stopped, what LOCAL SERVICE made in its folder is given to
+# the site's own SID before it starts through the launcher (#4077, the
+# account block). Said in capitals when it cannot be, naming why; the site
+# still starts, because a site left stopped takes the launcher's sign-in
+# down with it.
+function StartIt {
+  if ($Owner) {
+    try { Repair-ThornswoodServiceOwner -Root $Root -Sid $Owner }
+    catch { 'COULD NOT GIVE THE SITE WHAT LOCAL SERVICE MADE IN ' + $Root + ': ' + $_.Exception.Message }
+  }
+  Start-ScheduledTask -TaskName $Task
+}
 function Healthy {
   $until = (Get-Date).AddSeconds($Wait)
   while ($true) {
@@ -927,8 +1024,33 @@ function Why {
 
 Write-Host ''
 if ($PutBack) { Write-Host "Putting back the newest .prev folder in $rootWin..." }
+elseif ($appUnchanged -and $ownerNew) { Write-Host 'Nothing in the app to swap, but the site starts through the launcher now: restarting it.' }
 elseif ($appUnchanged) { Write-Host 'Nothing in the app to swap; site left running.' }
 else { Write-Host 'Stopping, swapping in and starting...' }
+# The site's own SID for StartIt (#4077), and the account helpers it uses.
+$ownerVars = $siteAccountHelpers + "`$Owner = '" + $owner + "'`r`n"
+# Nothing to swap and the site still writes as LOCAL SERVICE (OWNER NEW):
+# stopped, given what LOCAL SERVICE made in its folder, and started through
+# the launcher, the way the swap does it, so nothing it writes from here on
+# is every service's.
+if ($appUnchanged -and $ownerNew -and -not $PutBack) {
+  $restartVars = "`$Root = '" + $Root.Replace('/', '\').Replace("'", "''") + "'`r`n`$Wait = " + $Wait + "`r`n" +
+                 "`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n"
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $restartOut = @(Remote ($ownerVars + $restartVars + $ThornswoodStopAndMoveText + $siteHooks + @'
+StopIt
+StartIt
+if (Healthy) { 'PASS: ' + (Answer); 'RESTART OK' } else { 'FAIL: it did not answer within ' + $Wait + ' seconds'; Why }
+'@) | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+  } finally { $ErrorActionPreference = $eap }
+  if ($restartOut -notcontains 'RESTART OK') {
+    Write-Host ''
+    Write-Host '  THE SITE DID NOT ANSWER AFTER ITS RESTART. The lines above say why.' -ForegroundColor Red
+    exit 1
+  }
+}
 if ($PutBack -or -not $appUnchanged) {
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) +
         ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n") +
@@ -938,7 +1060,7 @@ if ($PutBack) { $pick = $putBackPick }
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $swapOut = @(Remote ($vars + $siteHooks + $pick + $serviceSwapBlock) |
+  $swapOut = @(Remote ($ownerVars + $vars + $siteHooks + $pick + $serviceSwapBlock) |
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 if (-not (Show-SwapResult $swapOut "$rootWin\.prev-<stamp>")) { exit 1 }

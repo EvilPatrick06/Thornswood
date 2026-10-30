@@ -28,6 +28,11 @@
 //      itself comes or goes.
 //   6. a change measured from a traced tree's listing, as a pull request
 //      measures it (pick), is what git diff --name-status gives.
+//   7. a change to a build workflow runs the whole gate only when the gate's
+//      part of it differs from the traced tree's (#3874): its gate steps,
+//      the build jobs' runners and the environment, never its triggers,
+//      concurrency, tested jobs, conditions or the steps after the gate; a
+//      traced tree with no shape runs the whole gate as before.
 'use strict';
 const path = require('path');
 const REPO = path.join(__dirname, '..');
@@ -205,6 +210,69 @@ try {
   try { A.parseTree(Buffer.from('not a listing\0')); } catch (e) { threw = true; }
   yes('a listing that is not one is refused, so the whole gate runs', threw);
   yes('a change to Run-Gate.ps1, the gate step\'s script, runs the whole gate', A.select({ map: map, gate: gate, base: BASE, changes: [{ status: 'M', path: 'scripts/dev/Run-Gate.ps1' }], baseFiles: baseFiles, headFiles: baseFiles }).full);
+  yes('so does a change to Gate-Map.ps1, which fetches the map off the box (#4009)', A.select({ map: map, gate: gate, base: BASE, changes: [{ status: 'M', path: 'scripts/dev/Gate-Map.ps1' }], baseFiles: baseFiles, headFiles: baseFiles }).full);
+}
+
+// 7. the gate's shape in the build workflows (#3874)
+{
+  const WF = [
+    'name: Build check', 'on:', '  push:', '    branches: [main]', 'permissions:', '  contents: read',
+    'concurrency:', '  group: build-${{ github.ref }}', '  cancel-in-progress: false', 'jobs:',
+    '  tested:', '    runs-on: ubuntu-latest', '    steps:', '      - run: echo look',
+    '  launcher-vps:', '    name: Launcher builds (VPS fallback)', '    needs: [tested, launcher]', "    if: ${{ !cancelled() }}",
+    '    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]', '    timeout-minutes: 40', '    steps: &checks',
+    '      - uses: actions/checkout@x # v7', '      # why the checks run', '      - name: Scan', '        run: |', '          .\\scripts\\dev\\Check-Secrets.ps1',
+    '      - name: Run the gate harnesses', '        id: gate', '        run: |', '          .\\scripts\\dev\\Run-Gate.ps1 -Throttle 6',
+    '      - name: Lint', '        run: echo lint', '      - name: Write down the tree', '        run: echo note',
+    '  launcher:', '    name: Launcher builds', '    needs: tested', '    runs-on: windows-latest', '    timeout-minutes: 60', '    steps: *checks', ''].join('\n');
+  const PR = WF.replace('name: Build check', 'name: Build check (pull requests)');
+  const sh = (a, b) => A.gateShape([a, b === undefined ? PR : b]);
+  const base = sh(WF);
+  yes('the two build workflows have a gate shape', /^[0-9a-f]{64}$/.test(base || ''));
+  yes('  the same in CRLF', sh(WF.split('\n').join('\r\n')) === base);
+  for (const [what, text] of [
+    ['a comment', WF.replace('      # why the checks run', '      # why the checks run, and when')],
+    ['the triggers', WF.replace('    branches: [main]', '    branches: [main, dev]')],
+    ['the concurrency', WF.replace('cancel-in-progress: false', 'cancel-in-progress: true')],
+    ['the tested job', WF.replace('      - run: echo look', '      - run: echo look again')],
+    ['a build job\'s condition and needs', WF.replace("    if: ${{ !cancelled() }}", "    if: ${{ !cancelled() && 1 }}").replace('needs: [tested, launcher]', 'needs: [tested, tested-vps, launcher]')],
+    ['a step after the gate', WF.replace('        run: echo note', '        if: runner.environment == \'github-hosted\'\n        run: echo note')],
+    ['a new job beside the build jobs', WF.replace('  launcher:\n', '  other:\n    runs-on: ubuntu-latest\n  launcher:\n')],
+  ]) { yes('  a change to ' + what + ' keeps it', sh(text) === base); }
+  for (const [what, text] of [
+    ['the gate step', WF.replace('-Throttle 6', '-Throttle 4')],
+    ['a step before the gate', WF.replace('Check-Secrets.ps1', 'Check-Secrets.ps1 -Binary')],
+    ['a new step before the gate', WF.replace('      - name: Run the gate harnesses', '      - name: Plant\n        run: echo x > game/x.js\n      - name: Run the gate harnesses')],
+    ['the fallback\'s runner', WF.replace('thornswood-vps, thornswood-build]', 'thornswood-build]')],
+    ['the hosted job\'s runner', WF.replace('runs-on: windows-latest', 'runs-on: windows-2025')],
+    ['the permissions', WF.replace('  contents: read', '  contents: read\n  actions: read')],
+    ['an env for every job', WF.replace('concurrency:', 'env:\n  X: 1\nconcurrency:')],
+  ]) { yes('  a change to ' + what + ' changes it', sh(text) !== base); }
+  yes('  so does one to the pull request workflow alone', sh(WF, PR.replace('-Throttle 6', '-Throttle 5')) !== base);
+  yes('  a workflow with no gate step has none', sh(WF.replace('        id: gate\n', '')) === null && sh(WF, null) === null);
+
+  const files = baseFiles.concat(['tests/test-1306-pr-workflow.js']);
+  const m2 = JSON.parse(JSON.stringify(map));
+  m2.harnesses['test-1306-pr-workflow.js'] = { reads: ['.github/workflows/build.yml', 'tests/test-1306-pr-workflow.js'], lists: [] };
+  const g2 = gate.concat(['test-1306-pr-workflow.js']);
+  const sel = (shape) => A.select({ map: m2, gate: g2, base: BASE, changes: [{ status: 'M', path: '.github/workflows/build.yml' }], baseFiles: files, headFiles: files, shape: shape });
+  r = sel({ base: base, head: base });
+  yes('a build.yml change outside the gate\'s part runs only what reads it', !r.full && r.run.indexOf('test-1306-pr-workflow.js') >= 0 && r.run.indexOf('test-food.js') < 0 && r.notes.length === 1);
+  yes('one inside it runs the whole gate', sel({ base: base, head: sh(WF.replace('-Throttle 6', '-Throttle 4')) }).full);
+  yes('so does any, measured from a traced tree with no shape', sel({ base: null, head: base }).full && sel(undefined).full);
+  yes('and an added or removed build workflow, whatever the shapes', A.select({ map: m2, gate: g2, base: BASE, changes: [{ status: 'D', path: '.github/workflows/build-pr.yml' }], baseFiles: files, headFiles: files, shape: { base: base, head: base } }).full);
+
+  const listing = Buffer.from('100644 blob ' + 'a'.repeat(40) + '\tdocs/a.md\0');
+  const withShape = A.readTreeFile(Buffer.concat([Buffer.from('#gate-shape ' + base + '\0'), listing]));
+  yes('a tree file carries the shape before its listing', withShape.shape === base && withShape.tree.get('docs/a.md') === '100644 ' + 'a'.repeat(40));
+  const old = A.readTreeFile(listing);
+  yes('  and one written before it reads with none', old.shape === null && old.tree.size === 1);
+  let threw = false;
+  try { A.readTreeFile(Buffer.concat([Buffer.from('#gate-shape nope\0'), listing])); } catch (e) { threw = true; }
+  yes('  a header that is not a shape is refused, so the whole gate runs', threw);
+  const ra = fs.readFileSync(path.join(REPO, 'scripts', 'dev', 'Run-Gate.ps1'), 'utf8');
+  yes('Run-Gate.ps1 writes the traced tree with the tree command, which carries the shape', /& node \$Affected tree HEAD /.test(ra));
+  yes('the repository\'s own two build workflows have a shape', A.gateShape(A.WORKFLOWS.map(f => fs.readFileSync(path.join(REPO, f), 'utf8'))) !== null);
 }
 
 console.log(pass + ' passed, ' + fail + ' failed');

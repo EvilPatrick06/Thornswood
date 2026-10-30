@@ -22,6 +22,10 @@ on [People who are not people](npcs.md). You speak to the trader.
 The server accepts the goods, because the actor's own scripts do
 not run.
 
+A new character's first errand, from the Cook of the town they start in, is
+not one of these. It pays nothing and moves no goods, and it is on
+[Creation](creation.md), under The first steps (#3166).
+
 ## What they are for
 
 A supply quest moves goods. The trader asks for a count of an item
@@ -177,11 +181,11 @@ over them and their quest steps are refused until it is put right.
 The remaining scarce places and scene objects have been selected in
 [Custom quest places](quest-locations.md), with exact source references,
 counts, cooldowns and the distinction between existing sources and the
-dedicated markers now authored in Content. The existing Farmer orchard interaction is bound in source; availability still requires Claude to deliver the merged sections. A dragon is not a bounty. Papyrus
+dedicated markers now authored in Content. The existing Farmer orchard interaction is bound in source; availability still requires the merged sections to be delivered. A dragon is not a bounty. Papyrus
 quests do not run.
 
-The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.
+The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask 3/cap 8 and 12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires a release.
 
-The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask2/cap6 and12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.
+The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask 2/cap 6 and 12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.
 
-The [longfin work](merchant-longfin-work.md) connects eight dedicated sea markers to Haafingar's Alchemist. Master Fishers with suitable poles draw one fish per shared four-hour return, up to eight per open quest. Returning consumes two, keeps extras and starts a twelve-hour rest. Original clams remain independent. Matching Content delivery and runtime activation belong to Claude.
+The [longfin work](merchant-longfin-work.md) connects eight dedicated sea markers to Haafingar's Alchemist. Master Fishers with suitable poles draw one fish per shared four-hour return, up to eight per open quest. Returning consumes two, keeps extras and starts a twelve-hour rest. Original clams remain independent. It is live only once the matching Content is delivered and the runtime activated.

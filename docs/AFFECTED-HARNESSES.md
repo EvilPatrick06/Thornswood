@@ -9,8 +9,8 @@ running on main and nightly. The parts are:
 - `scripts/dev/Trace-HarnessReads.js`, the Linux tracer the study used.
 - `scripts/dev/Trace-Gate.ps1` and `scripts/dev/Trace-Gate-Box.ps1`, the
   Windows tracer. An administrator runs it on the shipping machine. It
-  starts an ETW session on the box, runs the gate through
-  `.github/workflows/trace-gate.yml`, and reads each harness's opens from
+  starts an ETW session on the box, runs the gate through `trace-gate.yml`
+  in the private ops repository (#4013), and reads each harness's opens from
   the trace against `Nightly-Harnesses.ps1 -StartLog`. Its self-test passed
   on the box at 9:40 PM on 21 Oct (Patrick's time) with no events lost.
 - `scripts/dev/Affected-Harnesses.js`, which builds the map from either
@@ -184,16 +184,21 @@ only by the always rules and by main and the nightly running everything.
 **Main and the tested-tree note.** Since #3182, main's build skips a tree
 that a green pull request build already passed. If a partial pull request
 build left that note, main would skip the full gate, and main would no longer
-run everything. So a partial build must either keep its note under another
-name, such as `tested-tree-partial-<tree>`, that Tested-Tree.js does not
-accept, or keep no note.
+run everything. So a partial build must keep no note, or one that
+Tested-Tree.js does not accept. Since #3399 the note is a `TESTED-TREE <tree>`
+line in the build's log, not an artifact, and a build that did not run the
+whole gate does not print it. Since #3874 only a build on GitHub's hosted
+runner prints it. On the VPS a pull request runs the whole gate only when the
+map could not serve it, and a main build skipped by the note is not traced,
+so the note kept the map stale and every later pull request ran the whole
+gate too. Without the note, main builds in full and is traced.
 
 ## 4. Forcing rules: a change to any of these runs the whole gate
 
 | Path | Why |
 |---|---|
-| `.github/workflows/build.yml`, `build-pr.yml` | These hold the gate's steps, environment and checkout. Any other workflow is an ordinary file: a harness that reads it has it in its map, as test-1306-pr-workflow.js does with build.yml. |
-| `scripts/dev/Nightly-Harnesses.ps1`, `Gate-Harnesses.ps1`, `Affected-Harnesses.js`, `Trace-HarnessReads.js` | They list, choose, run and trace the harnesses. |
+| The gate's part of `.github/workflows/build.yml` and `build-pr.yml` | Their top-level permissions, env and defaults, and the two build jobs (less their name, needs and if) through the gate step hold the gate's steps, environment and checkout. Since #3874 the traced tree carries a hash of that part (`#gate-shape`, written by `Affected-Harnesses.js tree`), and only a change to it, or a tree with no hash to compare, forces the whole gate. A change elsewhere in those two files (the triggers, the concurrency, the tested jobs, the steps after the gate) makes them ordinary files, as is every other workflow: a harness that reads one has it in its map, as test-1306-pr-workflow.js does with build.yml. Adding or removing either file still forces it. |
+| `scripts/dev/Run-Gate.ps1`, `Nightly-Harnesses.ps1`, `Gate-Harnesses.ps1`, `Affected-Harnesses.js`, `Trace-HarnessReads.js` | They list, choose, run and trace the harnesses. |
 | `tests/gate-excluded.txt` | It is the gate list. |
 | A code helper in `tests/` (`*.ps1`, `*.js`, `*.py`, `*.c` not named `test-*`) | Belt and braces: a helper is already in the map of every harness that reads it. The rule catches a helper that only Windows loads. Over the 40 merges it cost 1.2 points of time share and two whole gates (#3061 `fork-git.js`, #3053 `bot-python.js`). `tests/README.md` is not code. |
 | `records/build-runners.json` | The gate step reads it for its share of the cores. |
@@ -377,14 +382,19 @@ of 570 gate harnesses. Replayed over the last 40 merges, a fresh map ran
    `Affected-Harnesses.js pick` builds the map from the newest traces and
    measures the change from the traced tree's listing to the pull request's
    merge commit. Nothing is fetched. It prints why each chosen harness runs.
-   It runs the whole gate when there is no map, when the map does not read,
-   when the change touches a forcing rule (section 4, now with
-   `Run-Gate.ps1`), and on a GitHub-hosted runner, which has no map.
-4. **Only a whole gate keeps the note.** Run-Gate.ps1 writes `whole=true`
-   only when every gate harness ran, and build.yml keeps the
-   `tested-tree-<tree>` note (#3182) only then. So after a pull request that
-   ran less, main builds in full, and that build is the one traced. Main and
-   the nightly run the whole gate every time.
+   A gate with no map of its own, on One's runners or GitHub's hosted
+   runner, uses the map main's build handed on (item 7). It runs the whole
+   gate when it has neither, when the map does not read, or when the change
+   touches a forcing rule (section 4, now with `Run-Gate.ps1` and
+   `Gate-Map.ps1`).
+4. **Only a whole gate on GitHub's hosted runner keeps the note.**
+   Run-Gate.ps1 writes `whole=true` only when every gate harness ran, and
+   build.yml writes the `TESTED-TREE <tree>` note in its log (#3182, #3399)
+   only then, and only on GitHub's hosted runner (#3874). So after any pull
+   request built on the VPS, main builds in full, and that build is the one
+   traced. On main a newer push waits for the build in progress instead of
+   cancelling it (#3874), so a busy hour still ends in a traced build. Main
+   and the nightly run the whole gate every time.
 5. **Install.** `.\scripts\dev\Trace-Gate.ps1 -Install` from the shipping
    machine, by somebody with the box's administrator key, runs the self-test
    and installs the task for the runners `records/build-runners.json` lists.
@@ -394,7 +404,24 @@ of 570 gate harnesses. Replayed over the last 40 merges, a fresh map ran
 6. **What it does not cover.** A main build on GitHub's hosted runner is not
    traced, so once hosted minutes are back (about 1 Nov) the map refreshes
    only when main builds on the box. A pull request built on the hosted
-   runner runs the whole gate.
+   runner picks from the last map a box build handed on (item 7), so the
+   merges since count as part of its change.
+7. **Off the box (#4009).** The map is only in the box's build runners'
+   folders, so a pull request built on One's runners (#3860) or GitHub's
+   ran the whole gate: #3861's own build on thornswood-pr-one took about 13
+   minutes for it (run 40424800152). Main's push build on the box now runs
+   `scripts/dev/Gate-Map.ps1 -Hand` after its gate: it builds the map from
+   that runner's newest traces and prints it, gzipped, with the traced tree,
+   into the job's log as numbered `GATE-MAP` lines with each part's sha256.
+   About 23 KB and 75 KB gzipped. A log, because this repository's artifact
+   storage is used up (#3399) and a log costs none. A gate with no map of
+   its own runs `Gate-Map.ps1 -Fetch` with the job's token (`actions:
+   read`), which reads the newest finished build.yml runs on a push to main
+   of this repository, passes over any other run, and writes the first whole
+   map it finds in the box's folder shape, the built map in place of the
+   traces. `pick` takes either. Run-Gate.ps1 takes the token out of the
+   environment before any harness starts. `tests/test-4009-gate-map.ps1`
+   holds both halves.
 
 `tests/test-3114-run-gate.ps1` runs Run-Gate.ps1 for real in a scratch
 repository for each of those cases, and on Windows runs the task's check of

@@ -83,7 +83,8 @@
     - before anything is sent the box says which zip its store keeps for this
       record, its live record, port, join pass switch and load order; with no
       zip for the record it stops there. -ServerBuild <zip> sends one first
-      (engine.yml's, held to the record here and by its bytes there);
+      (the pin's, from Where.ps1 EngineArtifact's artifact\server, held to
+      the record here and by its bytes there);
     - the record, the gamemode and its stamp, and our plugins when they are
       not the box's bytes, go up into the stage as -GamemodeOnly sends them;
       the box takes the zip's files into the stage, held to the record
@@ -201,7 +202,8 @@ param(
   # The server build records\server-build.json names, out of the store on the
   # box, with no server build on this machine (#459). See FROM THE STORE.
   [switch]$FromStore,
-  # A server build zip (engine.yml's server-<...>.zip, its .json beside it) to
+  # A server build zip (server-<...>.zip, its .json beside it, as
+  # Get-EngineArtifact.ps1 makes it from the fork's build of the pin) to
   # send to the store first, for -FromStore.
   [string]$ServerBuild = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
@@ -503,7 +505,7 @@ function Invoke-PutBack {
   if (-not (Show-SwapResult $backOut "$rootWin\.undone-<stamp>")) { exit 1 }
   # The record that came back with the files is what the box says it runs.
   Restore-SwapRecord "$User@$Vps" $ssh $Root $backOut "$Root/data/thornswood-deploy.json" 'gamemode'
-  $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
+  $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root (Get-ThornswoodDocsRootBeside $Root)
   Write-Host ''
   Write-Host '  PASS. The previous files are back and the server is answering.' -ForegroundColor Green
   exit 0
@@ -849,7 +851,7 @@ if (Test-Path -LiteralPath $rp) {
     if (-not $stored.Name) {
       throw ('the store on the box keeps no server build of ' + $stored.Commit.Substring(0, 8) + ' with the record this commit holds' +
              $(if (@($stored.Others).Count) { ' (it has ' + (@($stored.Others) -join ', ') + ', from that commit with another record)' } else { '' }) +
-             '. Put it there with a full deploy or a publish from a machine that has that build, or with -ServerBuild and the zip engine.yml made. Nothing was sent and the server was not touched.')
+             '. Put it there with a full deploy or a publish from a machine that has that build, or with -ServerBuild and the pin''s server zip (Where.ps1 EngineArtifact, artifact\server). Nothing was sent and the server was not touched.')
     }
     $theirs = if ($boxRecordCommit) { $boxRecordCommit.Substring(0, [Math]::Min(8, $boxRecordCommit.Length)) } else { 'none recorded' }
     Write-Host ('{0,-22} {1} out of the store on the box, commit {2}; the live server runs {3}{4}' -f 'build', $stored.Name, $ours8, $theirs,
@@ -1214,7 +1216,7 @@ Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood
 $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
 # And what engine it runs, from the box's own server-build.json, where the site
 # reads it for the credits page (DeployedBuild.ps1). Never fails the deploy.
-$null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
+$null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root (Get-ThornswoodDocsRootBeside $Root)
 
 # And from here, the shape Publish-Server.ps1 uses: ONE try (#2975). The box
 # answering itself on 127.0.0.1 is the same socket the rest of the world
@@ -1236,6 +1238,6 @@ if ($outside.Answered) {
   Write-Host ("  FAIL. The box says the server is up, and {0}:{1} was {2} from here, though {3} on the box answers from here." -f $Vps, $resPort, $outside.Said, $witness) -ForegroundColor Red
   Write-Host '  The new files stay in place: this is the box''s inbound rule for the port, or' -ForegroundColor Red
   Write-Host '  something between, and putting the old files back would not change it:' -ForegroundColor Red
-  Write-Host ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) -ForegroundColor DarkGray
+  Write-Host ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -PolicyStore ActiveStore -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) -ForegroundColor DarkGray
   exit 1
 }

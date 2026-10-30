@@ -66,14 +66,42 @@ param(
     [string]$Allow = '',
     # A submodule the tree scan finds not checked out (#1326): Say names it
     # and carries on; Require also counts it as not read, so the scan exits 2.
-    [ValidateSet('Say', 'Require')][string]$Submodules = 'Say'
+    [ValidateSet('Say', 'Require')][string]$Submodules = 'Say',
+    # The client record the six client runtime files are held to. Empty is
+    # this checkout's records\client-build.json, as Ship-Rules loads it.
+    # Package-Thornswood passes the record of the launcher it packs (#3099):
+    # an installer of an older release carries that launcher's client, and
+    # held to the checkout's record every one of the six failed as
+    # client-not-recorded-build, so no installer of 1.2.5 could be made.
+    [string]$ClientRecord = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $Here = $PSScriptRoot
+# Taken before Ship-Rules is dot-sourced: it sets $clientRecord, the same
+# name to PowerShell, to the checkout's record.
+$givenRecord = $ClientRecord
 . (Join-Path $Here '..\release\Ship-Rules.ps1')
+if ($givenRecord) {
+    # Read the way Ship-Rules reads the checkout's: a record that does not
+    # read, or names no files, stops the scan rather than leaving the six
+    # paths unlisted (#2711).
+    try {
+        $given = Get-Content -LiteralPath $givenRecord -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if (-not $given -or -not $given.PSObject.Properties['files'] -or -not $given.files) { throw 'it names no files' }
+    } catch {
+        Write-Host ("Check-Secrets: the client record $givenRecord does not read (" + $_.Exception.Message + '), so the client runtime cannot be held to it. Nothing was scanned.') -ForegroundColor Red
+        exit 2
+    }
+    $ShipClientFiles.Clear()
+    $ShipClientHashes = @{}
+    foreach ($p in $given.files.PSObject.Properties.Name) {
+        [void]$ShipClientFiles.Add($p)
+        $ShipClientHashes[$p] = ([string]$given.files.$p.sha256).ToLowerInvariant()
+    }
+}
 
 # ---------------------------------------------------------------- the rules
 #

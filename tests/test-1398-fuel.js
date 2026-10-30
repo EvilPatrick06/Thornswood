@@ -48,7 +48,7 @@ function lineOf(re) { const m = re.exec(gm); return m ? m[0] : null; }
 // ------------------------------------------------- 1. the table and the page
 const fuelLine = /^const FUEL_BY_RECIPE = (\{.*\});$/m.exec(gm);
 const FUEL = fuelLine ? JSON.parse(fuelLine[1]) : {};
-yes('FUEL_BY_RECIPE is installed in the gamemode', !!fuelLine && Object.keys(FUEL).length > 300);
+yes('FUEL_BY_RECIPE is installed in the gamemode', !!fuelLine && Object.keys(FUEL).length > 200);
 {
   const built = Fuel.blockLines(Fuel.fuelTable(RECIPES_JSON), Object.keys(RECIPES_JSON.recipes || {}).length).join('\n');
   const installed = slice(gm, '// ==== FUEL_BY_RECIPE, generated ====', '// ==== end FUEL_BY_RECIPE ====');
@@ -104,7 +104,12 @@ if (RECIPES && KEPT) {
   yes('a hotter metal on the list wins: glass ingots in a Tribunal robe burn briquette',
       grade('Tribunal Light Robe Black') === 3);
   yes('a forge piece with no metal on the table still burns one charcoal, the lowest',
-      grade('Fur Hood') === 1 && FUEL[byName('Fur Hood')][1] === '');
+      grade('Hide Helmet') === 1 && FUEL[byName('Hide Helmet')][1] === '');
+  // #3120 moved the Tailor's and the Woodwright's forge rows to their own bench,
+  // where nothing burns.
+  yes('a piece moved off the forge to its trade\'s bench burns nothing: the Fur Hood is made at the loom',
+      !!byName('Fur Hood') && RECIPES_JSON.recipes[byName('Fur Hood')].movedFromName === 'CraftingSmithingForge' &&
+      !Object.prototype.hasOwnProperty.call(FUEL, byName('Fur Hood')));
   const reach = Object.keys(FUEL).every(function (k) {
     return (Object.prototype.hasOwnProperty.call(RECIPES, k) && !RECIPES[k].nobody) || Object.prototype.hasOwnProperty.call(KEPT, k);
   });
@@ -150,11 +155,18 @@ const pieces = {
   handle: lineOf(/^const HANDLE_DESC = .*$/m),
   tools: slice(gm, 'const TOOLS = {', '\n};'),
   key: lineOf(/^const KEY_RECIPE = .*$/m),
+  // #3151: the quality a weapon or an armour piece comes out at.
+  quality: [slice(gm, 'const CRAFT_QUALITY = {', '\n};'), lineOf(/^const QUALITY_WEAPON_FAMILIES = .*$/m),
+            lineOf(/^const QUALITY_RANKS = .*$/m)].join('\n'),
   fns: ['function idOf(descriptor)', 'function mintedEntry(entry)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function wovenMark(actorId)',
         'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
+        'function qualityTier(margin, roll)', 'function qualityRolled(row, baseId)',
+        'function qualityMargin(actorId, row)', 'function qualityOutput(actorId, row, margin)',
+        // A dish named with its days left (#3163), after the other outputs.
+        'function spoilingOutput(actorId)',
         'function unfitToMake(actorId, workbenchId)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
@@ -201,7 +213,7 @@ function craftRig(state) {
     __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } },
     __thornswoodManeuvers: { WOVEN: WOVEN }
   };
-  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key]
+  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.quality]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
   const onCraft = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'guard', 'notify', 'say', 'log',
     'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork', body)(
@@ -301,7 +313,8 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     ['Lute', 'Drum', 'Flute'].forEach(function (name) {
       const r = craftRig(wood);
       r.give(T1, 1);
-      yes('a ' + name.toLowerCase() + ' is made without a tool handle', r.craft(byName(name)) !== false && r.count(T1) === 0);
+      yes('a ' + name.toLowerCase() + ' is made at the woodworking bench without a tool handle, and burns no charcoal',
+          r.craft(byName(name)) !== false && r.count(T1) === 1);
     });
     ['Iron War Axe', 'Iron Battleaxe', 'Iron Warhammer', 'Iron Mace'].forEach(function (name) {
       const r = craftRig(smith);

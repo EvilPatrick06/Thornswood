@@ -1,0 +1,10 @@
+name: proto_flutter
+description: The Flutter prototype for the launcher stack study (#3209).
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: ^3.9.0
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.0

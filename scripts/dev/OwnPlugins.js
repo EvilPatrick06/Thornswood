@@ -2,8 +2,8 @@
 //
 // Where a builder reads a plugin of the load order from (#2923).
 //
-// Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp,
-// Thornswood-WoodworkerTrail.esp, and any other file in game/content) are made
+// Thornswood's own plugins (Thornswood-Content.esp, Thornswood-Last.esp, and
+// any other file in game/content) are made
 // and shipped from this repository's game/content. A game folder holds
 // whichever release last reached it: on 20 Oct One's held a Content plugin
 // from 12 Oct, 146,941 bytes against the repository's 117,274 the day before
@@ -84,4 +84,12 @@ function loadedOrder(file, dataDir) {
   return order;
 }
 
-module.exports = { OWN_DIR, MASTERS, isOwn, pluginPath, loadOrder, switchedOff, loadedOrder };
+// What a table says it was read from: how many plugins and the first twelve
+// hex of the sha256 of their names in order, one per line. Never the plugin
+// list's path, which names one machine (#3105).
+function loadOrderName(order) {
+  const hex = require('crypto').createHash('sha256').update(order.join('\n'), 'utf8').digest('hex').slice(0, 12);
+  return order.length + ' plugins in load order (names sha256 ' + hex + ')';
+}
+
+module.exports = { OWN_DIR, MASTERS, isOwn, pluginPath, loadOrder, switchedOff, loadedOrder, loadOrderName };

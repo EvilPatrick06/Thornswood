@@ -34,7 +34,11 @@
            sees END deletes the report;
          - a read while the run has its report open for appending reads it
            and leaves the run able to write (#3233: ReadAllLines did not, so
-           a read mid-run made the run's next line fail and end it as END 1).
+           a read mid-run made the run's next line fail and end it as END 1);
+         - a run whose starting session is still open waits for it to end
+           before any of its script runs, and one whose session does not
+           end within its limit runs nothing and is ERROR and END 1 (#3214:
+           Install-Bridge's run stopped the bridge its own start rode).
   Setup-Domain.ps1's use of it is in tests\test-setup-domain-taskonly.ps1.
   Starts only the Windows PowerShell processes it waits for, in the scratch
   folder it removes; nothing leaves this machine.
@@ -75,6 +79,14 @@ Yes 'a folder with a quote in it is refused' $threw
 # the run's next AppendAllText fail and the run end as ERROR and END 1.
 Yes 'the read opens the report so the run can go on writing it (#3233)' (
     -not $r.Read.Contains('ReadAllLines') -and $r.Read.Contains('[IO.FileShare]::ReadWrite'))
+# #3214: the start names its session's sshd process before it starts the
+# run, and the run waits for it before any of the script.
+$runnerText = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String(([regex]::Match($r.Start, '-EncodedCommand ([A-Za-z0-9+/=]+)')).Groups[1].Value))
+Yes 'the start names the session''s own sshd process for the run before it starts it (#3214)' (
+    $r.Start.IndexOf(".ps1.session', [string]`$up.ProcessId)") -gt 0 -and $r.Start.IndexOf(".ps1.session', [string]`$up.ProcessId)") -lt $cim -and
+    $r.Start.Contains("'^sshd(-session)?\.exe`$'") -and $r.Start.Contains('CreationDate -gt'))
+Yes '  and the run waits for that process to exit before it runs the script' (
+    $runnerText.Contains('WaitForExit(120000)') -and $runnerText.IndexOf('WaitForExit(') -lt $runnerText.IndexOf("*>&1 | ForEach-Object"))
 
 if (-not $OnWindows) {
     Write-Host 'SKIP  the runs: they need Windows PowerShell 5.1 and WMI, which only Windows has'
@@ -91,9 +103,16 @@ function Invoke-51([string]$text) {
     $out = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -EncodedCommand $e 2>&1 | ForEach-Object { "$_" })
     return [pscustomobject]@{ Out = $out; Code = $LASTEXITCODE }
 }
-# Starts a run and reads its report until END, a minute at most.
-function Invoke-Run([string]$script) {
-    $run = Get-ThornswoodDetachedRun -Script $script -Folder $scratch
+# Starts a run and reads its report until END, a minute at most. With -Go,
+# the run waits for that file, which is made only once the first read is
+# done, so the first read finds it still going however slowly this machine
+# starts a Windows PowerShell (a fixed three seconds was not enough on One,
+# where the start and the first read took longer, #3861).
+function Invoke-Run([string]$script, [string]$Go = '', [int]$SessionPid = 0, [int]$SessionWait = 120) {
+    $run = Get-ThornswoodDetachedRun -Script $script -Folder $scratch -SessionWait $SessionWait
+    # A harness has no ssh session above it, so the start names none; this
+    # names a process of the harness's in its place.
+    if ($SessionPid) { [IO.File]::WriteAllText($run.File + '.session', [string]$SessionPid) }
     $s = Invoke-51 $run.Start
     $runPid = 0
     $m = @($s.Out | Where-Object { $_ -match '^STARTED (\d+)$' })
@@ -107,7 +126,10 @@ function Invoke-Run([string]$script) {
     $until = (Get-Date).AddMinutes(1)
     while ((Get-Date) -lt $until) {
         $rd = Invoke-51 $run.Read
-        if ($null -eq $first) { $first = ($rd.Out -join '|') }
+        if ($null -eq $first) {
+            $first = ($rd.Out -join '|')
+            if ($Go) { [IO.File]::WriteAllText($Go, 'go') }
+        }
         if ($rd.Out.Count -and $rd.Out[0] -match '^REPORT \d+$') {
             $lines = @($rd.Out | Select-Object -Skip 1)
             if ($lines.Count -and $lines[-1] -match '^END ') { break }
@@ -120,8 +142,10 @@ function Invoke-Run([string]$script) {
 
 try {
     Write-Host ''
-    Write-Host 'A run that says things, errs, waits and exits 3:'
-    $a = Invoke-Run "'first line'`r`nWrite-Error 'an error line'`r`nStart-Sleep -Seconds 3`r`n'last line'`r`nexit 3"
+    Write-Host 'A run that says things, errs, waits to be let go and exits 3:'
+    $go = Join-Path $scratch 'go-a'
+    $wait = "`$until = [DateTime]::UtcNow.AddMinutes(1); while (-not (Test-Path -LiteralPath '" + $go + "') -and [DateTime]::UtcNow -lt `$until) { Start-Sleep -Milliseconds 100 }"
+    $a = Invoke-Run ("'first line'`r`nWrite-Error 'an error line'`r`n" + $wait + "`r`n'last line'`r`nexit 3") -Go $go
     Yes '  the start says STARTED and exits 0' ($a.Pid -gt 0 -and $a.Start.Code -eq 0)
     Yes ('  the run''s parent is the WMI service''s process (' + $a.Parent + '), not the PowerShell that started it') ($a.Parent -eq 'WmiPrvSE.exe')
     Yes ('  it is still going once that PowerShell has ended: the first read finds no END yet (' + $a.First + ')') (
@@ -148,6 +172,21 @@ try {
     $b = Invoke-Run "'before'`r`nthrow 'stops here'`r`n'never'"
     Yes '  an ERROR line with what stopped it, then END 1' (
         ($b.Lines -join '|') -eq 'before|ERROR stops here|END 1')
+
+    Write-Host ''
+    Write-Host 'A run whose starting session is still open for a few seconds:'
+    $sleeper = Start-Process -FilePath $ps51 -ArgumentList '-NoProfile', '-Command', 'Start-Sleep -Seconds 6' -PassThru -WindowStyle Hidden
+    $d = Invoke-Run ("if (Get-Process -Id " + $sleeper.Id + " -ErrorAction SilentlyContinue) { 'session still open' } else { 'session gone' }") -SessionPid $sleeper.Id
+    Yes '  none of its script runs until that session has ended (#3214)' (($d.Lines -join '|') -eq 'session gone|END 0')
+    Yes '  and the session file is gone' (-not (Test-Path -LiteralPath ($d.Run.File + '.session')))
+
+    Write-Host ''
+    Write-Host 'A run whose starting session outlasts its limit:'
+    $stuck = Start-Process -FilePath $ps51 -ArgumentList '-NoProfile', '-Command', 'Start-Sleep -Seconds 60' -PassThru -WindowStyle Hidden
+    try { $e2 = Invoke-Run "'never'" -SessionPid $stuck.Id -SessionWait 2 } finally { Stop-Process -Id $stuck.Id -Force -ErrorAction SilentlyContinue }
+    Yes '  runs nothing, and says so with ERROR, then END 1' (
+        ($e2.Lines -join '|') -eq ('ERROR the ssh session that started this run (process ' + $stuck.Id + ') did not end within 2 s, so none of the run was started|END 1'))
+    Yes '  and its script file is gone' (-not (Test-Path -LiteralPath $e2.Run.File))
 
     Write-Host ''
     Write-Host 'A run that ends without exit, after a program that exited 5:'

@@ -197,7 +197,9 @@ function Invoke-ThornswoodRemote {
         $rc = $LASTEXITCODE
     }
     finally {
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        # The local copy is this helper's own scratch, not a change the caller
+        # asked about, so a caller's -WhatIf does not keep it (#3123).
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue -WhatIf:$false
         # The far side's exit code, scp's when the copy failed, or 1 when
         # nothing ran.
         $global:LASTEXITCODE = $rc
@@ -253,6 +255,13 @@ function Start-ThornswoodRemote {
 #          can reach it, and says STARTED and the run's process id. Nothing
 #          of $Script has run by then. Files earlier runs left that are a
 #          day old go first; a run still going is minutes old.
+#          The run waits for the ssh session that started it to end before
+#          any of $Script runs (#3214): a script that stops the bridge, or
+#          Caddy in front of it, started at once, cut the start's own session
+#          on its way out when it stopped them quickly enough. The start
+#          names the session's own sshd process in <File>.session; a run that
+#          finds one waits for it to exit, SessionWait seconds at most, and
+#          past that runs nothing and ends as END 1 after an ERROR line.
 #   Read   what to send, any number of times, to read the run's report:
 #          REPORT NONE before there is one, else REPORT <n> and its n lines.
 #          The last is END <exit code> once the run is over, and the read
@@ -263,7 +272,8 @@ function Start-ThornswoodRemote {
 function Get-ThornswoodDetachedRun {
     param(
         [Parameter(Mandatory = $true)][string]$Script,
-        [string]$Folder = 'C:\Windows\Temp'
+        [string]$Folder = 'C:\Windows\Temp',
+        [int]$SessionWait = 120
     )
     if ($Folder -match "['`r`n]") { throw ('not a folder for a run: ' + $Folder) }
     $id = [Guid]::NewGuid().ToString('N')
@@ -278,6 +288,13 @@ function Get-ThornswoodDetachedRun {
 function Put([string]`$l) { [IO.File]::AppendAllText(`$log, `$l + "``r``n") }
 `$rc = 1
 try {
+  `$session = '$file.session'
+  if (Test-Path -LiteralPath `$session) {
+    `$sid = [int]([IO.File]::ReadAllText(`$session).Trim())
+    Remove-Item -LiteralPath `$session -Force -EA SilentlyContinue
+    `$p = Get-Process -Id `$sid -EA SilentlyContinue
+    if (`$p -and -not `$p.WaitForExit($($SessionWait * 1000))) { throw ('the ssh session that started this run (process ' + `$sid + ') did not end within $SessionWait s, so none of the run was started') }
+  }
   `$global:LASTEXITCODE = 0
   & '$file' *>&1 | ForEach-Object { Put ([string]`$_) }
   `$rc = `$LASTEXITCODE
@@ -292,12 +309,22 @@ finally {
     $start = @"
 `$ErrorActionPreference = 'Stop'
 Get-ChildItem -LiteralPath '$Folder' -Filter 'thornswood-run-*' -File -EA SilentlyContinue |
-  Where-Object { `$_.Name -match '^thornswood-run-[0-9a-f]{32}\.(ps1|log)`$' -and `$_.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddDays(-1) } |
+  Where-Object { `$_.Name -match '^thornswood-run-[0-9a-f]{32}\.(ps1|log|ps1\.session)`$' -and `$_.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddDays(-1) } |
   Remove-Item -Force -EA SilentlyContinue
 [IO.File]::WriteAllText('$file', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$body')), (New-Object Text.UTF8Encoding(`$true)))
+# The session's own sshd process, the nearest above this one, for the run to
+# wait out. Each step up must have started before the one below it, so a
+# parent id Windows has since given to another process is not followed.
+`$at = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$PID) -EA SilentlyContinue
+for (`$i = 0; `$i -lt 8 -and `$at; `$i++) {
+  `$up = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$at.ParentProcessId) -EA SilentlyContinue
+  if (-not `$up -or `$up.CreationDate -gt `$at.CreationDate) { break }
+  if (`$up.Name -match '^sshd(-session)?\.exe`$') { [IO.File]::WriteAllText('$file.session', [string]`$up.ProcessId); break }
+  `$at = `$up
+}
 `$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '$cmd' }
 if (`$r.ReturnValue -ne 0) {
-  Remove-Item -LiteralPath '$file' -Force -EA SilentlyContinue
+  Remove-Item -LiteralPath '$file', '$file.session' -Force -EA SilentlyContinue
   'the run could not be started (Win32_Process Create said ' + `$r.ReturnValue + '). Nothing of it ran.'
   exit 1
 }

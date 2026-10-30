@@ -98,7 +98,7 @@ foreach ($n in $naming) { Write-Host "      $n" }
 
 # The game folder's own front build, client bundle and Modules, where this
 # machine has one. Information for the machine that ships, not a gate.
-$game = 'C:\Thornswood\Game\Data\Platform'
+$game = Join-Path ([string](& (Join-Path $Here 'scripts\release\Where.ps1') Install)) 'Game\Data\Platform'
 if (Test-Path -LiteralPath $game) {
     $there = @()
     foreach ($sub in 'UI', 'Plugins', 'Modules') {
@@ -135,19 +135,17 @@ foreach ($r in $stay) {
 $pub = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Publish-Update.ps1'))
 $tm   = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
 $fc   = [regex]::Match($pub, '(?ms)^function Test-FromCollection\(.*?^\}\r?$')
-$sgf  = [regex]::Match($pub, '(?m)^\$shipGeneratedFiles = Get-ShipGeneratedFiles \$ProfileDir\r?$')
 $diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
 $coll = [regex]::Match($pub, '(?ms)^\$collectionRemovals = .*?^\}\r?$')
 $alw  = [regex]::Match($pub, '(?ms)^\$alwaysGone = @\(Get-ShipDeleteAlways\)\r?\nforeach \(\$d in \$alwaysGone\) \{.*?^\}\r?$')
 Yes 'Publish-Update.ps1 still has Test-Machine, Test-FromCollection, the diff, the collection filter and the always list to lift' (
-    $tm.Success -and $fc.Success -and $sgf.Success -and $diff.Success -and $coll.Success -and $alw.Success)
+    $tm.Success -and $fc.Success -and $diff.Success -and $coll.Success -and $alw.Success)
 Yes 'and its scan still leaves out what Test-Machine claims' ($pub -match 'if \(Test-Machine \$rel\) \{ continue \}')
-if (-not ($tm.Success -and $fc.Success -and $sgf.Success -and $diff.Success -and $coll.Success -and $alw.Success)) { Done }
+if (-not ($tm.Success -and $fc.Success -and $diff.Success -and $coll.Success -and $alw.Success)) { Done }
 . ([scriptblock]::Create($tm.Value))
 . ([scriptblock]::Create($fc.Value))
 # A profile with no generated record: nothing generated, so the list is empty.
 $ProfileDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-2177-profile-' + [Guid]::NewGuid().ToString('N'))
-. ([scriptblock]::Create($sgf.Value))
 
 $Dev = $true
 $vortexFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)

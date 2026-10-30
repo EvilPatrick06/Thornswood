@@ -7,29 +7,30 @@
   repository, and a cloud thread's proxy refuses every actions/runners path
   (#3107). So the box's admin service (scripts\vps\admin\admin.js, which
   tests\test-3107-admin.js runs) holds a GitHub App's key, and
-  .github\workflows\github-admin.yml asks it, through
+  the ops repository's github-admin.yml asks it, through
   scripts\deploy\Set-BuildRunners.ps1 (Patrick's A of 22 Oct 2026).
 
   WHAT IT HOLDS THEM TO.
-    1. github-admin.yml: started by hand (with -Check's input) and by a push
-       to main that changes a runner record, and by nothing else; a token
-       that reads the repository and can ask for an OIDC token, nothing
-       more; one run at a time, never cancelled half way; on any VPS runner,
-       not a build runner, with a timeout; no environment and no secret; no
-       token kept by the checkout, every file written again after it
-       (#3029); main's Set-BuildRunners.ps1 -OnGitHub under pwsh with no
-       profile, nothing pasted into its script.
+    1. github-admin.yml is not here: it moved to the private ops repository
+       with the VPS runners (#4013), whose tests\test-box-workflows.ps1
+       holds its shape, and Set-BuildRunners.ps1 starts it there. Its ask input
+       takes repo-settings too (#3683), which Set-BuildRunners.ps1
+       -RepoSettings sends.
     2. Set-BuildRunners.ps1 -OnGitHub, against a stand-in for GitHub's token
        service and the admin service: it asks for this run's token for the
        audience thornswood-admin, hands it to 127.0.0.1:7791 with nothing
        but runner-labels and the check, and writes the answer (MATCHES,
        CHANGED <n>, DIFFERS <n>) as an annotation titled Set-BuildRunners
-       with the service's lines; a refusal, a stop, or an answer that is not
-       the service's is an error; with no OIDC token to ask for it asks
-       nothing.
+       with the service's lines; with -RepoSettings it asks for
+       repo-settings and titles its answer Set-RepoSettings;
+       installation-repos (#4013) asks for that alone and answers REPOS <n>;
+       an ask it does not know asks nothing; a refusal, a stop, or an answer
+       that is not the service's is an error; with no OIDC token to ask for
+       it asks nothing.
     3. Set-BuildRunners.ps1 in a session, against a stand-in for gh: it
-       starts github-admin.yml on main with the check, reads the runner's
-       annotation and exits 0, 1 or 2 by it, and -Run reads a run's answer
+       starts the ops repository's github-admin.yml on main with the check,
+       reads the runner's annotation and exits 0, 1 or 2 by it, -AppRepos
+       starts it with installation-repos, and -Run reads a run's answer
        later.
     4. Install-AdminService.ps1: it parses, and every script it sends parses
        once built; a commit or nothing; LOCAL SERVICE with its own SID,
@@ -38,7 +39,12 @@
        rolled back when the new one does not answer; StopIt stops only what
        names admin.log; it looks for the whole line admin.js answers with;
        -Setup makes a 32 byte state on the box that lives an hour and
-       refuses while an App is held; no install touches the state folder.
+       refuses while an App is held; no install moves or changes what is in
+       the state folder. That folder is locked apart before anything stops
+       (#4076): nothing inherited, SYSTEM, Administrators, the task's own
+       SID and OWNER RIGHTS only, owned by Administrators; the install
+       refuses, leaving the service stopped, while another service could
+       read the key, and -Status says which.
     5. records\runner-isolation.json keeps every runner account out of the
        service's folder.
 
@@ -69,37 +75,23 @@ function Done {
 $set = Join-Path $repo 'scripts/deploy/Set-BuildRunners.ps1'
 $wf = Join-Path $repo '.github/workflows/github-admin.yml'
 $inst = Join-Path $repo 'scripts/deploy/Install-AdminService.ps1'
-foreach ($p in $set, $wf, $inst) { Yes ((Split-Path -Leaf $p) + ' is there') (Test-Path -LiteralPath $p) }
-if (-not ((Test-Path -LiteralPath $set) -and (Test-Path -LiteralPath $wf) -and (Test-Path -LiteralPath $inst))) { Done }
+foreach ($p in $set, $inst) { Yes ((Split-Path -Leaf $p) + ' is there') (Test-Path -LiteralPath $p) }
+if (-not ((Test-Path -LiteralPath $set) -and (Test-Path -LiteralPath $inst))) { Done }
 foreach ($p in $set, $inst, (Join-Path $repo 'scripts/ops/WorkflowRun.ps1')) {
     $e = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($p, [ref]$null, [ref]$e)
     Yes ((Split-Path -Leaf $p) + ' parses') (@($e).Count -eq 0)
 }
 
-# ---- 1. the workflow ---------------------------------------------------------
+# ---- 1. the workflow is in the ops repository (#4013) --------------------------
 Write-Host ''; Write-Host 'the workflow'
-$y = [IO.File]::ReadAllText($wf) -replace "`r`n", "`n"
-$code = (@($y -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
-$on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
-Yes 'it is started by hand and by a push, nothing else' ($on -match '(?m)^  workflow_dispatch:' -and $on -match '(?m)^  push:' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 2)
-Yes '  by hand with a check input that is a boolean' ($on -match '(?ms)check:\n\s+description:[^\n]*\n\s+type: boolean\n\s+default: false')
-Yes '  a push to main only, and only when a runner record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n?$")
-$perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
-Yes ("its token reads the repository and asks for an OIDC token, nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: read`n  id-token: write")
-Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
-Yes 'one run at a time, never cancelled half way' ($code -match '(?ms)^concurrency:\n  group: github-admin\n  cancel-in-progress: false')
-Yes 'it runs on any VPS runner, not a build runner' ($code -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps\]$')
-Yes '  with a timeout' ($code -match '(?m)^    timeout-minutes: \d+$')
-Yes '  in no environment, so it holds no secret' ($code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
-Yes 'the checkout keeps no token' ($code -match 'uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
-Yes '  and every file is written again after it (#3029)' ($code -match '- name: Check every tracked file out again')
-$step = [regex]::Match($code, '(?ms)- name: Ask the box\n(.*)$').Groups[1].Value
-Yes 'the step is pwsh with no profile' ($step -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
-$run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value
-Yes '  running main''s Set-BuildRunners.ps1 -OnGitHub' ($run -match "scripts/deploy/Set-BuildRunners\.ps1'\) -OnGitHub")
-Yes '  with nothing pasted into its script' ($run -notmatch '\$\{\{')
-Yes '  and the check through the environment' ($step.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
+Yes 'github-admin.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath $wf))
+$setText = [IO.File]::ReadAllText($set)
+Yes '  Set-BuildRunners.ps1 starts it in the private ops repository, where the runners are registered' ($setText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $setText.Contains("`$workflow = 'github-admin.yml'"))
+$aboutText = [IO.File]::ReadAllText((Join-Path $repo 'scripts/deploy/Set-RepoAbout.ps1'))
+Yes '  and Set-RepoAbout.ps1 starts it there too' ($aboutText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $aboutText.Contains("`$workflow = 'github-admin.yml'"))
+$settingsText = [IO.File]::ReadAllText((Join-Path $repo 'scripts/deploy/Check-GitHubSettings.ps1'))
+Yes '  and Check-GitHubSettings.ps1 starts it there, reading this repository''s settings (#3534)' ($settingsText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $settingsText.Contains("`$workflow = 'github-admin.yml'") -and $settingsText.Contains("`$Repo = 'EvilPatrick06/Thornswood'"))
 
 # ---- 2. the GitHub half ------------------------------------------------------
 Write-Host ''; Write-Host 'the GitHub half'
@@ -113,18 +105,18 @@ function Invoke-WebRequest {
     if ([string]$Uri -eq 'http://127.0.0.1:7791/converge') { return [pscustomobject]@{ StatusCode = $s.code; Content = $s.content } }
     return [pscustomobject]@{ StatusCode = 599; Content = '' }
 }
-function OnGitHub([hashtable]$envs, [hashtable]$state) {
+function OnGitHub([hashtable]$envs, [hashtable]$state, [switch]$Rules) {
     $base = @{ tokenCode = 200; code = 200; content = '{"ok":true,"lines":["records/build-runners.json: GitHub matches it"],"changed":0,"differs":0}' }
     foreach ($k in $state.Keys) { $base[$k] = $state[$k] }
     $global:TSadmin = $base
     $global:TScalls = @()
-    $all = @{ GITHUB_ACTIONS = 'true'; ACTIONS_ID_TOKEN_REQUEST_URL = 'https://token.test/idtoken?api-version=2.0'; ACTIONS_ID_TOKEN_REQUEST_TOKEN = 'request-token'; ADMIN_CHECK = 'false'; THORNSWOOD_ADMIN_PORT = '' }
+    $all = @{ GITHUB_ACTIONS = 'true'; ACTIONS_ID_TOKEN_REQUEST_URL = 'https://token.test/idtoken?api-version=2.0'; ACTIONS_ID_TOKEN_REQUEST_TOKEN = 'request-token'; ADMIN_CHECK = 'false'; ADMIN_ASK = ''; THORNSWOOD_ADMIN_PORT = '' }
     foreach ($k in $envs.Keys) { $all[$k] = $envs[$k] }
     $was = @{}
     foreach ($k in $all.Keys) { $was[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $all[$k]) }
     try {
         $global:LASTEXITCODE = 0
-        $out = @(& $set -OnGitHub 6>&1 2>&1 | ForEach-Object { "$_" })
+        $out = @(& $set -OnGitHub -RepoSettings:$Rules 6>&1 2>&1 | ForEach-Object { "$_" })
         $rc = $LASTEXITCODE
     } finally {
         foreach ($k in $was.Keys) { [Environment]::SetEnvironmentVariable($k, $was[$k]) }
@@ -138,11 +130,23 @@ Yes '  it asked for this run''s token for the audience thornswood-admin, with th
     $r.Calls.Count -eq 2 -and $r.Calls[0].Uri -eq 'https://token.test/idtoken?api-version=2.0&audience=thornswood-admin' -and $r.Calls[0].Auth -eq 'bearer request-token')
 Yes '  and handed it to the box''s service on 127.0.0.1:7791 alone, past any proxy' ($r.Calls[1].Method -eq 'POST' -and $r.Calls[1].Uri -eq 'http://127.0.0.1:7791/converge' -and $r.Calls[1].Auth -eq 'Bearer oidc-for-this-run' -and $r.Calls[1].NoProxy)
 Yes '  asking for runner-labels and the check, nothing else' ($r.Calls[1].Body.what -eq 'runner-labels' -and $r.Calls[1].Body.check -eq $false -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 2)
-$r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/sign-runners.json: thornswood-vps-3, thornswood-sign put on"],"changed":1,"differs":1}' }
-Yes 'labels put right: exit 0, CHANGED 1 with the lines' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::CHANGED 1%0Arecords/sign-runners\.json: thornswood-vps-3, thornswood-sign put on')
+$r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/github-repo-settings.json: release tags made (active)"],"changed":1,"differs":1}' } -Rules
+Yes '-RepoSettings asks for repo-settings and the check, nothing else, and titles its answer Set-RepoSettings' (
+    $r.Code -eq 0 -and $r.Calls[1].Body.what -eq 'repo-settings' -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 2 -and $r.Out -match '::notice title=Set-RepoSettings::CHANGED 1%0Arecords/github-repo-settings\.json: release tags made')
+$r = OnGitHub @{ ADMIN_ASK = 'repo-settings' } @{ content = '{"ok":true,"lines":["records/github-repo-settings.json: GitHub matches it"],"changed":0,"differs":0}' }
+Yes '  and so does a run started for repo-settings, with no -RepoSettings' ($r.Code -eq 0 -and $r.Calls[1].Body.what -eq 'repo-settings' -and $r.Out -match '::notice title=Set-RepoSettings::MATCHES')
+$r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/build-runners.json: thornswood-vps-2, thornswood-build put on"],"changed":1,"differs":1}' }
+Yes 'labels put right: exit 0, CHANGED 1 with the lines' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::CHANGED 1%0Arecords/build-runners\.json: thornswood-vps-2, thornswood-build put on')
 $r = OnGitHub @{ ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["x would have y put on"],"changed":0,"differs":2}' }
 Yes 'a check that differs: exit 0, DIFFERS 2, and the check reached the service' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::DIFFERS 2' -and $r.Calls[1].Body.check -eq $true)
-$r = OnGitHub @{} @{ code = 409; content = '{"ok":false,"lines":["STOP no runner records/sign-runners.json lists is registered on GitHub"],"changed":0,"differs":0}' }
+$r = OnGitHub @{ ADMIN_ASK = 'runner-labels' } @{}
+Yes 'asking for runner-labels by name is the same' ($r.Code -eq 0 -and $r.Calls[1].Body.what -eq 'runner-labels' -and $r.Out -match 'Set-BuildRunners::MATCHES')
+$r = OnGitHub @{ ADMIN_ASK = 'installation-repos'; ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["installed on EvilPatrick06/Thornswood","installed on EvilPatrick06/Thornswood-Ops"],"repos":["EvilPatrick06/Thornswood","EvilPatrick06/Thornswood-Ops"]}' }
+Yes 'installation-repos: exit 0, REPOS 2 with a line for each' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::REPOS 2%0Ainstalled on EvilPatrick06/Thornswood%0Ainstalled on EvilPatrick06/Thornswood-Ops')
+Yes '  asking for that and nothing else' ($r.Calls[1].Body.what -eq 'installation-repos' -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 1)
+$r = OnGitHub @{ ADMIN_ASK = 'secrets' } @{}
+Yes 'an ask it does not know: exit 1, nothing asked' ($r.Code -eq 1 -and $r.Calls.Count -eq 0 -and $r.Out -match 'neither runner-labels nor installation-repos')
+$r = OnGitHub @{} @{ code = 409; content = '{"ok":false,"lines":["STOP no runner records/build-runners.json lists is registered on GitHub"],"changed":0,"differs":0}' }
 Yes 'the service stopping: exit 1, an error with its lines' ($r.Code -eq 1 -and $r.Out -match '::error title=Set-BuildRunners::the box''s admin service said no \(HTTP 409\)%0ASTOP no runner')
 $r = OnGitHub @{} @{ code = 403; content = '{"ok":false,"lines":["refused: the token is from the workflow x"]}' }
 Yes 'the service refusing the token: exit 1' ($r.Code -eq 1 -and $r.Out -match 'HTTP 403\)%0Arefused')
@@ -182,11 +186,20 @@ function Session([hashtable]$a, [string]$run, [object[]]$notes) {
     $out = @(& $set @a 6>&1 2>&1 | ForEach-Object { "$_" })
     return [pscustomobject]@{ Out = ($out -join "`n"); Code = $LASTEXITCODE; Calls = @($global:TSghCalls); Body = $global:TSghBody }
 }
-function Note([string]$level, [string]$message) { return @{ annotation_level = $level; title = 'Set-BuildRunners'; message = $message } }
+function Note([string]$level, [string]$message, [string]$title = 'Set-BuildRunners') { return @{ annotation_level = $level; title = $title; message = $message } }
 
-$s = Session @{} $done @((Note 'notice' "CHANGED 1`nrecords/sign-runners.json: thornswood-vps-3, thornswood-sign put on"))
-Yes ("it starts github-admin.yml on main and says GitHub matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/Thornswood/actions/workflows/github-admin\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Out -match '1 label\(s\) changed')
-Yes '  with check false, and the service''s lines' ($s.Body.inputs.check -eq 'false' -and $s.Out -match 'thornswood-sign put on')
+$s = Session @{} $done @((Note 'notice' "CHANGED 1`nrecords/build-runners.json: thornswood-vps-2, thornswood-build put on"))
+Yes ("it starts the ops repository's github-admin.yml on main and says GitHub matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/Thornswood-Ops/actions/workflows/github-admin\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Out -match 'runner records now; 1 change\(s\) made')
+Yes '  with check false, and the service''s lines' ($s.Body.inputs.check -eq 'false' -and $s.Out -match 'thornswood-build put on')
+Yes '  asking for runner-labels' ($s.Body.inputs.ask -eq 'runner-labels')
+$s = Session @{ RepoSettings = $true } $done @((Note 'notice' "CHANGED 1`nrecords/github-repo-settings.json: release tags made (active)" 'Set-RepoSettings'))
+Yes '-RepoSettings: ask repo-settings, it reads the Set-RepoSettings answer, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.ask -eq 'repo-settings' -and $s.Out -match 'matches main''s repository settings record now; 1 change' -and $s.Out -match 'release tags made')
+$s = Session @{ RepoSettings = $true; Check = $true } $done @((Note 'notice' "MATCHES`nx" 'Set-BuildRunners'), (Note 'notice' "DIFFERS 1`nrecords/github-repo-settings.json: main differs and would be put back" 'Set-RepoSettings'))
+Yes '  and with -Check reads its own answer, not the labels'' (exit 1)' ($s.Code -eq 1 -and $s.Out -match 'differs from main''s repository settings record in 1' -and $s.Out -match 'Set-BuildRunners\.ps1 -RepoSettings puts it right')
+$s = Session @{ AppRepos = $true } $done @((Note 'notice' "REPOS 2`ninstalled on EvilPatrick06/Thornswood`ninstalled on EvilPatrick06/Thornswood-Ops"))
+Yes '-AppRepos asks for installation-repos and says where the App is, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.ask -eq 'installation-repos' -and $s.Out -match 'installed on EvilPatrick06/Thornswood-Ops' -and $s.Out -match 'installed on 2 repositories')
+$s = Session @{ AppRepos = $true; RepoSettings = $true } $done @()
+Yes '-AppRepos with -RepoSettings: exit 1, nothing started' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
 $s = Session @{ Check = $true } $done @((Note 'notice' "DIFFERS 2`nx would have y put on"))
 Yes '-Check that differs: check true, exit 1' ($s.Code -eq 1 -and $s.Body.inputs.check -eq 'true' -and $s.Out -match 'differs from main''s runner records in 2')
 $s = Session @{ Check = $true } $done @((Note 'notice' "MATCHES`nrecords/build-runners.json: GitHub matches it"))
@@ -257,6 +270,30 @@ Yes '  running admin.js under server-log.js, kept 90 days with a time on each li
 Yes 'the folder takes nothing from C:\ and no broad group keeps a rule on it' (
     $install -match 'SetAccessRuleProtection\(`\$true, `\$false\)' -and $install -match "'S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19'")
 Yes '  and the state folder is made there before the grant' ($stageCode.Contains("if (-not (Test-Path -LiteralPath 'C:\Thornswood-Admin\state')) { New-Item -ItemType Directory -Path 'C:\Thornswood-Admin\state'"))
+# #4076: CREATOR OWNER on the folder became LOCAL SERVICE Modify on key.pem.
+$lockAt = $stageCode.IndexOf('# Locked apart')
+$lock = if ($lockAt -ge 0) { $stageCode.Substring($lockAt, $stageCode.IndexOf("'COULD NOT LOCK STATE: '") - $lockAt) } else { '' }
+Yes 'the state folder is locked apart before anything is stopped, and a lock that fails stops the install (#4076)' (
+    $lock -and $stageCode.IndexOf("'COULD NOT LOCK STATE: '") -lt $stageCode.IndexOf("'READY'") -and $stageCode -match "'COULD NOT LOCK STATE: ' \+ \`$_\.Exception\.Message; exit 1")
+Yes '  nothing inherited, so no CREATOR OWNER, and no rule of its own left over' (
+    $lock -match "Get-Acl -LiteralPath 'C:\\Thornswood-Admin\\state'" -and $lock -match '\$acl\.SetAccessRuleProtection\(\$true, \$false\)' -and
+    $lock -match 'foreach \(\$r in @\(\$acl\.GetAccessRules\(\$true, \$false, [^\r\n]*RemoveAccessRuleSpecific\(\$r\)')
+Yes '  SYSTEM and Administrators Full, OWNER RIGHTS only Synchronize, the task''s own SID Modify' (
+    $lock -match "@\('S-1-5-18', 'FullControl'\), @\('S-1-5-32-544', 'FullControl'\), @\('S-1-3-4', 'Synchronize'\)" -and
+    $lock -match "NTAccount\('NT TASK', 'Thornswood Admin'\)" -and $lock -match "if \(\`$taskSid\) \{ \`$rules \+= ,@\(\`$taskSid, 'Modify'\) \}" -and
+    $lock -notmatch "'S-1-5-19'|'S-1-3-0'|'S-1-1-0'|'S-1-5-11'|'S-1-5-32-545'")
+Yes '  owned by Administrators, and so is all in it, which keeps only what state gives it' (
+    $lock -match '\$acl\.SetOwner\(\$admins\)' -and $lock -match "Get-ChildItem -LiteralPath 'C:\\Thornswood-Admin\\state' -Recurse -Force" -and
+    $lock -match '\$a\.SetAccessRuleProtection\(\$false, \$false\)' -and $lock -match '\$a\.SetOwner\(\$admins\)' -and $lock -notmatch '(Remove|Move|Set-Content|Clear)-(Item|Content)')
+$check = $installCode.IndexOf('ANOTHER SERVICE COULD READ')
+Yes 'after the grant and before the start, the install refuses while another service could read the key' (
+    $check -gt $installCode.IndexOf('Grant-ThornswoodServiceFolder -Root') -and $check -lt $installCode.IndexOf("Start-ScheduledTask -TaskName 'Thornswood Admin'") -and
+    $installCode -match "Test-ThornswoodServiceCannotReach -Paths \(@\('C:\\Thornswood-Admin\\state'\) \+ [^\r\n]*-Sids @\('S-1-3-0'\)")
+Yes '  or LOCAL SERVICE owns a file there with no OWNER RIGHTS rule, and leaves the service stopped and disabled' (
+    $installCode -match "GetOwner\(\[Security\.Principal\.SecurityIdentifier\]\)\.Value -eq 'S-1-5-19' -and -not \`$capped" -and
+    $installCode -match "Disable-ScheduledTask -TaskName 'Thornswood Admin'[^\r\n]*\r?\n\s*'ADMIN REFUSED'; exit 1")
+$statusCode = Build (@($hs | Where-Object { $_.Extent.Text -match "'task      ' \+" })[0])
+Yes '-Status says whether another service could read the key' ($statusCode -match "'state     OPEN to other services: '" -and $statusCode -match "'S-1-5-19', 'S-1-3-0'" -and $statusCode -match "-notcontains 'S-1-3-4'")
 Yes 'the stage is checked by hash and node --check before the old service stops' (
     $installCode.IndexOf('did not arrive as it was sent') -lt $installCode.IndexOf('if (-not $stopOk)') -and $installCode.IndexOf('--check') -lt $installCode.IndexOf('if (-not $stopOk)'))
 Yes 'a service that does not answer gets the old files and task back' ($installCode -match 'Register-ScheduledTask -TaskName .Thornswood Admin. -Xml \$oldXml' -and $installCode -match 'ADMIN ROLLED BACK')

@@ -25,7 +25,7 @@ non-sale and transfer/drop restrictions before enabling these offers.
 The ledger source is ACTI `17100:Thornswood-Content.esp`, with the book's
 model and bounds. Its placement `17208:Thornswood-Content.esp` is in Riverwood
 Trader CELL `133c9:Skyrim.esm` at `[173.47137451171875,-99.40931701660156,329.3854064941406]`.
-This is12 units above the measured upstairs book anchor `1060aa:Skyrim.esm`.
+This is 12 units above the measured upstairs book anchor `1060aa:Skyrim.esm`.
 The original book remains; activating the dedicated source grants no skill.
 
 | New longfin reference | Original clam anchor | Source CELL |
@@ -40,8 +40,8 @@ The original book remains; activating the dedicated source grants no skill.
 | `17207:Thornswood-Content.esp` | `faf60:Skyrim.esm` | `3d6a:Skyrim.esm` |
 
 All eight use the existing longfin FLOR base `154a5:Thornswood-Content.esp`
-in Tamriel. Each final point is48 units east of its measured clam anchor,
-with zero rotation and32 units below the recorded sea surface. Exact final positions are in the
+in Tamriel. Each final point is 48 units east of its measured clam anchor,
+with zero rotation and 32 units below the recorded sea surface. Exact final positions are in the
 manifest. Native CELL grids verify that every shifted point remains in its
 declared exterior cell. Native HasWater, XCLW and Tamriel DNAM resolve the sea level to -14000; markers stand at -14032 rather than on deep seabed clam heights. The clams and their stock remain independent.
 
@@ -58,8 +58,8 @@ quest placements. Station checks retain their existing assertions; separate
 tests verify every new field, item and placement, plus malformed declarations
 and record collisions. Rendering and connected gameplay are not verified here.
 
-Claude must deliver matching Content bytes to Dev's server before releasing
-them to clients, using the normal content fingerprint checks. Runtime offers
+Matching Content bytes must reach Dev's server before they are released
+to clients, using the normal content fingerprint checks. Runtime offers
 stay disabled until their source validation succeeds. The next runtime section
 must be released only with the matching content fingerprint. No install,
 release, server command, Vortex action or playtest is part of source authoring.

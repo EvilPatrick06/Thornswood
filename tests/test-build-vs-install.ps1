@@ -162,7 +162,7 @@ try {
     # tracks is missing, so the art, the ini and the record are here too.
     $fakeRepo = $repo
     foreach ($d in @((Join-Path $fakeRepo 'scripts\release'), (Join-Path $fakeRepo 'scripts\dev'), (Join-Path $fakeRepo 'launcher\app'),
-                     (Join-Path $fakeRepo 'launcher\lib\webview2'), (Join-Path $fakeRepo 'records'), (Join-Path $fakeRepo 'installer\setup'), $tmp)) {
+                     (Join-Path $fakeRepo 'launcher\lib\webview2'), (Join-Path $fakeRepo 'launcher\lib\nlayer'), (Join-Path $fakeRepo 'records'), (Join-Path $fakeRepo 'installer\setup'), $tmp)) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     $realRepo = $Here
@@ -189,10 +189,14 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'installer\setup\Setup.manifest') -Destination (Join-Path $fakeRepo 'installer\setup')
     Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\WindowFit.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
     Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Themes.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
+    # And the path fence its unpack is held to (#3561).
+    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\PathFence.cs') -Destination (Join-Path $fakeRepo 'launcher\app')
     Copy-Item -Path (Join-Path $realRepo 'launcher\lib\webview2\*') -Destination (Join-Path $fakeRepo 'launcher\lib\webview2')
+    Copy-Item -Path (Join-Path $realRepo 'launcher\lib\nlayer\*') -Destination (Join-Path $fakeRepo 'launcher\lib\nlayer')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\client-build.json') -Destination (Join-Path $fakeRepo 'records')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\skyrim-files.json') -Destination (Join-Path $fakeRepo 'records')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\ui-gone.json') -Destination (Join-Path $fakeRepo 'records')
+    Copy-Item -LiteralPath (Join-Path $realRepo 'records\generated.json') -Destination (Join-Path $fakeRepo 'records')
     Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
     # Both projects read the version off Updater.cs, as the real one has it.
     Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Updater.cs') -Value 'static class Updater { public const string Version = "1.0.0"; }' -Encoding ASCII

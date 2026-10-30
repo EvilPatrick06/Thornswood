@@ -5,8 +5,8 @@
 
   Issue #2199, the refresh of the scheduled fetch. On 12 Oct
   Fetch-Backups.ps1 -Schedule was run through Git Bash with an unquoted
-  -To C:\Users\evilp\Downloads\Thornswood-Repo\local\backups. Bash dropped
-  the backslashes, the script got C:UsersevilpDownloadsThornswood-Repolocalbackups,
+  -To C:\Users\<you>\Downloads\Thornswood-Repo\local\backups. Bash dropped
+  the backslashes, the script got C:Users<you>DownloadsThornswood-Repolocalbackups,
   a path relative to the current folder on drive C:, made that folder where
   it ran, and registered the task with it word for word. The task's next run
   would have fetched into a new folder under its own copy's folder.
@@ -94,7 +94,7 @@ try {
     # $cwd (the current folder of that drive for the run) if it is not refused.
     $drive = $cwd.Substring(0, 2)
     $bad = @(
-        @{ Name = 'a drive-relative -To, as Git Bash passes C:\... unquoted'; To = ($drive + 'UsersevilpDownloadsThornswood-Repolocalbackups') },
+        @{ Name = 'a drive-relative -To, as Git Bash passes C:\... unquoted'; To = ($drive + 'UsersyouDownloadsThornswood-Repolocalbackups') },
         @{ Name = 'a folder-relative -To'; To = 'local\backups' },
         # Into the scratch folder, so a script that took it makes nothing
         # at the root of the drive.
@@ -109,7 +109,7 @@ try {
         if ($b.To.StartsWith('\')) { Yes '  nothing made at that folder' (-not (Test-Path -LiteralPath ($drive + $b.To))) }
     }
 
-    $code = Run @('-Schedule', '-TaskName', $task, '-To', ($drive + 'UsersevilpDownloadsThornswood-Repolocalbackups'), '-NoPause')
+    $code = Run @('-Schedule', '-TaskName', $task, '-To', ($drive + 'UsersyouDownloadsThornswood-Repolocalbackups'), '-NoPause')
     Yes ("-Schedule with a drive-relative -To is refused (exit {0})" -f $code) (($code -eq 1) -and (Said 'not a whole path'))
     Yes '  no task registered' (-not (Get-ScheduledTask -TaskName $task -EA SilentlyContinue))
     Yes '  no scripts copied' (-not (Test-Path -LiteralPath (Join-Path $app 'Thornswood\Backups-Fetch')))

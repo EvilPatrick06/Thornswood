@@ -80,6 +80,10 @@ link, and the old line goes.
 - **A shipment is lost only when people raid it**, never by chance. 22 Oct
   2026,
   [#3158](https://github.com/EvilPatrick06/Thornswood/issues/3158#issuecomment-6335273986).
+- **A cart whose driver leaves the road stays where they left**, and anybody
+  there can raid it until the driver comes back and takes it on (#3531).
+  26 Oct 2026,
+  [#3158](https://github.com/EvilPatrick06/Thornswood/issues/3158#issuecomment-6423068040).
 - **Each hold has 2 to 3 hold-only plants, ores or animals.** 22 Oct 2026,
   [#3150](https://github.com/EvilPatrick06/Thornswood/issues/3150#issuecomment-6335275040).
 - **Seasons are mild:** yields up or down a quarter, winter cold a quarter
@@ -128,12 +132,20 @@ link, and the old line goes.
 - **Every file we ship from Nexus has its author and terms recorded;** any
   with no permission is rebuilt as ours. 22 Oct 2026,
   [#2793](https://github.com/EvilPatrick06/Thornswood/issues/2793#issuecomment-6335267215).
+  Files made from another mod's records, which cannot be rebuilt, leave for
+  good and nobody asks for permission (the four Fishing In Skyrim faces).
+  26 Oct 2026,
+  [#2793](https://github.com/EvilPatrick06/Thornswood/issues/2793#issuecomment-6433239073).
 - **Food spoils gently:** raw in 1 real week, cooked in 2, preserved never.
   22 Oct 2026,
   [#3163](https://github.com/EvilPatrick06/Thornswood/issues/3163#issuecomment-6335272878).
 - **A pack does not spoil while its owner is offline;** chests and shops
   keep spoiling. 22 Oct 2026,
   [#3163](https://github.com/EvilPatrick06/Thornswood/issues/3163#issuecomment-6335272878).
+- **A drop lies on the ground for 2 minutes, then is gone,** a restart in
+  between included, and it keeps what it carried. So food never spoils on
+  the ground. 27 Oct 2026,
+  [#3498](https://github.com/EvilPatrick06/Thornswood/issues/3498#issuecomment-6431943093).
 - **Hangover: stamina regen down 25% for 10 minutes. Withdrawal after 3 uses
   in a day: stamina and magicka regen down 10% for 30 minutes.** Drunk,
   high, hangover and withdrawal each have visual effects as well (Patrick:
@@ -167,6 +179,18 @@ link, and the old line goes.
   button. 21 Oct 2026,
   [#3155](https://github.com/EvilPatrick06/Thornswood/issues/3155#issuecomment-6333339922).
 
+## Voice and the in-game UI
+
+- **Voice leaves the browser:** a native voice engine in the launcher sends
+  one stream to the box, and the box forwards each voice only to the people
+  in range. Every launcher no longer connects to every other. 26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
+- **The in-game panels become Skyrim's own menus (Scaleform)**, chat
+  included, and the in-game browser goes once they have; the away window is
+  built first as the proof. Emotes as Q menu powers stay as #2026 decided.
+  26 Oct 2026,
+  [#3208](https://github.com/EvilPatrick06/Thornswood/issues/3208#issuecomment-6422741408).
+
 ## The box
 
 - **The site's contact is Discord only.** It names no street address,
@@ -181,6 +205,10 @@ link, and the old line goes.
   only by the Discord staff roles; when it is full, people wait in line at
   the main menu. 29 Sep 2026,
   [#481](https://github.com/EvilPatrick06/Thornswood/issues/481).
+- **One Discord account holds one seat**, on main and on dev: a second game
+  from an account already in the world is told why and ended. Staff testing
+  two-person scenes on dev use a second Discord account. 20 Oct 2026,
+  [#2887](https://github.com/EvilPatrick06/Thornswood/issues/2887).
 - **Dev is never rolled back;** a fault on dev is fixed forward. Only main is
   rolled back, then fixed. 29 Sep 2026,
   [#1158](https://github.com/EvilPatrick06/Thornswood/issues/1158).
@@ -224,10 +252,13 @@ link, and the old line goes.
   (Mountain)**, at low priority, after the 2:15 AM backup. Telemetry stays
   off. 22 Oct 2026,
   [#3213](https://github.com/EvilPatrick06/Thornswood/issues/3213#issuecomment-6335264517).
-- **Whether a gamemode-only deploy reloads instead of restarting waits on
-  one measured start.** Measure what one dev start costs first, then decide.
-  22 Oct 2026,
-  [#3196](https://github.com/EvilPatrick06/Thornswood/issues/3196#issuecomment-6335264712).
+- **A gamemode-only dev deploy reloads the gamemode in the running server
+  instead of restarting it**, and the NPC runtime hands its NPCs straight to
+  the new copy so they never pause. Decided on the measured starts (about 15
+  processor seconds each, but everybody dropped and nearly 4 minutes before
+  the NPCs were back). A deploy that also changes plugins or settings still
+  restarts. 22 Oct 2026,
+  [#3196](https://github.com/EvilPatrick06/Thornswood/issues/3196#issuecomment-6342491535).
 - **One narrow workflow deletes a closed pull request's own branch** in this
   repository. It never checks out or runs that pull request's code. 22 Oct
   2026,
@@ -241,7 +272,7 @@ link, and the old line goes.
   [#2929](https://github.com/EvilPatrick06/Thornswood/issues/2929#issuecomment-6335266070).
 - **The watchdog and maintenance tasks stay SYSTEM, by design;** the
   services that run code we deploy, and the nightly backup, run on accounts
-  of their own (docs/DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
+  of their own (the ops repo's DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6335268289),
   the backup
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6342972359).
@@ -252,6 +283,23 @@ link, and the old line goes.
 - **Djinn's one-line crash log (fork #89) rides the next engine pin.** 22
   Oct 2026,
   [#2025](https://github.com/EvilPatrick06/Thornswood/issues/2025#issuecomment-6335269045).
+- **The launcher and the installer are rebuilt on Avalonia and .NET 10**
+  (#4063). 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The launcher is Windows only;** no Linux or Steam Deck launcher is
+  planned. 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The launcher's download size is no limit on its stack.** 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The install is done in compiled code, and Velopack installs and updates
+  the launcher;** `Setup-Thornswood.ps1`, `Setup.bat` and `Install.bat`
+  retire (#4064). 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
+- **The game files update through the same Velopack channel as the
+  launcher,** with the feed's release record and its checks (the sha256 of
+  every file, the signed manifest, the baseline record) rebuilt on top of
+  it, not dropped (#4065). 26 Oct 2026,
+  [#3209](https://github.com/EvilPatrick06/Thornswood/issues/3209#issuecomment-6434829911).
 
 ## Work and crafting
 
@@ -368,3 +416,7 @@ removal again:
   [#3158](https://github.com/EvilPatrick06/Thornswood/issues/3158#issuecomment-6333340060).
 - **Apprentices rank faster** beside a higher-rank crafter. 21 Oct 2026,
   [#3171](https://github.com/EvilPatrick06/Thornswood/issues/3171#issuecomment-6333339289).
+- **The collection's edited menu files are made from each person's own copy,
+  never shipped.** SkyUI's and SkyHUD's page terms (patches that need the
+  original file, credit for changes) change nothing. 26 Oct 2026,
+  [#3800](https://github.com/EvilPatrick06/Thornswood/issues/3800#issuecomment-6431656924).

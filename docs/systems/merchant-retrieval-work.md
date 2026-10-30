@@ -58,6 +58,6 @@ native item identity query or missing policy refuses the transfer. Ordinary
 goods keep their existing behavior. The dispatch uses the sealed case model
 and distinct MISC identity, with no container-opening behavior.
 
-Claude delivers the matching Content file to the server before clients and
+The matching Content file reaches the server before clients and
 the runtime. Source tests are not a deployment record. There are no new NPCs,
 purse refills, migration prerequisites or invented farming mechanics.

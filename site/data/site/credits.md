@@ -17,8 +17,22 @@ GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES.
 ## The mod list
 
 Every mod in Thornswood was made by somebody who gave it away. The full list is
-in the launcher, and each one links to its own page. Go and endorse the ones
-you like.
+the collection on Nexus, linked from the [Downloads](/downloads) page, and each
+mod in it links to its own page and its author. Go and endorse the ones you
+like.
+
+## Thornswood's own work
+
+Thornswood's own code (the launcher, the installer, the overlays, the
+gamemode, the code behind this site, the bot and the voice service) is under
+the MIT licence. Its own lore, art, music and game content are under
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/):
+share and adapt them, not for money, crediting Thornswood and keeping the same
+licence. The Thornswood name and logo are under neither, and stay
+Thornswood's with all rights reserved. The theme music is its composer's,
+with all rights reserved: it is licensed to Thornswood alone and is not under
+that licence. What other people made keeps its own licence, as the rest of
+this page says.
 
 <a id='source'></a>
 
@@ -36,10 +50,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`7ae58fea`](https://github.com/EvilPatrick06/skymp/tree/7ae58feababd242c0731ec98eeeb4abe462ba4d9).
+[`7af2fae8`](https://github.com/EvilPatrick06/skymp/tree/7af2fae85d3effc54a5969bbff4c4a5cb2a04e1f).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...7ae58fea)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...7af2fae8)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -75,8 +89,11 @@ Frida with GLib, and Node.js. Every download that carries one of the four
 has a `licences` folder with each library's own licence, and its note lists
 which library is in which file. The installer puts that folder in your
 Thornswood folder. Frida is Frida's own build, with other libraries inside
-it, and the note names where their source is: Thornswood's copies of
-Frida's repositories, at the commits Frida built them from.
+it, and the note names where their source is: one archive of each, at the
+commit Frida built it from, on
+**[Thornswood's release of Frida's sources](https://github.com/EvilPatrick06/Thornswood/releases/tag/frida-sources-16.0.19)**.
+Until that repository is public, the same commits are in Thornswood's
+copies of Frida's repositories, which the note names too.
 
 SkyMP's in-game interface, `build.js` with the fonts, pictures and sounds
 beside it, is built from the same public copy too: from its `skymp5-front`
@@ -111,7 +128,14 @@ shows every line of it.
 
 **The launcher** carries three files from Microsoft's WebView2 SDK, version
 1.0.2903.40. They give it the browser that voice runs in. Microsoft's licence
-for them is at the bottom of this page.
+for them is at the bottom of this page. It also carries NLayer 3.0.0, by Mark
+Heath, Andrew Ward and contributors, the MP3 decoder it plays its menu theme
+with, under the MIT licence, which is at the bottom of this page too. Its
+source is [on GitHub](https://github.com/naudio/NLayer), at commit
+`046c7ce4`. And it carries zlib's compressor, from zlib 1.3 by Jean-loup
+Gailly and Mark Adler, under the zlib licence. It is translated into C# so
+that the main menu the launcher makes from your game comes out the same on
+every machine.
 
 **The Thornswood Client Runtime** is Thornswood's own mod on
 [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/192762), and
@@ -133,6 +157,24 @@ board and drop box meshes are put together from pieces of Skyrim's own meshes
 with the game's own textures. Thornswood ships none of the three: the launcher
 makes them on your computer from your own copy of the game.
 
+**The animation files** in `Data\meshes\actors\character` (its `behaviors`
+and `characters` folders) and `Data\meshes\animationdatasinglefile.txt` and
+`animationsetdatasinglefile.txt` are Skyrim's own, with the animation patches
+of Precision and True Directional Movement, both by Ersh, merged in by Pandora
+Behaviour Engine+, by the Pandora Behaviour Engine Team. The launcher runs the
+collection's Pandora on your computer to make them; Thornswood wrote none of
+them, and they never come with Thornswood.
+
+**The bodies** are built on your computer by the launcher, in the
+collection's BodySlide, each with underwear, at its own slider defaults, and
+never come with Thornswood. The women's is CBBE 3BA, by Acro, and Astrid's is
+CBBE's, both on CBBE by Ousnius, Caliente and Jeir. The men's,
+`malebody_0.nif` and `malebody_1.nif`, is Highly Improved Male Body Overhaul
+(HIMBO), by Kreiste and Novelyst, changed only by that build. HIMBO's body is
+under the
+[Creative Commons Attribution-ShareAlike 4.0 licence](https://creativecommons.org/licenses/by-sa/4.0/),
+and so are these two files.
+
 **SkyHUD's settings**, `Data\Interface\skyhud\skyhud.txt`, are Thornswood's
 preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection
 installs. SkyHUD's author lets anybody share a preset that says which version
@@ -140,13 +182,17 @@ it is for, and nothing else of SkyHUD's comes with it.
 
 **QuickLoot IE's settings**, `Data\SKSE\Plugins\QuickLootIE.json`, are
 QuickLoot IE 4.1.3's own settings file with one line added by Thornswood, so
-its loot menu shows weight and no gold value. QuickLoot IE is under the GNU
-General Public License version 3, and so is this file.
+its loot menu shows weight and no gold value. QuickLoot IE is released under
+the GPL-3.0-or-later, and so is this file.
 
 **SkyUI's item lists and item card, SkyHUD's line under an item and moreHUD's
 value to weight** show no gold value on Thornswood, because an item here has
-no gold price. Thornswood ships none of those files: the launcher makes them
-on your computer from your own copy of each mod.
+no gold price. **SkyUI's journal** has no saving, loading, Skyrim help or
+Creation Club on its System page, because Thornswood keeps your character on
+the server and has its own help. They are the work of the SkyUI Team, the
+SkyHUD Team and Ahzaab, moreHUD's author. Thornswood ships none of those
+files: the launcher makes them on your computer from your own copy of each
+mod.
 
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
@@ -197,4 +243,30 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## NLayer licence
+
+```
+MIT License
+
+Copyright (c) 2018 Mark Heath, Andrew Ward & Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```

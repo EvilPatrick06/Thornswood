@@ -2,7 +2,9 @@
 # Issue #2161. Offline: scripts\vps\Check-RunnerIsolation.ps1 against made-up
 # runner facts and the repository's own workflows, and the ACL reading in
 # scripts\vps\Get-RunnerFacts.ps1 against stand-in rules. Nothing reaches the
-# VPS or GitHub.
+# VPS or GitHub. From #3550 to #4033 it also held every job of the real
+# workflows that could land on the signing runner to main's code; no runner
+# of the box signs since #4013, so the check and its cases went.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 # What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
@@ -78,19 +80,53 @@ try {
     T ($x.Report -match 'loopback \| tcp 3001') 'loopback services every local account can reach are listed from the #2165 facts'
     T ($x.Report -match "not Windows' effective access") 'the report says rights come from reading ACLs'
 
-    # The real build.yml, whichever way it stands (Patrick, 11 Oct 2026: hosted
-    # runners by default, VPS runners as a backup, Codex lane). Any pull request
-    # job left on the VPS, a fallback included, is a risk row to read, never a hard fail without -Strict.
+    # The real workflows: no pull request job is on the production label
+    # without the same-repository condition, read job by job (#3550). And no
+    # row is about a signing runner, since there is none (#4033).
     $x = Run (Facts) ''
-    $bt = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
-    $prOnProd = ($bt -match '(?m)^  pull_request:') -and ($bt -match 'runs-on:\s*\[[^\]]*\bthornswood-vps\b')
-    if ($prOnProd) {
-        T ($x.Out -match 'RISK  workflow build\.yml runs on: expected not thornswood-vps for untrusted code') 'the real build.yml still runs pull requests on the production runners, and the check says so (until the Codex move)'
-    } else {
-        T ($x.Out -notmatch 'RISK  workflow build\.yml runs on' -and $x.Report -match '\| workflow \| build\.yml runs on \|[^\n]*\| ok \|') 'the real build.yml runs no pull request on the production runners, and the check says ok'
-    }
-    T ($x.Out -notmatch 'RISK  workflow (nightly|release|drop-claims)\.yml runs on') 'nightly, release and drop-claims stay on the VPS and are not risks (no pull request trigger)'
+    T ($x.Out -notmatch 'RISK  workflow \S+ runs on') 'no real workflow runs a pull request on the production runners without the same-repository condition'
+    T ($x.Report -notmatch 'signing runner') 'no row is about a signing runner, since no runner of the box signs (#4033)'
     T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*same-repository pull requests only[^\n]*\| ok \|') 'the real build-pr.yml falls back to the VPS for same-repository pull requests only, and the check says ok (Patrick, 12 Oct 2026)'
+
+    # Anything anyone can start on a public repository (#3685): opening or
+    # closing their own issue. The real area-label.yml and drop-claims.yml
+    # take the VPS only while the repository is private.
+    foreach ($n in 'area-label.yml', 'drop-claims.yml') {
+        T ($x.Out -notmatch ('RISK  workflow ' + [regex]::Escape($n) + ' started by anyone') -and $x.Report -match ('\| workflow \| ' + [regex]::Escape($n) + ' started by anyone \|[^\n]*only while private[^\n]*\| ok \|')) "the real $n is on the VPS only while the repository is private, and the check says ok"
+    }
+    $wfIs = Join-Path $scratch 'wfis'; New-Item -ItemType Directory -Path $wfIs | Out-Null
+    Set-Content (Join-Path $wfIs 'label.yml') "on:`n  issues:`n    types: [opened]`npermissions:`n  issues: write`njobs:`n  a:`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfIs
+    T ($x.Out -match 'RISK  workflow label\.yml started by anyone') 'an issue job always on the production label is a risk, even while private'
+    Set-Content (Join-Path $wfIs 'label.yml') "on:`n  issue_comment:`npermissions:`n  issues: write`njobs:`n  a:`n    runs-on: `${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'ubuntu-latest' }}`n  b:`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfIs
+    T ($x.Out -match 'RISK  workflow label\.yml started by anyone') '  and one job left on it beside one that picks it only while private is still a risk'
+    Set-Content (Join-Path $wfIs 'label.yml') "on:`n  issue_comment:`npermissions:`n  issues: write`njobs:`n  a:`n    runs-on: `${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'ubuntu-latest' }}`n"
+    $x = Run (Facts) $wfIs
+    T ($x.Out -notmatch 'RISK  workflow label\.yml started by anyone') '  a job that picks it only while private is not'
+    $pub = Facts; $pub.github.private = $false
+    $x = Run $pub $wfIs
+    T ($x.Out -notmatch 'RISK  workflow label\.yml started by anyone') '  and stays not a risk once public, since it then runs on GitHub'
+
+    # Once public, the same-repository condition is no guard: a fork's pull
+    # request carries its own workflow files (#3685). The real build-pr.yml
+    # falls back to the box's build runners (the build label, since 26 Oct
+    # 2026 without the VPS label, and since #4010 the pull request build label,
+    # which runner 2 on the box carries), so a public repository shows it as a
+    # risk until that fallback is gone.
+    $x = Run $pub ''
+    $bp = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build-pr.yml'))
+    if ($bp -match 'runs-on:[^\n]*\bthornswood-(vps|build|pr-build)\b') {
+        T ($x.Out -match 'RISK  workflow build-pr\.yml runs on: expected not thornswood-vps for untrusted code, found [^\n]*the repository is public') 'a public repository with a runner and a pull request job on the production label is a risk, condition or not'
+    } else {
+        T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on') 'build-pr.yml has no job on the production label, so a public repository is safe from it'
+    }
+    T ($x.Out -match 'RISK  github self-hosted runners on a public repository: expected none, found 1') '  and a public repository with any self-hosted runner registered is a risk'
+    # Patrick's A of 26 Oct 2026: on the day it goes public the runners move
+    # to the private ops repository, and then nothing here can reach them.
+    $gone = Facts; $gone.github.private = $false; $gone.github.runners = @()
+    $x = Run $gone ''
+    T ($x.Out -notmatch 'RISK  workflow [^\n]* runs on' -and $x.Out -notmatch 'RISK  workflow [^\n]* started by anyone' -and $x.Out -notmatch 'RISK  github self-hosted runners') 'once public with the runners moved off, no real workflow is a risk'
 
     # A pull request on the production label without the same-repository
     # condition is a risk; with it, it is not.
@@ -104,6 +140,20 @@ try {
     Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request_target:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
     $x = Run (Facts) $wfPr
     T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'pull_request_target on the production label stays a risk, condition or not'
+    # Two pull request jobs on the production label, one limited to this
+    # repository: the other is still a risk (#3550, the condition used to be
+    # matched against the whole file).
+    Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]`n  b:`n    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]`n"
+    $x = Run (Facts) $wfPr
+    T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'one job limited to this repository does not cover the job beside it'
+
+    # ---- the environments counted as main only (#3550) ---------------------
+    $g = Facts
+    $g.github.environments = @([ordered]@{ name = 'board'; policy = 'custom'; refs = @('branch:main') }, [ordered]@{ name = 'notices'; policy = 'any'; refs = @() })
+    $x = Run $g $wfOk
+    T ($x.Out -match 'RISK  github environment notices admits' -and $x.Out -notmatch 'RISK  github environment board') 'an environment the record counts as main only that GitHub says lets in other refs is a risk'
+    T (-not (Test-Path -LiteralPath (Join-Path (Join-Path $repo 'records') 'sign-runners.json'))) 'records\sign-runners.json is gone: no runner of the box signs (#4033)'
+
     $rec0 = Get-Content (Join-Path $repo 'records\runner-isolation.json') -Raw | ConvertFrom-Json
     T ([string]$rec0.decision -match 'GitHub-hosted' -and [string]$rec0.decision -match '11 Oct 2026' -and [string]$rec0.decision -match 'outbound' -and [string]$rec0.decision -notmatch 'residual') 'the record carries the decision'
 

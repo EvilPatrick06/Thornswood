@@ -29,6 +29,10 @@
 // 403 Nexus gives a free account, and addRevision adds a revision with the
 // local collection archive its download serves.
 //
+// For New-NexusRevision.ps1 -Discard (#4070) it answers discardRevision as the
+// live schema has it (read 30 October), and addRevision with status draft
+// makes that revision the waiting draft.
+//
 // For New-NexusRevision.ps1 -Add (#2969) it also knows a mod of somebody
 // else's, 1932, with an optional file 8662, and answers legacyModsByDomain
 // with each mod's author and category.
@@ -72,7 +76,8 @@ const files = {
     { id: 'ver-809366', game_scoped_id: '809366', name: 'Thornswood Client Runtime', version: '1.0.0', category: 'main', uploaded_at: '2026-09-22T22:17:00Z', is_primary: true, position: '1' }] },
   'file-content': { id: 'file-content', name: 'Thornswood Content', mod: '192001', versions: [
     { id: 'ver-809365', game_scoped_id: '809365', name: 'Thornswood Content', version: '1.1', category: 'old_version', uploaded_at: '2026-09-22T22:11:00Z', is_primary: false, position: '1' },
-    { id: 'ver-811029', game_scoped_id: '811029', name: 'Thornswood Content', version: '1.2', category: 'main', uploaded_at: '2026-09-26T22:15:00Z', is_primary: true, position: '2' }] },
+    { id: 'ver-811029', game_scoped_id: '811029', name: 'Thornswood Content', version: '1.2', category: 'main', uploaded_at: '2026-09-26T22:15:00Z', is_primary: true, position: '2',
+      file_name: 'Thornswood Content 192001 1.2 2026-09-26T22-15Z EwgfAezil.zip' }] },
   'file-hair': { id: 'file-hair', name: 'KS Hairdos Lite SE NoNPCs', mod: '1932', versions: [
     { id: 'ver-8662', game_scoped_id: '8662', name: 'KS Hairdos Lite SE NoNPCs', version: '1.3', category: 'optional', uploaded_at: '2016-11-17T08:37:45Z', is_primary: false, position: '1' }] },
 };
@@ -153,6 +158,15 @@ function api(req, res, url, body, json) {
   if (req.method === 'GET' && (m = p.match(/^\/v3\/games\/skyrimspecialedition\/mod-file-versions\/(\d+)$/))) {
     const hit = findVersion(v => v.game_scoped_id === m[1]); if (!hit) return problem(res, 404, 'No version');
     return send(res, 200, { data: versionView(hit.v, hit.f) });
+  }
+  // v1's file record, the one place a file's name on Nexus is given (a mod
+  // rule names a file by it): <name> <mod> <version> <uploaded> <token>.<ext>.
+  if (req.method === 'GET' && (m = p.match(/^\/v1\/games\/skyrimspecialedition\/mods\/(\d+)\/files\/(\d+)\.json$/))) {
+    const hit = findVersion(v => v.game_scoped_id === m[2]);
+    if (!hit || hit.f.mod !== m[1]) return send(res, 404, { error: 'File ID \'' + m[2] + '\' not found' });
+    const v = hit.v;
+    const fileName = v.file_name || (v.name + ' ' + m[1] + ' ' + v.version + ' ' + v.uploaded_at.slice(0, 16).replace(':', '-') + 'Z Tok' + v.game_scoped_id + '.7z');
+    return send(res, 200, { id: [Number(m[2]), 1704], file_id: Number(m[2]), name: v.name, version: v.version, category_name: v.category.toUpperCase(), is_primary: v.is_primary, file_name: fileName, mod_version: v.version });
   }
   if (req.method === 'GET' && p === '/v3/team-mods') {
     return send(res, 200, { data: { mods: Object.keys(mods).filter(k => !mods[k].notTeam).map(k => ({ mod: { id: mods[k].uid, game_scoped_id: k, name: mods[k].name, game: { id: '1704', name: 'Skyrim Special Edition', domain_name: 'skyrimspecialedition' } }, affiliation: 'owner', bug_tracker: 'open', open_bug_count: 0 })) }, meta: { page: 1, page_size: 100, total_count: 2 } });
@@ -243,6 +257,15 @@ function graph(req, res, json) {
     if (!n || collection.revisions[n].status !== 'draft') return send(res, 200, { errors: [{ message: 'No draft revision ' + id }] });
     collection.revisions[n].status = 'published'; collection.latest = Number(n); collection.draft = null;
     return send(res, 200, { data: { publishRevision: { success: true } } });
+  }
+  if (/mutation/.test(q) && /discardRevision/.test(q)) {
+    const v = json.variables || {};
+    const n = String(v.revisionNumber);
+    if (String(v.collectionId) !== String(collection.id)) return send(res, 200, { errors: [{ message: 'No collection ' + v.collectionId }] });
+    if (!collection.revisions[n] || collection.revisions[n].status !== 'draft') return send(res, 200, { errors: [{ message: 'No draft revision ' + n }] });
+    delete collection.revisions[n];
+    if (String(collection.draft) === n) collection.draft = null;
+    return send(res, 200, { data: { discardRevision: { success: true } } });
   }
   if ((m = q.match(/legacyModsByDomain\(ids: \[\{gameDomain: "skyrimspecialedition", modId: (\d+)\}\]\)/))) {
     const mod = mods[m[1]];
@@ -344,11 +367,11 @@ const server = http.createServer((req, res) => {
       // A description put straight into the stored form, to give the scripts one they cannot read back.
       if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; mods[c.setStored.mod].cached = undefined; delete c.setStored; }
       // A revision whose download is a local collection archive.
-      if (c.addRevision) { collection.revisions[c.addRevision.n] = { id: String(c.addRevision.id), status: c.addRevision.status || 'published', upload: null, archive: c.addRevision.archive }; delete c.addRevision; }
+      if (c.addRevision) { collection.revisions[c.addRevision.n] = { id: String(c.addRevision.id), status: c.addRevision.status || 'published', upload: null, archive: c.addRevision.archive }; if (c.addRevision.status === 'draft') collection.draft = c.addRevision.n; delete c.addRevision; }
       Object.assign(control, c);
       return send(res, 200, control);
     }
-    const isApi = url.pathname.startsWith('/v3/') || url.pathname === '/v2/graphql' || url.pathname.startsWith('/v2/collections/');
+    const isApi = url.pathname.startsWith('/v3/') || url.pathname.startsWith('/v1/') || url.pathname === '/v2/graphql' || url.pathname.startsWith('/v2/collections/');
     requests.push({ method: req.method, path: url.pathname, query: url.search, api: isApi,
       key: req.headers.apikey === undefined ? 'none' : (req.headers.apikey === KEY ? 'right' : 'wrong'),
       appName: req.headers['application-name'] || '', appVersion: req.headers['application-version'] || '',

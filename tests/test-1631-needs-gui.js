@@ -56,7 +56,6 @@ function helpTopic(id) {
 }
 const skills = read('game', 'ui', 'thornswood-skills.js');
 const emotes = read('game', 'plugins', 'thornswood-emotes.js');
-const helpCs = read('launcher', 'app', 'Help.cs');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -113,9 +112,16 @@ const GONE = ['/eat', '/drink', '/bard'];
       !!PW && PW.indexOf('/needs') !== -1 && W.indexOf('/needs') !== -1 && W.indexOf('/need') !== -1);
   yes('A3 nothing in the chat commands gives food or drink without an item',
       !/needs\.ate\(/.test(chatBlock) && !/\.ate\(actorId, '(food|drink|ale)'\)/.test(chatBlock));
-  yes('A3 and eating or drinking the item is still reported and valued: /ate and consumed',
-      W.indexOf('/ate') !== -1 && /function consumed\(actorId, baseId\)/.test(needsBlock) &&
-      /tellServer\('\/ate ' \+ id\.toString\(16\)\)/.test(read('game', 'plugins', 'thornswood-front.js')));
+  /*
+    Eating or drinking the item is still valued, from the engine's own
+    record of it (mp.onEatItem hands it to eaten, #3136), and from no line
+    the client sends: /ate was a meal anybody could type.
+  */
+  yes('A3 and eating or drinking the item is still valued, from mp.onEatItem and never a chat word',
+      W.indexOf('/ate') === -1 && gm.indexOf("word === '/ate'") === -1 &&
+      /function eaten\(actorId, baseId\)[\s\S]{0,800}?return consumed\(actorId, baseId\);/.test(needsBlock) &&
+      /mp\.onEatItem = guard\('onEatItem'[\s\S]{0,3000}?needsApi\.eaten\(actorId, Number\(baseId\) \|\| 0\)/.test(gm) &&
+      read('game', 'plugins', 'thornswood-front.js').indexOf("'/ate '") === -1);
 
   // Every quoted string in the gamemode: none tells anybody to type them.
   const said = (gm.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(function (s) {
@@ -132,22 +138,17 @@ const GONE = ['/eat', '/drink', '/bard'];
   yes('A5 and names no word to type but /needs, for the bars as text (#2267)',
       text.length > 0 && (text.match(/\/[a-z]*/g) || []).every(function (w) { return w === '/needs'; }));
 
-  yes('A6 the launcher\'s Help page tells nobody to type /eat, /drink, /bard or /rest',
-      !/\/(eat|drink|bard|rest)\b/.test(helpCs));
-  const needsItem = (/new HelpItem\("In game", "You will get hungry, thirsty and cold",\s*"((?:[^"\\]|\\.)*)"\)/.exec(helpCs) || [])[1] || '';
-  yes('A6 and its needs item points at the Body page on K, the wheel\'s Sit and Sing',
-      /Body page on K/.test(needsItem) && /Sit on the emote wheel/.test(needsItem) && /Sing/.test(needsItem));
 
   // The pages the issue names. Patrick's own words are quoted on some of them
   // and say /bard; a word to type is written as code.
   const pages = [['docs', 'systems', 'exhaustion.md'], ['docs', 'systems', 'thirst.md'],
     ['docs', 'systems', 'hunger.md'], ['docs', 'systems', 'temperature.md'], ['docs', 'systems', 'emotes.md'],
     ['docs', 'systems', 'people.md'], ['docs', 'systems', 'chat.md'], ['site', 'data', 'site', 'classes.md'],
-    ['known board']];
+    ['known page']];
   const stale = [];
   pages.forEach(function (p) {
-    // Known Issues is the known board, as /known writes it (#2414).
-    const t = p[0] === 'known board' ? (require('./fixtures/known-page').knownPage() || '') : read.apply(null, p);
+    // Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
+    const t = p[0] === 'known page' ? (require('./fixtures/known-page').knownPage() || '') : read.apply(null, p);
     if (/`\/(eat|drink|bard)\b|`\/rest bed`/.test(t) || /\/needs gives/.test(t)) { stale.push(p[p.length - 1]); }
   });
   yes('A7 no page the issue names tells anybody to type them' + (stale.length ? ' (' + stale.join(', ') + ')' : ''),
@@ -155,16 +156,18 @@ const GONE = ['/eat', '/drink', '/bard'];
 
   // #1743: the launcher's Settings page. The line under "Show the needs bars
   // on screen", and what Settings logs when the bars are turned off, both
-  // said to type /needs, which the server no longer answers.
-  const shellCs = read('launcher', 'app', 'Shell.cs');
-  const uiXaml = read('launcher', 'ui.xaml');
-  const offLine = (/\? "The needs bars are shown\.[^"]*"\s*:\s*"([^"]*)"\);/.exec(shellCs) || [])[1] || '';
-  const boxLine = (/x:Name="ChkNeedsBars"[^>]*\/>\s*<TextBlock[^>]*Text="([^"]*)"/.exec(uiXaml) || [])[1] || '';
-  yes('A8 the Settings page\'s needs bars line, and the line it logs when they go off, are there',
+  // said to type /needs, which the server no longer answers. Since #3126
+  // they are on Settings in the game: the note under the Shown and Hidden
+  // buttons, and the line the front says back when the bars go off.
+  const front = read('game', 'plugins', 'thornswood-front.js');
+  const settingsPage = read('game', 'ui', 'thornswood-settings.js');
+  const offLine = (/said = shown \? 'The needs bars are shown\.' : ('[^;]*);/.exec(front) || [])[1] || '';
+  const boxLine = (/'<p class="note">Hunger, Thirst, Rest and Temp\.[\s\S]*?<\/p>';/.exec(settingsPage) || [])[0] || '';
+  yes('A8 the Settings needs bars line, and the line said when they go off, are there',
       offLine.length > 0 && boxLine.length > 0);
-  yes('A8 and the line under the box names /needs, the bars as text (#2267)', /\/needs in the chat/.test(boxLine));
-  yes('A8 and both send people to the Body page on K',
-      /Body page on K/.test(offLine) && /Body page on K/.test(boxLine));
+  yes('A8 and the line under the buttons names /needs, the bars as text (#2267)', /\/needs in the chat/.test(boxLine));
+  yes('A8 and both send people to the Body page on the skills key, K unless it is moved',
+      /Body page on ' \+ keyName\(SKILLS_KEY\)/.test(offLine) && /Body page on ' \+\s*esc\(nameOf\([^\n]*SkillsKey[^\n]*: 37\)\)/.test(boxLine));
 }
 
 // ================================================ B. the bard, as it plays
@@ -470,7 +473,6 @@ function needsRig() {
   yes('E1 the wheel has Sing, and the list is still in alphabetical order',
       by.Sing === 'IdleDialogueHappyStart' &&
       names.join('|') === names.slice().sort(function (x, y) { return x.toLowerCase() < y.toLowerCase() ? -1 : 1; }).join('|'));
-  yes('E2 the launcher\'s Help page counts the wheel as it is', helpCs.indexOf('G opens a wheel of ' + EMOTES.length + ' emotes') !== -1);
   const plays = /var BARD_PLAYS = (\{[\s\S]*?\});/.exec(needsBlock);
   let P = null;
   try { P = plays ? new Function('return ' + plays[1])() : null; } catch (e) { P = null; }
