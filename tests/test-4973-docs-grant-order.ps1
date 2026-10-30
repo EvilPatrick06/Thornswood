@@ -44,6 +44,8 @@ function Done {
     exit 0
 }
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the site task''s grants and their order happen only on Windows'; exit 0 }
 . (Join-Path $Repo 'scripts\deploy\ServiceAccount.ps1')
 # The places no service may read, none here, so the fail-safe never reads
 # this machine's own C:\Thornswood-* folders.
@@ -138,7 +140,8 @@ if (-not (Get-Command New-ScheduledTaskPrincipal -ErrorAction SilentlyContinue))
     Write-Host 'SKIP  the ScheduledTasks cmdlets are not on this machine, so the setup script was not run'
     Done
 }
-$icaclsExe = Join-Path $env:SystemRoot 'System32\icacls.exe'
+$icaclsExe = Get-WindowsPath 'System32\icacls.exe'
+$cmdExe = Get-WindowsPath 'System32\cmd.exe'
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-4973-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 function Put([string]$path, [string]$text) {
     $d = Split-Path -Parent $path
@@ -165,7 +168,7 @@ function Maps([string]$sid) {
 $standIns = @'
 $ErrorActionPreference = 'Continue'
 $script:log = @()
-function Install-ThornswoodOwnerLaunch { return (Join-Path $env:SystemRoot 'System32\cmd.exe') }
+function Install-ThornswoodOwnerLaunch { return $cmdExe }
 function icacls { $script:log += ('icacls ' + ($args -join ' ')); & $icaclsExe @args }
 '@
 $nodeLine = '$node = (Get-Command node -EA SilentlyContinue).Source'
@@ -243,7 +246,7 @@ try {
             Yes 'real task: there is no such task before the deploy' ($null -eq (Get-ScheduledTask -TaskName $scratchTask -ErrorAction SilentlyContinue))
             Yes 'real task: and its SID has no mapping yet' (-not (Maps $scratchSid))
             $seg = SegmentOf (Build '' $docs $scratchTask)
-            $code = $standIns + "`n" + $seg.Replace($nodeLine, '$node = (Join-Path $env:SystemRoot ''System32\cmd.exe'')') + "`n" + "'SETUP DONE'"
+            $code = $standIns + "`n" + $seg.Replace($nodeLine, '$node = $cmdExe') + "`n" + "'SETUP DONE'"
             try { $r = Run $code } catch { $r = @{ said = 'THREW: ' + $_.Exception.Message; log = @() } }
             $task = Get-ScheduledTask -TaskName $scratchTask -ErrorAction SilentlyContinue
             Yes 'real task: one deploy registers the task' ($r.said -match 'scheduled task created' -and $null -ne $task)

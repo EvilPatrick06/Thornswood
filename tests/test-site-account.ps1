@@ -90,6 +90,7 @@ if (-not $RepoPath) { $RepoPath = $Here }
 # The principal and the fail-safe the account block calls (#2578, #2613).
 # Deploy-Docs sends these up as text in front of the setup script.
 . (Join-Path $RepoPath 'scripts\deploy\ServiceAccount.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 # The places no service may read, swapped for scratch ones the test sets, so
 # the fail-safe never reads this machine's own C:\Thornswood-* folders.
 $script:neverReach = @()
@@ -512,7 +513,7 @@ try {
             $said -match 'GRANTS REFUSED to NT TASK\\Thornswood Docs' -and $said -notmatch 'LOCAL SERVICE no longer has a rule' -and
             (RulesFor $server 'S-1-5-19').Count -ge 1)
         $taskSid = Get-ThornswoodTaskSidFromName 'Thornswood Docs'
-        $runBlock = 'function icacls { $a = @($args | ForEach-Object { ([string]$_).Replace(''*' + $taskSid + ':'', ''*S-1-5-4:'') }); & (Join-Path $env:SystemRoot ''System32\icacls.exe'') @a }' + "`n" + $block
+        $runBlock = 'function icacls { $a = @($args | ForEach-Object { ([string]$_).Replace(''*' + $taskSid + ':'', ''*S-1-5-4:'') }); & ''' + (Get-WindowsPath 'System32\icacls.exe') + ''' @a }' + "`n" + $block
     }
     $r = Run $runBlock
     $said = $r.said -join "`n"
