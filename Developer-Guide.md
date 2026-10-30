@@ -599,10 +599,9 @@ Check-ShipReady and Build-Generated then take that folder without `-Root`.
 Ship and Check-ShipReady refuse a folder Vortex deploys into, before
 anything is built.
 
-Moving a release folder means building its generated files once more
-afterwards, `.\scripts\mods\Build-Generated.ps1 -Channel dev`, because
-`generated.txt` records the game folder they were built for and Ship
-refuses them for any other.
+Moving a release folder needs nothing built afterwards: no release carries
+the animation and body files since #3715, and every launcher builds its own
+before Play.
 
 `tests\test-ship-machine.ps1` walks this section: every script it names is
 in the repository with the parameters it is given, the template holds paths
@@ -1274,14 +1273,17 @@ from the board, none of these three puts an issue aside:
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
   there, and a folder made before this loses such files at its next refresh,
   logged (OwnGameKinds.cs, tests\test-own-folder-alone.ps1).
-  Decided by Patrick on 29 Sep (#1247): the behavior files and the BodySlide
-  bodies a release carries are made in Thornswood's own folder, as a step on
-  the shipping machine before a Ship (`scripts\mods\Build-Generated.ps1`,
-  what it builds in `records\generated.json`), never in the Steam copy. The
-  behavior files come from Pandora Behaviour Engine+, which the collection
-  carries from revision 2, because Nemesis cannot generate from a command
-  line. Ship stops while they are not built for the current mod list
-  (tests\test-build-generated.ps1).
+  Decided by Patrick on 29 Sep (#1247) and changed on 27 Oct (#3715): the
+  behavior files and the BodySlide bodies are made in Thornswood's own
+  folder, never in the Steam copy, and since #3715 by every launcher on its
+  own computer before Play, never on the shipping machine for a release. No
+  release and no installer carries them, because they are other people's
+  work (CBBE's page disallows distribution without permission). What is
+  built is `records\generated.json`, compiled into the launcher
+  (`launcher\app\GeneratedBuild.cs`, which `scripts\mods\Build-Generated.ps1`
+  runs too). The behavior files come from Pandora Behaviour Engine+, which
+  the collection carries from revision 2, because Nemesis cannot generate
+  from a command line (tests\test-build-generated.ps1).
 - Whichever folder the game runs from, the launcher looks after its own
   files: Keep puts its files back before Play and parks any plugin in
   `Data\Platform\Plugins` that is not ours; Hold keeps its files open read
@@ -1860,9 +1862,9 @@ is built from that git does not know, with
 a `-Version` other than the number already on main, or with main here behind
 or ahead of `origin/main`, so what ships is what is on GitHub. It builds the
 launcher, checks that the game folder holds the recorded client build
-(`Sync-Client.ps1 -Check`) and that the behavior files and bodies in it were
-built for this mod list (`scripts\mods\Build-Generated.ps1`, run before a Ship;
-see One Skyrim of its own), then runs
+(`Sync-Client.ps1 -Check`) and that the collection there can build the
+behavior files and bodies every launcher makes before Play
+(`scripts\mods\Build-Generated.ps1 -DryRun`; see One Skyrim of its own), then runs
 `scripts\release\Publish-Update.ps1`, which
 scans the game folder for loose files that are not Vortex's, not vanilla, not
 runtime and not per machine, diffs them against this channel's baseline
@@ -2024,7 +2026,7 @@ folder went:
 | `thornswood-front.zip` | `local` | The front build, made outside the repository | Go |
 | `mod-audit.json` | `local` | What Audit-Mods found last time | Audit-Mods |
 | `backups` | `local` | The backups brought off the VPS, since 5 Oct (`Downloads\Thornswood-Backups` before). Secrets are inside them | Fetch-Backups, Backup-Server, Clean-Everything |
-| `release-devbuild` | `local`, on One | The folder One's dev release is built from, since 5 Oct, recorded by Setup-ShipMachine -Root | Ship, Check-ShipReady, Build-Generated |
+| `release-devbuild` | `local`, on One | The folder One's dev release is built from, since 5 Oct, recorded by Setup-ShipMachine -Root | Ship, Check-ShipReady, Build-Generated -DryRun |
 | `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
 second holder is, is `docs\OWNERSHIP.md` in the private ops repo.
 
@@ -2135,57 +2137,66 @@ the Vortex profile's lists as of the folder's last update, and are the
 reference load order a release carries (`Get-ShipLoadOrderDir`). Ship checks
 the client in `<Root>\Game` against `records\client-build.json`.
 
-**The behavior files and the bodies, before a Ship.** Every release carries
-the behavior files (the animations for the mod list, Nemesis' output until
-29 September) and the bodies BodySlide builds. Decided by Patrick on
-29 September (issue #1247): they are made in
-Thornswood's own folder, as a step on the shipping machine before a Ship, and
-never in the Steam copy, which stays the person's own. Since #1232 nothing run
-into the Steam copy reaches Thornswood's folder or a release. With the game and
-the launcher closed, on the machine that ships:
+**The behavior files and the bodies, built on each computer.** The behavior
+files (the animations for the mod list, Nemesis' output until 29 September)
+and the bodies BodySlide builds are other people's work: Precision's and True
+Directional Movement's patches merged into the game's graphs, and CBBE 3BA's,
+CBBE's and HIMBO's bodies. Decided by Patrick on 27 October (issue #3715,
+changing #1247): every launcher builds them in its own folder before Play,
+and no release or installer carries them. Before that a step on the shipping
+machine built them and every release shipped them. They are never built in
+the Steam copy, which stays the person's own.
+
+The launcher's Play runs `GeneratedHere.Ensure` (launcher\app\GeneratedHere.cs)
+when `Profile\OwnGame\generated.txt` is missing or stale, and Fix offers the
+same build as a card. A failed build or a body that is not covered stops
+Play with a message saying why. `scripts\mods\Build-Generated.ps1` runs the
+same code (`launcher\app\GeneratedBuild.cs`, compiled by
+`scripts\mods\Generated.ps1`), so a developer can build or check a folder by
+hand. With the game and the launcher closed:
 
 ```
-.\scripts\mods\Build-Generated.ps1 -Channel dev      C:\Thornswood-DevBuild\Game
-.\scripts\mods\Build-Generated.ps1 -Channel main     C:\Thornswood\Game
+.\scripts\mods\Build-Generated.ps1 -Root <a Thornswood install> -NoPause
 ```
 
-Those are the defaults; on a machine that recorded its release folder with
-`Setup-ShipMachine.ps1 -Root`, `-Channel` builds in that one, the folder
-Ship packs (issue #1692).
+The build runs two tools the collection installs, with what
+`records\generated.json` names. The behavior files come from Pandora
+Behaviour Engine+ (Nexus 133232, in the collection from revision 2), with
+exactly the four patches the list names and every other patch off. Nemesis
+cannot do it: its `-generate` never starts its work (in its own source, the
+command line connects to a slot that does not exist), which is why it leaves
+the collection in the same revision. Pandora's output for the current mod
+list was compared with Nemesis' on 29 September: the same 20 behavior and
+character files with the same names in them. The build runs a copy of
+Pandora in its work folder, with a `Settings.json` beside it naming only that
+folder's Data and a work output folder: Pandora 4.4.0 ignores `-o` and
+without that file would take the registry's Skyrim, the Steam copy. It
+refuses if Pandora changed anything in the game folder or its log has an
+error, and needs the .NET 10 runtime on the machine. The bodies come from
+BodySlide's sets (the women's 3BA NeverNude body and the men's HIMBO body
+with boxers, issue #405). Each body is built at its set's own slider defaults
+and never with RaceMenu morph files; it refuses a set or a slider move that
+would shape the breasts, the seat, the genitals or the nipples (issue #1004)
+or take the underwear off, and reads every body in the folder
+(`launcher\app\CoveredBodies.cs`, which `Check-CoveredBodies.ps1` runs too)
+before the record is written. First it gives the folder its own copy of every
+file BodySlide writes in place, because the folder is mostly hard links to
+Vortex's copies and a write through one lands in Vortex's copy and the Steam
+copy too; it refuses, and records nothing, if a tool wrote through a link
+anyway. A tool that sits using no processor time and writing nothing for
+three minutes is stopped. It refuses while Skyrim or a launcher runs from
+that install, and in any folder Vortex deploys into. `-DryRun` checks all of
+it and changes nothing. What it made goes in `Profile\OwnGame\generated.txt`,
+with a sha256 each and what it was built from: the launcher keeps those files
+as Thornswood's through every refresh (`OwnGameKinds.cs`). The record is
+stale when the mod list, a file either tool reads, `records\generated.json`
+or a built file changed since, and the next Play builds them again.
 
-It runs two tools the collection installs, with what `records\generated.json`
-names. The behavior files come from Pandora Behaviour Engine+ (Nexus 133232,
-in the collection from revision 2), with exactly the four patches the list
-names and every other patch off. Nemesis cannot do it: its `-generate` never
-starts its work (in its own source, the command line connects to a slot that
-does not exist), which is why it leaves the collection in the same revision.
-Pandora's output for the current mod list was compared with Nemesis' on
-29 September: the same 20 behavior and character files with the same names in
-them. The script runs a copy of Pandora in its work folder, with a
-`Settings.json` beside it naming only that folder's Data and a work output
-folder: Pandora 4.4.0 ignores `-o` and without that file would take the
-registry's Skyrim, the Steam copy. It refuses if Pandora changed anything in
-the game folder or its log has an error, and needs the .NET 10 runtime on the
-machine. The bodies come from BodySlide's sets (the women's 3BA NeverNude body
-and the men's HIMBO body with boxers, issue #405). Each body is built at its set's own
-slider defaults and never with RaceMenu morph files; it refuses a set or a
-slider move that would shape the breasts, the seat, the genitals or the
-nipples (issue #1004) or take the underwear off, and reads every body it built
-with `Check-CoveredBodies.ps1` before one goes in. First it gives the folder
-its own copy of every file BodySlide writes in place, because the folder is
-mostly hard links to Vortex's copies and a write through one lands in Vortex's
-copy and the Steam copy too; it refuses, and records nothing, if a tool wrote
-through a link anyway. A tool that sits using no processor time and writing
-nothing for three minutes is stopped. It refuses while Skyrim or a launcher
-runs from that install, and in any folder Vortex deploys into. `-DryRun` checks all of it and
-changes nothing. What it made goes in `Profile\OwnGame\generated.txt`, with a
-sha256 each and what it was built from (`scripts\mods\Generated.ps1`): the
-launcher keeps those files as Thornswood's through every refresh
-(`OwnGameKinds.cs`), and `Ship-Rules.ps1` lets the release carry them, though
-Vortex deploys files of the same names. Ship and `Check-ShipReady.ps1` stop
-when that record is missing or stale: the mod list, a file either tool reads,
-`records\generated.json`, or a built file changed since. The fix is to run it
-again.
+`Ship-Rules.ps1` names the built files (`Test-ShipGenerated`) as machine
+files: never packed, never in the installer and never listed as removed, so
+no update deletes what an install built. Ship's "Animation and body files"
+step runs `Build-Generated.ps1 -DryRun` on the ship root and stops both
+channels when the collection installed there could not build them.
 
 **The folder a release is built from (issue #2019).** Each channel's ship root
 (`Where.ps1 ShipRoot` and `ShipRootDev`, recorded by `Setup-ShipMachine.ps1
@@ -2201,8 +2212,8 @@ up to date with Vortex's deployment. Then the recorded client goes in from the
 engine build (`engine\README.md` "One engine"), and the Ship stops with a
 sentence, before anything is built or published, when either step cannot be
 done. Main has its own root (`local\release-main` on One), so no Ship packs
-`C:\Thornswood`. After a refresh that changed the bodies' or the animations'
-sources, `Build-Generated.ps1 -Channel <channel>` runs again, and Ship says so.
+`C:\Thornswood`. Nothing is built in a ship root for a release: the
+animation and body files are every launcher's own (#3715).
 `tests\test-2019-ship-roots.ps1` holds it.
 
 A new root takes the game's own files from the Steam copy only when that copy
@@ -2628,21 +2639,21 @@ Publishing a new revision of the collection is done from Patrick's Nexus account
 
 ### L. Pandora
 
-Pandora Behaviour Engine+ builds the behavior files a release carries. The collection carries Pandora from revision 2. Nemesis cannot generate those files from a command line, which is why the shipping machine uses Pandora.
+Pandora Behaviour Engine+ builds the behavior files. The collection carries Pandora from revision 2. Nemesis cannot generate those files from a command line, which is why the launcher uses Pandora.
 
-Before a Ship, on the machine that publishes:
+Every launcher builds them on its own computer before Play, and no release carries them (#3715). To build or check a folder by hand, with the game and the launcher closed:
 
 ```powershell
-.\scripts\mods\Build-Generated.ps1
+.\scripts\mods\Build-Generated.ps1 -Root <a Thornswood install> -NoPause
 ```
 
-Ship stops while those files are not built for the current mod list. What the script builds is listed in `records\generated.json`. The behavior files are made in Thornswood's own folder, never in the Steam copy. The same rule is in [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite).
+Ship runs it with `-DryRun` and stops when the collection installed in the ship root could not build them. What it builds is listed in `records\generated.json`. The behavior files are made in Thornswood's own folder, never in the Steam copy. The same rule is in [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite).
 
 #### Learn more about Pandora
 
 - Pandora Behaviour Engine+ on the Nexus, the file the collection carries: https://www.nexusmods.com/skyrimspecialedition/mods/133232
 - Which revision added it, and the other mods beside it: [docs/COLLECTION-REVISION-2.md](docs/COLLECTION-REVISION-2.md)
-- The command that runs it: [scripts/mods/Build-Generated.ps1](scripts/mods/Build-Generated.ps1)
+- The code that runs it: [launcher/app/GeneratedBuild.cs](launcher/app/GeneratedBuild.cs), and by hand [scripts/mods/Build-Generated.ps1](scripts/mods/Build-Generated.ps1)
 
 ### M. Creation Kit
 
