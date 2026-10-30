@@ -817,11 +817,21 @@ if (AGE_PATHS[here] && !ageOk()) {
              // The step said install the collection and never said where. The
              // address comes from version.json by way of the news feed, so there
              // is one copy of it and it cannot go stale here.
+             // The link opens the revision the server was built against, not
+             // the collection's page, which Nexus always shows at its newest
+             // (#4115): a newer revision than the server's keeps Play shut.
              (d.collection
                ? '<div class="grab"><a class="btn first" href="' + esc(d.collection) +
-                 '" target="_blank" rel="noopener">Open the collection</a>' +
-                 '<p class="also faintly">Opens on Nexus. Vortex takes it from ' +
-                 'there.</p></div>'
+                 '" target="_blank" rel="noopener">' +
+                 (d.collectionRevision > 0 ? 'Open revision ' + esc(String(d.collectionRevision)) : 'Open the collection') +
+                 '</a>' +
+                 '<p class="also faintly">' +
+                 (d.collectionRevision > 0
+                   ? 'Opens revision ' + esc(String(d.collectionRevision)) + ' on Nexus, the one the ' +
+                     'server was built against. Install that one in Vortex, not a newer one ' +
+                     'Nexus may show first.'
+                   : 'Opens on Nexus. Vortex takes it from there.') +
+                 '</p></div>'
                : '') +
              '</div></div>' +
            '<div class="step"><div><h3>Connect your Discord in the launcher</h3>' +

@@ -3,8 +3,9 @@
 
       pwsh -NoProfile -File .\tests\test-covered-bodies.ps1
 
-  scripts\mods\Check-CoveredBodies.ps1 tells a covered body from a nude one,
-  and Ship.ps1 refuses a main release over a nude one.
+  scripts\mods\Check-CoveredBodies.ps1 (launcher\app\CoveredBodies.cs) tells
+  a covered body from a nude one, and the launcher's build of the bodies
+  refuses a nude one, so Play does not start on it (#3715).
 
   WHY THIS EXISTS. Issue #405, Patrick on 28 Sep: "I really just want no
   nudity in players or NPCs for both males and females." MEASURED that day:
@@ -123,7 +124,7 @@ try {
     Yes 'and says what is missing' ($r.Out -match 'nothing over the chest, nothing over the groin')
     Yes 'Bra and Panty on bones do not count as covering it' ($r.Out -notmatch 'covered\s+femalebody')
     Yes 'and HIMBO with its boxers is covered' ($r.Out -match 'covered\s+malebody_1\.nif\s+shapes: HIMBO - Boxers')
-    Yes 'and the verdict says where the fix goes' ($r.Out -match '(?i)collection revision')
+    Yes 'and the verdict says where the bodies are built from' ($r.Out -match 'records.generated\.json')
 
     # ------------------------------------------ what the revision brings
     $g = New-Game @{
@@ -216,25 +217,34 @@ try {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# ============================================================ Ship's gate
+# ============================================================ the launcher's gate
+# Since #3715 the bodies are built on each computer by the launcher, and no
+# release carries them, so the gate is the launcher's: the build reads the
+# bodies BodySlide built before any is put in place, and every body in the
+# folder before it records them, and refuses either; Play does not start on a
+# refusal. Ship has no body step any more: nothing it sends has a body in it.
+
+$App = Join-Path $Repo 'launcher\app'
+$build = [IO.File]::ReadAllText((Join-Path $App 'GeneratedBuild.cs'))
+$here = [IO.File]::ReadAllText((Join-Path $App 'GeneratedHere.cs'))
+$play = [IO.File]::ReadAllText((Join-Path $App 'ShellPlay.cs'))
+Yes 'the build reads the bodies BodySlide built, and refuses a nude or unreadable one before any is put in place' (
+    $build -match '(?s)CoveredResult covered = CoveredBodies\.Check\(stageRoot, false, Say\);\s*if \(covered\.Nude > 0 \|\| covered\.Unread > 0\)\s*throw new GeneratedStop' -and
+    $build.IndexOf('CoveredBodies.Check(stageRoot') -lt $build.IndexOf('foreach (string f in built) outputs.Add(PutOutput('))
+Yes 'and reads every body in the folder, refusing a nude one, before it writes the record' (
+    $build -match '(?s)CoveredResult all = CoveredBodies\.Check\(game, true, Say\);\s*if \(all\.Nude > 0 \|\| all\.Unread > 0\)\s*throw new GeneratedStop' -and
+    $build.IndexOf('CoveredBodies.Check(game, true, Say)') -lt $build.IndexOf('GeneratedRecord.Write(recordPath'))
+Yes 'Play builds them before the game starts, and a refusal stops Play' (
+    $play -match 'GeneratedHere\.Ensure\(SafeLog\)' -and $play -match '(?s)if \(notBuilt != null\)\s*\{.{0,200}Not launching\..{0,300}return;' -and
+    $play.IndexOf('GeneratedHere.Ensure(SafeLog)') -lt $play.IndexOf('if (!EnsureServer()) return;'))
+Yes 'the launcher builds only in Thornswood''s own folder' ($here -match '(?s)public static string Ensure\(Action<string> say\)\s*\{\s*if \(!OwnGame\.Active\) return null;')
 
 $text = [IO.File]::ReadAllText($Ship)
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, $Ship, [ref]$null, [ref]$pe)
 Yes 'Ship.ps1 parses' (@($pe).Count -eq 0)
 $params = @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
-Yes 'Ship.ps1 takes -AllowUncoveredBodies' ($params -contains 'AllowUncoveredBodies')
-Yes 'and documents it' ($text -match '\.PARAMETER AllowUncoveredBodies')
-$at = $text.IndexOf("Head 'Covered bodies'")
-Yes 'Ship.ps1 has a Covered bodies step' ($at -gt 0)
-$step = if ($at -gt 0) { $text.Substring($at, [Math]::Min(1600, $text.Length - $at)) } else { '' }
-Yes 'it runs Check-CoveredBodies.ps1 on the game folder' ($step -match "Check-CoveredBodies\.ps1'\)\s+-Game \`$GameDir")
-Yes 'it refuses a main release on exit 2 unless -AllowUncoveredBodies' (
-    $step -match '\$bodiesExit -eq 2 -and -not \$Dev -and -not \$AllowUncoveredBodies' -and $step -match 'Die ')
-Yes 'and puts the version back when it does' ($step -match "Unbump 'a body in the game folder is nude'")
-Yes 'and it reads the exit code off the global one' ($step -match '\$global:LASTEXITCODE = 0')
-$client = $text.IndexOf("Head 'Client build'")
-$publish = $text.IndexOf('Publish-Update.ps1', $at + 1)
-Yes 'the step comes after the client build check and before anything is published' ($client -gt 0 -and $at -gt $client -and ($publish -lt 0 -or $publish -gt $at))
+Yes 'Ship.ps1 has no -AllowUncoveredBodies and no Covered bodies step: it sends no body' (
+    $params -notcontains 'AllowUncoveredBodies' -and $text -notmatch "Head 'Covered bodies'" -and $text -notmatch 'Check-CoveredBodies')
 
 # ======================================================== this machine
 

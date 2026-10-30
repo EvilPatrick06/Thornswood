@@ -136,8 +136,14 @@ async function main() {
     };
     fs.writeFileSync(path.join(files, 'files.json'), JSON.stringify(meta));
     const jsonFile = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } };
+    // listFiles lists only what /file/ serves (downloadServed, #3798).
+    const rule = ['function payloadZip(', 'function downloadServed('].map((h) => {
+      const m = new RegExp('\\n' + h.replace('(', '\\(') + '[\\s\\S]*?\\n\\}\\n').exec(server);
+      return m ? m[0] : '';
+    }).join('');
+    yes('the rule for what is served is in server.js', /function downloadServed\(/.test(rule));
     const listFiles = new Function('fs', 'path', 'FILES', 'jsonFile',
-      lf[0] + '\nreturn listFiles;')(fs, path, files, jsonFile);
+      rule + lf[0] + '\nreturn listFiles;')(fs, path, files, jsonFile);
     const list = () => {
       const by = {};
       for (const f of listFiles()) by[f.name] = f;
@@ -149,8 +155,8 @@ async function main() {
     yes('in lower case', e.sha256 === good.toLowerCase());
     yes('a value that is not a SHA-256 does not go out',
         (by['Thornswood-Setup.zip'] || {}).sha256 === '');
-    yes('a file files.json says nothing about gets an empty one',
-        (by['notes.txt'] || {}).sha256 === '');
+    yes('a file files.json says nothing about is not listed at all (#3798)',
+        !('notes.txt' in by));
     yes('and nothing that was there before is lost',
         e.label === 'Thornswood installer' && e.version === 'launcher 1.2.3' &&
         e.size === exeBytes.length && e.hidden === false &&

@@ -62,13 +62,47 @@ function Log([string]$m) {
 }
 
 # The pipe, for thornswood-deploy and SYSTEM, and for no other machine.
-function New-GatePipe {
+# Windows itself refuses every other machine: the pipe is made with
+# PIPE_REJECT_REMOTE_CLIENTS, which .NET's own constructor does not set, so
+# it is made here and handed to .NET. Its access list allows SYSTEM and the
+# deploy account and denies nothing. Until 30 Oct it denied NETWORK
+# (S-1-5-2) to keep other machines out, but sshd logs a key in as a network
+# logon, which puts NETWORK in thornswood-deploy's token too, and a deny
+# beats an allow: the first ping through the gate was "Access to the path
+# is denied". FILE_FLAG_FIRST_PIPE_INSTANCE: nothing else may hold the name
+# first.
+$GatePipeCode = @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+namespace ThornswoodGate {
+    public static class Pipe {
+        [StructLayout(LayoutKind.Sequential)]
+        struct SecurityAttributes { public int Length; public IntPtr Descriptor; public int Inherit; }
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        static extern IntPtr CreateNamedPipeW(string name, uint openMode, uint pipeMode, uint instances, uint outSize, uint inSize, uint timeout, ref SecurityAttributes sa);
+        const uint Duplex = 0x3, FirstInstance = 0x80000, Overlapped = 0x40000000, RejectRemote = 0x8;
+        public static IntPtr Create(string name, byte[] descriptor) {
+            GCHandle pinned = GCHandle.Alloc(descriptor, GCHandleType.Pinned);
+            try {
+                SecurityAttributes sa = new SecurityAttributes();
+                sa.Length = Marshal.SizeOf(typeof(SecurityAttributes));
+                sa.Descriptor = pinned.AddrOfPinnedObject();
+                IntPtr h = CreateNamedPipeW(@"\\.\pipe\" + name, Duplex | FirstInstance | Overlapped, RejectRemote, 1, 4096, 4096, 0, ref sa);
+                if (h == new IntPtr(-1)) { throw new Win32Exception(Marshal.GetLastWin32Error()); }
+                return h;
+            } finally { pinned.Free(); }
+        }
+    }
+}
+'@
+function New-GatePipe([string]$Name = 'thornswood-gate') {
+    if (-not ('ThornswoodGate.Pipe' -as [type])) { Add-Type -TypeDefinition $GatePipeCode }
     $sec = New-Object IO.Pipes.PipeSecurity
-    $sec.AddAccessRule((New-Object IO.Pipes.PipeAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-2')), [IO.Pipes.PipeAccessRights]::FullControl, [Security.AccessControl.AccessControlType]::Deny)))
     $sec.AddAccessRule((New-Object IO.Pipes.PipeAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-18')), [IO.Pipes.PipeAccessRights]::FullControl, [Security.AccessControl.AccessControlType]::Allow)))
     $sec.AddAccessRule((New-Object IO.Pipes.PipeAccessRule((New-Object Security.Principal.SecurityIdentifier([string]$Cfg.deploySid)), [IO.Pipes.PipeAccessRights]::ReadWrite, [Security.AccessControl.AccessControlType]::Allow)))
-    return (New-Object IO.Pipes.NamedPipeServerStream('thornswood-gate', [IO.Pipes.PipeDirection]::InOut, 1,
-        [IO.Pipes.PipeTransmissionMode]::Byte, [IO.Pipes.PipeOptions]::None, 4096, 4096, $sec))
+    $handle = New-Object Microsoft.Win32.SafeHandles.SafePipeHandle([ThornswoodGate.Pipe]::Create($Name, $sec.GetSecurityDescriptorBinaryForm()), $true)
+    return (New-Object IO.Pipes.NamedPipeServerStream([IO.Pipes.PipeDirection]::InOut, $true, $false, $handle))
 }
 
 # Sending to a caller that may have gone: once a write fails, the run goes
@@ -80,6 +114,16 @@ function Send([string]$m) {
     if ($script:Transcript) { [IO.File]::AppendAllText($script:Transcript, ($m + "`r`n"), $Utf8) }
     if ($script:Gone) { return }
     try { $script:Writer.WriteLine($m) } catch { $script:Gone = $true }
+}
+
+# A short program's lines, its errors among them, and its exit code. The
+# broker runs under Windows PowerShell 5.1, where a redirected line on stderr
+# under 'Stop' ends the script before the exit code is read (the gate's
+# install stopped that way on 29 Oct), so 'Continue' holds here alone.
+function Invoke-Short([string]$File, [string[]]$Words) {
+    $ErrorActionPreference = 'Continue'
+    $o = @(& $File @Words 2>&1 | ForEach-Object { "$_" })
+    return [pscustomobject]@{ Out = $o; Code = $LASTEXITCODE }
 }
 
 # One program to its end, its output sent line by line as it comes and its
@@ -112,7 +156,7 @@ function Invoke-Child([string]$File, [string[]]$Words, [string]$Dir, [double]$Mi
         }
         if ((Get-Date) -gt $until) {
             Send ('| the gate ended it: it ran past its ' + $Minutes + ' minutes')
-            & "$env:SystemRoot\System32\taskkill.exe" /T /F /PID $p.Id 2>&1 | Out-Null
+            Invoke-Short "$env:SystemRoot\System32\taskkill.exe" @('/T', '/F', '/PID', [string]$p.Id) | Out-Null
             $p.WaitForExit(30000) | Out-Null
             return -1
         }
@@ -140,9 +184,9 @@ function Update-Checkout {
         $c = Invoke-Child $git $step $Root 10
         if ($c -ne 0) { Send ('| git ' + $step[2] + ' ended ' + $c + ', so main could not be read'); return '' }
     }
-    $o = @(& $git -C $Repo rev-parse HEAD 2>&1 | ForEach-Object { "$_" })
-    if ($LASTEXITCODE -ne 0 -or ($o -join '') -notmatch '^[0-9a-f]{40}$') { return '' }
-    return ($o -join '')
+    $o = Invoke-Short $git @('-C', $Repo, 'rev-parse', 'HEAD')
+    if ($o.Code -ne 0 -or ($o.Out -join '') -notmatch '^[0-9a-f]{40}$') { return '' }
+    return ($o.Out -join '')
 }
 
 # A file the verb wrote, in pieces small enough for one line each.
@@ -174,9 +218,9 @@ function Invoke-Request($Pipe) {
     if ($req.Verb -eq 'ping') {
         # It also reads main's tip with the deploy key, so a ping proves the
         # way to GitHub as well as the pipe.
-        $tip = @(& ([string]$Cfg.git) ls-remote ([string]$Cfg.remote) refs/heads/main 2>&1 | ForEach-Object { "$_" })
-        $main = if ($LASTEXITCODE -eq 0 -and ($tip -join ' ') -match '^([0-9a-f]{40})\s') { $Matches[1] } else { '' }
-        if (-not $main) { Send ('| GATE BROKEN: GitHub did not answer with the deploy key: ' + (($tip | Select-Object -Last 2) -join ' ')); Send '@END 66'; Log 'PING main unreadable'; return }
+        $tip = Invoke-Short ([string]$Cfg.git) @('ls-remote', ([string]$Cfg.remote), 'refs/heads/main')
+        $main = if ($tip.Code -eq 0 -and ($tip.Out -join ' ') -match '([0-9a-f]{40})\s+refs/heads/main') { $Matches[1] } else { '' }
+        if (-not $main) { Send ('| GATE BROKEN: GitHub did not answer with the deploy key: ' + (($tip.Out | Select-Object -Last 2) -join ' ')); Send '@END 66'; Log 'PING main unreadable'; return }
         Send ('| GATE READY, installed from ' + $Cfg.commit + ', main at ' + $main + ', runs ' + ((@((Read-ThornswoodGateVerbs (Join-Path $Root 'verbs.json')).verbs.PSObject.Properties) | ForEach-Object { $_.Name }) -join ', '))
         Send '@END 0'
         Log 'PING'

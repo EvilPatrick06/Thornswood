@@ -2,12 +2,12 @@
   A stand-in Data\Platform\UI for harnesses that run the real Publish-Update
   or Package-Thornswood. Save-ShipUiHashedAssets refuses a game folder whose
   build.js is missing or names nothing (#1318). Font names are derived from
-  the real shipped build.js fixture (tests/fixtures/ui-front-build.js), so
-  they follow that file. They are the two that build.js and the front built
-  from the fork both still ship, Bankir-Retro and icomoon: its four Futura PT
-  and DIN Pro faces are on records\ui-gone.json since #1317, so they are
-  never ours, and a harness that packed them would be testing a file no
-  release carries.
+  the real shipped build.js's asset modules (tests/fixtures/ui-front-build.js,
+  cut from the whole build in #3761), so they follow that file. They are the
+  two that build.js and the front built from the fork both still ship,
+  Bankir-Retro and icomoon: its four Futura PT and DIN Pro faces are on
+  records\ui-gone.json since #1317, so they are never ours, and a harness
+  that packed them would be testing a file no release carries.
 #>
 $script:UiFrontFixtureRoot = $PSScriptRoot
 $script:UiFrontFixtureFonts = $null

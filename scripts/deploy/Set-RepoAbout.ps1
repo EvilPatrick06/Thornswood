@@ -9,9 +9,10 @@
       pwsh scripts/deploy/Set-RepoAbout.ps1 -Check     change nothing; exit 1 when GitHub differs
       pwsh scripts/deploy/Set-RepoAbout.ps1 -Run <id>  the answer of a run that had not ended
 
-  Changing it is a pull request to the record; once it merges,
-  .github\workflows\github-admin.yml runs by itself and GitHub matches it a
-  minute later. This script is for asking again, or for -Check.
+  Changing it is a pull request to the record; once it merges, the Desk runs
+  this script and GitHub matches it a minute later. -Check says only what
+  differs. The workflow it starts is in the private ops repository (#4013),
+  so a push here cannot start it by itself.
 
   WHY THIS WAY (#3682, Patrick's A of 26 Oct 2026). The About box is a
   repository setting, and a cloud thread's proxy refuses every repository
@@ -19,9 +20,10 @@
   proxy" (HTTP 403, measured 26 Oct 2026, 5:13 PM), and the topics the same.
   The box's admin service (scripts\vps\admin\admin.js) already holds a GitHub
   App with administration write on this repository for the runner labels
-  (#3107), and that covers these. So this starts github-admin.yml on main,
-  whose run hands GitHub's OIDC token for it to the service, and the service
-  reads the record from main itself and makes the About box match. What to
+  (#3107), and that covers these. So this starts github-admin.yml on the
+  ops repository's main, whose run hands GitHub's OIDC token for it to the
+  service, and the service reads the record from this repository's main
+  itself and makes the About box match. What to
   set never comes from here. The social preview picture has no API, so it is
   not in the record.
 
@@ -46,7 +48,7 @@ param(
     [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
     [switch]$OnGitHub,
     [int]$WaitMinutes = 15,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
 )
 
 Set-StrictMode -Version Latest
