@@ -488,7 +488,7 @@ const BOWL = idFor(DATA.item);
       /kind === 'dye'\) \{ return 'offers to dye your hair with '/.test(PA) && /data\.offer\.kind === 'dye' \? 'offers to dye your hair with '/.test(PA));
   yes('U5 the look prompt offers Dye their hair on hd, and K is Take on\'s first', /row\.hd && !\(Array\.isArray\(row\.a\)/.test(FR) &&
       /'\|' \+ \(row\.hd \|\| 0\) \+/.test(FR) &&
-      FR.indexOf('apprenticePress()) { return; }') < FR.indexOf('hairDyePress()) { return; }') && /const HAIR_DYE_KEY = SKILLS_KEY;/.test(FR));
+      FR.indexOf('apprenticePress()) { return; }') < FR.indexOf('hairDyePress()) { return; }') && /(?:const|let) HAIR_DYE_KEY = SKILLS_KEY;/.test(FR));
   yes('U6 the front does not poll the hair colour: the redraw belongs to the engine fork', !/guard\('hair colour'/.test(FR) &&
       !/hairReadAt|hairSeen/.test(FR));
   // The panels run in a browser; make sure what was added parses.

@@ -1016,7 +1016,7 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     'npcAllowCrimeFaction', 'npcAllowEssential', 'thornswoodLoadOrderRefuse',
     'thornswoodRequirePass', 'thornswoodServer', 'npcEnabled', 'thornswoodVoicePort',
     'equipmentSlotCheckEnabled', 'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled',
-    'forbiddenReloot', 'forbiddenBaseContainer'
+    'equipItemAttemptEnabled', 'forbiddenReloot', 'forbiddenBaseContainer'
   )
   # The counting function (#2011) and the light rule (#2947) the block below
   # takes up, both from ServerOrder.ps1.
@@ -1044,6 +1044,9 @@ foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled','equipm
   if (`$s.PSObject.Properties.Name -notcontains `$k) { `$wantEquip = `$true }
   elseif (`$s.`$k -ne `$false) { `$wantEquip = `$true }
 }
+# The one equipment switch that is on, the engine asking before it puts an
+# item on (#2262, written out in Deploy-Gamemode.ps1).
+if (`$s.PSObject.Properties.Name -notcontains 'equipItemAttemptEnabled' -or `$s.equipItemAttemptEnabled -ne `$true) { `$wantEquip = `$true }
 `$wantOrder = `$false
 `$newOrder = @()
 `$orderWire = '$orderWire'
@@ -1162,6 +1165,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   `$s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue `$false -Force
   `$s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue `$false -Force
+  `$s | Add-Member -NotePropertyName equipItemAttemptEnabled -NotePropertyValue `$true -Force
   # Nothing in the world comes back except FLOR and TREE, which is the hanging
   # meat, the garlic, the elves ears, every plant and every crop. The argument
   # and the census behind the exception are written out in Deploy-Gamemode.ps1;
