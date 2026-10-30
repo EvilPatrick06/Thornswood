@@ -204,7 +204,7 @@ finally {
 # ---- 6. the door ----------------------------------------------------------
 $caddy = Text (P 'scripts', 'deploy', 'Caddyfile')
 $bridgeJs = Text (P 'scripts', 'vps', 'bridge', 'bridge.js')
-Yes 'the Caddyfile hands /box/ to 127.0.0.1:7790' ($caddy -match '(?s)handle_path /box/\* \{\s*reverse_proxy 127\.0\.0\.1:7790\s*\}')
+Yes 'the Caddyfile hands /box/ to 127.0.0.1:7790' ($caddy -match '(?s)handle_path /box/\* \{\s*reverse_proxy 127\.0\.0\.1:7790\b')
 Yes '  the port bridge.js takes when none is given' ($bridgeJs -match 'THORNSWOOD_BRIDGE_PORT\) \|\| 7790')
 Yes '  and Install-Bridge.ps1 installs it on' ($install -match '\[int\]\$Port\s+= 7790')
 Yes 'Setup-Domain.ps1 refuses a Caddyfile without the /box/ block' ((Text (P 'scripts', 'deploy', 'Setup-Domain.ps1')) -match "'handle_path /box/\*'")

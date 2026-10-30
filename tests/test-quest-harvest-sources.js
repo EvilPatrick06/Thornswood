@@ -59,6 +59,8 @@ for(const key of ['reference','base','world','position','item','rank','returnMin
 }
 const bad=copy(population);bad.loadOrder[0].sha256='bad';
 assert.throws(()=>validateScarceHarvest(doc,bad),/source evidence/);
+{const rebuilt=copy(population);rebuilt.loadOrder.find(r=>r.name==='Thornswood-Last.esp').sha256='0'.repeat(64);
+ assert.equal(validateScarceHarvest(doc,rebuilt).sources.length,doc.sources.length,'a rebuilt own plugin keeps the evidence (#613)');}
 
 // Exercise the generated production exports, rather than replacing them with
 // the controllable adapters used by the harvesting transaction fixture.

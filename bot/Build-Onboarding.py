@@ -42,9 +42,8 @@
   why, and sends nothing while anything fails.
 
   The token is read from DISCORD_TOKEN and never printed. The bot needs Manage
-  Server and Manage Roles for the PUT (Discord's rule for this endpoint); the
-  running bot is not given Manage Server, so tick Administrator on its role for
-  the run, as for a build, and untick it after.
+  Server and Manage Roles for the PUT (Discord's rule for this endpoint). It
+  keeps Administrator (#3317, Patrick, 22 Oct 2026), which covers both.
 """
 
 import json
@@ -88,11 +87,11 @@ HOLD_WORDS = {
     'Whiterun': 'The middle of everything',
     'Solitude': 'Court, trade, and the embassy',
     'Windhelm': "The High King's seat",
-    'Riften': 'Ask no questions',
+    'Riften': 'Fish, mead, and the Ratway',
     'Markarth': 'Stone, silver and old grudges',
     'Dawnstar': 'Cold, and the ships come in',
-    'Morthal': 'Quiet. Too quiet',
-    'Falkreath': 'More graves than people',
+    'Morthal': "A swamp and the Jarl's hall",
+    'Falkreath': 'Pines, and a graveyard bigger than the town',
     'Winterhold': 'What is left of it',
 }
 
@@ -148,7 +147,9 @@ def plan(grant_member=False, rules=False, age=False):
             single=True, required=True, options=opts))
     # r28n. Pick several, optional, channels only. r28n pointed "I want to
     # help test" at #test-these, which only testers and staff can see; testing
-    # starts with an application now, so it points there instead.
+    # starts with an application now, so it points there instead: since the
+    # ticket split (#3317, page card q-3317-ticket-split, A) that is
+    # #apply-to-playtest.
     prompts.append(dict(
         key='here-for',
         title='What are you here for?',
@@ -159,8 +160,8 @@ def plan(grant_member=False, rules=False, age=False):
             dict(title='Just playing', description='Talk about anything in #general.',
                  roles=[], channels=['general']),
             dict(title='I want to help test',
-                 description='Testing starts with an application in #tickets-and-applications.',
-                 roles=[], channels=['tickets-and-applications']),
+                 description='Testing starts with an application in #apply-to-playtest.',
+                 roles=[], channels=['apply-to-playtest']),
             dict(title='I make videos', description='Screenshots and clips go in #media.',
                  roles=[], channels=['media']),
         ]))
@@ -503,8 +504,8 @@ def main(argv, api=None, out=print):
     if not bot_perms & ADMINISTRATOR and (
             (bot_perms & (MANAGE_GUILD | MANAGE_ROLES)) != (MANAGE_GUILD | MANAGE_ROLES)):
         problems.append('The bot has not got Manage Server and Manage Roles, which '
-                        'Discord wants for this. Tick Administrator on its role for '
-                        'the run and untick it after.')
+                        'Discord wants for this. It keeps Administrator (#3317): '
+                        'tick it on its role again.')
     if '--body' in args:
         out('')
         out(json.dumps(body, indent=1, ensure_ascii=False))

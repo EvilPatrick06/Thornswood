@@ -64,7 +64,7 @@ function fixture(options = {}) {
   assert.equal(typeof context.startSharedNpcServerRuntime, 'function',
     'A shared production entry must replace the single-actor deployed entry');
   let time = 0, sequence = 0, callback = null;
-  const pending = new Map(), states = new Map(), persisted = new Map();
+  const pending = new Map(), states = new Map(), persisted = new Map(), writes = [];
   // A spawn made in this run of the server (#2623); kept and temporary are
   // checked in test-npc-population-runtime.js.
   for(const id of options.commanded || []) persisted.set(id+':thornswoodNpcCommanded',{run:'run-now'});
@@ -130,6 +130,7 @@ function fixture(options = {}) {
     },
     set(id, prop, value) {
       persisted.set(id + ':' + prop, plain(value));
+      writes.push({id, prop, at:time, value:plain(value)});
       // The engine teleports an actor whose locationalData is written.
       if (prop === 'locationalData') {
         const state = states.get(id);
@@ -228,7 +229,11 @@ function fixture(options = {}) {
     vm.runInContext(source.slice(policyBegin,policyEnd),context);
     population=context.createNpcPopulation(api,options.populationData,['Skyrim.esm'],null,{run:'run-now'});
   }
-  runtime = context.startSharedNpcServerRuntime(api, timers, () => time,
+  // How often each of the runtime's tasks reads the clock (#3181): a read
+  // per NPC it looks at, so it counts how many a pass looks at.
+  const reads = new Map();
+  let task = '';
+  runtime = context.startSharedNpcServerRuntime(api, timers, () => { reads.set(task, (reads.get(task) || 0) + 1); return time; },
     text => logs.push(text), population);
   function advance(ms) {
     const until = time + ms;
@@ -237,7 +242,8 @@ function fixture(options = {}) {
       const [handle, task] = [...pending].sort((a,b) => a[1].at-b[1].at || a[0]-b[0])[0];
       if (task.at > until) break;
       time = task.at; pending.delete(handle); callback = {};
-      try { task.fn(); } finally { callback = null; }
+      const named = task.fn.npcRuntimeTask || '';
+      try { taskName(named); task.fn(); } finally { callback = null; taskName(''); }
       assert.ok(++runs < 30000, 'Each turn must yield rather than reschedule endlessly');
     }
     time = until;
@@ -246,14 +252,15 @@ function fixture(options = {}) {
     assert.deepEqual(budgetViolations, [], 'No callback may exceed its budget');
     assert.deepEqual([...states.keys()], originalIds, 'The current cast is preserved');
   }
+  function taskName(name) { task = name; }
   function stop() { runtime.stop(); assert.equal(pending.size, 0, 'Stop cancels every timer'); }
-  return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,teleports,
+  return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,teleports,writes,
     timers, policyEvents, loadedLookups:() => loadedLookups,
     addNpc(id, overrides = {}) {
       assert.ok(!states.has(id)); ids.push(id); states.set(id,actor(overrides));
       originalIds.push(id);
     },
-    time:() => time, status:() => plain(runtime.getStatus()),
+    time:() => time, status:() => plain(runtime.getStatus()), reads,
     advance, stop, disconnect(id) { online = online.filter(other => other !== id); },
     forget(id) { runtime.forget(id); }};
 }
@@ -461,7 +468,8 @@ test('An overlapping unlinked triangle cannot displace a verified movement neigh
   mesh.data.writeInt16LE(2,offset+8);
   mesh.data.writeInt16LE(0,offset+2*16+10);
   const f = fixture({count:1,meshes:new Map([[60,mesh]])});
-  f.advance(15000);
+  // Nobody sees it, so it takes a step every 15 seconds (#3181).
+  for (let i = 0; i < 9; i++) f.advance(10000);
   assert.ok(f.moves.some(m => m.pos[0]+m.pos[1] > 600),
     'Traversal must choose the reciprocal neighbor among overlapping surfaces');
   assert.ok(f.controlled.has(1),'Overlapping unrelated navigation cannot revoke authority');
@@ -491,7 +499,8 @@ test('A displaced actor loses unsafe movement while retaining server ownership',
   assert.ok(f.moved.has(1),'The displaced actor must have published walking movement first');
   f.states.get(1).pos = [1000,1000,0];
   const count = f.moves.length;
-  f.advance(3000);
+  // Nobody sees either, so each is stepped once every 15 seconds (#3181).
+  f.advance(16000);
   assert.ok(f.controlled.has(1),'Movement failure cannot return authority to clients');
   assert.ok(!f.moves.slice(count).some(move => move.id === 1));
   assert.ok(f.moves.slice(count).some(move => move.id === 2));
@@ -561,7 +570,8 @@ test('Immobile NPCs pause while other cast members move, then resume when mobile
   f.advance(5000);
   assert.ok(!f.moved.has(1)); assert.ok(f.moved.has(2));
   f.states.get(1).immobile = false;
-  f.advance(10000); assert.ok(f.moved.has(1)); f.stop();
+  // Nobody sees it, so its next step is within 15 seconds (#3181).
+  f.advance(16000); assert.ok(f.moved.has(1)); f.stop();
 });
 test('A moving NPC becoming immobile publishes a reliable stop and resumes safely when mobile', () => {
   const f = fixture({count:1});
@@ -569,7 +579,8 @@ test('A moving NPC becoming immobile publishes a reliable stop and resumes safel
   assert.ok(f.moved.has(1));
   const position = f.states.get(1).pos.slice(),count = f.moves.length;
   f.states.get(1).immobile = true;
-  f.advance(1000);
+  // Nobody sees it, so its next step, the one that stops it, is within 15 seconds (#3181).
+  f.advance(16000);
   assert.ok(f.controlled.has(1));
   assert.deepEqual(f.states.get(1).pos,position,'An immobile actor cannot translate');
   assert.equal(f.moves.length,count,'An immobile actor cannot submit walking updates');
@@ -577,7 +588,7 @@ test('A moving NPC becoming immobile publishes a reliable stop and resumes safel
   assert.equal(last.speed,0); assert.equal(last.runMode,'Standing'); assert.equal(last.reliable,true);
   assert.deepEqual(last.pos,position);
   f.states.get(1).immobile = false;
-  f.advance(10000);
+  f.advance(16000);
   assert.ok(f.moves.slice(count).some(move => move.id === 1 && move.speed > 0));
   assert.ok(f.controlled.has(1)); f.stop();
 });
@@ -807,7 +818,8 @@ test('A sloped face keeps an in-home actor moving when vertical home projection 
 
 test('A forgotten actor is let go of at once, before it is destroyed (#2623)', () => {
   const gone=0xff000040,stays=0xff000041;
-  const f=fixture({ids:[gone,stays],commanded:[gone,stays],
+  // Somebody is near both, so each is stepped every near pass (#3181).
+  const f=fixture({ids:[gone,stays],commanded:[gone,stays],humans:[100],human:{100:{pos:[500,500,0], aggression:0}},
     populationData:{version:1,plugins:['Skyrim.esm'],keep:[],cut:[]}});
   f.advance(3000);
   assert.ok(f.moves.some(move=>move.id===gone),'Both are active before');
@@ -822,7 +834,8 @@ test('A commanded actor survives five-second discovery under the real population
   const commanded=0xff000040,ordinary=0xff000041;
   const f=fixture({ids:[commanded,ordinary],commanded:[commanded],
     populationData:{version:1,plugins:['Skyrim.esm'],keep:[],cut:[]}});
-  f.advance(12000);
+  // Nobody sees it, so its second step is 15 seconds after its first (#3181).
+  f.advance(11000);f.advance(11000);
   assert.ok(f.loadedLookups()>=2,'Exercise repeated native identity discovery');
   assert.ok(f.controlled.has(commanded),'The commanded NPC retains authority');
   assert.ok(!f.controlled.has(ordinary),'Uncommanded actors still need a habitat');
@@ -974,6 +987,142 @@ test('A raised NPC near the edge of its leash only steps where it would stand in
   for (let i = 0; i < 4; i++) f.advance(15000);
   assert.ok(!f.logs.some(l => /activity unavailable/.test(l)),'Never stopped: '+f.logs.filter(l => /unavailable/.test(l)).join(' | '));
   checkLeash(f.moves,home,80); f.stop();
+});
+
+// #3180: each write of the activity record saves the actor's whole record
+// durably on the server. Every NPC used to be written every 30 seconds as it
+// wandered, about 5,000 files every 32 seconds on each server with nobody on.
+test('An NPC that only wanders is written once, when it is taken on, not as it walks', () => {
+  const f = fixture({ids:[11,42,103]});
+  for (let i = 0; i < 10; i++) f.advance(30000);
+  for (const id of f.ids) {
+    const own = f.writes.filter(w => w.id === id && w.prop === 'thornswoodNpcActivity');
+    assert.ok(f.moves.some(m => m.id === id && m.speed > 0), 'It walks for the five minutes');
+    assert.equal(own.length, 1, id + ' is written once in five minutes, not every 30 seconds: ' + own.length);
+    assert.equal(own[0].value.mode, 'ambient');
+  }
+  f.stop();
+});
+test('A fight starting is written, with its mode, and the walk around it is not', () => {
+  const f = fixture({count:1,humans:[100],npc:{1:{combatTarget:100}},
+    human:{100:{pos:[500,500,0]}}});
+  for (let i = 0; i < 4; i++) f.advance(30000);
+  assert.ok(f.attacks.length > 0, 'It fights');
+  const own = f.writes.filter(w => w.id === 1 && w.prop === 'thornswoodNpcActivity');
+  assert.ok(own.some(w => w.value.mode === 'combat'), 'The fight starting is written');
+  for (let i = 1; i < own.length; i++) assert.notEqual(own[i].value.mode, own[i-1].value.mode, 'Each write is a change of mode');
+  f.stop();
+});
+
+// #3181, Patrick's C on his report page (22 Oct 2026): NPCs nobody can see
+// are updated less often, never paused. On 21 Oct, with nobody on dev, the
+// JavaScript thread was busy 0.187 of a core, nearly all of it this runtime
+// stepping NPCs nobody was near, each on every pass over the cast.
+function gaps(moves, id) {
+  const at = moves.filter(m => m.id === id).map(m => m.at), out = [];
+  for (let i = 1; i < at.length; i++) out.push(at[i] - at[i-1]);
+  return out;
+}
+test('An NPC nobody can see that only wanders is stepped once every 15 seconds, and keeps walking', () => {
+  const f = fixture({count:40});
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  const from = f.moves.length;
+  for (let i = 0; i < 12; i++) f.advance(10000);
+  const later = f.moves.slice(from);
+  for (const id of f.ids) {
+    const g = gaps(later, id);
+    assert.ok(g.length >= 6, id + ' is still stepped: ' + g.length + ' steps in two minutes');
+    assert.ok(Math.min(...g) >= 15000, id + ' is stepped at most once every 15 seconds: ' + Math.min(...g) + ' ms');
+    assert.ok(later.some(m => m.id === id && m.speed > 0), id + ' still walks');
+  }
+  assert.ok(f.logs.some(l => /background steps/.test(l)), 'The minute report counts the background steps');
+  f.stop();
+});
+test('An NPC somebody can see is stepped as often as before', () => {
+  const f = fixture({count:1, humans:[100], human:{100:{pos:[500,500,0], aggression:0}}});
+  f.advance(30000);
+  const g = gaps(f.moves.slice(5), 1);
+  assert.ok(g.length > 50 && Math.max(...g) <= 1000, 'Stepped on every near pass: ' + g.length + ' steps, longest gap ' + Math.max(...g));
+  f.stop();
+});
+test('A pass looks only at the NPCs that are due, not the whole cast', () => {
+  const f = fixture({count:400});
+  for (let i = 0; i < 12; i++) f.advance(10000);
+  const before = f.reads.get('backgroundTick') || 0, from = f.moves.length;
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  const looked = (f.reads.get('backgroundTick') || 0) - before;
+  const stepped = f.moves.slice(from).length;
+  assert.ok(stepped >= 400 * 3, 'Each of the 400 is still stepped about every 15 s: ' + stepped + ' steps in a minute');
+  // A minute is 3,000 passes. Walking the cast read the clock at least once for
+  // every NPC looked at, up to 256 a pass: about 1.5 million reads a minute.
+  assert.ok(looked < 3000 * 2 + stepped * 8, 'The clock is read about twice a pass and a few times a step: ' + looked + ' reads for ' + stepped + ' steps');
+  f.stop();
+});
+test('A forgotten NPC loses its turn, and the rest keep theirs', () => {
+  const f = fixture({count:40});
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  f.forget(7);
+  const from = f.moves.length;
+  for (let i = 0; i < 12; i++) f.advance(10000);
+  const later = f.moves.slice(from);
+  assert.ok(!later.some(m => m.id === 7), '7 is never stepped again');
+  for (const id of f.ids.filter(id => id !== 7)) {
+    const g = gaps(later, id);
+    assert.ok(g.length >= 6 && Math.min(...g) >= 15000 && Math.max(...g) <= 15100, id + ' keeps its turn: ' + JSON.stringify([g.length, Math.min(...g), Math.max(...g)]));
+  }
+  f.stop();
+});
+test('An NPC is stepped in the background again within a second or two of being left alone', () => {
+  const f = fixture({count:1, humans:[100], human:{100:{pos:[500,500,0], aggression:0}}});
+  f.advance(30000);
+  f.disconnect(100);
+  const left = f.time(), from = f.moves.length;
+  f.advance(10000);
+  const next = f.moves.slice(from).find(m => m.id === 1);
+  assert.ok(next && next.at - left <= 2100, 'Its first background step comes ' + (next ? next.at - left : 'never') + ' ms after');
+  f.stop();
+});
+test('The mesh, search, prepare and near tasks sleep while they have nothing to do', () => {
+  // #3181: on dev with nobody on, meshTick still woke every 2 ms with no mesh
+  // work, and searchTick, prepareTick and nearTick every 10 or 100 ms.
+  const idle = ['meshTick', 'searchTick', 'prepareTick', 'nearTick'];
+  // A population, so the runtime looks for NPCs found later (discover).
+  const f = fixture({count:3, humans:[100], human:{100:{pos:[500,500,0]}},
+    population:(id, state) => ({home:state.pos.slice(), cell:state.cellOrWorld, leash:400}),
+    meshes:new Map([[60, square()], [61, square()]])});
+  f.advance(30000);
+  assert.equal(f.status().active, 3, 'The cast is ready');
+  const runs = () => Object.fromEntries(idle.map(name => [name, f.reads.get(name) || 0]));
+  let before = runs();
+  f.advance(60000);
+  assert.ok(runs().nearTick > before.nearTick, 'Somebody is near, so nearTick runs');
+  for (const name of ['meshTick', 'searchTick', 'prepareTick'])
+    assert.equal(runs()[name], before[name], name + ' sleeps with nothing to do');
+  f.disconnect(100);
+  f.advance(2000);
+  before = runs();
+  f.advance(60000);
+  assert.deepEqual(runs(), before, 'With nobody on and the cast ready, none of them runs');
+  // An NPC found later, in a cell whose mesh is not loaded yet, wakes the
+  // tasks that load the mesh and prepare it, and then walks.
+  f.addNpc(9001, {cellOrWorld:61, pos:[100,100,0]});
+  const from = f.moves.length;
+  f.advance(30000);
+  assert.ok(runs().meshTick > before.meshTick && runs().prepareTick > before.prepareTick,
+    'The new NPC woke the mesh and prepare tasks: ' + JSON.stringify(runs()));
+  assert.ok(f.moves.slice(from).some(m => m.id === 9001 && m.speed > 0), 'The new NPC walks');
+  before = runs();
+  f.advance(60000);
+  for (const name of ['meshTick', 'searchTick', 'prepareTick'])
+    assert.equal(runs()[name], before[name], name + ' sleeps again once its work is done');
+  f.stop();
+});
+test('A fight nobody can see keeps its pace: the less frequent steps are for wandering only', () => {
+  const f = fixture({count:2, npc:{1:{aggression:3, pos:[100,100,0]}, 2:{aggression:0, pos:[150,150,0]}}});
+  for (let i = 0; i < 6; i++) f.advance(10000);
+  const hits = f.attacks.filter(a => a.id === 1);
+  assert.ok(hits.length > 15, 'Unseen, 1 still attacks 2 at its usual pace: ' + hits.length + ' attacks in a minute');
+  f.stop();
 });
 
 console.log(JSON.stringify({passed,failed}));

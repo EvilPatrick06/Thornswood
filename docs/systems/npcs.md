@@ -53,7 +53,7 @@ first stood up, once, and not again. Supply rewards debit this purse.
 Scene rewards create the amount named on the quest, subject to its
 cooldown. See [Gold](gold.md). Each hold has one recorded guild site. A later walk can move it.
 Traders are not relocated by that record. See [Merchant's Guild](merchants-guild.md).
-The60 guild traders, one of each of the six roles in every hold, are listed by role, hold, place and reference in
+The 60 guild traders, one of each of the six roles in every hold, are listed by role, hold, place and reference in
 [Merchant trader counts](merchant-traders.md).
 
 Carriage and ferry drivers stay at stops outside city walls. They are
@@ -65,6 +65,21 @@ See [The Thalmor](thalmor.md).
 
 Animals in the hunt table, the fish, the seams, the plants, the
 crops. Those are the classes, not this cast.
+
+## What an NPC carries
+
+Body loot comes from the server's assigned body piles and Hunter yields,
+not the NPC record's pockets or death-item list. Inherited armour, weapons,
+ammunition, scrolls and carried lights remain internal equipment for
+appearance and combat. They cannot be taken alive or dead, sold as stock,
+or dropped for somebody to pick up. Returning after death does not add a
+new vanilla pile. See [Dungeon loot](dungeon-loot.md#bodies).
+
+Deliberate assignments remain separate, even when they use the same item
+as an inherited weapon. Guild purses and purchased stock still belong to
+the merchant ledger. Custom guard equipment, Thalmor patrol assignments
+and trade-ship crews retain their appearance and combat equipment. A
+ship's cargo remains in its cargo register, not in its crew's pockets.
 
 ## Difficulty and population
 

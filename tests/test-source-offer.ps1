@@ -131,6 +131,8 @@ Yes 'Package-Thornswood.ps1 has a Get-SourceNotice' ($null -ne $fn)
 $note = ''
 $rows = @()
 if ($fn) {
+    # Get-ClientLicenceLines, which Package-Thornswood.ps1 dot-sources (#3099).
+    . (Join-Path $Here 'scripts\release\Source-Notice.ps1')
     . ([ScriptBlock]::Create($fn))
     $note = Get-SourceNotice $clientPath $serverPath
 
@@ -213,8 +215,10 @@ if ($fn) {
             ($n5.Contains('a commit the build record does not name') -and -not $n5.Contains('unknown, fetch'))
 
         # The SkyMP files the payload carries that were not built here. A
-        # payload shaped like the 23 September stage gets all three named, as
-        # their own group, with the gap said and no commit claimed for them.
+        # payload shaped like the 23 September stage, with records from before
+        # the front was built from the fork (no front-build.json beside them),
+        # gets all three named, as their own group, with the gap said and no
+        # commit claimed for them.
         $pl = Join-Path $tmp 'payload'
         $extraFiles = @('Data\Platform\UI\build.js', 'Data\Platform\Modules\skyrimPlatform.ts', 'Data\Scripts\MpClientPlugin.pex')
         foreach ($rel in $extraFiles) {
@@ -222,7 +226,9 @@ if ($fn) {
             $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p)
             [IO.File]::WriteAllText($p, 'x')
         }
-        $n6 = Get-SourceNotice $clientPath $serverPath $pl
+        [IO.File]::Copy($clientPath, $cp, $true)
+        [IO.File]::Copy($serverPath, $sp, $true)
+        $n6 = Get-SourceNotice $cp $sp $pl
         $cut = $n6.IndexOf('did not build')
         Yes 'a payload with build.js and the rest gets a group for what Thornswood did not build' ($cut -gt 0)
         $tail = if ($cut -gt 0) { $n6.Substring($cut) } else { '' }
@@ -241,17 +247,41 @@ if ($fn) {
         Yes 'the note with that group is plain ASCII and in the house words' `
             (-not ($n6 -match '[^\x09\x0A\x0D\x20-\x7E]') -and (Test-Words $n6))
 
+        # Since #2931 every Ship builds build.js from the fork's skymp5-front
+        # at the pin and holds it to records\front-build.json, so with the
+        # real records it is one of the files Thornswood built, at the
+        # client's commit, and leaves the group of what it did not build.
+        $nf = Get-SourceNotice $clientPath $serverPath $pl
+        $cutF = $nf.IndexOf('did not build')
+        $headF = if ($cutF -gt 0) { $nf.Substring(0, $cutF) } else { $nf }
+        $tailF = if ($cutF -gt 0) { $nf.Substring($cutF) } else { '' }
+        Yes 'with front-build.json beside the client record, build.js is in the built group as skymp5-front' `
+            ($headF -match '(?m)^\s{2}build\.js\s{2,}skymp5-front\s{2,}GNU GPL version 3\s*$')
+        Yes '  and not in the group of what Thornswood did not build, which keeps the other two' `
+            ($cutF -gt 0 -and -not ($tailF -match '(?m)^\s{2}build\.js\s') -and $tailF.Contains('skyrimPlatform.ts') -and $tailF.Contains('MpClientPlugin.pex'))
+        Yes '  and the built group names the client commit' ($headF.Contains($forkUrl + '/tree/' + $cCommit))
+        # A front record of another commit than the client's stops it, since
+        # the note names one commit for everything Thornswood built.
+        $fr = Read-Json (Join-Path $Here 'records\front-build.json')
+        $fr.forkCommit = 'abcdef1234567890abcdef1234567890abcdef12'
+        $fp = Join-Path $tmp 'front-build.json'
+        [IO.File]::WriteAllText($fp, ($fr | ConvertTo-Json -Depth 6))
+        $threw = $false
+        try { $null = Get-SourceNotice $clientPath $serverPath $pl $fp } catch { $threw = $_.Exception.Message -match 'one commit' }
+        Yes 'a front record of another commit than the client record stops it' $threw
+        Remove-Item -LiteralPath $fp -Force
+
         # Only what is there. A payload with build.js alone names build.js alone.
         Remove-Item -LiteralPath (Join-Path $pl 'Data\Platform\Modules') -Recurse -Force
         Remove-Item -LiteralPath (Join-Path $pl 'Data\Scripts') -Recurse -Force
-        $n7 = Get-SourceNotice $clientPath $serverPath $pl
+        $n7 = Get-SourceNotice $cp $sp $pl
         Yes 'a payload with only build.js names build.js and not the two it does not hold' `
             ($n7.Contains('skymp5-front') -and -not ($n7 -match 'skyrimPlatform\.ts|MpClientPlugin\.pex'))
 
         # A payload with none of them says nothing about them.
         Remove-Item -LiteralPath (Join-Path $pl 'Data') -Recurse -Force
         $null = New-Item -ItemType Directory -Force -Path $pl
-        $n8 = Get-SourceNotice $clientPath $serverPath $pl
+        $n8 = Get-SourceNotice $cp $sp $pl
         Yes 'a payload with none of them gets no such group' (-not $n8.Contains('did not build'))
     }
     finally {
@@ -278,6 +308,22 @@ Yes 'Setup-Thornswood.ps1 copies SOURCE CODE.txt into the install folder' `
 $uninstall = Get-Content -LiteralPath (Join-Path $Here 'launcher\app\Uninstall.cs') -Raw
 Yes 'Uninstall.cs removes SOURCE CODE.txt from the install folder' `
     ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "SOURCE CODE\.txt"\)\)')
+
+# The libraries inside the client files, with their texts beside the note (#3099).
+if ($fn) {
+    $libs = @(Get-ClientLicences $clientPath $files)
+    $ln = Get-SourceNotice $clientPath $serverPath -Licences $libs
+    $notListed = @($libs | Where-Object { -not ($ln -match ('(?m)^\s{2}' + [regex]::Escape($_.Port + '.txt') + '\s+' + [regex]::Escape($_.Version) + '\s')) } | ForEach-Object { $_.Port })
+    Yes ('given the client''s libraries, the note lists all ' + $libs.Count + ' with their versions' + $(if ($notListed.Count) { ', not: ' + ($notListed -join ', ') } else { '' })) ($libs.Count -gt 0 -and $notListed.Count -eq 0)
+    Yes '  and says their texts are in the licences folder beside it' ($ln.Contains('in the licences folder beside this note'))
+    Yes '  in plain ASCII' (-not ($ln -match '[^\x09\x0A\x0D\x20-\x7E]'))
+}
+Yes 'Package-Thornswood.ps1 hands Get-SourceNotice the libraries of the client it packs and stages their texts in licences\' `
+    ($package -match 'Get-ClientLicences \$clientRecordPath' -and $package -match '-Licences \$clientLicences' -and $package -match "Join-Path \`$stage 'licences'" -and $package -match 'Save-PackageClientLicences')
+Yes 'Setup-Thornswood.ps1 replaces the licences folder in the install folder whole' `
+    ($setup -match "Join-Path \`$Here 'licences'" -and $setup -match "Join-Path \`$Root 'licences'" -and $setup -match 'Remove-Item -LiteralPath \$libTo -Recurse')
+Yes 'Uninstall.cs removes the licences folder from the install folder' `
+    ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "licences"\)\)')
 
 # Full GPL / AGPL / WebView2 texts beside the note (issue #421).
 $licenceDir = Join-Path $Here 'installer\licences'

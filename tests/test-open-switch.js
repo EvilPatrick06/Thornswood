@@ -79,11 +79,13 @@ yes('a config with no play list still works', JSON.stringify(S.playRoles(undefin
 // ----------------------------------------------------- standing(), run --
 const stHead = 'async function standing(discordId) {';
 const stFrom = src.indexOf(stHead);
-// Through holdsStaffRole (#481) and holdsNamedRole (#1417, #1420), which
-// standing() calls and which follow it, in that order.
+// Through holdsStaffRole (#481), holdsNamedRole (#1417, #1420) and
+// leaderRoles (#3317), which standing() calls and which follow it, in that
+// order.
 const stStaff = src.indexOf('\nfunction holdsStaffRole(', stFrom);
 const stNamed = src.indexOf('\nfunction holdsNamedRole(', stFrom);
-const stRoles = Math.max(stStaff, stNamed);
+const stLead = src.indexOf('\nfunction leaderRoles(', stFrom);
+const stRoles = Math.max(stStaff, stNamed, stLead);
 const stTo = stFrom < 0 ? -1 : src.indexOf('\n}\n', stRoles > stFrom ? stRoles : stFrom);
 const stSrc = (stFrom >= 0 && stTo > stFrom) ? src.slice(stFrom, stTo + 2) : '';
 yes('standing() is in server.js', stSrc.length > 0);
@@ -251,7 +253,7 @@ function standingWith(open, roleIds) {
       ' read' + (said.length ? '; still in ' + said.join(', ') : '') + ')', said.length === 0);
   const board = JSON.parse(read('site/data/board.json'));
   yes('nor the Patreon wording kept on the board', !/closed[\s-]+playtest/i.test(JSON.stringify(board)));
-  // Known Issues is the known board, written out as /known writes it (#2414).
+  // Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
   yes('nor the Known Issues page, across line breaks too',
       !/closed[\s-]+playtest/i.test(require('./fixtures/known-page').knownPage() || ''));
   yes('the launcher no longer holds the collection back until an application is accepted',

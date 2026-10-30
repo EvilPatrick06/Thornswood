@@ -28,13 +28,22 @@ body{margin:0;background:var(--night);color:var(--page);
   font:400 17px/1.7 var(--serif);overflow-x:hidden;
   -webkit-font-smoothing:antialiased}
 img{max-width:100%;height:auto;display:block}
-a{color:var(--gold);text-decoration:none}
-a:hover{color:var(--gold-hot)}
+/* A link is underlined (#2768, Patrick's answer on 22 Oct 2026). Gold on the
+   grey of running text is told apart by colour alone, which is not enough for
+   somebody who cannot see the difference (WCAG 1.4.1, Lighthouse
+   link-in-text-block). The underline is on every link here, so a link written
+   into any sentence anywhere on the site has one without anybody remembering
+   to add it. Menus and buttons are links that do not sit in a sentence, and
+   they opt out in the one list below. */
+a{color:var(--gold);text-decoration-line:underline;text-decoration-thickness:1px;
+  text-decoration-color:rgba(201,162,75,.45);text-underline-offset:3px}
+a:hover{color:var(--gold-hot);text-decoration-color:currentColor}
+nav.top a,footer .cols a,.mark,.mobile-cta,.btn,.skip{text-decoration-line:none}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 /* Skip link: first focusable, off-screen until Tab. Gold on night ground. */
 .skip{position:absolute;left:12px;top:12px;z-index:100;padding:10px 14px;
   background:var(--gold);color:var(--night);font:600 14px/1 var(--sans);
-  letter-spacing:.04em;text-decoration:none;
+  letter-spacing:.04em;
   clip:rect(0 0 0 0);clip-path:inset(50%);width:1px;height:1px;overflow:hidden;
   white-space:nowrap}
 .skip:focus,.skip:focus-visible{clip:auto;clip-path:none;width:auto;height:auto;overflow:visible;
@@ -50,7 +59,8 @@ header{position:sticky;top:0;z-index:40;
   border-bottom:1px solid var(--edge)}
 header .bar{display:flex;align-items:center;gap:26px;height:64px}
 .mark{display:flex;align-items:center;gap:11px;font:600 19px/1 var(--carve);
-  letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap}
+  letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap;
+  flex-shrink:0}
 .mark img{width:28px;height:28px;border-radius:6px}
 nav.top{display:flex;gap:24px;margin-left:auto;align-items:center}
 nav.top a{font:400 14px/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;
@@ -68,17 +78,22 @@ nav.top a:hover{color:var(--page)}
 .breadcrumbs{padding-top:24px;font:14px/1.6 var(--sans);color:var(--quiet)}
 .breadcrumbs ol{display:flex;flex-wrap:wrap;gap:12px;list-style:none;margin:0;padding:0}
 .breadcrumbs li+li::before{content:'/';margin-right:12px}
-.breadcrumbs a{text-decoration:underline;text-underline-offset:3px}
+/* The menu folds into the burger at 1080 and under, not 900: the name (210
+   wide, never squeezed) and the eight links need about 1050 across, and below
+   that the bar shrank the name into RULES and pushed Discord and Download off
+   the right edge (#3293). home.js narrow() asks the same width. */
 @media(max-width:900px){
-  header .bar{gap:12px}
   .mark{font-size:15px;letter-spacing:.04em;gap:7px}
+}
+@media(max-width:1080px){
+  header .bar{gap:12px}
   .mobile-cta{display:flex;align-items:center;min-height:44px;margin-left:auto;
     padding:0 10px;border:1px solid var(--gold);font:600 13px/1 var(--sans);color:var(--gold)}
   .burger{margin-left:0;flex-shrink:0}
 }
 /* Keep anchor destinations visible below the sticky header. */
 [id]{scroll-margin-top:100px}
-@media(max-width:900px){
+@media(max-width:1080px){
   nav.top{position:fixed;inset:calc(64px + env(safe-area-inset-top,0px)) 0 auto 0;
     flex-direction:column;align-items:stretch;gap:0;background:var(--stone);
     border-bottom:1px solid var(--edge);margin:0;padding:6px 0 14px}
@@ -96,7 +111,7 @@ nav.top a:hover{color:var(--page)}
   color:var(--page)}
 .notice .wrap{padding:13px 0}
 .notice b{color:var(--gold-hot);font-weight:600}
-.notice a{margin-left:8px;white-space:nowrap;border-bottom:1px solid rgba(201,162,75,.4)}
+.notice a{margin-left:8px;white-space:nowrap}
 @media(max-width:560px){ .notice{font-size:13.5px} }
 
 /* ----------------------------------------------------------------- hero -- */
@@ -114,7 +129,7 @@ nav.top a:hover{color:var(--page)}
   ridge.svg is still in this folder. Putting it back is one line here.
 
   The loop ships at 1600 by 900, 24 frames a second, 3.1 MB, with its first
-  frame beside it as the poster. Three times the launcher strip it replaced
+  frame beside it as the still under it (banner-*.webp, #3218). Three times the launcher strip it replaced
   and two hundred times the ridgeline, which is the price of the picture
   moving at the size the hero actually is. It is worth not adding a second
   one.
@@ -131,23 +146,51 @@ nav.top a:hover{color:var(--page)}
   The painting carries its own title and emblem, so the crest and the big
   Thornswood over it went the same day: two titles on one picture. The
   words sit at the bottom over a dark scrim instead, where they read.
+
+  THE SCRIM RIDES WITH THE WORDS, AND NARROW SCREENS PUT THE WORDS UNDER THE
+  PAINTING (#2767). The scrim was the bottom 64% of the hero, so how dark it
+  was behind the words depended on how tall the hero was next to them: at
+  1366 by 768 the era line sat where it was barely half dark, over the
+  sunset, at 1.9:1. It now hangs from the words themselves (.wrap::before),
+  clear for the 96 pixels above the era line and dark enough under every
+  line of them at any size. On a phone no scrim was enough, because the
+  crop put the painted title behind the pitch (1.0:1 at worst), so below
+  900 pixels the painting is a band of its own, whole, and the words follow
+  it on the page. Patrick's answer on the board, 22 October: below the
+  painting, and readable on desktop too. Measured at 412, 768, 1024, 1366,
+  1920 and 3440 wide with the words hidden: 4.5:1 or better at the worst
+  pixel behind every line.
+
+  THE WORDS ARE UNDER THE PAINTING AT EVERY WIDTH (Patrick, 26 Oct: "the text
+  be covering the logo some"). On a wide screen the words still sat over the
+  painting's foot, and at 1920 by 950 the era line and the pitch covered the
+  bottom of the painted title, its thorns and the purple crest: the words
+  are about 430 pixels tall, and no hero height under the 84vh cap left that
+  much room below the title once the picture was cropped. So the band below
+  900 pixels is the layout everywhere now. The painting is a band of its
+  own, the whole picture (16:9 of the width) when that fits, kept to the top
+  (the title is in its top 42%), no taller than 52vh so the Download button
+  is still on a 1366 by 768 screen, and never under 27vw so the whole title
+  fits in it even on an ultrawide and with the slow drift. Measured at 412,
+  768, 1024, 1366, 1920, 2560 and 3440 wide: the era line starts under the
+  painting every time, and the title's foot is inside it.
 */
-.hero{position:relative;min-height:min(84vh,56.25vw);display:grid;align-items:end;
-  padding:84px 0 64px;text-align:center;overflow:hidden;isolation:isolate}
-.hero .art{position:absolute;inset:0;z-index:-2;width:100%;height:100%;
-  object-fit:cover;object-position:50% 25%}
-.hero::before{content:"";position:absolute;left:0;right:0;bottom:0;height:64%;z-index:-1;
-  pointer-events:none;
-  background:linear-gradient(180deg,rgba(11,9,7,0) 0%,rgba(11,9,7,.48) 40%,rgba(11,9,7,.9) 100%)}
+.hero{position:relative;padding:0 0 56px;text-align:center;overflow:hidden;isolation:isolate}
+.hero > .paint{position:relative;z-index:-2;overflow:hidden;height:min(56.25vw,max(52vh,27vw))}
+.hero .art{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:50% 0}
+/* the foot of the painting fades into the page the words are on */
+.hero > .paint::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28%;
+  background:linear-gradient(180deg,rgba(11,14,10,0),var(--night))}
+.hero .wrap{padding-top:22px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* Grain over the whole thing, because a flat gradient reads as a web page and
    a grained one reads as a place. */
 .hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.42;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>")}
 .hero > *{position:relative;z-index:1}
-@media(max-width:640px){ .hero{min-height:auto;padding:72px 0 88px} }
 /* A video ignores prefers-reduced-motion on its own, so it is stopped in
-   script below and the poster is what stays on screen. This only covers the
+   script below and the still under it is what stays on screen. This only covers the
    slow drift on top of it. */
 @media(prefers-reduced-motion:no-preference){
   .hero .art{animation:drift 60s ease-in-out infinite alternate}
@@ -157,10 +200,10 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
   text-transform:uppercase;margin:0;text-wrap:balance;
   background:linear-gradient(180deg,#F0E6CE 12%,var(--gold) 92%);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-/* Over the painting rather than over the dark page, so lighter than the
-   page's own faint and with a shadow behind, or the sky eats them. */
+/* Lighter than the page's own faint, and a solid colour: a see-through one
+   is only as readable as whatever is behind it (#2767). */
 .era{margin:0 auto;font:400 13px/1 var(--sans);letter-spacing:.34em;
-  text-transform:uppercase;color:rgba(240,230,206,.78);text-shadow:0 1px 10px rgba(0,0,0,.8)}
+  text-transform:uppercase;color:#DCD2B9;text-shadow:0 1px 10px rgba(0,0,0,.8)}
 .pitch{max-width:30ch;margin:18px auto 0;font:300 clamp(19px,2.3vw,25px)/1.5 var(--serif);
   color:#F5EEDD;text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.75)}
 .pitch em{font-style:italic;color:var(--gold)}
@@ -176,7 +219,7 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 .live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
   text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px;
   align-items:center;justify-content:center;text-shadow:0 1px 8px rgba(0,0,0,.8)}
-.live a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.live a{color:inherit;text-decoration-color:currentColor}
 .live a:hover{color:var(--gold)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
 .dot.on{background:#79B05F;box-shadow:0 0 0 4px rgba(121,176,95,.16)}
@@ -230,11 +273,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .feat p{margin:0;color:var(--quiet);font-size:15.5px;line-height:1.65}
 
 .being-built{margin-top:40px;padding-top:28px;border-top:1px solid var(--edge)}
-.being-built .eyebrow{margin-bottom:10px}
-.being-built h3.built-title{margin:0 0 8px;font:500 22px/1.25 var(--carve);color:var(--page)}
-.being-built .built-lead{margin:0 0 22px;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
-.being-built .built-lead a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--edge2)}
-.being-built .built-lead a:hover{border-bottom-color:var(--gold)}
+.being-built .built-lead{margin:0;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
 
 .steps{counter-reset:s;margin-top:48px;border-top:1px solid var(--edge)}
 /* 34px of top margin was right when this sat on its own above the steps.
@@ -243,8 +282,6 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .grab .btn{margin:0}
 .grab .also{margin:16px 0 0;max-width:56ch;font:400 15px/1.65 var(--serif,var(--carve));
   color:var(--page)}
-.grab .also a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--edge2)}
-.grab .also a:hover{border-bottom-color:var(--gold)}
 .grab .faintly{margin-top:6px;font-size:13px;color:var(--faint)}
 .step{counter-increment:s;display:grid;grid-template-columns:70px 1fr;gap:26px;
   padding:30px 0;border-bottom:1px solid var(--edge);align-items:start}
@@ -363,7 +400,6 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-show .gal-cap{position:absolute;left:0;right:0;bottom:0;padding:18px 22px;
   background:linear-gradient(180deg,transparent,rgba(11,14,10,.88));
   color:var(--page);font:400 15px/1.4 var(--serif);z-index:2}
-.gal-show .gal-cap a{border-bottom:1px solid rgba(201,162,75,.45)}
 .gal-show .gal-nav{position:absolute;top:50%;transform:translateY(-50%);
   z-index:3;width:44px;height:44px;padding:0;border-radius:2px;
   border:1px solid var(--gold);background:rgba(11,14,10,.82);
@@ -378,10 +414,15 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   .gal-show .gal-prev{left:8px}
   .gal-show .gal-next{right:8px}
 }
-.gal-dots{display:flex;gap:8px;justify-content:center;margin-top:16px}
-.gal-dots button{width:9px;height:9px;padding:0;border-radius:50%;
-  border:1px solid var(--edge2);background:transparent;cursor:pointer}
-.gal-dots button.on{background:var(--gold);border-color:var(--gold)}
+/* Each dot is a 24 pixel button with the 9 pixel dot drawn in the middle of
+   it (#3218). The buttons were the 9 pixel dots themselves, 8 apart, under
+   the 24 by 24 a finger or a shaky hand needs (WCAG 2.5.8). */
+.gal-dots{display:flex;gap:2px;justify-content:center;margin-top:12px}
+.gal-dots button{width:24px;height:24px;padding:0;border:0;background:transparent;
+  cursor:pointer;display:grid;place-items:center}
+.gal-dots button::before{content:"";width:9px;height:9px;border-radius:50%;
+  border:1px solid var(--edge2)}
+.gal-dots button.on::before{background:var(--gold);border-color:var(--gold)}
 .gal-more{margin-top:22px}
 
 .release{display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;
@@ -425,7 +466,6 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   border-bottom:1px solid var(--edge);white-space:nowrap}
 .page td{padding:11px 14px;border-bottom:1px solid var(--edge);vertical-align:top;
   color:#CFD6C3;font-size:16px}
-.page a{border-bottom:1px solid rgba(201,162,75,.35)}
 
 /* roadmap and releases */
 .lane{margin:44px 0}
@@ -480,3 +520,6 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
   height: 1px;
   overflow: hidden;
 }
+/* Turnstile's widget on the report form (#3216): its own height held, so the
+   button under it does not jump when Cloudflare draws it. */
+.ts-check { min-height: 65px; }

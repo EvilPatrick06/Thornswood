@@ -20,8 +20,8 @@
     -Rules         a required "have you read the rules" question
     -Age           a required "are you 18 or over" question
 
-  The bot needs Manage Server and Manage Roles for this, which the running bot
-  is not given: tick Administrator on its role for the run and untick it after.
+  The bot needs Manage Server and Manage Roles for this. Its role keeps
+  Administrator (#3317, Patrick, 22 Oct 2026), which covers both.
 
   It asks for the token rather than taking it on the command line, so it stays
   out of your history. Nothing writes it to disk.

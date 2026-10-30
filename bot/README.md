@@ -5,113 +5,108 @@ things a bot is not allowed to do for you.
 
 ## The shape of it
 
-another server has nine hold channels, two world instances and eighty Thalmor
-Inquisitors. That shape is right for eighty thousand people and wrong for six,
-because forty channels with nothing in them reads as abandoned rather than
-organised. This is the same skeleton with the empty rooms left out, and it
-grows by adding to a category rather than by rebuilding.
+`docs/systems/discord.md` is the whole layout: every category, channel and
+role in order, who sees, talks and posts in each, and what each was before.
+It is made from the builder's plan (`python3.12 bot/Build-Discord.py
+--layout`) and `test-3317-layout.py` fails when the two differ, so read it
+there rather than here. `Setup-Discord.ps1 -OnBox -Audit` says where the live
+server differs from it. What follows is only what the bot itself depends on.
 
-### Start Here
+The sidebar reads in the order somebody meets it (#3317, Patrick, 22 Oct,
+page card q-3317-discord-order, A): Start Here, Tickets, Information,
+Roleplay Guide, Applications, Out of Character, In Character, a category per
+faction, a category per hold, Playtesters, Staff, and the staff spaces.
+Somebody who joins sees Start Here, Tickets and Applications, and nothing
+else until the Member button in `#start-here` (THE GATE in the builder).
 
-| Channel | Who writes | What it is |
+### Tickets and Applications
+
+Each of these five channels has its own panel, with only its kinds of ticket
+(`TICKET_DESKS` in `bot.py`; page card q-3317-ticket-split, A):
+
+| Channel | Category | What it opens |
 |---|---|---|
-| `#rules` | staff | Seven rules, short on purpose |
-| `#welcome` | staff | What this is and the three steps to get in |
-| `#start-here` | staff | Installing, joining, where the logs are |
-| `#say-hello` | anybody | The one channel somebody who is not approved yet can talk in |
+| `#get-help` | Tickets | Cannot install, start or connect. Support answers |
+| `#report-someone` | Tickets | A report about somebody. Moderation answers |
+| `#apply-to-playtest` | Applications | The playtest application |
+| `#apply-for-a-seat` | Applications | Jarl and Faction Leader, listing only open seats |
+| `#apply-for-staff` | Applications | Gamemaster, Loremaster, Moderator, Dev, Content Creator |
 
-These four and the Applications category are all somebody sees before staff
-give them Member. The category itself is open to everybody, and the three
-read only ones stay read only.
+Each ticket opens a private thread off its channel that only the person and
+the roles pulled into that kind can read. Faction Leader tickets go only to
+the role IDs in `UPPER_STAFF_ROLES` (Owner ID and each Lead department ID);
+empty means the ticket is refused. They were all in one dropdown in
+`#tickets-and-applications`, which the builder retires with the old closed
+ticket log `#tickets`; `-Prune` leaves a channel while a thread in it is still
+open, so no open ticket goes with it.
 
-### Information
-
-| Channel | Who writes | What it is |
-|---|---|---|
-| `#news` | the launcher | Every release, posted automatically |
-| `#updates` | staff | Restarts, notices, anything happening today |
-| `#faq` | staff | The questions people actually ask |
-
-Downloads, known issues and credits are all pages on the website. A copy in
-Discord is a copy that goes stale, so the welcome post links to them instead.
-
-### Applications
-
-| Channel | Who reads | What it is |
-|---|---|---|
-| `#tickets-and-applications` | everybody | The bot's ticket panel: applying for any job, reporting somebody, cannot install or connect. Each ticket opens a private thread only the person and the roles pulled into that kind can read. Faction Leader tickets go only to the role IDs in `UPPER_STAFF_ROLES` (Owner ID and each Lead department ID). Empty means the ticket is refused |
-| `#tickets` | staff only | Every closed ticket, with a link back to it, and the whole of any ticket whose private thread would not open |
-
-`#tickets` has to stay staff only, because a report about somebody lands there
-when its thread fails. The bot checks the channel's permissions rather than
-its name, and passes over a `#tickets` anybody else can read.
-
-### Help
-
-| Channel | What it is |
-|---|---|
-| `#suggestions` | A forum, mods and features, Nexus link included |
-| `Support` (voice) | Where a ticket goes when typing is slower than talking |
+`#ticket-log`, in Staff, is every closed ticket with a link back to it, and
+the whole of any ticket whose private thread would not open. It has to stay
+the council's only, because a report about somebody lands there when its
+thread fails. The bot checks the channel's permissions rather than its name,
+and passes over a log anybody else can read.
 
 Installing and connecting problems are a ticket, not a public forum. Half of
 them involve somebody's machine, their paths, or their account, and none of
-that belongs in a channel everybody reads.
+that belongs in a channel everybody reads. `#bugs` and `#logs-and-crashes`
+are gone; the builder still names both (`make=False`) so that a prune never
+deletes a channel of either name and no run makes them again.
 
-`#bugs` and `#logs-and-crashes` were here and are gone. The builder still
-names both so that a prune never deletes a channel of either name, and never
-makes them again (`make=False`). A bug goes in a ticket or in `#general-chat`
-until somebody decides otherwise.
+### Out of Character
 
-### Thornswood
+One general, `#general-chat`: a second one only ever splits the same
+conversation in half. It was `#general` until it was renamed, and its topic is
+written by hand, so the builder leaves the topic alone. `#welcome-travelers` is
+where the join cards go, and the server's system channel points at it. The
+card is a file, so the builder gives the bot Attach Files in that channel's
+overwrite for the bot (#2341).
 
-`#general-chat`, `#media`, `#welcome-travelers`, `#game-rules`,
-`#server-progression-and-economy`.
+The General and AFK voice rooms are here, since the Voice category went
+(Patrick, 22 Oct). Proximity voice is in the launcher, so these are for
+before, after, and whoever is not in the world. AFK is the server's real AFK
+channel, so Discord moves people into it after five minutes of silence.
+The Support voice, where a ticket goes when typing is slower than talking, is
+in the Support category, open to everybody; the support staff's own room
+there is Support Staff.
 
-One general. A second one only ever splits the same conversation in half. It
-was `#general` until it was renamed, and the topic on it is written by hand,
-so the builder leaves the topic alone. `#welcome-travelers` is where the join
-cards go, and the server's system channel points at it. The card is a file, so
-the builder gives the bot Attach Files in that channel's overwrite for the bot,
-beside seeing, posting and reading back, which is all it gets elsewhere (#2341).
+`#game-rules` is in Roleplay Guide and carries the nine in-world rules, read
+out of the "In the World" part of `site\data\site\rules.md`, the /rules page,
+so the two cannot disagree.
 
-`#game-rules` sits here rather than in In Character, because that is where it
-was moved to. It carries the nine in-world rules, read out of the "In the
-World" part of `site\data\site\rules.md`, the /rules page, so the two cannot
-disagree.
+### The holds
 
-### In Character
+`#choose-your-hold` in In Character has the bot's hold buttons and, under
+them, the office panel, where a Jarl gives and takes their hold's Court,
+Steward and Guards (#2551). Each hold then has a category of its own:
+`#<hold>-announcements`, the hold's hall, `#<hold>-court`, `#<hold>-guard`
+and a `<Hold> Court` voice room. A hold's Citizen role opens its category.
 
-`#character-introductions` (a forum, one post each), `#tales` (a forum, one
-story per post), `#lore`, `#rp-appreciation`, `#graveyard`.
+### The factions
 
-### The Holds
+Each of the sixteen factions in `factions.json` has a category of its own
+(#3317, Patrick, 22 Oct; page card q-3317-faction-category, C):
+`#<faction>-announcements` (its members read; the Leader and Officers post),
+the faction's chat, `#<faction>-leadership` (the Leader and Officers),
+`#<faction>-seats` and a voice room. The faction's member role opens its
+category.
 
-`#choose-your-hold` at the top, where the bot's buttons are, then one channel
-per hold: `#whiterun` `#solitude` `#windhelm` `#riften` `#markarth`
-`#dawnstar` `#morthal` `#falkreath` `#winterhold`.
-
-In character. What is said there is said in the hold. A hold with nowhere to
-talk is a line on a map, and it is what makes the onboarding question mean
-something.
-
-### Voice
-
-**AFK** and **General**.
-
-Proximity voice is in the launcher, so these are for before, after, and
-whoever is not in the world. AFK is set as the server's real AFK channel, so
-Discord moves people into it after five minutes of silence rather than hoping
-they remember to move themselves.
-
-The support voice channel sits in Help, because that is what it is for.
+`#<faction>-seats` is the Leader's panel, and only the Leader and the faction
+staff see it: Add and Remove for the faction's members and its Officers
+(`<short> Officer`, one role per faction; Patrick picked it over a Court and
+a Steward, and named the channel leadership "since it's not a court"). The
+panel's faction is the channel's. The Officer role goes only to a member,
+and taking somebody's membership takes it with it.
+The shared `#seats` and its one panel, in the Factions category, are retired;
+until `-Prune` deletes it, the old panel says where the panels went.
 
 ### Testing
 
-`#test-findings` (a forum, `test-results` until 11 October), `#test-tasks` (a
-forum), `#known-issues` and **play-testing** (voice), visible to Playtesters
-and staff and to nobody else. `#test-tasks` also lets in the lead gamemaster
-role, which may post test tasks and is not otherwise in that gate. It is on
-that channel's own line in the builder's plan, so no other channel moved.
+The Playtesters category (Testing until #3317): `#test-tasks` (a forum),
+`#known-issues`, `#test-findings` (a forum, `test-results` until 11
+October) and the Playtester Voice room (play-testing until #3317), with the
+playtesters' announcements, rules, sessions and chat. Playtesters and staff
+see it, and nobody else. The bot finds the three testing channels by these
+names.
 
 `#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup,
 and `#test-these` is in the builder's retired list so a re-run does not bring
@@ -142,17 +137,29 @@ token for that repository's issues. No token, none is kept, said once in the
 log.
 
 - `#known-issues`, read only: one post per open issue labelled Dev Findings
-  or Main Findings, tagged Dev or Main. Its title and body are the issue's
+  or Main Findings whose fix has not landed yet, tagged Dev or Main
+  (Patrick, 22 Oct). Its fix has landed once the issue has a `Test task:`
+  comment or is in Done: done-on-merge.yml's comment on it, `Pull request #N
+  merged (...)` written by the workflow, or the `board: Done` label for the
+  minute before board-status.yml takes it off. Then it is not a known issue
+  and its post goes at once. A card moved to Done by hand with no merge is
+  not seen, since the bot cannot read the board. A merged pull request alone does
+  not take a post down (#3140): when any merged pull request that named the
+  issue did, a measuring step on the scripts finding, partial fixes and a
+  `Refs` written by mistake kept bugs people still meet off the list. Each
+  post taken down says why in the log, `known issues: took #N down:`. Its title and body are the issue's
   last comment that starts `Known issue:` (a short title, at most 45
   characters, then what goes wrong, where, and how to avoid it), the same
   shape as a test task below; until somebody writes one, the issue's own title
   and a plain line. No issue number and no link, because testers have no
   GitHub. The post is deleted the moment the issue is no longer an open
-  finding: fixed and closed, closed any other way, or its label taken off.
+  finding: fixed and closed, closed any other way, its label taken off,
+  moved to Done, or a test task written on it.
   Its tag says where it was found and stays Dev or Main as before.
 - `#test-tasks`: one post for each issue closed as fixed from the day this
-  began, always tagged Main. Its title and body are the issue's last comment
-  that starts `Test task:`, written by whoever fixed it:
+  began, always tagged Main. Its title and body are the issue's last
+  `Test task:` comment that is not `Server: Dev`, written when a main Ship
+  carries the fix (a newer Dev one beside it does not hide it):
 
       Test task: <what to try, at most 45 characters>
       <numbered steps in the game, then what should happen>
@@ -166,17 +173,17 @@ log.
   back to `#known-issues` if it is still a finding. Staff close a test task
   in Discord once it is confirmed.
 - `#dev-test-tasks`, in Staff and seen only by staff (Patrick, 12 Oct): one
-  post per issue whose last `Test task:` comment has `Server: Dev` straight
-  under its first line, tagged Dev. That is a measurement someone on dev has
-  to take, usually on an open issue whose code is done. The post is made as
-  soon as the comment is there, open issue or closed, and it goes when the
-  issue is closed after that comment, or when a newer `Test task:` comment
-  does not say `Server: Dev`. A closed issue's last test task then goes to
-  `#test-tasks` as above, if it is Main; an issue that closes while its last
-  test task still says `Server: Dev` gets no `#test-tasks` post from it.
-  Every other test task is Main, because testers play on main in the alpha.
-  The post is deleted when it goes, so what was measured belongs on the
-  issue.
+  post per issue from its last `Test task:` comment that has `Server: Dev`
+  straight under its first line, tagged Dev. That is a check only a dev can do: it
+  needs staff or dev commands, the dev server, logs, the box, or a setup
+  testers cannot make (Patrick, 22 Oct). The post is made as soon as the
+  comment is there, open issue or closed, and it stays when the issue
+  closes, because a dev check can still be wanted while the fix is on main.
+  A newer Main `Test task:` comment beside it, such as the one the main Ship
+  writes when it closes the issue, leaves it up. It goes when the comment is
+  taken back; staff close it once it is done. An issue can have both: its
+  Dev post here and its Main one in `#test-tasks` once it closes. The post is deleted when it goes, so what was measured belongs
+  on the issue.
 
   A dev post is written for developers, who have GitHub (Patrick, 12 Oct):
   it links the issue and says its state and labels, links every pull request
@@ -195,6 +202,23 @@ log.
   words, no numbers, links or code, because testers are not developers. A Dev test task posted by hand (`/test-task` with the tag Dev) also
   lands here; it belongs to no issue, so the bot leaves it for staff to close.
 
+**One post per issue, never two** (Patrick, 22 Oct, after duplicates in all
+three forums). Before it makes a post, the bot looks for a post of its own
+with that title among the open and the closed ones, and takes that one up:
+until 22 Oct only open posts were looked at, so a post staff closed, or one
+Discord closed after quiet days, was made again whenever its record was lost.
+A test task taken back (its comment edited so the first line no longer
+starts `Test task:`) takes its post down. The Claude Code line GitHub puts
+under a comment a Claude writes never shows in a post. To find and remove
+duplicates already there, with the bot running or stopped:
+
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --forum-check           (says what it would delete)
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --forum-check --apply   (deletes them)
+
+Of two posts with one title it keeps the one an issue owns (or the oldest)
+and deletes the rest; two issues owning one title are said and left, to be
+fixed on the issues.
+
 **When an issue is closed** (Patrick, 11 Oct): dev is where the team checks
 that nothing breaks the game, and main is where testers test, since we are in
 alpha. So a fix people would notice is closed, with its `Test task:` comment,
@@ -203,8 +227,11 @@ dev. The bot posts a test task the moment the issue closes, so closing it
 earlier sends testers to look for a fix main does not have. That is why every
 test task in `#test-tasks` is tagged Main. Write `Server: Main` (or no
 `Server:` line) under `Test task:` for testers on main, and `Server: Dev`
-only when someone on dev has to measure it, which sends it to
-`#dev-test-tasks` for staff. The line never shows in the post. `Server: Dev`
+only for a check only a dev can do, which sends it to `#dev-test-tasks` for
+staff. If a playtester could do it with the normal game once it is on
+main, it is Main, even when a dev command would make it quicker (#613's
+forge re-cost, Patrick, 22 Oct). An issue has one dev post, so a newer
+`Server: Dev` comment replaces the one before it. The line never shows in the post. `Server: Dev`
 counts only on a comment written from the day `#dev-test-tasks` began (the
 bot's first pass that finds it, `dev_since` in `data\known-issues.json`), so
 the comments written before that, which all carried a `Server:` line, stay in
@@ -263,11 +290,47 @@ dev test tasks until the next apply makes it again. `Build-Discord.py` names
 it in Staff with `make=False` and in its never-delete list, so `-Prune`
 leaves it. `test-testing-channels.py` holds all of this.
 
+### The site's known issues and roadmap
+
+The site's Known Issues page (`/known`) and its roadmap (`/roadmap`, and the
+front page's) are written from the issue board, so they cannot go stale
+(Patrick, #3140). The bot writes both into `data\from-bot\lists.json` under
+the site's folder (`PUBLIC_LISTS_FILE`), which the site makes and reads, after
+every pass over the board (every five minutes, `KNOWN_ISSUES_EVERY`), the
+whole file at once.
+
+- The known list is the `#known-issues` posts above, word for word, with where
+  each was found. Nothing is typed into the site for it.
+- The roadmap has three lanes: Being built now, Next and Later. An open
+  issue labelled `roadmap: now`, `roadmap: next` or `roadmap: later` is in
+  that lane. Once it closes, however, it leaves the roadmap: there is no
+  Done section (Patrick, 26 Oct, "Done section needs removed from the
+  roadmap"). Its words are the issue's last comment that starts `Roadmap:`:
+
+      Roadmap: <what, at most 45 characters>
+      <where it stands, in a sentence or two>
+
+- What keeps a row off: no `Roadmap:` comment, two lane labels, a title over
+  45 characters, nothing under the first line, an issue number, a link or
+  code, an em dash, or the word for the people who play that Developer-Guide.md
+  bans in its Words section. The last two hold for known issue text too,
+  since the site shows it to anybody. The issue gets one comment naming the rule, the same as a test
+  task; fixing the comment puts the row on at the next pass.
+- A "---" and "Generated by" footer under the comment is left off the row.
+- Comments are read again only for an issue whose update time moved.
+- A part the bot could not read on a pass is left out of the file rather than
+  written empty, and the site says the list could not be read rather than
+  showing nothing. The bot writes the folder with Modify rights that
+  `Bot-Service.ps1` gives it, and `Install-Bot.ps1` stops if the site has not
+  made the folder yet.
+
 ### Staff
 
-A staff `#news` where the site watcher speaks, `dev-test-results` (a forum),
-`#dev-test-tasks` (a forum the bot keeps, see Testing above),
-`#staff-general` and a Staff Room. Invisible to everybody else.
+`#staff-announcements` (the staff `#news` until #3317, where the dev updates
+webhook posts), `#council-decisions`, `#staff-updates`, `#staff-general`,
+`#council`, `#ticket-log` and a Staff Room. Invisible to everybody else.
+`#dev-test-tasks` (a forum the bot keeps, see Testing above) and
+`#dev-test-findings` are in the Dev space.
 
 `#dev-notes`, `#deploys` and `#reports` were here and are gone, and like
 `#bugs` the builder keeps their names so that a prune cannot take a channel of
@@ -333,8 +396,12 @@ archived it after a week with nothing said. Every hour the bot asks Discord
 for the closed private threads in each `TICKET_CHANNEL` channel and deletes
 those it opened that closed more than a year ago, one `closed tickets:` line
 in bot.log each. Threads a Gamemaster opened there by hand are never touched.
-The `#tickets` line for a deleted ticket keeps its name, and its link stops
-working.
+The bot's own messages in the `TICKET_LOG` channels (`#ticket-log`, and an old
+`#tickets`) go the same way, 365 days after each was posted (#3634): a whole
+ticket that went there because its thread would not open, and the Closed line
+written at each close, which names the thread and so the person who opened
+it. The Closed line goes a year after that close, with the thread it points
+at. One `ticket log:` line in bot.log says how many went from each channel.
 
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
@@ -398,6 +465,24 @@ accepted. Discord has no default-role setting. Then the person picks a hold.
 `content.py` holds every read only post. Edit it, run `Setup-Discord.ps1`
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
+
+`Setup-Discord.ps1` asks for the bot token at a hidden prompt. With `-OnBox`
+it asks for nothing: the build runs on the VPS with the token the running bot
+already holds in `C:\Thornswood-Bot\bot.env.json`, so anybody with the VPS key
+can run it and the token never leaves the box (#2519, #2341). The running bot
+has the smaller permission set, so a change that needs Administrator is named
+under "did not manage" until the bot's role has it again.
+
+## Reading what the live server really allows
+
+The plan only says what a channel the build makes gets, and much of the live
+server was gated by hand. `Setup-Discord.ps1 -OnBox -Audit` reads the live
+server and changes nothing (#3317). It says the bot's own permissions against
+the running set, each role's permissions against the plan, who holds each
+staff rank, anybody holding two ranks of one staff category, every planned
+category and channel whose overwrites differ from what its mode gives, and the
+channels the plan does not name. Each difference starts `DIFFERS`, and the
+last line counts them. Run it before and after any change to roles or access.
 
 ## Running the bot's tests
 
@@ -605,8 +690,8 @@ on the server when it runs:
 
 Run `-Check` first, every time. It names every channel Discord would refuse
 and why, and sends nothing while anything fails. The bot needs Manage Server
-and Manage Roles for the write: tick Administrator on its role for the run and
-untick it after.
+and Manage Roles for the write, which it has: it keeps Administrator (#3317,
+Patrick, 22 Oct 2026).
 
 Discord will not switch onboarding on until it has **at least 7 default
 channels and at least 5 of them that everybody can post in**, and it only
@@ -621,7 +706,7 @@ What it sets:
   the minimum.
 - **What are you here for?** Pick several, optional, channels only: Roleplay
   shows `#tales`, Just playing `#general`, I want to help test
-  `#tickets-and-applications` (testing starts with an application), I make
+  `#apply-to-playtest` (testing starts with an application), I make
   videos `#media`.
 
 `Build-Onboarding.py` still names `general` and `test-these`, which the server

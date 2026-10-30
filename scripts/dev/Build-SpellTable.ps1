@@ -278,7 +278,21 @@ Write-Host ''
 Write-Host 'names' -ForegroundColor Cyan
 $tables = @{}
 $looseDir = Join-Path $Data 'Strings'
-$bsaFiles = $null
+# A localised plugin's table is loose in Data\Strings, or in an archive: its
+# own (_ResourcePack.esl's is in _ResourcePack.bsa), or Skyrim - Interface.bsa
+# for the five masters. The same places Build-HuntTable.ps1 and
+# Build-HarvestTable.ps1 look (#3349: this read only Skyrim - Interface.bsa,
+# and stopped on _ResourcePack.esl once dev's load order carried it).
+$bsaCache = @{}
+function Get-BsaCached([string]$name) {
+    if ($bsaCache.ContainsKey($name)) { return $bsaCache[$name] }
+    $p = Join-Path $Data $name
+    if (-not (Test-Path -LiteralPath $p)) { $bsaCache[$name] = $null; return $null }
+    $got = $null
+    try { $got = Get-BsaStringFiles $p } catch { Note ("could not read {0}: {1}" -f $name, $_.Exception.Message); $got = $null }
+    $bsaCache[$name] = $got
+    return $got
+}
 foreach ($pl in $Plugins) {
     $base = [System.IO.Path]::GetFileNameWithoutExtension($pl).ToLowerInvariant()
     $want = $base + '_' + $LANGUAGE + '.strings'
@@ -287,18 +301,22 @@ foreach ($pl in $Plugins) {
         $tables[$pl] = @{ Table = (Read-StringTable ([System.IO.File]::ReadAllBytes($loose))); Where = 'Data\Strings' }
         continue
     }
-    if ($null -eq $bsaFiles) {
-        $bsa = Join-Path $Data 'Skyrim - Interface.bsa'
-        if (Test-Path -LiteralPath $bsa) {
-            $bsaFiles = Get-BsaStringFiles $bsa
-            Note ("{0} strings files inside Skyrim - Interface.bsa" -f $bsaFiles.Count)
-        } else {
-            $bsaFiles = @{}
-            Note "no Data\Strings and no Skyrim - Interface.bsa: names will fall back to editor ids"
+    # only a plugin flagged localised keeps its names in a string table, so
+    # only its archives are opened
+    $path = Get-PluginPath $Data $pl
+    if (-not (Test-Path -LiteralPath $path)) { continue }
+    $head = New-Object byte[] 12
+    $fs = [System.IO.File]::OpenRead($path)
+    [void]$fs.Read($head, 0, 12)
+    $fs.Dispose()
+    if (-not ([BitConverter]::ToUInt32($head, 8) -band 0x80)) { continue }
+    $stem = [System.IO.Path]::GetFileNameWithoutExtension($pl)
+    foreach ($cand in @(($stem + '.bsa'), ($stem + ' - Interface.bsa'), 'Skyrim - Interface.bsa')) {
+        $files = Get-BsaCached $cand
+        if ($files -and $files.ContainsKey($want)) {
+            $tables[$pl] = @{ Table = (Read-StringTable $files[$want]); Where = $cand }
+            break
         }
-    }
-    if ($bsaFiles.ContainsKey($want)) {
-        $tables[$pl] = @{ Table = (Read-StringTable $bsaFiles[$want]); Where = 'Skyrim - Interface.bsa' }
     }
 }
 foreach ($pl in $Plugins) {

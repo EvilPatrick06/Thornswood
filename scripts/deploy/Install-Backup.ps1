@@ -21,7 +21,7 @@
   then it does not matter who finds a backup.
 
   This installs the on-box half. Getting the backups off the box is
-  Fetch-Backups.ps1, which runs here, and restoring one is docs\RESTORING.md.
+  Fetch-Backups.ps1, which runs here, and restoring one is RESTORING.md in the ops repo.
 #>
 [CmdletBinding()]
 param(
@@ -29,9 +29,17 @@ param(
   [string]$VpsUser  = '',
   [string]$Root     = 'C:\Thornswood-Backup',
   [string]$TaskName = 'Thornswood Backup',
-  # Quarter past three in the morning, well clear of when anybody is playing.
-  # (It used to say "after the nightly restart"; no script here registers one.)
-  [string]$At       = '03:15',
+  # In UTC, as the cron of .github\workflows\nightly.yml is, so the two keep
+  # the same distance all year: Task Scheduler keeps a trigger written with
+  # Z on UTC, and the box's clock moves an hour with daylight saving (#3187).
+  # Until 21 Oct 2026 it was 03:15 box time (09:15 UTC), a quarter of an hour
+  # into the nightly harness shares at 09:00 UTC, in the box's busiest hour
+  # (99% busy on 21 Oct): the backup took 9.8 minutes beside them and 4.5 on
+  # a quiet night. 08:15 UTC is 2:15 AM box time in summer and 1:15 AM in
+  # winter, 45 minutes before the shares start and with nobody on (none in
+  # 10 days of the load record between midnight and 7 AM).
+  # tests\test-3187-backup-clear-of-nightly.ps1 holds the two apart.
+  [string]$At       = '08:15Z',
   # Where the copy of the passphrase lands on this machine. Outside the repo
   # on purpose: it must never be committed.
   [string]$KeyOut   = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
@@ -234,7 +242,21 @@ else {
           `$r.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, 'ReadAndExecute', `$tree, 'None', 'Allow')))
           Set-ThornswoodServiceAcl `$d.FullName `$r
         }
-        'read ' + `$src + ' (' + `$dirs.Count + ' folder(s) given the rule)'
+        # And each file in those folders that takes no rules from above, which
+        # no folder rule reaches: bot.env.json, locked to the bot and the
+        # admins because it holds the bot's token. On 22 Oct 2026 the night
+        # said NO ACCESS on it and ended with code 1 (#2836). Read, on that
+        # file alone; Protect-ThornswoodBotEnv keeps it when the file is
+        # written again. One locked deeper than these is named NO ACCESS by
+        # the night, which then fails, and this run again gives it the rule.
+        `$locked = @(foreach (`$d in `$dirs) { Get-ChildItem -LiteralPath `$d.FullName -File -Force -EA SilentlyContinue |
+                      Where-Object { (Get-Acl -LiteralPath `$_.FullName).AreAccessRulesProtected } })
+        foreach (`$f in `$locked) {
+          `$r = Get-Acl -LiteralPath `$f.FullName
+          `$r.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, 'Read', 'Allow')))
+          Set-ThornswoodServiceAcl `$f.FullName `$r
+        }
+        'read ' + `$src + ' (' + `$dirs.Count + ' folder(s) given the rule' + `$(if (`$locked.Count) { ', and ' + (@(`$locked | ForEach-Object { `$_.Name }) -join ', ') }) + ')'
       }
       'on LOCAL SERVICE, Limited, as ' + `$sid
     } catch {
@@ -263,7 +285,7 @@ Say '  1. Put the passphrase where you keep the server password. It is at' 'Dark
 Say "     $KeyOut on this machine. Losing it makes every backup noise." 'DarkGray'
 Say '  2. Run .\scripts\vps\Fetch-Backups.ps1 -Schedule once, so this machine pulls' 'DarkGray'
 Say '     them off the box every day. A backup only on the server is not a backup.' 'DarkGray'
-Say '  3. Restore one, once, following docs\RESTORING.md, and write the date' 'DarkGray'
+Say '  3. Restore one, once, following RESTORING.md in the ops repo, and write the date' 'DarkGray'
 Say '     in it. Until that has been done none of this is known to work.' 'DarkGray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

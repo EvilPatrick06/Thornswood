@@ -115,7 +115,6 @@ function rig(random, seed) {
     records[idOf(desc)] = edidRecord(edid);
   };
   api.ledger = function () { return JSON.parse(JSON.stringify(saved)); };
-  api.mark = function (id) { return (store[id] || {}).thornswoodDungeonLoot || 0; };
   return api;
 }
 
@@ -204,7 +203,7 @@ if (block) {
     return g.desc === 'f:Skyrim.esm' && g.count === paid.gold;
   }));
   yes('the chest says what it held', api.said.length === 1 && api.said[0].indexOf('The chest held ') === 0);
-  yes('the chest remembers the pay', api.mark(chest) === api.clock());
+  yes('the ledger remembers the pay', (api.ledger().entries[chest.toString(16) + ':Skyrim.esm'] || {}).at === api.clock());
 
   const before = api.given.length;
   yes('the same chest does not pay twice inside the rest', api.onChest(actor, chest) === null);

@@ -26,35 +26,43 @@ rest) and the `test-*.js` harnesses are not in this list.
 | Script | What it is for |
 | --- | --- |
 | [deploy/Artifact.ps1](deploy/Artifact.ps1) | What a deploy sends, built from a commit rather than copied off a working tree, and what the box keeps to say which commit each part runs. |
+| [deploy/CloudflareRanges.ps1](deploy/CloudflareRanges.ps1) | Dot-sourced. Reads scripts\deploy\cloudflare-ranges.txt, the addresses Cloudflare's proxy reaches the box from, and says whether an address is inside them (#2995). |
 | [deploy/CollectionPlugins.ps1](deploy/CollectionPlugins.ps1) | Holds the plugins a deploy sends to the collection's own bytes (#2019). |
-| [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS and restarts only that server. |
+| [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS, which loads it while it runs when nothing else changes, and otherwise restarts only that server. |
 | [deploy/Deploy-Docs.ps1](deploy/Deploy-Docs.ps1) | Puts the Thornswood docs site on the VPS and keeps it running. |
 | [deploy/Deploy-Gamemode.ps1](deploy/Deploy-Gamemode.ps1) | Puts gamemode.js into the built server and writes a server load order that actually lines up with the client's. |
 | [deploy/Deploy-Server.ps1](deploy/Deploy-Server.ps1) | Sends the built server up to the VPS and restarts it. |
 | [deploy/DeployedBuild.ps1](deploy/DeployedBuild.ps1) | What each server actually runs, where the site can read it. |
 | [deploy/DocsPasswordFile.ps1](deploy/DocsPasswordFile.ps1) | Where the site's member password comes from for Deploy-Docs.ps1 -Password, when nobody types it (issue #2116): a file on the box, locked to the box's Administrators and the deploy account. |
 | [deploy/Fresh-Checkout.ps1](deploy/Fresh-Checkout.ps1) | Deploy and ship scripts refuse a stale or dirty checkout (#2118). |
+| [deploy/Install-AdminService.ps1](deploy/Install-AdminService.ps1) | Puts the box's GitHub admin service on the VPS (#3107, Patrick's A of 22 Oct 2026): scripts\vps\admin\admin.js, as the task "Thornswood Admin", listening on 127.0.0.1:7791. |
 | [deploy/Install-Backup.ps1](deploy/Install-Backup.ps1) | Puts the nightly backup on the VPS: sends vps-nightly-backup.ps1 up, makes a passphrase if there is not one yet, and registers the scheduled task that runs it. |
 | [deploy/Install-Bot.ps1](deploy/Install-Bot.ps1) | Puts the Thornswood bot on the VPS and keeps it running. |
 | [deploy/Install-Bridge.ps1](deploy/Install-Bridge.ps1) | Puts the box's end of ssh on the VPS (#2753, #2891), the way every machine reaches the box's ssh: scripts\vps\bridge\bridge.js, as the task "Thornswood Bridge", listening on 127.0.0.1:7790. |
+| [deploy/Install-Gate.ps1](deploy/Install-Gate.ps1) | Puts the deploy gate on the box (#2841): the account thornswood-deploy, which has no administrator rights, its forced command, and the broker that runs the verbs. |
 | [deploy/Install-Runner.ps1](deploy/Install-Runner.ps1) | Puts a GitHub Actions runner on the VPS, so the build check runs on every pull request without paying for minutes. |
 | [deploy/Install-ThornswoodContent.ps1](deploy/Install-ThornswoodContent.ps1) | Drops Thornswood-Content.esp into the game folder and inserts it into the load order ahead of the city overhauls. |
 | [deploy/Install-ThornswoodServer.ps1](deploy/Install-ThornswoodServer.ps1) | Run this ON THE VPS, after Bootstrap-VPS.ps1, as Administrator. |
 | [deploy/Install-Voice.ps1](deploy/Install-Voice.ps1) | Puts the proximity voice service on the VPS beside the game server and opens the one port it needs. |
 | [deploy/MaxOnline.ps1](deploy/MaxOnline.ps1) | How many people a Thornswood server holds at once: read from the one place it is written, records\most-online.json, and put into server-settings.json. |
+| [deploy/New-RunnerDrive.ps1](deploy/New-RunnerDrive.ps1) | Makes the Windows 11 Dev Drive that One's pull request runners live on, so Defender scans what their builds open without holding each file until the scan is done (#4048, #3861; Patrick's answer A on the report page, 27 Oct 2026, q-3861-defender). |
+| [deploy/Reload.ps1](deploy/Reload.ps1) | A dev gamemode deploy that changes only gamemode.js puts the new one in place while the dev server runs, and the server loads it there, with nobody dropped and every NPC still in the world (#3196, Patrick's C on 22 Oct 2026). |
 | [deploy/Remirror-Site-Feed.ps1](deploy/Remirror-Site-Feed.ps1) | Puts the release feed on the site, so https://thornswood.net/feed/version.json is the same file as this machine's working copy of the feed and every asset it names can be downloaded from thornswood.net. |
 | [deploy/Rotate-BotToken.ps1](deploy/Rotate-BotToken.ps1) | Puts a new Discord bot token into both places on the VPS that use it, in one go, and restarts both programs that read it. |
 | [deploy/Rotate-ServerPassword.ps1](deploy/Rotate-ServerPassword.ps1) | Changes the server password and hands the new one to the site, so the launcher can fetch it after checking Discord. |
 | [deploy/ServerArtifact.ps1](deploy/ServerArtifact.ps1) | The server build as a versioned artifact, kept in the box's store beside the gamemode artifacts. |
 | [deploy/ServerBuild.ps1](deploy/ServerBuild.ps1) | Which server files come from the fork, and whether a folder, a zip or a stage holds the build records\server-build.json names. |
 | [deploy/ServerContent.ps1](deploy/ServerContent.ps1) | Which Thornswood-Content.esp a game server holds, read off the box, and whether a release may send clients a content plugin that server does not hold (#2308). |
+| [deploy/ServerFolderTurn.ps1](deploy/ServerFolderTurn.ps1) | One turn at the game server folders, for the nightly backup and for the scripts that stop a game server and swap its files (#3247). |
 | [deploy/ServerOrder.ps1](deploy/ServerOrder.ps1) | The server's load order once the engine loads light plugins (#1715), and the full index a form id is computed from. |
 | [deploy/ServerReadyWait.ps1](deploy/ServerReadyWait.ps1) | How long a started game server has to answer on its ports before a deploy puts the old files back. |
 | [deploy/ServerSettings.ps1](deploy/ServerSettings.ps1) | Which settings a game server install takes from the release, and which it keeps from the server it replaces. |
 | [deploy/ServiceAccount.ps1](deploy/ServiceAccount.ps1) | The account the services that run code we deploy run as (#2578): both game servers, both voice services and Caddy. |
-| [deploy/Set-BuildRunners.ps1](deploy/Set-BuildRunners.ps1) | Makes the build label on GitHub's VPS runners match records\build-runners.json, so no more builds run on the box at once than that file lists runners. |
+| [deploy/Set-BuildRunners.ps1](deploy/Set-BuildRunners.ps1) | Makes the labels on GitHub's VPS runners match the runner records on main (records\<name>-runners.json): records\build-runners.json caps how many builds run on the box at once, records\sign-runners.json says which runner may sign a release launcher, records\check-runners.json which runners may check a signed draft (#3956). |
 | [deploy/Set-DiscordLogin.ps1](deploy/Set-DiscordLogin.ps1) | Points the site at your Discord, which is what decides who gets in anywhere. |
 | [deploy/Set-DiscordOnboarding.ps1](deploy/Set-DiscordOnboarding.ps1) | Sets Discord's onboarding (Server Settings, Onboarding) with the bot, from bot\Build-Onboarding.py: the default channels, the questions and what each answer gives, every role and channel looked up by name on the server when it runs. |
+| [deploy/Set-RepoAbout.ps1](deploy/Set-RepoAbout.ps1) | Makes the repository's About box on GitHub (the line under its name, the website and the topics) match records\repo-about.json on main. |
+| [deploy/Set-Turnstile.ps1](deploy/Set-Turnstile.ps1) | Puts Cloudflare Turnstile's two keys for the report form into the site's config.json on the VPS and restarts the site, so /report draws the check and the site asks Cloudflare about every pass (#3216, Patrick's answer on 22 Oct 2026). |
 | [deploy/Setup-Discord.ps1](deploy/Setup-Discord.ps1) | Builds the Thornswood Discord: roles, categories, channels, permissions and the words in the read only channels, in one run. |
 | [deploy/Setup-Domain.ps1](deploy/Setup-Domain.ps1) | Puts thornswood.net in front of the docs site, with a real certificate. |
 | [deploy/SiteConfigSet.ps1](deploy/SiteConfigSet.ps1) | The one block that changes a single top-level setting in the site's config.json on the VPS and leaves every other setting as it was. |
@@ -77,15 +85,22 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Close-Launcher.ps1](dev/Close-Launcher.ps1) | Shared by every script that writes into the build. |
 | [dev/Copy-BoxGuard.ps1](dev/Copy-BoxGuard.ps1) | Writes scripts\vps\BoxGuard.ps1's Get-ThornswoodBoxRefusal into every box script that carries a copy of it. |
 | [dev/Gate-Harnesses.ps1](dev/Gate-Harnesses.ps1) | Prints the harnesses the build check runs on every pull request: every tests\test-*.js and tests\test-*.ps1 that tests\gate-excluded.txt does not name, one a line, in name order. |
+| [dev/Gate-Map.ps1](dev/Gate-Map.ps1) | Hands the newest traced gate map from the box to runners off it, through main's build log (#4009). |
 | [dev/Install-Serena.ps1](dev/Install-Serena.ps1) | Installs Serena once, at the version in scripts\dev\serena-version.txt, and points Claude Code on this machine at the installed program, so a session start runs Serena straight away instead of resolving it first. |
 | [dev/Install-Thornswood.ps1](dev/Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
+| [dev/Lint.ps1](dev/Lint.ps1) | Reports ruff, eslint and PSScriptAnalyzer findings, warnings only, over the files it is given or the whole tree, with each pinned tool fetched once per machine. |
 | [dev/Measure-Reclaim.ps1](dev/Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |
 | [dev/New-ScriptIndex.ps1](dev/New-ScriptIndex.ps1) | Writes scripts\README.md, the list of every PowerShell script under scripts\ and the one line that says what each one is for. |
-| [dev/Nightly-Harnesses.ps1](dev/Nightly-Harnesses.ps1) | Runs one share of the test harnesses for the nightly checks, one at a time and each on a clock, and always ends by naming every harness that failed and the ten slowest, inside the time it is given. |
+| [dev/Nightly-Harnesses.ps1](dev/Nightly-Harnesses.ps1) | Runs one share of the test harnesses for the nightly checks, or the ones it is named, one at a time or a few side by side, each on a clock, and always ends by naming every harness that failed and the ten slowest, inside the time it is given. |
 | [dev/Nightly-Issue.ps1](dev/Nightly-Issue.ps1) | Keeps one issue on the board for a failing nightly, and closes it the night the checks pass. |
+| [dev/Nightly-PlainIssues.ps1](dev/Nightly-PlainIssues.ps1) | Names every issue and issue comment made in the last day that is not written plain. |
 | [dev/Nightly-Stray.ps1](dev/Nightly-Stray.ps1) | Names every pull request open more than two days and every branch other than main with no open pull request, reading every page GitHub has. |
 | [dev/OwnPlugins.ps1](dev/OwnPlugins.ps1) | Where a builder reads a plugin of the load order from (#2923). |
+| [dev/Run-Gate.ps1](dev/Run-Gate.ps1) | Runs the gate harnesses for build.yml's "Run the gate harnesses" step: every one on main, under the trace task's trace on the VPS, and on a pull request built on the VPS only those its change can reach (#3114). |
 | [dev/Start-Thornswood.ps1](dev/Start-Thornswood.ps1) | Launches the game the way the launcher's Play() does, without the launcher. |
+| [dev/Trace-Gate-Box.ps1](dev/Trace-Gate-Box.ps1) | The part of a gate trace that runs on the VPS, as an administrator: an ETW session that sees every file each gate harness opens, and the reading of it into one list of paths a harness (#3114). |
+| [dev/Trace-Gate-Task.ps1](dev/Trace-Gate-Task.ps1) | The trace task on the VPS: traces every main build's gate as it runs and leaves the map pull requests are held to in each build runner's folder (#3114). |
+| [dev/Trace-Gate.ps1](dev/Trace-Gate.ps1) | Traces one run of the pull request gate on the VPS: which files every gate harness opens, on the box, as the build runner runs it (#3114). |
 | [dev/Watch-Foreground.ps1](dev/Watch-Foreground.ps1) | Which window Windows is giving the keyboard to, sampled from outside the game. |
 | [mods/Add-Accuracy.ps1](mods/Add-Accuracy.ps1) | RETIRED. DO NOT RUN. Issue #1179: hand-installed Core Impact Framework and Accuracy, then Ships. |
 | [mods/Add-Bodies.ps1](mods/Add-Bodies.ps1) | RETIRED. DO NOT RUN. Issue #405: every run poured the nude CBBE and 3BA female body (femalebody_0.nif and _1.nif, shapes 3BA, 3BA_Vagina and 3BA_Anus, no Bra or Panty) back over Game\Data, whatever body had been put there since. |
@@ -99,7 +114,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Check-CollectionRules.ps1](mods/Check-CollectionRules.ps1) | Whether the plugin rules the Nexus collection carries hold a clean install to a plugin list's order. |
 | [mods/Check-CoveredBodies.ps1](mods/Check-CoveredBodies.ps1) | Says whether every body the game folder shows people is covered by underwear, men and women alike, and exits 2 when one is not. |
 | [mods/Check-Editions.ps1](mods/Check-Editions.ps1) | Does anything in the load order need the paid Anniversary upgrade? |
-| [mods/Check-FromGame.ps1](mods/Check-FromGame.ps1) | Makes the main menu and the notice board's two meshes from a game's own archives the way the launcher does, and says whether each came out byte for byte (#2827). |
+| [mods/Check-FromGame.ps1](mods/Check-FromGame.ps1) | Makes the main menu, the notice board's two meshes and the collection's menus with no gold values from a game's own archives the way the launcher does, and says whether each came out byte for byte (#2827, #3113). |
 | [mods/Check-Manifest.ps1](mods/Check-Manifest.ps1) | Says what load order the game server is actually handing out, and how it compares to the one you play with. |
 | [mods/Check-Plugins.ps1](mods/Check-Plugins.ps1) | What is enabled that should not be, and what is missing that should be there. |
 | [mods/Clean-Everything.ps1](mods/Clean-Everything.ps1) | Finds the old installers, build leftovers, temp files, stale backups and old GitHub release assets across this machine, the server and the source repository, adds up what they are costing, and prints it. |
@@ -116,7 +131,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Rebuild-ContentTables.ps1](mods/Rebuild-ContentTables.ps1) | Rebuilds every table that is read out of the plugins of the load order, in the order they read each other, after a change to one of Thornswood's own plugins in game\content, and says what changed. |
 | [mods/Remove-DeadRecords.ps1](mods/Remove-DeadRecords.ps1) | Deletes records from Thornswood-Content.esp that nothing uses any more, and refuses to delete one that anything still points at. |
 | [mods/Remove-Plugin.ps1](mods/Remove-Plugin.ps1) | RETIRED. DO NOT RUN. Issue #1179: took one plugin out of the build by hand. |
-| [mods/Run-OnBox.ps1](mods/Run-OnBox.ps1) | Runs one of the repository's Python tools on the VPS box, against the game plugins a game server there already holds, and brings back what the tool wrote into the repository's game\ and records\ folders. |
+| [mods/Run-OnBox.ps1](mods/Run-OnBox.ps1) | Runs one of the repository's content tools on the VPS box, against the game plugins a game server there already holds, and brings back what the tool wrote into the repository's game\, records\ and docs\systems\ folders. |
 | [mods/Send-GameArchives.ps1](mods/Send-GameArchives.ps1) | Puts Skyrim's own archives that the content tools read on the VPS box, in C:\Thornswood-GameData, each checked against records\skyrim-files.json on this machine before it goes and on the box after it lands, and the loose string tables records\game-strings.json names, held to that record the same way. |
 | [mods/Set-UnboundMenu.ps1](mods/Set-UnboundMenu.ps1) | RETIRED. DO NOT RUN. Issue #1179: swapped Skyrim Unbound's MCM script by hand. |
 | [mods/Show-EslCascade.ps1](mods/Show-EslCascade.ps1) | Answers one question: if the server load order drops every ESL-flagged plugin, how much else has to go with it? |
@@ -130,15 +145,19 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [ops/New-Character.ps1](ops/New-Character.ps1) | Throws the test character away so the next connect builds a fresh one. |
 | [ops/Publish-Discord.ps1](ops/Publish-Discord.ps1) | Posts the newest release into the Discord #news channel. |
 | [ops/Publish-News.ps1](ops/Publish-News.ps1) | Copies the launcher's news feed onto the docs site, so the News page there is the same list of changes people see in the launcher rather than a second one written by hand that immediately falls behind. |
+| [ops/Read-Board.ps1](ops/Read-Board.ps1) | Reads the whole board, every card's Status and Order, into board.json, from a machine that has gh and no board token: a cloud Claude thread (#3192). |
 | [ops/Release-List.ps1](ops/Release-List.ps1) | The release list a game server lets go of at its next start (#2351), as Reset-Character.ps1, Wipe-Saves.ps1 (#2668) and New-Character.ps1 (#2673) write it. |
 | [ops/Reset-Appearance.ps1](ops/Reset-Appearance.ps1) | Puts a character back into the race menu without deleting them. |
 | [ops/Reset-Character.ps1](ops/Reset-Character.ps1) | Throws away the character on the server so the next launch runs creation from the top. |
-| [ops/Say-Staff.ps1](ops/Say-Staff.ps1) | Posts one staff notice in #staff-updates through the bot, from One, a developer's PC or a cloud thread: a line before an edit to one of the six shared files, taking the dev feed, what was merged or published. |
+| [ops/Say-Staff.ps1](ops/Say-Staff.ps1) | Posts one staff notice in #staff-updates through the bot, from One, a developer's PC or a cloud thread: only when staff must act: something staff must act on, a server restart or outage staff will see, or a change to how staff do their job. |
+| [ops/Sealed.ps1](ops/Sealed.ps1) | The seal a workflow puts on what it sends back to the session that started it, for scripts\vps\Box-Run.ps1 (the deploy gate) and scripts\release\Nexus-Run.ps1 (the Nexus scripts), both #2841. |
 | [ops/Set-Collection.ps1](ops/Set-Collection.ps1) | Asks for the collection address and publishes it, in the two places that decide it, the same two Set-Server.ps1 uses. |
 | [ops/Set-DevNews.ps1](ops/Set-DevNews.ps1) | Points dev releases at the Discord channel for dev build updates, so they stop being something only the dev launcher ever mentions and stay out of #news, where everybody reads about the build they actually play. |
 | [ops/Set-Door.ps1](ops/Set-Door.ps1) | Turns the game server's door on, off, or tells you what it has been seeing. |
+| [ops/Set-Ref.ps1](ops/Set-Ref.ps1) | Makes a release tag, or deletes a branch, on GitHub for a session whose git cannot write refs: a cloud Claude thread (#3107, #3314). |
 | [ops/Set-Server.ps1](ops/Set-Server.ps1) | Sets the server everyone connects to, in the two places that decide it, and sends the feed to the VPS (#907). |
 | [ops/Wipe-Saves.ps1](ops/Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |
+| [ops/WorkflowRun.ps1](ops/WorkflowRun.ps1) | Starts a workflow on main and reads the answer its runner left, for a script whose session cannot make the change itself: Set-Ref.ps1 (a ref write, which a cloud session's proxy refuses) and Set-BuildRunners.ps1 (a runner label, which needs the box's GitHub App). |
 | [release/Add-VirusTotalComment.ps1](release/Add-VirusTotalComment.ps1) | Optional manual tool: leaves one community comment on a build's VirusTotal report, or says plainly that it is not commenting and carries on. |
 | [release/Assert-PublishSigned.ps1](release/Assert-PublishSigned.ps1) | Helpers for the publish sign gate. Dot-source this from Ship.ps1 and Publish-Installer.ps1. |
 | [release/Build-Engine.ps1](release/Build-Engine.ps1) | Takes a machine from a fresh clone to a built engine: the SkyMP server and the client runtime, out of the fork in engine\skymp. |
@@ -150,10 +169,14 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Check-Build.ps1](release/Check-Build.ps1) | The server does not check plugin names. It checks size and crc32 of every plugin it names, so the wrong version of a mod is the same to it as not having the mod. |
 | [release/Check-Records.ps1](release/Check-Records.ps1) | Holds the committed high-risk records to their shape and version, fail closed (#2180). |
 | [release/Check-ShipReady.ps1](release/Check-ShipReady.ps1) | Whether THIS machine can run a release, and what is missing if it cannot. |
+| [release/Clean-NewsRepeats.ps1](release/Clean-NewsRepeats.ps1) | Takes out of a channel's published notes every line an older note already said, so the News tab and the site list each change once. |
+| [release/Clear-News.ps1](release/Clear-News.ps1) | Takes every published note off a channel: the launcher's News tab, the site's News page for main, and the record of the channel's Discord posts. |
+| [release/Close-ShippedIssues.ps1](release/Close-ShippedIssues.ps1) | Closes the issues in Done whose fix a main Ship carries, each with the test task its pull request wrote, and says which it closed and which stay open. |
 | [release/Compare-NexusLayout.ps1](release/Compare-NexusLayout.ps1) | Says whether a collection revision's layout record (what Install-NexusRevision.ps1 writes) is the same as another layout record, or the same as what Vortex deployed into a game folder, file by file and plugin by plugin (#2969). |
 | [release/Dev-News.ps1](release/Dev-News.ps1) | Which notes on the dev feed are marked DEV, worked out from main's feed, and the one place that writes those marks and the dev feed's mainVersion. |
-| [release/EngineArtifact.ps1](release/EngineArtifact.ps1) | CI's engine build of the pin, the artifact engine.yml keeps, made this machine's engine build after every file in it is held to the checkout's records. |
+| [release/EngineArtifact.ps1](release/EngineArtifact.ps1) | CI's engine build of the pin, the public fork's own build of the commit (thornswood-engine-<commit>), made this machine's engine build after every file in it is held to the checkout's records. |
 | [release/EngineJobs.ps1](release/EngineJobs.ps1) | How many projects an engine build compiles at once, and whether a compile that failed ran the machine out of memory. |
+| [release/EngineRecords.ps1](release/EngineRecords.ps1) | The records engine.yml makes for a pin, carried from the run to the pin pull request in the run's log (#3399). |
 | [release/Export-ServerPayload.ps1](release/Export-ServerPayload.ps1) | Packages everything the VPS needs into one zip. |
 | [release/Feed-Json.ps1](release/Feed-Json.ps1) | The one way a channel's version.json is written (#1050). |
 | [release/Feed-News.ps1](release/Feed-News.ps1) | The notes the launcher's News tab shows, wherever the feed keeps them (#1050). |
@@ -162,24 +185,32 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Find-MSBuild.ps1](release/Find-MSBuild.ps1) | Says where the MSBuild that builds launcher\app\Thornswood.csproj is, and whether this machine has the .NET Framework 4.8.1 reference assemblies it builds against (issue #498). |
 | [release/ForkEngineBuild.ps1](release/ForkEngineBuild.ps1) | Finds the public fork's own build of an engine commit, and puts it where a build of that commit on this machine would be, for engine.yml to record. |
 | [release/Front.ps1](release/Front.ps1) | What Build-Front.ps1 and Go.ps1 share about the front build, the page skymp5-front's webpack makes for Data\Platform\UI: the record of it, the zip it travels in, and the check that a zip is the recorded build. |
-| [release/Get-EngineArtifact.ps1](release/Get-EngineArtifact.ps1) | Fetches CI's engine build of the pin (engine.yml's artifact), holds every file in it to records\client-build.json and records\server-build.json, and makes it this machine's engine build. |
+| [release/Get-EngineArtifact.ps1](release/Get-EngineArtifact.ps1) | Fetches CI's engine build of the pin (the public fork's own build of it), holds every file in it to records\client-build.json and records\server-build.json, and makes it this machine's engine build. |
+| [release/Get-EngineRecords.ps1](release/Get-EngineRecords.ps1) | Takes the records an engine.yml run made out of its log and writes them into this checkout's records\, for the pin pull request. |
 | [release/Get-ScratchDir.ps1](release/Get-ScratchDir.ps1) | Says where a short-lived build scratch folder goes, so Ship and Install-Thornswood take their launcher build (and the CI setup stub) from one place instead of each calling [IO.Path]::GetTempPath(). |
 | [release/Get-SevenZip.ps1](release/Get-SevenZip.ps1) | Puts 7-Zip's own Linux build (7zz, 25.01) on a Linux machine, checked against its pinned sha256, and prints where it is, so a cloud session can unpack every archive of the collection (#2969). |
 | [release/Go.ps1](release/Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/Install-NexusRevision.ps1](release/Install-NexusRevision.ps1) | Lays out one revision of the Thornswood collection on Nexus Mods (slug 7essxf) into a game folder, the way Vortex installs and deploys it, without Vortex (#2754). |
+| [release/LogHandBack.ps1](release/LogHandBack.ps1) | A file handed back from a workflow run in its job's log rather than as an artifact. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
+| [release/New-ClientLicenceRecord.ps1](release/New-ClientLicenceRecord.ps1) | Records which libraries are in the client files, vcpkg's and the others, with each one's licence text, into records\client-licences.json and records\client-licences\. |
 | [release/New-FeedRoot.ps1](release/New-FeedRoot.ps1) | Stages the folder a release from the feed is built from: every file the channel's last release left installed, from the site, by its sha256. |
 | [release/New-NexusRevision.ps1](release/New-NexusRevision.ps1) | Makes the next revision of the Thornswood collection on Nexus Mods (slug 7essxf), as a draft, from the revision published now with one or more of its mods moved to a new Nexus file; and publishes a draft once it has been checked (#2914). |
 | [release/New-ServerBuildRecord.ps1](release/New-ServerBuildRecord.ps1) | Records every server file the fork builds and the one commit they were built from, into records\server-build.json. |
 | [release/New-SkyrimFilesRecord.ps1](release/New-SkyrimFilesRecord.ps1) | Records every file of the pinned Skyrim build, from the depot manifests the Downgrade asks Steam for, into records\skyrim-files.json. |
+| [release/Nexus-Run.ps1](release/Nexus-Run.ps1) | Runs one of the Nexus scripts with Patrick's Nexus API key from a session that does not hold the key, a cloud thread included (#2841). |
 | [release/Nexus.ps1](release/Nexus.ps1) | The one place the release scripts talk to Nexus Mods from, with Patrick's personal API key (#2914). |
+| [release/Note-Repeats.ps1](release/Note-Repeats.ps1) | Whether a note tells a channel something it has already been told (#3320). |
 | [release/Note-Rules.ps1](release/Note-Rules.ps1) | What release notes may say. Ship.ps1 dot-sources this and refuses notes that break it, before anything is built. tests\test-note-rules.ps1 drives the same function, so the rule and its test cannot disagree. |
 | [release/Package-ClientRecord.ps1](release/Package-ClientRecord.ps1) | The client runtime an installer is held to. |
+| [release/Package-Stage.ps1](release/Package-Stage.ps1) | The installer's stage folder, kept from one build to the next, and the one compression of it. |
 | [release/Package-Thornswood.ps1](release/Package-Thornswood.ps1) | Turns the built install at C:\Thornswood into the single file your friends run. |
+| [release/Publish-FridaSources.ps1](release/Publish-FridaSources.ps1) | The source of what is inside frida-gum.lib, on one permanent Release of this repository (#3287, Patrick's answer C of 26 Oct 2026). |
 | [release/Publish-Installer.ps1](release/Publish-Installer.ps1) | Puts the current installer on the docs site so friends always have the newest one without anybody sending files around. |
 | [release/Publish-Pack.ps1](release/Publish-Pack.ps1) | Builds the optional packs listed in optional-packs.txt, sends them to the site, and adds them to version.json so every launcher offers them under Add-ons on its Diagnostics page. |
 | [release/Publish-PostShip.ps1](release/Publish-PostShip.ps1) | Runs what follows a published tip: the host feed remirror. VirusTotal is no longer part of publish; use Publish-VirusTotal.ps1 by hand if you want a report. |
+| [release/Publish-ReleaseFiles.ps1](release/Publish-ReleaseFiles.ps1) | Puts every file one release names on a GitHub Release of this repository, on the release's own tag, so downloads and updates come from Releases (#3686, Patrick's decision of 26 Oct for going public). |
 | [release/Publish-Server.ps1](release/Publish-Server.ps1) | Run this ON YOUR LAPTOP. It packs the server, sends it to the VPS, installs it there and checks it came up. |
 | [release/Publish-Update.ps1](release/Publish-Update.ps1) | Diffs the current build against the last published state, packs only what changed, sends it to the site (thornswood.net/feed[-dev]/assets/<sha256>, #897), and updates version.json so everyone's launcher picks it up. |
 | [release/Publish-VirusTotal.ps1](release/Publish-VirusTotal.ps1) | Optional manual tool: sends a file to VirusTotal, or says plainly that it is not sending and carries on. Not called from publish. |
@@ -212,14 +243,15 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Update-Checkout.ps1](release/Update-Checkout.ps1) | Moves a checkout that sits detached at origin/main, the shared clone on One, to the newest origin/main with engine\skymp at the commit it pins, or says why it cannot and moves nothing. |
 | [release/Update-ShipRoot.ps1](release/Update-ShipRoot.ps1) | Brings a ship root's game folder up to date with Vortex's deployment and puts the recorded client in it, or says why it cannot; Ship runs it before anything is packed. |
 | [release/Where.ps1](release/Where.ps1) | Says where the engine fork and the build output are, so every script asks one place instead of carrying its own copy of a path. |
-| [vps/Backup-Server.ps1](vps/Backup-Server.ps1) | Pulls everything off the server that could not be rebuilt from the repo, and puts it in a dated zip on this machine: in local\backups in the repository (Where.ps1 Backups), or the folder -Out names. |
+| [vps/Backup-Server.ps1](vps/Backup-Server.ps1) | Pulls everything off the server that could not be rebuilt from the repo, and puts it on this machine as a dated zip encrypted with the backup passphrase, thornswood-backup-<yyyyMMdd-HHmm>.zip.enc: in local\backups in the repository (Where.ps1 Backups), or the folder -Out names. |
 | [vps/Bootstrap-VPS.ps1](vps/Bootstrap-VPS.ps1) | Run this ON THE VPS, once, in the PowerShell 5.1 that ships with Windows Server 2022. |
 | [vps/Bot-Service.ps1](vps/Bot-Service.ps1) | Runs the Thornswood bot as a Windows service under its own account, and stops and starts it by name (issue #465). |
+| [vps/Box-Run.ps1](vps/Box-Run.ps1) | Runs one verb of the deploy gate on the box (#2841), from any session gh is signed in on, a cloud thread included, with no key to the box. |
 | [vps/BoxGuard.ps1](vps/BoxGuard.ps1) | What a box script asks before it changes anything: is this the box? |
 | [vps/Check-LiveGamemode.ps1](vps/Check-LiveGamemode.ps1) | Says whether the gamemode running on the VPS is the one in this repo. |
 | [vps/Check-Load.ps1](vps/Check-Load.ps1) | Answers the only question worth asking before paying for a bigger server: what is this one actually running out of. |
 | [vps/Check-ProdParity.ps1](vps/Check-ProdParity.ps1) | Compares the VPS's own facts with what the repository says it should be (binds, Caddy, tasks, services, live file hashes, TLS dates, settings shape) and writes a redacted parity report; read-only (issue #2165). |
-| [vps/Check-RehearsalDue.ps1](vps/Check-RehearsalDue.ps1) | Says whether the monthly hands-on restore rehearsal is due, from the Last rehearsed line in docs\RESTORING.md, and fails once it is overdue. |
+| [vps/Check-RehearsalDue.ps1](vps/Check-RehearsalDue.ps1) | Says whether the monthly hands-on restore rehearsal is due, from the Last rehearsed line in RESTORING.md in the private ops repo, and fails once it is overdue. |
 | [vps/Check-RunnerIsolation.ps1](vps/Check-RunnerIsolation.ps1) | Checks what the self-hosted GitHub Actions runners on the VPS can reach (accounts, groups, production paths, leftovers, firewall, which workflows and pull requests run there, the repository's Actions settings) and writes a redacted report; read-only (issue #2161). |
 | [vps/Check-ServerPriority.ps1](vps/Check-ServerPriority.ps1) | Reads, and changes nothing: the priority the live and dev game servers and the live and dev voice services run at on the VPS (#2491). |
 | [vps/Check-Site.ps1](vps/Check-Site.ps1) | Asks whether thornswood.net is actually working: from the outside first, the way a visitor or an uptime monitor sees it, and then from the box, the way the site sees Discord. |
@@ -228,43 +260,59 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Delete-Person.ps1](vps/Delete-Person.ps1) | Carries out a deletion request (issue #2351). |
 | [vps/Fetch-Backups.ps1](vps/Fetch-Backups.ps1) | Brings the nightly backups off the VPS onto this machine, and checks that what arrived is readable. |
 | [vps/Forecast-Storage.ps1](vps/Forecast-Storage.ps1) | Records the VPS disk free space over time and forecasts when it reaches the watchdog's DISK LOW and DISK CRITICAL lines, refusing to forecast from too few samples, and tells staff when the forecast turns. |
+| [vps/gate/Gate.ps1](vps/gate/Gate.ps1) | The deploy key's forced command (#2841). |
+| [vps/gate/GateBroker.ps1](vps/gate/GateBroker.ps1) | The deploy gate's broker (#2841). The task "Thornswood Gate" runs it as SYSTEM from boot, out of C:\Thornswood-Gate, which only SYSTEM and Administrators may change (scripts\deploy\Install-Gate.ps1 puts it there and registers the task). |
+| [vps/gate/GateRules.ps1](vps/gate/GateRules.ps1) | What the deploy gate (#2841) will run, as functions with no side effects, so the box's broker, the client and tests\test-2841-deploy-gate.ps1 all hold a line to the same rules. |
 | [vps/Get-Logs.ps1](vps/Get-Logs.ps1) | Brings the server's own logs down to this machine so they can be read whole. |
 | [vps/Get-ProdFacts.ps1](vps/Get-ProdFacts.ps1) | Runs ON THE VPS, read-only: prints the box's own facts (listeners, tasks, services, file hashes, certificate dates, versions, setting names) as JSON for Check-ProdParity.ps1, never a secret value (issue #2165). |
 | [vps/Get-RunnerFacts.ps1](vps/Get-RunnerFacts.ps1) | Runs ON THE VPS, read-only: prints what each GitHub Actions runner account can reach (groups, rights on production paths, leftovers in its work folders, firewall rules, setting names) as JSON for Check-RunnerIsolation.ps1, never a secret value (issue #2161). |
 | [vps/Get-RunnerJobs.ps1](vps/Get-RunnerJobs.ps1) | Lists the GitHub Actions jobs one runner started after a given time, with how each ended and which step failed, and says whether one of them passed; read-only (issue #2161). |
 | [vps/Grant-BoxAccess.ps1](vps/Grant-BoxAccess.ps1) | Gives one person, or one machine, its own way into the box, or takes it away, and touches nobody else's (#2891). |
-| [vps/Harden-VPS.ps1](vps/Harden-VPS.ps1) | Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off. |
+| [vps/Harden-VPS.ps1](vps/Harden-VPS.ps1) | Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off, and the Windows services and telemetry the box never uses, and moves Windows Update and its maintenance to 4 AM. |
+| [vps/Keep-RunnerLogs.ps1](vps/Keep-RunnerLogs.ps1) | The build runners on the box keep every log they write in their _diag folders and nothing ever removed one: 1.6 GB and about 4,000 files on 21 Oct 2026, the oldest from 25 Sep (#3184). -Install puts vps-runner-logs.ps1 on the box as C:\Thornswood-Watch\runner-logs.ps1 and a task that runs it at 4:30 AM every day as SYSTEM, which removes the runner and worker logs older than 14 days. vps-runner-logs.ps1 says exactly what it removes. |
 | [vps/Lock-Folder.ps1](vps/Lock-Folder.ps1) | The one place the creators of the VPS service folders get their lock from (follow-up to issues #1183 and #1691): Watch-Services.ps1 and Watch-Load.ps1 for C:\Thornswood-Watch, Setup-Domain.ps1 for C:\Thornswood-Caddy, and Artifact.ps1 and Swap.ps1 for C:\Thornswood-Deploys, and Grant-BoxAccess.ps1 for the copies it keeps in C:\ProgramData\ssh\box-access-before (#3034). |
 | [vps/Lock-VpsFolders.ps1](vps/Lock-VpsFolders.ps1) | Takes the rule that lets every account on the box read them off the game servers', the voice services' and the backups' folders, now rather than at each one's next install (issues #1105 and #1173). |
+| [vps/Profile-GameServer.ps1](vps/Profile-GameServer.ps1) | Where a game server's processor time goes (#3181). |
+| [vps/Protect-BackupZip.ps1](vps/Protect-BackupZip.ps1) | Protect-ThornswoodBackupZip encrypts a backup zip into the TSBK1 file the nightly backup writes (vps-nightly-backup.ps1, "encrypt"), the one format Restore-Backup.ps1 opens: "TSBK1", a 16 byte salt, a 16 byte IV, the zip in AES-256-CBC, then an HMAC-SHA256 over everything after the five letters. |
 | [vps/Prove-SecretOffCommandLines.ps1](vps/Prove-SecretOffCommandLines.ps1) | Proves, on one real run, that a secret-sending script keeps the value off every command line on the VPS (issue #1212, the person check of #451). |
 | [vps/Read-Availability.ps1](vps/Read-Availability.ps1) | Says how many minutes each service was down over a window, and what share of the window it was up, from the down and back lines the watchdog writes into alerts.jsonl. |
 | [vps/Read-Load.ps1](vps/Read-Load.ps1) | Says which service is using the box, from the record vps-load.ps1 keeps on it. |
 | [vps/Remote.ps1](vps/Remote.ps1) | Runs a bit of PowerShell on the VPS, properly. |
+| [vps/Remove-HandMadeTasks.ps1](vps/Remove-HandMadeTasks.ps1) | Takes the two SYSTEM tasks somebody made by hand on the box, and the folders they run from, off the box (issue #3288). |
 | [vps/Request-Restart.ps1](vps/Request-Restart.ps1) | Tells the live server to warn everybody and then clear them out, without needing to be standing in the world to type /restart. |
 | [vps/Restart-Server.ps1](vps/Restart-Server.ps1) | Restarts a Thornswood service on the VPS. Nothing is copied and nothing is built: this only stops it and starts it again. |
 | [vps/Restore-Backup.ps1](vps/Restore-Backup.ps1) | Opens one of the nightly backups: checks it has not been tampered with, decrypts it, and unpacks it into a folder you name. |
 | [vps/Restore-Box.ps1](vps/Restore-Box.ps1) | Puts a nightly backup back onto a new VPS, run from this machine. |
 | [vps/Restore-Server.ps1](vps/Restore-Server.ps1) | Puts a nightly backup's world back into a game server folder and checks the result would start: the load order resolves and the characters are there. |
 | [vps/Roll-Log.ps1](vps/Roll-Log.ps1) | Rolls a log just before the service that writes it starts. |
+| [vps/Seal.ps1](vps/Seal.ps1) | How a secret held by GitHub reaches the box without passing through any session, chat or log in a form anybody can read (#3216, Patrick's A of 22 Oct 2026). |
 | [vps/Send-Script.ps1](vps/Send-Script.ps1) | The one way a script here runs PowerShell on the VPS. |
 | [vps/Send-Secret.ps1](vps/Send-Secret.ps1) | How a secret goes to the VPS: on ssh's standard input, never on a command line. |
+| [vps/Set-InboundRules.ps1](vps/Set-InboundRules.ps1) | Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807). |
 | [vps/Set-SshScope.ps1](vps/Set-SshScope.ps1) | Limits which addresses may reach ssh on the VPS (port 22), after proving key login, refusing a list that leaves this machine out, and with a put back the box runs by itself if the new login fails. |
 | [vps/Set-TimeWait.ps1](vps/Set-TimeWait.ps1) | Sets TcpTimedWaitDelay to 30 seconds on the VPS, so the box stops dropping connections from the cloud before TLS (#2946), and restarts the box for it when asked and nobody is on either server. |
 | [vps/Set-Vps.ps1](vps/Set-Vps.ps1) | Points everything at a different server box. |
+| [vps/Set-WebFirewall.ps1](vps/Set-WebFirewall.ps1) | Lets the box take TCP 80 and 443 only from Cloudflare's ranges, so a forged SYN from anywhere else gets no SYN-ACK back (#2995). -Open puts both back to any address. |
 | [vps/Setup-CloudSsh.ps1](vps/Setup-CloudSsh.ps1) | Sets up ssh to the box from a cloud Claude thread (#2753). |
 | [vps/Setup-SshKey.ps1](vps/Setup-SshKey.ps1) | Sets a PC up to reach the box over ssh, through the bridge, with a key and a token of its own (#2891). |
 | [vps/Show-BotLog.ps1](vps/Show-BotLog.ps1) | What the bot has been saying, without redeploying it to find out. |
+| [vps/Strip-Uploads.ps1](vps/Strip-Uploads.ps1) | Takes what each picture and recording already in the site's uploads says about where and when it was made out of it, the way the site now does to every upload as it lands (#3648). |
+| [vps/Upgrade-OpenSsh.ps1](vps/Upgrade-OpenSsh.ps1) | Upgrades the box's OpenSSH for Windows to a release with a post-quantum key exchange, keeping the pinned host keys: proves key login, swaps sshd on the box, proves a new login with the pinned key negotiates a post-quantum key exchange, and only then keeps it. |
 | [vps/vps-capture-443.ps1](vps/vps-capture-443.ps1) | Captures the SYN and RST packets on port 443 at the box's network card for a set time, so #2946 can see whether the TLS connects from a cloud session that stall and then reset ever reach the box, and whether the box answers them. |
 | [vps/vps-dev-instance.ps1](vps/vps-dev-instance.ps1) | Runs ON the VPS. Makes the dev game server and the dev voice server beside the live ones, from copies of the live installs, on their own ports, with their own scheduled tasks and firewall rules. |
 | [vps/vps-freeze.ps1](vps/vps-freeze.ps1) | Runs ON the old VPS on the day the server moves: stops everything that writes what a backup takes, then takes the last backup. |
-| [vps/vps-harden.ps1](vps/vps-harden.ps1) | Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off and turns Remote Desktop off, leaving ssh on port 22 alone. |
+| [vps/vps-harden.ps1](vps/vps-harden.ps1) | Runs ON THE VPS, sent there by Harden-VPS.ps1: turns ssh password login off, turns Remote Desktop off and the Windows services and telemetry the box never uses, and moves Windows Update and its maintenance to 4 AM, leaving ssh on port 22 alone. |
+| [vps/vps-inbound-rules.ps1](vps/vps-inbound-rules.ps1) | Runs ON THE VPS, sent there by Set-InboundRules.ps1: turns off every enabled inbound Allow firewall rule that is not on the box's list, and says which (#3807). |
 | [vps/vps-load.ps1](vps/vps-load.ps1) | Runs ON the VPS, every five minutes, as the scheduled task that Watch-Load.ps1 -Install puts there. |
 | [vps/vps-nightly-backup.ps1](vps/vps-nightly-backup.ps1) | Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1 puts there. |
+| [vps/vps-openssh.ps1](vps/vps-openssh.ps1) | Runs ON THE VPS, sent there by Upgrade-OpenSsh.ps1: puts Microsoft's OpenSSH for Windows 10.4 in place of the Windows Server 2022 one, so sshd offers a post-quantum key exchange, keeping the box's host keys, sshd_config and port 22 rules as they are. |
 | [vps/vps-restore-services.ps1](vps/vps-restore-services.ps1) | Runs ON the VPS, sent there by Restore-Box.ps1: puts the site's, the bot's and Caddy's half of an unpacked nightly backup back into their folders. |
+| [vps/vps-runner-logs.ps1](vps/vps-runner-logs.ps1) | Runs ON the VPS, once a day, as the scheduled task that Keep-RunnerLogs.ps1 -Install puts there (C:\Thornswood-Watch\runner-logs.ps1). |
 | [vps/vps-say-staff.ps1](vps/vps-say-staff.ps1) | Puts one staff notice from an agent into the watchdog's outbox, alerts.jsonl, which the bot says in #staff-updates within a minute, or the watchdog through its #staff-updates webhook when the bot is down (#447). |
 | [vps/vps-ssh-scope.ps1](vps/vps-ssh-scope.ps1) | Runs ON THE VPS, sent there by Set-SshScope.ps1: limits who may reach ssh on port 22 to a list of addresses, refusing a list that leaves out the machine running it, and arms a ten minute put back. |
 | [vps/vps-syn-flood.ps1](vps/vps-syn-flood.ps1) | Measures the forged SYN flood on the box's port 443 (#2995) and what it costs the box, over a short window. |
 | [vps/vps-time-wait.ps1](vps/vps-time-wait.ps1) | Runs ON the VPS, sent there by Set-TimeWait.ps1: holds a connection the box closed in TIME_WAIT for 30 seconds instead of Windows' 120, and restarts the box for it when asked and nobody is on either server. |
+| [vps/vps-web-firewall.ps1](vps/vps-web-firewall.ps1) | Runs ON THE VPS, sent there by Set-WebFirewall.ps1: lets TCP 80 and 443 in only from Cloudflare's ranges, so a forged SYN from anywhere else gets no answer (#2995). -Open puts both back to any address. |
 | [vps/Vps.ps1](vps/Vps.ps1) | The one place every script gets the VPS address, user, and ports from. |
 | [vps/Watch-Load.ps1](vps/Watch-Load.ps1) | The website, the game server, the voice service and the bot share one five core box, and nothing kept a number for any of them. |
 | [vps/Watch-Outside.ps1](vps/Watch-Outside.ps1) | Watches, from outside the VPS, the things the project needs that the VPS cannot watch for itself, and tells staff in Discord when one breaks and again when it is fixed. |

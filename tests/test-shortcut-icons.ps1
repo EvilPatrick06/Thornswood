@@ -179,6 +179,33 @@ namespace Thornswood
     Yes 'the dev install does not read the main install''s stamp' ([bool]$due.Invoke($null, @($exe, $want, $false)))
     $art.GetField('Dev').SetValue($null, $false)
 
+    # #3205: removal finds shortcuts by what they run, not by name. A pin left
+    # behind under Thornswood.lnk made the next pin "Thornswood (2)".
+    $to = $icons.GetMethod('ShortcutsTo', [Reflection.BindingFlags]'Public, Static')
+    $drop = $icons.GetMethod('Drop', [Reflection.BindingFlags]'Public, Static')
+    Yes 'Icons has ShortcutsTo and Drop (#3205)' ($to -and $drop)
+    if ($to -and $drop) {
+        $ws = New-Object -ComObject WScript.Shell
+        function Link([string]$name, [string]$target) {
+            $p = Join-Path $root $name
+            $sc = $ws.CreateShortcut($p); $sc.TargetPath = $target; $sc.Save()
+            $p
+        }
+        [string]$devExe = Join-Path $devRoot 'Launcher\Thornswood.exe'
+        $numbered = Link 'Thornswood (2).lnk' $exe
+        $other = Link 'Thornswood.lnk' 'C:\Gone\Launcher\Other.exe'
+        $devLnk = Link 'Thornswood Dev.lnk' $devExe
+        $found = @($to.Invoke($null, @($exe)))
+        Yes 'ShortcutsTo finds the shortcut that runs this exe under a name that is not its own' ($found -contains $numbered)
+        Yes 'and not one called Thornswood.lnk that runs something else, nor the dev build''s' (-not ($found -contains $other) -and -not ($found -contains $devLnk))
+        $gone = [int]$drop.Invoke($null, @($exe))
+        Yes "Drop deletes just that one (said $gone)" ($gone -eq 1 -and -not (Test-Path -LiteralPath $numbered) -and (Test-Path -LiteralPath $other) -and (Test-Path -LiteralPath $devLnk))
+        Remove-Item -LiteralPath $other, $devLnk -Force
+    }
+    $src0 = Get-Content -LiteralPath $iconsCs -Raw
+    $toAt = $src0.IndexOf('public static List<string> ShortcutsTo(string exe)')
+    Yes 'ShortcutsTo walks the same places as Ensure, the pinned taskbar folder among them' ($toAt -ge 0 -and $src0.IndexOf('foreach (Place spot in Places())', $toAt) -gt $toAt -and $src0.Contains('User Pinned\\TaskBar'))
+
     # Ensure wires it in before the walk, and remembers after it.
     $src = Get-Content -LiteralPath $iconsCs -Raw
     $ensureAt = $src.IndexOf('public static int Ensure(bool force)')

@@ -32,7 +32,11 @@
        staff-notice.yml on main with the text on gh's standard input, reads
        the runner's annotation, and says what the box said; -From other than
        claude, a stopped runner, a run with no answer, a run not taken in
-       time and -Run of another workflow each say so.
+       time and -Run of another workflow each say so. A run GitHub has
+       started but does not serve yet is waited for like a queued one, never
+       a stop (#3081); a failed read after the start says the notice was
+       sent, exit 2, with the -Run line; -Run of a run GitHub does not have
+       stops at once.
     5. Grant-BoxAccess.ps1: a notices key's line is taken only through the
        bridge and only runs say-staff.ps1 as its own name; -List reads that
        back; the box change stops with nothing changed when say-staff.ps1 is
@@ -68,6 +72,26 @@ $grantPath = P 'scripts', 'vps', 'Grant-BoxAccess.ps1'
 $watchPath = P 'scripts', 'vps', 'Watch-Services.ps1'
 $shell = (Get-Process -Id $PID).Path
 $enc = New-Object Text.UTF8Encoding($false)
+# The stand-ins for ssh, ssh-keyscan, ssh-keygen and gh are node, not
+# PowerShell (#3168): the runs below start them 51 times, and a PowerShell
+# start costs the box about ten times a node start. What they stand in for
+# (the box half, Say-Staff.ps1, the workflow's step) still runs in PowerShell.
+$node = (Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1)
+if (-not $node) { Write-Host 'FAIL  node is not on PATH, and the stand-ins for ssh and gh are node'; exit 1 }
+$node = $node.Source
+# A path as a JavaScript string, for the stand-ins' own text.
+function Js([string]$s) { return (ConvertTo-Json -InputObject $s -Compress) }
+# Each stand-in is started through a .cmd on Windows; elsewhere through a
+# shell script, since only Windows runs a .cmd (#2989).
+function Put-StandIn([string]$dir, [string]$name, [string]$js) {
+    if ($env:OS -eq 'Windows_NT') {
+        [IO.File]::WriteAllText((Join-Path $dir ($name + '.cmd')), ('@"' + $node + '" "' + $js + '" %*' + "`r`n"), $enc)
+    } else {
+        $sh = Join-Path $dir $name
+        [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $node + "' '" + $js + "' `"`$@`"`n"), $enc)
+        & chmod 755 $sh
+    }
+}
 
 # ---- 1. they parse ---------------------------------------------------------
 $asts = @{}
@@ -84,10 +108,12 @@ $tmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-say-' + [Guid]::NewGuid
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $root = Join-Path $tmp 'Thornswood-Watch'
 $alerts = Join-Path $root 'alerts.jsonl'
+# The bot's data folder, where it writes what it took back (#3328).
+$botData = Join-Path $tmp 'Thornswood-Bot-data'
 
 # The box half as sshd runs it: its own process, the line on its input.
 function Box([string]$from, [string[]]$in, [string]$at = $root) {
-    $args2 = @('-NoProfile', '-NonInteractive', '-File', $box, '-From', $from, '-Root', $at)
+    $args2 = @('-NoProfile', '-NonInteractive', '-File', $box, '-From', $from, '-Root', $at, '-BotData', $botData)
     $out = @($in | & $shell @args2 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
     return [pscustomobject]@{ Out = $out; Code = $LASTEXITCODE; Last = ($out | Select-Object -Last 1) }
 }
@@ -182,6 +208,26 @@ try {
     Yes 'check: no such notice' ((Box 'a' @('check agent-a-9')).Last -eq 'NOT FOUND')
     Yes 'check: only an agent notice''s id is asked about' ((Box 'a' @('check outside-20261020-caddy-down')).Last -like 'REFUSED*')
 
+    # Taking a notice back (#3328): the ask goes in alerts-unsay.txt for the
+    # bot, only for the sender's own notice, once; a check reads what the bot
+    # wrote in its data folder.
+    $unsayFile = Join-Path $root 'alerts-unsay.txt'
+    [IO.File]::AppendAllText($alerts, ((ConvertTo-Json @{ id = 'outside-x-down'; at = $now; service = 'caddy'; kind = 'down'; text = 't' } -Compress) + "`r`n"), $enc)
+    $r = Box 'a' @('unsay agent-a-1')
+    Yes 'unsay: the sender''s own notice is asked for, UNSAY QUEUED <id>, exit 0' ($r.Last -eq 'UNSAY QUEUED agent-a-1' -and $r.Code -eq 0 -and @([IO.File]::ReadAllLines($unsayFile)) -contains 'agent-a-1')
+    $r = Box 'a' @('unsay agent-a-1')
+    Yes '  asked twice, written once' ($r.Last -eq 'UNSAY QUEUED agent-a-1' -and @([IO.File]::ReadAllLines($unsayFile) | Where-Object { $_ -eq 'agent-a-1' }).Count -eq 1)
+    $r = Box 'b' @('unsay agent-a-2')
+    Yes '  another sender''s notice is refused, nothing written' ($r.Last -like 'REFUSED*not a notice from b*' -and $r.Code -eq 1 -and @([IO.File]::ReadAllLines($unsayFile)) -notcontains 'agent-a-2')
+    Yes '  so is the watchdog''s own message, and an id not in the outbox' (
+        (Box 'a' @('unsay outside-x-down')).Last -like 'REFUSED*' -and (Box 'a' @('unsay agent-a-9')).Last -eq 'NOT FOUND')
+    $r = Box 'a' @('check agent-a-1')
+    Yes 'check: asked to be taken back, the bot not there yet: UNSAY WAITING, exit 0' ($r.Last -eq 'UNSAY WAITING' -and $r.Code -eq 0)
+    New-Item -ItemType Directory -Path $botData -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $botData 'staff-unsaid.txt'), "agent-a-1`tfailed Forbidden`nagent-a-1`tdeleted`n", $enc)
+    $r = Box 'a' @('check agent-a-1')
+    Yes 'check: what the bot did last with it, UNSAID deleted, exit 0' ($r.Last -eq 'UNSAID deleted' -and $r.Code -eq 0)
+
     # ---- 3. the bot's reader takes it ----------------------------------------
     Fresh
     $r = Box 'cloud' @((SayLine 'for the bot'))
@@ -190,6 +236,9 @@ try {
     $probe = ''
     if ($py) {
         $env:DISCORD_TOKEN = 'not-a-real-token'
+        # bot.py writes roots.pem into its data folder when it is imported,
+        # which is bot\ itself in a checkout with no bot\data (#3220).
+        $env:THORNSWOOD_BOT_DATA = $tmp
         $code = @"
 import json, sys, time
 sys.path.insert(0, sys.argv[1])
@@ -211,7 +260,7 @@ for aid, text in due:
         $probe = @($said | Where-Object { $_ -match '^(SKIP|DUE) ' }) | Select-Object -Last 1
         $dueId = @($said | Where-Object { $_ -like 'ID *' } | ForEach-Object { $_.Substring(3) })
         $dueText = @($said | Where-Object { $_ -like 'TEXT *' } | ForEach-Object { ConvertFrom-Json $_.Substring(5) })
-        Remove-Item Env:DISCORD_TOKEN -ErrorAction SilentlyContinue
+        Remove-Item Env:DISCORD_TOKEN, Env:THORNSWOOD_BOT_DATA -ErrorAction SilentlyContinue
     }
     if ($probe -like 'DUE *') {
         Yes 'bot.py watch_alerts_due takes the line the box half wrote, with its text' (
@@ -226,25 +275,26 @@ for aid, text in due:
     # came on its input, the way sshd would.
     $bin = Join-Path $tmp 'bin'
     New-Item -ItemType Directory -Path $bin -Force | Out-Null
-    $standIn = Join-Path $tmp 'ssh-stand-in.ps1'
+    $standIn = Join-Path $tmp 'ssh-stand-in.js'
     $argsFile = Join-Path $tmp 'ssh-args.txt'
-    [IO.File]::WriteAllText($standIn, @"
-`$all = @(`$args | ForEach-Object { [string]`$_ })
-[IO.File]::WriteAllLines('$argsFile', [string[]]`$all)
-`$cmd = `$all[-1]
-`$from = if (`$cmd -match '-From ([a-z0-9-]+)`$') { `$Matches[1] } else { '' }
-`$in = @([Console]::In.ReadToEnd() -split '\r?\n' | Where-Object { `$_ })
-[IO.File]::WriteAllLines('$argsFile.in', [string[]]`$in)
-`$in | & '$shell' -NoProfile -NonInteractive -File '$box' -From `$from -Root '$root'
-exit `$LASTEXITCODE
-"@, $enc)
-    if ($env:OS -eq 'Windows_NT') {
-        [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), ('@"' + $shell + '" -NoProfile -NonInteractive -File "' + $standIn + '" %*' + "`r`n"), $enc)
-    } else {
-        $sh = Join-Path $bin 'ssh'
-        [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $shell + "' -NoProfile -NonInteractive -File '" + $standIn + "' `"`$@`"`n"), $enc)
-        & chmod 755 $sh
-    }
+    $sshHead = @"
+const fs = require('fs'), os = require('os'), cp = require('child_process');
+const all = process.argv.slice(2).map(String);
+
+"@
+    $sshBody = @"
+fs.writeFileSync($(Js $argsFile), all.map(a => a + os.EOL).join(''));
+const cmd = all[all.length - 1];
+const m = /-From ([a-z0-9-]+)`$/i.exec(cmd);
+const from = m ? m[1] : '';
+const lines = fs.readFileSync(0, 'utf8').split(/\r?\n/).filter(l => l);
+fs.writeFileSync($(Js "$argsFile.in"), lines.map(l => l + os.EOL).join(''));
+const r = cp.spawnSync($(Js $shell), ['-NoProfile', '-NonInteractive', '-File', $(Js $box), '-From', from, '-Root', $(Js $root), '-BotData', $(Js $botData)],
+  { input: lines.map(l => l + os.EOL).join(''), stdio: ['pipe', 'inherit', 'inherit'] });
+process.exit(r.status === null ? 1 : r.status);
+"@
+    [IO.File]::WriteAllText($standIn, ($sshHead + $sshBody), $enc)
+    Put-StandIn $bin 'ssh' $standIn
     Remove-Item Env:THORNSWOOD_NOTICE_KEY_B64, Env:THORNSWOOD_NOTICE_TOKEN -ErrorAction SilentlyContinue
     function SayStaff([string[]]$a) {
         $path = $env:PATH
@@ -271,6 +321,17 @@ exit `$LASTEXITCODE
     [IO.File]::WriteAllText((Join-Path $root 'alerts-sent-bot.txt'), "$id`r`n")
     $s = SayStaff @('-Check', $id)
     Yes '  and said by the bot is exit 0' ($s.Code -eq 0 -and $s.Out -match 'posted in #staff-updates, by the bot')
+    $s = SayStaff @('-From', 'claude', '-Unsay', $id)
+    Yes 'Say-Staff.ps1 -Unsay: asked, exit 0, and the ask is on the box' ($s.Code -eq 0 -and $s.Out -match ('asked the bot to take ' + $id + ' back') -and @([IO.File]::ReadAllLines((Join-Path $root 'alerts-unsay.txt'))) -contains $id)
+    $s = SayStaff @('-Check', $id)
+    Yes '  -Check while the bot has not done it is exit 2' ($s.Code -eq 2 -and $s.Out -match 'not done it yet')
+    New-Item -ItemType Directory -Path $botData -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $botData 'staff-unsaid.txt'), "$id`twebhook`n", $enc)
+    $s = SayStaff @('-Check', $id)
+    Yes '  and one the webhook said is exit 1, saying a person deletes it' ($s.Code -eq 1 -and $s.Out -match 'Manage Messages')
+    [IO.File]::WriteAllText((Join-Path $botData 'staff-unsaid.txt'), "$id`twithheld`n", $enc)
+    $s = SayStaff @('-Check', $id)
+    Yes '  and one never said is exit 0' ($s.Code -eq 0 -and $s.Out -match 'never posted')
 
     Remove-Item -LiteralPath $argsFile -ErrorAction SilentlyContinue
     $s = SayStaff @('-From', 'claude', '-Text', ('y' * 1801))
@@ -296,36 +357,30 @@ exit `$LASTEXITCODE
     # pins from there alone, never from a machine's own override file.
     $pin = [string]@((Get-Content -LiteralPath (P 'scripts', 'vps', 'vps.json') -Raw | ConvertFrom-Json).hostKeys)[0]
     $fpFile = Join-Path $tmp 'fingerprint.txt'
-    $keyscanIn = Join-Path $tmp 'ssh-keyscan-stand-in.ps1'
-    $keygenIn = Join-Path $tmp 'ssh-keygen-stand-in.ps1'
-    [IO.File]::WriteAllText($keyscanIn, "'127.0.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBoxhostkeystandin'`n", $enc)
+    $keyscanIn = Join-Path $tmp 'ssh-keyscan-stand-in.js'
+    $keygenIn = Join-Path $tmp 'ssh-keygen-stand-in.js'
+    [IO.File]::WriteAllText($keyscanIn, "process.stdout.write('127.0.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBoxhostkeystandin\n');`n", $enc)
     [IO.File]::WriteAllText($keygenIn, @"
-if (`$args -ccontains '-F') { exit 1 }
-if (`$args -ccontains '-l') { '256 ' + [IO.File]::ReadAllText('$fpFile').Trim() + ' 127.0.0.1 (ED25519)'; exit 0 }
-exit 1
+const a = process.argv.slice(2);
+if (a.includes('-F')) { process.exit(1); }
+if (a.includes('-l')) { const fs = require('fs'); fs.writeSync(1, '256 ' + fs.readFileSync($(Js $fpFile), 'utf8').trim() + ' 127.0.0.1 (ED25519)\n'); process.exit(0); }
+process.exit(1);
 "@, $enc)
-    foreach ($pair in @(@('ssh-keyscan', $keyscanIn), @('ssh-keygen', $keygenIn))) {
-        if ($env:OS -eq 'Windows_NT') {
-            [IO.File]::WriteAllText((Join-Path $bin ($pair[0] + '.cmd')), ('@"' + $shell + '" -NoProfile -NonInteractive -File "' + $pair[1] + '" %*' + "`r`n"), $enc)
-        } else {
-            $sh = Join-Path $bin $pair[0]
-            [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $shell + "' -NoProfile -NonInteractive -File '" + $pair[1] + "' `"`$@`"`n"), $enc)
-            & chmod 755 $sh
-        }
-    }
+    Put-StandIn $bin 'ssh-keyscan' $keyscanIn
+    Put-StandIn $bin 'ssh-keygen' $keygenIn
     # The ssh stand-in also keeps what the key and known_hosts files held
     # while it ran, since they are gone once Say-Staff.ps1 ends.
     $seenKey = Join-Path $tmp 'seen-key'
     $seenHosts = Join-Path $tmp 'seen-known-hosts'
-    $peek = Join-Path $tmp 'peek.ps1'
-    [IO.File]::WriteAllText($peek, @"
-`$all = @(`$args | ForEach-Object { [string]`$_ })
-`$i = [array]::IndexOf(`$all, '-i')
-if (`$i -ge 0) { Copy-Item -LiteralPath `$all[`$i + 1] -Destination '$seenKey' }
-`$k = @(`$all | Where-Object { `$_ -like 'UserKnownHostsFile=*' }) | Select-Object -First 1
-if (`$k) { Copy-Item -LiteralPath `$k.Substring(19) -Destination '$seenHosts' }
-"@, $enc)
-    [IO.File]::WriteAllText($standIn, ('. ''' + $peek + "' @args`n" + [IO.File]::ReadAllText($standIn)), $enc)
+    $peek = @"
+const copy = (from, to) => { try { fs.copyFileSync(from, to); } catch (e) { fs.writeSync(2, e.message + '\n'); } };
+const ki = all.indexOf('-i');
+if (ki >= 0) { copy(all[ki + 1], $(Js $seenKey)); }
+const kh = all.find(a => /^UserKnownHostsFile=/i.test(a));
+if (kh) { copy(kh.substring(19), $(Js $seenHosts)); }
+
+"@
+    [IO.File]::WriteAllText($standIn, ($sshHead + $peek + $sshBody), $enc)
     # A machine's own vps.json pinning something else, as an earlier job on
     # the runner account could leave: -OnTheBox goes by the repository's.
     $localVps = Join-Path $tmp 'local-vps.json'
@@ -377,36 +432,53 @@ if (`$k) { Copy-Item -LiteralPath `$k.Substring(19) -Destination '$seenHosts' }
     # writes down each call. The run's annotations come from a file per case.
     $bin2 = Join-Path $tmp 'bin2'
     New-Item -ItemType Directory -Path $bin2 -Force | Out-Null
-    $ghIn = Join-Path $tmp 'gh-stand-in.ps1'
+    $ghIn = Join-Path $tmp 'gh-stand-in.js'
     $ghCalls = Join-Path $tmp 'gh-calls.txt'
     $ghBody = Join-Path $tmp 'gh-body.json'
     $ghRun = Join-Path $tmp 'gh-run.json'
     $ghNotes = Join-Path $tmp 'gh-annotations.json'
+    # How many reads of run 77 are Not Found before it is served (-1: every
+    # one), whether its jobs read is refused, and whether the dispatch names
+    # no run (#3081).
+    $ghMiss = Join-Path $tmp 'gh-miss.txt'
+    $ghJobsRefused = Join-Path $tmp 'gh-jobs-refused.txt'
+    $ghNoRun = Join-Path $tmp 'gh-no-run.txt'
     [IO.File]::WriteAllText($ghIn, @"
-`$all = @(`$args | ForEach-Object { [string]`$_ })
-[IO.File]::AppendAllText('$ghCalls', ((`$all -join ' ') + "``n"))
-`$p = @(`$all | Where-Object { `$_ -like 'repos/*' }) | Select-Object -First 1
-if (`$all -contains '--input') { [IO.File]::WriteAllText('$ghBody', [Console]::In.ReadToEnd()) }
-switch -Regex (`$p) {
-    'actions/workflows/staff-notice\.yml/dispatches$' { '{"workflow_run_id":77,"run_url":"https://api.github.com/x/runs/77","html_url":"https://github.com/x/actions/runs/77"}'; exit 0 }
-    'actions/runs/77$' { [IO.File]::ReadAllText('$ghRun'); exit 0 }
-    'actions/runs/77/jobs$' { '{"total_count":1,"jobs":[{"id":555}]}'; exit 0 }
-    'check-runs/555/annotations$' { [IO.File]::ReadAllText('$ghNotes'); exit 0 }
+const fs = require('fs');
+const all = process.argv.slice(2).map(String);
+fs.appendFileSync($(Js $ghCalls), all.join(' ') + '\n');
+const p = all.find(a => /^repos\//i.test(a)) || '';
+if (all.some(a => a.toLowerCase() === '--input')) { fs.writeFileSync($(Js $ghBody), fs.readFileSync(0, 'utf8')); }
+// writeSync, so nothing is still unwritten when it exits.
+const say = s => { fs.writeSync(1, s + '\n'); process.exit(0); };
+const no = s => { fs.writeSync(2, s + '\n'); process.exit(1); };
+if (/actions\/workflows\/staff-notice\.yml\/dispatches`$/i.test(p)) {
+  if (fs.existsSync($(Js $ghNoRun))) { process.exit(0); }
+  say('{"workflow_run_id":77,"run_url":"https://api.github.com/x/runs/77","html_url":"https://github.com/x/actions/runs/77"}');
 }
-[Console]::Error.WriteLine('gh: Not Found (HTTP 404)')
-exit 1
+if (/actions\/runs\/77`$/i.test(p)) {
+  const miss = parseInt(fs.readFileSync($(Js $ghMiss), 'utf8'), 10);
+  if (miss !== 0) {
+    if (miss > 0) { fs.writeFileSync($(Js $ghMiss), String(miss - 1)); }
+    no('gh: Not Found (HTTP 404)');
+  }
+  say(fs.readFileSync($(Js $ghRun), 'utf8'));
+}
+if (/actions\/runs\/77\/jobs`$/i.test(p)) {
+  if (fs.existsSync($(Js $ghJobsRefused))) { no('gh: Server Error (HTTP 502)'); }
+  say('{"total_count":1,"jobs":[{"id":555}]}');
+}
+if (/check-runs\/555\/annotations`$/i.test(p)) { say(fs.readFileSync($(Js $ghNotes), 'utf8')); }
+no('gh: Not Found (HTTP 404)');
 "@, $enc)
-    if ($env:OS -eq 'Windows_NT') {
-        [IO.File]::WriteAllText((Join-Path $bin2 'gh.cmd'), ('@"' + $shell + '" -NoProfile -NonInteractive -File "' + $ghIn + '" %*' + "`r`n"), $enc)
-    } else {
-        $sh = Join-Path $bin2 'gh'
-        [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $shell + "' -NoProfile -NonInteractive -File '" + $ghIn + "' `"`$@`"`n"), $enc)
-        & chmod 755 $sh
-    }
+    Put-StandIn $bin2 'gh' $ghIn
     $done = '{"status":"completed","conclusion":"success","path":".github/workflows/staff-notice.yml","html_url":"https://github.com/x/actions/runs/77"}'
     function Note([string]$level, [string]$title, [string]$message) { return @{ annotation_level = $level; title = $title; message = $message } }
-    function ThroughGitHub([string[]]$a, [string]$run, [object[]]$notes) {
-        Remove-Item -LiteralPath $ghCalls, $ghBody -ErrorAction SilentlyContinue
+    function ThroughGitHub([string[]]$a, [string]$run, [object[]]$notes, [int]$miss = 0, [switch]$jobsRefused, [switch]$noRun) {
+        Remove-Item -LiteralPath $ghCalls, $ghBody, $ghJobsRefused, $ghNoRun -ErrorAction SilentlyContinue
+        [IO.File]::WriteAllText($ghMiss, [string]$miss, $enc)
+        if ($jobsRefused) { [IO.File]::WriteAllText($ghJobsRefused, 'yes', $enc) }
+        if ($noRun) { [IO.File]::WriteAllText($ghNoRun, 'yes', $enc) }
         [IO.File]::WriteAllText($ghRun, $run, $enc)
         [IO.File]::WriteAllText($ghNotes, (ConvertTo-Json -InputObject @($notes) -Compress), $enc)
         $path = $env:PATH
@@ -448,6 +520,23 @@ exit 1
     Yes '-Run reads that run''s answer, starting nothing' ($g.Code -eq 0 -and $g.Out -match 'by the bot' -and $null -eq $g.Body)
     $g = ThroughGitHub @('-Run', '77') $done.Replace('staff-notice.yml', 'build.yml') @((Note 'notice' 'Say-Staff' 'POSTED bot'))
     Yes '  and refuses a run of another workflow' ($g.Code -eq 1 -and $g.Out -match 'not a staff-notice run')
+
+    # #3081: the dispatch names the run before every read of GitHub serves it.
+    $runReads = { param($calls) @($calls | Where-Object { $_ -eq 'api repos/EvilPatrick06/Thornswood/actions/runs/77' }).Count }
+    $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued)) 1
+    Yes 'a started run GitHub does not serve yet is waited for, then read: queued, exit 0, no stop' (
+        $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-' -and $g.Out -match 'does not serve the new run yet' -and $g.Out -notmatch 'STOP' -and (& $runReads $g.Calls) -eq 2)
+    $g = ThroughGitHub @('-Text', $text, '-WaitMinutes', '0') $done @() -1
+    Yes '  one still not served by -WaitMinutes is exit 2 with the -Run line, not a stop' (
+        $g.Code -eq 2 -and $g.Out -match 'not served by GitHub yet' -and $g.Out -match 'Say-Staff\.ps1 -Run 77' -and $g.Out -notmatch 'STOP')
+    $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued)) 0 -jobsRefused
+    Yes '  a read that fails after the start says the notice was sent, exit 2, with the -Run line' (
+        $g.Code -eq 2 -and $g.Out -match 'the notice was sent: GitHub started run 77' -and $g.Out -match 'HTTP 502' -and $g.Out -match 'Say-Staff\.ps1 -Run 77' -and $g.Out -notmatch 'STOP')
+    $g = ThroughGitHub @('-Text', $text) $done @() 0 -noRun
+    Yes '  a start that names no run says the notice was sent and where its runs are, exit 2' (
+        $g.Code -eq 2 -and $g.Out -match 'the notice was sent' -and $g.Out -match 'actions/workflows/staff-notice\.yml' -and $g.Out -notmatch 'STOP')
+    $g = ThroughGitHub @('-Run', '77') $done @() -1
+    Yes '-Run of a run GitHub does not have stops at once, exit 1' ($g.Code -eq 1 -and $g.Out -match 'STOP\..*HTTP 404' -and (& $runReads $g.Calls) -eq 1)
 
     # ---- 5. Grant-BoxAccess.ps1's notices key ------------------------------
     $gast = $asts[$grantPath]
@@ -548,8 +637,11 @@ function icacls { }
     $c = EnvCase @{ ("GET " + $envPath) = @(1, 'gh: Must have admin rights to Repository. (HTTP 403)') }
     Yes '  GitHub refusing the read stops it, changing nothing' ($c.Err -match '^DIE .*HTTP 403' -and $c.Changes.Count -eq 0)
     $grantText = [IO.File]::ReadAllText($grantPath)
+    # The same line sets the desk's DESK_KEY_B64 for -Deploy (#2841), so the
+    # name is a variable that is NOTICE_KEY_B64 for every other key.
     Yes 'the key goes to gh secret set NOTICE_KEY_B64 for that environment on its standard input, and to no file' (
-        $grantText -match [regex]::Escape('[Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) | & gh secret set NOTICE_KEY_B64 --env $ToEnvironment --repo $GitHubRepo') -and
+        $grantText.Contains("`$SecretName = if (`$Deploy) { 'DESK_KEY_B64' } else { 'NOTICE_KEY_B64' }") -and
+        $grantText -match [regex]::Escape('[Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) | & gh secret set $SecretName --env $ToEnvironment --repo $GitHubRepo') -and
         $grantText.IndexOf('if ($ToEnvironment) {', $grantText.IndexOf('Proving the new key through the bridge')) -lt $grantText.IndexOf('notice-access.txt', $grantText.IndexOf('Proving the new key through the bridge')))
     Yes '  and the environment is settled before the box is touched' ($grantText.IndexOf('Set-MainOnlyEnvironment $ToEnvironment') -lt $grantText.IndexOf('Get-BoxChangeScript $Name'))
 

@@ -52,39 +52,46 @@ $null = New-Item -ItemType Directory -Force -Path $bin
 # offbox.txt, writes the name it was given into FAKE_MARK and says MARKED
 # (nothing at all when FAKE_MARK_REFUSE is set); the fake scp copies from
 # FAKE_SRC, and copies only FAKE_SHORT_BYTES bytes of the file FAKE_SHORT.
-Set-Content -LiteralPath (Join-Path $bin 'ssh.ps1') -Encoding ASCII -Value @'
-$cmd = '' + $args[-1]
-$said = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($cmd.Substring($cmd.LastIndexOf(' ') + 1)))
-if ($said -match "offbox\.txt' -Value '([^']+)'") {
-  if ($env:FAKE_MARK_REFUSE) { exit 1 }
-  Set-Content -LiteralPath $env:FAKE_MARK -Value ($said -replace '^.*-LiteralPath ''([^'']+)''.*$', '$1') -Encoding ASCII
-  Add-Content -LiteralPath $env:FAKE_MARK -Value $Matches[1] -Encoding ASCII
-  'MARKED'
-  exit 0
+# Both are node, not PowerShell (#3168): the ten runs start them 35 times,
+# and a PowerShell start costs the box about ten times a node start.
+$node = (Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1)
+if (-not $node) { Write-Host 'FAIL  node is not on PATH, and the fake ssh and scp are node'; exit 1 }
+$node = $node.Source
+Set-Content -LiteralPath (Join-Path $bin 'ssh.js') -Encoding ASCII -Value @'
+const fs = require('fs');
+const cmd = String(process.argv[process.argv.length - 1]);
+const said = Buffer.from(cmd.slice(cmd.lastIndexOf(' ') + 1), 'base64').toString('utf16le');
+const m = /offbox\.txt' -Value '([^']+)'/.exec(said);
+if (m) {
+  if (process.env.FAKE_MARK_REFUSE) { process.exit(1); }
+  const at = /-LiteralPath '([^']+)'/.exec(said);
+  fs.writeFileSync(process.env.FAKE_MARK, (at ? at[1] : said) + '\r\n' + m[1] + '\r\n', 'ascii');
+  process.stdout.write('MARKED\n');
+  process.exit(0);
 }
-Get-Content -LiteralPath $env:FAKE_LIST
-exit 0
+process.stdout.write(fs.readFileSync(process.env.FAKE_LIST));
 '@
 # Each is started through a .cmd on Windows; elsewhere through a shell script,
 # since only Windows runs a .cmd (#2989).
 function Put-Launcher([string]$name) {
     if ($OnWindows) {
-        Set-Content -LiteralPath (Join-Path $bin "$name.cmd") -Encoding ASCII -Value ('@"' + $exe + '" -NoProfile -ExecutionPolicy Bypass -File "%~dp0' + $name + '.ps1" %*')
+        Set-Content -LiteralPath (Join-Path $bin "$name.cmd") -Encoding ASCII -Value ('@"' + $node + '" "%~dp0' + $name + '.js" %*')
     } else {
-        Set-Content -LiteralPath (Join-Path $bin $name) -Encoding ASCII -NoNewline -Value ("#!/bin/sh`nexec '" + $exe + "' -NoProfile -File '" + (Join-Path $bin "$name.ps1") + "' ""`$@""`n")
+        Set-Content -LiteralPath (Join-Path $bin $name) -Encoding ASCII -NoNewline -Value ("#!/bin/sh`nexec '" + $node + "' '" + (Join-Path $bin "$name.js") + "' ""`$@""`n")
         & chmod 755 (Join-Path $bin $name)
     }
 }
 Put-Launcher 'ssh'
-Set-Content -LiteralPath (Join-Path $bin 'scp.ps1') -Encoding ASCII -Value @'
-$src = $args[-2]; $dst = $args[-1]
-$name = $src.Substring($src.LastIndexOf('/') + 1)
-$from = Join-Path $env:FAKE_SRC $name
-if (-not (Test-Path -LiteralPath $from)) { exit 1 }
-$b = [IO.File]::ReadAllBytes($from)
-if ($env:FAKE_SHORT -eq $name) { $b = $b[0..([int]$env:FAKE_SHORT_BYTES - 1)] }
-[IO.File]::WriteAllBytes($dst, $b)
-exit 0
+Set-Content -LiteralPath (Join-Path $bin 'scp.js') -Encoding ASCII -Value @'
+const fs = require('fs'), path = require('path');
+const a = process.argv.slice(2);
+const src = String(a[a.length - 2]), dst = String(a[a.length - 1]);
+const name = src.slice(src.lastIndexOf('/') + 1);
+const from = path.join(process.env.FAKE_SRC, name);
+if (!fs.existsSync(from)) { process.exit(1); }
+let b = fs.readFileSync(from);
+if (process.env.FAKE_SHORT === name) { b = b.subarray(0, parseInt(process.env.FAKE_SHORT_BYTES, 10)); }
+fs.writeFileSync(dst, b);
 '@
 Put-Launcher 'scp'
 

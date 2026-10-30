@@ -30,6 +30,35 @@ const https  = require('https');
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
+const tls    = require('tls');
+
+/* node server.js --strip-metadata <folder> (#3648): takes what each picture
+   and recording in the folder says about where and when it was made out of
+   it, as stripMedia does to every upload, says what it did, and stops. The
+   site is not started. scripts/vps/Strip-Uploads.ps1 runs it on the box. */
+if (process.argv[2] === '--strip-metadata') process.exit(stripFolder(process.argv[3]));
+
+/* NO eMUDHRA ROOT (#3111). Every request this process makes, discord.com with
+   the bot token and the webhooks among them, verified against Node's bundled
+   roots, which are Mozilla's from when this Node was built and carry all four
+   of eMudhra's emSign roots. emSign ECC Root CA - G3 is the root of the eight
+   intermediates found on 17 Oct 2026 with keys anyone could recover (Mozilla
+   bug 2083449), and Node checks no revocation list, so a certificate made with
+   one of those keys was enough to sit between this site and Discord. Mozilla
+   still lists G1, and takes C1 and C3 out only in NSS 3.132, so a newer Node
+   does not end it either. Nothing this site talks to chains to eMudhra, so
+   its roots are what Node trusts by default less each one whose subject or
+   issuer is eMudhra's, set once here before any connection is made, and
+   bot\trust.py leaves out the same for the bot. Taking away is all this does:
+   a root Node drops leaves with the next Node. */
+const NOT_TRUSTED = /O=eMudhra/i;
+const LEFT_OUT = [];
+tls.setDefaultCACertificates(tls.getCACertificates('default').filter((pem) => {
+  const c = new crypto.X509Certificate(pem);
+  if (!NOT_TRUSTED.test(c.subject) && !NOT_TRUSTED.test(c.issuer)) return true;
+  LEFT_OUT.push((c.subject.match(/^CN=(.*)$/m) || [null, c.subject])[1]);
+  return false;
+}));
 
 const PORT   = Number(process.env.THORNSWOOD_DOCS_PORT || 3001);
 /* LOOPBACK UNLESS ASKED (#2185). Caddy holds 443 and hands everything on from
@@ -52,6 +81,12 @@ const UP     = path.join(ROOT, 'uploads');
    granted read on this folder only (scripts\vps\Bot-Service.ps1), so it never
    reaches the site's own records beside it, sessions.json among them. */
 const FOR_BOT = path.join(DATA, 'for-bot');
+/* And the other way round (issue #3140): what the bot writes for the site and
+   nothing else, lists.json, the Known Issues page and the roadmap it builds
+   from the issue board. The bot's account is given Modify on this folder only
+   (Bot-Service.ps1), so it writes nothing else of the site's. */
+const FROM_BOT = path.join(DATA, 'from-bot');
+const LISTS = path.join(FROM_BOT, 'lists.json');
 
 // ==== thornswood site log ====
 //
@@ -318,15 +353,25 @@ let cfg = {
   */
   open: false,
   access: {
-    admin:  ['Owner', 'Dev'],
-    play:   ['Owner', 'Dev', 'Moderator', 'Gamemaster', 'Loremaster',
-             'Content Creator', 'Playtester'],
+    // #3317 (Patrick, 22 Oct): every staff role plays the main build, with
+    // Playtester; the site's admin pages are Owner, Co-Owner and the Dev rank.
+    admin:  ['Owner', 'Co-Owner', 'Lead Dev', 'Dev'],
+    play:   ['Owner', 'Co-Owner', 'Lead Dev', 'Lead Gamemaster', 'Lead Loremaster',
+             'Lead Moderator', 'Lead Content Creator', 'Lead Support', 'Dev',
+             'Gamemaster', 'Trial Gamemaster', 'Loremaster', 'Moderator',
+             'Content Creator', 'Support', 'Playtester'],
     banned: ['Banned']
   },
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
   admins: [],            // discord ids, an override for when the bot is down
   secret: '',
-  passKey: ''            // signs join passes; the game servers hold a copy (#937)
+  passKey: '',           // signs join passes; the game servers hold a copy (#937)
+  /* Cloudflare Turnstile on the report form (#3216). The site key goes to the
+     page and is public; the secret is what the site checks a pass with, and
+     lives only here. Both are set on the box by Set-Turnstile.ps1. Either one
+     empty, as on a copy on your machine, means no widget and no check. */
+  turnstileSiteKey: '',
+  turnstileSecret: ''
 };
 /* The byte order mark matters. Windows PowerShell puts one on the front of
    anything it writes with -Encoding UTF8, JSON.parse refuses a string that
@@ -355,21 +400,31 @@ cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // The one switch (#428). Only a real true opens it: "true", 1 or a typo does not.
 cfg.open = cfg.open === true;
 cfg.access.play = playRoles(cfg.access.play, cfg.open);
-// Who may use the dev build and join the dev server. Left out of config.json
-// it is the Discord staff roles, the same set the bot's STAFF_ROLES names
-// (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
-// staff, bot.py). Patrick's call on 27 September for the dev-build install gate
-// (#605): the dev build is for staff, not the admin pair alone. It folds
-// access.admin in through out.dev below, so widening admin still widens dev.
-// Add role names here to widen it further.
+// Who is staff in the game: the staff seats over the most the world holds,
+// the game's staff powers (devProfiles), and the uploads queue. Since #3317
+// (Patrick, 22 Oct) it is the staff who work in the world: Owner and
+// Co-Owner, and the Dev, Gamemaster and Loremaster ranks with their leads.
+// Moderators moderate the Discord only, and Content Creator and Support work
+// in the Discord, so none of them is staff in the game. It folds access.admin
+// in through out.dev below, so widening admin still widens it.
 if (!Array.isArray(cfg.access.dev)) {
-  cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
+  cfg.access.dev = ['Owner', 'Co-Owner', 'Lead Dev', 'Dev', 'Lead Gamemaster',
+                    'Gamemaster', 'Trial Gamemaster', 'Lead Loremaster', 'Loremaster'];
+}
+// Who may use the dev build and join the dev server (#605, the install gate).
+// Patrick, 22 Oct (#3317): "Dev build: Owner, Co-Owner, Dev and the leads
+// only". Every lead of the council is in it, a lead whose rank is not staff
+// in the game included. It folds access.admin in through out.devBuild below.
+if (!Array.isArray(cfg.access.devBuild)) {
+  cfg.access.devBuild = ['Owner', 'Co-Owner', 'Lead Dev', 'Lead Gamemaster',
+                         'Lead Loremaster', 'Lead Moderator', 'Lead Content Creator',
+                         'Lead Support', 'Dev'];
 }
 // Who the Free Skyrim Trading Company has taken on (#1393): an application in
 // Discord, the same shape as a Jarl's, and a person gives the role. The game
 // lets them handle a company sale.
 if (!Array.isArray(cfg.access.company)) {
-  cfg.access.company = ['Trading Company'];
+  cfg.access.company = ['Free Skyrim Trading Company'];
 }
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
@@ -458,7 +513,7 @@ if (tellPassword) {
 // A folder that cannot be made is said (#2736), by its path and the error
 // code; every read and write under it fails after this, and the line here is
 // the one that says why.
-for (const dir of [DATA, FOR_BOT, PUBLIC, FILES, UP]) {
+for (const dir of [DATA, FOR_BOT, FROM_BOT, PUBLIC, FILES, UP]) {
   try { fs.mkdirSync(dir, { recursive: true }); }
   catch (e) { console.error('[thornswood-docs] could not make ' + dir + ' (' + (e.code || e.message) + ')'); }
 }
@@ -492,17 +547,15 @@ const DOCS = {
 /* Boards. A board is sections, each section a table with its own columns, so
    a column can be added to one without touching the rest.
 
-   KNOWN ISSUES IS A BOARD, AND THE ONLY COPY (#2414). Until 12 October the
-   text was kept twice, data/known.md for /known and a known board here that
-   nothing showed and, after the hub stopped editing boards (#433), nothing
-   could edit, so it went stale (it still said NPCs stand still with nobody
-   near after #504). Patrick, 12 October: the hub board is the one source.
-   So /known and /api/page/known are this board rendered (knownMarkdown,
-   below), the hub edits it at /hub/known, and known.md is gone. */
+   KNOWN ISSUES AND THE ROADMAP ARE NOT BOARDS ANY MORE (#3140). Both were
+   typed here, and both went stale: the known board kept NPC behaviour #504
+   had fixed, and the roadmap called the emote wheel unstarted while it
+   shipped. Patrick: build them from the board's labels. The bot, which reads
+   the issue board for #known-issues, writes both into data/from-bot/lists.json
+   and the site draws them from there (THE KNOWN ISSUES PAGE AND THE ROADMAP,
+   below). */
 const BOARDS = {
   active:      'Active Issues',
-  known:       'Known Issues',
-  roadmap:     'Roadmap',
   suggestions: 'Suggestions',
   archive:     'Archive',
   todo:        'Patrick'
@@ -527,11 +580,9 @@ const BOARDS = {
    The page now matches the doors behind it. The linked accounts are 'staff'
    since #1010, because that page is where staff ban, PK and write notes, and
    every staff role may. The other two stay 'admin': the play sessions and
-   the report inbox. Known Issues is 'admin' like every board: a board is
-   saved through the admins-only door (#2414). */
+   the report inbox. */
 const LEVEL = {
-  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin',
-  known: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -543,9 +594,9 @@ const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/join',
                       // Known Issues and Help are for the person whose install
                       // will not start or who cannot sign in, so they cannot
                       // sit behind the sign in. Help is help.md in the data
-                      // folder and Known Issues is the known board rendered
-                      // (#2414), both read through /api/page like the site
-                      // pages. The hub edits Known Issues at /hub/known.
+                      // folder and Known Issues is written from the issue
+                      // board (#3140), both read through /api/page like the
+                      // site pages.
                       '/known', '/help',
                       // What is kept about somebody and what they are
                       // agreeing to cannot sit behind a sign in, because
@@ -559,26 +610,28 @@ const SITE = path.join(DATA, 'site');
 
 /* What a link to each page says when it is pasted into Discord. Every address
    used to unfurl with the same generic home text, so a link to the rules and a
-   link to the roadmap read identically in a channel. home.html carries the
-   same list for the browser tab; this is the one a crawler sees, because a
-   crawler does not run the page's script. */
+   link to the roadmap read identically in a channel. This is the only copy:
+   the page is sent with its title, description and og tags already written
+   from it (publicDiscovery and the route below), so the browser tab and a
+   crawler read the same words. home.js kept a second list for the tab until
+   #3138, and the two had drifted apart on two pages. */
 const BLURB = {
   '/':          ['Thornswood', 'A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.'],
   '/world':     ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
   '/rules':     ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
-  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
+  '/join':      ['How to join', 'What you need, how to apply, and what happens between pressing Play and arriving in your town.'],
   '/credits':   ['Credits', 'Everyone whose work Thornswood is built on.'],
-  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make armour, so you find somebody who can.'],
-  '/known':     ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
+  '/classes':   ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make steel armour, so you find somebody who can.'],
+  '/known':     ['Known issues', 'What is broken right now that the team already knows about, each one on the board to be fixed. Read this before reporting anything.'],
   '/help':      ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
   '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
   '/roadmap':   ['Roadmap', 'What is being worked on and roughly in what order.'],
   '/news':      ['Every release', 'What changed, newest first. The same list the launcher shows.'],
-  '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
+  '/report':    ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
   '/gallery':   ['From the world', 'Pictures taken by people playing.'],
-  '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
+  '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no tracking cookie.'],
   '/terms':     ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
-  '/cookies':   ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
+  '/cookies':   ['Cookies', 'Every cookie and piece of browser storage this site uses: sign-in and the eighteen-and-over gate. No advertising cookie.']
 };
 const escAttr = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -715,60 +768,165 @@ function pageHtml(md) {
   return '<pre class="pre-wrap">' + escAttr(md) + '</pre>';
 }
 /*
-  THE KNOWN ISSUES PAGE, WRITTEN OUT OF ITS BOARD (#2414).
+  THE KNOWN ISSUES PAGE AND THE ROADMAP, FROM THE ISSUE BOARD (#3140).
 
-  The board is the one copy and the hub edits it; this turns it into the
-  markdown /known and /api/page/known serve. Its intro under the title, then
-  each section as a heading, its note, and its table. A row ticked done in
-  the hub is fixed, so it leaves the page. A section with no note and nothing
-  left in its table is left out. A cell is one table cell whatever is typed in
-  it: a | is escaped and a line break becomes a space, so a row cannot split
-  the table (a <br> would not do: the page renderer refuses HTML and would
-  show it as typed). The seed was taken from known.md, so this writes that
-  page back byte for byte.
+  Both used to be boards typed into board.json, and both went stale. Now the
+  bot builds them from the board each time it reads it for #known-issues
+  (bot.py, "the site's known issues and roadmap") and writes them into
+  data/from-bot/lists.json:
+
+    { at: when the bot read the board,
+      known: [{ title, text, where: ['Main', 'Dev'] }],
+      roadmap: { lanes: [{ name, rows: [{ title, text }] }] } }
+
+  known is the #known-issues forum's list, word for word: an open issue
+  labelled Main Findings or Dev Findings whose fix has not landed, in the
+  words of its last "Known issue:" comment. roadmap is every open issue
+  labelled roadmap: now, next or later, in that lane, in the words of its
+  last "Roadmap:" comment; there is no Done lane (Patrick, 26 Oct).
+
+  These two turn the file into what /known (and /api/page/known) and /roadmap
+  (and /api/roadmap) serve. A part the file does not hold, or a file that is
+  not there or will not read, is said on the page as not read, never drawn as
+  an empty list: an empty list says nothing is broken. The time of the read is
+  on both pages, so a bot that stopped writing shows as an old date.
 */
-// ==== thornswood known board ====
-function knownMarkdown(title, b) {
-  const board = b && typeof b === 'object' ? b : {};
-  const text = (v) => String(v == null ? '' : v).replace(/\r\n/g, '\n').trim();
-  const cell = (v) => text(v).replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
-  const out = ['# ' + title, ''];
-  if (text(board.intro)) out.push(text(board.intro), '');
-  for (const sec of (Array.isArray(board.sections) ? board.sections : [])) {
-    if (!sec || typeof sec !== 'object') continue;
-    const cols = Array.isArray(sec.columns) ? sec.columns.filter((c) => c && c.id) : [];
-    const rows = (Array.isArray(sec.rows) ? sec.rows : []).filter((r) => r && !r.done);
-    const note = text(sec.note);
-    const table = cols.length && rows.length;
-    if (!note && !table) continue;
-    out.push('## ' + text(sec.name), '');
-    if (note) out.push(note, '');
-    if (table) {
-      out.push('| ' + cols.map((c) => cell(c.name)).join(' | ') + ' |');
-      out.push('|' + cols.map(() => '---').join('|') + '|');
-      for (const r of rows) {
-        out.push('| ' + cols.map((c) => cell((r.cells || {})[c.id])).join(' | ') + ' |');
-      }
-      out.push('');
-    }
+// ==== thornswood lists ====
+const KNOWN_INTRO = 'What is broken right now that the team already knows about. Each one is\n' +
+  'on the issue board to be fixed, and comes off this page as soon as work on\n' +
+  'it is merged.';
+const ROADMAP_INTRO = 'What is being built and roughly in what order. Nothing here has a date on it, because a date would be a guess.\n\n' +
+  'Things move up this list when somebody starts on them, not when they are announced.';
+const LIST_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// "26 Oct 2026, 8:05 AM UTC", or null for a time that will not read.
+function listTime(at) {
+  const d = new Date(String(at || ''));
+  if (!at || isNaN(d.getTime())) return null;
+  const h = d.getUTCHours(), m = d.getUTCMinutes();
+  return d.getUTCDate() + ' ' + LIST_MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear() + ', ' +
+    (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM') + ' UTC';
+}
+function listText(v) { return String(v == null ? '' : v).replace(/\r\n/g, '\n').trim(); }
+// Where a known issue was found, in words.
+function knownWhere(where) {
+  const w = (Array.isArray(where) ? where : []).map(String);
+  const words = [];
+  if (w.indexOf('Main') >= 0) words.push('main');
+  if (w.indexOf('Dev') >= 0) words.push('the dev server');
+  return words.length ? 'Found on ' + words.join(' and ') + '.' : '';
+}
+// The Known Issues page's markdown out of lists.json's contents (or null).
+function knownMarkdown(lists) {
+  const out = ['# Known Issues', '', KNOWN_INTRO, ''];
+  const at = listTime(lists && lists.at);
+  const known = lists && Array.isArray(lists.known) ? lists.known : null;
+  if (!known || !at) {
+    out.push('The list could not be read from the issue board just now. Try again in a few', 'minutes, and report a problem as usual in the meantime.');
+    return out.join('\n') + '\n';
   }
-  while (out.length && out[out.length - 1] === '') out.pop();
+  const rows = known.filter((k) => k && listText(k.title));
+  out.push('## Broken right now', '');
+  if (!rows.length) out.push('Nothing is listed right now.', '');
+  else out.push('Report one of these only if it does something this page does not describe.', '');
+  for (const k of rows) {
+    out.push('### ' + listText(k.title).replace(/\s*\n\s*/g, ' '), '');
+    if (listText(k.text)) out.push(listText(k.text), '');
+    const where = knownWhere(k.where);
+    if (where) out.push('*' + where + '*', '');
+  }
+  out.push('*Read from the issue board ' + at + '.*');
   return out.join('\n') + '\n';
 }
-// ==== end thornswood known board ====
+// The roadmap as /api/roadmap hands it to the front page and /roadmap draws
+// it: its intro, a section per lane (columns What and Where it stands, so a
+// lane reads like the board it replaced), when it was read, and unread when
+// the file held no roadmap.
+function roadmapBoard(lists) {
+  const at = listTime(lists && lists.at);
+  const rm = lists && lists.roadmap && Array.isArray(lists.roadmap.lanes) ? lists.roadmap : null;
+  const board = { intro: ROADMAP_INTRO, sections: [], at: at || '', unread: !rm || !at };
+  if (board.unread) return board;
+  rm.lanes.forEach((lane, i) => {
+    if (!lane || !listText(lane.name)) return;
+    board.sections.push({
+      id: 'lane' + i, name: listText(lane.name), note: '',
+      columns: [{ id: 'what', name: 'What' }, { id: 'where', name: 'Where it stands' }],
+      rows: (Array.isArray(lane.rows) ? lane.rows : []).filter((r) => r && listText(r.title)).map((r, j) => ({
+        id: 'lane' + i + 'r' + j, done: false,
+        cells: { what: listText(r.title), where: listText(r.text) } }))
+    });
+  });
+  return board;
+}
+// ==== end thornswood lists ====
 
 // A written page's markdown, or null. Help lives in the data folder with the
-// other documents, not under site; Known Issues is its board (#2414).
+// other documents, not under site; Known Issues is written from the issue
+// board, by way of the bot's lists.json (#3140).
 function pageMarkdown(name) {
   if (name === 'known') {
-    const b = readBoard().known;
-    if (!b || typeof b !== 'object') return null;
-    try { return forMode(knownMarkdown(BOARDS.known, b), cfg.open); } catch (e) { return null; }
+    try { return forMode(knownMarkdown(readLists()), cfg.open); } catch (e) { return null; }
   }
   const dir = PUBLIC_DOCS.indexOf(name) >= 0 ? DATA : SITE;
   const file = path.join(dir, name + '.md');
   if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
   try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
+}
+
+// The hints and lore lines (#3147): data\site\lines.md is the one copy of
+// them. The front page's lore line comes out of it as the page is served,
+// and /api/public hands the lot out, which is where the Discord bot reads its
+// status lines. The file's own comment says its rules, and
+// tests\test-3147-lines.js holds them, so nothing here checks a line again.
+// ==== thornswood lines ====
+function parseLines(md) {
+  const out = { hints: [], lore: [] };
+  let list = null, last = null;
+  String(md == null ? '' : md).replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/).forEach(function (l) {
+    const head = /^##\s+(.*?)\s*$/.exec(l);
+    if (head) {
+      list = /^hints$/i.test(head[1]) ? 'hints' : /^lore lines$/i.test(head[1]) ? 'lore' : null;
+      last = null;
+      return;
+    }
+    if (!list) return;
+    const item = /^- (.*?)\s*$/.exec(l);
+    if (item) {
+      if (list === 'hints') { out.hints.push(item[1]); last = null; }
+      else { last = { text: item[1], from: '' }; out.lore.push(last); }
+      return;
+    }
+    // The source of a lore line, on the line under it.
+    const from = /^ {2}(\S.*?)\s*$/.exec(l);
+    if (from && last && !last.from) last.from = from[1];
+  });
+  return out;
+}
+
+// home.html's lore line, the empty quote under The World, filled with one
+// line picked at pick (0 to 1, Math.random() when served). With no lore line
+// to show it stays empty and hidden.
+function fillLoreLine(html, lore, pick) {
+  const esc = function (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+  const list = Array.isArray(lore) ? lore : [];
+  if (!list.length) return html;
+  const one = list[Math.min(list.length - 1, Math.floor(pick * list.length))];
+  return html.replace('<blockquote class="chron" id="loreLine" hidden></blockquote>', () =>
+    '<blockquote class="chron" id="loreLine">' + esc(one.text) +
+    (one.from ? '<cite>' + esc(one.from) + '</cite>' : '') + '</blockquote>');
+}
+// ==== end thornswood lines ====
+
+function readLines() {
+  try {
+    return parseLines(forMode(fs.readFileSync(path.join(SITE, 'lines.md'), 'utf8'), cfg.open));
+  } catch (e) {
+    console.error('[thornswood-docs] could not read data/site/lines.md, so the front page shows ' +
+                  'no lore line and /api/public no lines: ' + e.message);
+    return { hints: [], lore: [] };
+  }
 }
 
 // The credits page says which engine each server runs. That is a fact of the
@@ -945,6 +1103,139 @@ function feedFile(channel) {
 function readJsonQuiet(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { return null; }
 }
+
+/* ---- release copies (#3686) ----
+   DOWNLOADS COME FROM THIS REPOSITORY'S RELEASES (Patrick, 26 Oct, for going
+   public). Every launcher of every age asks this site for its files, at
+   /feed[-dev]/assets/<sha256>, and that never changes: a launcher from 1.2.6
+   on builds each address from the feed's own folder (feedSplit, and Sync.cs
+   AssetFolder for a record's files), and older ones were given these
+   addresses in their feeds. What moves is where the bytes come from.
+   release-files.yml puts every file a release names on a GitHub Release, on
+   the release's own tag (release/main/<id>, release/dev/<id>), each named by
+   its sha256. Here, once GitHub says publicly that the Release of the feed's
+   current release holds a file, under that name, with that sha256 as its own
+   digest and with this site's size, the asset route answers 302 to the
+   Release's copy instead of sending the bytes. Every launcher since before
+   25 Sep follows a redirect and allows github.com and its download hosts
+   (Updater.cs AllowedHosts), and still checks the sha256 of what it gets.
+
+   Only what GitHub answers without a token counts, so while the repository
+   is private, or the Release is still a draft being filled, the answer is
+   404 and the site sends the bytes itself, as it always has; the site's copy
+   is also what any release the Release does not hold is served from. A
+   Release once seen is kept: release-files.yml publishes it only after every
+   file is on it, and never replaces a file of a published one. One that is
+   not there yet is asked about again RELEASE_LOOK_MS later, never sooner,
+   which keeps the site inside GitHub's sixty unsigned calls an hour. The
+   lookup never holds a download: the request that starts it is served from
+   here. tests/test-release-copies.js drives this block. */
+const RELEASE_REPO = 'EvilPatrick06/Thornswood';
+const RELEASE_DOWNLOAD = 'https://github.com/' + RELEASE_REPO + '/releases/download/';
+const RELEASE_LOOK_MS = 10 * 60 * 1000;
+const RELEASE_TAG_RE = /^release\/(main|dev)\/\d{8}-\d{4,6}(-dev)?$/;
+const releaseCopies = {};   // tag -> { files: { sha: { url, size } }, installer, seen } once found; { at, busy } while not
+const releaseTagOf = {};    // feed generation file -> the release tag it names, or ''
+function releaseGitHub(apiPath) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (v) => { if (!settled) { settled = true; clearTimeout(timer); resolve(v); } };
+    const req = https.get({
+      hostname: 'api.github.com', path: '/repos/' + RELEASE_REPO + apiPath,
+      headers: { 'user-agent': 'thornswood-site', accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' }
+    }, (res) => {
+      let out = '';
+      res.setEncoding('utf8');
+      res.on('data', (d) => { out += d; });
+      res.on('error', (e) => settle({ status: 0, why: e.message }));
+      res.on('end', () => {
+        if (res.statusCode !== 200) return settle({ status: res.statusCode, why: 'GitHub answered ' + res.statusCode });
+        try { settle({ status: 200, body: JSON.parse(out) }); }
+        catch (e) { settle({ status: 0, why: 'GitHub\'s answer did not read' }); }
+      });
+    });
+    const timer = setTimeout(() => { settle({ status: 0, why: 'GitHub did not answer inside ten seconds' }); req.destroy(); }, 10000);
+    req.on('error', (e) => settle({ status: 0, why: 'could not reach GitHub: ' + e.message }));
+  });
+}
+// The files of one published Release, from GitHub without a token. Only an
+// asset whose name is the sha256 GitHub itself measured on it counts, and
+// the installer only under its own name with GitHub's sha256 beside it.
+async function lookReleaseCopies(tag) {
+  // The newest Releases rather than /releases/tags/<tag>, which a tag with
+  // slashes in it does not suit; a feed's current release is always among
+  // them, since release-files.yml makes its Release just after its Ship.
+  const list = await releaseGitHub('/releases?per_page=30');
+  if (list.status !== 200 || !Array.isArray(list.body)) return { found: false, why: list.why || 'the Release list did not read' };
+  const r = list.body.find((x) => x && x.tag_name === tag && !x.draft && Number.isInteger(x.id));
+  if (!r) return { found: false, why: '' };
+  const files = {};
+  let installer = null;
+  for (let page = 1; page <= 10; page++) {
+    const got = await releaseGitHub('/releases/' + r.id + '/assets?per_page=100&page=' + page);
+    if (got.status !== 200 || !Array.isArray(got.body)) return { found: false, why: got.why || 'the asset list did not read' };
+    for (const a of got.body) {
+      if (!a || a.state !== 'uploaded' || typeof a.name !== 'string') continue;
+      const url = String(a.browser_download_url || '');
+      if (!url.startsWith(RELEASE_DOWNLOAD) || !url.endsWith('/' + a.name) || /[\s"'<>]/.test(url)) continue;
+      const m = /^sha256:([0-9a-f]{64})$/.exec(String(a.digest || ''));
+      if (!m || !Number.isInteger(a.size)) continue;
+      if (a.name === m[1]) files[m[1]] = { url, size: a.size };
+      else if (a.name === 'Thornswood-Setup.exe') installer = { sha: m[1], url, size: a.size };
+    }
+    if (got.body.length < 100) break;
+  }
+  return { found: true, files, installer };
+}
+function askReleaseCopies(tag) {
+  const had = releaseCopies[tag];
+  if (had && (had.files || had.busy || Date.now() - had.at < RELEASE_LOOK_MS)) return;
+  releaseCopies[tag] = { at: Date.now(), busy: true };
+  lookReleaseCopies(tag).then((v) => {
+    if (v.found) {
+      releaseCopies[tag] = { files: v.files, installer: v.installer, seen: Date.now() };
+      console.log('[thornswood-docs] release copies: ' + tag + ' holds ' + Object.keys(v.files).length + ' file(s)' + (v.installer ? ' and the installer' : ''));
+    } else {
+      releaseCopies[tag] = { at: Date.now(), busy: false };
+      if (v.why && !/ 404$/.test(v.why)) console.error('[thornswood-docs] release copies: ' + tag + ': ' + v.why);
+    }
+  }, (e) => {
+    releaseCopies[tag] = { at: Date.now(), busy: false };
+    console.error('[thornswood-docs] release copies: ' + tag + ': ' + (e && e.message));
+  });
+}
+// The tag of the release a channel's newest feed names, or ''. A generation
+// file is never rewritten (#2727), so its tag is read once.
+function feedReleaseTag(channel) {
+  const file = feedFile(channel);
+  if (!file) return '';
+  if (!(file in releaseTagOf)) {
+    const doc = readJsonQuiet(file);
+    const tag = String((doc && doc.release && doc.release.tag) || '');
+    releaseTagOf[file] = RELEASE_TAG_RE.test(tag) ? tag : '';
+  }
+  return releaseTagOf[file];
+}
+// Where a feed asset of this size can be fetched instead of here, or ''.
+function releaseCopy(channel, sha, size) {
+  const tag = feedReleaseTag(channel);
+  if (!tag) return '';
+  askReleaseCopies(tag);
+  const c = releaseCopies[tag];
+  const f = c && c.files && c.files[sha];
+  return f && f.size === size ? f.url : '';
+}
+// The same for the installer on the Downloads page: the main release's copy,
+// when it is the very file this site lists (its sha256 in files.json).
+function releaseInstallerCopy(sha, size) {
+  const tag = feedReleaseTag('feed');
+  if (!tag || !/^[0-9a-f]{64}$/.test(sha)) return '';
+  askReleaseCopies(tag);
+  const c = releaseCopies[tag];
+  const i = c && c.installer;
+  return i && i.sha === sha && i.size === size ? i.url : '';
+}
+/* ---- end release copies ---- */
 function creditsFacts() {
   const feeds = {};
   for (const pair of [['public', 'feed'], ['dev', 'feed-dev']]) {
@@ -981,12 +1272,13 @@ function publicPageBody(route) {
     }
     if (!news.length) body += '<p>No release notes are available yet.</p>';
   } else if (route === '/roadmap') {
-    // Same public board as /api/roadmap; staff boards never enter this HTML.
-    const rm = readBoard().roadmap || {sections:[]};
+    // Same roadmap as /api/roadmap, built from the issue board (#3140).
+    const rm = roadmapBoard(readLists());
     if (rm.intro) body += pageHtml(rm.intro).replace(/<h1\b/g, '<h2').replace(/<\/h1>/g, '</h2>');
     let count = 0;
     for (const section of (rm.sections || [])) {
-      // Done is drawn too (#2560), last, as it sits in the data.
+      // Every lane the bot wrote is drawn, in its order, none filtered by
+      // name (#2560); the bot writes no Done lane since 26 Oct.
       if (!(section.rows || []).length) continue;
       body += '<section class="lane"><h2>' + escAttr(section.name || '') + '</h2><ul>';
       for (const row of section.rows) {
@@ -995,7 +1287,9 @@ function publicPageBody(route) {
       }
       body += '</ul></section>';
     }
-    if (!count) body += '<p>No upcoming work is listed here yet. See <a href="/known">known issues</a> for current limits.</p>';
+    if (rm.unread) body += '<p>The roadmap could not be read from the issue board just now. Try again in a few minutes.</p>';
+    else if (!count) body += '<p>No upcoming work is listed here yet. See <a href="/known">known issues</a> for current limits.</p>';
+    if (rm.at) body += '<p><em>Read from the issue board ' + escAttr(rm.at) + '.</em></p>';
   } else if (route === '/gallery') {
     const shots = publicJson(GALLERY, []);
     const approved = (Array.isArray(shots) ? shots : []).slice(0, 24);
@@ -1005,7 +1299,9 @@ function publicPageBody(route) {
       const alt = g.alt || 'Skyrim scene shared by ' + (g.by || 'the Thornswood community');
       const media = /\.(mp4|webm)$/i.test(g.name || '')
         ? '<video controls preload="metadata" aria-label="' + escAttr(alt) + '"><source src="' + escAttr(g.url) + '"></video>'
-        : '<img src="' + escAttr(g.url) + '" alt="' + escAttr(alt) + '" loading="lazy">';
+        : '<img src="' + escAttr(g.url) + '"' +
+          (g.srcset ? ' srcset="' + escAttr(g.srcset) + '" sizes="(max-width: 620px) calc(100vw - 48px), 34vw"' : '') +
+          ' alt="' + escAttr(alt) + '" loading="lazy">';
       body += '<figure class="shot-card"><div class="shot">' + media + '</div><figcaption>' + escAttr(g.by || 'Thornswood community') + '</figcaption></figure>';
     }
     body += '</div>';
@@ -1024,16 +1320,66 @@ function publicPageBody(route) {
   }
   return body;
 }
+/*
+  EVERY FILE A PAGE NAMES CARRIES ITS OWN HASH, SO IT CAN BE KEPT FOR A YEAR
+  (#3218).
+
+  Only home.js and home.css had a ?v= written on, and the static branch below
+  never read it, so those two were kept for an hour like everything else, and
+  the fonts, the logo, the banner and the video were fetched again after every
+  hour (Cloudflare stretched it to four). A Lighthouse run on 21 Oct 2026 put
+  826 KiB of a repeat visit on it.
+
+  Now every "/name" a page names in src, href, poster or srcset, and every
+  url(/name) a stylesheet names, is written out as /name?v=<hash of what is
+  served>, and the static branch sends a name asked for with the hash it has
+  now as immutable for a year. A deploy that changes a file changes its hash,
+  so the page names a new address and nothing old is shown. A stylesheet's
+  hash is of the stylesheet as served, its fonts' hashes included, so a new
+  font file moves fonts.css's address with it. Asked for with no hash, or an
+  old one, a file is the hour and its ETag, as before.
+
+  The hash of a stylesheet is kept against its own file and the hashes of what
+  it names; any other file's against its size and times, which every deploy
+  changes.
+*/
 const publicAssetVersions = new Map();
+const ASSET_NAME = /^[A-Za-z0-9._-]+\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?|mp4|webm)$/i;
 function publicAssetVersion(asset) {
+  if (!ASSET_NAME.test(asset)) return null;
   const file = path.join(PUBLIC, asset);
   try {
     const st = fs.statSync(file), key = st.size + ':' + st.mtimeMs + ':' + st.ctimeMs;
     const cached = publicAssetVersions.get(asset);
-    if (cached && cached.key === key) return cached.version;
-    const version = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 16);
-    publicAssetVersions.set(asset, {key, version}); return version;
+    const named = (refs) => refs.map(publicAssetVersion).join(',');
+    if (cached && cached.key === key && named(cached.refs) === cached.named) return cached.version;
+    const body = publicAssetBody(asset);
+    const refs = /\.css$/i.test(asset) ? assetRefs(fs.readFileSync(file, 'utf8')) : [];
+    const version = crypto.createHash('sha256').update(body).digest('hex').slice(0, 16);
+    publicAssetVersions.set(asset, {key, version, refs, named: named(refs)}); return version;
   } catch (e) { return null; }
+}
+// The bytes the static branch sends for a file of public/: a stylesheet with
+// its url()s versioned, anything else as it is on disk.
+function publicAssetBody(asset) {
+  const raw = fs.readFileSync(path.join(PUBLIC, asset));
+  return /\.css$/i.test(asset) ? Buffer.from(versionAssets(raw.toString('utf8')), 'utf8') : raw;
+}
+const ASSET_ATTR = /(\s(?:src|href|poster)=")\/([A-Za-z0-9._-]+)"/g;
+const ASSET_SRCSET = /(\ssrcset=")([^"]*)"/g;
+const ASSET_URL = /url\((["']?)\/([A-Za-z0-9._-]+)\1\)/g;
+function assetRefs(text) {
+  const out = [];
+  String(text).replace(ASSET_URL, (all, q, name) => { out.push(name); return all; });
+  return out;
+}
+function versionAssets(text) {
+  const tag = (name) => { const v = publicAssetVersion(name); return v ? '/' + name + '?v=' + v : '/' + name; };
+  return String(text)
+    .replace(ASSET_ATTR, (all, attr, name) => attr + tag(name) + '"')
+    .replace(ASSET_SRCSET, (all, attr, list) => attr +
+      list.replace(/(^|,\s*)\/([A-Za-z0-9._-]+)/g, (m, lead, name) => lead + tag(name)) + '"')
+    .replace(ASSET_URL, (all, q, name) => 'url(' + q + tag(name) + q + ')');
 }
 function publicDiscovery(html, route) {
   const blurb = BLURB[route], canonical = PUBLIC_ORIGIN + route;
@@ -1064,11 +1410,7 @@ function publicDiscovery(html, route) {
     '<meta name="twitter:title" content="' + escAttr(title) + '">\n' +
     '<meta name="twitter:description" content="' + escAttr(blurb[1]) + '">\n' +
     '<script type="application/ld+json">' + ld + '</script>\n';
-  for (const asset of ['home.js', 'home.css']) {
-    const version = publicAssetVersion(asset);
-    if (!version) continue;
-    html = html.replace('"/' + asset + '"', () => '"/' + asset + '?v=' + version + '"');
-  }
+  // The ?v= on every file the page names is send()'s (versionAssets).
   return html.replace(/<title>[\s\S]*?<\/title>/, () => '<title>' + escAttr(title) + '</title>')
     .replace('</head>', () => head + '</head>');
 }
@@ -1160,9 +1502,7 @@ const PAGES = {
   '/uploads':     'uploads',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/inbox':       'inbox',
-  // The Known Issues board, which /known is written from (#2414).
-  '/hub/known':   'known'
+  '/inbox':       'inbox'
 };
 
 /*
@@ -1368,6 +1708,9 @@ function writeDoc(n, text) {
 
 const BOARDFILE = path.join(DATA, 'board.json');
 const readBoard = () => jsonFile(BOARDFILE, {});
+// The bot's lists (#3140), or null when there is no file yet or it will not
+// read (jsonFile says which).
+const readLists = () => jsonFile(LISTS, null);
 // EVERY BOARD HAS A REVISION (#2188). One board is saved at a time, so two
 // people on two boards never overwrite each other, but until 11 October two
 // people on the SAME board did, silently: last save won and the other edit
@@ -1586,6 +1929,50 @@ function reportFrom(req) {
   return crypto.createHmac('sha256', reportSalt).update(clientAddr(req)).digest('hex').slice(0, 32);
 }
 
+/* CLOUDFLARE TURNSTILE ON THE REPORT FORM (#3216). The report form is the one
+   form anybody can send without signing in, on purpose, so it is the one a
+   script can fill from anywhere. The gallery's forms and the hub need a
+   Discord sign in with a role, which a script does not have, and the member
+   password's form is off once Discord sign in is set up. Patrick's answer on
+   22 Oct 2026 was to put Turnstile on the site's forms; this is the form that
+   needs it.
+
+   The page draws the widget with the site key (/api/report/form), and the
+   widget gives it a one-time pass that goes with the report. The site asks
+   Cloudflare whether that pass is good, with the secret and the sender's
+   address, before it keeps anything. Both keys empty, as on a copy on your
+   machine, is no widget and no check, never one without the other: a page
+   that drew no widget would otherwise have every report refused. */
+const TURNSTILE_VERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+function turnstileOn() {
+  return typeof cfg.turnstileSiteKey === 'string' && cfg.turnstileSiteKey.length > 0 &&
+         typeof cfg.turnstileSecret === 'string' && cfg.turnstileSecret.length > 0;
+}
+/* 'yes', 'no', or 'unasked' when Cloudflare did not answer inside the same
+   ten seconds every other outside question gets (post()). The action is the
+   one the page draws the widget with, so a pass made on another page of
+   another site with the same key would not do. */
+async function turnstilePasses(token, addr) {
+  const t = String(token || '');
+  if (!t || t.length > 2048) return 'no';
+  let said;
+  try {
+    said = await post(TURNSTILE_VERIFY, { secret: cfg.turnstileSecret, response: t, remoteip: addr || '' });
+  } catch (e) {
+    // post() is the Discord helper and names Discord when nothing came back.
+    console.error('[thornswood] turnstile: Cloudflare did not answer the check (' +
+                  (e && e.discordSilent ? 'no answer in ten seconds' : (e && e.name) || 'error') + ')');
+    return 'unasked';
+  }
+  if (said && said.success === true && said.action === 'report') return 'yes';
+  // The error codes say why (timeout-or-duplicate, invalid-input-response);
+  // never the pass itself or the secret.
+  console.log('[thornswood] turnstile: a report was refused, Cloudflare said ' +
+              JSON.stringify((said && said['error-codes']) || []) +
+              (said && said.success === true ? ' with action ' + JSON.stringify(String(said.action || '')) : ''));
+  return 'no';
+}
+
 function reportRefusal(key, now, whose) {
   const from = whose || 'your connection';
   const HOUR = 60 * 60 * 1000, DAY = 24 * HOUR;
@@ -1790,25 +2177,172 @@ const KIND = {
 };
 
 /*
+  SMALLER COPIES OF A GALLERY PICTURE (#3218). Every picture went out as it
+  was uploaded: the first on the front page was 1.15 MB at 2563 by 1440 and
+  drawn at about 1229 by 514. The site cannot make a smaller copy, because
+  node reads and writes no pictures and the site installs nothing, so the
+  one that sends the picture makes them (Patrick's answer on the report
+  page, 22 Oct 2026, option B): the upload page and the launcher's gallery
+  button each send an 800 and a 1600 pixel wide copy after the picture, one
+  for each width the picture is wider than, over POST /api/gallery/copy.
+
+  WHAT GOES PUBLIC IS WHAT STAFF SAW. The site cannot look at a picture, so
+  it cannot tell that a copy shows the same thing as the picture it is a
+  copy of. What it can read is the width and height a file says it has
+  (pictureSize), and a copy is refused unless it is exactly its width and
+  the picture's shape. The rest is staff: the hub and the launcher show the
+  copies on the waiting card beside the picture, and Accept says which
+  copies it showed (copies on /api/gallery/approve). Only those go on the
+  gallery. A launcher from before this sends no copies on Accept, so a
+  picture it accepts goes out at full size, as every picture did.
+
+  The sender may send each copy once, and only while the picture waits, so
+  a copy cannot change between staff looking at it and accepting it. Staff
+  may send or replace one at any time from the hub, made in their own
+  browser from the picture they are looking at; that is how a picture
+  accepted at full size gets its copies.
+
+  A copy lives in uploads/small as <picture>.w<width>.webp or .jpg, is
+  served at /shot/<picture>?w=<width> once the picture is on the gallery and
+  at /up/<picture>?w=<width> to staff while it waits, and goes when the
+  picture's file goes: deleteUpload takes the copies with it, so every door
+  and sweep that deletes a picture deletes them too. gallery.json names the
+  copies in the item's srcset, so /api/public and /api/gallery hand them
+  out with nothing worked out per request.
+*/
+const SMALL_WIDTHS = [800, 1600];
+const SMALL_KINDS = ['.webp', '.jpg'];
+const SMALL_CAP = 8 * 1024 * 1024;
+const UP_SMALL = path.join(UP, 'small');
+function smallFile(name, width, ext) {
+  return path.join(UP_SMALL, String(name) + '.w' + width + ext);
+}
+// The copy at that width on disk, or '' when there is none.
+function smallCopy(name, width) {
+  for (const ext of SMALL_KINDS) {
+    const file = smallFile(name, width, ext);
+    if (file.startsWith(UP_SMALL + path.sep) && fs.existsSync(file)) return file;
+  }
+  return '';
+}
+/* The width and height a PNG, JPEG, GIF or WebP file is shown at, read off
+   its header, or null when the header cannot be read. A JPEG's size is in
+   its frame header, after any metadata, so the markers are walked; a camera
+   JPEG may say in its Exif that it is turned a quarter, and is then shown
+   with width and height the other way round, as browsers show it and as a
+   copy of it is made. */
+function pictureSize(file) {
+  let b;
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      b = Buffer.alloc(Math.min(fs.fstatSync(fd).size, 1048576));
+      fs.readSync(fd, b, 0, b.length, 0);
+    } finally { fs.closeSync(fd); }
+  } catch (e) {
+    console.error('[thornswood-docs] could not read the size of ' + path.basename(String(file)) + ' (' + (e.code || e.message) + ')');
+    return null;
+  }
+  const size = (w, h) => (w > 0 && h > 0 ? { w: w, h: h } : null);
+  if (b.length >= 24 && b.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) {
+    return size(b.readUInt32BE(16), b.readUInt32BE(20));
+  }
+  if (b.length >= 10 && /^GIF8[79]a$/.test(b.subarray(0, 6).toString('ascii'))) {
+    return size(b.readUInt16LE(6), b.readUInt16LE(8));
+  }
+  if (b.length >= 30 && b.subarray(0, 4).toString('ascii') === 'RIFF' && b.subarray(8, 12).toString('ascii') === 'WEBP') {
+    const chunk = b.subarray(12, 16).toString('ascii');
+    if (chunk === 'VP8 ') return size(b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff);
+    if (chunk === 'VP8L') {
+      const bits = b.readUInt32LE(21);
+      return size((bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1);
+    }
+    if (chunk === 'VP8X') return size(b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1);
+    return null;
+  }
+  if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2, turned = false;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) return null;
+      const m = b[i + 1];
+      if (m === 0xff) { i++; continue; }
+      // SOF0 to SOF15 hold the size; C4, C8 and CC are other tables.
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+        const w = b.readUInt16BE(i + 7), h = b.readUInt16BE(i + 5);
+        return turned ? size(h, w) : size(w, h);
+      }
+      if (m === 0xe1 && i + 4 + 14 <= b.length && b.subarray(i + 4, i + 10).toString('latin1') === 'Exif\0\0') {
+        turned = exifTurned(b, i + 10, Math.min(b.length, i + 2 + b.readUInt16BE(i + 2)));
+      }
+      if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+  }
+  return null;
+}
+// Whether the Exif block at start (its TIFF header) to end says the picture
+// is turned a quarter: orientation 5 to 8, tag 0x0112 in the first IFD.
+function exifTurned(b, start, end) {
+  const turn = exifTags(b, start, end).turn;
+  return turn >= 5 && turn <= 8;
+}
+// The widths a waiting picture has copies of, as the queue lists them.
+function pendingCopies(entry) {
+  return (Array.isArray(entry && entry.copies) ? entry.copies : [])
+    .map(Number).filter((n) => SMALL_WIDTHS.indexOf(n) >= 0);
+}
+/* The srcset gallery.json keeps for a picture: each copy listed, then the
+   picture itself at its own width, which the site reads off its header. ''
+   with no copy, or when the picture's width cannot be read. */
+function shotSrcset(name, widths) {
+  const listed = SMALL_WIDTHS.filter((n) => widths.indexOf(n) >= 0 && smallCopy(name, n));
+  if (!listed.length) return '';
+  const full = pictureSize(path.join(UP, String(name)));
+  if (!full) return '';
+  // Escaped, because a srcset is split on spaces and a name may hold one.
+  const url = '/shot/' + encodeURIComponent(String(name));
+  return listed.map((n) => url + '?w=' + n + ' ' + n + 'w').concat(url + ' ' + full.w + 'w').join(', ');
+}
+// The copy widths a gallery item's srcset names.
+function srcsetWidths(srcset) {
+  const out = [];
+  for (const m of String(srcset || '').matchAll(/\?w=(\d+) /g)) {
+    if (SMALL_WIDTHS.indexOf(Number(m[1])) >= 0) out.push(Number(m[1]));
+  }
+  return out;
+}
+
+/*
   Deleting an upload, said truthfully (#2352, #2354). Both doors that delete a
   file used to catch the failure and answer ok, so a picture somebody asked
   to have removed could stay on disk with staff told it had gone. This
   answers { ok } or { ok: false, code } and writes one line to the site's
   log for a failure: the file's name and the error code, never what it holds.
   A file already gone is gone, which is what was asked.
+
+  A gallery picture's smaller copies go with it (#3218), first, so a copy is
+  never left behind a picture that went. One that will not go is said the
+  same way and the picture stays, so the next sweep asks again for both.
 */
 function deleteUpload(name) {
   const file = path.join(UP, String(name));
   if (!file.startsWith(UP + path.sep)) return { ok: false, code: 'BADNAME' };
-  try {
-    fs.unlinkSync(file);
-    return { ok: true };
-  } catch (e) {
-    const code = (e && e.code) || 'unknown';
-    if (code === 'ENOENT') return { ok: true };
-    retentionSay('gallery', { event: 'delete-failed', file: String(name), code: code });
-    return { ok: false, code: code };
+  const files = [];
+  for (const width of SMALL_WIDTHS) {
+    for (const ext of SMALL_KINDS) files.push(smallFile(name, width, ext));
   }
+  files.push(file);
+  for (const one of files) {
+    try {
+      fs.unlinkSync(one);
+    } catch (e) {
+      const code = (e && e.code) || 'unknown';
+      if (code === 'ENOENT') continue;
+      retentionSay('gallery', { event: 'delete-failed', file: path.relative(UP, one), code: code });
+      return { ok: false, code: code };
+    }
+  }
+  return { ok: true };
 }
 
 /* A gallery submission staff removed and whose file stayed on disk: marked
@@ -1895,7 +2429,10 @@ function listUploads() {
    is null for any kind or a list of lower case extensions (with the dot) when a
    route only wants some. It answers 413 or 415 itself and returns; on a good
    file it calls saved(name) and leaves the reply to the route, because /upload
-   and /gallery/submit write different things once the bytes are down. */
+   and /gallery/submit write different things once the bytes are down. A
+   smaller copy of a gallery picture (copy true, #3218) counts its bytes
+   against the hour and not its file, so sending a picture and its two
+   copies is one of the 40 files an hour, as the picture alone was. */
 // ==== thornswood upload guard ====
 const uploadBudgets = new Map();
 function mediaSignature(ext, bytes) {
@@ -1907,7 +2444,473 @@ function mediaSignature(ext, bytes) {
   if (ext === '.webm') return bytes.subarray(0,4).equals(Buffer.from('1a45dfa3','hex'));
   return false;
 }
-function receiveUpload(req, res, asked, cap, allow, saved) {
+/*
+  WHAT A FILE SAYS ABOUT WHERE IT WAS MADE (#3648). A phone or a camera
+  writes into a picture or a recording where and when it was made and with
+  what, often with the GPS position, and the gallery kept that file byte for
+  byte and served it to anyone at /shot/<name>. Now every picture and
+  recording has those blocks taken out as it lands in uploads/, before staff
+  or anybody else can fetch it, and the launcher takes them out before it
+  sends (Gallery.Submit). Node reads and writes no pictures, so nothing is
+  decoded or encoded again: the file's blocks are walked and the ones that
+  only describe it are left out, and every pixel and frame is the sender's.
+
+    JPEG  every APP1 (Exif, XMP), APP3 to APP13 (IPTC, Photoshop, makers'
+          blocks), APP15 and comment; APP2 unless it is the colour profile;
+          and anything after the end of the picture, where a phone hangs a
+          second picture with an Exif of its own.
+    PNG   eXIf, tEXt, zTXt, iTXt, tIME and caBX (content credentials), and
+          anything after IEND.
+    WebP  EXIF and XMP, and the VP8X flags that name them.
+    GIF   comments, and application blocks other than looping and colour.
+    MP4   udta, meta and XMP uuid boxes become free space of the same size,
+          so no offset into the file moves, and the made and changed times
+          in mvhd, tkhd and mdhd are zeroed.
+    WebM  Tags become Void of the same size, and DateUTC in Info is zeroed.
+
+  Kept: the colour profile and the orientation. A camera picture that is
+  turned gets a new Exif block saying only that, so it still shows the right
+  way up and pictureSize still reads it turned.
+
+  stripMedia answers { ok: true, changed, gps, removed } or { ok: false,
+  why }. changed is false for a file that had nothing to take out, which is
+  then not written at all. A file whose blocks cannot be walked is not ok,
+  and receiveUpload refuses it rather than keep it as it came. The launcher's
+  copy of these rules is launcher/app/MediaStrip.cs; a change here is a
+  change there.
+
+  node server.js --strip-metadata <folder> runs it over a folder (the one-off
+  for uploads/ already on the box, scripts/vps/Strip-Uploads.ps1).
+*/
+function stripMedia(file) {
+  const strip = {
+    '.jpg': stripJpeg, '.jpeg': stripJpeg, '.png': stripPng, '.webp': stripWebp,
+    '.gif': stripGif, '.mp4': stripMp4, '.webm': stripWebm
+  }[path.extname(String(file)).toLowerCase()];
+  if (!strip) return { ok: true, changed: false, gps: false, removed: [] };
+  let b;
+  try { b = fs.readFileSync(file); }
+  catch (e) { return { ok: false, why: 'could not be read (' + (e.code || e.message) + ')' }; }
+  const said = { changed: false, gps: false, removed: [] };
+  let out;
+  try { out = strip(b, said); }
+  catch (e) { out = null; }
+  if (!out) return { ok: false, why: 'its blocks could not be walked' };
+  if (!said.changed) return { ok: true, changed: false, gps: said.gps, removed: [] };
+  const temp = file + '.strip';
+  try {
+    fs.writeFileSync(temp, out, { flag: 'wx' });
+    fs.renameSync(temp, file);
+  } catch (e) {
+    try { fs.unlinkSync(temp); } catch (e2) { /* never made, or already renamed */ }
+    return { ok: false, why: 'could not be written back (' + (e.code || e.message) + ')' };
+  }
+  return { ok: true, changed: true, gps: said.gps, removed: said.removed };
+}
+
+// Orientation (0x0112) and whether there is a GPS block (0x8825) in the first
+// IFD of the Exif TIFF at start to end. turn is 0 when it does not say.
+function exifTags(b, start, end) {
+  const got = { turn: 0, gps: false };
+  if (start < 0 || start + 8 > end || end > b.length) return got;
+  const order = b.subarray(start, start + 2).toString('latin1');
+  if (order !== 'II' && order !== 'MM') return got;
+  const u16 = (at) => (order === 'II' ? b.readUInt16LE(at) : b.readUInt16BE(at));
+  const u32 = (at) => (order === 'II' ? b.readUInt32LE(at) : b.readUInt32BE(at));
+  const ifd = start + u32(start + 4);
+  if (ifd + 2 > end) return got;
+  const count = u16(ifd);
+  for (let k = 0; k < count; k++) {
+    const at = ifd + 2 + k * 12;
+    if (at + 12 > end) break;
+    const tag = u16(at);
+    if (tag === 0x0112) got.turn = u16(at + 8);
+    if (tag === 0x8825) got.gps = true;
+  }
+  return got;
+}
+// The Exif TIFF kept for a turned picture: one tag, its orientation.
+function exifOnlyTurn(turn) {
+  const t = Buffer.alloc(26);
+  t.write('MM', 0, 'latin1'); t.writeUInt16BE(42, 2); t.writeUInt32BE(8, 4);
+  t.writeUInt16BE(1, 8);
+  t.writeUInt16BE(0x0112, 10); t.writeUInt16BE(3, 12); t.writeUInt32BE(1, 14); t.writeUInt16BE(turn, 18);
+  return t;
+}
+function keepTurn(turn) { return turn >= 2 && turn <= 8; }
+// XMP and text blocks are only looked at to count positions, never kept.
+// The copyright sign then xyz is the box a phone writes its position into in a recording.
+function saysWhere(bytes) { return /GPS|ISO6709|\u00a9xyz|loci|location/i.test(bytes.toString('latin1')); }
+
+function stripJpeg(b, said) {
+  if (b.length < 2 || b[0] !== 0xff || b[1] !== 0xd8) return null;
+  const out = [b.subarray(0, 2)];
+  let i = 2, turn = 0, exifAt = -1;
+  while (i < b.length) {
+    if (b[i] !== 0xff) return null;
+    if (i + 1 >= b.length) { out.push(b.subarray(i)); break; }
+    const m = b[i + 1];
+    if (m === 0xff) { i++; continue; }
+    if (m === 0xd9) {
+      out.push(b.subarray(i, i + 2));
+      if (i + 2 < b.length) said.removed.push('data after the picture');
+      break;
+    }
+    if (m === 0x01 || m === 0xd8 || (m >= 0xd0 && m <= 0xd7)) { out.push(b.subarray(i, i + 2)); i += 2; continue; }
+    if (i + 4 > b.length) { out.push(b.subarray(i)); break; }
+    const end = i + 2 + b.readUInt16BE(i + 2);
+    const seg = b.subarray(i, Math.min(end, b.length));
+    const body = seg.subarray(4);
+    let drop = '';
+    if (m === 0xe1 && body.subarray(0, 6).toString('latin1') === 'Exif\0\0') {
+      const t = exifTags(body, 6, body.length);
+      if (t.gps) said.gps = true;
+      if (!turn) turn = t.turn;
+      if (exifAt < 0) exifAt = out.length;
+      drop = 'Exif';
+    } else if (m === 0xe1) {
+      if (saysWhere(body)) said.gps = true;
+      drop = 'XMP';
+    } else if (m === 0xe2 && body.subarray(0, 12).toString('latin1') !== 'ICC_PROFILE\0') drop = 'APP2';
+    else if ((m >= 0xe3 && m <= 0xed) || m === 0xef) drop = 'APP' + (m - 0xe0);
+    else if (m === 0xfe) drop = 'comment';
+    if (drop) said.removed.push(drop); else out.push(seg);
+    i = end;
+    if (m === 0xda && end <= b.length) {
+      // The scan: entropy-coded bytes up to the next marker that is not a
+      // stuffed zero, a restart or a fill byte.
+      let j = end;
+      while (j < b.length) {
+        if (b[j] === 0xff && j + 1 < b.length) {
+          const n = b[j + 1];
+          if (n !== 0x00 && n !== 0xff && !(n >= 0xd0 && n <= 0xd7)) break;
+        }
+        j++;
+      }
+      out.push(b.subarray(end, j));
+      i = j;
+    }
+  }
+  if (keepTurn(turn)) {
+    const tiff = exifOnlyTurn(turn);
+    const head = Buffer.alloc(10);
+    head[0] = 0xff; head[1] = 0xe1; head.writeUInt16BE(2 + 6 + tiff.length, 2); head.write('Exif\0\0', 4, 'latin1');
+    out.splice(exifAt, 0, head, tiff);
+  }
+  const buf = Buffer.concat(out);
+  said.changed = !buf.equals(b);
+  return buf;
+}
+
+function crc32(buf) {
+  let c = ~0;
+  for (let k = 0; k < buf.length; k++) {
+    c ^= buf[k];
+    for (let j = 0; j < 8; j++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return (~c) >>> 0;
+}
+function stripPng(b, said) {
+  if (b.length < 8) return null;
+  const out = [b.subarray(0, 8)];
+  let i = 8, turn = 0, exifAt = -1;
+  while (i < b.length) {
+    if (i + 8 > b.length) { out.push(b.subarray(i)); break; }
+    const len = b.readUInt32BE(i), type = b.subarray(i + 4, i + 8).toString('latin1');
+    if (len > 0x7fffffff) return null;
+    const end = i + 12 + len;
+    const chunk = b.subarray(i, Math.min(end, b.length));
+    if (type === 'eXIf') {
+      const t = exifTags(b, i + 8, Math.min(i + 8 + len, b.length));
+      if (t.gps) said.gps = true;
+      if (!turn) turn = t.turn;
+      if (exifAt < 0) exifAt = out.length;
+      said.removed.push('eXIf');
+    } else if (type === 'tEXt' || type === 'zTXt' || type === 'iTXt' || type === 'tIME' || type === 'caBX') {
+      if (saysWhere(chunk)) said.gps = true;
+      said.removed.push(type);
+    } else out.push(chunk);
+    i = end;
+    if (type === 'IEND') {
+      if (i < b.length) said.removed.push('data after the picture');
+      break;
+    }
+  }
+  if (keepTurn(turn)) {
+    const tiff = exifOnlyTurn(turn);
+    const chunk = Buffer.alloc(12 + tiff.length);
+    chunk.writeUInt32BE(tiff.length, 0); chunk.write('eXIf', 4, 'latin1'); tiff.copy(chunk, 8);
+    chunk.writeUInt32BE(crc32(chunk.subarray(4, 8 + tiff.length)), 8 + tiff.length);
+    out.splice(exifAt, 0, chunk);
+  }
+  const buf = Buffer.concat(out);
+  said.changed = !buf.equals(b);
+  return buf;
+}
+
+function stripWebp(b, said) {
+  if (b.length < 12) return null;
+  const out = [Buffer.from(b.subarray(0, 12))];
+  let i = 12, turn = 0, exifAt = -1, vp8x = -1;
+  while (i < b.length) {
+    if (i + 8 > b.length) { out.push(b.subarray(i)); break; }
+    const tag = b.subarray(i, i + 4).toString('latin1'), len = b.readUInt32LE(i + 4);
+    const end = i + 8 + len + (len & 1);
+    const chunk = b.subarray(i, Math.min(end, b.length));
+    if (tag === 'EXIF') {
+      const data = b.subarray(i + 8, Math.min(i + 8 + len, b.length));
+      const at = data.subarray(0, 6).toString('latin1') === 'Exif\0\0' ? 6 : 0;
+      const t = exifTags(data, at, data.length);
+      if (t.gps) said.gps = true;
+      if (!turn) turn = t.turn;
+      if (exifAt < 0) exifAt = out.length;
+      said.removed.push('EXIF');
+    } else if (tag === 'XMP ') {
+      if (saysWhere(chunk)) said.gps = true;
+      said.removed.push('XMP');
+    } else {
+      if (tag === 'VP8X' && vp8x < 0 && chunk.length >= 9) { vp8x = out.length; out.push(Buffer.from(chunk)); }
+      else out.push(chunk);
+    }
+    i = end;
+  }
+  if (!said.removed.length) return b;
+  if (vp8x >= 0) {
+    out[vp8x][8] &= ~0x0c;
+    if (keepTurn(turn)) {
+      const tiff = exifOnlyTurn(turn);
+      const chunk = Buffer.alloc(8 + tiff.length);
+      chunk.write('EXIF', 0, 'latin1'); chunk.writeUInt32LE(tiff.length, 4); tiff.copy(chunk, 8);
+      out[vp8x][8] |= 0x08;
+      out.splice(exifAt, 0, chunk);
+    }
+  }
+  const buf = Buffer.concat(out);
+  buf.writeUInt32LE(buf.length - 8, 4);
+  said.changed = !buf.equals(b);
+  return buf;
+}
+
+function stripGif(b, said) {
+  if (b.length < 13) return null;
+  // Sub-blocks from j: the end, past the empty one that closes them.
+  const blocks = (j) => {
+    while (j < b.length) { const n = b[j]; j += 1 + n; if (n === 0) break; }
+    return j;
+  };
+  let i = 13;
+  if (b[10] & 0x80) i += 3 * (1 << ((b[10] & 7) + 1));
+  const out = [b.subarray(0, Math.min(i, b.length))];
+  while (i < b.length) {
+    const kind = b[i];
+    if (kind === 0x3b) {
+      out.push(b.subarray(i, i + 1));
+      if (i + 1 < b.length) said.removed.push('data after the picture');
+      break;
+    }
+    if (kind === 0x21) {
+      const label = b[i + 1];
+      const end = blocks(i + 2);
+      const part = b.subarray(i, Math.min(end, b.length));
+      let drop = '';
+      if (label === 0xfe) drop = 'comment';
+      else if (label === 0xff) {
+        const app = b.subarray(i + 3, i + 14).toString('latin1');
+        if (app !== 'NETSCAPE2.0' && app !== 'ANIMEXTS1.0' && app !== 'ICCRGBG1012') drop = app.trim() || 'application block';
+      }
+      if (drop) {
+        if (saysWhere(part)) said.gps = true;
+        said.removed.push(drop);
+      } else out.push(part);
+      i = end;
+      continue;
+    }
+    if (kind === 0x2c) {
+      let j = i + 10;
+      if (b[i + 9] & 0x80) j += 3 * (1 << ((b[i + 9] & 7) + 1));
+      const end = blocks(j + 1);
+      out.push(b.subarray(i, Math.min(end, b.length)));
+      i = end;
+      continue;
+    }
+    return null;
+  }
+  const buf = Buffer.concat(out);
+  said.changed = !buf.equals(b);
+  return buf;
+}
+
+// Box by box from from to to; each(type, at, head, end). False when a size
+// cannot be a box's.
+function mp4Boxes(b, from, to, each) {
+  let i = from;
+  while (i + 8 <= to) {
+    let size = b.readUInt32BE(i), head = 8;
+    const type = b.subarray(i + 4, i + 8).toString('latin1');
+    if (size === 1) {
+      if (i + 16 > to) return true;
+      size = Number(b.readBigUInt64BE(i + 8));
+      head = 16;
+    } else if (size === 0) size = to - i;
+    if (size < head) return false;
+    each(type, i, head, Math.min(i + size, to));
+    i += size;
+  }
+  return true;
+}
+function stripMp4(b, said) {
+  const XMP = 'be7acfcb97a942e89c71999491e3afac';
+  const free = (type, at, head, end) => {
+    const body = b.subarray(at + head, end);
+    if (saysWhere(body)) said.gps = true;
+    said.removed.push(type);
+    b.write('free', at + 4, 'latin1');
+    body.fill(0);
+    said.changed = true;
+  };
+  const describes = (type, at, head, end) => type === 'udta' || type === 'meta' ||
+    (type === 'uuid' && end - at >= head + 16 && b.subarray(at + head, at + head + 16).toString('hex') === XMP);
+  // The made and changed times of a full box: four bytes each in version 0,
+  // eight in version 1, after the version and flags.
+  const times = (at, head, end) => {
+    const wide = b[at + head] === 1 ? 8 : 4;
+    const from = at + head + 4, to = from + 2 * wide;
+    if (to > end) return;
+    if (!b.subarray(from, to).some((x) => x !== 0)) return;
+    b.fill(0, from, to);
+    said.changed = true;
+    if (said.removed.indexOf('times') < 0) said.removed.push('times');
+  };
+  let good = true;
+  const walk = (from, to, inside) => mp4Boxes(b, from, to, (type, at, head, end) => {
+    if (describes(type, at, head, end)) return free(type, at, head, end);
+    if (inside === 'moov' && type === 'mvhd') return times(at, head, end);
+    if (inside === 'trak' && type === 'tkhd') return times(at, head, end);
+    if (inside === 'mdia' && type === 'mdhd') return times(at, head, end);
+    if (type === 'moov' || type === 'trak' || type === 'mdia') {
+      if (!walk(at + head, end, type)) good = false;
+    }
+  });
+  if (!walk(0, b.length, '') || !good) return null;
+  return b;
+}
+
+function stripWebm(b, said) {
+  const SEGMENT = 0x18538067, TAGS = 0x1254c367, INFO = 0x1549a966, DATE = 0x4461, CLUSTER = 0x1f43b675;
+  const TOP = [0x114d9b74, INFO, CLUSTER, 0x1654ae6b, 0x1c53bb6b, 0x1941a469, 0x1043a770, TAGS, SEGMENT, 0x1a45dfa3];
+  // An element's id and size at i: null when the bytes cannot be one, and
+  // short when the file ends inside its head.
+  const head = (i) => {
+    if (i >= b.length) return { short: true };
+    const f = b[i];
+    const iw = f & 0x80 ? 1 : f & 0x40 ? 2 : f & 0x20 ? 3 : f & 0x10 ? 4 : 0;
+    if (!iw) return null;
+    if (i + iw >= b.length) return { short: true };
+    const s = b[i + iw];
+    let sw = 1;
+    while (sw <= 8 && !(s & (0x80 >> (sw - 1)))) sw++;
+    if (sw > 8) return null;
+    if (i + iw + sw > b.length) return { short: true };
+    let v = s & (0xff >> sw), all = v === (0xff >> sw);
+    for (let k = 1; k < sw; k++) { v = v * 256 + b[i + iw + k]; if (b[i + iw + k] !== 0xff) all = false; }
+    return { id: b.readUIntBE(i, iw), data: i + iw + sw, size: all ? -1 : v };
+  };
+  // An element at at to end made into a Void of the same length.
+  const voidOut = (at, end) => {
+    const total = end - at, w = Math.min(8, total - 1);
+    let v = total - 1 - w;
+    b.fill(0, at, end);
+    b[at] = 0xec;
+    for (let k = w - 1; k >= 1; k--) { b[at + 1 + k] = v % 256; v = Math.floor(v / 256); }
+    b[at + 1] = (0x80 >> (w - 1)) | v;
+    said.changed = true;
+  };
+  let i = 0;
+  while (i < b.length) {
+    const top = head(i);
+    if (!top) return null;
+    if (top.short) break;
+    const end = top.size < 0 ? b.length : Math.min(top.data + top.size, b.length);
+    if (top.id !== SEGMENT) { i = end; continue; }
+    let j = top.data;
+    while (j < end) {
+      const el = head(j);
+      if (!el) return null;
+      if (el.short) break;
+      if (el.size < 0) {
+        // A cluster a recorder wrote with no size: it ends where an element
+        // that only sits at the top of a segment starts.
+        let k = el.data;
+        for (;;) {
+          const c = head(k);
+          if (!c) return null;
+          if (c.short || TOP.indexOf(c.id) >= 0) break;
+          if (c.size < 0) return null;
+          k = Math.min(c.data + c.size, end);
+          if (k >= end) break;
+        }
+        j = k;
+        continue;
+      }
+      const stop = Math.min(el.data + el.size, end);
+      if (el.id === TAGS) {
+        if (saysWhere(b.subarray(el.data, stop))) said.gps = true;
+        said.removed.push('Tags');
+        voidOut(j, stop);
+      } else if (el.id === INFO) {
+        let k = el.data;
+        while (k < stop) {
+          const c = head(k);
+          if (!c || c.short || c.size < 0) break;
+          const cend = Math.min(c.data + c.size, stop);
+          if (c.id === DATE && b.subarray(c.data, cend).some((x) => x !== 0)) {
+            b.fill(0, c.data, cend);
+            said.changed = true;
+            said.removed.push('DateUTC');
+          }
+          k = cend;
+        }
+      }
+      j = stop;
+    }
+    i = end;
+  }
+  return b;
+}
+
+// node server.js --strip-metadata <folder>: stripMedia over every file in the
+// folder and the folders in it. Prints one line for each file it changed or
+// could not walk, names and block names only, never what a block said, then
+// the counts. 0 when every file is clean now, 1 when one is not.
+function stripFolder(folder) {
+  const seen = { looked: 0, changed: 0, gps: 0, failed: 0 };
+  const visit = (dir) => {
+    let names;
+    try { names = fs.readdirSync(dir); }
+    catch (e) { console.error('could not list ' + dir + ' (' + (e.code || e.message) + ')'); seen.failed++; return; }
+    for (const name of names) {
+      const file = path.join(dir, name);
+      let st;
+      try { st = fs.statSync(file); } catch (e) { continue; }
+      if (st.isDirectory()) { visit(file); continue; }
+      seen.looked++;
+      const r = stripMedia(file);
+      const shown = path.relative(folder, file);
+      if (!r.ok) { seen.failed++; console.log('NOT CLEANED  ' + shown + ': ' + r.why); continue; }
+      if (r.gps) seen.gps++;
+      if (r.changed) {
+        seen.changed++;
+        console.log('cleaned  ' + shown + ': ' + Array.from(new Set(r.removed)).join(', ') + (r.gps ? ' (it held a position)' : ''));
+      }
+    }
+  };
+  if (!folder) { console.error('say which folder: node server.js --strip-metadata <folder>'); return 2; }
+  visit(path.resolve(folder));
+  console.log(seen.looked + ' files looked at, ' + seen.changed + ' had blocks taken out, ' +
+              seen.gps + ' held a position, ' + seen.failed + ' could not be cleaned');
+  return seen.failed ? 1 : 0;
+}
+function receiveUpload(req, res, asked, cap, allow, saved, copy) {
   if (Number(req.headers['content-length'] || 0) > cap) {
     return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
   }
@@ -1933,7 +2936,8 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
     return send(res, 429, JSON.stringify({error:'This connection has reached its upload limit. Try again later.'}),
       null, {'Retry-After':String(Math.max(1, Math.ceil((budget.start + 3600000 - now) / 1000))), Connection:'close'});
   }
-  budget.count++; budget.active++;
+  if (!copy) budget.count++;
+  budget.active++;
   const d = new Date();
   const two = (n) => String(n).padStart(2, '0');
   const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '-' +
@@ -1998,6 +3002,18 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
       }
       console.error('[thornswood-docs] could not write the upload ' + name + ' (' + broke + ')');
       return sendJson(res, 500, { error: 'the site could not save that file. Try again in a minute.' });
+    }
+    // A picture or recording is what its first bytes say it is: what it says
+    // about where and when it was made goes before anybody can fetch it
+    // (#3648). One that cannot be cleaned is not kept as it came.
+    if (mediaSignature(path.extname(safe).toLowerCase(), prefix)) {
+      const clean = stripMedia(dest);
+      if (!clean.ok) {
+        console.error('[thornswood-docs] could not clean the upload ' + name + ': ' + clean.why);
+        try { fs.unlinkSync(dest); }
+        catch (e) { console.error('[thornswood-docs] could not remove the upload ' + name + ' (' + (e.code || e.message) + ')'); }
+        return sendJson(res, 415, { error: 'The site could not read that file to take out where and when it was made, so it did not keep it.' });
+      }
     }
     saved(name);
   });
@@ -2221,9 +3237,9 @@ async function who(req, waitMs, staleOk) {
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
-    // "dev" is staff (access.dev: Owner, Dev, Gamemaster, Moderator,
-    // Loremaster), used by the gallery queue and reports. Not the Owner/Dev
-    // admin pair alone.
+    // "dev" is staff in the game (access.dev: Owner, Co-Owner, and the Dev,
+    // Gamemaster and Loremaster ranks with their leads, #3317), used by the
+    // gallery queue and reports. Not the admin pair alone.
     member: st.admin || isMember(req),
     admin: st.admin,
     dev: !!st.dev,
@@ -2281,6 +3297,36 @@ const allowed = (key, w) =>
   neither cookie nor ticket the refusal is the 403 'staff only' these doors
   have always sent, so nothing about the hub page changes.
 */
+/* Who is sending something to the gallery: a picture, a report, or a
+   picture's smaller copies (#3218). A signed-in Discord account that may
+   play, or the hub member cookie (password bootstrap / staff). Hub "member"
+   alone used to be the only web door, and with Discord live that meant only
+   admins could submit from the site. Otherwise a launcher ticket verified
+   the way the door verifies it: read it, ask Discord for the standing, and
+   hold it to the same answers /api/play/join gives, so a banned or departed
+   account cannot put a picture in the queue. signIn is what a caller with
+   neither is told. dev is whether the account holds a staff role. */
+async function gallerySender(url, w, signIn) {
+  if (w.play || w.member) return { ok: true, from: 'web', discordId: w.id || '', dev: !!w.dev };
+  const t = readTicket(url.searchParams.get('ticket'));
+  // Signed in, and Discord did not answer in time (#467): say that.
+  if (!t && w.id && w.lookupFailed) return { ok: false, code: 503, body: { ok: false, why: 'could not ask Discord', error:
+    'Thornswood could not ask Discord about your account just now. Try again in a minute.' } };
+  if (!t) return { ok: false, code: 401, body: { ok: false, why: 'link', error: signIn } };
+  const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
+  standCache.delete(String(t.d));
+  if (st.lookupFailed && !st.admin) return { ok: false, code: 503, body: discordUnasked() };
+  // Banned before the guild check (#1022). standing() leaves inGuild false
+  // when bans.json already refused the account.
+  if (st.banned) return { ok: false, code: 403, body: { ok: false, why: 'banned', error:
+    'That Discord account is banned from Thornswood.' } };
+  if (!st.inGuild) return { ok: false, code: 403, body: { ok: false, why: 'guild', error:
+    'That Discord account is not in the Thornswood Discord.' } };
+  if (!st.play) return { ok: false, code: 403, body: { ok: false, why: 'role', error:
+    'That Discord account has no role that lets it in yet.' } };
+  return { ok: true, from: 'launcher', discordId: String(t.d), dev: !!st.dev };
+}
+
 async function galleryStaff(url, w) {
   if (w.dev) return { ok: true, from: 'web', discordId: w.id || '' };
   // Signed in, and Discord did not answer in time (#1164): say that, rather
@@ -2305,21 +3351,57 @@ async function galleryStaff(url, w) {
 
 // ----------------------------------------------------------------- plumb --
 /* One CSP for every answer (#1474). home.html and the hub load CSS/JS as
-   same-origin files, so script-src and style-src need only 'self'. Keep this
-   string in one place so send(), Range replies, and the request-level
-   setHeader cannot drift. */
-const CSP_HEADER = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
+   same-origin files, so style-src needs only 'self'. Keep this string in one
+   place so send(), Range replies, and the request-level setHeader cannot
+   drift.
+
+   The one other site in it is Cloudflare Web Analytics (#3218, Patrick's
+   answer on 22 Oct 2026). Cloudflare writes its beacon into every page it
+   carries, so the page never names it: the script comes from
+   static.cloudflareinsights.com and posts what it measured to
+   cloudflareinsights.com. With script-src 'self' alone every page raised a
+   CSP error in the console and Cloudflare counted nothing. The privacy page
+   names it. It sets no cookie and keeps nothing on the visitor's machine.
+
+   The third is Cloudflare Turnstile on the report form (#3216, Patrick's
+   answer on 22 Oct 2026): its script and the frame it draws the check in
+   both come from challenges.cloudflare.com. The privacy page names it. */
+const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
+/* A NONCE ON EVERY ANSWER (#3216). Bot Fight Mode, on by Patrick's answer on
+   22 Oct 2026, turns on Cloudflare's JavaScript Detections, which cannot be
+   turned off on its own and writes a small inline script into every page
+   Cloudflare carries. script-src 'self' refuses any inline script, so every
+   page would raise a CSP error and the detection would never run. Cloudflare
+   reads a nonce out of this header and puts it on the script it writes in, so
+   each answer gets a fresh one (handle() makes it). The site's own pages
+   carry no inline script and never use it; a nonce is only good for the one
+   answer it came with, so it opens nothing to anybody else. */
+/* What no page here may use (#2762). Nothing on this site asks for the
+   camera, the microphone, the location, a payment or a USB device, so a page
+   or a frame in it that tried would be refused. Caddy sends the same value on
+   every answer from the name (scripts\deploy\Caddyfile, its header block),
+   and tests\test-2762-door-headers.js keeps the two equal. */
+const PERMISSIONS_POLICY = 'camera=(), microphone=(), geolocation=(), payment=(), usb=()';
+function cspFor(res) {
+  const n = res && res.cspNonce;
+  return n ? CSP_HEADER.replace("script-src 'self'", "script-src 'self' 'nonce-" + n + "'") : CSP_HEADER;
+}
 function send(res, code, payload, type, extra) {
   // Defense in depth (#1366 / #1474): conservative CSP (this page and the hub
-  // load nothing from other sites; CSS and JS are external same-origin files),
+  // name nothing on other sites, and CSS and JS are external same-origin
+  // files; the analytics beacon Cloudflare adds is the one exception, above),
   // frame-ancestors self so the hub cannot be iframed for clickjacking, and a
   // referrer policy that does not leak path on cross-origin navigations.
+  // A page names its files with their hashes (versionAssets, #3218), here so
+  // that no page sent can miss it.
+  if (/^text\/html\b/.test(String(type || '')) && payload) payload = versionAssets(payload);
   res.writeHead(code, Object.assign({
     'Content-Type': type || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': CSP_HEADER,
-    'Referrer-Policy': 'strict-origin-when-cross-origin'
+    'Content-Security-Policy': cspFor(res),
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': PERMISSIONS_POLICY
   }, extra || {}));
   res.end(payload);
 }
@@ -2367,7 +3449,7 @@ function rangeReply(req, res, file, size, headers, head) {
       'accept-ranges': 'bytes',
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
-      'content-security-policy': CSP_HEADER,
+      'content-security-policy': cspFor(res),
       'referrer-policy': 'strict-origin-when-cross-origin'
     });
     res.end();
@@ -2382,7 +3464,7 @@ function rangeReply(req, res, file, size, headers, head) {
     'accept-ranges': 'bytes',
     'cache-control': headers['cache-control'] || 'no-store',
     'x-content-type-options': 'nosniff',
-    'content-security-policy': CSP_HEADER,
+    'content-security-policy': cspFor(res),
     'referrer-policy': 'strict-origin-when-cross-origin'
   }));
   if (head) { res.end(); return true; }
@@ -3995,6 +5077,51 @@ function copyKeptChats(now) {
   return out;
 }
 
+/* A restore (scripts\vps\vps-restore-services.ps1) moves the data folder,
+   the uploads and config.json it replaces to <name>-before-restore-<stamp>
+   beside them, <stamp> the box's local yyyyMMdd-HHmmss, with -2, -3 for a
+   second restore in the same second. Nothing deleted them (#3620). Decided
+   by Patrick on 26 Oct (B): a set-aside copy is kept 30 days, so a restore
+   can be undone, then deleted. By the time in its name, never a file's own
+   times, which a move keeps from the original. A link is left as it is and
+   said. The feed's copies are not the site's to delete (it is denied writing
+   there, #913) and hold no person. Delete-Person.ps1 reads a data copy for a
+   deletion request while it is here. */
+const RESTORE_ASIDE_DAYS = 30;
+const RESTORE_ASIDE = /^(data|uploads|config\.json)-before-restore-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})(?:-\d+)?$/;
+function sweepRestoreCopies(now, root) {
+  root = root || ROOT;
+  const out = { deleted: 0, failed: [] };
+  let names;
+  try { names = fs.readdirSync(root); }
+  catch (e) {
+    out.error = (e && e.code) || 'unknown';
+    retentionSay('restore-copy', { event: 'list-failed', code: out.error });
+    return out;
+  }
+  const cut = now - RESTORE_ASIDE_DAYS * 86400000;
+  for (const n of names.sort()) {
+    const m = RESTORE_ASIDE.exec(n);
+    if (!m) continue;
+    const at = new Date(+m[2], +m[3] - 1, +m[4], +m[5], +m[6], +m[7]).getTime();
+    if (!(at < cut)) continue;
+    const p = path.join(root, n);
+    let st;
+    try { st = fs.lstatSync(p); } catch (e) { continue; }
+    if (st.isSymbolicLink()) { retentionSay('restore-copy', { event: 'left-link', name: n }); continue; }
+    if (st.isDirectory() !== (m[1] !== 'config.json')) continue;
+    try {
+      fs.rmSync(p, { recursive: true });
+      out.deleted++;
+      retentionSay('restore-copy', { event: 'deleted', name: n, days: RESTORE_ASIDE_DAYS });
+    } catch (e) {
+      out.failed.push(n);
+      retentionSay('restore-copy', { event: 'delete-failed', name: n, code: (e && e.code) || 'unknown' });
+    }
+  }
+  return out;
+}
+
 function retentionSweep() {
   const now = Date.now();
   const sessions = sweepSessions(now);
@@ -4009,7 +5136,8 @@ function retentionSweep() {
            removedUploads: pruneRemovedUploads(now),
            signIns: sweepSignIns(now), inbox: sweepInbox(now),
            staff: sweepStaffRecords(now), moderationLog: sweepModLog(now),
-           galleryReports: sweepGalleryReports(now) };
+           galleryReports: sweepGalleryReports(now),
+           restoreCopies: sweepRestoreCopies(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 
@@ -4694,7 +5822,7 @@ async function standing(discordId) {
      having a bad morning, so it cannot be gated behind a guild lookup that
      needs all three of those to be fine. */
   if (cfg.admins.indexOf(String(discordId)) >= 0) {
-    out.admin = true; out.play = true; out.inGuild = true; out.dev = true;
+    out.admin = true; out.play = true; out.inGuild = true; out.dev = true; out.devBuild = true;
     if (cfg.discord.botToken && cfg.discord.guildId) {
       const r = await memberOf(discordId);
       if (r.ok) {
@@ -4705,7 +5833,7 @@ async function standing(discordId) {
         out.roles = (me.roles || []).map((id) => names[id]).filter(Boolean);
         out.staffRole = holdsStaffRole(out.roles);
         out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
-        out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+        out.leads = leaderRoles(out.roles);
         out.devRole = holdsNamedRole(out.roles, 'Dev');
       } else if (r.status !== 404) {
         out.lookupFailed = r.why;
@@ -4744,10 +5872,11 @@ async function standing(discordId) {
   if (has(cfg.access.admin)) out.admin = true;
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
+  out.devBuild = out.admin || has(cfg.access.devBuild);
   out.company = has(cfg.access.company);
   out.staffRole = holdsStaffRole(out.roles);
   out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
-  out.factionOwner = holdsNamedRole(out.roles, 'Faction Owner');
+  out.leads = leaderRoles(out.roles);
   out.devRole = holdsNamedRole(out.roles, 'Dev');
   return out;
 }
@@ -4768,6 +5897,19 @@ function holdsStaffRole(roles) {
 function holdsNamedRole(roles, name) {
   const mine = Array.isArray(roles) ? roles : [];
   return mine.indexOf(name) >= 0;
+}
+
+/*
+  THE FACTION LEADER ROLES HELD (#3317). Every faction's Leader role is its
+  name and " Leader" (bot/Build-Discord.py FACTION_LEADERS), and a faction
+  that comes in through the application as Other gets one the same way, so
+  the site reads them by that shape rather than keeping a second list of the
+  factions. Whoever holds one owns that faction's book in the game (Patrick,
+  22 Oct, page card q-3317-faction-books, A).
+*/
+function leaderRoles(roles) {
+  const mine = Array.isArray(roles) ? roles : [];
+  return mine.filter((n) => typeof n === 'string' && /^[^\n]{1,96} Leader$/.test(n));
 }
 
 /*
@@ -5371,11 +6513,14 @@ process.on('uncaughtException', (e) => {
 
 async function handle(req, res) {
   // Apply before parsing the address, so streamed and malformed responses
-  // carry the same policy as ordinary pages.
-  res.setHeader('Content-Security-Policy', CSP_HEADER);
+  // carry the same policy as ordinary pages. The nonce is this answer's own
+  // (cspFor, #3216).
+  res.cspNonce = crypto.randomBytes(16).toString('base64');
+  res.setHeader('Content-Security-Policy', cspFor(res));
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', PERMISSIONS_POLICY);
   /* The address is a path on this site, so it is read as one (#929).
 
      new URL(req.url, 'http://x') read an address that starts with two slashes
@@ -5530,6 +6675,37 @@ async function handle(req, res) {
   if (route === '/discord' && req.method === 'GET') {
     if (!cfg.discord.invite) return send(res, 404, 'No invite link set yet.', 'text/plain');
     return send(res, 302, '', 'text/plain', { Location: cfg.discord.invite });
+  }
+
+  // ------------------------------------------------------- security.txt
+  /* Where somebody who finds a hole in the site says so (RFC 9116, #3216,
+     Patrick's answer on 22 Oct 2026). The first contact is the report page:
+     open to anybody without an account, read by staff and nobody else, and
+     the place staff already read every day, so a finding is never waiting in
+     a mailbox nobody opens. The second is the Discord, for a direct message
+     to the owner alone. These are the routes SECURITY.md gives too (#3683,
+     Patrick's answer on 26 Oct, q-3683-report-route A), so a stranger gets
+     one answer wherever they look. GitHub's Report a vulnerability button
+     joins both, with a Policy line for SECURITY.md, once the repository is
+     public: before that both addresses answer 404 to anybody outside it.
+
+     Expires is written as the file is asked for, 180 days on, inside the
+     year RFC 9116 asks for. The file says what this site answers, and the
+     site answering is the proof somebody still keeps it: a date written by
+     hand into a file would run out by itself one day while the contact
+     still worked, and a check that a person has to remember to move is the
+     kind that gets forgotten. */
+  if (p === '/.well-known/security.txt' && req.method === 'GET') {
+    const until = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+    until.setUTCHours(0, 0, 0, 0);
+    return send(res, 200, [
+      'Contact: ' + PUBLIC_ORIGIN + '/report',
+      'Contact: ' + PUBLIC_ORIGIN + '/discord',
+      'Expires: ' + until.toISOString(),
+      'Preferred-Languages: en',
+      'Canonical: ' + PUBLIC_ORIGIN + '/.well-known/security.txt',
+      ''
+    ].join('\n'), 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=86400' });
   }
 
   // ----------------------------------------------------------- domain proof
@@ -5724,9 +6900,14 @@ async function handle(req, res) {
       // /join, never /hub. Somebody clicking Apply wants to know how to apply,
       // and sending them to the admin panel is the worst possible answer.
       html = html.split('DISCORD_URL').join(cfg.discord.invite || '/join');
+      // One lore line from lines.md under The World (#3147), a new pick each
+      // time a page is served. Every page, not only /: the front is in each
+      // one, for the page's script to show when it goes back to /. After the
+      // invite link, for the same reason as the written pages below.
+      html = fillLoreLine(html, readLines().lore, Math.random());
       // The og tags a crawler reads are the ones in the file, so the page
-      // actually being served is written into them here. home.html rewrites
-      // the same tags for the browser tab.
+      // actually being served is written into them here. The browser tab reads
+      // the same tags; home.js keeps no list of its own (#3138).
       const blurb = BLURB[route];
       let pageTitle = null;
       if (blurb) {
@@ -5762,7 +6943,12 @@ async function handle(req, res) {
         }
       }
       html = publicDiscovery(html, route);
-      return send(res, 200, html, TYPES['.html']);
+      /* no-cache, not send()'s no-store (#3218). A public page is the same for
+         everybody: nothing in it says who is asking. no-store kept every one
+         of them out of the browser's back and forward cache, so Back from
+         the rules to the front page fetched and drew the whole page again.
+         no-cache still asks the site each time the page is opened anew. */
+      return send(res, 200, html, TYPES['.html'], { 'Cache-Control': 'no-cache' });
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
   }
 
@@ -5784,7 +6970,10 @@ async function handle(req, res) {
     // Installed launchers read the original full array. The website opts into
     // pagination until those clients can follow a continuation themselves.
     const gallery = galleryPage(0, url.searchParams.get('galleryLimit') === '24' ? 24 : Number.MAX_SAFE_INTEGER);
-    return sendJson(res, 200, {
+    // no-cache for the same reason as the public pages: the same answer for
+    // everybody, and a no-store answer to the page's own fetch kept the page
+    // out of the back and forward cache as well (#3218).
+    return send(res, 200, JSON.stringify({
       // The one switch (#428), for the pages and the Discord bot.
       open: cfg.open === true,
       invite: cfg.discord.invite || '',
@@ -5799,8 +6988,10 @@ async function handle(req, res) {
       launcher: feed.launcher || '',
       collection: feed.collection || '',
       files: listFiles(),
-      news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title }))
-    });
+      news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title })),
+      // The hints and lore lines (#3147): the Discord bot's status lines.
+      lines: readLines()
+    }), 'application/json; charset=utf-8', { 'Cache-Control': 'no-cache' });
   }
 
   /*
@@ -5867,6 +7058,12 @@ async function handle(req, res) {
      how a bug turns into nobody bothering. Held to one short message at a
      time, five an hour from one place, and the inbox is capped so it cannot
      be used to fill the disk. See thornswood report limits above. */
+  // What the report page needs to draw the form: the Turnstile site key, or
+  // nothing when the check is off (#3216). Public, like the key itself.
+  if (route === '/api/report/form' && req.method === 'GET') {
+    return sendJson(res, 200, { turnstile: turnstileOn() ? cfg.turnstileSiteKey : '' });
+  }
+
   if (route === '/api/report' && req.method === 'POST') {
     const sender = reportFrom(req);
     const refuse = (no) => send(res, 429, JSON.stringify({ error: no.error }), null,
@@ -5884,6 +7081,18 @@ async function handle(req, res) {
     if (o && String(o.homepage || '').trim()) return sendJson(res, 200, { ok: true });
     const title = String(o.title || '').trim().slice(0, 200);
     if (!title) return sendJson(res, 400, { error: 'say what happened in the first box' });
+    // Turnstile's pass (#3216), asked before the limit is read again below,
+    // because it waits on Cloudflare and nothing may wait between that read
+    // and reportTaken. A refused pass is not counted against the sender.
+    if (turnstileOn()) {
+      const ts = await turnstilePasses(o.turnstile, requestAddr(req));
+      if (ts === 'unasked') {
+        return sendJson(res, 503, { error: 'Cloudflare did not answer the check that you are a person, so nothing was sent. Try again in a minute.' });
+      }
+      if (ts !== 'yes') {
+        return sendJson(res, 403, { error: 'The check that you are a person did not pass. Wait for the tick under the form, then send it again.' });
+      }
+    }
     // And asked again now the body is in, because the answer above is stale.
     // A script that opens thirty connections, sends every set of headers and
     // then every body gets all thirty past the first check before any of
@@ -6143,10 +7352,10 @@ async function handle(req, res) {
   }
 
   if (route === '/api/roadmap' && req.method === 'GET') {
-    const all = readBoard();
-    // The intro is markdown, and it is rendered here like the written pages
-    // so the front page needs no markdown library of its own.
-    const rm = all.roadmap || { intro:'', sections:[] };
+    // Built from the issue board by the bot (#3140). The intro is markdown,
+    // and it is rendered here like the written pages so the front page needs
+    // no markdown library of its own.
+    const rm = roadmapBoard(readLists());
     return sendJson(res, 200, Object.assign({}, rm,
       { introHtml: rm.intro ? pageHtml(rm.intro) : '' }));
   }
@@ -6183,7 +7392,10 @@ async function handle(req, res) {
     // without it. html is the one to show; md is kept for anything reading it.
     // sha256 is what the installer stores. changed is the day that wording last changed,
     // or null when the list has no row for this text.
-    const md = pageMarkdown(pg[1]);
+    // Only the pages the site shows (#3656): every .md in data\site was
+    // served here, lines.md's notes for the team included, though no page
+    // shows them.
+    const md = MD_PAGES.indexOf('/' + pg[1]) >= 0 ? pageMarkdown(pg[1]) : null;
     if (md === null) return sendJson(res, 404, { error: 'no such page' });
     const sha = pageSha256(md);
     const ver = findPageVersion(sha);
@@ -6203,10 +7415,17 @@ async function handle(req, res) {
   }
   const shot = route.match(/^\/shot\/([a-z0-9._ -]+)$/);
   if (shot && req.method === 'GET') {
-    const ok = jsonFile(GALLERY, [])
-      .some((g) => String(g.name).toLowerCase() === shot[1]);
-    const file = path.join(UP, shot[1]);
-    if (!ok || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
+    const item = jsonFile(GALLERY, [])
+      .find((g) => String(g.name).toLowerCase() === shot[1]);
+    // ?w= is one of its smaller copies (#3218), and only one its srcset names.
+    // The file by the name gallery.json keeps, since the address is lower
+    // cased and a name may not be: the same file on the box's Windows, and
+    // none at all on a copy of the site on Linux.
+    const wide = url.searchParams.get('w');
+    const file = !item ? ''
+      : wide === null ? path.join(UP, String(item.name))
+      : srcsetWidths(item.srcset).indexOf(Number(wide)) >= 0 ? smallCopy(item.name, Number(wide)) : '';
+    if (!file || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
       return send(res, 404, 'no such picture', 'text/plain');
     }
     const st = fs.statSync(file);
@@ -6238,6 +7457,25 @@ async function handle(req, res) {
     if (file.startsWith(PUBLIC + path.sep) && fs.existsSync(file)) {
       const type = TYPES[path.extname(file).toLowerCase()] || 'text/plain';
       /*
+        How long it may be kept. A name asked for with the hash it has now
+        (versionAssets, #3218) is that file and no other for good, so a year
+        and immutable. Anything else is the hour and an ETag: a browser
+        reuses it for the hour and then asks, and the answer to that
+        question is 25 bytes rather than 1.8 MB.
+
+        send() puts Cache-Control: no-store on everything, which is right for
+        a page that holds who somebody is and wrong for a picture. no-store
+        also means a browser cannot even answer with a 304, so before this a
+        page reload was a full download of all of public/.
+
+        The ETag is the hash of what is served, so it changes the moment a
+        deploy writes a new file, a stylesheet's when one of its fonts does.
+      */
+      const name = p.slice(1);
+      const version = publicAssetVersion(name);
+      const cache = version && url.searchParams.get('v') === version
+        ? 'public, max-age=31536000, immutable' : 'public, max-age=3600';
+      /*
         A byte range when one is asked for, because video needs it.
 
         Safari and iOS do not play a video from a plain 200 with the whole file
@@ -6245,46 +7483,26 @@ async function handle(req, res) {
         header. Chrome tolerates it, which is exactly how this ships broken for
         half the people and fine for whoever tested it.
 
-        Everything else is unaffected. No Range header means the old path, byte
-        for byte, with Accept-Ranges added so a client knows it may ask.
+        A stylesheet is sent as versionAssets writes it, which is not the file
+        on disk byte for byte, so it is never sent in pieces. The range carries
+        the same cache line as the whole file; it went out no-store, which kept
+        the banner video from being kept at all. No Range header means the
+        whole file, with Accept-Ranges added so a client knows it may ask.
       */
-      if (rangeReply(req, res, file, fs.statSync(file).size, { 'content-type': type }, head)) return;
-      /*
-        AND A CACHE HEADER, BECAUSE A LOGO IS NOT SOMEBODY'S PRIVATE DATA.
-
-        send() puts Cache-Control: no-store on everything, which is right for a
-        page that holds who somebody is and wrong for a picture. Every visit
-        was re-downloading the whole of public/: the favicon, the fonts, the
-        backdrop, the video. no-store also means a browser cannot even answer
-        with a 304, so a page reload is a full download of all of it.
-
-        An asset here is a file in public/ that a page asks for by name, and
-        the honest way to cache one that is NOT fingerprinted is a short
-        max-age plus an ETag: a browser reuses it for the hour and then asks,
-        and the answer to that question is 25 bytes rather than 1.8 MB.
-
-        The ETag is size and modified time, which is what a static file server
-        does. It changes the moment a deploy writes a new file, so a changed
-        picture is picked up on the next ask rather than after the hour.
-
-        The pages themselves are untouched: they go through send() and keep
-        no-store, which this branch never handles.
-      */
-      const st = fs.statSync(file);
-      const etag = '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"';
+      if (!/\.css$/i.test(name) &&
+          rangeReply(req, res, file, fs.statSync(file).size, { 'content-type': type, 'cache-control': cache }, head)) return;
+      const etag = '"' + (version || crypto.createHash('sha256').update(publicAssetBody(name)).digest('hex').slice(0, 16)) + '"';
       if (String(req.headers['if-none-match'] || '') === etag) {
         res.writeHead(304, {
           'etag': etag,
-          'cache-control': 'public, max-age=3600',
+          'cache-control': cache,
           'x-content-type-options': 'nosniff'
         });
         return res.end();
       }
-      return send(res, 200, fs.readFileSync(file), type, {
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public, max-age=3600',
-        'ETag': etag
-      });
+      const extra = { 'Cache-Control': cache, 'ETag': etag };
+      if (!/\.css$/i.test(name)) extra['Accept-Ranges'] = 'bytes';
+      return send(res, 200, publicAssetBody(name), type, extra);
     }
   }
 
@@ -6298,6 +7516,16 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
+    // The installer from the main release's GitHub Release, once it holds
+    // this very file publicly (release copies, #3686).
+    if (dl[1] === 'Thornswood-Setup.exe') {
+      const meta = jsonFile(path.join(FILES, 'files.json'), {});
+      const copy = releaseInstallerCopy(String((meta[dl[1]] || {}).sha256 || '').toLowerCase(), st.size);
+      if (copy) {
+        res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+        return res.end();
+      }
+    }
     /* Resumable, because the payload is hundreds of megabytes and the Join
        page says a dropped connection carries on. Accept-Ranges on the 200 so
        a client knows before it starts. The ETag and Last-Modified are what a
@@ -6435,6 +7663,13 @@ async function handle(req, res) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
+    // The Release's copy of these bytes, once GitHub holds it publicly
+    // (release copies, #3686). no-cache: the answer moves when it appears.
+    const copy = releaseCopy(feedAsset[1], feedAsset[2], st.size);
+    if (copy) {
+      res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
+      return res.end();
+    }
     /* Same Range resume as /file/: packs are tens of megabytes and a drop
        must carry on. Cache-Control is long and immutable because the name
        is the bytes; a new pack is a new name. */
@@ -6489,8 +7724,11 @@ async function handle(req, res) {
                     String((gs.body && gs.body.error) || 'staff only'), 'text/plain');
       }
     }
-    const file = path.join(UP, up[1]);
-    if (!file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
+    // ?w= is a waiting picture's smaller copy (#3218), for the staff card.
+    const wide = url.searchParams.get('w');
+    const file = wide === null ? path.join(UP, up[1])
+      : SMALL_WIDTHS.indexOf(Number(wide)) >= 0 ? smallCopy(up[1], Number(wide)) : '';
+    if (!file || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     /* A gallery submission that staff removed is not served to anybody
@@ -6575,35 +7813,9 @@ async function handle(req, res) {
     // door verifies it: read it, ask Discord for the standing, and hold it to
     // the same answers /api/play/join gives, so a banned or departed account
     // cannot put a picture in the queue.
-    let from = '', discordId = '';
-    // A signed-in Discord account that may play, or the hub member cookie
-    // (password bootstrap / staff). Hub "member" alone used to be the only
-    // web door, and with Discord live that meant only admins could submit
-    // from the site. Play-capable signed-in people submit too.
-    if (w.play || w.member) {
-      from = 'web';
-      discordId = w.id || '';
-    } else {
-      const t = readTicket(url.searchParams.get('ticket'));
-      // Signed in, and Discord did not answer in time (#467): say that.
-      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
-        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
-      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
-        'Sign in to the hub, or send a valid launcher ticket.' });
-      const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
-      standCache.delete(String(t.d));
-      if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
-      // Banned before the guild check (#1022). standing() leaves inGuild false
-      // when bans.json already refused the account.
-      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
-        'That Discord account is banned from Thornswood.' });
-      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
-        'That Discord account is not in the Thornswood Discord.' });
-      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
-        'That Discord account has no role that lets it in yet.' });
-      from = 'launcher';
-      discordId = String(t.d);
-    }
+    const who = await gallerySender(url, w, 'Sign in to the hub, or send a valid launcher ticket.');
+    if (!who.ok) return sendJson(res, who.code, who.body);
+    const from = who.from, discordId = who.discordId;
 
     const asked = (url.searchParams.get('name') || 'shot.png').split(/[\\/]/).pop();
     const by = (url.searchParams.get('by') || '').slice(0, 40);
@@ -6638,6 +7850,99 @@ async function handle(req, res) {
     });
   }
 
+  /*
+    A picture's smaller copies (#3218, SMALL_WIDTHS says why). The body IS
+    the copy, a WebP or a JPEG named by its Content-Type, the /api/upload
+    way; the picture's name and the copy's width ride in the query, with the
+    launcher's ticket as on submit. Whoever sent the picture may send each
+    width once while it waits; staff may send or replace one at any time.
+    The copy has to be exactly that width and the picture's shape, both read
+    off the files' own headers, and the picture has to be wider than it. A
+    copy staff send for a picture already on the gallery goes out at once,
+    since staff made it from the picture they were looking at; any other
+    copy waits for an Accept that showed it.
+  */
+  if (p === '/api/gallery/copy' && req.method === 'POST') {
+    const who = await gallerySender(url, w, 'Sign in to the hub, or send a valid launcher ticket.');
+    if (!who.ok) return sendJson(res, who.code, who.body);
+    const name = String(url.searchParams.get('name') || '');
+    const width = Number(url.searchParams.get('w'));
+    if (!/^[A-Za-z0-9._ -]+$/.test(name) || name === 'uploads.json') return sendJson(res, 400, { error: 'Say which picture this is a copy of.' });
+    if (SMALL_WIDTHS.indexOf(width) < 0) return sendJson(res, 400, { error: 'A copy is ' + SMALL_WIDTHS.join(' or ') + ' pixels wide.' });
+    const entry = jsonFile(GPENDING, []).find((x) => String(x.name) === name);
+    const shown = jsonFile(GALLERY, []).find((g) => String(g.name) === name);
+    if (!entry && !shown) return sendJson(res, 404, { error: 'That picture is not waiting for staff or on the gallery.' });
+    const owner = !!(entry && who.discordId && String(entry.discordId || '') === who.discordId);
+    if (!who.dev && !owner) return sendJson(res, 403, { error: 'Only whoever sent that picture, or staff, can send its smaller copies.' });
+    if (!who.dev && pendingCopies(entry).indexOf(width) >= 0) {
+      return sendJson(res, 409, { error: 'That copy is already in. Staff look at the copies before they Accept, so a copy is not changed once it is sent.' });
+    }
+    if (uploadRemoved(name)) return sendJson(res, 409, { error: 'That picture was removed from the gallery.' });
+    const full = pictureSize(path.join(UP, name));
+    if (!full) return sendJson(res, 422, { error: 'The site could not read the size of that picture, so it takes no copy of it.' });
+    if (full.w <= width) return sendJson(res, 400, { error: 'That picture is ' + full.w + ' pixels wide, so it needs no ' + width + ' copy.' });
+    const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    const ext = type === 'image/webp' ? '.webp' : type === 'image/jpeg' ? '.jpg' : '';
+    if (!ext) return sendJson(res, 415, { error: 'A copy is a WebP or a JPEG.' });
+    const tall = Math.round(full.h * width / full.w);
+    return receiveUpload(req, res, 'copy' + ext, SMALL_CAP, SMALL_KINDS, (temp) => {
+      const sent = path.join(UP, temp);
+      const got = pictureSize(sent);
+      if (!got || got.w !== width || Math.abs(got.h - tall) > 1) {
+        // The file goes, and one that will not go is said by deleteUpload.
+        deleteUpload(temp);
+        return sendJson(res, 422, { error: 'That copy is ' + (got ? got.w + ' by ' + got.h : 'not a picture the site can read') +
+                                           ', and a ' + width + ' copy of this picture is ' + width + ' by ' + tall + '.' });
+      }
+      // Kept and noted in the queue's turn, so two copies at one width sent
+      // together cannot both get in: the second is told it is already in.
+      withGalleryPending(() => {
+        const pending = jsonFile(GPENDING, []);
+        const hit = pending.find((x) => String(x.name) === name);
+        if (!who.dev && (!hit || pendingCopies(hit).indexOf(width) >= 0)) {
+          deleteUpload(temp);
+          return sendJson(res, 409, { error: hit ? 'That copy is already in.' : 'That picture is no longer waiting for staff.' });
+        }
+        try {
+          fs.mkdirSync(UP_SMALL, { recursive: true });
+          fs.renameSync(sent, smallFile(name, width, ext));
+          // The other kind at this width, if one was sent before, goes, or
+          // smallCopy could go on finding it.
+          for (const other of SMALL_KINDS) {
+            if (other === ext) continue;
+            try { fs.unlinkSync(smallFile(name, width, other)); }
+            catch (e) { if (!e || e.code !== 'ENOENT') throw e; }
+          }
+        } catch (e) {
+          console.error('[thornswood-docs] could not keep the ' + width + ' copy of ' + name + ' (' + (e.code || e.message) + ')');
+          deleteUpload(temp);
+          return sendJson(res, 500, { error: 'The site could not keep that copy (' + (e.code || 'unknown') + '). Try again in a minute.' });
+        }
+        if (hit) {
+          const have = pendingCopies(hit).concat(width);
+          hit.copies = SMALL_WIDTHS.filter((n) => have.indexOf(n) >= 0);
+          if (!putJson(GPENDING, pending)) {
+            console.error('[thornswood-docs] gallery ' + JSON.stringify({ event: 'pending-write-failed' }));
+            return sendJson(res, 500, { ok: false, error: 'The site kept the copy but could not note it on the queue. Send it again in a minute.' });
+          }
+        }
+        if (who.dev) {
+          const gallery = jsonFile(GALLERY, []);
+          const item = gallery.find((g) => String(g.name) === name);
+          if (item) {
+            const srcset = shotSrcset(name, srcsetWidths(item.srcset).concat(width));
+            if (srcset) item.srcset = srcset;
+            if (!putJson(GALLERY, gallery)) {
+              console.error('[thornswood-docs] gallery ' + JSON.stringify({ event: 'gallery-write-failed' }));
+              return sendJson(res, 500, { ok: false, error: 'The site kept the copy but could not put it on the gallery. Send it again in a minute.' });
+            }
+          }
+        }
+        sendJson(res, 200, { ok: true, name: name, w: width });
+      }).catch((e) => failed(req, res, e));
+    }, true);
+  }
+
   // The queue, for staff (access.dev) to look through. Never public, so it is
   // its own door rather than a field on /api/public. galleryStaff takes the hub
   // cookie or a launcher ticket for a staff account; everything below it does
@@ -6670,19 +7975,29 @@ async function handle(req, res) {
     const by = (o.by !== undefined && o.by !== null) ? String(o.by).slice(0, 40)
              : (hit ? String(hit.by || '') : '');
 
+    // The smaller copies the card showed (#3218): those go out with it and
+    // no others, so what is public is what staff saw. A caller that names
+    // none (a launcher from before the copies) puts it up at full size.
+    const showed = Array.isArray(o.copies) ? o.copies.map(Number) : [];
+    const copies = pendingCopies(hit).filter((n) => showed.indexOf(n) >= 0);
+    const srcset = copies.length ? shotSrcset(name, copies) : '';
+
     const gallery = jsonFile(GALLERY, []);
     const already = gallery.find((g) => String(g.name) === name);
     if (already) {
       already.url = '/shot/' + name;
       if (by) already.by = by;
+      if (srcset) already.srcset = srcset;
     } else {
-      gallery.push({ name: name, url: '/shot/' + name, by: by });
+      const item = { name: name, url: '/shot/' + name, by: by };
+      if (srcset) item.srcset = srcset;
+      gallery.push(item);
     }
     putJson(GALLERY, gallery);
 
     const left = pending.filter((x) => String(x.name) !== name);
     if (left.length !== pending.length) putJson(GPENDING, left);
-    return sendJson(res, 200, { ok: true, name: name, approved: true });
+    return sendJson(res, 200, { ok: true, name: name, approved: true, copies: srcsetWidths(srcset) });
   }
 
 
@@ -6804,30 +8119,9 @@ async function handle(req, res) {
   // launcher with the same ticket /api/gallery/submit takes. The report sits
   // in gallery-reports.json for staff; it does not take the shot down.
   if (p === '/api/gallery/report' && req.method === 'POST') {
-    let from = '', discordId = '';
-    if (w.play || w.member) {
-      from = 'web';
-      discordId = w.id || '';
-    } else {
-      const t = readTicket(url.searchParams.get('ticket'));
-      // Signed in, and Discord did not answer in time (#467): say that.
-      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
-        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
-      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
-        'Sign in, or send a valid launcher ticket.' });
-      const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
-      standCache.delete(String(t.d));
-      if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
-      // Same order as submit (#1022): a file ban is not "not in the Discord".
-      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
-        'That Discord account is banned from Thornswood.' });
-      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
-        'That Discord account is not in the Thornswood Discord.' });
-      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
-        'That Discord account has no role that lets it in yet.' });
-      from = 'launcher';
-      discordId = String(t.d);
-    }
+    const who = await gallerySender(url, w, 'Sign in, or send a valid launcher ticket.');
+    if (!who.ok) return sendJson(res, who.code, who.body);
+    const from = who.from, discordId = who.discordId;
 
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
@@ -6926,12 +8220,12 @@ async function handle(req, res) {
       notAcceptedYet(),
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
-    // access.dev (the staff roles by default, Patrick 27 Sep #605, unless
+    // access.devBuild (Owner, Co-Owner, Dev and the leads, #3317, unless
     // config.json says otherwise); anyone else is sent back to the main build
     // with a plain reason.
     const wantsDev = String(o.channel || '') === 'dev';
-    if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
-      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    if (wantsDev && !st.devBuild) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
+      'The dev build is for the ' + andList(cfg.access.devBuild) + ' roles. Play on the main build.' });
     /*
       The world is full (#481). Not a no any more: Patrick, 29 Sep, a full
       world lets people into the game's menu to wait in line. The yes below
@@ -7088,6 +8382,9 @@ async function handle(req, res) {
       avatar: st.avatar || '',
       admin: st.admin,
       dev: !!st.dev,
+      // Whether this account may install and play the dev build
+      // (access.devBuild, #3317). dev above is staff in the game.
+      devBuild: !!st.devBuild,
       roles: st.roles,
       slots: slotsFor(st),
       // Whether the profile id sent is now against this account. False when
@@ -7328,17 +8625,56 @@ async function handle(req, res) {
     const who = (o.who && typeof o.who === 'object') ? o.who : {};
     const store = jsonFile(ROSTER, { who: {} });
     if (!store.who || typeof store.who !== 'object') store.who = {};
+    const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
+    if (!store.sent || typeof store.sent !== 'object' || Array.isArray(store.sent)) store.sent = {};
+    store.sent[srv] = Date.now();
+    /*
+      A deleted person's characters stay off the roster (#3677).
+
+      The site takes a deletion request out of roster.json as it starts and
+      then deletes the request, but a game server takes its own part only at
+      its own next start (#2758), and until then it still holds their rows
+      and sends its whole book here every five minutes. So the site's start
+      leaves a mark in roster.json's deleted for each of their character
+      numbers, { at, clear }: at is when the site removed them, and nothing
+      else about them is kept. A row for a marked number is refused unless
+      the game server wrote it after that (row.at, which moves only while
+      somebody is playing it), so a character the number is played as again
+      comes back and the deleted one does not. Each server whose book no
+      longer has the old row, and whose held list does not name it, is added
+      to clear, and the mark goes once every server that has ever sent a book
+      (sent, and servers for a box older than sent) is there, which is when
+      no server can send it back.
+    */
+    const marks = (store.deleted && typeof store.deleted === 'object' && !Array.isArray(store.deleted)) ? store.deleted : {};
+    const stale = (pid) => {
+      const m = marks[String(pid)];
+      const row = who[String(pid)];
+      return !!m && !(row && typeof row === 'object' && Number(row.at) > (Number(m.at) || 0));
+    };
     // Which of the profiles it looked at that server holds a character for,
     // kept per server (#955). /api/play/roster reads it back as "gone".
     if (Array.isArray(o.checked) && Array.isArray(o.held)) {
-      const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
-      const ints = (a) => a.map(Number).filter((x) => x > 0 && Number.isInteger(x)).slice(0, 100000);
+      const ints = (a) => a.map(Number).filter((x) => x > 0 && Number.isInteger(x) && !stale(x)).slice(0, 100000);
       if (!store.servers || typeof store.servers !== 'object') store.servers = {};
       store.servers[srv] = { at: Date.now(), checked: ints(o.checked), held: ints(o.held) };
     }
+    const held = new Set(Array.isArray(o.held) ? o.held.map(Number) : []);
+    const known = ['main'].concat(Object.keys(store.servers || {}), Object.keys(store.sent));
+    const refused = new Set();
+    for (const pid of Object.keys(marks)) {
+      const m = marks[pid];
+      if (!m || typeof m !== 'object') { delete marks[pid]; continue; }
+      if (stale(pid) && (who[pid] || held.has(Number(pid)))) { refused.add(pid); continue; }
+      const clear = Array.isArray(m.clear) ? m.clear.map(String) : [];
+      if (clear.indexOf(srv) < 0) clear.push(srv);
+      m.clear = clear;
+      if (known.every((s) => clear.indexOf(s) >= 0)) delete marks[pid];
+    }
+    if (Object.keys(marks).length) store.deleted = marks; else delete store.deleted;
     let n = 0;
     for (const pid of Object.keys(who)) {
-      if (!/^\d+$/.test(pid)) continue;
+      if (!/^\d+$/.test(pid) || refused.has(pid)) continue;
       const row = who[pid];
       if (!row || typeof row !== 'object') continue;
       store.who[pid] = {
@@ -7448,13 +8784,15 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], offices: {}, jarlClash: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], offices: {}, jarlClash: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionLeaderProfiles: {}, factionLeaderClash: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
     const seenStaffRole = new Set();
     const seenBusiness = new Set();
-    const seenFaction = new Set();
+    // Leader role -> account -> that account's profiles, so a Leader role two
+    // accounts hold can come off both below.
+    const leaderAccounts = new Map();
     const seenDevRole = new Set();
     const seenCompany = new Set();
     const seenFailed = new Set();
@@ -7489,7 +8827,7 @@ async function handle(req, res) {
         continue;
       }
       if (!st.play || st.banned) continue;
-      if (devDoor && !st.dev) continue;
+      if (devDoor && !st.devBuild) continue;
       for (const n of profiles) if (!seen.has(n)) { seen.add(n); out.profiles.push(n); }
       if (st.dev) {
         for (const n of profiles) if (!seenDev.has(n)) { seenDev.add(n); out.devProfiles.push(n); }
@@ -7508,8 +8846,9 @@ async function handle(req, res) {
       if (st.businessOwner) {
         for (const n of profiles) if (!seenBusiness.has(n)) { seenBusiness.add(n); out.businessOwnerProfiles.push(n); }
       }
-      if (st.factionOwner) {
-        for (const n of profiles) if (!seenFaction.has(n)) { seenFaction.add(n); out.factionOwnerProfiles.push(n); }
+      for (const role of (st.leads || [])) {
+        if (!leaderAccounts.has(role)) leaderAccounts.set(role, new Map());
+        leaderAccounts.get(role).set(String(d), profiles);
       }
       if (st.devRole) {
         for (const n of profiles) if (!seenDevRole.has(n)) { seenDevRole.add(n); out.devRoleProfiles.push(n); }
@@ -7525,6 +8864,15 @@ async function handle(req, res) {
        this and nothing else. And one Jarl a hold: a hold's Jarl role two
        accounts hold comes off both, and staff are told (officesForDoor). */
     out.jarlClash = await officesForDoor(out, answers, linked);
+    /* THE FACTION BOOKS (#3317): each faction's Leader role and the profiles
+       of the account that holds it. One Leader a faction, like one Jarl a
+       hold: a Leader role two accounts hold goes to neither, so the book
+       stays with nobody new until staff fix it, and the bot's faction panel
+       refuses both the same way (bot.py leader_held_twice). */
+    for (const [role, accounts] of leaderAccounts) {
+      if (accounts.size > 1) { out.factionLeaderClash.push(role); continue; }
+      for (const pl of accounts.values()) out.factionLeaderProfiles[role] = pl.slice();
+    }
     /* STAFF BANS (#412), which are this site's own file and need no Discord.
        Every profile under an active ban is left out of every list, including
        a profile no account holds and one Discord could not be asked about,
@@ -7547,6 +8895,7 @@ async function handle(req, res) {
       }
       if (Array.isArray(out.people)) out.people = [];
       out.offices = {};
+      out.factionLeaderProfiles = {};
     }
     const barred = new Set(out.pk);
     for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
@@ -7555,8 +8904,12 @@ async function handle(req, res) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
       for (const n of Object.keys(out.offices)) if (barred.has(Number(n))) delete out.offices[n];
-      for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
+      for (const k of ['businessOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
+      }
+      for (const role of Object.keys(out.factionLeaderProfiles)) {
+        out.factionLeaderProfiles[role] = out.factionLeaderProfiles[role].filter((n) => !barred.has(Number(n)));
+        if (!out.factionLeaderProfiles[role].length) delete out.factionLeaderProfiles[role];
       }
       out.people = out.people.map((p) => Object.assign({}, p, { profiles: p.profiles.filter((n) => !barred.has(Number(n))) }))
         .filter((p) => p.profiles.length);
@@ -7724,8 +9077,8 @@ async function handle(req, res) {
       'That Discord account is not in the Thornswood Discord.' });
     if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', message:
       notAcceptedYet() });
-    if (server === 'dev' && !st.dev) return sendJson(res, 403, { ok: false, why: 'dev', message:
-      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    if (server === 'dev' && !st.devBuild) return sendJson(res, 403, { ok: false, why: 'dev', message:
+      'The dev build is for the ' + andList(cfg.access.devBuild) + ' roles. Play on the main build.' });
 
     const linked = jsonFile(LINKED, {});
     const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))
@@ -8161,7 +9514,10 @@ async function handle(req, res) {
   approved, with the file. What stays: a session staff marked kept with its
   logs and alerts, reports they made or that were made about them, and a
   picture held while a report about it is looked into (#2352). Staff's own
-  records (bans, notes, PKs, the staff log) are never read here.
+  records (bans, notes, PKs, the staff log) are never read here. What is
+  added: a mark in roster.json for each of their character numbers, with the
+  time and nothing else, which /api/roster refuses a running game server's
+  old rows by until every server has let go (#3677).
 
   Every file is read before any is written; one that is there and will not
   parse leaves the request where it is, and the start goes on. A write that
@@ -8257,6 +9613,14 @@ function applyDeletionRequests() {
     }, 'failed-session alerts');
     const R = f.roster.v;
     if (isObj(R.who)) for (const k of Object.keys(R.who)) if (mine(k)) { delete R.who[k]; f.roster.dirty = true; gone('roster rows', 1); }
+    // A game server that has not started since still holds their rows and
+    // sends them every five minutes; this mark is what /api/roster refuses
+    // them by, until every server has let go (#3677).
+    if (P.size) {
+      if (!isObj(R.deleted)) R.deleted = {};
+      for (const n of P) R.deleted[String(n)] = { at: now, clear: [] };
+      f.roster.dirty = true;
+    }
     if (isObj(R.servers)) {
       for (const sv of Object.values(R.servers)) {
         if (!isObj(sv)) continue;
@@ -8336,8 +9700,12 @@ http.createServer((req, res) => {
   console.log('[thornswood-docs] writing this to ' + siteLog.file +
               ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);
+  console.log('[thornswood-docs] trusting ' + tls.getCACertificates('default').length +
+              ' root certificates, leaving out ' + (LEFT_OUT.join(', ') || 'none'));
   rereadTrouble();
-  // The first retention pass, then every hour (#2350).
+  // The first retention pass, then every hour (#2350). Before the ready line
+  // below: the site harnesses read the pass's files once that line is out
+  // (#4082).
   retentionSweep();
   // The files play and identity rest on, read once on the way up (#2180).
   // Each broken one has said STATE BROKEN or BANS BROKEN above this line.

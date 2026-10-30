@@ -54,7 +54,7 @@
      undo; the join pass, the door and the launcher's roster follow it; both
      moderation.logs say it. The rules page and the terms.
   8. Only the admin role: a second scratch site with Discord roles, where a
-     Moderator is refused on the hub and in the game and an Owner is not, and
+     Gamemaster is refused on the hub and in the game and an Owner is not, and
      a Patreon tier's third slot counts.
 
   Nothing leaves this machine. Scratch files go under THORNSWOOD_TEMP when it
@@ -297,18 +297,19 @@ function braceGrab(text, head) {
   Part 8: a second scratch site whose people have Discord roles, from a stub
   loaded ahead of server.js (the way test-hub-staff-gallery.js does it), so a
   staff member who is not an admin exists. Owner is the admin role;
-  Moderator is staff and not an admin. Tova (Playtester) has two slots and
+  Gamemaster is staff in the game and not an admin (since #3317 a
+  Moderator works in the Discord only and is not staff here). Tova (Playtester) has two slots and
   two living characters; Mira (Milk Drinker, a Patreon tier) has three.
 */
 function discordStub() {
   const https = require('https');
   const { EventEmitter } = require('events');
   const GUILD = process.env.TS_STUB_GUILD;
-  const ROLES = [{ id: 'r1', name: 'Owner' }, { id: 'r2', name: 'Moderator' },
+  const ROLES = [{ id: 'r1', name: 'Owner' }, { id: 'r2', name: 'Gamemaster' },
                  { id: 'r3', name: 'Playtester' }, { id: 'r4', name: 'Milk Drinker' }];
   const member = (id, name, roles) => ({ nick: name, roles, user: { id, username: name.toLowerCase(), global_name: name } });
   const ids = JSON.parse(process.env.TS_STUB_IDS);
-  const MEMBERS = [member(ids.owner, 'Owner', ['r1']), member(ids.mod, 'Moderator', ['r2']),
+  const MEMBERS = [member(ids.owner, 'Owner', ['r1']), member(ids.mod, 'Gamemaster', ['r2']),
                    member(ids.tova, 'Tova', ['r3']), member(ids.mira, 'Mira', ['r3', 'r4'])];
   function answer(where) {
     if (where === '/api/v10/guilds/' + GUILD) return { id: GUILD, name: 'Thornswood (harness)' };
@@ -360,7 +361,7 @@ async function adminRoleOnly() {
   const D2 = path.join(d2, 'data');
   fs.writeFileSync(path.join(D2, 'linked.json'), JSON.stringify({
     [ids.owner]: { id: ids.owner, name: 'Owner', profiles: [8001] },
-    [ids.mod]: { id: ids.mod, name: 'Moderator', profiles: [8002] },
+    [ids.mod]: { id: ids.mod, name: 'Gamemaster', profiles: [8002] },
     [ids.tova]: { id: ids.tova, name: 'Tova', profiles: [8101, 8102, 8103] },
     [ids.mira]: { id: ids.mira, name: 'Mira', profiles: [8201, 8202, 8203] }
   }));
@@ -369,8 +370,8 @@ async function adminRoleOnly() {
     8201: { name: 'Mira One' }, 8202: { name: 'Mira Two' }, 8203: { name: 'Mira Dead' }
   } }));
   fs.writeFileSync(path.join(D2, 'pk.json'), JSON.stringify({
-    8103: { at: 1, by: 'Moderator', why: 'thought it was agreed', name: 'Tova Dead', account: ids.tova, from: 'the hub' },
-    8203: { at: 1, by: 'Moderator', why: 'wrong character', name: 'Mira Dead', account: ids.mira, from: 'the hub' }
+    8103: { at: 1, by: 'Gamemaster', why: 'thought it was agreed', name: 'Tova Dead', account: ids.tova, from: 'the hub' },
+    8203: { at: 1, by: 'Gamemaster', why: 'wrong character', name: 'Mira Dead', account: ids.mira, from: 'the hub' }
   }));
   fs.writeFileSync(path.join(d2, 'stub.js'), '(' + discordStub.toString() + ')();\n');
   const pk2 = () => JSON.parse(fs.readFileSync(path.join(D2, 'pk.json'), 'utf8'));
@@ -388,14 +389,14 @@ async function adminRoleOnly() {
   });
   try {
     yes('the second scratch site starts, with Discord roles from the stub', await listening(site2, port2).then(() => true));
-    const modC = cookie2(ids.mod, 'Moderator'), ownC = cookie2(ids.owner, 'Owner');
+    const modC = cookie2(ids.mod, 'Gamemaster'), ownC = cookie2(ids.owner, 'Owner');
     let r = await request(port2, 'GET', '/api/all', modC);
-    yes('the Moderator is staff and not an admin', r.status === 200 && r.j.me.dev === true && r.j.me.admin === false);
+    yes('the Gamemaster is staff and not an admin', r.status === 200 && r.j.me.dev === true && r.j.me.admin === false);
     r = await request(port2, 'POST', '/api/staff/unpk', modC, { id: ids.mira, profileId: 8203, why: 'made by mistake' });
-    yes('Undo PK on the hub refuses the Moderator with a plain line, and nothing changes',
+    yes('Undo PK on the hub refuses the Gamemaster with a plain line, and nothing changes',
         r.status === 403 && r.j.message === 'Only an admin can undo a PK.' && !pk2()['8203'].undone);
     r = await request(port2, 'POST', '/api/staff/game/unpk', { 'X-Thornswood-Key': key2 },
-                      { profileId: 8203, why: 'made by mistake', byProfileId: 8002, byName: 'Moderator' });
+                      { profileId: 8203, why: 'made by mistake', byProfileId: 8002, byName: 'Gamemaster' });
     yes('and so does the game\'s /unpk route, asking Discord itself',
         r.status === 403 && r.j.message === 'Only an admin can undo a PK.' && !pk2()['8203'].undone);
     r = await request(port2, 'GET', '/api/all', ownC);

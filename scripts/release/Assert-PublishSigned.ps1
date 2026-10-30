@@ -27,7 +27,11 @@
   never answered by an older copy already loaded in the same session.
 #>
 
-$AssertPublishSignedCs = Join-Path $PSScriptRoot '..\..\launcher\app\Signature.cs'
+# Signature.cs sits beside this file's folder. Sign-OnGitHub.ps1 carries the
+# file's text to the box, where it runs as a block with no script root, and
+# names Signature.cs itself (first cloud dev Ship, 22 Oct 2026: Join-Path
+# with the empty root stopped the box's check before it began).
+if ($PSScriptRoot) { $AssertPublishSignedCs = Join-Path $PSScriptRoot '..\..\launcher\app\Signature.cs' }
 
 function Get-LauncherSignatureType {
     $src = [IO.File]::ReadAllText($AssertPublishSignedCs)

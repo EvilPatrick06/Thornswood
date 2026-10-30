@@ -72,7 +72,11 @@ for (const g of GATES) {
   yes('R4 ' + label + ' sits in a cell\'s persistent group, where Bethesda placed it', r.cell !== null && r.child === 8);
   yes('R5 ' + label + ' is not disabled', !(r.flags & 0x800));
 }
-yes('R6 no other placed reference is overridden', Object.keys(found).length === GATES.length);
+// The only other placed references here are the floor items, each switched
+// off (#3077, tests/test-3077-floor-items.js).
+const gateFids = GATES.map((g) => ((sky << 24) >>> 0) + g);
+yes('R6 no other placed reference is overridden, but the floor items, each switched off',
+    Object.keys(found).every((f) => gateFids.indexOf(Number(f)) >= 0 || (found[f].flags & 0x800)));
 
 const man = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
 yes('J1 the manifest names the three gates', JSON.stringify(man.gatesUnlocked) ===

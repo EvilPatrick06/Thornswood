@@ -28,13 +28,22 @@
      site in a src, a url(), a stylesheet link or a preconnect here.
 
      If anything like it comes back, it comes back with the privacy
-     page and the consent gate in the same change, not after it. -->
+     page and the consent gate in the same change, not after it.
+
+     THE ONE EXCEPTION IS CLOUDFLARE WEB ANALYTICS (#3218), which
+     Patrick allowed on 22 October 2026. It is not in this file:
+     Cloudflare, which carries every request to the site anyway, writes
+     its beacon into the page on the way out. It sets no cookie and keeps
+     nothing on the visitor's machine, so there is nothing for a consent
+     gate to ask about; the content rules in server.js (CSP_HEADER) let
+     it through and the privacy page names it. -->
 <title>Thornswood</title>
 <meta name="description" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
 <!-- What a link to this site looks like when it is pasted into Discord. Without
      these every address unfurled with the same generic home text, so a link to
      the rules and a link to the roadmap read identically in a channel. The
-     router below rewrites them per page once it knows which page this is. -->
+     server writes each page's own words into them before it sends the page,
+     from its one list (BLURB in server.js, #3138). -->
 <meta property="og:site_name" content="Thornswood">
 <meta property="og:type" content="website">
 <meta property="og:title" id="ogTitle" content="Thornswood">
@@ -51,6 +60,15 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+<!-- The two faces every page sets its first words in, asked for with the
+     page rather than after fonts.css has come back and been read (#3218):
+     the font files hung off fonts.css, which put about 850 ms before the
+     text was in its own face. The addresses are the ones fonts.css names,
+     ?v= and all, which send() writes into both (versionAssets). crossorigin
+     because a font is always fetched that way, and a preload without it is
+     fetched twice. -->
+<link rel="preload" href="/cinzel.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/spectral-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/fonts.css">
 <link rel="stylesheet" href="/home.css">
 </head>
@@ -60,7 +78,9 @@
 
 <header>
   <div class="wrap bar">
-    <a class="mark" href="/"><img src="/logo.png" alt="Thornswood">Thornswood</a>
+    <!-- alt="" because the link says Thornswood in words beside it, and a
+         screen reader read the name twice (#3218). -->
+    <a class="mark" href="/"><img src="/logo-28.webp" srcset="/logo-28.webp 1x, /logo-56.webp 2x, /logo-84.webp 3x" width="28" height="28" alt="">Thornswood</a>
     <a class="mobile-cta" href="/downloads">Download</a>
     <button class="burger" id="burger" aria-label="Open menu" aria-controls="nav" aria-expanded="false">&#9776;</button>
     <nav class="top" id="nav" aria-label="Main navigation">
@@ -106,9 +126,9 @@
 
     muted and playsinline because a hero that asks permission to play does not
     play at all: autoplay is only allowed without sound, and without
-    playsinline iOS opens it fullscreen instead. The poster is the still, so
-    the first paint is a picture rather than black, and it is what stays on
-    screen for anybody who has asked their machine for less motion.
+    playsinline iOS opens it fullscreen instead. The still under it is the
+    first paint, a picture rather than black, and it is what stays on screen
+    for anybody who has asked their machine for less motion.
 
     Both files are the whole painting, not the launcher's strip.
     banner.mp4 is the 24 second v4 loop at 1600x900 and banner.jpg is its
@@ -125,7 +145,7 @@
     DECORATIVE (#2193). The painting says nothing the page does not say in
     words, so the video is hidden from assistive technology (aria-hidden),
     kept out of the tab order (tabindex -1), carries no controls, and has no
-    fallback text: a browser that cannot play it shows the poster, and a
+    fallback text: a browser that cannot play it shows the still, and a
     screen reader has nothing to announce. disablepictureinpicture and
     disableremoteplayback keep the browser from laying its own picture in
     picture and cast buttons over it, which would be a media control with no
@@ -134,11 +154,38 @@
     stays in the tab order. Reduced motion is home.js too: no autoplay
     attribute here, so nothing starts before it has asked.
   -->
-  <video class="art" muted loop playsinline preload="none"
-         poster="/banner.jpg" aria-hidden="true" tabindex="-1"
-         disablepictureinpicture disableremoteplayback>
-    <source src="/banner.mp4" type="video/mp4">
-  </video>
+  <!--
+    THE STILL IS A PICTURE OF ITS OWN UNDER THE VIDEO, NOT THE VIDEO'S POSTER
+    (#3218). A poster is one address for every screen, so a phone was sent the
+    1600 pixel JPEG, 326 KiB, and a browser cannot be told to fetch it early.
+    This is the same painting at three widths in WebP, the browser picks the
+    one its screen needs, and it is asked for at once because it is the
+    biggest thing on the page when it opens. Built by
+    scripts/dev/Build-SiteImages.py from banner.jpg. The video sits over it
+    with no poster, so it shows nothing until its first frame and the still
+    shows through until then. home.js starts it only once the page has loaded
+    (#2777), so its 3.3 MB do not share a phone's line with the still while
+    the still is coming in; for somebody who asked for less motion it never
+    plays, and the still is what stays. alt="" and aria-hidden for the same
+    reason as the video (#2193, below).
+  -->
+  <!--
+    The frame both pictures sit in (#2767). Wide, it lies under the words; on
+    a narrow screen it is a band of its own above them, the whole painting at
+    16:9, and the words follow on the dark page. Its overflow keeps the slow
+    drift inside the painting either way.
+  -->
+  <div class="paint">
+    <img class="art" src="/banner-1600.webp"
+         srcset="/banner-800.webp 800w, /banner-1200.webp 1200w, /banner-1600.webp 1600w"
+         sizes="100vw" width="1600" height="900" alt="" aria-hidden="true"
+         fetchpriority="high">
+    <video class="art" muted loop playsinline preload="none"
+           aria-hidden="true" tabindex="-1"
+           disablepictureinpicture disableremoteplayback>
+      <source src="/banner.mp4" type="video/mp4">
+    </video>
+  </div>
   <div class="wrap">
     <!-- The painting carries the title and the emblem; the page's h1 stays
          for readers and search, unseen. -->
@@ -166,21 +213,23 @@
 <section id="what">
   <div class="wrap">
     <div class="eyebrow">What this is</div>
-    <h2>A world that is not empty at three in the morning</h2>
-    <p class="lede">Thornswood is built around a smaller population of people
-      in the towns, alongside the characters you and others bring into the world.
-      <strong>Thornswood keeps a chosen few.</strong> Enough that a hold feels
-      lived in when two of you are online, few enough that you are still the
-      reason anything happens.</p>
+    <h2>A world run by the people in it</h2>
+    <p class="lede">The towns are yours to fill. The game's own guards, courts and
+      wandering townsfolk are gone, so the guard on the wall, the Jarl in the
+      hall and the smith at the forge are other people playing.
+      <strong>Thornswood keeps a chosen few.</strong> The traders, the
+      drivers and the ferrymen stay, so a hold still works when two of you are
+      online, and you are still the reason anything happens.</p>
 
     <div class="three">
       <div>
         <div class="num">01</div>
         <h3>Fewer, and worth talking to</h3>
-        <p>Most of the crowd goes. What stays is what a town actually needs:
-          the innkeeper, the smith, the shopkeeper, the guards on the wall.
-          Trading and routines are still being tested. Read the
-          <a href="/known">known issues</a> for what works today.</p>
+        <p>What stays is what a hold needs from somebody who is not a person:
+          six guild traders in each, the Smith, the Woodworker, the Tailor, the
+          Enchanter, the Cook and the Alchemist, who buy, sell and hand out
+          work, and the drivers who carry you between the holds. The
+          <a href="/known">known issues</a> say what is broken right now.</p>
       </div>
       <div>
         <div class="num">02</div>
@@ -214,23 +263,19 @@
       <h2>Fifty years of a free Skyrim</h2>
       <p class="lede">The Stormcloaks won. The Legion marched out in the first
         thaw of 4E 203 and the Moot put a crown on Ulfric's head. He held it for
-        twenty-six years and died in bed, which surprised him as much as anyone.
+        twenty-six years and died in his bed.
         <br><br>
         The Thalmor were thrown out in 209 and have been illegal ever since.
-        That has not stopped them being here. The Empire came back in 221 the
-        way empires do when they cannot come back with soldiers, and there is
-        an embassy in Solitude flying a flag that used to fly over all of this.
+        Some of them are still here. The Empire could not come back with
+        soldiers, so in 221 it came back with trade, and there is an embassy
+        in Solitude flying a flag that used to fly over all of this.
         <br><br>
         There is a High King of Skyrim and nothing above him. Each hold keeps
         its own Jarl, its own court, and its own opinion of everyone else's.</p>
       <p class="mt-28"><a href="/world">The full history and the Accord &rarr;</a></p>
     </div>
     <div>
-      <blockquote class="chron">The terms were short. Skyrim would govern
-        Skyrim. Imperial soldiers would leave by the first thaw. The Empire kept
-        its claim on paper and nothing else, which is what a claim is worth
-        without soldiers standing on it.
-        <cite>A Free Skyrim, Windhelm, 4E 252</cite></blockquote>
+      <blockquote class="chron" id="loreLine" hidden></blockquote>
       <div class="play-box">
         <h3>You can play</h3>
         <p>
@@ -271,17 +316,18 @@
       <div class="feat">
         <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v13H4z"/><path d="M7 9h7M7 12.5h10M7 16h5"/></svg>
         <h3>Notice boards in every hold</h3>
-        <p>Pay coin to pin a notice or a job at a board outside. Anyone can read
-          what is up. Take a job and it goes on your list. Nothing takes a
-          notice down yet.</p>
+        <p>Pay coin to pin a notice, a job with its reward held, or a sealed
+          letter for somebody to carry. Anyone can read what is up, and J reads
+          every town's board from anywhere. Take a job and it goes on your
+          list.</p>
       </div>
       <div class="feat">
         <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg>
         <h3>Nobody can do everything</h3>
         <p>You pick a profession, one half of it, and a class. An Edgewright
-          cannot make steel armour. Only a hunter can loot an animal, only a miner can
-          mine. So the leather in your armour came off somebody, and they
-          remember. <a href="/classes">Professions and classes</a>.</p>
+          cannot make steel armour. Only a hunter can loot an animal, only a
+          miner can mine. So the leather in your armour came off somebody, and
+          they remember. <a href="/classes">Professions and classes</a>.</p>
       </div>
       <div class="feat">
         <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 20h18M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg>
@@ -290,30 +336,19 @@
           and can evict. The house is yours because you hold the paper, not
           because a menu sold you a plot.</p>
       </div>
+      <div class="feat">
+        <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3 4 7v6c0 4.4 3.4 7.4 8 8 4.6-.6 8-3.6 8-8V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
+        <h3>Law with people behind it</h3>
+        <p>Every guard is somebody, named by the Jarl of their hold, and the
+          cells are theirs to keep. Nothing in the game puts a price on your
+          head, so getting caught is not a fine and a loading screen. Somebody
+          has to decide what happens to you.</p>
+      </div>
     </div>
 
     <div class="being-built">
-      <div class="eyebrow">Being built</div>
-      <h3 class="built-title">Still on the roadmap</h3>
-      <p class="built-lead">These are written for where the world is going, not
-        what runs today. See the <a href="/roadmap">roadmap</a>.</p>
-      <div class="feats">
-        <div class="feat">
-          <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3 4 7v6c0 4.4 3.4 7.4 8 8 4.6-.6 8-3.6 8-8V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
-          <h3>Law with people behind it</h3>
-          <p>Every guard is somebody. Nothing in the game puts a price on your
-            head: cells and courts are run by the people holding the keys, so
-            getting caught is not a fine and a loading screen. Somebody has to
-            decide what happens to you.</p>
-        </div>
-        <div class="feat">
-          <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="8" r="3.4"/><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M18 3.5l1 2 2 .6-1.5 1.5.3 2.1-1.8-1-1.8 1 .3-2.1L15 6.1l2-.6Z"/></svg>
-          <h3>People with their own work</h3>
-          <p>The ones who stayed are getting jobs, routines and errands of their
-            own, so a quiet hold still has something happening in it and somebody
-            to ask.</p>
-        </div>
-      </div>
+      <p class="built-lead">What is being added next is on the
+        <a href="/roadmap">roadmap</a>.</p>
     </div>
   </div>
 </section>
@@ -369,7 +404,7 @@
       </div>
       <div>
         <h2>Playing</h2>
-        <a href="/downloads">How to join</a>
+        <a href="/join">How to join</a>
         <a href="/downloads">Download</a>
         <a href="/classes">Professions</a>
         <a href="/help">Help</a>
@@ -382,13 +417,11 @@
         <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
         <a href="https://www.patreon.com/thornswood" id="footPatreon"
            target="_blank" rel="noopener">Patreon</a>
-        <a href="/roadmap">Roadmap</a>
         <a href="/news">Release notes</a>
       </div>
       <div>
         <h2>Behind it</h2>
         <a href="/hub">Admin login</a>
-        <a href="/news">Release notes</a>
         <a href="/credits">Credits</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>
@@ -404,6 +437,7 @@
   </div>
 </footer>
 
+<script src="/copies.js"></script>
 <script src="/home.js"></script>
 </body>
 </html>

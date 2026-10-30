@@ -161,9 +161,12 @@ hauls still hold, and what a haul holds for somebody away.
 
 The lead of the company is a Faction Leader ticket in Discord, Apply:
 Faction Leader, picking Free Skyrim Trading Company. The role that
-lets a character handle a company sale is still Trading Company, given
-by a person in Discord. `bot/Build-Discord.py` makes that role, and
-`access.company` in the site's config names it. A sale out of Skyrim is the trade panel's Buy
+lets a character handle a company sale is the company's member role,
+Free Skyrim Trading Company (it was called Trading Company until #3317),
+given and taken by the company's Leader on the faction panel in
+#free-skyrim-trading-company-seats, in the company's own category.
+`bot/Build-Discord.py` makes that role, and `access.company` in the
+site's config names it. A sale out of Skyrim is the trade panel's Buy
 for the company, as above. The things the seller put up leave the
 seller's pack and the world. The worker pays the price less their
 10%, another 10% is destroyed, and the seller receives the rest.

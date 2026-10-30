@@ -534,12 +534,14 @@ if ((Get-ExeBytes) -ne $TARGET_EXE_BYTES -and -not $SkipDowngrade) {
 # another server and another server install into the Steam folder, and a patched
 # loader of exactly the right size would sail straight past it and end up in
 # this copy. So the three files that get patched are matched by content against
-# the ones this package was built from.
+# the pinned build's own, by the SHA-1 Steam's manifests list for them
+# (records\skyrim-files.json, which Package-Thornswood.ps1 writes into
+# vanilla.json, #3412), the same SHA-1 the launcher holds the Steam copy to.
 # Get-FileHash lives in a module that is not always on PSModulePath, and a
 # script started with -NoProfile can find itself without it. .NET is always
 # there, so the hashing goes straight to it.
-function Get-Sha256([string]$path) {
-    $sha = [Security.Cryptography.SHA256]::Create()
+function Get-Sha1([string]$path) {
+    $sha = [Security.Cryptography.SHA1]::Create()
     try {
         $fs = [IO.File]::OpenRead($path)
         try { return ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLower() }
@@ -558,7 +560,7 @@ if (Test-Path $vanillaList) {
         foreach ($prop in $doc.PSObject.Properties) {
             $f = Join-Path $GameDir $prop.Name
             if (-not (Test-Path -LiteralPath $f)) { continue }
-            if ((Get-Sha256 $f) -ne ([string]$prop.Value).ToLower()) { $out += $prop.Name }
+            if ((Get-Sha1 $f) -ne ([string]$prop.Value).ToLower()) { $out += $prop.Name }
         }
         return $out
     }
@@ -731,6 +733,16 @@ if (Test-Path -LiteralPath $srcNote) { Copy-Item -LiteralPath $srcNote -Destinat
 foreach ($lic in @('GPL-3.0.txt', 'AGPL-3.0.txt', 'WebView2-LICENSE.txt')) {
     $from = Join-Path $Here $lic
     if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $Root -Force }
+}
+
+# The licence texts of the libraries inside the SkyMP files, which SOURCE
+# CODE.txt lists (#3099). The folder is replaced whole, so a text of a
+# library an older client had does not stay behind; Uninstall.cs names it.
+$libFrom = Join-Path $Here 'licences'
+if (Test-Path -LiteralPath $libFrom) {
+    $libTo = Join-Path $Root 'licences'
+    if (Test-Path -LiteralPath $libTo) { Remove-Item -LiteralPath $libTo -Recurse -Force }
+    Copy-Item -LiteralPath $libFrom -Destination $libTo -Recurse -Force
 }
 
 $s = Join-Path $Here 'Thornswood.exe'
@@ -941,7 +953,7 @@ function Open-Launcher([string]$exe) {
 
 Write-Host ''
 if ($bad) {
-    Say "$bad checks failed. Send staff a screenshot of this window in the Discord." 'Red'
+    Say "$bad check$(if ($bad -eq 1) { '' } else { 's' }) failed. Send staff a screenshot of this window in the Discord." 'Red'
     Write-Host ''
     # Left open on purpose. This is the window somebody has to photograph.
     # From the setup window it is that window which stays open, on exit 1.

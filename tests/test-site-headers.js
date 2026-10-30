@@ -11,10 +11,14 @@ function yes(what, condition) {
 }
 const src = fs.readFileSync(path.join(APP, 'server.js'), 'utf8');
 const policy = src.match(/const CSP_HEADER = ("[^"\r\n]*");/);
+// Permissions-Policy (#2762): the value is checked against the Caddyfile's in
+// test-2762-door-headers.js; here, that every answer carries it once.
+const perms = src.match(/const PERMISSIONS_POLICY = '([^'\r\n]*)';/);
 const G = {
  'X-Content-Type-Options': 'nosniff',
  'X-Frame-Options': 'SAMEORIGIN',
  'Referrer-Policy': 'strict-origin-when-cross-origin',
+ 'Permissions-Policy': perms ? perms[1] : 'PERMISSIONS_POLICY is not in server.js',
  'Content-Security-Policy': policy ? JSON.parse(policy[1]) : ''
 };
 yes('the current CSP still refuses inline script and styling', !!policy && !G['Content-Security-Policy'].includes('unsafe-inline'));
@@ -60,12 +64,16 @@ function guarded(what, r) {
   const twice = [];
   Object.keys(G).forEach(function (name) {
     const low = name.toLowerCase();
-    if (String(r.headers[low] || '') !== String(G[name])) { missing.push(name); }
+    // The CSP carries a nonce of its own on every answer (cspFor, #3216);
+    // apart from it, it is the one CSP_HEADER says.
+    let got = String(r.headers[low] || '');
+    if (low === 'content-security-policy') got = got.replace(/ 'nonce-[A-Za-z0-9+/=]+'/, '');
+    if (got !== String(G[name])) { missing.push(name); }
     let seen = 0;
     for (let i = 0; i < r.raw.length; i += 2) { if (String(r.raw[i]).toLowerCase() === low) { seen++; } }
     if (seen !== 1) { twice.push(name + ' x' + seen); }
   });
-  yes(what + ' carries all four guard headers, once each' +
+  yes(what + ' carries all five guard headers, once each' +
       (missing.length ? ', missing or wrong: ' + missing.join(', ') : '') +
       (twice.length ? ', not once: ' + twice.join(', ') : ''),
       missing.length === 0 && twice.length === 0);
@@ -132,8 +140,10 @@ function stop(run) {
         yes('a public page answers 200 as HTML (' + page.status + ')',
             page.status === 200 && /text\/html/.test(String(page.headers['content-type'] || '')));
         guarded('a public page', page);
-        yes('and keeps the Cache-Control send() has always written',
-            String(page.headers['cache-control'] || '') === 'no-store');
+        // no-cache, so the back and forward cache can keep it (#3218): a
+        // public page holds nothing about who asked.
+        yes('and is no-cache, asked again each time but kept for Back',
+            String(page.headers['cache-control'] || '') === 'no-cache');
 
         const api = await ask(run.port, '/api/public');
         yes('an API answer is 200 JSON (' + api.status + ')',

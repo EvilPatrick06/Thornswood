@@ -14,14 +14,15 @@
 
   1. Every file the game server's code names under its data folder is one of
      the files below, each read and found to hold nobody (what it holds is
-     written beside it), or a name kept in private whose data copy is only
-     ever taken out. A new file under data fails here until somebody has
+     written beside it). A new file under data fails here until somebody has
      looked at what it holds and added it with the reason. A planted file
      proves the scan sees one.
   2. The real books (thornswoodBooks and its start, out of game/gamemode.js)
      keep books.json and last-left.json in the private folder and write
      nothing under data.
-  3. The start removes the copies an older gamemode left in data.
+  3. The start neither reads nor touches a copy an older gamemode left in
+     data (#3094): the alpha carries no data over a change, so a copy there
+     is a file for whoever runs the box to delete, not a register.
 */
 'use strict';
 const fs = require('fs');
@@ -59,10 +60,6 @@ const SHIPPED = {
   'merchant-traders.json': 'the merchant table, from the repository',
   'furniture.json': 'the furniture catalog and its staff numbers, from the repository (#2679)',
 };
-// Kept in private. The data copy an older gamemode wrote is only taken out.
-const TAKEN_OUT = ['farm-claims.json', 'property.json'];
-// Not a literal name: the books start walks this list to take the old copies out.
-const TAKEN_OUT_LIST = /var served = \[('[^']+'(?:, '[^']+')*)\];\s*for \(var si = 0; si < served\.length; si\+\+\) \{\s*var old = path\.join\(dataDir, served\[si\]\);\s*if \(fs\.existsSync\(old\)\) \{\s*fs\.unlinkSync\(old\);/;
 
 function scan(text) {
   const out = [];
@@ -85,29 +82,19 @@ function scan(text) {
 
 function judge(text) {
   const bad = [];
-  const seen = [];
-  const takenOut = new Set(TAKEN_OUT);
-  const list = TAKEN_OUT_LIST.exec(text);
-  const listed = list ? list[1].split(',').map(s => s.trim().replace(/'/g, '')) : [];
   for (const hit of scan(text)) {
     if (hit.kind === 'shipped') {
       if (!SHIPPED[hit.name]) bad.push('line ' + hit.line + ' reads ' + hit.name + ' beside the gamemode, not in the shipped list');
       continue;
     }
     if (hit.name === null) {
-      if (hit.expr === 'served[si]' && list) continue;
       bad.push('line ' + hit.line + ' names something under data this check cannot read: ' + hit.text);
       continue;
     }
     if (PUBLIC[hit.name]) continue;
-    if (takenOut.has(hit.name) && /^var from = /.test(hit.text)) { seen.push(hit.name); continue; }
     bad.push('line ' + hit.line + ' keeps ' + hit.name + ' under data');
   }
-  for (const name of seen.concat(listed)) {
-    const kept = new RegExp("join\\(\\s*privDir\\s*,\\s*'" + name.replace(/\./g, '\\.') + "'").test(text);
-    if (!kept) bad.push(name + ' is taken out of data but not kept in private');
-  }
-  return { bad, listed };
+  return { bad };
 }
 
 const files = fs.readdirSync(GAME).filter(f => /\.js$/.test(f)).map(f => path.join(GAME, f));
@@ -119,9 +106,10 @@ for (const f of files) {
   allBad = allBad.concat(r.bad.map(b => path.basename(f) + ' ' + b));
 }
 yes('every file the game server names under data is one read and found to hold nobody', allBad.length === 0, allBad.join('; '));
-const gmJudge = judge(gm);
-yes('the books start takes books.json and last-left.json out of data',
-    gmJudge.listed.indexOf('books.json') >= 0 && gmJudge.listed.indexOf('last-left.json') >= 0, gmJudge.listed.join(', '));
+// The registers that moved to private (#541 on 25 Sep, the books with #2582) are kept there.
+for (const name of ['farm-claims.json', 'property.json', 'books.json', 'last-left.json']) {
+  yes(name + ' is kept in private', new RegExp("join\\(\\s*privDir\\s*,\\s*'" + name.replace(/\./g, '\\.') + "'").test(gm));
+}
 
 // The scan sees a file somebody adds under data.
 const planted = gm + "\nfs.writeFileSync(path.join(dataDir, 'who-was-on.json'), JSON.stringify(seen));\n";
@@ -170,10 +158,10 @@ try {
   vm.createContext(box);
   vm.runInContext(block + '\n' + initializer, box, { filename: 'books.js' });
   const api = box.__thornswoodBooks;
-  yes('the books start with the old data copies there', !!api, logged.join(' | '));
-  yes('the old last-left.json and books.json in data are gone', !fs.existsSync(path.join(dataDir, 'last-left.json')) && !fs.existsSync(path.join(dataDir, 'books.json')));
-  yes('  and saying so in the log', logged.filter(l => /removed .*served to anybody/.test(l)).length === 2, logged.join(' | '));
-  yes('  and nothing that is not theirs is touched', fs.existsSync(path.join(dataDir, 'online.json')));
+  yes('the books start with old data copies there', !!api, logged.join(' | '));
+  yes('  and leave them as they were: never read, moved or removed (#3094)',
+      read(path.join(dataDir, 'last-left.json')) === '{"101":1790000000000}' &&
+      read(path.join(dataDir, 'books.json')) === '{"books":[],"ledgers":{}}');
   yes('  and nothing of the old copy is carried into private', !fs.existsSync(path.join(privDir, 'last-left.json')));
 
   api.noteTick();           // the first tick only notes who is on
@@ -186,20 +174,9 @@ try {
 
   const reply = api.command({ actorId: 1, profileId: 1, parts: ['/book', 'new', 'business', 'Ore'] });
   yes('a new book is saved in private', fs.existsSync(path.join(privDir, 'books.json')), String(reply));
-  yes('nothing about anybody is written under data', fs.readdirSync(dataDir).join(',') === 'online.json', fs.readdirSync(dataDir).join(','));
+  yes('nothing about anybody is written under data', fs.readdirSync(dataDir).sort().join(',') === 'books.json,last-left.json,online.json' &&
+      read(path.join(dataDir, 'last-left.json')) === '{"101":1790000000000}', fs.readdirSync(dataDir).join(','));
 
-  // A start whose old copy cannot be removed does not run with it still served.
-  fs.writeFileSync(path.join(dataDir, 'last-left.json'), '{}');
-  const stuck = Object.create(io);
-  stuck.unlinkSync = () => { const e = new Error('EPERM: operation not permitted'); e.code = 'EPERM'; throw e; };
-  const box2 = Object.assign({}, box, { require: n => n === 'fs' ? stuck : path, __thornswoodBooks: null });
-  box2.globalThis = box2;
-  const said = [];
-  box2.log = (...a) => said.push(a.join(' '));
-  vm.createContext(box2);
-  vm.runInContext(block + '\n' + initializer, box2, { filename: 'books.js' });
-  yes('an old copy that cannot be removed stops the books, with the reason in the log',
-      box2.__thornswoodBooks === null && said.some(l => /^books: .*EPERM/.test(l)), said.join(' | '));
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

@@ -8,9 +8,10 @@
   launcher and mods both, in a single release.
 
   THE VERSION IS BUMPED BEFOREHAND, not here, by Bump-Version.ps1, and the bump
-  reaches main through a pull request like any other change: main refuses a
-  push from everybody, the owner included. Ship only reads this repository and
-  writes nothing back to it. A main release is refused if anything is
+  reaches main through a pull request like any other change, the owner's
+  included. GitHub refuses a push to main from write access; the admin account
+  is held to it by the team rule, since enforce_admins is off. Ship only reads
+  this repository and writes nothing back to it. A main release is refused if anything is
   uncommitted or unpushed, or if a file in a folder a release is built from is
   one git does not know, so what ships and what is written down are the same
   thing.
@@ -227,7 +228,7 @@
 
   THERE IS ONE DEV FEED AND THE LAST DEV SHIP WINS. Both machines publish to
   the same one, so a dev Ship replaces whatever the other machine put there.
-  Say in #staff-updates before taking it. A main Ship resets dev to match main. A
+  Check with the team before taking it. A main Ship resets dev to match main. A
   hotfix does not, because the work on dev was not in it.
 
   Everything goes to dev first, decided by Patrick on 23 September: "even
@@ -254,15 +255,17 @@
   sha256, and this checkout builds over them: the front, Go.ps1's files, the
   plugins and the client. The plugin list and the Vortex profile are the last
   release's, held to the server's load order on the box; a load order or
-  collection change ships from One, as a collection Ship. Keeps the feed's
-  launcher, so it needs -ModsOnly, and takes neither -Package nor
-  -RebuildLauncher.
+  collection change ships from One, as a collection Ship. When something the
+  launcher is built from changed, the new launcher is built and signed on
+  GitHub from main's commit (#3312): release-tag.yml tags it and release.yml
+  builds and signs it, on the box's runner 3 when GitHub has no minutes, so
+  the checkout must be exactly origin/main. Does not take -Package.
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
-  Puts this branch on the dev build and the dev server for testing. Say in
-  #staff-updates first: the last dev Ship wins.
+  Puts this branch on the dev build and the dev server for testing. The last dev
+  Ship wins.
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 -DryRun "The map marker points at the right door now"
@@ -618,12 +621,30 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
     } finally { $ErrorActionPreference = $old }
 }
 
+# The commit tag $tag names on origin, '' when origin has no such tag. A tag a
+# release from the feed asked for (release-tag.yml, #3312) holds its number
+# to its commit for good, since a tag is never moved.
+function Get-RemoteTagCommit([string]$repoDir, [string]$tag) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { $lines = @(& git -C $repoDir ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" 2>$null) }
+    finally { $ErrorActionPreference = $old }
+    if ($LASTEXITCODE -ne 0) { throw "git could not list origin's tags (exit $LASTEXITCODE)" }
+    $plain = ''; $peeled = ''
+    foreach ($l in $lines) {
+        $m = [regex]::Match([string]$l, '^([0-9a-f]{40})\s+refs/tags/(.+)$')
+        if (-not $m.Success) { continue }
+        if ($m.Groups[2].Value -eq "$tag^{}") { $peeled = $m.Groups[1].Value } elseif ($m.Groups[2].Value -eq $tag) { $plain = $m.Groups[1].Value }
+    }
+    if ($peeled) { return $peeled }
+    return $plain
+}
+
 # THE EXE CI BUILT MAY NOT BE SIGNED, issue #921. release.yml's VPS job
 # compiles on a runner that holds no signing certificate, so its v<version>
 # draft carries an unsigned Thornswood.exe, and until #2163's switch-over
-# every release is built there. release.yml's hosted job signs the exe on a
-# v tag, and such a draft passes through here untouched ("already signed by
-# us" below).
+# every release is built there. release.yml's hosted job signs the exe in a
+# run of main's own workflow (#3930), and such a draft passes through here
+# untouched ("already signed by us" below).
 # 20260927-1633 put exactly that on Main as 1.1.101 (sha256 38d4cd5d...), an
 # hour before the publish sign gate existed. Since then the gate refuses it,
 # which is safe but means no main Ship can go out at all.
@@ -850,7 +871,9 @@ function Test-KeepFeedLauncher($pub, [string]$inputs, [string]$current, [bool]$d
 # its signature against $expectedSigner (Get-PublishSignRefusal), and returns
 # '' when the checked exe is there, or a sentence saying why not, with nothing
 # half written left behind.
-function Get-FeedLauncher($pub, [string]$into, [string]$expectedSigner) {
+# $check, when given, is the signature check in its place: a release from the
+# feed off Windows holds the exe on the box (Get-SignedFileRefusal, #3312).
+function Get-FeedLauncher($pub, [string]$into, [string]$expectedSigner, [scriptblock]$check) {
     if ($null -eq $pub -or -not $pub.Url -or ([string]$pub.Sha) -notmatch '^[0-9a-fA-F]{64}$') {
         return ("Main's feed names no whole launcher (a launcherUrl and a 64 digit launcherSha256), so there is no launcher " +
                 'it offers to put in the installer. Nothing was published.')
@@ -881,7 +904,8 @@ function Get-FeedLauncher($pub, [string]$into, [string]$expectedSigner) {
                 "(wanted $want, got $got). Do not ship it. Nothing was published.")
     }
     Move-Item -LiteralPath $part -Destination $exe -Force
-    $why = Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner
+    if ($check) { $why = & $check $exe $expectedSigner }
+    else { $why = Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner }
     if ($why) {
         Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue
         return ("The launcher main's feed offers, $($pub.Version), is not signed by ExpectedSigner: $why")
@@ -972,6 +996,10 @@ Set-StrictMode -Version Latest
 $script:InstallerFailed = 0
 # What the packager threw, when it threw rather than exiting (#2243).
 $script:InstallerWhy = ''
+# The sha256 of the launcher a release from the feed took from GitHub and
+# held to the launcher's own check (#3312), so the publish gate does not send
+# the same bytes to the box twice. Empty until then.
+$FeedLauncherChecked = ''
 # What Publish-Discord.ps1 did, read back after it runs. It sets this in the
 # global scope; seeded here so strict mode has something to read either way.
 $global:ThornswoodDiscordResult = ''
@@ -1024,12 +1052,12 @@ if (-not $PSBoundParameters.ContainsKey('Root') -and -not $FromFeed) {
     try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
     catch { Die ($_.Exception.Message + ' Nothing was built.') }
 }
-# What a Ship from the feed cannot do, said before anything is built: a new
-# launcher is compiled with MSBuild and signed, and the installer holds the
-# whole game, both on One (#2754).
+# What a Ship from the feed cannot do, said before anything is built: the
+# installer holds the whole game, on One (#2754). A new launcher it can carry
+# since #3312, built and signed on GitHub, so -RebuildLauncher and -Version
+# mean what they mean anywhere else.
 if ($FromFeed) {
     if ($Package) { Die '-Package builds the installer from the whole game folder, which a Ship from the feed does not have. Ship -Package from One. Nothing was built.' }
-    if ($RebuildLauncher -or $Version) { Die 'A Ship from the feed keeps the launcher the feed offers; a new one is built and signed on One. Nothing was built.' }
 }
 
 # ------------------------------------------------------------ dev channel
@@ -1126,6 +1154,24 @@ if ($noteProblems.Count) {
     foreach ($p in $noteProblems) { Say "    $p" 'Yellow' }
     Write-Host ''
     Say '  Say what somebody will notice in the game or the launcher, in plain words.' 'DarkGray'
+    exit 1
+}
+
+# And only what is new on this channel (#3320, Note-Repeats.ps1 says why):
+# a title or line its feed or its Discord channel has already had stops here.
+. (Join-Path $PSScriptRoot 'Note-Repeats.ps1')
+$toldChannel = $(if ($Dev) { 'dev' } else { 'main' })
+try { $told = Get-ChannelPosts $toldChannel }
+catch { Die ("What the $toldChannel channel has already been told could not be read, so these notes cannot be checked for repeats. Nothing was built: " + $_.Exception.Message) }
+$repeats = @(Get-NoteRepeats $Notes $told.Posts $told.Newest)
+if ($repeats.Count) {
+    Write-Host ''
+    Say '  STOP. These notes say again what this channel has already been told.' 'Red'
+    Say '  Each post says only what is new since the last one. Nothing was built.' 'Red'
+    foreach ($r in $repeats) { Say "    $r" 'Yellow' }
+    Write-Host ''
+    Say '  Write only what this release adds. A gamemode deploy whose Ship follows' 'DarkGray'
+    Say '  takes -ShipFollows and posts nothing, so the Ship says it once.' 'DarkGray'
     exit 1
 }
 Write-Host "  $Notes" -ForegroundColor DarkGray
@@ -1244,8 +1290,9 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
                  "Put them through a pull request, delete them, or add them to .gitignore, then Ship.")
         }
         if ($ahead -gt 0) {
-            # Not "git push": main refuses a push from everybody since
-            # enforce_admins went on, so that advice sent people into a refusal.
+            # Not "git push": main takes commits only through a pull request.
+            # GitHub refuses the push from write access, and the admin account
+            # keeps the same rule by hand, so that advice was always wrong.
             Die ("$branch is $ahead commit(s) ahead of origin/$branch. A release has to be buildable from what " +
                  "everybody else can see, and main takes commits only through a pull request: move them to " +
                  "a branch, push that, merge its pull request, git pull, then Ship.")
@@ -1346,9 +1393,23 @@ if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
         $ModsOnly = $true
     }
 }
+# A RELEASE FROM THE FEED WITH A NEW LAUNCHER (#3312). It cannot compile or
+# sign one where it runs, the cloud included, so release.yml builds and signs
+# it on GitHub from main's commit (the box's runner 3 when GitHub has no
+# minutes), under the build section below. So the checkout has to be exactly
+# origin/main. A dry run makes no tag and starts nothing, so it shows the
+# release with the feed's launcher, and says so.
 if ($FromFeed -and -not $ModsOnly) {
-    Die ('Something the launcher is built from changed since the one the ' + $Channel + ' feed offers, and a new launcher is compiled and signed on One. ' +
-         'Ship from One, or -ModsOnly to keep the feed''s launcher. Nothing was built.')
+    if (-not $MainSourceAligned) {
+        Die ('Something the launcher is built from changed since the one the ' + $Channel + ' feed offers. From the feed, the new launcher is built and ' +
+             'signed on GitHub from main''s own commit, and this checkout is not exactly origin/main with nothing uncommitted. ' +
+             '.\scripts\release\Update-Checkout.ps1 puts it there; or -ModsOnly to keep the feed''s launcher. Nothing was built.')
+    }
+    if ($DryRun) {
+        Say ('  the launcher changed, and from the feed it is built and signed on GitHub by a tag a dry run does not make: ' +
+             'this dry run shows the release with the feed''s launcher') 'Yellow'
+        $ModsOnly = $true
+    }
 }
 
 if ($ModsOnly) {
@@ -1496,6 +1557,24 @@ elseif ($Dev) {
     # Never downgrade a Dev launcher when promoting: bump Main first.
     if ($MainEquivalent) {
         $target = $current
+    }
+    # A release from the feed asks release-tag.yml for the tag v<number>, and
+    # a tag is never moved (#3312). One that stopped after asking left its
+    # number tagged on its own commit, so a later one climbs past it rather
+    # than be refused.
+    if ($FromFeed -and -not $ModsOnly -and -not $MainEquivalent) {
+        for ($k = 0; ; $k++) {
+            $on = ''
+            try { $on = Get-RemoteTagCommit $RepoDir ('v' + $target) }
+            catch { Die ("Could not read whether v$target is tagged already (" + $_.Exception.Message + '). Nothing was built.') }
+            if (-not $on -or $on -eq $releaseSource.Commit) { break }
+            if ($k -ge 50) { Die "v$target and the 50 dev numbers after it are all tagged on other commits. Nothing was built." }
+            $tp = @($target -split '\.')
+            if ($tp.Count -lt 4) { Die "v$target is already tagged on $($on.Substring(0, 12)), another commit, and a number without a fourth part cannot climb past it. Nothing was built." }
+            $next = (($tp[0..2] -join '.') + '.' + ([int]$tp[3] + 1))
+            Say "  v$target is already tagged on $($on.Substring(0, 12)), another commit, so this goes out as $next" 'Yellow'
+            $target = $next
+        }
     }
 }
 else {
@@ -1669,7 +1748,48 @@ if (-not $ModsOnly) {
     # the shortcut and the icon, which is everything the build used to do.
     $buildOut = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-launcher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
 
-    if (-not $Dev -and -not $DryRun) {
+    if ($FromFeed) {
+        # A RELEASE FROM THE FEED TAKES ITS LAUNCHER FROM GITHUB (#3312): it
+        # cannot compile or sign one where it runs. release-tag.yml tags this
+        # commit (origin/main, held above) v<the number worked out above> and
+        # starts main's release.yml for it (#3930), which writes that number into Updater.cs,
+        # builds the exe, signs it with ThornswoodRelease on GitHub's runner,
+        # or on the box's runner 3 when GitHub has no minutes, and has a
+        # build runner check the signed draft. The draft's exe comes down
+        # held to its SHA256SUMS (Get-ReleaseLauncher, as a main Ship takes
+        # one) and to the launcher's own check, here on Windows or on the box
+        # anywhere else (Get-SignedFileRefusal). Main's own launcher on dev is
+        # the one main's feed offers, held the same way.
+        try {
+            $ciSigner = Get-ExpectedSignerFragment -RepoRoot $RepoDir
+        } catch {
+            Unbump 'ExpectedSigner could not be read'
+            Die ($_.Exception.Message + ' Nothing was published.')
+        }
+        $hold = { param($p, $who) Get-SignedFileRefusal $p $who $RepoDir }
+        if ($MainEquivalent) {
+            Head "Main's launcher, from main's feed"
+            $why = Get-FeedLauncher $MainLauncher $buildOut $ciSigner $hold
+            if ($why) {
+                Unbump 'main''s launcher could not be taken from its feed'
+                Die $why
+            }
+            Say ("  $($MainLauncher.Version), sha256 and signature checked") 'Green'
+        } else {
+            Head 'The launcher, built and signed on GitHub'
+            $srcRepo = Get-SourceRepo $RepoDir
+            $why = Invoke-ReleaseLauncherOnGitHub -Repo $srcRepo -Tag ('v' + $target) -Commit $releaseSource.Commit
+            if (-not $why) { $why = Get-ReleaseLauncher $srcRepo $target $buildOut }
+            if (-not $why) { $why = & $hold (Join-Path $buildOut 'Thornswood.exe') $ciSigner }
+            if ($why) {
+                Unbump 'there is no signed launcher from GitHub'
+                Die ($why + ' Nothing was published.')
+            }
+            Say ("  v$target, verified against SHA256SUMS and the launcher's own check, {0:n0} KB" -f ((Get-Item (Join-Path $buildOut 'Thornswood.exe')).Length / 1KB)) 'Green'
+        }
+        $FeedLauncherChecked = (Get-FileHash -LiteralPath (Join-Path $buildOut 'Thornswood.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    elseif (-not $Dev -and -not $DryRun) {
         # A MAIN RELEASE TAKES THE EXE CI BUILT, and verifies it, since issue
         # #457. The binary that reaches every launcher is compiled on a clean
         # runner from the tagged commit, not here, and this checks it against
@@ -2107,6 +2227,20 @@ function Measure-Installer {
 # not touch the installer, and its closing note still warns. A hotfix never
 # refuses either: it is the live build plus one urgent fix, and holding it for a
 # twenty-minute installer rebuild is the opposite of what a hotfix is for.
+# THE MAIN FEED AS THE STORE HOLDS IT NOW, read before the gate counts it
+# (#3961). Measure-Installer counts the releases after the installer's from
+# the main feed's working folder, and until 26 October nothing filled that
+# folder before the gate: Publish-Update receives the feed only later, inside
+# the publish. So the gate counted whatever copy the last main Ship left on
+# this machine, an old one on One, and none at all in a cloud container, where
+# the first main Ship from the feed stopped here at 8:08 PM.
+if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
+    try { [void](Receive-FeedStore 'main' $MainReleaseDir) }
+    catch {
+        Unbump 'the main feed could not be read for the installer check'
+        Die ('Could not receive the main feed from the VPS, so how far behind the installer is cannot be counted and nothing was published: ' + $_.Exception.Message)
+    }
+}
 if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
     $ins = Measure-Installer
     $rebuild = ('Rebuild it as part of this release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 -OneFile ' +
@@ -2134,7 +2268,8 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
 $signCfg = Join-Path $Here '..\..\records\signing\signing.json'
 # A release from the feed signs on GitHub, in the engine fork (#2903,
 # Patrick's A of 20 Oct), so this machine needs gh rather than a signing
-# setup; it keeps the feed's launcher, so there is no launcher to sign here.
+# setup; a new launcher came signed from GitHub (#3312), so nothing is signed
+# here either.
 $signWhy = if ($FromFeed) { Get-SignOnGitHubRefusal $RepoDir } else { Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
 if ($signWhy) {
     Unbump 'this machine cannot sign'
@@ -2148,7 +2283,15 @@ if (-not $ModsOnly) {
         Unbump 'ExpectedSigner could not be read'
         Die ($_.Exception.Message + ' Nothing was published.')
     }
-    $signWhy = Get-PublishSignRefusal -Path $pubExe -ExpectedSigner $expectWho
+    # From the feed: held already, before it was installed, when it is still
+    # those bytes; otherwise here on Windows or on the box (#3312).
+    if ($FromFeed) {
+        $signWhy = ''
+        $pubSha = ''
+        if (Test-Path -LiteralPath $pubExe) { $pubSha = (Get-FileHash -LiteralPath $pubExe -Algorithm SHA256).Hash.ToLowerInvariant() }
+        if (-not $FeedLauncherChecked -or $pubSha -ne $FeedLauncherChecked) { $signWhy = Get-SignedFileRefusal $pubExe $expectWho $RepoDir }
+    }
+    else { $signWhy = Get-PublishSignRefusal -Path $pubExe -ExpectedSigner $expectWho }
     if ($signWhy) {
         Unbump 'the launcher is not signed for publish'
         Die $signWhy
@@ -2706,6 +2849,30 @@ if (-not $DryRun -and $global:ThornswoodPublishedRelease) {
     }
 }
 # ==== end thornswood release tag ====
+
+# THE DONE ISSUES THIS RELEASE CARRIES ARE CLOSED (#3279). A fix people would
+# notice stays open in Done after its merge, with its test task written on it
+# by done-on-merge.yml, until a main Ship puts it on the main server; this is
+# that Ship. Close-ShippedIssues.ps1 reads the board, closes each open issue in
+# Done whose merge the commit this release was built from contains, with its
+# test task as the closing comment, and names the ones that stay open. Main
+# only: dev is where the team checks nothing breaks, not where testers test.
+# After the tag, because it needs the commit the release record names, and
+# like the follow-ons above it cannot fail the release.
+if (-not $DryRun -and -not $Dev -and $global:ThornswoodPublishedRelease) {
+    Head 'The Done issues it carries'
+    if ($tagged.Commit) {
+        Invoke-PostShip 'closing the Done issues it carries' 'Close-ShippedIssues.ps1' @{ Commit = $tagged.Commit; RepoDir = $RepoDir; NoPause = $true } `
+            ".\scripts\release\Close-ShippedIssues.ps1 -Commit $($tagged.Commit)"
+    } else {
+        # The tag step said why the record named no commit.
+        Say '  not closed: the release record names no commit, so what this release carries is not known' 'Red'
+        $script:PostShipFailed += [pscustomobject]@{
+            What     = 'the Done issues it carries were not closed'
+            PutRight = '.\scripts\release\Close-ShippedIssues.ps1 -Commit (git rev-parse HEAD)'
+        }
+    }
+}
 
 Head 'Done'
 # Repeated here on purpose. A red line in the middle of a release log is a line

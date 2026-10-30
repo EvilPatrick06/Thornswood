@@ -142,7 +142,7 @@ Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBui
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @(); $missing = @()
 foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherLib)) { $p = $n; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
 Yes ('every reference Thornswood.csproj names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
 if ($missing.Count) { Done }
 New-Item -ItemType Directory -Force -Path $T | Out-Null
@@ -379,9 +379,9 @@ $syncedBefore = Get-Game $synced
 $fake = Join-Path $T 'repo'
 New-Item -ItemType Directory -Force -Path $fake | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-foreach ($f in 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\client-build.json', 'records\ui-gone.json') {
+foreach ($f in 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json') {
     $from = Join-Path $repo $f
-    if (Test-Path -LiteralPath $from) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null; Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force }
+    if (Test-Path -LiteralPath $from) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null; Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force -Recurse }
 }
 $work = Join-Path $T 'scrub-work'
 function Scrub([string]$channel, [string[]]$more) {

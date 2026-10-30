@@ -79,7 +79,7 @@ def ch(cid, name, mode, ctype=0):
 def gated():
     """The server as Build-Discord.py's PLAN and the hand set gate describe it."""
     c = [ch(1, 'welcome', 'read'), ch(2, 'rules', 'read'), ch(3, 'start-here', 'read'),
-         ch(4, 'say-hello', 'public'), ch(5, 'tickets-and-applications', 'read'),
+         ch(4, 'say-hello', 'public'), ch(5, 'apply-to-playtest', 'read'),
          ch(6, 'news', 'membersread', 5), ch(7, 'general', 'open'),
          ch(8, 'media', 'open'), ch(9, 'character-introductions', 'open'),
          ch(10, 'tales', 'open', 15), ch(11, 'rp-appreciation', 'open'),
@@ -196,7 +196,7 @@ q2 = body['prompts'][-1] if body.get('prompts') else {}
 yes('question two is pick several and optional',
     q2.get('single_select') is False and q2.get('required') is False)
 want2 = {'Roleplay': 'tales', 'Just playing': 'general',
-         'I want to help test': 'tickets-and-applications', 'I make videos': 'media'}
+         'I want to help test': 'apply-to-playtest', 'I make videos': 'media'}
 yes('question two: every answer shows the channel it was written to show, by id',
     dict((o['title'], o['channel_ids']) for o in q2.get('options', [])) ==
     dict((t, [cid(g, n)]) for t, n in want2.items()))

@@ -59,6 +59,8 @@ for(const key of ['reference','base','world','position','item','rank','returnMin
 }
 const bad=copy(population);bad.loadOrder[0].sha256='bad';
 assert.throws(()=>validateScarceGeodes(doc,bad),/source evidence/);
+{const rebuilt=copy(population);rebuilt.loadOrder.find(r=>r.name==='Thornswood-Last.esp').sha256='0'.repeat(64);
+ assert.equal(validateScarceGeodes(doc,rebuilt).sources.length,doc.sources.length,'a rebuilt own plugin keeps the evidence (#613)');}
 
 
 for(const field of ['SOUL','SLCP']) {const w=fixture();w.records.get(w.id(rows[0].item)).record.fields.find(f=>f.type===field).data[0]=2;assert.throws(()=>createQuestGeodeSources(w.mp,rows),/geode source/i);}

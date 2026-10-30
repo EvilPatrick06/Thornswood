@@ -26,7 +26,7 @@ param(
         'C:\Thornswood-Docs\config.json', 'C:\Thornswood-Docs\feed', 'C:\Thornswood-Docs\feed-dev',
         'C:\Thornswood-Bot\bot.env.json', 'C:\Thornswood-Backup', 'C:\Thornswood-Backup\key.txt',
         'C:\Thornswood-Server\private', 'C:\Thornswood-Server-Dev\private', 'C:\Thornswood-Server\world',
-        'C:\Thornswood-Deploys', 'C:\Thornswood-Caddy', 'C:\Thornswood-Watch', 'C:\Thornswood-Dumps',
+        'C:\Thornswood-Deploys', 'C:\Thornswood-Caddy', 'C:\Thornswood-Watch', 'C:\Thornswood-Admin', 'C:\Thornswood-Dumps',
         'C:\ProgramData\ssh', 'C:\Users\Administrator')
 )
 

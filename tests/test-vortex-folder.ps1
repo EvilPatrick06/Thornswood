@@ -597,7 +597,7 @@ namespace Thornswood
 
             // Fix.
             var said = new List<string>();
-            Verify.Fix(s.Cfg, delegate(string m) { said.Add(m); });
+            Verify.Fix(s.Cfg, delegate(string m) { said.Add(m); }, null);
             Config saved = Config.Load(Paths.CfgFile);
             Yes("Fix saves Other Server Online as VortexGame in config.json", saved != null && string.Equals(saved.VortexGame, k, StringComparison.OrdinalIgnoreCase));
             Yes("and hands on to making the own folder the way Make it does (Verify.OwnFolderNext)", OwnFolderNext());

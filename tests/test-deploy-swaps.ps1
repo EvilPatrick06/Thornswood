@@ -132,7 +132,13 @@ $utf8    = New-Object Text.UTF8Encoding($false)
 $runTag      = [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $TaskPrefix  = 'Thornswood Test ' + $runTag
 $BotService  = 'ThornswoodTest' + $runTag + 'Bot'
-foreach ($d in $farTemp, $tasks, $far) { $null = [IO.Directory]::CreateDirectory($d) }
+# The site the feed scripts read, a stand-in with nothing published on it.
+# Since #3324 Deploy-DevGamemode reads what the dev channel has already been
+# told before it sends a note, and without this it asked thornswood.net,
+# which a runner account may not reach and this harness never talks to.
+$site    = Join-Path $work 'site'
+$env:THORNSWOOD_TEST_SITE_DIR = $site
+foreach ($d in $farTemp, $tasks, $far, $site) { $null = [IO.Directory]::CreateDirectory($d) }
 
 function Put([string]$path, [string]$text) {
     $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $path))
@@ -537,6 +543,8 @@ Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
 # Install-Bot packs and sends _pyguard.py beside bot.py since #2421 (Refs #2276).
 Put (Join-Path $repo 'bot\_pyguard.py') 'PYGUARD = 1'
+# And trust.py, the roots it trusts, since #3111.
+Put (Join-Path $repo 'bot\trust.py') 'TRUST = 1'
 Put (Join-Path $repo 'bot\requirements.txt') ''
 Put (Join-Path $repo 'bot\factions.json') '[]'
 Put (Join-Path $repo 'bot\staff-channel.txt') '0'
@@ -866,7 +874,7 @@ try {
     # shorter loop than the real one (tests\test-bot-wrapper.ps1 runs that).
     Bot 'bot v1'
     $null = [IO.Directory]::CreateDirectory($botRoot)
-    foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
+    foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
     Put (Join-Path $botRoot 'bot.env.json') '{ "DISCORD_TOKEN": "not a token" }'
     $bq = $botRoot.Replace("'", "''")
     # bot.log in the data folder under the bot's, where the service writes it
@@ -877,10 +885,13 @@ try {
     # The service $BotService (ThornswoodTest<run>Bot), standing in for ThornswoodBot (#465).
     Task $BotService 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
     function BotSays([string]$v) { return ((Get $botLog) -match [regex]::Escape($v + ' watching')) }
-    # The site's data\for-bot, which Install-Bot waits for before it sends the
-    # bot (#1102): a site that has not made it yet is refused below.
+    # The site's data\for-bot and data\from-bot, which Install-Bot waits for
+    # before it sends the bot (#1102, and #3140 for from-bot, where the bot
+    # writes the site's known issues and roadmap): a site that has not made
+    # one yet is refused below.
     $siteForBot = Join-Path $box 'Thornswood-Docs'
     $null = [IO.Directory]::CreateDirectory((Join-Path $siteForBot 'data\for-bot'))
+    $null = [IO.Directory]::CreateDirectory((Join-Path $siteForBot 'data\from-bot'))
     $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; DocsRoot = $siteForBot; Service = $BotService; CodeOnly = $true; NoPause = $true; Wait = 20 }
     Yes 'Install-Bot: the stand-in bot is up' (WaitFor { BotSays 'bot v1' })
 
@@ -891,6 +902,17 @@ try {
     $failed = $script:fail
     Yes 'Install-Bot: a site with no data\for-bot yet stops it, naming Deploy-Docs, with the bot untouched' (
         (-not $r.Ok) -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
+    if ($script:fail -gt $failed) { Show }
+
+    Bot 'bot v2'
+    $live = Live $botRoot
+    $noFrom = Join-Path $box 'Site-Without-From-Bot'
+    $null = [IO.Directory]::CreateDirectory((Join-Path $noFrom 'data\for-bot'))
+    $a = $bot.Clone(); $a['DocsRoot'] = $noFrom
+    $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Bot: a site with data\for-bot but no data\from-bot yet stops it, naming from-bot and Deploy-Docs, with the bot untouched' (
+        (-not $r.Ok) -and $r.Said -match 'from-bot yet' -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
     if ($script:fail -gt $failed) { Show }
 
     Bot 'bot v2'

@@ -19,8 +19,8 @@ it adds no NPC, plant, crop, planting, cultivation or growth mechanic.
 Gatherer standing and any rank required by the existing plant table apply on
 every draw. The hand-written crimson row has no higher rank or tool rule.
 The live source must be enabled, retain its exact base `b6fb9:Skyrim.esm`,
-and stay within128 units of its winning recorded position in Blackreach
-(`1ee62:Skyrim.esm`). The character must be in that world and within400 units
+and stay within 128 units of its winning recorded position in Blackreach
+(`1ee62:Skyrim.esm`). The character must be in that world and within 400 units
 of that source. A deleted source or another plant cannot substitute.
 
 | Existing reference | Winning source position |
@@ -39,7 +39,7 @@ and in direct harvesting. This remains true when the quest service fails or a
 source is replaced by another base. Other plants do not consult this quest's
 service. Runtime source validation checks native REFR, ACTI, INGR and WRLD
 records, NAME mapping and live position. The source manifest pins the measured
-winning placements and the103-plugin population load order used to read them.
+winning placements and the 103-plugin population load order used to read them.
 
 The existing native metadata/inventory operation grants the ingredient and
 increments the quest draw together. The existing shared resource stock reserves
@@ -51,4 +51,4 @@ repair loop, extra spawn, gold reward or changed ordinary plant yield is added.
 Automated source and actual harvest/activation fixtures cover exact offers,
 standing, source failures, shared depletion, caps, extras, abandonment and
 concurrent writes. Automated checks do not establish connected playtest results.
-Claude owns the operational step after merge.
+Merging the source does not make it live; that needs a release.

@@ -117,7 +117,7 @@ if (-not $Tool) {
     $out = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-shiproot-' + (Split-Path -Leaf $Root))
     New-Item -ItemType Directory -Force -Path $out | Out-Null
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $built = & $found.MSBuild (Resolve-Path -LiteralPath $proj).Path -nologo -v:quiet -nr:false -p:Configuration=Release ('-p:OutDir=' + $out.TrimEnd('\') + '\') 2>&1 | Out-String
+    $built = & $found.MSBuild (Resolve-Path -LiteralPath $proj).Path -nologo -v:quiet -nr:false -p:UseSharedCompilation=false -p:Configuration=Release ('-p:OutDir=' + $out.TrimEnd('\') + '\') 2>&1 | Out-String
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     $Tool = Join-Path $out 'Thornswood-ShipRoot.exe'

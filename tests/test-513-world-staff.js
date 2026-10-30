@@ -6,8 +6,12 @@
   page of K (Patrick, 17 Oct: no slash commands, tools only, nothing
   scripted, staff confirm). What it holds to:
     - Staff, and only staff, get the world's card on the Office page: where
-      the world is with its force, and the proposal waiting, with its stage,
-      who proposed it and when.
+      the world is with its force and since when, and the proposal waiting,
+      with its stage, when, and who proposed it while the server remembers.
+    - war.json names nobody (#2860, #2353): who moved, proposed, confirmed
+      or dropped is in the staff log. Who proposed the one waiting is held in
+      memory, so after a restart the card and the log say only that it was
+      proposed before the last restart.
     - The server checks staff again on every line the card sends, the way
       the #2551 staff buttons do (settleAs): who is staff, the staff block's
       proof, and the staff log loaded. Somebody who is not staff, or staff
@@ -288,10 +292,11 @@ attempt('the server', function () {
   const n0 = notices(s);
   press(s, BOB, '/world confirm test-landing ' + t0);
   const st = stage(s);
-  yes('W11 the confirm moves the world, as the confirmer\'s move, with who proposed it: "' + said() + '"',
-      st.id === 'test-landing' && st.force === 'remnant' && st.by === 'Bjorn (profile 404)' && pending(s) === null &&
-      JSON.stringify(JSON.parse(warText()).history.slice(-1)[0]) ===
-        JSON.stringify({ id: 'test-landing', at: clock.t, by: 'Bjorn (profile 404)', proposedBy: 'Aela (profile 303)' }));
+  yes('W11 the confirm moves the world: "' + said() + '"',
+      st.id === 'test-landing' && st.force === 'remnant' && st.since === clock.t && pending(s) === null &&
+      JSON.stringify(JSON.parse(warText()).history.slice(-1)[0]) === JSON.stringify({ id: 'test-landing', at: clock.t }));
+  yes('W11 and war.json names neither who confirmed nor who proposed, by name or profile',
+      ['Aela', 'Bjorn', '303', '404', 'profile'].every(function (w) { return warText().indexOf(w) < 0; }));
   const crec = records[records.length - 1];
   yes('W11 and it is in the staff log with the notice it put up',
       records.length === 2 && crec[0] === 'worldconfirm' && crec[1] === 404 && crec[4] === 'A test landing' &&
@@ -343,10 +348,27 @@ attempt('the server', function () {
   press(s, ALICE, '/world');
   yes('W19 a line with nothing after it says where to go, not what to type', /Office page of K/.test(said()) && !/\/world/.test(said()));
 
-  // It all survives a restart.
+  // It all survives a restart, but who proposed: the file never had it.
   s = boot(true);
   yes('W20 after a restart the world and the proposal are where they were',
       stage(s).id === 'test-badnote' && pending(s).id === 'peace');
+  const pw = pending(s);
+  yes('W21 the proposal waiting is on disk with its stage and when only',
+      JSON.stringify(JSON.parse(warText()).pending) === JSON.stringify({ id: 'peace', at: pw.at }) &&
+      ['Aela', 'Bjorn', '303', '404', 'profile'].every(function (w) { return warText().indexOf(w) < 0; }));
+  const rv = view(s, ALICE);
+  yes('W21 after a restart the card still shows it, with nobody named for it',
+      !!rv.world.pending && rv.world.pending.id === 'peace' && rv.world.pending.at === pw.at && rv.world.pending.by === '');
+  press(s, ALICE, '/world drop ' + pw.at);
+  const lrec = records[records.length - 1];
+  yes('W22 and a drop of it is logged as proposed before the last restart',
+      pending(s) === null && lrec[0] === 'worlddrop' && /^proposed before the last restart; /.test(lrec[5]) && lrec[7].proposedBy === '');
+  press(s, ALICE, '/world propose peace');
+  s = boot(true);
+  press(s, BOB, '/world confirm peace ' + pending(s).at);
+  const frec = records[records.length - 1];
+  yes('W22 and so is a confirm of one', stage(s).id === 'peace' && frec[0] === 'worldconfirm' &&
+      /, proposed before the last restart/.test(frec[5]) && frec[7].proposedBy === '');
   fs.unlinkSync(warFile);
 });
 
@@ -428,11 +450,16 @@ attempt('the K panel', function () {
   yes('K6 Drop sends the proposal it drops (' + lines.join(' | ') + ')', lines.join() === '/world drop ' + w.pending.at);
 
   show(Object.assign({}, page, { world: { stage: { id: 'test-quiet', name: 'A quiet stage', force: '', text: 'No notice.',
-    since: Date.now(), by: 'Bjorn (profile 404)' }, pending: null, stages: w.stages } }));
+    since: Date.now() }, pending: null, stages: w.stages } }));
   goOffice();
-  yes('K7 with nothing proposed the card says so, and when and by whom the world got where it is',
-      /Nothing is proposed\./.test(body.textContent) && /moved by Bjorn \(profile 404\)/.test(body.textContent) &&
+  yes('K7 with nothing proposed the card says so, and when the world got where it is',
+      /Nothing is proposed\./.test(body.textContent) && /It got there /.test(body.textContent) && !/moved by/.test(body.textContent) &&
       buttons('Confirm').length === 0 && buttons('Drop').length === 0 && buttons('A quiet stage').length === 0);
+  show(Object.assign({}, page, { world: { stage: w.stage, pending: Object.assign({}, w.pending, { by: '' }), stages: w.stages } }));
+  goOffice();
+  yes('K7b a proposal made before a restart shows when, and names nobody',
+      /Proposed: A test landing \(remnant\)/.test(body.textContent) && !/\bby\b/.test(body.textContent.split('Proposed:')[1].split('Confirm')[0]) &&
+      !/somebody/.test(body.textContent));
   const words = all(body).map(function (n) { return n._text; }).join(' ');
   yes('K8 no em dash and never the forbidden word on the card',
       words.indexOf('\u2014') < 0 && words.toLowerCase().indexOf('pla' + 'yer') < 0);

@@ -31,7 +31,8 @@
     - the repository: an annotated tag, release/main/<id> or release/dev/<id>,
       on the commit that release was built from, made and pushed by Ship only
       after the publisher has sent the feed (Add-ReleaseTag). Never v<...>, so
-      it cannot start the launcher build in release.yml.
+      it cannot start the launcher build in release.yml. In a cloud session,
+      whose git cannot push a tag, GitHub makes it (Set-Ref.ps1, #3314).
 
       git tag -l 'release/dev/*'         every dev release
       git show release/main/<id>         what it shipped and where to find it
@@ -245,8 +246,32 @@ function Read-ReleaseListFile([string]$Path) {
     return ,@($o | Where-Object { $null -ne $_ })
 }
 
-# The annotated tag's message: the release, then everything it is known by.
-function Get-ReleaseTagMessage($r, [string]$FeedUrl) {
+# The sha256 of every file the feed in $Doc names for this release, labelled
+# as the tag message carries them (#3686): the record, whose own entries name
+# the rest of the release's files, the launcher, the client runtime, the
+# notes, and the signed manifest with its catalog. release-files.yml reads
+# these off the tag to put the release's files on its GitHub Release, so it
+# never has to find them in a feed that a later Ship has moved on. A field
+# the feed does not have, or that is not a sha256, is left out.
+function Get-ReleaseFileShas($Doc) {
+    $out = [ordered]@{}
+    if ($null -eq $Doc) { return $out }
+    $field = { param($o, [string]$n) if ($null -ne $o -and $o.PSObject.Properties[$n]) { ([string]$o.$n).ToLowerInvariant() } else { '' } }
+    $pick = [ordered]@{
+        record   = (& $field $(if ($Doc.PSObject.Properties['baseline']) { $Doc.baseline }) 'sha256')
+        exe      = (& $field $Doc 'launcherSha256')
+        runtime  = (& $field $(if ($Doc.PSObject.Properties['clientRuntime']) { $Doc.clientRuntime }) 'sha256')
+        news     = (& $field $(if ($Doc.PSObject.Properties['newsFile']) { $Doc.newsFile }) 'sha256')
+        manifest = (& $field $(if ($Doc.PSObject.Properties['signedManifest']) { $Doc.signedManifest }) 'sha256')
+        catalog  = (& $field $(if ($Doc.PSObject.Properties['signedManifest']) { $Doc.signedManifest }) 'catalogSha256')
+    }
+    foreach ($k in $pick.Keys) { if ($pick[$k] -match '^[0-9a-f]{64}$') { $out[$k] = $pick[$k] } }
+    return $out
+}
+
+# The annotated tag's message: the release, then everything it is known by,
+# then the sha256 of each file it names when the feed ($Doc) is given.
+function Get-ReleaseTagMessage($r, [string]$FeedUrl, $Doc = $null) {
     $lines = @()
     $lines += ('Thornswood ' + (Get-ReleaseField $r 'channel') + ' release ' + (Get-ReleaseField $r 'id'))
     $lines += ''
@@ -261,11 +286,13 @@ function Get-ReleaseTagMessage($r, [string]$FeedUrl) {
     $u = 0; [void][int]::TryParse((Get-ReleaseField $r 'uncommitted'), [ref]$u)
     if ($u -gt 0) { $lines += ('built with ' + $u + ' uncommitted change(s) on top of this commit') }
     if ($FeedUrl) { $lines += ('feed      ' + $FeedUrl) }
+    $shas = Get-ReleaseFileShas $Doc
+    foreach ($k in $shas.Keys) { $lines += ($k.PadRight(10) + $shas[$k]) }
     return ($lines -join "`n")
 }
 
 # Tags the commit the release in $VersionFile was built from and pushes the
-# tag. Ship calls it only after the publisher has sent the feed, and passes the
+# tag, or in a cloud session has GitHub make it (Set-Ref.ps1). Ship calls it only after the publisher has sent the feed, and passes the
 # id the publisher said it sent ($PublishedId); anything else tags nothing.
 # Returns { Tag, Commit, Why, PutRight }: Why is '' when the tag is on the
 # remote, and PutRight is what a person runs to finish it, '' when there is
@@ -296,7 +323,7 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
     $rcWas = $global:LASTEXITCODE
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
-        [IO.File]::WriteAllText($msgFile, (Get-ReleaseTagMessage $r $FeedUrl) + "`n", (New-Object Text.UTF8Encoding($false)))
+        [IO.File]::WriteAllText($msgFile, (Get-ReleaseTagMessage $r $FeedUrl $doc) + "`n", (New-Object Text.UTF8Encoding($false)))
         $push = "git push $Remote refs/tags/$($o.Tag)"
         $make = "git tag -a $($o.Tag) $($o.Commit) -m ""Thornswood $(Get-ReleaseField $r 'channel') release $id"""
         $g = Invoke-ReleaseGit $RepoDir @('rev-parse', '--verify', '--quiet', ($o.Commit + '^{commit}'))
@@ -308,6 +335,28 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
         $has = (Invoke-ReleaseGit $RepoDir @('rev-parse', '--verify', '--quiet', ('refs/tags/' + $o.Tag + '^{commit}'))).First
         if ($has -and $has -ne $o.Commit) {
             $o.Why = "$($o.Tag) already names commit $has, not $($o.Commit); it was left alone"
+            return $o
+        }
+        # A cloud session's git cannot write refs: the cloud environment's
+        # proxy refuses a tag push (#3314, measured 22 Oct 2026). There GitHub
+        # makes the tag, from the same message, in git-ref.yml (Set-Ref.ps1),
+        # and nothing is tagged in the session's own checkout, so the tag on
+        # GitHub is the only one.
+        if ($env:CLAUDE_CODE_REMOTE -eq 'true') {
+            $setRef = Join-Path $RepoDir 'scripts/ops/Set-Ref.ps1'
+            $again = "pwsh scripts/ops/Set-Ref.ps1 -Tag $($o.Tag) -Commit $($o.Commit) -Message ""Thornswood $(Get-ReleaseField $r 'channel') release $id"""
+            if (-not (Test-Path -LiteralPath $setRef -PathType Leaf)) {
+                $o.Why = "this checkout has no scripts/ops/Set-Ref.ps1, which a cloud session needs to put $($o.Tag) on GitHub"
+                $o.PutRight = $again
+                return $o
+            }
+            & $setRef -Tag $o.Tag -Commit $o.Commit -MessageFile $msgFile
+            $rc = $LASTEXITCODE
+            if ($rc -eq 2) { $o.Why = "GitHub was asked to make $($o.Tag) and its run had not ended; it still makes the tag, and the line above reads its answer"; return $o }
+            if ($rc -ne 0) {
+                $o.Why = "GitHub did not put $($o.Tag) on (Set-Ref.ps1 exit $rc); the lines above say why"
+                $o.PutRight = $again
+            }
             return $o
         }
         if (-not $has) {

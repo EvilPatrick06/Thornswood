@@ -54,8 +54,9 @@ Hearthcook from novice, so a Confectioner does not mill their own
 flour unless this half is theirs or a master has taught it. Flour is
 what every dessert asks for. A novice confectioner buys it.
 
-The cookpot does not turn a stranger away at the furniture. The
-recipe does.
+The cookpot opens only for somebody who can make a meal there: a
+Hearthcook, or a Confectioner for the novice meals. Anybody else is
+turned away before the menu opens.
 
 ## What you are handed
 

@@ -435,6 +435,12 @@ namespace Thornswood
             "Data\\Interface\\startmenu.swf",
             "Data\\meshes\\thornswood\\noticeboard01.nif",
             "Data\\meshes\\thornswood\\dropbox01.nif",
+            // The collection's menus with no gold values (#3113).
+            "Data\\Interface\\skyui\\config.txt",
+            "Data\\Interface\\skyui\\itemcard.swf",
+            "Data\\Interface\\hudmenu.swf",
+            "Data\\Interface\\AHZHudInfo.swf",
+            "Data\\Interface\\exported\\AHZHudInfo.swf",
         };
 
         /// <summary>Thornswood's by its name alone: NamedOurs, WrittenInGame, MadeInGame, or the client runtime.</summary>

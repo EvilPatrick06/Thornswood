@@ -180,7 +180,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const remRefused = run(env, STEWARD, 0x16, '/remnant add Person1');
     yes('R3 nor the remnant roll, which is an application', env.E.rolls().remnant.length === 0 && /application/.test(remRefused));
     run(env, ADMIN, 0x14, '/embassy add Person1 armed');
-    // docs/SYSTEMS.md, "Buttons, not commands": nothing here is for people to type.
+    // docs/GAME-SYSTEMS.md, "Buttons, not commands": nothing here is for people to type.
     const own = run(env, NOBODY, 0xff001001, '/embassy');
     yes('R3 /embassy is a staff command: somebody on the roll who types it is told only that an admin writes it',
         own === 'Only an admin writes the embassy roll.');
@@ -318,12 +318,14 @@ if (block && RECIPES && ADMIN_ITEMS) {
       // The steward here keeps the building's hold: a steward settles their own
       // hold only (#2551), which test-offices.js and test-2551-building-holds.js hold.
       const fn = new Function('globalThis', 'isSteward', 'here', 'holderOf', 'nameOf', 'claims', 'save', 'pushAll', 'plog',
-        'redrawPanel', 'OFFICE_AT_DOOR', 'notStewardHere', 'isStaffHere', 'settleAs', evictSrc + '\nreturn evict;');
+        'redrawPanel', 'OFFICE_AT_DOOR', 'notStewardHere', 'isStaffHere', 'settleAs',
+        // What an evicted holder owed stays theirs (#3950): tests/test-3893-rent-arrears.js; no rent here.
+        'keepOwed', evictSrc + '\nreturn evict;');
       // Staff at any door (settleAs, #2551) is test-2551-building-holds.js's: here the steward settles as steward.
       const evict = fn({ __thornswoodEmbassy: E }, function () { return true; }, function () { return building; },
         function () { return claims[building] || null; }, function (b) { return b; }, claims,
         function () { }, function () { }, function () { }, function () { }, 'Stand at the door.', function () { return null; },
-        function () { return false; }, function () { return { as: 'steward' }; });
+        function () { return false; }, function () { return { as: 'steward' }; }, function () { });
       evict(0x14, STEWARD, function (p, line) { told.push(line); });
       return { told: told.join(' '), claims: claims };
     }
@@ -475,8 +477,12 @@ if (block && RECIPES && ADMIN_ITEMS) {
   {
     const spoils = slice(gm, '// ==== thornswood spoils ====', '// ==== end thornswood spoils ====');
     const loot = slice(gm, '// ==== thornswood dungeon loot ====', '// ==== end thornswood dungeon loot ====');
-    yes('S1 the spoils block takes every weapon, armour and arrow the world placed',
-        !!spoils && /var SPOIL_TYPES = \{ WEAP: true, ARMO: true, AMMO: true \};/.test(spoils));
+    // Nothing the world placed is handed over (#3077, #3078): the floor's
+    // weapons, armour and arrows are switched off in Thornswood-Last.esp.
+    const builder = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Build-LastPlugin.py'), 'utf8');
+    const types = (/FLOOR_TYPES = \(([^)]*)\)/.exec(builder) || ['', ''])[1];
+    yes('S1 no weapon, armour or arrow the world placed lies on the floor',
+        !!spoils && ['WEAP', 'ARMO', 'AMMO'].every(function (t) { return types.indexOf("b'" + t + "'") >= 0; }));
     const outs = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll; }).map(function (k) { return RECIPES[k].out; })
       .concat(['65bbf:Skyrim.esm', '10c698:Skyrim.esm']);
     yes('S2 no dungeon chest or body hands out an embassy or remnant piece',
@@ -540,7 +546,8 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const article = text => slice(text, 'Article the Third', 'Article the Fourth') || '';
     const said = 'no more than ' + word(roll) + ' persons in service, of whom no more than ' +
                  word(armed) + ' may bear arms';
-    for (const rel of ['site/data/site/world.md', 'lore/accord.md']) {
+    // world.md is the Accord's only copy since #3138; lore/accord.md points at it.
+    for (const rel of ['site/data/site/world.md']) {
       const text = read(rel);
       yes('A2 ' + rel + ' Article the Third says ' + word(roll) + ' in service and ' + word(armed) + ' armed',
           article(text).replace(/\s+/g, ' ').indexOf(said) >= 0);

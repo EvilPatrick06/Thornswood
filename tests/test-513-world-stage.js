@@ -13,8 +13,10 @@
       or whose stage the list does not have, is the start too, and the log
       says so once. The file is left as it is, and kept beside the new one
       when a move is made after that.
-    - war.json keeps every move, oldest first, with when and who. Nothing is
-      ever taken off it.
+    - war.json keeps every move, oldest first, with when. Nothing is ever
+      taken off it. It names nobody (#2860, #2353): who moved the world is in
+      the staff log, and who made the proposal waiting is held in memory
+      only, so after a restart nobody is named for it.
     - setWorldStage(id, by) refuses an id the list does not have, the stage
       the world is already at, and a move that does not say who made it, and
       writes nothing when it refuses. What it writes survives a restart.
@@ -224,8 +226,8 @@ attempt('the stage', function () {
       'proposeWorldStage', 'confirmWorldStage', 'dropWorldStageProposal', 'pendingWorldStage', 'proclaim']
       .every(function (k) { return typeof s.S[k] === 'function'; }));
   let st = call(s, 'worldStage');
-  yes('S1 no file is the first stage, from nobody, at no time, with no force',
-      st.id === 'peace' && st.name === 'Peace' && st.since === 0 && st.by === '' && st.force === '' &&
+  yes('S1 no file is the first stage, at no time, with no force, and it names nobody',
+      st.id === 'peace' && st.name === 'Peace' && st.since === 0 && !('by' in st) && st.force === '' &&
       call(s, 'worldHistory').length === 0 && call(s, 'pendingWorldStage') === null);
   yes('S1 and a missing file is not a fault the log reports', stageLogs(s.logs).length === 0);
   yes('S1 and nothing is written just for reading it', warText() === null);
@@ -257,10 +259,12 @@ attempt('the stage', function () {
   const t1 = clock.t;
   r = call(s, 'setWorldStage', 'test-landing', 'Gavin  (a test)');
   let d = onDisk();
-  yes('S5 a stage the list has is taken, and written with when and who, as the first move on record',
+  yes('S5 a stage the list has is taken, and written with when, as the first move on record',
       r && r.ok === true && r.stage.id === 'test-landing' && !!d && d.id === 'test-landing' &&
-      d.since === t1 && d.by === 'Gavin (a test)' && Array.isArray(d.history) && d.history.length === 1 &&
-      JSON.stringify(d.history[0]) === JSON.stringify({ id: 'test-landing', at: t1, by: 'Gavin (a test)' }));
+      d.since === t1 && Array.isArray(d.history) && d.history.length === 1 &&
+      JSON.stringify(d.history[0]) === JSON.stringify({ id: 'test-landing', at: t1 }));
+  yes('S5 and the file names nobody: who moved it is the staff log\'s (#2860)',
+      !('by' in d) && warText().indexOf('Gavin') < 0);
   st = call(s, 'worldStage');
   yes('S5 and worldStage() reads it at once, with the force as written', st.id === 'test-landing' && st.force === 'remnant');
   yes('S5 and no half written file is left beside it', !fs.existsSync(warFile + '.tmp'));
@@ -277,11 +281,11 @@ attempt('the stage', function () {
   s = boot(worldTest);
   st = call(s, 'worldStage');
   const h = call(s, 'worldHistory');
-  yes('S7 after a restart the stage, when and who are all still there', st.id === 'peace' && st.since === t3 &&
-      st.by === 'Gavin' && stageLogs(s.logs).length === 0);
-  yes('S7 and the history keeps every move, oldest first, a later stage taking none off',
-      h.map(function (e) { return e.id + '@' + e.at + ':' + e.by; }).join() ===
-      ['test-landing@' + t1 + ':Gavin (a test)', 'test-free@' + t2 + ':Smeagle', 'peace@' + t3 + ':Gavin'].join());
+  yes('S7 after a restart the stage and when are still there', st.id === 'peace' && st.since === t3 &&
+      stageLogs(s.logs).length === 0);
+  yes('S7 and the history keeps every move, oldest first, a later stage taking none off, naming nobody',
+      JSON.stringify(h) === JSON.stringify([{ id: 'test-landing', at: t1 }, { id: 'test-free', at: t2 }, { id: 'peace', at: t3 }]) &&
+      ['Gavin', 'Smeagle'].every(function (n) { return warText().indexOf(n) < 0; }));
   h.length = 0;
   yes('S7 and what worldHistory() hands out is a copy', call(s, 'worldHistory').length === 3);
   const before = warText();
@@ -301,8 +305,11 @@ attempt('the stage', function () {
   yes('S10 a proposal is kept and moves nothing', r.ok === true && call(s, 'worldStage').id === 'peace' &&
       JSON.stringify(call(s, 'pendingWorldStage')) === JSON.stringify({ id: 'test-landing', at: tp, by: 'the server' }) &&
       onDisk().history.length === 3 && onDisk().pending.id === 'test-landing');
+  yes('S10 and the file keeps its stage and when, never who proposed it',
+      JSON.stringify(onDisk().pending) === JSON.stringify({ id: 'test-landing', at: tp }) && warText().indexOf('the server') < 0);
   s = boot(worldTest);
-  yes('S10 and it is still there after a restart', (call(s, 'pendingWorldStage') || {}).id === 'test-landing');
+  yes('S10 and it is still there after a restart, with nobody named for it',
+      JSON.stringify(call(s, 'pendingWorldStage')) === JSON.stringify({ id: 'test-landing', at: tp, by: '' }));
   r = call(s, 'proposeWorldStage', 'test-free', 'the server');
   yes('S11 a later proposal replaces it', r.ok && call(s, 'pendingWorldStage').id === 'test-free');
   r = call(s, 'confirmWorldStage', ' ');
@@ -312,28 +319,37 @@ attempt('the stage', function () {
   const tc = clock.t;
   r = call(s, 'confirmWorldStage', 'Gavin');
   const last = call(s, 'worldHistory').slice(-1)[0];
-  yes('S12 a yes makes the move, as the confirmer\'s, with who proposed it on record, and clears it',
-      r.ok === true && call(s, 'worldStage').id === 'test-free' &&
-      JSON.stringify(last) === JSON.stringify({ id: 'test-free', at: tc, by: 'Gavin', proposedBy: 'the server' }) &&
-      call(s, 'pendingWorldStage') === null && onDisk().pending === null);
+  yes('S12 a yes makes the move and clears it, handing back who proposed it for the staff log, and the file names neither',
+      r.ok === true && r.proposedBy === 'the server' && call(s, 'worldStage').id === 'test-free' &&
+      JSON.stringify(last) === JSON.stringify({ id: 'test-free', at: tc }) &&
+      call(s, 'pendingWorldStage') === null && onDisk().pending === null &&
+      warText().indexOf('Gavin') < 0 && warText().indexOf('the server') < 0);
   r = call(s, 'confirmWorldStage', 'Gavin');
   yes('S13 a second yes has nothing to confirm', r.ok === false && /Nothing is proposed/.test(r.why));
   call(s, 'proposeWorldStage', 'peace', 'the server');
   const hist0 = JSON.stringify(call(s, 'worldHistory'));
   r = call(s, 'dropWorldStageProposal', 'Gavin');
   yes('S14 a proposal dropped moves nothing and leaves the history alone',
-      r.ok === true && call(s, 'pendingWorldStage') === null && call(s, 'worldStage').id === 'test-free' &&
+      r.ok === true && r.proposedBy === 'the server' && call(s, 'pendingWorldStage') === null && call(s, 'worldStage').id === 'test-free' &&
       JSON.stringify(call(s, 'worldHistory')) === hist0 && onDisk().pending === null);
   yes('S14 and dropping nothing is refused', call(s, 'dropWorldStageProposal', 'Gavin').ok === false);
   call(s, 'proposeWorldStage', 'test-landing', 'the server');
   r = call(s, 'setWorldStage', 'peace', 'Gavin');
   yes('S15 a direct move clears a proposal it overtook', r.ok && call(s, 'pendingWorldStage') === null && onDisk().pending === null);
+  call(s, 'proposeWorldStage', 'test-landing', 'the server');
+  s = boot(worldTest);
+  clock.t += 1000;
+  r = call(s, 'confirmWorldStage', 'Gavin');
+  yes('S15b a proposal made before a restart is confirmed with nobody named for it',
+      r.ok === true && r.proposedBy === '' && call(s, 'worldStage').id === 'test-landing' &&
+      JSON.stringify(call(s, 'worldHistory').slice(-1)[0]) === JSON.stringify({ id: 'test-landing', at: clock.t }));
+  call(s, 'setWorldStage', 'peace', 'Gavin');
 
   // Files the list cannot account for.
   const kept = warText();
   // Put the world, in the file, at a stage the real list does not have.
   fs.writeFileSync(warFile, JSON.stringify(Object.assign(JSON.parse(kept), { id: 'test-landing',
-    history: JSON.parse(kept).history.concat([{ id: 'test-landing', at: 1, by: 'x' }]) })));
+    history: JSON.parse(kept).history.concat([{ id: 'test-landing', at: 1 }]) })));
   const lostText = warText();
   s = boot(worldBlock);
   st = call(s, 'worldStage');
@@ -344,7 +360,7 @@ attempt('the stage', function () {
       r.ok === true && onDisk().history.length === JSON.parse(lostText).history.length + 1 &&
       onDisk().history.slice(-2)[0].id === 'test-landing');
 
-  fs.writeFileSync(warFile, JSON.stringify({ history: [{ id: 'peace', at: 1, by: 'a' }], pending: { id: 'dragons', at: 2, by: 'b' } }));
+  fs.writeFileSync(warFile, JSON.stringify({ history: [{ id: 'peace', at: 1 }], pending: { id: 'dragons', at: 2 } }));
   s = boot(worldTest);
   yes('S17 a proposal naming a stage the list does not have is not kept', call(s, 'pendingWorldStage') === null &&
       call(s, 'worldStage').id === 'peace');
@@ -364,13 +380,13 @@ attempt('the stage', function () {
       onDisk().history.length === 1);
   fs.unlinkSync(aside);
 
-  fs.writeFileSync(warFile, JSON.stringify({ history: [{ id: 'dragons', at: 5, by: 'nobody' }] }));
+  fs.writeFileSync(warFile, JSON.stringify({ history: [{ id: 'dragons', at: 5 }] }));
   s = boot(worldTest);
   st = call(s, 'worldStage');
   yes('S20 a file naming a stage the list does not have is the start, said once', st.id === 'peace' && st.since === 0 &&
       stageLogs(s.logs).length === 1 && /dragons/.test(stageLogs(s.logs)[0]));
 
-  fs.writeFileSync(warFile, '\uFEFF' + JSON.stringify({ history: [{ id: 'test-landing', at: 7, by: 'Gavin' }] }));
+  fs.writeFileSync(warFile, '\uFEFF' + JSON.stringify({ history: [{ id: 'test-landing', at: 7 }] }));
   s = boot(worldTest);
   yes('S21 a file a Windows editor saved with a byte order mark still reads',
       call(s, 'worldStage').id === 'test-landing' && stageLogs(s.logs).length === 0);

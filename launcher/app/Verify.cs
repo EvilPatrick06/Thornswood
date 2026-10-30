@@ -25,25 +25,26 @@ namespace Thornswood
         // the list. The gate still counts Blocking (see Shell Play).
         public bool FileMissing;
         // The file is there, enabled, in the right place, and its bytes are
-        // not the server's. Fix fetches the server's copy. Which file, and what
-        // the server says it should be, so Fix does not have to ask twice.
+        // not the server's. Fix puts in the release's copy when it is the
+        // server's (#3386). Which file, and what the server says it should
+        // be, so Fix does not have to ask twice.
         public string Plugin;
         public long WantSize;
         public int WantCrc;
-        public int WantIndex;   // position in the server manifest; the file is served at /plugins/<index>.bin
-        // The server hands out its copy: Thornswood's own plugin, the only one
-        // its manifest lists as served (#1180). Fix fetches only these; every
-        // other plugin is another author's mod, which Vortex installs from its
-        // author, and Fix names the mod to put right in Vortex instead.
+        public int WantIndex;   // position in the server manifest (in its light list when WantLight)
+        // Thornswood's own plugin, the only kind the server's manifest lists
+        // as served (#1180). Fix puts in only these, from the release (#3386);
+        // every other plugin is another author's mod, which Vortex installs
+        // from its author, and Fix names the mod to put right in Vortex
+        // instead.
         public bool Served;
         // The folder Vortex really deploys into, when it is not the Skyrim this
         // install reads. Fix points the launcher at it and Thornswood's own
         // folder is made from it, so the plugins Run finds missing are not a
         // reason to grey Fix out while this is on the list.
         public string VortexFolder;
-        // Served at /plugins/light-<index>.bin, where the index is the
-        // plugin's place in the manifest's light list, rather than at
-        // /plugins/<index>.bin: one of our own light plugins (#2627).
+        // In the manifest's light list rather than its mods: one of our own
+        // light plugins (#2627).
         public bool WantLight;
 
         // ---- for Scan and Fix (#2627) ----------------------------------
@@ -244,7 +245,7 @@ namespace Thornswood
 
             // An Anniversary owner's Creation Club plugins that take no place in
             // the order are not counted here (#479, LoadOrder.NotInBuild). Nor
-            // is a plugin the server hands out, which is ours: a server ahead
+            // is a plugin the server's served list names, which is ours: a server ahead
             // of this build's list names it, Fix put it in the server's place
             // (PutInServerOrder), and the next release's list carries it.
             foreach (string p in LoadOrder.NotInBuild(have, want, LightOrMissing))
@@ -453,9 +454,10 @@ namespace Thornswood
         // name, same place in the order, other bytes.
         //
         // So the same comparison runs here, against the same manifest, and
-        // Fix fetches the server's copy of a plugin that differs when the
-        // server hands that plugin out, which it does for Thornswood's own and
-        // nothing else (#1180, the manifest's "served" list). Another author's
+        // Fix puts in the release's copy of a plugin that differs when it is
+        // Thornswood's own (#1180, the manifest's "served" list) and that copy
+        // is the server's (#3386: the bytes come from the signed release over
+        // https, never from this port, which is plain http). Another author's
         // plugin comes from its author through Vortex, and Fix names the mod
         // to update or reinstall there. The five Bethesda masters and the
         // Creation Club files are left out the way the game leaves them out:
@@ -480,10 +482,9 @@ namespace Thornswood
         class ServerManifest
         {
             [DataMember] public ServerMod[] mods;
-            // The plugins the server hands out: Thornswood's own, by the
-            // gamemode's server manifest block (#1180), a full one at
-            // /plugins/<index in mods>.bin and, since #2627, a light one at
-            // /plugins/light-<index in light>.bin.
+            // Thornswood's own plugins, by the gamemode's server manifest
+            // block (#1180), full and, since #2627, light. Only names: Fix
+            // takes their bytes from the release (#3386).
             [DataMember] public string[] served;
             // A server that loads light plugins publishes them apart from
             // mods, in light index order (#1715): mods stays the full plugins
@@ -609,17 +610,14 @@ namespace Thornswood
                     m.filename + " is not the same file the server has" +
                     (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
                     ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server.",
-                    m.Served ? "Fix fetches the server's copy." : null,
-                    m.Served ? NotHandedOver : FromVortex(cfg, m.filename),
+                    m.Served ? "Fix puts in the release's copy." : null,
+                    m.Served ? NotInRelease : FromVortex(cfg, m.filename),
                     true);
                 i.Plugin = m.filename;
                 i.WantSize = m.size;
                 i.WantCrc = (int)m.crc32;
-                // Where the file is served: a full plugin of ours at
-                // /plugins/<index in mods>.bin, a light one of ours at
-                // /plugins/light-<index in light>.bin (#2627). Another
-                // author's is never served, and Fix sends the person to
-                // Vortex for it.
+                // Its place in the manifest, in mods or in light (#2627),
+                // which the session report carries.
                 i.WantLight = isLight;
                 i.WantIndex = isLight ? idx - mods.Length : idx;
                 i.Served = m.Served;
@@ -630,8 +628,8 @@ namespace Thornswood
 
         /// <summary>
         /// What puts another author's plugin right, said by Scan and by Fix.
-        /// The server hands out only Thornswood's own plugin (#1180): any
-        /// other is that author's to give out, through Vortex and the
+        /// Fix puts in only Thornswood's own plugin (#1180, from the release
+        /// since #3386): any other is that author's to give out, through Vortex and the
         /// collection, so Vortex is where it is put right. The mod is named by
         /// Vortex's own deployment record when there is one.
         /// </summary>
@@ -640,7 +638,7 @@ namespace Thornswood
             string mod = null;
             try { mod = OwnGame.VortexModOf(cfg, plugin); }
             catch (Exception ex) { Swallow.Note("Verify.FromVortex, asking Vortex's record which mod has " + plugin, ex); }
-            return "It comes from another author's mod, which Vortex installs from its author, so the server does not hand it out. " +
+            return "It comes from another author's mod, which Vortex installs from its author, so Thornswood has no copy of it to give. " +
                    "In Vortex, update the Thornswood collection, or reinstall " +
                    (string.IsNullOrEmpty(mod) ? "the mod that has " + plugin : mod) +
                    " (right click it on the Mods page, Reinstall), then press Scan.";
@@ -654,28 +652,28 @@ namespace Thornswood
         /// <summary>A plugin of the collection that is not in the game folder and Vortex has no copy of.</summary>
         const string VortexDeploys = "Vortex has to deploy it: in Vortex, enable the Thornswood profile and press Deploy, or install the collection if you have not, then press Scan.";
 
-        /// <summary>A plugin of ours the server did not hand over.</summary>
-        const string NotHandedOver = "The server did not hand over its copy. It publishes its plugin files when it starts, so a server started before this launcher's release has none to give: staff restart it, then press Fix again.";
+        /// <summary>A plugin of ours whose server copy the release does not have (#3386).</summary>
+        const string NotInRelease = "Fix takes Thornswood's own plugins from the latest release, and that release does not have the copy the server runs yet, or could not be reached. The next update brings it: take it when it is waiting, then press Scan.";
 
         /// <summary>The order cannot be put right while the server names a plugin this build has no line for and that is not ours.</summary>
-        const string OrderNeeds = "The server's order names a plugin this build's list does not have and the server does not hand out, so only an update or Vortex can bring it: take the update when one is waiting, or deploy the Thornswood collection in Vortex, then press Scan.";
+        const string OrderNeeds = "The server's order names a plugin this build's list does not have and that is not Thornswood's own, so only an update or Vortex can bring it: take the update when one is waiting, or deploy the Thornswood collection in Vortex, then press Scan.";
 
         /// <summary>
-        /// What puts an order right that Fix could not: the server's copy when
-        /// the plugin the server has there is ours (Fix fetches it and puts it
-        /// in its place, so what is left is a server with none to give), an
+        /// What puts an order right that Fix could not: the release's copy
+        /// when the plugin the server has there is ours (Fix puts it in and in
+        /// its place, so what is left is a release without it), an
         /// update or Vortex when it is another author's, and pressing Fix again
         /// when the server has nothing there and the list has one too many.
         /// </summary>
         static string OrderWhatWill(Config cfg, string theirs)
         {
             if (theirs == "nothing") return Retry;
-            return ServedByServer(cfg, theirs) ? NotHandedOver : OrderNeeds;
+            return ServedByServer(cfg, theirs) ? NotInRelease : OrderNeeds;
         }
 
         /// <summary>
-        /// True when the server's manifest names this plugin as one it hands
-        /// out, which makes it ours (#1180): full or light (#2627). False when
+        /// True when the server's manifest names this plugin in its served
+        /// list, which makes it ours (#1180): full or light (#2627). False when
         /// the server cannot be asked.
         /// </summary>
         static bool ServedByServer(Config cfg, string plugin)
@@ -924,8 +922,8 @@ namespace Thornswood
                 // 16 Oct the server's order named Thornswood-Last.esp, which
                 // the release Patrick's launcher had not taken yet ships, and
                 // this said the order "was left alone" at every Fix while the
-                // light order stayed wrong. Ours is what the server hands
-                // out, and only once it is in Data: switching on a plugin the
+                // light order stayed wrong. Ours is what the server's served
+                // list names, and only once it is in Data: switching on a plugin the
                 // game cannot find would move every one after it.
                 var ours = new List<string>();
                 var notOurs = new List<string>();
@@ -949,9 +947,9 @@ namespace Thornswood
                 if (ordered == null)
                 {
                     if (notOurs.Count > 0)
-                        say("The server's order names " + string.Join(", ", notOurs.ToArray()) + ", which this build's plugin list does not enable and the server does not hand out, so the order was left alone. " + OrderNeeds);
+                        say("The server's order names " + string.Join(", ", notOurs.ToArray()) + ", which this build's plugin list does not enable and is not Thornswood's own, so the order was left alone. " + OrderNeeds);
                     else if (notHere.Count > 0)
-                        say("The server's order names " + string.Join(", ", notHere.ToArray()) + ", which is ours and is not in Data, because the server did not hand it over, so the order was left alone. " + NotHandedOver);
+                        say("The server's order names " + string.Join(", ", notHere.ToArray()) + ", which is ours and is not in Data, because the release did not have it, so the order was left alone. " + NotInRelease);
                     else
                         say("This build's plugin list enables the same plugin twice, so the order was left alone.");
                     return 0;
@@ -1082,42 +1080,59 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The server's copy of one plugin, written over the file that is here.
+        /// The release's copy of one plugin of ours, written over the file
+        /// that is here, when it is the copy the server runs (#3386).
         /// Written into the existing file rather than swapped for a new one, so
         /// a hard link (Vortex's deployment, the launcher's own Game folder,
         /// which share the file with the Steam copy) sees the same bytes
         /// everywhere and Vortex has nothing to report. The old bytes are kept
-        /// whole under Profile\Replaced first. Nothing is written unless what
-        /// came down is exactly what the manifest describes.
+        /// whole under Profile\Replaced first.
+        ///
+        /// The bytes come from the release the update feed names, over https,
+        /// by the sha256 its record gives them (Updater.ReleaseCopy), and
+        /// from nowhere else. Until #3386 they came from the server's
+        /// resources port over plain http and were checked against the size
+        /// and crc32 in that same server's manifest, so anybody on the path
+        /// could hand over a plugin of their own with numbers to match. The
+        /// manifest is still what says which copy the server runs, so a
+        /// release copy that is not that one is not written: it would only
+        /// swap one LOAD ORDER ERROR for another.
         /// </summary>
-        static bool FetchPlugin(Config cfg, Issue i, Action<string> say)
+        static bool FetchPlugin(Config cfg, Issue i, Func<string, byte[]> release, Action<string> say)
         {
             // Only what the server lists as served, Thornswood's own plugin
             // (#1180). Before that this fetched any plugin that differed, and
             // the server handed out 42 other authors' mods to anybody who
-            // asked (measured on both servers, 5 Oct).
+            // asked (measured on both servers, 5 Oct). The release holds only
+            // ours anyway; this keeps the sentence for another author's right.
             if (!i.Served)
             {
                 say(i.Plugin + " was left as it is. " + FromVortex(cfg, i.Plugin));
                 return false;
             }
             string dest = Path.Combine(Paths.Game, "Data", i.Plugin);
-            // Served by manifest position, not name: the resources server refuses
-            // any URL whose name contains .esp/.esm/.esl. gamemode publishFiles
-            // writes each full plugin as <index>.bin at its position in mods,
-            // and each light one as light-<index>.bin at its position in light
-            // (#2627), so the two lists cannot name the same file.
-            byte[] bytes = Get(ServerBase(cfg) + "/plugins/" + (i.WantLight ? "light-" : "") + i.WantIndex + ".bin", 90000);
+            if (release == null)
+            {
+                say(i.Plugin + ": the update feed could not be read, so there is no release copy to put in and nothing was changed.");
+                return false;
+            }
+            byte[] bytes;
+            try { bytes = release(i.Plugin); }
+            catch (Exception ex)
+            {
+                say(i.Plugin + ": the release's copy could not be fetched (" + ex.Message.TrimEnd('.') + "), so nothing was changed.");
+                return false;
+            }
             if (bytes == null)
             {
-                say(i.Plugin + ": the server did not hand over its copy. It publishes the files at start, so a server older than this launcher, or one that is down, has none to give.");
+                say(i.Plugin + ": the release the update feed names does not ship it, so nothing was changed.");
                 return false;
             }
             int crc;
             using (var ms = new MemoryStream(bytes)) crc = Crc32Of(ms);
             if (bytes.LongLength != i.WantSize || crc != i.WantCrc)
             {
-                say(i.Plugin + ": what the server handed over is not what its own manifest describes, so nothing was changed.");
+                say(i.Plugin + ": the release's copy is not the one the server runs, so nothing was changed.");
                 return false;
             }
             bool hadLocal = false;
@@ -1153,7 +1168,7 @@ namespace Thornswood
                 return false;
             }
             lock (crcCache) { crcCache.Remove(dest); }
-            say(i.Plugin + " is now the server's copy (" + Fmt(bytes.LongLength) + ")." + (hadLocal ? " Yours is kept in Profile\\Replaced." : ""));
+            say(i.Plugin + " is now the release's copy, the one the server runs (" + Fmt(bytes.LongLength) + ")." + (hadLocal ? " Yours is kept in Profile\\Replaced." : ""));
             return true;
         }
 
@@ -1167,7 +1182,7 @@ namespace Thornswood
         /// Windows' own Skyrim folder. The order waits in Profile (#1234).
         /// Once the folder exists, the file written is the one the game reads.
         /// </summary>
-        public static int Fix() { return Fix(null, null); }
+        public static int Fix() { return Fix(null, null, null); }
 
         /// <summary>
         /// Where plugins.txt and loadorder.txt are written. After the own
@@ -1224,7 +1239,11 @@ namespace Thornswood
         /// </summary>
         public static bool OwnFolderNext;
 
-        public static int Fix(Config cfg, Action<string> say)
+        /// <param name="release">Thornswood's own plugins from the release
+        /// the update feed names (Updater.ReleaseCopy, #3386), the only
+        /// place Fix takes a plugin's bytes from. Null when the feed could not
+        /// be read, and then none is put in.</param>
+        public static int Fix(Config cfg, Action<string> say, Func<string, byte[]> release)
         {
             if (say == null) say = delegate(string m) { };
             OwnFolderNext = false;
@@ -1289,16 +1308,16 @@ namespace Thornswood
             try { n += OwnGame.RestoreMissingPlugins(cfg, say); }
             catch (Exception ex) { Swallow.Note("Verify.Fix, restoring missing plugins from Vortex", ex); say("Could not restore missing plugins from Vortex (" + ex.Message.TrimEnd('.') + ")."); }
 
-            // The server's copy of our own plugin when its bytes are not the
-            // server's; another author's is named for Vortex (#1180).
+            // The release's copy of our own plugin when its bytes are not the
+            // server's (#3386); another author's is named for Vortex (#1180).
             if (cfg != null)
             {
                 foreach (Issue i in Bytes(cfg))
-                    if (i.Plugin != null && FetchPlugin(cfg, i, say)) n++;
+                    if (i.Plugin != null && FetchPlugin(cfg, i, release, say)) n++;
             }
 
-            // Still missing from Data and served by the server, which is our
-            // own plugin only (#1180), full or light (#2627): fetch that copy.
+            // Still missing from Data and ours by the server's served list
+            // (#1180), full or light (#2627): the release's copy (#3386).
             // Bytes skips absent files on purpose (Run already named them);
             // Fix still has to put ours back when the game folder lost it, or
             // never had it: on 16 Oct Thornswood-Last.esp, light and ours,
@@ -1327,7 +1346,7 @@ namespace Thornswood
                             try { goneFile = !File.Exists(dest); }
                             catch (Exception ex) { Swallow.Note("Verify.Fix, asking whether " + m.filename + " is still missing before fetch", ex); goneFile = true; }
                             if (!goneFile) continue;
-                            var miss = new Issue(m.filename + " is missing from Data; Fix fetches the server's copy.", true);
+                            var miss = new Issue(m.filename + " is missing from Data; Fix puts in the release's copy.", true);
                             miss.FileMissing = true;
                             miss.Plugin = m.filename;
                             miss.WantSize = m.size;
@@ -1335,11 +1354,11 @@ namespace Thornswood
                             miss.WantLight = isLight;
                             miss.WantIndex = isLight ? idx - mods.Length : idx;
                             miss.Served = true;
-                            if (FetchPlugin(cfg, miss, say)) n++;
+                            if (FetchPlugin(cfg, miss, release, say)) n++;
                         }
                     }
                 }
-                catch (Exception ex) { Swallow.Note("Verify.Fix, fetching still-missing plugins from the server", ex); }
+                catch (Exception ex) { Swallow.Note("Verify.Fix, putting in still-missing plugins of ours from the release", ex); }
             }
 
             // The server's order, into this build's own list, last: after the

@@ -14,10 +14,9 @@
   roles, so it falls back to the hand written admin list and lets everybody
   else in as an ordinary member. With it, Discord roles decide everything:
 
-    Owner, Dev                         admin on the site
-    Moderator, Gamemaster, Loremaster,
-      Content Creator, Playtester,
-      Member                           allowed into the game
+    Owner, Co-Owner, Lead Dev, Dev     admin on the site
+    every staff role, Playtester       allowed into the game (#3317)
+    Owner, Co-Owner, Dev, the leads    allowed the dev build
     Banned                             turned away everywhere
 
   Jarl of <hold> and Citizen of <hold> are in world and grant nothing. Somebody
@@ -43,6 +42,13 @@
 
     .\Set-DiscordLogin.ps1 -Invite https://discord.gg/yyyy -NoSecrets
 
+  Which roles mean what (#3317). Each -Access is one list, written whole:
+  pass every role name the list should hold, not just the new one. The lists
+  are the site's cfg.access ones: admin, play, dev, devBuild, banned, company
+  and slots3. Lists not named keep what they hold.
+
+    .\Set-DiscordLogin.ps1 -NoSecrets -Access 'company=Free Skyrim Trading Company'
+
   The fallback admin list, for when Discord itself is having a bad day. Pass
   every id, not just the new one:
 
@@ -65,6 +71,8 @@ param(
   # time, and no amount of angle brackets stops it.
   [switch]$NewInvite,
   [string[]]$Admin,
+  # 'list=Role,Role' for each access list to write whole (#3317).
+  [string[]]$Access,
   # The Patreon page, once there is one. Puts a real link in the nav and the
   # footer instead of sending people to the Support page.
   [string]$Patreon,
@@ -260,6 +268,24 @@ if ($Patreon -and $Patreon -ne 'none') {
   }
 }
 
+# The access lists, checked here so nothing odd leaves this machine: a list
+# the site has, and role names in plain words.
+$accessLists = 'admin', 'play', 'dev', 'devBuild', 'banned', 'company', 'slots3'
+$acc = @{}
+foreach ($a in @($Access | Where-Object { "$_".Trim() })) {
+  if ("$a" -notmatch '^\s*([A-Za-z0-9]+)\s*=(.*)$' -or $accessLists -cnotcontains $Matches[1]) {
+    Write-Host ("  -Access takes 'list=Role,Role' with a list of " + ($accessLists -join ', ') + ', not: ' + $a) -ForegroundColor Red
+    exit 1
+  }
+  $key = $Matches[1]
+  $names = @($Matches[2] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  foreach ($n in $names) {
+    if ($n -notmatch '^[\p{L}\p{N} ._-]+$') { Write-Host ('  -Access: not a role name: ' + $n) -ForegroundColor Red; exit 1 }
+  }
+  if (-not $names.Count) { Write-Host ('  -Access ' + $key + ' names no role. Nothing sent.') -ForegroundColor Red; exit 1 }
+  $acc[$key] = $names
+}
+
 $d = @{}
 if ($ClientId)     { $d.clientId = $ClientId }
 if ($clientSecret) { $d.clientSecret = $clientSecret }
@@ -274,6 +300,7 @@ $payload = @{
   token   = "$botToken"
   patreon = "$Patreon"
   admins  = @(if ($Admin) { $Admin | ForEach-Object { "$_" } })
+  access  = $acc
 } | ConvertTo-Json -Depth 4 -Compress
 # A client id given with the token says which application this is on purpose,
 # and the token was checked against it above.
@@ -316,11 +343,22 @@ if (`$patch.patreon -eq 'none') { `$cfg['patreon'] = '' }
 elseif (`$patch.patreon)         { `$cfg['patreon'] = `$patch.patreon }
 if (-not `$cfg['admins']) { `$cfg['admins'] = @() }
 if (-not `$cfg['access']) {
+  # The same lists as site\server.js's defaults (#3317).
   `$cfg['access'] = @{
-    admin  = @('Owner','Dev')
-    play   = @('Owner','Dev','Moderator','Gamemaster','Loremaster','Content Creator','Playtester')
+    admin  = @('Owner','Co-Owner','Lead Dev','Dev')
+    play   = @('Owner','Co-Owner','Lead Dev','Lead Gamemaster','Lead Loremaster','Lead Moderator',
+               'Lead Content Creator','Lead Support','Dev','Gamemaster','Trial Gamemaster',
+               'Loremaster','Moderator','Content Creator','Support','Playtester')
     banned = @('Banned')
   }
+}
+# -Access: each list named is written whole, the rest kept (#3317).
+if (`$patch.access -and @(`$patch.access.PSObject.Properties).Count) {
+  `$acc = @{}
+  if (`$cfg['access'] -is [hashtable]) { foreach (`$k in `$cfg['access'].Keys) { `$acc[`$k] = `$cfg['access'][`$k] } }
+  elseif (`$cfg['access']) { `$cfg['access'].PSObject.Properties | ForEach-Object { `$acc[`$_.Name] = `$_.Value } }
+  `$patch.access.PSObject.Properties | ForEach-Object { `$acc[`$_.Name] = @(`$_.Value) }
+  `$cfg['access'] = `$acc
 }
 
 # Set-Content -Encoding UTF8 on Windows PowerShell writes a byte order mark.
@@ -377,6 +415,11 @@ function TokenLooks(`$v, `$cid) {
 '  fallback admins ' + (@(`$back.admins) -join ', ')
 '  patreon       ' + `$(if (`$back.patreon) { `$back.patreon } else { 'not set' })
 '  lets into the game: ' + (@(`$back.access.play) -join ', ')
+if (`$patch.access) {
+  `$patch.access.PSObject.Properties | ForEach-Object {
+    '  access ' + `$_.Name + ': ' + (@(`$back.access.(`$_.Name)) -join ', ')
+  }
+}
 
 Restart-ThornswoodSite -Root '$rootWin' -Task '$Task'
 if (`$tokenChanged) { Restart-ThornswoodBot -Root '$botWin' -Service '$BotService' }

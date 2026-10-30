@@ -19,8 +19,8 @@
        the other workflows use (#437), with a timeout;
     2. it checks out nothing and runs no action, and the label and issue reach
        the script through the environment: no ${{ }} inside the script;
-    3. the script itself, lifted out of the workflow and run in a child
-       PowerShell with a stand-in Invoke-RestMethod that answers as GitHub
+    3. the script itself, lifted out of the workflow and run in a fresh
+       runspace of its own with a stand-in Invoke-RestMethod that answers as GitHub
        would and writes down each call instead of making it: the Status named
        on the label is set on the issue's card, whatever its case, spaces or
        hyphens; every board: label on the issue comes off and no other label
@@ -28,7 +28,13 @@
        label on the issue is deleted from the repository; something that is
        not a number, or a board with no Order field, fails the run; a Status the board does not have, a missing token, an error
        from the board and a refused label removal each fail the run, and the
-       ones that fail before the Status is set touch no label.
+       ones that fail before the Status is set touch no label;
+    4. Done is not closed (#3076): while the board's built-in "Auto-close
+       issue" workflow is on, or the board does not say whether it is, a
+       board: Done label on an open issue moves nothing, keeps its label and
+       fails the run, naming the setting, because Done would close the issue
+       before its fix is on main; an issue already closed, In Progress and
+       Order still go; every run says whether it is on.
 
   It never reaches GitHub. Read only apart from files under its own temp
   folder.
@@ -101,17 +107,27 @@ if ($run.Success) {
     $script = ($body -join "`n").TrimEnd() + "`n"
 }
 Yes 'the script has no ${{ }} in it: the label and issue come in through the environment' ($script.Length -gt 0 -and $script -notmatch '\$\{\{')
-Yes '  as LABEL, ISSUE and ISSUE_NODE out of the event' (
+Yes '  as LABEL, ISSUE, ISSUE_NODE and ISSUE_STATE out of the event' (
     $text -match [regex]::Escape('LABEL: ${{ github.event.label.name }}') -and
     $text -match [regex]::Escape('ISSUE: ${{ github.event.issue.number }}') -and
-    $text -match [regex]::Escape('ISSUE_NODE: ${{ github.event.issue.node_id }}'))
+    $text -match [regex]::Escape('ISSUE_NODE: ${{ github.event.issue.node_id }}') -and
+    $text -match [regex]::Escape('ISSUE_STATE: ${{ github.event.issue.state }}'))
 Yes '  with the run''s own token beside them for the labels' ($text -match [regex]::Escape('GH_TOKEN: ${{ github.token }}'))
 Yes 'the script runs under pwsh' ($text -match '(?m)^\s+shell:\s*pwsh\s*$')
 
 # ---- 3. the script, run against a stand-in for GitHub -----------------------
-$pwsh = (Get-Command pwsh -ErrorAction SilentlyContinue)
-Yes 'pwsh is on this machine to run the script with' ($null -ne $pwsh)
-if (-not $pwsh -or -not $script) { Done }
+# Each case runs the script in a fresh runspace of this PowerShell, not a
+# child pwsh: a runspace starts with nothing of this harness in it (no
+# variable, function, StrictMode or ErrorActionPreference), as a new process
+# does, and a PowerShell start costs the gate box about ten times a node
+# start, thirty of them here (#3168). The environment is the process's either
+# way. Its exit code is read the way pwsh -File gives it: the number exit
+# gave, 1 for an error that ended it, else 0.
+$parseErrors = $null
+$null = [System.Management.Automation.Language.Parser]::ParseInput($script, [ref]$null, [ref]$parseErrors)
+Yes 'the script parses, so it can be run' ($script -and @($parseErrors).Count -eq 0)
+if (-not $script -or @($parseErrors).Count) { Done }
+$iss = [Management.Automation.Runspaces.InitialSessionState]::CreateDefault2()
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-board-status-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
@@ -120,7 +136,9 @@ $calls = Join-Path $work 'calls.txt'
 # It writes down each call, one line of JSON, and answers as GitHub would: the
 # board with the options in TS_OPTIONS, the issue's labels from TS_LABELS, an
 # error from the board when TS_BOARD_ERROR is set, and a 500 for the removal
-# of the label named in TS_BROKEN.
+# of the label named in TS_BROKEN. Its workflows are the board's built-in
+# ones, with Auto-close issue on when TS_AUTOCLOSE is 'on' and left out when
+# it is 'none'.
 $standIn = @'
 function Invoke-RestMethod {
     param([string]$Method, [string]$Uri, [hashtable]$Headers, [string]$Body)
@@ -133,13 +151,20 @@ function Invoke-RestMethod {
         if ($q -match '^query') {
             $opts = @($env:TS_OPTIONS -split '\|' | ForEach-Object { [pscustomobject]@{ id = 'opt-' + ($_ -replace ' ', '_'); name = $_ } })
             $order = if ($env:TS_NO_ORDER) { $null } else { [pscustomobject]@{ id = 'PVTF_order'; dataType = 'NUMBER' } }
-            return [pscustomobject]@{ data = [pscustomobject]@{ user = [pscustomobject]@{ projectV2 = [pscustomobject]@{ id = 'PVT_board'; status = [pscustomobject]@{ id = 'PVTSSF_status'; options = $opts }; order = $order } } } }
+            $flows = @(
+                [pscustomobject]@{ name = 'Item closed'; enabled = $true }
+                [pscustomobject]@{ name = 'Item reopened'; enabled = $true }
+                [pscustomobject]@{ name = 'Pull request merged'; enabled = $true })
+            if ($env:TS_AUTOCLOSE -ne 'none') { $flows += [pscustomobject]@{ name = 'Auto-close issue'; enabled = ($env:TS_AUTOCLOSE -eq 'on') } }
+            return [pscustomobject]@{ data = [pscustomobject]@{ user = [pscustomobject]@{ projectV2 = [pscustomobject]@{ id = 'PVT_board'; status = [pscustomobject]@{ id = 'PVTSSF_status'; options = $opts }; order = $order; workflows = [pscustomobject]@{ nodes = $flows } } } } }
         }
         if ($q -match 'addProjectV2ItemById') { return [pscustomobject]@{ data = [pscustomobject]@{ addProjectV2ItemById = [pscustomobject]@{ item = [pscustomobject]@{ id = 'PVTI_card' } } } } }
         if ($q -match 'updateProjectV2ItemFieldValue') { return [pscustomobject]@{ data = [pscustomobject]@{ updateProjectV2ItemFieldValue = [pscustomobject]@{ projectV2Item = [pscustomobject]@{ id = 'PVTI_card' } } } } }
         throw "stand-in: unexpected query $q"
     }
-    if ($Method -eq 'Get') { return @(($env:TS_LABELS | ConvertFrom-Json) | ForEach-Object { [pscustomobject]@{ name = $_ } }) }
+    # A list goes back as one object, the way the real Invoke-RestMethod hands
+    # on a JSON array (tests\test-3192-board-hygiene.ps1 checks the real one).
+    if ($Method -eq 'Get') { return ,@(($env:TS_LABELS | ConvertFrom-Json) | ForEach-Object { [pscustomobject]@{ name = $_ } }) }
     $name = [Uri]::UnescapeDataString(($Uri -split '/labels/')[1])
     if ($env:TS_BROKEN -and $name -eq $env:TS_BROKEN) {
         $res = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]'InternalServerError')
@@ -156,7 +181,7 @@ function Invoke-RestMethod {
 $runner = Join-Path $work 'status.ps1'
 [IO.File]::WriteAllText($runner, $standIn + $script)
 
-$names = 'BOARD_TOKEN', 'GH_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'ISSUE', 'ISSUE_NODE', 'LABEL', 'GITHUB_REPOSITORY', 'TS_CALLS', 'TS_OPTIONS', 'TS_LABELS', 'TS_BOARD_ERROR', 'TS_BROKEN', 'TS_GONE', 'TS_NO_ORDER'
+$names = 'BOARD_TOKEN', 'GH_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'ISSUE', 'ISSUE_NODE', 'ISSUE_STATE', 'LABEL', 'GITHUB_REPOSITORY', 'TS_CALLS', 'TS_OPTIONS', 'TS_LABELS', 'TS_BOARD_ERROR', 'TS_BROKEN', 'TS_GONE', 'TS_NO_ORDER', 'TS_AUTOCLOSE'
 function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @{}) {
     if (Test-Path -LiteralPath $calls) { Remove-Item -LiteralPath $calls -Force }
     $keep = @{}
@@ -168,6 +193,7 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
         $env:BOARD_NUMBER = '1'
         $env:ISSUE = '2863'
         $env:ISSUE_NODE = 'I_issue2863'
+        $env:ISSUE_STATE = 'open'
         $env:LABEL = $label
         $env:GITHUB_REPOSITORY = 'EvilPatrick06/Thornswood'
         $env:TS_CALLS = $calls
@@ -177,10 +203,31 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
         $env:TS_BROKEN = ''
         $env:TS_GONE = ''
         $env:TS_NO_ORDER = ''
+        $env:TS_AUTOCLOSE = 'off'
         foreach ($k in $extra.Keys) { [Environment]::SetEnvironmentVariable($k, $extra[$k]) }
-        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner 2>&1 | Out-String; $code = $LASTEXITCODE }
-        finally { $ErrorActionPreference = $old }
+        $rs = [runspacefactory]::CreateRunspace($iss)
+        $ps = [powershell]::Create()
+        try {
+            $rs.Open()
+            $ps.Runspace = $rs
+            $null = $ps.AddCommand($runner)
+            $ended = $null
+            $res = @()
+            try { $res = @($ps.Invoke()) } catch { $ended = $_.Exception }
+            # What pwsh -File would have printed: Write-Host, output, warnings
+            # and errors, and the error that ended it, by its own message.
+            $said = @($ps.Streams.Information | ForEach-Object { [string]$_.MessageData })
+            if ($res.Count) { $said += ($res | Out-String) }
+            $said += @($ps.Streams.Warning | ForEach-Object { 'WARNING: ' + $_.Message })
+            $said += @($ps.Streams.Error | ForEach-Object { [string]$_ })
+            if ($ended) {
+                while ($ended -is [System.Management.Automation.MethodInvocationException] -and $ended.InnerException) { $ended = $ended.InnerException }
+                $said += $ended.Message
+            }
+            $out = ($said -join "`n") + "`n"
+            $exited = $rs.SessionStateProxy.GetVariable('LASTEXITCODE')
+            $code = if ($ended) { 1 } elseif ($null -ne $exited) { [int]$exited } else { 0 }
+        } finally { $ps.Dispose(); $rs.Dispose() }
     } finally {
         foreach ($k in $keep.Keys) { [Environment]::SetEnvironmentVariable($k, $keep[$k]) }
     }
@@ -277,6 +324,37 @@ try {
 
     $r = Invoke-Status 'board: In Progress' @('board: In Progress') @{ TS_BROKEN = 'board: In Progress' }
     Yes ("a refused label removal fails the run (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Out -notmatch 'took board: In Progress off')
+
+    # ---- 4. Done is not closed (#3076) ---------------------------------------
+    $r = Invoke-Status 'board: Done' @('board: Done')
+    Yes ("with Auto-close issue off, Done is set and the run says it is off (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Out -match "Auto-close issue workflow is off")
+    Yes '  the board''s workflows are read in the same first call, with no extra one' (
+        @($r.Calls | Where-Object { $_.uri -eq 'https://api.github.com/graphql' }).Count -eq 3 -and $r.Calls[0].body.query -match 'workflows\(first:\d+\)\{nodes\{name enabled\}\}')
+
+    $r = Invoke-Status 'board: Done' @('board: Done', 'claimed: Claude') @{ TS_AUTOCLOSE = 'on' }
+    Yes ("with Auto-close issue on, board: Done fails the run (exit {0})" -f $r.Code) ($r.Code -ne 0)
+    Yes '  sets nothing on the card' ($r.Set.Count -eq 0 -and @($r.Calls | Where-Object { $_.PSObject.Properties['body'] -and $_.body.query -match 'addProjectV2ItemById' }).Count -eq 0)
+    Yes '  leaves the label on, so it shows it was not carried out' ($r.Deleted.Count -eq 0)
+    Yes '  and names the setting and where it is' ($r.Out -match "Auto-close issue workflow is on, so Done would close #2863" -and $r.Out -match 'Workflows, Auto-close issue')
+
+    $r = Invoke-Status 'board: done' @('board: done') @{ TS_AUTOCLOSE = 'on' }
+    Yes ("  'board: done' is Done too, and is refused the same (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Set.Count -eq 0)
+
+    $r = Invoke-Status 'board: Done' @('board: Done') @{ TS_AUTOCLOSE = 'on'; ISSUE_STATE = 'closed' }
+    Yes ("with Auto-close issue on, Done on an issue already closed goes ahead, with nothing left to close (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Set[0].body.variables.v.singleSelectOptionId -eq 'opt-Done' -and $r.Deleted.Count -eq 1)
+
+    $r = Invoke-Status 'board: In Progress' @('board: In Progress') @{ TS_AUTOCLOSE = 'on' }
+    Yes ("with Auto-close issue on, In Progress still goes, since only Done closes (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Set[0].body.variables.v.singleSelectOptionId -eq 'opt-In_Progress' -and $r.Out -match 'Auto-close issue workflow is on')
+
+    $r = Invoke-Status 'order: 8' @('order: 8') @{ TS_AUTOCLOSE = 'on' }
+    Yes ("  and so does an Order (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Set[0].body.variables.v.number -eq 8)
+
+    $r = Invoke-Status 'board: Done' @('board: Done') @{ TS_AUTOCLOSE = 'none' }
+    Yes ("a board that does not say whether Auto-close issue is on refuses Done and moves nothing (exit {0})" -f $r.Code) (
+        $r.Code -ne 0 -and $r.Set.Count -eq 0 -and $r.Deleted.Count -eq 0 -and $r.Out -match 'did not say whether its Auto-close issue workflow is on' -and $r.Out -match 'Item closed, Item reopened, Pull request merged')
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

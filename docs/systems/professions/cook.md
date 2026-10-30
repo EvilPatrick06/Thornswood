@@ -7,9 +7,9 @@ Dinners and desserts.
 - [Confectioner](cook/confectioner.md) makes the desserts. 28 recipes,
   every one of them reaches the server.
 
-The oven is closed. Either half, from novice. The cookpot is open
-furniture, and the recipe is still Hearthcook's, so a confectioner
-at the pot is making their sister half and stops at novice meals.
+The oven is either half, from novice. The cookpot is the
+Hearthcook's, from novice, so a confectioner at the pot is making
+their sister half and stops at novice meals.
 The grain mill is Hearthcook only.
 
 ## Grand Chef

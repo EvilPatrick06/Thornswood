@@ -25,8 +25,9 @@
        name, keeps what is already right, writes config.json from the feed,
        and refuses a record without :record:files and an asset whose bytes
        are not its name. The client is held to the checkout's record, taken
-       from this channel's assets or else the other's, and refused when
-       neither feed has it (#2983).
+       from this channel's assets or else the other's, else from CI's engine
+       build of the pin (a stand-in folder, -EngineDist), and refused when
+       none of them holds the recorded bytes (#2983).
     5. Sign-OnGitHub.ps1 with a stand-in gh and box: it sends release.json and
        Thornswood's own pin, account and signer to the fork's workflow, waits
        for that run, takes its catalog, and returns '' only when the box
@@ -173,11 +174,16 @@ try {
         Put $clientRec (([pscustomobject]@{ forkCommit = 'b9e16e8b'; files = [pscustomobject]$f }) | ConvertTo-Json -Depth 5)
     }
     Set-ClientRecord @{ 'Data\Platform\Plugins\chat.js' = $one }
+    # CI's engine build of the pin, standing in: absent until a case puts the
+    # client in it, so no stage reaches GitHub.
+    $engineDist = Join-Path $Scratch 'engine-ci\build\dist\client'
     function Stage([string]$Channel = 'dev') {
         $oldE = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $rel 'New-FeedRoot.ps1') -Channel $Channel -Root $root -SiteDir $site -ClientRecord $clientRec 2>&1 | Out-String); $code = $LASTEXITCODE }
+        try { $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $rel 'New-FeedRoot.ps1') -Channel $Channel -Root $root -SiteDir $site -ClientRecord $clientRec -EngineDist $engineDist 2>&1 | Out-String); $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $oldE }
-        return [pscustomobject]@{ Code = $code; Out = $out }
+        # Squashed: the refusal is an error record, which PowerShell wraps at the
+        # console's width (a word can break across two lines) on a runner.
+        return [pscustomobject]@{ Code = $code; Out = $out; Squashed = ($out -replace '[\s|]', '') }
     }
     Set-Feed (New-Record $true)
     Put (Join-Path $root 'Game\Data\stray.txt') 'left from something older'
@@ -222,7 +228,19 @@ try {
     Put (Join-Path $site 'feed\version\00000001.json') (([pscustomobject]$mfeed) | ConvertTo-Json -Depth 5)
     Set-ClientRecord @{ 'Data\Platform\Plugins\skymp5-client.js' = $newClient }
     $r = Stage 'main'
-    Yes 'a recorded client the last release lacks is refused when neither feed has it' ($r.Code -ne 0 -and $r.Out -match 'on neither feed' -and $r.Out -match 'skymp5-client\.js')
+    Yes 'a recorded client the last release lacks is refused when neither feed nor CI''s engine build has it' ($r.Code -ne 0 -and $r.Out -match 'on neither feed' -and $r.Out -match 'skymp5-client\.js' -and $r.Squashed -match 'noenginebuildat')
+    # A client no Ship has carried yet (#3088's d39a9a93): on neither feed, but
+    # in CI's engine build of the pin.
+    $ciFile = Join-Path $engineDist 'Data\Platform\Plugins\skymp5-client.js'
+    Put $ciFile 'not the recorded client'
+    $r = Stage 'main'
+    Yes '  and refused when CI''s engine build holds another file than the record names' ($r.Code -ne 0 -and $r.Squashed -match 'holdsanotherData.Platform.Plugins.skymp5-client\.jsthantherecordnames' -and -not (Test-Path -LiteralPath (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')))
+    Put $ciFile ([byte[]]$newClient)
+    $r = Stage 'main'
+    Yes ("  and taken from CI's engine build of the pin when neither feed has it (exit {0})" -f $r.Code) ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')) -eq $sNew -and $r.Out -match "skymp5-client\.js from CI's engine build of the pin")
+    if ($r.Code -ne 0) { Write-Host $r.Out -ForegroundColor DarkGray }
+    Remove-Item -LiteralPath (Join-Path $Scratch 'engine-ci') -Recurse -Force
+    Remove-Item -LiteralPath (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js') -Force
     [void](Asset $newClient)
     $r = Stage 'main'
     Yes ("  and taken from dev's assets when only dev has it (exit {0})" -f $r.Code) ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')) -eq $sNew -and $r.Out -match 'skymp5-client\.js from /feed-dev')
@@ -267,10 +285,11 @@ try {
     $script:boxSaid = @('CATALOG ACCEPTED')
     $script:boxScript = ''
     $box = { param($s) $script:boxScript = $s; return $script:boxSaid }
+    $launcherUrl = 'https://thornswood.net/feed-dev/assets/' + ('ab' * 32)
     function SignNow([string]$request) {
         $script:want = $request
         $script:calls.Clear()
-        return (Invoke-ReleaseCatalogSignOnGitHub -Json $sign -Catalog $cat -RepoDir $repo -Request $request -Gh $gh -Box $box -WaitSeconds 1 -Poll 0)
+        return (Invoke-ReleaseCatalogSignOnGitHub -Json $sign -Catalog $cat -RepoDir $repo -Request $request -LauncherUrl $launcherUrl -Gh $gh -Box $box -WaitSeconds 1 -Poll 0)
     }
     $why = SignNow 'r1'
     Yes ("a green run and a box that accepts: signed ('{0}')" -f $why) ($why -eq '')
@@ -284,11 +303,49 @@ try {
     Yes '  with the pin Setup-ShipMachine.ps1 holds' ($sent -contains ('client_version=' + $pin.Version) -and $sent -contains ('client_sha256=' + $pin.Sha256))
     Yes '  with the account and profile metadata.json names' ($sent -contains ('endpoint=' + $meta.Endpoint) -and $sent -contains ('account=' + $meta.CodeSigningAccountName) -and $sent -contains ('certificate_profile=' + $meta.CertificateProfileName))
     Yes '  and with Updater.cs''s ExpectedSigner' ($sent -contains ('expected_signer=' + (Get-ExpectedSignerFragment -RepoRoot $repo)))
+    # #3312: the fork checks the launcher the release names before it signs.
+    $gzArg = @($sent | Where-Object { $_ -like 'signature_cs_gz=*' })
+    $csBack = ''
+    if ($gzArg.Count -eq 1) {
+        $gz = New-Object IO.Compression.GZipStream((New-Object IO.MemoryStream(, [Convert]::FromBase64String($gzArg[0].Substring(16)))), [IO.Compression.CompressionMode]::Decompress)
+        $csBack = (New-Object IO.StreamReader($gz, [Text.Encoding]::UTF8)).ReadToEnd()
+    }
+    Yes '  and with Signature.cs, gzipped, which unpacks to the file itself (#3312)' ($csBack -ne '' -and $csBack -eq [IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Signature.cs')))
+    Yes '  and with where the site serves the launcher the release names' ($sent -contains ('launcher_url=' + $launcherUrl))
+    Yes '  and the whole dispatch fits a Windows command line (32,767)' ((($sent | ForEach-Object { [string]$_ }) -join ' ').Length -lt 30000)
     $dl = @($script:calls | Where-Object { $_[0] -eq 'run' -and $_[1] -eq 'download' })
     Yes '  and takes the catalog from that run, by the request''s own name' ($dl.Count -eq 1 -and @($dl[0]) -contains '42' -and @($dl[0]) -contains 'release-cat-r1')
     Yes 'the box is sent the catalog, release.json and the launcher''s own check' ($script:boxScript.Contains([Convert]::ToBase64String([IO.File]::ReadAllBytes($sign))) -and $script:boxScript.Contains('Get-PublishSignRefusal') -and $script:boxScript.Contains('Test-FileCatalog') -and $script:boxScript.Contains('Signature.cs'))
     Yes '  as ASCII, for its Windows PowerShell 5.1' (-not ($script:boxScript.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
     Yes '  and its folder goes whatever happens' ($script:boxScript -match 'finally \{ Remove-Item -LiteralPath \$d -Recurse')
+    # The box runs that text as Send-Script.ps1's runner hands it over: read
+    # from its file and run as a block from -EncodedCommand, so there is no
+    # script root. Here it runs the same way, under Windows PowerShell where
+    # there is one. On 22 Oct 2026 the first cloud dev Ship stopped at
+    # Assert-PublishSigned.ps1's Join-Path on that empty root, before the check
+    # began, and nothing had ever run the text.
+    $runDir = Join-Path $Scratch 'box-run'
+    New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+    $onWin = ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT)
+    $runCat = $cat
+    if ($onWin) {
+        $runCat = Join-Path $runDir 'release.cat'
+        New-FileCatalog -Path (Split-Path -Parent $sign) -CatalogFilePath $runCat -CatalogVersion 2.0 | Out-Null
+    }
+    $runText = Join-Path $runDir 'check.ps1'
+    [IO.File]::WriteAllText($runText, (New-SignedCatalogCheckScript $sign $runCat 'Thornswood' $repo), (New-Object Text.UTF8Encoding($false)))
+    $runner = '$b = [scriptblock]::Create([IO.File]::ReadAllText(''' + $runText.Replace("'", "''") + ''', [Text.Encoding]::UTF8)); . $b'
+    $exe = if ($onWin) { 'powershell.exe' } else { (Get-Process -Id $PID).Path }
+    # The box's text puts its folder in TEMP, which off Windows nothing sets.
+    $hadTemp = $env:TEMP
+    $env:TEMP = $runDir
+    try { $ran = @(& $exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($runner))) 2>&1 | ForEach-Object { [string]$_ }) }
+    finally { $env:TEMP = $hadTemp }
+    $ranSaid = @($ran | Where-Object { $_ -match '^CATALOG ' })
+    $ranLine = ($ranSaid -join ' | ')
+    Yes ("the box's text, run with no script root, says one CATALOG line ('{0}')" -f $ranLine) ($ranSaid.Count -eq 1 -and $ranLine -notmatch 'Cannot bind argument')
+    if ($onWin) { Yes '  and gets as far as the launcher''s own check, which refuses an unsigned catalog' ($ranLine -match '^CATALOG REFUSED release\.cat ') }
+    else { Yes '  and gets as far as the catalog check, which this machine does not have' ($ranLine -match 'Test-FileCatalog') }
     $script:boxSaid = @('CATALOG REFUSED release.cat is signed by "CN=Somebody", which does not contain ExpectedSigner')
     $why = SignNow 'r2'
     Yes 'a box that refuses it: refused, with the box''s reason' ($why -match 'Somebody')
@@ -310,20 +367,102 @@ try {
     Yes 'a run that kept no catalog: refused' ($why -match 'kept no release\.cat')
     $script:runState.Kept = $true
     $script:want = 'r8'
-    $why = Invoke-ReleaseCatalogSignOnGitHub -Json $sign -Catalog $cat -RepoDir $repo -Request 'r8' -Gh { throw 'HTTP 403' } -Box $box -WaitSeconds 1 -Poll 0
+    $why = Invoke-ReleaseCatalogSignOnGitHub -Json $sign -Catalog $cat -RepoDir $repo -Request 'r8' -LauncherUrl $launcherUrl -Gh { throw 'HTTP 403' } -Box $box -WaitSeconds 1 -Poll 0
     Yes 'a dispatch GitHub refuses: refused, saying so' ($why -match 'could not be started' -and $why -match '403')
     $so = [IO.File]::ReadAllText((Join-Path $rel 'Sign-OnGitHub.ps1'))
     Yes 'Sign-OnGitHub.ps1 is ASCII, for Windows PowerShell 5.1' (-not ($so.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
+
+    # ---- 5b. the launcher from GitHub (#3312) ------------------------------------------
+    Write-Host ''; Write-Host 'the launcher from GitHub'
+    $now = (Get-Date).ToUniversalTime()
+    $script:lcalls = New-Object System.Collections.ArrayList
+    $script:lstate = @{ TagRun = 'success'; TagStatus = 'completed'; Runs = $true; Status = 'completed'; Conclusion = 'success'; Old = $false }
+    $lgh = {
+        [void]$script:lcalls.Add(@($args))
+        if ($args[0] -eq 'workflow') { return '' }
+        if ($args[0] -eq 'run' -and $args[1] -eq 'list') {
+            $w = $args[[array]::IndexOf($args, '-w') + 1]
+            $when = $now.AddSeconds(5).ToString('yyyy-MM-ddTHH:mm:ssZ')
+            if ($script:lstate.Old) { $when = $now.AddHours(-2).ToString('yyyy-MM-ddTHH:mm:ssZ') }
+            if ($w -eq 'release-tag.yml') {
+                return ('[{"databaseId":7,"displayTitle":"tag v1.2.6.7","headBranch":"main","status":"' + $script:lstate.TagStatus + '","conclusion":"' + $script:lstate.TagRun + '","url":"https://github.com/x/runs/7","createdAt":"' + $when + '"}]')
+            }
+            if (-not $script:lstate.Runs) { return '[]' }
+            # Main's run for the tag (#3930), an older tag's on main, and a
+            # newer manual run on the tag's own ref, which signs nothing.
+            return ('[{"databaseId":9,"displayTitle":"Release launcher v1.2.6.7","headBranch":"main","status":"' + $script:lstate.Status + '","conclusion":"' + $script:lstate.Conclusion + '","url":"https://github.com/x/runs/9","createdAt":"' + $when + '"},' +
+                    '{"databaseId":8,"displayTitle":"Release launcher v1.2.6.6","headBranch":"main","status":"completed","conclusion":"success","url":"x","createdAt":"' + $when + '"},' +
+                    '{"databaseId":10,"displayTitle":"Release launcher v1.2.6.7","headBranch":"v1.2.6.7","status":"completed","conclusion":"success","url":"https://github.com/x/runs/10","createdAt":"' + $when + '"}]')
+        }
+        throw "gh was asked something unexpected: $($args -join ' ')"
+    }
+    $sha40 = 'c' * 40
+    function AskNow { $script:lcalls.Clear(); return (Invoke-ReleaseLauncherOnGitHub -Repo 'EvilPatrick06/Thornswood' -Tag 'v1.2.6.7' -Commit $sha40 -Gh $lgh -WaitSeconds 1 -Poll 0) }
+    $why = AskNow
+    Yes ("a green release.yml run on the tag: '' ('{0}')" -f $why) ($why -eq '')
+    $d = @($script:lcalls | Where-Object { $_[0] -eq 'workflow' })
+    Yes '  it asks release-tag.yml on main for that tag and commit' ($d.Count -eq 1 -and @($d[0]) -contains 'release-tag.yml' -and @($d[0]) -contains 'main' -and @($d[0]) -contains 'tag=v1.2.6.7' -and @($d[0]) -contains ('commit=' + $sha40))
+    $script:lstate.Conclusion = 'failure'
+    $why = AskNow
+    Yes 'a red release.yml run: refused, with the run' ($why -match 'ended failure' -and $why -match 'runs/9')
+    Yes '  and a green run on the tag''s own ref, which signs nothing, is not taken instead (#3930)' ($why -notmatch 'runs/10')
+    $script:lstate.Conclusion = 'success'; $script:lstate.Runs = $false; $script:lstate.TagRun = 'failure'
+    $why = AskNow
+    Yes 'a red release-tag.yml run (a tag on another commit): refused, with that run' ($why -match 'release-tag\.yml ended failure' -and $why -match 'runs/7')
+    $script:lstate.TagRun = 'success'
+    $why = AskNow
+    Yes 'no release.yml run on the tag: refused when the wait is up' ($why -match 'no release\.yml run on main started for v1\.2\.6\.7')
+    $script:lstate.Runs = $true; $script:lstate.Old = $true
+    $why = AskNow
+    Yes '  and a run from before the ask is not taken for it' ($why -match 'no release\.yml run on main started')
+    $script:lstate.Old = $false; $script:lstate.Status = 'in_progress'
+    $why = AskNow
+    Yes 'a run still going when the wait is up: refused' ($why -match 'still in_progress')
+    $script:lstate.Status = 'completed'
+    Yes 'a tag that is not v<a.b.c[.d]> is refused before anything is asked' ((Invoke-ReleaseLauncherOnGitHub -Repo 'r' -Tag 'main' -Commit $sha40 -Gh $lgh) -match 'not a launcher release tag')
+
+    # Get-SignedFileRefusal: on the box off Windows, with a stand-in box.
+    $exeFile = Join-Path $Scratch 'Thornswood.exe'
+    Put $exeFile 'MZ not really a launcher'
+    $script:fboxSaid = @('SIGNED ACCEPTED')
+    $script:fboxScript = ''
+    $fbox = { param($t) $script:fboxScript = $t; return $script:fboxSaid }
+    $why = Get-SignedFileRefusal $exeFile 'Thornswood' $repo $fbox
+    Yes ("a box that accepts the file: '' ('{0}')" -f $why) ($why -eq '')
+    Yes '  the box is sent the file, Signature.cs and Get-PublishSignRefusal' ($script:fboxScript.Contains([Convert]::ToBase64String([IO.File]::ReadAllBytes($exeFile))) -and $script:fboxScript.Contains('Get-PublishSignRefusal -Path $f') -and $script:fboxScript.Contains('Signature.cs'))
+    Yes '  as ASCII, for its Windows PowerShell 5.1' (-not ($script:fboxScript.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
+    Yes '  and its folder goes whatever happens' ($script:fboxScript -match 'finally \{ Remove-Item -LiteralPath \$d -Recurse')
+    $script:fboxSaid = @('SIGNED REFUSED Thornswood.exe is not Authenticode Valid (status NotSigned).')
+    Yes 'a box that refuses: refused, with its reason' ((Get-SignedFileRefusal $exeFile 'Thornswood' $repo $fbox) -match 'NotSigned')
+    $script:fboxSaid = @('nothing useful')
+    Yes 'a box that does not say: refused' ((Get-SignedFileRefusal $exeFile 'Thornswood' $repo $fbox) -match 'did not say')
+    # The text runs as the box's runner hands it over, with no script root.
+    $runText = Join-Path $runDir 'checkfile.ps1'
+    [IO.File]::WriteAllText($runText, (New-SignedFileCheckScript $exeFile 'Thornswood' $repo), (New-Object Text.UTF8Encoding($false)))
+    $runner = '$b = [scriptblock]::Create([IO.File]::ReadAllText(''' + $runText.Replace("'", "''") + ''', [Text.Encoding]::UTF8)); . $b'
+    $hadTemp = $env:TEMP
+    $env:TEMP = $runDir
+    try { $ran = @(& $exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($runner))) 2>&1 | ForEach-Object { [string]$_ }) }
+    finally { $env:TEMP = $hadTemp }
+    $ranSaid = @($ran | Where-Object { $_ -match '^SIGNED ' })
+    Yes ("the box's text for a file, run with no script root, says one SIGNED line ('{0}')" -f ($ranSaid -join ' | ')) ($ranSaid.Count -eq 1 -and ($ranSaid -join '') -match '^SIGNED REFUSED Thornswood\.exe ')
 
     # ---- 6. where it sits -------------------------------------------------------------
     Write-Host ''; Write-Host 'where it sits'
     $ship = [IO.File]::ReadAllText((Join-Path $rel 'Ship.ps1')).Replace("`r`n", "`n")
     Yes 'Ship -FromFeed asks gh, not a signing machine, at the sign gate' ($ship.Contains('$signWhy = if ($FromFeed) { Get-SignOnGitHubRefusal $RepoDir } else { Get-SigningConfigRefusal'))
     Yes '  and loads Sign-OnGitHub.ps1 only then' ($ship.Contains("if (`$FromFeed) { . (Join-Path `$Here 'Sign-OnGitHub.ps1') }"))
+    Yes 'Ship -FromFeed with a new launcher no longer sends it to One (#3312)' (-not $ship.Contains('a new launcher is compiled and signed on One'))
+    Yes '  it asks GitHub to build and sign it from main''s commit, by tag v<number>' ($ship.Contains("Invoke-ReleaseLauncherOnGitHub -Repo `$srcRepo -Tag ('v' + `$target) -Commit `$releaseSource.Commit"))
+    Yes '  takes the draft held to its SHA256SUMS, then to the launcher''s own check' ($ship.Contains('if (-not $why) { $why = Get-ReleaseLauncher $srcRepo $target $buildOut }') -and $ship.Contains("if (-not `$why) { `$why = & `$hold (Join-Path `$buildOut 'Thornswood.exe') `$ciSigner }"))
+    Yes '  only from a checkout that is exactly origin/main' ($ship -match '(?s)if \(\$FromFeed -and -not \$ModsOnly\) \{\s*if \(-not \$MainSourceAligned\)')
+    Yes '  and climbs past a dev number tagged on another commit' ($ship.Contains('if (-not $on -or $on -eq $releaseSource.Commit) { break }'))
+    Yes '  and the publish gate holds it on the box off Windows' ($ship.Contains('$signWhy = Get-SignedFileRefusal $pubExe $expectWho $RepoDir'))
     Yes '  and carries SkyUI''s check only through Get-ShipSkyUIFeedChange' ($ship.Contains('$skyuiMoved = @(Get-ShipSkyUIFeedChange $GameDir $feedRecord @(Get-ShipDeleteAlways))'))
     $pu = [IO.File]::ReadAllText((Join-Path $rel 'Publish-Update.ps1')).Replace("`r`n", "`n")
     Yes 'Publish-Update -FromFeed writes release.json without a catalog' ($pu.Contains('-NoCatalog:$FromFeed'))
     Yes '  signs it on GitHub' ($pu.Contains('Invoke-ReleaseCatalogSignOnGitHub -Json $sm.Json -Catalog $sm.Catalog -RepoDir $RepoDir'))
+    Yes '  telling the fork where the site serves the launcher it names (#3312)' ($pu.Contains("-LauncherUrl (Val `$doc 'launcherUrl')"))
     Yes '  and still holds the listing to the feed' ($pu.Contains('Get-ReleaseManifestRefusal $sm $doc -CatalogChecked'))
     Yes '  and any other release still signs here' ($pu.Contains('$smWhy = Invoke-ReleaseCatalogSign $sm.Catalog $RepoDir'))
 }

@@ -14,6 +14,8 @@ for (const channel of ['main', 'dev', undefined]) {
   const settings = { thornswoodServer: channel, loadOrder: ['Skyrim.esm'], privDir: `${channel || 'main'}-private` };
   const ctx = {
     require, setTimeout, clearTimeout, Date, serverRunId: () => "test-run", removeSpawned() {},
+    // #3296: the startup names its NPC code from the file that is loading.
+    __filename: path.join(__dirname, '../game/gamemode.js'),
     // #2675: what the merchants are told is not the plain item (a hair dye).
     mintedEntry: () => false,
     log: text => logs.push(text),

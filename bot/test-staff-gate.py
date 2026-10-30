@@ -12,7 +12,8 @@ The hole was inside is_staff, which also let in anybody the channel trusted
 with threads. On the server Build-Discord.py makes, that is Lead Gamemaster
 and Trial Gamemaster, whose GM permissions carry Manage Threads on every
 channel, and neither is a staff role. Both could close any ticket and skip
-the ticket limits.
+the ticket limits. Since #3317 every lead is on the council and staff; a
+Trial Gamemaster still is not.
 
 This holds all of it in place:
 
@@ -86,22 +87,31 @@ COMMANDS = {
 BUTTONS = [
     ('thornswood:close', STAFF),       # Close ticket, on every ticket
     ('thornswood:ticket', ANYBODY),    # the ticket panel: one open, a cooldown
+    ('thornswood:ticket:', ANYBODY),   # each ticket desk's panel (#3317), the same
     ('thornswood:hold:', ANYBODY),     # pick a hold: Member or staff, pick_hold
     ('thornswood:ping:', ANYBODY),     # ping roles: Member or staff, toggle_ping
     # A Jarl's office buttons (#2551): only the Jarl of a hold, for their own
     # hold, and nobody while two accounts hold that Jarl role: office_press
     # and office_change. bot/test-2551-hold-offices.py presses them.
     ('thornswood:office:', ANYBODY),
+    # A faction Leader's member buttons (#3317): only the Leader of a
+    # faction, for their own faction, and nobody while two accounts hold
+    # that Leader role: faction_press and faction_change.
+    # bot/test-3317-faction-panel.py presses them.
+    ('thornswood:faction:', ANYBODY),
 ]
 
-# Staff, as the Developer Guide lists them, and the three who post a test
-# task. Lead Gamemaster and Trial Gamemaster are not staff here.
-STAFF_ROLES = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster']
+# Staff: the council (Owner, Co-Owner and every lead, #3317, Patrick, 22 Oct)
+# and the four ranks the Developer Guide listed before it, and the three who
+# post a test task. Trial Gamemaster is not staff here.
+STAFF_ROLES = ['Owner', 'Co-Owner', 'Lead Dev', 'Lead Gamemaster', 'Lead Loremaster',
+               'Lead Moderator', 'Lead Content Creator', 'Lead Support',
+               'Dev', 'Gamemaster', 'Moderator', 'Loremaster']
 TASK_ROLES = ['Owner', 'Dev', 'Lead Gamemaster']
 OUTSIDERS = {
     STAFF: [[], ['Member'], ['Playtester'], ['Content Creator'],
             ['Member', 'Content Creator'], ['Trial Gamemaster'],
-            ['Lead Gamemaster'], ['Server Booster'], ['Jarl of Whiterun'],
+            ['Server Booster'], ['Jarl of Whiterun'],
             ['Trading Company']],
     TASKS: [[], ['Member'], ['Playtester'], ['Content Creator'],
                  ['Trial Gamemaster'], ['Moderator'], ['Gamemaster'],
@@ -118,13 +128,13 @@ _spec.loader.exec_module(_built)
 MANAGES_THREADS = set(n for n, _c, _h, p in _built.ROLES
                       if p.manage_threads or p.administrator)
 
-yes('the default staff in bot.py are the five the Developer Guide names',
+yes('the default staff in bot.py are the council and the four ranks',
     sorted(bot.STAFF_NAMES) == sorted(r.lower() for r in STAFF_ROLES))
-yes('Lead Gamemaster and Trial Gamemaster carry Manage Threads, the way in '
-    'this closes',
-    {'Lead Gamemaster', 'Trial Gamemaster'} <= MANAGES_THREADS)
-yes('and neither is a staff role',
-    not ({'lead gamemaster', 'trial gamemaster'} & bot.STAFF_NAMES))
+yes('Trial Gamemaster carries Manage Threads, the way in this closes',
+    'Trial Gamemaster' in MANAGES_THREADS)
+yes('and is not a staff role, while every lead is',
+    'trial gamemaster' not in bot.STAFF_NAMES and
+    all(n.lower() in bot.STAFF_NAMES for n in _built.LEADS))
 
 
 # ------------------------------------------------------------- the world --
@@ -306,10 +316,12 @@ yes('and every command written down here is still registered%s'
     not gone)
 
 hook = inspect.getsource(bot.Thornswood.setup_hook)
-VIEWS = re.findall(r'add_view\((\w+)\(\)\)', hook)
-yes('setup_hook registers the ticket panel, the ticket tools, the hold panel, '
-    'the office panel (#2551) and no other panel (the Live smoke rows are gone)',
-    sorted(VIEWS) == ['HoldPanel', 'OfficePanel', 'TicketPanel', 'TicketTools']
+VIEWS = re.findall(r'add_view\((\w+)\((?:desk)?\)\)', hook)
+yes('setup_hook registers the ticket panel and each ticket desk\'s (#3317), the '
+    'ticket tools, the hold panel, the office panel (#2551), the faction panel '
+    '(#3317) and no other panel (the Live smoke rows are gone)',
+    sorted(VIEWS) == ['FactionPanel', 'HoldPanel', 'OfficePanel', 'TicketPanel',
+                      'TicketPanel', 'TicketTools']
     and 'live_smoke' not in hook
     and hook.count('add_view(') == len(VIEWS))
 
@@ -415,14 +427,14 @@ trial = Person(['Trial Gamemaster'])
 yes('a Trial Gamemaster does hold Manage Threads on the ticket',
     ticket.permissions_for(trial).manage_threads)
 yes('and is still not staff', not bot.is_staff(trial))
-yes('a Lead Gamemaster is not staff either', not bot.is_staff(
+yes('a Lead Gamemaster is staff, on the council (#3317)', bot.is_staff(
     Person(['Lead Gamemaster'])))
 yes('is_staff reads roles and never a channel permission',
     'permissions_for' not in inspect.getsource(bot.is_staff)
     and list(inspect.signature(bot.is_staff).parameters) == ['who'])
 
 # The ticket limits, which staff skip and nobody else does.
-for roles in (['Trial Gamemaster'], ['Lead Gamemaster'], ['Content Creator']):
+for roles in (['Trial Gamemaster'], ['Content Creator']):
     guild, _t, panel = world()
     who = Person(roles, uid=600)
     bot._last_ticket[bot._ticket_key(guild, who)] = bot._now()

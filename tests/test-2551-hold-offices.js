@@ -575,10 +575,12 @@ function siteWith(opts) {
   // ===================================================================== T
   {
     const towns = (/HOLDS = \[([^\]]+)\]/.exec(builder) || [])[1] || '';
-    const nine = towns.split(',').map(function (s) { return s.trim().replace(/'/g, ''); }).filter(Boolean);
+    // Raven Rock is one of the builder's HOLDS since #3317 (Patrick, 22 Oct,
+    // page card q-3317-raven-rock, A): ten holds, all of them the site's.
+    const ten = towns.split(',').map(function (s) { return s.trim().replace(/'/g, ''); }).filter(Boolean);
     const siteTowns = /const OFFICE_HOLDS = \{([^}]+)\}/.exec(site);
     yes('T1 every hold the Discord builder makes roles for is a hold the site reads, by the same town name',
-        nine.length === 9 && !!siteTowns && nine.every(function (t) { return siteTowns[1].indexOf("'" + t + "'") !== -1; }));
+        ten.length === 10 && ten[9] === 'Raven Rock' && !!siteTowns && ten.every(function (t) { return siteTowns[1].indexOf("'" + t + "'") !== -1; }));
     yes('T2 the builder, the site and the bot spell the three offices the same way',
         /_h \+ ' Court'/.test(builder) && /'Steward of ' \+ _h/.test(builder) && /'Guard of ' \+ _h/.test(builder) &&
         /return town \+ ' Court';/.test(site) && /return 'Steward of ' \+ town;/.test(site) && /return 'Guard of ' \+ town;/.test(site) &&
@@ -588,7 +590,7 @@ function siteWith(opts) {
     const ledger = (/var LEDGER_HOLDS = \[([^\]]+)\]/.exec(gm) || [])[1] || '';
     const holdTown = (/var HOLD_TOWN = \{([^}]+)\}/.exec(gm) || [])[1] || '';
     yes('T4 Raven Rock\'s Jarl and offices are made, and the game reads them for its board and its drop box',
-        /OFFICE_HOLDS = HOLDS \+ \['Raven Rock'\]/.test(builder) && /for _h in OFFICE_HOLDS:/.test(builder) &&
+        /OFFICE_HOLDS = list\(HOLDS\)/.test(builder) && ten.indexOf('Raven Rock') !== -1 && /for _h in OFFICE_HOLDS:/.test(builder) &&
         /ravenrock: 'Raven Rock'/.test(holdTown) && /'ravenrock'/.test(ledger) && /ravenrock: 'Raven Rock'/.test(siteTowns ? siteTowns[1] : ''));
     yes('T3 and the game names them the same way to people',
         /return town \+ ' Court';/.test(gm) && /return 'Steward of ' \+ town;/.test(gm) && /return 'Guard of ' \+ town;/.test(gm));

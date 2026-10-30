@@ -121,7 +121,7 @@ function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 var P = { has: own, TABLE: { tuning: { farming: farmingTuning } } };
 globalThis.__thornswoodProgression = P;
 
-// The block writes data/farm-claims.json beside the process, so run in a temp
+// The block writes private/farm-claims.json beside the process, so run in a temp
 // folder. NOT tools\\work inside the repo, which is where this used to put it:
 // the folder stayed behind after every run, showed up untracked in git status
 // on both machines, and an untracked file a branch later adds is exactly what
@@ -348,30 +348,31 @@ check('the holder can',
 // (issue #541, 25 September: the live farm-claims.json answered 200).
 check('the claims are written to private', fs.existsSync(path.join('private', 'farm-claims.json')) ? 'yes' : 'no', 'yes');
 check('and nothing is left in data', fs.existsSync(path.join('data', 'farm-claims.json')) ? 'still there' : 'gone', 'gone');
-// A server that ran the code before this has its claims in data. The first
-// load carries them across, so nobody loses a farm, and takes the public copy
-// away.
+// Nothing is read from data, and nothing there is touched: the alpha carries
+// no data over a change (#3094). A copy there is a file for whoever runs the
+// box to delete, never a register.
 var held = fs.readFileSync(claimFile, 'utf8');
+fs.writeFileSync(path.join('data', 'farm-claims.json'), '{"claims":{}}');
+delete globalThis.__thornswoodFarmClaims;
+delete globalThis.__thornswoodFarmSeeded;
+eval(farmCode);
+F = globalThis.__thornswoodFarming;
+check('a copy in data is never read: the claims still say who holds what',
+      say(function () { F.command('/plant', [], 211, 32, toProfile); }), 'held by Cadwell');
+check('and neither copy is moved or changed',
+      (fs.readFileSync(path.join('data', 'farm-claims.json'), 'utf8') === '{"claims":{}}' ? 'data as it was' : 'data changed') + ', ' +
+      (fs.readFileSync(claimFile, 'utf8') === held ? 'private as it was' : 'private changed'),
+      'data as it was, private as it was');
 fs.unlinkSync(claimFile);
 fs.writeFileSync(path.join('data', 'farm-claims.json'), held);
 delete globalThis.__thornswoodFarmClaims;
 delete globalThis.__thornswoodFarmSeeded;
 eval(farmCode);
 F = globalThis.__thornswoodFarming;
-check('an old copy in data is carried into private on the first load',
-      fs.existsSync(claimFile) && fs.readFileSync(claimFile, 'utf8') === held ? 'carried' : 'lost', 'carried');
-check('and the public copy is gone', fs.existsSync(path.join('data', 'farm-claims.json')) ? 'still there' : 'gone', 'gone');
-check('and the claims still say who holds what',
-      say(function () { F.command('/plant', [], 211, 32, toProfile); }), 'held by Cadwell');
-// Both copies there (the old code wrote data after the new code moved it):
-// private wins and the public one is removed.
-fs.writeFileSync(path.join('data', 'farm-claims.json'), '{"claims":{}}');
-delete globalThis.__thornswoodFarmClaims;
-eval(farmCode);
-check('with both there, private is kept and data is removed',
-      (fs.existsSync(path.join('data', 'farm-claims.json')) ? 'data left' : 'data gone') + ', ' +
-      (fs.readFileSync(claimFile, 'utf8') === held ? 'private kept' : 'private changed'),
-      'data gone, private kept');
+check('with no claims in private, the copy in data is not carried across',
+      fs.existsSync(claimFile) ? 'carried' : 'not carried', 'not carried');
+check('and holds nobody\'s farm',
+      /held by Cadwell/.test(say(function () { F.command('/plant', [], 211, 32, toProfile); })) ? 'held' : 'free', 'free');
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

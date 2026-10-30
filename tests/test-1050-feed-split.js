@@ -41,6 +41,8 @@ const CR = String.fromCharCode(13);
 const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const CSP_HEADER = JSON.parse(src.match(/const CSP_HEADER = ("[^"\r\n]*");/)[1]);
+// send() names it beside the CSP (#2762).
+const PERMISSIONS_POLICY = src.match(/const PERMISSIONS_POLICY = '([^'\r\n]*)';/)[1];
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -102,6 +104,8 @@ for (const c of ['feed', 'feed-dev']) {
 yes('server.js has the generations block with feedView and feedSettings', /function feedView\(/.test(genSrc) && /function feedSettings\(/.test(genSrc));
 yes('the split starts at minLauncher 1.2.6, the number after 1.2.5', gen.FEED_SPLIT_LAUNCHER === '1.2.6');
 eval(grab('function send('));
+// send() and rangeReply() put each answer's nonce into the CSP (#3216).
+eval(grab('function cspFor('));
 eval(grab('function rangeReply('));
 const verSrc = route('const feedVer = p.match(', "if (feedVer && req.method === 'GET')");
 const watchSrc = route('const feedWatch = p.match(', "if (feedWatch && req.method === 'GET')");

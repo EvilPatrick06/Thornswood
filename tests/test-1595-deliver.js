@@ -299,7 +299,7 @@ attempt('the words', function () {
   yes('W6 the launcher\'s Help says E hands over a letter, and names no letter command',
       /the prompt also shows E, Hand over the letter/.test(help) && !NAMES_A_LETTER_WORD.test(help));
   yes('W7 the systems page lists E on the look prompt',
-      /E to hand over a letter you carry for\s+them/.test(read('docs/SYSTEMS.md')));
+      /E to hand over a letter you carry for\s+them/.test(read('docs/GAME-SYSTEMS.md')));
 });
 
 // ------------------------------------------------------------ the look prompt

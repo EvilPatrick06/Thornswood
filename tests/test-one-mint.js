@@ -337,11 +337,9 @@ const WRITERS = {
   'property/takeBlankMold': [1, 'only takes a mold away'],
   'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
   'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
-  'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
   'trade/saleById': [2, 'a company sale (#1393): the things out of the seller\'s pack and out of the world with the seller\'s share in, and the price less the worker\'s cut out of the worker\'s pack, which is never less than the share; one write each (section 4)'],
-  'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
   'furniture/takeOne': [1, 'takes one furniture item off a pack to set its piece down; it never adds (#2679)'],
   'furniture/giveOne': [1, 'hands back one furniture item, a MISC out of game/data/furniture.json, for a piece picked up; never gold (#2679, test-2679-furniture.js)'],
   'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)'],
@@ -719,7 +717,22 @@ function goldDescriptors(text) {
   }
   const noItems = cut(src, '  // ==== ITEM_NAMES ====', '  // ==== end ITEM_NAMES ====');
   const noAdmin = noItems && cut(noItems, '  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====');
-  const outside = noAdmin && cut(noAdmin,'// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  const noDungeon = noAdmin && cut(noAdmin,'// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  /*
+    AND THE RECIPES SET IN EACH GAME (#613, #3115). RECIPES_SET_IN_GAME names
+    gold only as a recipe input it takes to 0: Patrick, q-3115 B, a forge
+    recipe costs no coins. A count of 0 takes nothing and mints nothing, and
+    the check below holds that every gold row there asks 0.
+  */
+  const setInGame = lift('// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====') || '';
+  const setRows = (/var RECIPES_SET_IN_GAME = (\{.*\});/.exec(setInGame) || [])[1];
+  let setTable = null;
+  try { setTable = JSON.parse(setRows); } catch (e) { setTable = null; }
+  yes('a recipe set in each game names gold only to take it to 0',
+      !!setTable && Object.keys(setTable).every(function (k) {
+        return setTable[k].inputs.every(function (i) { return goldDescriptors('"' + i[0] + '"').gold.length === 0 || i[2] === 0; });
+      }));
+  const outside = noDungeon && cut(noDungeon, '// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====');
   const dungeon=lift('// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
   const dungeonGold=goldDescriptors(dungeon || '');
   yes('the checked dungeon reward names exactly one gold descriptor as GOLD_DESC',
@@ -993,9 +1006,15 @@ if (tradeBlock !== null) {
 yes('the gamemode never asks Papyrus to AddItem', !/(['"])AddItem\1/.test(code));
 
 {
-  const spoil = bodyOf('spoils/isSpoil');
-  yes('and the world does not hand gold over: it is the first thing isSpoil refuses',
-      spoil !== null && /if \(baseId === GOLD\) \{ return true; \}/.test(spoil));
+  // The world hands no gold over, and nothing in the gamemode has to refuse
+  // it: no container holds what the world put there (forbiddenBaseContainer,
+  // #3078), and Thornswood-Last.esp switches off every placed MISC, which
+  // Gold001 is, and every coin purse (#3077).
+  const builder = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Build-LastPlugin.py'), 'utf8');
+  const deploy = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'deploy', 'Deploy-Gamemode.ps1'), 'utf8');
+  yes('and the world does not hand gold over: no container is filled, and no coin or coin purse lies on the floor',
+      /forbiddenBaseContainer -NotePropertyValue @\('CONT'\)/.test(deploy) &&
+      /FLOOR_TYPES = \([^)]*b'MISC'/.test(builder) && /COIN_PURSES = \(/.test(builder));
 }
 
 console.log('');

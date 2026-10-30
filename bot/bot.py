@@ -25,7 +25,9 @@ What it does:
            python bot.py --post-task). #dev-test-tasks, a staff only forum
            in Staff, holds the test tasks whose comment says "Server: Dev":
            a measurement someone on dev has to take, open issue or closed,
-           and any posted by hand tagged Dev.
+           and any posted by hand tagged Dev. The same read writes the
+           site's Known Issues page (the #known-issues list) and its
+           roadmap (the "roadmap:" labels) for the site to show (#3140).
            The channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
@@ -76,6 +78,8 @@ Everything it needs is in env:
   KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
   KNOWN_ISSUES_LABELS default Dev Findings,Main Findings
   KNOWN_ISSUES_EVERY  seconds between GitHub reads, default 300, never under 60
+  PUBLIC_LISTS_FILE   where the site's known issues and roadmap are written,
+                      default the site's data/from-bot/lists.json on the VPS
   HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
                    file, which is where the watchdog reads it
   HEARTBEAT_EVERY  seconds between heartbeats, default 60
@@ -101,25 +105,65 @@ import time
 import traceback
 import sys
 import typing
+import urllib.error
 import urllib.parse
 import urllib.request
 
-# Windows Server ships with an empty root certificate store and the automatic
-# update for it switched off, so Python cannot verify discord.com and the
-# handshake dies with "unable to get local issuer certificate". Install-Bot
-# sets SSL_CERT_FILE for the service; a bot started any other way points it at
-# certifi's bundle here. certifi is in requirements.txt beside discord.py, so
-# a bot without it is missing its libraries and stops on this import, saying
-# so, rather than connecting without its roots (#2736). Each SSL context made
-# from here on reads the variable.
-if not os.environ.get('SSL_CERT_FILE'):
-    import certifi
-    os.environ['SSL_CERT_FILE'] = certifi.where()
-    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
+# The bot's own records, joins.json, open-tickets.json, heartbeat.json
+# and commands-synced.json, go in a folder of their own, data beside bot.py, and
+# so does bot.log, which the service writes (issue #1104). The service's
+# account may write there and nowhere else in the bot's folder: the code is
+# read only to it, so nothing that gets into the bot can rewrite bot.py or put
+# a module beside it for the next start to import. The service names the
+# folder in THORNSWOOD_BOT_DATA (BotService.cs). With no data folder yet, a
+# box whose full install has not run since, the records stay beside bot.py
+# where they were, so a code only deploy never starts the join numbers again;
+# the full install moves them across while the bot is stopped (Bot-Service.ps1).
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
+    os.path.join(HERE, 'data') if os.path.isdir(os.path.join(HERE, 'data')) else HERE)
+
+# The roots the bot trusts are its own file, roots.pem in its data folder: the
+# roots in certifi's bundle (requirements.txt, by hash) less those trust.py
+# leaves out, eMudhra's (#3111). It is written again at every start, before
+# discord.py or urllib makes a single connection.
+#
+# Not the box's certificate store. Its automatic root update is off by
+# policy, so it lacks what discord.com chains to and the handshake died with
+# "unable to get local issuer certificate" (#2736); and it holds emSign Root
+# CA - G1 in LocalMachine\Root (read on the box 21 Oct). Python's default
+# SSL context on Windows loads that store as well as SSL_CERT_FILE, so
+# pointing SSL_CERT_FILE at the file is not enough on its own. Every
+# connection the bot makes goes through CONTEXT instead, made from the file
+# alone: urllib through the opener installed here, discord.py's HTTP and
+# gateway through the connector TrustedClient gives it at login.
+# SSL_CERT_FILE names the same file for anything else in the process.
+#
+# Always this file, whatever the environment named before. Install-Bot used to
+# set SSL_CERT_FILE to certifi's bundle as the box's own Python found it, with
+# none of py-libs on its path, so it named the certifi that Python had
+# installed for itself, if any, and not the one requirements.txt pins.
+# certifi is in requirements.txt beside discord.py, so a bot without it is
+# missing its libraries and stops here, saying so, rather than connecting
+# without its roots (#2736).
+import trust
+ROOTS = os.path.join(DATA_DIR, 'roots.pem')
+_trusted, _left_out = trust.write_bundle(ROOTS)
+os.environ['SSL_CERT_FILE'] = ROOTS
+os.environ['REQUESTS_CA_BUNDLE'] = ROOTS
+CONTEXT = trust.context(ROOTS)
+urllib.request.install_opener(
+    urllib.request.build_opener(urllib.request.HTTPSHandler(context=CONTEXT)))
 
 import discord
 
 import card
+
+
+# A discord.Client whose every request and gateway connection verifies
+# against CONTEXT (#3111). trust.py makes the class, the one every script in
+# bot/ that logs in to Discord makes its client from (#3604).
+TrustedClient = trust.client_class(CONTEXT)
 
 
 def _load_env_file(argv):
@@ -160,6 +204,45 @@ TICKETS = [n.strip().lower() for n in
            if n.strip()]
 TICKETS_SAID = ' or #'.join(TICKETS)
 
+# THE TICKET DESKS (#3317, Patrick's page card q-3317-ticket-split, A): one
+# channel a kind of ticket, each with a panel offering only its kinds, and the
+# private threads open off it. A Tickets category holds help and reports, an
+# Applications category the three kinds of application; Build-Discord.py makes
+# them by these names. TICKETS above is the one channel of before the split,
+# #tickets-and-applications. It is used only on a server that has none of
+# these, so a server not yet built again keeps working, and where it is still
+# there beside them its panel says where the tickets went.
+TICKET_DESKS = [
+    ('get-help',          ('help',)),
+    ('report-someone',    ('report',)),
+    ('apply-to-playtest', ('playtest',)),
+    ('apply-for-a-seat',  ('jarl', 'faction')),
+    ('apply-for-staff',   ('gamemaster', 'loremaster', 'moderator', 'dev', 'creator')),
+]
+# Every channel a ticket thread can be off.
+TICKET_NAMES = [d for d, _k in TICKET_DESKS] + [n for n in TICKETS
+                                                  if n not in dict(TICKET_DESKS)]
+
+
+def desk_of(kind):
+    """The desk channel a kind of ticket opens in, by name."""
+    for desk, kinds in TICKET_DESKS:
+        if kind in kinds:
+            return desk
+    return None
+
+
+def ticket_channel(guild, kind):
+    """The channel this kind of ticket opens its thread off: its desk, or on a
+       server not yet split, the one channel of before."""
+    desk = desk_of(kind)
+    ch = by_name(guild, [desk]) if desk else None
+    if ch is not None:
+        return ch
+    if any(by_name(guild, [d]) is not None for d, _k in TICKET_DESKS):
+        return None
+    return by_name(guild, TICKETS)
+
 # Where a closed ticket is written down, and it is NOT the channel above.
 # Everybody who can apply can read that one, so a closed application posted
 # there is somebody else's answers sitting in front of the next person
@@ -167,14 +250,22 @@ TICKETS_SAID = ' or #'.join(TICKETS)
 # not there. A ticket whose private thread will not open goes here too, so a
 # report about somebody is never posted where that somebody can read it.
 # log_channel checks that by the channel's permissions, not by these names.
+# #ticket-log first since #3317, which moved the staff only #tickets out of the
+# public Applications category into Staff under that name; #tickets is still
+# answered to, so a server not yet built again keeps working.
 TICKET_LOG = [n.strip().lower() for n in
-              os.environ.get('TICKET_LOG', 'tickets,ticket-log').split(',')
+              os.environ.get('TICKET_LOG', 'ticket-log,tickets').split(',')
               if n.strip()]
 # Who gets pulled into every ticket thread.
 # Tokens may be Discord role snowflake IDs (digits) or names. IDs survive a
 # rename; names are kept so an unmigrated bot.env.json still works.
+# The council (Owner, Co-Owner and every lead, #3317) reads every ticket, so
+# it is in the default; a bot.env.json that lists ids needs their ids added.
 _STAFF_RAW = [r.strip() for r in
-              os.environ.get('STAFF_ROLES', 'Owner,Gamemaster,Dev,Loremaster,Moderator').split(',')
+              os.environ.get('STAFF_ROLES',
+                             'Owner,Co-Owner,Lead Dev,Lead Gamemaster,Lead Loremaster,'
+                             'Lead Moderator,Lead Content Creator,Lead Support,'
+                             'Gamemaster,Dev,Loremaster,Moderator').split(',')
               if r.strip()]
 
 # Roles that see one kind of ticket and not the rest.
@@ -349,20 +440,6 @@ WATCH_ID = _int_env('WATCH_CHANNEL_ID', _staff_channel_id())
 # instead (#2940). TROUBLE_CHANNEL_ID in bot.env.json overrides it.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
-# The bot's own records, joins.json, open-tickets.json, heartbeat.json
-# and commands-synced.json, go in a folder of their own, data beside bot.py, and
-# so does bot.log, which the service writes (issue #1104). The service's
-# account may write there and nowhere else in the bot's folder: the code is
-# read only to it, so nothing that gets into the bot can rewrite bot.py or put
-# a module beside it for the next start to import. The service names the
-# folder in THORNSWOOD_BOT_DATA (BotService.cs). With no data folder yet, a
-# box whose full install has not run since, the records stay beside bot.py
-# where they were, so a code only deploy never starts the join numbers again;
-# the full install moves them across while the bot is stopped (Bot-Service.ps1).
-HERE = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
-    os.path.join(HERE, 'data') if os.path.isdir(os.path.join(HERE, 'data')) else HERE)
-
 # Where the site writes the sessions that went wrong. The bot and the site run
 # on the same box, so this is a file rather than a request: no ticket, no port
 # and nothing to keep in step. In for-bot, a folder of the site's data that
@@ -372,6 +449,10 @@ DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
 TROUBLE_FILE = os.environ.get(
     'TROUBLE_FILE', r'C:\Thornswood-Docs\data\for-bot\trouble.json')
 TROUBLE_EVERY = _int_env('TROUBLE_EVERY', 120)
+
+# Which message in Discord says which session went wrong, so the post goes
+# when its row leaves trouble.json (#3942). The bot's own, beside joins.json.
+TROUBLE_POSTS = os.path.join(DATA_DIR, 'trouble-posts.json')
 
 # Where the site writes what people send in on its public report page, read
 # the same way as trouble.json and said in the same staff channel.
@@ -397,7 +478,7 @@ if not TOKEN:
 intents = discord.Intents(guilds=True, members=True)
 
 
-class Thornswood(discord.Client):
+class Thornswood(TrustedClient):
     async def setup_hook(self):
         """
         Everything that has to happen once per process, and not once per
@@ -424,9 +505,13 @@ class Thornswood(discord.Client):
                 % ', '.join(UPPER_STAFF_IGNORED))
         warn_upper_staff_config()
         self.add_view(TicketPanel())          # so it keeps working after a restart
+        for desk, _kinds in TICKET_DESKS:     # and every desk's (#3317)
+            if desk_kinds(desk):
+                self.add_view(TicketPanel(desk))
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
         self.add_view(OfficePanel())          # and a Jarl's office buttons (#2551)
+        self.add_view(FactionPanel())         # and a faction Leader's member buttons (#3317)
 
 
 client = Thornswood(intents=intents)
@@ -633,11 +718,12 @@ async def log_channel(guild, make=True):
             if _role_hit(r, STAFF_IDS, STAFF_NAMES):
                 over[r] = discord.PermissionOverwrite(view_channel=True,
                                                       send_messages=True)
-        where = by_name(guild, TICKETS)
+        # In Staff, where Build-Discord.py has #ticket-log (#3317).
+        where = discord.utils.get(getattr(guild, 'categories', None) or [], name='Staff')
         ch = await guild.create_text_channel(
             free[0],
             overwrites=over,
-            category=(where.category if where is not None else None),
+            category=where,
             topic='Every ticket that gets closed, with a link back to it, and '
                   'any ticket whose private thread would not open. Staff only.')
         log('made #%s for closed tickets, staff only' % ch.name)
@@ -799,6 +885,52 @@ def joins_age(rec, now_ms, here):
     return marked, dropped
 
 
+
+# A restore (scripts/vps/vps-restore-services.ps1) moves the joins.json it
+# replaces to joins.json-before-restore-<stamp> beside it in the data folder,
+# <stamp> the box's local yyyyMMdd-HHmmss, with -2, -3 for a second restore in
+# the same second, and nothing deleted it (#3620). Decided by Patrick on 26 Oct
+# (B): a set-aside copy is kept 30 days, so a restore can be undone, then
+# deleted. By the time in its name, never the file's own times, which a move
+# keeps from the original. Delete-Person.ps1 takes a deleted person out of one
+# while it is here.
+RESTORE_ASIDE_DAYS = 30
+RESTORE_ASIDE = re.compile(r'^joins\.json-before-restore-(\d{8})-(\d{6})(?:-\d+)?$')
+
+
+def age_restore_copies(folder, now):
+    """
+    Deletes the set-aside joins.json copies in folder older than
+    RESTORE_ASIDE_DAYS by the stamp in their names, now a POSIX time in
+    seconds. A link, or anything that is not a plain file, is left as it is.
+    Returns (deleted names, [(name, reason)] it could not delete).
+    """
+    cut = now - RESTORE_ASIDE_DAYS * 86400
+    deleted, failed = [], []
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError as e:
+        return deleted, [(folder, str(e))]
+    for n in names:
+        m = RESTORE_ASIDE.match(n)
+        if not m:
+            continue
+        try:
+            at = datetime.datetime.strptime(m.group(1) + m.group(2), '%Y%m%d%H%M%S').timestamp()
+        except ValueError:
+            continue
+        if at >= cut:
+            continue
+        p = os.path.join(folder, n)
+        if os.path.islink(p) or not os.path.isfile(p):
+            continue
+        try:
+            os.remove(p)
+            deleted.append(n)
+        except OSError as e:
+            failed.append((n, str(e)))
+    return deleted, failed
+
 async def watch_join_numbers():
     """
     Marks who has left and drops the numbers past JOIN_KEEP_DAYS, as the bot
@@ -831,6 +963,16 @@ async def watch_join_numbers():
         except Exception:
             log('join numbers: could not age %s, so it is as it was until the '
                 'next pass:\n%s' % (JOINS, traceback.format_exc()))
+        try:
+            gone, stuck = age_restore_copies(DATA_DIR, time.time())
+            for n in gone:
+                log('join numbers: deleted %s, set aside by a restore more than %d days ago'
+                    % (n, RESTORE_ASIDE_DAYS))
+            for n, why in stuck:
+                log('join numbers: COULD NOT DELETE %s (%s); it is tried again in an hour' % (n, why))
+        except Exception:
+            log('join numbers: could not age the copies a restore set aside:\n%s'
+                % traceback.format_exc())
         await asyncio.sleep(JOIN_KEEP_EVERY)
 
 
@@ -1103,9 +1245,9 @@ QUESTIONS = {
     # questions ask about the character rather than about the person, and the
     # last one asks the thing that actually decides it: whether they can lose
     # the seat and keep playing.
+    # The hold itself is a Select of the open seats only, built in
+    # TicketModal (#3317, Patrick, 22 Oct: "only include the open seats").
     'jarl': [
-        ('Which hold? Second choice if you have one',
-         'Whiterun, Solitude, Windhelm, Riften, Markarth, Dawnstar, Morthal, Falkreath, Winterhold.', False),
         ('Who is your character?',
          'Name, where they come from, what they have been doing until now. In character.', True),
         ('What is their claim to the seat?',
@@ -1154,21 +1296,121 @@ QUESTIONS = {
 
 # Named factions, names only, beside this file. Other is always added in
 # code, last, and is never stored here. A name change is a pull request.
-# Seat tracking waits for a Faction Lead Discord role; the list always
-# shows every name in this file, plus Other.
+# A named faction is offered only while its "<faction> Leader" role has
+# nobody in it (#3317); Other is always offered.
 FACTIONS_FILE = os.path.join(HERE, 'factions.json')
 FACTION_OTHER = 'Other'
 FACTION_PICK_Q = 'Which faction?'
 FACTION_OTHER_Q = 'If Other, which faction?'
 FACTION_OTHER_HINT = 'Only if you picked Other. The name of the faction.'
-# Jarl and Faction Leader: staff cannot hold these, so a staff applicant is
-# flagged. Wider than is_staff: Lead Gamemaster and Trial Gamemaster are not
-# staff for /close, and they still cannot hold a lead seat. is_staff is left
-# as it is. Content Creator is on neither list.
+HOLD_PICK_Q = 'Which hold?'
+# THE SEAT RULE (#3317, Patrick, 22 Oct, 11:03 AM): "any Staff role can't
+# also be a faction leader which includes Jarl's (Jarls are faction leaders
+# but have a separate application on purpose ...)". He picked the bot
+# refusing it (page card q-3317-seat-rule-check, A): staff cannot apply for
+# a seat, and a seat holder cannot apply for staff. Every staff role counts,
+# Trial Gamemaster, Content Creator and Support included, so the names are
+# Build-Discord.py's STAFF, and test-3317-seats.py holds the two to the same
+# list. STAFF_ROLES ids count too.
 LEADERSHIP_KINDS = ('jarl', 'faction')
-LEADERSHIP_EXTRA = ('Lead Gamemaster', 'Trial Gamemaster')
+SEAT_RULE_STAFF = ('Owner', 'Co-Owner',
+                   'Lead Dev', 'Dev',
+                   'Lead Gamemaster', 'Gamemaster', 'Trial Gamemaster',
+                   'Lead Loremaster', 'Loremaster',
+                   'Lead Moderator', 'Moderator',
+                   'Lead Content Creator', 'Content Creator',
+                   'Lead Support', 'Support')
+# The applications that make somebody staff. Apply: Lead and Apply: Support
+# join this when they are on the panel.
+STAFF_JOB_KINDS = ('gamemaster', 'loremaster', 'moderator', 'dev', 'creator')
+# A faction's leader role uses its short name, as Build-Discord.py makes it.
+FACTION_SHORT = {'Thalmor Remnant': 'Thalmor', 'The Companions': 'Companions'}
 # Djinn, 12 Oct 2026. On the public panel, word for word.
 STAFF_LEADERSHIP_RULE = 'No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.'
+SEAT_STAFF_REFUSED = ('You hold a staff role (%s). Nobody on staff may hold a '
+                      'Jarl seat or lead a faction, so this application is '
+                      'closed to you.')
+SEAT_HELD_REFUSED = ('You hold %s. Nobody who holds a Jarl seat or leads a '
+                     'faction may be on staff. To apply, give the seat up '
+                     'first: say so in an "I need help" ticket.')
+NO_OPEN_HOLD = ('Every Jarl seat is held right now, so there is nothing to '
+                'apply for. When one opens it is listed here.')
+
+
+def faction_leader_role(faction):
+    """The leader role of a named faction: "Thalmor Leader"."""
+    return FACTION_SHORT.get(faction, faction) + ' Leader'
+
+
+def jarl_role(hold):
+    return 'Jarl of ' + hold
+
+
+def seat_roles():
+    """Every seat of the world, as role names: each Jarl, then each faction leader."""
+    return ([jarl_role(h) for h in OFFICE_TOWNS] +
+            [faction_leader_role(f) for f in faction_names()])
+
+
+def _role_named(guild, name):
+    for r in getattr(guild, 'roles', None) or []:
+        if getattr(r, 'name', None) == name:
+            return r
+    return None
+
+
+def seat_is_open(guild, role_name):
+    """
+    Nobody holds this seat. A seat whose role is not on the server yet is
+    open: nobody can hold a role that does not exist.
+    """
+    r = _role_named(guild, role_name)
+    return r is None or not list(getattr(r, 'members', None) or [])
+
+
+def open_holds(guild):
+    """The holds whose Jarl seat is empty, in the order of OFFICE_TOWNS."""
+    return [h for h in OFFICE_TOWNS if seat_is_open(guild, jarl_role(h))]
+
+
+def open_factions(guild):
+    """The named factions whose leader seat is empty, in factions.json order."""
+    return [f for f in faction_names()
+            if seat_is_open(guild, faction_leader_role(f))]
+
+
+def seats_held(who):
+    """The seat roles this person holds, by name."""
+    seats = set(seat_roles())
+    return [r.name for r in getattr(who, 'roles', None) or []
+            if getattr(r, 'name', None) in seats]
+
+
+def seat_refusal(kind, who, guild):
+    """
+    Why this person cannot open this application, in words, or None.
+
+    Asked when they pick from the panel and again when the form comes back.
+    Unlike ticket_refusal it holds for staff too, because the rule is about
+    staff. Anything that goes wrong in here lets them through, for the reason
+    ticket_refusal gives, and the council reading the ticket is the check.
+    """
+    try:
+        if kind in LEADERSHIP_KINDS:
+            held = leadership_staff_held(who)
+            if held:
+                return SEAT_STAFF_REFUSED % ', '.join(held)
+            if kind == 'jarl' and not open_holds(guild):
+                return NO_OPEN_HOLD
+        if kind in STAFF_JOB_KINDS:
+            held = seats_held(who)
+            if held:
+                return SEAT_HELD_REFUSED % ', '.join(held)
+        return None
+    except Exception:
+        log('the seat rule could not be checked, so this one was let '
+            'through:\n' + traceback.format_exc())
+        return None
 
 
 def faction_names():
@@ -1183,12 +1425,21 @@ def faction_names():
     return []
 
 
-def faction_pick_options():
-    """Select options for the form: every named faction, then Other last."""
-    opts = [discord.SelectOption(label=n[:100], value=n[:100])
-            for n in faction_names()]
+def faction_pick_options(guild=None):
+    """
+    Select options for the form: every named faction whose leader seat is
+    open, then Other last. With no guild to look in, every named faction.
+    """
+    names = faction_names() if guild is None else open_factions(guild)
+    opts = [discord.SelectOption(label=n[:100], value=n[:100]) for n in names]
     opts.append(discord.SelectOption(label=FACTION_OTHER, value=FACTION_OTHER))
     return opts
+
+
+def hold_pick_options(guild=None):
+    """Select options for the Jarl form: every hold whose Jarl seat is open."""
+    holds = list(OFFICE_TOWNS) if guild is None else open_holds(guild)
+    return [discord.SelectOption(label=h, value=h) for h in holds]
 
 
 def faction_pick_is_known(picked):
@@ -1215,16 +1466,14 @@ def field_said(item):
 
 def leadership_staff_held(who):
     """
-    Names of staff roles they hold, including Lead and Trial Gamemaster.
+    Names of the staff roles they hold, for the seat rule.
 
-    The list the Faction Leader and Jarl flags use. is_staff does not include
-    those two, and it is left as it is so /close stays on the same five
-    roles. Content Creator is not on this list either.
+    Every staff role counts (SEAT_RULE_STAFF, and any STAFF_ROLES id), wider
+    than is_staff, which decides /close and the ticket limits.
     """
     try:
-        ids, names = set(STAFF_IDS), set(STAFF_NAMES)
-        for n in LEADERSHIP_EXTRA:
-            names.add(n.lower())
+        ids = set(STAFF_IDS)
+        names = set(STAFF_NAMES) | set(n.lower() for n in SEAT_RULE_STAFF)
         found = []
         for r in getattr(who, 'roles', None) or []:
             if _role_hit(r, ids, names):
@@ -1235,21 +1484,35 @@ def leadership_staff_held(who):
 
 
 class TicketModal(discord.ui.Modal):
-    def __init__(self, kind, label):
+    def __init__(self, kind, label, guild=None):
         super().__init__(title=label[:45])
         self.kind = kind
         self.label_text = label
         self.fields = []
         self.faction_select = None
         self.faction_other = None
+        self.hold_select = None
         # Discord takes five items on a form. The faction kind uses all five:
-        # a required Select of every named faction plus Other (discord.py
+        # a required Select of every open faction seat plus Other (discord.py
         # 2.6.0 put Select inside a modal; 2.7.1 is the pin), an optional
-        # Other box, and the three copied questions.
+        # Other box, and the three copied questions. The Jarl kind is a
+        # required Select of the open holds and its four questions. The
+        # seats are read off the guild the form is opened in.
+        if kind == 'jarl':
+            sel = discord.ui.Select(
+                placeholder='Pick a hold',
+                options=hold_pick_options(guild),
+                min_values=1,
+                max_values=1,
+                required=True)
+            self.hold_select = sel
+            self.add_item(discord.ui.Label(
+                text=HOLD_PICK_Q[:45],
+                component=sel))
         if kind == 'faction':
             sel = discord.ui.Select(
                 placeholder='Pick a faction',
-                options=faction_pick_options(),
+                options=faction_pick_options(guild),
                 min_values=1,
                 max_values=1,
                 required=True)
@@ -1279,7 +1542,8 @@ class TicketModal(discord.ui.Modal):
         # Checked again here, and counted here rather than on the panel, so a
         # form opened by mistake and cancelled costs nobody five minutes. See
         # TICKET_COOLDOWN for why there is a limit at all.
-        no = ticket_refusal(interaction)
+        no = (ticket_refusal(interaction) or
+              seat_refusal(self.kind, interaction.user, interaction.guild))
         if no:
             await interaction.response.send_message(no, ephemeral=True)
             return
@@ -1333,9 +1597,13 @@ class TicketModal(discord.ui.Modal):
         # and out of Asking for: they go only in the escaped answers below.
         picked = field_said(self.faction_select) if self.faction_select is not None else ''
         other_said = field_said(self.faction_other) if self.faction_other is not None else ''
+        hold = field_said(self.hold_select) if self.hold_select is not None else ''
 
         def written(clean):
             lines = []
+            if self.kind == 'jarl':
+                lines.append('**%s**\n%s'
+                             % (HOLD_PICK_Q, clean(hold) or 'nothing said'))
             if self.kind == 'faction':
                 lines.append('**%s**\n%s'
                              % (FACTION_PICK_Q, clean(picked) or 'nothing said'))
@@ -1357,15 +1625,23 @@ class TicketModal(discord.ui.Modal):
             if rules is not None and not rules['yes']:
                 out = ('**CHECK THIS ONE.** Asked if they accept the rules they '
                        'said "%s".\n\n' % (clean(rules_said) or 'nothing')) + out
+            # A seat can be filled between the form opening and coming back,
+            # and two people can apply for the same open seat; the council
+            # reads which. A pick that was never on the list is a tampered
+            # submit.
             if self.kind == 'faction' and not faction_pick_is_known(picked):
                 out = ('**CHECK THIS ONE.** The faction they picked is not on '
                        'the list.\n\n') + out
-            if self.kind in LEADERSHIP_KINDS:
-                held = leadership_staff_held(who)
-                if held:
-                    out = ('**CHECK THIS ONE.** Holds a staff role (%s); staff '
-                           'cannot hold a Jarl seat or a faction lead.\n\n'
-                           % ', '.join(held)) + out
+            elif (self.kind == 'faction' and picked != FACTION_OTHER
+                  and not seat_is_open(guild, faction_leader_role(picked))):
+                out = ('**CHECK THIS ONE.** The faction they picked has a '
+                       'leader now.\n\n') + out
+            if self.kind == 'jarl' and hold not in OFFICE_TOWNS:
+                out = ('**CHECK THIS ONE.** The hold they picked is not on '
+                       'the list.\n\n') + out
+            elif self.kind == 'jarl' and not seat_is_open(guild, jarl_role(hold)):
+                out = ('**CHECK THIS ONE.** The hold they picked has a Jarl '
+                       'now.\n\n') + out
             return out
 
         # Two copies of the same ticket, because the two places that take it
@@ -1403,13 +1679,14 @@ class TicketModal(discord.ui.Modal):
         head = '%s opened this. %s' % (who.mention,
                                        ' '.join(r.mention for r in staff_roles))
 
-        ch = by_name(guild, TICKETS)
+        ch = ticket_channel(guild, self.kind)
         why = None
         opened = None
         posted = False
 
         if ch is None:
-            why = ('there is no text channel called #%s in this server' % TICKETS_SAID)
+            why = ('there is no text channel called #%s in this server'
+                   % (desk_of(self.kind) or TICKETS_SAID))
             log(why)
         else:
             why = thread_block(guild, ch)
@@ -1787,7 +2064,7 @@ def ticket_refusal(interaction):
 def is_ticket_thread(ch):
     """
     True for a thread a ticket opened: one off a channel named in
-    TICKET_CHANNEL, which is the only place TicketModal opens one. A ticket
+    TICKET_DESKS or TICKET_CHANNEL, the only places TicketModal opens one. A ticket
     that could not have its thread goes into the TICKET_LOG channel as a
     plain message, never a thread, so that channel has none to close.
 
@@ -1802,7 +2079,7 @@ def is_ticket_thread(ch):
     if not isinstance(ch, discord.Thread):
         return False
     name = getattr(ch.parent, 'name', None)
-    return bool(name) and name.lower() in TICKETS
+    return bool(name) and name.lower() in TICKET_NAMES
 
 
 def faction_leader_label():
@@ -1978,7 +2255,7 @@ async def age_closed_tickets(guild, bot_id, now):
     cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
     deleted = failed = 0
     for ch in getattr(guild, 'text_channels', []):
-        if (getattr(ch, 'name', '') or '').lower() not in TICKETS:
+        if (getattr(ch, 'name', '') or '').lower() not in TICKET_NAMES:
             continue
         due = []
         try:
@@ -2012,79 +2289,186 @@ async def age_closed_tickets(guild, bot_id, now):
     return deleted, failed
 
 
+# THE STAFF TICKET LOG IS KEPT THE SAME 365 DAYS (#3634). The bot writes two
+# things into the TICKET_LOG channel: a whole ticket whose private thread
+# would not open (its title with the opener's name, the opener's mention and
+# every answer they typed), and a Closed line naming the thread, which is the
+# opener's name, at every close. age_closed_tickets deletes the threads and
+# never read this channel, so those copies had no keeping time while the
+# privacy page said a ticket goes after 365 days. Each of the bot's own
+# messages there now goes TICKET_KEEP_DAYS after it was posted: a fallback
+# ticket the same year as a ticket in a thread, and a Closed line the same
+# year as the thread it points at, which is deleted a year after that close.
+# Only the bot's own messages, and never in a channel tickets open off, so a
+# panel is never touched if TICKET_LOG is ever pointed at one.
+async def age_ticket_log(guild, bot_id, now):
+    """
+    Deletes the bot's own messages in this server's TICKET_LOG channels that
+    were posted more than TICKET_KEEP_DAYS before now, and returns (deleted,
+    failed). Said in bot.log as counts a channel, never what a message said.
+    A history that cannot be read, or a delete Discord refuses, is a line
+    with Discord's reason, and the message stays until the next pass.
+    """
+    if bot_id is None:
+        return 0, 0
+    cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
+    deleted = failed = 0
+    for ch in getattr(guild, 'text_channels', []):
+        name = (getattr(ch, 'name', '') or '').lower()
+        if name not in TICKET_LOG or name in TICKET_NAMES:
+            continue
+        due = []
+        try:
+            async for m in ch.history(limit=None, before=cut):
+                at = getattr(m, 'created_at', None)
+                if (getattr(getattr(m, 'author', None), 'id', None) == bot_id
+                        and isinstance(at, datetime.datetime)
+                        and at.tzinfo is not None and at < cut):
+                    due.append(m)
+        except Exception as e:
+            failed += 1
+            log('ticket log: could not read #%s of "%s", so none of it was '
+                'deleted this pass: %s: %s'
+                % (ch.name, guild.name, type(e).__name__, e))
+            continue
+        gone = 0
+        for m in due:
+            try:
+                await m.delete()
+            except Exception as e:
+                failed += 1
+                log('ticket log: could not delete message %s in #%s, posted '
+                    '%s: %s: %s' % (m.id, ch.name, m.created_at.date().isoformat(),
+                                    type(e).__name__, e))
+                continue
+            gone += 1
+        if gone:
+            deleted += gone
+            log('ticket log: deleted %d of the bot\'s messages in #%s posted '
+                'more than %d days ago' % (gone, ch.name, TICKET_KEEP_DAYS))
+    return deleted, failed
+
+
 async def watch_closed_tickets():
     """
-    Runs age_closed_tickets on every server as the bot comes up and every
-    TICKET_KEEP_EVERY seconds, like watch_join_numbers. Nothing in here may
-    end the loop: a pass that fails is said in bot.log, and the threads it
-    did not reach are there for the next one.
+    Runs age_closed_tickets and age_ticket_log on every server as the bot
+    comes up and every TICKET_KEEP_EVERY seconds, like watch_join_numbers.
+    Nothing in here may end the loop: a pass that fails is said in bot.log,
+    and the threads and messages it did not reach are there for the next one.
     """
     await client.wait_until_ready()
     while not client.is_closed():
         now = datetime.datetime.now(datetime.timezone.utc)
         bot_id = getattr(client.user, 'id', None)
         for gd in list(client.guilds):
-            try:
-                await age_closed_tickets(gd, bot_id, now)
-            except Exception:
-                log('closed tickets: the pass on "%s" stopped part way, so '
-                    'what it did not reach waits for the next one:\n%s'
-                    % (gd.name, traceback.format_exc()))
+            for age in (age_closed_tickets, age_ticket_log):
+                try:
+                    await age(gd, bot_id, now)
+                except Exception:
+                    log('closed tickets: the %s pass on "%s" stopped part way, '
+                        'so what it did not reach waits for the next one:\n%s'
+                        % (age.__name__, gd.name, traceback.format_exc()))
         await asyncio.sleep(TICKET_KEEP_EVERY)
 
 
 class TicketPanel(discord.ui.View):
-    def __init__(self):
+    """One desk's panel (TICKET_DESKS), offering only its kinds, or with desk
+       None the one panel of before the split, offering every kind. A desk
+       with no kind to offer today (the playtest one while the world is
+       open) is its words alone."""
+
+    def __init__(self, desk=None):
         super().__init__(timeout=None)
-        self.add_item(TicketPicker())
+        if desk_kinds(desk):
+            self.add_item(TicketPicker(desk))
+
+
+def desk_kinds(desk):
+    """The KINDS a desk's panel offers, in KINDS' order; every one for None."""
+    if desk is None:
+        return list(KINDS)
+    want = dict(TICKET_DESKS).get(desk, ())
+    return [k for k in KINDS if k[0] in want]
 
 
 class TicketPicker(discord.ui.Select):
-    def __init__(self):
+    def __init__(self, desk=None):
         super().__init__(
-            custom_id='thornswood:ticket',
+            # A custom_id of its own a desk, so a press on any posted panel
+            # is answered after a restart; the one of before keeps its own.
+            custom_id='thornswood:ticket' + ('' if desk is None else ':' + desk),
             placeholder='What do you need?',
             options=[discord.SelectOption(label=lab, value=k, description=desc[:100])
-                     for k, lab, desc in KINDS])
+                     for k, lab, desc in desk_kinds(desk)])
 
     async def callback(self, interaction):
         # Told here, before the form opens, so nobody types out a whole
         # application only to be turned away at the end of it.
-        no = ticket_refusal(interaction)
+        k = self.values[0]
+        no = (ticket_refusal(interaction) or
+              seat_refusal(k, interaction.user, interaction.guild))
         if no:
             await interaction.response.send_message(no, ephemeral=True)
             return
-        k = self.values[0]
         lab = dict((a, b) for a, b, _ in KINDS)[k]
-        await interaction.response.send_modal(TicketModal(k, lab))
+        await interaction.response.send_modal(TicketModal(k, lab, interaction.guild))
 
 
+_PANEL_THREAD = ('It asks a few questions, then opens a thread only you and staff '
+                 'can see. Nothing here is public and nobody else in the server '
+                 'can read it.')
 _PANEL_TOP = ('**Open a ticket**\n\n'
-              'Pick the one that fits. It asks a few questions, then opens a thread '
-              'only you and staff can see. Nothing here is public and nobody else in '
-              'the server can read it.\n\n')
-_PANEL_JOBS = ('**Apply: Jarl** and **Apply: Faction Leader** are '
-               'answered in character: the seats are empty, and the first people to '
-               'hold them are picked out of what is written there. A faction has one '
-               'leader. ' + STAFF_LEADERSHIP_RULE + '\n\n'
+              'Pick the one that fits. ' + _PANEL_THREAD + '\n\n')
+_PANEL_SEATS = ('**Apply: Jarl** and **Apply: Faction Leader** are '
+                'answered in character, and list only the seats nobody holds. A '
+                'Jarl is a faction leader with an application of its own, because '
+                'a hold is a seat like no other. A faction has one leader. ' +
+                STAFF_LEADERSHIP_RULE + ' Somebody who holds a seat cannot apply '
+                'for staff either.')
+_PANEL_ANSWER = 'Applying for one does not give you it. Somebody reads it and answers.'
+_PANEL_JOBS = (_PANEL_SEATS + '\n\n'
                'The jobs below that are open to anybody already in, and they are jobs '
                'rather than titles: each one is work somebody is currently doing '
-               'instead of you.\n\n'
-               'Applying for one does not give you it. Somebody reads it and answers.')
-PANEL_ALPHA = (_PANEL_TOP +
-               'Thornswood is in alpha, and the world is open by application. Anyone '
-               'can download it. **Apply to be an alpha playtester** is the one '
-               'everybody starts with: once it is accepted you get the Playtester '
-               'role, and that is what lets you press Play. It asks whether you are '
-               '18 or over and whether you accept the rules, so read #rules first. '
-               'Your answers are kept against your Discord account.\n\n' +
-               _PANEL_JOBS)
-PANEL_OPEN = (_PANEL_TOP +
-              'Thornswood is open: anyone in the Discord can play, so there is '
-              'nothing to apply for to get in. Read #rules, because being here '
-              'and in the world means accepting them.\n\n' +
-              _PANEL_JOBS)
+               'instead of you.\n\n' + _PANEL_ANSWER)
+_PANEL_PLAY_ALPHA = ('Thornswood is in alpha, and the world is open by application. Anyone '
+                     'can download it. **Apply to be an alpha playtester** is the one '
+                     'everybody starts with: once it is accepted you get the Playtester '
+                     'role, and that is what lets you press Play. It asks whether you are '
+                     '18 or over and whether you accept the rules, so read #rules first. '
+                     'Your answers are kept against your Discord account.')
+_PANEL_PLAY_OPEN = ('Thornswood is open: anyone in the Discord can play, so there is '
+                    'nothing to apply for to get in. Read #rules, because being here '
+                    'and in the world means accepting them.')
+PANEL_ALPHA = _PANEL_TOP + _PANEL_PLAY_ALPHA + '\n\n' + _PANEL_JOBS
+PANEL_OPEN = _PANEL_TOP + _PANEL_PLAY_OPEN + '\n\n' + _PANEL_JOBS
 PANEL = PANEL_ALPHA
+
+
+def desk_panel(desk):
+    """A desk's words, for the world as it is now (OPEN); PANEL for None."""
+    if desk == 'get-help':
+        return ('**Get help**\n\n'
+                'It will not install, will not start or will not connect, or '
+                'something else is wrong that staff can fix. Pick **I need help** '
+                'below. ' + _PANEL_THREAD)
+    if desk == 'report-someone':
+        return ('**Report somebody**\n\n'
+                'Something happened and it should not have. Pick **Report '
+                'somebody** below. ' + _PANEL_THREAD + ' The person you report '
+                'never sees it.')
+    if desk == 'apply-to-playtest':
+        if OPEN:
+            return '**Apply to play**\n\n' + _PANEL_PLAY_OPEN
+        return '**Apply to play**\n\n' + _PANEL_PLAY_ALPHA + ' ' + _PANEL_THREAD
+    if desk == 'apply-for-a-seat':
+        return ('**Apply for a seat**\n\n' + _PANEL_SEATS + '\n\n' + _PANEL_THREAD +
+                '\n\n' + _PANEL_ANSWER)
+    if desk == 'apply-for-staff':
+        return ('**Apply for staff**\n\n'
+                'These are jobs rather than titles: each one is work somebody is '
+                'currently doing instead of you. Somebody who holds a Jarl seat or '
+                'leads a faction cannot apply. ' + _PANEL_THREAD + '\n\n' + _PANEL_ANSWER)
+    return PANEL
 
 # THE ONE SWITCH (#428), read off the site so there is one copy of it: the
 # site's config.json "open", which /api/public hands out. Off, which is today,
@@ -2114,6 +2498,62 @@ def site_open():
         log('could not ask the site whether the world is open, so the panel is '
             'the alpha one:', e)
         return False
+
+
+#
+# THE STATUS LINES (#3147). The bot's status, under its name in the member
+# list, is one of Thornswood's hints and lore lines, a new one every
+# LINES_EVERY seconds. Their one copy is site\data\site\lines.md; the site
+# hands them out in /api/public as "lines", read here at every change, so a
+# line edited there reaches the bot at the next Deploy-Docs.ps1 -Site, with
+# no bot install. Hints and lore lines take turns, each list in its own order.
+LINES_EVERY = 15 * 60
+
+
+def status_lines(lines):
+    """The lines the status steps through: a hint, then a lore line, in turn,
+       until both lists are used up. A lore line is its quote alone; its source
+       does not fit in a status."""
+    lines = lines if isinstance(lines, dict) else {}
+    hints = [h for h in (lines.get('hints') or []) if isinstance(h, str) and h]
+    lore = [x.get('text') for x in (lines.get('lore') or [])
+            if isinstance(x, dict) and isinstance(x.get('text'), str) and x.get('text')]
+    out = []
+    for i in range(max(len(hints), len(lore))):
+        out.extend(([hints[i]] if i < len(hints) else []) + ([lore[i]] if i < len(lore) else []))
+    return out
+
+
+def site_lines():
+    """The status lines from the site's /api/public. Raises when the site
+       cannot be read, for watch_lines to say."""
+    with urllib.request.urlopen(SITE + '/api/public', timeout=8) as r:
+        return status_lines(json.loads(r.read().decode('utf-8')).get('lines'))
+
+
+async def watch_lines():
+    """
+    Sets the status to the next line every LINES_EVERY seconds. When the site
+    cannot be read, or hands out no lines, that is said in bot.log and the
+    status stays as it is until the next pass. Nothing in here may end the
+    loop.
+    """
+    await client.wait_until_ready()
+    at = 0
+    while not client.is_closed():
+        try:
+            texts = await asyncio.get_running_loop().run_in_executor(None, site_lines)
+            if texts:
+                await client.change_presence(
+                    activity=discord.CustomActivity(name=texts[at % len(texts)]))
+                at += 1
+            else:
+                log('status lines: the site handed out none, so the status '
+                    'stays as it is until the next pass')
+        except Exception:
+            log('status lines: could not set the next one, so the status stays '
+                'as it is until the next pass:\n' + traceback.format_exc())
+        await asyncio.sleep(LINES_EVERY)
 
 
 def set_open(on):
@@ -2150,11 +2590,11 @@ def _panel_options(msg):
     return pairs
 
 
-def _panel_wanted():
-    return [(k, lab) for k, lab, _ in KINDS]
+def _panel_wanted(desk=None):
+    return [(k, lab) for k, lab, _ in desk_kinds(desk)]
 
 
-def panel_is_current(msg):
+def panel_is_current(msg, desk=None):
     """
     True when the posted panel already says what it should, text and options.
 
@@ -2164,7 +2604,8 @@ def panel_is_current(msg):
     a real fault: too eager and the panel is edited on every reconnect, too
     lazy and a ticket kind added later never appears for anybody.
     """
-    return getattr(msg, 'content', None) == PANEL and _panel_options(msg) == _panel_wanted()
+    return (getattr(msg, 'content', None) == desk_panel(desk)
+            and _panel_options(msg) == _panel_wanted(desk))
 
 
 # Which servers staff have been told cannot open ticket threads, and why, so
@@ -2173,15 +2614,41 @@ _told_blocked = set()
 
 
 async def ensure_panel(guild):
-    ch = by_name(guild, TICKETS)
-    if ch is None:
+    """Every desk's panel (TICKET_DESKS), current, in its own channel. On a
+       server not yet split, the one panel of before in TICKETS; where that
+       channel is still there beside the desks, its panel says where they
+       went (#3317, q-3317-ticket-split)."""
+    desks = [(d, by_name(guild, [d])) for d, _k in TICKET_DESKS]
+    here = [(d, ch) for d, ch in desks if ch is not None]
+    old = by_name(guild, TICKETS)
+    if not here and old is None:
         names = ', '.join('#' + c.name for c in guild.text_channels) or 'none'
-        log('there is no text channel called #%s in "%s", so there is no panel '
-            'and no tickets. Text channels there: %s. Set TICKET_CHANNEL in '
-            'bot.env.json to one of those and run Install-Bot.ps1 again.'
-            % (TICKETS_SAID, guild.name, names))
+        log('there is no ticket channel in "%s": none of #%s, and no #%s, so there '
+            'is no panel and no tickets. Text channels there: %s. Build-Discord.py '
+            'makes them.' % (guild.name, ', #'.join(d for d, _k in TICKET_DESKS),
+                             TICKETS_SAID, names))
         return
 
+    book = await log_channel(guild)
+    if book is not None:
+        log('closed tickets are written down in #%s' % book.name)
+
+    if not here:
+        await desk_ready(guild, old, None, book)
+        return
+    gone = [d for d, ch in desks if ch is None]
+    if gone:
+        log('there is no #%s in "%s", so those tickets have nowhere to open. '
+            'Build-Discord.py makes them.' % (', #'.join(gone), guild.name))
+    for d, ch in here:
+        await desk_ready(guild, ch, d, book)
+    if old is not None:
+        await point_old_panel(old, here)
+
+
+async def desk_ready(guild, ch, desk, book):
+    """One desk's channel: who cannot use /close there, whether a private
+       thread can be opened in it, and its panel posted or made current."""
     # Said at startup rather than the first time somebody applies, because the
     # first time somebody applies is the worst moment to find out.
     # Slash commands are a permission of their own, and it is granted per
@@ -2202,10 +2669,6 @@ async def ensure_panel(guild):
             'for them there. Turn it on in that channel\'s permissions. The '
             'Close button on the ticket works for them either way.'
             % (', '.join(blocked), ch.name))
-
-    book = await log_channel(guild)
-    if book is not None:
-        log('closed tickets are written down in #%s' % book.name)
 
     why = thread_block(guild, ch)
     if why:
@@ -2231,15 +2694,19 @@ async def ensure_panel(guild):
         # posted one keeps answering through the view setup_hook registers.
         # All it would do is take away the one way to report somebody, on the
         # night that way is broken.
-        if (guild.id, why) not in _told_blocked:
-            _told_blocked.add((guild.id, why))
+        if (guild.id, ch.name, why) not in _told_blocked:
+            _told_blocked.add((guild.id, ch.name, why))
             await trouble_say('**Tickets cannot open a private thread:** ' + fix)
     else:
         log('ticket threads look fine in #%s' % ch.name)
 
     try:
+        head = desk_panel(desk).split('\n', 1)[0]
         async for m in ch.history(limit=30):
-            if m.author.id == client.user.id and m.components:
+            # Its words alone when it has no kind to offer, so found by its
+            # first line as well as by a dropdown.
+            if m.author.id == client.user.id and (
+                    m.components or (m.content or '').startswith(head)):
                 # The options a dropdown offers live in the message that was
                 # posted, not in the View this process builds on startup. So
                 # leaving the old message alone is exactly why a ticket kind
@@ -2255,16 +2722,47 @@ async def ensure_panel(guild):
                 # compared: comparing the text alone puts back the bug above,
                 # where a kind added later never appeared because the words
                 # around it had not changed.
-                if panel_is_current(m):
+                if panel_is_current(m, desk):
                     log('ticket panel is already current in #%s' % ch.name)
                     return
-                await m.edit(content=PANEL, view=TicketPanel())
+                await m.edit(content=desk_panel(desk), view=TicketPanel(desk))
                 log('ticket panel updated in #%s' % ch.name)
                 return
-        await ch.send(PANEL, view=TicketPanel())
+        await ch.send(desk_panel(desk), view=TicketPanel(desk))
         log('ticket panel posted in #%s' % ch.name)
     except Exception:
         log('panel failed:\n' + traceback.format_exc())
+
+
+
+
+MOVED_HEAD = '**Tickets have moved**'
+
+
+def moved_text(here):
+    return (MOVED_HEAD + '\n\nEvery kind of ticket has a channel of its own now: ' +
+            ', '.join(ch.mention for _d, ch in here) + '. Open yours there. A '
+            'ticket already open here stays open until staff close it.')
+
+
+async def point_old_panel(old, here):
+    """The one panel of before, in a channel the desks replaced and -Prune has
+       not deleted yet: its dropdown taken off, and where each desk is said.
+       A ticket thread still open off it keeps working."""
+    text = moved_text(here)
+    try:
+        async for m in old.history(limit=30):
+            if m.author.id != client.user.id:
+                continue
+            if m.content == text and not m.components:
+                return
+            if m.components or (m.content or '').startswith(MOVED_HEAD):
+                await m.edit(content=text, view=None)
+                log('the old panel in #%s now says where the tickets went' % old.name)
+                return
+    except Exception:
+        log('the old panel in #%s could not be changed:\n' % old.name
+            + traceback.format_exc())
 
 
 # ------------------------------------------------------ holds and pings --
@@ -2272,8 +2770,9 @@ async def ensure_panel(guild):
 # #choose-your-hold, where a Member picks the hold their character calls home
 # and which announcements they want a ping for.
 #
-# The hold channels are private: each one is open to its own Citizen and Jarl
-# roles and to staff, so picking a hold here is what opens its channel. One
+# The hold channels are private: each hold's category is open to its own
+# Citizen, Jarl and officers and to staff, so picking a hold here is what
+# opens it. One
 # hold per person. Picking another takes the old Citizen role away, and
 # pressing the one you already have leaves it. Jarl roles are never touched
 # here; a Jarl is appointed, not picked.
@@ -2289,14 +2788,16 @@ HOLD_CHANNEL = [n.strip().lower() for n in
                 if n.strip()]
 MEMBER_ROLE = os.environ.get('MEMBER_ROLE', 'Member').strip().lower()
 MEMBER_IDS, MEMBER_NAMES = _role_tokens([MEMBER_ROLE] if MEMBER_ROLE else [])
+# Raven Rock is a hold like the nine since #3317 (Patrick, 22 Oct, page card
+# q-3317-raven-rock, A), last, on a row of its own on the panel.
 HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
-         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold']
+         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold', 'Raven Rock']
 # key, role name, button label
 PINGS = [('news', 'News Pings', 'News pings'),
          ('updates', 'Updates Pings', 'Updates pings')]
 
 HOLD_PANEL = ('**Choose your hold**\n\n'
-              'Pick the hold your character calls home and its channel opens '
+              'Pick the hold your character calls home and its channels open '
               'to you. One hold at a time: picking another moves you there, '
               'and pressing the one you have leaves it.\n\n'
               '**Pings**\n\n'
@@ -2403,10 +2904,19 @@ class HoldButton(discord.ui.Button):
         await pick_hold(interaction, self.hold)
 
 
+# THE PANEL'S ROWS (#3317, Patrick, 22 Oct: "These button layouts also need
+# fixed"). Five holds to a row wrapped on a phone, four and then Markarth on
+# its own, three and then Winterhold on its own. Three to a row fits a phone
+# and reads as a block on a desktop: nine holds in three rows of three, and
+# the two pings in a row of their own under them.
+HOLDS_PER_ROW = 3
+
+
 class PingButton(discord.ui.Button):
     def __init__(self, key, name, label):
         super().__init__(label=label, style=discord.ButtonStyle.primary,
-                         custom_id='thornswood:ping:' + key, row=2)
+                         custom_id='thornswood:ping:' + key,
+                         row=-(-len(HOLDS) // HOLDS_PER_ROW))
         self.role_name = name
 
     async def callback(self, interaction):
@@ -2418,7 +2928,7 @@ class HoldPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         for i, hold in enumerate(HOLDS):
-            self.add_item(HoldButton(hold, 0 if i < 5 else 1))
+            self.add_item(HoldButton(hold, i // HOLDS_PER_ROW))
         for key, name, label in PINGS:
             self.add_item(PingButton(key, name, label))
 
@@ -2426,6 +2936,23 @@ class HoldPanel(discord.ui.View):
 def _hold_ids_wanted():
     return (['thornswood:hold:' + h.lower() for h in HOLDS] +
             ['thornswood:ping:' + k for k, _, _ in PINGS])
+
+
+def _hold_rows_wanted():
+    """The panel's buttons by row, as Discord gives a posted message back."""
+    ids = ['thornswood:hold:' + h.lower() for h in HOLDS]
+    return ([ids[i:i + HOLDS_PER_ROW] for i in range(0, len(ids), HOLDS_PER_ROW)] +
+            [['thornswood:ping:' + k for k, _, _ in PINGS]])
+
+
+def _rows(msg):
+    """A posted message's buttons by row, so a panel laid out differently
+       is not taken for current because its buttons are the same."""
+    try:
+        return [[getattr(item, 'custom_id', '') for item in getattr(row, 'children', None) or []]
+                for row in getattr(msg, 'components', None) or []]
+    except Exception:
+        return []
 
 
 def _hold_ids(msg):
@@ -2441,7 +2968,7 @@ def _hold_ids(msg):
 
 def hold_panel_is_current(msg):
     return (getattr(msg, 'content', None) == HOLD_PANEL and
-            _hold_ids(msg) == _hold_ids_wanted())
+            _rows(msg) == _hold_rows_wanted())
 
 
 async def ensure_hold_panel(guild):
@@ -2510,9 +3037,8 @@ async def ensure_hold_panel(guild):
 # the reason. Changes made in the game come to the staff channel the same way,
 # through the site's moderation.log (watch_moderation, office_text).
 OFFICES = [('court', 'Court'), ('steward', 'Steward'), ('guard', 'Guard')]
-# The towns a hold role can name: Build-Discord.py's nine, and Raven Rock,
-# which it makes no roles for, so roles made for it by hand work the same.
-OFFICE_TOWNS = HOLDS + ['Raven Rock']
+# The towns a hold role can name: every hold, Raven Rock included.
+OFFICE_TOWNS = list(HOLDS)
 
 OFFICE_PANEL = ('**Hold offices**\n\n'
                 'The Jarl of a hold gives and takes its Court, its Steward and '
@@ -2883,6 +3409,392 @@ async def ensure_office_panel(guild):
         log('office panel posted in #%s' % ch.name)
     except Exception:
         log('office panel failed:\n' + traceback.format_exc())
+
+
+# ------------------------------------------------------ faction members --
+#
+# #3317. Patrick, 22 Oct, page card q-3317-faction-member-give, A: a
+# faction's Leader gives and takes its member role from a bot panel. The
+# member role is the faction's short name ("Thalmor", "Companions"), made by
+# Build-Discord.py with its "<short name> Leader" role, and the Leader is
+# whoever holds that role. Like a Jarl's offices: their own faction only, and
+# when two accounts hold one Leader role neither acts until staff take it
+# from all but one.
+#
+# Patrick, 22 Oct, later: "seats should be in a different channel like how
+# the holds have the add member add court add a steward so one for each
+# faction in it's category", and on page card q-3317-faction-category, C:
+# "One Officer role, not Court and Steward". So each faction has its own
+# category, and in it its own seats channel with this panel: Add and Remove
+# for its members and its Officers ("<short> Officer"). The faction is the
+# channel's. The shared #seats it was in until then is retired; its old panel
+# says where the panels went until -Prune deletes it.
+#
+# A change goes in bot.log and in Discord's audit log with its reason; it is
+# not said to staff, because staff have nothing to do about it (Patrick,
+# 22 Oct: #staff-updates only when staff must act).
+FACTION_OFFICES = [('member', 'member'), ('officer', 'Officer')]
+FACTION_LABELS = {
+    'member': ('Add member', 'Remove member'),
+    'officer': ('Add Officer', 'Remove Officer'),
+}
+# The one shared panel of before, in #seats.
+OLD_FACTION_PANEL_CHANNEL = ['seats']
+
+
+def faction_slug(faction):
+    """A faction's channel name: its short name, lower case, hyphens, as
+       Build-Discord.py names its channels."""
+    return FACTION_SHORT.get(faction, faction).lower().replace(' ', '-')
+
+
+def faction_seats(faction):
+    """The channel a faction's panel is in: "#companions-seats"."""
+    return faction_slug(faction) + '-seats'
+
+
+def faction_role(office, faction):
+    """A faction's role for an office, as Build-Discord.py makes it."""
+    short = FACTION_SHORT.get(faction, faction)
+    if office == 'officer':
+        return short + ' Officer'
+    return short
+
+
+def faction_member_role(faction):
+    """The member role of a named faction: "Thalmor"."""
+    return faction_role('member', faction)
+
+
+def faction_of_channel(ch):
+    """The faction whose seats channel this is, or None."""
+    name = (getattr(ch, 'name', '') or '').lower()
+    for f in faction_names():
+        if faction_seats(f) == name:
+            return f
+    return None
+
+
+def faction_panel_text(faction):
+    return ('**%s: seats**\n\n'
+            'The Leader of %s gives and takes its roles here: its members and '
+            'its Officers. Press a button, then pick the person. Only the '
+            'Leader can use them. An Officer is a member first, and taking '
+            'somebody\'s membership takes their Officer role with it.'
+            % (faction, faction))
+
+
+def led_factions(member):
+    """The named factions this member leads, by their own Leader roles."""
+    held = set(getattr(r, 'name', '') for r in list(getattr(member, 'roles', None) or []))
+    return [f for f in faction_names() if faction_leader_role(f) in held]
+
+
+def leader_held_twice(guild, faction):
+    """True when more than one account holds this faction's Leader role."""
+    lead = _role(guild, faction_leader_role(faction))
+    return lead is not None and len(list(getattr(lead, 'members', None) or [])) > 1
+
+
+LEADER_TWICE = ('Two accounts hold the %s role, so neither acts as its Leader '
+                'until staff take it from all but one.')
+
+
+async def faction_press(interaction, add, office='member'):
+    """A button on a faction's panel: that faction's, by the channel it is
+       in, for its Leader only. Off a seats channel (the old shared panel),
+       the presser's own faction, asked which when they lead two."""
+    guild, who = interaction.guild, interaction.user
+    led = led_factions(who) if guild is not None else []
+    here = faction_of_channel(getattr(interaction, 'channel', None))
+    if here is not None:
+        if here not in led:
+            await _say(interaction, 'Only the Leader of %s uses these buttons.' % here)
+            return
+        await faction_for(interaction, here, add, office)
+        return
+    if not led:
+        await _say(interaction, 'Only the Leader of a faction gives its member '
+                                'role. A Leader is whoever holds that faction\'s '
+                                'Leader role.')
+        return
+    if len(led) > 1:
+        await interaction.response.send_message(
+            'You lead more than one faction. Which one?',
+            view=FactionPick(add, led, office), ephemeral=True)
+        return
+    await faction_for(interaction, led[0], add, office)
+
+
+def _faction_ask(faction, office):
+    if office == 'officer':
+        return 'Who becomes an Officer of %s?' % faction
+    return 'Who joins %s?' % faction
+
+
+async def faction_for(interaction, faction, add, office='member'):
+    """The picker for one faction and office: a person to give the role, or a
+       holder to take it from."""
+    guild = interaction.guild
+    if leader_held_twice(guild, faction):
+        await _say(interaction, LEADER_TWICE % faction_leader_role(faction))
+        return
+    name = faction_role(office, faction)
+    role = _role(guild, name)
+    if role is None or not _can_give(guild, role):
+        log('cannot give %s: the role is missing, or the bot has no Manage '
+            'Roles, or its own role is not above it.' % name)
+        await _say(interaction, 'The %s role cannot be given out right now. Ask '
+                                'staff.' % name)
+        return
+    if add:
+        await interaction.response.send_message(
+            _faction_ask(faction, office), view=FactionGive(faction, office), ephemeral=True)
+        return
+    holders = [m for m in list(getattr(role, 'members', None) or [])
+               if not getattr(m, 'bot', False)]
+    if not holders:
+        await _say(interaction, 'Nobody holds the %s role.' % name)
+        return
+    await interaction.response.send_message(
+        'Take the %s role from whom?' % name,
+        view=FactionTake(faction, holders[:25], office), ephemeral=True)
+
+
+async def faction_change(interaction, faction, member, add, office='member'):
+    """
+    Give or take one of the faction's roles, with every rule asked again at
+    the moment of the change: the presser still holds the faction's Leader
+    role, nobody else does, and the role is one the bot may give. The
+    Officer role goes only to a member, and taking the member role takes it
+    with it.
+    """
+    guild, who = interaction.guild, interaction.user
+    if guild is None or faction not in led_factions(who):
+        await _say(interaction, 'Only the Leader of %s gives its %s.' % (
+            faction, 'member role' if office == 'member' else 'roles'))
+        return
+    if leader_held_twice(guild, faction):
+        await _say(interaction, LEADER_TWICE % faction_leader_role(faction))
+        return
+    name = faction_role(office, faction)
+    role = _role(guild, name)
+    if role is None or not _can_give(guild, role):
+        await _say(interaction, 'The %s role cannot be given out right now. Ask '
+                                'staff.' % name)
+        return
+    if member is None or not hasattr(member, 'roles'):
+        await _say(interaction, 'That person is not in this Discord.')
+        return
+    if getattr(member, 'bot', False):
+        await _say(interaction, 'A bot joins no faction.')
+        return
+    shown = getattr(member, 'display_name', None) or str(member)
+    has = role in member.roles
+    if add and has:
+        await _say(interaction, '%s already holds the %s role.' % (shown, name))
+        return
+    if not add and not has:
+        await _say(interaction, '%s does not hold the %s role.' % (shown, name))
+        return
+    if add and office != 'member':
+        joined = _role(guild, faction_member_role(faction))
+        if joined is None or joined not in member.roles:
+            await _say(interaction, '%s is not a member of %s. Add them as a '
+                                    'member first.' % (shown, faction))
+            return
+    by = getattr(who, 'display_name', None) or str(who)
+    reason = '%s by %s, Leader of %s, on the faction panel' % (
+        'Given' if add else 'Taken', by, faction)
+    # Leaving the faction leaves its offices too.
+    also = []
+    if not add and office == 'member':
+        also = [r for r in (_role(guild, faction_role(o, faction))
+                            for o, _ in FACTION_OFFICES if o != 'member')
+                if r is not None and r in member.roles]
+    try:
+        if add:
+            await member.add_roles(role, reason=reason)
+        else:
+            for r in [role] + also:
+                await member.remove_roles(r, reason=reason)
+    except Exception:
+        log('faction change failed:\n' + traceback.format_exc())
+        await _say(interaction, 'That did not go through. Try again, or ask staff.')
+        return
+    log('faction: %s (%s), Leader of %s, %s %s (%s) the %s role'
+        % (by, who.id, faction, 'gave' if add else 'took from', shown, member.id,
+           ', '.join([name] + [r.name for r in also])))
+    if add:
+        said = '%s holds the %s role now.' % (shown, name)
+    elif also:
+        said = '%s no longer holds the %s role, nor %s.' % (
+            shown, name, ' or '.join(r.name for r in also))
+    else:
+        said = '%s no longer holds the %s role.' % (shown, name)
+    await _say(interaction, said)
+
+
+class FactionButton(discord.ui.Button):
+    def __init__(self, add, office='member', row=None):
+        add_label, remove_label = FACTION_LABELS[office]
+        # The member buttons keep the custom_id the one shared panel had.
+        tail = '' if office == 'member' else ':' + office
+        super().__init__(label=add_label if add else remove_label,
+                         style=(discord.ButtonStyle.primary if add
+                                else discord.ButtonStyle.secondary),
+                         custom_id='thornswood:faction:%s%s' % ('add' if add else 'remove', tail),
+                         row=row)
+        self.add = add
+        self.office = office
+
+    async def callback(self, interaction):
+        await faction_press(interaction, self.add, self.office)
+
+
+class FactionPanel(discord.ui.View):
+    """Persistent, like the office panel: Add and Remove for each of the
+       faction's roles, a row each. The same buttons in every faction's seats
+       channel; the channel says which faction."""
+    def __init__(self):
+        super().__init__(timeout=None)
+        for row, (office, _label) in enumerate(FACTION_OFFICES):
+            self.add_item(FactionButton(True, office, row))
+            self.add_item(FactionButton(False, office, row))
+
+
+class FactionPickSelect(discord.ui.Select):
+    def __init__(self, add, factions, office='member'):
+        super().__init__(placeholder='The faction',
+                         options=[discord.SelectOption(label=f[:100], value=f) for f in factions[:25]])
+        self.add = add
+        self.office = office
+
+    async def callback(self, interaction):
+        await faction_for(interaction, self.values[0], self.add, self.office)
+
+
+class FactionPick(discord.ui.View):
+    def __init__(self, add, factions, office='member'):
+        super().__init__(timeout=180)
+        self.add_item(FactionPickSelect(add, factions, office))
+
+
+class FactionGiveSelect(discord.ui.UserSelect):
+    def __init__(self, faction, office='member'):
+        super().__init__(placeholder='The person', min_values=1, max_values=1)
+        self.faction = faction
+        self.office = office
+
+    async def callback(self, interaction):
+        picked = self.values[0] if self.values else None
+        member = picked if hasattr(picked, 'roles') else (
+            interaction.guild.get_member(getattr(picked, 'id', 0)) if interaction.guild else None)
+        await faction_change(interaction, self.faction, member, True, self.office)
+
+
+class FactionGive(discord.ui.View):
+    def __init__(self, faction, office='member'):
+        super().__init__(timeout=180)
+        self.add_item(FactionGiveSelect(faction, office))
+
+
+class FactionTakeSelect(discord.ui.Select):
+    def __init__(self, faction, holders, office='member'):
+        super().__init__(placeholder='The person', options=[
+            discord.SelectOption(label=(getattr(m, 'display_name', None) or str(m))[:100],
+                                 value=str(m.id)) for m in holders])
+        self.faction = faction
+        self.office = office
+
+    async def callback(self, interaction):
+        try:
+            mid = int(self.values[0])
+        except (TypeError, ValueError, IndexError):
+            mid = 0
+        member = interaction.guild.get_member(mid) if interaction.guild else None
+        await faction_change(interaction, self.faction, member, False, self.office)
+
+
+class FactionTake(discord.ui.View):
+    def __init__(self, faction, holders, office='member'):
+        super().__init__(timeout=180)
+        self.add_item(FactionTakeSelect(faction, holders, office))
+
+
+def faction_panel_ids():
+    return [b.custom_id for b in FactionPanel().children]
+
+
+def faction_panel_is_current(msg, faction):
+    return (getattr(msg, 'content', None) == faction_panel_text(faction) and
+            _hold_ids(msg) == faction_panel_ids())
+
+
+FACTION_MOVED_HEAD = '**Faction panels have moved**'
+
+
+async def ensure_faction_panel(guild):
+    """Each faction's panel in its own seats channel, found again by its own
+       buttons; the old shared one in #seats told where they went."""
+    missing = [faction_role(o, f) for f in faction_names() for o, _ in FACTION_OFFICES
+               if _role(guild, faction_role(o, f)) is None]
+    if missing:
+        log('these faction roles are missing, so they cannot be given until '
+            'Build-Discord.py makes them: %s' % ', '.join(missing))
+    here = []
+    nowhere = []
+    for f in faction_names():
+        ch = by_name(guild, [faction_seats(f)])
+        if ch is None:
+            nowhere.append(faction_seats(f))
+            continue
+        here.append(ch)
+        await _faction_panel_in(ch, f)
+    if nowhere:
+        log('no #%s yet, so those factions\' panels wait for Build-Discord.py '
+            'to make them' % ', #'.join(nowhere))
+    old = by_name(guild, OLD_FACTION_PANEL_CHANNEL)
+    if old is not None and here:
+        await _old_faction_panel(old, here)
+
+
+async def _faction_panel_in(ch, faction):
+    text = faction_panel_text(faction)
+    try:
+        async for m in ch.history(limit=30):
+            if (m.author.id == client.user.id and m.components and
+                    any(i.startswith('thornswood:faction:') for i in _hold_ids(m))):
+                if faction_panel_is_current(m, faction):
+                    log('faction panel is already current in #%s' % ch.name)
+                    return
+                await m.edit(content=text, view=FactionPanel())
+                log('faction panel updated in #%s' % ch.name)
+                return
+        await ch.send(text, view=FactionPanel())
+        log('faction panel posted in #%s' % ch.name)
+    except Exception:
+        log('faction panel failed in #%s:\n' % ch.name + traceback.format_exc())
+
+
+async def _old_faction_panel(old, here):
+    text = (FACTION_MOVED_HEAD + '\n\nEach faction has its own seats channel '
+            'now, in its own category, with its Leader\'s buttons for its '
+            'members and its Officers.')
+    try:
+        async for m in old.history(limit=30):
+            if m.author.id != client.user.id:
+                continue
+            if m.content == text and not m.components:
+                return
+            if (m.components and any(i.startswith('thornswood:faction:') for i in _hold_ids(m))) \
+                    or (m.content or '').startswith(FACTION_MOVED_HEAD):
+                await m.edit(content=text, view=None)
+                log('the old faction panel in #%s now says where the panels went' % old.name)
+                return
+    except Exception:
+        log('the old faction panel in #%s could not be changed:\n' % old.name
+            + traceback.format_exc())
 
 
 # ------------------------------------------------------- testing channels --
@@ -3586,9 +4498,34 @@ TASK_SERVER = re.compile(r'^\s*server\s*:\s*(dev|main)\s*$', re.I)
 TASK_TAG = 'Main'
 # The form of the posts each record was made with. 2: test tasks tagged Main
 # whatever their Server line, and both bodies say the fix is on main (11 Oct).
-TASK_FORM = 2
-KNOWN_FORM = 2
-DEV_FORM = 1
+# 3 (and KNOWN_FORM 3, DEV_FORM 2): the Claude Code line under a comment is
+# not in the post (22 Oct).
+# 4 (and KNOWN_FORM 4, DEV_FORM 3): no post ends with a "---" rule or any
+# "Generated by/with" footer (Patrick, 22 Oct).
+# KNOWN_FORM 5: done-on-merge.yml's comment takes a known post down
+# (merged_fix, 26 Oct), so every finding's comments are read again once.
+TASK_FORM = 4
+KNOWN_FORM = 5
+DEV_FORM = 3
+# The board's column for a fix that is merged and waits on main
+# (done-on-merge.yml puts it on, with the test task). The label is an
+# instruction, not a record: board-status.yml moves the card and takes it off
+# again within a minute (#2863), so a pass rarely sees it. What stays is
+# done-on-merge.yml's comment, written by the workflow and starting
+# "Pull request #N merged (", which Close-ShippedIssues.ps1 reads as well.
+BOARD_DONE = 'board: Done'
+DONE_ON_MERGE = re.compile(r'^Pull request #\d+ merged \(')
+DONE_ON_MERGE_BY = 'github-actions[bot]'
+
+
+def merged_fix(comments):
+    """True when done-on-merge.yml has written its record of a merged fix
+       on the issue: the issue is in Done and its fix has landed."""
+    for c in comments or []:
+        who = str(((c.get('user') or {}).get('login')) or '')
+        if who == DONE_ON_MERGE_BY and DONE_ON_MERGE.match(str(c.get('body') or '')):
+            return True
+    return False
 
 
 def _github_get(url):
@@ -3602,6 +4539,18 @@ def _github_get(url):
         return json.loads(r.read().decode('utf-8'))
 
 
+def _github_rows(got, url):
+    """A page of a GitHub list, which is a list. Anything else is an answer
+       that is not the list, and is raised, never read as no issues: a pass
+       that read no findings would take every #known-issues post down."""
+    if got is None:
+        return []
+    if not isinstance(got, list):
+        raise ValueError('GitHub answered %s with a %s, not a list'
+                         % (url.split('?')[0], type(got).__name__))
+    return got
+
+
 def github_open_findings(get=None):
     """Every open issue (not pull request) carrying one of KNOWN_LABELS, by
        number. One query per label because GitHub ANDs labels in one."""
@@ -3613,7 +4562,7 @@ def github_open_findings(get=None):
             url = ('%s/repos/%s/issues?state=open&per_page=100&page=%d&labels=%s'
                    % (GITHUB_API, KNOWN_REPO, page,
                       urllib.parse.quote(label)))
-            rows = get(url) or []
+            rows = _github_rows(get(url), url)
             for row in rows:
                 if isinstance(row, dict) and 'pull_request' not in row:
                     out.setdefault(int(row['number']), row)
@@ -3672,6 +4621,38 @@ def github_issue(number, get=None):
     return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
 
 
+def finding_gone(number, get=None):
+    """Why issue number is no longer an open finding, read from the issue
+       itself, or None when it still is one: open, in KNOWN_REPO, carrying
+       one of KNOWN_LABELS.
+
+       The label lists (github_open_findings) are not the issue. On 22 Oct
+       one list, then the other, then both came back from GitHub without
+       issues that were open and labelled the whole time (no label, close or
+       reopen on their timelines), and the same ten #known-issues posts came
+       down and went back up as a set three times in one process (#3438).
+       So a post whose issue a list left out comes down on this answer, not
+       on the list's. Any other failure to read raises, and the pass that
+       asked changes nothing."""
+    try:
+        issue = github_issue(number, get)
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 410):
+            return 'GitHub has no issue #%d any more (%d)' % (int(number), e.code)
+        raise
+    if not isinstance(issue, dict):
+        raise ValueError('GitHub answered issue #%d with a %s, not an issue'
+                         % (int(number), type(issue).__name__))
+    where = str(issue.get('repository_url') or '').lower()
+    if not where.endswith('/repos/' + KNOWN_REPO.lower()):
+        return 'it moved to %s' % (where.split('/repos/')[-1] or 'another repository')
+    if str(issue.get('state')) != 'open':
+        return 'it is closed'
+    if not issue_tags_found(issue):
+        return 'it no longer carries %s' % ' or '.join(KNOWN_LABELS)
+    return None
+
+
 def github_comments(number, get=None):
     get = get or _github_get
     out, page = [], 1
@@ -3715,7 +4696,17 @@ def issue_tags(issue, server=None):
 
 
 def known_title(issue):
-    return (str(issue.get('title') or '').strip() or 'untitled')[:TASK_TITLE_ROOM]
+    return short_title(str(issue.get('title') or '').strip() or 'untitled')
+
+
+def short_title(text, room=45):
+    """text cut to room characters at a word, for a title the bot makes
+       itself from the issue's (a post title is 45 at most, Patrick 22 Oct)."""
+    text = str(text or '').strip()
+    if len(text) <= room:
+        return text
+    cut = text[:room + 1].rsplit(' ', 1)[0].rstrip(' ,.;:-')
+    return cut if cut else text[:room]
 
 
 def known_body(issue):
@@ -3724,14 +4715,50 @@ def known_body(issue):
             'fix is on main, and then it comes back as a test task.' % where)
 
 
-def _marked(issue, comments, mark, room=TASK_BODY_ROOM):
-    """(title, body, server or None, created_at, comment address) from the
-       issue's last comment whose first line matches mark ("Test task:" or
-       "Known issue:"), or None. A first line with nothing after the colon
-       takes the issue's own title. The body is cut at room characters, the
-       most a first post takes; room None keeps all of it."""
-    for c in reversed(comments or []):
-        lines = str(c.get('body') or '').replace('\r\n', '\n').strip().split('\n')
+# The line GitHub puts under every comment a Claude session writes (a rule,
+# then "_Generated by [Claude Code](...)_"). It is not part of the test task,
+# and a post carries no link (22 Oct: it showed in #test-tasks posts).
+# Patrick, 22 Oct: no #test-tasks, #dev-test-tasks or #known-issues post ends
+# with a footer. Any trailing "Generated by/with Claude Code" or
+# "\U0001f916 Generated with" line goes, and so does a trailing "---" rule.
+FOOTER_LINE = re.compile(r'^\s*(?:\U0001f916\s*)?[_*]*\s*Generated\s+(?:by|with)\b.*$'
+                         r'|^\s*\U0001f916\s*Generated with\b.*$', re.I)
+FOOTER_RULE = re.compile(r'^\s*(?:-{3,}|\*{3,}|_{3,})\s*$')
+CLAUDE_WORDS = re.compile(r'claude', re.I)
+
+
+def strip_footer(text):
+    """text without the footer at its end: trailing blank lines, "---"
+       rules and "Generated by/with Claude Code" (or "\U0001f916 Generated
+       with") lines, as many as there are, and nothing above them."""
+    lines = str(text or '').replace('\r\n', '\n').split('\n')
+    while lines:
+        last = lines[-1]
+        if not last.strip() or FOOTER_RULE.match(last):
+            lines.pop()
+        elif FOOTER_LINE.match(last) and (CLAUDE_WORDS.search(last)
+                                         or last.lstrip().startswith('\U0001f916')):
+            lines.pop()
+        else:
+            break
+    return '\n'.join(lines)
+
+
+CLAUDE_FOOTER = re.compile(r'\n*^-{3,}[ \t]*\n+_Generated by \[Claude Code\]\([^)\n]*\)_\s*\Z',
+                           re.M)
+
+
+def _all_marked(issue, comments, mark, room=TASK_BODY_ROOM):
+    """Every comment of the issue whose first line matches mark ("Test task:"
+       or "Known issue:"), oldest first, as (title, body, server or None,
+       created_at, comment address). A first line with nothing after the
+       colon takes the issue's own title. The Claude Code line under a
+       comment is not part of the body. The body is cut at room characters,
+       the most a first post takes; room None keeps all of it."""
+    out = []
+    for c in comments or []:
+        text = strip_footer(CLAUDE_FOOTER.sub('', str(c.get('body') or '').replace('\r\n', '\n').strip()))
+        lines = text.strip().split('\n')
         m = mark.match(lines[0]) if lines else None
         if not m:
             continue
@@ -3744,55 +4771,72 @@ def _marked(issue, comments, mark, room=TASK_BODY_ROOM):
         body = '\n'.join(rest).strip()
         if room is not None:
             body = body[:room]
-        return (title, body, server, str(c.get('created_at') or ''),
-                str(c.get('html_url') or ''))
-    return None
+        out.append((title, body, server, str(c.get('created_at') or ''),
+                    str(c.get('html_url') or '')))
+    return out
 
 
-def last_task(issue, comments, dev_since=None):
-    """(title, body, server, created_at, comment address) from the last
-       "Test task:" comment, or None. server is 'Dev' when a "Server: Dev"
+def _marked(issue, comments, mark, room=TASK_BODY_ROOM):
+    """The last of _all_marked, or None."""
+    got = _all_marked(issue, comments, mark, room)
+    return got[-1] if got else None
+
+
+def task_list(issue, comments, dev_since=None):
+    """Every "Test task:" comment, oldest first, as (title, body, server,
+       created_at, comment address). server is 'Dev' when a "Server: Dev"
        line is straight under it and the comment was written at or after
        dev_since, the day #dev-test-tasks began; 'Main' otherwise, so a
        Server line from before that day, or with no dev_since at all, is read
        and changes nothing. A Dev body is kept whole (it is for developers,
        and posted over as many messages as it takes); a Main body is cut to
        one first post, as it always was."""
-    got = _marked(issue, comments, TASK_MARK, room=None)
-    if got is None:
-        return None
-    title, body, server, created, url = got
-    if server == 'Dev' and dev_since and created >= dev_since:
-        return title, body or 'Measure this on dev.', 'Dev', created, url
-    return (title, body[:TASK_BODY_ROOM] or 'Check this on main.', 'Main',
-            created, url)
+    out = []
+    for title, body, server, created, url in _all_marked(issue, comments,
+                                                         TASK_MARK, room=None):
+        if server == 'Dev' and dev_since and created >= dev_since:
+            out.append((title, body or 'Measure this on dev.', 'Dev', created, url))
+        else:
+            out.append((title, body[:TASK_BODY_ROOM] or 'Check this on main.',
+                        'Main', created, url))
+    return out
+
+
+def last_task(issue, comments, dev_since=None):
+    """The last "Test task:" comment (task_list's tuple), Dev or Main, or None."""
+    got = task_list(issue, comments, dev_since)
+    return got[-1] if got else None
+
+
+def main_task_of(issue, comments, dev_since=None):
+    """The issue's Main test task: its last "Test task:" comment that is not
+       Dev (task_list's tuple), or None. A newer Dev one beside it does not
+       hide it: the two are for different people (Patrick, 22 Oct)."""
+    got = [t for t in task_list(issue, comments, dev_since) if t[2] == 'Main']
+    return got[-1] if got else None
 
 
 def test_task_of(issue, comments, dev_since=None):
-    """(title, body, created_at) from the last "Test task:" comment when it
-       is one for main, or None. A Server line under it is read so it is not
-       in the body. The last one saying Server: Dev (last_task) is not a
-       test task for main, so this is None for it."""
-    got = last_task(issue, comments, dev_since)
-    if got is None or got[2] == 'Dev':
+    """(title, body, created_at) from the issue's Main test task, or None. A
+       Server line under it is read so it is not in the body."""
+    got = main_task_of(issue, comments, dev_since)
+    if got is None:
         return None
     return got[0], got[1], got[3]
 
 
 def dev_task_of(issue, comments, dev_since):
-    """The issue's dev test task (last_task's tuple), or None when it has
-       none: its last "Test task:" comment does not say Server: Dev, or the
-       issue was closed after that comment was written."""
+    """The issue's dev test task (task_list's tuple), or None: its last
+       "Test task:" comment saying Server: Dev. Open issue or closed, and
+       whatever Main one is beside it: the two are for different people, and
+       a check only a dev can do stays up after the fix reaches main
+       (Patrick, 22 Oct), so the main Ship writing the Main one does not take
+       it down. It goes when its comment is taken back or staff close the
+       post; a newer Dev one replaces it."""
     if not dev_since:
         return None
-    got = last_task(issue, comments, dev_since)
-    if got is None or got[2] != 'Dev':
-        return None
-    if str(issue.get('state')) != 'open':
-        closed = str(issue.get('closed_at') or '')
-        if closed and closed >= got[3]:
-            return None
-    return got
+    got = [t for t in task_list(issue, comments, dev_since) if t[2] == 'Dev']
+    return got[-1] if got else None
 
 
 def fix_refs(timeline):
@@ -3873,7 +4917,7 @@ def dev_render(issue, task, prs=(), commits=()):
         head.append('**Build:** %s' % build.group(1))
     if comment_url:
         head.append('**Test task comment:** <%s>' % comment_url)
-    return title, '\n'.join(head) + '\n\n' + body, [DEV_TAG]
+    return title, strip_footer('\n'.join(head) + '\n\n' + strip_footer(body)), [DEV_TAG]
 
 
 def dev_chunks(text, room=TASK_BODY_ROOM):
@@ -3900,13 +4944,230 @@ def dev_chunks(text, room=TASK_BODY_ROOM):
     return [c for c in out if c.strip()] or ['(empty)']
 
 
+# The rules every post is checked against before it goes up (Patrick, 22
+# Oct: "the bot checks every rule, in all three channels, before it posts").
+# A post that breaks one is not made, nor is a post already up edited to the
+# bad version; the issue gets one comment naming the rules broken, so the
+# thread that owns it fixes it, and the bot tries again on its next pass.
+POST_TITLE_ROOM = 45
+# Off only in tests of the forum passes that predate the rules; the rules
+# have their own test (test-post-rules.py).
+POST_RULES = True
+STEP_LINE = re.compile(r'^\s*\d+[.)]\s+\S', re.M)
+ISSUE_NUMBER = re.compile(r'(?<![\w&])#\d+\b')
+LINK = re.compile(r'https?://|www\.', re.I)
+CODE = re.compile(r'`')
+# Built from its code point, never pasted, as Check-Words.ps1 explains.
+EM_DASH = re.compile(chr(0x2014) + r'|&mdash;|&#8212;|&#x2014;', re.I)
+BANNED_WORD = re.compile(r'\bplayers?\b', re.I)
+# Steps a Claude, the Desk, a harness, a workflow or a command can do: a
+# dev test task is only for what a human dev must do in the game.
+AUTOMATABLE = re.compile(
+    r'\bclaude\b|\bthe desk\b|\bthe box\b|\bon the box\b|\bvps\b|\bharness'
+    r'|\bworkflow\b|\bpowershell\b|\bcurl\b|\bssh\b|\bscript\b|\.ps1\b|\.py\b'
+    r'|\bbot\.py\b|\bget-content\b|\bget-filehash\b|\bremote\.ps1'
+    r'|\bserver\.log\b|\bserver log\b|\blauncher\.log\b|\bskyrim-platform\.log\b'
+    r'|\bgamemode log\b|\blogs?\b(?=[^.\n]*\b(?:count|read|copy|look|check|grep)\b)'
+    r'|\b(?:count|read|copy|check)\b[^.\n]*\blogs?\b'
+    r'|\bstaff[- ]notice\b|\bmanifest\b', re.I)
+# What makes a check a dev's and not a playtester's: a staff or dev command,
+# the dev build (offered only to staff) or something only staff can set up.
+DEV_ONLY = re.compile(
+    r'(?:^|\s)/(?!helpme\b)[a-z]+|\bstaff\b|\bdev command|\badmin\b'
+    r'|\bdev (?:build|launcher|install|release)\b|\bswitch(?:ed)?\b'
+    r'|\bhand-?edit|\bsettings file\b|\bskse loader\b', re.I)
+# A staff or dev command in a main test task, which every playtester runs.
+STAFF_STEP = re.compile(
+    r'(?:^|\s)/(?:tp|give|spawn|kick|ban|god|heal|npcs?|time|weather|item|gold'
+    r'|setrank|rank|mute|summon|teleport|debug)\b|\bstaff command|\bdev command'
+    r'|\badmin\b', re.I)
+
+
+def _steps(body):
+    return [l for l in str(body or '').split('\n') if STEP_LINE.match(l)]
+
+
+def task_server_line(issue, comments, url):
+    """The Server line written straight under the "Test task:" comment at
+       url ('Dev' or 'Main'), or None when it has none."""
+    for got in _all_marked(issue, comments, TASK_MARK, room=None):
+        if got[4] == url:
+            return got[2]
+    return None
+
+
+def post_problems(channel, title, body, *, server=None, issue=None,
+                  merged_pr=False, has_task=False, fix_in_main=None,
+                  taken_titles=()):
+    """
+    The rules the post breaks, in words for the issue comment; empty when
+    it may go up. channel is 'dev', 'main' (#test-tasks) or 'known'. body is
+    the post's text as written on the issue (before dev_render adds the
+    links a dev post carries). server is the Server line the comment had.
+    fix_in_main is True or False when the latest main release was read
+    (None: not known, not refused for it). taken_titles are the titles other
+    issues already hold in this channel.
+    """
+    out = []
+    text = str(body or '')
+    lines = text.split('\n')
+    if any(FOOTER_RULE.match(l) for l in lines) or any(
+            FOOTER_LINE.match(l) and (CLAUDE_WORDS.search(l) or '\U0001f916' in l)
+            for l in lines):
+        out.append('Footer: the text has a "---" line or a "Generated by/with '
+                   'Claude Code" line; no post carries either.')
+    if len(str(title or '')) > POST_TITLE_ROOM:
+        out.append('Format: the title is %d characters; it may be %d at most.'
+                   % (len(str(title)), POST_TITLE_ROOM))
+    if str(title or '') in set(taken_titles):
+        out.append('Duplicates: another issue already has a post titled "%s" '
+                   'in this channel; one post per issue.' % title)
+    if ISSUE_NUMBER.search(text) or LINK.search(text) or CODE.search(text):
+        out.append('Format: the text has an issue number, a link or code; '
+                   'posts carry none.')
+    if channel in ('known', 'roadmap'):
+        # The site shows these two to anybody (#3140), so the writing rules
+        # every public page keeps hold here too (Check-Words.ps1 reads the
+        # repository; these words are on GitHub, so the bot reads them).
+        words = '%s\n%s' % (title or '', text)
+        if EM_DASH.search(words):
+            out.append('Words: the text has an em dash; nothing written for '
+                       'people has one.')
+        if BANNED_WORD.search(words):
+            out.append('Words: the text says "player"; write "people", '
+                       '"characters" or "testers" instead.')
+    if channel == 'roadmap':
+        if not text.strip():
+            out.append('Roadmap: the "Roadmap:" comment has nothing under its '
+                       'first line, which is where the work stands.')
+        return out
+    if channel == 'known':
+        if issue is not None and str(issue.get('state')) != 'open':
+            out.append('Known issues: the issue is closed.')
+        if merged_pr:
+            out.append('Known issues: a merged pull request names the issue.')
+        if has_task:
+            out.append('Known issues: the issue has a "Test task:" comment.')
+        return out
+    want = 'Dev' if channel == 'dev' else 'Main'
+    if server != want:
+        out.append('Format: the line under "Test task:" must be "Server: %s" '
+                   'for this channel.' % want)
+    steps = _steps(text)
+    if not steps:
+        out.append('Format: the steps are not numbered (1. 2. 3.).')
+    if channel == 'dev':
+        auto = [s.strip() for s in steps if AUTOMATABLE.search(s)]
+        if auto:
+            out.append('Dev test tasks: a Claude, the Desk, a harness, a '
+                       'workflow or a command can do these steps, so they '
+                       'run them and post the result instead (a "Check '
+                       '(Claude):" comment): ' + ' / '.join(a[:80] for a in auto[:3]))
+        if steps and not any(DEV_ONLY.search(s) for s in steps):
+            out.append('Dev test tasks: these are ordinary playtester steps '
+                       'with no staff or dev command; that is a Main test '
+                       'task, written once a main release carries the fix.')
+    else:
+        if fix_in_main is False:
+            out.append('Main test tasks: the fix commit is not in the latest '
+                       'main release yet.')
+        staff = [s.strip() for s in steps if STAFF_STEP.search(s)]
+        if staff:
+            out.append('Main test tasks: these steps need staff or dev '
+                       'commands, which makes it a Dev test task: '
+                       + ' / '.join(s[:80] for s in staff[:3]))
+    return out
+
+
+def github_say(number, text):
+    """Comments text on the issue. The bot's GITHUB_TOKEN needs issues
+       write for this; when it cannot, the refusal is only logged."""
+    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    req = urllib.request.Request(
+        '%s/repos/%s/issues/%d/comments' % (GITHUB_API, KNOWN_REPO, int(number)),
+        data=json.dumps({'body': text}).encode('utf-8'), method='POST',
+        headers={'Accept': 'application/vnd.github+json',
+                 'Authorization': 'Bearer ' + token,
+                 'User-Agent': 'thornswood-bot',
+                 'X-GitHub-Api-Version': '2022-11-28'})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode('utf-8'))
+
+
+CHANNEL_NAMES = {'dev': 'dev-test-tasks', 'main': 'test-tasks',
+                 'known': 'known-issues'}
+# Where each kind of post goes, as the refusal comment says it.
+POST_PLACES = {'dev': 'in #dev-test-tasks', 'main': 'in #test-tasks',
+               'known': 'in #known-issues', 'roadmap': "on the site's roadmap"}
+
+
+def refuse(state, channel, num, problems, say=None):
+    """Remembers that the post for issue num in channel breaks problems and
+       comments that on the issue once (again only when the rules broken
+       change). With no problems, forgets any earlier refusal and returns
+       False; otherwise True: the caller does not post."""
+    if not POST_RULES:
+        return False
+    seen = state.setdefault('refused', {})
+    key = '%s:%s' % (channel, num)
+    if not problems:
+        if seen.pop(key, None) is not None:
+            state['_dirty'] = True
+        return False
+    sig = '\n'.join(problems)
+    if seen.get(key) == sig:
+        return True
+    text = ('The bot did not post this issue %s, because the post breaks '
+            'these rules (%s):\n\n%s'
+            '\n\nFix the comment and the bot tries again on its next pass.'
+            % (POST_PLACES.get(channel, 'in #' + channel),
+               'bot/README.md, "The site\'s known issues and roadmap"'
+               if channel == 'roadmap'
+               else 'Developer-Guide.md, "Test tasks and known issues"',
+               '\n'.join('- ' + p for p in problems)))
+    try:
+        (say or github_say)(num, text)
+    except Exception as e:
+        log('refused %s post for #%s, and could not comment: %s' % (channel, num, e))
+    seen[key] = sig
+    state['_dirty'] = True
+    return True
+
+
+def fix_in_main(prs, commits, get=None):
+    """True when a fix commit of the issue (a merged pull request's merge
+       commit, or a commit naming it) is in the newest release/main tag,
+       False when none is, None when that cannot be read."""
+    get = get or _github_get
+    try:
+        refs = get('%s/repos/%s/git/matching-refs/tags/release/main/'
+                   % (GITHUB_API, KNOWN_REPO)) or []
+        tags = sorted(str(r.get('ref') or '') for r in refs if isinstance(r, dict))
+        if not tags:
+            return None
+        tag = tags[-1][len('refs/tags/'):]
+        shas = list(commits or [])
+        for pr in prs or []:
+            if pr.get('merged_at'):
+                got = get('%s/repos/%s/pulls/%d' % (GITHUB_API, KNOWN_REPO, pr['number']))
+                if got and got.get('merge_commit_sha'):
+                    shas.append(got['merge_commit_sha'])
+        for sha in shas:
+            cmp = get('%s/repos/%s/compare/%s...%s' % (GITHUB_API, KNOWN_REPO, tag, sha))
+            if str((cmp or {}).get('status')) in ('identical', 'behind'):
+                return True
+        return False
+    except Exception:
+        return None
+
+
 def known_of(issue, comments):
     """(title, body, tags) for the #known-issues post: the last "Known
        issue:" comment, or the issue's title and a plain line until somebody
        writes one."""
     got = _marked(issue, comments, KNOWN_MARK)
     if got:
-        return got[0], got[1] or known_body(issue), issue_tags(issue, got[2])
+        return got[0], strip_footer(got[1]) or known_body(issue), issue_tags(issue, got[2])
     return known_title(issue), known_body(issue), issue_tags(issue)
 
 
@@ -3922,14 +5183,15 @@ def default_task_body(issue):
 
 
 def task_post_of(issue, comments, dev_since=None):
-    """(title, body, tags) for an issue's #test-tasks post, or None when it
-       gets none (not a finding and nobody wrote a test task, or its last
-       test task says Server: Dev, which is #dev-test-tasks')."""
-    task = last_task(issue, comments, dev_since)
-    if task is not None and task[2] == 'Dev':
-        return None
+    """(title, body, tags) for an issue's #test-tasks post, from its Main
+       test task, or None when it gets none: not a finding and nobody wrote a
+       test task, or its only test tasks say Server: Dev, which are
+       #dev-test-tasks'."""
+    task = main_task_of(issue, comments, dev_since)
     if task is not None:
-        return task[0], task[1], [TASK_TAG]
+        return task[0], strip_footer(task[1]) or 'Check this on main.', [TASK_TAG]
+    if last_task(issue, comments, dev_since) is not None:
+        return None
     if issue_tags_found(issue):
         return known_title(issue), default_task_body(issue), [TASK_TAG]
     return None
@@ -3950,13 +5212,30 @@ async def _forum_thread(forum, tid):
     return th
 
 
-async def _forum_post(forum, title, body, tags, me_id=None):
-    """A post in the forum, tagged; an open post of the bot's with that exact
-       title is handed back rather than made twice. Returns the thread."""
+async def _bot_threads(forum, me_id=None):
+    """Every post of the bot's in the forum, open and closed, oldest first.
+       forum.threads holds only the open ones: a post staff closed, or one
+       Discord closed after a few quiet days, is only in the archive."""
+    mine = {}
     for th in list(getattr(forum, 'threads', None) or []):
-        if (str(getattr(th, 'name', '')) == title
-                and not getattr(th, 'archived', False)
-                and (me_id is None or getattr(th, 'owner_id', me_id) == me_id)):
+        if me_id is None or getattr(th, 'owner_id', me_id) == me_id:
+            mine[th.id] = th
+    archived = getattr(forum, 'archived_threads', None)
+    if archived is not None:
+        async for th in archived(limit=None):
+            if me_id is None or getattr(th, 'owner_id', me_id) == me_id:
+                mine.setdefault(th.id, th)
+    return [mine[k] for k in sorted(mine)]
+
+
+async def _forum_post(forum, title, body, tags, me_id=None):
+    """A post in the forum, tagged; a post of the bot's with that exact title,
+       open or closed, is handed back rather than made twice. Returns the
+       thread. Closed ones count since 22 Oct: Patrick found duplicates, and
+       a post closed by staff or by Discord after quiet days was not looked
+       at, so one whose record was lost was made again."""
+    for th in await _bot_threads(forum, me_id):
+        if str(getattr(th, 'name', '')) == title:
             return th
     applied = [t for t in (task_tag_of(forum, x) for x in tags) if t is not None]
     made = await forum.create_thread(name=title, content=body,
@@ -4034,14 +5313,12 @@ async def _sync_more(th, texts, more):
 
 async def _dev_post(forum, title, chunks, tags, me_id=None):
     """A #dev-test-tasks post over as many messages as its text takes.
-       (thread, follow-up ids). An open post of the bot's with this title,
-       made before a crash, is taken up with what it already holds, never
-       made twice."""
+       (thread, follow-up ids). A post of the bot's with this title, open or
+       closed, made before a crash or whose record was lost, is taken up with
+       what it already holds, never made twice."""
     found = None
-    for th in list(getattr(forum, 'threads', None) or []):
-        if (str(getattr(th, 'name', '')) == title
-                and not getattr(th, 'archived', False)
-                and (me_id is None or getattr(th, 'owner_id', me_id) == me_id)):
+    for th in await _bot_threads(forum, me_id):
+        if str(getattr(th, 'name', '')) == title:
             found = th
             break
     if found is None:
@@ -4054,15 +5331,31 @@ async def _dev_post(forum, title, chunks, tags, me_id=None):
     return th, await _sync_more(th, chunks[1:], more)
 
 
-async def known_issues_once(forum, state, get=None, save=None, me_id=None):
+async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=None):
     """
     One pass over #known-issues, a forum. state is the dict kept in
     known-issues.json, changed in place; the caller writes it. Returns the
     issue numbers posted, edited and removed.
 
+    A known issue is a finding people still meet: an open issue labelled
+    Dev Findings or Main Findings whose fix has not landed (Patrick, 22 Oct,
+    and #3140). Its fix has landed when the issue gets a "Test task:"
+    comment or is in Done: done-on-merge.yml's comment on it (merged_fix),
+    or the board: Done label for the minute it is on (BOARD_DONE). A card
+    moved to Done by hand, with no merge, is not seen: the bot cannot read
+    the board. A closed or unlabelled issue is not a finding at all. Then its post goes: the fix is a test task, not
+    a known issue. A merged pull request alone does not take it down: until
+    26 Oct any one that named the issue did, and a measuring step on the
+    scripts finding, a partial fix, and a Refs written by mistake each kept
+    a bug people still meet off the list (#3140).
+    An issue the label lists leave out is read itself first, and its post
+    stays unless that read says it is closed, unlabelled, moved or deleted
+    (finding_gone, #3438).
+
     Comments are read only for an issue GitHub says changed since the last
     pass (its updated_at), or whose record was made with an older form of
-    the post (KNOWN_FORM), so an untouched issue costs nothing.
+    the post (KNOWN_FORM), so an untouched issue costs nothing. A label put
+    on or a comment written moves updated_at, so nothing else is read.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
@@ -4073,16 +5366,42 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
         if have.get('channel_id') != getattr(forum, 'id', None) or 'thread_id' not in have:
             rec.pop(key, None)
             state['_dirty'] = True
-    posted, edited, removed = [], [], []
+    if state.pop('known_changed', None) is not None:
+        state['_dirty'] = True      # the merged pull requests the old rule kept
+    posted, edited, removed, listed = [], [], [], set()
+    # Why each issue that is not listed is not, said when its post comes
+    # down. Ten posts came down and went back up as a set several times
+    # before 26 Oct with no line saying why (#3140).
+    why = {}
     for num in sorted(issues):
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
+        if BOARD_DONE.lower() in [str(l.get('name', '')).lower()
+                                  for l in issue.get('labels') or []]:
+            why[key] = 'it is on the board as Done: its fix is merged'
+            continue                # fixed, waiting on main: not a known issue
         if (have and have.get('updated') == issue.get('updated_at')
                 and have.get('form') == KNOWN_FORM):
+            listed.add(num)
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
+        if _all_marked(issue, comments, TASK_MARK, room=None):
+            why[key] = 'it has a "Test task:" comment'
+            continue                # it has a test task: being checked, not known
+        if merged_fix(comments):
+            why[key] = 'done-on-merge wrote its merged fix on it'
+            continue                # fixed, waiting on main: not a known issue
         title, body, tags = known_of(issue, comments)
+        taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items() if k != key]
+        if refuse(state, 'known', num, post_problems(
+                'known', title, body, issue=issue,
+                has_task=False, taken_titles=taken), say):
+            if have:
+                listed.add(num)     # the post already up stays as it was
+            why[key] = 'its post breaks a rule'
+            continue
+        listed.add(num)
         sig = _sig(title, body, tags)
         if have:
             if have.get('sig') != sig:
@@ -4106,8 +5425,21 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
         if save:
             save(state)      # straight away, so a crash cannot double it
         posted.append(num)
+    # An issue the label lists left out is read itself before its post comes
+    # down (finding_gone). Every read is made before anything is taken down,
+    # so a read that fails fails the pass with every post still up.
+    for key in list(rec):
+        if int(key) in listed or int(key) in issues:
+            continue                # listed, or not for a reason found above
+        gone = await loop.run_in_executor(None, finding_gone, int(key), get)
+        if gone is None:
+            log('known issues: the open findings GitHub listed left out #%s, '
+                'which is still open and labelled; its post stays' % key)
+            listed.add(int(key))
+        else:
+            why[key] = gone
     for key, have in list(rec.items()):
-        if int(key) in issues:
+        if int(key) in listed:
             continue
         try:
             await _forum_drop(forum, have['thread_id'])
@@ -4116,10 +5448,13 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
         rec.pop(key, None)
         state['_dirty'] = True
         removed.append(int(key))
+        log('known issues: took #%s down: %s'
+            % (key, why.get(key, 'no reason was recorded')))
     return posted, edited, removed
 
 
-async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=None):
+async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=None,
+                         say=None):
     """
     One pass over #test-tasks. An issue closed as fixed gets a post when it
     was closed after state['since'] (set to now on the first pass, so nothing
@@ -4138,6 +5473,22 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
         state['since'] = since = now or _utc_stamp()
         state['_dirty'] = True
     rec = state.setdefault('tasks', {})
+
+    async def broken(num, issue, comments, post):
+        # The rules check before a #test-tasks post goes up or is edited.
+        task = main_task_of(issue, comments, dev_since)
+        if task is None:
+            return False    # the bot's own line for a fixed finding
+        timeline = await loop.run_in_executor(None, github_timeline, num, get)
+        inmain = await loop.run_in_executor(None, fix_in_main,
+                                            *fix_refs(timeline), get)
+        taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items()
+                 if k != str(num)]
+        return refuse(state, 'main', num, post_problems(
+            'main', post[0], post[1],
+            server=task_server_line(issue, comments, task[4]),
+            fix_in_main=inmain, taken_titles=taken), say)
+
     closed = await loop.run_in_executor(None, github_closed_since, since, get)
     posted, edited, removed = [], [], []
     for num in sorted(closed):
@@ -4157,16 +5508,23 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
             continue
         post = task_post_of(issue, comments, dev_since)
         if post is None:
-            # Not a finding and nobody wrote a test task, or its last test
-            # task says Server: Dev and is #dev-test-tasks'. A post already
-            # here is left as it is, and not read again until the issue
-            # changes.
+            # Not a finding and no Main test task: none was written, or the
+            # one there was taken back (its comment no longer starts "Test
+            # task:"), or it is a Dev one, which is #dev-test-tasks'. A post
+            # already here goes: it is no longer a test task for testers.
             if have:
-                have.update(updated=issue.get('updated_at'), form=TASK_FORM)
+                try:
+                    await _forum_drop(forum, have['thread_id'])
+                except discord.HTTPException:
+                    continue
+                rec.pop(key, None)
                 state['_dirty'] = True
+                removed.append(num)
             continue
         title, body, tags = post
         sig = _sig(title, body, tags)
+        if (not have or have.get('sig') != sig) and await broken(num, issue, comments, post):
+            continue        # not posted, and a post already up keeps its text
         if have:
             if have.get('sig') != sig:
                 try:
@@ -4210,31 +5568,43 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
             # the post: brought up to date.
             comments = await loop.run_in_executor(None, github_comments, int(key), get)
             post = task_post_of(issue, comments, dev_since)
-            if post is not None:
-                sig = _sig(*post)
-                if have.get('sig') != sig:
-                    try:
-                        if await _forum_edit(forum, have['thread_id'], *post):
-                            edited.append(int(key))
-                    except discord.HTTPException:
-                        continue
-                have['sig'] = sig
+            if post is None:
+                # Its test task was taken back: the post goes, as above.
+                try:
+                    await _forum_drop(forum, have['thread_id'])
+                except discord.HTTPException:
+                    continue
+                rec.pop(key, None)
+                state['_dirty'] = True
+                removed.append(int(key))
+                continue
+            sig = _sig(*post)
+            if have.get('sig') != sig and await broken(int(key), issue, comments, post):
+                continue
+            if have.get('sig') != sig:
+                try:
+                    if await _forum_edit(forum, have['thread_id'], *post):
+                        edited.append(int(key))
+                except discord.HTTPException:
+                    continue
+            have['sig'] = sig
             have['updated'] = issue.get('updated_at')
             have['form'] = TASK_FORM
             state['_dirty'] = True
     return posted, edited, removed
 
 
-async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None):
+async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None,
+                        say=None):
     """
     One pass over #dev-test-tasks, found by the id the setup recorded. An
-    issue, open or closed, whose last "Test task:" comment says Server: Dev
-    gets a post tagged Dev (dev_task_of), written for developers
-    (dev_render: the issue, its pull requests and commits, labels, build,
-    and the whole test task, over as many messages as it takes); it goes
-    when the issue is closed after that comment, or a newer test task does
-    not say Server: Dev. A rewritten comment, or any other change to the
-    issue that changes the post, edits it.
+    issue, open or closed, with a "Test task:" comment saying Server: Dev
+    gets a post tagged Dev from its last one (dev_task_of), written for
+    developers (dev_render: the issue, its pull requests and commits,
+    labels, build, and the whole test task, over as many messages as it
+    takes); it goes when that comment is taken back, and stays beside a
+    Main one. A rewritten comment, or any other change to the issue that
+    changes the post, edits it.
 
     The first pass sets state['dev_since'] to now: nothing written before it
     counts as a dev test task, so nothing from before floods in and no post
@@ -4267,6 +5637,13 @@ async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None
         task = dev_task_of(issue, comments, since)
         post = None
         if task is not None:
+            taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items() if k != key]
+            if refuse(state, 'dev', num, post_problems(
+                    'dev', task[0], task[1], server=task[2],
+                    taken_titles=taken), say):
+                read[key] = upd     # the post already up, if any, keeps its text
+                state['_dirty'] = True
+                continue
             timeline = await loop.run_in_executor(None, github_timeline, num, get)
             post = dev_render(issue, task, *fix_refs(timeline))
         try:
@@ -4315,6 +5692,56 @@ async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None
     return posted, edited, removed
 
 
+async def forum_check(forum, records, me_id=None, apply=False):
+    """
+    The duplicates in one of the three forums, and with apply, gone. records
+    maps a thread id to the issue whose post it is (known-issues.json). Two
+    posts of the bot's with the same title are one too many: the one an issue
+    owns is kept, or the oldest when none is, and the rest are deleted. Two
+    posts that two issues own under one title are said and left: both issues
+    carry the same test task, which is fixed on the issues. Returns the lines
+    it says.
+    """
+    lines, by_title = [], {}
+    threads = await _bot_threads(forum, me_id)
+    for th in threads:
+        by_title.setdefault(str(getattr(th, 'name', '')), []).append(th)
+    owned = [th for th in threads if th.id in records]
+    lines.append('#%s: %d post(s) of the bot\'s, %d owned by an issue'
+                 % (getattr(forum, 'name', '?'), len(threads), len(owned)))
+    gone = 0
+    for title in sorted(by_title):
+        group = by_title[title]
+        if len(group) < 2:
+            continue
+        mine = [th for th in group if th.id in records]
+        keep = mine or group[:1]
+        extra = [th for th in group if th not in keep]
+        lines.append('  "%s": %d posts; keeps %s%s' % (
+            title, len(group),
+            ', '.join('%d (#%s)' % (th.id, records.get(th.id, '-')) for th in keep),
+            '; two issues own this title, fix it on the issues' if len(mine) > 1 else ''))
+        for th in extra:
+            if apply:
+                await th.delete()
+                gone += 1
+                lines.append('    deleted %d' % th.id)
+            else:
+                lines.append('    would delete %d' % th.id)
+    if apply:
+        lines.append('  %d deleted' % gone)
+    return lines
+
+
+def forum_records(state):
+    """{thread id: issue number} for each of the three forums' records."""
+    def of(part):
+        return dict((int(v['thread_id']), int(k)) for k, v in
+                    (state.get(part) or {}).items()
+                    if isinstance(v, dict) and v.get('thread_id'))
+    return {'known': of('issues'), 'tasks': of('tasks'), 'dev': of('dev')}
+
+
 def adopt_task(number, thread_id, path=None):
     """Records a test task post made by hand (--post-task) as issue number's,
        so later passes edit it and take it down if the issue reopens. Run
@@ -4327,6 +5754,155 @@ def adopt_task(number, thread_id, path=None):
         'thread_id': int(thread_id), 'channel_id': None, 'sig': '', 'updated': ''}
     _state_write(path, state)
     return 'issue %d now owns test task post %d' % (int(number), int(thread_id))
+
+
+# -------------------------------------- the site's known issues and roadmap --
+#
+# Issue #3140 (Patrick): the site's Known Issues page and its roadmap are built
+# from the board, so they cannot go stale. Until then both were boards typed
+# into site/data/board.json; the roadmap's Later lane said the emote wheel was
+# never started while it shipped (test-roadmap.js), and the known board kept
+# NPC behaviour that #504 had fixed. The bot already reads the board for the
+# Discord forums, with the one issues token there is, so it writes both lists
+# into one file the site reads:
+#
+#   known    the posts that are up in #known-issues, the same list, each as
+#            its title, its words and where it was found (Main, Dev). One
+#            rule decides both: known_issues_once.
+#   roadmap  every open issue labelled "roadmap: now", "roadmap: next" or
+#            "roadmap: later", in that lane. A closed one is off the
+#            roadmap: it has no Done lane (Patrick, 26 Oct).
+#            Its words are its last "Roadmap:" comment: the first line is
+#            what is being built (45 characters at most), the lines under it
+#            where it stands. The rules of a known issue hold for it (no
+#            footer, no issue number, link or code), and so do the writing
+#            rules of a public page (no em dash, never "player"). An issue
+#            with a lane and no such comment, or one that breaks a rule, is
+#            left off and gets one comment saying why (refuse).
+#
+# The file is PUBLIC_LISTS_FILE, in the site's data\from-bot folder, which
+# holds only what the bot writes for the site: the site makes it, and
+# Install-Bot.ps1 gives the bot's account Modify on it and nothing else of the
+# site's (the other way round from for-bot, #1102). It is written whole after
+# every pass, with the time of the pass, so the site can say how old it is;
+# a part the bot could not read this pass is left out rather than written
+# empty, and the site says that part could not be read.
+PUBLIC_LISTS_FILE = os.environ.get(
+    'PUBLIC_LISTS_FILE', r'C:\Thornswood-Docs\data\from-bot\lists.json')
+ROADMAP_LANES = (('now', 'Being built now'), ('next', 'Next'), ('later', 'Later'))
+ROADMAP_MARK = re.compile(r'^\s*roadmap\s*:\s*(.*)$', re.I)
+
+
+def roadmap_label(lane):
+    return 'roadmap: %s' % lane
+
+
+def github_labelled(label, state, get=None):
+    """Every issue (not pull request) with the label, open or closed (state),
+       by number."""
+    get = get or _github_get
+    out = {}
+    page = 1
+    while True:
+        url = ('%s/repos/%s/issues?state=%s&per_page=100&page=%d&labels=%s'
+               % (GITHUB_API, KNOWN_REPO, state, page, urllib.parse.quote(label)))
+        rows = get(url) or []
+        for row in rows:
+            if isinstance(row, dict) and 'pull_request' not in row:
+                out.setdefault(int(row['number']), row)
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
+def roadmap_lanes_of(issue):
+    """The lanes (now, next, later) the issue is labelled with."""
+    names = [n.lower() for n in _labels(issue)]
+    return [lane for lane, _name in ROADMAP_LANES if roadmap_label(lane) in names]
+
+
+def roadmap_of(issue, comments):
+    """(title, words, problems) for the issue's roadmap row, from its last
+       "Roadmap:" comment. problems is empty when it may go on the site."""
+    got = _marked(issue, comments, ROADMAP_MARK, room=None)
+    if got is None:
+        return None, None, ['Roadmap: the issue has a roadmap label and no '
+                            'comment whose first line starts "Roadmap:", '
+                            'which holds the words the site shows.']
+    title, body = got[0], strip_footer(got[1])
+    return title, body, post_problems('roadmap', title, body)
+
+
+def roadmap_once(state, get=None, say=None):
+    """
+    One read of the roadmap off the board. state is the dict kept in
+    known-issues.json, changed in place; its 'roadmap' part remembers each
+    labelled issue's row by its updated_at, so comments are read only for an
+    issue that changed (a label, a close and a comment all move it). Returns
+    the roadmap as the site draws it: {lanes: [{name, rows: [{title, text}]}]},
+    the lanes in order, each by issue number. Only open issues are read: the
+    roadmap has no Done lane (Patrick, 26 Oct, "Done section needs removed
+    from the roadmap"), so an issue that closes leaves it.
+    """
+    seen = {}
+    for lane, _name in ROADMAP_LANES:
+        for num, issue in github_labelled(roadmap_label(lane), 'open', get).items():
+            seen[num] = issue
+    rec = state.setdefault('roadmap', {})
+    for key in [k for k in rec if int(k) not in seen]:
+        rec.pop(key, None)
+        state['_dirty'] = True
+    rows = dict((name, []) for _lane, name in ROADMAP_LANES)
+    for num in sorted(seen):
+        issue = seen[num]
+        key = str(num)
+        have = rec.get(key)
+        if not have or have.get('updated') != issue.get('updated_at'):
+            title, body, problems = roadmap_of(issue, github_comments(num, get))
+            lanes = roadmap_lanes_of(issue)
+            if len(lanes) > 1:
+                problems = problems + ['Roadmap: the issue is in %s at once; '
+                                       'one lane only.' % ', '.join(
+                                           roadmap_label(l) for l in lanes)]
+            have = rec[key] = {'updated': issue.get('updated_at'),
+                               'title': title, 'text': body,
+                               'problems': problems}
+            state['_dirty'] = True
+        if refuse(state, 'roadmap', num, have.get('problems') or [], say):
+            continue
+        rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(
+            {'title': have['title'], 'text': have['text']})
+    return {'lanes': [{'name': name, 'rows': rows[name]}
+                      for _lane, name in ROADMAP_LANES]}
+
+
+def known_list(state):
+    """The posts up in #known-issues, as the site shows them: title, words
+       and where (Main, Dev), by issue number. The records hold each post's
+       sig, which is exactly what went up (_sig)."""
+    out = []
+    for key in sorted((state.get('issues') or {}), key=int):
+        sig = str((state['issues'][key] or {}).get('sig') or '')
+        if not sig:
+            continue
+        title, rest = (sig.split('\n', 1) + [''])[:2]
+        body, _, tags = rest.rpartition('\n')
+        out.append({'title': title, 'text': body,
+                    'where': [t for t in tags.split(',') if t]})
+    return out
+
+
+def write_public_lists(known, roadmap, path=None, now=None):
+    """Writes the site's lists: known and roadmap as the passes made them,
+       either None when it could not be read this pass, and so left out."""
+    data = {'at': now or _utc_stamp()}
+    if known is not None:
+        data['known'] = known
+    if roadmap is not None:
+        data['roadmap'] = roadmap
+    _state_write(path or PUBLIC_LISTS_FILE, data)
+    return data
 
 
 def issue_tags_found(issue):
@@ -4352,7 +5928,7 @@ async def watch_known_issues():
             'fixed by hand (posting from empty would double every post)'
             % KNOWN_STATE)
         return
-    said_text = said_dev = False
+    said_text = said_dev = said_lists = False
     while not client.is_closed():
         try:
             known = tasks = dev = None
@@ -4394,8 +5970,24 @@ async def watch_known_issues():
                 if posted or edited or removed:
                     log('dev test tasks: posted %s, edited %s, removed %s'
                         % (posted or 'none', edited or 'none', removed or 'none'))
+            # The site's lists (#3140): known only when #known-issues was
+            # kept this pass, since it is that forum's list.
+            roadmap = await asyncio.get_running_loop().run_in_executor(
+                None, roadmap_once, state)
             if state.get('_dirty'):
                 _known_save(state)
+            try:
+                write_public_lists(known_list(state) if known is not None else None,
+                                   roadmap)
+            except OSError as e:
+                if not said_lists:
+                    log('known issues: could not write the site\'s lists to %s '
+                        '(%s). Install-Bot.ps1 gives the bot Modify on that '
+                        'folder once Deploy-Docs.ps1 has made it.'
+                        % (PUBLIC_LISTS_FILE, type(e).__name__))
+                    said_lists = True
+            else:
+                said_lists = False
         except Exception as e:
             # Never the URL with the token, and never the token: the request
             # carries it in a header, which str(e) does not print.
@@ -4413,9 +6005,10 @@ async def watch_known_issues():
 # the watchdog decides and this only delivers (watch_services, below).
 
 
-async def watch_say(text):
+async def watch_send(text):
     """
-    Say it once, in the staff channel, found by id. True when it was said.
+    Say it once, in the staff channel, found by id: (True, the message) when
+    it was said, (False, None) when it was not.
 
     Nothing is guessed and nothing falls back to another channel. If that id is
     not a channel this bot can see, it says so in the bot log and stays quiet in
@@ -4425,23 +6018,29 @@ async def watch_say(text):
     if not WATCH_ID:
         log('watch: no channel id, so nothing was said. staff-channel.txt is '
             'missing or unreadable; Install-Bot.ps1 sends it with the code.')
-        return False
+        return False, None
     ch = client.get_channel(WATCH_ID)
     if ch is None:
         log('watch: channel %d is not one this bot can see, so nothing was '
             'said.' % WATCH_ID)
-        return False
+        return False, None
     try:
         # The text is the watchdog's own sentence, which can carry a name
         # or a line from somewhere else. Mentions stay off, so @everyone
         # in it is text and not a ping. Discord honors allowed_mentions
         # even when the text still says @everyone.
-        await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
-        return True
+        msg = await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
+        return True, msg
     except Exception:
         log('watch: could not post in #%s:\n' % getattr(ch, 'name', WATCH_ID)
             + traceback.format_exc())
-        return False
+        return False, None
+
+
+async def watch_say(text):
+    """watch_send, True when it was said."""
+    ok, _msg = await watch_send(text)
+    return ok
 
 
 def _clock(ms):
@@ -4472,6 +6071,11 @@ def _clock(ms):
 # A log that arrives within this long of the session ending is the launcher's
 # own end-of-session upload, not a backlog, so its arrival is not called out.
 TROUBLE_LATE_MS = 5 * 60 * 1000
+
+# How every post _trouble_line makes begins, which is how the one-time look
+# through the channel (trouble_backfill) tells one from anything else the bot
+# says there.
+TROUBLE_HEAD = '**A session went wrong.**'
 
 
 def _trouble_line(row):
@@ -4512,7 +6116,7 @@ def _trouble_line(row):
                     'so this is a late upload rather than a new failure.' % got)
 
     return (
-        '**A session went wrong.** %s, on %s%s.%s%s\n%s\n%s\n'
+        TROUBLE_HEAD + ' %s, on %s%s.%s%s\n%s\n%s\n'
         'The logs are on the sessions page under that session, '
         'and it is the red one.'
         % (who,
@@ -4524,9 +6128,196 @@ def _trouble_line(row):
            ('```\n%s\n```' % line[:400]) if line else ''))
 
 
+def _trouble_rows():
+    """
+    The rows in trouble.json, or None when the file is not there or cannot be
+    read. None is never taken for an empty file: a post is deleted because its
+    row has gone, so a file that could not be read must delete nothing.
+    """
+    try:
+        with open(TROUBLE_FILE, encoding='utf-8') as f:
+            rows = json.load(f)
+    except Exception:
+        return None
+    return rows if isinstance(rows, list) else None
+
+
+def _trouble_sessions(rows):
+    return set(r['session'] for r in rows
+               if isinstance(r, dict) and r.get('session'))
+
+
+def trouble_remember(sid, msg, path=None):
+    """Writes down which message said session sid went wrong."""
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None:
+        log('trouble: %s cannot be read, so the post for session %s is not '
+            'written down and will not be deleted when its logs go'
+            % (path, sid))
+        return False
+    posts = state.setdefault('posts', {})
+    posts[str(sid)] = {'channel': msg.channel.id, 'message': msg.id}
+    try:
+        _state_write(path, state)
+    except Exception as e:
+        log('trouble: could not write %s, so the post for session %s will not '
+            'be deleted when its logs go: %s: %s'
+            % (path, sid, type(e).__name__, e))
+        return False
+    return True
+
+
+async def trouble_forget(rows, path=None):
+    """
+    A FAILED SESSION'S POST GOES WHEN ITS ROW GOES (#3942). The post carries
+    the person's name and a line out of their logs. The site keeps the row in
+    trouble.json exactly as long as the session and its logs: it ages out at
+    365 days, stays while staff keep the session, and goes with a deletion
+    request (freshTrouble and the deletion sweep in site/server.js). The
+    oldest also goes past the file's last 200 rows. Nothing deleted the post,
+    so it stayed in the channel after all of that.
+
+    So every post this bot makes is written down against its session in
+    TROUBLE_POSTS, and here each one whose session is no longer in rows is
+    deleted. Returns (deleted, failed). A post already gone from Discord (staff
+    deleted it) is taken off the list; any other failure is a line with
+    Discord's reason, and the post stays on the list for the next pass. Said
+    in bot.log by session id and count, never what a post said.
+    """
+    if rows is None:
+        return 0, 0
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None:
+        log('trouble: %s cannot be read, so no post was deleted this pass'
+            % path)
+        return 0, 1
+    posts = state.get('posts') or {}
+    present = _trouble_sessions(rows)
+    deleted = failed = 0
+    changed = False
+    for sid in [k for k in posts if k not in present]:
+        rec = posts.get(sid) if isinstance(posts.get(sid), dict) else {}
+        try:
+            cid, mid = int(rec.get('channel')), int(rec.get('message'))
+        except (TypeError, ValueError):
+            log('trouble: the post for session %s has no message written down, '
+                'so it is taken off the list' % sid)
+            del posts[sid]
+            changed = True
+            continue
+        ch = client.get_channel(cid)
+        if ch is None:
+            failed += 1
+            log('trouble: channel %d of the post for session %s is not one this '
+                'bot can see, so it is not deleted this pass' % (cid, sid))
+            continue
+        try:
+            await ch.get_partial_message(mid).delete()
+            deleted += 1
+        except discord.NotFound:  # staff deleted it already: it is gone, as wanted
+            pass
+        except Exception as e:
+            failed += 1
+            log('trouble: could not delete the post for session %s: %s: %s'
+                % (sid, type(e).__name__, e))
+            continue
+        del posts[sid]
+        changed = True
+    if changed:
+        state['posts'] = posts
+        try:
+            _state_write(path, state)
+        except Exception as e:
+            log('trouble: could not write %s after deleting posts: %s: %s'
+                % (path, type(e).__name__, e))
+    if deleted:
+        log('trouble: deleted %d failed-session post(s) whose session has left '
+            'trouble.json' % deleted)
+    return deleted, failed
+
+
+def _trouble_post_matches(content, row):
+    """
+    True when a post the bot made before #3942 is about this row. The wording
+    has changed since the first posts (#532), so the row's own text is looked
+    for rather than the whole line: the name, and the log line in its code
+    block or, with no line, the reason.
+    """
+    if content == _trouble_line(row)[:1900]:
+        return True
+    who = row.get('name') or row.get('who') or ''
+    line = (row.get('line') or '').strip()
+    mark = ('```\n%s\n```' % line[:400]) if line else (row.get('why') or '')
+    return bool(who) and bool(mark) and who in content and mark in content
+
+
+async def trouble_backfill(rows, path=None):
+    """
+    The posts made before #3942 were never written down. Once, the first time
+    the bot comes up with this, it looks through the trouble channel for its
+    own posts that begin with TROUBLE_HEAD, writes down each whose row is still
+    in trouble.json, and deletes the rest, whose session and logs are already
+    gone. A post it cannot match to a row is one of those. Returns
+    (deleted, failed); with any failure the look runs again next start.
+    """
+    if rows is None:
+        return 0, 0
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None or state.get('backfilled'):
+        return 0, 0
+    ch = _trouble_channel()
+    bot_id = getattr(client.user, 'id', None)
+    if ch is None or bot_id is None:
+        return 0, 0
+    posts = state.setdefault('posts', {})
+    known = set(str(r.get('message')) for r in posts.values()
+                if isinstance(r, dict))
+    rows = [r for r in rows if isinstance(r, dict) and r.get('session')]
+    deleted = failed = 0
+    try:
+        async for m in ch.history(limit=None):
+            if getattr(getattr(m, 'author', None), 'id', None) != bot_id:
+                continue
+            content = getattr(m, 'content', '') or ''
+            if not content.startswith(TROUBLE_HEAD) or str(m.id) in known:
+                continue
+            row = next((r for r in rows if str(r['session']) not in posts
+                        and _trouble_post_matches(content, r)), None)
+            if row is not None:
+                posts[str(row['session'])] = {'channel': ch.id, 'message': m.id}
+                continue
+            try:
+                await m.delete()
+                deleted += 1
+            except discord.NotFound:  # already gone from the channel, as wanted
+                pass
+            except Exception as e:
+                failed += 1
+                log('trouble: could not delete an old failed-session post '
+                    '(%s): %s: %s' % (m.id, type(e).__name__, e))
+    except Exception as e:
+        failed += 1
+        log('trouble: could not read #%s for the old failed-session posts: '
+            '%s: %s' % (getattr(ch, 'name', '?'), type(e).__name__, e))
+    if not failed:
+        state['backfilled'] = True
+    try:
+        _state_write(path, state)
+    except Exception as e:
+        log('trouble: could not write %s after the look for old posts: %s: %s'
+            % (path, type(e).__name__, e))
+    log('trouble: the old failed-session posts: %d written down, %d deleted, '
+        '%d failed' % (len(posts), deleted, failed))
+    return deleted, failed
+
+
 async def watch_trouble():
     """
-    Say in the staff channel when a session goes wrong.
+    Say in the staff channel when a session goes wrong, and take the post down
+    when that session's logs go (trouble_forget).
 
     The site reads every session's logs as they arrive and appends the ones
     that went wrong to trouble.json. This reads that file and says each new one
@@ -4544,19 +6335,8 @@ async def watch_trouble():
     """
     await client.wait_until_ready()
 
-    def read_all():
-        try:
-            with open(TROUBLE_FILE, encoding='utf-8') as f:
-                rows = json.load(f)
-            return rows if isinstance(rows, list) else []
-        except Exception:
-            return []
-
     loop = asyncio.get_running_loop()
-    said = set()
-    for row in await loop.run_in_executor(None, read_all):
-        if isinstance(row, dict) and row.get('session'):
-            said.add(row['session'])
+    said = _trouble_sessions(await loop.run_in_executor(None, _trouble_rows) or [])
     ch = _trouble_channel()
     log('trouble: watching %s every %ds, speaking in %s, %d already there and '
         'treated as said'
@@ -4564,16 +6344,24 @@ async def watch_trouble():
            ('#' + ch.name) if ch is not None else 'NOWHERE, see above',
            len(said)))
 
+    first = True
     while not client.is_closed():
         try:
-            for row in await loop.run_in_executor(None, read_all):
+            rows = await loop.run_in_executor(None, _trouble_rows)
+            if first:
+                first = False
+                await trouble_backfill(rows)
+            for row in rows or []:
                 if not isinstance(row, dict):
                     continue
                 sid = row.get('session') or ''
                 if not sid or sid in said:
                     continue
                 said.add(sid)
-                await trouble_say(_trouble_line(row))
+                msg = await trouble_say(_trouble_line(row))
+                if msg is not None:
+                    trouble_remember(sid, msg)
+            await trouble_forget(rows)
         except Exception:
             log('trouble: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
@@ -4606,19 +6394,21 @@ def _trouble_channel():
 
 
 async def trouble_say(text):
-    """Say it once, in the staff channel. Same rules as watch_say."""
+    """Say it once, in the staff channel. Same rules as watch_say. The
+    message, or None when nothing was said."""
     ch = _trouble_channel()
     if ch is None:
-        return
+        return None
     try:
         # The line carries a name and a line from a log, both from somewhere
         # else. Mentions stay off, as in watch_say and report_say, so an
         # @everyone in it is text and not a ping.
-        await ch.send(text[:1900],
-                      allowed_mentions=discord.AllowedMentions.none())
+        return await ch.send(text[:1900],
+                             allowed_mentions=discord.AllowedMentions.none())
     except Exception:
         log('trouble: could not post in #%s:\n' % getattr(ch, 'name', '?')
             + traceback.format_exc())
+        return None
 
 
 # ------------------------------------------------------ the box's watchdog --
@@ -4648,6 +6438,18 @@ async def trouble_say(text):
 WATCH_ALERTS = os.path.join(WATCH_DIR, 'alerts.jsonl')
 WATCH_SENT_BOT = os.path.join(WATCH_DIR, 'alerts-sent-bot.txt')
 WATCH_SENT_HOOK = os.path.join(WATCH_DIR, 'alerts-sent-webhook.txt')
+# Taking a notice back (#3328). Say-Staff.ps1 -Unsay puts its id in
+# alerts-unsay.txt, through say-staff.ps1 on the box, which takes back only the
+# sender's own notices. The bot keeps the Discord message each notice became in
+# staff-messages.txt, and what it did with each ask in staff-unsaid.txt, both
+# in its own data folder, the one place it writes; say-staff.ps1 -Check reads
+# the second. On 22 Oct a notice that should not have gone out stayed up until
+# Patrick deleted it by hand: nothing knew which message it was.
+WATCH_UNSAY = os.path.join(WATCH_DIR, 'alerts-unsay.txt')
+STAFF_MESSAGES = os.path.join(DATA_DIR, 'staff-messages.txt')
+STAFF_UNSAID = os.path.join(DATA_DIR, 'staff-unsaid.txt')
+# How far back a notice said before staff-messages.txt existed is looked for.
+UNSAY_LOOK_BACK = 200
 # The watchdog's $alertMaxAge: a message a day late is noise, not news.
 WATCH_ALERT_MAX_AGE = 24 * 3600
 
@@ -4706,6 +6508,119 @@ def _watch_mark(aid):
         f.write(aid + '\r\n')
 
 
+def _watch_note(path, *fields):
+    """One tab separated line onto path. Blocking, so run through an executor."""
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write('\t'.join(str(x).replace('\t', ' ').replace('\n', ' ')
+                          for x in fields) + '\n')
+
+
+def _watch_table(path):
+    """{first field: the rest} of a tab separated file, the last line winning.
+    {} when there is none, None when it is there and cannot be read."""
+    lines = _watch_lines(path)
+    if lines is None:
+        return None
+    out = {}
+    for line in lines:
+        parts = line.split('\t')
+        if parts[0]:
+            out[parts[0]] = parts[1:]
+    return out
+
+
+def unsay_plan(asked, done, messages, by_bot, by_hook, texts):
+    """
+    What to do with each notice asked to be taken back, in the order asked:
+    (id, how). how is 'message' (its Discord message is known), 'look' (the bot
+    said it before it kept message ids, so it is looked for by its words),
+    'webhook' (the watchdog's webhook said it, which the bot cannot delete),
+    'withhold' (not said yet, so it never is) or 'unknown' (no such notice).
+    An id already done, or asked twice, is planned once.
+    """
+    out = []
+    seen = set(done)
+    for aid in asked:
+        aid = aid.strip()
+        if not aid or aid in seen:
+            continue
+        seen.add(aid)
+        if aid in messages:
+            how = 'message'
+        elif aid in by_bot:
+            how = 'look'
+        elif aid in by_hook:
+            how = 'webhook'
+        elif aid in texts:
+            how = 'withhold'
+        else:
+            how = 'unknown'
+        out.append((aid, how))
+    return out
+
+
+async def watch_unsay(lines, said):
+    """
+    Take back every notice asked for that is not done yet. lines is the
+    outbox, said the ids this run of the bot said. Each ask is written down in
+    staff-unsaid.txt once, whatever came of it, so a failed one is not tried
+    every minute for ever; its line says why.
+    """
+    loop = asyncio.get_running_loop()
+    asked = await loop.run_in_executor(None, _watch_lines, WATCH_UNSAY)
+    if not asked:
+        return
+    done = await loop.run_in_executor(None, _watch_table, STAFF_UNSAID)
+    messages = await loop.run_in_executor(None, _watch_table, STAFF_MESSAGES)
+    mine = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_BOT)
+    hook = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_HOOK)
+    if done is None or messages is None or mine is None or hook is None:
+        return
+    texts = {}
+    for raw in lines:
+        try:
+            a = json.loads(raw)
+            texts[str(a['id']).strip()] = str(a['text'])[:1900]
+        except Exception:
+            continue
+    plan = unsay_plan(asked, done, messages, set(mine) | said, set(hook), texts)
+    ch = client.get_channel(WATCH_ID) if WATCH_ID else None
+    for aid, how in plan:
+        result = how
+        try:
+            if how == 'withhold':
+                # Marked said, so neither this loop nor the watchdog's webhook
+                # ever says it; staff-unsaid.txt says why it is marked.
+                await loop.run_in_executor(None, _watch_mark, aid)
+                said.add(aid)
+                result = 'withheld'
+            elif how in ('message', 'look'):
+                if ch is None:
+                    continue
+                target = None
+                if how == 'message':
+                    target = ch.get_partial_message(int(messages[aid][-1]))
+                else:
+                    me = getattr(client.user, 'id', None)
+                    async for m in ch.history(limit=UNSAY_LOOK_BACK):
+                        if getattr(m.author, 'id', None) == me and m.content == texts.get(aid):
+                            target = m
+                            break
+                if target is None:
+                    result = 'gone'
+                else:
+                    try:
+                        await target.delete()
+                        result = 'deleted'
+                    except discord.NotFound:
+                        result = 'gone'
+        except Exception as e:
+            log('services: could not take back %s:\n%s' % (aid, traceback.format_exc()))
+            result = 'failed ' + type(e).__name__
+        await loop.run_in_executor(None, _watch_note, STAFF_UNSAID, aid, result)
+        log('services: took back %s: %s' % (aid, result))
+
+
 async def watch_services():
     """
     Every WATCH_READ_EVERY seconds, say what the watchdog's outbox holds that
@@ -4737,14 +6652,19 @@ async def watch_services():
                 unreadable = True
             else:
                 unreadable = False
+                await watch_unsay(lines, said)
                 due = watch_alerts_due(lines, said | set(mine) | set(hook),
                                        int(time.time()))
                 for aid, text in due:
-                    if not await watch_say(text):
+                    ok, msg = await watch_send(text)
+                    if not ok:
                         break
                     said.add(aid)
                     log('services: said ' + aid)
                     await loop.run_in_executor(None, _watch_mark, aid)
+                    if getattr(msg, 'id', None):
+                        await loop.run_in_executor(None, _watch_note, STAFF_MESSAGES,
+                                                   aid, WATCH_ID, msg.id)
         except Exception:
             log('services: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
@@ -4935,11 +6855,18 @@ _MOD_DID = {
     'evict': 'ended the claim of %s',
     'rent': 'set the rent on the claim of %s',
     'norent': 'took the rent off the claim of %s',
+    # Rent handed over in person, marked paid on the Office page (#3895).
+    'rentpaid': 'marked rent paid by %s',
     # Staff on the world's card, the Office page of K (#513): the stage is
     # the who, and the why says from where, to where, and the force.
     'worldpropose': 'proposed moving the world to %s',
     'worldconfirm': 'confirmed moving the world to %s',
     'worlddrop': 'dropped the proposal to move the world to %s',
+    # Staff on the crafting card, the Office page of K (#3167): the why says
+    # which rank from what to what, or what was given back and why.
+    'craftrank': 'raised a rank of %s',
+    'craftrecipes': 'handed the newer recipe list to the game of %s',
+    'craftgive': 'gave back to %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).
@@ -5451,6 +7378,7 @@ async def on_ready():
         asyncio.create_task(watch_known_issues())
         asyncio.create_task(watch_join_numbers())
         asyncio.create_task(watch_closed_tickets())
+        asyncio.create_task(watch_lines())
 
     log('up as %s' % client.user)
 
@@ -5461,6 +7389,7 @@ async def on_ready():
         await ensure_hold_panel(g)
         await ensure_office_roles(g)
         await ensure_office_panel(g)
+        await ensure_faction_panel(g)
     log('watching %d server(s)' % len(client.guilds))
     # Guilds are known here. Empty was already said in setup_hook. IDs
     # that match no role can only be seen once the guild's roles are in.
@@ -5512,6 +7441,9 @@ def run_cli(argv):
       --setup-channels [--apply]   the one-time setup, a preview without --apply
       --post-task --title T --body B|--body-file F [--tag Main|Dev]
       --adopt-task --issue N --thread ID   (offline; with the bot stopped)
+      --forum-check [--apply]      the duplicate posts in #known-issues,
+                                   #test-tasks and #dev-test-tasks, a preview
+                                   without --apply (forum_check)
 
     Returns the exit code.
     """
@@ -5529,6 +7461,7 @@ def run_cli(argv):
     ap.add_argument('--adopt-task', action='store_true')
     ap.add_argument('--issue', type=int)
     ap.add_argument('--thread', type=int)
+    ap.add_argument('--forum-check', action='store_true')
     a = ap.parse_args(argv)
     if a.adopt_task:
         if not a.issue or not a.thread:
@@ -5543,7 +7476,7 @@ def run_cli(argv):
         if not a.title or not body:
             ap.error('--post-task needs --title and --body or --body-file')
     out = {'code': 0}
-    cli = discord.Client(intents=discord.Intents(guilds=True))
+    cli = TrustedClient(intents=discord.Intents(guilds=True))
 
     @cli.event
     async def on_ready():
@@ -5560,6 +7493,24 @@ def run_cli(argv):
                         print('  ' + line)
                     if not a.apply:
                         print('  (preview only; add --apply to do it)')
+                elif a.forum_check:
+                    state = _state_read(KNOWN_STATE)
+                    if state is None:
+                        print('  %s will not read; nothing was looked at' % KNOWN_STATE)
+                        out['code'] = 1
+                        continue
+                    recs = forum_records(state)
+                    me = getattr(cli.user, 'id', None)
+                    for forum, part in ((_channel_named(g, KNOWN_NAME, ('forum',)), 'known'),
+                                        (_channel_named(g, TASKS_NAME, ('forum',)), 'tasks'),
+                                        (dev_tasks_forum(g), 'dev')):
+                        if forum is None:
+                            print('  no %s forum' % part)
+                            continue
+                        for line in await forum_check(forum, recs[part], me, a.apply):
+                            print('  ' + line)
+                    if not a.apply:
+                        print('  (preview only; add --apply to delete the duplicates)')
                 else:
                     thread, said = await post_test_task(g, a.title, body, a.tag)
                     print('  ' + said)
@@ -5666,8 +7617,12 @@ def apply_deletion_requests():
 # how it runs on the VPS.
 if __name__ == '__main__':
     if ('--setup-channels' in sys.argv or '--post-task' in sys.argv
-            or '--adopt-task' in sys.argv):
+            or '--adopt-task' in sys.argv or '--forum-check' in sys.argv):
         raise SystemExit(run_cli(sys.argv[1:]))
+    # Said here and not where the roots are written, so a tool that imports
+    # bot.py reads nothing extra on its standard output.
+    log('trusting %d root certificates from %s, leaving out %s' % (
+        _trusted, ROOTS, ', '.join(_left_out) or 'none'))
     # One heartbeat before anything can hang, so a bot stuck logging in has
     # this run's pid in the file and the watchdog can say how long it has sat.
     beat_now()

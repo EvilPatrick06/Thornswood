@@ -5,11 +5,11 @@ using System.IO;
 namespace Thornswood
 {
     /// <summary>
-    /// Puts the three files Thornswood makes from the person's own game into
-    /// the game folder (#2827): the main menu with no Bethesda logo and the
-    /// notice board's and drop box's meshes. FromGame.cs says why they are
-    /// made here and not shipped, and makes them; this decides when, and
-    /// writes them.
+    /// Puts the files Thornswood makes from the person's own game into the
+    /// game folder (#2827): the main menu with no Bethesda logo, the notice
+    /// board's and drop box's meshes, and the collection's item menus and HUD
+    /// with no gold values (#3113). FromGame.cs says why they are made here
+    /// and not shipped, and makes them; this decides when, and writes them.
     ///
     /// Before every Play (ShellPlay, beside Thornswood.ini) and from Fix
     /// (Upkeep), only for a file that is missing or not the bytes Thornswood
@@ -18,11 +18,12 @@ namespace Thornswood
     /// from, and the files go to Paths.Game.
     ///
     /// A game whose files differ from the ones the recipes were written
-    /// against (another Skyrim build, or archives a mod replaced) makes
-    /// nothing, and the line says which of the game's files differs. Nothing
-    /// stands in for a file that could not be made: the game shows its own
-    /// menu and the boards have no mesh until the game is on the build
-    /// Thornswood pins, and Scan says so.
+    /// against (another Skyrim build, archives a mod replaced, or another
+    /// version of SkyUI, SkyHUD or moreHUD than the collection's) makes
+    /// nothing, and the line says which file differs. Nothing stands in for a
+    /// file that could not be made: the game shows its own menu, the boards
+    /// have no mesh and the mods' menus show gold values until the game and
+    /// the collection are the ones Thornswood pins, and Scan says so.
     ///
     /// Each file is written beside its place and moved in. The name in the
     /// game folder is taken off first, whatever the layout: in an own folder
@@ -32,7 +33,7 @@ namespace Thornswood
     /// </summary>
     static class MadeFromGame
     {
-        /// <summary>The three, under the game folder, that are missing or not the bytes Thornswood makes.</summary>
+        /// <summary>The files, under the game folder, that are missing or not the bytes Thornswood makes.</summary>
         public static List<string> OutOfDate()
         {
             var l = new List<string>();
@@ -40,15 +41,15 @@ namespace Thornswood
             return l;
         }
 
-        /// <summary>Makes the three from this machine's game, without writing anything.</summary>
+        /// <summary>Makes them from this machine's game, without writing anything.</summary>
         public static List<FromGameFile> Make()
         {
             return FromGame.Build(Path.Combine(Paths.Skyrim, "Data"));
         }
 
         /// <summary>
-        /// Makes and writes whichever of the three is out of date. Returns a
-        /// line for the log, or null when all three were already right.
+        /// Makes and writes whichever is out of date. Returns a line for the
+        /// log, or null when all of them were already right.
         /// Throws when a made file cannot be written.
         /// </summary>
         public static string Ensure()
@@ -67,8 +68,33 @@ namespace Thornswood
             var said = new List<string>();
             if (wrote.Count > 0) said.Add("Made " + string.Join(", ", wrote.ToArray()) + " from your game's own files.");
             if (not.Count > 0)
-                said.Add("Could not make " + string.Join("; ", not.ToArray()) + ". Until that is put right the game shows its own main menu, and the notice boards have no mesh.");
+                said.Add("Could not make " + string.Join("; ", not.ToArray()) + ". Until that is put right " + Shows(off) + ".");
             return string.Join(" ", said.ToArray());
+        }
+
+        /// <summary>Whether the file is one of the collection's mods' menus rather than one of the game's.</summary>
+        public static bool FromMod(string rel)
+        {
+            foreach (MenuRecipe m in MenuRecipe.Mods) if (rel.Equals(m.Path, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>What the game shows while these files are not made, as a clause.</summary>
+        public static string Shows(List<string> rels)
+        {
+            bool menu = false, board = false, mods = false;
+            foreach (string rel in rels)
+            {
+                if (rel.Equals(FromGame.MenuFile, StringComparison.OrdinalIgnoreCase)) menu = true;
+                else if (FromMod(rel)) mods = true;
+                else board = true;
+            }
+            var l = new List<string>();
+            if (menu) l.Add("the game shows its own main menu");
+            if (board) l.Add("the notice boards have no mesh");
+            if (mods) l.Add("the item menus and the line under an item you look at still show gold values");
+            if (l.Count == 1) return l[0];
+            return string.Join(", ", l.GetRange(0, l.Count - 1).ToArray()) + " and " + l[l.Count - 1];
         }
 
         static void Write(string dest, byte[] bytes)

@@ -11,16 +11,13 @@
 // propley not able to be picked up off the ground but are still found in chests
 // and able to be looted when they shouoldnt be."
 //
-// THE GROUND HALF ALWAYS WORKED AND THE CHEST HALF NEVER DID, for a reason
-// that is invisible from the JavaScript: a container's contents are copied out
-// of the plugin lazily, by EnsureBaseContainerAdded, and the engine's own
-// Activate calls that AFTER this hook has run and returned. So the read came
-// back empty every time, nothing was taken, and the chest then opened with
-// everything Bethesda put in it.
-//
-// So the thing this file checks hardest is the SHAPE OF THE PRESS, not the
-// classification: what happens when the inventory is empty at the moment of
-// the press and full a moment later, which is every chest in Skyrim.
+// THE GROUND HALF ALWAYS WORKED AND THE CHEST HALF NEVER DID, because a
+// container's contents were copied out of the plugin by the engine
+// (EnsureBaseContainerAdded) after this block's hook had run. The gamemode
+// chased that with timers. Now the engine never puts a record's contents in a
+// container (forbiddenBaseContainer, #3078), so this block does not touch a
+// container at all, and this file checks that it does not: no write, no mark,
+// no timer. tests\test-3078-containers-empty.js checks the setting itself.
 //
 // It drives the REAL spoils block out of gamemode.js over a fake mp and a fake
 // clock, the way test-needs.js does.
@@ -125,239 +122,83 @@ if (block) {
   const api = rig();
   const CHEST = api.kind('chest:Skyrim.esm', 'CONT');
   const SWORD = api.kind('sword:Skyrim.esm', 'WEAP');
-  const HELM = api.kind('helm:Skyrim.esm', 'ARMO');
-  const ARROW = api.kind('arrow:Skyrim.esm', 'AMMO');
   const BREAD = api.kind('bread:Skyrim.esm', 'FOOD');
   const GOLD = api.GOLD;
   const PICK = api.idOf('pick:X.esm');
 
   // ------------------------------------------------------ what counts
+  // Nothing the world placed is handed over, so nothing here sorts what is a
+  // spoil: a container starts empty (#3078) and the floor is switched off in
+  // Thornswood-Last.esp (#3077). What stays is what other blocks ask of it.
   {
-    yes('a weapon is a spoil', api.isSpoil(SWORD));
-    yes('armour is a spoil', api.isSpoil(HELM));
-    yes('ammunition is a spoil', api.isSpoil(ARROW));
-    yes('gold is a spoil', api.isSpoil(GOLD));
-    yes('a tool off the TOOLS table is a spoil', api.isSpoil(PICK));
-    yes('bread is not', !api.isSpoil(BREAD));
-    // Not knowing has to mean not touching. One unreadable record would
-    // otherwise empty every chest that held one.
-    yes('a form the engine cannot name is left alone', !api.isSpoil(0xdead));
+    yes('there is no spoil list left to sort by: no isSpoil, SPOIL_TYPES, isCutOut or isJailKey',
+        api.isSpoil === undefined && api.isJailKey === undefined &&
+        !/function isSpoil\(|SPOIL_TYPES|isCutOut|CUT_OUTS|isJailKey/.test(block));
+    yes('the engine still names a record kind', api.kindOf(SWORD) === 'WEAP' && api.kindOf(BREAD) === 'FOOD');
+    yes('a form the engine cannot name is an empty answer', api.kindOf(0xdead) === '');
+    yes('a tool off the TOOLS table is still known', api.isTool(PICK) && !api.isTool(BREAD));
+    yes('and gold is still Gold001', GOLD === 0x0000000F);
   }
 
-  // ------------------------------------------------------ the ground
+  /*
+    ------------------------------------------------------ THE FLOOR
+
+    Patrick, 21 Oct 2026 (#3077): "don't spawn floor items anymore at all no
+    matter what they are". Nothing a plugin placed lies on the floor any more:
+    Thornswood-Last.esp switches every one off (tests/test-3077-floor-items.js
+    holds the plugin to that). So a press on anything that is not a container
+    is never refused here, whoever placed it, and the block carries no floor
+    refusal and no coin purse rule to fall back on.
+  */
   {
     const placed = 0x00012345;   // below 0xff000000: a plugin put it there
     const dropped = 0xff000123;  // above it: a person put it there
-    const swordNo = api.activate(1, placed, 'sword:Skyrim.esm');
-    yes('a sword Bethesda left on a table does not come up',
-        /put here by the world, not left by a person/.test(swordNo || '') && /not off the ground/.test(swordNo || ''));
-    yes('a sword somebody dropped does', api.activate(1, dropped, 'sword:Skyrim.esm') === null);
-    yes('and bread on a table is still bread',
-        api.activate(1, placed, 'bread:Skyrim.esm') === null);
+    yes('a press on a sword is never refused here, placed or dropped',
+        api.activate(1, placed, 'sword:Skyrim.esm') === null && api.activate(1, dropped, 'sword:Skyrim.esm') === null);
+    const flower = api.kind('flower:Skyrim.esm', 'FLOR');
+    yes('nor on a flora of any kind, and nothing is put back for one',
+        api.activate(7, placed, 'd790c:Skyrim.esm') === null && api.activate(7, placed, 'flower:Skyrim.esm') === null &&
+        api.putBacks.length === 0 && flower > 0);
+    yes('the block has no floor refusal line and no coin purse rule left in it',
+        !/put here by the world/.test(block) && !/isPurse|PURSES|putBack\(/.test(block) &&
+        api.isPurse === undefined && api.PURSES === undefined);
   }
 
   /*
-    ------------------------------------------------------ COIN PURSES
+    ------------------------------------------------------ THE CHEST (#3078)
 
-    Patrick, 24 September, after a playtest: "people can pick up coin pocuhes
-    off the ground that was supposed to be included in no gold lol". A purse is
-    a FLOR whose produce is a leveled list of gold, and the engine rolls it and
-    adds the coin itself, so the press is the only place to stop it.
-  */
-  {
-    const g5 = rig();
-    const flower = g5.kind('flower:Skyrim.esm', 'FLOR');
-    const placed = 0x0001a2b3;
-    let all = Array.isArray(g5.PURSES) && g5.PURSES.length === 6;
-    for (const d of (g5.PURSES || [])) {
-      g5.kind(d, 'FLOR');
-      if (!g5.isSpoil(g5.idOf(d)) || !g5.isPurse || !g5.isPurse(g5.idOf(d))) { all = false; }
-    }
-    yes('all six coin purses are spoils', all);
-    yes('a flower is not a purse and not a spoil', !!g5.isPurse && !g5.isPurse(flower) && !g5.isSpoil(flower));
-
-    const no = g5.activate(7, placed, 'd790c:Skyrim.esm');
-    yes('a coin purse in the world does not come up',
-        /coin purse/.test(no || '') && /put here by the world, not left by a person/.test(no || '') &&
-        /not off the ground/.test(no || ''));
-    yes('and it is put back on the screen of the person who pressed it',
-        g5.putBacks.length === 1 && g5.putBacks[0][0] === 7 && g5.putBacks[0][1] === placed);
-    yes('a Thieves Guild purse does not come up either',
-        /coin purse/.test(g5.activate(7, placed + 1, 'd8e8c:Skyrim.esm') || ''));
-    const before = g5.putBacks.length;
-    yes('a flower still picks', g5.activate(7, placed + 2, 'flower:Skyrim.esm') === null);
-    yes('and nothing is put back for it', g5.putBacks.length === before);
-
-    // The same block with no putBack in reach still refuses rather than
-    // throwing.
-    const bare = new Function('globalThis', 'mp', 'console', 'idOf', 'TOOLS', 'setTimeout',
-      block + '\nreturn globalThis.__thornswoodSpoils;')(
-      {}, { makeProperty: function () { }, get: function () { }, set: function () { },
-            lookupEspmRecordById: function () { return { record: { type: 'FLOR' } }; } },
-      { log: function () { } }, function (d) { return d === 'd790c:Skyrim.esm' ? 0xd790c : 0x999; },
-      {}, function () { });
-    let threw = false, ans = null;
-    try { ans = bare.activate(7, placed, 'd790c:Skyrim.esm'); } catch (e) { threw = true; }
-    yes('with no putBack about, a purse is still refused and nothing throws', !threw && /coin purse/.test(ans || ''));
-
-    // #627: idOf answering 0 on the first press must not freeze an empty map.
-    {
-      const placed2 = 0x0002c3d4;
-      const store = {};
-      const kinds = {};
-      const timers = [];
-      const putBacks = [];
-      const said = [];
-      const ids = {};
-      let nextId = 0x500;
-      let ready = false;
-      function realId(desc) {
-        if (!ids[desc]) { ids[desc] = nextId++; }
-        return ids[desc];
-      }
-      function lazyId(desc) {
-        if (!ready) { return 0; }
-        return realId(desc);
-      }
-      const Fake = {
-        makeProperty: function () { },
-        get: function (id, key) {
-          const row = store[id] || {};
-          if (key === 'inventory') { return { entries: (row.inventory || []).slice() }; }
-          return row[key];
-        },
-        set: function (id, key, v) {
-          if (!store[id]) { store[id] = {}; }
-          if (key === 'inventory') { store[id].inventory = (v && v.entries) || []; return; }
-          store[id][key] = v;
-        },
-        lookupEspmRecordById: function (baseId) {
-          const t = kinds[baseId];
-          return t ? { record: { type: t } } : null;
-        }
-      };
-      const lazy = new Function(
-        'globalThis', 'mp', 'console', 'idOf', 'TOOLS', 'setTimeout', 'putBack',
-        'Math', 'Number', 'String', 'Object', 'Array', 'Date',
-        block + '\nreturn globalThis.__thornswoodSpoils;')(
-        {}, Fake, { log: function (s) { said.push(String(s)); } },
-        lazyId,
-        { pick: { accept: ['pick:X.esm'] }, shovel: { accept: ['shovel:X.esm'] } },
-        function (f, ms) { timers.push({ f: f, ms: ms }); return timers.length; },
-        function (actorId, refrId) { putBacks.push([actorId, refrId]); },
-        Math, Number, String, Object, Array, Date);
-      const first = lazy.activate(3, placed2, 'd790c:Skyrim.esm');
-      yes('a purse pressed before the load order is ready is not yet known as a purse',
-          first === null);
-      ready = true;
-      for (const d of (lazy.PURSES || [])) { kinds[realId(d)] = 'FLOR'; }
-      const second = lazy.activate(3, placed2, 'd790c:Skyrim.esm');
-      yes('the same purse pressed after idOf works is refused as a purse no person left',
-          /coin purse/.test(second || '') && /put here by the world, not left by a person/.test(second || ''));
-    }
-  }
-
-  /*
-    The list is every FLOR in the load order whose produce is coin, as
-    game\data\harvests.json has them. A rebuilt table with a purse this list lacks
-    is a purse that pays out again, so that fails here.
-  */
-  {
-    const hv = path.join(path.dirname(SRC), 'data', 'harvests.json');
-    if (fs.existsSync(hv)) {
-      const h = JSON.parse(fs.readFileSync(hv, 'utf8'));
-      const un = h.unranked || {};
-      const coin = Object.keys(un).filter(k => {
-        const r = un[k] || {};
-        return /coin/i.test(r.name || '') || /gold/i.test(r.produceName || '') || /purse/i.test(r.editorId || '');
-      }).sort();
-      const listed = (rig().PURSES || []).slice().sort();
-      yes('every coin-giving flora in harvests.json is on the purse list (' + coin.length + ')',
-          coin.length > 0 && coin.every(k => listed.indexOf(k) >= 0));
-      yes('and every purse on the list is in harvests.json', listed.length > 0 && listed.every(k => coin.indexOf(k) >= 0));
-    } else {
-      yes('game\\data\\harvests.json is there to check the purse list against', false);
-    }
-  }
-
-  /*
-    ------------------------------------------------------ THE CHEST
-
-    This is the one that was wrong, and the shape is the whole of it. On the
-    press the container is EMPTY, because the engine has not copied the
-    plugin's contents in yet. It does that immediately afterwards, inside its
-    own Activate, and then the chest opens on somebody's screen.
+    The engine puts nothing of a container's record in it, so whatever is in
+    a chest at the press is somebody's, and the press leaves it exactly as it
+    is: no write, no mark, no timer.
   */
   {
     const chest = 0x00055555;
     const g2 = rig();
-    const C = g2.kind('chest:Skyrim.esm', 'CONT');
+    g2.kind('chest:Skyrim.esm', 'CONT');
     g2.kind('sword:Skyrim.esm', 'WEAP');
     g2.kind('bread:Skyrim.esm', 'FOOD');
     const sword = g2.idOf('sword:Skyrim.esm'), bread = g2.idOf('bread:Skyrim.esm');
-
-    g2.put(chest, []);                       // empty at the moment of the press
-    g2.activate(1, chest, 'chest:Skyrim.esm');
-
-    yes('an empty read takes nothing and records nothing',
-        g2.inv(chest).length === 0 && !g2.alreadyStripped(chest));
-    yes('but it asks to be looked at again', g2.timers.length >= 1);
-    yes('and the first of those is immediate, not a quarter of a second later',
-        g2.timers.some(t => t.ms === 0));
-
-    // The engine fills it, the way EnsureBaseContainerAdded does.
-    g2.put(chest, [
-      { baseId: sword, count: 1 },
+    const stored = [
+      { baseId: sword, count: 3 },
       { baseId: g2.GOLD, count: 60 },
       { baseId: bread, count: 2 }
-    ]);
-    g2.fire(0);
-
-    const left = g2.inv(chest);
-    yes('the second look empties it, on the same press',
-        left.length === 1 && left[0].baseId === bread);
-    yes('and the chest is marked so nobody comes back to it', g2.alreadyStripped(chest));
+    ];
+    g2.put(chest, stored.slice());
+    const answer = g2.activate(1, chest, 'chest:Skyrim.esm');
+    yes('a chest opens as it always did', answer === null);
+    yes('and what a person stored in it stays, sword and gold included',
+        JSON.stringify(g2.inv(chest)) === JSON.stringify(stored));
+    yes('nothing is written on the chest', Object.keys(g2.store[chest]).join() === 'inventory');
+    yes('and no timer is set to come back to it', g2.timers.length === 0);
   }
 
-  // A chest somebody has since put their own swords in is theirs.
+  // Nothing in the block reads or empties a container any more.
   {
-    const chest = 0x00066666;
-    const g3 = rig();
-    g3.kind('chest:Skyrim.esm', 'CONT');
-    g3.kind('sword:Skyrim.esm', 'WEAP');
-    const sword = g3.idOf('sword:Skyrim.esm');
-    g3.put(chest, [{ baseId: sword, count: 1 }]);
-    g3.activate(1, chest, 'chest:Skyrim.esm');
-    yes('the first press empties a chest that was already full', g3.inv(chest).length === 0);
-    // Now somebody stores their own work in it.
-    g3.put(chest, [{ baseId: sword, count: 3 }]);
-    g3.activate(1, chest, 'chest:Skyrim.esm');
-    g3.fire(1000);
-    yes('and a smith who stores their own swords in it keeps them',
-        g3.inv(chest).length === 1 && g3.inv(chest)[0].count === 3);
-  }
-
-  // A chest that is genuinely empty is never recorded as done, or the first
-  // empty chest anybody opened would become a chest nobody could ever be
-  // stopped from filling with Bethesda's loot later.
-  {
-    const chest = 0x00077777;
-    const g4 = rig();
-    g4.kind('chest:Skyrim.esm', 'CONT');
-    g4.activate(1, chest, 'chest:Skyrim.esm');
-    g4.fire(1000);
-    yes('an empty chest is still not marked after the second look',
-        !g4.alreadyStripped(chest));
-  }
-
-  // The timers are the fix. A change that removes them puts the hole back.
-  {
-    const act = src.slice(src.indexOf('function activate(actorId, refrId, baseDesc)'),
-                          src.indexOf('// ------------------------------------------------- where gold comes from --'));
-    yes('the empty read is followed up rather than left to a second press',
-        /strip\(refrId\) === 0/.test(act) && /setTimeout\(again, 0\)/.test(act));
-    yes('and the reason is written next to it',
-        /EnsureBaseContainerAdded/.test(act));
+    yes('there is no strip, no emptied mark and no timer in the spoils block',
+        !/function strip\(/.test(block) && !/thornswoodStripped/.test(block) &&
+        !/STRIPPED_PROPERTY/.test(block) && !/setTimeout/.test(block));
+    yes('and the reason is written in it',
+        /forbiddenBaseContainer/.test(block) && /#3078/.test(block));
   }
 }
 

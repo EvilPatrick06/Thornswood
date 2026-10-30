@@ -14,8 +14,12 @@
 # there (measured 21 Oct 2026). The cloud environment's setup script does run,
 # once, when the environment's image is built, after the repositories are
 # cloned and before any session; each session then starts from that image with
-# the clone moved up to main. So the setup script runs this with --register,
-# which installs now (kept in the image) and adds this script to the user's
+# the clone moved up to main. So the setup script
+# (scripts/dev/cloud-environment-setup.sh holds its text) runs this with
+# --register when the image holds the clone; every session of the
+# environment runs that script, and one with no repository attached, the
+# project chat, has no clone and skips this (#3085). With --register it
+# installs now (kept in the image) and adds this script to the user's
 # Claude settings as a SessionStart hook, which runs it again at every session
 # start against the clone as it is then. A pin that moved since the image was
 # built is installed there, and an unchanged one costs pip about a second.

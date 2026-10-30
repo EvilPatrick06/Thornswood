@@ -53,7 +53,59 @@
   carrying the VPS label (full -OffBox still refuses it). -NetworkOnly -Status
   counts the rules, -NetworkOnly -Remove takes only that group off (the
   rollback), and -DryRunTo writes the script instead, as everywhere else.
-  Fetch the lists again now and then the same way (run it again).
+  Fetch the lists again now and then the same way (run it again). An
+  install on the box puts the same rules on in the same run, before the
+  runner can take a job; until 27 Oct 2026 it put none on, and runner 4
+  needed a -NetworkOnly run after its install (#3956).
+
+  THE SIGNING RUNNER (#3312). A runner records\sign-runners.json lists signs
+  release launchers (release.yml's VPS fallback), and its sign steps reach
+  Microsoft as well as GitHub: the signing client from api.nuget.org, the
+  token exchange, the signing service, the timestamp and a revocation check.
+  The record's "reach" names each host with the Azure service tag whose
+  published ranges hold it, and -NetworkOnly for such a runner lets those
+  tags' ranges through as well, read from Microsoft's Service Tags file
+  (its download page names the week's file, and the file must say it is the
+  Public cloud). The box reads the file and resolves each host, as it reads
+  GitHub's lists, and each host has to answer from inside its tag, or
+  nothing is changed and the host is named: an address resolved once stops
+  holding when a front door moves, a published list does not.
+  Microsoft adds a range to that file at least a week before Azure uses it,
+  so a -NetworkOnly run each week keeps every host reachable. What it does
+  not do: a tag is a whole service's space (AzureCloud.westus2 is every
+  address Azure has in that region), wider than the one host, as GitHub's
+  actions list is. The install registers such a runner with the record's
+  label too, the way a build runner gets its label.
+
+  THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS (#3889). A runner
+  takes any job whose labels it all carries, and the labels come from the
+  workflow file of the ref that runs, so a branch's own copy of a workflow
+  could ask for the signing runner's labels and run there, whatever the
+  workflows on main say (#3550 holds those). What such a job leaves in the
+  runner's folder, its profile or its caches, the next sign job runs with.
+  So a runner records\sign-runners.json lists gets a job-started hook,
+  C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1, which actions/runner
+  runs first in every job, before any of the job's own steps
+  (ACTIONS_RUNNER_HOOK_JOB_STARTED in its .env, read when its service
+  starts). The hook lets a job through only when its
+  repository is this one and its ref and its workflow's ref are both
+  refs/heads/main. Those are the job's github context,
+  which the runner writes over any env a workflow sets (actions/runner
+  v2.337.0, Handlers\ScriptHandler.cs). Refusing ends the job: a failed hook
+  is only a failed step, and a later step marked if: always() still runs
+  (StepsRunner.cs), so the hook stops the Runner.Worker that started it, the
+  job's own process, and the runner reports the job failed and takes the
+  next one (Runner.Listener\JobDispatcher.cs). The hook's folder is SYSTEM's
+  and Administrators' to change; every account may read it. The install
+  writes the hook and the .env line before the service first starts, and
+  -Lock writes both again for every signing runner on the box (and takes the
+  line off any other runner, whose branch jobs it would refuse); a runner
+  already running takes the line at its next start. Main alone, not v tags
+  as well (#3930, Patrick, 27 Oct): a v tag push runs the tagged commit's
+  own copy of a workflow, and a tag can be pushed on any commit, while
+  release.yml now signs only in a run of main's own workflow and hands a
+  tag push over to one, so no job a signing runner should take runs on a
+  tag ref.
 
   WHAT A PULL REQUEST JOB MAY REACH (-OffBox, or -NetworkOnly for the network
   alone). Two guards, put on by the
@@ -63,8 +115,9 @@
       their own ('Thornswood PR runner <account>'), that match only programs
       running as the runner's account (-LocalUser, the account's SID) and
       cover every address except GitHub's (the web, api, git and actions
-      lists of https://api.github.com/meta, fetched when it runs), loopback,
-      and whatever -AllowHost names resolve to then. Windows Firewall puts a
+      lists of https://api.github.com/meta, fetched when it runs, on the
+      machine the rules go on, #3312), loopback, and whatever -AllowHost
+      names resolve to then. Windows Firewall puts a
       block rule above any allow rule, so "block everything, allow GitHub"
       cannot be two rules: the block rules ARE the complement of GitHub's
       ranges. What that does not do: it has no idea of host names (a rule is
@@ -111,8 +164,36 @@
   harness step took 34 to 39 minutes and the 40-minute limit cancelled
   builds that were passing. The heavy jobs ask for a second label,
   thornswood-build, which only the runners records\build-runners.json lists
-  carry (1 to 4). This install registers a listed runner with it;
+  carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
+
+  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The pull request build's
+  fallback (build-pr.yml, launcher-vps) needs nothing of the box, so it asks
+  for thornswood-pr-build alone; main's (build.yml) stays on the box, which
+  traces the gate (#3114, #3874). An -OffBox runner whose name
+  records\pr-build-runners.json's offBox lists (thornswood-pr-one,
+  thornswood-pr-one-2, ... on One) is registered with thornswood-pr-build
+  too and takes them, on One's own cores. It never carries thornswood-build,
+  which only ever means one of the box's build slots (#4010), nor
+  thornswood-vps, so staff notices, the admin service, the release jobs and
+  every other job that needs the box never reach it. Pass -AllowHost pypi.org,files.pythonhosted.org, or the build's
+  ruff install fails closed (WHAT A PULL REQUEST JOB MAY REACH, above).
+  -OffBox -Number n -Remove takes one off again.
+
+  ON THE RUNNER DRIVE (#4048, #3861, Patrick's A on 27 Oct 2026). Off the box
+  Defender scans each runner's folder (step 6), and a fresh runner's first
+  build on One took 7 to 11 times the box's processor time for it. So One's
+  runners live on the Dev Drive scripts\deploy\New-RunnerDrive.ps1 makes,
+  where Defender scans in performance mode instead of not at all. When a
+  volume labelled Thornswood Runners is there and -Root is not given, -OffBox
+  puts the runner in <drive>:\Thornswood-RunnerPR<n>. Its account is shut
+  out of the other runners' folders on that drive as on C:, the drive's own
+  root is left out of the read denies (New-RunnerDrive.ps1 locks it), and
+  the service starts by hand: the drive's startup task attaches the drive
+  and then starts it. -OffBox refuses a -Root on any other drive. To move a
+  runner there, one at a time, in PowerShell run as administrator:
+      .\scripts\deploy\Install-Runner.ps1 -OffBox -Number n -Remove
+      .\scripts\deploy\Install-Runner.ps1 -OffBox -Number n -AllowHost pypi.org,files.pythonhosted.org
 
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
@@ -136,6 +217,21 @@
        PRIORITY TASK, below).
     6. Tells Windows Defender to skip the runner's own folder, so the few
        hundred processes a check starts are not each scanned on the way in.
+    7. Writes the runner's .env so its jobs keep their temp files in its own
+       folder (TEMP IN ITS OWN FOLDER, below).
+
+  TEMP IN ITS OWN FOLDER (#3117). A job's TEMP and TMP were the runner
+  account's own, C:\Users\thornswood-runnerN\AppData\Local\Temp, outside the
+  folder step 6 has Defender skip and outside the job temp folder
+  (_work\_temp) actions/runner empties for every job. Measured on the box on
+  21 October 2026 with four builds running: the box at 80% CPU on average and
+  99.7% at the top, Defender 15 to 31% of it, and 26,214 to 28,472 entries
+  left in each build runner's temp folder, the oldest from 4 October. Each
+  runner's .env (actions/runner reads it when its service starts) now sets
+  TEMP and TMP to its _work\_temp, so what the tests write there is not
+  scanned and is gone after the job. The install writes it before the
+  service first starts; -Lock writes it for every runner on the box and says
+  which runners take it only at their next start.
 
   It needs gh on this machine, signed in as somebody who can administer the
   repository (Patrick): the registration token comes from
@@ -157,8 +253,9 @@
   every runner service there, it locks the runner's folder, and shuts its
   account out of every C:\Thornswood-* folder but its own and Dumps, saying
   which it had to close, takes off a deny an earlier install put on Dumps
-  for it, and it takes off every priority watcher task left on the box. No
-  service is stopped and no job is touched. An install ends by doing the
+  for it, it takes off every priority watcher task left on the box, and it
+  writes each runner's .env (TEMP IN ITS OWN FOLDER). No service is stopped
+  and no job is touched. An install ends by doing the
   same for every runner, so adding one leaves all of them locked.
 
   CRASH DUMPS (#2127, #2488). Patrick decided on 11 October 2026 (#2127)
@@ -205,9 +302,26 @@
   Patrick's decision, "we need to fix it so the servers run on high
   priority" (#2491, Install-ThornswoodServer.ps1 and Install-Voice.ps1).
 
+  A REMOVED ACCOUNT'S PROFILE (#3119). Removing an account leaves its
+  profile, C:\Users\<account>, and Windows gives a later account of the same
+  name C:\Users\<account>.<computer> beside it. A runner's account is a
+  service's, and Windows keeps a service account's registry loaded until the
+  box restarts, even after the service stops and the account is gone; while
+  it is loaded the profile cannot be taken off. Measured on the VPS on 22 Oct
+  2026: removed runners 4 to 8 had their registry loaded hours later, with no
+  logon session and nothing running as them, reg unload was refused, and
+  stopping the Program Compatibility Assistant changed nothing; a new
+  runner 3's registry was still loaded 60 seconds after its service stopped;
+  the restart at 8:45 PM let go of every one. So -Remove, -Lock and the next
+  install of that name take off each profile under a runner account's name
+  whose account is gone, once Windows has let go of it, and say LEFT for one
+  still loaded, until a restart. An install makes no new account while a
+  profile of its name is LEFT, so it never makes a second one; restart the
+  box (scripts\vps\Set-TimeWait.ps1 -Restart) and run it again.
+
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
-  Replacing one stops the job it is running; -Lock does not.
+  Replacing or removing one refuses while it is running a job, and touches nothing (#3889); -Lock does not stop jobs either.
 #>
 [CmdletBinding()]
 param(
@@ -232,8 +346,8 @@ param(
   [switch]$NetworkOnly,
   # Folders the runner's account is shut out of as well as C:\Thornswood*.
   [string[]]$AlsoDeny = @(),
-  # -OffBox or -NetworkOnly: host names a job may reach besides GitHub,
-  # resolved to addresses when it runs (WHAT A PULL REQUEST JOB MAY REACH).
+  # Host names a job may reach besides GitHub, resolved to addresses when it
+  # runs (WHAT A PULL REQUEST JOB MAY REACH), on an install, -Lock or -NetworkOnly.
   [string[]]$AllowHost = @(),
   # -OffBox only: let Defender skip the runner's folder as it does on the VPS.
   [switch]$DefenderSkip,
@@ -274,22 +388,65 @@ if ($Number -gt 1) {
 # mistaken for, or replace, a runner on the VPS. thornswood-pr99 is 15
 # characters, inside the 20 a local account may have.
 $liveFilter = 'Thornswood-*'
+$runnerDrive = ''; $onRunnerDrive = $false
 if ($OffBox) {
   $n = $(if ($Number -gt 1) { '' + $Number } else { '' })
   if (-not $PSBoundParameters.ContainsKey('Root'))       { $Root = 'C:\Thornswood-RunnerPR' + $n }
+  # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, found by
+  # its label, is where a runner goes when the command line names no folder.
+  $runnerDrive = ''
+  # Dry-run metadata is hermetic: no label lookup; an explicit non-C: root
+  # simulates the runner drive. Otherwise the documented C: fixture wins.
+  if (-not $DryRunTo) {
+    try { $runnerDrive = @(Get-Volume -FileSystemLabel 'Thornswood Runners' -ErrorAction Stop | Where-Object { $_.DriveLetter } | ForEach-Object { [string]$_.DriveLetter + ':' })[0] } catch { $runnerDrive = '' }
+  } elseif ($PSBoundParameters.ContainsKey('Root') -and $Root -match '^[D-Zd-z]:\\') { $runnerDrive = $Root.Substring(0, 2).ToUpper() }
+  if (-not $runnerDrive) { $runnerDrive = '' }
+  if ($runnerDrive -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = $runnerDrive + '\Thornswood-RunnerPR' + $n }
   if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-pr' + $n }
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + [Environment]::MachineName.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
-  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
+  $rootDrive = $Root.Substring(0, 2).ToUpper()
+  $onRunnerDrive = ($rootDrive -match '^[A-Z]:$' -and $rootDrive -ne 'C:' -and ($rootDrive -eq $runnerDrive.ToUpper() -or $DryRunTo))
+  if ($rootDrive -ne 'C:' -and $rootDrive -ne $runnerDrive.ToUpper() -and -not $DryRunTo) { Write-Host ('STOP. ' + $Root + ' is on ' + $rootDrive + ', which is not the runner drive (New-RunnerDrive.ps1). A runner goes on C: or on that drive only: the read denies shut its account out of every other drive.') -ForegroundColor Red; exit 1 }
+  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: every job that needs the box itself (staff notices, the admin service, the release jobs) asks for it.' -ForegroundColor Red; exit 1 }
 }
 # HOW MANY BUILD AT ONCE (#2994). A VPS runner that records\build-runners.json
 # lists is registered with its build label as well, so a reinstall keeps the
-# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner never carries it.
+# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner never carries it:
+# One's take the pull request build's fallback by the label below (#4010).
 $registerLabels = $Label
+$buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
 if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
-  $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
+}
+# PULL REQUEST BUILDS (#4010). records\pr-build-runners.json's label is the
+# one the pull request build's fallback asks for: a VPS runner its runners
+# list names carries it (2, not 1, which is kept for main's builds), and so
+# does an off-box runner its offBox names, which still never carries
+# thornswood-vps, so no box-only job reaches it.
+$prRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\pr-build-runners.json') -Raw | ConvertFrom-Json
+if (-not $PSBoundParameters.ContainsKey('Label')) {
+  $takesPr = $(if ($OffBox) { $prRecord.PSObject.Properties['offBox'] -and @($prRecord.offBox) -contains $RunnerName } else { @($prRecord.runners | ForEach-Object { [int]$_ }) -contains $Number })
+  if ($takesPr) { $registerLabels = $registerLabels + ',' + $prRecord.label }
+}
+# THE SIGNING RUNNER (#3312). A VPS runner records\sign-runners.json lists
+# is registered with its label and, under -NetworkOnly, reaches the hosts
+# the record names for the sign steps.
+$signRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\sign-runners.json') -Raw | ConvertFrom-Json
+$signs = (-not $OffBox) -and (@($signRecord.runners | ForEach-Object { [int]$_ }) -contains $Number)
+if ($signs -and -not $PSBoundParameters.ContainsKey('Label')) { $registerLabels = $registerLabels + ',' + $signRecord.label }
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889): where the hook lives on the box, and the accounts of the runners
+# the record lists, by the names -Number gives them, for -Lock.
+$hookPath = 'C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1'
+$signAccounts = @($signRecord.runners | ForEach-Object { 'thornswood-runner' + $(if ([int]$_ -gt 1) { '' + [int]$_ } else { '' }) })
+# THE CHECK RUNNERS (#3956). A VPS runner records\check-runners.json lists
+# is registered with its label, so release.yml's check of a signed draft
+# can run on it.
+if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
+  $checkRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\check-runners.json') -Raw | ConvertFrom-Json
+  if (@($checkRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $registerLabels + ',' + $checkRecord.label }
 }
 # On the box, the folders records\runner-isolation.json says no runner may
 # reach that are not C:\Thornswood-* (C:\ProgramData\ssh, the
@@ -381,7 +538,6 @@ function Invoke-Gh {
     # Stand-ins, so a dry run asks GitHub nothing.
     $a = $args -join ' '
     if ($a -match 'registration-token|remove-token') { return 'DRY-RUN-TOKEN-NOT-REAL' }
-    if ($a -match '^api meta') { return '{"web":["140.82.112.0/20","2a0a:a440::/29"],"api":["192.30.252.0/22"],"git":["140.82.112.0/20"],"actions":["4.148.0.0/16"]}' }
     return ('{"runners":[{"name":"' + $RunnerName + '","status":"online (dry run)","busy":false,"labels":[{"name":"' + $Label + '"}]}]}')
   }
   $out = & gh @args 2>$null
@@ -399,6 +555,90 @@ $service = 'actions.runner.' + $Repo.Replace('/', '-') + '.' + $RunnerName
 # icacls by its exit code (#941).
 $lockLib = @'
 $broadSids = @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0')
+# The header's TEMP IN ITS OWN FOLDER (#3117): the runner's .env sends its
+# jobs' TEMP and TMP to the job temp folder actions/runner empties for every
+# job, inside the folder Defender skips. Lines of the runner's own are kept.
+# It is read when the runner's service starts, so one written while the
+# runner runs is said, and waits for its next start.
+# An off-box runner ($ownInstall) also names its own install folder,
+# THORNSWOOD_INSTALL (#3860, Where.ps1 Install): on One the install rule finds
+# Patrick's own game, C:\Thornswood, which its account is denied, and builds
+# stopped on it. Under its own root, never made here, as a box runner sees a
+# machine with no install at all, so no job looks in or writes to his game.
+function Set-RunnerTemp([string]$root, [string]$svcName, [bool]$ownInstall = $false) {
+  $file = Join-Path $root '.env'
+  $temp = Join-Path $root '_work\_temp'
+  $want = @(('TEMP=' + $temp), ('TMP=' + $temp))
+  if ($ownInstall) { $want += ('THORNSWOOD_INSTALL=' + (Join-Path $root 'install')) }
+  $had = @()
+  if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
+  $keep = @($had | Where-Object { $_ -notmatch '^(TEMP|TMP|THORNSWOOD_INSTALL)=' })
+  $new = @($keep) + $want
+  if (($had -join "`n") -eq ($new -join "`n")) { return ($root + ' sends its jobs'' temp files to ' + $temp + ' already') }
+  [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
+  $line = $root + ' now sends its jobs'' temp files to ' + $temp
+  $svc = Get-CimInstance Win32_Service -Filter ("Name='" + $svcName + "'") -EA SilentlyContinue
+  if ($svc -and $svc.State -eq 'Running') { $line += '; its runner is running, so this takes effect when ' + $svcName + ' next starts' }
+  return $line
+}
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889). Set-RunnerHook names $hook as the runner's job-started hook in its
+# .env, or, given '', takes that line off; lines of the runner's own and
+# TEMP and TMP are kept. Like TEMP, the runner reads it when its service
+# starts, so one written while the runner runs is said.
+function Set-RunnerHook([string]$root, [string]$svcName, [string]$hook) {
+  $file = Join-Path $root '.env'
+  $had = @()
+  if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
+  $new = @($had | Where-Object { $_ -notmatch '^ACTIONS_RUNNER_HOOK_JOB_STARTED=' })
+  if ($hook) { $new += ('ACTIONS_RUNNER_HOOK_JOB_STARTED=' + $hook) }
+  $what = $(if ($hook) { ' refuses any job but main''s, through ' + $hook } else { ' has no job-started hook, as a runner that does not sign' })
+  if (($had -join "`n") -eq ($new -join "`n")) { return ($root + $what + ' already') }
+  [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
+  $line = $root + ' now' + $what
+  $svc = Get-CimInstance Win32_Service -Filter ("Name='" + $svcName + "'") -EA SilentlyContinue
+  if ($svc -and $svc.State -eq 'Running') { $line += '; its runner is running, so this takes effect when ' + $svcName + ' next starts' }
+  return $line
+}
+# Writes the hook to $path, in a folder only SYSTEM and Administrators may
+# change and every account may read (a runner's job runs it as the runner's
+# account), and reads the rules back. It throws, and the .env is not
+# pointed at it, when the folder is not that.
+function Set-RunnerHookFile([string]$path, [string]$text) {
+  $ErrorActionPreference = 'Continue'
+  $dir = Split-Path -Parent $path
+  if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+  # Every account may make a folder in C:\ProgramData, and a folder's owner
+  # may change its rules whatever they say, so the folder and what is in it
+  # are given to Administrators, and every rule anybody put on them goes,
+  # before the folder gets its own.
+  $steps = @(
+    @{ What = 'give ' + $dir + ' to Administrators'; Args = @($dir, '/setowner', '*S-1-5-32-544', '/T') },
+    @{ What = 'take every rule off ' + $dir; Args = @($dir, '/reset', '/T') },
+    @{ What = 'give ' + $dir + ' its rules'; Args = @($dir, '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX') },
+    @{ What = 'stop ' + $dir + ' taking rules from above it'; Args = @($dir, '/inheritance:r') })
+  foreach ($st in $steps) {
+    $out = & icacls.exe @($st.Args + @('/C', '/Q')) 2>&1
+    if ($LASTEXITCODE -ne 0) { throw ('icacls could not ' + $st.What + ': ' + (($out | ForEach-Object { "$_" }) -join ' ')) }
+  }
+  [IO.File]::WriteAllText($path, $text, (New-Object Text.UTF8Encoding($true)))
+  $out = & icacls.exe $path /setowner '*S-1-5-32-544' /C /Q 2>&1
+  if ($LASTEXITCODE -ne 0) { throw ('icacls could not give ' + $path + ' to Administrators: ' + (($out | ForEach-Object { "$_" }) -join ' ')) }
+  # Read back: the folder and the file are Administrators', only SYSTEM and
+  # Administrators may write, and nothing is taken from above the folder.
+  $admins = @('S-1-5-18', 'S-1-5-32-544')
+  $writes = [int]([Security.AccessControl.FileSystemRights]'WriteData, AppendData, WriteExtendedAttributes, WriteAttributes, Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership')
+  foreach ($p in $dir, $path) {
+    $acl = Get-Acl -LiteralPath $p
+    $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+    if ($admins -notcontains $owner) { throw ($p + ' is owned by ' + $owner + ', not Administrators, so the hook was not trusted') }
+    $open = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
+              Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $admins -notcontains $_.IdentityReference.Value -and ([int]$_.FileSystemRights -band $writes) })
+    if ($open.Count) { throw ($p + ' may be changed by ' + (@($open | ForEach-Object { $_.IdentityReference.Value }) -join ', ') + ', so the hook was not trusted') }
+  }
+  if (-not (Get-Acl -LiteralPath $dir).AreAccessRulesProtected) { throw ($dir + ' still takes rules from above it, so the hook was not trusted') }
+  $path + ': the signing runner''s job-started hook, which only SYSTEM and Administrators may change'
+}
 function Lock-RunnerRoot([string]$root, [string]$acct) {
   $ErrorActionPreference = 'Continue'
   $out = & icacls.exe $root /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' ($acct + ':(OI)(CI)M') /C /Q 2>&1
@@ -464,13 +704,54 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
     try { $rules = @((Get-Acl -LiteralPath $d.FullName -ErrorAction Stop).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) }
     catch { $acct + ': the rules on ' + $d.FullName + ' could not be read (' + $_.Exception.Message + '), so it is counted as one it could read' }
     if ($null -ne $rules -and @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }).Count) { $had++; continue }
-    $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
+    # CREATOR OWNER (S-1-3-0) is not counted for the runner's account: Windows
+    # gives it only on what an account makes there itself, and a runner
+    # account that may make nothing there gets nothing from it. The admin
+    # service's folder carries one for its log and state (ServiceAccount.ps1),
+    # and on 27 Oct 2026 that alone named it as one runners 1 to 3 COULD READ,
+    # which they could not (#3956). What it gives the service that does write
+    # there, and every other task running as that same account, is not this
+    # check's question (#4076, #4077). The deny goes on either way.
+    $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $_.IdentityReference.Value -ne 'S-1-3-0' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
     $null = & icacls.exe $d.FullName /deny ($acct + ':(OI)(CI)F') /C /Q 2>&1
     if ($LASTEXITCODE -ne 0) { throw ('icacls could not shut ' + $acct + ' out of ' + $d.FullName) }
     if ($open) { $wasOpen += $d.FullName } else { $shut++ }
   }
   foreach ($w in $wasOpen) { $acct + ' COULD READ ' + $w + ' until now; shut out of it' }
   $acct + ': already shut out of ' + $had + ' folder(s)' + $(if ($shut) { ', and a deny added on ' + $shut + ' that were closed to it anyway' } else { '' })
+}
+# What -Remove runs: takes the account's deny off the same folders
+# Close-RunnerAccount puts it on, its own folder aside, and reads each one
+# back. The deny sits on each folder only, (OI)(CI) and inherited below, so
+# taking it off there takes it off what is below too. Until #3112 -Remove
+# took it off with icacls /T, which rewrote every file under each folder one
+# by one: on 21 Oct 2026 removing runner 8 sat over ten minutes on
+# C:\Users\Administrator alone. Read on the box on 22 Oct 2026: 13,987
+# folders under the 27 that are denied, and not one deny by name for a runner
+# account below them, so there was nothing below for /T to find. A line that
+# starts COULD NOT names a folder the deny is still on.
+function Open-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\', [string]$filter = 'Thornswood-*', [string[]]$also = @()) {
+  $ErrorActionPreference = 'Continue'
+  $sid = ''
+  if ($acct.StartsWith('*')) { $sid = $acct.Substring(1) }
+  else {
+    try { $sid = (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { return ($acct + ': no account of that name on this box, so it has no deny to take off: ' + $_.Exception.Message) }
+  }
+  $off = 0
+  $dirs = @(@(Get-ChildItem -LiteralPath $parent -Directory -Filter $filter -EA SilentlyContinue) +
+            @($also | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | ForEach-Object { Get-Item -LiteralPath $_ }))
+  foreach ($d in $dirs) {
+    if ($d.FullName -eq $own) { continue }
+    $mine = { @((Get-Acl -LiteralPath $d.FullName -ErrorAction Stop).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }) }
+    try {
+      if (-not (& $mine).Count) { continue }
+      $null = & icacls.exe $d.FullName /remove:d ('*' + $sid) /C /Q 2>&1
+      if ($LASTEXITCODE -ne 0 -or (& $mine).Count) { 'COULD NOT take ' + $acct + '''s deny off ' + $d.FullName; continue }
+      $off++
+    } catch { 'COULD NOT read the rules on ' + $d.FullName + ', so ' + $acct + '''s deny may still be on it: ' + $_.Exception.Message }
+  }
+  $acct + ': deny taken off ' + $off + ' folder(s)'
 }
 # Says, once for the box, what each $leave folder is: Lock-VpsFolders.ps1's,
 # and whether Users, Everyone or Authenticated Users still reach it, which
@@ -483,6 +764,62 @@ function Show-LeftFolders([string]$parent = 'C:\', [string[]]$leave = @()) {
     $broad = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $broadSids -contains $_.IdentityReference.Value })
     if ($broad.Count) { $p + ' is left to Lock-VpsFolders.ps1 (#2127), and USERS STILL REACH IT, so every runner may read it: run .\scripts\vps\Remote.ps1 -File .\scripts\vps\Lock-VpsFolders.ps1 from the repository' }
     else { $p + ' is left to Lock-VpsFolders.ps1 (#2127): no deny from here, and Users do not reach it' }
+  }
+}
+# The profile a removed runner account leaves (#3119, the header's A REMOVED
+# ACCOUNT'S PROFILE). $like is the folder names under C:\Users to look at
+# ('thornswood-runner3' and 'thornswood-runner3.*' for one account,
+# 'thornswood-runner*' for the box). A profile whose SID still names an
+# account is that account's and is left alone. One whose account is gone is
+# taken off once Windows has let go of its registry, and said LEFT while it
+# has not; a folder of that name no profile owns goes too. Each line it says
+# that starts LEFT names one still there and why. Test-RunnerSidAlive is its
+# own function so tests\test-runner-lock.ps1 can stand in for it off Windows.
+function Test-RunnerSidAlive([string]$sid) {
+  if (Get-LocalUser -SID $sid -EA SilentlyContinue) { return $true }
+  try { $null = (New-Object Security.Principal.SecurityIdentifier($sid)).Translate([Security.Principal.NTAccount]); $true } catch { $false }
+}
+function Remove-LeftProfiles([string[]]$like, [string]$users = 'C:\Users') {
+  $ErrorActionPreference = 'Continue'
+  $owned = @{}
+  foreach ($p in @(Get-CimInstance Win32_UserProfile -EA SilentlyContinue)) {
+    $path = '' + $p.LocalPath
+    $leaf = Split-Path -Leaf $path
+    if (-not @($like | Where-Object { $leaf -like $_ }).Count) { continue }
+    $owned[$leaf.ToLowerInvariant()] = $true
+    if (Test-RunnerSidAlive $p.SID) { continue }
+    if ($p.Loaded) { 'LEFT ' + $path + ': its account is gone and Windows keeps its registry loaded until the box restarts; the next -Lock or install after a restart takes it off'; continue }
+    try { $p | Remove-CimInstance -EA Stop; 'took off ' + $path + ', the profile of a removed account (#3119)' }
+    catch { 'LEFT ' + $path + ': its account is gone and it could not be taken off: ' + $_.Exception.Message }
+  }
+  foreach ($d in @(Get-ChildItem -LiteralPath $users -Directory -EA SilentlyContinue)) {
+    if ($owned.ContainsKey($d.Name.ToLowerInvariant()) -or -not @($like | Where-Object { $d.Name -like $_ }).Count) { continue }
+    Remove-Item -LiteralPath $d.FullName -Recurse -Force -EA SilentlyContinue
+    if (Test-Path -LiteralPath $d.FullName) { 'LEFT ' + $d.FullName + ': no profile owns it and something holds a file in it' }
+    else { 'took off ' + $d.FullName + ', a profile folder no account owned (#3119)' }
+  }
+}
+# A runner is never taken off mid-job or by halves (#3889, 30 Oct: a job
+# started between the idle check and a reinstall, Stop-Service and the removal
+# of the old configuration failed without a word, the old listener kept running
+# with its files open, and runner 3 was left with no service). The install and
+# -Remove both ask this first, and stop with what is wrong.
+function Get-RunnerProcesses([string]$root) {
+  # -EA Stop: a process list that cannot be read is a stop, never an empty list.
+  @(Get-CimInstance Win32_Process -EA Stop | Where-Object { ('' + $_.ExecutablePath) -like ($root.TrimEnd('\') + '\*') })
+}
+function Assert-RunnerIdle([string]$root) {
+  $worker = @(Get-RunnerProcesses $root | Where-Object { $_.Name -eq 'Runner.Worker.exe' })
+  if ($worker.Count) { throw ('this runner is running a job (Runner.Worker ' + (($worker | ForEach-Object { $_.ProcessId }) -join ', ') + '); nothing was changed. Run it again once -Status says it is idle.') }
+}
+function Stop-RunnerHere([string]$root, [string]$svc) {
+  if (Get-Service -Name $svc -EA SilentlyContinue) { Stop-Service -Name $svc -Force -EA Stop }
+  $left = @(Get-RunnerProcesses $root)
+  if ($left.Count) { throw ('still running from ' + $root + ' after the stop: ' + (($left | ForEach-Object { $_.Name + ' ' + $_.ProcessId }) -join ', ')) }
+  if (Get-Service -Name $svc -EA SilentlyContinue) {
+    & sc.exe delete $svc 2>&1 | Out-Null
+    if (Get-Service -Name $svc -EA SilentlyContinue) { throw ('the service ' + $svc + ' is still registered after sc.exe delete') }
+    'the service that was there is removed'
   }
 }
 '@
@@ -509,6 +846,71 @@ function Remove-RunnerWatchers([string]$prefix = 'Thornswood Runner') {
   }
 }
 '@
+
+# ------------------------------------------------- the signing runner's hook --
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889). $hookLib decides; tests\test-runner-hook.ps1 lifts it out and
+# runs it against every kind of ref. $hookText is the whole hook as the box
+# gets it, for this repository.
+$hookLib = @'
+# '' when a job of $repo may run on the signing runner, else why not.
+# Repository names are matched as GitHub matches them, without case; a ref
+# is matched as git does, with case. GITHUB_WORKFLOW_REF has to be a file
+# of this repository's .github/workflows, then @ and the job's own ref: a
+# run of main's copy of the workflow (#3930: a v tag's copy is the tagged
+# commit's own, which nothing reviewed).
+function Test-SignJobRef([string]$repo, [string]$repository, [string]$ref, [string]$workflowRef) {
+  if (-not $repository -or -not $ref -or -not $workflowRef) { return 'the job does not say its repository, its ref and its workflow (GITHUB_REPOSITORY, GITHUB_REF, GITHUB_WORKFLOW_REF)' }
+  if ($repository -ne $repo) { return ('it is a job of ' + $repository + ', and this runner signs for ' + $repo + ' alone') }
+  if ($ref -cne 'refs/heads/main') { return ('it runs ' + $ref + ', which is not main') }
+  if (-not $workflowRef.EndsWith('@' + $ref, [StringComparison]::Ordinal)) { return ('its workflow, ' + $workflowRef + ', is not the copy on ' + $ref) }
+  $file = $workflowRef.Substring(0, $workflowRef.Length - $ref.Length - 1)
+  if (-not $file.StartsWith($repo + '/.github/workflows/', [StringComparison]::OrdinalIgnoreCase) -or $file.Contains('@')) { return ('its workflow, ' + $file + ', is not one of ' + $repo + '''s') }
+  return ''
+}
+'@
+$hookText = @'
+# The signing runner's job-started hook (#3889). scripts\deploy\
+# Install-Runner.ps1 writes it, at every install and -Lock, for the runners
+# records\sign-runners.json lists, which name it in their .env as
+# ACTIONS_RUNNER_HOOK_JOB_STARTED. Only SYSTEM and Administrators may change
+# it; a change here is undone by the next -Lock, so change Install-Runner.ps1.
+#
+# A runner takes any job whose labels it all carries, and the labels come
+# from the workflow file of the ref that runs, so a branch's own copy of a
+# workflow could ask for this runner. actions/runner runs this first in
+# every job, before any of the job's own steps, and it lets a job through
+# only when the job is this repository's and its ref and its workflow's ref
+# are both main. GITHUB_REPOSITORY, GITHUB_REF and
+# GITHUB_WORKFLOW_REF are the job's github context, which the runner writes
+# over any env a workflow sets.
+#
+# Refusing ends the job, not only this step: a failed hook is one failed
+# step, and a later step marked if: always() still runs. So it stops the
+# Runner.Worker that started it, the job's own process, and the runner
+# reports the job failed and takes the next one.
+'@ + "`n`$repo = '" + $Repo.Replace("'", "''") + "'`n" + $hookLib + @'
+$why = Test-SignJobRef $repo $env:GITHUB_REPOSITORY $env:GITHUB_REF $env:GITHUB_WORKFLOW_REF
+if (-not $why) {
+  'The signing runner takes this job: ' + $env:GITHUB_WORKFLOW_REF + ' is main''s (#3889).'
+  exit 0
+}
+'::error::REFUSED on the signing runner (#3889): ' + $why + '. The job is ended here, before any of its steps.'
+$ErrorActionPreference = 'Continue'
+$parent = $null
+try {
+  $me = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID) -EA Stop
+  $parent = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $me.ParentProcessId) -EA Stop
+} catch { '::error::the process that started this hook could not be read: ' + $_.Exception.Message }
+if ($parent -and $parent.Name -eq 'Runner.Worker.exe') {
+  Stop-Process -Id $parent.ProcessId -Force
+} else {
+  '::error::this hook was not started by Runner.Worker.exe' + $(if ($parent) { ' but by ' + $parent.Name }) + ', so the job could not be ended; a later step marked if: always() may still run'
+}
+exit 1
+'@
+$hookLiteral = "'" + $hookText.Replace("'", "''") + "'"
+$signAccountList = '@(' + ((@($signAccounts) | ForEach-Object { "'" + $_ + "'" }) -join ', ') + ')'
 
 # ------------------------------------------------- the off-box guards --
 # The header's WHAT A PULL REQUEST JOB MAY REACH. $rangeLib runs here, on the
@@ -554,6 +956,45 @@ function Get-RunnerBlockRanges([string[]]$allow) {
   }
   $out.ToArray()
 }
+# The address ranges of each service tag in $names, out of the text of
+# Microsoft's Service Tags file (THE SIGNING RUNNER), as a hashtable of name
+# to prefixes. Throws for a file that is not the Public cloud's, or a name it
+# has not exactly once with ranges. The file is near 5 MB, past the 2 MB
+# Windows PowerShell 5.1's ConvertFrom-Json reads, so there it is read with
+# the serializer that cmdlet uses, its limit raised.
+function Read-RunnerServiceTags([string]$text, [string[]]$names) {
+  $text = $text.TrimStart([char]0xFEFF)
+  if ($PSVersionTable.PSVersion.Major -ge 6) {
+    $doc = $text | ConvertFrom-Json
+    $cloud = [string]$doc.cloud
+    $values = @($doc.values | ForEach-Object { @{ Name = [string]$_.name; Prefixes = @($_.properties.addressPrefixes) } })
+  } else {
+    Add-Type -AssemblyName System.Web.Extensions
+    $js = New-Object Web.Script.Serialization.JavaScriptSerializer
+    $js.MaxJsonLength = [int]::MaxValue
+    $doc = $js.DeserializeObject($text)
+    $cloud = [string]$doc['cloud']
+    $values = @($doc['values'] | ForEach-Object { @{ Name = [string]$_['name']; Prefixes = @($_['properties']['addressPrefixes']) } })
+  }
+  if ($cloud -ne 'Public') { throw ('the Service Tags file says it is the "' + $cloud + '" cloud, not Public') }
+  $out = @{}
+  foreach ($n in @($names | Where-Object { $_ } | Select-Object -Unique)) {
+    $hit = @($values | Where-Object { $_.Name -ceq $n })
+    if ($hit.Count -ne 1) { throw ('the Service Tags file has ' + $hit.Count + ' tags named ' + $n + ', not one') }
+    $pre = @($hit[0].Prefixes | Where-Object { $_ } | ForEach-Object { [string]$_ })
+    if (-not $pre.Count) { throw ('the Service Tags file gives ' + $n + ' no address range') }
+    $out[$n] = $pre
+  }
+  $out
+}
+# The addresses in $ips that none of $prefixes holds.
+function Get-RunnerReachMisses([string[]]$ips, [string[]]$prefixes) {
+  $rs = @($prefixes | Where-Object { $_ } | ForEach-Object { ConvertTo-RunnerRange $_ })
+  @($ips | Where-Object { $_ } | Where-Object {
+    $a = ConvertTo-RunnerRange $_
+    -not @($rs | Where-Object { $_.V -eq $a.V -and $_.Lo -le $a.Lo -and $a.Lo -le $_.Hi }).Count
+  })
+}
 '@
 $guardLib = @'
 # Outbound block rules for the account alone, replacing any it had.
@@ -561,14 +1002,14 @@ function Set-RunnerFirewall([string]$acct, [string]$group, [string[]]$blocks, [i
   $sid = $(if ($acct.StartsWith('*')) { $acct.Substring(1) } else { (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value })
   if (-not @($blocks).Count) { throw 'there is no address list to block, so the firewall was left as it was' }
   @(Get-NetFirewallRule -Group $group -EA SilentlyContinue) | ForEach-Object { Remove-NetFirewallRule -Name $_.Name }
-  $why = 'Install-Runner.ps1 (#1306, #2161): this account reaches GitHub, loopback and the -AllowHost names only. -NetworkOnly -Remove takes it off.'
+  $why = 'Install-Runner.ps1 (#1306, #2161): this account reaches GitHub, loopback, the -AllowHost names and, on the signing runner, the Microsoft tags records\sign-runners.json names (#3312), only. -NetworkOnly -Remove takes it off.'
   $n = 0
   for ($i = 0; $i -lt $blocks.Count; $i += $per) {
     $n++
     $chunk = @($blocks[$i..([Math]::Min($i + $per, $blocks.Count) - 1)])
     New-NetFirewallRule -DisplayName ($group + ' ' + $n) -Group $group -Direction Outbound -Action Block -Profile Any -LocalUser ('D:(A;;CC;;;' + $sid + ')') -RemoteAddress $chunk -Description $why -EA Stop | Out-Null
   }
-  'firewall: ' + $acct + ' may reach GitHub and this machine only, ' + $blocks.Count + ' blocked range(s) in ' + $n + ' outbound rule(s), group ' + $group
+  'firewall: ' + $acct + ' may reach GitHub, this machine and what it was given only, ' + $blocks.Count + ' blocked range(s) in ' + $n + ' outbound rule(s), group ' + $group
 }
 function Remove-RunnerFirewall([string]$group) {
   $r = @(Get-NetFirewallRule -Group $group -EA SilentlyContinue)
@@ -583,11 +1024,16 @@ function Get-RunnerFirewall([string]$group) {
 # The folders outside C:\Thornswood* it is shut out of. $users, $programData
 # and $drives are C:\Users, C:\ProgramData and the other drives except in
 # tests\test-runner-offbox.ps1, which gives scratch folders.
-function Get-RunnerReadDenies([string]$acct, [string]$users = 'C:\Users', [string]$programData = $env:ProgramData, $drives = $null) {
+# $Own is the runner drive (New-RunnerDrive.ps1) when the runner's folder is
+# on it: that drive's root is locked by New-RunnerDrive.ps1 and each folder
+# on it by Lock-RunnerRoot, so its root is not denied, which would leave the
+# account unable to look at the drive its own folder is on.
+function Get-RunnerReadDenies([string]$acct, [string]$users = 'C:\Users', [string]$programData = $env:ProgramData, $drives = $null, [string]$Own = '') {
   if ($null -eq $drives) {
     $sys = '' + $env:SystemDrive
     $drives = @(Get-CimInstance Win32_LogicalDisk -EA SilentlyContinue | Where-Object { ($_.DriveType -eq 2 -or $_.DriveType -eq 3) -and $_.DeviceID -ne $sys } | ForEach-Object { $_.DeviceID + '\' })
   }
+  if ($Own) { $drives = @($drives | Where-Object { $_ -and $_.TrimEnd('\') -ne $Own.TrimEnd('\') }) }
   $name = $acct.Split('\')[-1]
   $keep = @('Default', 'Default User', 'All Users')
   $out = @($drives | Where-Object { $_ })
@@ -614,19 +1060,89 @@ function Open-RunnerReads([string]$acct, [string[]]$paths) {
 # Where the runner is: the guards, as source. $mode is apply, remove or status.
 function Get-GuardScript([string]$mode, [string[]]$blocks = @()) {
   $list = '@(' + ((@($blocks) | ForEach-Object { "'" + $_ + "'" }) -join ', ') + ')'
-  $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n"
+  $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n`$grdOwn = '" + $(if ($onRunnerDrive) { $rootDrive } else { '' }) + "'`n"
   if ($mode -eq 'status') { return $head + 'Get-RunnerFirewall $grdGroup' }
   if ($mode -eq 'network-remove') { return $head + "Remove-RunnerFirewall `$grdGroup`n" }
   if ($mode -eq 'network') { return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`n" }
-  if ($mode -eq 'remove') { return $head + "Remove-RunnerFirewall `$grdGroup`nOpen-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n" }
-  return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`nClose-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n"
+  if ($mode -eq 'remove') { return $head + "Remove-RunnerFirewall `$grdGroup`nOpen-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct -Own `$grdOwn)`n" }
+  return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`nClose-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct -Own `$grdOwn)`n"
 }
-# GitHub's published lists, loopback and -AllowHost, as the ranges to block.
+# WHERE THE LISTS ARE READ (#3312). GitHub's lists, Microsoft's Service Tags
+# and the signing hosts' addresses are read on the machine the rules go on,
+# the box or (-OffBox) this one, by $listLib: its own traffic is what the
+# rules hold, and its name server is the one its jobs ask. That also lets a
+# cloud session run this: its GitHub access refuses api.github.com/meta
+# ("sessions are bound to their configured repositories", 22 Oct 2026), and
+# the box's does not. The script prints one line per fact, which the parse
+# below reads, and stops at the first thing it cannot read.
+$listLib = $rangeLib + @'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+function Get-RunnerWebText([string]$url) {
+  [Text.Encoding]::UTF8.GetString((Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 300).RawContentStream.ToArray())
+}
+function Get-RunnerLists([string[]]$tags, [string[]]$hosts) {
+  try {
+    $meta = (Get-RunnerWebText 'https://api.github.com/meta').TrimStart([char]0xFEFF) | ConvertFrom-Json
+    foreach ($k in 'web', 'api', 'git', 'actions') { foreach ($p in @($meta.$k | Where-Object { $_ })) { "list`tgithub-$k`t$p" } }
+    if (@($tags).Count) {
+      $page = 'https://www.microsoft.com/en-us/download/details.aspx?id=56519'
+      $urls = @([regex]::Matches((Get-RunnerWebText $page), 'https://download\.microsoft\.com/download/[0-9A-Za-z/-]+/ServiceTags_Public_\d{8}\.json') | ForEach-Object { $_.Value } | Select-Object -Unique)
+      if ($urls.Count -ne 1) { throw ('Microsoft''s download page ' + $page + ' names ' + $urls.Count + ' Service Tags files, not one') }
+      "file`t" + $urls[0]
+      $got = Read-RunnerServiceTags (Get-RunnerWebText $urls[0]) $tags
+      foreach ($n in @($got.Keys)) { foreach ($p in $got[$n]) { "list`t$n`t$p" } }
+    }
+    foreach ($h in @($hosts | Where-Object { $_ })) {
+      $ips = @()
+      try { $ips = @([Net.Dns]::GetHostAddresses($h) | ForEach-Object { $_.IPAddressToString }) } catch { throw ($h + ' does not resolve: ' + $_.Exception.Message) }
+      if (-not $ips.Count) { throw ($h + ' resolves to nothing') }
+      foreach ($ip in $ips) { "addr`t$h`t$ip" }
+    }
+  } catch { "error`t" + $_.Exception.Message; exit 1 }
+}
+'@
+# The lists, as @{ Lists = name -> prefixes; Addresses = host -> addresses;
+# File = the Service Tags file read }. GitHub's are github-web, github-api,
+# github-git and github-actions. The dry run asks no one: GitHub's lists
+# are stand-ins, every tag is 198.51.100.0/24 and 2001:db8::/32, and every
+# host answers from 198.51.100.7.
+function Get-PublishedLists([string[]]$tags, [string[]]$hosts) {
+  $out = @{ Lists = @{}; Addresses = @{}; File = '' }
+  if ($DryRunTo) {
+    $out.Lists['github-web'] = @('140.82.112.0/20', '2a0a:a440::/29'); $out.Lists['github-api'] = @('192.30.252.0/22')
+    $out.Lists['github-git'] = @('140.82.112.0/20'); $out.Lists['github-actions'] = @('4.148.0.0/16')
+    foreach ($n in @($tags)) { $out.Lists[$n] = @('198.51.100.0/24', '2001:db8::/32') }
+    foreach ($h in @($hosts)) { $out.Addresses[$h] = @('198.51.100.7') }
+    $out.File = 'a stand-in (dry run)'
+    return $out
+  }
+  $q = { param($a) '@(' + ((@($a) | Where-Object { $_ } | ForEach-Object { "'" + ([string]$_).Replace("'", "''") + "'" }) -join ', ') + ')' }
+  $said = @(Remote ($listLib + "`nGet-RunnerLists " + (& $q $tags) + ' ' + (& $q $hosts) + "`n"))
+  $code = $LASTEXITCODE
+  foreach ($line in $said) {
+    $f = ([string]$line).Split("`t")
+    if ($f[0] -eq 'error' -and $f.Count -ge 2) { throw ('reading the published lists on ' + $where + ': ' + $f[1]) }
+    if ($f[0] -eq 'file' -and $f.Count -eq 2) { $out.File = $f[1] }
+    elseif ($f[0] -eq 'list' -and $f.Count -eq 3) { if (-not $out.Lists.ContainsKey($f[1])) { $out.Lists[$f[1]] = @() }; $out.Lists[$f[1]] += $f[2] }
+    elseif ($f[0] -eq 'addr' -and $f.Count -eq 3) { if (-not $out.Addresses.ContainsKey($f[1])) { $out.Addresses[$f[1]] = @() }; $out.Addresses[$f[1]] += $f[2] }
+  }
+  if ($code -ne 0) { throw ('reading the published lists on ' + $where + ' stopped (exit ' + $code + '): ' + (@($said | Select-Object -Last 3) -join ' ')) }
+  return $out
+}
+# GitHub's published lists, loopback, -AllowHost and, for the signing runner,
+# the Microsoft tags records\sign-runners.json names, as the ranges to block.
 function Get-GuardBlocks {
-  $meta = (Invoke-Gh api meta | Out-String) | ConvertFrom-Json
+  $reach = @()
+  if ($signs) {
+    $reach = @($signRecord.reach.hosts | Where-Object { $_ })
+    if (-not $reach.Count) { throw 'records\sign-runners.json names no host the sign steps reach' }
+  }
+  $lists = Get-PublishedLists @($reach | ForEach-Object { [string]$_.tag } | Select-Object -Unique) @($reach | ForEach-Object { [string]$_.host })
   $allow = @('127.0.0.0/8', '::1/128')
   foreach ($k in 'web', 'api', 'git', 'actions') {
-    $got = @($meta.$k | Where-Object { $_ })
+    $got = @($lists.Lists['github-' + $k] | Where-Object { $_ })
     if (-not $got.Count) { throw ('api.github.com/meta has no ' + $k + ' list, so no firewall rule was made') }
     $allow += $got
   }
@@ -645,31 +1161,66 @@ function Get-GuardBlocks {
     $allow += $ips
     Say ('  -AllowHost ' + $h + ': ' + ($ips -join ', ') + ' (as of now)') 'Yellow'
   }
+  # THE SIGNING RUNNER: each host has to answer, on the machine the rules go
+  # on, from inside its tag, or nothing is changed and the host is named.
+  if ($reach.Count) { Say ('  Microsoft''s Service Tags: ' + $lists.File) 'DarkGray' }
+  foreach ($r in $reach) {
+    $pre = @($lists.Lists[[string]$r.tag] | Where-Object { $_ })
+    if (-not $pre.Count) { throw ('Microsoft''s Service Tags gave ' + $r.tag + ' no range, so no firewall rule was made') }
+    $ips = @($lists.Addresses[[string]$r.host] | Where-Object { $_ })
+    if (-not $ips.Count) { throw ($r.host + ' gave no address on ' + $where + ', so no firewall rule was made') }
+    $miss = @(Get-RunnerReachMisses $ips $pre)
+    if ($miss.Count) { throw ($r.host + ' answers from ' + ($miss -join ', ') + ', which Microsoft''s ' + $r.tag + ' list does not hold, so records\sign-runners.json is out of date for it and no firewall rule was made') }
+    Say ('  ' + $r.host + ': ' + $r.tag + ', ' + $pre.Count + ' published range(s), and it answers from inside them') 'Yellow'
+    $allow += $pre
+  }
   Get-RunnerBlockRanges $allow
 }
 
 # Every runner service on the box, by what Windows says it is: its folder is
 # the one its RunnerService.exe is in, its account the one it runs as. Then
 # the old priority watchers, which belong to no one runner.
-$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n" + @'
+$profileLike = $(if ($OffBox) { 'thornswood-pr*' } else { 'thornswood-runner*' })
+# The signing runners' hook goes with it on the box, never off it: an
+# off-box runner signs nothing (THE SIGNING RUNNER TAKES ONLY MAIN'S AND A V
+# TAG'S JOBS).
+$lockSign = $(if ($OffBox) { "`$signAccounts = @()`n`$hookPath = ''`n`$hookText = ''`n" } else { "`$signAccounts = " + $signAccountList + "`n`$hookPath = '" + $hookPath + "'`n`$hookText = " + $hookLiteral + "`n" })
+$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n`$profileLike = '" + $profileLike + "'`n" + $lockSign + @'
 
 $ErrorActionPreference = 'Continue'
 $bad = 0
 foreach ($line in @(Remove-RunnerWatchers)) { $line; if ($line -like 'COULD NOT*') { $bad++ } }
 $services = @(Get-CimInstance Win32_Service -Filter "Name LIKE 'actions.runner.%'" -EA SilentlyContinue)
 if (-not $services.Count) { 'no runner service on this box' }
+# The hook first, so no .env names a hook that is not there, or one an
+# account other than SYSTEM and Administrators could have changed.
+$hookOk = $false
+if ($signAccounts.Count) {
+  try { Set-RunnerHookFile $hookPath $hookText; $hookOk = $true } catch { 'HOOK NOT WRITTEN, so no signing runner was pointed at it: ' + $_.Exception.Message; $bad++ }
+}
 foreach ($svc in $services) {
   $exe = ('' + $svc.PathName).Trim().Trim('"')
   $root = Split-Path -Parent (Split-Path -Parent $exe)
   $acct = (('' + $svc.StartName) -split '\\')[-1]
-  if ($root -notlike 'C:\Thornswood-Runner*') { $svc.Name + ' runs from ' + $exe + ', not a C:\Thornswood-Runner folder, so it was left alone'; $bad++; continue }
+  if ($root -notmatch '^[A-Za-z]:\\Thornswood-Runner') { $svc.Name + ' runs from ' + $exe + ', not a Thornswood-Runner folder at the root of a drive, so it was left alone'; $bad++; continue }
   if (-not $acct -or $acct -match '^(LocalSystem|LocalService|NetworkService)$') { $svc.Name + ' runs as ' + $svc.StartName + ', not an account of its own, so it was left alone'; $bad++; continue }
   try {
     Lock-RunnerRoot $root $acct
     Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny $leave
+    # ON THE RUNNER DRIVE (New-RunnerDrive.ps1): the other runners' folders there too.
+    if ($root -notlike 'C:\*') { Close-RunnerAccount $acct $root $root.Substring(0, 3) $liveFilter }
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  try { Set-RunnerTemp $root $svc.Name ($acct -like 'thornswood-pr*') } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  if ($signAccounts -contains $acct) {
+    if ($hookOk) { try { Set-RunnerHook $root $svc.Name $hookPath } catch { 'HOOK NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ } }
+  } else {
+    try { Set-RunnerHook $root $svc.Name '' } catch { 'HOOK NOT TAKEN OFF: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  }
 }
 Show-LeftFolders 'C:\' $leave
+# A removed runner's profile is not a lock, so one still left is said and
+# does not fail the lock (A REMOVED ACCOUNT'S PROFILE).
+Remove-LeftProfiles @($profileLike)
 if ($bad) { exit 1 }
 '@
 
@@ -715,6 +1266,10 @@ if (Test-Path '$Root') {
   `$wide = @(`$a.GetAccessRules(`$true, `$true, [Security.Principal.SecurityIdentifier]) | Where-Object { "`$(`$_.AccessControlType)" -eq 'Allow' -and @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0') -contains `$_.IdentityReference.Value })
   if (`$a.AreAccessRulesProtected -and -not `$wide.Count) { 'folder    locked: takes nothing from C:\' } else { 'folder    OPEN to every account on the box: -Lock locks it' }
 }
+`$hl = @(Get-Content -LiteralPath '$Root\.env' -EA SilentlyContinue | Where-Object { `$_ -like 'ACTIONS_RUNNER_HOOK_JOB_STARTED=*' } | ForEach-Object { `$_.Substring(32) })
+if (`$hl.Count) { 'hook      ' + `$hl[-1] + `$(if (Test-Path -LiteralPath `$hl[-1]) { ', refuses any job but main''s (#3889)' } else { ': THE FILE IS NOT THERE. -Lock writes it' }) }
+elseif ('$signs' -eq 'True') { 'hook      NONE: this runner signs and takes a branch''s job. -Lock gives it the hook (#3889)' }
+else { 'hook      none, as a runner that does not sign' }
 `$old = @(Get-RunnerWatchers)
 if (`$old.Count) { 'priority  OLD WATCHER TASK still here: ' + ((`$old | ForEach-Object { `$_.TaskName }) -join ', ') + '. -Lock takes it off' }
 else { 'priority  no watcher task; the service starts the runner at normal' }
@@ -738,9 +1293,14 @@ if ($Remove) {
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
   # The removal token goes on ssh's standard input and reaches config.cmd in
   # its environment, never on a command line (Send-Secret.ps1, issue #451).
-  Send-WithSecret ([string]$tok) ($watcherLib + "`n" + @"
+  # The far side's exit code decides, as for -NetworkOnly -Remove: until
+  # #3214 it was not read, so two removals whose ssh was cut 8 minutes in
+  # ended with exit 0 and half their lines.
+  $said = @(Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+# Never mid-job, before GitHub is told anything (#3889).
+Assert-RunnerIdle '$Root'
 if ((Test-Path '$Root\config.cmd') -and `$t) {
   Push-Location '$Root'
   `$env:ACTIONS_RUNNER_INPUT_TOKEN = `$t; `$t = `$null
@@ -748,33 +1308,28 @@ if ((Test-Path '$Root\config.cmd') -and `$t) {
   Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN -EA SilentlyContinue
   Pop-Location
 }
-Stop-Service -Name '$service' -Force -EA SilentlyContinue
-& sc.exe delete '$service' 2>&1 | Out-Null
+Stop-RunnerHere '$Root' '$service'
 Remove-RunnerWatchers
-foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA SilentlyContinue | ForEach-Object { `$_.FullName }) + $alsoDenyList)) {
-  if (Test-Path -LiteralPath `$d) { & icacls.exe `$d /remove:d '$Account' /T /C /Q 2>&1 | Out-Null }
-}
+Open-RunnerAccount '$Account' '$Root' 'C:\' '$liveFilter' $alsoDenyList
+$(if ($onRunnerDrive) { "Open-RunnerAccount '" + $Account + "' '" + $Root + "' '" + $rootDrive + "\' '" + $liveFilter + "'" })
 $(if ($OffBox) { Get-GuardScript 'remove' } else { Get-GuardScript 'network-remove' })
 # What the install put outside the folder goes too: the Defender skip, which
 # would leave a later folder at this path unscanned, and the account's
 # profile, which Remove-LocalUser leaves (a later account of the same name
 # then gets a <name>.<computer> profile beside it). Measured on the VPS on
 # 20 Oct 2026: C:\Users\thornswood-runner5 and 6 left from removed runners.
+# The profile goes once the account has (A REMOVED ACCOUNT'S PROFILE).
 if (@((Get-MpPreference -EA SilentlyContinue).ExclusionPath) -contains '$Root') {
   try { Remove-MpPreference -ExclusionPath '$Root' -EA Stop; 'Defender scans $Root again' } catch { 'COULD NOT take off the Defender skip for $Root' + ': ' + `$_.Exception.Message }
 }
-`$sid = ''
-`$u = Get-LocalUser -Name '$Account' -EA SilentlyContinue
-if (`$u) { `$sid = `$u.SID.Value }
 Remove-LocalUser -Name '$Account' -EA SilentlyContinue
-if (`$sid) {
-  foreach (`$p in @(Get-CimInstance Win32_UserProfile -Filter "SID='`$sid'" -EA SilentlyContinue)) {
-    try { `$p | Remove-CimInstance -EA Stop; 'profile ' + `$p.LocalPath + ' removed' } catch { 'COULD NOT remove the profile ' + `$p.LocalPath + ': ' + `$_.Exception.Message }
-  }
-}
+Remove-LeftProfiles @('$Account', '$Account.*')
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
-"@) | ForEach-Object { Say "  $_" }
+"@))
+  $code = $LASTEXITCODE
+  $said | ForEach-Object { Say "  $_" }
+  if ($code -ne 0) { Die "the removal did not say it finished (exit $code); the lines above say how far it got, and -Status says what is left." }
   Done
 }
 
@@ -812,6 +1367,28 @@ $zipUrl = "https://github.com/actions/runner/releases/download/v$version/$zipNam
 Say "  actions/runner $version (pinned), SHA-256 $sha" 'Green'
 
 Head "What the build check needs, on $where"
+# A signing runner (#3312) also needs what release.yml's sign steps run:
+# signtool from the Windows SDK, found the way Sign-Artifact.ps1 finds it,
+# and a .NET runtime of 8 or later for Microsoft's signing client, asked of
+# the machine wide install the runner account loads it from.
+$signNeed = ''
+if ($signs) {
+  $signNeed = @'
+$st = $null
+foreach ($r in @("${env:ProgramFiles(x86)}\Windows Kits\10\bin", "$env:ProgramFiles\Windows Kits\10\bin")) {
+  if (-not (Test-Path -LiteralPath $r)) { continue }
+  $st = Get-ChildItem -LiteralPath $r -Recurse -Filter 'signtool.exe' -EA SilentlyContinue | Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName -Descending | Select-Object -First 1
+  if ($st) { break }
+}
+if ($st) { 'HAVE signtool ' + $st.FullName } else { 'MISSING signtool' }
+$pf = $env:ProgramW6432
+if (-not $pf) { $pf = $env:ProgramFiles }
+$rtDir = Join-Path $pf 'dotnet\shared\Microsoft.NETCore.App'
+$rt = @()
+if (Test-Path -LiteralPath $rtDir) { $rt = @(Get-ChildItem -LiteralPath $rtDir -Directory -EA SilentlyContinue | Where-Object { $_.Name -match '^(\d+)\.\d+\.\d+$' -and [int]$Matches[1] -ge 8 } | ForEach-Object { $_.Name }) }
+if ($rt.Count) { 'HAVE dotnet ' + ($rt -join ', ') } else { 'MISSING dotnet' }
+'@
+}
 $need = Remote @"
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine')
 foreach (`$c in 'pwsh','node','python','git') {
@@ -826,16 +1403,28 @@ if (`$msb) { 'HAVE msbuild ' + `$msb } else { 'MISSING msbuild' }
 `$ref = Join-Path `$pf86 'Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1'
 if (Test-Path (Join-Path `$ref 'mscorlib.dll')) { 'HAVE net481refs ' + `$ref } else { 'MISSING net481refs' }
 try { Add-Type -AssemblyName PresentationFramework; 'HAVE wpf' } catch { 'MISSING wpf' }
+$signNeed
 "@
 $need | ForEach-Object { Say "  $_" }
 $missing = @($need | Where-Object { "$_" -like 'MISSING *' } | ForEach-Object { "$_".Substring(8) })
 if ($missing.Count) {
+  $missingNames = $missing -join ', '
   $how = @()
+  # Off the box the fix is on this machine, for all users: the runner's
+  # service account cannot use a per-user or Store install. Python 3.13,
+  # because a per-user 3.12.10 (One, 26 Oct 2026) makes the 3.12.10 installer
+  # modify that copy instead of adding one for all users; the build itself
+  # takes 3.12 from setup-python.
+  if ($OffBox -and $missing -contains 'pwsh') { $how += 'winget install --id Microsoft.PowerShell -e --installer-type wix --scope machine --accept-source-agreements --accept-package-agreements   (PowerShell 7 for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'pwsh' }) }
+  if ($OffBox -and $missing -contains 'python') { $how += 'winget install --id Python.Python.3.13 -e --scope machine --override "/quiet InstallAllUsers=1 PrependPath=1 Include_pip=1 Include_test=0" --accept-source-agreements --accept-package-agreements   (Python for all users, in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'python' }) }
+  if ($OffBox -and ($missing -contains 'node' -or $missing -contains 'git')) { $how += 'winget install --id OpenJS.NodeJS.LTS -e --scope machine   and   winget install --id Git.Git -e --scope machine   (in an elevated PowerShell)'; $missing = @($missing | Where-Object { $_ -ne 'node' -and $_ -ne 'git' }) }
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'msbuild' -or $missing -contains 'net481refs') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeBuildTools -SkipFirewall'   (MSBuild and the .NET Framework 4.8.1 reference assemblies the launcher builds with, #498)" }
+  if ($missing -contains 'signtool') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'   (signtool comes with the Windows SDK the C++ workload brings, #459)" }
+  if ($missing -contains 'dotnet') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeSigningRuntime -SkipFirewall'   (the .NET runtime Microsoft's signing client runs on, #3312)" }
   if ($missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
-  Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
+  Die ("$where is missing " + $missingNames + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }
 
 Head 'Registration token'
@@ -843,14 +1432,19 @@ $token = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/registration-token"
 if (-not $token) { Die "GitHub gave no registration token. gh has to be signed in as somebody who administers $Repo." }
 Say '  got one, good for an hour, not shown' 'Green'
 
-$guard = ''
-if ($OffBox) {
-  Head 'What a pull request job may reach'
-  try { $guard = Get-GuardScript 'apply' @(Get-GuardBlocks) } catch { Die ('nothing was installed: ' + $_.Exception.Message) }
-  Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
-}
+# Off the box, the network and the reads (WHAT A PULL REQUEST JOB MAY REACH).
+# On the box, the network (NETWORK ONLY's rules, Patrick, 11 Oct 2026): until
+# 27 Oct 2026 an install there put none on, and runner 4 took jobs with no
+# outbound limit until a -NetworkOnly run after it (#3956).
+Head 'What a job may reach'
+try { $guard = Get-GuardScript $(if ($OffBox) { 'apply' } else { 'network' }) @(Get-GuardBlocks) } catch { Die ('nothing was installed: ' + $_.Exception.Message) }
+Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
 
 Head "Installing it on $where"
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889). A signing runner's .env names the hook only once the hook is
+# written and read back.
+$installHook = $(if ($signs) { "`$hookText = " + $hookLiteral + "`nSet-RunnerHookFile '" + $hookPath + "' `$hookText`nSet-RunnerHook `$root '" + $service + "' '" + $hookPath + "'" } else { "Set-RunnerHook `$root '" + $service + "' ''" })
 # The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
 # command line and in no file on either machine. Until then it was written
 # into this script, which is long enough to go up as a file, so it sat in
@@ -861,6 +1455,13 @@ $out = Send-WithSecret $token ($lockLib + $watcherLib + "`n" + @"
 if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
 `$root = '$Root'
 `$acct = '$Account'
+
+# A runner already here is taken off first, so a second run replaces it:
+# never one in the middle of a job, and never by halves (Assert-RunnerIdle and
+# Stop-RunnerHere, #3889). Before the account's password changes, so a refusal
+# leaves the old service and the password it was registered with as they were.
+Assert-RunnerIdle `$root
+Stop-RunnerHere `$root '$service'
 
 # The account. In Users and nothing else. A password nobody ever sees: made
 # here, set, handed to config.cmd for the service, and dropped. Letters and
@@ -883,6 +1484,12 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
   Set-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires `$true
   'account ' + `$acct + ' was there, new password set'
 } else {
+  # A profile an earlier account of this name left would make Windows give
+  # this one <name>.<computer> (A REMOVED ACCOUNT'S PROFILE), so it goes
+  # first, and the account is not made while one is still there.
+  `$left = @(Remove-LeftProfiles @(`$acct, (`$acct + '.*')))
+  `$left
+  if (@(`$left | Where-Object { "`$_" -like 'LEFT *' }).Count) { throw ('Nothing was installed: a new ' + `$acct + ' would get a second profile beside the one above. Restart the box (scripts\vps\Set-TimeWait.ps1 -Restart) and run this again.') }
   New-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires -UserMayNotChangePassword -Description 'Thornswood build check runner' | Out-Null
   Add-LocalGroupMember -Group 'Users' -Member `$acct -EA SilentlyContinue
   'account ' + `$acct + ' made'
@@ -893,23 +1500,26 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
 # box Dumps is left to Lock-VpsFolders.ps1 (the header's CRASH DUMPS). The
 # same Close-RunnerAccount -Lock runs, so the two can never disagree again.
 Close-RunnerAccount `$acct `$root 'C:\' '$liveFilter' $alsoDenyList $leaveList
-# Off the box: the network and the reads (WHAT A PULL REQUEST JOB MAY REACH),
-# before the runner can take a job.
+$(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: the other runners' folders there as well.`nClose-RunnerAccount `$acct `$root '" + $rootDrive + "\' '" + $liveFilter + "'" })
+# The guard above, before the runner can take a job.
 $guard
 
-# A runner already here is taken off first, so a second run replaces it.
-`$svc = '$service'
-if (Get-Service -Name `$svc -EA SilentlyContinue) {
-  Stop-Service -Name `$svc -Force -EA SilentlyContinue
-  & sc.exe delete `$svc 2>&1 | Out-Null
-  'the service that was there is removed'
-}
-if (Test-Path (Join-Path `$root '.runner')) {
-  Remove-Item -LiteralPath (Join-Path `$root '.runner'), (Join-Path `$root '.credentials'), (Join-Path `$root '.credentials_rsaparams') -Force -EA SilentlyContinue
-}
+# Everything config.cmd reads as "already configured": actions/runner keeps a
+# runner moved to the broker as .runner_migrated and .credentials_migrated, and
+# a reinstall that left those got "Cannot configure the runner because it is
+# already configured" (#3889, runner 3, 30 Oct).
+`$oldConfig = @('.runner', '.runner_migrated', '.credentials', '.credentials_migrated', '.credentials_rsaparams') | ForEach-Object { Join-Path `$root `$_ }
+foreach (`$f in `$oldConfig) { if (Test-Path -LiteralPath `$f) { Remove-Item -LiteralPath `$f -Force -EA Stop } }
+`$left = @(`$oldConfig | Where-Object { Test-Path -LiteralPath `$_ })
+if (`$left.Count) { throw ('the old configuration is still there: ' + (`$left -join ', ')) }
 if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force | Out-Null }
 # Locked before config.cmd writes GitHub's credentials into it.
 Lock-RunnerRoot `$root `$acct
+# Before the service first starts, so its first job already has it (#3117).
+Set-RunnerTemp `$root '$service' `$$(if ($OffBox) { 'true' } else { 'false' })
+# The signing runner's hook, before the service first starts too, so it never
+# takes a job without it; any other runner has no hook line (#3889).
+$installHook
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {
@@ -958,6 +1568,7 @@ Pop-Location
 `$pw = `$null; `$sec = `$null; `$regToken = `$null
 `$cfg | Where-Object { "`$_" -match 'Runner successfully|Settings Saved|Service .* started|error|Error|failed' } | ForEach-Object { '  config: ' + "`$_".Trim() }
 if (`$code -ne 0) { throw ('config.cmd stopped with ' + `$code) }
+$(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: started by the drive's startup task once the drive is`n# attached, never by Windows before it is.`n& sc.exe config `$svc start= demand 2>&1 | Out-Null`n'service starts by hand; the task Thornswood Runner Drive starts it at startup'" })
 
 # Normal priority, from the service: the service control manager starts
 # RunnerService.exe at Normal, I/O priority 2 and memory priority 5, and

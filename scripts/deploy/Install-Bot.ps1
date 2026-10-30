@@ -71,12 +71,15 @@ param(
   # Staff only, and a different channel: posting closed applications where
   # people apply puts one person's answers in front of the next, and buries
   # the panel. The bot makes it if it is not there.
-  [string]$TicketLog     = 'tickets,ticket-log',
+  [string]$TicketLog     = 'ticket-log,tickets',
   # Where join cards go. The channel called general was renamed, and the bot
   # said so in its log for a day before anybody read it.
   [string]$JoinChannel   = 'welcome-travelers',
-  # Pulled into every ticket thread.
-  [string]$StaffRoles    = 'Owner,Gamemaster,Dev,Loremaster,Moderator',
+  # Pulled into every ticket thread: the council and the ranks that answer
+  # tickets, the same names as bot.py's STAFF_ROLES default and Build-Discord.py's
+  # TICKET_STAFF (#3317). A run that wrote the old list left the council out of
+  # every ticket; bot\test-3317-give.py holds the three together.
+  [string]$StaffRoles    = 'Owner,Co-Owner,Lead Dev,Lead Gamemaster,Lead Loremaster,Lead Moderator,Lead Content Creator,Lead Support,Gamemaster,Dev,Loremaster,Moderator',
   # Pulled into applications to join them and nothing else. Content Creator is
   # social media rather than staff, so it has no business reading a report
   # about somebody or another person's playtest application.
@@ -158,7 +161,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $SetPing) {
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/_pyguard.py', 'bot/card.py', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/factions.json', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/_pyguard.py', 'bot/trust.py', 'bot/card.py', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/factions.json', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -392,8 +395,9 @@ Head 'Staging it'
 # factions.json too: the named factions the Faction Leader form reads from
 # beside itself. A file this list does not name never reaches the box.
 $send = [ordered]@{}
-# _pyguard.py is the Python version check bot.py imports first (#2276).
-foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json') {
+# _pyguard.py is the Python version check bot.py imports first (#2276), and
+# trust.py says which roots it trusts (#3111).
+foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   $send[$f] = $src
@@ -414,6 +418,13 @@ $forBot = @(Remote "if (Test-Path -LiteralPath '$docsWin\data\for-bot') { 'FOR-B
 if ($forBot -notcontains 'FOR-BOT THERE') {
   Die "the site has not made $docsWin\data\for-bot yet, where the bot now reads what the site writes for it. Run .\scripts\deploy\Deploy-Docs.ps1 first, then this again. Nothing on the box was changed."
 }
+# The other way round (issue #3140): the bot writes the site's Known Issues
+# page and roadmap into data\from-bot, which the site makes and reads. A bot
+# sent first could not write them, and the grant below needs the folder there.
+$fromBot = @(Remote "if (Test-Path -LiteralPath '$docsWin\data\from-bot') { 'FROM-BOT THERE' } else { 'NO FROM-BOT' }" | ForEach-Object { "$_".Trim() })
+if ($fromBot -notcontains 'FROM-BOT THERE') {
+  Die "the site has not made $docsWin\data\from-bot yet, where the bot writes the site's known issues and roadmap. Run .\scripts\deploy\Deploy-Docs.ps1 first, then this again. Nothing on the box was changed."
+}
 
 # A stage a run that died part way left behind was never swapped in.
 $made = @(Remote @"
@@ -431,7 +442,7 @@ foreach ($rel in $send.Keys) {
   Say "  $rel" 'Green'
 }
 $hashes = Get-SwapHashes $send
-$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('bot.py', '_pyguard.py', 'card.py')) + $serviceCheckBlock) |
+$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('bot.py', '_pyguard.py', 'trust.py', 'card.py')) + $serviceCheckBlock) |
               ForEach-Object { Say "  $_"; "$_".Trim() })
 if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so the bot was not stopped or changed. The lines above say why.' }
 }
@@ -851,13 +862,18 @@ if (`$LASTEXITCODE -ne 0) { 'PY-LIBS NOT RESET: icacls exited ' + `$LASTEXITCODE
     `$_.IdentityReference.Value -eq 'NT SERVICE\$Service' -and `$_.AccessControlType -eq 'Allow' -and (`$_.FileSystemRights -band `$rx) -eq `$rx })
 })
 if (`$shut.Count) { 'PY-LIBS NOT READABLE by NT SERVICE\${Service}: ' + `$shut.Count + ' file(s), first ' + `$shut[0].Name }
+# The roots the bot will trust: certifi's from these libraries, less what
+# trust.py leaves out (#3111). The bot writes the same set into data\roots.pem
+# at every start; this says it before anything is stopped, and stops the run
+# when the staged trust.py cannot make it from what was installed.
 `$env:PYTHONPATH = '$rootWin\$stageName\py-libs'
-`$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
-if (`$ca -and (Test-Path `$ca)) { 'root certificates at ' + `$ca } else { 'COULD NOT FIND certifi, TLS will fail' }
+`$said = @(& python '$rootWin\$stageName\trust.py' 2>&1 | ForEach-Object { "`$_" })
+if (`$LASTEXITCODE -eq 0) { `$said | ForEach-Object { 'roots: ' + `$_ } } else { 'ROOTS NOT MADE: ' + (`$said -join ' ') }
 "@)
 $libs | ForEach-Object { Say "  $_" }
 if ("$libs" -match 'PIP FAILED') { Die 'the libraries did not install into py-libs, so the bot was not stopped or changed.' }
 if ("$libs" -match 'PY-LIBS NOT') { Die "the bot's account could not read py-libs, so the bot was not stopped or changed." }
+if ("$libs" -match 'ROOTS NOT MADE') { Die "trust.py could not make the bot's roots from the certifi in py-libs, so the bot was not stopped or changed." }
 
 # --------------------------------------------------------------- token ---
 $token = ''
@@ -944,26 +960,18 @@ if ('$($PSBoundParameters.ContainsKey('UpperStaffRoles'))' -eq 'True') {
 # service program sets the same path itself.
 `$env2['PYTHONPATH'] = '$rootWin\py-libs'
 
-# Where Python looks for root certificates. ssl.set_default_verify_paths reads
-# this, and load_default_certs calls it on every platform, so pointing it at
-# certifi's bundle fixes the handshake without touching the Windows store.
-# Said when it cannot be pointed, since the bot then cannot reach Discord.
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-  'NO SSL_CERT_FILE: python is not on the PATH here, so certifi''s bundle could not be found'
-} else {
-  `$eap = `$ErrorActionPreference; `$ErrorActionPreference = 'Continue'
-  try { `$ca = [string](& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1) }
-  finally { `$ErrorActionPreference = `$eap }
-  if (`$ca -and (Test-Path -LiteralPath `$ca)) {
-    `$env2['SSL_CERT_FILE']      = `$ca
-    `$env2['REQUESTS_CA_BUNDLE'] = `$ca
-  } else { 'NO SSL_CERT_FILE: certifi did not name its bundle (' + `$ca + ')' }
-}
+# No SSL_CERT_FILE. The bot writes its own roots at every start and names them
+# itself (bot.py, trust.py, #3111). The one set here was certifi's bundle as
+# this shell's Python found it, with nothing of py-libs on its path, so it
+# was not the certifi requirements.txt pins. One an earlier run wrote goes, so
+# bot.env.json does not name a file the bot no longer reads.
+foreach (`$k in 'SSL_CERT_FILE', 'REQUESTS_CA_BUNDLE') { if (`$env2.Contains(`$k)) { `$env2.Remove(`$k) } }
 [IO.File]::WriteAllText(`$f, (`$env2 | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
 # Locked down, but not so far that the thing meant to read it cannot: SYSTEM,
 # Administrators and this account, plus read for NT SERVICE\ThornswoodBot,
 # given in the same write (Protect-ThornswoodBotEnv in Write-BotToken.ps1,
-# issue #2158). SYSTEM stays for the nightly backup. A file its reader cannot
+# issue #2158), and for the nightly backup's own task account, NT TASK\
+# Thornswood Backup, when the box has it (#2836). A file its reader cannot
 # open is how the swap once failed and left the bot stopped.
 try { Protect-ThornswoodBotEnv -Path `$f -Service '$Service' }
 catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }

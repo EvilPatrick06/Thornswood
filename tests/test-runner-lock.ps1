@@ -103,7 +103,7 @@ Yes '  and both say so when the box does not finish' (([regex]::Matches($text, '
 if ($all) {
     Yes '-Lock finds the runners by their Windows services' ($all -match "Name LIKE 'actions\.runner\.%'")
     Yes '  their folders by where RunnerService.exe is, their accounts by what they run as' ($all -match 'PathName' -and $all -match 'StartName')
-    Yes '  only folders under C:\Thornswood-Runner' ($all.Contains("-notlike 'C:\Thornswood-Runner*'"))
+    Yes '  only Thornswood-Runner folders at a drive''s root: C:, or One''s runner drive (#3861)' ($all.Contains("-notmatch '^[A-Za-z]:\\Thornswood-Runner'"))
     Yes '  and touches no runner: no service stopped, removed or registered' ($all -notmatch '(?i)Stop-Service|Restart-Service|sc\.exe|config\.cmd|Remove-LocalUser|Set-LocalUser')
 }
 # ---- crash dumps (#2127, #2488) ---------------------------------------------------
@@ -131,10 +131,49 @@ Yes ('no other folder deny in the script: Close-RunnerAccount''s and the off-box
     @($denies | Where-Object { $_ -eq '$null = & icacls.exe $d.FullName /deny ($acct + '':(OI)(CI)F'') /C /Q 2>&1' -or $_ -eq '$null = & icacls.exe $p /deny ($acct + '':(OI)(CI)F'') /C /Q 2>&1' }).Count -eq 2)
 if ($all) { Yes '  and -Lock says what Dumps is, once for the box' ($all.Contains("Show-LeftFolders 'C:\' `$leave")) }
 
+# ---- -Remove takes the deny off where the install put it (#3112) ---------------------
+# On 21 Oct 2026 removing runner 8 sat over ten minutes in icacls /T, which
+# rewrote every file under C:\Users\Administrator to take off a deny that is
+# only on its root. -Remove now runs Open-RunnerAccount over the folders
+# Close-RunnerAccount denies, and nothing in the script walks a tree to do it.
+$opens = @([regex]::Matches($text, '(?m)^[ \t]*Open-RunnerAccount [^\r\n]*') | ForEach-Object { $_.Value.Trim() })
+Yes ('-Remove takes the denies off with Open-RunnerAccount, over the install''s folders (' + ($opens -join ' | ') + ')') ($opens.Count -eq 1 -and $opens[0] -eq "Open-RunnerAccount '`$Account' '`$Root' 'C:\' '`$liveFilter' `$alsoDenyList" -and
+    @($calls | Where-Object { $_.Contains("'C:\' '`$liveFilter' `$alsoDenyList") }).Count -eq 1)
+$removeAll = @([regex]::Matches($text, '(?m)^[^\r\n#]*/remove:d[^\r\n]*') | ForEach-Object { $_.Value.Trim() })
+Yes ('  no deny is taken off with /T, folder by folder below it (' + $removeAll.Count + ' /remove:d found)') ($removeAll.Count -ge 3 -and -not @($removeAll | Where-Object { $_ -match '\s/T\b' }).Count)
+
 if ($lib) {
     Yes 'a runner''s folder takes nothing from C:\' ($lib.Contains('/inheritance:r'))
     Yes '  SYSTEM and Administrators Full Control, its own account Modify' ($lib.Contains("'*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' (`$acct + ':(OI)(CI)M')"))
     Yes '  and it is read back, not taken on trust' ($lib -match 'AreAccessRulesProtected' -and $lib -match 'still open')
+}
+
+# ---- TEMP IN ITS OWN FOLDER (#3117) ---------------------------------------------------
+# A job's temp files went to the account's own temp folder, outside the folder
+# Defender skips and never emptied: 26,214 to 28,472 entries per build runner
+# on 21 Oct 2026. The runner's .env sends TEMP and TMP to its _work\_temp.
+if ($lib -and $all) {
+    Yes 'the runner''s .env sends a job''s TEMP and TMP to its own _work\_temp (#3117)' ($lib -match "function Set-RunnerTemp" -and $lib.Contains("Join-Path `$root '_work\_temp'") -and $lib.Contains("@(('TEMP=' + `$temp), ('TMP=' + `$temp))"))
+    Yes '  -Lock writes it for every runner on the box' ($all.Contains('Set-RunnerTemp $root $svc.Name'))
+    Yes '  and the install writes it before config.cmd first starts the service' ($text.IndexOf('Set-RunnerTemp `$root ''$service''') -gt 0 -and $text.IndexOf('Set-RunnerTemp `$root ''$service''') -lt $text.IndexOf('config.cmd --unattended'))
+    # Run on a scratch folder, any OS: no service is asked about there.
+    . ([scriptblock]::Create($lib))
+    function Get-CimInstance { $null }
+    $tr = Join-Path ([IO.Path]::GetTempPath()) ('tw-runner-temp-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tr -Force | Out-Null
+    try {
+        $envFile = Join-Path $tr '.env'
+        [IO.File]::WriteAllText($envFile, "http_proxy=none`r`nTEMP=C:\old`r`n")
+        $said1 = Set-RunnerTemp $tr 'actions.runner.x'
+        $lines = @(Get-Content -LiteralPath $envFile)
+        $want = Join-Path $tr '_work\_temp'
+        Yes 'Set-RunnerTemp keeps the runner''s own lines and puts TEMP and TMP right' ($lines.Count -eq 3 -and $lines[0] -eq 'http_proxy=none' -and $lines -contains ('TEMP=' + $want) -and $lines -contains ('TMP=' + $want) -and $said1 -like '* now sends *')
+        $said2 = Set-RunnerTemp $tr 'actions.runner.x'
+        Yes '  and a second run changes nothing and says so' ($said2 -like '* already' -and @(Get-Content -LiteralPath $envFile).Count -eq 3)
+    } finally {
+        Remove-Item -LiteralPath $tr -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-CimInstance -ErrorAction SilentlyContinue
+    }
 }
 
 # ---- for real, on scratch folders -----------------------------------------------------
@@ -151,8 +190,12 @@ if (-not $icacls -or -not $lib) {
     $open = Join-Path $scratch 'Thornswood-Open'
     $shut = Join-Path $scratch 'Thornswood-Shut'
     $other = Join-Path $scratch 'Other'
+    # A service's folder as ServiceAccount.ps1 leaves it: nothing from its
+    # parent, and CREATOR OWNER on what is made in it (#3956).
+    $creator = Join-Path $scratch 'Thornswood-Service'
     try {
-        foreach ($d in $own, $open, $shut, $other) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+        foreach ($d in $own, $open, $shut, $other, $creator) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+        $null = & icacls.exe $creator /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' ('*' + $me + ':(OI)(CI)F') '*S-1-3-0:(OI)(CI)(IO)M' /C /Q 2>&1
         # What C:\ gives a new folder there, Users may read, on the runner's own
         # folder and on one the account should be shut out of.
         foreach ($d in $own, $open) { $null = & icacls.exe $d /grant '*S-1-5-32-545:(OI)(CI)RX' /C /Q 2>&1 }
@@ -176,9 +219,26 @@ if (-not $icacls -or -not $lib) {
         Yes '  never its own' ((& $deny $own) -eq 0)
         Yes '  and nothing that is not a Thornswood-* folder' ((& $deny $other) -eq 0)
         Yes '  it names the one Users could read' (@($said | Where-Object { $_ -eq ('*S-1-5-7 COULD READ ' + $open + ' until now; shut out of it') }).Count -eq 1)
-        Yes '  and counts the one that was closed anyway' (@($said | Where-Object { $_ -like '*: already shut out of 0 folder(s), and a deny added on 1 that were closed to it anyway' }).Count -eq 1)
+        Yes '  and not a service''s folder whose only wide rule is CREATOR OWNER, which gives an account nothing it did not make (#3956)' ((& $deny $creator) -ge 1 -and @($said | Where-Object { $_ -like ('*COULD READ ' + $creator + '*') }).Count -eq 0)
+        Yes '  and counts the two that were closed anyway' (@($said | Where-Object { $_ -like '*: already shut out of 0 folder(s), and a deny added on 2 that were closed to it anyway' }).Count -eq 1)
         $said = @(Close-RunnerAccount '*S-1-5-7' $own $scratch)
-        Yes '  a second run finds both already shut and names nothing' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: already shut out of 2 folder(s)')
+        Yes '  a second run finds all three already shut and names nothing' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: already shut out of 3 folder(s)')
+
+        # #3112: the deny comes off the folder it was put on, and so off
+        # everything below it, with no walk of the tree.
+        $deep = Join-Path $shut 'a\b\c'
+        New-Item -ItemType Directory -Path $deep -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $deep 'file.txt') -Value 'stand-in'
+        Yes '  the deny reaches a file three folders down (the control)' ((& $deny (Join-Path $deep 'file.txt')) -ge 1)
+        $said = @(Open-RunnerAccount '*S-1-5-7' $own $scratch)
+        Yes 'Open-RunnerAccount: the deny is off all three folders' ((& $deny $open) -eq 0 -and (& $deny $shut) -eq 0 -and (& $deny $creator) -eq 0)
+        Yes '  and off what is below, which it never walked' ((& $deny $deep) -eq 0 -and (& $deny (Join-Path $deep 'file.txt')) -eq 0)
+        Yes '  and it says how many it took it off' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: deny taken off 3 folder(s)')
+        $said = @(Open-RunnerAccount '*S-1-5-7' $own $scratch)
+        Yes '  a second run has none to take off' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: deny taken off 0 folder(s)')
+        $said = @(Open-RunnerAccount ('no-such-runner-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)) $own $scratch)
+        Yes '  an account Windows does not know is said, and nothing stops' ($said.Count -eq 1 -and $said[0] -match '^no-such-runner-\w+: no account of that name on this box, so it has no deny to take off: \S')
+        $null = Close-RunnerAccount '*S-1-5-7' $own $scratch
 
         # #2711: an account name Windows does not know was looked up in a try
         # with an empty catch; now the stop says what the lookup said. And the
@@ -240,6 +300,54 @@ if (-not $icacls -or -not $lib) {
         Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
     }
     Yes 'the scratch folders are gone again' (-not (Test-Path -LiteralPath $scratch))
+}
+
+# ---- a removed account's profile (#3119) ----------------------------------------------
+# The real Remove-LeftProfiles, run against stand-ins for Windows' profile
+# list and its account lookup, so it runs everywhere. On 22 Oct 2026 removed
+# runners 4 to 8 kept their registry loaded until the box restarted, and an
+# install of runner 3's name beside the old profile would have made
+# C:\Users\thornswood-runner3.<computer>.
+$removeAt = $text.IndexOf("Remove-LocalUser -Name '`$Account' -EA SilentlyContinue")
+Yes '-Remove takes off the profile right after the account' ($removeAt -gt 0 -and $text.IndexOf("Remove-LeftProfiles @('`$Account', '`$Account.*')", $removeAt) -gt $removeAt)
+Yes '  and sends the library that does it' ($text.Contains('Send-WithSecret ([string]$tok) ($lockLib + $watcherLib'))
+$newAt = $text.IndexOf('New-LocalUser -Name `$acct')
+$leftAt = $text.IndexOf('`$left = @(Remove-LeftProfiles @(`$acct, (`$acct + ''.*'')))')
+Yes 'an install takes a left profile of its name off before it makes the account' ($leftAt -gt 0 -and $newAt -gt $leftAt)
+Yes '  and makes none while one is LEFT' ($text.IndexOf("Where-Object { `"```$_`" -like 'LEFT *' }).Count) { throw ('Nothing was installed", $leftAt) -gt $leftAt)
+if ($all) { Yes '-Lock tidies every runner account''s left profile, and a left one does not fail the lock' ($all -match '(?m)^Remove-LeftProfiles @\(\$profileLike\)\r?$' -and $text.Contains("`$profileLike = `$(if (`$OffBox) { 'thornswood-pr*' } else { 'thornswood-runner*' })")) }
+if ($lib) {
+    $users = Join-Path ([IO.Path]::GetTempPath()) ('tw-left-profiles-' + [guid]::NewGuid().ToString('N'))
+    try {
+        $r = & {
+            . ([scriptblock]::Create($lib))
+            $state = @{ Profiles = @(); Alive = @(); Gone = @() }
+            function Get-CimInstance { param([string]$ClassName) $state.Profiles | Where-Object { $state.Gone -notcontains $_.SID } }
+            function Remove-CimInstance { param([Parameter(ValueFromPipeline = $true)]$InputObject)
+                process { if ($InputObject.Loaded) { throw 'The process cannot access the file because it is being used by another process.' }
+                          $state.Gone += $InputObject.SID; Remove-Item -LiteralPath $InputObject.LocalPath -Recurse -Force } }
+            function Test-RunnerSidAlive([string]$sid) { $state.Alive -contains $sid }
+            function P([string]$name, [string]$sid, [bool]$loaded) {
+                $path = Join-Path $users $name; $null = New-Item -ItemType Directory -Force -Path $path
+                [pscustomobject]@{ LocalPath = $path; SID = $sid; Loaded = $loaded } }
+            $null = New-Item -ItemType Directory -Force -Path $users
+            $state.Profiles = @((P 'thornswood-runner' 'S-1001' $true), (P 'thornswood-runner3' 'S-1005' $false),
+                                (P 'thornswood-runner4' 'S-1007' $false), (P 'thornswood-runner6.HOST' 'S-1015' $false),
+                                (P 'thornswood-runner8' 'S-1019' $true), (P 'Administrator' 'S-500' $true))
+            $null = New-Item -ItemType Directory -Force -Path (Join-Path $users 'thornswood-runner7'), (Join-Path $users 'Public')
+            $state.Alive = @('S-1001', 'S-500')
+            $one = @(Remove-LeftProfiles @('thornswood-runner3', 'thornswood-runner3.*') $users)
+            $box = @(Remove-LeftProfiles @('thornswood-runner*') $users)
+            [pscustomobject]@{ One = $one; Box = $box; Gone = $state.Gone }
+        }
+        $sayOne = $r.One -join "`n"; $sayBox = $r.Box -join "`n"
+        Yes ('for one account it touches that name alone: its dead profile, which Windows has let go of, taken off (' + $sayOne + ')') ($r.One.Count -eq 1 -and $r.One[0] -like ('took off ' + (Join-Path $users 'thornswood-runner3') + ', the profile of a removed account (#3119)') -and -not (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner3')))
+        Yes '  for the box: a dead one Windows had already let go of goes' ($sayBox -like ('*took off ' + (Join-Path $users 'thornswood-runner4') + ',*') -and -not (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner4')))
+        Yes '  so does a <name>.<computer> one' ($sayBox -like ('*took off ' + (Join-Path $users 'thornswood-runner6.HOST') + ',*'))
+        Yes '  and a folder no profile owns' ($sayBox -like ('*took off ' + (Join-Path $users 'thornswood-runner7') + ', a profile folder no account owned*') -and -not (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner7')))
+        Yes '  one whose registry Windows still has loaded is LEFT until a restart, and kept' ($sayBox -like ('*LEFT ' + (Join-Path $users 'thornswood-runner8') + ': its account is gone and Windows keeps its registry loaded until the box restarts*') -and (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner8')) -and $r.Gone -notcontains 'S-1019')
+        Yes '  a live account''s profile and anything not a runner''s are left alone' ((Test-Path -LiteralPath (Join-Path $users 'thornswood-runner')) -and (Test-Path -LiteralPath (Join-Path $users 'Administrator')) -and (Test-Path -LiteralPath (Join-Path $users 'Public')) -and $r.Gone -notcontains 'S-1001' -and $sayBox -notmatch 'Administrator|Public|thornswood-runner[,:]')
+    } finally { Remove-Item -LiteralPath $users -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 Write-Host ''

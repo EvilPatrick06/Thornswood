@@ -195,7 +195,12 @@
 
   function drawnByClient() {
     try {
-      const views = sp.storage.view && sp.storage.view.getFormViews();
+      /* The engine's storage answers a key nobody set with a function, not
+         undefined (the fork's storageProxy.js), so the view is read by type
+         (#3333). */
+      const view = sp.storage.view;
+      const views = (view && typeof view === 'object' && typeof view.getFormViews === 'function')
+        ? view.getFormViews() : null;
       if (!views) { return 'not known'; }
       let forms = 0;
       let actors = 0;
@@ -1109,6 +1114,8 @@
     on its way.
   */
   let relogAt = 0;
+  // targetIp and targetPort are read by type: a key nobody set in storage is
+  // a function, not undefined (the fork's storageProxy.js, #3333).
   function relogAs(id) {
     const now = Date.now();
     if (now - relogAt < 15000) { return; }
@@ -1118,8 +1125,10 @@
     relogAt = now;
     try {
       sp.storage.authGameData = { local: { profileId: id } };
-      const host = String(sp.storage.targetIp || HOST || '');
-      const port = Number(sp.storage.targetPort) || Number(client['server-port']) || 7777;
+      const ip = sp.storage.targetIp;
+      const host = String((typeof ip === 'string' && ip) || HOST || '');
+      const port = (typeof sp.storage.targetPort === 'number' && sp.storage.targetPort) ||
+                   Number(client['server-port']) || 7777;
       sp.mpClientPlugin.createClient(host, port);
       log('menu: back into the world as profile', id, 'through', host + ':' + port);
     } catch (e) {
@@ -1572,7 +1581,14 @@
     (relogAs). A hot reload does not show an old one again.
   */
   let deniedSeenAt = 0;
-  try { deniedSeenAt = Number((sp.storage.thornswoodConnectionDenied || {}).at) || 0; } catch (e) { deniedSeenAt = 0; }
+  // By type: an unset key in storage is a function, not undefined (#3333).
+  function deniedInStorage() {
+    try {
+      const d = sp.storage.thornswoodConnectionDenied;
+      return (d && typeof d === 'object') ? d : null;
+    } catch (e) { return null; }
+  }
+  deniedSeenAt = Number((deniedInStorage() || {}).at) || 0;
   function connectionDenied(reason) {
     const me = PROFILE;
     const sentence = 'The server turned the connection away' + (reason ? ': ' + reason : '.');
@@ -1590,8 +1606,7 @@
   }
   sp.on('update', guard('idle check', () => {
     const now = Date.now();
-    let denied = null;
-    try { denied = sp.storage.thornswoodConnectionDenied || null; } catch (e) { denied = null; }
+    const denied = deniedInStorage();
     if (denied && (Number(denied.at) || 0) > deniedSeenAt) {
       deniedSeenAt = Number(denied.at) || 0;
       connectionDenied(String(denied.error || ''));
@@ -4671,51 +4686,6 @@
     return fireNearest(px, py, pz, fireSpotsHere(pc), -1);
   }
 
-  /*
-    ===================== EATING AND DRINKING ==============================
-
-    Patrick, 23 September: "I also just ate food and my food percentage
-    didn't change".
-
-    Of course it did not. The only thing that has ever fed anybody on this
-    server is typing /eat. Eating in the game is the client consuming an item
-    in its own inventory, and the server is not told: there is no eat event
-    in the four hooks a gamemode gets, and by the time the inventory sync
-    arrives the food is simply gone, which is indistinguishable from dropping
-    it.
-
-    The client can see it, because in Skyrim eating is EQUIPPING: an ALCH
-    record equipped by the player is eaten or drunk on the spot. So the equip
-    event is watched, and anything that is a Potion is reported to the server
-    with what it was, in the same one line channel everything else uses.
-
-    FOOD OR DRINK IS THE RECORD'S OWN ANSWER. Potion.isFood is the flag on
-    the ALCH, so a sweet roll is food, a bottle of ale is a drink, and a
-    potion of healing is neither and is left alone: it is not a meal and the
-    meters have no business moving for it.
-  */
-  sp.on('equip', (e) => {
-    try {
-      if (!e || !e.actor || !e.baseObj) { return; }
-      const pc = sp.Game.getPlayer();
-      if (!pc || e.actor.getFormID() !== pc.getFormID()) { return; }
-      const pot = sp.Potion.from(e.baseObj);
-      if (!pot) { return; }
-      const id = e.baseObj.getFormID();
-      if (!id) { return; }
-      /*
-        EVERYTHING THAT GOES DOWN COUNTS, and which of them it was is the
-        server's to decide off its own table. Patrick, 23 September:
-        "Potions and poisons should be counted towards thirst they are
-        liquids". So there is no filter here at all beyond it being an ALCH:
-        a sweet roll, a bottle of ale and a potion of healing all report, and
-        food.json says which is which.
-      */
-      tellServer('/ate ' + id.toString(16));
-      say('ate base ' + id.toString(16) + ' "' + (e.baseObj.getName() || '') + '"');
-    } catch (err) { }
-  });
-
   sp.on('update', guard('race read', raceReadTick));
 
   // The fire probe's cell walk, a slice a frame (#976). See walkCellSlice.
@@ -6823,10 +6793,17 @@
     };
   }
 
-  sp.on('browserMessage', guard('overhead', (event) => {
-    const a = event.arguments;
-    if (!a || a[0] !== 'thornswood-front') { return; }
-    const what = String(a[1] || '');
+  /*
+    The chat's and voice's messages for the lines above heads: 'head:' with
+    the words somebody said near you, 'headclear:' when staff silence them,
+    and 'marks:' with who is speaking. True when the message was one of
+    those, so the browserMessage handler below returns before its last line,
+    which logs whatever nothing took (#3941). These carry other people's
+    words and ids, and thornswood-front.log goes up with the session's logs.
+    They used to have a browserMessage listener of their own, so the main
+    one never knew they were taken and logged every one.
+  */
+  function overheadMessage(what) {
     if (what.indexOf('headclear:') === 0) {
       const pid = Number(what.slice(10)) || 0;
       for (const k in overheadHeads) {
@@ -6835,12 +6812,12 @@
         overheadDrop(overheadHeads[k]);
         delete overheadHeads[k];
       }
-      return;
+      return true;
     }
     if (what.indexOf('head:') === 0) {
       let doc = null;
       try { doc = JSON.parse(what.slice(5)); } catch (e) { doc = null; }
-      if (!doc || !doc.who || !doc.text) { return; }
+      if (!doc || !doc.who || !doc.text) { return true; }
       const key = String(doc.who);
       const had = overheadHeads[key];
       if (had && had.text !== String(doc.text)) { overheadDrop(had); }
@@ -6851,12 +6828,12 @@
         id: had && had.text === String(doc.text) ? had.id : 0,
         said: had && had.text === String(doc.text) ? had.said : ''
       };
-      return;
+      return true;
     }
     if (what.indexOf('marks:') === 0) {
       let list = null;
       try { list = JSON.parse(what.slice(6)); } catch (e) { list = null; }
-      if (!Array.isArray(list)) { return; }
+      if (!Array.isArray(list)) { return true; }
       const want = {};
       for (let i = 0; i < list.length; i++) {
         const row = list[i];
@@ -6873,8 +6850,10 @@
         if (!Object.prototype.hasOwnProperty.call(want, k)) { continue; }
         if (!overheadMarks[k]) { overheadMarks[k] = { mode: want[k], id: 0, said: '' }; }
       }
+      return true;
     }
-  }));
+    return false;
+  }
 
   sp.on('update', guard('overhead', () => {
     const now = Date.now();
@@ -7987,7 +7966,7 @@
     READ WHEN THE JOURNAL OPENS AND CLOSES, where the menus live, and once a
     minute for the few a hotkey flips (AHZmoreHUD's widget toggle). Never per
     frame: a read is 176 native calls. Only what moved since the last read is
-    sent, as /modset Name=value lines over the chat socket like /ate, packed
+    sent, as /modset Name=value lines over the chat socket like /place, packed
     under the 400 characters the voice service keeps of a line.
 
     PUTTING THEM BACK IS THE SERVER'S: an updateOwner script on the
@@ -9388,6 +9367,9 @@
     }
     if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
+
+    // Words above heads and speaking marks, never logged (overheadMessage).
+    if (overheadMessage(what)) { return; }
 
     // A held key on the choice page asking who has the keyboard now (#591).
     if (what.indexOf('select:keycheck ') === 0) {

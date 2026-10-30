@@ -65,6 +65,19 @@ try {
     Yes 'and lists build.js and index.html' ($null -ne $rec.files.'build.js' -and $null -ne $rec.files.'index.html')
     Yes 'and no DIN Pro or Futura face (#1317)' (-not @($rec.files.PSObject.Properties.Name | Where-Object { $_ -match '(?i)din|futura' }).Count)
 
+    # ---- a fork folder is a clone of its own, not an unfetched submodule (#3315)
+    $outer = Join-Path $tmp 'outer'
+    $inner = Join-Path (Join-Path $outer 'engine') 'skymp'
+    New-Item -ItemType Directory -Force -Path $inner | Out-Null
+    & git init -q $outer
+    Yes 'an empty folder inside another checkout is not a fork clone' (-not (Test-ThornswoodForkClone $inner))
+    Yes 'a folder that is not there is not one' (-not (Test-ThornswoodForkClone (Join-Path $tmp 'nothing')))
+    & git init -q $inner
+    Yes 'a clone of its own is one' (Test-ThornswoodForkClone $inner)
+    Yes 'the same folder named with the other slash is the same path' ((Get-ThornswoodFullPath ($inner -replace '\\', '/')) -eq (Get-ThornswoodFullPath ($inner -replace '/', '\')))
+    $bf = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Build-Front.ps1'))
+    Yes 'Build-Front fetches the pin into an unfetched engine\skymp before reading the commit' ($bf.IndexOf('submodule update --init --depth 1 engine/skymp') -ge 0 -and $bf.IndexOf('submodule update --init --depth 1 engine/skymp') -lt $bf.IndexOf('rev-parse --verify --quiet ($Commit'))
+
     # ---- Go.ps1 unpacks only the recorded build
     $go = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Go.ps1'))
     $front = $go.Substring($go.IndexOf("Head 'Front'"), $go.IndexOf('# The wheel is an overlay script now') - $go.IndexOf("Head 'Front'"))

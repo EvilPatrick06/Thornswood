@@ -72,10 +72,14 @@ yes('_role_hit accepts either id or name on the same call',
 
 # ---------------------------------------------------------- staff / creator --
 
-yes('STAFF defaults stay the current names (old harnesses)',
-    set(bot.STAFF_NAMES) == {'owner', 'gamemaster', 'dev', 'loremaster', 'moderator'}
+# The council joined the default in #3317 (Owner, Co-Owner and every lead).
+_DEFAULT_STAFF = {'owner', 'co-owner', 'lead dev', 'lead gamemaster', 'lead loremaster',
+                  'lead moderator', 'lead content creator', 'lead support',
+                  'gamemaster', 'dev', 'loremaster', 'moderator'}
+yes('STAFF defaults are names: the council and the four ranks',
+    set(bot.STAFF_NAMES) == _DEFAULT_STAFF
     and bot.STAFF_IDS == set()
-    and set(bot.STAFF) == {'owner', 'gamemaster', 'dev', 'loremaster', 'moderator'})
+    and set(bot.STAFF) == _DEFAULT_STAFF)
 yes('CREATOR defaults stay Content Creator (old harnesses)',
     bot.CREATOR_NAMES == {'content creator'}
     and bot.CREATOR_IDS == set()

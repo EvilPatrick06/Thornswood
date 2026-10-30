@@ -7,7 +7,7 @@ controller's fenced native actor transaction can commit either. Existing
 legacy quests and accepted terms remain outside this allowance. The complete
 merchant catalogue and account/world economy assessment remain unfinished.
 
-The allowance is150 gold per character in a half-open rolling24-hour window,
+The allowance is 150 gold per character in a half-open rolling 24-hour window,
 shared by all newly admitted scenes. It is not an account or world cap. At acceptance, reserve the original reward of
 10 through 150 gold. Recent payouts plus all outstanding reservations cannot
 exceed 150. There can be at most three held scenes. Reservations never expire;
@@ -53,6 +53,6 @@ competing reservations, an inventory refusal and a stale repeated payout.
 These are source tests, not a game/server or connected acceptance test.
 The production-controller fixture in `node tests/test-merchant-expanded-scenes.js`
 checks all four objectives, gates, original terms, allowance, cancellation and
-recovery, competing writes and full-property capacity. Claude owns Dev delivery
-after this playable section passes CI and merges; the complete catalogue need
-not finish before that handoff runs.
+recovery, competing writes and full-property capacity. Dev delivery can follow
+once this playable section passes CI and merges; the complete catalogue need
+not finish before that delivery.

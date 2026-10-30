@@ -33,7 +33,8 @@
        somebody else's stay, and every purse and shelf is the same
     L  the log says counts and nothing else
     W  a part that cannot write waits, alone, for the next start; a list that
-       is not one releases nothing and is left
+       is not one releases nothing and is left; settings that will not read
+       release nothing and leave the list and the ships' manifest (#2871)
     C  a list naming characters only, no profile, as Reset-Character.ps1 and
        Wipe-Saves.ps1 write it (#2668): what a character held goes (an
        embassy row with no profile, a dungeon chest's reservation, a trader's
@@ -155,6 +156,8 @@ function registers(dir) {
       'b2:Skyrim.esm': { by: PY, name: 'Yours', at: NOW, touched: NOW, master: { for: P1, no: 3 } },
       'b3:Skyrim.esm': { by: PZ, name: 'Theirs', at: NOW, touched: NOW, master: { for: PZ, no: 4 } }
     },
+    // Rent still owed on a place by somebody who no longer holds it (#3893).
+    arrears: { 'b2:Skyrim.esm': [{ by: P1, name: 'Mine', owed: 25, at: NOW }, { by: PY, name: 'Yours', owed: 5, at: NOW }] },
     funds: { whiterun: 200, riften: 50 },
     notices: {
       whiterun: [
@@ -414,6 +417,8 @@ try {
   yes('P16 their night, and the guests of the building they held, end; somebody else\'s guest stays',
       !beds.guests['b2:Skyrim.esm'][P1] && !!beds.guests['b2:Skyrim.esm'][PZ] && !beds.guests['b1:Skyrim.esm']);
   yes('P17 the takings kept for them go, the others\' stay', beds.takings[P1] === undefined && beds.takings[PY] === 4);
+  yes('P18 rent they still owed on a place they no longer held goes; somebody else\'s stays (#3893)',
+      JSON.stringify(prop.arrears) === JSON.stringify({ 'b2:Skyrim.esm': [{ by: PY, name: 'Yours', owed: 5, at: NOW }] }));
 
   // ---- B
   const was = JSON.parse(before['property.json']);
@@ -483,7 +488,7 @@ try {
   // ---- L
   const all = run.logged.join('\n');
   yes('L1 the log says counts: property ' + (L[2] || '').replace('release: property: ', ''),
-      /^release: property: claims 1, masterKeys 1, offices 2, posts 2, handedBack 1, owed 1, lines 5, box 1, boxRecord 2, guests 2, takings 1$/.test(L[2] || ''));
+      /^release: property: claims 1, masterKeys 1, offices 2, posts 2, handedBack 1, owed 1, lines 5, box 1, boxRecord 2, guests 2, takings 1, arrears 1$/.test(L[2] || ''));
   yes('L2 and never a name, a profile id or a form id of theirs, in any line of this start',
       !/Mine|Also mine|my words/.test(all) &&
       [P1, P2, A1, A2].every(function (n) { return !new RegExp('\\b(' + n + '|' + n.toString(16) + ')\\b', 'i').test(all); }));
@@ -536,6 +541,25 @@ try {
   }
   yes('W5 a list that is not one lets go of nothing and is left as it is, said in the log',
       same && n1.logged.some(function (l) { return /is not a list of deleted characters, so nothing was let go and it is left as it is/.test(l); }));
+
+  // ============================================================ W: settings that will not read (#2871)
+  // Until 22 Oct 2026 the release and the trade ships read privDir inside an
+  // empty catch, so a settings file that would not parse sent both to the
+  // default folder without a word. Now each says so and touches nothing.
+  const dir5 = path.join(scratch, 'settings-unread');
+  registers(dir5);
+  fs.writeFileSync(path.join(dir5, 'server-settings.json'), '{ "privDir": "private", ');
+  const keep5 = {};
+  for (const f of fs.readdirSync(path.join(dir5, 'private'))) { keep5[f] = fs.readFileSync(path.join(dir5, 'private', f), 'utf8'); }
+  const u1 = start(dir5, { before: function (b) { b.__thornswoodRolesKnown = function () { return false; }; } });
+  const U = u1.logged.filter(function (l) { return /^release: /.test(l); });
+  yes('W6 settings that will not parse: the release says so and lets go of nothing (' + U.join(' / ') + ')',
+      U.length === 1 && /^release: server-settings\.json could not be read \(.+\), so where the list is is not known and nothing was let go$/.test(U[0]));
+  yes('W7 and the list is left as it was',
+      fs.readFileSync(path.join(dir5, 'private', 'deleted-characters.json'), 'utf8') === keep5['deleted-characters.json']);
+  yes('W8 the trade ships say so too, and their manifest is left as it was',
+      u1.logged.some(function (l) { return /^\[ships\] server-settings\.json could not be read \(.+\), so where the manifest is is not known/.test(l); }) &&
+      fs.readFileSync(path.join(dir5, 'private', 'trade-cargo.json'), 'utf8') === keep5['trade-cargo.json']);
 
   // ============================================================ S: saves not taken yet
   // A list whose saves server-log.js has not taken (#2758): the registers go,

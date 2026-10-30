@@ -56,7 +56,7 @@ $dist = Join-Path $T 'dist'
 $plant = 'HARNESS1081 the player must not ship'
 try {
     New-Item -ItemType Directory -Force -Path (Join-Path $tree 'scripts\release'), (Join-Path $tree 'scripts\dev'), (Join-Path $tree 'records'), $play, $dist | Out-Null
-    foreach ($n in 'Ship.ps1', 'Ship-Rules.ps1', 'ShippedBytes.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1') {
+    foreach ($n in 'Ship.ps1', 'Ship-Rules.ps1', 'ShippedBytes.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1', 'Note-Repeats.ps1', 'Feed-News.ps1', 'Release-Baseline.ps1', 'Feed-Rules.ps1') {
         Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $n)) -Destination (Join-Path $tree ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath $wordsReal -Destination (Join-Path $tree 'scripts\dev\Check-Words.ps1') -Force
@@ -66,12 +66,17 @@ try {
 
     $ps = (Get-Process -Id $PID).Path
     $notes = "The map marker points at the right door`n- The marker over a house now sits on the door you walk through"
+    # What the channel has been told (#3320) is read from an empty stand-in
+    # for the site and the VPS store, so nothing connects anywhere.
+    $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
+    $env:THORNSWOOD_TEST_SITE_DIR = Join-Path $T 'site'
+    New-Item -ItemType Directory -Force -Path (Join-Path $T 'site\feed'), (Join-Path $T 'site\feed-dev') | Out-Null
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     try {
         $out = & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tree 'scripts\release\Ship.ps1') -DryRun -NoPause -Root $play -DistRoot $dist $notes 2>&1 | Out-String
         $code = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $old }
+    } finally { $ErrorActionPreference = $old; $env:THORNSWOOD_TEST_SITE_DIR = $oldSite }
 
     Yes ("a planted hit stops a dry-run Ship (exit {0})" -f $code) ($code -ne 0 -and $out -notmatch 'Dry run finished' -and $out -notmatch 'Building the launcher')
     Yes 'and the hit names the file, the line and the rule' ($out -match '::error file=README\.md,line=1::\[banned-word\]' -and $out -match 'Nothing was built')

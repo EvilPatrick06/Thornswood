@@ -33,10 +33,18 @@
        09d8ae92...).
     6. The same files compile at C# 5, which is what Windows PowerShell 5.1's
        Add-Type compiles, because scripts\release\Go.ps1 runs them there.
-    7. By the source: the three are FromGame.Files, Ship-Rules.ps1
-       $ShipMadeFromGame and OwnGameKinds.cs MadeInGame alike; no release list
+    7. By the source: the three, then the collection's five menus, are
+       FromGame.Files, Ship-Rules.ps1 $ShipMadeFromGame then
+       $ShipMadeFromMods, and OwnGameKinds.cs MadeInGame alike; no release list
        ships them and no file at their paths is in the repository; Play, Scan
        and Fix, the own folder and Go.ps1 all make or keep them.
+    8. The collection's menus with no gold values (#3113, FromGameModMenus.cs,
+       written by scripts\mods\Build-ModMenus.py from the mods' own archives,
+       which no test machine has): on the made-up game, which has none of the
+       mods, each of the five says which archive it needs and nothing is made;
+       each names its mod and both sha256s; a recipe for a file that is not a
+       SWF takes its edits on the bytes as they are; and a mod file that is not
+       the pinned one names the mod.
 
   Reads the repository; writes only its own folder under the scratch folder.
   Needs Python (the fixture is plain Python) and the compiler the build runs.
@@ -83,12 +91,13 @@ Yes 'Python is on this machine, to write the made-up game' ([bool]$python)
 # Tools' csc against .NET Framework 4.8.1, which only Windows has; off Windows
 # the made-up game and the recipes are still checked, and that part says SKIP.
 if ($OnWindows) { Yes 'the compiler the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc) }
-$real = @('FromGame.cs', 'FromGameArchive.cs', 'FromGameDeflate.cs', 'FromGameMath.cs', 'FromGameBoard.cs', 'FromGameMenu.cs') |
+$real = @('FromGame.cs', 'FromGameArchive.cs', 'FromGameDeflate.cs', 'FromGameMath.cs', 'FromGameBoard.cs', 'FromGameMenu.cs', 'FromGameModMenus.cs') |
     ForEach-Object { Join-Path $App $_ }
 foreach ($f in $real) {
     $why = ''
     if ($f -like '*FromGameMenu.cs') { $why = ' (written on a machine with the game by scripts\mods\Build-StartMenu.py)' }
     if ($f -like '*FromGameBoard.cs') { $why = ' (written on a machine with the game by scripts\mods\Build-NoticeBoard.py)' }
+    if ($f -like '*FromGameModMenus.cs') { $why = ' (written from the collection''s archives by scripts\mods\Build-ModMenus.py)' }
     Yes ("launcher\app\{0} is there{1}" -f [IO.Path]::GetFileName($f), $why) (Test-Path -LiteralPath $f)
 }
 $refs = @('System.dll', 'System.Core.dll') | ForEach-Object { Find-LauncherRef $_ }
@@ -238,6 +247,44 @@ namespace Thornswood
             File.WriteAllBytes(Path.Combine(gone, FromGame.MenuFile), menu.Bytes);
             Yes("nor is one with other bytes", !FromGame.IsCurrent(gone, FromGame.MenuFile));
 
+            // The collection's menus with no gold values (#3113). The made-up
+            // game has none of the mods' archives, so each of the five says
+            // which one it could not read, and nothing is made.
+            List<FromGameFile> all = FromGame.Build(game);
+            int mods = 0; bool named = true, pinned = true;
+            foreach (MenuRecipe m in MenuRecipe.Mods)
+            {
+                FromGameFile f = Get(all, m.Path);
+                if (f == null) { named = false; continue; }
+                mods++;
+                if (f.Bytes != null || f.Problem == null || f.Problem.IndexOf(m.Archive, StringComparison.OrdinalIgnoreCase) < 0) named = false;
+                if (string.IsNullOrEmpty(m.Mod) || FromGame.Expected(m.Path) != m.Sha256 || m.Sha256.Length != 64 || m.SourceSha256.Length != 64 || m.Edits.Length == 0) pinned = false;
+            }
+            Yes("a game with none of the collection's mods makes none of their five menus, and each reason names the archive it needs", mods == 5 && named);
+            Yes("each of the five names its mod, the sha256 of the mod's own file it is made from, and the sha256 it must come out at", pinned);
+
+            // A recipe for a file that is not a SWF (SkyUI's config.txt) takes
+            // its edits on the bytes as they are. Tried on the made-up game's
+            // menu, read as plain bytes.
+            byte[] plainSrc = new GameArchives(game, new[] { "Skyrim - Interface.bsa" }).Read("interface\\startmenu.swf");
+            var want = new List<byte>(plainSrc);
+            want.RemoveRange(3, 2);
+            want.InsertRange(3, new byte[] { 0x41, 0x42, 0x43 });
+            var text = new MenuRecipe
+            {
+                Mod = "Fixture", Archive = "Skyrim - Interface.bsa", Source = "interface\\startmenu.swf",
+                SourceSha256 = FromGame.Sha256(plainSrc), SourceSize = plainSrc.Length,
+                Path = "Data\\Interface\\fixture.txt", Sha256 = FromGame.Sha256(want.ToArray()), Size = want.Count,
+                Edits = new[] { new MenuEdit(3, 2, "414243") }
+            };
+            FromGameFile t = FromGame.BuildMenu(game, text);
+            Yes("a recipe for a file that is not a SWF takes its edits on the bytes as they are" + (t.Problem != null ? ": " + t.Problem : ""),
+                t.Problem == null && Same(t.Bytes, want.ToArray()));
+            text.SourceSha256 = new string('0', 64);
+            FromGameFile u = FromGame.BuildMenu(game, text);
+            Yes("and when the mod's own file is not the one the recipe pins, nothing is made and the reason names the mod: " + u.Problem,
+                u.Bytes == null && u.Problem != null && u.Problem.IndexOf("Fixture is not the version the collection pins", StringComparison.Ordinal) >= 0);
+
             Console.WriteLine("files: " + string.Join("|", FromGame.Files));
             return 0;
         }
@@ -278,7 +325,7 @@ namespace Thornswood
         elseif ($l -match '^files: (.*)$') { $files = $Matches[1] -split '\|' }
         else { Write-Host "      $l" }
     }
-    Yes 'the driver ran to the end and reported' ($files.Count -eq 3)
+    Yes 'the driver ran to the end and reported' ($files.Count -eq 8)
 
     $zcheck = Join-Path $work 'zcheck.py'
     [IO.File]::WriteAllText($zcheck, @'
@@ -303,21 +350,21 @@ sys.exit(1 if bad else 0)
 
     # ---- 7. by the source ------------------------------------------------------------
     $rules = Src (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
-    $made = List $rules 'ShipMadeFromGame'
+    $made = @(List $rules 'ShipMadeFromGame') + @(List $rules 'ShipMadeFromMods')
     $ours = List $rules 'ShipOursFiles'
     $kinds = Src (Join-Path $App 'OwnGameKinds.cs')
     $inGame = @([regex]::Matches([regex]::Match($kinds, '(?s)static readonly string\[\] MadeInGame = \{(.*?)\};').Groups[1].Value, '"((?:[^"\\]|\\.)*)"') |
         ForEach-Object { $_.Groups[1].Value.Replace('\\', '\') })
-    Yes ('Ship-Rules.ps1 $ShipMadeFromGame is FromGame.Files (' + ($made -join ', ') + ')') ((@($made) -join '|') -eq ($files -join '|'))
+    Yes ('Ship-Rules.ps1 $ShipMadeFromGame, then $ShipMadeFromMods, is FromGame.Files (' + ($made -join ', ') + ')') ((@($made) -join '|') -eq ($files -join '|'))
     Yes 'and so is OwnGameKinds.cs MadeInGame, which the own folder keeps' ((@($inGame) -join '|') -eq ($files -join '|'))
     Yes 'and no release list ships any of them' (@($files | Where-Object { $ours -contains $_ }).Count -eq 0)
     $go = Src (Join-Path $Repo 'scripts\release\Go.ps1')
     $goMenu = List $go 'oursMenuFiles'
     if (-not $goMenu.Count) { $goMenu = @([regex]::Matches([regex]::Match($go, '(?s)\$oursMenuFiles = @\((.*?)\)').Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value }) }
-    Yes 'Go.ps1 copies none of them out of game\ours' ($goMenu.Count -gt 0 -and @($goMenu | Where-Object { $_ -match 'startmenu\.swf|noticeboard01|dropbox01' }).Count -eq 0)
+    Yes 'Go.ps1 copies none of them out of game\ours' ($goMenu.Count -gt 0 -and @($goMenu | Where-Object { $files -contains $_ }).Count -eq 0)
     Yes 'and makes them with FromGame instead' ($go -match "\[Thornswood\.FromGame\]::Build\(" -and $go -match "Filter 'FromGame\*\.cs'")
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $tracked = @(& git -C $Repo ls-files -- 'game/ours/Data/Interface/startmenu.swf' 'game/ours/Data/meshes/thornswood/noticeboard01.nif' 'game/ours/Data/meshes/thornswood/dropbox01.nif' 2>&1)
+    $tracked = @(& git -C $Repo ls-files -- @($files | ForEach-Object { 'game/ours/' + $_.Replace('\', '/') }) 2>&1)
     $ErrorActionPreference = $old
     Yes 'no file at their game\ours paths is in the repository' ($LASTEXITCODE -eq 0 -and $tracked.Count -eq 0)
     $play = Src (Join-Path $App 'ShellPlay.cs')

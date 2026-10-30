@@ -312,8 +312,8 @@ yes('#welcome says the world is open by application',
     'open by application' in content.WELCOME and 'Anyone can download' in content.WELCOME)
 yes('#welcome names the application and the role that unlocks Play',
     'Apply to be an alpha playtester' in content.WELCOME and 'Playtester role' in content.WELCOME)
-yes('#welcome says to read the rules before applying',
-    content.WELCOME.find('<#RULES>') < content.WELCOME.find('<#TICKETS>'))
+yes('#welcome says to read the rules before applying in #apply-to-playtest',
+    content.WELCOME.find('<#RULES>') < content.WELCOME.find('<#PLAYTEST>'))
 yes('#welcome no longer says people are let in slowly',
     'letting people in slowly' not in content.WELCOME and 'Not open to everyone' not in content.WELCOME)
 yes('#rules says applying is accepting them, and that the answer is kept',

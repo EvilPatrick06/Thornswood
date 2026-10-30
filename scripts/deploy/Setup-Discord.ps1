@@ -14,7 +14,31 @@
                                     content.py. Use this when the wording moved.
     .\Setup-Discord.ps1 -Check     changes nothing at all, just says what it
                                     would do
+    .\Setup-Discord.ps1 -Audit     changes nothing at all, reads the live
+                                    server and says where it differs from
+                                    the plan: the bot's permissions, each
+                                    role's, who holds each staff rank and
+                                    every double rank, and every channel's
+                                    overwrites (#3317)
     .\Setup-Discord.ps1 -Prune     also deletes channels this no longer wants
+    .\Setup-Discord.ps1 -OnBox     runs the build on the VPS with the token the
+                                    running bot already holds, and asks for
+                                    nothing. Goes with -Check, -Audit, -Posts,
+                                    -Prune and -Only
+    .\Setup-Discord.ps1 -Give 'Co-Owner=WiccanDjinn','Lead Dev=Patrick Thornwood'
+                                   gives each staff rank to the one member
+                                    named exactly, and does nothing else. Never
+                                    a second rank of one category, never to a
+                                    seat holder; with -Check only says it (#3317)
+    .\Setup-Discord.ps1 -Only Gamemasters,welcome-travelers
+                                   touches only those categories and channels
+                                    of the plan: no role made or moved, no
+                                    other channel, no webhook, no server
+                                    setting. For a change approved for one
+                                    part of the Discord (#2519)
+    .\Setup-Discord.ps1 -Only lore,factions -Posts
+                                   also rewrites the read only posts of
+                                    those channels, and no other post (#3656)
 
   First time only, before running it:
 
@@ -23,15 +47,12 @@
     2. Bot in the sidebar, then Reset Token, and copy what it gives you.
     3. Still under Bot, turn ON "Server Members Intent". Leave the rest off.
     4. OAuth2, URL Generator, tick "bot" and then "Administrator". Open the URL
-       it builds and add the bot to your server. Administrator is for the build
-       only: it makes the Owner and Dev roles, which carry Administrator, and
-       Discord refuses that from a bot without it.
+       it builds and add the bot to your server. The bot keeps Administrator,
+       for a build and the rest of the time (#3317, Patrick, 22 Oct 2026: "the
+       bot will keep admin"). A build makes the Owner and Co-Owner roles, which
+       carry Administrator, and Discord refuses that from a bot without it.
 
-  Two permission sets. Administrator for a build, and a smaller set for the
-  rest of the time, which is all the running bot needs. A build that finishes
-  with nothing failed ends on the invite link with that smaller set and a line
-  saying to untick Administrator on the bot's role. Tick it again before the
-  next build. To see that link without building anything, from the repository
+  To see the invite link without building anything, from the repository
   folder, with the id from the developer portal's General Information page:
 
     python bot\Build-Discord.py --invite <application id>
@@ -42,6 +63,25 @@
 
   It asks for the token rather than taking it on the command line, so it stays
   out of your history. Nothing writes it to disk.
+
+  -OnBox asks for nothing (#2519, #2341). The token is the bot's own, in
+  C:\Thornswood-Bot\bot.env.json on the VPS, so a machine with the VPS key
+  and no token, or a run with nobody at a prompt, can still build, and the
+  token never leaves the box. Build-Discord.py, content.py,
+  staff-channel.txt and factions.json go up inside the run's script as the
+  commit holds them,
+  with the two site pages content.py reads its words from (join.md and
+  rules.md), each at its place in the repository, because content.py finds
+  them by its own folder (..\site\data\site). An uncommitted change to any
+  of them stops the run before the box is asked anything. They go into a
+  folder of the run's own under C:\Windows\Temp.
+  There the box's Python runs the build with the bot's own libraries
+  (py-libs), the token is read from bot.env.json into that one process's
+  environment, and the folder is removed when the build ends. The build may
+  write the news webhook into that folder; it goes with the folder, because
+  the box already keeps the webhook (Discord-Hook.ps1). The running bot holds
+  the smaller permission set, not Administrator, so anything that needs
+  Administrator is named under "did not manage".
 #>
 [CmdletBinding()]
 param(
@@ -57,7 +97,20 @@ param(
   # flashing.
   [switch]$Posts,
   # Touches nothing. Says what it would make, remove and rewrite, then stops.
-  [switch]$Check
+  [switch]$Check,
+  # Touches nothing. Reads the live server and says where it differs from the
+  # plan (#3317). Nothing else in the run happens.
+  [switch]$Audit,
+  # Builds on the VPS with the token the bot holds there. Asks for nothing.
+  [switch]$OnBox,
+  # Only these categories and channels of the plan, and nothing else in the
+  # Discord (#2519). Build-Discord.py's ONLY says what that leaves out, and
+  # refuses a name its plan does not have before Discord is asked anything.
+  [string[]]$Only = @(),
+  # Staff ranks to give, each 'rank=member' (#3317). Build-Discord.py's GIVE
+  # says which ranks and how a member is matched. Nothing else in the run
+  # happens.
+  [string[]]$Give = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -65,6 +118,120 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $app = Join-Path $Here '..\..\bot\Build-Discord.py'
 if (-not (Test-Path -LiteralPath $app)) { throw "not found: $app" }
+# One 'rank=member' each. A quote, a semicolon or anything else that could
+# leave the line it is written into stops here, before anything is sent.
+$gives = @($Give | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+foreach ($g in $gives) {
+  if ($g -notmatch '^[A-Za-z -]+=[\p{L}\p{N} _.-]+$') { throw ("-Give takes 'staff rank=member', not: " + $g) }
+}
+
+# The one switch (#428): the site's "open", read off its public page so the
+# posts say the same as the site. Anything that goes wrong is the alpha
+# wording, which is what is true until somebody flips it.
+$open = $false
+try {
+  $pub = Invoke-RestMethod -Uri 'https://thornswood.net/api/public' -TimeoutSec 15
+  $open = ($pub.open -eq $true)
+} catch {
+  Write-Host ('  Could not ask the site whether the world is open (' + $_.Exception.Message + '), so the posts use the alpha wording.') -ForegroundColor Yellow
+}
+if ($Posts) {
+  if ($open) { Write-Host '  The site says the world is open to everybody, so the posts say so.' }
+  else { Write-Host '  The site says the world is in alpha, open by application, so the posts say so.' }
+}
+
+if ($OnBox) {
+  . (Join-Path $Here '..\vps\Vps.ps1')
+  . (Join-Path $Here '..\vps\Send-Script.ps1')
+  $Repo = Split-Path -Parent (Split-Path -Parent $Here)
+  # Every file the build reads, at its place in the repository: content.py
+  # reads join.md and rules.md through ..\site\data\site from its own folder,
+  # and a run that sent only the bot's files stopped on the box with
+  # FileNotFoundError for join.md (22 Oct 2026). tests\test-2519-setup-discord-onbox.ps1
+  # imports content.py from a folder holding only these. Build-Discord.py
+  # reads factions.json from its own folder when it loads (#3317), and the
+  # first -OnBox run after that stopped with FileNotFoundError for it; the
+  # same test imports Build-Discord.py there too, where a python with
+  # discord.py is. content.py reads #factions out of lore\factions.md (#3317).
+  # Build-Discord.py logs in through trust.py, the bot's roots (#3604).
+  $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/trust.py', 'bot/staff-channel.txt',
+    'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md',
+    'lore/factions.md')
+  # The commit, never the working tree, so what ran is a commit anyone can name.
+  $dirty = @(& git -C $Repo status --porcelain -- @send 2>$null)
+  if ($LASTEXITCODE -ne 0) { throw 'git could not say whether the build''s files are committed. Nothing was sent.' }
+  if ($dirty.Count) { throw ('Commit these first, nothing was sent: ' + (($dirty | ForEach-Object { "$_".Trim() }) -join ', ')) }
+  $commit = "$(& git -C $Repo rev-parse --short=12 HEAD)".Trim()
+  $files = ''
+  foreach ($rel in $send) {
+    $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Repo $rel)))
+    $files += "  '" + $rel + "' = '" + $b64 + "'`r`n"
+  }
+  $flags = "`$env:THORNSWOOD_OPEN = '" + $(if ($open) { '1' } else { '0' }) + "'`r`n"
+  if ($Guild) { $flags += "`$env:DISCORD_GUILD = '" + ($Guild -replace '[^0-9]', '') + "'`r`n" }
+  if ($Prune) { $flags += "`$env:DISCORD_PRUNE = '1'`r`n" }
+  if ($Posts) { $flags += "`$env:DISCORD_POSTS = '1'`r`n" }
+  if ($Check) { $flags += "`$env:DISCORD_CHECK = '1'`r`n" }
+  if ($Audit) { $flags += "`$env:DISCORD_AUDIT = '1'`r`n" }
+  if ($Only.Count) {
+    $names = @($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    foreach ($n in $names) { if ($n -notmatch '^[A-Za-z0-9 _-]+$') { throw ('-Only takes category and channel names from the plan, not: ' + $n) } }
+    $flags += "`$env:DISCORD_ONLY = '" + ($names -join ',') + "'`r`n"
+  }
+  if ($gives.Count) {
+    $flags += "`$env:DISCORD_GIVE = '" + ($gives -join ';') + "'`r`n"
+  }
+  # What runs on the box. The token is read there and set for the one Python
+  # process; the folder goes when the build ends, however it ends.
+  $far = @"
+`$ErrorActionPreference = 'Stop'
+`$ProgressPreference = 'SilentlyContinue'
+# sshd's sessions carry the PATH from before Python was installed (Install-Bot.ps1).
+`$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
+`$botRoot = 'C:\Thornswood-Bot'
+# The box's own temp folder, where OnBox.ps1 keeps its runs too.
+`$top = 'C:\Windows\Temp'
+`$dir = Join-Path `$top ('thornswood-discord-' + [Guid]::NewGuid().ToString('N'))
+`$code = 1
+New-Item -ItemType Directory -Force -Path `$dir | Out-Null
+try {
+  `$files = @{
+$files  }
+  # Each at its place in the repository, so content.py finds the site pages.
+  foreach (`$k in `$files.Keys) {
+    `$p = Join-Path `$dir `$k
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent `$p) | Out-Null
+    [IO.File]::WriteAllBytes(`$p, [Convert]::FromBase64String(`$files[`$k]))
+  }
+  `$cfg = Get-Content -LiteralPath (Join-Path `$botRoot 'bot.env.json') -Raw | ConvertFrom-Json
+  if (-not `$cfg.DISCORD_TOKEN) { 'NO TOKEN: C:\Thornswood-Bot\bot.env.json holds no DISCORD_TOKEN. Nothing was built.'; exit 3 }
+  `$env:DISCORD_TOKEN = [string]`$cfg.DISCORD_TOKEN
+  `$cfg = `$null
+  `$env:PYTHONPATH = Join-Path `$botRoot 'py-libs'
+  `$env:PYTHONIOENCODING = 'utf-8'
+$flags  `$ErrorActionPreference = 'Continue'
+  & python (Join-Path `$dir 'bot/Build-Discord.py') 2>&1 | ForEach-Object { "`$_" }
+  `$code = `$LASTEXITCODE
+} finally {
+  `$env:DISCORD_TOKEN = `$null
+  Remove-Item -LiteralPath `$dir -Recurse -Force -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath `$dir) { 'LEFT BEHIND: ' + `$dir + ' could not be removed' }
+}
+exit `$code
+"@
+  $User = Get-ThornswoodVpsUser
+  $Vps = Get-ThornswoodVpsAddress
+  $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
+  Write-Host ("Building on the VPS from commit {0}, with the token the bot holds there..." -f $commit)
+  $out = Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $far
+  $code = $LASTEXITCODE
+  foreach ($l in @($out)) { Write-Host "$l" }
+  if ($code -ne 0) {
+    Write-Host ''
+    Write-Host ("  The build on the VPS ended with exit {0}. Fix what it said above and run it again." -f $code) -ForegroundColor Yellow
+  }
+  exit $code
+}
 
 # The bot's Python is 3.12. Plain python is whichever is first on PATH, which
 # on a PC with more than one can be too old (on One it is 3.9, #2276), so the
@@ -87,8 +254,12 @@ if (-not $py) { throw 'No Python 3.10 or newer found. Install Python 3.12 (py -3
 
 if (-not $SkipInstall) {
   Write-Host 'Making sure discord.py is here...'
-  & $py @pyArgs -m pip install -q -U discord.py
-  if ($LASTEXITCODE -ne 0) { throw 'pip could not install discord.py' }
+  # Build-Discord.py logs in through bot\trust.py, which reads its roots out
+  # of the certifi the bot pins, so that one comes too (#3604).
+  $certifi = [regex]::Match((Get-Content -LiteralPath (Join-Path $Here '..\..\bot\requirements.in') -Raw), '(?m)^certifi==(\S+)').Groups[1].Value
+  if (-not $certifi) { throw 'bot\requirements.in names no certifi version, so the roots Build-Discord.py trusts cannot be installed.' }
+  & $py @pyArgs -m pip install -q -U discord.py ('certifi==' + $certifi)
+  if ($LASTEXITCODE -ne 0) { throw 'pip could not install discord.py and certifi' }
   Write-Host '  ready'
 }
 
@@ -105,23 +276,11 @@ if ($Guild) { $env:DISCORD_GUILD = $Guild }
 if ($Prune) { $env:DISCORD_PRUNE = '1' }
 if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
+if ($Audit) { $env:DISCORD_AUDIT = '1' }
+if ($Only.Count) { $env:DISCORD_ONLY = (@($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ',') }
+if ($gives.Count) { $env:DISCORD_GIVE = ($gives -join ';') }
 $tok = $null
-
-# The one switch (#428): the site's "open", read off its public page so the
-# posts say the same as the site. Anything that goes wrong is the alpha
-# wording, which is what is true until somebody flips it.
-$open = $false
-try {
-  $pub = Invoke-RestMethod -Uri 'https://thornswood.net/api/public' -TimeoutSec 15
-  $open = ($pub.open -eq $true)
-} catch {
-  Write-Host ('  Could not ask the site whether the world is open (' + $_.Exception.Message + '), so the posts use the alpha wording.') -ForegroundColor Yellow
-}
 $env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
-if ($Posts) {
-  if ($open) { Write-Host '  The site says the world is open to everybody, so the posts say so.' }
-  else { Write-Host '  The site says the world is in alpha, open by application, so the posts say so.' }
-}
 
 try {
   & $py @pyArgs $app
@@ -131,8 +290,14 @@ try {
   $env:DISCORD_PRUNE = $null
   $env:DISCORD_POSTS = $null
   $env:DISCORD_CHECK = $null
+  $env:DISCORD_AUDIT = $null
+  $env:DISCORD_ONLY = $null
+  $env:DISCORD_GIVE = $null
   $env:THORNSWOOD_OPEN = $null
 }
+# An audit reads and builds nothing, and a give only gives, so there is no
+# webhook to hand on.
+if ($Audit -or $gives.Count) { exit $code }
 
 # It used to say the webhook was ready whatever happened, including on the run
 # that stopped on a missing intent and built nothing at all. A script that

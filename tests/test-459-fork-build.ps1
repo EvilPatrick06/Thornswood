@@ -7,23 +7,28 @@
   of 16 Oct): scripts\release\ForkEngineBuild.ps1, and -BuiltBy in
   New-ServerBuildRecord.ps1 and New-ClientBuildRecord.ps1.
 
-  WHY. engine.yml records the fork's build instead of compiling the engine
-  only when that build is the one asked for, and compiles it here only when
-  the fork truly has none. Each of those is a line a later edit could change
-  with nothing else going red:
+  WHY. engine.yml records the fork's build, and only when that build is the
+  one asked for; it compiles nothing (#3014, #3399), so with no fork build
+  it stops. A Ship machine holds the same build with the same checks
+  (Get-ForkEngineBuildProblems, EngineArtifact.ps1). Each of those is a line
+  a later edit could change with nothing else going red:
     1. Find-ForkEngineBuild, against a stand-in GitHub: no build, a build of
-       another branch, event, repository or commit (none, all four); a green
-       push build with its artifact (found, the newest such); one whose
-       artifact is gone (none); one still running (stop); one red (stop);
-       and a lookup that fails throws rather than saying there is none.
+       another branch, event, repository or commit (none, all four, saying
+       nothing is compiled in its place); a green push build with its
+       artifact (found, the newest such); one whose artifact is gone (none);
+       one still running (stop); one red (stop); and a lookup that fails
+       throws rather than saying there is none.
     2. Expand-ForkEngineBuild, on artifacts made here: the right one goes
        into the fork's build folder with fork-build.json's times, to the tick
        and in UTC whatever the zip says; and each of these is refused with
        nothing put in the fork: a download whose sha256 is not GitHub's
        digest, another commit, another run, a pull request's build, a file
        that is not the one named, a file named and missing, a file not
-       named, a path outside build/, a time with no zone, and a fork whose
-       build folder is there already.
+       named, a path outside build/, a time with no zone, a build with no
+       build/licences/licences.json (#3099), and a fork whose build folder is
+       there already. Get-ForkEngineBuildProblems on a folder unpacked by
+       hand (as gh run download leaves one) finds the same: none for the
+       right one, the sentence for a wrong one.
     3. -BuiltBy, on a made up fork whose files were written after the build
        (as a checkout made after it is): both records are written and hold
        the build to the commit's time, not the checkout's dates; without it
@@ -87,7 +92,7 @@ try {
 
     $s = Stand-In @() @{}
     $f = Find-ForkEngineBuild $C $s.Get
-    Yes 'no fork build at all: none, so it is built here' ($f.State -eq 'none' -and $f.Why -match 'has no build')
+    Yes 'no fork build at all: none, and nothing is built in its place' ($f.State -eq 'none' -and $f.Why -match 'has no build' -and $f.Why -match 'no build of it to record' -and $f.Why -notmatch 'builds it')
     Yes '  the runs are asked of the fork''s workflow, for this commit, a push, and the branch' ($s.Asked[0] -match '^repos/EvilPatrick06/skymp/actions/workflows/thornswood-pr-windows\.yml/runs\?' -and
         $s.Asked[0] -match "head_sha=$C" -and $s.Asked[0] -match 'event=push' -and $s.Asked[0] -match 'branch=thornswood%2Fengine-changes')
 
@@ -103,19 +108,19 @@ try {
 
     $s = Stand-In @((Run-Of 13 'completed' 'success')) @{ 13 = (Art 130 $true) }
     $f = Find-ForkEngineBuild $C $s.Get
-    Yes 'a green build whose artifact is gone (expired, or from before the fork kept one): none, built here' ($f.State -eq 'none' -and $f.Why -match '90 days')
+    Yes 'a green build whose artifact is gone (expired, or from before the fork kept one): none, saying to run that build again in the fork' ($f.State -eq 'none' -and $f.Why -match '90 days' -and $f.Why -match 'Run that build again in the fork')
     $s = Stand-In @((Run-Of 14 'completed' 'success')) @{ 14 = (Art 140 $false 'server-dist') }
     Yes '  and one that kept only other artifacts: none' ((Find-ForkEngineBuild $C $s.Get).State -eq 'none')
 
     $s = Stand-In @((Run-Of 15 'in_progress' ''), (Run-Of 14 'completed' 'failure')) @{}
     $f = Find-ForkEngineBuild $C $s.Get
-    Yes 'a fork build still running: stop, naming it, so the engine is not built twice' ($f.State -eq 'stop' -and $f.Why -match 'still building' -and $f.Why -match 'runs/15')
+    Yes 'a fork build still running: stop, naming it' ($f.State -eq 'stop' -and $f.Why -match 'still building' -and $f.Why -match 'runs/15')
     $s = Stand-In @((Run-Of 16 'queued' ''), (Run-Of 13 'completed' 'success')) @{ 13 = (Art 130) }
     Yes '  but a green build with its artifact is taken even while a newer one runs' ((Find-ForkEngineBuild $C $s.Get).State -eq 'found')
 
     $s = Stand-In @((Run-Of 17 'completed' 'failure')) @{}
     $f = Find-ForkEngineBuild $C $s.Get
-    Yes 'a fork build that ended red: stop, naming it and how it ended, not built here without its tests' ($f.State -eq 'stop' -and $f.Why -match 'ended failure' -and $f.Why -match 'runs/17')
+    Yes 'a fork build that ended red: stop, naming it and how it ended' ($f.State -eq 'stop' -and $f.Why -match 'ended failure' -and $f.Why -match 'runs/17')
 
     $bad = { param($path) throw 'Response status code does not indicate success: 401 (Unauthorized).' }
     $e = Threw { Find-ForkEngineBuild $C $bad }
@@ -124,7 +129,8 @@ try {
     # ---- 2. the build put in the fork --------------------------------------------
     Write-Host ''; Write-Host 'Expand-ForkEngineBuild'
     $times = @{ 'build/dist/server/scam_native.node' = '2026-10-16T13:07:48.1234567Z'; 'build/dist/server/dist_back/skymp5-server.js' = '2026-10-16T12:56:56.0000000Z'
-                'build/dist/client/Data/Platform/Plugins/skymp5-client.js' = '2026-10-16T12:50:00.5000000Z'; 'build/skymp5-server/launch_server.bat.tmp' = '2026-10-16T12:40:00.0000000Z' }
+                'build/dist/client/Data/Platform/Plugins/skymp5-client.js' = '2026-10-16T12:50:00.5000000Z'; 'build/skymp5-server/launch_server.bat.tmp' = '2026-10-16T12:40:00.0000000Z'
+                'build/licences/licences.json' = '2026-10-16T13:08:00.0000000Z'; 'build/licences/zlib.txt' = '2026-10-16T13:08:00.0000000Z' }
     # An artifact as the fork's build keeps it; $edit changes the folder or
     # the manifest before it is zipped. Returns @{ Zip; Digest }.
     function New-Artifact([string]$tag, [scriptblock]$edit) {
@@ -194,10 +200,25 @@ try {
     $a = New-Artifact 'nobin' { param($d, $m) Remove-Item -LiteralPath (Join-Path $d 'build/skymp5-server/launch_server.bat.tmp'); $m.files.Remove('build/skymp5-server/launch_server.bat.tmp') }
     $r = Try-Expand $a 'nobin'
     Yes 'a build with no launch_server.bat.tmp (the record holds launch_server.bat to it) is refused' ($r.Error -match 'does not name build/skymp5-server/launch_server\.bat\.tmp' -and -not $r.Put)
+    $a = New-Artifact 'nolicences' { param($d, $m) Remove-Item -LiteralPath (Join-Path $d 'build/licences') -Recurse; $m.files.Remove('build/licences/licences.json'); $m.files.Remove('build/licences/zlib.txt') }
+    $r = Try-Expand $a 'nolicences'
+    Yes 'a build that did not measure its client files'' libraries (no build/licences/licences.json, #3099) is refused' ($r.Error -match 'does not name build/licences/licences\.json' -and -not $r.Put)
     $fork = New-Fork 'there'
     Put (Join-Path $fork 'build\CMakeCache.txt') 'another build'
     $e = Threw { $null = Expand-ForkEngineBuild -Zip $good.Zip -Commit $C -RunId 42 -Digest $good.Digest -Fork $fork -Scratch (Join-Path $T 'x-there') }
     Yes 'a fork with a build folder already is refused, so two builds are never mixed' ($e -match 'there already' -and -not (Test-Path -LiteralPath (Join-Path $fork 'build\dist')))
+
+    # The same holding on a folder unpacked by hand, as gh run download leaves
+    # one for a Ship machine (EngineArtifact.ps1, #3399).
+    $held = Get-ForkEngineBuildProblems (Join-Path $T 'art-good') $C 42
+    Yes 'Get-ForkEngineBuildProblems: an unpacked folder of the right build has none, and gives fork-build.json' ($held.Why.Count -eq 0 -and [string]$held.Manifest.commit -eq $C)
+    $held = Get-ForkEngineBuildProblems (Join-Path $T 'art-tamper') $C 42
+    Yes '  one with a file that is not the one named says so' ($held.Why.Count -ge 1 -and ($held.Why -join ' ') -match 'scam_native\.node is not the file')
+    $held = Get-ForkEngineBuildProblems (Join-Path $T 'art-good') $C 43
+    Yes '  and one of another run says so' (($held.Why -join ' ') -match 'names run 42, not 43')
+    $bare = Join-Path $T 'bare'; $null = New-Item -ItemType Directory -Force -Path $bare
+    $held = Get-ForkEngineBuildProblems $bare $C 42
+    Yes '  and a folder with no fork-build.json has no manifest, saying so' ($null -eq $held.Manifest -and ($held.Why -join ' ') -match 'no fork-build\.json')
 
     # ---- 3. -BuiltBy in the two record scripts ----------------------------------
     Write-Host ''; Write-Host '-BuiltBy'

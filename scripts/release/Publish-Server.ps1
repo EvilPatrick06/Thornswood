@@ -106,7 +106,13 @@
   the order; a new order is Deploy-Gamemode.ps1 and a publish with -Dist.
   A build CI made and the store does not hold yet goes there first, held to
   the record here and again on the box:
-      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <engine.yml's server-<...>.zip>
+      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <the pin's server-<...>.zip>
+  A machine that takes CI's engine build (Setup-ShipMachine.ps1 -EngineBuild
+  ci, #3047) has no built server to pack, only the files the record names
+  and the zip they came in, so there a publish that names no -Dist does this
+  by itself, with the zip from Where.ps1 EngineArtifact's artifact\server,
+  fetching CI's build of the pin first when it is not there (#3262):
+      .\scripts\release\Publish-Server.ps1 -Channel dev
 
   A LOAD ORDER THAT DROPS PLUGINS (#2320). The installer refuses, before
   anything is stopped, a payload whose load order leaves out a plugin the
@@ -212,8 +218,8 @@ param(
     # store, with no engine build on this machine (#459, FROM THE STORE in the
     # header).
     [switch]$FromStore,
-    # A server build zip (engine.yml's server-<...>.zip, with its .json beside
-    # it) to send to the store first, for -FromStore.
+    # A server build zip (server-<...>.zip, with its .json beside it, as
+    # Get-EngineArtifact.ps1 makes it) to send to the store first, for -FromStore.
     [string]$ServerBuild = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
@@ -247,6 +253,24 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # empty in an advanced script's defaults (#2229). $DistGiven says whether the
 # person named the build, for the refusal below.
 $DistGiven = [bool]$Dist
+# A machine that takes CI's engine build (Setup-ShipMachine.ps1 -EngineBuild
+# ci, #3047) has no built server to pack: CI's artifact holds the server
+# files the record names and the zip they came in, never a
+# server-settings.json, a load order or a gamemode. So there a publish that
+# names no build is one from the store, sending that zip to the store first
+# (FROM THE STORE above). On 22 Oct 2026 at 5:37 AM the plain dev publish
+# stopped on such a machine, saying engine-ci\1a6e3e53f9f7\build\dist\server
+# holds no server-settings.json, and was run again by hand with -FromStore
+# -ServerBuild and the artifact's zip (#3262). -PutBack and -TaskOnly send
+# no build, so they are left as they are.
+$CiFromStore = $false
+if (-not $DistGiven -and -not $FromStore -and -not $PutBack -and -not $TaskOnly) {
+    $buildsFile = & (Join-Path $Here 'Where.ps1') EngineBuilds
+    if (Test-Path -LiteralPath $buildsFile) {
+        $buildsRec = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($buildsFile)) $buildsFile
+        if ($buildsRec -and $buildsRec.PSObject.Properties['ci'] -and $buildsRec.ci -eq $true) { $CiFromStore = $true; $FromStore = $true }
+    }
+}
 # -FromStore packs no build, so it never asks this machine for one (#459).
 if (-not $Dist -and -not $FromStore) { $Dist = & (Join-Path $Here 'Where.ps1') ServerDist }
 if (-not $Zip)  { $Zip  = & (Join-Path $Here 'Where.ps1') ServerZip }
@@ -257,6 +281,27 @@ if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
+
+# CI's engine build (above): its server zip, fetched first when this machine
+# does not have the pin's build yet, the way Sync-Client.ps1 fetches its client.
+if ($CiFromStore) {
+    $ciDir = & (Join-Path $Here 'Where.ps1') EngineArtifact
+    $ciStamp = Join-Path $ciDir 'engine-artifact.json'
+    if (-not (Test-Path -LiteralPath $ciStamp)) {
+        Say ("this machine takes CI's engine build, and the pin's is not at $ciDir yet, so Get-EngineArtifact.ps1 fetches it") 'Cyan'
+        & (Join-Path $Here 'Get-EngineArtifact.ps1') -NoPause
+        if ($LASTEXITCODE -ne 0) { Die ("Get-EngineArtifact.ps1 could not fetch CI's engine build of the pin (exit $LASTEXITCODE); its lines above say why. Nothing was sent.") }
+    }
+    $ciInfo = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($ciStamp)) $ciStamp
+    $ciZipName = if ($ciInfo.PSObject.Properties['serverZip']) { [string]$ciInfo.serverZip } else { '' }
+    $ciZip = Join-Path (Join-Path (Join-Path $ciDir 'artifact') 'server') $ciZipName
+    if (-not $ciZipName -or -not (Test-Path -LiteralPath $ciZip -PathType Leaf)) {
+        Die ("$ciStamp names " + $(if ($ciZipName) { $ciZipName } else { 'no server zip' }) + ", and there is none at $ciZip, so CI's server build is not here to send. " +
+             "Remove $ciDir and run .\scripts\release\Get-EngineArtifact.ps1 to put it back whole. Nothing was sent.")
+    }
+    if (-not $ServerBuild) { $ServerBuild = $ciZip }
+    Say ('{0,-22} {1}' -f 'engine build', ("CI's, at $ciDir, which has no built server to pack, so this publishes from the store and sends " + $ServerBuild + ' there first')) 'DarkGray'
+}
 
 # A put-back sets no setting: the installer puts the previous folder back
 # with the running server's own (#1804). Refused before anything is built,
@@ -400,7 +445,7 @@ function Save-ServerRecords([switch]$PutBack) {
         Die ("the server is installed and answering, but the box's record of what it runs was not written, so its data\thornswood-deploy.json " +
              "and the store's current record still name what ran before. The lines above say why. Put that right, then run this again.")
     }
-    $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot
+    $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot (Get-ThornswoodDocsRootBeside $VpsRoot)
 }
 
 # The installer and the files it loads, sent alone, before a run that
@@ -824,7 +869,7 @@ if (-not $FromStore) {
     if (-not $stored.Name) {
         Die ('the store on the box keeps no server build of ' + $stored.Commit.Substring(0, 8) + ' with the record this commit holds' +
              $(if (@($stored.Others).Count) { ' (it has ' + (@($stored.Others) -join ', ') + ', from that commit with another record)' } else { '' }) +
-             '. Put it there with a publish from a machine that has that build (-Dist), or with -ServerBuild and the zip engine.yml made. Nothing was sent.')
+             '. Put it there with a publish from a machine that has that build (-Dist), or with -ServerBuild and the pin''s server zip (Where.ps1 EngineArtifact, artifact\server). Nothing was sent.')
     }
     Say ('{0,-22} {1}, in the store on the box' -f 'server build', $stored.Name) 'Green'
 }
@@ -914,7 +959,7 @@ Save-ServerRecords
   which belong to the dev world, and a door.json with the live address, which
   gives the dev door the live list. The dev door asks
   https://thornswood.net/dev, whose list is only the people the dev build is
-  for (docs\SYSTEM.md, "The door"); on 28 Sep that took the dev list from 46
+  for (SERVER.md in the ops repo, "The door"); on 28 Sep that took the dev list from 46
   to 28, which is right.
 
   So now: door.json is live's key and join pass key with the address ending

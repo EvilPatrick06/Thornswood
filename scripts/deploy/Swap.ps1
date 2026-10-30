@@ -341,7 +341,20 @@ function PutBack {
 
 if (-not $port) {
   'the staged settings name no port, so nothing was stopped'
-  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+  if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
+  'SWAP REFUSED'
+  exit 1
+}
+# The nightly backup reads this server's folder; one of the two at a time
+# (#3247, Enter-ThornswoodServerFolderTurn in ServerFolderTurn.ps1). Held
+# until this block ends. A put-back's stage is the .prev folder it puts back,
+# so a refused put-back leaves it where it is ($KeepStage).
+$turnWhy = ''
+try { $serverTurn = Enter-ThornswoodServerFolderTurn (Join-Path (Split-Path -Parent $Root.TrimEnd('\')) 'Thornswood-Backup') ('a deploy into ' + $Root) 1200 { param($m) Write-Host $m } }
+catch { $turnWhy = $_.Exception.Message }
+if ($turnWhy) {
+  $turnWhy + ', so nothing was stopped'
+  if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
   'SWAP REFUSED'
   exit 1
 }
@@ -351,7 +364,7 @@ if ($notGone.Count -or (Held)) {
   if ($notGone.Count) { 'what the stop ended has not all exited, so its files may still be open, and nothing was swapped' }
   elseif ($heldWhy) { 'the UDP ports could not be listed after the stop (' + $heldWhy + '), so whether UDP ' + $port + ' let go is not known, and nothing was swapped' }
   else { 'UDP ' + $port + ' is still held by pid ' + ($heldBy -join ', ') + ' after the stop, so nothing was swapped' }
-  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+  if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
   'SWAP REFUSED'
   exit 1
 }
@@ -411,9 +424,14 @@ if ($moved) {
     # The last two sets of replaced files stay, newest first by their stamp,
     # and the last two a -PutBack took out.
     foreach ($kind in '.prev-*', '.undone-*') {
-      Get-ChildItem -LiteralPath $Root -Directory -Force -EA SilentlyContinue |
-        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2 |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -EA SilentlyContinue }
+      # Said, not thrown away: a copy that will not go stays, and the line
+      # says which and what Windows answered (#3183).
+      $pastTwo = @(Get-ChildItem -LiteralPath $Root -Directory -Force |
+        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2)
+      foreach ($pd in $pastTwo) {
+        try { Remove-Item -LiteralPath $pd.FullName -Recurse -Force -ErrorAction Stop }
+        catch { 'PRUNE FAILED: could not remove ' + $pd.FullName + ', one of the old copies past the newest 2: ' + $_.Exception.Message }
+      }
     }
     'SWAP OK'
     exit 0
@@ -493,6 +511,10 @@ $checkBlock = $ThornswoodRecordShapeText + $checkBlock
 # here, and of the service swap below.
 $ThornswoodStopAndMoveText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'StopAndMove.ps1')) + "`r`n"
 $swapBlock = $ThornswoodStopAndMoveText + $swapBlock
+# And the server folders' turn (#3247), which the nightly backup takes as
+# well: in front of the game server swap only, the one whose folders it reads.
+$ThornswoodServerFolderTurnText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'ServerFolderTurn.ps1')) + "`r`n"
+$swapBlock = $ThornswoodServerFolderTurnText + $swapBlock
 
 # ==== put-back pick ====
 #
@@ -501,9 +523,12 @@ $swapBlock = $ThornswoodStopAndMoveText + $swapBlock
 # .prev folder IS the stage, what it holds is what gets swapped back in, and
 # what it replaces goes to .undone-<stamp> rather than another .prev, so a
 # second -PutBack goes to the one before rather than back to what was just
-# taken out. $KeepStage, because a put-back that does not answer must leave
-# that .prev folder where it was, full, rather than clear it as a failed stage
-# is cleared. A file the deploy added with nothing before it stays; there is
+# taken out. $KeepStage, because a put-back that does not answer, or is
+# refused before it swaps, must leave that .prev folder where it was, full,
+# rather than clear it as a failed stage is cleared. Until 22 Oct 2026 the
+# game server swap's two refusals before it moves anything (no port, the stop
+# not done) cleared it anyway, and a refused put-back lost what it was putting
+# back. A file the deploy added with nothing before it stays; there is
 # nothing to put back for it, and nothing running reads a file the old one
 # did not name.
 $putBackPick = @'
@@ -732,9 +757,14 @@ if ($moved) {
     Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
     # The newest two of each, by their stamp.
     foreach ($kind in '.prev-*', '.undone-*') {
-      Get-ChildItem -LiteralPath $Root -Directory -Force -EA SilentlyContinue |
-        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2 |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -EA SilentlyContinue }
+      # Said, not thrown away: a copy that will not go stays, and the line
+      # says which and what Windows answered (#3183).
+      $pastTwo = @(Get-ChildItem -LiteralPath $Root -Directory -Force |
+        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2)
+      foreach ($pd in $pastTwo) {
+        try { Remove-Item -LiteralPath $pd.FullName -Recurse -Force -ErrorAction Stop }
+        catch { 'PRUNE FAILED: could not remove ' + $pd.FullName + ', one of the old copies past the newest 2: ' + $_.Exception.Message }
+      }
     }
     'SWAP OK'
     exit 0

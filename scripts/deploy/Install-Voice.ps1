@@ -188,7 +188,8 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
 }
 
 <#
-  HOW MANY PEOPLE IT TAKES AT ONCE (#481). records\most-online.json is the one
+  HOW MANY PEOPLE HOLD A VOICE PLACE AT ONCE (#481; only somebody in the world
+  holds one, #3570). records\most-online.json is the one
   place the numbers live, the world's seats and voice's, read through
   MaxOnline.ps1 the way the deploys read the seats, before anything is sent:
   a voice number under the seats stops here with the box untouched. It goes
@@ -197,7 +198,7 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
   and this says so.
 
   Dev voice, C:\Thornswood-Voice-Dev (the folder every dev install names,
-  docs\SYSTEM.md), takes the dev server's numbers, the record's dev object;
+  SERVER.md in the ops repo), takes the dev server's numbers, the record's dev object;
   any other folder is the live service and takes main's (Patrick, 12 Oct:
   dev voice at most 5).
 #>
@@ -827,13 +828,20 @@ if ($Bind -eq '127.0.0.1') {
     # The service is only useful if something is carrying it, so say whether
     # anything actually is rather than leaving that to be assumed. This goes
     # over HTTPS, so it is asked from anywhere, a cloud thread included.
+    # Through the site /health says only ok (#3806): the build, bind and auth
+    # go to a caller on the box, and the build was read there above.
     if (-not $reachable) {
         $via = ''
         if ($Site) { $via = $Site.TrimEnd('/') + $(if ($Port -eq 7778) { '/voice' } else { '/voice-dev' }) }
         if ($via) {
             try {
                 $h = Invoke-RestMethod ($via + '/health') -TimeoutSec 10
-                Say "Reached it through $via, build $($h.build), bind $($h.bind), auth $($h.auth)." 'Green'
+                if ($h -and $h.PSObject.Properties['ok'] -and $h.ok -eq $true) {
+                    Say "Reached it through $via, which says ok." 'Green'
+                } else {
+                    Say "Something answered at $via/health, but not voice's ok, so the site is not carrying voice there." 'Red'
+                    Say '  Check the Caddyfile has the handle_path block for this port.' 'DarkGray'
+                }
             } catch {
                 Say "But $via/health did not answer either, so nothing is carrying it." 'Red'
                 Say '  Check the Caddyfile has the handle_path block for this port.' 'DarkGray'

@@ -153,27 +153,56 @@ $saved = @{}
 foreach ($k in 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_DATE') { $saved[$k] = [Environment]::GetEnvironmentVariable($k) }
 $env:GIT_COMMITTER_NAME = 'Thornswood test'; $env:GIT_COMMITTER_EMAIL = 'test@thornswood.invalid'
 $env:GIT_AUTHOR_NAME = 'Thornswood test'; $env:GIT_AUTHOR_EMAIL = 'test@thornswood.invalid'
-function G { $o = @(& git -C $git -c commit.gpgsign=false -c tag.gpgsign=false @args 2>&1 | ForEach-Object { [string]$_ }); if ($LASTEXITCODE) { throw ("git " + ($args -join ' ') + ": " + ($o -join ' ')) }; return ,$o }
+function G { $o = @(& git -C $git -c commit.gpgsign=false -c tag.gpgsign=false -c maintenance.auto=false @args 2>&1 | ForEach-Object { [string]$_ }); if ($LASTEXITCODE) { throw ("git " + ($args -join ' ') + ": " + ($o -join ' ')) }; return ,$o }
 try {
-    [void](G init -q)
-    [void](G commit -q --allow-empty -m base)
+    [void](G init -q -b main)
     # One commit a release, each with a change of its own (an empty commit has
-    # nothing main could be missing), tagged the way Ship tags it.
-    $commitOf = @{}
-    $last = ''
+    # nothing main could be missing), tagged the way Ship tags it: an
+    # annotated tag whose tagger time is when Ship tagged it. Written in one
+    # git fast-import, not an add, a commit, a rev-parse and a tag for each
+    # of the 44 (#3835: those were about 350 processes on the box, two for
+    # every git behind Git's cmd\git.exe, and each start a Defender scan).
+    $who = 'Thornswood test <test@thornswood.invalid>'
+    $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $fi = New-Object Text.StringBuilder
+    function Add-Data([string]$text) { [void]$fi.Append('data ' + [Text.Encoding]::UTF8.GetByteCount($text) + "`n" + $text + "`n") }
+    [void]$fi.Append("commit refs/heads/main`nmark :1`ncommitter $who $now +0000`n"); Add-Data 'base'
+    $markOf = @{}
+    $mark = 1
     foreach ($t in $tags) {
         if (-not $t[3]) {
-            [IO.File]::WriteAllText((Join-Path $git 'release.txt'), $t[0])
-            [void](G add release.txt)
-            [void](G commit -q -m ("work for " + $t[0]))
-            $last = (G rev-parse HEAD)[0].Trim()
+            $mark++
+            [void]$fi.Append("commit refs/heads/main`nmark :$mark`ncommitter $who $now +0000`n"); Add-Data ('work for ' + $t[0])
+            [void]$fi.Append("M 100644 inline release.txt`n"); Add-Data $t[0]
         }
-        $commitOf[$t[0]] = $last
+        $markOf[$t[0]] = $mark
         $msg = "Thornswood dev release $($t[0])`n`nlauncher  1.2.3.2`npacks     $($t[0])`nbaseline  $($t[0])`nbranch    HEAD"
         if ($t[2]) { $msg += "`nbuilt with 1 uncommitted change(s) on top of this commit" }
-        $env:GIT_COMMITTER_DATE = $t[1]
-        try { [void](G tag -a ("release/dev/" + $t[0]) $last -m $msg) } finally { Remove-Item Env:GIT_COMMITTER_DATE -ErrorAction SilentlyContinue }
+        $when = [DateTimeOffset]::Parse($t[1], [Globalization.CultureInfo]::InvariantCulture)
+        $zone = '{0}{1:00}{2:00}' -f $(if ($when.Offset -lt [TimeSpan]::Zero) { '-' } else { '+' }), [Math]::Abs($when.Offset.Hours), [Math]::Abs($when.Offset.Minutes)
+        [void]$fi.Append("tag release/dev/$($t[0])`nfrom :$mark`ntagger $who $($when.ToUnixTimeSeconds()) $zone`n"); Add-Data ($msg + "`n")
     }
+    $marks = Join-Path $Scratch 'marks.txt'
+    # Straight to its standard input as bytes: PowerShell's pipe to a native
+    # command and Start-Process -RedirectStandardInput both rewrite the end of
+    # the text, and fast-import counts every byte of each data block.
+    $psi = New-Object Diagnostics.ProcessStartInfo 'git'
+    $psi.Arguments = '-C "' + $git + '" fast-import --quiet "--export-marks=' + $marks + '"'
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardError = $true
+    $fip = [Diagnostics.Process]::Start($psi)
+    $bytes = (New-Object Text.UTF8Encoding($false)).GetBytes($fi.ToString())
+    $fip.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+    $fip.StandardInput.Close()
+    $fiErr = $fip.StandardError.ReadToEnd()
+    $fip.WaitForExit()
+    if ($fip.ExitCode) { throw ('git fast-import: ' + $fiErr) }
+    $shaOf = @{}
+    foreach ($l in [IO.File]::ReadAllLines($marks)) { if ($l -match '^:(\d+) ([0-9a-f]{40})$') { $shaOf[[int]$Matches[1]] = $Matches[2] } }
+    $commitOf = @{}
+    foreach ($id in $markOf.Keys) { $commitOf[$id] = $shaOf[$markOf[$id]] }
+    [void](G reset -q --hard)
     $mainCommit = $commitOf['20261011-174543-dev']
     $made = G tag -l 'release/dev/*'
     Yes ("the stand-in clone has 44 tagged dev releases on one line ({0})" -f $made.Count) ($made.Count -eq 44)

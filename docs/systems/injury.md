@@ -152,11 +152,11 @@ a bite or a break with it for a scene.
 
 Not in yet:
 
-- Going down. Health reaching zero is still the engine's death, applied
-  before the server hears of it. The fork has to ask the server first,
-  and #1383 says what it has to expose (#1626); the gamemode half is
-  #2681. Until then a bleed that empties
-  your health is a death with no killer, and the wake stops the bleed.
+- Going down. The engine now asks the server before health reaching
+  zero kills, before anything is sent (#1626), which is the moment going
+  down needs; the rest of it is #2681. Until that is built a bleed that
+  empties your health is a death with no killer, and the wake stops the
+  bleed.
 
 A broken arm makes a block cost twice the stamina and a broken leg
 refuses sprint, for as long as the break lasts, splinted or not.

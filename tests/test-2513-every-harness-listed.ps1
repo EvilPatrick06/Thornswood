@@ -92,7 +92,10 @@ Yes 'test-release-baseline.ps1 and test-publish-refusals.ps1 are on the gate (#2
 Yes 'and this check is too' (-not $why.ContainsKey('test-2513-every-harness-listed.ps1'))
 foreach ($wf in 'build.yml', 'build-pr.yml') {
     $t = [IO.File]::ReadAllText((Join-Path $Repo ".github\workflows\$wf"))
-    Yes "$wf runs the gate through Gate-Harnesses.ps1" ($t -match '(?m)^\s+\$gate = @\(& \.\\scripts\\dev\\Gate-Harnesses\.ps1\)')
+    # Through scripts\dev\Run-Gate.ps1 since #3114; tests\test-gate-list.ps1
+    # holds that it takes its list from Gate-Harnesses.ps1.
+    Yes "$wf runs the gate through Run-Gate.ps1, which lists it with Gate-Harnesses.ps1" ($t -match '(?m)^\s+\.\\scripts\\dev\\Run-Gate\.ps1 ' -and
+        [IO.File]::ReadAllText((Join-Path $Repo 'scripts\dev\Run-Gate.ps1')) -match "(?m)^\`$gate = @\(& \(Join-Path \`$Here 'Gate-Harnesses\.ps1'\)\)")
     Yes "  and has no hand-kept list left (#3009)" ($t -notmatch '(?m)^\s+\$six\s*=')
 }
 

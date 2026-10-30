@@ -1,38 +1,44 @@
 
 /*
-  Autoplay is a video attribute and no media query turns it off, so somebody
-  who has asked their system for less motion still gets 24 seconds of drifting
-  aurora behind the title. Paused here instead, which leaves the poster frame
-  showing: the same picture, holding still.
+  The hero video starts once the page has loaded, not as this script runs
+  (#2777). It is 3.3 MB, and asked for at once it shared a phone's connection
+  with the still under it, the picture the page opens on, which then took 3.4
+  to 6.8 seconds to show. The still has the line to itself until it is in,
+  and the video paints over it when it plays.
+
+  It never starts for somebody who has asked their system for less motion:
+  there is no autoplay attribute, so nothing plays that this does not start,
+  and the still is what stays. Nor once somebody has pressed the button
+  before the page loaded, which is their answer.
 
   Nothing here throws: matchMedia is asked only where it exists (narrow()
-  below asks it unguarded), and pause and removeAttribute do not throw on a
-  video, so no try is needed (#2736).
+  below asks it unguarded), so no try is needed (#2736).
 */
 var m = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
-if (m && m.matches) {
-  document.addEventListener('DOMContentLoaded', function () {
-    var v = document.querySelector('video.art');
-    if (v) { v.pause(); v.removeAttribute('autoplay'); }
-  });
-}
 
 var bannerVideo = document.querySelector('video.art'), bannerMotion = document.getElementById('bannerMotion');
 if (bannerVideo && bannerMotion) {
+  var bannerAsked = false;
   bannerMotion.hidden = false;
   function motionLabel() { bannerMotion.textContent = bannerVideo.paused ? 'Play background animation' : 'Pause background animation'; }
   bannerVideo.addEventListener('play', motionLabel);
   bannerVideo.addEventListener('pause', motionLabel);
   bannerMotion.addEventListener('click', function () {
+    bannerAsked = true;
     if (bannerVideo.paused) bannerVideo.play().catch(motionLabel);
     else bannerVideo.pause();
   });
-  if (!(m && m.matches)) bannerVideo.play().catch(motionLabel);
+  if (!(m && m.matches)) {
+    window.addEventListener('load', function () {
+      if (!bannerAsked) bannerVideo.play().catch(motionLabel);
+    });
+  }
   motionLabel();
 }
 
 var burger = document.getElementById('burger'), nav = document.getElementById('nav');
-function narrow(){ return window.matchMedia('(max-width:900px)').matches; }
+// The same width home.css folds the menu at (#3293).
+function narrow(){ return window.matchMedia('(max-width:1080px)').matches; }
 function shut(){ if (narrow()) { nav.hidden = true; burger.setAttribute('aria-expanded','false'); burger.setAttribute('aria-label','Open menu'); } else { nav.hidden = false; } }
 shut();
 window.addEventListener('resize', shut);
@@ -59,36 +65,6 @@ var PAGES = { '/world':1, '/rules':1, '/join':1, '/credits':1,
               '/privacy':1, '/terms':1, '/cookies':1 };
 var here = location.pathname.replace(/\/+$/, '').toLowerCase() || '/';
 
-/* What each address says when it is pasted into a channel. A crawler reads the
-   tags in the file rather than waiting for this, so the server fills them in
-   for the page it is serving; this is for the browser tab and for anything
-   that does run the script. */
-var BLURB = {
-  '/world':   ['The world', 'Fifty years after the Stormcloaks won. A free Skyrim, an Empire with an embassy and no soldiers, and the White Harbour Accord.'],
-  '/rules':   ['Rules', 'Nine rules, short on purpose. Nobody dies without agreeing to, play a person rather than a legend, and staff decide.'],
-  '/join':    ['How to join', 'What you need, how to apply, and what happens between pressing Play and waking up in an inn.'],
-  '/credits': ['Credits', 'Everyone whose work Thornswood is built on.'],
-  '/classes': ['Professions and classes', 'One profession, one half of it, one class. An Edgewright cannot make steel armour, so you find somebody who can.'],
-  '/known':   ['Known issues', 'What is limited or broken right now and why, and which of it is on the roadmap. Read this before reporting anything.'],
-  '/help':    ['Help', 'Installing, the collection, LOAD ORDER ERROR, and where the logs are.'],
-  '/downloads': ['Download', 'What you need, the installer, and the collection in Vortex.'],
-  '/roadmap': ['Roadmap', 'What is being worked on and roughly in what order.'],
-  '/news':    ['Every release', 'What changed, newest first. The same list the launcher shows.'],
-  '/report':  ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
-  '/gallery': ['From the world', 'Pictures taken by people playing.'],
-  '/privacy': ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
-  '/terms':   ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
-  '/cookies': ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
-};
-(function () {
-  var b = BLURB[here];
-  if (!b) return;
-  var t = document.getElementById('ogTitle'), d = document.getElementById('ogDesc');
-  if (t) t.setAttribute('content', b[0] + ' \u00b7 Thornswood');
-  if (d) d.setAttribute('content', b[1]);
-  var md = document.querySelector('meta[name="description"]');
-  if (md) md.setAttribute('content', b[1]);
-})();
 
 /* The anchor in a fetched page. Called after the markdown is on the page,
    because until then there is nothing with that id to scroll to. */
@@ -148,6 +124,15 @@ function preparePicture(file) {
     });
   }).catch(function () { return file; });
 }
+/* A picture's smaller copies (#3218), made and sent by copies.js after the
+   picture. '' when they went or none was needed, or a sentence saying
+   which did not go. */
+function sendCopies(file, name) {
+  if (!/\.(png|jpe?g|webp)$/i.test(file.name || '')) return Promise.resolve('');
+  return window.galleryCopies.send(file, name).then(function (r) {
+    return r.bad ? r.bad + ', so it will show at full size until staff make them.' : '';
+  });
+}
 function show(html) {
   var headingSeen = false;
   html = html.replace(/<h1\b([^>]*)>([\s\S]*?)<\/h1>/gi, function (all, attrs, text) {
@@ -158,9 +143,11 @@ function show(html) {
   var page = document.getElementById('page');
   page.hidden = false;
   document.getElementById('pagebody').innerHTML = html;
-  document.title = BLURB[here] ? BLURB[here][0] + ' \u00b7 Thornswood' : (document.querySelector('#pagebody h1') || {}).textContent
-    ? document.querySelector('#pagebody h1').textContent + ' \u00b7 Thornswood'
-    : 'Thornswood';
+  // The server wrote this page's own title from its one list of them (BLURB
+  // in server.js, #3138). A page that list does not name keeps the bare name,
+  // and takes its heading instead.
+  var h1 = document.querySelector('#pagebody h1');
+  if (document.title === 'Thornswood' && h1 && h1.textContent) document.title = h1.textContent + ' \u00b7 Thornswood';
 }
 
 /* Hard eighteen-and-over door on /downloads and /join only. Remembered in
@@ -272,9 +259,9 @@ if (AGE_PATHS[here] && !ageOk()) {
     // Rendered by the server, like the written pages.
     if (b.introHtml) out += b.introHtml;
     else if (b.intro) out += '<p>' + esc(b.intro) + '</p>';
-    // Every section is drawn, Done included (#2560). Done used to be hidden
-    // here, so the finished work #2561 moved into it never reached the page.
-    // Done is last in the data, so it is drawn last.
+    // Every section is drawn, in its order, none filtered by name (#2560: a
+    // Done filter here once kept finished work off the page). Which lanes
+    // there are is the bot's to say, and since 26 Oct it writes no Done.
     var live = b.sections || [];
     live.forEach(function (sec) {
       var cols = sec.columns || [], rows = sec.rows || [];
@@ -290,9 +277,13 @@ if (AGE_PATHS[here] && !ageOk()) {
       });
       out += '</div></div>';
     });
-    if (!live.some(function (s) { return (s.rows || []).length; })) {
+    // Built from the issue board by the bot (#3140): a roadmap it could not
+    // read is said, never drawn as an empty one.
+    if (b.unread) out += '<p>The roadmap could not be read from the issue board just now. Try again in a few minutes.</p>';
+    else if (!live.some(function (s) { return (s.rows || []).length; })) {
       out += '<p>Nothing on it yet.</p>';
     }
+    if (b.at) out += '<p><em>Read from the issue board ' + esc(b.at) + '.</em></p>';
     show(out);
   }).catch(function () { show('<h1>Roadmap</h1><p>Could not load it.</p>'); });
 } else if (here === '/news') {
@@ -392,7 +383,11 @@ if (AGE_PATHS[here] && !ageOk()) {
         var recording = /\.(mp4|webm)$/i.test(g.name || '');
         var media = recording
           ? '<video controls preload="metadata" aria-label="' + description + '"><source src="' + esc(g.url) + '"></video>'
-          : '<img src="' + esc(g.url) + '" alt="' + description + '" loading="lazy">';
+          : '<img src="' + esc(g.url) + '"' +
+            // Its smaller copies (#3218). A card is a column of a grid at
+            // least 260 wide: one column up to 620, then about a third.
+            (g.srcset ? ' srcset="' + esc(g.srcset) + '" sizes="(max-width: 620px) calc(100vw - 48px), 34vw"' : '') +
+            ' alt="' + description + '" loading="lazy">';
         var card = '<div class="shot-card"><div class="shot">' + media + '</div>';
         if (g.by) card += '<div class="also faintly">' + esc(g.by) + '</div>';
         // Per-image report for live public shots only. No staff inbox here.
@@ -578,14 +573,15 @@ if (AGE_PATHS[here] && !ageOk()) {
         send.disabled = true; send.textContent = 'Sending';
         // One request per file, in order. The submit door writes gallery-pending.json
         // as read-modify-write, so parallel posts could drop an entry.
-        var i = 0, names = [], fail = null;
+        var i = 0, names = [], fail = null, copyBad = '';
         function next() {
           if (fail || i >= list.length) {
             if (fail) said(fail, true);
             else {
-              said(names.length === 1
+              said((names.length === 1
                 ? 'Sent. Staff will look at it before it goes up.'
-                : ('Sent ' + names.length + '. Staff will look at them before they go up.'));
+                : ('Sent ' + names.length + '. Staff will look at them before they go up.')) +
+                (copyBad ? ' ' + copyBad : ''));
               picked = [];
               if (f) f.value = '';
               showPicked();
@@ -593,7 +589,9 @@ if (AGE_PATHS[here] && !ageOk()) {
             send.disabled = false; send.textContent = 'Send pictures';
             return;
           }
+          var sent;
           preparePicture(list[i++]).then(function (file) {
+            sent = file;
             var q = '/api/gallery/submit?name=' + encodeURIComponent(file.name) +
             (by ? '&by=' + encodeURIComponent(by) : '') +
             (note ? '&note=' + encodeURIComponent(note) : '');
@@ -603,7 +601,15 @@ if (AGE_PATHS[here] && !ageOk()) {
           })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
             .then(function (x) {
-              if (x.ok && x.j && x.j.ok) { names.push(x.j.name); next(); }
+              if (x.ok && x.j && x.j.ok) {
+                names.push(x.j.name);
+                // Then its smaller copies; one that does not go is said, and
+                // the picture is still in.
+                return sendCopies(sent, x.j.name).then(function (bad) {
+                  if (bad && !copyBad) copyBad = bad;
+                  next();
+                });
+              }
               else {
                 fail = (x.j && (x.j.error || x.j.why)) || 'Could not send it.';
                 if (names.length) fail = 'Sent ' + names.length + ', then stopped: ' + fail;
@@ -886,10 +892,46 @@ if (AGE_PATHS[here] && !ageOk()) {
     '<p class="hint">We use what you send to investigate and respond. Your Discord name is optional for game faults and ideas. ' +
       'Do not send passwords, access tokens, payment details, or unrelated personal information. ' +
       '<a href="/privacy">How reports are stored and used</a>. Staff work in their own time; there is no guaranteed response time.</p>' +
+    // Cloudflare Turnstile's check that a person is sending it (#3216),
+    // drawn here when the site has a key for it.
+    '<div id="rCheck" class="ts-check" hidden></div>' +
     '<div><button class="btn first" type="submit">Send report</button></div>' +
     '<p id="rSaid" class="said" role="status" aria-live="polite" hidden></p>' +
     '</form>');
   var form = document.getElementById('rep');
+  /* Turnstile (#3216). The site says whether the check is on and with which
+     key; off, nothing is loaded from Cloudflare and the form is as it was.
+     On, the widget's pass goes with the report, and a pass is good once, so
+     the widget is drawn again after every answer. tsWanted is true while the
+     check is on and has not given a pass yet. */
+  var tsWanted = false, tsToken = '', tsWidget = null;
+  function tsReset() {
+    tsToken = '';
+    if (tsWidget !== null && window.turnstile) window.turnstile.reset(tsWidget);
+  }
+  request('/api/report/form').then(function (r) { return r.json(); }).then(function (d) {
+    var key = d && d.turnstile;
+    if (!key) return;
+    tsWanted = true;
+    var box = document.getElementById('rCheck');
+    box.hidden = false;
+    var s = document.createElement('script');
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    s.async = true;
+    s.onload = function () {
+      tsWidget = window.turnstile.render(box, {
+        sitekey: key, action: 'report', theme: 'dark',
+        callback: function (t) { tsToken = t; },
+        'expired-callback': function () { tsToken = ''; },
+        'error-callback': function () { tsToken = ''; }
+      });
+    };
+    s.onerror = function () {
+      box.textContent = 'The check that you are a person could not load, so this form cannot send. ' +
+        'Something in this browser may be blocking challenges.cloudflare.com.';
+    };
+    document.head.appendChild(s);
+  }).catch(function () { /* the form still sends; the site says if it needed the check */ });
   /* Who is asking, told apart (#1097): not signed in gets the sign in link;
      signed in but not let in, banned, or Discord not answering gets the
      site's own sentence (personSays, what /api/report would answer) and no
@@ -942,6 +984,10 @@ if (AGE_PATHS[here] && !ageOk()) {
       btn.disabled = false;
       personBox();
     }
+    if (tsWanted && !tsToken) {
+      finish('Wait for the tick under the form, then send it again.');
+      return;
+    }
     var aboutPerson = document.getElementById('rPerson').checked;
     request('/api/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -952,6 +998,7 @@ if (AGE_PATHS[here] && !ageOk()) {
         by:     document.getElementById('rBy').value,
         homepage: document.getElementById('rHome').value,
         about:  aboutPerson ? document.getElementById('rWho').value : '',
+        turnstile: tsToken,
         kind:   aboutPerson ? 'report'
               : (document.getElementById('rIdea').checked ? 'idea' : 'bug')
       })
@@ -962,6 +1009,7 @@ if (AGE_PATHS[here] && !ageOk()) {
           .then(function (j) { return { ok: r.ok, j: j || {} }; });
       })
       .then(function (res) {
+        tsReset();
         if (res.ok) {
           form.querySelectorAll('input, textarea').forEach(function (i) {
             if (i.type === 'checkbox') { i.checked = false; } else { i.value = ''; }
@@ -973,12 +1021,88 @@ if (AGE_PATHS[here] && !ageOk()) {
           finish(res.j.error || 'That did not send. Try again in a minute.');
         }
       }).catch(function () {
+        tsReset();
         finish(gaveUp
           ? 'No answer from the site after fifteen seconds, so it may not have gone. Try again in a minute.'
           : 'That did not send. Try again in a minute.');
       });
   });
 }
+
+/* The line under the title and the figure beside it: whether the world is
+   up and who is in it, from /api/public. */
+function paintStatus(d) {
+  var dot = document.getElementById('dot'), t = document.getElementById('livetext');
+  if (dot && t) {
+    if (d.status && d.status.up) {
+      dot.className = 'dot on';
+      var n = d.status.online || 0;
+      if (n === 0) {
+        /* Patrick's line, 28 Sep (#884). The second half goes to /join,
+           which says how to apply. Built from nodes, not markup. */
+        t.textContent = 'The world is open, ';
+        var apply = document.createElement('a');
+        apply.href = '/join';
+        /* With the one switch on (#428) there is nothing to apply for. */
+        apply.textContent = d.open === true
+          ? 'come into the Discord and play!'
+          : 'apply to be an alpha playtester in the Discord!';
+        t.appendChild(apply);
+      } else {
+        /* N of the most the world holds (#481). The site sends the number
+           even when the server has not said it, from records\most-online.json.
+           It is every seat, the staff seats too (Patrick, 12 Oct: "of 30"),
+           so full can come before N reaches it: the seats past the door's
+           number are kept for the staff roles, and the page says so.
+           And how many wait at the menu when anybody does. */
+        var most = d.status.max > 0 ? d.status.max : 0;
+        var seen = most ? Math.min(n, most) : n;
+        var waiting = d.status.line > 0 ? d.status.line : 0;
+        if (most && (n >= most || d.status.full === true)) {
+          t.textContent = 'The world is full, ' + seen + ' of ' + most + ' people are in it' +
+            (n < most ? ' and the rest of the seats are kept for staff' : '') +
+            (waiting ? ', ' + waiting + ' waiting for a seat' : '');
+        } else if (most) {
+          t.textContent = seen + ' of ' + most + ' people in the world';
+        } else {
+          t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
+        }
+      }
+      var f = document.getElementById('figOnline');
+      var w = document.getElementById('figOnlineWrap');
+      // Only worth a tile of its own once there is somebody in it.
+      if (f && w && n > 0) {
+        f.textContent = d.status.max > 0 ? Math.min(n, d.status.max) + ' of ' + d.status.max : String(n);
+        w.hidden = false;
+      } else if (w) {
+        w.hidden = true;
+      }
+    } else {
+      dot.className = 'dot';
+      t.textContent = 'Server offline';
+      var gone = document.getElementById('figOnlineWrap');
+      if (gone) gone.hidden = true;
+    }
+  }
+}
+
+/* Back to this page from another one shows it as it was left (#3218: the
+   public pages are no longer no-store, so the browser keeps them in its back
+   and forward cache). Everything on it holds still except who is in the
+   world, which is asked again rather than shown from minutes ago. */
+window.addEventListener('pageshow', function (e) {
+  if (!e.persisted) return;
+  request('/api/public?galleryLimit=24', { credentials:'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(paintStatus)
+    .catch(function () {
+      // As on a first load that could not ask: say nothing rather than a
+      // line from before that may no longer be true.
+      var t = document.getElementById('livetext'), dot = document.getElementById('dot');
+      if (t) t.textContent = '';
+      if (dot) dot.className = 'dot';
+    });
+});
 
 /* The three live things on the front page, all of them honest about being
    empty rather than filled with something invented. */
@@ -999,53 +1123,7 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
       }
     }
 
-    var dot = document.getElementById('dot'), t = document.getElementById('livetext');
-    if (dot && t) {
-      if (d.status && d.status.up) {
-        dot.className = 'dot on';
-        var n = d.status.online || 0;
-        if (n === 0) {
-          /* Patrick's line, 28 Sep (#884). The second half goes to /join,
-             which says how to apply. Built from nodes, not markup. */
-          t.textContent = 'The world is open, ';
-          var apply = document.createElement('a');
-          apply.href = '/join';
-          /* With the one switch on (#428) there is nothing to apply for. */
-          apply.textContent = d.open === true
-            ? 'come into the Discord and play!'
-            : 'apply to be an alpha playtester in the Discord!';
-          t.appendChild(apply);
-        } else {
-          /* N of the most the world holds (#481). The site sends the number
-             even when the server has not said it, from records\most-online.json.
-             It is every seat, the staff seats too (Patrick, 12 Oct: "of 30"),
-             so full can come before N reaches it: the seats past the door's
-             number are kept for the staff roles, and the page says so.
-             And how many wait at the menu when anybody does. */
-          var most = d.status.max > 0 ? d.status.max : 0;
-          var seen = most ? Math.min(n, most) : n;
-          var waiting = d.status.line > 0 ? d.status.line : 0;
-          if (most && (n >= most || d.status.full === true)) {
-            t.textContent = 'The world is full, ' + seen + ' of ' + most + ' people are in it' +
-              (n < most ? ' and the rest of the seats are kept for staff' : '') +
-              (waiting ? ', ' + waiting + ' waiting for a seat' : '');
-          } else if (most) {
-            t.textContent = seen + ' of ' + most + ' people in the world';
-          } else {
-            t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
-          }
-        }
-        var f = document.getElementById('figOnline');
-        var w = document.getElementById('figOnlineWrap');
-        // Only worth a tile of its own once there is somebody in it.
-        if (f && w && n > 0) {
-          f.textContent = d.status.max > 0 ? Math.min(n, d.status.max) + ' of ' + d.status.max : String(n);
-          w.hidden = false;
-        }
-      } else {
-        t.textContent = 'Server offline';
-      }
-    }
+    paintStatus(d);
 
     var rel = document.getElementById('releases');
     if (!rel) return;
@@ -1070,14 +1148,34 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
     if (show && band && shots.length) {
       band.hidden = false;
       var i = 0;
-      shots.forEach(function (s, n) {
+      /* Only the picture on show and the one after it are fetched (#3218).
+         Every picture had its address from the start, and loading="lazy" did
+         not hold the rest back: they are stacked in the same box, so all of
+         them are "in view" once the box is, and scrolling down to it fetched
+         every shot in the gallery at once, 5 MB on 21 Oct 2026. Lazy now, as
+         the band is far below the first screen. */
+      var frames = shots.map(function (s, n) {
         var img = document.createElement('img');
-        img.src = s.url;
         img.alt = s.alt || 'Skyrim scene shared by ' + (s.by || 'the Thornswood community');
-        img.loading = n === 0 ? 'eager' : 'lazy';
+        img.loading = 'lazy';
         if (n === 0) img.className = 'on';
         show.appendChild(img);
+        return img;
       });
+      // A picture's smaller copies (#3218) are set with its address, so
+      // neither is fetched early. The band is the page's width less its
+      // margins, at most 1480.
+      function fetchFrame(n) {
+        var img = frames[n];
+        if (!img || img.getAttribute('src')) return;
+        if (shots[n].srcset) {
+          img.sizes = '(max-width: 1528px) calc(100vw - 48px), 1480px';
+          img.srcset = shots[n].srcset;
+        }
+        img.src = shots[n].url;
+      }
+      fetchFrame(0);
+      fetchFrame(1 % shots.length);
       var cap = document.createElement('div');
       cap.className = 'gal-cap';
       cap.innerHTML = (shots[0].by ? esc(shots[0].by) + ' \u00b7 ' : '') +
@@ -1096,6 +1194,8 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
       }
       function go(n) {
         i = ((n % shots.length) + shots.length) % shots.length;
+        fetchFrame(i);
+        fetchFrame((i + 1) % shots.length);
         var imgs = show.querySelectorAll('img');
         for (var k = 0; k < imgs.length; k++) {
           imgs[k].className = k === i ? 'on' : '';

@@ -24,15 +24,23 @@
        line endings as committed, so Windows and Linux build the same bytes.
     2. yarn 1.22.22 (through npx) installs the locked packages and builds.
        Needs node and the npm registry; nothing else on the machine.
-    3. Compares what it built with records\front-build.json. The same: it
-       writes local\thornswood-front.zip, one fixed time on every entry, so
-       the zip is the same on every machine. Different: it writes nothing and
-       says which files differ.
-  -Record writes records\front-build.json from this build instead of
-  comparing, for when the pin moved: commit it with the pin.
+    3. Reads which npm packages webpack put in build.js, and each one's
+       licence text from the folder it came from (Front.ps1, #3751).
+    4. Compares what it built, and those packages and texts, with
+       records\front-build.json. The same: it writes
+       local\thornswood-front.zip, one fixed time on every entry, so the zip
+       is the same on every machine. Different: it writes nothing and says
+       what differs.
+  -Record writes records\front-build.json and records\front-licences\ (each
+  package's text) from this build instead of comparing, for when the pin
+  moved: commit them with the pin. The texts are not in the zip: they go
+  with build.js in the installer's licences folder and in every update that
+  carries build.js (Source-Notice.ps1).
 
-  Read only except for the zip, the record with -Record, and its own scratch
-  folder, which it removes. Never talks to the VPS.
+  Read only except for the zip, the record and its texts with -Record, its own scratch
+  folder, which it removes, and engine\skymp when this checkout never
+  fetched it (a cloud checkout): then it fetches the pinned commit there with
+  git submodule update --init --depth 1. Never talks to the VPS.
 
 .EXAMPLE
   .\scripts\release\Build-Front.ps1
@@ -74,7 +82,15 @@ if (-not $Commit) {
     if (-not $pinned) { throw 'this checkout pins no engine\skymp commit (git ls-tree HEAD engine/skymp), so there is no front to build. Nothing was written.' }
     $Commit = $pinned
 }
-if (-not (Test-Path -LiteralPath $Fork)) { throw "there is no fork clone at $Fork. git submodule update --init engine/skymp fetches it, or give -Fork. Nothing was written." }
+if (-not (Test-ThornswoodForkClone $Fork)) {
+    $sub = Join-Path (Join-Path $repo 'engine') 'skymp'
+    if ((Get-ThornswoodFullPath $Fork) -ne (Get-ThornswoodFullPath $sub)) { throw "there is no clone of the fork at $Fork. Give -Fork a clone of EvilPatrick06/skymp. Nothing was written." }
+    # This checkout's own engine\skymp, never fetched (a cloud checkout):
+    # the pin says which commit, so it is fetched here at that commit alone.
+    Say "  engine\skymp is not fetched in this checkout, fetching the pinned commit"
+    $null = Invoke-Native 'git submodule update --init --depth 1 engine/skymp' { & git -C $repo submodule update --init --depth 1 engine/skymp }
+    if (-not (Test-ThornswoodForkClone $Fork)) { throw "engine\skymp is still not a clone of the fork after git submodule update. Nothing was written." }
+}
 $full = (& git -C $Fork rev-parse --verify --quiet ($Commit + '^{commit}') 2>$null)
 if ($LASTEXITCODE -ne 0 -or -not $full) { throw "the fork clone at $Fork does not have $Commit. Fetch it there (git -C $Fork fetch origin thornswood/engine-changes). Nothing was written." }
 $full = "$full".Trim()
@@ -107,6 +123,8 @@ try {
     $files = Get-ThornswoodFolderFiles $dist
     if (-not $files.Contains('build.js') -or -not $files.Contains('index.html')) { throw 'the build made no build.js or index.html. Nothing was written.' }
     Say ("  built {0} files" -f $files.Count)
+    $packages = Get-ThornswoodFrontPackages $dist $front
+    Say ("  build.js holds {0} npm packages: {1}" -f $packages.Count, (@($packages.Values | ForEach-Object { $_.package + ' ' + $_.version }) -join ', '))
 
     if ($Record) {
         $rec = [ordered]@{
@@ -114,13 +132,22 @@ try {
             builtUtc   = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
             builtWith  = ('node ' + "$(& node --version)".Trim() + ', ' + $yarn)
             files      = $files
+            packages   = [ordered]@{}
+        }
+        $texts = [IO.Path]::GetFullPath($ThornswoodFrontLicencesDir)
+        if (Test-Path -LiteralPath $texts) { Remove-Item -LiteralPath $texts -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $texts | Out-Null
+        foreach ($n in $packages.Keys) {
+            $p = $packages[$n]
+            [IO.File]::WriteAllBytes((Join-Path $texts ($n + '.txt')), $p.Text)
+            $rec.packages[$n] = [ordered]@{ package = $p.package; version = $p.version; licence = $p.licence; from = $p.from; sha256 = $p.sha256; bytes = $p.bytes }
         }
         [IO.File]::WriteAllText([IO.Path]::GetFullPath($ThornswoodFrontRecordPath), (($rec | ConvertTo-Json -Depth 5) + "`n"), (New-Object Text.UTF8Encoding($false)))
-        Say '  recorded in records\front-build.json: commit it with the pin' 'Green'
+        Say '  recorded in records\front-build.json and records\front-licences\: commit them with the pin' 'Green'
     } else {
         $recorded = Read-ThornswoodFrontRecord
         if ($recorded.forkCommit -ne $full) { throw "records\front-build.json is the build of $($recorded.forkCommit), not $full. After a pin move run this with -Record and commit the record with the pin. Nothing was written." }
-        $bad = @(Get-ThornswoodFrontProblems $files $recorded)
+        $bad = @(Get-ThornswoodFrontProblems $files $recorded) + @(Get-ThornswoodFrontPackageProblems $packages $recorded)
         if ($bad.Count) {
             foreach ($b in $bad) { Say "  STOP  $b" 'Red' }
             throw 'this build is not records\front-build.json''s, so the zip was not written.'

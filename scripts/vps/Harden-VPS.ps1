@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off.
+  Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off, and the Windows services and telemetry the box never uses, and moves Windows Update and its maintenance to 4 AM.
 
 .DESCRIPTION
   Issue #450. Patrick, 28 September: yes to password login off once key login
@@ -23,7 +23,18 @@
        C:\Windows\Temp and removed after, and a run cut short left the copy
        there). Remote Desktop refused, its
        firewall rules turned off, its service stopped and set to Disabled;
-       ssh's own rules on port 22 are never touched. Then PasswordAuthentication
+       ssh's own rules on port 22 are never touched. Then the Windows
+       services the box never uses (the print spooler, telemetry and six
+       more, vps-harden.ps1 lists each and why, #3186) stopped and set to
+       Disabled. Then telemetry off: DiskSnapshot.exe's, CompatTelRunner.exe's
+       and the Customer Experience Improvement Program's tasks set to
+       Disabled, and AllowTelemetry 0. Then Windows Update, which stays on,
+       installs every day at 4 AM box time, restarts the box 15 minutes
+       after an install that needs it, so in the 4 AM to 6 AM window, and
+       its automatic maintenance starts at 4 AM, after the 2:15 AM backup
+       and the nightly checks (Patrick, 22 Oct 2026, #3213). A restart
+       Windows set before that is said, WARN when it is outside the window,
+       and left. Then PasswordAuthentication
        no and KbdInteractiveAuthentication no in sshd_config, checked with
        sshd -t first, the old file kept beside it, and sshd restarted. Every
        line it prints says CHANGED, WOULD, ALREADY, KEPT, WARN or STOP.
@@ -32,7 +43,8 @@
        Remote Desktop's port does not answer.
 
   -WhatIf does steps 1 to 3 and runs step 4 read only: it prints what WOULD
-  change and changes nothing.
+  change and changes nothing. It is also the check: run on a box already
+  hardened, every line says ALREADY, and a WOULD names what has come back on.
 
   THE SAFETY NET. When sshd_config changes, the box also registers a task,
   "Thornswood harden rollback", that puts the old sshd_config back and
@@ -51,6 +63,17 @@
       Get-ChildItem C:\ProgramData\ssh\sshd_config.before-harden-*
       Copy-Item <the newest of those> C:\ProgramData\ssh\sshd_config -Force
       Restart-Service sshd
+
+    A service back (vps-harden.ps1 $IdleServices names them), for example:
+      Set-Service Spooler -StartupType Automatic
+      Start-Service Spooler
+
+    A telemetry task back (vps-harden.ps1 $TelemetryTasks names them):
+      Enable-ScheduledTask -TaskPath '\Microsoft\Windows\DiskFootprint\' -TaskName Diagnostics
+
+    Windows Update as it was before (vps-harden.ps1 $UpdatePolicies names
+    each value), for example:
+      Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' AUOptions 7
 
     Remote Desktop back:
       Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' fDenyTSConnections 0
@@ -129,9 +152,10 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit $code }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Done 1 }
 
-# ssh's own chatter, not the box's answer.
+# The box's answer as lines, the empty ones left out. A warning ssh prints
+# stays in, so one that starts is seen (#1043).
 function Clean($lines) {
-    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ })
 }
 
 # Publickey as the only method, so a password can never be what lets it in.
@@ -227,7 +251,7 @@ Head '3. From outside, before'
 $before = Show-Outside 'now'
 
 # ----------------------------------------------------------------- 4. box ---
-$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", 'turn ssh password login and Remote Desktop off')
+$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", 'turn ssh password login, Remote Desktop, telemetry and the services the box never uses off, and move Windows Update to 4 AM')
 Head $(if ($doIt) { '4. On the box' } else { '4. On the box, read only' })
 $box = Invoke-Box (-not $doIt)
 if ($box.Code -ne 0 -or @($box.Lines | Where-Object { $_ -match '^STOP ' }).Count) {

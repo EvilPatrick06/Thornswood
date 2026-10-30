@@ -24,10 +24,23 @@
 # names. scripts\mods\Send-GameArchives.ps1 puts them there, and with them,
 # under Strings, the loose string tables records\game-strings.json names: a
 # localized master whose names are in no archive (RaceCompatibility.esm,
-# measured 20 Oct) stops Build-LastPlugin without them.
+# measured 20 Oct) stops Build-LastPlugin without them. _ResourcePack.bsa,
+# the game's own archive beside _ResourcePack.esl, since #3100: that master
+# is localized and its string tables are in that archive alone, so on 21 Oct
+# the hunt and ore builders failed on the box with "_ResourcePack.esl:
+# localised and no english string table found" (records\skyrim-files.json
+# pins its size and sha1 like the others).
 $ThornswoodGameArchiveStore = 'C:\Thornswood-GameData'
 $ThornswoodGameArchives = @('Skyrim - Interface.bsa', 'Skyrim - Meshes0.bsa', 'Skyrim - Meshes1.bsa') +
-    @(0..8 | ForEach-Object { 'Skyrim - Textures' + $_ + '.bsa' })
+    @(0..8 | ForEach-Object { 'Skyrim - Textures' + $_ + '.bsa' }) + @('_ResourcePack.bsa')
+# And the script pack (#3105): every Papyrus script a game PC's Data folder
+# holds, which scripts\mods\New-ScriptPack.py makes there and
+# records\papyrus-scripts.json pins. None of the archives that carry scripts
+# is on the box (Skyrim - Misc.bsa, the Creation Club ones, the mods'), so on
+# 26 Oct the whole rebuild stopped at the crime table with 14,553 scripts
+# missing. Each run links it into its data folder beside the archives, where
+# scripts\dev\Audit-PapyrusEvents.py reads it in their place.
+$ThornswoodScriptPack = 'papyrus-scripts.zip'
 
 # Text for the box: makes a file readable, and linkable, and nothing more to
 # everyone but SYSTEM. A run reaches the archives through hard links, which
@@ -69,17 +82,38 @@ catch { 'STOP. the run''s folder could not be held through its lock, so nothing 
 
 # -Run is the run's own folder on the box, holding tools.zip; -ServerRoot the
 # game server whose plugins folder is copied; -Tool the repository path of
-# the Python tool; -Arguments what it is run with, '{data}' and '{repo}'
-# standing for the data and repository folders of the run.
+# the tool, a .py run by Python, a .js by node or a .ps1 by PowerShell 7
+# (#3100); -Arguments what it is run with, '{data}', '{plugins}',
+# '{settings}' and '{repo}' standing for the data folder, the plugin list,
+# the load order settings and the repository folder of the run. The plugin
+# list is the server's loadOrder as the game's plugins.txt; the load order
+# settings are a server-settings.json holding that loadOrder alone, each
+# plugin in the run's data folder, for the builders that read a server's
+# settings (Build-NpcPopulation.py), so they read this commit's own plugins
+# and not the server's copies. Each is made only when an argument names it:
+# server-settings.json holds the server's secrets too, so only its loadOrder
+# is read, and only the file names in it are written.
 function Get-ThornswoodOnBoxScript {
     param(
         [Parameter(Mandatory = $true)][string]$Run,
         [Parameter(Mandatory = $true)][string]$ServerRoot,
         [Parameter(Mandatory = $true)][string]$Tool,
         [string[]]$Arguments = @(),
-        [string]$ArchiveStore = $ThornswoodGameArchiveStore
+        [string]$ArchiveStore = $ThornswoodGameArchiveStore,
+        # What the run lists and brings back when it changes: folders and
+        # files of the repository, with forward slashes. Run-OnBox.ps1 adds
+        # every file a step of the content chain writes outside these (#3425).
+        [string[]]$Watch = @('game', 'records', 'docs/systems')
     )
+    foreach ($w in $Watch) {
+        if ($w -notmatch '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$' -or $w -match '(^|/)\.\.?(/|$)') { throw "$w is not a path inside the repository to watch." }
+    }
+    $watchText = (@($Watch | ForEach-Object { "'" + $_.Replace('/', '\') + "'" }) -join ', ')
     $argText = (@($Arguments | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ')
+    $wantsPlugins = [bool]@($Arguments | Where-Object { $_ -like '*{plugins}*' }).Count
+    $wantsSettings = [bool]@($Arguments | Where-Object { $_ -like '*{settings}*' }).Count
+    $kind = [IO.Path]::GetExtension($Tool).ToLowerInvariant()
+    $toolFar = $Tool.Replace('/', '\')
     return @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
@@ -106,6 +140,11 @@ if (Test-Path -LiteralPath `$store) {
   }
 }
 if (`$linked) { 'archives  ' + `$linked + ' from ' + `$store + ', linked, read only' } else { 'archives  none: ' + `$store + ' holds no Skyrim archive, so a tool that reads one stops' }
+`$pack = Join-Path `$store '$ThornswoodScriptPack'
+if (Test-Path -LiteralPath `$pack) {
+  `$null = New-Item -ItemType HardLink -Path (Join-Path `$data '$ThornswoodScriptPack') -Value `$pack
+  'scripts   $ThornswoodScriptPack from ' + `$store + ', linked, read only'
+} else { 'scripts   none: ' + `$store + ' holds no $ThornswoodScriptPack, so a tool that reads the scripts stops' }
 `$storeStrings = Join-Path `$store 'Strings'
 `$linkedStrings = 0
 if (Test-Path -LiteralPath `$storeStrings) {
@@ -117,14 +156,33 @@ if (Test-Path -LiteralPath `$storeStrings) {
   }
 }
 if (`$linkedStrings) { 'strings   ' + `$linkedStrings + ' loose string table(s) from ' + `$storeStrings + ', linked, read only' }
+`$pluginList = Join-Path `$run 'plugins.txt'
+`$orderSettings = Join-Path `$run 'server-settings.json'
+if (`$$wantsPlugins -or `$$wantsSettings) {
+  try { `$order = @(([IO.File]::ReadAllText('$ServerRoot\server-settings.json') | ConvertFrom-Json).loadOrder) } catch { `$order = @() }
+  `$names = @(`$order | ForEach-Object { [IO.Path]::GetFileName([string]`$_) } | Where-Object { `$_ })
+  if (-not `$names.Count) { 'STOP. ' + '$ServerRoot\server-settings.json' + ' names no loadOrder, so there is no load order to give the tool.'; exit 2 }
+}
+if (`$$wantsPlugins) {
+  `$masters = @('skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm', 'dragonborn.esm')
+  `$lines = @(`$names | Where-Object { `$masters -notcontains `$_.ToLowerInvariant() } | ForEach-Object { '*' + `$_ })
+  [IO.File]::WriteAllLines(`$pluginList, [string[]]`$lines, (New-Object Text.UTF8Encoding(`$false)))
+  'plugins   ' + `$lines.Count + ' line(s) in plugins.txt: the loadOrder of ' + '$ServerRoot\server-settings.json' + ' after the five masters'
+}
+if (`$$wantsSettings) {
+  `$inData = @(`$names | ForEach-Object { (Join-Path `$data `$_).Replace('\', '/') })
+  [IO.File]::WriteAllText(`$orderSettings, (ConvertTo-Json -InputObject @{ loadOrder = [string[]]`$inData } -Depth 3), (New-Object Text.UTF8Encoding(`$false)))
+  'settings  ' + `$inData.Count + ' plugin(s) in server-settings.json: the loadOrder of ' + '$ServerRoot\server-settings.json' + ', in the run''s data folder, and nothing else of it'
+}
 
 `$sha = [Security.Cryptography.SHA256]::Create()
 function Hashes {
   `$h = @{}
-  foreach (`$top in 'game', 'records') {
+  foreach (`$top in $watchText) {
     `$d = Join-Path `$repo `$top
     if (-not (Test-Path -LiteralPath `$d)) { continue }
-    foreach (`$f in @(Get-ChildItem -LiteralPath `$d -File -Recurse)) {
+    `$files = `$(if (Test-Path -LiteralPath `$d -PathType Leaf) { @(Get-Item -LiteralPath `$d) } else { @(Get-ChildItem -LiteralPath `$d -File -Recurse) })
+    foreach (`$f in `$files) {
       `$rel = `$f.FullName.Substring(`$repo.Length + 1).Replace('\', '/')
       `$s = [IO.File]::OpenRead(`$f.FullName)
       try { `$h[`$rel] = [BitConverter]::ToString(`$sha.ComputeHash(`$s)) } finally { `$s.Close() }
@@ -136,20 +194,39 @@ function Hashes {
 
 # python.exe itself, named by the py launcher: run through py, a quoted
 # path arrived with a space in front of it and Python could not open it.
+# Named for every tool, because Rebuild-ContentTables.ps1 runs Python
+# builders too: it goes first on the PATH the tool is given.
 `$launcher = Get-Command py -CommandType Application -EA SilentlyContinue | Select-Object -First 1
 if (-not `$launcher) { 'STOP. there is no Python launcher (py) on the box.'; exit 2 }
 `$python = (& `$launcher.Source -3 -c 'import sys; print(sys.executable)' | Select-Object -First 1)
 if (-not `$python -or -not (Test-Path -LiteralPath `$python)) { 'STOP. py -3 named no Python on the box.'; exit 2 }
+`$env:PATH = (Split-Path -Parent `$python) + ';' + `$env:PATH
+`$words = @()
+switch ('$kind') {
+  '.py' { `$exe = `$python }
+  '.js' {
+    `$c = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
+    if (-not `$c) { 'STOP. there is no node on the box.'; exit 2 }
+    `$exe = `$c.Source
+  }
+  '.ps1' {
+    `$c = Get-Command pwsh -CommandType Application -EA SilentlyContinue | Select-Object -First 1
+    if (-not `$c) { 'STOP. there is no PowerShell 7 (pwsh) on the box.'; exit 2 }
+    `$exe = `$c.Source
+    `$words = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File')
+  }
+  default { 'STOP. ' + '$Tool' + ' is not a .py, .js or .ps1 tool.'; exit 2 }
+}
 `$given = @($argText)
-`$words = @('"' + (Join-Path `$repo '$($tool.Replace('/', '\'))') + '"')
-foreach (`$a in `$given) { `$words += '"' + `$a.Replace('{data}', `$data).Replace('{repo}', `$repo) + '"' }
+`$words += '"' + (Join-Path `$repo '$toolFar') + '"'
+foreach (`$a in `$given) { `$words += '"' + `$a.Replace('{data}', `$data).Replace('{plugins}', `$pluginList).Replace('{settings}', `$orderSettings).Replace('{repo}', `$repo) + '"' }
 `$env:THORNSWOOD_DATA = `$data
 `$env:PYTHONUTF8 = '1'
 `$env:PYTHONIOENCODING = 'utf-8'
 `$env:PYTHONDONTWRITEBYTECODE = '1'
 `$out = Join-Path `$run 'out.txt'
 `$err = Join-Path `$run 'err.txt'
-`$p = Start-Process -FilePath `$python -ArgumentList `$words -WorkingDirectory `$repo -NoNewWindow -PassThru -RedirectStandardOutput `$out -RedirectStandardError `$err
+`$p = Start-Process -FilePath `$exe -ArgumentList `$words -WorkingDirectory `$repo -NoNewWindow -PassThru -RedirectStandardOutput `$out -RedirectStandardError `$err
 # Taking the handle now is what keeps ExitCode: without it, a process
 # Start-Process started reports none once it has ended.
 `$null = `$p.Handle

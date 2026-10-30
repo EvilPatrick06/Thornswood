@@ -53,6 +53,36 @@ spatial index across overlapping regions, yields after bounded work, and creates
 reciprocal portal links only when a route needs them. Background activity continues
 with no connections. Nearby activity uses the same authority and state.
 
+An NPC nobody can see that only wanders takes one step every 15 seconds, and
+its first step at once (#3181, Patrick's C on 22 Oct 2026: NPCs nobody can see
+are updated less often, never paused). Such a step covers up to 15 seconds of
+walking, still no further than the next point of its path. Before, the pass
+over the cast stepped each of them as fast as its 4 ms every 20 ms allowed,
+about every 5 seconds: with nobody on, dev's 4,820 took about 59,000 moving
+steps a minute on 22 Oct, and those steps were most of the 0.18 of a core
+dev's JavaScript thread was busy. The first try, a step every 4 seconds, was
+no fewer steps than that, and the profiles showed it. An NPC in a fight or a flight nobody can see is
+stepped every 100 ms, as often as one somebody can see, and one within 4,096
+units of somebody is stepped as before. The minute report counts the
+background steps.
+
+Each NPC waits its turn in a queue ordered by when it is due, and a pass takes
+only the ones that are due. The first version walked the whole cast in order
+and skipped whoever was not due yet. Dev's second profile on 22 Oct, with
+4,820 NPCs and nobody on, found that walk cost more than the steps it saved:
+`backgroundTick` took 1,984 ms in 120 s, against 593 ms before the change.
+With the 15 second turn, dev's third profile (6:35 AM) found 0.129 of a core,
+down from 0.191, and about 19,200 moving steps a minute.
+
+The runtime's other tasks run only while they have work. Loading navigation
+meshes, searching for walkable ground, preparing an NPC and stepping the NPCs
+somebody can see each start when something hands them work, and stop when
+their queue is empty. Until 22 Oct each one set its next turn whatever it found,
+so with nobody on and every mesh loaded, the mesh task still woke every 2 ms
+and the other three every 10 or 100 ms. Dev's 6:35 AM profile put that waking,
+its timers and the minute line's count of each run at about 2.5 s of the
+15.5 s its JavaScript thread was busy in 120 s (#3181).
+
 Movement follows walkable triangles in the local region. It retains the saved
 height above the navigation surface and crosses only verified reciprocal edges.
 Missing or corrupt geometry, an unsuitable saved position, or a displacement
@@ -112,10 +142,38 @@ reach, cooldown, damage, block, health, and death pipeline. Health, death, attac
 and terminal stop messages are reliable. Ordinary movement is unreliable, with
 one message per directly connected observer.
 
-Authority and private activity progress survive world saves. A gamemode reload
-cancels the old controller's timers and reconstructs routes from current saved
-positions. Temporary combat targets are not persisted. Saved faction removals,
-including an empty faction list, remain removed after reconstruction.
+Authority and private activity progress survive world saves. An NPC's
+activity record is written when it is taken on and when a fight or a flight
+starts or ends, never as it only wanders (#3180): each write saves the actor's
+whole record to disk, and until 22 Oct 2026 every NPC was written every 30
+seconds, about 5,000 files every 32 seconds on each server with nobody on.
+So after a server restart a wandering NPC starts where it was last written,
+inside its home, rather than where it had walked to. Temporary combat
+targets are not persisted. Saved faction removals, including an empty faction
+list, remain removed after reconstruction.
+
+A gamemode reload in a running server (a gamemode-only dev deploy, #3196)
+keeps the engine, its actors and where they stand, and the NPCs carry on
+through it (#3296, Patrick's C on #3196: "the NPC runtime also hands its NPCs
+straight to the new copy, so they never pause"). The old runtime and
+population stop and hand over what they know: each NPC enrolled, owned and
+prepared with its state and policy, the navigation meshes read and their tile
+index, the `due` queue, the NPCs held off walkable ground and the searches
+under way, the habitat counts and the loading cursor. The new ones go on from
+that, so no batch is read again, no NPC is owned or configured again and no
+mesh is read again; only each merchant's purse is read by the new purse
+service. Before, the new runtime took the whole cast back from nothing, about
+3 minutes 50 seconds on dev in which the NPCs stood still. What is handed
+over is data only: the new load looks each triangle up again in its own
+navigation and starts each search again, so nothing of the old load's code
+stays in memory. It is taken only when both loads have the same NPC code and
+catalogue: a SHA-256 of the population policy, catalogue and runtime blocks
+and the NPC SERVER STARTUP block, read from the file that is loading, and of
+the catalogue the merchant roles made. Any difference takes the full load and
+server.log says "Shared NPC runtime starts over" with the reason; a carried
+load says "Shared NPC runtime carried on from the previous gamemode load"
+with its counts. `tests/test-3296-npc-handover.js` holds all of it. A
+server restart still loads the cast from the saved world, as above.
 
 Fixed cave and dungeon tiers scale maximum health and outgoing weapon or spell
 damage. Tier 1 uses the source baseline, tier 2 uses 1.25 health and 1.10 damage,
@@ -137,8 +195,8 @@ capabilities. Exact guild relocation is deferred.
 Verification uses the native suite, the shared runtime fixtures, and an offline
 run against the installed 48-plugin load order. The offline acceptance fixture
 requires all retained identities owned and accounted for within five simulated
-minutes, actual activity before and after a gamemode reload, saved sequence
-recovery, stationary position preservation, and less than 2 GiB RSS. Scheduled
+minutes, actual activity before and after a gamemode reload, no record
+rewritten while its mode stays the same, saved sequence recovery, stationary position preservation, and less than 2 GiB RSS. Scheduled
 activity callbacks must finish within 50 ms. A single cold native record load is
 indivisible and has a separate 100 ms ceiling; it cannot accumulate into a batch.
 No game or launcher is started by these checks. A real dev restart and a later

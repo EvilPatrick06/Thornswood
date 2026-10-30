@@ -22,6 +22,13 @@
   the footer is "dev server", the title is not prefixed, and announced.json
   is not consulted, because every deploy is its own announcement.
 
+  IT REMEMBERS WHAT IT SAID, LINE BY LINE (#3320). Every post, a release or
+  a gamemode deploy, goes into announced.json as "posts-main" or "posts-dev"
+  (its title and lines, the newest forty), and Ship.ps1 and
+  Deploy-DevGamemode.ps1 refuse a note that says one of them again
+  (Note-Repeats.ps1). A gamemode deploy whose record cannot be read still
+  posts, as it always did, and says the record was not written.
+
   IT REMEMBERS WHAT IT POSTED. Until 23 September this script always posted
   whatever was newest in the feed and had no idea it had posted it before, so
   running it twice, or running it days after a release to see what it does,
@@ -321,6 +328,7 @@ if ($GamemodeDeploy) {
 # Said in the title as well as the footer. The dev channel is the one place
 # the two builds' notes could ever be taken for each other. A gamemode-only
 # deploy is not a dev build release, so it keeps the title as written.
+$saidTitle = $title
 if ($Dev -and -not $GamemodeDeploy) { $title = 'Dev build: ' + $title }
 if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 
@@ -332,6 +340,36 @@ if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 # worth saying. The pair is what gets remembered. Gamemode deploys are not
 # releases and are never deduped here.
 if ($Record -and $GamemodeDeploy) { Write-Host '  -Record is for releases; a gamemode deploy is never remembered. Nothing done.' -ForegroundColor Yellow; return }
+. (Join-Path $Here '..\release\Note-Repeats.ps1')   # Add-AnnouncedPost: every post's lines, for the repeat check (#3320)
+$stateRead = $false
+if ($GamemodeDeploy) {
+  # Never gated on the record, as before; only remembered in it (#3320).
+  . (Join-Path $Here '..\release\Feed-Store.ps1')
+  $stateKey = 'dev'
+  $stateDir = Join-Path (Split-Path -Parent (Get-FeedStoreDir $stateKey)) ('announced-' + $stateKey)
+  $stateFile = Join-Path $stateDir 'announced.json'
+  $said = @{}
+  try {
+    $got = Receive-FeedStore $stateKey -Dir $stateDir -Files @('announced.json')
+    if ($got['announced.json'] -and (Test-Path -LiteralPath $stateFile)) {
+      $raw = ([IO.File]::ReadAllText($stateFile) -replace '^\uFEFF', '') | ConvertFrom-Json
+      foreach ($p in $raw.PSObject.Properties) { $said[$p.Name] = $p.Value }
+    }
+    $stateRead = $true
+  } catch {
+    if (-not $Quiet) { Write-Host ('  could not read the shared record, so this post will not be remembered in it: ' + $_.Exception.Message) -ForegroundColor Yellow }
+  }
+  # Writes this post into the record and sends it to the store. Returns '' or why it could not.
+  function Save-ThornswoodAnnouncedPost {
+    if (-not $stateRead) { return 'the shared record was never read' }
+    try {
+      Add-AnnouncedPost $said $stateKey $saidTitle @($detailLines) 'gamemode'
+      [IO.File]::WriteAllText($stateFile, ($said | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+      $null = Send-FeedStore $stateKey -Dir $stateDir -Files @('announced.json')
+      return ''
+    } catch { return $_.Exception.Message }
+  }
+}
 if (-not $GamemodeDeploy) {
   # The shared record, in the channel's VPS store (#2167). See the note above.
   . (Join-Path $Here '..\release\Feed-Store.ps1')
@@ -339,7 +377,6 @@ if (-not $GamemodeDeploy) {
   $stateDir = Join-Path (Split-Path -Parent (Get-FeedStoreDir $stateKey)) ('announced-' + $stateKey)
   $stateFile = Join-Path $stateDir 'announced.json'
   $said = @{}
-  $stateRead = $false
   try {
     $got = Receive-FeedStore $stateKey -Dir $stateDir -Files @('announced.json')
     $stateRead = $true
@@ -379,13 +416,15 @@ if (-not $GamemodeDeploy) {
     }
   }
   # Writes this release into the record and sends it to the store. Returns ''
-  # or why it could not.
-  function Save-ThornswoodAnnounced {
+  # or why it could not. -Posted also remembers the post's lines (#3320);
+  # -Record says a release was announced and has no lines of its own to add.
+  function Save-ThornswoodAnnounced([switch]$Posted) {
     if (-not $stateRead) { return 'the shared record was never read' }
     try {
       $said[$stateKey] = @{ stamp = $stamp; version = (Prop $v 'launcherVersion')
                             title = $title; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z' }
-      [IO.File]::WriteAllText($stateFile, ($said | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
+      if ($Posted) { Add-AnnouncedPost $said $stateKey $saidTitle @($detailLines) 'release' }
+      [IO.File]::WriteAllText($stateFile, ($said | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
       $null = Send-FeedStore $stateKey -Dir $stateDir -Files @('announced.json')
       return ''
     } catch { return $_.Exception.Message }
@@ -470,14 +509,17 @@ try {
   $global:ThornswoodDiscordResult = 'posted'
   # AFTER the post returns and never before. A file written first turns a
   # failed post into a release nobody is ever told about, because the next
-  # run would read it and refuse. Gamemode deploys are not releases and are
-  # not remembered here.
+  # run would read it and refuse. A gamemode deploy is not a release: only
+  # its lines are remembered, for the repeat check (#3320).
   if (-not $GamemodeDeploy) {
-    $why = Save-ThornswoodAnnounced
+    $why = Save-ThornswoodAnnounced -Posted
     if ($why) {
       Write-Host "  posted, but could not write the shared announced record: $why" -ForegroundColor Yellow
       Write-Host ('  record it with: .\scripts\ops\Publish-Discord.ps1' + $(if ($Dev) { ' -Dev' } else { '' }) + ' -Record') -ForegroundColor Yellow
     }
+  } else {
+    $why = Save-ThornswoodAnnouncedPost
+    if ($why) { Write-Host "  posted, but its lines are not in the shared record, so a later note may say them again unchecked: $why" -ForegroundColor Yellow }
   }
 } catch {
   # Said in colour and said again by Ship at the end. A release whose

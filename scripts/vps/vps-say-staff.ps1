@@ -15,6 +15,8 @@
   WHAT IT READS, on standard input, one line:
       say <the notice, UTF-8, base64>    queue it
       check <id>                         whether it has been said yet
+      unsay <id>                         take it back (#3328): only the
+                                         sender's own, by -From
       (nothing)                          prints READY and changes nothing,
                                          which is how a new key is proved
   The notice is never on a command line: sshd hands that to cmd.exe, and
@@ -27,6 +29,13 @@
       WAITING            in the outbox, not said yet
       EXPIRED            in the outbox and over a day old, so never said
       NOT FOUND          no notice with that id
+      UNSAY QUEUED <id>  the bot takes it back within a minute
+      UNSAY WAITING      (check) asked to be taken back, not done yet
+      UNSAID <what>      (check) taken back: deleted, gone (it was not
+                         there any more), withheld (never said), webhook
+                         (the watchdog's webhook said it; a person with
+                         Manage Messages deletes it), unknown, or failed
+                         and why, from the bot's data\staff-unsaid.txt
       NOWATCHER          the watchdog is not installed here, so nothing would
                          ever say it; nothing was written
       REFUSED <why>      nothing was written
@@ -55,7 +64,10 @@ param(
     [string]$From = '',
     # The watchdog's folder. The installed copy sits in it, so it is this
     # file's own folder unless a harness says otherwise.
-    [string]$Root = ''
+    [string]$Root = '',
+    # The bot's data folder, where it writes what it took back (bot.py,
+    # STAFF_UNSAID). A harness gives its own.
+    [string]$BotData = 'C:\Thornswood-Bot\data'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -98,9 +110,38 @@ function Read-Ids([string]$name) {
 }
 
 $nowUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+$unsayFile = Join-Path $Root 'alerts-unsay.txt'
+
+# What the bot did with an ask to take a notice back, the last line for the
+# id winning; '' when it has not done it yet.
+function Read-Unsaid([string]$id) {
+    $p = Join-Path $BotData 'staff-unsaid.txt'
+    if (-not (Test-Path -LiteralPath $p)) { return '' }
+    $got = ''
+    foreach ($line in [IO.File]::ReadAllLines($p, $enc)) {
+        $f = $line.Split("`t")
+        if ($f.Count -ge 2 -and $f[0] -eq $id) { $got = $f[1].Trim() }
+    }
+    return $got
+}
+
+if ($ask -match '^unsay (agent-[a-z0-9-]{1,80})$') {
+    $id = $Matches[1]
+    $row = @(Read-Outbox | Where-Object { [string]$_.id -eq $id }) | Select-Object -First 1
+    if (-not $row) { 'NOT FOUND'; exit 1 }
+    # A sender takes back its own notices and nothing else: not another
+    # sender's, and not the watchdog's own outage messages.
+    if ([string]$row.service -ne ('agent ' + $From)) { 'REFUSED ' + $id + ' is not a notice from ' + $From + ', so it cannot take it back.'; exit 1 }
+    if (@(Read-Ids 'alerts-unsay.txt') -notcontains $id) { [IO.File]::AppendAllText($unsayFile, $id + "`r`n", $enc) }
+    'UNSAY QUEUED ' + $id
+    exit 0
+}
 
 if ($ask -match '^check (agent-[a-z0-9-]{1,80})$') {
     $id = $Matches[1]
+    $unsaid = Read-Unsaid $id
+    if ($unsaid) { 'UNSAID ' + $unsaid; exit 0 }
+    if ((Read-Ids 'alerts-unsay.txt') -contains $id) { 'UNSAY WAITING'; exit 0 }
     if ((Read-Ids 'alerts-sent-bot.txt') -contains $id) { 'POSTED bot'; exit 0 }
     if ((Read-Ids 'alerts-sent-webhook.txt') -contains $id) { 'POSTED webhook'; exit 0 }
     $row = @(Read-Outbox | Where-Object { [string]$_.id -eq $id }) | Select-Object -First 1
@@ -110,7 +151,7 @@ if ($ask -match '^check (agent-[a-z0-9-]{1,80})$') {
     exit 0
 }
 
-if ($ask -notmatch '^say ([A-Za-z0-9+/=]+)$') { 'REFUSED the line was neither "say <base64>" nor "check <id>".'; exit 1 }
+if ($ask -notmatch '^say ([A-Za-z0-9+/=]+)$') { 'REFUSED the line was not "say <base64>", "check <id>" or "unsay <id>".'; exit 1 }
 $text = ''
 try { $text = $enc.GetString([Convert]::FromBase64String($Matches[1])) }
 catch { 'REFUSED the notice was not base64.'; exit 1 }

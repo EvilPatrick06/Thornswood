@@ -130,8 +130,8 @@ const cut = catalogue.npcs.filter((r) => !r.keep && r.ref !== '14:Skyrim.esm');
 const lists = manifest.refs;
 const listed = {};
 let twice = 0;
-for (const k of ['disabled', 'deleted', 'alreadyOff', 'corpseKept']) {
-  for (const d of lists[k]) { if (listed[d]) { twice++; } listed[d] = k; }
+for (const k of ['disabled', 'deleted', 'alreadyOff', 'corpseKept', 'heldByServer']) {
+  for (const d of (lists[k] || [])) { if (listed[d]) { twice++; } listed[d] = k; }
 }
 yes('A1 the catalogue cuts ' + cut.length + ' placed actors, and each is in exactly one of the manifest\'s lists',
     twice === 0 && cut.every((r) => listed[r.ref]) && Object.keys(listed).length === cut.length);
@@ -161,11 +161,14 @@ yes('A5 a cut Whiterun guard is among them' + (guard ? ' (' + guard.ref + ')' : 
 // ---------------------------------------------------------------- Q
 const qrecs = Object.keys(recs).filter((k) => k.startsWith('QUST:')).map((k) => recs[k]);
 const stopped = manifest.quests.stopped, kept = manifest.quests.kept, modStopped = manifest.quests.modStopped;
-yes('Q1 every quest in the plugin is one the manifest stops (' + qrecs.length + ')',
-    qrecs.length === stopped.length + modStopped.length &&
-    stopped.concat(modStopped).every((q) => recs['QUST:' + fidOf(q.quest)]));
+const propped = manifest.questScriptProperties || [];
+yes('Q1 every quest in the plugin is one the manifest stops (' + (qrecs.length - propped.length) + '), or one whose ' +
+    'script properties the policy sets (' + propped.length + ', tests/test-3101-unbound-start-gear.js)',
+    qrecs.length === stopped.length + modStopped.length + propped.length &&
+    stopped.concat(modStopped, propped).every((q) => recs['QUST:' + fidOf(q.quest)]));
+const proppedFids = new Set(propped.map((q) => fidOf(q.quest)));
 let qbad = [];
-for (const r of qrecs) {
+for (const r of qrecs.filter((x) => !proppedFids.has(x.fid))) {
   const t = r.subs.map((s) => s.t);
   const dnam = r.subs.find((s) => s.t === 'DNAM').b;
   const n = t.indexOf('NEXT');

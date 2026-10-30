@@ -33,9 +33,9 @@ leave, it waits until you are back.
 
 J has a second tab for a group book: prices, members, and a chat for
 when the group is not standing together. The tab is absent until the
-Discord account holds Business Owner or Faction Owner, or the role
-named Dev, or this character has accepted an invite, or the account
-is staff. The book itself is on [Factions and businesses](factions.md).
+Discord account holds Business Owner or a faction's Leader role, or
+the role named Dev, or this character has accepted an invite, or the
+account is staff. The book itself is on [Factions and businesses](factions.md).
 It does not use one of the 12 journals. Someone with Prices stands
 at that hold's notice board, which is the drop box, and leaves a
 copy from the board's panel. The list stays in the book.

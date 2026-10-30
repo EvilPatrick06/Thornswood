@@ -1,6 +1,6 @@
 ﻿// test-626-tundra-cotton.js
 //
-// #626: Tundra Cotton must be gatherer flora (with put-back), not a farm crop.
+// #626: Tundra Cotton must be gatherer flora (answered by harvest()), not a farm crop.
 //
 // Discord: counting as farming and does not phase back like flowers/mushrooms;
 // should be gatherers. Root cause: TreeFloraTundraCotton01 was named in
@@ -102,7 +102,7 @@ if (CROPS_BY_BASE && HARVESTS_BY_BASE && CROP_RULES) {
     Object.prototype.hasOwnProperty.call(CROPS_BY_BASE, WHEAT));
 }
 
-// onActivate: crop before plant; plant putBack gated; crop has no putBack.
+// onActivate: crop before plant; nothing is put back for either (#3080).
 const handler = cut("mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {", '\n});\n');
 yes('onActivate is in the gamemode', !!handler);
 if (handler) {
@@ -120,9 +120,9 @@ if (handler) {
     return handler.slice(start, end);
   }
   const plantText = branchSlice(plantBranch, ['else if (isVein(baseDesc))', 'else {']);
-  yes('plant branch putBack is gated by floraHanded (phase-back on refusal)',
-    /putBack\(casterRefrId, refrId\)/.test(plantText) &&
-    /!floraHanded\(message\)/.test(plantText));
+  yes('plant branch answers through harvest() and puts nothing back (#3080: the press never picked it)',
+    /harvest\(casterRefrId, refrId, baseDesc\)/.test(plantText) &&
+    !/putBack\(/.test(plantText));
 
   const cropText = branchSlice(cropBranch, ['else if (isFish(baseDesc))', 'else if (isPlant(baseDesc))']);
   yes('crop branch does not call putBack (why cotton looked stuck when misclassified)',

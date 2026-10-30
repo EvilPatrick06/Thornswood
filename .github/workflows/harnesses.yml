@@ -10,13 +10,21 @@
 # the live server's folders (records\runner-isolation.json, #2161).
 #
 # How. Dispatch it on main, or on a branch to try that branch's harnesses,
-# with the names as the nightly prints them, split by spaces or commas:
+# with the names as the nightly prints them, split by spaces or commas. It
+# runs on the build runners, which never sign (#3550):
 #
 #   gh workflow run harnesses.yml --ref main -f harnesses='test-deploy-swaps.ps1 voice/test-most.js'
 #
 # A name that is no harness in that commit fails the run before anything
 # runs. The names reach the script through the environment, never pasted into
 # the script's text, so nothing typed into the box can run as code.
+#
+# The word gate in place of names runs the pull request gate's own list, the
+# one scripts\dev\Gate-Harnesses.ps1 prints, and throttle runs that many side
+# by side, the way build.yml runs them (#3114). That is how a throttle is
+# measured on the box without a pull request:
+#
+#   gh workflow run harnesses.yml --ref main -f harnesses=gate -f throttle=3
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
@@ -25,14 +33,23 @@ on:
   workflow_dispatch:
     inputs:
       harnesses:
-        description: 'Harness names, split by spaces or commas (test-x.ps1, test-y.js, voice/test-z.js)'
+        description: 'Harness names, split by spaces or commas (test-x.ps1, test-y.js, voice/test-z.js), or gate for the pull request gate''s list'
         required: true
+      throttle:
+        description: 'How many run at once, 1 to 16'
+        required: false
+        default: '1'
 permissions:
   contents: read
 jobs:
   harnesses:
     name: Named harnesses
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    # On a build runner (records\build-runners.json), never on any VPS runner
+    # (#3550): this runs a branch's harnesses, and runner 3, which takes any
+    # job asking for thornswood-vps alone, signs the release launchers. Nine
+    # runs of claude/* branches landed there from 22 to 26 Oct. A share of
+    # harnesses, or the whole gate, is a build runner's kind of work anyway.
+    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -69,8 +86,17 @@ jobs:
         shell: pwsh
         env:
           HARNESSES: ${{ inputs.harnesses }}
+          THROTTLE: ${{ inputs.throttle }}
         run: |
-          # One at a time, each on its clock, each printed as it ends, then
-          # every one that failed: scripts\dev\Nightly-Harnesses.ps1 says why.
+          # As many at once as asked, each on its clock, each printed as it
+          # ends, then every one that failed: scripts\dev\Nightly-Harnesses.ps1
+          # says why.
           Write-Host ('commit ' + $env:GITHUB_SHA + ' on ' + $env:GITHUB_REF_NAME)
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -BudgetSeconds 2400
+          if ($env:HARNESSES.Trim() -eq 'gate') {
+            $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+            $env:HARNESSES = $gate -join ' '
+          }
+          $throttle = 0
+          if (-not [int]::TryParse($env:THROTTLE, [ref]$throttle)) { Write-Host ('::error::throttle is not a number: ' + $env:THROTTLE); exit 2 }
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -Throttle $throttle -BudgetSeconds 2400

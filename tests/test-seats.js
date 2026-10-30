@@ -662,12 +662,13 @@ async function join(standing, status, channel) {
   yes('24 of 25: in, no wait', !!got.obj && got.obj.ok === true && got.obj.wait === false);
   got = await join({}, { up: false, online: 0, max: 0 });
   yes('server down: in, no wait, and the number from the record', !!got.obj && got.obj.ok === true && got.obj.wait === false && got.obj.max === 25);
-  got = await join({ dev: true, staffRole: true }, FULL, 'dev');
+  got = await join({ dev: true, devBuild: true, staffRole: true }, FULL, 'dev');
   yes('the dev build (staff only) never waits', !!got.obj && got.obj.ok === true && got.obj.wait === false);
 
   // ------------------------------------------------------------ the home page
-  const START = "    var dot = document.getElementById('dot'), t = document.getElementById('livetext');";
-  const END = "        t.textContent = 'Server offline';\n      }\n    }\n";
+  // paintStatus in home.js (#3218).
+  const START = "  var dot = document.getElementById('dot'), t = document.getElementById('livetext');";
+  const END = "      if (gone) gone.hidden = true;\n    }\n  }\n";
   const ha = home.indexOf(START);
   const hb = ha < 0 ? -1 : home.indexOf(END, ha);
   const hblock = (ha >= 0 && hb >= 0) ? home.slice(ha, hb + END.length) : null;

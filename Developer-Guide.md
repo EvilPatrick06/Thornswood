@@ -1,6 +1,6 @@
 # Developer Guide
 
-This is the one guide for working on Thornswood. A first day starts at section 1 and follows the numbers. A later day uses the table of contents, the glossary, or the outline in Visual Studio Code to open the heading you need. `CLAUDE.md` adds only what applies to a Claude.
+This is the one guide for working on Thornswood. A first day starts at section 1 and follows the numbers. A later day uses the table of contents, the glossary, or the outline in Visual Studio Code to open the heading you need. `CLAUDE.md` in the private ops repo adds only what applies to a Claude.
 
 The outline nests, and the table of contents follows it. A part is a numbered section. A group inside it is a subsection. A step inside that is a sub-subsection.
 
@@ -51,6 +51,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [Fix the cause, no band-aids](#fix-the-cause-no-band-aids)
     - [Buttons, not chat commands](#buttons-not-chat-commands)
     - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
+    - [How an issue and a comment are written](#how-an-issue-and-a-comment-are-written)
     - [What is not a reason to skip an issue](#what-is-not-a-reason-to-skip-an-issue)
     - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
     - [How work moves](#how-work-moves)
@@ -186,7 +187,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 
 Do this once on a new Windows PC. Stay in order. On every PC is the steps. Setting up a machine and Shipping from another machine are for a PC that will publish a release. You can read those two after the clone works.
 
-Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
+Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared clone on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
 ### On every PC
 
@@ -303,7 +304,7 @@ You do not get the server password. Your PC creates a key and gets a token of it
 .\scripts\vps\Setup-SshKey.ps1
 ```
 
-The script prints one line that starts with `ssh-ed25519`. Copy that whole line into Discord, and press Enter when it asks for the token. Leave the private key file where the script put it. Once the token comes, run it again and paste it. The whole guide is `docs\BOX-ACCESS.md`; the reads, the test, and what the VPS is are in [E. VPS](#e-vps).
+The script prints one line that starts with `ssh-ed25519`. Copy that whole line into Discord, and press Enter when it asks for the token. Leave the private key file where the script put it. Once the token comes, run it again and paste it. The whole guide is `docs\BOX-ACCESS.md` in the private ops repo; the reads, the test, and what the VPS is are in [E. VPS](#e-vps).
 
 ### Setting up a machine
 
@@ -363,7 +364,7 @@ which makes a key for the VPS, points ssh at it through the bridge, and
 prints the public line. Send that line to Patrick; he runs
 `.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard` on One and
 sends you a token, which you paste when the same script asks
-(`docs\BOX-ACCESS.md`). `.\scripts\vps\Setup-SshKey.ps1 -Test` proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
+(`docs\BOX-ACCESS.md` in the private ops repo). `.\scripts\vps\Setup-SshKey.ps1 -Test` proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
 `Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
 reach it, and Ship stops before it builds anything: the feed and its baseline
 are received from the VPS (#907).
@@ -449,13 +450,13 @@ by hand, and no secret is written into the repository.
 | The source | the shared clone | `git clone https://github.com/EvilPatrick06/Thornswood.git` and `gh auth login` as a collaborator |
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
-| VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | Its own key and token: `.\scripts\vps\Setup-SshKey.ps1`, and somebody the VPS already knows runs `.\scripts\vps\Grant-BoxAccess.ps1 -Name <machine> -FromClipboard` with the line it prints (`docs\BOX-ACCESS.md`). With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md`) |
+| VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | Its own key and token: `.\scripts\vps\Setup-SshKey.ps1`, and somebody the VPS already knows runs `.\scripts\vps\Grant-BoxAccess.ps1 -Name <machine> -FromClipboard` with the line it prints (`docs\BOX-ACCESS.md` in the private ops repo). With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md` in the private ops repo) |
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
-| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | The script fetches the zip of the recorded commit from the site's feed (`clientRuntime` in `/feed-dev/version.json` or `/feed/version.json`), checks it against the feed's sha256 and every file against the record, and puts the six files in the build folder. A commit on neither feed is built: `.\scripts\release\Setup-ShipMachine.ps1 -Rebuild`, or `.\scripts\release\Build-Engine.ps1` |
+| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches the public fork's build of the pin, `thornswood-engine-<fork commit>` from EvilPatrick06/skymp (#3540), and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
-| The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md`) |
+| The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md` in the private ops repo) |
 | Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
 
 #### Your own signing sign in
@@ -463,14 +464,14 @@ by hand, and no secret is written into the repository.
 Until 4 Oct only Patrick's Azure account could sign (29 Sep, #1121), so a
 second machine signed only while he sat at it and signed in. Since 4 Oct each
 person who ships signs in as themselves, with an account of their own in the
-signing tenant, Default Directory (`5a096034-ce55-40d2-b313-10ee86efe26a`, domain
-`evilpatrick06outlook.onmicrosoft.com`), that holds the Artifact Signing Certificate
+signing tenant, Default Directory (`5a096034-ce55-40d2-b313-10ee86efe26a`), that
+holds the Artifact Signing Certificate
 Profile Signer role on the ThornswoodRelease profile (Patrick, 4 Oct; #1740).
 The role is on that profile only, so the account can sign and can do nothing
 else in the subscription. What it signs carries the same publisher name as
 what Patrick signs, because the certificate comes from his identity
 validation. Accounts that can sign, 4 Oct: Patrick's own, and
-`djinn@evilpatrick06outlook.onmicrosoft.com`.
+Djinn's.
 
 ##### Patrick, once for each person
 
@@ -480,7 +481,7 @@ On a machine where `az` is signed in as Patrick, in PowerShell 7:
 az account show --query "{user:user.name, tenant:tenantId}" -o table
 ```
 
-It names evilpatrick06@outlook.com and the tenant above. Then:
+It names Patrick's own sign-in and the tenant above. Then:
 
 ```powershell
 $scope = (az resource list --name ThornswoodSigning --resource-type Microsoft.CodeSigning/codeSigningAccounts --query "[0].id" -o tsv) + "/certificateProfiles/ThornswoodRelease"; $scope
@@ -645,13 +646,22 @@ The first push sets the upstream. It puts this branch on GitHub under the same n
 
 #### After a change to the content plugin
 
-A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two beside it) changes the tables the server reads out of the load order. Rebuild all of them before you commit, on a PC with the game at `C:\Thornswood`:
+A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two beside it) changes the tables the server reads out of the load order. Rebuild all of them before you commit, on the VPS box from any machine with box access (below), or on a PC with the game at `C:\Thornswood`:
 
 ```powershell
 .\scripts\mods\Rebuild-ContentTables.ps1
 ```
 
 It runs every builder in `scripts\mods\content-tables.json`, in order, and writes each plugin's new sha256 into `records\asset-provenance.json`. It ends with `All <n> builders ran.` and a list of every file that changed: commit those with the plugin, and write in the plugin's entry in `records\asset-provenance.json` what your change put in it. When a builder fails it prints `STOP.`, names the builder, and runs nothing after it.
+
+One builder needs no game: commit first, then run it on the VPS box against the dev server's plugins, its load order and Skyrim's archives there, from any machine with box access (a cloud thread runs `pwsh scripts/vps/Setup-CloudSsh.ps1` first). What it writes under `game`, `records` and `docs\systems` comes back into your checkout:
+
+```powershell
+pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'
+pwsh scripts/mods/Run-OnBox.ps1 scripts/dev/Build-NpcPopulation.py --settings '{settings}' --strings-dir '{data}'
+```
+
+`{data}` is the run's copy of the plugins with this commit's own in their place, `{plugins}` the server's load order as a plugins.txt and `{settings}` as a server-settings.json. The whole rebuild runs the same way (`Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'`), and writes the tables a game PC writes: every builder reads the load order `game\data\npc-population.json` records, and the crime table reads the script pack in `records\papyrus-scripts.json` (#3105).
 
 #### Switch between branches
 
@@ -723,7 +733,7 @@ Closes #123
 gh pr create --title "Short title" --body $body
 ```
 
-The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, because its issue is closed with a `Test task:` comment when the fix reaches main ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
+The title says what changed. The body says how you tested it. If the work finishes an issue and nobody would notice it in the game, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, with its test task under it as `Test task for #123: <title>`, because its issue is closed with that test task when a main Ship puts the fix on the main server, not when the pull request merges: the Ship closes it itself (`scripts\release\Close-ShippedIssues.ps1`, #3279) ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
 
 Run the test that covers your change before you open the pull request.
 
@@ -757,7 +767,7 @@ git pull
 git push --force
 ```
 
-Force push replaces the remote branch. Use it on your own branch after you rewrote that branch. Main refuses a force push. If `main` moved while you were working:
+Force push replaces the remote branch. Use it on your own branch after you rewrote that branch. Never force push main: GitHub refuses it from write access, but not from the admin account while `enforce_admins` is off, so for the admin it is a team rule kept by hand. If `main` moved while you were working:
 
 ```powershell
 git fetch origin
@@ -785,7 +795,7 @@ git switch main
 git pull
 ```
 
-When `Launcher builds` says pass, and you are confident in the change, merge it yourself. Say what you merged in #staff-updates. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
+When `Launcher builds` says pass, and you are confident in the change, merge it yourself. A merge gets no line in #staff-updates, and neither does the release that carries it. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -801,7 +811,7 @@ JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 
 Nothing here assumes you use Claude: this file is the rules for everybody, and a Claude
-reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
+reads the same file. CLAUDE.md in the private ops repo only adds what is about a Claude. A new developer
 is added as a collaborator on the repository, and on CODEOWNERS beside the
 shared files, and agrees once to the contributor terms in `LICENSE`.
 Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
@@ -809,9 +819,9 @@ Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
 Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
 Vortex) also work here, on the shipping machine, under his GitHub account.
 Every rule in this file binds them the same as a person. They share notes
-through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
-(`wiki/status.md` is what is true now); the vault is for coordinating, and
-the board is still the one record of work. They mark what they are on with a
+through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine;
+what is true now is `ops\status.md` in the private ops repo (since 22 Oct). The
+vault is for coordinating, and the board is still the one record of work. They mark what they are on with a
 `claimed: <lane>` label and the board card moved to In Progress. When the
 issue closes, `.github\workflows\drop-claims.yml` takes every `claimed:`
 label off it (#1863), so a lane's finish step need not. Their
@@ -824,11 +834,16 @@ with its branch once the pull request merges.
 One rule binds the lanes and not a person (Patrick, 11 Oct): a lane only
 commits, pushes and merges. It never runs a Ship, a Deploy-*, Publish-* or
 Install-* script, a step on the live or dev server, or a Vortex step. For each
-change that needs a run, the lane writes one note in the vault's
-`wiki/claude-queue/` folder with the exact command, its risks, draft release
-notes, and a news post when people would notice; the README in that folder
-has the template. A Claude on the shipping machine runs those notes. A lane
+change that needs a run, the lane writes one note in the private ops repo's
+`ops\claude-queue\` folder, naming the pull request of the change, with the exact
+command, its risks, draft release notes, and a news post when people would
+notice; `ops\README.md` there has the template. A Claude on the shipping machine runs those notes once that pull request is merged. A lane
 does not ask anybody to approve a deploy; the note is the hand-off.
+
+A lane writes test tasks the way "Test tasks and known issues" says, in
+its pull request and on the issue: Main for what any playtester can check,
+Dev only for what needs a dev, one per issue and kind, never posted by hand
+in Discord.
 
 #### Words
 
@@ -951,7 +966,7 @@ from GMs"). So do the ways of saying a line, `/me`, `/do`, `/w`, `/s`,
 "Allow those commands and don't do buttons"). So does `/needs`, the
 needs bars as a line of text for somebody who hid them (Patrick,
 11 Oct, #2267). Never add another chat command for people. A panel
-may send the server a line, but no person is told to type it and help text never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+may send the server a line, but no person is told to type it and help text never lists it. [docs/GAME-SYSTEMS.md](docs/GAME-SYSTEMS.md), "Buttons, not
 commands", is the rule and what counts as a button;
 [docs/systems/commands.md](docs/systems/commands.md) lists every command
 there is today and the issue that converts each one that does not stay.
@@ -965,7 +980,7 @@ Each piece of work is an issue on this repository, and every issue is on the
 board. Decided by Patrick on 25 Sep and approved in #staff-general: the list moved there
 from a claude.ai page that nobody without Claude could open. The 169 open
 entries became issues #368 to #536, each keeping its old number as its Order.
-`docs/archive/todo-list-2026-09-25.md` holds every entry as it stood that day,
+`docs/archive/todo-list-2026-09-25.md` in the private ops repo holds every entry as it stood that day,
 the finished ones included, so a comment in the code that says "entry 243 on
 the To Do List" means entry 243 in that file.
 
@@ -979,15 +994,37 @@ entry, with no step telling anybody to deploy it.
 
 How to use it:
 
+- Before filing a new idea or feature, read `docs/DECIDED.md` (what was
+  decided against, and the settled rules) and the `docs/systems` page for
+  that part of the game, and name that page in the issue. An idea that
+  goes against a decision there says so and asks for the decision to be
+  changed, instead of quietly reopening it (#3192).
 - Order is the do-order. A new issue gets the Order of where it belongs, not
   the end; a number between two others (52.5) is fine.
 - Work that fits an existing issue is an edit or a comment on it, not a
-  second issue. Write down what was measured and what is left.
+  second issue. Say in it what is left; what was measured goes with the
+  evidence ("How an issue and a comment are written", below).
 - Uncommitted changes sitting in the repo are outstanding work and belong on
   the board too.
-- Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
-  or what it waits on, and `anyone can start` marks what needs nobody in
-  particular. Assign yourself when you start one.
+- Labels: `area:` is the part of the project, `needs: patrick` marks what
+  waits on him, and `anyone can start` marks what needs nobody in
+  particular. `Main Findings` and `Dev Findings` mark what testers found on
+  main and on dev, and the bot keeps #known-issues and the site's Known
+  Issues page from them. `roadmap: now`, `roadmap: next` and `roadmap: later`
+  put an issue on the site's roadmap in that lane, in the words of its last
+  `Roadmap:` comment, while it is open; the roadmap has no Done section
+  (#3140, Patrick 26 Oct; bot README, "The site's known issues and
+  roadmap"). `area: triage`
+  marks an issue whose title did not say which part it is:
+  `.github\workflows\area-label.yml` gives a new issue with no `area:` label
+  the one its title names, or this one, and a person swaps it for the right
+  area. `weekly-review` marks what the weekly project review found,
+  `Suggestion` an idea somebody asked for, and `bug` something broken;
+  nothing reads these three, they are for people sorting the board.
+  `claimed: <name>` marks who is on an issue ("What this is" says how the
+  lanes use it). Assign yourself when you start one. The stage is Order and
+  Status: the `wave:` labels and `needs: the live server` were retired on
+  22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
   needs testing (Patrick, 19 Oct). The board's Status options are Todo, In
   Progress and Done; never add one through the API, which rewrites every
@@ -999,34 +1036,169 @@ How to use it:
   Claude thread is refused GraphQL, which the board needs, so these labels
   are how it moves a card:
   `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
+  To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
+  `.github\workflows\board-read.yml`, which reads every card's Status and
+  Order on a VPS runner and changes nothing, and writes them to board.json
+  (#3192).
 - A pull request that finishes an issue says `Closes #N`, so merging closes
-  it and the board moves it to Done. Say in the pull request, or in #staff-updates,
-  which issues moved.
+  it and the board moves it to Done. Say in the pull request which issues moved.
 - A fix people would notice is the exception: its pull request says `Refs #N`,
   and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
   is where the team checks that nothing breaks the game, and main is where
-  testers test, since we are in alpha). When it is on main, whoever fixed it
-  writes a comment on the issue whose first line is `Test task: <a title of
-  at most 45 characters>`, then numbered steps in plain English and what
-  should happen, with no issue numbers, links or code, and closes the issue.
-  The bot turns that comment into a post in the #test-tasks forum the moment
-  the issue closes, tagged Main, so closing it when it merges or when it
-  reaches dev sends testers to look for a fix that main does not have. Write
-  `Server: Main` on the line under the title, or no `Server:` line at all.
-- Most test tasks are Main, because testers play on main in the alpha and dev
-  is where the team checks nothing is broken (Patrick, 12 Oct). When the code
-  is done and someone on dev has to measure something first, write a
-  `Test task:` comment with `Server: Dev` on the line under the title, and
-  leave the issue open. That one is for developers, so write it in developer
-  terms: the files, log lines and commands to run, and what each should
-  print, with a `Build:` line naming the dev release or gamemode commit it
-  needs. The bot posts it at once in #dev-test-tasks, a forum in the Staff
-  category that only staff see, whole, with links to the issue, its pull
-  requests and commits, and its labels. It takes the post down when the
-  issue closes or a newer `Test task:` comment does not say `Server: Dev`.
-  Put what was measured on the issue: the post is deleted when it goes. When
-  the fix reaches main, write the Main test task in plain words and close
-  the issue as above, and it moves to #test-tasks (`bot\README.md`, Testing).
+  testers test, since we are in alpha). The pull request carries the test
+  task as `Test task for #N: <a title of at most 45 characters>`, then
+  numbered steps in plain English and what should happen, with no issue
+  numbers, links or code. At the merge, `.github\workflows\done-on-merge.yml`
+  moves the issue to Done and writes the test task on it. The main Ship that
+  carries the merge closes it (#3279): after it tags the release,
+  `scripts\release\Close-ShippedIssues.ps1` reads the board and closes every
+  open issue in Done whose done-on-merge comment names a merge the release was
+  built from, with a comment whose first line is `Test task: <title>` and the
+  steps under it, and names the ones that stay open. Nobody closes these by
+  hand. The bot turns that comment into a post in the #test-tasks forum the
+  moment the issue closes, tagged Main, so closing it when it merges or when
+  it reaches dev sends testers to look for a fix that main does not have.
+  The test task in the pull request is Main, in the shape below, unless
+  only a developer can make the check (Dev, below). To better the test task
+  after the merge, write a newer `Test task:` comment of the same kind on
+  the issue and leave it open: the Ship closes it with yours instead. A
+  Dev test task never keeps the issue open. Whoever moves an issue to Done
+  by hand (a fix spread over several pull requests, a pin, a change on the
+  box) writes on it a comment whose first line is `Fixed by <merge commit,
+  12 characters> (pull request #N).`, naming the last merge the fix needs,
+  then either its Main test task in a fenced block, or the line
+  `No test task: nobody would notice this fix.` The Ship reads that line as
+  it reads done-on-merge's comment, from anybody, the newer of the two
+  winning, and closes the issue when the release carries that merge (#3411).
+  A line with neither a test task nor the no-task line keeps the issue open,
+  and the Ship names it as trouble. To see what a main Ship
+  would close, without closing anything:
+  `.\scripts\release\Close-ShippedIssues.ps1 -Commit origin/main -Check`.
+
+#### How an issue and a comment are written
+
+Decided by Patrick on 26 Oct (#3692), before the repository goes public:
+every new issue and every comment on one is written plain, by everybody, a
+person, a lane, a Claude or a workflow. When the repository goes public,
+every issue and every comment goes public with it, open or closed, and the
+ones written the old way are re-filed and then deleted (#3692). One written
+plain never needs that.
+
+- An issue is a plain title, two to five lines a person would write, and a
+  last line `Done when:` with one thing somebody can check. The team's issue
+  form asks for exactly that.
+- A comment is the same: a few plain lines. A `Test task:` comment and a
+  `Roadmap:` comment keep their own shapes ("Test tasks and known issues").
+- Neither ever holds: who found it ("Found by the ... audit", "Written by",
+  a lane's or a Claude's name, a thread or a Desk); a "Generated by/with
+  Claude Code" line, a session link or a closing `---` written in by hand;
+  the box's address, anybody's home address, a `C:\Users\<name>` path, an
+  email, a Discord id or a person's real name; a secret's value; or for a
+  security or privacy problem, anything somebody could use to exploit it.
+- The one closing line nobody writes and nobody takes off: the platform puts
+  `_Generated by [Claude Code](https://claude.ai/code)_` under a `---` at
+  the end of everything a cloud Claude writes, on every path, and it cannot
+  be turned off. The nightly check leaves that exact line at the very end
+  alone and reads everything above it as usual.
+- The evidence (files and lines, logs, what was measured, how the fix
+  should go) goes in the private ops repo, in `issues/<number>.md` for the
+  issue's number, never on the issue. Until that repository exists, it stays
+  in the finder's own private notes and moves there with the rest.
+- A claim is the `claimed:` label and the card in In Progress, with no
+  comment. A comment saying where the work stands is fine, written plain.
+- `scripts\dev\Nightly-PlainIssues.ps1`, run by the nightly, names every
+  issue and comment of the last day that breaks this, and the night goes
+  red until it is rewritten (#3692).
+
+#### Test tasks and known issues
+
+The bot checks every post against these rules before it goes up, in all
+three forums (`post_problems` in `bot\bot.py`, Patrick 22 Oct). A post that
+breaks one is never made, and a post already up is not edited to it; the
+issue gets one comment naming each rule broken, and the bot tries again once
+the comment is fixed. The rules: no "---" or "Generated by/with Claude Code"
+line; a title of 45 characters at most; the Server line matching the forum;
+numbered steps; no issue numbers, links or code (backticks) in the text.
+Dev: no step a Claude, the Desk, logs, the box, a harness, a workflow or a
+command could do (a Dev test task is only for what a human dev must do in
+the game; the rest is a "Check (Claude):" comment with its result), and not
+ordinary playtester steps with no staff or dev command (that is Main). Main:
+the fix commit is in the newest `release/main/` tag, and no staff or dev
+command. Known issues: open, no merged pull request names it, no test task.
+One post per issue per forum. The bot's token needs issues write to comment.
+
+Three Discord forums show testing, and the bot keeps all three from the
+board (`bot\README.md`, Testing). Patrick, 22 Oct: "dev test tasks are for
+things that only devs can test and can still be there while on main; main
+is for just regular testing for our playtesters, only when it's on main",
+and known issues are what is on the board whose fix has not landed yet
+(Patrick, 26 Oct, #3140). Test tasks never go on the report page; they go in Discord.
+
+- **#test-tasks, Main test tasks.** An ordinary check any playtester can do
+  with the normal game. If a playtester could do it once it is on main, it
+  is Main, even when a dev command would make it quicker. Its comment is
+  written only once a main Ship carries the fix, and the issue is closed
+  with it: the main Ship does both from the pull request's test task
+  (above), and the bot posts it the moment the issue closes. The shape:
+
+      Test task: <what to try, 45 characters at most>
+      Server: Main
+      1. <a plain step in the game or the launcher>
+      2. <the next step>
+      What should happen: <what the tester should see>
+
+  Plain words for testers: no issue numbers, links, commit ids, file
+  names, commands they cannot type, or "dev". Commands anyone can type,
+  such as `/stuck` or `/needs`, are fine. Nothing else goes in the comment; what
+  shipped and where is said in a separate comment.
+- **#dev-test-tasks, Dev test tasks.** A check only a dev can do: it needs
+  staff or dev commands, the dev server, logs, the box, or a setup testers
+  cannot make (a planted record or a hand-edited file counts; owning two
+  screens does not). A fix that has reached dev and not yet main is not
+  one: checking that a fix works is its Main test task, written when it
+  reaches main, however soon that is (#613: Patrick found one in
+  #dev-test-tasks, 22 Oct). Staff only. Written as soon as a build carries
+  the work, open issue or closed, and posted at once, whole, with links to
+  the issue, its pull requests and commits. It does not hold the issue
+  open: the main Ship that carries the fix closes it all the same. It stays
+  up while the fix is on main and after the issue closes, beside the Main
+  one, until its comment is taken back, a newer Dev one replaces it, or
+  staff close the post. The shape:
+
+      Test task: <what to check, 45 characters at most>
+      Server: Dev
+      Build: <the dev release, gamemode commit or main release it needs>
+      What it checks: <one line>
+      1. <steps in developer terms: files, commands, log lines>
+      What should happen: <what each step should print or show>
+
+  An issue may have both: its Dev test task in #dev-test-tasks and its
+  Main one in #test-tasks once it closes. A newer `Server: Dev` comment
+  replaces the older Dev post; put every measurement the issue still needs
+  in the newest. Put what was measured on the issue.
+- **#known-issues.** An open issue labelled `Main Findings` or `Dev
+  Findings` whose fix has not landed: it has no test task and is not in
+  Done. The bot takes the post down the moment a `Test task:` comment is
+  written on it, Done on merge writes its `Pull request #N merged` comment
+  on it (with `board: Done`, which board-status.yml takes off again within
+  a minute), or it closes or loses its label. A card moved to Done by hand
+  with no merge keeps its post: the bot cannot read the board. A merged
+  pull request alone does not take it down (Patrick, 26 Oct, #3140), so a
+  measuring step or a partial fix leaves the post up. Every known issue is
+  in the threads' work queue, so one is fixed in its turn and none waits
+  for somebody to remember it (Patrick, 26 Oct). The site's Known Issues
+  page is the same list. Its words come from the last `Known
+  issue:` comment: a title of 45 characters at most, then what goes wrong,
+  where, and how to avoid it, in plain words.
+- **One post per issue per forum, never two.** A changed test task or known
+  issue is an edit of its comment, or a newer comment, never a second post
+  by hand. Never post a test task by hand (`/test-task`) for something on
+  the board: the bot posts it from the comment. Two issues for one fix carry
+  one test task, on the issue the fix belongs to. The bot keeps one post per
+  issue and per title, open or closed, and `python bot.py --forum-check`
+  (`--apply` to delete) finds and removes duplicates in all three forums.
+- To take a test task back, edit its comment so its first line no longer
+  starts with `Test task:`; the bot takes its post down.
 
 #### What is not a reason to skip an issue
 
@@ -1197,16 +1369,21 @@ The short form of the rules. The same decisions, with the dates they were made, 
   tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
-  straight to main, which held while `enforce_admins` was off and stopped
-  holding the moment it went on.
+  straight to main. GitHub refuses a push to main from write access. It does
+  not refuse one from the admin account: with `enforce_admins` off, GitHub
+  holds an admin to none of main's rules, so for the admin this is a team rule
+  kept by hand.
 - What branch protection on main actually enforces, since 25 Sep:
   `enforce_admins` is **off**, there is no required check, required
   approving reviews is **0**, and the code owner review is **off**.
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
   anybody on the team merges their own pull request once `Launcher builds`
   (the build check, on the VPS) is green and they have said what it is in
-  #staff-updates. Nobody waits for Patrick. Force pushes are refused.
-  Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
+  #staff-updates. Nobody waits for Patrick. What GitHub does hold write
+  access to on main: a change comes through a pull request (with no approval
+  needed), and a force push or deleting main is refused. None of that applies
+  to the admin account while `enforce_admins` is off.
+  Because nothing enforces the build check, it has to be kept by hand: on 25 Sep 35 pull
   requests were merged with their VPS build red and 18 with no build at all,
   and main went red with them. Wait for `Launcher builds` to say pass before
   merging, every time, including your own and including a Claude's. The last
@@ -1218,9 +1395,10 @@ The short form of the rules. The same decisions, with the dates they were made, 
   with `--admin` on every one of his own pull requests, and it is now zero.
   The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
   which had to stay off while `Ship.ps1` pushed its own version commit
-  straight to main, went on, because Ship writes nothing to the repository now:
-  `Bump-Version.ps1` moves the number first, as an ordinary commit on a
-  branch, and Ship reads it.
+  straight to main, was turned on that day, since Ship writes nothing to the
+  repository now: `Bump-Version.ps1` moves the number first, as an ordinary
+  commit on a branch, and Ship reads it. It was off again by 25 Sep and is
+  off today, which is why the admin account is not held to main's rules.
   Check which it is rather than assuming, because this paragraph was wrong
   for a day before anybody looked:
   `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
@@ -1250,8 +1428,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   says which.
 - The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
-  Say in #staff-updates when you take it, because there is one dev feed and the last
-  dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged, apart
+  There is one dev feed and the last dev Ship wins, so a Dev says in
+  #dev-coordination before taking it; the Lead Dev does not have to. A release
+  gets no #staff-updates line (Patrick, 22 Oct). A main Ship leaves the Dev feed and baseline unchanged, apart
   from which dev notes are marked DEV (see Mark the dev notes again).
 - Every release note has a title and details, dev included. Patrick, 25 Sep,
   after two dev posts went out as "The scroll glows" and "Dev build: ...":
@@ -1349,19 +1528,37 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `Package -NoPublish` may still print "not signing" and leave an unsigned
   intermediate; that soft skip must not reach the site or the feed. The live main launcher,
   1.1.101, predates signing; the next main Ship is the first signed one.
-- Every pull request gets the build check (.github/workflows/build.yml, about
-  two minutes: the secret scan, every script and file parses, the Python
-  names only what exists (ruff, issue #1343), the writing
-  rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
-  seven more harnesses that are just as quick (the script index, the script
-  paths, the architecture page and three launcher harnesses, issue #875, and
-  the new-box runbook read against its scripts, issue #454),
-  the launcher window, the count of
-  silent catches in the launcher, the scripts, the site, voice and the bot, the launcher builds
-  with MSBuild from its project files, and that build is held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498). Red means the branch would stop Ship at the build step;
-  fix that, and merge once it is green, you are confident in the change, and you have said so in
-  #staff-updates. Run the test harnesses your change touches yourself. All
+- Every pull request gets the build check, `.github/workflows/build-pr.yml`,
+  and every push to main gets the same steps from
+  `.github/workflows/build.yml`. build-pr.yml is generated from build.yml:
+  change build.yml, then run `node scripts/dev/Build-PrWorkflow.js`
+  (`tests\test-1306-pr-workflow.js` fails while the two differ). It is one job
+  of named steps, and it builds only; nothing is published. It scans for
+  secrets, parses every PowerShell script and game script, checks the
+  writing rules (see Words), the ownership page (`tests\test-ownership.js`,
+  issue #752), the names that must stay out, that the engine is one commit and
+  the high-risk records, runs the gate harnesses (every `tests\test-*.js` and
+  `tests\test-*.ps1` that `tests\gate-excluded.txt` does not name, side by side
+  through `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) and the
+  voice service's health harness, checks our plugins are clean, the launcher
+  window and its UI thread, that the Python names only what exists (ruff,
+  issue #1343) and the count of silent catches, and builds the launcher with
+  MSBuild from its project files, held to its sources
+  (`tests\test-498-msbuild.ps1`, issue #498).
+- The check has two names, and either one passing is the merge bar.
+  **Launcher builds** is the job on GitHub's hosted Windows runner, tried
+  first. **Launcher builds (VPS fallback)** runs the same steps on a build
+  runner on the VPS, when the hosted job did not succeed, when the repository
+  variable `BUILD_RUNNER` is `vps` (then Launcher builds shows skipped), or
+  when a manual run of build.yml asks for `runner: vps`. A pull request from a
+  fork never gets the fallback. While the month's hosted minutes are used up,
+  `BUILD_RUNNER` is `vps` and the fallback is the one that goes green. A push
+  to main whose tree a green pull request build already passed stops green at
+  "Already tested in its pull request" instead of building again (#3182).
+  Red means the branch would stop Ship at the build step; fix that, and merge
+  once one of the two is green, you are confident in the change, and you have
+  said so in #staff-updates. Nothing in GitHub's settings is required. Run the
+  test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
@@ -1375,8 +1572,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   the first beside it. `.\scripts\deploy\Install-Runner.ps1 -Status` (with
   `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
   every runner's folder again without stopping a job.
-- Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
-  Publish-Update.ps1 without a line in #staff-updates first; every machine touches those.
+- An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
+  Publish-Update.ps1 that blocks others' work gets a line in #dev-coordination first, from a Dev; every machine touches those.
 
 #### How work moves, the long form
 
@@ -1390,18 +1587,21 @@ this is the long form.
   shipped is already on GitHub and every other machine can `git pull` exactly
   that.
 - **Every change goes through a pull request, Patrick's included.** Nobody
-  pushes to main from any machine; GitHub refuses it. `git checkout -b
+  pushes to main from any machine. GitHub refuses it from write access; from
+  the admin account it does not, so there it is our rule. `git checkout -b
   <name>/what-it-is` (your name, then a slash; a Claude uses `claude/`; older
   branches use `gavin/`), small
   commits with plain messages, `git push -u origin <branch>`, then
   `gh pr create --fill` standing on the branch. Nothing is force pushed.
 - **What GitHub enforces on main, and what it does not.** Since 25 Sep:
   `enforce_admins` is off; there is no required check; required approving
-  reviews is 0; the code owner review is off. The build check,
+  reviews is 0; the code owner review is off. For write access a change
+  still has to come through a pull request, and a force push or deleting
+  main is refused; with `enforce_admins` off, GitHub holds an admin to none
+  of main's rules. The build check,
   `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
   request on the VPS runner, and the rule is ours rather than a setting:
-  merge your own pull request once it is green, you are confident in the change, and you have said so in
-  #staff-updates. Nothing merges by itself: auto-merge is off on the repository, so
+  merge your own pull request once it is green, and you are confident in the change. Nothing merges by itself: auto-merge is off on the repository, so
   somebody presses merge or runs `gh pr merge --squash`. Each of us merges
   our own. Somebody else on the team reading a pull request first is a habit,
   not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when
@@ -1416,15 +1616,14 @@ this is the long form.
   push means pull first; never `--force`.
 - **The dev channel is for trying.** `.\scripts\release\Ship.ps1 -Channel dev "..."`
   runs from any branch on any machine and puts that build on the dev
-  server. There is one dev feed and the last dev Ship wins, so say in #staff-updates
-  when you take it. A main Ship preserves the Dev feed and baseline.
+  server. There is one dev feed and the last dev Ship wins, so a Dev says in #dev-coordination before taking it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
   client built from the fork and recorded, the launcher build (MSBuild from
   the project files, C# 13, #498), one complete release at a time: changing any of these starts as a few lines in #staff-updates, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
-  `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-updates; every
-  machine touches them.
+  `Updater.cs` or `Publish-Update.ps1` in a way that blocks others' work gets a
+  line in #dev-coordination from a Dev; every machine touches them.
 - **The publisher receives the feed and the baseline from the VPS** at the
   start and asks again before `version.json` is edited: a feed somebody changed
   meanwhile is received again and the release goes on top of it, and a
@@ -1457,18 +1656,21 @@ this is the long form.
 
 ## 3. How to release to dev
 
-Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins. Say what you are about to publish in #staff-updates first.
+Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins, so a Dev says in #dev-coordination before taking the dev feed. The Lead Dev does not have to.
 
 The machine that runs `Ship.ps1` still has to sign the build. [Setting up a machine](#setting-up-a-machine) and [Shipping from another machine](#shipping-from-another-machine) are how a PC gets there.
 
 ### The content plugin goes to the server first
 
-The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last dev release, put it on the dev server before you Ship, with the note the dev updates channel gets:
+The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last dev release, put it on the dev server before you Ship. The Ship right after it carries the same change to the launcher and says it, so the deploy posts nothing (`-ShipFollows`) and the note goes to the Ship alone:
 
 ```powershell
-.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -Note "The forge takes the new ores
+.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -ShipFollows
+.\scripts\release\Ship.ps1 -Channel dev "The forge takes the new ores
 - Iron and silver ore smelt at every forge."
 ```
+
+Each post says only what is new on its channel (#3320, Patrick, 22 Oct). Ship and `Deploy-DevGamemode.ps1` refuse a note whose title or `- ` line the channel's News or its Discord channel has already had, and say where it was said. On 22 Oct a deploy and the Ship after it posted the same note twice, which is what `-ShipFollows` is for.
 
 `-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: our two plugins from your checkout, the others from the collection. `Thornswood-Last.esp` is always the last plugin in that order: when the dev server's order does not end with it, `-LoadOrder` puts it there and sends the order (#2486). It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
 
@@ -1520,7 +1722,7 @@ Ship already posts the note. These commands send nothing. They show what a secon
 
 ### What any developer may do
 
-Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Say what you are about to publish in #staff-updates first. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
 The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, in First Time Setup, says which Azure sign-in can sign.
 
@@ -1554,7 +1756,7 @@ To post the current feed again:
 
 ## 4. How to release to main
 
-A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign, then say so in #staff-updates. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
+A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign. A release gets no #staff-updates line; the update channel, the app and site News tabs and GitHub say it. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
 
 ### Move the version first
 
@@ -1623,8 +1825,7 @@ dev feed and the dev baseline (`feed-dev` in the VPS store), the dev ports,
 and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
-never #news. There is one dev feed and the last dev Ship wins, so say in #staff-updates
-when you take it. Main and Dev have independent feeds and baselines. A Main
+never #news. There is one dev feed and the last dev Ship wins, so a Dev says in #dev-coordination before taking it. Main and Dev have independent feeds and baselines. A Main
 Ship leaves Dev's release unchanged; advance Dev through its own Ship. What a
 Main Ship does change on the dev feed is which notes are marked DEV and its
 `mainVersion`, right after main's feed is out (`Refresh-DevNews.ps1`, which
@@ -1642,8 +1843,8 @@ git pull
 
 The version moves first and on its own. `Bump-Version.ps1` changes `Version`
 in `launcher\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
-prints the rest. main refuses a push from everybody, so it prints the
-commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
+prints the rest. Every change reaches main through a pull request, the
+admin's included, so it prints the commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
 push it and open the pull request, which is then merged (see How work
 moves, the long form). Then, back on main:
 
@@ -1825,7 +2026,7 @@ folder went:
 | `backups` | `local` | The backups brought off the VPS, since 5 Oct (`Downloads\Thornswood-Backups` before). Secrets are inside them | Fetch-Backups, Backup-Server, Clean-Everything |
 | `release-devbuild` | `local`, on One | The folder One's dev release is built from, since 5 Oct, recorded by Setup-ShipMachine -Root | Ship, Check-ShipReady, Build-Generated |
 | `backup-key.txt` | `local` | A copy of the backup passphrase, a secret. Documents is where it really lives | Restore-Backup | Who holds each thing Thornswood cannot run without, and who the
-second holder is, is `docs\OWNERSHIP.md`.
+second holder is, is `docs\OWNERSHIP.md` in the private ops repo.
 
 ### One Skyrim of its own
 
@@ -2044,7 +2245,7 @@ it per session and ignores which profile Vortex has on.
 
 ### Where things are written down
 
-- This guide. The table at the top is the way in. `CLAUDE.md`: what applies to a
+- This guide. The table at the top is the way in. `CLAUDE.md` in the private ops repo: what applies to a
   Claude on top of these rules. The To Do board,
   https://github.com/users/EvilPatrick06/projects/1: all outstanding work.
 - `README.md`: what the repo is and where to start. A customer's install is
@@ -2052,20 +2253,24 @@ it per session and ignores which profile Vortex has on.
   developer's machine is "Setting up a machine" above.
 - `launcher\app\ARCHITECTURE.md`: how the launcher starts, what each class owns
   on disk, and every step between pressing Play and the game starting.
-- `docs\MOVING-THE-SERVER.md`, `docs\COLLECTION-METHOD.md`: the VPS and the
+- `docs\MOVING-THE-SERVER.md` (in the private ops repo), `docs\COLLECTION-METHOD.md`: the VPS and the
   mod collection.
-- `docs\OWNERSHIP.md`: who holds each credential, account and build, and who
+- `docs\OWNERSHIP.md` (in the private ops repo): who holds each credential, account and build, and who
   the second holder is.
 - `lore\`: history and the Accord. `site\data\site\*.md`: the public
   pages (join, rules, classes, world, credits, privacy, terms), also live on
   the site.
 - The site's hub boards (Active Issues, Test These, Suggestions, Archive, the
   Patrick runbook) are older than the board and are being retired (issue
-  #433); where they disagree with the board, the board is right. Known
-  Issues is not one of them: it is the public page's only copy, the known
-  board in `site\data\board.json`, edited in the hub at `/hub/known` and
-  written out at `/known` (decided by Patrick on 12 Oct, issue #2414).
-- `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
+  #433); where they disagree with the board, the board is right. The
+  public Known Issues page and roadmap are not boards: the bot writes both
+  from the issue board into the site's `data\from-bot\lists.json`, the
+  known list from the `Known issue:` comments on the findings and the
+  roadmap from the `roadmap:` labels and `Roadmap:` comments, and `/known`
+  and `/roadmap` show that file (issue #3140; bot README, "The site's known
+  issues and roadmap"). Change their words on the issue, never in a site
+  file.
+- `docs\archive` (in the private ops repo): dated snapshots (HANDOFF, the 17 September audit,
   WORKING-NOTES and the old To Do List), history only.
 
 ## 6. FAQ
@@ -2236,11 +2441,11 @@ Stay in `C:\Dev\Thornswood`. Each big folder has its own `README.md`. Open that 
 | `scripts\deploy` | Put a build on the server | `Get-ChildItem scripts\deploy` |
 | `scripts\vps` | The server key and log reads | `Get-ChildItem scripts\vps` |
 | `tests` | The test files | `Get-ChildItem tests` |
-| `docs` | The system notes | `code .\docs\SYSTEM.md` |
+| `docs` | The system notes | `code .\docs\README.md` |
 
 `engine` is the SkyMP source. Leave it until a task tells you to build the server. `out` and `local` appear after a build. Git keeps them off GitHub.
 
-Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-updates. Those files sit in `launcher\app` and `scripts\release`.
+An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 that blocks others' work gets a line in #dev-coordination first, from a Dev. Those files sit in `launcher\app` and `scripts\release`.
 
 Search one file from PowerShell:
 
@@ -2260,7 +2465,7 @@ For the whole repository, `Ctrl+Shift+F` is the search to use.
 
 ### E. VPS
 
-The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key and a token of its own, and the scripts connect through the bridge at `wss://thornswood.net/box/` with them. The whole guide, with what to do when it stops working, is `docs\BOX-ACCESS.md`.
+The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key and a token of its own, and the scripts connect through the bridge at `wss://thornswood.net/box/` with them. The whole guide, with what to do when it stops working, is `docs\BOX-ACCESS.md` in the private ops repo.
 
 #### Make a key and test it
 
@@ -2294,8 +2499,8 @@ A good answer is that ssh to the box works. `Host key verification failed` means
 #### Learn more about VPS
 
 - [OpenSSH on Windows](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse), Microsoft's install page
-- When the server is down: [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md)
-- Moving the box: [docs/MOVING-THE-SERVER.md](docs/MOVING-THE-SERVER.md)
+- When the server is down: `docs\IT-IS-DOWN.md` in the private ops repo
+- Moving the box: `docs\MOVING-THE-SERVER.md` in the private ops repo
 
 ### F. Website
 
@@ -2349,7 +2554,7 @@ That says whether the dev build and its game folder are in place, and ships noth
 
 On the Play page, the server list is at the lower right, under the Play button. Main is the live server. Dev is the row under it. Choose Dev.
 
-![The Play page. The server list at the lower right shows Main and Dev, and Dev is circled.](docs/guide/launcher-play-dev.png)
+![The Play page. The server list at the lower right shows Main and Dev, and Dev is circled.](docs/launcher-play-dev.png)
 
 #### Learn more about Dev Build
 
@@ -2510,7 +2715,7 @@ Thornswood
 | `voice` | The proximity voice service | [voice/voice-server.js](voice/voice-server.js) |
 | `scripts` | Commands you run from the repository folder | [scripts/README.md](scripts/README.md) |
 | `tests` | One file per check. `node tests\the-name.js` runs it | the `tests` folder |
-| `docs` | How the feed, the gamemode, and the server fit | [docs/SYSTEM.md](docs/SYSTEM.md) |
+| `docs` | How the feed, the gamemode, and the game's systems fit | [docs/README.md](docs/README.md) |
 | `records` | What a Ship compares the build to, and signing | [records/README.md](records/README.md) |
 | `installer` | The small setup program people download first | [installer/setup/README.md](installer/setup/README.md) |
 | `engine` | SkyMP source. Leave it until you are building the server | [engine/README.md](engine/README.md) |
@@ -2542,7 +2747,7 @@ Click a name to open the file. The line under it says what the file is for.
 | [scripts/deploy/Deploy-Gamemode.ps1](scripts/deploy/Deploy-Gamemode.ps1) | Puts the gamemode on the live server. The server deploy is the next script in that folder |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | The long list of Thornswood words |
 
-Six files are shared by every machine. A line in #staff-updates comes before an edit:
+Six files are shared by every machine. A Dev posts a line in #dev-coordination before an edit that blocks others' work. #dev-coordination is the Dev space's channel, which only the Dev ranks and the council see. The Lead Dev does not have to post these lines, and neither does a Claude working for the Lead Dev (Patrick, 22 Oct). They are for coordinating the work, so they never go in #staff-updates:
 
 | File | Where |
 | --- | --- |
@@ -2553,7 +2758,7 @@ Six files are shared by every machine. A line in #staff-updates comes before an 
 | [launcher/app/Updater.cs](launcher/app/Updater.cs) | The feed, the version, and applying a pack |
 | [scripts/release/Publish-Update.ps1](scripts/release/Publish-Update.ps1) | Builds the pack a Ship publishes |
 
-Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-updates.
+An edit to one of them that blocks others' work gets a line in #dev-coordination first, from a Dev; any other edit gets none.
 
 #### Learn more about the repository
 
@@ -2682,11 +2887,11 @@ says **not enforced** where nothing checks it.
 | TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`, put there by hand too; `vps-dev-instance.ps1` never copies the live one (#1083). Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` sends the Documents copy up when the box has no `key.txt` (a new box, issue #454), makes one when neither has it, and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
 | GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and a main Ship's download of the launcher CI built. Releases go to the VPS, not GitHub, since #897 and #907. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to the source repo is Patrick's to give or take away. |
-| VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, with its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS, taken only through the bridge; and your own bridge token, `.ssh\thornswood-box-token`, whose SHA-256 is in a file named for you in `C:\Thornswood-Bridge\tokens` on the VPS. Made on One, it waits in `box-access\<you>\box-token.txt` in the scratch folder (the path Grant-BoxAccess.ps1 prints) until it is sent to you, and that file is then deleted (`docs\BOX-ACCESS.md`) | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. Neither half alone gets a shell. None of the scripts needs the Administrator password. | Patrick, one name at a time, with `Grant-BoxAccess.ps1` on One: `-Name <you> -Remove` takes your key and token off and leaves everybody else's. For a new pair, move the old key aside (rename both `.ssh\thornswood_ed25519` and its `.pub`, say by adding `.old`) and delete `.ssh\thornswood-box-token`, then run `Setup-SshKey.ps1`, which makes a new key and prints its line. Patrick runs `Grant-BoxAccess.ps1 -Name <you> -FromClipboard` with it, which replaces your old key and token on the box, and sends you the new token to paste. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes. |
+| VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, with its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS, taken only through the bridge; and your own bridge token, `.ssh\thornswood-box-token`, whose SHA-256 is in a file named for you in `C:\Thornswood-Bridge\tokens` on the VPS. Made on One, it waits in `box-access\<you>\box-token.txt` in the scratch folder (the path Grant-BoxAccess.ps1 prints) until it is sent to you, and that file is then deleted (`docs\BOX-ACCESS.md` in the private ops repo) | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. Neither half alone gets a shell. None of the scripts needs the Administrator password. | Patrick, one name at a time, with `Grant-BoxAccess.ps1` on One: `-Name <you> -Remove` takes your key and token off and leaves everybody else's. For a new pair, move the old key aside (rename both `.ssh\thornswood_ed25519` and its `.pub`, say by adding `.old`) and delete `.ssh\thornswood-box-token`, then run `Setup-SshKey.ps1`, which makes a new key and prints its line. Patrick runs `Grant-BoxAccess.ps1 -Name <you> -FromClipboard` with it, which replaces your old key and token on the box, and sends you the new token to paste. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes. |
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
-| Nexus Mods API key | `%LOCALAPPDATA%\Thornswood\Nexus\api-key.txt` on One, written by `.\scripts\release\Set-NexusKey.ps1` at a prompt, and the environment variable `THORNSWOOD_NEXUS_API_KEY` in a cloud session's environment variables; nowhere in this repository. `scripts\release\Nexus.ps1` reads it from one of those two by those exact names (the variable when it is set) and sends it only in the `apikey` header to api.nexusmods.com, never to the upload addresses Nexus hands back (#2914) | Everything Patrick's Nexus account may do through the API: new file versions and description edits on Thornswood Content (192001) and the Thornswood Client Runtime (192762) (`Send-NexusFile.ps1`, `Set-NexusDescription.ps1`), and new and published revisions of the collection `7essxf` (`New-NexusRevision.ps1`). `Set-NexusKey.ps1 -Check` says where the key was found and whether its account owns both mods, without showing it. | Patrick, at https://www.nexusmods.com/settings/api-keys, then `Set-NexusKey.ps1` on One and the new value in the cloud environment's variables. |
+| Nexus Mods API key | `%LOCALAPPDATA%\Thornswood\Nexus\api-key.txt` on One, written by `.\scripts\release\Set-NexusKey.ps1` at a prompt, and the secret `NEXUS_API_KEY` of the GitHub environment `desk` (main only), put there by `Set-NexusKey.ps1 -ToEnvironment desk` and read only by `nexus-run.yml`; a cloud session holds no copy and runs the scripts through `scripts\release\Nexus-Run.ps1` (#2841); nowhere in this repository. `scripts\release\Nexus.ps1` reads it from the file, or from the variable `THORNSWOOD_NEXUS_API_KEY` that nexus-run.yml sets from the secret, and sends it only in the `apikey` header to api.nexusmods.com, never to the upload addresses Nexus hands back (#2914) | Everything Patrick's Nexus account may do through the API: new file versions and description edits on Thornswood Content (192001) and the Thornswood Client Runtime (192762) (`Send-NexusFile.ps1`, `Set-NexusDescription.ps1`), and new and published revisions of the collection `7essxf` (`New-NexusRevision.ps1`). `Set-NexusKey.ps1 -Check` says where the key was found and whether its account owns both mods, without showing it. | Patrick, at https://www.nexusmods.com/settings/api-keys, then `Set-NexusKey.ps1` on One and `Set-NexusKey.ps1 -ToEnvironment desk` there. |
 | Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as the person who ships from it, with an account of their own that holds the Certificate Profile Signer role on the Artifact Signing profile ([Your own signing sign in](#your-own-signing-sign-in)), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account and the tenant are his. He makes each person's account, gives it the role, and takes the role away when they stop shipping. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
-| The domain, thornswood.net | Registered at Cloudflare, in Patrick's own Cloudflare login, which he signs in to with GitHub (`docs\OWNERSHIP.md`). Nothing about it is kept on a machine or in this repository | The address everybody reaches the site, the feed and the launcher downloads at. Whoever holds the login can point it anywhere or let it lapse. | Patrick, in that Cloudflare login: renewing, moving or changing the records. Nobody else holds it. |
+| The domain, thornswood.net | Registered at Cloudflare, in Patrick's own Cloudflare login, which he signs in to with GitHub (`docs\OWNERSHIP.md` in the private ops repo). Nothing about it is kept on a machine or in this repository | The address everybody reaches the site, the feed and the launcher downloads at. Whoever holds the login can point it anywhere or let it lapse. | Patrick, in that Cloudflare login: renewing, moving or changing the records. Nobody else holds it. |
 
 **The rule for this table.** A control that does not exist is listed as
 **not enforced**, never left out and never left in as though it worked. The
@@ -2714,10 +2919,13 @@ opens nothing either way.
 
 **Copies.** The nightly backups, on the box and in `local\backups` in the
 repository folder once `Fetch-Backups.ps1` has brought them down, are encrypted with the
-passphrase. `Backup-Server.ps1` makes a plain zip in that same folder, with
-the site's config, the bot and voice folders whole and every game server's
-`private` folder, so a machine that has run it holds every VPS secret above
-except the backup passphrase, in the clear.
+passphrase. `Backup-Server.ps1`, the whole-server copy taken by hand,
+encrypts its zip on the box with the same passphrase and brings down only
+`thornswood-backup-<stamp>.zip.enc` (the site's config, the bot and voice
+folders whole, voice chat included, and every game server's `private`
+folder), so no plain copy reaches a machine that runs it. `Fetch-Backups.ps1`
+deletes a copy taken by hand 30 days after the day in its name, as the
+privacy page says.
 
 **Checking a row.** Each of these reads, and none prints a value:
 

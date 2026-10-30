@@ -902,8 +902,14 @@ attempt('the wiring', function () {
       !/'company':\s+'Trading Company'/.test(bot) && !/'company': \[/.test(bot) &&
       bot.indexOf('No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.') !== -1);
   const build = read('bot/Build-Discord.py');
+  // Since #3317 the role is the company's member role, the faction's own
+  // name in bot/factions.json, which Build-Discord.py makes for every faction.
+  const factions = JSON.parse(read('bot/factions.json'));
   yes('W10 and Build-Discord.py makes that role, so there is one to give',
-      !!def && build.indexOf("ROLES.append(('" + def[1] + "', ") !== -1);
+      !!def && factions.indexOf(def[1]) !== -1 &&
+      /FACTION_MEMBERS = tuple\(FACTION_SHORT\.get\(f, f\) for f in FACTIONS\)/.test(build) &&
+      /for _name in FACTION_MEMBERS:\n    ROLES\.append\(\(_name, /.test(build) &&
+      !/'Free Skyrim Trading Company':/.test(build.slice(build.indexOf('FACTION_SHORT = {'), build.indexOf('FACTION_SHORT = {') + 200)));
   const party = read('game/ui/thornswood-party.js');
   yes('W11 there is no sale on the request prompt and no sale in /yes: the sale is the trade panel',
       party.indexOf("'sale'") === -1 && !/o\.kind === 'sale'/.test(YES_BRANCH));

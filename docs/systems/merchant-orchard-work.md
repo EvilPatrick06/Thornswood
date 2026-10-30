@@ -20,15 +20,15 @@ regrowth are added.
 | `1831ad` | `[29923.47265625,-13003.6845703125,-4364.17578125]` |
 
 Exact native references, original positions, FLOR base and apple produce
-are checked at startup and harvest. Live sources stay within128 units of
-the original point, and the Farmer stays within400 units of the source.
+are checked at startup and harvest. Live sources stay within 128 units of
+the original point, and the Farmer stays within 400 units of the source.
 Missing source evidence closes this work.
 
 Existing Farmer rules apply: shovel, profession rank, farm/building claims
 and seasonal growth. An untouched standing tree gives one apple once.
 An emptied plot must be sown with an apple using the existing interaction.
-The crop's base growth is75 minutes, multiplied by its sower's rank:
-Expert0.7 gives52.5 minutes, Master0.55 gives41.25 minutes. Expert crops
+The crop's base growth is 75 minutes, multiplied by its sower's rank:
+Expert 0.7 gives 52.5 minutes, Master 0.55 gives 41.25 minutes. Expert crops
 pause in autumn and winter under the existing season rules. Ripe yield
 belongs to the sower's rank: four for Expert, five for Master.
 
@@ -39,7 +39,7 @@ Cook, keep extras and start twelve hours of rest. Abandon consumes all
 outstanding drawn apples without a rest. As with other scarce work, spent
 apples must be replaced before the return or abandon can complete. There
 is no gold reward, purse refill or separately generated quest apple.
-Two completions in24 hours can retain at most twelve extra apples per
+Two completions in 24 hours can retain at most twelve extra apples per
 Farmer, before sowing costs; ordinary shared harvests are not duplicated.
 
 Only these ten references keep their authoritative plot state in the private
@@ -69,5 +69,5 @@ not add cross-store sowing recovery to the existing alpha farming rules.
 Definite seed shortages retain the existing starter-seed recovery.
 
 Offline native proof and isolated Farmer/quest fixtures cover these paths.
-Required CI, source merge and Claude's matching Dev delivery remain
+Required CI, source merge and the matching Dev delivery remain
 separate from connected acceptance. No game playtest is claimed.

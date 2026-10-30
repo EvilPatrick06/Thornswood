@@ -9,6 +9,7 @@
       server-build        records\server-build.json      the server build every deploy is held to
       client-build        records\client-build.json      the client build Ship and the launcher are held to
       front-build         records\front-build.json       the front build Go.ps1 unpacks into Data\Platform\UI (#2754)
+      client-licences     records\client-licences.json   the vcpkg libraries in the client files and their texts' sha256 (#3099)
       most-online         records\most-online.json       the seat count the engine and gamemode take, main's and dev's
       collection-plugins  records\collection-plugins.json  the collection's plugin bytes (#2019)
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
@@ -43,6 +44,8 @@ $script:ThornswoodRecordKinds = [ordered]@{
     'client-build'       = @{ File = 'records\client-build.json';       Versions = @(1); MustSay = $false }
     # #2754: the front, built from the same fork commit (Build-Front.ps1).
     'front-build'        = @{ File = 'records\front-build.json';        Versions = @(1); MustSay = $false }
+    # #3099: which licence text goes with which client file (New-ClientLicenceRecord.ps1).
+    'client-licences'    = @{ File = 'records\client-licences.json';    Versions = @(1); MustSay = $false }
     'most-online'        = @{ File = 'records\most-online.json';        Versions = @(1); MustSay = $false }
     'collection-plugins' = @{ File = 'records\collection-plugins.json'; Versions = @(1); MustSay = $true }
     # Slice 3 (#2180): the release records the launcher and Ship are built on.
@@ -142,9 +145,55 @@ function Get-ThornswoodRecordProblems {
             if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 7 40)) { $out += 'forkCommit is missing or not a commit SHA' }
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
         }
+        'client-licences' {
+            if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 7 40)) { $out += 'forkCommit is missing or not a commit SHA' }
+            $files = Get-ThornswoodRecordProp $Doc 'files'
+            if ($null -eq $files -or $files -isnot [psobject] -or $files -is [array] -or $files -is [string] -or @($files.PSObject.Properties).Count -eq 0) { $out += 'files is missing, empty, or not a map of client file to its ports' }
+            $ports = Get-ThornswoodRecordProp $Doc 'ports'
+            if ($null -eq $ports -or $ports -isnot [psobject] -or $ports -is [array] -or $ports -is [string]) { $out += 'ports is missing or not a map of port to its text' }
+            else {
+                foreach ($p in $ports.PSObject.Properties) {
+                    if ($p.Name -notmatch '^[a-z0-9]+(-[a-z0-9]+)*$') { $out += "ports.$($p.Name) is not a vcpkg port name" }
+                    if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "ports.$($p.Name) has no sha256" }
+                    if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "ports.$($p.Name) has no whole bytes" }
+                    if (-not ((Get-ThornswoodRecordProp $p.Value 'version') -is [string])) { $out += "ports.$($p.Name) has no version" }
+                }
+                if ($null -ne $files -and $files -is [psobject]) {
+                    foreach ($f in $files.PSObject.Properties) {
+                        foreach ($n in @($f.Value)) { if (-not $ports.PSObject.Properties[[string]$n]) { $out += "files.$($f.Name) names $n, which ports does not list" } }
+                    }
+                }
+            }
+            # The fork's own noticed folders and the npm packages in
+            # skymp5-client.js (#3751). A client measured before that has none.
+            $libs = Get-ThornswoodRecordProp $Doc 'libraries'
+            if ($null -ne $libs) {
+                if ($libs -isnot [psobject] -or $libs -is [array] -or $libs -is [string]) { $out += 'libraries is there and not a map of library to its text' }
+                else {
+                    foreach ($p in $libs.PSObject.Properties) {
+                        if ($p.Name -notmatch '^[a-z0-9][a-z0-9._-]*$') { $out += "libraries.$($p.Name) is not a name a text can safely have" }
+                        if (@('fork', 'npm') -notcontains [string](Get-ThornswoodRecordProp $p.Value 'kind')) { $out += "libraries.$($p.Name) is not of kind fork or npm" }
+                        if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "libraries.$($p.Name) has no sha256" }
+                        if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "libraries.$($p.Name) has no whole bytes" }
+                        if (-not @(Get-ThornswoodRecordProp $p.Value 'in').Count) { $out += "libraries.$($p.Name) is in no file" }
+                    }
+                }
+            }
+        }
         'front-build' {
             if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 40 40)) { $out += 'forkCommit is missing or not a full commit SHA' }
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
+            # The npm packages in build.js, each with its text (#3751).
+            $pk = Get-ThornswoodRecordProp $Doc 'packages'
+            if ($null -eq $pk -or $pk -isnot [psobject] -or $pk -is [array] -or $pk -is [string]) { $out += 'packages is missing or not a map of package to its text' }
+            else {
+                foreach ($p in $pk.PSObject.Properties) {
+                    if ($p.Name -notmatch '^npm-[a-z0-9][a-z0-9._-]*$') { $out += "packages.$($p.Name) is not an npm-<name>-<version> text name" }
+                    if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "packages.$($p.Name) has no sha256" }
+                    if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "packages.$($p.Name) has no whole bytes" }
+                    if (-not ((Get-ThornswoodRecordProp $p.Value 'version') -is [string])) { $out += "packages.$($p.Name) has no version" }
+                }
+            }
         }
         'most-online' {
             # Main's numbers are the record's own, and dev's, when it has its
@@ -161,8 +210,8 @@ function Get-ThornswoodRecordProblems {
                 elseif ([int64](Get-ThornswoodRecordProp $o 'people') -gt 1000) { $out += "${pre}people is over 1000, the engine's limit" }
                 $s = Get-ThornswoodRecordProp $o 'staffSeats'
                 if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += "${pre}staffSeats is there and not a whole number" }
-                # The most the voice service takes at once (#481); MaxOnline.ps1
-                # holds it to no fewer than the seats.
+                # The most people who hold a voice place at once (#481, #3570);
+                # MaxOnline.ps1 holds it to no fewer than the seats.
                 $v = Get-ThornswoodRecordProp $o 'voice'
                 if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += "${pre}voice is there and not a whole number above zero" }
             }

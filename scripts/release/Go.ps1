@@ -165,6 +165,32 @@ function Update-KeptCopies([string]$GameDir, [string[]]$Installed, [string[]]$Re
   return $n
 }
 
+# Takes out of Data\Platform\UI every overlay of ours the repo no longer has,
+# and returns the paths it took out. The overlays loop below copies each of
+# game\ui's scripts in and never took one out, so an overlay that left the
+# repo stayed in the game folder Ship packs from, and every release kept it on
+# every install: thornswood-loadscreen.js, the #3130 test pulled on 22 Oct,
+# was still there, and the dry run that should have deleted it said "0
+# removed". The plugins folder has had the same rule since the retired
+# dresser (removing stray file from the plugins folder, below).
+#
+# Only thornswood-*.js in that one folder: the front's own files, the page,
+# the pictures and the music are not overlays. thornswood-characters.js is
+# the launcher's, one machine's character list (Chars.WriteCharacters,
+# Ship-Rules' one-machine list), so it is never taken out here.
+function Remove-RetiredOverlays([string]$UiDir, [string]$UiSrc) {
+  $out = New-Object System.Collections.Generic.List[string]
+  if (-not (Test-Path -LiteralPath $UiDir -PathType Container)) { return @($out) }
+  $have = @(Get-ChildItem -LiteralPath $UiSrc -File -Filter *.js | ForEach-Object { $_.Name })
+  $have += 'thornswood-characters.js'
+  foreach ($s in @(Get-ChildItem -LiteralPath $UiDir -File -Filter 'thornswood-*.js' -EA SilentlyContinue)) {
+    if ($have -contains $s.Name) { continue }
+    Remove-Item -LiteralPath $s.FullName -Force
+    $out.Add($s.FullName)
+  }
+  return @($out)
+}
+
 # ------------------------------------------------------------------- front --
 Head 'Front'
 # The front build, skymp5-front from the pinned fork commit, which
@@ -218,6 +244,10 @@ if (Test-Path -LiteralPath $uiSrc) {
     Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
+  }
+  foreach ($r in @(Remove-RetiredOverlays $ui $uiSrc)) {
+    Bad ('removing an overlay the repo no longer has: ' + (Split-Path -Leaf $r))
+    $script:removed.Add($r)
   }
   # The page itself. The front's zip above carries the plain one; ours is
   # the same page plus the two lines that draw the character choice before
@@ -288,8 +318,9 @@ foreach ($pair in $menuPairs) {
 }
 
 # ------------------------------------------------ our own menu files --
-# The empty loading spinner, the silent stand-in for the game's theme and
-# SkyHUD's settings as Thornswood set them. From game\ours, beside
+# The empty loading spinner, the silent stand-in for the game's theme,
+# SkyHUD's settings as Thornswood set them and QuickLoot IE's with no gold
+# value column (#3113). From game\ours, beside
 # game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
@@ -301,7 +332,8 @@ $oursSrc = Join-Path $Here '..\..\game\ours'
 $oursMenuFiles = @(
   'Data\Interface\loadwaitspinner.swf',
   'Data\music\special\mus_maintheme.xwm',
-  'Data\Interface\skyhud\skyhud.txt'
+  'Data\Interface\skyhud\skyhud.txt',
+  'Data\SKSE\Plugins\QuickLootIE.json'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel
@@ -323,6 +355,10 @@ foreach ($rel in $oursMenuFiles) {
 # the line says which of the game's files differs. Not a failed run: nothing
 # here ships, and the launcher says the same thing at Play. The destination is
 # removed first, for the hard link reason above.
+# The collection's item menus and HUD with no gold values are made the same
+# way from the mods' own archives in this game (#3113, Ship-Rules
+# $ShipMadeFromMods): SkyUI's config.txt and itemcard.swf, SkyHUD's
+# hudmenu.swf and moreHUD's AHZHudInfo.swf, two copies.
 Head 'Made from the game'
 if (-not ('Thornswood.FromGame' -as [type])) {
   $fromGameCs = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\..\launcher\app') -Filter 'FromGame*.cs' -File |
@@ -507,18 +543,20 @@ if (-not $SkipServer) {
   }
   $voiceUrl = 'https://thornswood.net/voice/health'
   $vh = VoiceUp $voiceUrl
-  # voice-server.js answers /health with JSON that counts its peers. Anything
-  # else answering 200 there is not the voice service (Caddy handing the path
-  # to the site, say), so it is said as such rather than counted as up.
+  # voice-server.js answers /health through the site with {"ok":true} and
+  # nothing more (#3806); the counts go only to a caller on the box, and the
+  # restart below prints that answer. Anything else answering 200 there is
+  # not the voice service (Caddy handing the path to the site, say), so it is
+  # said as such rather than counted as up.
   $vhDoc = $null; $vhWhy = ''
   if ($vh) {
     try { $vhDoc = $vh | ConvertFrom-Json } catch { $vhWhy = $_.Exception.Message }
-    if (-not $vhWhy -and -not ($vhDoc -and $vhDoc.PSObject.Properties['peers'])) { $vhWhy = 'it names no peers' }
+    if (-not $vhWhy -and -not ($vhDoc -and $vhDoc.PSObject.Properties['ok'] -and $vhDoc.ok -eq $true)) { $vhWhy = 'it does not say ok' }
   }
   if ($vh -and $vhWhy) {
     Bad "voice service: something answered at $voiceUrl, but not voice's health ($vhWhy)"
   } elseif ($vh) {
-    Note ('voice service: answering at /voice/  ' + [string]$vhDoc.peers + ' peer(s)')
+    Note 'voice service: answering at /voice/'
   } else {
     Bad "voice service: NOTHING at $voiceUrl"
     Bad '  that is Caddy or the service itself; the raw port is shut on purpose and proves nothing'

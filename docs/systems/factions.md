@@ -18,7 +18,7 @@ owner is away.
 
 The tab is not drawn at all unless one of these is true.
 
-- The Discord account holds Business Owner, or Faction Owner.
+- The Discord account holds Business Owner, or a faction's Leader role.
 - This character has been invited into a faction or a business, and
   has accepted.
 - The Discord account is staff.
@@ -31,31 +31,44 @@ row.
 
 ## Named factions
 
-Some factions have a lead seat: Imperial Embassy, Thalmor Remnant,
-Dark Brotherhood, The Companions, and the Free Skyrim Trading
-Company. The names live in `bot/factions.json`. Applying is
-Apply: Faction Leader in Discord. A faction has one leader. No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.
+There are sixteen factions, each with a Leader role in Discord (the
+faction's short name and "Leader", such as Companions Leader) and a
+member role the Leader gives from the faction panel in #seats. The
+names live in `bot/factions.json`, and each one's place in 4E 252 is
+in `lore/factions.md`. Applying is Apply: Faction Leader in Discord.
+Accepting one gives that faction's Leader role, which is already
+there: the application does not make a new Discord role. A faction has
+one leader.
+No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.
+A new faction comes only through that application, as Other, and gets
+its Leader role the same way.
 
-The Discord role Faction Owner is separate: it lets an account found
-a faction book in the game. It is not granted by this application,
-and this application does not make a new Discord role.
+Each faction has one book, and it is its Leader's (#3317, Patrick, 22
+Oct). Whoever holds the faction's Leader role in Discord owns the
+book. When the role goes to somebody else, the book goes with it: the
+first time one of the new Leader's characters opens J, they are put in
+the book as its owner. The old Leader stays a member until the new one
+removes them. Staff do not hand a faction's book on; giving the role
+in Discord is how it moves. While two accounts hold the same Leader
+role, neither owns the book, as with a Jarl role two accounts hold.
 
 ## Founding one
 
-Business Owner may found one business, and name it.
+Business Owner may found one business, and name it. A second is
+refused. Founding is on the account, so another character on the
+same account does not get a second book. Any character on that
+account can open the book as its owner.
 
-Faction Owner may found one faction, and name it.
-
-An account that holds both may found one of each. A second of the
-same kind is refused. Founding is on the account, so another
-character on the same account does not get a second book. Any
-character on that account can open the book as its owner.
+A faction's Leader may found that faction's book, and name it, once.
+A second book for the same faction is refused. Somebody who leads two
+factions may found one for each.
 
 On the tab: type the name, then New business or New faction. A Dev
-may found one business and one faction without holding Business
-Owner or Faction Owner. Any other staff seat can found one only when
-they also hold that Discord role. They do not need the role to open a
-book that already exists.
+may found one business without holding Business Owner. A faction's
+book needs its Leader role, whoever founds it, Dev or staff included.
+Any other staff seat can found a business only when they also hold
+Business Owner. They do not need a role to open a book that already
+exists.
 
 ## Roles
 
@@ -82,15 +95,17 @@ The owner can rename the book. The owner can disband it. A member
 can leave.
 
 Staff have every permission on every book, including a book they were
-not invited to. Staff can rename, remove someone, disband, and hand
-ownership to a character who is already a member. Removing someone
-from the book does not take a Discord role off the account.
+not invited to. Staff can rename, remove someone, disband, and hand a
+business to a character who is already a member. A faction's book is
+not handed on: it moves with its Leader role. Removing someone from
+the book does not take a Discord role off the account.
 
 When somebody's account is deleted at their request, the game lets go of
 their characters at its next start (#2351): they leave every book, the
-lines they wrote in a book's chat go, and a book one of them owns is
-disbanded. Staff who are told the group wants to keep it hand it to
-another member first.
+lines they wrote in a book's chat go, and a business one of them owns
+is disbanded. Staff who are told the group wants to keep it hand it to
+another member first. A faction's book stays, with no owner, until
+whoever holds its Leader role next opens it.
 
 ## The price list
 
@@ -173,8 +188,8 @@ prompt (#1591). The panel sends the server a line for each button;
 nobody is told to type it, and no help names it (#1630). The book is
 kept for the group and survives a restart. The time a character last
 left is kept too. J draws the tab only for
-a Discord account that holds Business Owner or Faction Owner, for a
-character who has accepted an invite, and for staff.
+a Discord account that holds Business Owner or a faction's Leader
+role, for a character who has accepted an invite, and for staff.
 
 Someone with the Prices permission stands at that hold's notice
 board, which is the drop box, and submits a copy of the list. The book stays in the journal. A later
@@ -184,7 +199,10 @@ that hold's traders would charge. Traders do not yet buy and sell
 from a purse the server tracks.
 
 Staff seats read Owner, Gamemaster, Dev, Loremaster, and Moderator
-off the Discord account. Business Owner and Faction Owner are read
-the same way. A Dev may found one of each. Any other staff seat
-founds only when the account also holds the matching role. Founding
-one book of each kind is capped on the account.
+off the Discord account. Business Owner and the faction Leader roles
+are read the same way; the site sends each Leader role with the
+profiles of the account that holds it (`factionLeaderProfiles`), and
+leaves out a Leader role two accounts hold. A Dev may found one
+business. Any other staff seat founds a business only when the
+account also holds Business Owner. One business is capped on the
+account, and one book on each faction.

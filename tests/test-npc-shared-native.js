@@ -181,7 +181,7 @@ const unavailable = new Set(), lines = [], positions = new Map(), firstWrites = 
 const acceptedAttackers = new Set();
 const attackAttempts = new Map(), nativeStates = new Map();
 const nativeSpeeds = new Map(), stoppedActors = new Set();
-const savedBeforeRestart = new Map(), writeSequences = new Map();
+const savedBeforeRestart = new Map(), writeSequences = new Map(), writeModes = new Map();
 const validationFailures = [];
 const worst = {callback:0,callbackTask:'',callbackWork:0,callbackWorkTask:'',counterGHz:threadClock.counterGHz,gcPause:0,wallOverLimit:0,
   load:0,state:0,nav:0,geometry:0,movement:0,attack:0};
@@ -285,8 +285,11 @@ api.set = (id,property,value) => {
   }
   if(writeSequences.has(id)) {
     assert.ok(value.sequence >= writeSequences.get(id),'Saved activity sequence cannot go backwards');
+    // Written when its mode changes, never again as it wanders (#3180): each
+    // write saves the actor's whole record durably.
+    assert.notEqual(value.mode,writeModes.get(id),'Activity is rewritten only when its mode changes, not as it wanders: '+id.toString(16));
   }
-  writeSequences.set(id,value.sequence);
+  writeSequences.set(id,value.sequence);writeModes.set(id,value.mode);
 };
 api.updateNpcMovement = (id,pos,rot,speed) => {
   assert.ok(controlled.has(id),'Movement requires current native server authority');
@@ -529,13 +532,10 @@ async function proveActivity(stage) {
     assert.ok(windowMoved.has(id) || windowAttackers.has(id),stage+' native activity missing for '+id.toString(16));
     const saved = server.get(id,'thornswoodNpcActivity');
     assert.equal(saved.version,2);
+    // Only a fight or a flight writes it again (#3180), so most stay as taken on.
     if(saved.sequence > firstWrites.get(id)) progressedSequences++;
-    if(saved.mode === 'ambient') {
-      assert.ok(saved.sequence > firstWrites.get(id),stage+' must persist actual ambient activity progress');
-    }
   }
   assert.ok(windowMoved.size > 1000,stage+' must physically move a substantial native cast');
-  assert.ok(progressedSequences > 1000,stage+' must persist sequence progress across the native cast');
   console.log(JSON.stringify({stage,eligible:eligible.length,moved:windowMoved.size,acceptedAttackers:windowAttackers.size,
     terminalPaused:terminalPositions.size,terminalSweepMs,
     progressedSequences,status:status(),peakRssMiB:peakRss/1048576,worst}));
@@ -587,7 +587,7 @@ try {
     if(saved && Number.isSafeInteger(saved.sequence)) savedBeforeRestart.set(id,saved);
   }
   server.clear();
-  controlled.clear();unavailable.clear();moved.clear();positions.clear();firstWrites.clear();writeSequences.clear();
+  controlled.clear();unavailable.clear();moved.clear();positions.clear();firstWrites.clear();writeSequences.clear();writeModes.clear();
   nativeSpeeds.clear();stoppedActors.clear();
   loaded.clear();observedNativeIds.clear();restarting = true;
   population = populationMode ? context.createNpcPopulation(api,populationData,pluginNames) : null;

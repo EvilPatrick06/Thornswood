@@ -351,8 +351,8 @@ yes('W7 and there is one watcher of outages, not two: the site watcher that '
     'watch_site' not in src and 'site_answers' not in src)
 _start = src.index('async def watch_services():')
 body = src[_start:src.index('\ndef ', _start)]
-yes('W7 it speaks only through watch_say, which has no public fallback',
-    'watch_say(' in body and '.send(' not in body and 'by_name' not in body)
+yes('W7 it speaks only through watch_send, which has no public fallback',
+    'watch_send(' in body and '.send(' not in body and 'by_name' not in body)
 
 # ------------------------------------------------ mentions stay off ---------
 # Issue #1353. The watchdog's sentence can carry a name or a line from
@@ -391,6 +391,154 @@ try:
         and mentions.roles is False and mentions.replied_user is False)
 finally:
     bot.client, bot.WATCH_ID = keep_c, keep_id
+
+# ------------------------------------------------ taking a notice back -----
+# Issue #3328. A notice that should not have gone out comes down again: the
+# bot keeps the message each notice became, and takes back what
+# alerts-unsay.txt names, once each.
+plan = bot.unsay_plan(
+    ['kept', 'old', 'hooked', 'queued', 'nobody', 'kept', 'done-before', ''],
+    {'done-before': ['deleted']}, {'kept': ['424242', '9001']},
+    {'kept', 'old'}, {'hooked'}, {'queued': 'x', 'old': 'y'})
+yes('W9 each ask is planned once, by what is known of it',
+    plan == [('kept', 'message'), ('old', 'look'), ('hooked', 'webhook'),
+             ('queued', 'withhold'), ('nobody', 'unknown')])
+
+
+class Msg(object):
+    def __init__(self, mid, content, author, box):
+        self.id = mid
+        self.content = content
+        self.author = author
+        self._box = box
+
+    async def delete(self):
+        if self.id in self._box['gone']:
+            raise bot.discord.NotFound(type('R', (), {'status': 404, 'reason': 'gone'})(), 'gone')
+        self._box['deleted'].append(self.id)
+
+
+class Me(object):
+    id = 77
+
+
+class Someone(object):
+    id = 88
+
+
+class UnsayChannel(object):
+    id = STAFF_ID
+    name = 'staff-updates'
+
+    def __init__(self, box):
+        self.box = box
+        self.sent = []
+
+    async def send(self, text, **kwargs):
+        m = Msg(5000 + len(self.sent), text, Me(), self.box)
+        self.sent.append(m)
+        return m
+
+    def get_partial_message(self, mid):
+        return Msg(mid, None, Me(), self.box)
+
+    async def _history(self, limit):
+        for m in self.box['history'][:limit]:
+            yield m
+
+    def history(self, limit=100):
+        return self._history(limit)
+
+
+class UnsayClient(object):
+    user = Me()
+
+    def __init__(self, ch):
+        self._ch = ch
+
+    async def wait_until_ready(self):
+        return None
+
+    def is_closed(self):
+        return False
+
+    def get_channel(self, cid):
+        return self._ch if cid == STAFF_ID else None
+
+
+ubox = os.path.join(TMP, 'unsay')
+udata = os.path.join(TMP, 'unsay-data')
+os.makedirs(ubox)
+os.makedirs(udata)
+names = ('client', 'WATCH_ID', 'WATCH_ALERTS', 'WATCH_SENT_BOT', 'WATCH_SENT_HOOK',
+         'WATCH_UNSAY', 'STAFF_MESSAGES', 'STAFF_UNSAID', 'asyncio')
+keep = tuple(getattr(bot, n) for n in names)
+store = {'deleted': [], 'gone': [9002], 'history': []}
+uch = UnsayChannel(store)
+bot.client = UnsayClient(uch)
+bot.WATCH_ID = STAFF_ID
+bot.WATCH_ALERTS = os.path.join(ubox, 'alerts.jsonl')
+bot.WATCH_SENT_BOT = os.path.join(ubox, 'alerts-sent-bot.txt')
+bot.WATCH_SENT_HOOK = os.path.join(ubox, 'alerts-sent-webhook.txt')
+bot.WATCH_UNSAY = os.path.join(ubox, 'alerts-unsay.txt')
+bot.STAFF_MESSAGES = os.path.join(udata, 'staff-messages.txt')
+bot.STAFF_UNSAID = os.path.join(udata, 'staff-unsaid.txt')
+
+
+def notice(i, text):
+    return json.dumps({'id': i, 'at': NOW, 'service': 'agent claude',
+                       'kind': 'notice', 'text': text})
+
+
+# Said before message ids were kept: one of the bot's own posts with its
+# words, and somebody else's post with the same words, which stays.
+add(bot.WATCH_ALERTS, notice('agent-claude-old', '[claude] Old words.') + '\r\n')
+add(bot.WATCH_SENT_BOT, 'agent-claude-old\r\n')
+add(bot.WATCH_SENT_HOOK, '')
+store['history'] = [Msg(7001, '[claude] Old words.', Someone(), store),
+                    Msg(7002, '[claude] Old words.', Me(), store)]
+ustep = [0]
+
+
+def unsay_steps():
+    ustep[0] += 1
+    if ustep[0] == 1:
+        # Said this run, its message kept; then three asks and one not yet said.
+        add(bot.WATCH_UNSAY, 'agent-claude-new\r\nagent-claude-old\r\nagent-claude-later\r\n')
+        add(bot.WATCH_ALERTS, notice('agent-claude-later', '[claude] Never said.') + '\r\n')
+    elif ustep[0] == 2:
+        add(bot.WATCH_UNSAY, 'agent-claude-new\r\n')
+    else:
+        raise Stop()
+
+
+add(bot.WATCH_ALERTS, notice('agent-claude-new', '[claude] New words.') + '\r\n')
+bot.asyncio = AsyncioShim(unsay_steps)
+try:
+    try:
+        asyncio.run(bot.watch_services())
+    except Stop:
+        pass
+    kept = bot._watch_table(bot.STAFF_MESSAGES)
+    yes('W9 the bot keeps the message each notice became',
+        kept.get('agent-claude-new') == [str(STAFF_ID), '5000'])
+    unsaid = bot._watch_table(bot.STAFF_UNSAID)
+    yes('W9 a kept message is deleted by its id', unsaid.get('agent-claude-new') == ['deleted']
+        and 5000 in store['deleted'])
+    yes('W9 one said before ids were kept is found by its words, and only the bot\'s own',
+        unsaid.get('agent-claude-old') == ['deleted'] and 7002 in store['deleted']
+        and 7001 not in store['deleted'])
+    yes('W9 one not said yet is withheld: never said, and marked so the webhook does not say it',
+        unsaid.get('agent-claude-later') == ['withheld']
+        and [m.content for m in uch.sent] == ['[claude] New words.']
+        and 'agent-claude-later' in bot._watch_lines(bot.WATCH_SENT_BOT))
+    with open(bot.STAFF_UNSAID, encoding='utf-8') as f:
+        lines_unsaid = [x for x in f if x.strip()]
+    yes('W9 an ask made twice is done once', len(lines_unsaid) == 3
+        and store['deleted'].count(5000) == 1)
+finally:
+    for n, v in zip(names, keep):
+        setattr(bot, n, v)
 
 shutil.rmtree(TMP, ignore_errors=True)
 done()

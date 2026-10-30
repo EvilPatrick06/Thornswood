@@ -272,7 +272,6 @@ namespace Thornswood
                 {
                     string moved = Display.MatchScreen();
                     if (moved != null) Log("Set the game to " + moved + " to match your screen. Tick Lock resolution in Settings to stop that.");
-                    Display.ScaleMenus();
                 }
 
                 int held = Enforce.Apply();
@@ -303,16 +302,17 @@ namespace Thornswood
                 }
                 catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
 
-                // The main menu with no Bethesda logo and the notice board's
-                // meshes are made from this machine's own game, never shipped
-                // (#2827, MadeFromGame). Only what is missing or changed is
+                // The main menu with no Bethesda logo, the notice board's
+                // meshes and the mods' menus with no gold values are made from
+                // this machine's own game, never shipped (#2827, #3113,
+                // MadeFromGame). Only what is missing or changed is
                 // written; a game that cannot make them still plays, and the
                 // line says why.
                 try { string made = MadeFromGame.Ensure(); if (made != null) Log(made); }
                 catch (Exception ex)
                 {
                     Swallow.Note("Shell.Play, the files made from the game", ex);
-                    Log("The main menu and the notice board's meshes could not be written (" + ex.Message.TrimEnd('.') + ").");
+                    Log("The files made from your game could not be written (" + ex.Message.TrimEnd('.') + ").");
                 }
 
                 if (!EnsureServer()) return;

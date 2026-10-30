@@ -193,11 +193,20 @@ $allCalls = @($ship.Ast.FindAll({ param($n) $n -is $CmdAst -and $n.GetCommandNam
 # the remirror (Refresh-DevNews.ps1, tests\test-dev-news-refresh.ps1). It is
 # not a remirror and not a launcher step; anything else is a third call.
 $marksCall = @($allCalls | Where-Object { $_.Extent.Text -match "'Refresh-DevNews\.ps1'" })
-$calls = @($allCalls | Where-Object { $_.Extent.Text -notmatch "'Refresh-DevNews\.ps1'" })
+# Since 22 Oct a third, on main only, closes the Done issues the release
+# carries, after the tag, with the commit the release record names
+# (Close-ShippedIssues.ps1, tests\test-3279-close-shipped.ps1, #3279).
+$closeCall = @($allCalls | Where-Object { $_.Extent.Text -match "'Close-ShippedIssues\.ps1'" })
+$calls = @($allCalls | Where-Object { $_.Extent.Text -notmatch "'(Refresh-DevNews|Close-ShippedIssues)\.ps1'" })
 Yes ("  Ship has one Invoke-PostShip call for the remirror ({0})" -f $calls.Count) ($calls.Count -eq 1)
 Yes ("  and one for the dev feed's DEV marks, main only, never on a dry run ({0})" -f $marksCall.Count) (
     $marksCall.Count -eq 1 -and @(Conditions $marksCall[0] | Where-Object { $_ -match '-not \$Dev\b' }).Count -gt 0 -and
     @(Conditions $marksCall[0] | Where-Object { $_ -match '-not \$DryRun\b' }).Count -gt 0)
+Yes ("  and one closing the Done issues it carries, main only, never on a dry run, after the tag ({0})" -f $closeCall.Count) (
+    $closeCall.Count -eq 1 -and @(Conditions $closeCall[0] | Where-Object { $_ -match '-not \$Dev\b' }).Count -gt 0 -and
+    @(Conditions $closeCall[0] | Where-Object { $_ -match '-not \$DryRun\b' }).Count -gt 0 -and
+    $closeCall[0].Extent.Text -match 'Commit = \$tagged\.Commit' -and
+    $closeCall[0].Extent.StartOffset -gt $shipSrc.IndexOf('$tagged = Add-ReleaseTag'))
 $atPublish = $shipSrc.IndexOf("& (Join-Path `$Here 'Publish-Update.ps1') @pubArgs")
 $atNews = $shipSrc.IndexOf("'..\ops\Publish-News.ps1'")
 $atAnnounce = $shipSrc.IndexOf("'..\vps\Request-Restart.ps1'")

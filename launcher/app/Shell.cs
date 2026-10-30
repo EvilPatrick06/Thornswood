@@ -21,7 +21,7 @@ namespace Thornswood
 {
     /// <summary>
     /// The launcher itself: Main, the window, every button, and the Play
-    /// sequence. There is no compiled window class. Run parses tools\ui.xaml,
+    /// sequence. There is no compiled window class. Run parses launcher\ui.xaml,
     /// which Build-Launcher.ps1 embeds in the exe, into a live Window at run
     /// time; Bind finds the named controls in it and Wire attaches every
     /// handler. So this is one static class, not a Window subclass, split
@@ -31,7 +31,7 @@ namespace Thornswood
     /// each of the other classes owns on disk, and every step between the
     /// Play button and the game starting, with the file and line of each.
     /// Whoever changes one of those steps changes that page in the same pull
-    /// request; tools\test-architecture.js fails when the page names a step
+    /// request; tests\test-architecture.js fails when the page names a step
     /// that is gone or out of order.
     /// </summary>
     static partial class Shell
@@ -150,7 +150,7 @@ namespace Thornswood
         static Button btnVoiceTest;
         static TextBlock txtVoiceState;
         static Button btnUninstall, btnServerStart, btnServerStop;
-        static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics;
+        static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics, btnOpenSteam;
         static Popup serverPickPopup;
         static Border serverPickPanel;
         static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, txtServerPickMeta;
@@ -422,13 +422,6 @@ namespace Thornswood
             {
                 string res = Display.MatchScreen();
                 if (res != null) Log("Set the game to " + res + " to match your screen.");
-
-                // Same idea, one layer up: the menus themselves are sized in
-                // pixels, so a tall screen makes the inventory small and the
-                // category icons squeeze together.
-                string menus = Display.ScaleMenus();
-                if (menus != null && menus != "1") Log("Sized the menus up " + menus + "x for this screen.");
-
             }
 
             // The shortcut points at whatever icon file the last build wrote,
@@ -520,10 +513,9 @@ namespace Thornswood
             win.Dispatcher.BeginInvoke(
                 new Action(delegate
                 {
-                    // PlaceLoader runs inside Voice.Start before CreateAsync.
-                    // Menu music must not CreateAsync until that file exists;
-                    // a separate ApplicationIdle item used to run first and
-                    // fail with "Unable to load DLL WebView2Loader.dll".
+                    // The theme starts in the same idle moment, once the
+                    // window is on screen. It plays from this process, not
+                    // from WebView2 (MenuMusic.cs, #3207).
                     Voice.Start(delegate (string m) { Log(m); }, cfg);
                     StartMenuMusic();
                 }),
@@ -759,6 +751,7 @@ namespace Thornswood
             dotServerMain = F<Ellipse>("DotServerMain");
             dotServerDev = F<Ellipse>("DotServerDev");
             btnCheckDiagnostics = F<Button>("BtnCheckDiagnostics");
+            btnOpenSteam = F<Button>("BtnOpenSteam");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
@@ -1291,9 +1284,8 @@ namespace Thornswood
         /// a puzzle rather than a mood. Off entirely when the person has turned
         /// it off in Settings, which is what MusicDecide reads.
         /// </summary>
-        // Menu theme plays through MenuMusic (WebView2 HTML5). WPF MediaPlayer
-        // failed on the ship PC with "Windows Media Player version 10 or later
-        // is required" while Voice's WebView2 still carried audio.
+        // Menu theme plays through MenuMusic, from this process, so the
+        // Windows Volume Mixer lists it under this build's name (#3207).
         static void StartMenuMusic()
         {
             // Not for somebody who opened this from Windows Settings to
@@ -1331,7 +1323,7 @@ namespace Thornswood
             try
             {
                 double vol = Math.Max(0, Math.Min(100, cfg.MusicVolume)) / 100.0;
-                MenuMusic.Start(file, vol, Stamp);
+                MenuMusic.Start(file, vol, cfg.BuildName, Icons.IconFile(), Stamp);
                 MusicDecide();
                 win.StateChanged += delegate { MusicDecide(); };
             }
@@ -1688,6 +1680,48 @@ namespace Thornswood
             label.Text = "By " + by + " (waiting)";
             meta.Children.Add(label);
 
+            // Its smaller copies (#3218), which most screens are shown in its
+            // place once it is accepted, so staff see them before Accept, and
+            // Accept puts out only these.
+            int[] copies = item.Copies ?? new int[0];
+            if (copies.Length > 0)
+            {
+                var said = new TextBlock();
+                said.Style = (Style)win.FindResource("Small");
+                said.TextWrapping = TextWrapping.Wrap;
+                said.Margin = new Thickness(0, 6, 0, 4);
+                said.Text = "Its smaller copies, what most screens show once it is accepted:";
+                meta.Children.Add(said);
+
+                var strip = new StackPanel();
+                strip.Orientation = Orientation.Horizontal;
+                foreach (int width in copies)
+                {
+                    var small = new Border();
+                    small.Width = 120;
+                    small.Height = 68;
+                    small.Margin = new Thickness(0, 0, 8, 0);
+                    small.Background = (Brush)win.FindResource("Line");
+                    small.ClipToBounds = true;
+                    small.ToolTip = "The " + width + " pixel copy";
+                    var smallImg = new Image();
+                    smallImg.Stretch = Stretch.UniformToFill;
+                    RenderOptions.SetBitmapScalingMode(smallImg, BitmapScalingMode.HighQuality);
+                    small.Child = smallImg;
+                    strip.Children.Add(small);
+
+                    int holdWidth = width;
+                    Image holdSmall = smallImg;
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        BitmapImage copy = Gallery.FetchCopy(holdItem, holdWidth);
+                        if (copy == null) return;
+                        win.Dispatcher.BeginInvoke(new Action(delegate { holdSmall.Source = copy; }));
+                    });
+                }
+                meta.Children.Add(strip);
+            }
+
             if (item.Note != null && item.Note.Length > 0)
             {
                 var note = new TextBlock();
@@ -1708,7 +1742,7 @@ namespace Thornswood
             accept.Content = "Accept";
             accept.Padding = new Thickness(14, 6, 14, 6);
             string name = item.Name;
-            accept.Click += delegate { GalleryAccept(name); };
+            accept.Click += delegate { GalleryAccept(name, copies); };
             buttons.Children.Add(accept);
 
             var del = new Button();
@@ -1972,12 +2006,17 @@ namespace Thornswood
             {
                 int ok = 0;
                 string firstBad = "";
+                string firstCopy = "";
                 for (int i = 0; i < paths.Length; i++)
                 {
-                    string bad = Gallery.Submit(paths[i], by, note);
+                    string copyBad;
+                    string bad = Gallery.Submit(paths[i], by, note, out copyBad);
                     if (bad.Length == 0) ok++;
                     else if (firstBad.Length == 0) firstBad = bad;
+                    if (copyBad.Length > 0 && firstCopy.Length == 0) firstCopy = copyBad;
                 }
+                // A smaller copy that did not go (#3218) is said after the rest.
+                string copyNote = firstCopy.Length > 0 ? " " + firstCopy : "";
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (ok == paths.Length)
@@ -1985,16 +2024,16 @@ namespace Thornswood
                         galleryChosenPaths.Clear();
                         PaintGalleryChosen();
                         if (boxGalleryNote != null) boxGalleryNote.Text = "";
-                        SayGallery(ok == 1
+                        SayGallery((ok == 1
                             ? "Sent. It is waiting for staff to Accept it onto the gallery."
-                            : ("Sent " + ok + " pictures. They are waiting for staff to Accept."));
+                            : ("Sent " + ok + " pictures. They are waiting for staff to Accept.")) + copyNote);
                         BuildGalleryPage();
                     }
                     else if (ok > 0)
                     {
                         galleryChosenPaths.Clear();
                         PaintGalleryChosen();
-                        SayGallery("Sent " + ok + " of " + paths.Length + ". " + firstBad);
+                        SayGallery("Sent " + ok + " of " + paths.Length + ". " + firstBad + copyNote);
                         BuildGalleryPage();
                     }
                     else
@@ -2006,12 +2045,13 @@ namespace Thornswood
             });
         }
 
-        static void GalleryAccept(string name)
+        /// <summary>shown is the smaller copies the card showed (#3218).</summary>
+        static void GalleryAccept(string name, int[] shown)
         {
             SayGallery("Accepting " + name + "...");
             ThreadPool.QueueUserWorkItem(delegate
             {
-                string bad = Gallery.Approve(name);
+                string bad = Gallery.Approve(name, shown);
                 win.Dispatcher.BeginInvoke(new Action(delegate
                 {
                     if (bad.Length == 0)
@@ -2203,8 +2243,7 @@ namespace Thornswood
                 if (band != null && picture != null) { picture.Background = headerArt; band.Visibility = Visibility.Visible; }
                 StartHeaderVideo();
             }
-            // Menu music starts from the Voice ApplicationIdle callback after
-            // WebView2Loader.dll is placed (see Voice.Start above).
+            // Menu music starts from the Voice ApplicationIdle callback above.
 
             titleBar.MouseLeftButtonDown += delegate(object s, MouseButtonEventArgs e)
             {
@@ -2326,6 +2365,7 @@ namespace Thornswood
             if (btnServerDev != null) btnServerDev.Click += delegate { CloseServerPick(); SwitchToDev(); };
             if (btnServerMain != null) btnServerMain.Click += delegate { CloseServerPick(); SwitchToMain(); };
             if (btnCheckDiagnostics != null) btnCheckDiagnostics.Click += delegate { ShowPage(PageDiag); };
+            if (btnOpenSteam != null) btnOpenSteam.Click += delegate { OpenSteam(); };
 
             btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
             btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
@@ -2531,7 +2571,15 @@ namespace Thornswood
                 // history to draw rather than one lonely bar.
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
-                if (!playing) return;
+                // Steam starting or closing redraws the Ready card, so it never
+                // says "running" about a Steam that has closed or keeps "Steam
+                // not running" up after Open Steam has started it (#3204).
+                // Nothing else redraws the rows between page changes and scans.
+                if (!playing)
+                {
+                    if (Checks.SteamStillRunning() != steamShown) DrawStatus();
+                    return;
+                }
                 // Asks the game processes the last look found whether they are
                 // still up, and lists the machine's processes only when none is
                 // (#978). Same answer as GameRunning, on the same tick.
@@ -2753,12 +2801,14 @@ namespace Thornswood
             // touched now, so an unchanged pass moves nothing on screen.
             List<Check> checks = Checks.All(cfg);
             bool all = true;
-            int problems = 0;
+            var blocking = new List<Check>();
             foreach (Check c in checks)
             {
                 // An advisory row that fails is drawn amber and leaves Play
                 // alone. See Check.Advisory.
-                if (c.Blocks) { all = false; problems++; }
+                if (c.Blocks) { all = false; blocking.Add(c); }
+                // What the rows now say about Steam, for the tick to compare.
+                if (c.Name == Checks.SteamRow) steamShown = c.Ok;
             }
 
             if (statusList != null)
@@ -2775,7 +2825,7 @@ namespace Thornswood
                     FillStatusRow(statusList.Children[i] as Border, checks[i]);
             }
 
-            UpdateReadySummary(all, problems);
+            UpdateReadySummary(blocking);
 
             // No card here. It said the same thing as the bar above Play, which
             // lives in its own grid row below the scroller, so the two stacked
@@ -3045,12 +3095,20 @@ namespace Thornswood
         /// <summary>
         /// The one line summary of the checklist that sits on the Play page
         /// (#607). Updated in place: it does not flash or re-say itself when the
-        /// count has not changed. The button's own words say why Play is held
+        /// words have not changed. The button's own words say why Play is held
         /// for anything that is not a failing row (an update, a downgrade, the
         /// feed), so this stays about the checks themselves.
+        ///
+        /// A failing pass names the problem in a few words, the first failing
+        /// row's Check.Problem in the order Diagnostics lists them, and how many
+        /// more there are (#3203). It said only "Check Diagnostics", so finding
+        /// out that Steam was closed meant opening another page. Hovering it
+        /// lists every one; the Diagnostics button beside it still opens the
+        /// rows with their details.
         /// </summary>
-        static void UpdateReadySummary(bool all, int problems)
+        static void UpdateReadySummary(List<Check> blocking)
         {
+            bool all = blocking.Count == 0;
             if (dotReady != null)
             {
                 Brush want = Res(all ? "Ok" : "Bad");
@@ -3058,15 +3116,79 @@ namespace Thornswood
             }
             if (txtReadyTitle != null)
             {
-                // Pass: "Everything checks out". Fail: red "Check Diagnostics"
-                // (capital C) and a button that opens the Diagnostics page.
-                string title = all ? "Everything checks out" : "Check Diagnostics";
+                string title = ReadyTitle(blocking);
                 if (txtReadyTitle.Text != title) txtReadyTitle.Text = title;
+                string tip = blocking.Count > 1 ? ReadyList(blocking) : null;
+                if (!Equals(txtReadyTitle.ToolTip, tip)) txtReadyTitle.ToolTip = tip;
                 Brush ink = Res(all ? "Ink" : "Bad");
                 if (!ReferenceEquals(txtReadyTitle.Foreground, ink)) txtReadyTitle.Foreground = ink;
             }
             if (btnCheckDiagnostics != null)
                 btnCheckDiagnostics.Visibility = all ? Visibility.Collapsed : Visibility.Visible;
+            if (btnOpenSteam != null)
+            {
+                // Whenever the Steam row is one of the problems, not only when
+                // it is the first, so "Wrong Skyrim build and 1 more" with Steam
+                // closed still has the button.
+                bool steamDown = false;
+                foreach (Check c in blocking) if (c.Name == Checks.SteamRow) steamDown = true;
+                Visibility want = steamDown ? Visibility.Visible : Visibility.Collapsed;
+                if (btnOpenSteam.Visibility != want) btnOpenSteam.Visibility = want;
+            }
+        }
+
+        /// <summary>
+        /// What the Steam row said when the rows were last drawn. The two
+        /// second tick redraws when Steam's answer differs from it.
+        /// </summary>
+        static bool steamShown;
+
+        /// <summary>
+        /// The Open Steam button on the Ready card, shown while Steam is not
+        /// running (#3204). Opens Steam's own window through its
+        /// steam://open/main link, rather than the tray start Fix makes,
+        /// because whoever presses it wants Steam in front of them to sign
+        /// in. The card turns green by itself once steam.exe is up (the two
+        /// second tick, above).
+        /// </summary>
+        static void OpenSteam()
+        {
+            if (Downgrade.AskSteam("steam://open/main", Log))
+                Log("Opening Steam. Sign in if it asks; the Ready card turns green once Steam is running.");
+            else
+                Log("Steam could not be opened from here. Start Steam yourself, signed in to the account that owns Skyrim.");
+        }
+
+        /// <summary>
+        /// The Ready card's words: "Everything checks out", one problem as its
+        /// row says it ("Steam not running"), or the first and a count
+        /// ("Wrong Skyrim build and 2 more").
+        /// </summary>
+        static string ReadyTitle(List<Check> blocking)
+        {
+            if (blocking.Count == 0) return "Everything checks out";
+            string first = ProblemWords(blocking[0]);
+            if (blocking.Count == 1) return first;
+            return first + " and " + (blocking.Count - 1) + " more";
+        }
+
+        /// <summary>Every failing row's words, one to a line, for the hover.</summary>
+        static string ReadyList(List<Check> blocking)
+        {
+            var lines = new List<string>();
+            foreach (Check c in blocking) lines.Add(ProblemWords(c));
+            return string.Join("\n", lines.ToArray());
+        }
+
+        /// <summary>
+        /// A row's Problem, which every row that can block sets in Checks. A
+        /// row added later without one still says which row it is and what
+        /// it found, rather than nothing.
+        /// </summary>
+        static string ProblemWords(Check c)
+        {
+            if (!string.IsNullOrEmpty(c.Problem)) return c.Problem;
+            return c.Name + ": " + c.Detail;
         }
 
         /// <summary>

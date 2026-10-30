@@ -8,7 +8,7 @@
 
   On 28 Sep the dev door list went from 46 profiles to 28 after Set-Door
   pointed the dev server at https://thornswood.net/dev, which is the design
-  (docs\SYSTEM.md, "The door"; site\server.js, /dev/api/allowed lists only the
+  (SERVER.md in the ops repo, "The door"; site\server.js, /dev/api/allowed lists only the
   people with the dev role). The 46 was the live list: Set-Door -Connect aimed
   at the dev root wrote the live address unless -Site was given. And
   Publish-Server.ps1's step that was meant to give dev the live roster was
@@ -184,6 +184,8 @@ $gm = Get-Content -LiteralPath $gamemode -Raw
 Yes 'the door asks <site>/api/allowed' ($gm.Contains("String(conf.site).replace(/\/+`$/, '') + '/api/allowed'"))
 $js = Get-Content -LiteralPath $siteJs -Raw
 Yes 'the site answers /dev/api/allowed' ($js.Contains("const devDoor = (route === '/dev/api/allowed');"))
-Yes 'and that list is only people with the dev role' ($js.Contains('if (devDoor && !st.dev) continue;'))
+# Since #3317 the dev server lets in the dev build's list (access.devBuild:
+# Owner, Co-Owner, Dev and the leads), not the staff list access.dev.
+Yes 'and that list is only people the dev build is for' ($js.Contains('if (devDoor && !st.devBuild) continue;'))
 
 Done

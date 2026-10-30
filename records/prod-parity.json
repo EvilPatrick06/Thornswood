@@ -1,5 +1,5 @@
 {
-  "about": "What the VPS should look like, read off the repository (docs/SYSTEM.md, scripts/deploy/Caddyfile, site/server.js, voice/README.md, the Install scripts). scripts/vps/Check-ProdParity.ps1 compares Get-ProdFacts.ps1 output against it. Issue #2165. No secret belongs here.",
+  "about": "What the VPS should look like, read off the repository (SERVER.md in the ops repo, scripts/deploy/Caddyfile, site/server.js, voice/README.md, the Install scripts). scripts/vps/Check-ProdParity.ps1 compares Get-ProdFacts.ps1 output against it. Issue #2165. No secret belongs here.",
   "listeners": [
     {
       "proto": "tcp",
@@ -20,7 +20,7 @@
       "port": 22,
       "bind": "public",
       "process": "sshd",
-      "why": "docs/DEPLOY-IDENTITIES.md"
+      "why": "the ops repo's DEPLOY-IDENTITIES.md"
     },
     {
       "proto": "tcp",
@@ -117,19 +117,23 @@
   "tasks": [
     {
       "name": "Thornswood Server",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "Install-ThornswoodServer.ps1, LOCAL SERVICE, Limited, with a SID of its own (#2578, ServiceAccount.ps1); the live task moves with the first live Publish-Server since #2578"
     },
     {
       "name": "Thornswood Dev Server",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "vps-dev-instance.ps1 and Publish-Server.ps1 -Channel dev, LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Voice",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "Install-Voice.ps1, LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Dev Voice",
-      "user": "SYSTEM"
+      "user": "LOCAL SERVICE",
+      "why": "Install-Voice.ps1 -TaskName 'Thornswood Dev Voice', LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Docs",
@@ -137,26 +141,29 @@
     },
     {
       "name": "Thornswood Web",
-      "user": "SYSTEM",
+      "user": "LOCAL SERVICE",
       "triggers": [
         "Boot"
-      ]
+      ],
+      "why": "Setup-Domain.ps1, Caddy as LOCAL SERVICE, Limited, with a SID of its own (#2578)"
     },
     {
       "name": "Thornswood Watch",
-      "user": "SYSTEM"
+      "user": "SYSTEM",
+      "why": "Watch-Services.ps1 -Install, every five minutes as SYSTEM, by design: it restarts and reads services and tasks of every other account (#2578, the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Backup",
-      "user": "SYSTEM",
+      "user": "LOCAL SERVICE",
       "triggers": [
         "Daily"
-      ]
+      ],
+      "why": "Install-Backup.ps1, LOCAL SERVICE, Limited, with a SID of its own, read on the folders it backs up (#2612, #2836)"
     },
     {
       "name": "Thornswood Load",
       "user": "SYSTEM",
-      "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061)"
+      "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061), by design: it reads the processes of every other account (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
       "name": "Thornswood Disk History",
@@ -164,17 +171,31 @@
       "triggers": [
         "Daily"
       ],
-      "why": "scripts/vps/Forecast-Storage.ps1 -Install, one disk sample a day at 04:00 as SYSTEM, and the forecast told to staff when it turns (#2178)"
+      "why": "scripts/vps/Forecast-Storage.ps1 -Install, one disk sample a day at 04:00 as SYSTEM, and the forecast told to staff when it turns (#2178), by design: it writes into the watchdog's folder and outbox (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
-      "name": "Thornswood Maint Update",
+      "name": "Thornswood Runner Logs",
       "user": "SYSTEM",
-      "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1"
+      "triggers": [
+        "Daily"
+      ],
+      "why": "scripts/vps/Keep-RunnerLogs.ps1 -Install, daily at 4:30 AM as SYSTEM (#3184), by design: it removes old logs from every runner account's _diag folder (the ops repo's DEPLOY-IDENTITIES.md section 8)"
     },
     {
-      "name": "Thornswood Dev Crash Capture",
+      "name": "Thornswood Bridge",
+      "user": "LOCAL SERVICE",
+      "triggers": [
+        "Boot"
+      ],
+      "why": "scripts/deploy/Install-Bridge.ps1, the box's end of ssh, LOCAL SERVICE, Limited, with a SID of its own (#2891, #2578)"
+    },
+    {
+      "name": "Thornswood Gate",
       "user": "SYSTEM",
-      "why": "dev crash capture task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1"
+      "triggers": [
+        "Boot"
+      ],
+      "why": "scripts/deploy/Install-Gate.ps1, from boot as SYSTEM (#2841): the deploy gate's broker, which runs only the verbs of scripts/vps/gate/verbs.json, each a script of main, and those reach the box as Administrator over loopback because the deploys' box halves need administrator (the ops repo's DEPLOY-IDENTITIES.md sections 2a and 9)"
     }
   ],
   "services": [
@@ -216,5 +237,153 @@
     "THORNSWOOD_VOICE_AUTH"
   ],
   "certMinDays": 14,
+  "inboundRulesAbout": "Every enabled inbound Allow firewall rule the box keeps, by its Name or DisplayName (#3807). scripts/vps/Set-InboundRules.ps1 turns off every other one, and Check-ProdParity.ps1 marks one outside this list for review. required: the rule must be there and on, or Set-InboundRules refuses to turn anything off. Not on the list, so off: WinRM, the old SkyMP copies of the game rules, Teredo, IP-HTTPS and IPv6-in-IPv4 tunnels, Delivery Optimization, DIAL, Cast to Device, AllJoyn, mDNS, Media Foundation and the Store apps' rules.",
+  "inboundRules": [
+    {
+      "rule": "Thornswood game (UDP)",
+      "required": true,
+      "why": "live game, UDP 7777 from anybody: the game connects straight to the box (Bootstrap-VPS.ps1)"
+    },
+    {
+      "rule": "Thornswood game (TCP)",
+      "required": true,
+      "why": "live game, TCP 7777 (Bootstrap-VPS.ps1)"
+    },
+    {
+      "rule": "Thornswood resources (TCP)",
+      "required": true,
+      "why": "live resources, TCP 3000 (Bootstrap-VPS.ps1)"
+    },
+    {
+      "rule": "Thornswood Dev game (UDP)",
+      "required": true,
+      "why": "dev game, UDP 7787 (vps-dev-instance.ps1)"
+    },
+    {
+      "rule": "Thornswood Dev game (TCP)",
+      "required": true,
+      "why": "dev game, TCP 7787 (vps-dev-instance.ps1)"
+    },
+    {
+      "rule": "Thornswood Dev resources (TCP)",
+      "required": true,
+      "why": "dev resources, TCP 7788 (vps-dev-instance.ps1)"
+    },
+    {
+      "rule": "Thornswood Web 80",
+      "required": true,
+      "why": "Caddy, only from Cloudflare's ranges (Setup-Domain.ps1, Set-WebFirewall.ps1, #2995)"
+    },
+    {
+      "rule": "Thornswood Web 443",
+      "required": true,
+      "why": "Caddy, only from Cloudflare's ranges (Setup-Domain.ps1, Set-WebFirewall.ps1, #2995)"
+    },
+    {
+      "rule": "Thornswood Voice",
+      "required": false,
+      "why": "made by Install-Voice.ps1 only when live voice answers every interface; on loopback (the default since #1304) it takes the rule away"
+    },
+    {
+      "rule": "Thornswood Dev Voice",
+      "required": false,
+      "why": "made by Install-Voice.ps1 only when dev voice answers every interface, as above"
+    },
+    {
+      "rule": "Thornswood Docs",
+      "required": false,
+      "why": "made by Deploy-Docs.ps1 only with THORNSWOOD_DOCS_EXPOSE=1; otherwise it takes the rule away (#2185)"
+    },
+    {
+      "rule": "OpenSSH-Server-In-TCP",
+      "required": false,
+      "why": "sshd on 22, only from 127.0.0.1 so only the bridge (Set-SshScope.ps1 owns every port 22 rule)"
+    },
+    {
+      "rule": "OpenSSH TCP 22",
+      "required": false,
+      "why": "an older ssh rule made by hand, scoped with the one above to 127.0.0.1 by Set-SshScope.ps1, the only script that changes port 22 rules"
+    },
+    {
+      "rule": "CoreNet-DHCP-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: DHCP answers"
+    },
+    {
+      "rule": "CoreNet-DHCPV6-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: DHCPv6 answers"
+    },
+    {
+      "rule": "CoreNet-ICMP4-DUFRAG-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: fragmentation needed, for path MTU"
+    },
+    {
+      "rule": "CoreNet-ICMP6-DU-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: destination unreachable"
+    },
+    {
+      "rule": "CoreNet-ICMP6-PTB-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: packet too big, for path MTU"
+    },
+    {
+      "rule": "CoreNet-ICMP6-TE-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: time exceeded"
+    },
+    {
+      "rule": "CoreNet-ICMP6-PP-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: parameter problem"
+    },
+    {
+      "rule": "CoreNet-ICMP6-NDS-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: neighbor discovery"
+    },
+    {
+      "rule": "CoreNet-ICMP6-NDA-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: neighbor discovery"
+    },
+    {
+      "rule": "CoreNet-ICMP6-RA-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: router advertisement, from link-local only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-RS-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: router solicitation"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LQ-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener query, local subnet only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LR-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener report, local subnet only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LR2-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener report v2, local subnet only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LD-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener done, local subnet only"
+    },
+    {
+      "rule": "CoreNet-IGMP-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast group membership"
+    }
+  ],
   "intentional": []
 }

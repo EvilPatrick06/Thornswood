@@ -59,10 +59,6 @@
                              The pieces are references in the world, so the
                              register goes aside with it, or a fresh world
                              would stand last world's furniture again.
-    data\property.json and data\farm-claims.json, where both were until
-                             25 September (issue #541: data is served to
-                             anybody), so a wipe on a server still running
-                             the older gamemode takes them too.
 
   The first two were here from the start. property.json and farm-claims.json
   were added on 21 September: without them a fresh world would have come up
@@ -93,13 +89,18 @@
   deletes it. The fresh world hands those form ids to new characters, which
   is why it is written before that start and not left to chance. A server
   whose move did not finish gets no list. Season, the benches and the door
-  are the server's, not anybody's.
+  are the server's, not anybody's, and so are the world stage
+  (private\war.json, #513) and the company's terms
+  (private\company-terms.json, #2695): both name nobody, because who moved
+  or changed them is in the staff log (#2860, #2687).
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
-  The old storage sits beside the new one until you decide it can go, which
-  means a wipe you regret at midnight is a rename away from being undone
-  instead of gone.
+  The old storage sits beside the new one for 30 days, which means a wipe you
+  regret at midnight is a rename away from being undone instead of gone. Then
+  the game server's server-log.js deletes it, by the date in its name, and
+  says so in server.log (#3620, Patrick's B: the privacy page says a
+  character is kept until a wipe, and the copy is a character too).
 
   Why a wipe is on the table at all: taking a plugin out of the middle of the
   load order shifts the index of every plugin below it, and SkyMP turns a form
@@ -114,6 +115,14 @@
 
     .\Wipe-Saves.ps1          asks
     .\Wipe-Saves.ps1 -Yes     does not ask
+
+  -Server dev or -Server main wipes only that server: the folder whose
+  server-settings.json says thornswoodServer is that name (Deploy-DevGamemode
+  writes dev, Deploy-Gamemode main). Without it every server on the box goes,
+  as before. Added for #3078, where Patrick chose to wipe dev and leave main
+  to its next wipe:
+
+    .\Wipe-Saves.ps1 -Server dev
 
   Read-Host reads the console rather than standard input, so a wipe run from a
   script or from an agent cannot answer the question however it is fed: it comes
@@ -130,6 +139,10 @@ param(
   # parameter that no longer decides anything is worse than no parameter: it
   # reads like it works.
   [switch]$NoPause,
+  # Only the server whose settings name it (thornswoodServer); every one when
+  # left out. See the header.
+  [ValidateSet('', 'dev', 'main')]
+  [string]$Server = '',
   # Skip the typed confirmation. The list of what would go is still printed
   # first, so an unattended run still leaves a record of exactly what it took.
   [switch]$Yes
@@ -166,8 +179,7 @@ $Moves = @('world', 'private\characters.json', 'private\property.json', 'private
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
            'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
-           'private\deleted-characters.json',
-           'data\property.json', 'data\farm-claims.json')
+           'private\deleted-characters.json')
 # The release parts (game\gamemode.js PARTS) whose registers are all in
 # $Moves, so a fresh start has nothing of anybody's in them: the new release
 # list marks them done and only 'merchants', the ledger a wipe keeps, waits.
@@ -216,6 +228,13 @@ foreach (`$t in (Get-ScheduledTask -EA SilentlyContinue)) {
 }
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
+  # Which server this is, as its own settings say (-Server). Settings that
+  # cannot be read are said, with why, so -Server never guesses past them.
+  try {
+    'NAME|' + `$r + '|' + [string]((Get-Content (Join-Path `$r 'server-settings.json') -Raw | ConvertFrom-Json).thornswoodServer)
+  } catch {
+    'NAMEERR|' + `$r + '|' + ("`$(`$_.Exception.Message)" -replace '[|\r\n]', ' ')
+  }
   if (`$taskOf.ContainsKey(`$r)) { 'TASK|' + `$r + '|' + `$taskOf[`$r] } else { 'NOTASK|' + `$r }
   foreach (`$n in @($movesLit)) {
     `$p = Join-Path `$r `$n
@@ -243,10 +262,30 @@ foreach (`$r in `$roots) {
 $roots  = @()
 $taskOf = @{}
 $items  = @()
+# -Server: which folders are that server, read before anything is listed, so
+# the list says only what this run takes. Every line after a ROOT line is that
+# root's, until the next.
+$nameOf = @{}
+foreach ($l in $lines) {
+  $bits = "$l" -split '\|'
+  if ($bits[0] -eq 'NAME') { $nameOf[$bits[1]] = $bits[2] }
+  if ($bits[0] -eq 'NAMEERR') {
+    # Unreadable settings could be the server asked for, so -Server stops
+    # rather than leave it; with no -Server every folder goes anyway.
+    if ($Server) { Die "The server settings at $($bits[1]) could not be read ($($bits[2])), so it is not known whether that folder is $Server. Nothing was wiped." }
+    Say "  the server settings at $($bits[1]) could not be read ($($bits[2]))" 'Yellow'
+  }
+}
+$keep = $true
 foreach ($l in $lines) {
   $s = "$l"
   if ($s -eq 'NOROOT') { Die 'No server-settings.json anywhere under C:\ on that machine, so there is no server to wipe.' }
   $bits = $s -split '\|'
+  if ($bits[0] -eq 'ROOT') {
+    $keep = (-not $Server) -or ($nameOf[$bits[1]] -eq $Server)
+    if (-not $keep) { Say "  server at $($bits[1]) is not $Server, so it is left as it is" 'DarkGray'; continue }
+  }
+  if (-not $keep) { continue }
   switch ($bits[0]) {
     'ROOT'   { $roots += $bits[1]; Say "  server at $($bits[1])" 'DarkGray' }
     'TASK'   { $taskOf[$bits[1]] = $bits[2]; Say ("    run by the '{0}' task" -f $bits[2]) 'DarkGray' }
@@ -256,6 +295,7 @@ foreach ($l in $lines) {
     'NONE'  { Say ("  not there: {0}" -f $bits[1]) 'DarkGray' }
   }
 }
+if ($Server -and -not $roots.Count) { Die "No server on that machine says thornswoodServer is $Server in its server-settings.json, so nothing was wiped." }
 if ($items.Count -eq 0) { Die 'Nothing to wipe. Either it is already empty or the paths moved.' }
 
 # ------------------------------------------------------------------- ask it ---
@@ -399,6 +439,7 @@ foreach ($l in $out) { Say "  $l" 'DarkGray' }
 
 Head 'Done'
 Say '  The old storage is beside the new one with today''s date on it.' 'Green'
-Say '  Leave it a week. Clean-Everything.ps1 will offer it once you are sure.' 'DarkGray'
+Say '  The game server deletes it 30 days from today and says so in server.log;' 'DarkGray'
+Say '  until then it can be put back, as RESTORING.md in the ops repo says.' 'DarkGray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

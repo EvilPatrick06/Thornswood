@@ -86,6 +86,8 @@ try {
   Yes 'read back there, it asks what the repository says' (
     $S2.Site -eq $S.Site -and $S2.VpsAddress -eq $S.VpsAddress -and $S2.NexusSlug -eq $S.NexusSlug -and $S2.Repo -eq $S.Repo -and
     @($S2.Feeds).Count -eq 2 -and @($S2.Feeds)[1].Url -eq @($S.Feeds)[1].Url -and $S2.StaffChannel -eq $S.StaffChannel)
+  Yes 'Cloudflare''s ranges go there from cloudflare-ranges.txt and read back whole (#2995)' (
+    @($S.FrontRanges).Count -ge 10 -and (@($S2.FrontRanges) -join ',') -eq (@($S.FrontRanges) -join ',') -and @($S.FrontRanges)[0] -eq '173.245.48.0/20')
   $wf = ''
   if (Test-Path -LiteralPath (Join-Path $pub '.github/workflows/watch-outside.yml')) { $wf = Get-Content -LiteralPath (Join-Path $pub '.github/workflows/watch-outside.yml') -Raw }
   Yes 'the workflow runs every five minutes' ($wf -match "cron: '\*/5 \* \* \* \*'")
@@ -101,6 +103,7 @@ try {
 
   # Fixed values from here on, so nothing below depends on what the repository says.
   $S.VpsAddress = '192.0.2.10'
+  $S.FrontRanges = @('104.16.0.0/13', '172.64.0.0/13', '2606:4700::/32')
 
   # ---- the fakes ------------------------------------------------------------
   $HookUrl = 'https://discord.com/api/webhooks/123456/SECRETHOOKTOKEN_abc'
@@ -118,7 +121,9 @@ try {
     $script:certEnd = $script:clock.ToUniversalTime().AddDays(60)
     $script:certProblems = 'None'
     $script:certError = ''
-    $script:dns = @('192.0.2.10')
+    $script:dns = @('104.21.5.10', '172.67.130.5')
+    $script:cfCode = 200
+    $script:cfBody = '{"result":{"ipv4_cidrs":["104.16.0.0/13","172.64.0.0/13"],"ipv6_cidrs":["2606:4700::/32"]},"success":true}'
     $script:rdap = 200
     $script:rdapEnd = '2027-09-15T01:11:45Z'
     $script:runner = 'online'
@@ -144,6 +149,7 @@ try {
       if ($script:rdap -ne 200) { return @{ Code = $script:rdap; Body = ''; Error = $(if ($script:rdap) { '' } else { 'did not answer within 20 seconds' }) } }
       return @{ Code = 200; Body = ('{"events":[{"eventAction":"expiration","eventDate":"' + $script:rdapEnd + '"}]}'); Error = '' }
     }
+    if ($url -eq 'https://api.cloudflare.com/client/v4/ips') { return @{ Code = $script:cfCode; Body = $script:cfBody; Error = $(if ($script:cfCode) { '' } else { 'did not answer within 20 seconds' }) } }
     if ($url -eq 'https://api.nexusmods.com/v2/graphql') { $script:nexusQuery = $body; return @{ Code = 200; Body = $script:nexus; Error = '' } }
     if ($url -eq $HookUrl -and $method -eq 'GET') { return @{ Code = $script:hookCode; Body = $script:hookBody; Error = '' } }
     return @{ Code = 0; Body = ''; Error = 'not in the table' }
@@ -185,7 +191,7 @@ try {
   # ---- everything fine ----------------------------------------------------
   Reset-World
   $r = Pass-Once
-  Yes 'a healthy world: every check ran, eight of them' ($r.Count -eq 8)
+  Yes 'a healthy world: every check ran, nine of them' ($r.Count -eq 9)
   Yes 'a healthy world: nothing is wrong and nothing could not be checked' (@($r.Values | Where-Object { $_.Bad -or $_.Unknown }).Count -eq 0)
   Yes 'a healthy world: nothing is posted' ($script:posted.Count -eq 0)
   Yes 'Nexus was asked for the collection from Config.cs' ($script:nexusQuery -match $S.NexusSlug)
@@ -360,12 +366,29 @@ try {
   Reset-World
 
   # ---- the address, the feed, the domain, Nexus ------------------------------
+  Yes 'the name through Cloudflare''s proxy is right (#2995)' (-not (Check-Dns $S).Bad -and (Check-Dns $S).Line -match '104\.21\.5\.10, 172\.67\.130\.5, Cloudflare''s')
+  $script:dns = @('2606:4700:3031::6815:50a')
+  Yes '  an IPv6 address of Cloudflare''s is right too' (-not (Check-Dns $S).Bad)
+  $script:dns = @('192.0.2.10')
+  Yes 'the name straight at the VPS, the proxy off, is wrong and says so' ((Check-Dns $S).Bad -and (Check-Dns $S).Why -match 'that is the VPS itself, with the proxy off')
   $script:dns = @('203.0.113.5')
-  Yes 'the name pointing elsewhere is wrong' ((Check-Dns $S).Bad -and (Check-Dns $S).Why -match '203\.0\.113\.5')
-  $script:dns = @('192.0.2.10', '203.0.113.5')
-  Yes 'the name pointing at the VPS and somewhere else is wrong' ((Check-Dns $S).Bad)
+  Yes 'the name pointing elsewhere is wrong' ((Check-Dns $S).Bad -and (Check-Dns $S).Why -match '203\.0\.113\.5 is not Cloudflare''s')
+  $script:dns = @('104.21.5.10', '203.0.113.5')
+  Yes 'the name pointing at Cloudflare and somewhere else is wrong' ((Check-Dns $S).Bad)
   $script:dns = @()
   Yes 'the name not resolving is wrong' ((Check-Dns $S).Bad)
+  $keep = $S.FrontRanges; $S.FrontRanges = @(); $script:dns = @('104.21.5.10')
+  Yes 'no list of ranges to compare with is could not check' ((Check-Dns $S).Unknown)
+  $S.FrontRanges = $keep
+  Reset-World
+  Yes 'Cloudflare''s ranges matching ours is right' (-not (Check-Ranges $S).Bad -and (Check-Ranges $S).Line -match 'the 3 ranges match')
+  $script:cfBody = '{"result":{"ipv4_cidrs":["104.16.0.0/13","172.64.0.0/13","198.51.100.0/22"],"ipv6_cidrs":[]},"success":true}'
+  $c = Check-Ranges $S
+  Yes 'a range Cloudflare added and one it dropped are wrong, each named' ($c.Bad -and $c.Why -match 'new 198\.51\.100\.0/22' -and $c.Why -match 'no longer listed 2606:4700::/32')
+  $script:cfCode = 0
+  Yes 'Cloudflare''s API not answering is could not check' ((Check-Ranges $S).Unknown -and -not (Check-Ranges $S).Bad)
+  $script:cfCode = 200; $script:cfBody = '{"success":false,"result":null}'
+  Yes 'an answer without the ranges is could not check' ((Check-Ranges $S).Unknown)
   Reset-World
   $feedDef = @($S.Feeds)[0]
   $script:feedBody = '<html>not a feed</html>'
@@ -391,15 +414,15 @@ try {
   $script:hookFails = $true
   $script:dns = @('203.0.113.5')
   $null = Pass-Once; $null = Pass-Once
-  Yes 'webhook failing: the message waits in the outbox' ((Get-Content -LiteralPath $P.Alerts -Raw) -match 'does not point at the VPS')
+  Yes 'webhook failing: the message waits in the outbox' ((Get-Content -LiteralPath $P.Alerts -Raw) -match 'does not point at Cloudflare')
   Yes 'and nothing was counted as posted' (-not (Test-Path -LiteralPath $P.Sent) -or -not ((Get-Content -LiteralPath $P.Sent -Raw) -match '-dns-down'))
   $log = Get-Content -LiteralPath $P.Log -Raw
   Yes 'watch.log says it could not post, once' (([regex]::Matches($log, 'could not post outside-\d+-dns-down')).Count -eq 1)
   $script:hookFails = $false
   $null = Pass-Once
-  Yes 'webhook working again: the waiting message is posted' ((Posted '*does not point at the VPS*') -eq 1)
+  Yes 'webhook working again: the waiting message is posted' ((Posted '*does not point at Cloudflare*') -eq 1)
   $null = Pass-Once
-  Yes 'and only once' ((Posted '*does not point at the VPS*') -eq 1)
+  Yes 'and only once' ((Posted '*does not point at Cloudflare*') -eq 1)
   Reset-World
   $null = Pass-Once; $null = Pass-Once
   Clear-Posted

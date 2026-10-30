@@ -2,11 +2,11 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 19 October 2026.
+Last changed: 26 October 2026.
 
-Thornswood is a free fan project run by two people. It is not a company. This
-page is written plainly rather than legally, and it is meant to be the whole
-truth rather than the minimum.
+Thornswood is a free fan project run by a small team in their own time. It is
+not a company. This page is written plainly rather than legally, and it is
+meant to be the whole truth rather than the minimum.
 
 The operators are primarily based in Colorado, United States. Thornswood is
 aimed at adults in North and South America. Privacy questions and requests
@@ -19,9 +19,11 @@ support tickets.
   roles you have. Nothing else from your Discord account.
 - Playing sends the server your character, where it is and what it does, and
   what you type in chat.
-- Voice is carried between people and is not recorded.
+- Voice goes straight from one launcher to another and is not recorded, so the
+  people in a voice room see each other's internet address (below).
 - Ask for deletion in the Discord and it is done.
-- There is no advertising tag and no analytics on this site.
+- There is no advertising tag on this site. Cloudflare counts how often each
+  page is opened and how fast it loads, with no cookie (below).
 
 ## What is stored, and why
 
@@ -47,8 +49,8 @@ what you have built and claimed, and the ranks you have earned. That is the
 character, and without it there is nothing to log back into.
 
 **What you say in chat.** Kept so that a report of something that happened has
-something behind it other than one person's word. If you would not want a
-moderator to read it, do not type it in a shared channel.
+something behind it other than one person's word. If you would not want staff
+to read it, do not type it.
 
 **Reports and calls for help.** /helpme and /report in the game, and a report
 about a person on the site's report page, keep who sent it, who it is about,
@@ -80,12 +82,19 @@ the game: which mods are installed, what failed to start, which version you
 are on. It is how somebody who cannot play gets helped without a conversation.
 
 **Gallery submissions.** The picture or recording, your signed-in account,
-the name for its caption and any note for staff are kept for review. Only
-approved submissions appear publicly. Their caption and media then become
-public too. Submit only material you have permission to share, without
-private information about other people. Ask in the Discord to have a
-submission removed. Removing one deletes its file from the site. See
-[Terms](/terms) for publication permissions.
+the name for its caption and any note for staff are kept for review. A
+picture or recording can also say inside the file where it was taken (a
+phone or camera often writes the GPS position), when, and with which camera
+or program. The site takes all of that out as the file arrives, so none of
+it is kept or shown. Of the file, only the picture or recording itself is
+kept, with its colours and which way up it is shown. Only approved
+submissions appear publicly. Their caption and media then become public too.
+With a picture, your browser or the launcher also sends smaller copies of
+it, which are shown in its place on smaller screens and deleted with it.
+Submit only material you have permission to share, without private
+information about other people. Ask in the Discord to have a submission
+removed. Removing one deletes its file from the site. See [Terms](/terms)
+for publication permissions.
 
 ## What is not stored
 
@@ -93,28 +102,63 @@ submission removed. Removing one deletes its file from the site. See
   payment side and Thornswood never sees a card.
 - No voice recording. Voice is passed between the people in the room and
   nothing keeps a copy.
-- No advertising or analytics tag on this site. There was a Google Ads tag
-  until 23 September 2026 and it was removed.
+- No advertising tag on this site. There was a Google Ads tag until 23
+  September 2026 and it was removed.
+- No cookie or anything else kept on your machine for counting visits.
+  Cloudflare's page counts, below, need none.
 
 ## What leaves this site anyway
 
 Honesty about the things a page does by existing:
 
+- **Voice** connects each launcher in a voice room straight to every other one
+  in it, machine to machine, with nothing in between. To make that connection
+  each launcher hands the others its internet address, the public one and the
+  one on your own network, so everybody with voice on in that room can read
+  yours from their own launcher. The voice service only introduces them, and
+  keeps no copy of what is said.
+
 - **Discord** is where sign-in happens, so signing in tells Discord that you
   signed in here.
 - **Launcher updates** are fetched from Thornswood's own site.
+- **Cloudflare** carries every connection to this site, and to voice, on
+  its way to our server, which answers nobody else. Like any network
+  between you and us it sees your address and what you ask for, and it
+  keeps its own records under
+  [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/).
+- **Cloudflare Web Analytics.** Since 22 October 2026 Cloudflare adds one
+  small script to each page on its way to you, from
+  static.cloudflareinsights.com. It reports that the page was opened, which
+  page, the page that sent you there, the kind of browser and device, and
+  how long the page took to load. It sets no cookie and keeps nothing on
+  your machine, and Cloudflare does not use it to follow anybody from site
+  to site. Thornswood sees only totals: how many visits each page had, from
+  which countries, and how fast it loaded. Blocking cloudflareinsights.com
+  in your browser stops it and changes nothing else on the site.
+- **Cloudflare Turnstile**, on the report page only, since October 2026.
+  It is the check under the form that a person, not a script, is sending
+  the report. It loads from challenges.cloudflare.com when the report page
+  opens and looks at the browser, not at anything typed into the form.
+  When the report is sent, this site asks Cloudflare whether the check
+  passed, with your address, and keeps only the report. What Cloudflare
+  does with what it sees is in the
+  [Turnstile privacy addendum](https://www.cloudflare.com/turnstile-privacy-policy/).
+  Blocking challenges.cloudflare.com stops the report form from sending;
+  /report in the game and a ticket in the Discord still reach staff.
 
-Opening a page on this site loads nothing from anybody else. The fonts came
-from Google and a markdown renderer from cdnjs until 24 September 2026, and
-both are served from here now.
+Apart from Cloudflare's analytics script and Turnstile, opening a page on this
+site loads nothing from anybody else. The fonts came from Google and a markdown renderer from cdnjs
+until 24 September 2026, and both are served from here now.
 
 ## How long it is kept
 
 - **Sign-in records**, the only thing on the site holding your address, are
   deleted after 30 days. The address is the one your connection reached the
   site from, as our own front door saw it, not anything your browser claims
-  about itself. That is enforced by the site rather than promised:
-  old rows go whenever the log is written or read.
+  about itself. Cloudflare carries the connection the last step, and the
+  front door takes the address from Cloudflare only when the connection
+  really comes from Cloudflare. That is enforced by the site rather than
+  promised: old rows go whenever the log is written or read.
 
 - **The game server's log** records the address each connection to the game
   came from, beside the Discord account it signed in as. It keeps nothing
@@ -133,7 +177,10 @@ both are served from here now.
   they change, this line changes with them.
 
 - **Your character** is kept until you ask for it to be deleted, or until a
-  wipe, which is announced first.
+  wipe, which is announced first. A wipe, a character reset or putting a
+  backup back leaves the characters it replaced set aside on the server for
+  30 days, so it can be undone, and then deleted. The server checks every
+  hour.
 - **Launcher logs** are kept for 365 days, like session records, unless staff
   mark the session kept.
 - **A gallery submission that is removed** has its file deleted then. One
@@ -149,7 +196,11 @@ both are served from here now.
   and it stays in the Discord, closed, for 365 days, then the bot deletes it.
   A ticket nobody closes is closed by Discord after a week with nothing said
   in it, and goes 365 days after that. Opening a ticket again starts its 365
-  days over when it next closes. The bot checks every hour.
+  days over when it next closes. Each time a ticket is closed, the bot writes
+  a line in a staff only ticket log naming the ticket, which carries your
+  name in Discord, and a ticket whose private thread cannot be opened goes
+  into that log whole instead. Each of those goes 365 days after it was
+  written. The bot checks every hour.
 - **Your answer to the rules** is kept for as long as your account is here,
   because it is the record that you agreed to them, and goes with the rest
   of your account when you ask for that to be deleted.
@@ -176,11 +227,15 @@ both are served from here now.
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the
 operator's computer are kept for 30 days, with at least seven retained for
-recovery. These are private recovery copies, not public downloads. Removing
+recovery. A whole copy of the server taken by hand, before moving it to a
+new machine, is encrypted the same way and kept on the operator's computer
+for 30 days. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
 retention schedule. The game server's log is not in them. Staff must
 reapply completed deletion requests before putting an older backup back
-into service.
+into service. What putting a backup back replaces (the site's records and
+uploads, the bot's join numbers, characters) is set aside on the server for
+30 days, so it can be undone, and then deleted.
 
 ## Deleting it
 
@@ -197,20 +252,29 @@ Discord message. Do not send a government identity document.
 
 What deletion means here: your Discord link, your session records, your chat,
 your character, your answer to the rules, the applications and calls for
-help you sent, your gallery pictures and your join number. What cannot be undone is something you said that somebody
+help you sent through the site, your gallery pictures and your join number.
+A ticket in the Discord, and the bot's lines about it in the staff ticket
+log, are not deleted by a request: each stays until its 365 days above are
+up, because it is the record of what you were told. What cannot be undone is something you said that somebody
 else has already quoted in a report, because that now belongs to the report.
 Staff's own records stay for the same reason: a ban, a note, a character
 killed for good, a report you made or one made about you, a line in a staff
 log, and a session staff marked kept because a report rests on it. A request
 does not delete them, and they still go when their time above is up. A completed request is written down
 with your Discord id and character numbers and nothing else, so that an older
-backup put back into service has you removed again first.
+backup put back into service has you removed again first. Until every game
+server has removed your character, the site also keeps its character numbers
+and nothing else, so that a server that has not restarted yet cannot put it
+back.
 
 ## Who can see it
 
-The two people who run Thornswood, and moderators for the parts moderation
-needs. Nothing is sold, shared or handed to anybody else, and there is nobody
-to hand it to.
+The Owner, the Co-Owner and the Dev rank, who run the site and the servers,
+can see all of it, chat and session records included. The other staff ranks
+see the parts their job needs: the staff who work in the world (Gamemasters
+and Loremasters) see the staff records and the gallery queue, and calls for
+help and reports reach staff in the Discord's staff channels. Nothing is sold,
+shared or handed to anybody else, and there is nobody to hand it to.
 
 ## Children
 
@@ -225,17 +289,9 @@ be said in the Discord rather than quietly edited.
 
 ## Cookies
 
-These cookies make the site and the age gate work. They are not advertising and they are not analytics.
-
-- **twa**. Signed Discord identity cookie for signed-in accounts, lasting up to 30 days. HttpOnly. Staff permissions are checked from roles, not granted by the cookie alone. Cleared on sign-out.
-- **twst_***. One-use security cookies for a Discord sign-in, lasting ten minutes and scoped to `/auth/discord`. HttpOnly. Cleared when sign-in returns.
-- **tw**. Fallback member-password cookie when Discord sign-in is not configured, lasting up to one year. HttpOnly. Ignored when Discord is configured; cleared on sign-out.
-- **tw-age-18**. Records that this browser stated eighteen or older. The cookie and the localStorage copy both last one year, and both ask again if the gate's wording changes what you agreed to. Not HttpOnly. Clearing site storage means the gate asks again. This is not verified age.
-
-Sign-in cookies use SameSite=Lax and Secure when served over HTTPS. See the
-[cookie policy](/cookies) for their purposes and how to clear them.
-
-There is no advertising cookie and no analytics cookie on this site. A longer list of what is stored about play (Discord id, character, chat, launcher logs) is in the sections above.
+The cookies and browser storage this site uses, what each is for and how long
+it lasts, are on the [cookie page](/cookies). None of them is for advertising
+or for counting visits.
 
 ## Asking about any of this
 

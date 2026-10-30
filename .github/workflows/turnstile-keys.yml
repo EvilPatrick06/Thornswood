@@ -1,0 +1,77 @@
+# Seals the Cloudflare token for the report form's Turnstile check to the
+# box's key, for scripts/deploy/Set-Turnstile.ps1 -FromCloudflare (#3216,
+# Patrick's A of 22 Oct 2026).
+#
+# WHY. The site needs the Turnstile widget's secret in its config.json on the
+# box. The Desk, a Claude session, refused to read it through the Cloudflare
+# connector, because a live secret would then sit in its transcript. Patrick
+# instead made a Cloudflare API token that can only read Turnstile widgets
+# (Account > Turnstile > Read) and pasted it once into the repository's
+# Actions secrets as CLOUDFLARE_TURNSTILE_TOKEN, a page only he signs in to.
+#
+# HOW. Set-Turnstile.ps1 -FromCloudflare has the box print the public half of
+# its seal key (scripts/vps/Seal.ps1) and starts this workflow on main with
+# it. This job seals the token to that key (RSA-OAEP) and leaves only the
+# sealed form, as an annotation titled Turnstile. Set-Turnstile.ps1 reads the
+# annotation and hands the sealed form to the box, which alone can open it,
+# asks Cloudflare for the widget's secret with the token, and writes the keys.
+# The token is in plain form only in this job's process and on the box; no
+# log, annotation or session ever holds it.
+#
+# WHO CAN REACH THE TOKEN. It is a repository secret, so a workflow on any
+# branch of this repository can read it, which means anybody with write
+# access, the same people who can change this file. It can only read
+# Turnstile widgets, and the most it gives is the report form's secret, which
+# lets nobody pass the check. The seal key comes in as an input for the same
+# reason: whoever can start this run could also read the token directly.
+#
+# NO OUTBOUND CALL. The job makes no network call besides GitHub's own, so it
+# runs on the light VPS runner under its outbound limits (#2161); the call to
+# Cloudflare is made by the box.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Turnstile keys
+run-name: Turnstile keys by ${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      seal_key:
+        description: 'The box''s public seal key, <RSAKeyValue>, as Set-Turnstile.ps1 -FromCloudflare passes it'
+        required: true
+permissions:
+  contents: read
+jobs:
+  seal:
+    name: Seal the Turnstile token to the box's key
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # One encryption. Past this it is stuck.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A runner keeps its folder from one job to the next, and a checkout
+      # there rewrites only the files that differ from the last job's commit,
+      # so every other file keeps the line endings the last job's
+      # .gitattributes gave it (#3029). Every tracked file is written again,
+      # the way this commit checks it out.
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Seal the token
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          CLOUDFLARE_TURNSTILE_TOKEN: ${{ secrets.CLOUDFLARE_TURNSTILE_TOKEN }}
+          SEAL_KEY: ${{ inputs.seal_key }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-Turnstile.ps1') -SealOnGitHub
+          exit $LASTEXITCODE

@@ -532,9 +532,9 @@ $dd = Read-Ast 'scripts\deploy\Deploy-DevGamemode.ps1'
 if ($dd) {
     $set = @(Commands $dd 'Set-ThornswoodArtifactCurrent')
     # Since #446 the start is inside the swap, and the record waits for it to
-    # have said SWAP OK.
-    $okAt = At $dd 'if (-not $swapped) { exit 1 }'
-    Yes 'Deploy-DevGamemode records it only once the swap has answered' ($set.Count -eq 1 -and $okAt -gt 0 -and $set[0].Extent.StartOffset -gt $okAt)
+    # have said SWAP OK, or since #3196 for the server to have loaded a reload.
+    $okAt = At $dd 'if (-not $deployed) { exit 1 }'
+    Yes 'Deploy-DevGamemode records it only once the swap has answered or the reload loaded' ($set.Count -eq 1 -and $okAt -gt 0 -and $set[0].Extent.StartOffset -gt $okAt)
     Yes 'and the dev server serves the record from its data folder' ($set.Count -eq 1 -and (Arg $set[0] 'Beside') -eq '"$Root/data/thornswood-deploy.json"')
     $stamps = @(Commands $dd 'Save-ThornswoodBuildStamp')
     Yes "its stamp takes the artifact's commit" ($stamps.Count -eq 1 -and (Arg $stamps[0] 'Artifact') -eq '$artifact')

@@ -167,7 +167,9 @@ public sealed class BackupFaultStream : Stream {
                 if ($kind -eq 'backup') {
                     $failedOut = Join-Path $root ("fault-$kind-$mode-out")
                     $code = Run $fixture ($common + @('-Out', $failedOut, '-KeyFile', $key))
-                    $leftovers = @(Get-ChildItem -LiteralPath $failedOut -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'backup.log' }).Count
+                    # The server folders' turn and its note stay in the backup's folder on
+                    # purpose (#3247, ServerFolderTurn.ps1); they are not archives.
+                    $leftovers = @(Get-ChildItem -LiteralPath $failedOut -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'backup.log' -and $_.Name -notlike 'server-folders.turn*' }).Count
                     $stages = @(Get-ChildItem -LiteralPath $isolatedTemp -Filter 'thornswood-backup-*' -ErrorAction SilentlyContinue).Count
                     Yes "backup $mode failure closes handles and removes all temporary archives" ($code -ne 0 -and ($script:said -join ' ') -match "fixture $mode failure" -and $leftovers -eq 0 -and $stages -eq 0)
                 } else {

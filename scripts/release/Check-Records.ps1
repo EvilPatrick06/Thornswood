@@ -78,6 +78,74 @@ try {
     $bad++
     Write-Host ('  REFUSED  {0,-20} could not compare skyrim-pin.json with skyrim-files.json: {1}' -f 'skyrim pin and files', $_.Exception.Message) -ForegroundColor Red
 }
+# client-licences.json is the licences of the client client-build.json
+# records, and each text it names, of a port or of another library (#3751),
+# is beside it, byte for byte, with no other there (#3099): the downloads
+# carry these texts with those files.
+try {
+    $cDoc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Repo 'records\client-build.json') -Raw) 'records\client-build.json'
+    $lDoc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Repo 'records\client-licences.json') -Raw) 'records\client-licences.json'
+    $why = @()
+    if ([string]$lDoc.forkCommit -ne [string]$cDoc.forkCommit) { $why += "client-licences.json is of $($lDoc.forkCommit) and client-build.json of $($cDoc.forkCommit): record both from one build" }
+    $native = @($cDoc.files.PSObject.Properties.Name | Where-Object { $_ -match '\.(dll|exe\.hidden)$' })
+    $measured = @($lDoc.files.PSObject.Properties.Name)
+    foreach ($f in $native) { if ($measured -notcontains $f) { $why += "client-licences.json does not measure $f" } }
+    foreach ($f in $measured) { if ($native -notcontains $f) { $why += "client-licences.json measures $f, which client-build.json does not record" } }
+    $dir = Join-Path $Repo 'records\client-licences'
+    $named = @{}
+    $entries = @($lDoc.ports.PSObject.Properties)
+    $libs = $lDoc.PSObject.Properties['libraries']
+    if ($libs -and $libs.Value) { $entries += @($libs.Value.PSObject.Properties) }
+    foreach ($p in $entries) {
+        $named[$p.Name + '.txt'] = $true
+        $t = Join-Path $dir ($p.Name + '.txt')
+        if (-not (Test-Path -LiteralPath $t -PathType Leaf)) { $why += "records\client-licences\$($p.Name).txt is missing"; continue }
+        if ((Get-FileHash -LiteralPath $t -Algorithm SHA256).Hash.ToLowerInvariant() -ne ([string]$p.Value.sha256).ToLowerInvariant() -or (Get-Item -LiteralPath $t).Length -ne [long]$p.Value.bytes) {
+            $why += "records\client-licences\$($p.Name).txt is not the text client-licences.json names (a checkout that turned its line ends, or an edit)"
+        }
+    }
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue)) { if (-not $named.ContainsKey($f.Name)) { $why += "records\client-licences\$($f.Name) is there and client-licences.json names no such port or library" } }
+    if ($why.Count) {
+        $bad++
+        Write-Host ('  REFUSED  {0,-20} {1}' -f 'client licences', ($why -join '; ')) -ForegroundColor Red
+    } else {
+        Write-Host ('  OK       {0,-20} {1} texts, of {2}' -f 'client licences', $named.Count, $lDoc.forkCommit)
+    }
+} catch {
+    $bad++
+    Write-Host ('  REFUSED  {0,-20} could not hold client-licences.json to client-build.json and its texts: {1}' -f 'client licences', $_.Exception.Message) -ForegroundColor Red
+}
+# front-build.json's packages, the npm packages in build.js (#3751), each
+# with its text in records\front-licences, byte for byte, and no other there:
+# the installer and every update that carries build.js carry these texts.
+try {
+    $fDoc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Repo 'records\front-build.json') -Raw) 'records\front-build.json'
+    $why = @()
+    $pk = $fDoc.PSObject.Properties['packages']
+    $dir = Join-Path $Repo 'records\front-licences'
+    $named = @{}
+    if (-not $pk -or $null -eq $pk.Value) { $why += 'front-build.json lists no packages: record the front with Build-Front.ps1 -Record' }
+    else {
+        foreach ($p in @($pk.Value.PSObject.Properties)) {
+            $named[$p.Name + '.txt'] = $true
+            $t = Join-Path $dir ($p.Name + '.txt')
+            if (-not (Test-Path -LiteralPath $t -PathType Leaf)) { $why += "records\front-licences\$($p.Name).txt is missing"; continue }
+            if ((Get-FileHash -LiteralPath $t -Algorithm SHA256).Hash.ToLowerInvariant() -ne ([string]$p.Value.sha256).ToLowerInvariant() -or (Get-Item -LiteralPath $t).Length -ne [long]$p.Value.bytes) {
+                $why += "records\front-licences\$($p.Name).txt is not the text front-build.json names (a checkout that turned its line ends, or an edit)"
+            }
+        }
+    }
+    foreach ($f in @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue)) { if (-not $named.ContainsKey($f.Name)) { $why += "records\front-licences\$($f.Name) is there and front-build.json names no such package" } }
+    if ($why.Count) {
+        $bad++
+        Write-Host ('  REFUSED  {0,-20} {1}' -f 'front licences', ($why -join '; ')) -ForegroundColor Red
+    } else {
+        Write-Host ('  OK       {0,-20} {1} texts, of {2}' -f 'front licences', $named.Count, ([string]$fDoc.forkCommit).Substring(0, 8))
+    }
+} catch {
+    $bad++
+    Write-Host ('  REFUSED  {0,-20} could not hold front-build.json''s packages to their texts: {1}' -f 'front licences', $_.Exception.Message) -ForegroundColor Red
+}
 if ($bad) { Write-Host "$bad record(s) cannot be trusted." -ForegroundColor Red; exit 1 }
 Write-Host 'Every high-risk record reads at a known version with the fields its readers need.'
 # Said out loud: a caller that dot-runs this reads $LASTEXITCODE, which is

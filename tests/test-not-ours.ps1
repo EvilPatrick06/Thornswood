@@ -234,8 +234,12 @@ try {
     $atNot = $pkg.IndexOf('if (Test-ShipNotOurs $rel) {')
     Yes 'Package-Thornswood leaves out what Test-ShipNotOurs claims' ($atNot -gt 0)
     Yes '  after the collection''s files, so those are counted as the collection''s' ($atNot -gt $pkg.IndexOf('if (Test-FromCollection $rel) {'))
-    Yes '  asked at the revision it sets before the loop' ($pkg.IndexOf('$ShipCollectionRevision = & {') -gt 0 -and $pkg.IndexOf('$ShipCollectionRevision = & {') -lt $atNot)
-    Yes '  loading LoadOrder.ps1 only for that' ($pkg -match "\`$ShipCollectionRevision = & \{ \. \(Join-Path \`$Here '\.\.\\mods\\LoadOrder\.ps1'\); Get-ShipCollectionRevision \`$Root \}")
+    # One assignment, the feed's revision with -FromFeed and this machine's
+    # Vortex otherwise (#3412, #4091).
+    $atRev = $pkg.IndexOf('$ShipCollectionRevision = if ($FromFeed) {')
+    $atLoad = $pkg.IndexOf("    & { . (Join-Path `$Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision `$Root }")
+    Yes '  asked at the revision it sets before the loop' ($atRev -gt 0 -and $atRev -lt $atNot)
+    Yes '  loading LoadOrder.ps1 only for that' ($atLoad -gt $atRev -and $atLoad -lt $atNot)
 
     # ---- 4. Check-Secrets --------------------------------------------------------------
     $pwsh = (Get-Process -Id $PID).Path

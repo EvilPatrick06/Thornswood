@@ -200,20 +200,24 @@ try {
     $chars = Read 'launcher\app\Chars.cs'
     Yes 'the old rule that left trace alone is gone (one owner for the log level)' ($chars -notmatch 'KeepPlatformLogReadable')
 
-    # --------------------------------------------- 3. menu music browser
+    # --------------------------------------------- 3. menu music output
+    # Since #3207 the theme plays from the launcher's own process through
+    # waveOut, not from a second WebView2; what #963 asked of that browser
+    # holds for the sound output now: nothing open beside the game.
     $shell = Read 'launcher\app\Shell.cs'
     $mm = Read 'launcher\app\MenuMusic.cs'
     $md = [regex]::Match($shell, '(?s)static void MusicDecide\(\)\s*\{(.*?)\n        \}')
-    Yes 'Shell: while the game runs MusicDecide closes the music browser' ($md.Success -and $md.Groups[1].Value -match 'if \(playing\) \{ try \{ MenuMusic\.Close\(\); \}')
+    Yes 'Shell: while the game runs MusicDecide closes the music output' ($md.Success -and $md.Groups[1].Value -match 'if \(playing\) \{ try \{ MenuMusic\.Close\(\); \}')
     Yes 'Shell: and returns before asking it to play or pause' ($md.Success -and $md.Groups[1].Value.IndexOf('MenuMusic.Close()') -lt $md.Groups[1].Value.IndexOf('MenuMusic.Decide('))
     $close = [regex]::Match($mm, '(?s)public static void Close\(\)\s*\{(.*?)\n        \}')
-    Yes 'MenuMusic.Close disposes the browser and closes its window' ($close.Success -and $close.Groups[1].Value -match 'v\.Dispose\(\)' -and $close.Groups[1].Value -match 'h\.Close\(\)')
-    Yes 'MenuMusic.Close leaves nothing behind to post to' ($close.Success -and $close.Groups[1].Value -match 'view = null;' -and $close.Groups[1].Value -match 'host = null;' -and $close.Groups[1].Value -match 'ready = false;')
+    Yes 'MenuMusic.Close stops the playback and lets go of it' ($close.Success -and $close.Groups[1].Value -match 'p\.Stop\(\);' -and $close.Groups[1].Value -match 'playback = null;')
+    $run = [regex]::Match($mm, '(?s)void Run\(\)\s*\{(.*?)\n            \}')
+    Yes 'the playback closes its sound output when it stops (waveOutReset, then waveOutClose)' ($run.Success -and $run.Groups[1].Value -match '(?s)finally.*waveOutReset\(dev\).*waveOutClose\(dev\)')
     $start = [regex]::Match($mm, '(?s)public static void Start\(.*?\)\s*\{(.*?)\n        \}')
-    Yes 'MenuMusic.Start makes no browser (a launcher opened mid game never has one)' ($start.Success -and $start.Groups[1].Value -notmatch 'Begin\(\)')
+    Yes 'MenuMusic.Start makes no playback (a launcher opened mid game never has one)' ($start.Success -and $start.Groups[1].Value -notmatch 'Open\(\)|Begin\(\)')
     $decide = [regex]::Match($mm, '(?s)public static void Decide\(bool play, double volume\)\s*\{(.*?)\n        \}')
-    Yes 'MenuMusic.Decide makes one again when the music is wanted after the game' ($decide.Success -and $decide.Groups[1].Value -match 'if \(play && view == null\) \{ Open\(\); return; \}')
-    Yes 'a browser closed before its answers arrive ignores them (generation checked in every late callback)' (([regex]::Matches($mm, 'if \(gen != generation\) return;')).Count -ge 4)
+    Yes 'MenuMusic.Decide makes one again when the music is wanted after the game' ($decide.Success -and $decide.Groups[1].Value -match 'if \(play && playback == null\) \{ Open\(\); return; \}')
+    Yes 'the menu music makes no browser at all' ($mm -notmatch 'Microsoft\.Web\.WebView2')
 
     # --------------------------------------------- 4. voice quality kept
     # Two clients since the service's own page went (#1822).
@@ -246,7 +250,9 @@ try {
     # The code, not the comments, which name the old call to say why it went.
     $gpCode = if ($gp.Success) { [regex]::Replace($gp.Groups[1].Value, '(?m)^\s*//.*$', '') } else { '' }
     Yes '#978 GameProcesses lists the processes once (GetProcesses), not once per name' ($gp.Success -and ([regex]::Matches($gpCode, 'Process\.GetProcesses\(\)')).Count -eq 1 -and $gpCode -notmatch 'GetProcessesByName')
-    Yes '#978 the in-play tick asks GameStillRunning' ($shell -match '(?s)if \(!playing\) return;.{0,400}if \(Checks\.GameStillRunning\(\)\)')
+    # Out of play the tick returns before it, after redrawing the rows when
+    # Steam has started or closed (#3204), so either shape of the return counts.
+    Yes '#978 the in-play tick asks GameStillRunning' ($shell -match '(?s)if \(!playing\)(?: return;|\s*\{[^{}]*return;\s*\}).{0,400}if \(Checks\.GameStillRunning\(\)\)')
 
     # A pretend game: SkyrimSE and a browser helper, up for a minute of two
     # second ticks, then SkyrimSE closes and the helper goes with it.
