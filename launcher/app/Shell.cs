@@ -92,7 +92,6 @@ namespace Thornswood
         // has moved past, which is what happened to everybody on 1.1.40.
         static DateTime updateSeenAt = DateTime.MinValue;
         static bool closedForUpdate = false;
-        static bool installWhenSeen = false;
         static int inPlayTicks = 0;
         static DispatcherTimer timer;
 
@@ -2635,7 +2634,8 @@ namespace Thornswood
                 if (closedForUpdate)
                 {
                     closedForUpdate = false;
-                    installWhenSeen = true;
+                    // With automatic updates on, the check's answer takes it
+                    // (UpdateBySelf, #3202), as it takes any update it finds.
                     Log("Fetching the update the game was closed for...");
                     ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
                 }
