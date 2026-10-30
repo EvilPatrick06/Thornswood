@@ -499,7 +499,7 @@ if (-not $r.Ok) {
     $h = StartHost $root
     $up = Until { (Log $root) -match 'watching 1 server' } 20
     Yes 'a rolled bot.log past copySeconds is deleted, and a newer one stays (#2166)' ($up -and -not (Test-Path -LiteralPath ($l + '.2')) -and (Test-Path -LiteralPath ($l + '.3')))
-    Yes '  and bot.log says so' ((Log $root) -match '\[run\] by age: 1 rolled bot\.log copy past ')
+    Yes '  and bot.log says so' ((Log $root) -match '\[run\] by age: 1 bot\.log copy past ')
     $null = StopHost $h
     $root = Box 'agedlive' 'env' @{ liveSeconds = 3; copySeconds = 3600; ageCheckSeconds = 1 }
     $l = Join-Path $root 'data\bot.log'
