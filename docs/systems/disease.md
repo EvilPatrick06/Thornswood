@@ -15,7 +15,8 @@ spent cold. Shorter than an hour does not catch it. A fire, a bed,
 warmth back to fine, or 2 hours clears it.
 
 **Food sickness.** Raw meat or fish catches it 40% of the time. Eating
-at 90 hunger or above catches it. Lasts 30 minutes. Weakness: the
+at 90 hunger or above catches it. Spoiled food always catches it
+([Spoilage](spoilage.md)). Lasts 30 minutes. Weakness: the
 weary hunger penalties. The optional meter on [The body](body.md)
 is not part of this sickness unless a later vote adds that meter.
 See [Food](food.md).
