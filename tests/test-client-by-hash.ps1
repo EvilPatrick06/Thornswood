@@ -46,7 +46,7 @@
 #>
 param(
     [string]$Repo,
-    [string]$Game = 'C:\Thornswood\Game'
+    [string]$Game = (Join-Path ([string](& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Install)) 'Game')
 )
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
 $env:THORNSWOOD_HARNESS = '1'

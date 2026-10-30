@@ -25,7 +25,7 @@
 
   It had a default of SYSTEM at first, and review found on 24 Sep that this
   undid the switch: once -RunAs 'LOCAL SERVICE' had been run, the next plain
-  deploy or -Site, which is what CLAUDE.md, Install-Bot and Set-Vps tell
+  deploy or -Site, which is what the ops repo's CLAUDE.md, Install-Bot and Set-Vps tell
   people to run, put the task back on SYSTEM at Highest and the read-back
   said so as if nothing were wrong. So there is no default, and the account
   block reads the account off the task when -RunAs is not given.
