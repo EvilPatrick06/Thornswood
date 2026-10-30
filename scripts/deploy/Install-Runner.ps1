@@ -1455,6 +1455,10 @@ $out = Send-WithSecret $token ($lockLib + $watcherLib + "`n" + @"
 if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
 `$root = '$Root'
 `$acct = '$Account'
+# The service's name, read further down (the runner drive's start setting and
+# the read back at the end). #4599 took this line out with the old stop, and
+# the read back then listed every service on the box (#3889, 30 Oct).
+`$svc = '$service'
 
 # A runner already here is taken off first, so a second run replaces it:
 # never one in the middle of a job, and never by halves (Assert-RunnerIdle and
