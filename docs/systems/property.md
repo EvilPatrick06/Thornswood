@@ -47,8 +47,13 @@ on it is a farm claim of its own.
 
 Claiming hands you a deed there and then, and the building's master
 key with it (see The master key, below). Every building uses one book.
-The name on that copy is the building: Deed to Breezehome is not Deed
-to Honeyside.
+The name on that copy is the building and its hold: Deed to Breezehome,
+Whiterun is not Deed to Honeyside, Riften. Some names are carried by more
+than one building (six Halls of the Dead), so the hold is what tells them
+apart, and where two in one hold share a name a number follows it, as on
+a master key: Warehouse, Windhelm, no. 2. Keys and key molds are named the
+same way, and a key, mold or deed opens and hands over only the one
+building its name says.
 
 What you hold is on the property page of the K panel: each building,
 whether it is locked, the rent owed on it, and your farm with the days

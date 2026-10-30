@@ -5082,6 +5082,51 @@ function copyKeptChats(now) {
   return out;
 }
 
+/* A restore (scripts\vps\vps-restore-services.ps1) moves the data folder,
+   the uploads and config.json it replaces to <name>-before-restore-<stamp>
+   beside them, <stamp> the box's local yyyyMMdd-HHmmss, with -2, -3 for a
+   second restore in the same second. Nothing deleted them (#3620). Decided
+   by Patrick on 26 Oct (B): a set-aside copy is kept 30 days, so a restore
+   can be undone, then deleted. By the time in its name, never a file's own
+   times, which a move keeps from the original. A link is left as it is and
+   said. The feed's copies are not the site's to delete (it is denied writing
+   there, #913) and hold no person. Delete-Person.ps1 reads a data copy for a
+   deletion request while it is here. */
+const RESTORE_ASIDE_DAYS = 30;
+const RESTORE_ASIDE = /^(data|uploads|config\.json)-before-restore-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})(?:-\d+)?$/;
+function sweepRestoreCopies(now, root) {
+  root = root || ROOT;
+  const out = { deleted: 0, failed: [] };
+  let names;
+  try { names = fs.readdirSync(root); }
+  catch (e) {
+    out.error = (e && e.code) || 'unknown';
+    retentionSay('restore-copy', { event: 'list-failed', code: out.error });
+    return out;
+  }
+  const cut = now - RESTORE_ASIDE_DAYS * 86400000;
+  for (const n of names.sort()) {
+    const m = RESTORE_ASIDE.exec(n);
+    if (!m) continue;
+    const at = new Date(+m[2], +m[3] - 1, +m[4], +m[5], +m[6], +m[7]).getTime();
+    if (!(at < cut)) continue;
+    const p = path.join(root, n);
+    let st;
+    try { st = fs.lstatSync(p); } catch (e) { continue; }
+    if (st.isSymbolicLink()) { retentionSay('restore-copy', { event: 'left-link', name: n }); continue; }
+    if (st.isDirectory() !== (m[1] !== 'config.json')) continue;
+    try {
+      fs.rmSync(p, { recursive: true });
+      out.deleted++;
+      retentionSay('restore-copy', { event: 'deleted', name: n, days: RESTORE_ASIDE_DAYS });
+    } catch (e) {
+      out.failed.push(n);
+      retentionSay('restore-copy', { event: 'delete-failed', name: n, code: (e && e.code) || 'unknown' });
+    }
+  }
+  return out;
+}
+
 function retentionSweep() {
   const now = Date.now();
   const sessions = sweepSessions(now);
@@ -5096,7 +5141,8 @@ function retentionSweep() {
            removedUploads: pruneRemovedUploads(now),
            signIns: sweepSignIns(now), inbox: sweepInbox(now),
            staff: sweepStaffRecords(now), moderationLog: sweepModLog(now),
-           galleryReports: sweepGalleryReports(now) };
+           galleryReports: sweepGalleryReports(now),
+           restoreCopies: sweepRestoreCopies(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 
@@ -7351,7 +7397,10 @@ async function handle(req, res) {
     // without it. html is the one to show; md is kept for anything reading it.
     // sha256 is what the installer stores. changed is the day that wording last changed,
     // or null when the list has no row for this text.
-    const md = pageMarkdown(pg[1]);
+    // Only the pages the site shows (#3656): every .md in data\site was
+    // served here, lines.md's notes for the team included, though no page
+    // shows them.
+    const md = MD_PAGES.indexOf('/' + pg[1]) >= 0 ? pageMarkdown(pg[1]) : null;
     if (md === null) return sendJson(res, 404, { error: 'no such page' });
     const sha = pageSha256(md);
     const ver = findPageVersion(sha);
