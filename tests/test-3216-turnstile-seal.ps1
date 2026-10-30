@@ -258,6 +258,8 @@ function Invoke-RestMethod {
     Yes '  and keeps every other setting' ($cfg.password -eq 'not-a-real-one' -and $cfg.botKey -eq 'not-a-real-key')
     Yes '  and restarts the site, which then says the check is on' ($all -match 'STUB Start-ScheduledTask' -and $all -match 'the report form is told the site key: the check is on')
     if ($all -notmatch 'the check is on') { Write-Host ('      it said: ' + $all) }
+    Yes 'turnstile-keys.yml is not in this repository, which has no VPS runner once public (#4013)' (-not (Test-Path -LiteralPath (Join-Path (Join-Path (Join-Path $Root '.github') 'workflows') 'turnstile-keys.yml')))
+    Yes '  through turnstile-keys.yml in the private ops repository, where the VPS runners are (#4013)' (@($handed | Where-Object { $_ -match '^gh api -X POST repos/EvilPatrick06/Thornswood-Ops/actions/workflows/turnstile-keys\.yml/dispatches ' }).Count -eq 1)
     $asked = if (Test-Path -LiteralPath $env:TW_ASKED) { [IO.File]::ReadAllText($env:TW_ASKED) } else { '' }
     Yes '  having asked Cloudflare for that widget in that account, once' ($asked.Trim() -eq "https://api.cloudflare.com/client/v4/accounts/c7738b46d6dea435f5228b00b6198706/challenges/widgets/$siteKey")
     $handedAll = ($handed -join "`n") + "`n" + $all

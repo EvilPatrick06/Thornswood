@@ -71,8 +71,8 @@ try {
     $r = Run-Check $RealXaml $RealApp
     Yes 'the real ui.xaml and launcher\app exit 0' ($r.Code -eq 0)
     Yes 'nothing is NEW' ($r.Out -notmatch '\bNEW\b')
-    $known = @([regex]::Matches($r.Out, '(?m)^\s*known\s+\S+')).Count
-    Yes ("the baseline names are reported as known ({0})" -f $known) ($known -ge 1)
+    # The baseline is empty since #3146 took out the last guarded lookups.
+    Yes 'nothing is missing, so nothing leans on the baseline' ($r.Out -match '(?ms)Looked up but not in ui\.xaml.*?^\s*none\s*$' -and $r.Out -notmatch '(?m)^\s*known\s')
     if ($OnWindows) { Yes 'it says ui.xaml parses' ($r.Out -match '(?ms)Does ui\.xaml parse.*?^\s*yes\s*$') }
     else { Yes 'off Windows it says the parse was not checked, and why' ($r.Out -match '(?ms)Does ui\.xaml parse.*?^\s*not checked: WPF, which reads it, is only on Windows\s*$') }
 
@@ -107,20 +107,30 @@ try {
         Write-Host 'SKIP  a window WPF refuses: XamlReader, which reads it, is in WPF, which only Windows has'
     }
 
-    # ---- a baseline line that covers nothing any more -------------------------
+    # ---- the baseline, seeded -------------------------------------------------
     #
-    # A copy of launcher\app with the BoxAddress lookup taken out, the way the
-    # guarded C# behind the baseline would be deleted. The line is now stale,
-    # which is information and not a failure.
+    # The real control-baseline.txt names nothing since #3146, so a copy of the
+    # script runs beside a seeded one that names BoxGone. A copy of
+    # launcher\app that still looks BoxGone up reads it as known; the real
+    # launcher\app, which does not, leaves the line stale, which is
+    # information and not a failure.
+    $dev = Join-Path $Tmp 'dev'
+    New-Item -ItemType Directory -Force -Path $dev | Out-Null
+    Copy-Item -LiteralPath $CheckPath -Destination (Join-Path $dev 'Check-Controls.ps1')
+    [System.IO.File]::WriteAllText((Join-Path $dev 'control-baseline.txt'), "# seeded`r`nBoxGone`r`n")
     $app = Join-Path $Tmp 'app'
     New-Item -ItemType Directory -Force -Path $app | Out-Null
-    foreach ($f in (Get-ChildItem -LiteralPath $RealApp -Filter '*.cs' -File)) {
-        $t = [System.IO.File]::ReadAllText($f.FullName)
-        [System.IO.File]::WriteAllText((Join-Path $app $f.Name), $t.Replace('boxAddress = F<TextBox>("BoxAddress");', ''))
-    }
+    foreach ($f in (Get-ChildItem -LiteralPath $RealApp -Filter '*.cs' -File)) { Copy-Item -LiteralPath $f.FullName -Destination $app }
+    [System.IO.File]::WriteAllText((Join-Path $app 'Gone.cs'), 'class Gone { static void G() { var b = F<TextBox>("BoxGone"); if (b != null) b.Text = ""; } }')
+    $real = $CheckPath
+    $CheckPath = Join-Path $dev 'Check-Controls.ps1'
     $r = Run-Check $RealXaml $app
-    Yes 'a baseline name nothing looks up is reported as stale' ($r.Out -match 'stale\s+BoxAddress\b')
+    Yes 'a missing name on the baseline is reported as known, not NEW' ($r.Out -match '(?m)^\s*known\s+BoxGone\b' -and $r.Out -notmatch '\bNEW\b')
+    Yes 'a known name does not fail the check' ($r.Code -eq 0)
+    $r = Run-Check $RealXaml $RealApp
+    Yes 'a baseline name nothing looks up is reported as stale' ($r.Out -match 'stale\s+BoxGone\b')
     Yes 'a stale baseline line does not fail the check' ($r.Code -eq 0)
+    $CheckPath = $real
 
     # ---- the exit code a person reads in the same session ---------------------
     #

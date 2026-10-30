@@ -231,9 +231,6 @@ try {
             [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
         }
         Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
-        # The covered bodies a publish needs since d2519bb, as a build leaves them.
-        . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-        New-GeneratedBodies $inst $fake
         . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
         Install-UiFrontFixture (Join-Path $inst 'Game')
         $node = Get-Command node -ErrorAction SilentlyContinue

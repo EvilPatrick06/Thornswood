@@ -54,9 +54,9 @@ const pieces = [
   cut('function wovenOutput(actorId, row) {')
 ];
 yes('1 the quality pieces are in the gamemode', pieces.every(Boolean));
-yes('1 mp.onCraft reads the margin before the work is credited, and names the quality before the weaver\'s mark',
+yes('1 mp.onCraft reads the margin before the work is credited, and names the quality before the weaver\'s mark and a dish\'s days (#3163)',
   /\n  const margin = qualityMargin\(actorId, row\);\n  if \(answer\.credit\) \{/.test(gm) &&
-  /\n  cookedOutput\(actorId, row\);\n  qualityOutput\(actorId, row, margin\);\n  wovenOutput\(actorId, row\);\n  return;\n\}\);/.test(gm));
+  /\n  cookedOutput\(actorId, row\);\n  qualityOutput\(actorId, row, margin\);\n  wovenOutput\(actorId, row\);\n  spoilingOutput\(actorId\);\n  return;\n\}\);/.test(gm));
 if (!pieces.every(Boolean)) {
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');

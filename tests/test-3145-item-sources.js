@@ -15,9 +15,10 @@
 //      source of anything.
 //   Q  the rare seams the custom quests open are quest, never gathered; the
 //      dungeon's exclusive list is found; the starting tools are start;
-//      each hair dye is its own row and the plain record it rides on none.
+//      each hair dye is its own row and the plain record it rides on none;
+//      each scarce draw names who works it.
 //   N  an input nothing hands out is under noSource, and one that something
-//      does hand out is not.
+//      does hand out is not; askedBy and goldAskedBy name what asks for it.
 //   P  the builder refuses, on a copy in a temporary folder, a table where
 //      the cut list says an item is not found while the dungeon hands it
 //      out, and a faction item a public bench also makes.
@@ -139,6 +140,17 @@ yes('Q5 every hair dye (' + dyes.dyes.length + ') is its own Tailor row, and the
         r.via.every(function (v) { return /^Tailor\//.test(v.by); });
     }));
 
+const scarceAt = gm.indexOf('var SCARCE = [');
+const gates = {};
+(gm.slice(scarceAt, gm.indexOf('];', scarceAt)).match(/gate: \{(classKey|profession): '(\w+)', rank: '(\w+)'\}, id: '(\w+)'/g) || []).forEach(function (m) {
+  const p = /gate: \{(?:classKey|profession): '(\w+)', rank: '(\w+)'\}, id: '(\w+)'/.exec(m);
+  gates[p[3]] = { by: p[1], rank: p[2] };
+});
+const scarceVia = [];
+ids.forEach(function (id) { table.items[id].via.forEach(function (v) { if (v.kind === 'quest' && gates[v.quest]) { scarceVia.push(v); } }); });
+yes('Q6 every scarce draw (' + scarceVia.length + ') names who works it and at what rank, as SCARCE in the gamemode gates it',
+    Object.keys(gates).length >= 8 && scarceVia.length >= 8 && scarceVia.every(function (v) { return v.by === gates[v.quest].by && v.rank === gates[v.quest].rank; }));
+
 // ---------------------------------------------------------------- N
 yes('N1 noSource is exactly the rows with no sources',
     JSON.stringify(table.noSource) === JSON.stringify(ids.filter(function (id) { return table.items[id].sources.length === 0; })));
@@ -148,6 +160,30 @@ yes('N2 an input nothing hands out stays in the table, so it can be seen: every 
       if (r.book === 'cut' || cutRecipe[id] || TEMPER.test(r.benchName || '')) { return true; }
       return (r.inputItems || []).every(function (it) { return it.item.toLowerCase() === 'f:skyrim.esm' || table.items[it.item]; });
     }));
+
+// What asks for each item, which scripts/dev/Check-Makers.js reads as the
+// recipe inputs the world must hand out (#3132).
+const askWrong = [];
+const goldAsks = [];
+['recipes', 'unowned'].forEach(function (section) {
+  Object.keys(recipes[section] || {}).forEach(function (id) {
+    const r = recipes[section][id];
+    const isLive = r.out && r.book !== 'cut' && !cutRecipe[id] && !TEMPER.test(r.benchName || '') && !/^BYOHBuilding/.test(r.benchName || '');
+    (r.inputItems || []).forEach(function (it) {
+      if (it.item.toLowerCase() === 'f:skyrim.esm') { if (isLive && goldAsks.indexOf(id) < 0) { goldAsks.push(id); } return; }
+      const asks = ((table.items[it.item] || {}).askedBy || []).indexOf(id) >= 0;
+      if (asks !== Boolean(isLive)) { askWrong.push(r.name + ' ' + id + ' -> ' + it.item); }
+    });
+  });
+});
+yes('N3 askedBy names every live recipe, owned or open, that asks for an item, and no dead one (' + askWrong.slice(0, 3).join(', ') + ')',
+    askWrong.length === 0);
+yes('N4 goldAskedBy is every live recipe that asks for gold, which no recipe may (#3115)',
+    JSON.stringify(table.goldAskedBy) === JSON.stringify(goldAsks.sort()));
+yes('N5 each hair dye\'s inputs and the water bottle\'s empty bottle are asked by them',
+    dyes.dyes.every(function (d) {
+      return d.inputs.every(function (it) { return ((table.items[it.item] || {}).askedBy || []).indexOf('hair-dye:' + d.id) >= 0; });
+    }) && ids.some(function (id) { return (table.items[id].askedBy || []).indexOf('NEEDS.waterItems') >= 0; }));
 
 // ---------------------------------------------------------------- P
 function copyRoot() {
