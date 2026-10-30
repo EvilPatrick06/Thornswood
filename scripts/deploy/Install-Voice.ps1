@@ -571,8 +571,11 @@ function StartIt {
                 `$sid = Get-ThornswoodTaskSid '$TaskName'
                 if (-not `$sid) { `$why = 'the task SID NT TASK\$TaskName could not be looked up' }
                 else {
-                    try { Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'chat' -Files 'voice.log', 'voice.log.*', 'token-key.txt' }
-                    catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+                    try {
+                        Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'chat' -Files 'voice.log', 'voice.log.*', 'token-key.txt'
+                        # What it makes is its own, not every service's (#4077).
+                        Set-ThornswoodTaskOwner -TaskName '$TaskName' -Sid `$sid -Action `$action -Roots '$Root'
+                    } catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
                 }
                 if (`$why) {
                     `$why + ', so the task goes back on SYSTEM'
