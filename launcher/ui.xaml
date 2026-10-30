@@ -1427,7 +1427,7 @@
                     <CheckBox x:Name="ChkDeleteMods" Content="Delete Thornswood's copy of the game as well" Margin="0,13,0,0" IsChecked="True"/>
                     <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="This is Thornswood's own Game folder, built from what Vortex deployed. It is not the mods themselves and it is not your Skyrim in Steam, neither of which this can touch: taking the mods off is Purge in Vortex and nothing here does it for you. Untick this and the folder stays exactly where it is, so reinstalling reuses what is already on the disk instead of pulling the collection down again, which is the difference between a few minutes and an evening."/>
                     <CheckBox x:Name="ChkKeepSaves" Content="Keep this build's saves and settings" Margin="0,13,0,0" IsChecked="True"/>
-                    <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="Leaves the Profile folder where it is, so a reinstall picks your characters and settings back up."/>
+                    <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0" Text="Leaves your characters, saves and settings in the Profile folder, so a reinstall picks them back up. The launcher's log, your Discord sign-in, name and picture, the support reports and the voice browser's data are not saves or settings, and go either way."/>
                     <Button x:Name="BtnUninstall" Style="{StaticResource Ghost}" Content="Uninstall Thornswood" HorizontalAlignment="Left" Margin="0,15,0,0"/>
                   </StackPanel>
                 </Border>
