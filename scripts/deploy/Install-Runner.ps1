@@ -387,6 +387,16 @@ if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
 if ($OffBox -and -not $PSBoundParameters.ContainsKey('Label') -and $buildRecord.PSObject.Properties['offBox'] -and @($buildRecord.offBox) -contains $RunnerName) {
   $registerLabels = $Label + ',' + $buildRecord.label
 }
+# PULL REQUEST BUILDS (#4010). records\pr-build-runners.json's label is the
+# one the pull request build's fallback asks for: a VPS runner its runners
+# list names carries it (2, not 1, which is kept for main's builds), and so
+# does an off-box runner its offBox names, which still never carries
+# thornswood-vps, so no box-only job reaches it.
+$prRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\pr-build-runners.json') -Raw | ConvertFrom-Json
+if (-not $PSBoundParameters.ContainsKey('Label')) {
+  $takesPr = $(if ($OffBox) { $prRecord.PSObject.Properties['offBox'] -and @($prRecord.offBox) -contains $RunnerName } else { @($prRecord.runners | ForEach-Object { [int]$_ }) -contains $Number })
+  if ($takesPr) { $registerLabels = $registerLabels + ',' + $prRecord.label }
+}
 # THE SIGNING RUNNER (#3312). A VPS runner records\sign-runners.json lists
 # is registered with its label and, under -NetworkOnly, reaches the hosts
 # the record names for the sign steps.

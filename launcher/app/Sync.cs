@@ -268,6 +268,85 @@ namespace Thornswood
             return Sync(cfg, at, r, v, log);
         }
 
+        /// <summary>
+        /// Thornswood's own plugins as the release the feed names ships them
+        /// (#3386), for Fix: a plugin's bytes, or null when the release does
+        /// not ship it or its record does not say its files are on the site.
+        /// Null itself when the feed names no record.
+        ///
+        /// Until #3386 Fix took them from the game server's resources port,
+        /// over plain http, and checked them against the size and crc32 of
+        /// that same server's manifest, so anybody on the path could hand
+        /// over another plugin with the numbers to match. Here every byte
+        /// comes the way an update's do: https to a host on the list, the
+        /// record by the sha256 the feed gives it, each file by the sha256
+        /// the record gives it.
+        /// </summary>
+        public static Func<string, byte[]> ReleaseCopy(Config cfg, VersionDoc v)
+        {
+            RecordRef r = v == null ? null : v.record;
+            if (r == null) return null;
+            Func<string, byte[]> at = null;
+            return delegate(string plugin)
+            {
+                if (at == null)
+                {
+                    CheckUrl(r.url);
+                    ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
+                    at = ReleaseCopyAt(AssetFolder(r), r);
+                }
+                return at(plugin);
+            };
+        }
+
+        /// <summary>
+        /// ReleaseCopy's reader, with $at the folder the record and its files
+        /// are in (checked by the caller). The record is read once, on the
+        /// first plugin asked for. tests\test-2627-scan-fix.ps1 calls
+        /// this with a copy of the site on this machine.
+        /// </summary>
+        internal static Func<string, byte[]> ReleaseCopyAt(string at, RecordRef r)
+        {
+            Dictionary<string, string> map = null;
+            return delegate(string plugin)
+            {
+                // A plugin by its bare name, in Data, and nothing else of the
+                // release: the name comes from the game server's manifest.
+                if (string.IsNullOrEmpty(plugin) || plugin.IndexOfAny(new[] { '\\', '/', ':' }) >= 0 ||
+                    !System.Text.RegularExpressions.Regex.IsMatch(plugin, @"\.(esp|esm|esl)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    return null;
+                string tmp = Path.Combine(Path.GetTempPath(), "thornswood-release-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(tmp);
+                try
+                {
+                    if (map == null)
+                    {
+                        string recFile = Path.Combine(tmp, "record.json");
+                        FetchInto(at + r.sha256, r.sha256, -1, recFile);
+                        map = ReadRecord(recFile);
+                    }
+                    if (!map.ContainsKey(RecordFilesMark)) return null;
+                    string want = "Data\\" + plugin;
+                    foreach (KeyValuePair<string, string> e in map)
+                    {
+                        if (e.Key.StartsWith(":", StringComparison.Ordinal)) continue;
+                        if (!string.Equals(e.Key.Replace('/', '\\'), want, StringComparison.OrdinalIgnoreCase)) continue;
+                        long bytes; string sha;
+                        if (!ReadEntry(e.Value, out bytes, out sha))
+                            throw new Exception("The record of release " + r.id + " has an entry that is not a size and a checksum (" + e.Key + ").");
+                        string blob = Path.Combine(tmp, sha);
+                        FetchInto(at + sha, sha, bytes, blob);
+                        return File.ReadAllBytes(blob);
+                    }
+                    return null;
+                }
+                finally
+                {
+                    try { Directory.Delete(tmp, true); } catch (Exception ex) { Swallow.Note("Updater.ReleaseCopy, tidy", ex); }
+                }
+            };
+        }
+
         internal class SyncItem
         {
             public string Rel;
