@@ -14,20 +14,22 @@ namespace Thornswood
         /// for Skyrim is read into the log and, when it does not hold the
         /// version (SteamUpdates.OnStart), set. With Steam closed that happens
         /// here and now, with nothing to ask. With Steam open it needs Steam
-        /// closed for a moment, so the question is put once the window is up,
-        /// and a No is remembered so it is not asked at every start.
+        /// closed for a moment, so the question is put once the window is up.
         ///
         /// Issue #493, Patrick on 29 September: "Our Repo should write this so
         /// it doesn't auto update the game and people have to re do the
         /// downgrade again". Until then it was only ever offered right after a
         /// downgrade, so anybody downgraded before that question existed, or
-        /// who pressed No once, had nothing holding Steam back.
+        /// who pressed No once, had nothing holding Steam back. Patrick on 27
+        /// October (#3600): always hold it, so nothing the person answered
+        /// stops the start writing it with Steam closed, and the question says
+        /// so.
         /// </summary>
         static void HoldSteamUpdatesOnStart()
         {
             string target = OwnGame.Source(cfg);
             string manifest = SteamUpdates.ManifestFor(target);
-            string what = SteamUpdates.OnStart(SteamUpdates.NeedsHolding(manifest), SteamUpdates.SteamRunning(), playing, cfg.SteamUpdatesDeclined);
+            string what = SteamUpdates.OnStart(SteamUpdates.NeedsHolding(manifest), SteamUpdates.SteamRunning(), playing);
             if (what == SteamUpdates.Write) { Log(SteamUpdates.Hold(manifest)); return; }
             string upd = SteamUpdates.Report(target);
             if (upd != null) Log(upd);
@@ -40,23 +42,24 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The question: whether the launcher should set Steam's Updates
-        /// setting for Skyrim to "Wait until I launch the game"
-        /// (SteamUpdates). Asked on the way in (above). It used to follow every
-        /// downgrade as well, when the downgrade put the Steam copy on
-        /// 1.6.1170; the downgrade never writes the Steam copy now (#1218), so
-        /// there is nothing there for the setting to hold. Nothing is written
-        /// unless the person presses Yes, and the question says what Yes
-        /// changes and where.
+        /// The question: whether to close Steam now so the launcher can set
+        /// Steam's Updates setting for Skyrim to "Wait until I launch the game"
+        /// (SteamUpdates). Asked on the way in (above), only while Steam is
+        /// open. It used to follow every downgrade as well, when the downgrade
+        /// put the Steam copy on 1.6.1170; the downgrade never writes the Steam
+        /// copy now (#1218), so there is nothing there for the setting to hold.
         ///
-        /// Steam is usually running. A change made to the
-        /// file while Steam runs is undone when Steam closes, so Yes closes
-        /// Steam itself (steam://exit, the same as Steam, Exit), waits for it
-        /// to go, makes the change, and starts Steam again in the tray, on a
-        /// pool thread so the window does not freeze while Steam shuts down.
-        /// Never while Skyrim runs, which needs Steam. No leaves everything as
-        /// it is, is remembered for the start, and the log says how to make
-        /// the same change in Steam. Play is never held on this.
+        /// Steam is usually running. A change made to the file while Steam
+        /// runs is undone when Steam closes, so Yes closes Steam itself
+        /// (steam://exit, the same as Steam, Exit), waits for it to go, makes
+        /// the change, and starts Steam again in the tray, on a pool thread so
+        /// the window does not freeze while Steam shuts down. Once Steam has
+        /// been asked to exit it is started again whatever happens after, and
+        /// a Steam slower than a minute is waited for rather than left closed
+        /// (#3600). Never while Skyrim runs, which needs Steam. No means not
+        /// now (SteamUpdates.NotNow): nothing is remembered, so the next start
+        /// writes it with Steam closed or asks again with Steam open. Play is
+        /// never held on this.
         /// </summary>
         static void AskToHoldSteamUpdates()
         {
@@ -64,37 +67,73 @@ namespace Thornswood
             try { manifest = SteamUpdates.ManifestFor(OwnGame.Source(cfg)); } catch (Exception ex) { Swallow.Note("Shell.AskToHoldSteamUpdates, finding Steam's file for Skyrim", ex); }
             if (!SteamUpdates.NeedsHolding(manifest)) return;
             if (playing || Checks.GameRunning()) return;
+            // Steam closed since the start looked: nothing to close, so nothing to ask.
+            if (!SteamUpdates.SteamRunning()) { Log(SteamUpdates.Hold(manifest)); return; }
 
-            bool steamUp = SteamUpdates.SteamRunning();
-            MessageBoxResult r = MessageBox.Show(win, SteamUpdates.Question(manifest, steamUp), "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            MessageBoxResult r = MessageBox.Show(win, SteamUpdates.Question(manifest), "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (r != MessageBoxResult.Yes)
             {
-                cfg.SteamUpdatesDeclined = true;
-                try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Shell.AskToHoldSteamUpdates, remembering No", ex); }
-                Log("Left Steam's Updates setting for Skyrim as it is. " + SteamUpdates.How);
+                Log(SteamUpdates.NotNow + " " + SteamUpdates.How);
                 return;
             }
-            if (!steamUp) { Log(SteamUpdates.Hold(manifest)); return; }
 
             Log("Closing Steam for a moment to change its Updates setting for Skyrim. It starts again by itself.");
             ThreadPool.QueueUserWorkItem(delegate
             {
-                string said;
-                try
-                {
-                    Downgrade.AskSteam("steam://exit", LogOnly);
-                    if (!SteamUpdates.WaitClosed(60))
-                        said = "Steam did not close within a minute, so nothing was changed, and the launcher asks again the next time it starts. " + SteamUpdates.How;
-                    else
-                    {
-                        said = SteamUpdates.Hold(manifest, false);
-                        StartSteamAgain();
-                    }
-                }
-                catch (Exception ex) { said = "Could not change Steam's Updates setting for Skyrim: " + ex.Message + " " + SteamUpdates.How; }
-                try { win.Dispatcher.BeginInvoke(new Action(delegate { Log(said); })); }
-                catch (Exception ex) { Swallow.Note("Shell.AskToHoldSteamUpdates, saying what happened", ex); LogOnly(said); }
+                string said = CloseSteamAndHold(manifest);
+                SayFromPool(said);
             });
+        }
+
+        /// <summary>
+        /// Yes, off the window's thread: asks Steam to exit, waits for it to
+        /// go, makes the change, and starts Steam again. What it returns is the
+        /// line for the log.
+        ///
+        /// Issue #3600: the minute's wait used to end in "nothing was changed"
+        /// with Steam already told to exit, and only the branch that wrote
+        /// started Steam again, so a Steam that finished closing after the
+        /// minute stayed closed. Now the minute only decides when the person
+        /// is told Steam is still closing; the wait goes on until Steam has
+        /// gone, and every way out after the exit request starts Steam again.
+        /// </summary>
+        static string CloseSteamAndHold(string manifest)
+        {
+            bool asked = false;
+            string said;
+            try
+            {
+                asked = Downgrade.AskSteam("steam://exit", LogOnly);
+                if (!asked)
+                    said = "Steam could not be asked to close, so nothing was changed. " + SteamUpdates.How;
+                else
+                {
+                    bool closed = SteamUpdates.WaitClosed(60);
+                    if (!closed)
+                    {
+                        SayFromPool(SteamUpdates.StillClosing);
+                        closed = SteamUpdates.WaitClosed(SteamUpdates.NoLimit);
+                    }
+                    said = closed
+                        ? SteamUpdates.Hold(manifest, false)
+                        : "Could not tell whether Steam had closed, so nothing was changed. " + SteamUpdates.How;
+                }
+            }
+            catch (Exception ex) { said = "Could not change Steam's Updates setting for Skyrim: " + ex.Message + " " + SteamUpdates.How; }
+            // Steam was asked to exit, so it is started again whatever came after, as Yes said.
+            if (asked)
+            {
+                try { StartSteamAgain(); }
+                catch (Exception ex) { Swallow.Note("Shell.CloseSteamAndHold, starting Steam again", ex); }
+            }
+            return said;
+        }
+
+        /// <summary>A line for the log from a pool thread, through the window's thread.</summary>
+        static void SayFromPool(string said)
+        {
+            try { win.Dispatcher.BeginInvoke(new Action(delegate { Log(said); })); }
+            catch (Exception ex) { Swallow.Note("Shell.AskToHoldSteamUpdates, saying what happened", ex); LogOnly(said); }
         }
 
         /// <summary>

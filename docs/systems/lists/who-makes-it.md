@@ -153,7 +153,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Woodworker/Woodwright | 45 |  |
 | Farmer | 13 |  |
 | Fisher | 12 |  |
-| Gatherer | 47 |  |
+| Gatherer | 48 |  |
 | Hunter | 51 |  |
 | Miner | 22 |  |
 

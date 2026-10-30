@@ -158,16 +158,14 @@ fs.readdirSync(siteDir).filter(function (f) { return /\.md$/.test(f); }).forEach
   if (wrong.length) { yes('site/' + f + ' puts a choice in the launcher: "' + wrong[0] + '"', false); }
 });
 
-// The bare hall is how it works, not a bug, so since #3137 it is on the Help
-// page's Things that are normal here and not on Known Issues, which lists only
-// what is broken.
+// The bare hall is how it works, not a bug, so since #3137 it is not on Known
+// Issues, which lists only what is broken. Help's Things that are normal here
+// went on 26 Oct (Patrick), so the hall is said once, in Your first character.
 const rows = known.split('\n').filter(function (l) { return /^\|/.test(l); });
 yes('Known Issues no longer lists the creation hall',
     !rows.some(function (l) { return /\bhall\b/i.test(l); }));
-const normal = slice(help, '## Things that are normal here', '\n## ') || '';
-yes('Help lists the bare hall as normal, and says the panel on K opens by itself',
-    choosing !== null && /creation hall is a bare room/i.test(normal) &&
-    /\bpanel\b/i.test(normal) && /\b(by itself|on its own)\b/i.test(normal));
+yes('Help has no Things that are normal here section to repeat it in',
+    !/## Things that are normal here/.test(help));
 yes('nothing says nothing in the hall is a choice',
     !/nothing in the creation hall is a choice/i.test(help + known));
 yes('Help says only the town has to be chosen to leave, and the class and profession can wait',

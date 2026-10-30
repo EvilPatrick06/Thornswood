@@ -107,7 +107,8 @@ function Case([string]$bind, [string]$channel, [string]$voice, [string]$res) {
         }
         function Say($m, $c = 'Gray') { $script:said += ($c + ': ' + $m) }
         function Write-Host { }
-        function Invoke-RestMethod { return [pscustomobject]@{ build = 'b1'; bind = '127.0.0.1'; auth = 'on' } }
+        # What the site's /voice/health says to anybody since #3806: ok, and nothing more.
+        function Invoke-RestMethod { return [pscustomobject]@{ ok = $true } }
         . $decide
     }
     & $sb $bind $channel $answers
@@ -117,7 +118,7 @@ function Case([string]$bind, [string]$channel, [string]$voice, [string]$res) {
 $c = Case '127.0.0.1' 'dev' 'silent for 5 s' 'answered'
 Yes 'loopback, silent, and the dev server answers: correctly shut, in green' ($c.Said -match 'Green: Loopback only, and 192\.0\.2\.1:7789 is correctly shut from out here \(silent for 5 s\)')
 Yes '  asking the dev server''s 7788' ($c.Asked -join ',' -eq '7789,7788')
-Yes '  and says what carries it' ($c.Said -match 'Green: Reached it through https://example\.invalid/voice-dev')
+Yes '  and says what carries it' ($c.Said -match 'Green: Reached it through https://example\.invalid/voice-dev, which says ok')
 
 $c = Case '127.0.0.1' 'main' 'silent for 5 s' 'silent for 5 s'
 Yes 'loopback, silent, and live''s 3000 silent too (a cloud thread): not known, in yellow' ($c.Said -match 'Yellow: Loopback only, and whether 192\.0\.2\.1:7778 is shut from outside is not known: this machine reaches no raw port on the box')

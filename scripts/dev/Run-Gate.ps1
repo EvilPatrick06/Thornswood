@@ -11,8 +11,10 @@
 
   THE GATE. Every harness scripts\dev\Gate-Harnesses.ps1 lists, run through
   scripts\dev\Nightly-Harnesses.ps1 -Throttle at once with this build's
-  share of the cores: the machine's cores over the builds the box runs at
-  once, the runners records\build-runners.json lists.
+  share of the cores: the machine's cores over the builds it runs at once.
+  On the box those are the runners records\build-runners.json lists, on One
+  the off-box runners the runner records name for it (#3860), and on
+  GitHub's hosted runner one.
 
   ON MAIN, ON THE VPS. Patrick chose on 22 Oct 2026 (option A on his page,
   q-3114-map-refresh) that every main build's gate is traced, so pull
@@ -40,14 +42,25 @@
   that change can reach, printing why each one runs. Anything that goes
   wrong on the way (no map, a map that does not read, pick failing) runs
   the whole gate and says why; so does any change to the scripts that list,
-  choose and run the harnesses, and a GitHub-hosted runner, which has no map.
+  choose and run the harnesses.
+
+  OFF THE BOX (#4009). A runner with no gate-map of its own (One's runners,
+  GitHub's hosted runner, or a box runner before its first map) takes the
+  map main's own build last handed on, through scripts\dev\Gate-Map.ps1
+  -Fetch, with the job's token in GATE_MAP_TOKEN, and picks from it the same
+  way. Main's build hands the box's newest map on in its log (Gate-Map.ps1
+  -Hand, in build.yml after the gate). The token is taken out of the environment here,
+  before any harness starts. No map there either runs the whole gate.
 
   THE NOTE. It writes whole=true to the step's outputs only when every gate
   harness ran. build.yml keeps the note main's build looks for (#3182, the
-  job "tested") only then, so main skips its build only for a tree a pull
-  request ran the whole gate on, and otherwise builds in full and is
-  traced. Main and the nightly run the whole gate every time, so whatever a
-  harness left out would have caught is still caught there.
+  job "tested") only then, and only on GitHub's hosted runner (#3874), so
+  main skips its build only for a tree a pull request ran the whole gate on
+  where no map is kept, and otherwise builds in full and is traced. On the
+  VPS a whole gate means the map could not serve the pull request, and a
+  skipped main build would leave it so. Main and the nightly run the whole
+  gate every time, so whatever a harness left out would have caught is
+  still caught there.
 
   The trace task, the map's folders and how they are kept from the
   runners' accounts: scripts\dev\Trace-Gate-Task.ps1. Why a map is enough:
@@ -85,6 +98,9 @@ $Repo = Split-Path -Parent (Split-Path -Parent $Here)
 $Affected = Join-Path $Here 'Affected-Harnesses.js'
 
 function Say([string]$m) { Write-Host $m }
+# For Gate-Map.ps1 -Fetch only: no harness gets it (#4009).
+$mapToken = [string]$env:GATE_MAP_TOKEN
+Remove-Item -LiteralPath Env:GATE_MAP_TOKEN -ErrorAction SilentlyContinue
 function Set-StepOutput([string]$name, [string]$value) {
     if ($env:GITHUB_OUTPUT) { Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ($name + '=' + $value) }
 }
@@ -97,8 +113,30 @@ function Write-Whole([string]$file, [string]$text) {
 
 $gate = @(& (Join-Path $Here 'Gate-Harnesses.ps1'))
 if ($LASTEXITCODE -ne 0) { exit 1 }
-$builds = @((Get-Content -LiteralPath (Join-Path $Repo 'records\build-runners.json') -Raw | ConvertFrom-Json).runners).Count
+# This build's share of the cores: the machine's cores over the builds this
+# machine runs at once. On the box, the runners records\build-runners.json
+# lists (#2994). On One, the off-box runners the runner records name for this
+# machine: until 27 Oct 2026 One's builds took the box's count too, so each
+# of its five took six of its 22 cores, thirty at once; run 40455516666 on
+# thornswood-pr-one-5 had the cores 91% busy throughout and seven harnesses
+# killed at their 300 s clock (#3860). On GitHub's hosted runner, one.
+function Get-MachineBuilds {
+    if ($env:RUNNER_ENVIRONMENT -eq 'github-hosted') { return 1 }
+    $records = Join-Path $Repo 'records'
+    if ([string]$env:RUNNER_NAME -like 'thornswood-pr-*') {
+        $machine = $(if ($env:COMPUTERNAME) { [string]$env:COMPUTERNAME } else { [Environment]::MachineName })
+        $mine = '^' + [regex]::Escape('thornswood-pr-' + $machine.ToLower()) + '(-\d+)?$'
+        $named = @(Get-ChildItem -LiteralPath $records -Filter '*-runners.json' | ForEach-Object {
+            $rec = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+            if ($rec.PSObject.Properties['offBox']) { @($rec.offBox) }
+        } | ForEach-Object { [string]$_ } | Where-Object { $_ -match $mine } | Sort-Object -Unique)
+        return [Math]::Max(1, $named.Count)
+    }
+    return @((Get-Content -LiteralPath (Join-Path $records 'build-runners.json') -Raw | ConvertFrom-Json).runners).Count
+}
+$builds = Get-MachineBuilds
 $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
+Say ('{0} build(s) at once on this machine, so {1} of its {2} cores are this one''s.' -f $builds, $share, [Environment]::ProcessorCount)
 
 # The runner's own folder: RUNNER_TEMP is <runner>\_work\_temp there.
 $root = ''
@@ -106,14 +144,22 @@ if ($env:RUNNER_ENVIRONMENT -eq 'self-hosted' -and $env:RUNNER_TEMP) { $root = S
 
 # The harnesses a pull request's change can reach, or $null for the whole gate.
 function Select-Affected {
-    if (-not $root) { Say 'The whole gate runs: the traced map is on the VPS, and this runner is not.'; return $null }
-    $maps = Join-Path $root 'gate-map'
+    $maps = $(if ($root) { Join-Path $root 'gate-map' } else { '' })
+    if (-not $maps -or -not (Test-Path -LiteralPath (Join-Path $maps 'latest.json'))) {
+        $why = $(if ($maps) { 'there is no traced map in ' + $maps + ' yet' } else { 'the traced map is on the VPS, and this runner is not' })
+        # Off the box: the map main's build handed on in its log (#4009).
+        if (-not $env:RUNNER_TEMP) { Say ('The whole gate runs: ' + $why + '.'); return $null }
+        $maps = Join-Path $env:RUNNER_TEMP 'gate-map-fetched'
+        & (Join-Path $Here 'Gate-Map.ps1') -Fetch $maps -Token $mapToken 2>&1 | ForEach-Object { Say ([string]$_) }
+        if ($LASTEXITCODE -ne 0) { Say ('The whole gate runs: ' + $why + ', and none main''s build handed on could be used (the lines above say why).'); return $null }
+    }
     $latest = Join-Path $maps 'latest.json'
-    if (-not (Test-Path -LiteralPath $latest)) { Say ('The whole gate runs: there is no traced map in ' + $maps + ' yet.'); return $null }
     try {
         $m = [IO.File]::ReadAllText($latest) | ConvertFrom-Json
         if ([string]$m.commit -notmatch '^[0-9a-f]{40}$' -or [string]$m.key -notmatch '^\d+-\d+$') { Say ('The whole gate runs: ' + $latest + ' names no commit and run.'); return $null }
         $traces = Join-Path $maps ([string]$m.key + '.traces.jsonl.gz')
+        # Off the box, the map main's build built from them (#4009).
+        if (-not (Test-Path -LiteralPath $traces)) { $traces = Join-Path $maps ([string]$m.key + '.map.json') }
         $tree = Join-Path $maps ([string]$m.key + '.tree.gz')
         $read = $m.read
         if ($read -is [datetime]) { $read = $read.ToUniversalTime().ToString('yyyy-MM-dd HH:mm') + ' UTC' }

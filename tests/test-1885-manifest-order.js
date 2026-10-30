@@ -105,7 +105,6 @@ function disk(opts) {
   put("data/Embers XD.bsa", "archive bytes");
   if (opts.earlier) {
     put(DST, JSON.stringify({ versionMajor: 1, mods: [{ filename: "Old.esp", size: 1, crc32: 1 }], loadOrder: ["Old.esp"], served: [] }));
-    put("data/api/servers/thornswood/plugins/3.bin", "old");
   }
   const fake = {
     readFileSync: function (p) {
@@ -216,9 +215,8 @@ if (block) {
       JSON.stringify(a.manifest.loadOrder) === JSON.stringify(ORDER));
   yes("the launcher's Fix keeps its list: served names Thornswood-Content.esp and nothing else",
       !!a.manifest && JSON.stringify(a.manifest.served) === JSON.stringify(["Thornswood-Content.esp"]));
-  yes("and our plugin is beside it at its manifest position (" + OUR_AT + ".bin), the earlier start's file gone",
-      ("data/api/servers/thornswood/plugins/" + OUR_AT + ".bin") in a.files &&
-      !("data/api/servers/thornswood/plugins/3.bin" in a.files));
+  yes("and no plugin file is published beside it (#3386: Fix takes ours from the release)",
+      !(("data/api/servers/thornswood/plugins/" + OUR_AT + ".bin") in a.files));
   yes("the refusal block gets the list the client is compared with",
       Array.isArray(a.box.__thornswoodManifestMods) && a.box.__thornswoodManifestMods.length === ORDER.length);
 

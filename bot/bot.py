@@ -457,6 +457,10 @@ TROUBLE_FILE = os.environ.get(
     'TROUBLE_FILE', r'C:\Thornswood-Docs\data\for-bot\trouble.json')
 TROUBLE_EVERY = _int_env('TROUBLE_EVERY', 120)
 
+# Which message in Discord says which session went wrong, so the post goes
+# when its row leaves trouble.json (#3942). The bot's own, beside joins.json.
+TROUBLE_POSTS = os.path.join(DATA_DIR, 'trouble-posts.json')
+
 # Where the site writes what people send in on its public report page, read
 # the same way as trouble.json and said in the same staff channel.
 REPORTS_FILE = os.environ.get(
@@ -2236,24 +2240,85 @@ async def age_closed_tickets(guild, bot_id, now):
     return deleted, failed
 
 
+# THE STAFF TICKET LOG IS KEPT THE SAME 365 DAYS (#3634). The bot writes two
+# things into the TICKET_LOG channel: a whole ticket whose private thread
+# would not open (its title with the opener's name, the opener's mention and
+# every answer they typed), and a Closed line naming the thread, which is the
+# opener's name, at every close. age_closed_tickets deletes the threads and
+# never read this channel, so those copies had no keeping time while the
+# privacy page said a ticket goes after 365 days. Each of the bot's own
+# messages there now goes TICKET_KEEP_DAYS after it was posted: a fallback
+# ticket the same year as a ticket in a thread, and a Closed line the same
+# year as the thread it points at, which is deleted a year after that close.
+# Only the bot's own messages, and never in a channel tickets open off, so a
+# panel is never touched if TICKET_LOG is ever pointed at one.
+async def age_ticket_log(guild, bot_id, now):
+    """
+    Deletes the bot's own messages in this server's TICKET_LOG channels that
+    were posted more than TICKET_KEEP_DAYS before now, and returns (deleted,
+    failed). Said in bot.log as counts a channel, never what a message said.
+    A history that cannot be read, or a delete Discord refuses, is a line
+    with Discord's reason, and the message stays until the next pass.
+    """
+    if bot_id is None:
+        return 0, 0
+    cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
+    deleted = failed = 0
+    for ch in getattr(guild, 'text_channels', []):
+        name = (getattr(ch, 'name', '') or '').lower()
+        if name not in TICKET_LOG or name in TICKET_NAMES:
+            continue
+        due = []
+        try:
+            async for m in ch.history(limit=None, before=cut):
+                at = getattr(m, 'created_at', None)
+                if (getattr(getattr(m, 'author', None), 'id', None) == bot_id
+                        and isinstance(at, datetime.datetime)
+                        and at.tzinfo is not None and at < cut):
+                    due.append(m)
+        except Exception as e:
+            failed += 1
+            log('ticket log: could not read #%s of "%s", so none of it was '
+                'deleted this pass: %s: %s'
+                % (ch.name, guild.name, type(e).__name__, e))
+            continue
+        gone = 0
+        for m in due:
+            try:
+                await m.delete()
+            except Exception as e:
+                failed += 1
+                log('ticket log: could not delete message %s in #%s, posted '
+                    '%s: %s: %s' % (m.id, ch.name, m.created_at.date().isoformat(),
+                                    type(e).__name__, e))
+                continue
+            gone += 1
+        if gone:
+            deleted += gone
+            log('ticket log: deleted %d of the bot\'s messages in #%s posted '
+                'more than %d days ago' % (gone, ch.name, TICKET_KEEP_DAYS))
+    return deleted, failed
+
+
 async def watch_closed_tickets():
     """
-    Runs age_closed_tickets on every server as the bot comes up and every
-    TICKET_KEEP_EVERY seconds, like watch_join_numbers. Nothing in here may
-    end the loop: a pass that fails is said in bot.log, and the threads it
-    did not reach are there for the next one.
+    Runs age_closed_tickets and age_ticket_log on every server as the bot
+    comes up and every TICKET_KEEP_EVERY seconds, like watch_join_numbers.
+    Nothing in here may end the loop: a pass that fails is said in bot.log,
+    and the threads and messages it did not reach are there for the next one.
     """
     await client.wait_until_ready()
     while not client.is_closed():
         now = datetime.datetime.now(datetime.timezone.utc)
         bot_id = getattr(client.user, 'id', None)
         for gd in list(client.guilds):
-            try:
-                await age_closed_tickets(gd, bot_id, now)
-            except Exception:
-                log('closed tickets: the pass on "%s" stopped part way, so '
-                    'what it did not reach waits for the next one:\n%s'
-                    % (gd.name, traceback.format_exc()))
+            for age in (age_closed_tickets, age_ticket_log):
+                try:
+                    await age(gd, bot_id, now)
+                except Exception:
+                    log('closed tickets: the %s pass on "%s" stopped part way, '
+                        'so what it did not reach waits for the next one:\n%s'
+                        % (age.__name__, gd.name, traceback.format_exc()))
         await asyncio.sleep(TICKET_KEEP_EVERY)
 
 
@@ -4388,12 +4453,30 @@ TASK_TAG = 'Main'
 # not in the post (22 Oct).
 # 4 (and KNOWN_FORM 4, DEV_FORM 3): no post ends with a "---" rule or any
 # "Generated by/with" footer (Patrick, 22 Oct).
+# KNOWN_FORM 5: done-on-merge.yml's comment takes a known post down
+# (merged_fix, 26 Oct), so every finding's comments are read again once.
 TASK_FORM = 4
-KNOWN_FORM = 4
+KNOWN_FORM = 5
 DEV_FORM = 3
 # The board's column for a fix that is merged and waits on main
-# (done-on-merge.yml puts it on, with the test task).
+# (done-on-merge.yml puts it on, with the test task). The label is an
+# instruction, not a record: board-status.yml moves the card and takes it off
+# again within a minute (#2863), so a pass rarely sees it. What stays is
+# done-on-merge.yml's comment, written by the workflow and starting
+# "Pull request #N merged (", which Close-ShippedIssues.ps1 reads as well.
 BOARD_DONE = 'board: Done'
+DONE_ON_MERGE = re.compile(r'^Pull request #\d+ merged \(')
+DONE_ON_MERGE_BY = 'github-actions[bot]'
+
+
+def merged_fix(comments):
+    """True when done-on-merge.yml has written its record of a merged fix
+       on the issue: the issue is in Done and its fix has landed."""
+    for c in comments or []:
+        who = str(((c.get('user') or {}).get('login')) or '')
+        if who == DONE_ON_MERGE_BY and DONE_ON_MERGE.match(str(c.get('body') or '')):
+            return True
+    return False
 
 
 def _github_get(url):
@@ -5208,9 +5291,10 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     A known issue is a finding people still meet: an open issue labelled
     Dev Findings or Main Findings whose fix has not landed (Patrick, 22 Oct,
     and #3140). Its fix has landed when the issue gets a "Test task:"
-    comment or is on the board as Done (BOARD_DONE), which done-on-merge.yml
-    sets for a merged fix, with its test task; a closed or unlabelled issue
-    is not a finding at all. Then its post goes: the fix is a test task, not
+    comment or is in Done: done-on-merge.yml's comment on it (merged_fix),
+    or the board: Done label for the minute it is on (BOARD_DONE). A card
+    moved to Done by hand, with no merge, is not seen: the bot cannot read
+    the board. A closed or unlabelled issue is not a finding at all. Then its post goes: the fix is a test task, not
     a known issue. A merged pull request alone does not take it down: until
     26 Oct any one that named the issue did, and a measuring step on the
     scripts finding, a partial fix, and a Refs written by mistake each kept
@@ -5256,6 +5340,9 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         if _all_marked(issue, comments, TASK_MARK, room=None):
             why[key] = 'it has a "Test task:" comment'
             continue                # it has a test task: being checked, not known
+        if merged_fix(comments):
+            why[key] = 'done-on-merge wrote its merged fix on it'
+            continue                # fixed, waiting on main: not a known issue
         title, body, tags = known_of(issue, comments)
         taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items() if k != key]
         if refuse(state, 'known', num, post_problems(
@@ -5633,8 +5720,9 @@ def adopt_task(number, thread_id, path=None):
 #   known    the posts that are up in #known-issues, the same list, each as
 #            its title, its words and where it was found (Main, Dev). One
 #            rule decides both: known_issues_once.
-#   roadmap  every issue labelled "roadmap: now", "roadmap: next" or
-#            "roadmap: later", open, in that lane; closed as done, in Done.
+#   roadmap  every open issue labelled "roadmap: now", "roadmap: next" or
+#            "roadmap: later", in that lane. A closed one is off the
+#            roadmap: it has no Done lane (Patrick, 26 Oct).
 #            Its words are its last "Roadmap:" comment: the first line is
 #            what is being built (45 characters at most), the lines under it
 #            where it stands. The rules of a known issue hold for it (no
@@ -5653,7 +5741,6 @@ def adopt_task(number, thread_id, path=None):
 PUBLIC_LISTS_FILE = os.environ.get(
     'PUBLIC_LISTS_FILE', r'C:\Thornswood-Docs\data\from-bot\lists.json')
 ROADMAP_LANES = (('now', 'Being built now'), ('next', 'Next'), ('later', 'Later'))
-ROADMAP_DONE = 'Done'
 ROADMAP_MARK = re.compile(r'^\s*roadmap\s*:\s*(.*)$', re.I)
 
 
@@ -5705,31 +5792,27 @@ def roadmap_once(state, get=None, say=None):
     labelled issue's row by its updated_at, so comments are read only for an
     issue that changed (a label, a close and a comment all move it). Returns
     the roadmap as the site draws it: {lanes: [{name, rows: [{title, text}]}]},
-    the open lanes in order and Done last, each lane by issue number and Done
-    newest close first.
+    the lanes in order, each by issue number. Only open issues are read: the
+    roadmap has no Done lane (Patrick, 26 Oct, "Done section needs removed
+    from the roadmap"), so an issue that closes leaves it.
     """
     seen = {}
     for lane, _name in ROADMAP_LANES:
-        for state_ in ('open', 'closed'):
-            for num, issue in github_labelled(roadmap_label(lane), state_, get).items():
-                seen[num] = issue
+        for num, issue in github_labelled(roadmap_label(lane), 'open', get).items():
+            seen[num] = issue
     rec = state.setdefault('roadmap', {})
     for key in [k for k in rec if int(k) not in seen]:
         rec.pop(key, None)
         state['_dirty'] = True
     rows = dict((name, []) for _lane, name in ROADMAP_LANES)
-    rows[ROADMAP_DONE] = []
     for num in sorted(seen):
         issue = seen[num]
         key = str(num)
-        closed = str(issue.get('state')) != 'open'
-        if closed and str(issue.get('state_reason') or 'completed') != 'completed':
-            continue        # dropped or a duplicate: never built, so not Done
         have = rec.get(key)
         if not have or have.get('updated') != issue.get('updated_at'):
             title, body, problems = roadmap_of(issue, github_comments(num, get))
             lanes = roadmap_lanes_of(issue)
-            if len(lanes) > 1 and not closed:
+            if len(lanes) > 1:
                 problems = problems + ['Roadmap: the issue is in %s at once; '
                                        'one lane only.' % ', '.join(
                                            roadmap_label(l) for l in lanes)]
@@ -5739,17 +5822,10 @@ def roadmap_once(state, get=None, say=None):
             state['_dirty'] = True
         if refuse(state, 'roadmap', num, have.get('problems') or [], say):
             continue
-        row = {'title': have['title'], 'text': have['text'],
-               'closed': str(issue.get('closed_at') or '')}
-        if closed:
-            rows[ROADMAP_DONE].append(row)
-        else:
-            rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(row)
-    rows[ROADMAP_DONE].sort(key=lambda r: r['closed'], reverse=True)
-    lanes = [name for _lane, name in ROADMAP_LANES] + [ROADMAP_DONE]
-    return {'lanes': [{'name': name,
-                       'rows': [{'title': r['title'], 'text': r['text']}
-                                for r in rows[name]]} for name in lanes]}
+        rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(
+            {'title': have['title'], 'text': have['text']})
+    return {'lanes': [{'name': name, 'rows': rows[name]}
+                      for _lane, name in ROADMAP_LANES]}
 
 
 def known_list(state):
@@ -5947,6 +6023,11 @@ def _clock(ms):
 # own end-of-session upload, not a backlog, so its arrival is not called out.
 TROUBLE_LATE_MS = 5 * 60 * 1000
 
+# How every post _trouble_line makes begins, which is how the one-time look
+# through the channel (trouble_backfill) tells one from anything else the bot
+# says there.
+TROUBLE_HEAD = '**A session went wrong.**'
+
 
 def _trouble_line(row):
     """
@@ -5986,7 +6067,7 @@ def _trouble_line(row):
                     'so this is a late upload rather than a new failure.' % got)
 
     return (
-        '**A session went wrong.** %s, on %s%s.%s%s\n%s\n%s\n'
+        TROUBLE_HEAD + ' %s, on %s%s.%s%s\n%s\n%s\n'
         'The logs are on the sessions page under that session, '
         'and it is the red one.'
         % (who,
@@ -5998,9 +6079,196 @@ def _trouble_line(row):
            ('```\n%s\n```' % line[:400]) if line else ''))
 
 
+def _trouble_rows():
+    """
+    The rows in trouble.json, or None when the file is not there or cannot be
+    read. None is never taken for an empty file: a post is deleted because its
+    row has gone, so a file that could not be read must delete nothing.
+    """
+    try:
+        with open(TROUBLE_FILE, encoding='utf-8') as f:
+            rows = json.load(f)
+    except Exception:
+        return None
+    return rows if isinstance(rows, list) else None
+
+
+def _trouble_sessions(rows):
+    return set(r['session'] for r in rows
+               if isinstance(r, dict) and r.get('session'))
+
+
+def trouble_remember(sid, msg, path=None):
+    """Writes down which message said session sid went wrong."""
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None:
+        log('trouble: %s cannot be read, so the post for session %s is not '
+            'written down and will not be deleted when its logs go'
+            % (path, sid))
+        return False
+    posts = state.setdefault('posts', {})
+    posts[str(sid)] = {'channel': msg.channel.id, 'message': msg.id}
+    try:
+        _state_write(path, state)
+    except Exception as e:
+        log('trouble: could not write %s, so the post for session %s will not '
+            'be deleted when its logs go: %s: %s'
+            % (path, sid, type(e).__name__, e))
+        return False
+    return True
+
+
+async def trouble_forget(rows, path=None):
+    """
+    A FAILED SESSION'S POST GOES WHEN ITS ROW GOES (#3942). The post carries
+    the person's name and a line out of their logs. The site keeps the row in
+    trouble.json exactly as long as the session and its logs: it ages out at
+    365 days, stays while staff keep the session, and goes with a deletion
+    request (freshTrouble and the deletion sweep in site/server.js). The
+    oldest also goes past the file's last 200 rows. Nothing deleted the post,
+    so it stayed in the channel after all of that.
+
+    So every post this bot makes is written down against its session in
+    TROUBLE_POSTS, and here each one whose session is no longer in rows is
+    deleted. Returns (deleted, failed). A post already gone from Discord (staff
+    deleted it) is taken off the list; any other failure is a line with
+    Discord's reason, and the post stays on the list for the next pass. Said
+    in bot.log by session id and count, never what a post said.
+    """
+    if rows is None:
+        return 0, 0
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None:
+        log('trouble: %s cannot be read, so no post was deleted this pass'
+            % path)
+        return 0, 1
+    posts = state.get('posts') or {}
+    present = _trouble_sessions(rows)
+    deleted = failed = 0
+    changed = False
+    for sid in [k for k in posts if k not in present]:
+        rec = posts.get(sid) if isinstance(posts.get(sid), dict) else {}
+        try:
+            cid, mid = int(rec.get('channel')), int(rec.get('message'))
+        except (TypeError, ValueError):
+            log('trouble: the post for session %s has no message written down, '
+                'so it is taken off the list' % sid)
+            del posts[sid]
+            changed = True
+            continue
+        ch = client.get_channel(cid)
+        if ch is None:
+            failed += 1
+            log('trouble: channel %d of the post for session %s is not one this '
+                'bot can see, so it is not deleted this pass' % (cid, sid))
+            continue
+        try:
+            await ch.get_partial_message(mid).delete()
+            deleted += 1
+        except discord.NotFound:  # staff deleted it already: it is gone, as wanted
+            pass
+        except Exception as e:
+            failed += 1
+            log('trouble: could not delete the post for session %s: %s: %s'
+                % (sid, type(e).__name__, e))
+            continue
+        del posts[sid]
+        changed = True
+    if changed:
+        state['posts'] = posts
+        try:
+            _state_write(path, state)
+        except Exception as e:
+            log('trouble: could not write %s after deleting posts: %s: %s'
+                % (path, type(e).__name__, e))
+    if deleted:
+        log('trouble: deleted %d failed-session post(s) whose session has left '
+            'trouble.json' % deleted)
+    return deleted, failed
+
+
+def _trouble_post_matches(content, row):
+    """
+    True when a post the bot made before #3942 is about this row. The wording
+    has changed since the first posts (#532), so the row's own text is looked
+    for rather than the whole line: the name, and the log line in its code
+    block or, with no line, the reason.
+    """
+    if content == _trouble_line(row)[:1900]:
+        return True
+    who = row.get('name') or row.get('who') or ''
+    line = (row.get('line') or '').strip()
+    mark = ('```\n%s\n```' % line[:400]) if line else (row.get('why') or '')
+    return bool(who) and bool(mark) and who in content and mark in content
+
+
+async def trouble_backfill(rows, path=None):
+    """
+    The posts made before #3942 were never written down. Once, the first time
+    the bot comes up with this, it looks through the trouble channel for its
+    own posts that begin with TROUBLE_HEAD, writes down each whose row is still
+    in trouble.json, and deletes the rest, whose session and logs are already
+    gone. A post it cannot match to a row is one of those. Returns
+    (deleted, failed); with any failure the look runs again next start.
+    """
+    if rows is None:
+        return 0, 0
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None or state.get('backfilled'):
+        return 0, 0
+    ch = _trouble_channel()
+    bot_id = getattr(client.user, 'id', None)
+    if ch is None or bot_id is None:
+        return 0, 0
+    posts = state.setdefault('posts', {})
+    known = set(str(r.get('message')) for r in posts.values()
+                if isinstance(r, dict))
+    rows = [r for r in rows if isinstance(r, dict) and r.get('session')]
+    deleted = failed = 0
+    try:
+        async for m in ch.history(limit=None):
+            if getattr(getattr(m, 'author', None), 'id', None) != bot_id:
+                continue
+            content = getattr(m, 'content', '') or ''
+            if not content.startswith(TROUBLE_HEAD) or str(m.id) in known:
+                continue
+            row = next((r for r in rows if str(r['session']) not in posts
+                        and _trouble_post_matches(content, r)), None)
+            if row is not None:
+                posts[str(row['session'])] = {'channel': ch.id, 'message': m.id}
+                continue
+            try:
+                await m.delete()
+                deleted += 1
+            except discord.NotFound:  # already gone from the channel, as wanted
+                pass
+            except Exception as e:
+                failed += 1
+                log('trouble: could not delete an old failed-session post '
+                    '(%s): %s: %s' % (m.id, type(e).__name__, e))
+    except Exception as e:
+        failed += 1
+        log('trouble: could not read #%s for the old failed-session posts: '
+            '%s: %s' % (getattr(ch, 'name', '?'), type(e).__name__, e))
+    if not failed:
+        state['backfilled'] = True
+    try:
+        _state_write(path, state)
+    except Exception as e:
+        log('trouble: could not write %s after the look for old posts: %s: %s'
+            % (path, type(e).__name__, e))
+    log('trouble: the old failed-session posts: %d written down, %d deleted, '
+        '%d failed' % (len(posts), deleted, failed))
+    return deleted, failed
+
+
 async def watch_trouble():
     """
-    Say in the staff channel when a session goes wrong.
+    Say in the staff channel when a session goes wrong, and take the post down
+    when that session's logs go (trouble_forget).
 
     The site reads every session's logs as they arrive and appends the ones
     that went wrong to trouble.json. This reads that file and says each new one
@@ -6018,19 +6286,8 @@ async def watch_trouble():
     """
     await client.wait_until_ready()
 
-    def read_all():
-        try:
-            with open(TROUBLE_FILE, encoding='utf-8') as f:
-                rows = json.load(f)
-            return rows if isinstance(rows, list) else []
-        except Exception:
-            return []
-
     loop = asyncio.get_running_loop()
-    said = set()
-    for row in await loop.run_in_executor(None, read_all):
-        if isinstance(row, dict) and row.get('session'):
-            said.add(row['session'])
+    said = _trouble_sessions(await loop.run_in_executor(None, _trouble_rows) or [])
     ch = _trouble_channel()
     log('trouble: watching %s every %ds, speaking in %s, %d already there and '
         'treated as said'
@@ -6038,16 +6295,24 @@ async def watch_trouble():
            ('#' + ch.name) if ch is not None else 'NOWHERE, see above',
            len(said)))
 
+    first = True
     while not client.is_closed():
         try:
-            for row in await loop.run_in_executor(None, read_all):
+            rows = await loop.run_in_executor(None, _trouble_rows)
+            if first:
+                first = False
+                await trouble_backfill(rows)
+            for row in rows or []:
                 if not isinstance(row, dict):
                     continue
                 sid = row.get('session') or ''
                 if not sid or sid in said:
                     continue
                 said.add(sid)
-                await trouble_say(_trouble_line(row))
+                msg = await trouble_say(_trouble_line(row))
+                if msg is not None:
+                    trouble_remember(sid, msg)
+            await trouble_forget(rows)
         except Exception:
             log('trouble: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
@@ -6080,19 +6345,21 @@ def _trouble_channel():
 
 
 async def trouble_say(text):
-    """Say it once, in the staff channel. Same rules as watch_say."""
+    """Say it once, in the staff channel. Same rules as watch_say. The
+    message, or None when nothing was said."""
     ch = _trouble_channel()
     if ch is None:
-        return
+        return None
     try:
         # The line carries a name and a line from a log, both from somewhere
         # else. Mentions stay off, as in watch_say and report_say, so an
         # @everyone in it is text and not a ping.
-        await ch.send(text[:1900],
-                      allowed_mentions=discord.AllowedMentions.none())
+        return await ch.send(text[:1900],
+                             allowed_mentions=discord.AllowedMentions.none())
     except Exception:
         log('trouble: could not post in #%s:\n' % getattr(ch, 'name', '?')
             + traceback.format_exc())
+        return None
 
 
 # ------------------------------------------------------ the box's watchdog --
@@ -6539,6 +6806,8 @@ _MOD_DID = {
     'evict': 'ended the claim of %s',
     'rent': 'set the rent on the claim of %s',
     'norent': 'took the rent off the claim of %s',
+    # Rent handed over in person, marked paid on the Office page (#3895).
+    'rentpaid': 'marked rent paid by %s',
     # Staff on the world's card, the Office page of K (#513): the stage is
     # the who, and the why says from where, to where, and the force.
     'worldpropose': 'proposed moving the world to %s',

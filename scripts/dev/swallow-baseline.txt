@@ -189,7 +189,7 @@ scripts\vps\Check-Load.ps1 1
 scripts\vps\Check-ServerPriority.ps1 1
 scripts\vps\Check-Site.ps1 2
 scripts\vps\Fetch-Backups.ps1 1
-scripts\vps\Get-Logs.ps1 1
+scripts\vps\Get-Logs.ps1 0
 scripts\vps\Get-ProdFacts.ps1 1
 scripts\vps\Lock-VpsFolders.ps1 3
 scripts\vps\Prove-SecretOffCommandLines.ps1 2
