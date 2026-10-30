@@ -21,7 +21,7 @@
   that and the new plugin floats, which is the same load order mismatch this
   entry exists to stop, arriving one revision later with nobody connecting
   the two." Nothing read the rules against a list, so nothing would have said
-  so. This does. It says NO, and exits 1, for any of four things:
+  so. This does. It says NO, and exits 1, for any of five things:
 
     - a full plugin the list enables that no rule names. It floats. The next
       upload needs a rule loading it after the full plugin above it.
@@ -30,9 +30,14 @@
       order, so LOOT is free to swap them.
     - a full plugin a rule names that the list does not enable, which means
       the collection and the list disagree about what is in the order.
+    - a rule that goes round in a circle with the order the game itself
+      sets (every master first, each plugin after its own masters), light
+      plugins included. LOOT can never keep it and says "cyclic interaction"
+      on every install, as revision 5's cheddars_mashups.esl rule did
+      (PluginRuleLoops.ps1).
 
   Light plugins (an .esl, or the ESL flag in the header, read out of the Data
-  folder) are left out, because the server's position check leaves them out
+  folder) are left out of the first four, because the server's position check leaves them out
   and LOOT moving one changes nothing it counts. So are the five base masters,
   which the game loads first whatever any list says. Only "after" and
   "before" rules are read. A collection that ordered plugins by LOOT groups
@@ -77,6 +82,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'LoadOrder.ps1')
+. (Join-Path $Here 'PluginRuleLoops.ps1')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Stop-Check([string]$m) {
@@ -340,6 +346,27 @@ if ($edges.Count -eq 0) {
     [void]$out.Add($n + ': a rule names it and the list does not enable it.')
   }
   Verdict 'every full plugin a rule names is enabled in the list' $out.ToArray()
+
+  # Five: a rule that goes round in a circle with the order the game sets,
+  # every master first and each plugin after its own masters. Light plugins
+  # count here: revision 5's cheddars_mashups.esl, an .esl and so a master,
+  # was ruled to load after three plugins that are not, and every clean
+  # install got LOOT's "cyclic interaction" for each (27 Oct). The headers
+  # are read out of Data, found by name in any case as in Four.
+  $headers = @{}
+  $inData = @{}
+  foreach ($f in @([IO.Directory]::EnumerateFiles($Data))) { $leaf = [IO.Path]::GetFileName($f); if (-not $inData.ContainsKey($leaf.ToLowerInvariant())) { $inData[$leaf.ToLowerInvariant()] = $f } }
+  foreach ($n in @($lineOf.Keys) + @($script:LoadOrderMasters)) {
+    $path = $inData[$n.ToLowerInvariant()]
+    if (-not $path) { continue }
+    $h = Read-PluginRuleHeader $path
+    if ($null -ne $h) { $headers[$n] = $h }
+  }
+  $out = New-Object Collections.Generic.List[string]
+  foreach ($l in @(Get-PluginRuleLoops $rules $headers)) {
+    [void]$out.Add($l.Loop + ': ' + ($l.Why -join '; ') + '. The rule "' + $l.After + ' loads after ' + $l.Before + '" can never hold, so LOOT reports a cyclic interaction on every install.')
+  }
+  Verdict 'no rule goes round in a circle with the order the game sets' $out.ToArray()
 }
 
 Write-Host ''
