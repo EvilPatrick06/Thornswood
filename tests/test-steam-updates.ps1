@@ -39,8 +39,16 @@
   should write this so it doesn't auto update the game and people have to re
   do the downgrade again"). On the way in, with Steam closed, it is written
   with nothing to ask; with Steam open, a question whose Yes closes Steam,
-  waits for it to be gone, writes and starts Steam again, and whose No is
-  remembered. The same question follows every downgrade that works.
+  waits for it to be gone, writes and starts Steam again.
+
+  ALWAYS HELD, AND NO IS NOT NOW (#3600, Patrick, 27 Oct). A No used to be
+  remembered and the question said "No leaves it as it is", while a start
+  with Steam closed wrote the setting anyway, and this harness held both at
+  once. Now No only means "do not close Steam now": nothing remembers it, the
+  next start with Steam closed writes it and one with Steam open asks again,
+  and the question says that before No is pressed. A Yes whose Steam takes
+  longer than a minute to close is waited for, and Steam is started again
+  whatever happens once it was asked to exit; it used to stay closed.
 
   WHY THE READ-ONLY MARK IS NOT NEEDED FOR THE GAME (measured 29 September,
   read only): Thornswood runs its own folder, whose exe, root files and
@@ -373,7 +381,7 @@ try {
     Yes ('no launcher file sets the read-only mark on anything' + $(if ($marks.Count) { ': ' + (($marks | ForEach-Object { $_.Name }) -join ', ') } else { '' })) ($marks.Count -eq 0)
 
     # Bytes that are not ASCII, a byte order mark, and CRLF, all kept.
-    $name = 'C:\\Users\\Zo' + [char]0x00EB + '\\Steam\\steam.exe'
+    $name = 'C:\\Games\\Caf' + [char]0x00E9 + '\\Steam\\steam.exe'
     $utf = [Text.Encoding]::UTF8.GetBytes((Acf 'absent' "`r`n").Replace('C:\\Program Files (x86)\\Steam\\steam.exe', $name))
     $bytes = New-Object byte[] ($utf.Length + 3)
     $bytes[0] = 0xEF; $bytes[1] = 0xBB; $bytes[2] = 0xBF
@@ -410,21 +418,22 @@ try {
     # update the game and people have to re do the downgrade again". Until then
     # the setting was only offered right after a downgrade. Now the start sets
     # it itself: with Steam closed at once, with Steam open through a question
-    # whose Yes closes Steam, writes and starts Steam again.
-    $mOnStart = Method 'OnStart' @([bool], [bool], [bool], [bool])
-    function OnStart([bool]$needs, [bool]$steam, [bool]$game, [bool]$declined) { return [string]$mOnStart.Invoke($null, [object[]]@($needs, $steam, $game, $declined)) }
+    # whose Yes closes Steam, writes and starts Steam again. Patrick, 27 Oct
+    # (#3600): always, so nothing the person answered goes into OnStart.
+    $mOnStart = Method 'OnStart' @([bool], [bool], [bool])
+    Yes 'OnStart takes no answer of the person''s, so no No can stop the start writing it' (($null -ne $mOnStart) -and (@($T.GetMethods($flags) | Where-Object { $_.Name -eq 'OnStart' }).Count -eq 1))
+    function OnStart([bool]$needs, [bool]$steam, [bool]$game) { return [string]$mOnStart.Invoke($null, [object[]]@($needs, $steam, $game)) }
     $W = [string]$T.GetField('Write', $flags).GetValue($null)
     $A = [string]$T.GetField('Ask', $flags).GetValue($null)
     $N = [string]$T.GetField('Nothing', $flags).GetValue($null)
     Yes 'the three answers are different words' ((@($W, $A, $N) | Sort-Object -Unique).Count -eq 3)
     Yes 'held already: the start does nothing, whatever else is true' ((@(
-        (OnStart $false $false $false $false), (OnStart $false $true $false $false),
-        (OnStart $false $false $true $true), (OnStart $false $true $true $true)) | Where-Object { $_ -ne $N }).Count -eq 0)
-    Yes 'not held and Steam closed: written with nothing to ask' ((OnStart $true $false $false $false) -ceq $W)
-    Yes '  even after a No, since nothing is closed under anybody' ((OnStart $true $false $false $true) -ceq $W)
-    Yes 'not held and Steam open: the question' ((OnStart $true $true $false $false) -ceq $A)
-    Yes '  but not while Skyrim runs, which needs Steam' ((OnStart $true $true $true $false) -ceq $N)
-    Yes '  and not again at the start once the person said No' ((OnStart $true $true $false $true) -ceq $N)
+        (OnStart $false $false $false), (OnStart $false $true $false),
+        (OnStart $false $false $true), (OnStart $false $true $true)) | Where-Object { $_ -ne $N }).Count -eq 0)
+    $closedWrites = (OnStart $true $false $false) -ceq $W
+    Yes 'not held and Steam closed: written with nothing to ask' $closedWrites
+    Yes 'not held and Steam open: the question, at every such start' ((OnStart $true $true $false) -ceq $A)
+    Yes '  but not while Skyrim runs, which needs Steam' ((OnStart $true $true $true) -ceq $N)
 
     # Only before Thornswood's own folder exists (#1226, Patrick, 29 Sep):
     # "after that, people's Steam copy is theirs to update however they like".
@@ -434,28 +443,42 @@ try {
     Yes '  not while a downgrade is needed first' (-not (Looks $false $true))
     Yes '  and never once the own folder exists, whatever else is true' ((-not (Looks $true $false)) -and (-not (Looks $true $true)))
 
-    $mQuestion = Method 'Question' @([string], [bool])
-    function Question([string]$m, [bool]$steam) { return [string]$mQuestion.Invoke($null, [object[]]@($m, $steam)) }
+    # The question is only put while Steam is open, so it has no Steam-closed
+    # form, and it asks to close Steam now, not whether to change the setting.
+    $mQuestion = Method 'Question' @([string])
+    function Question([string]$m) { return [string]$mQuestion.Invoke($null, [object[]]@($m)) }
+    $notNow = [string]$T.GetField('NotNow', $flags).GetValue($null)
     Put (Acf '0')
-    $q = Question $m $true
-    Yes 'the question says what Yes changes, in Steam''s own words, and where' (($q -like '*Yes changes Steam''s Updates setting for Skyrim to "Wait until I launch the game"*') -and ($q -like '*Automatic Updates*') -and ($q -like ('*' + $m + '*')))
+    $q = Question $m
+    Yes 'the question says what the launcher changes, in Steam''s own words, and where' (($q -like '*the launcher changes Steam''s Updates setting for Skyrim to "Wait until I launch the game"*') -and ($q -like '*Automatic Updates*') -and ($q -like ('*' + $m + '*')))
     Yes 'says Thornswood never starts Skyrim through Steam' ($q -like '*never starts Skyrim through Steam*')
-    Yes 'with Steam open, says Yes closes Steam and starts it again' ($q -like '*Yes closes Steam, makes the change and starts Steam again*')
-    Yes 'and No leaves it' ($q -like '*No leaves it as it is*')
-    Yes 'with Steam closed, says nothing about closing it' ((Question $m $false) -notlike '*closes Steam*')
+    Yes 'asks to close Steam now, and says Yes closes Steam and starts it again' (($q -like '*Close Steam now?*') -and ($q -like '*Yes closes Steam, makes the change and starts Steam again*'))
+    # #3600: these two are one check, so the start and the question can no
+    # longer each pass while saying different things. The start writes with
+    # Steam closed whatever was answered, so No has to say so before it is
+    # pressed, and nothing may still say No leaves the setting alone.
+    Yes 'No is not now, and says what the start then does, the same as the start does it' (
+        $closedWrites -and ((OnStart $true $true $false) -ceq $A) -and
+        ($q -like ('*' + $notNow)) -and
+        ($notNow -like '*makes the change by itself the next time it starts while Steam is closed*') -and
+        ($notNow -like '*asks again the next time it starts while Steam is open*') -and
+        ($q -notlike '*leaves it as it is*'))
     Yes 'a writable file is not called read only' ($q -notlike '*read only*')
     [IO.File]::SetAttributes($m, [IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Archive)
-    Yes 'a read-only file on 0: Yes also takes the mark off' ((Question $m $true) -like '*marked read only*Yes also takes that mark off*')
+    Yes 'a read-only file on 0: the launcher also takes the mark off' ((Question $m) -like '*marked read only*The launcher also takes that mark off*')
     Put (Acf '1')
     [IO.File]::SetAttributes($m, [IO.FileAttributes]::ReadOnly -bor [IO.FileAttributes]::Archive)
-    $q1 = Question $m $true
-    Yes 'on 1 and read only, as Patrick''s is: the question says it is already held and Yes only takes the mark off' (($q1 -like '*already "Wait until I launch the game"*') -and ($q1 -like '*Yes takes that mark off and changes nothing in the file*') -and ($q1 -like '*Yes closes Steam*'))
+    $q1 = Question $m
+    Yes 'on 1 and read only, as Patrick''s is: the question says it is already held and only the mark comes off' (($q1 -like '*already "Wait until I launch the game"*') -and ($q1 -like '*takes that mark off and changes nothing in the file*') -and ($q1 -like '*Close Steam now?*') -and ($q1 -like ('*' + $notNow)))
     [IO.File]::SetAttributes($m, [IO.FileAttributes]::Normal)
 
     $mWait = Method 'WaitClosed' @([int])
     if (@(Get-Process -Name steam -ErrorAction SilentlyContinue).Count -eq 0) {
         $t0 = [DateTime]::UtcNow
         Yes 'with no Steam running, waiting for it to close answers at once' (([bool]$mWait.Invoke($null, [object[]]@(5))) -and (([DateTime]::UtcNow - $t0).TotalSeconds -lt 2))
+        $noLimit = [int]$T.GetField('NoLimit', $flags).GetValue($null)
+        $t0 = [DateTime]::UtcNow
+        Yes '  and so does waiting with no limit' (($noLimit -lt 0) -and ([bool]$mWait.Invoke($null, [object[]]@($noLimit))) -and (([DateTime]::UtcNow - $t0).TotalSeconds -lt 2))
     } else {
         $t0 = [DateTime]::UtcNow
         $r = [bool]$mWait.Invoke($null, [object[]]@(1))
@@ -490,26 +513,44 @@ try {
     Yes 'exactly one launcher file writes the setting, ShellSteamUpdates.cs' (($writers.Count -eq 1) -and ($writers[0].Name -eq 'ShellSteamUpdates.cs'))
 
     $start = Body $askSrc 'static void HoldSteamUpdatesOnStart()'
-    Yes 'the start decides by OnStart, with the game''s state and the remembered No' (($start -match 'SteamUpdates\.OnStart\(SteamUpdates\.NeedsHolding\(manifest\), SteamUpdates\.SteamRunning\(\), playing, cfg\.SteamUpdatesDeclined\)'))
+    Yes 'the start decides by OnStart, with the game''s state and nothing the person answered' (($start -match 'SteamUpdates\.OnStart\(SteamUpdates\.NeedsHolding\(manifest\), SteamUpdates\.SteamRunning\(\), playing\)'))
     Yes 'and writes only when it says Write' ($start -match 'if \(what == SteamUpdates\.Write\) \{ Log\(SteamUpdates\.Hold\(manifest\)\); return; \}')
     Yes 'otherwise logs the start line' ($start -match 'SteamUpdates\.Report\(target\)')
     Yes 'and puts the question once the window is idle, only when it says Ask' (($start -match 'if \(what != SteamUpdates\.Ask\) return;') -and ($start -match 'AskToHoldSteamUpdates\(\)') -and ($start -match 'DispatcherPriority\.ApplicationIdle'))
 
     $ask = Body $askSrc 'static void AskToHoldSteamUpdates()'
+    $close = Body $askSrc 'static string CloseSteamAndHold(string manifest)'
     $yesAt = $ask.IndexOf('MessageBoxResult.Yes')
     $gameAt = $ask.IndexOf('Checks.GameRunning()')
-    $exitAt = $ask.IndexOf('"steam://exit"')
-    $waitAt = $ask.IndexOf('SteamUpdates.WaitClosed(')
-    $holdAt = $ask.IndexOf('SteamUpdates.Hold(')
-    $holdClosedAt = $ask.IndexOf('SteamUpdates.Hold(manifest, false)')
+    $closedAt = $ask.IndexOf('if (!SteamUpdates.SteamRunning()) { Log(SteamUpdates.Hold(manifest)); return; }')
+    $showAt = $ask.IndexOf('MessageBox.Show(')
     Yes 'the question is never put while Skyrim runs' (($gameAt -ge 0) -and ($gameAt -lt $yesAt))
-    Yes 'every write in it comes after the person pressed Yes' (($yesAt -ge 0) -and ($holdAt -gt $yesAt))
-    Yes 'with Steam open, Yes closes Steam and waits for it to be gone before writing' (($exitAt -gt $yesAt) -and ($waitAt -gt $exitAt) -and ($holdClosedAt -gt $waitAt))
-    Yes 'and only writes when it did close' ($ask -match 'if \(!SteamUpdates\.WaitClosed\(60\)\)')
-    Yes 'then starts Steam again' ($ask.IndexOf('StartSteamAgain()') -gt $holdClosedAt)
-    Yes 'the wait is off the window''s thread' ($ask -match 'ThreadPool\.QueueUserWorkItem')
-    Yes 'No is remembered, and the log says how to do it in Steam' (($ask -match 'cfg\.SteamUpdatesDeclined = true;') -and ($ask -match 'SteamUpdates\.How'))
-    Yes 'the question is SteamUpdates.Question, the one tested above' ($ask -match 'SteamUpdates\.Question\(manifest, steamUp\)')
+    Yes 'nor with Steam closed by then, which is written with nothing to ask, as the start does' (($closedAt -gt $gameAt) -and ($closedAt -lt $showAt))
+    Yes 'the only other write is Yes''s, off the window''s thread' (([regex]::Matches($ask, 'SteamUpdates\.Hold\(')).Count -eq 1 -and ($ask -match 'ThreadPool\.QueueUserWorkItem') -and ($ask.IndexOf('CloseSteamAndHold(manifest)') -gt $yesAt))
+    Yes 'No is not now: nothing is remembered, and the log says the same as the question and how to do it in Steam' (
+        ($ask -match 'Log\(SteamUpdates\.NotNow \+ " " \+ SteamUpdates\.How\);') -and ($askSrc -notmatch 'cfg\.SteamUpdates') -and ($ask -notmatch 'leaves it as it is|as it is\.'))
+    Yes 'the question is SteamUpdates.Question, the one tested above' ($ask -match 'SteamUpdates\.Question\(manifest\)')
+
+    # Yes, in CloseSteamAndHold (#3600). The exit request cannot be taken
+    # back, so the minute only decides when the person is told; the wait goes
+    # on until Steam has gone, and every way out after the request starts
+    # Steam again. Until then a timed out Yes said "nothing was changed" and
+    # left Steam closed.
+    $exitAt = $close.IndexOf('asked = Downgrade.AskSteam("steam://exit", LogOnly);')
+    $waitAt = $close.IndexOf('SteamUpdates.WaitClosed(60)')
+    $stillAt = $close.IndexOf('SayFromPool(SteamUpdates.StillClosing);')
+    $onAt = $close.IndexOf('SteamUpdates.WaitClosed(SteamUpdates.NoLimit)')
+    $holdAt = $close.IndexOf('SteamUpdates.Hold(manifest, false)')
+    $catchAt = $close.IndexOf('catch (Exception ex)')
+    $againAt = $close.IndexOf('if (asked)')
+    Yes 'Yes asks Steam to exit and goes no further when it could not be asked' (($exitAt -ge 0) -and ($close -match 'if \(!asked\)\s+said = "Steam could not be asked to close, so nothing was changed\. "'))
+    Yes 'then waits for it to be gone before writing' (($waitAt -gt $exitAt) -and ($holdAt -gt $waitAt) -and ($close -match 'said = closed\s+\? SteamUpdates\.Hold\(manifest, false\)'))
+    Yes 'after a minute says Steam is still closing, and keeps waiting rather than giving up' (($stillAt -gt $waitAt) -and ($onAt -gt $stillAt) -and ($onAt -lt $holdAt) -and ($close -notmatch 'nothing was changed, and the launcher asks again'))
+    Yes 'and starts Steam again outside every branch, after the catch, whenever Steam was asked to exit' (
+        ($catchAt -gt $holdAt) -and ($againAt -gt $catchAt) -and ($close.IndexOf('StartSteamAgain()') -gt $againAt) -and
+        (([regex]::Matches($askSrc, 'StartSteamAgain\(\);')).Count -eq 1))
+    $still = [string]$T.GetField('StillClosing', $flags).GetValue($null)
+    Yes 'the still-closing line says Steam was asked to exit and what happens if the launcher closes first' (($still -like '*asked to close*') -and ($still -like '*starts Steam again*') -and ($still -like '*start Steam yourself*') -and ($still -like '*next time it starts while Steam is closed*'))
     $again = Body $askSrc 'static void StartSteamAgain()'
     # Since #2627 the start is Upkeep.StartSteam, which Fix also runs when
     # Scan finds Steam not running; StartSteamAgain hands on to it.
@@ -519,13 +560,13 @@ try {
     }
     Yes 'Steam starts again in the tray, with its link as the fallback' (($again -match '"-silent"') -and ($again -match 'steam://open/main'))
     $cfgSrc = Get-Content -LiteralPath (Join-Path $AppPath 'Config.cs') -Raw
-    Yes 'the remembered No is a config setting that starts off false' ($cfgSrc -match '\[DataMember\] public bool SteamUpdatesDeclined = false;')
+    Yes 'no config setting remembers a No' ($cfgSrc -notmatch 'SteamUpdatesDeclined')
 
     $down = Body $shell 'static void RunDowngrade()'
     # Since #1218 the downgrade never writes the Steam copy, so there is nothing
     # there for the setting to hold afterwards, and the question does not
     # follow it (test-own-folder-alone.ps1).
-    Yes 'the question does not follow a downgrade, which no longer writes the Steam copy' (($down.Length -gt 0) -and ($down -notmatch 'AskToHoldSteamUpdates') -and ($ask -notmatch 'SteamUpdatesDeclined\)'))
+    Yes 'the question does not follow a downgrade, which no longer writes the Steam copy' (($down.Length -gt 0) -and ($down -notmatch 'AskToHoldSteamUpdates'))
     Yes 'the start calls it only before the own folder exists and once no downgrade is needed' ($shell -match 'if \(SteamUpdates\.LooksAtStart\(!Paths\.Collection, Downgrade\.Needed\(cfg\)\)\) HoldSteamUpdatesOnStart\(\);')
     Yes 'and reads Steam''s file for the Steam copy, never Thornswood''s folder' (($start -match 'string target = OwnGame\.Source\(cfg\);') -and ($ask -match 'SteamUpdates\.ManifestFor\(OwnGame\.Source\(cfg\)\)'))
     Yes 'the start line is read only there' ((([regex]::Matches($shell + $askSrc, 'SteamUpdates\.Report\(')).Count -eq 1) -and ($start -match 'SteamUpdates\.Report\('))

@@ -63,7 +63,7 @@
 
   A SHARE, AND MORE ONLY INTO FREE CORES (#3114, 22 Oct 2026). Up to -Share
   run at once whatever the machine is doing: that is this run's part of the
-  cores beside the other builds the box runs at once. Past it, up to
+  cores beside the other builds the machine runs at once. Past it, up to
   -Throttle, another starts only into a core the machine has free: the
   processor is read every half second, and after each reading no more of
   those start than it had cores idle. So a build alone on the box uses the
@@ -290,6 +290,25 @@ function Idle-Cores($a, $b) {
     [Math]::Floor($cores * (100 - [Math]::Min(100, [Math]::Max(0, $busy))) / 100 + 1e-9)
 }
 
+# One git setting for every git a harness starts, through git's own
+# GIT_CONFIG_COUNT / GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n, after the ones
+# already there. Hands back what was there, for Undo-GitSetting.
+function Add-GitSetting([string]$Key, [string]$Value) {
+    $was = $env:GIT_CONFIG_COUNT
+    $n = 0
+    if ($was -match '^\d+$') { $n = [int]$was }
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_KEY_' + $n), $Key)
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_VALUE_' + $n), $Value)
+    $env:GIT_CONFIG_COUNT = [string]($n + 1)
+    return [pscustomobject]@{ Count = $was; Index = $n }
+}
+function Undo-GitSetting($was) {
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_KEY_' + $was.Index), $null)
+    [Environment]::SetEnvironmentVariable(('GIT_CONFIG_VALUE_' + $was.Index), $null)
+    if ($null -eq $was.Count) { Remove-Item Env:\GIT_CONFIG_COUNT -ErrorAction SilentlyContinue }
+    else { $env:GIT_CONFIG_COUNT = $was.Count }
+}
+
 # Start-Process joins -ArgumentList with spaces and quotes nothing, so a path
 # is quoted here. $p.Handle is read at once because without it ExitCode comes
 # back empty once the process is gone.
@@ -300,12 +319,24 @@ function Start-One($t) {
     if ($t.File.Extension -eq '.js') { $exe = 'node'; $argList = @('"' + $t.File.FullName + '"') }
     else { $exe = 'pwsh'; $argList = @('-NoProfile', '-File', ('"' + $t.File.FullName + '"')) }
     if (-not $onWindows) { $env:THORNSWOOD_NIGHTLY_RUN = $mark }
+    # Git's auto maintenance off for the harness and all it starts (#3835).
+    # A commit, fetch, merge or pull starts `git maintenance run --auto`
+    # after it, a process of its own that a scratch clone has no use for.
+    # Counted on the box on 26 Oct 2026: a commit is 3 processes with it and
+    # 2 without, and each process start costs Defender about 4.5 ms of
+    # processor beside its own. Added after any git settings this process
+    # already carries; a harness that sets GIT_CONFIG_COUNT itself replaces
+    # them for its own git.
+    $gitWas = Add-GitSetting 'maintenance.auto' 'false'
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $before = [DateTime]::UtcNow
     try {
         $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
                -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
-    } finally { Remove-Item Env:\THORNSWOOD_NIGHTLY_RUN -ErrorAction SilentlyContinue }
+    } finally {
+        Remove-Item Env:\THORNSWOOD_NIGHTLY_RUN -ErrorAction SilentlyContinue
+        Undo-GitSetting $gitWas
+    }
     $null = $p.Handle
     $job = [IntPtr]::Zero
     if ($onWindows) {

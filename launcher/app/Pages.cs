@@ -18,7 +18,7 @@ namespace Thornswood
     static partial class Shell
     {
         static TextBlock txtSrvAddress, txtSrvState, txtSrvPingNote,
-                         txtBuildHead, txtBuildSummary, txtDiagNote, txtThemeNote;
+                         txtBuildHead, txtBuildSummary, txtDiagNote, txtDiagHolds, txtThemeNote;
         static StackPanel srvPingBars, srvRows, buildBars, buildRows, controlsList, diagReadings, diagCollection, diagAddons;
         static Button btnSrvCopy, btnSrvRetest, btnBuildRefresh, btnDiagBundle, btnDiagOpen;
 
@@ -33,7 +33,7 @@ namespace Thornswood
             txtSrvAddress = F<TextBlock>("TxtSrvAddress"); txtSrvState = F<TextBlock>("TxtSrvState");
             txtSrvPingNote = F<TextBlock>("TxtSrvPingNote");
             txtBuildHead = F<TextBlock>("TxtBuildHead"); txtBuildSummary = F<TextBlock>("TxtBuildSummary");
-            txtDiagNote = F<TextBlock>("TxtDiagNote"); txtThemeNote = F<TextBlock>("TxtThemeNote");
+            txtDiagNote = F<TextBlock>("TxtDiagNote"); txtDiagHolds = F<TextBlock>("TxtDiagHolds"); txtThemeNote = F<TextBlock>("TxtThemeNote");
             srvPingBars = F<StackPanel>("SrvPingBars"); srvRows = F<StackPanel>("SrvRows");
             buildBars = F<StackPanel>("BuildBars"); buildRows = F<StackPanel>("BuildRows");
             controlsList = F<StackPanel>("ControlsList"); diagReadings = F<StackPanel>("DiagReadings");
@@ -51,6 +51,7 @@ namespace Thornswood
             // somewhere it should not be. It stays in config.json where it is
             // needed and off every page where it is not.
             btnSrvCopy.Visibility = Visibility.Collapsed;
+            txtDiagHolds.Text = Diag.WhatTheReportHolds();
             btnSrvRetest.Click += delegate { StartPing(); Log("Testing the server."); };
             btnBuildRefresh.Click += delegate { buildSizes = null; BuildInstalled(); };
             btnDiagOpen.Click += delegate

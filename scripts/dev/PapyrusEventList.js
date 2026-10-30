@@ -61,6 +61,13 @@ const FILES = {
 const STANDARD_DIR = 'skymp5-server/standard_scripts';
 const DATA_PEX_DIR = 'skymp5-scripts/pex';
 const SERVER_CPP = 'skymp5-server/cpp';
+// The searches readClient and readServer make, read together up front.
+const SEARCHES = [
+  ['blockPapyrusEvents(false)', 'skymp5-client/src'],
+  ['SendPapyrusEvent', SERVER_CPP],
+  ['GetPapyrusVm().AddObject', SERVER_CPP],
+  ['disableVanillaScriptsInExterior', 'skymp5-server'],
+];
 
 // ------------------------------------------------------------- reading git --
 
@@ -89,29 +96,99 @@ function hasCommit(fork, commit) {
   }
 }
 
+// What the reader reads at one commit. Each git started on the build box is
+// a process, two behind Git's cmd\git.exe, and a Defender scan, and one list
+// was about fifteen of them, a git show for every file and a git grep for
+// every name (#3835). So the files, the folder listings and the searches a
+// list needs are each read in one git (prefetch), and kept; a read nothing
+// asked for beforehand still works, in a git of its own.
 function Source(fork, commit) {
   this.fork = fork;
   this.commit = commit;
+  this.blobs = {};   // path -> text, or null where the commit has no file there
+  this.listed = {};  // folder -> its file names
+  this.found = {};   // needle + '\0' + folder -> the files that hold it
 }
+const has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+
+// Files' text at the commit, from one git cat-file --batch.
+Source.prototype.read = function (rels) {
+  const self = this;
+  const want = rels.filter(function (r) { return !has(self.blobs, r); });
+  if (!want.length) { return; }
+  const out = execFileSync('git', ['-C', this.fork, 'cat-file', '--batch'], {
+    input: want.map(function (r) { return self.commit + ':' + r + '\n'; }).join(''),
+    stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 });
+  let at = 0;
+  want.forEach(function (r) {
+    const nl = out.indexOf(10, at);
+    const head = out.toString('utf8', at, nl);
+    at = nl + 1;
+    // "<object> <type> <size>", or "<what was asked> missing".
+    const m = /^[0-9a-f]{40,64} (\w+) (\d+)$/.exec(head);
+    if (!m) { self.blobs[r] = null; return; }
+    const size = Number(m[2]);
+    self.blobs[r] = m[1] === 'blob' ? out.toString('utf8', at, at + size) : null;
+    at += size + 1;
+  });
+};
 Source.prototype.show = function (rel) {
-  return gitIn(this.fork, ['show', this.commit + ':' + rel]).split('\r').join('');
+  this.read([rel]);
+  if (this.blobs[rel] === null) { throw new Error(rel + ' is not a file at ' + this.commit); }
+  return this.blobs[rel].split('\r').join('');
+};
+
+// The names in folders at the commit, from one git ls-tree.
+Source.prototype.list = function (dirs) {
+  const self = this;
+  const want = dirs.filter(function (d) { return !has(self.listed, d); });
+  if (!want.length) { return; }
+  want.forEach(function (d) { self.listed[d] = []; });
+  gitIn(this.fork, ['ls-tree', '--name-only', this.commit].concat(want.map(function (d) { return d + '/'; })))
+    .split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (p) {
+      want.forEach(function (d) {
+        if (p.indexOf(d + '/') === 0) { self.listed[d].push(p.split('/').pop()); }
+      });
+    });
 };
 Source.prototype.names = function (dir) {
-  return gitIn(this.fork, ['ls-tree', '--name-only', this.commit, dir + '/'])
-    .split('\n').map(function (s) { return s.trim(); }).filter(Boolean)
-    .map(function (p) { return p.split('/').pop(); });
+  this.list([dir]);
+  return this.listed[dir].slice();
 };
-// Files under dir whose text matches a fixed string at the commit.
-Source.prototype.grepFiles = function (needle, dir) {
+
+// Files under folders whose text holds fixed strings at the commit, for
+// every [needle, folder] pair, from one git grep that prints each matching
+// line, which is then put on the needles it holds.
+Source.prototype.search = function (pairs) {
+  const self = this;
+  const want = pairs.filter(function (p) { return !has(self.found, p[0] + '\0' + p[1]); });
+  if (!want.length) { return; }
+  want.forEach(function (p) { self.found[p[0] + '\0' + p[1]] = []; });
+  const needles = sortedUnique(want.map(function (p) { return p[0]; }));
+  const dirs = sortedUnique(want.map(function (p) { return p[1]; }));
   let out = '';
   try {
-    out = gitIn(this.fork, ['grep', '-l', '-F', needle, this.commit, '--', dir]);
+    out = gitIn(this.fork, ['grep', '-z', '-a', '-n', '-F']
+      .concat([].concat.apply([], needles.map(function (n) { return ['-e', n]; })))
+      .concat([this.commit, '--']).concat(dirs));
   } catch (e) {
-    if (e.status === 1) { return []; }
-    throw e;
+    if (e.status !== 1) { throw e; }   // 1: no line holds any of them
   }
-  return out.split('\n').map(function (s) { return s.trim(); }).filter(Boolean)
-    .map(function (s) { return s.slice(s.indexOf(':') + 1); });
+  // "<commit>:<path>\0<line>\0<text>", a line each.
+  out.split('\n').forEach(function (line) {
+    const f = line.split('\0');
+    if (f.length < 3) { return; }
+    const file = f[0].slice(f[0].indexOf(':') + 1);
+    const text = f.slice(2).join('\0');
+    want.forEach(function (p) {
+      const hits = self.found[p[0] + '\0' + p[1]];
+      if (file.indexOf(p[1] + '/') === 0 && text.indexOf(p[0]) >= 0 && hits.indexOf(file) < 0) { hits.push(file); }
+    });
+  });
+};
+Source.prototype.grepFiles = function (needle, dir) {
+  this.search([[needle, dir]]);
+  return this.found[needle + '\0' + dir].slice();
 };
 
 // ---------------------------------------------------------- reading C++ --
@@ -265,7 +342,9 @@ function readClient(src) {
 function readServer(src) {
   // Every name a Papyrus event is sent under, read off every call.
   const sends = [], unread = [];
-  src.grepFiles('SendPapyrusEvent', SERVER_CPP).forEach(function (file) {
+  const sending = src.grepFiles('SendPapyrusEvent', SERVER_CPP);
+  src.read(sending.filter(function (f) { return /\.cpp$/.test(f); }));
+  sending.forEach(function (file) {
     if (!/\.cpp$/.test(file)) { return; }
     const body = stripComments(src.show(file));
     const re = /(^|[^\w:])SendPapyrusEvent\s*\(/g;
@@ -348,6 +427,9 @@ function readServer(src) {
 // The list at one commit of one fork folder.
 function readList(fork, commit) {
   const src = new Source(fork, commit);
+  src.read(Object.keys(FILES).map(function (k) { return FILES[k]; }));
+  src.list([STANDARD_DIR, DATA_PEX_DIR]);
+  src.search(SEARCHES);
   return { client: readClient(src), server: readServer(src) };
 }
 

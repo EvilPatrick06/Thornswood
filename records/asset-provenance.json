@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, docs\\WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
+  "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, the ops repo's WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
   "statuses": {
     "cleared": "The licence is named by the file itself or its publisher and the evidence is cited, or the file holds nothing that could need one. Nothing to ask.",
     "ours": "Thornswood's own work: made for Thornswood by a team member under the contributor terms in LICENSE (#1331), or built here by a script in this repository from nothing but its own numbers. Who made it and who decided it are recorded. Nothing to ask.",
@@ -8,6 +8,7 @@
     "unconfirmed": "Made for Thornswood by this repository's own account, but who made it, on what terms, and who approved it are not recorded. Ships today. Its ask says what is missing and who can answer.",
     "agreed-not-written": "Patrick has said it may go out, but the terms with its maker are not written down anywhere. Ships today.",
     "no-licence-found": "Somebody else's, and nothing found gives Thornswood the right to hand it on. Ships today. Its issue carries the decision.",
+    "leaving": "In a file Thornswood uploads to Nexus Mods (Thornswood Content, mod 192001): it goes to everybody who installs the collection today, and the next upload of that file leaves it out or replaces it, for the reason its entry gives. Its issue carries that upload.",
     "withheld": "Never ships: packs and the installer leave it out and delete it from installs.",
     "made-from-game": "Bethesda's own file, edited, or put together from Bethesda's: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own game archives (#2827), so nobody is handed the game's files. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
     "made-from-mods": "One of the collection's mods' own files, edited: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own copy of the mod, out of its archive (#3113), so nobody is handed the mod's file. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
@@ -24,7 +25,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
       "status": "ours"
     },
     {
@@ -37,7 +38,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -50,20 +51,20 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
       "path": "site/public/favicon.ico",
-      "sha256": "b8f2124f2f9fe8ef019b15fa62ff804003358e64207ca7ebf56ff7ae6b85aa97",
-      "what": "The site's tab icon, the crest.",
+      "sha256": "498279f4546985c9cf3ff907916493873b62ea4884c867dcb9cd19250854df3f",
+      "what": "The site's tab icon: the 16, 32 and 48 frames of launcher/app.ico, the badge with TW (Djinn, 27 Oct, #3319).",
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -76,7 +77,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -89,7 +90,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -186,7 +187,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: docs\\WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -199,7 +200,7 @@
       "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in docs\\WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -360,8 +361,8 @@
     },
     {
       "path": "launcher/app.ico",
-      "sha256": "9fb8dd6ade2a6e669e972597dc6b4ae1bb69621b6ad26f027757c6b33c190df4",
-      "what": "The launcher's icon, the full badge at every size (Djinn, 11 Oct; tests\\test-launcher-icons.js).",
+      "sha256": "be99a5cd8ef3c1d025702ac3fb9a73824928f3320b8b0d75bd2e428d50526e60",
+      "what": "The launcher's icon, the badge at every size: Thornswood at 128 and 256, TW at 32 to 64, the crest and scene alone at 16 and 24 (Djinn, 27 Oct, #3319; tests\\test-launcher-icons.js).",
       "published": "The launcher and its shortcuts",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
@@ -396,32 +397,6 @@
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
       "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: launcher\\art\\BACKDROP-SPEC.md; launcher\\art\\ART-PROMPT.md.",
       "status": "ours"
-    },
-    {
-      "path": "launcher/art/thornswood-art-1536.png",
-      "sha256": "995d2e3968510b21653883d4f78af8b869c64069992d5c962699ee772671127a",
-      "what": "The 16 Sep source of the backdrop (BACKDROP-SPEC.md). No build has used it since 20 Sep.",
-      "published": "nowhere",
-      "source": "not recorded",
-      "creator": "not recorded",
-      "licence": "not recorded",
-      "attribution": "not recorded",
-      "approved": "not recorded",
-      "evidence": "launcher\\art\\BACKDROP-SPEC.md.",
-      "status": "not-published"
-    },
-    {
-      "path": "launcher/art/thornswood-banner-1672.png",
-      "sha256": "7e6878a4102b8d53a1c3510ae3d4676280c5762d4ebab157bf9b3275b4d6f24c",
-      "what": "A banner picture. No script, page or document names it.",
-      "published": "nowhere",
-      "source": "not recorded",
-      "creator": "not recorded",
-      "licence": "not recorded",
-      "attribution": "not recorded",
-      "approved": "not recorded",
-      "evidence": "No file in the repository names it (searched 12 Oct).",
-      "status": "not-published"
     },
     {
       "path": "game/ui/thornswood-theme.mp3",
@@ -545,15 +520,15 @@
     },
     {
       "path": "game/ours/Data/SKSE/Plugins/QuickLootIE.json",
-      "sha256": "41fdc7a0d5b38c5b91b0032843db71c06073e56a9d704ab170c9817908323627",
+      "sha256": "a38d8add4004f2c7f77b1d646939b4b95466c0a6ab5bf95741cf03074bd72354",
       "what": "QuickLoot IE 4.1.3's settings file with one override added, \"_root.lootMenu.infoColumns\": [\"weight\"], so the loot menu shows weight and no gold value column (#3113), and a comment at the top saying what Thornswood changed and when. Hash as git stores it, with LF line endings.",
       "published": "Every pack and the installer (Data\\SKSE\\Plugins)",
-      "source": "QuickLoot IE's own SKSE\\Plugins\\QuickLootIE.json (1,333 bytes, sha256 113760ff7a3fa6f31dfcef43ba82682e867bf4ea1751468bc879fbeaef119c4a), from QuickLoot IE 4.1.3 (Nexus Mods, Skyrim Special Edition mod 120075, file 806802, the file collection 7essxf revision 4 installs), with one line added",
-      "creator": "QuickLoot IE's authors: the file's settings and comments; the added line and the comment at the top are Thornswood's, 22 Oct 2026",
-      "licence": "GNU General Public License version 3: QuickLoot IE carries it as QLIE-LICENSE.md (Data\\QLIE-LICENSE.md, installed by the collection beside the file). A changed copy may go out under the same licence when it says what was changed and when, which the file's first lines do",
-      "attribution": "The credits page names it as QuickLoot IE 4.1.3's settings file with Thornswood's line, under the GPL 3 (#3113)",
+      "source": "QuickLoot IE's own SKSE\\Plugins\\QuickLootIE.json (1,333 bytes, sha256 113760ff7a3fa6f31dfcef43ba82682e867bf4ea1751468bc879fbeaef119c4a), from QuickLoot IE 4.1.3 (Nexus Mods, Skyrim Special Edition mod 120075, file 806802, the file collection 7essxf installs in revisions 4 and 5), with one line added",
+      "creator": "QuickLoot IE's authors: the file's settings and comments; the added line and the comment at the top are Thornswood's, 22 Oct 2026, the comment's licence name corrected 27 Oct 2026 (#3800)",
+      "licence": "GPL-3.0-or-later: QuickLoot IE's Nexus Mods page says \"Released under the GPL-3.0-or-later license\" (read 26 Oct 2026) and its 4.1.0 changelog \"Changed the project license to GPL-3.0-or-later\". The mod carries the licence text as QLIE-LICENSE.md (Data\\QLIE-LICENSE.md, installed by the collection beside the file), which in file 806802 is the GNU General Public License version 3 unchanged, byte for byte installer\\licences\\GPL-3.0.txt (35,149 bytes, sha256 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986). A changed copy may go out under the same licence when it says what was changed and when, which the file's first lines do",
+      "attribution": "The credits page names it as QuickLoot IE 4.1.3's settings file with Thornswood's line, under the GPL-3.0-or-later (#3113, #3800)",
       "approved": "Patrick, 21 Oct 2026: items have no gold price on Thornswood, and #3113 asks for the gold value display gone",
-      "evidence": "The collection's revision 4 file list (/mnt/project-files/handoff/2979, layout-4 files.txt) and the file itself, downloaded 21 Oct 2026 through the Nexus Mods API; QuickLoot IE's LootMenuIE.swf (infoColumns defaults to value, weight, valuePerWeight; applyOverrides sets swfConfig.overrides after the settings); scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; THIRD-PARTY.md, The collection's menus, with no gold values.",
+      "evidence": "The collection's revision 4 file list (/mnt/project-files/handoff/2979, layout-4 files.txt) and the file itself, downloaded 21 Oct 2026 through the Nexus Mods API; revisions 4 and 5 both pin file 806802 (Nexus Mods API, collectionRevision 7essxf, read 27 Oct 2026); file 806802's QLIE-LICENSE.md and the mod's changelogs, read through the Nexus Mods API 27 Oct 2026 (#3800); QuickLoot IE's LootMenuIE.swf (infoColumns defaults to value, weight, valuePerWeight; applyOverrides sets swfConfig.overrides after the settings); scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; THIRD-PARTY.md, The collection's menus, with no gold values.",
       "status": "cleared"
     },
     {
@@ -586,7 +561,7 @@
       "path": "game/content/Thornswood-Content.esp",
       "sha256": "8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66",
       "what": "Thornswood's own plugin, 271,624 bytes on 22 Oct (#3349, the ten passage books' words, plain town lines written by the tool; #2993, its header's description built from the records it holds; #1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
-      "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
+      "published": "Every pack and the installer on both channels. Not on Nexus Mods yet: Thornswood Content 1.2 carries the plugin from before #2553, registered as its own entry, until the next Thornswood Content file carries this one (#2793)",
       "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records; the other server's placements, its 57 of Thornswood's stations included (Patrick, 16 Oct, A on #2553), and its changes to Skyrim's own placements are gone.",
       "creator": "Thornswood (scripts/mods/Add-ContentRecords.py and scripts/dev/Build-StationSites.py)",
       "licence": "Thornswood's own; the Bethesda records it overrides are the game's, as in any plugin with Skyrim's masters",
@@ -970,17 +945,96 @@
       "status": "cleared"
     },
     {
-      "path": "Thornswood Content (Nexus mod 192001): SkyrimSoulsRE.ini, OpenAnimationReplacer.ini and four face files",
-      "what": "Two other mods' settings files with Thornswood's values, and the face meshes and tints the Creation Kit made for two people Fishing In Skyrim adds.",
-      "published": "Nexus Mods, to everybody who installs the collection",
-      "source": "Skyrim Souls RE (27859), Open Animation Replacer (92109), Fishing In Skyrim Special Edition (47618)",
-      "creator": "Those mods' authors, changed or exported here",
-      "licence": "not recorded: THIRD-PARTY.md did not read those mods' permissions",
+      "path": "Thornswood Content (Nexus mod 192001) 1.2: Thornswood-Content.esp",
+      "files": [
+        {
+          "path": "Thornswood-Content.esp",
+          "sha256": "988b6d00e86d9e58b67a0da5f6ea145976a33a4ecee6bc814505fc98b6fcc112"
+        },
+        {
+          "path": "Thornswood-Content.esp, as the collection installs it",
+          "sha256": "4b004dce782573445381ef013be7e6984c4df09c31a3af7234242f6f2acc7f58"
+        }
+      ],
+      "what": "Thornswood's plugin as it was on 25 Sep 2026, before #2553 remade it: 141,442 bytes, and 141,023 once the collection applies its own patch (patches\\Thornswood Content\\Thornswood-Content.esp.diff). It still carries the records salvaged from another server's plugin. No pack or installer runs it: they put game/content/Thornswood-Content.esp in its place. The next Thornswood Content file carries game/content/Thornswood-Content.esp instead, and the collection revision that pins that file drops the patch.",
+      "published": "Nexus Mods, Thornswood Content 1.2 (file 811029), to everybody who installs the collection",
+      "source": "Thornswood's plugin of 25 Sep 2026, with records salvaged from another SkyMP server's plugin (#400, #954); scripts/mods/content-salvaged.json lists every one",
+      "creator": "Thornswood, from another server's records",
+      "licence": "Patrick, 15 Oct 2026 (#2177, B): the plugin is remade as Thornswood's own (#2553), and game/content/Thornswood-Content.esp is that one. This copy is the one from before, with the other server's records in it",
+      "attribution": "None given",
+      "approved": "Patrick uploads the mod (EvilPatrick06); Patrick, 15 Oct 2026 (#2177, B): remade as Thornswood's own",
+      "evidence": "Thornswood Content 1.2 (file 811029) downloaded 27 Oct 2026 through the Nexus Mods API, the bytes and sha256 in THIRD-PARTY.md, Thornswood Content; scripts/mods/content-salvaged.json; tests/test-2553-salvaged-gone.js.",
+      "status": "leaving",
+      "issue": 2793
+    },
+    {
+      "path": "Thornswood Content (Nexus mod 192001) 1.2: SKSE\\Plugins\\SkyrimSoulsRE.ini",
+      "files": [
+        {
+          "path": "SKSE\\Plugins\\SkyrimSoulsRE.ini",
+          "sha256": "a787ecc3e13ec6ca55719ff25e544fa8b5bcee09734e2c19d5cf5defebf3815a"
+        }
+      ],
+      "what": "Skyrim Souls RE's settings file, with the Tab menu kept paused. It is the 7,009-byte SkyrimSoulsRE.ini that Skyrim Souls RE 3.1.2 ships (file 754726, 21 May 2026, sha256 ab4901ab8cbc94f562b5091bdb573515e5ce00c178f4fca26c9be62cebc09c4a) with its byte order mark taken off, a blank line added under the first line and bTweenMenu changed from true to false. Collection revision 2 removed Skyrim Souls RE, so nothing reads it. The next Thornswood Content file leaves it out.",
+      "published": "Nexus Mods, Thornswood Content 1.2 (file 811029), to everybody who installs the collection",
+      "source": "Skyrim Souls RE - Unpaused Menus (Nexus SE 27859, by Vermunds and Fudgyduff), version 3.1.2, file 754726, https://www.nexusmods.com/skyrimspecialedition/mods/27859",
+      "creator": "Skyrim Souls RE's authors; one value changed for Thornswood",
+      "licence": "The mod page's Author's instructions, read 26 Oct 2026 (#2793): 3.2.0 and later under GPL-3.0 with the modding exception, and 'Version 3.1.2 and earlier is released under the MIT License'. The MIT licence lets the file go out on condition that its copyright and permission notice go with it; Thornswood Content 1.2 carries no notice",
+      "attribution": "None given in Thornswood Content 1.2",
+      "approved": "Patrick, 22 Oct 2026 (#2793, A): every file we ship from Nexus has its author and terms recorded; any with no permission is rebuilt as ours",
+      "evidence": "Thornswood Content 1.2 (file 811029) downloaded 27 Oct 2026 through the Nexus Mods API, the bytes and sha256 in THIRD-PARTY.md, Thornswood Content; Skyrim Souls RE 3.1.2 (754726) and 3.2.0 (810395) downloaded the same day and compared: 3.1.2's ini is the one above, 3.2.0's is 7,149 bytes; the mod's Permissions and credits, read 26 Oct 2026 (#2793); docs\\COLLECTION-REVISION-2.md.",
+      "status": "leaving",
+      "issue": 2793
+    },
+    {
+      "path": "Thornswood Content (Nexus mod 192001) 1.2: SKSE\\Plugins\\OpenAnimationReplacer.ini",
+      "files": [
+        {
+          "path": "SKSE\\Plugins\\OpenAnimationReplacer.ini",
+          "sha256": "328ce7e0412685bb8cab1fa0d81b5bdbf9f805b6d8f3f76e92662ca2b418403c"
+        }
+      ],
+      "what": "Open Animation Replacer's settings file with Thornswood's values, 1,165 bytes. It is not one of that mod's files: its archives (3.1.6, which the collection deployed on 21 Oct, and 3.2.1, file 798222, in revision 5) hold only OpenAnimationReplacer.dll and its .pdb, and the DLL writes this file from the settings it runs with. The two values Thornswood needs, bShowWelcomeBanner and bEnableAnimationQueueProgressBar off, the launcher writes into it on every Play (launcher\\app\\Enforce.cs), and makes the file and its [UI] section when they are missing. The next Thornswood Content file leaves it out, so the launcher is the one place those values come from.",
+      "published": "Nexus Mods, Thornswood Content 1.2 (file 811029), to everybody who installs the collection",
+      "source": "Written by Open Animation Replacer (Nexus SE 92109, by Ersh) from Thornswood's settings, https://www.nexusmods.com/skyrimspecialedition/mods/92109",
+      "creator": "Open Animation Replacer's DLL, holding Thornswood's values",
+      "licence": "No part of the mod's archive is in it. The mod page, read 26 Oct 2026 (#2793): modifying the mod's files needs Ersh's permission, its assets may be used with credit, and it may not be uploaded to other sites",
+      "attribution": "None given",
+      "approved": "Patrick, 22 Oct 2026 (#2793, A): every file we ship from Nexus has its author and terms recorded; any with no permission is rebuilt as ours",
+      "evidence": "Thornswood Content 1.2 (file 811029) downloaded 27 Oct 2026 through the Nexus Mods API, the bytes and sha256 in THIRD-PARTY.md, Thornswood Content; Open Animation Replacer 3.2.1 (798222) downloaded the same day; the collection's 21 Oct deployment record (OpenAnimationReplacer.dll and .pdb from 3.1.6); the mod's Permissions and credits, read 26 Oct 2026 (#2793); launcher\\app\\Enforce.cs.",
+      "status": "leaving",
+      "issue": 2793
+    },
+    {
+      "path": "Thornswood Content (Nexus mod 192001) 1.2: the four FishingInSkyrim.esp face files",
+      "files": [
+        {
+          "path": "meshes\\actors\\character\\facegendata\\facegeom\\FishingInSkyrim.esp\\00025905.nif",
+          "sha256": "5353f567eb73684f48e085e31276db2d33ec5bdbe9cd17d2f1ff264e22f21ba5"
+        },
+        {
+          "path": "meshes\\actors\\character\\facegendata\\facegeom\\FishingInSkyrim.esp\\0002a07c.nif",
+          "sha256": "82d7309d6997cc6cdc63c396ecc18dde35e7b438dc96b756c66491e29120b0cc"
+        },
+        {
+          "path": "textures\\actors\\character\\facegendata\\facetint\\FishingInSkyrim.esp\\00025905.dds",
+          "sha256": "0fd4584d9f06ffde6d77adbf1037c4143dde3fca2d082473e73c0536ac109d3c"
+        },
+        {
+          "path": "textures\\actors\\character\\facegendata\\facetint\\FishingInSkyrim.esp\\0002a07c.dds",
+          "sha256": "31b0fee7b2aba7d1d6ad26df96995698603a5d021cc35d14fb52a05cfb6b85fb"
+        }
+      ],
+      "what": "The face meshes and face tints of the two people Fishing In Skyrim adds, Rybek Kupiecski (FishingVendorPolish, 00025905) and Lillani (FISLillani, 0002A07C), exported again in the Creation Kit from that mod's records and dated 26 Sep 2026, four days after the 22 Sep crash in Rybek's face (docs\\archive\\todo-list-2026-09-25.md). Fishing In Skyrim's own archive (file 194634, 1.0) carries its own four for the same two people, dated 27 Mar 2021, and Vortex deploys Thornswood Content's over them (the 21 Oct deployment record). Being made from that mod's NPC records, they cannot be rebuilt as Thornswood's own, so the next Thornswood Content file leaves them out for good (Patrick, 26 Oct 2026, B on #2793: those NPCs are not enabled on Thornswood anyway).",
+      "published": "Nexus Mods, Thornswood Content 1.2 (file 811029), to everybody who installs the collection",
+      "source": "Fishing In Skyrim Special Edition (Nexus SE 47618), its two NPC records, exported in the Creation Kit; https://www.nexusmods.com/skyrimspecialedition/mods/47618",
+      "creator": "Fishing In Skyrim's authors (created by Arodicus Snaux, ported to Special Edition by diablo0307 with his permission); exported for Thornswood, by whom is not recorded",
+      "licence": "The mod page, read 26 Oct 2026 (#2793): 'You must get permission from me before you are allowed to use any of the assets in this file', the same for modifying its files, no upload to other sites, and 'This author has not provided any additional notes regarding file permissions'. No permission is recorded",
       "attribution": "not recorded",
-      "approved": "Patrick uploads the mod (EvilPatrick06)",
-      "evidence": "THIRD-PARTY.md, Thornswood Content.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: read the three mods' Nexus permissions for these files and record them here."
+      "approved": "Patrick, 22 Oct 2026 (#2793, A): any with no permission is rebuilt as ours; Patrick, 26 Oct 2026 (#2793, B): these cannot be, so they leave for good and nobody asks the mod's author",
+      "evidence": "Thornswood Content 1.2 (file 811029) downloaded 27 Oct 2026 through the Nexus Mods API, the bytes and sha256 in THIRD-PARTY.md, Thornswood Content; Fishing In Skyrim Special Edition 1.0 (194634) downloaded the same day; the collection's 21 Oct deployment record; the mod's Permissions and credits, read 26 Oct 2026 (#2793).",
+      "status": "leaving",
+      "issue": 2793
     },
     {
       "path": "Data\\Interface\\startmenu.swf",
@@ -1021,9 +1075,9 @@
       "path": "Data\\Interface\\ (skyui\\config.txt, skyui\\itemcard.swf, hudmenu.swf, AHZHudInfo.swf and exported\\AHZHudInfo.swf)",
       "what": "The collection's item menus and HUD with no gold values (#3113): SkyUI's item list layout with no value or value to weight column in any of its twelve views (37,907 bytes, sha256 13a963540cb6b2d3d3f3de633ec517fb5c7ebe988cce8616b4173445ed3450c3); SkyUI's item card with no VALUE label or value field on any card (55,440 bytes, sha256 e08c8cc1e97c237e0cf241c5fbd421345bf1a30c7fc55122dc2b0b66b9e87aa9); SkyHUD's HUD with no VALUE under an item somebody looks at (438,631 bytes, sha256 3a9fb686511a56ec4949387d3843821b64d91b7ee4a0017cc3cfeeff7cb574f5); and moreHUD's HUD info with its value to weight off, both copies (36,077 bytes, sha256 486ac4d42a1c0b409b27412ed0471bdc57bd211eaa024bf0f816608b6bfd3c9b).",
       "published": "Never: the launcher makes them before every Play from the person's own SkyUI_SE.bsa, SkyHUD.bsa and AHZmoreHUD.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
-      "source": "SkyUI's interface\\skyui\\config.txt and itemcard.swf (SkyUI_SE.bsa, Nexus Mods mod 12604, file 749043), SkyHUD 0.90B's interface\\hudmenu.swf (SkyHUD.bsa, mod 463, file 61422) and moreHUD 5.4.5's interface\\ahzhudinfo.swf and interface\\exported\\ahzhudinfo.swf (AHZmoreHUD.bsa, mod 12688, file 803483), the files collection 7essxf revision 4 installs, edited. What the repository holds is the edits, as the bytes that change, each pinned to the sha256 of the mod's own file (launcher\\app\\FromGameModMenus.cs, written by scripts\\mods\\Build-ModMenus.py), not the files",
+      "source": "SkyUI's interface\\skyui\\config.txt and itemcard.swf (SkyUI_SE.bsa, Nexus Mods mod 12604, file 749043), SkyHUD 0.90B's interface\\hudmenu.swf (SkyHUD.bsa, mod 463, file 61422) and moreHUD 5.4.5's interface\\ahzhudinfo.swf and interface\\exported\\ahzhudinfo.swf (AHZmoreHUD.bsa, mod 12688, file 803483), the files collection 7essxf installs in revisions 4 and 5, edited. What the repository holds is the edits, as the bytes that change, each pinned to the sha256 of the mod's own file (launcher\\app\\FromGameModMenus.cs, written by scripts\\mods\\Build-ModMenus.py), not the files",
       "creator": "SkyUI's, SkyHUD's and moreHUD's authors; edited for Thornswood on 21 and 22 Oct 2026 by scripts\\mods\\Build-ModMenus.py",
-      "licence": "Each mod's own terms on its Nexus Mods page; none of them lets Thornswood hand these files on, edited or not, so they are made on each machine from the person's own copy",
+      "licence": "Each mod's own terms on its Nexus Mods page, read 26 Oct 2026 (#3800). SkyUI (12604): \"Upload: not allowed to upload to other sites\", modification allowed with credit, and its author notes \"You may release any patches that require the original file\". SkyHUD (463): modification and asset use allowed with credit, and its permission note lets anybody share a preset (skyhud.txt), but \"The rest of the mod must not be included\". moreHUD (12688): the page shows no permission list and no author instructions. So none of the five files may go out, edited or not, and they are made on each machine from the person's own copy; what Thornswood holds, and the launcher carries, is the edit, which works only on each mod's own file. Patrick, 26 Oct 2026, on #3800: these terms change nothing, and the five stay made from the person's own copy",
       "attribution": "The site's credits page says Thornswood ships none of them and makes them from the person's own copy of each mod (#3113)",
       "approved": "Patrick, 21 Oct 2026: items have no gold price on Thornswood, and #3113 asks for the gold value display gone",
       "evidence": "The measurement on #3113, 21 Oct 2026; launcher\\app\\FromGame.cs, FromGameModMenus.cs and MadeFromGame.cs; scripts\\mods\\Build-ModMenus.py; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromMods; tests\\test-2827-from-game.ps1; THIRD-PARTY.md, The collection's menus, with no gold values.",
@@ -1042,11 +1096,11 @@
   "dispositions": [
     {
       "what": "Community gallery pictures and recordings",
-      "how": "Each submission is checked by staff for permission and privacy before it is approved; submitting is not proof of ownership of somebody else's material (Terms; docs\\WEBSITE-OPERATIONS.md, Asset permission evidence). They are people's data on the VPS, so they are not listed here one by one. A removed submission's file is #2352."
+      "how": "Each submission is checked by staff for permission and privacy before it is approved; submitting is not proof of ownership of somebody else's material (Terms; the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence). They are people's data on the VPS, so they are not listed here one by one. A removed submission's file is #2352."
     },
     {
       "what": "The Nexus collection's mods",
-      "how": "Thornswood does not hand them on: each person installs them from Nexus Mods through Vortex under each author's own terms, and the launcher and the public credits page link every one (THIRD-PARTY.md, Not shipped by Thornswood). What packs used to carry of them is THIRD-PARTY.md's entry 168 paragraph."
+      "how": "Thornswood does not hand them on: each person installs them from Nexus Mods through Vortex under each author's own terms, and the launcher and the public credits page link every one (THIRD-PARTY.md, Not shipped by Thornswood). What each mod's page says about being put in a collection is records\\collection-permissions.json (#3649). What packs used to carry of them is THIRD-PARTY.md's entry 168 paragraph."
     },
     {
       "what": "Program code, libraries and engine files",
