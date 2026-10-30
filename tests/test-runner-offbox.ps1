@@ -123,6 +123,15 @@ try {
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
+    # A reinstall never takes off a runner mid-job or by halves (#3889, 30 Oct).
+    Yes '  a reinstall stops before anything is touched when the runner is running a job' ($r.Text -match [regex]::Escape("throw ('this runner is running a job") -and $r.Text -match '(?m)^Assert-RunnerIdle \$root\s*$')
+    Yes '  then stops it whole: no process left under its folder and the service gone, or it says which' ($r.Text -match '(?m)^Stop-RunnerHere \$root ' -and $r.Text -match [regex]::Escape("throw ('still running from '") -and $r.Text -match [regex]::Escape("Stop-Service -Name `$svc -Force -EA Stop"))
+    Yes '  it clears the broker''s .runner_migrated and .credentials_migrated as well, and stops when any of the old configuration is left' ($r.Text -match [regex]::Escape("@('.runner', '.runner_migrated', '.credentials', '.credentials_migrated', '.credentials_rsaparams')") -and $r.Text -match [regex]::Escape("throw ('the old configuration is still there: '"))
+    Yes '  and no stop is passed over silently' ($r.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue')
+    Yes '  both come before the account''s password changes, so a refusal leaves the old service able to log on' ($r.Text.IndexOf("Assert-RunnerIdle `$root") -ge 0 -and $r.Text.IndexOf("Assert-RunnerIdle `$root") -lt $r.Text.IndexOf('Set-LocalUser -Name') -and $r.Text.IndexOf("Stop-RunnerHere `$root") -lt $r.Text.IndexOf('Set-LocalUser -Name'))
+    Yes '  and a process list that cannot be read stops them, never reads as empty' ($r.Text -match [regex]::Escape('@(Get-CimInstance Win32_Process -EA Stop | Where-Object'))
+    $rm = Dry @('-Number', '3', '-Remove')
+    Yes '  -Remove refuses a runner running a job before GitHub is told, and stops it the same way' ($rm.Text -match "(?m)^Assert-RunnerIdle 'C:\\Thornswood-Runner3'" -and $rm.Text -match "(?m)^Stop-RunnerHere 'C:\\Thornswood-Runner3' " -and $rm.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue' -and $rm.Text.IndexOf('Assert-RunnerIdle ''C:\Thornswood-Runner3''') -lt $rm.Text.IndexOf('config.cmd remove'))
     Yes '  the VPS runner keeps its label, name and folder, runner 1 takes builds (#2994) and checks signed drafts (#3956), but no pull request builds (#4010)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'(?!,)" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
     $r2 = Dry @('-Number', '2')
     Yes '  runner 2 takes builds, pull request builds and checks (#4010)' ($r2.Code -eq 0 -and $r2.Text -match "--name 'thornswood-vps-2' --labels 'thornswood-vps,thornswood-build,thornswood-pr-build,thornswood-check'(?!,)")

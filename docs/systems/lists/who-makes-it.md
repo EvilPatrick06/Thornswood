@@ -6,7 +6,7 @@ Everything in the world has a recipe except named uniques and quest items (Patri
 
 A maker is a recipe in the open book (not cut and not tempering), or a class that gathers the item. A bottle the alchemy lab brews is a new form, not a record, so the lab is the maker of no record. The build fails when the world hands out something with no maker that `scripts/dev/Check-Makers.waiting.json` does not name with the issue that will give it one.
 
-268 items handed out. 151 have a maker. 117 have none yet.
+269 items handed out. 152 have a maker. 117 have none yet.
 
 ## Nobody makes these yet
 
@@ -141,7 +141,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Mage | 0 | a mage has no halves. classes.md gives the Mage two schools and two starting spells, and none of it is a crafting recipe. What a mage knows is written by `scripts\dev\Build-SpellTable.ps1`. |
 | Alchemist/Blightbrewer | 0 | brews poisons in the alchemy lab's menu, which has no recipe rows |
 | Alchemist/Physicker | 2 | also brews medicine in the alchemy lab's menu, which has no recipe rows |
-| Cook/Hearthcook | 56 |  |
+| Cook/Hearthcook | 64 |  |
 | Cook/Confectioner | 12 |  |
 | Smith/Platewright | 171 |  |
 | Smith/Edgewright | 82 |  |
@@ -151,7 +151,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Tailor/Haberdasher | 169 |  |
 | Woodworker/Charburner | 5 |  |
 | Woodworker/Woodwright | 45 |  |
-| Farmer | 13 |  |
+| Farmer | 14 |  |
 | Fisher | 12 |  |
 | Gatherer | 48 |  |
 | Hunter | 51 |  |
@@ -194,6 +194,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Gourd | Asked for by a recipe | Farmer, novice | `10d666:Skyrim.esm` |
 | Hanging Moss | Asked for by a recipe | Gatherer, novice | `57f91:Skyrim.esm` |
 | Heart Stone | Asked for by a recipe | Miner, master | `17749:Dragonborn.esm` |
+| Honeycomb | Asked for by a recipe | Farmer, novice | `b08c5:Skyrim.esm` |
 | Horker Meat | Asked for by a recipe | Fisher, advanced; Hunter, advanced | `65c9b:Skyrim.esm` |
 | Horse Meat | Asked for by a recipe | Hunter, advanced | `65c9c:Skyrim.esm` |
 | Jazbay Grapes | Asked for by a recipe | Gatherer, novice | `6ac4a:Skyrim.esm` |
