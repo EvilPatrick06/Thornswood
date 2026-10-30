@@ -81,6 +81,13 @@ eval(src.split('\n').filter((l) => /^const (publicAssetVersions|ASSET_NAME|ASSET
      ['function publicAssetVersion(', 'function publicAssetBody(', 'function assetRefs(', 'function versionAssets(']
        .map(grab).join('\n'));
 
+// /file/ serves only what files.json publishes (#3798), so the route reads
+// it through jsonFile and asks downloadServed.
+// A const in an eval stays in the eval, so jsonFile is taken as its arrow.
+const JSON_AT = src.indexOf('const jsonFile = (p, fallback) => {');
+const jsonFile = eval('(' + src.slice(src.indexOf('(', JSON_AT), block(JSON_AT)) + ')');
+eval(grab('function payloadZip(') + '\n' + grab('function downloadServed('));
+
 const rangeSrc = grab('function rangeReply(');
 yes('server.js has one range function, rangeReply()', !!rangeSrc);
 if (rangeSrc) eval(rangeSrc);
@@ -103,6 +110,7 @@ const whole = Buffer.alloc(SIZE);
 for (let i = 0; i < SIZE; i++) whole[i] = (i * 7 + (i >> 8) + (i >> 16)) & 255;
 const NAME = 'Thornswood-Setup-20260924-0100.zip';
 fs.writeFileSync(path.join(FILES, NAME), whole);
+fs.writeFileSync(path.join(FILES, 'files.json'), JSON.stringify({ [NAME]: { hidden: true } }));
 fs.writeFileSync(path.join(PUBLIC, 'clip.mp4'), whole.subarray(0, 5000));
 
 // The two lines of handle() that come before every route: HEAD is routed as
