@@ -9,7 +9,10 @@ changed here changes everywhere at the next deploy:
 - the site hands the lot out in `/api/public` as `lines`, and the Discord bot
   shows one of them as its status, a new one every fifteen minutes
   (`bot\bot.py`, `watch_lines`);
-- the in-game loading screens are to take their hints from here as well (#3130).
+- the in-game loading screen shows one hint, a new one at every load
+  (`game\ui\thornswood-loadscreen.js`), from the copy `scripts\release\Go.ps1`
+  writes into the game folder at every Ship (`Write-ThornswoodHints`), so a
+  hint changed here reaches the game with the next release (#3130).
 
 This is not a page: no address serves it. `Deploy-Docs.ps1 -Site` sends it
 with the public pages, and the bot reads it from the site, so a new line
@@ -54,7 +57,7 @@ The rules, which `tests\test-3147-lines.js` checks:
 - Menus do not pause the world. The inventory, the crafting menu and the map all keep it running.
 - When you die, you wake at the temple of the hold you died in.
 - Text chat is kept, with the name and the time. Voice is not recorded.
-- The launcher's Controls page changes any key. Press Change, then the key you want, with Skyrim closed.
+- Settings, on the help panel (F7) and the K, P and J panels, changes any key, and it works at once.
 - Turned away with LOAD ORDER ERROR? Close the game, open Diagnostics in the launcher, press Scan, then Fix.
 - Diagnostics, Build the report makes one zip of your logs to drag into your ticket in the Discord.
 - When the countdown says restart, the server is going down. Get somewhere safe and log out before it ends.

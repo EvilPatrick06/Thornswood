@@ -336,6 +336,7 @@
       '<div class="foot"><span id="' + ID + '-foot"></span>' +
       '<span style="flex:1"></span>' +
       '<button id="' + ID + '-help">Help</button>' +
+      '<button id="' + ID + '-settings">Settings</button>' +
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
@@ -344,6 +345,7 @@
     document.body.appendChild(askEl);
     root.querySelector('#' + ID + '-close').onclick = close;
     root.querySelector('#' + ID + '-help').onclick = help;
+    root.querySelector('#' + ID + '-settings').onclick = settings;
 
     /*
       Escape and P close it, and the page has to handle both itself.
@@ -533,6 +535,8 @@
                 '<span class="tools">' +
                 (nr.friend ? '' : '<button data-do="befriend" data-who="' + esc(nr.id) + '">Add friend</button>') +
                 '<button data-do="trade" data-who="' + esc(nr.id) + '">Trade</button>' +
+                // A trade cart on the road goes with its driver (#3158): Raid cart opens it.
+                (nr.cart ? '<button data-do="raid" data-who="' + esc(nr.id) + '">Raid cart</button>' : '') +
                 dyeButtons(nr.id) +
                 switches(nr) +
                 '</span></div>';
@@ -599,6 +603,7 @@
         else if (verb === 'drop') { net('/friend remove ' + who); }
         else if (verb === 'befriend') { net('/friend ' + who); }
         else if (verb === 'trade') { net('/trade ' + who); }
+        else if (verb === 'raid') { net('/cart raid ' + who); }
         else if (verb === 'dye') { net('/hairdye offer ' + who + ' ' + (this.getAttribute('data-dye') || '')); }
       };
     }
@@ -664,6 +669,12 @@
   */
   function help() {
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('people'); } } catch (e) { }
+    close();
+  }
+
+  /* Settings beside Help (#3126): the Settings panel, the same way. */
+  function settings() {
+    try { if (window.thornswoodSettings) { window.thornswoodSettings.open(); } } catch (e) { }
     close();
   }
 

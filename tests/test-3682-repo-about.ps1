@@ -118,8 +118,8 @@ function gh {
     $p = @($a | Where-Object { $_ -match '^repos/' }) | Select-Object -First 1
     if ($a -contains '--input') { $global:TSghBody = (@($input) -join "`n") | ConvertFrom-Json }
     $global:LASTEXITCODE = 0
-    if ($p -match '/actions/workflows/github-admin\.yml/dispatches$') { return '{"workflow_run_id":91,"html_url":"https://github.com/x/actions/runs/91"}' }
-    if ($p -match '/actions/runs/91$') { return '{"status":"completed","conclusion":"success","path":".github/workflows/github-admin.yml","html_url":"https://github.com/x/actions/runs/91"}' }
+    if ($p -match '^repos/EvilPatrick06/Thornswood-Ops/actions/workflows/github-admin\.yml/dispatches$') { return '{"workflow_run_id":91,"html_url":"https://github.com/x/actions/runs/91"}' }
+    if ($p -match '^repos/EvilPatrick06/Thornswood-Ops/actions/runs/91$') { return '{"status":"completed","conclusion":"success","path":".github/workflows/github-admin.yml","html_url":"https://github.com/x/actions/runs/91"}' }
     if ($p -match '/actions/runs/91/jobs$') { return '{"jobs":[{"id":557}]}' }
     if ($p -match '/check-runs/557/annotations$') { return $global:TSghNotes }
     $global:LASTEXITCODE = 1
@@ -135,7 +135,7 @@ function Session([hashtable]$a, [object[]]$notes) {
 # The run also carries the runner labels' answer; only its own is read.
 $labels = @{ annotation_level = 'notice'; title = 'Set-BuildRunners'; message = 'DIFFERS 9' }
 $s = Session @{} @($labels, @{ annotation_level = 'notice'; title = 'Set-RepoAbout'; message = "CHANGED 3`nrecords/repo-about.json: the topics is now x" })
-Yes ("it starts github-admin.yml on main and says the About box matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Body.ref -eq 'main' -and $s.Body.inputs.check -eq 'false' -and $s.Out -match '3 part\(s\) changed')
+Yes ("it starts github-admin.yml on the ops repository's main and says the About box matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Body.ref -eq 'main' -and $s.Body.inputs.check -eq 'false' -and $s.Out -match '3 part\(s\) changed')
 $s = Session @{ Check = $true } @($labels, @{ annotation_level = 'notice'; title = 'Set-RepoAbout'; message = "DIFFERS 2`nx would be y" })
 Yes '-Check that differs: check true, exit 1' ($s.Code -eq 1 -and $s.Body.inputs.check -eq 'true' -and $s.Out -match 'differs from main''s record in 2')
 
