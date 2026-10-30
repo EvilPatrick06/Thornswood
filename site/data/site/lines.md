@@ -9,7 +9,10 @@ changed here changes everywhere at the next deploy:
 - the site hands the lot out in `/api/public` as `lines`, and the Discord bot
   shows one of them as its status, a new one every fifteen minutes
   (`bot\bot.py`, `watch_lines`);
-- the in-game loading screens are to take their hints from here as well (#3130).
+- the in-game loading screen shows one hint, a new one at every load
+  (`game\ui\thornswood-loadscreen.js`), from the copy `scripts\release\Go.ps1`
+  writes into the game folder at every Ship (`Write-ThornswoodHints`), so a
+  hint changed here reaches the game with the next release (#3130).
 
 This is not a page: no address serves it. `Deploy-Docs.ps1 -Site` sends it
 with the public pages, and the bot reads it from the site, so a new line
