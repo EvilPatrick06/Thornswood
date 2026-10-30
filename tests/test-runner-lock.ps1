@@ -103,7 +103,7 @@ Yes '  and both say so when the box does not finish' (([regex]::Matches($text, '
 if ($all) {
     Yes '-Lock finds the runners by their Windows services' ($all -match "Name LIKE 'actions\.runner\.%'")
     Yes '  their folders by where RunnerService.exe is, their accounts by what they run as' ($all -match 'PathName' -and $all -match 'StartName')
-    Yes '  only folders under C:\Thornswood-Runner' ($all.Contains("-notlike 'C:\Thornswood-Runner*'"))
+    Yes '  only Thornswood-Runner folders at a drive''s root: C:, or One''s runner drive (#3861)' ($all.Contains("-notmatch '^[A-Za-z]:\\Thornswood-Runner'"))
     Yes '  and touches no runner: no service stopped, removed or registered' ($all -notmatch '(?i)Stop-Service|Restart-Service|sc\.exe|config\.cmd|Remove-LocalUser|Set-LocalUser')
 }
 # ---- crash dumps (#2127, #2488) ---------------------------------------------------
@@ -190,8 +190,12 @@ if (-not $icacls -or -not $lib) {
     $open = Join-Path $scratch 'Thornswood-Open'
     $shut = Join-Path $scratch 'Thornswood-Shut'
     $other = Join-Path $scratch 'Other'
+    # A service's folder as ServiceAccount.ps1 leaves it: nothing from its
+    # parent, and CREATOR OWNER on what is made in it (#3956).
+    $creator = Join-Path $scratch 'Thornswood-Service'
     try {
-        foreach ($d in $own, $open, $shut, $other) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+        foreach ($d in $own, $open, $shut, $other, $creator) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+        $null = & icacls.exe $creator /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' ('*' + $me + ':(OI)(CI)F') '*S-1-3-0:(OI)(CI)(IO)M' /C /Q 2>&1
         # What C:\ gives a new folder there, Users may read, on the runner's own
         # folder and on one the account should be shut out of.
         foreach ($d in $own, $open) { $null = & icacls.exe $d /grant '*S-1-5-32-545:(OI)(CI)RX' /C /Q 2>&1 }
@@ -215,9 +219,10 @@ if (-not $icacls -or -not $lib) {
         Yes '  never its own' ((& $deny $own) -eq 0)
         Yes '  and nothing that is not a Thornswood-* folder' ((& $deny $other) -eq 0)
         Yes '  it names the one Users could read' (@($said | Where-Object { $_ -eq ('*S-1-5-7 COULD READ ' + $open + ' until now; shut out of it') }).Count -eq 1)
-        Yes '  and counts the one that was closed anyway' (@($said | Where-Object { $_ -like '*: already shut out of 0 folder(s), and a deny added on 1 that were closed to it anyway' }).Count -eq 1)
+        Yes '  and not a service''s folder whose only wide rule is CREATOR OWNER, which gives an account nothing it did not make (#3956)' ((& $deny $creator) -ge 1 -and @($said | Where-Object { $_ -like ('*COULD READ ' + $creator + '*') }).Count -eq 0)
+        Yes '  and counts the two that were closed anyway' (@($said | Where-Object { $_ -like '*: already shut out of 0 folder(s), and a deny added on 2 that were closed to it anyway' }).Count -eq 1)
         $said = @(Close-RunnerAccount '*S-1-5-7' $own $scratch)
-        Yes '  a second run finds both already shut and names nothing' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: already shut out of 2 folder(s)')
+        Yes '  a second run finds all three already shut and names nothing' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: already shut out of 3 folder(s)')
 
         # #3112: the deny comes off the folder it was put on, and so off
         # everything below it, with no walk of the tree.
@@ -226,9 +231,9 @@ if (-not $icacls -or -not $lib) {
         Set-Content -LiteralPath (Join-Path $deep 'file.txt') -Value 'stand-in'
         Yes '  the deny reaches a file three folders down (the control)' ((& $deny (Join-Path $deep 'file.txt')) -ge 1)
         $said = @(Open-RunnerAccount '*S-1-5-7' $own $scratch)
-        Yes 'Open-RunnerAccount: the deny is off both folders' ((& $deny $open) -eq 0 -and (& $deny $shut) -eq 0)
+        Yes 'Open-RunnerAccount: the deny is off all three folders' ((& $deny $open) -eq 0 -and (& $deny $shut) -eq 0 -and (& $deny $creator) -eq 0)
         Yes '  and off what is below, which it never walked' ((& $deny $deep) -eq 0 -and (& $deny (Join-Path $deep 'file.txt')) -eq 0)
-        Yes '  and it says how many it took it off' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: deny taken off 2 folder(s)')
+        Yes '  and it says how many it took it off' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: deny taken off 3 folder(s)')
         $said = @(Open-RunnerAccount '*S-1-5-7' $own $scratch)
         Yes '  a second run has none to take off' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: deny taken off 0 folder(s)')
         $said = @(Open-RunnerAccount ('no-such-runner-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)) $own $scratch)

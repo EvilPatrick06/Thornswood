@@ -22,6 +22,10 @@
 //      have is named, and a record whose runners GitHub has none of, one
 //      that names a label every runner carries, lists no runners, or names a
 //      label another record names, stops;
+//   3b. the About record (#3682): the real records/repo-about.json passes, and
+//      an empty, too long or two-line description, a website that is not
+//      https, and a topic in capitals, twice, or past GitHub's 20 each stop;
+//      topics compare in any order;
 //   4. admin.js spawned against a stand-in GitHub: anything through Caddy
 //      (X-Forwarded-For) but the setup pages is the plain 404; no token, a
 //      branch's token, and a token for another audience are 403 with nothing
@@ -29,7 +33,12 @@
 //      check says what differs and changes nothing, a run puts the labels
 //      right with the installation token GitHub gave, reads them back, and
 //      a second run changes nothing; the records come from main through the
-//      App, never from the caller; and the log holds no token;
+//      App, never from the caller; installation-repos (#4013) lists the
+//      repositories the App is on with a token that reads metadata alone,
+//      and changes nothing; and the log holds no token. The About box the
+//      same way: a check names what differs and writes nothing, a run sets
+//      it in one PATCH and one PUT and reads it back, a second run changes
+//      nothing, and a bad record on main stops it;
 //   5. the App's setup: no armed setup, a wrong or expired state, and an App
 //      already held are the plain 404; the armed page sends the manifest
 //      (administration write, contents read, no webhook, private) to GitHub
@@ -141,6 +150,15 @@ yes('  and so does an off-box runner, which never takes box jobs', did('thornswo
 yes('a runner that is right is left alone', !did('thornswood-vps') && !did('thornswood-vps-3') && p.changes.length === 3);
 yes('a listed runner GitHub does not have is named', p.lines.some(l => /runner 4 is in records\/build-runners\.json but not registered/.test(l)));
 yes('  and nothing is refused', p.refuse === '');
+// Build runners on One (26 Oct 2026): named in offBox, an off-box runner keeps it,
+// but never one that carries thornswood-vps too.
+const recOne = Object.assign({}, rec4, { offBox: ['thornswood-pr-one', 'thornswood-pr-one-2'] });
+const withVps = mixed.concat([runner(41, 'thornswood-pr-one-2', ['self-hosted', 'Windows', 'thornswood-pr', 'thornswood-vps', 'thornswood-build'])]);
+const pOne = admin.planLabels(recOne, withVps);
+const didOne = (name) => (pOne.changes.find(c => c.name === name) || {}).do;
+yes('an off-box runner the record names by name keeps the label', !didOne('thornswood-pr-one'));
+yes('  but not one that also carries thornswood-vps', didOne('thornswood-pr-one-2') === 'take off');
+yes('an off-box name with no runner under it is named', admin.planLabels(Object.assign({}, rec4, { offBox: ['thornswood-pr-one-5'] }), mixed).lines.some(l => /off-box runner thornswood-pr-one-5 is in/.test(l)));
 yes('a record whose runners GitHub has none of is refused', /never comes/.test(admin.planLabels({ file: 'r', label: 'thornswood-build', runners: [9] }, mixed).refuse));
 yes('runner numbers: thornswood-vps is 1, thornswood-vps-<n> is n, anything else none',
   admin.runnerNumber('thornswood-vps') === 1 && admin.runnerNumber('thornswood-vps-7') === 7 && admin.runnerNumber('thornswood-pr-one') === 0 && admin.runnerNumber('thornswood-vps-x') === 0);
@@ -152,6 +170,8 @@ yes('  and one naming self-hosted', /every runner carries/.test(stops([{ file: '
 yes('a record listing no runners stops', /lists no runners/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [] }])));
 yes('two records naming one label stop', /both name/.test(stops([rec4, Object.assign({}, sign3, { label: 'thornswood-build' })])));
 yes('a label that is not one lower case word stops', /one lower case word/.test(stops([{ file: 'r', label: 'a b', runners: [1] }])));
+yes('an off-box name that is not thornswood-pr-* stops', /not thornswood-pr-/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-vps-9'] })])));
+yes('an off-box name listed twice stops', /off-box runner twice/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-pr-one', 'thornswood-pr-one'] })])));
 yes('a runner number below 1 stops', /number from 1/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [0] }])));
 yes('the real records on this checkout pass', (() => {
   const dir = path.join(REPO, 'records');
@@ -161,6 +181,24 @@ yes('the real records on this checkout pass', (() => {
   });
   return recs.length > 0 && stops(recs) === '';
 })());
+
+// ---- 3b. the About record (#3682) ---------------------------------------------------
+console.log('the About record');
+const aboutReal = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'repo-about.json'), 'utf8'));
+const aboutRec = (o) => Object.assign({ file: 'records/repo-about.json', description: aboutReal.description, homepage: aboutReal.homepage, topics: aboutReal.topics.slice() }, o || {});
+function aboutStops(r) { try { admin.checkAbout(r); return ''; } catch (e) { return e.message; } }
+yes('the real records/repo-about.json passes', aboutStops(aboutRec()) === '');
+yes('an empty description stops', /empty/.test(aboutStops(aboutRec({ description: ' ' }))));
+yes('one longer than GitHub takes stops', /350/.test(aboutStops(aboutRec({ description: 'x'.repeat(351) }))));
+yes('one of two lines stops', /one line/.test(aboutStops(aboutRec({ description: 'a\nb' }))));
+yes('a website that is not https stops', /https/.test(aboutStops(aboutRec({ homepage: 'http://thornswood.net' }))));
+yes('  and no website at all is allowed', aboutStops(aboutRec({ homepage: '' })) === '');
+yes('a topic in capitals stops', /lower case/.test(aboutStops(aboutRec({ topics: ['Skyrim'] }))));
+yes('a topic twice stops', /twice/.test(aboutStops(aboutRec({ topics: ['skyrim', 'skyrim'] }))));
+yes('more topics than GitHub takes stops', /20/.test(aboutStops(aboutRec({ topics: Array.from({ length: 21 }, (_, i) => 't' + i) }))));
+const ap = admin.planAbout(aboutRec(), { description: null, homepage: null }, []);
+yes('an empty About box differs in all three parts', ap.length === 3 && ap.map(c => c.what).join(',') === 'description,website,topics');
+yes('topics in another order are the same', admin.planAbout(aboutRec(), { description: aboutReal.description, homepage: aboutReal.homepage }, aboutReal.topics.slice().reverse()).length === 0);
 
 // ---- 4 and 5. the service, against a stand-in GitHub ---------------------------------
 const gh = {
@@ -175,8 +213,11 @@ const gh = {
     runner(13, 'thornswood-vps-3', base.concat('thornswood-build')),
     runner(14, 'thornswood-vps-4', base),
   ],
+  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null },
+  topics: [],
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   installed: true,
+  installRepos: ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'],
   conversion: null,
 };
 const appKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -202,12 +243,17 @@ function standIn(req, res) {
     if (P === '/repos/EvilPatrick06/Thornswood/installation') return !asApp() ? send(401, { message: 'Bad credentials' }) : gh.installed ? send(200, { id: 77 }) : send(404, { message: 'Not Found' });
     if (P === '/app/installations/77/access_tokens' && req.method === 'POST') return asApp() ? send(201, { token: gh.instToken }) : send(401, { message: 'Bad credentials' });
     if (!P.startsWith('/app-manifests/') && !asInst()) return send(401, { message: 'Bad credentials' });
+    if (P === '/installation/repositories') return send(200, { total_count: gh.installRepos.length, repositories: gh.installRepos.map(n => ({ full_name: n })) });
     if (P === '/repos/EvilPatrick06/Thornswood/contents/records') {
       if (u.searchParams.get('ref') !== 'main') return send(404, { message: 'No commit found for the ref' });
       return send(200, Object.keys(gh.records).concat(['README.md']).map(n => ({ type: 'file', name: n })));
     }
     let m = /^\/repos\/EvilPatrick06\/Thornswood\/contents\/records\/(.+)$/.exec(P);
     if (m && gh.records[m[1]] && u.searchParams.get('ref') === 'main') return send(200, { content: Buffer.from(JSON.stringify(gh.records[m[1]])).toString('base64') });
+    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'GET') return send(200, gh.repo);
+    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'PATCH') { Object.assign(gh.repo, body); return send(200, gh.repo); }
+    if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'GET') return send(200, { names: gh.topics });
+    if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'PUT') { gh.topics = body.names.slice(); return send(200, { names: gh.topics }); }
     if (P === '/repos/EvilPatrick06/Thornswood/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
     m = /^\/repos\/EvilPatrick06\/Thornswood\/actions\/runners\/(\d+)\/labels(?:\/(.+))?$/.exec(P);
     if (m) {
@@ -295,7 +341,7 @@ function start(stateDir, ghPort) {
     r = await ask4(bearer(sign(good())));
     yes('with no App yet it says how to make one (503)', r.status === 503 && /Install-AdminService\.ps1 -Setup/.test(r.text));
     r = await ask4(bearer(sign(good())), { what: 'secrets' });
-    yes('anything but runner-labels is refused (400)', r.status === 400);
+    yes('anything but runner-labels and installation-repos is refused (400)', r.status === 400 && /runner-labels and installation-repos/.test(r.text));
 
     // The App, as the setup would leave it.
     fs.writeFileSync(path.join(state, 'key.pem'), appKeyPem);
@@ -330,8 +376,45 @@ function start(stateDir, ghPort) {
     gh.calls = [];
     r = await ask4(bearer(sign(good())));
     yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && writes().length === 0);
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'installation-repos', check: false });
+    const repoTok = gh.calls.find(c => /access_tokens$/.test(c.path));
+    yes('installation-repos lists the repositories the App is on, sorted (200)',
+      r.status === 200 && r.json.ok && JSON.stringify(r.json.repos) === '["EvilPatrick06/Thornswood","EvilPatrick06/Thornswood-Ops"]' && r.json.lines.includes('installed on EvilPatrick06/Thornswood-Ops'));
+    yes('  with a token that reads metadata alone, for no one repository',
+      repoTok && repoTok.body.repositories === undefined && JSON.stringify(repoTok.body.permissions) === '{"metadata":"read"}');
+    yes('  asked with that token, and changing nothing, reading no record and no runner',
+      gh.calls.some(c => c.path.startsWith('/installation/repositories') && c.auth === 'Bearer ' + gh.instToken) && writes().length === 0 && !gh.calls.some(c => /contents\/records|actions\/runners/.test(c.path)));
+    gh.installRepos = [];
+    r = await ask4(bearer(sign(good())), { what: 'installation-repos' });
+    yes('  an installation on no repository says so', r.status === 200 && r.json.repos.length === 0 && r.json.lines[0] === 'installed on no repository');
+    gh.installRepos = ['EvilPatrick06/Thornswood-Ops', 'EvilPatrick06/Thornswood'];
     r = await ask4(bearer(sign(good())), { what: 'runner-labels', records: { 'x-runners.json': { label: 'thornswood-x', runners: [4] } } });
     yes('records sent by the caller are not used', r.status === 200 && r.json.changed === 0 && !labels('thornswood-vps-4').includes('thornswood-x'));
+
+    // The About box (#3682), from records/repo-about.json on main.
+    gh.records['repo-about.json'] = { about: 'x', description: aboutReal.description, homepage: aboutReal.homepage, topics: aboutReal.topics };
+    const aboutWrites = () => gh.calls.filter(c => c.method === 'PATCH' || c.method === 'PUT');
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'repo-about', check: true });
+    yes('an About check answers 200 with the three parts that differ, and changes nothing', r.status === 200 && r.json.ok && r.json.differs === 3 && r.json.changed === 0 && aboutWrites().length === 0);
+    yes('  it names what each would be', r.json.lines.some(l => /the website would be "https:\/\/thornswood\.net"/.test(l)));
+    yes('  and the runner records are not read for it', !gh.calls.some(c => /runners/.test(c.path)));
+    gh.calls = [];
+    r = await ask4(bearer(sign(good({ event_name: 'push' }))), { what: 'repo-about' });
+    yes('an About run sets the description, the website and the topics (200, 3 changed)', r.status === 200 && r.json.ok && r.json.changed === 3 &&
+      gh.repo.description === aboutReal.description && gh.repo.homepage === aboutReal.homepage && gh.topics.join(',') === aboutReal.topics.join(','));
+    yes('  in one PATCH and one PUT, with the installation token', aboutWrites().length === 2 && aboutWrites().every(c => c.auth === 'Bearer ' + gh.instToken) &&
+      JSON.stringify(Object.keys(aboutWrites().find(c => c.method === 'PATCH').body).sort()) === '["description","homepage"]');
+    yes('  and the record came from main', gh.calls.some(c => c.path === '/repos/EvilPatrick06/Thornswood/contents/records/repo-about.json?ref=main'));
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'repo-about' });
+    yes('a second About run changes nothing', r.status === 200 && r.json.changed === 0 && aboutWrites().length === 0 && /GitHub matches it/.test(r.text));
+    gh.records['repo-about.json'] = { description: 'two\nlines', homepage: '', topics: ['skyrim'] };
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())), { what: 'repo-about', description: 'from the caller' });
+    yes('a bad About record on main stops it, nothing changed (502)', r.status === 502 && /one line/.test(r.text) && aboutWrites().length === 0);
+    delete gh.records['repo-about.json'];
 
     gh.records['bad-runners.json'] = { label: 'thornswood-vps', runners: [1] };
     gh.calls = [];

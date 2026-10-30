@@ -20,9 +20,13 @@
        stamped for them; a trade waiting on somebody else stays
     C  no coin or goods are made or lost: every purse and shelf is the same
     V  each changed entry's revision rises by one, the file verifies and
-       loads again, and the service goes on (read, compareAndCommit); the
-       release writes no trader's mirror, prepare() puts it right
+       loads again, and the service goes on (read, compareAndCommit)
     A  a retired trader's waiting trade is let go too
+    K  each trader's own saved copy (the thornswoodMerchant property) that
+       names them is written from the ledger, a retired trader's too, and no
+       longer names them; a copy naming nobody there is not written; a copy
+       left naming them by an earlier start whose copy write did not take is
+       found and written on the next, with no ledger write
     N  a second run, or a list naming nobody there, writes nothing
     P  a commission promise held for them, and a finished one cooling down,
        goes (by profile, and by form id when the owner names no plugin);
@@ -79,9 +83,9 @@ yes('S4 the parts still waiting are said once, after the NPC startup',
 yes('S5 the purse service answers release beside compareAndCommit', /return \{prepare,read,commit,compareAndCommit,pendingRecords,ledgerStates,release,/.test(purseSrc));
 const dp = fs.readFileSync(path.join(REPO, 'scripts', 'vps', 'Delete-Person.ps1'), 'utf8');
 yes('S6 Delete-Person counts the merchant ledger as released', /const RELEASED = \/\^\([^)]*\|merchant-ledger\)\\\.json\$\/i;/.test(dp));
-const ops = fs.readFileSync(path.join(REPO, 'docs', 'WEBSITE-OPERATIONS.md'), 'utf8');
-yes('S7 the deletion runbook says the ledger is let go, not left',
-    /The dry run counts those as `release`, and the game server lets\s+go of them/.test(ops) && !/merchant-ledger\.json`\) keys a supply wait, and a trade still waiting\s+on a character, by that character's form id and profile; the dry run counts\s+those as `left`/.test(ops));
+// S7, that the deletion runbook says the ledger is let go, left with
+// WEBSITE-OPERATIONS.md for the private ops repo (#3693), whose
+// tests/test-ops-docs.js holds it.
 
 // ---------------------------------------------------------------- stand-ins
 const NOW = Date.now();
@@ -134,7 +138,7 @@ function seed(priv) {
 }
 function open(dir, opt) {
   opt = opt || {};
-  const logged = [], mirror = new Map();
+  const logged = [], mirror = new Map(opt.copies || []);
   const box = { require: require, Buffer: Buffer, console: { log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); } },
                 log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); } };
   box.globalThis = box;
@@ -153,7 +157,10 @@ function open(dir, opt) {
     makeProperty: function () { }, getIdFromDesc: function (d) { return { '9:Skyrim.esm': 9, '8:Skyrim.esm': 8, '7:Skyrim.esm': 7, '6:Skyrim.esm': 6 }[d] || 0; },
     getNpcAIState: function () { return { isHuman: false }; },
     get: function (id, k) { return k === 'baseDesc' ? BASE : mirror.get(id); },
-    set: function (id, k, v) { mirror.set(id, JSON.parse(JSON.stringify(v))); }
+    set: function (id, k, v) {
+      if (opt.failSet === id) { throw new Error('the copy could not be written'); }
+      mirror.set(id, JSON.parse(JSON.stringify(v)));
+    }
   };
   const data = { keep: REF.slice(0, 3).map(function (r) { return [r, BASE, null, null, null, null, 'trader']; }), merchantHistory: REF.map(function (r) { return [r, BASE]; }) };
   const purses = box.createNpcMerchantPurses(api, data, storage);
@@ -171,7 +178,9 @@ try {
   const dir = path.join(scratch, 'one');
   seed(path.join(dir, 'private'));
   const before = readFile(dir);
-  const s1 = open(dir);
+  // Each trader's own saved copy, as prepare() and the commits left it.
+  const copies = [9, 8, 7, 6].map(function (id) { return [id, JSON.parse(JSON.stringify(before.entries[id + ':Skyrim.esm']))]; });
+  const s1 = open(dir, { copies: copies });
   yes('T0 before: four traders hold a waiting trade, every one counted towards the limit', s1.purses.pendingRecords().length === 4);
   const r = s1.purses.release(whoOf([P1], [A1, A2]));
   const after = readFile(dir);
@@ -190,14 +199,25 @@ try {
   yes('V1 each changed entry\'s revision rises by one, the other\'s does not',
       e9.revision === 5 && e8.revision === 5 && e6.revision === 5 && e7.revision === 4);
   yes('V2 the answer is counts and saved', r && r.saved === true &&
-      JSON.stringify(r.counts) === JSON.stringify({ merchants: 3, supply: 2, commissions: 0, trades: 3 }));
+      JSON.stringify(r.counts) === JSON.stringify({ merchants: 3, supply: 2, commissions: 0, trades: 3, copies: 3 }));
   yes('V3 the file verifies', after.sha256 === sum(after));
   yes('V4 the service goes on: it reads what it wrote, and one waiting trade is left towards the limit',
       s1.purses.read(9).pending === null && s1.purses.pendingRecords().length === 1);
-  const mirrored = s1.mirror.size;
+  // ---- K
+  // Their form ids as a desc, or their profile id, anywhere in the copy,
+  // keys written as JSON inside JSON included.
+  const theirIds = new RegExp('"(' + hex(A1) + '|' + hex(A2) + ')"|"profileId":' + P1 + '\\b|,' + P1 + ',', 'i');
+  const namesThem = (copy) => theirIds.test(JSON.stringify(copy).replace(/\\"/g, '"'));
+  yes('K0 before: the copies of 9, 8 and the retired 6 name them, 7\'s names nobody there',
+      namesThem(copies[0][1]) && namesThem(copies[1][1]) && namesThem(copies[3][1]) && !namesThem(copies[2][1]));
+  yes('K1 the retired trader\'s copy is written from the ledger and no longer names them',
+      JSON.stringify(s1.mirror.get(6)) === JSON.stringify(e6) && !namesThem(s1.mirror.get(6)));
+  yes('K2 an active trader\'s copies are written the same, without waiting for prepare()',
+      JSON.stringify(s1.mirror.get(9)) === JSON.stringify(e9) && JSON.stringify(s1.mirror.get(8)) === JSON.stringify(e8) &&
+      !namesThem(s1.mirror.get(9)) && !namesThem(s1.mirror.get(8)));
+  yes('K3 a copy naming nobody there is not written', JSON.stringify(s1.mirror.get(7)) === JSON.stringify(copies[2][1]));
   s1.purses.prepare(9);
-  yes('V5 the release writes no trader\'s mirror; prepare() puts an active trader\'s right from the ledger, a retired one has none',
-      mirrored === 0 && s1.mirror.get(9) && s1.mirror.get(9).revision === 5 && s1.mirror.get(9).pending === null && !s1.mirror.has(6));
+  yes('V5 prepare() finds the copy already right', s1.mirror.get(9).revision === 5 && s1.mirror.get(9).pending === null);
   const c = s1.purses.compareAndCommit(9, 5, Object.assign({}, s1.purses.read(9), { purse: 281 }));
   yes('V6 and a trade after it commits on the new revision', !!c && c.revision === 6);
   s1.purses.shutdown();
@@ -211,6 +231,26 @@ try {
   const n2 = s2.purses.release(whoOf([123], [0xff000fff]));
   yes('N2 a list naming nobody there writes nothing', n2.saved === true && n2.counts.merchants === 0 && fs.readFileSync(fileOf(dir), 'utf8') === bytes);
   s2.purses.shutdown();
+
+  // ============================================================ K: a copy write that did not take
+  const dir5 = path.join(scratch, 'copy');
+  seed(path.join(dir5, 'private'));
+  const before5 = readFile(dir5);
+  const copies5 = [[6, JSON.parse(JSON.stringify(before5.entries['6:Skyrim.esm']))]];
+  const k1 = open(dir5, { copies: copies5, failSet: 6 });
+  let copyWhy = '';
+  try { k1.purses.release(whoOf([P1], [A1, A2])); } catch (e) { copyWhy = String(e.message); }
+  const saved5 = fs.readFileSync(fileOf(dir5), 'utf8');
+  yes('K4 a copy write that fails stops the part, said, after the ledger is let go',
+      /could not be written/.test(copyWhy) && readFile(dir5).entries['6:Skyrim.esm'].pending === null && namesThem(k1.mirror.get(6)));
+  k1.purses.shutdown();
+  const k2 = open(dir5, { copies: [[6, k1.mirror.get(6)]] });
+  const rk = k2.purses.release(whoOf([P1], [A1, A2]));
+  yes('K5 the next start finds that copy and writes it, with no ledger write',
+      rk.saved === true && rk.counts.merchants === 0 && rk.counts.copies === 1 && !namesThem(k2.mirror.get(6)) &&
+      JSON.stringify(k2.mirror.get(6)) === JSON.stringify(readFile(dir5).entries['6:Skyrim.esm']) &&
+      fs.readFileSync(fileOf(dir5), 'utf8') === saved5);
+  k2.purses.shutdown();
 
   // ============================================================ P: commission promises
   // merchant-commission-state.js keys a promise by [owner, job], the owner
@@ -255,7 +295,7 @@ try {
       !!COMMISSIONS.read(c9) && !!COMMISSIONS.read(c8) && c9.serial === 3 && c8.serial === 1);
   yes('P6 no coin or goods are made or lost', JSON.stringify(coin(after3)) === JSON.stringify(coin(before3)));
   yes('P7 the answer counts the promises', rp && rp.saved === true &&
-      JSON.stringify(rp.counts) === JSON.stringify({ merchants: 2, supply: 0, commissions: 3, trades: 1 }));
+      JSON.stringify(rp.counts) === JSON.stringify({ merchants: 2, supply: 0, commissions: 3, trades: 1, copies: 0 }));
   p1.purses.shutdown();
 
   // ============================================================ B: a trade with somebody else

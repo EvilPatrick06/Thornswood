@@ -18,19 +18,21 @@
        not a build runner, with a timeout; no environment and no secret; no
        token kept by the checkout, every file written again after it
        (#3029); main's Set-BuildRunners.ps1 -OnGitHub under pwsh with no
-       profile, nothing pasted into its script.
+       profile, nothing pasted into its script; an ask input that is
+       runner-labels or installation-repos, runner-labels on a push.
     2. Set-BuildRunners.ps1 -OnGitHub, against a stand-in for GitHub's token
        service and the admin service: it asks for this run's token for the
        audience thornswood-admin, hands it to 127.0.0.1:7791 with nothing
        but runner-labels and the check, and writes the answer (MATCHES,
        CHANGED <n>, DIFFERS <n>) as an annotation titled Set-BuildRunners
-       with the service's lines; a refusal, a stop, or an answer that is not
-       the service's is an error; with no OIDC token to ask for it asks
-       nothing.
+       with the service's lines; installation-repos (#4013) asks for that
+       alone and answers REPOS <n>; an ask it does not know asks nothing; a
+       refusal, a stop, or an answer that is not the service's is an error;
+       with no OIDC token to ask for it asks nothing.
     3. Set-BuildRunners.ps1 in a session, against a stand-in for gh: it
        starts github-admin.yml on main with the check, reads the runner's
-       annotation and exits 0, 1 or 2 by it, and -Run reads a run's answer
-       later.
+       annotation and exits 0, 1 or 2 by it, -AppRepos starts it with
+       installation-repos, and -Run reads a run's answer later.
     4. Install-AdminService.ps1: it parses, and every script it sends parses
        once built; a commit or nothing; LOCAL SERVICE with its own SID,
        granted its folder and its state folder, after the fail-safe; the
@@ -38,7 +40,12 @@
        rolled back when the new one does not answer; StopIt stops only what
        names admin.log; it looks for the whole line admin.js answers with;
        -Setup makes a 32 byte state on the box that lives an hour and
-       refuses while an App is held; no install touches the state folder.
+       refuses while an App is held; no install moves or changes what is in
+       the state folder. That folder is locked apart before anything stops
+       (#4076): nothing inherited, SYSTEM, Administrators, the task's own
+       SID and OWNER RIGHTS only, owned by Administrators; the install
+       refuses, leaving the service stopped, while another service could
+       read the key, and -Status says which.
     5. records\runner-isolation.json keeps every runner account out of the
        service's folder.
 
@@ -84,7 +91,7 @@ $code = (@($y -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
 $on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'it is started by hand and by a push, nothing else' ($on -match '(?m)^  workflow_dispatch:' -and $on -match '(?m)^  push:' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 2)
 Yes '  by hand with a check input that is a boolean' ($on -match '(?ms)check:\n\s+description:[^\n]*\n\s+type: boolean\n\s+default: false')
-Yes '  a push to main only, and only when a runner record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n?$")
+Yes '  a push to main only, and only when a runner record or the About record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n\s+- 'records/repo-about\.json'\n?$")
 $perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
 Yes ("its token reads the repository and asks for an OIDC token, nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: read`n  id-token: write")
 Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
@@ -94,12 +101,23 @@ Yes '  with a timeout' ($code -match '(?m)^    timeout-minutes: \d+$')
 Yes '  in no environment, so it holds no secret' ($code -notmatch '(?m)^\s+environment:' -and $code -notmatch 'secrets\.')
 Yes 'the checkout keeps no token' ($code -match 'uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
 Yes '  and every file is written again after it (#3029)' ($code -match '- name: Check every tracked file out again')
-$step = [regex]::Match($code, '(?ms)- name: Ask the box\n(.*)$').Groups[1].Value
+$step = [regex]::Match($code, '(?ms)- name: Ask the box\n(.*?)(?=\n      - name: |\z)').Groups[1].Value
 Yes 'the step is pwsh with no profile' ($step -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
 $run = [regex]::Match($step, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes '  running main''s Set-BuildRunners.ps1 -OnGitHub' ($run -match "scripts/deploy/Set-BuildRunners\.ps1'\) -OnGitHub")
 Yes '  with nothing pasted into its script' ($run -notmatch '\$\{\{')
 Yes '  and the check through the environment' ($step.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
+Yes 'by hand with an ask input: runner-labels or installation-repos, runner-labels by default' ($on -match '(?ms)ask:\n\s+description:[^\n]*\n\s+type: choice\n\s+options:\n\s+- runner-labels\n\s+- installation-repos\n\s+default: runner-labels')
+Yes '  through the environment too, runner-labels on a push' ($step.Contains("ADMIN_ASK: `${{ inputs.ask || 'runner-labels' }}"))
+# The About box (#3682): its own step after the runner labels, run whatever
+# they answered, the same way.
+$about = [regex]::Match($code, '(?ms)- name: Match the About box\n(.*?)(?=\n      - name: |\z)').Groups[1].Value
+Yes 'the About box has a step of its own' ($about -ne '')
+Yes '  that runs whatever the runner labels answered, but not for installation-repos' ($about -match '(?m)^\s+if: \$\{\{ !cancelled\(\) && inputs\.ask != ''installation-repos'' \}\}$')
+Yes '  under pwsh with no profile' ($about -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
+$aboutRun = [regex]::Match($about, '(?ms)run: \|\n(.*)$').Groups[1].Value
+Yes '  running main''s Set-RepoAbout.ps1 -OnGitHub, nothing pasted in' ($aboutRun -match "scripts/deploy/Set-RepoAbout\.ps1'\) -OnGitHub" -and $aboutRun -notmatch '\$\{\{')
+Yes '  and the check through the environment' ($about.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
 
 # ---- 2. the GitHub half ------------------------------------------------------
 Write-Host ''; Write-Host 'the GitHub half'
@@ -118,7 +136,7 @@ function OnGitHub([hashtable]$envs, [hashtable]$state) {
     foreach ($k in $state.Keys) { $base[$k] = $state[$k] }
     $global:TSadmin = $base
     $global:TScalls = @()
-    $all = @{ GITHUB_ACTIONS = 'true'; ACTIONS_ID_TOKEN_REQUEST_URL = 'https://token.test/idtoken?api-version=2.0'; ACTIONS_ID_TOKEN_REQUEST_TOKEN = 'request-token'; ADMIN_CHECK = 'false'; THORNSWOOD_ADMIN_PORT = '' }
+    $all = @{ GITHUB_ACTIONS = 'true'; ACTIONS_ID_TOKEN_REQUEST_URL = 'https://token.test/idtoken?api-version=2.0'; ACTIONS_ID_TOKEN_REQUEST_TOKEN = 'request-token'; ADMIN_CHECK = 'false'; ADMIN_ASK = ''; THORNSWOOD_ADMIN_PORT = '' }
     foreach ($k in $envs.Keys) { $all[$k] = $envs[$k] }
     $was = @{}
     foreach ($k in $all.Keys) { $was[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $all[$k]) }
@@ -142,6 +160,13 @@ $r = OnGitHub @{} @{ content = '{"ok":true,"lines":["records/sign-runners.json: 
 Yes 'labels put right: exit 0, CHANGED 1 with the lines' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::CHANGED 1%0Arecords/sign-runners\.json: thornswood-vps-3, thornswood-sign put on')
 $r = OnGitHub @{ ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["x would have y put on"],"changed":0,"differs":2}' }
 Yes 'a check that differs: exit 0, DIFFERS 2, and the check reached the service' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::DIFFERS 2' -and $r.Calls[1].Body.check -eq $true)
+$r = OnGitHub @{ ADMIN_ASK = 'runner-labels' } @{}
+Yes 'asking for runner-labels by name is the same' ($r.Code -eq 0 -and $r.Calls[1].Body.what -eq 'runner-labels' -and $r.Out -match 'Set-BuildRunners::MATCHES')
+$r = OnGitHub @{ ADMIN_ASK = 'installation-repos'; ADMIN_CHECK = 'true' } @{ content = '{"ok":true,"lines":["installed on EvilPatrick06/Thornswood","installed on EvilPatrick06/Thornswood-Ops"],"repos":["EvilPatrick06/Thornswood","EvilPatrick06/Thornswood-Ops"]}' }
+Yes 'installation-repos: exit 0, REPOS 2 with a line for each' ($r.Code -eq 0 -and $r.Out -match 'Set-BuildRunners::REPOS 2%0Ainstalled on EvilPatrick06/Thornswood%0Ainstalled on EvilPatrick06/Thornswood-Ops')
+Yes '  asking for that and nothing else' ($r.Calls[1].Body.what -eq 'installation-repos' -and @($r.Calls[1].Body.PSObject.Properties).Count -eq 1)
+$r = OnGitHub @{ ADMIN_ASK = 'secrets' } @{}
+Yes 'an ask it does not know: exit 1, nothing asked' ($r.Code -eq 1 -and $r.Calls.Count -eq 0 -and $r.Out -match 'neither runner-labels nor installation-repos')
 $r = OnGitHub @{} @{ code = 409; content = '{"ok":false,"lines":["STOP no runner records/sign-runners.json lists is registered on GitHub"],"changed":0,"differs":0}' }
 Yes 'the service stopping: exit 1, an error with its lines' ($r.Code -eq 1 -and $r.Out -match '::error title=Set-BuildRunners::the box''s admin service said no \(HTTP 409\)%0ASTOP no runner')
 $r = OnGitHub @{} @{ code = 403; content = '{"ok":false,"lines":["refused: the token is from the workflow x"]}' }
@@ -187,6 +212,9 @@ function Note([string]$level, [string]$message) { return @{ annotation_level = $
 $s = Session @{} $done @((Note 'notice' "CHANGED 1`nrecords/sign-runners.json: thornswood-vps-3, thornswood-sign put on"))
 Yes ("it starts github-admin.yml on main and says GitHub matches, exit 0 ($($s.Code))") ($s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/Thornswood/actions/workflows/github-admin\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Out -match '1 label\(s\) changed')
 Yes '  with check false, and the service''s lines' ($s.Body.inputs.check -eq 'false' -and $s.Out -match 'thornswood-sign put on')
+Yes '  asking for runner-labels' ($s.Body.inputs.ask -eq 'runner-labels')
+$s = Session @{ AppRepos = $true } $done @((Note 'notice' "REPOS 2`ninstalled on EvilPatrick06/Thornswood`ninstalled on EvilPatrick06/Thornswood-Ops"))
+Yes '-AppRepos asks for installation-repos and says where the App is, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.ask -eq 'installation-repos' -and $s.Out -match 'installed on EvilPatrick06/Thornswood-Ops' -and $s.Out -match 'installed on 2 repositories')
 $s = Session @{ Check = $true } $done @((Note 'notice' "DIFFERS 2`nx would have y put on"))
 Yes '-Check that differs: check true, exit 1' ($s.Code -eq 1 -and $s.Body.inputs.check -eq 'true' -and $s.Out -match 'differs from main''s runner records in 2')
 $s = Session @{ Check = $true } $done @((Note 'notice' "MATCHES`nrecords/build-runners.json: GitHub matches it"))
@@ -257,6 +285,30 @@ Yes '  running admin.js under server-log.js, kept 90 days with a time on each li
 Yes 'the folder takes nothing from C:\ and no broad group keeps a rule on it' (
     $install -match 'SetAccessRuleProtection\(`\$true, `\$false\)' -and $install -match "'S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19'")
 Yes '  and the state folder is made there before the grant' ($stageCode.Contains("if (-not (Test-Path -LiteralPath 'C:\Thornswood-Admin\state')) { New-Item -ItemType Directory -Path 'C:\Thornswood-Admin\state'"))
+# #4076: CREATOR OWNER on the folder became LOCAL SERVICE Modify on key.pem.
+$lockAt = $stageCode.IndexOf('# Locked apart')
+$lock = if ($lockAt -ge 0) { $stageCode.Substring($lockAt, $stageCode.IndexOf("'COULD NOT LOCK STATE: '") - $lockAt) } else { '' }
+Yes 'the state folder is locked apart before anything is stopped, and a lock that fails stops the install (#4076)' (
+    $lock -and $stageCode.IndexOf("'COULD NOT LOCK STATE: '") -lt $stageCode.IndexOf("'READY'") -and $stageCode -match "'COULD NOT LOCK STATE: ' \+ \`$_\.Exception\.Message; exit 1")
+Yes '  nothing inherited, so no CREATOR OWNER, and no rule of its own left over' (
+    $lock -match "Get-Acl -LiteralPath 'C:\\Thornswood-Admin\\state'" -and $lock -match '\$acl\.SetAccessRuleProtection\(\$true, \$false\)' -and
+    $lock -match 'foreach \(\$r in @\(\$acl\.GetAccessRules\(\$true, \$false, [^\r\n]*RemoveAccessRuleSpecific\(\$r\)')
+Yes '  SYSTEM and Administrators Full, OWNER RIGHTS only Synchronize, the task''s own SID Modify' (
+    $lock -match "@\('S-1-5-18', 'FullControl'\), @\('S-1-5-32-544', 'FullControl'\), @\('S-1-3-4', 'Synchronize'\)" -and
+    $lock -match "NTAccount\('NT TASK', 'Thornswood Admin'\)" -and $lock -match "if \(\`$taskSid\) \{ \`$rules \+= ,@\(\`$taskSid, 'Modify'\) \}" -and
+    $lock -notmatch "'S-1-5-19'|'S-1-3-0'|'S-1-1-0'|'S-1-5-11'|'S-1-5-32-545'")
+Yes '  owned by Administrators, and so is all in it, which keeps only what state gives it' (
+    $lock -match '\$acl\.SetOwner\(\$admins\)' -and $lock -match "Get-ChildItem -LiteralPath 'C:\\Thornswood-Admin\\state' -Recurse -Force" -and
+    $lock -match '\$a\.SetAccessRuleProtection\(\$false, \$false\)' -and $lock -match '\$a\.SetOwner\(\$admins\)' -and $lock -notmatch '(Remove|Move|Set-Content|Clear)-(Item|Content)')
+$check = $installCode.IndexOf('ANOTHER SERVICE COULD READ')
+Yes 'after the grant and before the start, the install refuses while another service could read the key' (
+    $check -gt $installCode.IndexOf('Grant-ThornswoodServiceFolder -Root') -and $check -lt $installCode.IndexOf("Start-ScheduledTask -TaskName 'Thornswood Admin'") -and
+    $installCode -match "Test-ThornswoodServiceCannotReach -Paths \(@\('C:\\Thornswood-Admin\\state'\) \+ [^\r\n]*-Sids @\('S-1-3-0'\)")
+Yes '  or LOCAL SERVICE owns a file there with no OWNER RIGHTS rule, and leaves the service stopped and disabled' (
+    $installCode -match "GetOwner\(\[Security\.Principal\.SecurityIdentifier\]\)\.Value -eq 'S-1-5-19' -and -not \`$capped" -and
+    $installCode -match "Disable-ScheduledTask -TaskName 'Thornswood Admin'[^\r\n]*\r?\n\s*'ADMIN REFUSED'; exit 1")
+$statusCode = Build (@($hs | Where-Object { $_.Extent.Text -match "'task      ' \+" })[0])
+Yes '-Status says whether another service could read the key' ($statusCode -match "'state     OPEN to other services: '" -and $statusCode -match "'S-1-5-19', 'S-1-3-0'" -and $statusCode -match "-notcontains 'S-1-3-4'")
 Yes 'the stage is checked by hash and node --check before the old service stops' (
     $installCode.IndexOf('did not arrive as it was sent') -lt $installCode.IndexOf('if (-not $stopOk)') -and $installCode.IndexOf('--check') -lt $installCode.IndexOf('if (-not $stopOk)'))
 Yes 'a service that does not answer gets the old files and task back' ($installCode -match 'Register-ScheduledTask -TaskName .Thornswood Admin. -Xml \$oldXml' -and $installCode -match 'ADMIN ROLLED BACK')
