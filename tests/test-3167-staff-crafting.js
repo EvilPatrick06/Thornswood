@@ -29,7 +29,8 @@
   The real chat command block, staff block, rulebook (the progression block)
   and staff crafting block run over a pretend world, as in
   test-staff-commands.js; the character block's state is a stand-in over that
-  world, with its own raiseLines. The real recipe list writer
+  world, and its names and raise lines are the real block's, run whole
+  beside the recipe table, so a raise says what the new rank opened (#3149). The real recipe list writer
   (handRecipesHidden) runs over a stand-in craft gate. The real K panel runs
   in a stand-in document, as in test-1638-office.js. Read only.
 */
@@ -65,16 +66,21 @@ const CRAFT = slice('// ==== thornswood staff crafting ====', '// ==== end thorn
 const RULES = slice('// ==== thornswood progression ====', '// ==== end thornswood progression ====');
 const PLACE_ACTORS = slice('\nfunction serverRunId(', '\n  return { made: made, why: why };\n}');
 const HIDDEN = between('\nfunction recipesRefused(actorId) {', '\n/*\n  A NEVER-COPIED');
-const NAMES = between("  /** The rulebook's own name for a class, a half or a school. */", '  /*\n    What somebody is told when the work is not theirs.');
-const RAISE = between('  function raiseLine(raised) {', '  function credit(actorId, key) {');
-const IS_HALF = between('  /** True when the key is a half of a profession, rather than a mage\'s school. */', '\n  /*');
+// The character block whole, for its own nameOf and raiseLines: since #4028
+// a raise line also says what the new rank opened, from the recipe book's
+// count, so lifting raiseLine and its neighbours alone left raiseLines
+// calling a recipeIndex that was not there.
+const CHARACTER = slice('// ==== thornswood character ====', '// ==== end thornswood character ====');
+const tableAt = src.indexOf('  var RECIPES_BY_ID = {');
+const tableEnd = tableAt < 0 ? -1 : src.indexOf('\n  };\n', tableAt);
+let TABLE = null;
+try { TABLE = JSON.parse(src.slice(tableAt + '  var RECIPES_BY_ID = '.length, tableEnd + 4)); } catch (e) { TABLE = null; }
 const OFFICE_VIEW = between('  function officeView(actorId, profileId) {', '\n  /*\n    THE JAIL RULE');
 [['the chat command block', COMMANDS], ['the staff block', STAFF], ['the staff crafting block', CRAFT],
  ['the progression block', RULES], ['placeActors', PLACE_ACTORS], ['the recipe list writer', HIDDEN],
- ['the character block\'s names', NAMES], ['its raise lines', RAISE], ['isCraftHalf', IS_HALF],
- ['the Office page\'s view', OFFICE_VIEW]]
+ ['the character block', CHARACTER], ['the recipe table', TABLE], ['the Office page\'s view', OFFICE_VIEW]]
   .forEach(function (x) { yes(x[0] + ' is in gamemode.js', !!x[1]); });
-if (!COMMANDS || !STAFF || !CRAFT || !RULES || !PLACE_ACTORS || !HIDDEN || !NAMES || !RAISE || !IS_HALF || !OFFICE_VIEW) {
+if (!COMMANDS || !STAFF || !CRAFT || !RULES || !PLACE_ACTORS || !HIDDEN || !CHARACTER || !TABLE || !OFFICE_VIEW) {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(1);
 }
@@ -199,13 +205,33 @@ function load(w) {
   box.__thornswoodSocial = { findPerson: function () { return { actorId: 0, why: 'Nobody here by that name.' }; } };
   vm.runInContext(RULES, box, { filename: 'gamemode.js (progression)' });
   const P = box.__thornswoodProgression;
-  // The character block's state, as a stand-in over the world, with its own names and raise lines.
-  // A raise line also says what the new rank opened in the K book (#3149);
-  // this world has no book, so that sentence is left out here, and
-  // test-3149-rank-unlock-line.js holds it.
-  vm.runInContext('var __charNames = (function () { var P = globalThis.__thornswoodProgression;' +
-                  ' function clog() { } function recipeIndex() { return null; } ' + IS_HALF + NAMES + RAISE +
-                  ' return { nameOf: nameOf, raiseLines: raiseLines }; })();', box);
+  // The character block's state, as a stand-in over the world, with the
+  // real block's names and raise lines: the block runs whole in a world of
+  // its own, as in test-3149-rank-unlock-line.js, beside the recipe table.
+  const charStore = {};
+  const charBox = {
+    mp: {
+      makeProperty: function () { },
+      get: function (id, key) {
+        if (key === 'profileId') { return 1000 + (id & 0xff); }
+        const p = charStore[id] || {};
+        return Object.prototype.hasOwnProperty.call(p, key) ? JSON.parse(p[key]) : undefined;
+      },
+      set: function (id, key, value) { (charStore[id] = charStore[id] || {})[key] = JSON.stringify(value); },
+      getDescFromId: function (n) { return 'unknown' + n + ':Nowhere.esp'; }
+    },
+    JSON: JSON, Object: Object, Array: Array, String: String, Number: Number, Math: Math, Date: Date,
+    console: { log: function () { }, error: function () { } },
+    guard: function (name, fn) { return fn; },
+    notify: function () { }, say: function () { }, log: function () { },
+    raceOf: function () { return ''; },
+    RECIPES_BY_ID: TABLE
+  };
+  charBox.globalThis = charBox;
+  vm.createContext(charBox);
+  vm.runInContext(RULES, charBox, { filename: 'gamemode.js (progression, for the character block)' });
+  vm.runInContext(CHARACTER, charBox, { filename: 'gamemode.js (character)' });
+  box.__charNames = charBox.__thornswoodCharacter;
   box.__thornswoodCharacter = {
     stateOf: function (a) { return JSON.parse(JSON.stringify(w.states[a] || P.fresh())); },
     writeState: function (a, s, redraw) {
@@ -292,7 +318,8 @@ const bj = w.states[A_BJORN];
 yes('R4 Raise makes him an Advanced Platewright, with the skill point a rank gives and the count at 0',
     bj.ranks.platewright === 'advanced' && bj.points === 1 && bj.work.platewright === 0);
 yes('R4 he is told the way work tells him (' + to(got, BJORN) + ')',
-    to(got, BJORN) === 'Staff raised your rank. You are now an Advanced Platewright. 1 skill point to spend, on K.');
+    to(got, BJORN).indexOf('Staff raised your rank. You are now an Advanced Platewright. 1 skill point to spend, on K. ' +
+                           'Advanced Platewright work opens ') === 0 && / more recipes to you: /.test(to(got, BJORN)));
 yes('R4 and the staff member is told (' + to(got, STAFFER) + ')',
     to(got, STAFFER) === 'Bjorn Iron-Hand is now Advanced in Platewright. It is in the staff log.');
 let rec = w.records[w.records.length - 1] || {};
