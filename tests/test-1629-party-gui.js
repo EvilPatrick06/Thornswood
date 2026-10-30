@@ -45,7 +45,6 @@ function helpTopic(id) {
 const front = process.env.FRONT ? fs.readFileSync(process.env.FRONT, 'utf8').split(CR).join('')
                                 : read('game', 'plugins', 'thornswood-front.js');
 const panel = read('game', 'ui', 'thornswood-party.js');
-const helpCs = read('launcher', 'app', 'Help.cs');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -422,18 +421,6 @@ if (social && trade && branch) {
   yes('P3 the panel says how many of them are here with you',
       /data\.together/.test(p) && /of them are here with you/.test(p));
   yes('P4 the panel\'s own words never say /party', !/<div class="none">[^<]*\/party/.test(panel));
-
-  const helpBodies = [];
-  const lit = '"((?:[^"\\\\]|\\\\.)*)"';
-  const re = new RegExp('new HelpItem\\(\\s*' + lit + '\\s*,\\s*' + lit + '\\s*,\\s*' + lit + '\\s*\\)', 'g');
-  let m;
-  while ((m = re.exec(helpCs)) !== null) { helpBodies.push(m[2] + '. ' + m[3]); }
-  const parties = helpBodies.filter(function (b) { return /^Parties\./.test(b); })[0] || '';
-  yes('H1 no item on the launcher\'s Help page names /party',
-      helpBodies.length > 20 && helpBodies.every(function (b) { return b.indexOf('/party') === -1; }));
-  yes('H2 the Parties item says look at them and press P, and the panel does the rest',
-      /look at them and press P/.test(parties) && /Leave there takes you out/.test(parties) &&
-      /Kick and Lead/.test(parties) && /Disband/.test(parties));
 
   const partyMd = read('docs', 'systems', 'party.md');
   const chatMd = read('docs', 'systems', 'chat.md');

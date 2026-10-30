@@ -8,8 +8,8 @@
 // What this holds:
 //   the help    none of the six words is named to everybody: not in
 //               PLAYER_WORDS (which /help and the unknown word reply read),
-//               not in /help, not on the launcher's Help page, not in the
-//               body of the system pages
+//               not in /help, not in the body of the system pages (the
+//               launcher's Help page, held to the same, went with #3146)
 //   the server  it still answers every line the keys and panels send,
 //               because removing a word from the help must not stop the
 //               server answering the panel (the trap on the issue)
@@ -54,7 +54,6 @@ function helpTopic(id) {
     return t ? t.text(new Function('return ' + k[1])()).join(' ') : '';
   } catch (e) { return ''; }
 }
-const helpCs = read('launcher', 'app', 'Help.cs');
 const panelSrc = read('game', 'ui', 'thornswood-party.js');
 
 let pass = 0, fail = 0;
@@ -105,15 +104,6 @@ if (helpBlock) {
   const people = helpTopic('people');
   yes('the help panel\'s People names none of the six, and says a request is answered with Accept or Refuse on its prompt',
       namesAny(people).length === 0 && /Answer a request with Accept or Refuse on its prompt\./.test(people));
-}
-
-{
-  const named = namesAny(helpCs);
-  yes('the launcher\'s Help page names none of the six' + (named.length ? ' (names: ' + named.join(', ') + ')' : ''),
-      named.length === 0);
-  yes('and says P lists the people near you with the five buttons, and everybody muted or hidden',
-      /P also lists the people near you, with Add friend, Trade, Mute, Text and Name beside each/.test(helpCs) &&
-      /everybody you have muted or hidden, friend or not/.test(helpCs));
 }
 
 /*
