@@ -96,7 +96,7 @@ $code = (@($y -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
 $on = [regex]::Match($code, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'it is started by hand and by a push, nothing else' ($on -match '(?m)^  workflow_dispatch:' -and $on -match '(?m)^  push:' -and @([regex]::Matches($on, '(?m)^  \S')).Count -eq 2)
 Yes '  by hand with a check input that is a boolean' ($on -match '(?ms)check:\n\s+description:[^\n]*\n\s+type: boolean\n\s+default: false')
-Yes '  a push to main only, and only when a runner record or the settings record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n\s+- 'records/github-repo-settings\.json'\n?$")
+Yes '  a push to main only, and only when a runner record, the About record or the settings record changes' ($on -match "(?ms)push:\n\s+branches: \[main\]\n\s+paths:\n\s+- 'records/\*-runners\.json'\n\s+- 'records/repo-about\.json'\n\s+- 'records/github-repo-settings\.json'\n?$")
 $perm = [regex]::Match($code, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value.Trim()
 Yes ("its token reads the repository and asks for an OIDC token, nothing else ($($perm -replace '\s+', ' '))") ($perm -eq "contents: read`n  id-token: write")
 Yes '  and no job asks for more' ($code -notmatch '(?m)^    permissions:')
@@ -112,7 +112,7 @@ Yes 'by hand with an ask input: runner-labels, repo-settings or installation-rep
 Yes 'two steps ask the box, one for the runner labels or the App''s repositories and one for the repository settings' ($askStep -and $rulesStep)
 Yes '  the first on a push, or by hand unless the repository settings are asked for' ($askStep.Contains("if: `${{ github.event_name == 'push' || inputs.ask != 'repo-settings' }}"))
 Yes '  with the ask through the environment, runner-labels on a push' ($askStep.Contains("ADMIN_ASK: `${{ inputs.ask || 'runner-labels' }}"))
-Yes '  the settings on a push once main has their record, or by hand when asked for' ($rulesStep.Contains("if: `${{ (github.event_name == 'push' && hashFiles('records/github-repo-settings.json') != '') || inputs.ask == 'repo-settings' }}"))
+Yes '  the settings on a push once main has their record, or by hand when asked for, whatever the steps before answered' ($rulesStep.Contains("if: `${{ !cancelled() && ((github.event_name == 'push' && hashFiles('records/github-repo-settings.json') != '') || inputs.ask == 'repo-settings') }}"))
 foreach ($st in @(@{ n = 'first'; s = $askStep; a = '-OnGitHub' }, @{ n = 'settings'; s = $rulesStep; a = '-OnGitHub -RepoSettings' })) {
     Yes ('the ' + $st.n + ' step is pwsh with no profile') ($st.s -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
     $run = [regex]::Match($st.s, '(?ms)run: \|\n(.*)$').Groups[1].Value
@@ -120,6 +120,15 @@ foreach ($st in @(@{ n = 'first'; s = $askStep; a = '-OnGitHub' }, @{ n = 'setti
     Yes '  with nothing pasted into its script' ($run -notmatch '\$\{\{')
     Yes '  and the check through the environment' ($st.s.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
 }
+# The About box (#3682): its own step after the runner labels, run whatever
+# they answered, the same way.
+$about = [regex]::Match($code, '(?ms)- name: Match the About box\n(.*?)(?=\n      - name: |\z)').Groups[1].Value
+Yes 'the About box has a step of its own' ($about -ne '')
+Yes '  that runs whatever the runner labels answered, but not for installation-repos or repo-settings alone' ($about -match '(?m)^\s+if: \$\{\{ !cancelled\(\) && inputs\.ask != ''installation-repos'' && inputs\.ask != ''repo-settings'' \}\}$')
+Yes '  under pwsh with no profile' ($about -match "shell: pwsh -NoProfile -NonInteractive -Command `". '\{0\}'`"")
+$aboutRun = [regex]::Match($about, '(?ms)run: \|\n(.*)$').Groups[1].Value
+Yes '  running main''s Set-RepoAbout.ps1 -OnGitHub, nothing pasted in' ($aboutRun -match "scripts/deploy/Set-RepoAbout\.ps1'\) -OnGitHub" -and $aboutRun -notmatch '\$\{\{')
+Yes '  and the check through the environment' ($about.Contains("ADMIN_CHECK: `${{ inputs.check && 'true' || 'false' }}"))
 
 # ---- 2. the GitHub half ------------------------------------------------------
 Write-Host ''; Write-Host 'the GitHub half'

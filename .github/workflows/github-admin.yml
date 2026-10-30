@@ -9,15 +9,17 @@
 # by scripts\vps\admin\admin.js and nowhere else, and this run is the only
 # thing that service listens to.
 #
-# HOW. scripts/deploy/Set-BuildRunners.ps1 starts it by hand from anywhere,
-# One or a cloud thread, and reads its answer; a push to main that changes a
-# records/*-runners.json starts it by itself, so a merged record is on GitHub
-# a minute later. The same goes for the repository settings (#3683,
-# Patrick's answers of 26 Oct 2026): records/github-repo-settings.json on
-# main says the rulesets and private vulnerability reporting of Thornswood
-# and the engine fork, Set-BuildRunners.ps1 -RepoSettings asks by hand, and
-# a push that changes the record runs it by itself. A push runs both,
-# each only making GitHub match its own record. Here Set-BuildRunners.ps1 -OnGitHub asks GitHub for this
+# HOW. scripts/deploy/Set-BuildRunners.ps1 (the runner labels) and
+# Set-RepoAbout.ps1 (the About box, #3682) start it by hand from anywhere,
+# One or a cloud thread, and read their answers; a push to main that changes
+# a records/*-runners.json or records/repo-about.json starts it by itself, so
+# a merged record is on GitHub a minute later. The same goes for the
+# repository settings (#3683, Patrick's answers of 26 Oct 2026):
+# records/github-repo-settings.json on main says the rulesets and private
+# vulnerability reporting of Thornswood and the engine fork,
+# Set-BuildRunners.ps1 -RepoSettings asks by hand, and a push that changes
+# the record runs it by itself. A push runs every step, each only making
+# GitHub match its own record. Here Set-BuildRunners.ps1 -OnGitHub asks GitHub for this
 # run's OIDC token for the audience thornswood-admin and hands it to the
 # service on 127.0.0.1:7791. The service checks the token against GitHub's
 # published keys and that it is this workflow on main, reads the records from
@@ -53,6 +55,7 @@ on:
     branches: [main]
     paths:
       - 'records/*-runners.json'
+      - 'records/repo-about.json'
       - 'records/github-repo-settings.json'
 permissions:
   contents: read
@@ -103,9 +106,25 @@ jobs:
           & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-BuildRunners.ps1') -OnGitHub
           exit $LASTEXITCODE
 
-      # Only once main has the settings record: before it, there is nothing to match.
+      # The About box, records/repo-about.json, the same way (#3682). It
+      # runs whatever the runner labels answered, since neither waits on
+      # the other, and writes its own answer, titled Set-RepoAbout. Asking
+      # only which repositories the App is on changes nothing, so it does
+      # not run then, nor when only the repository settings are asked for.
+      - name: Match the About box
+        if: ${{ !cancelled() && inputs.ask != 'installation-repos' && inputs.ask != 'repo-settings' }}
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-RepoAbout.ps1') -OnGitHub
+          exit $LASTEXITCODE
+
+      # The repository settings, records/github-repo-settings.json (#3683),
+      # the same way, and only once main has the record: before it, there is
+      # nothing to match. Its answer is titled Set-RepoSettings.
       - name: Ask the box for the repository settings
-        if: ${{ (github.event_name == 'push' && hashFiles('records/github-repo-settings.json') != '') || inputs.ask == 'repo-settings' }}
+        if: ${{ !cancelled() && ((github.event_name == 'push' && hashFiles('records/github-repo-settings.json') != '') || inputs.ask == 'repo-settings') }}
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
         env:
           ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
