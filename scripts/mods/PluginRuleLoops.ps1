@@ -89,7 +89,9 @@ function Get-PluginRuleLoops($Rules, [hashtable]$Headers) {
     $cmp = [StringComparer]::OrdinalIgnoreCase
     $names = New-Object Collections.Generic.List[string]
     $hdr = [Collections.Generic.Dictionary[string, object]]::new($cmp)
-    foreach ($k in @($Headers.Keys)) {
+    # In name order, so the same plugins give the same loops in the same order
+    # on every run, whatever order the hashtable keeps its keys in.
+    foreach ($k in @($Headers.Keys | Sort-Object)) {
         if ($null -eq $Headers[$k] -or $hdr.ContainsKey([string]$k)) { continue }
         $hdr[[string]$k] = $Headers[$k]
         [void]$names.Add([string]$k)
@@ -199,7 +201,7 @@ function Get-PluginRuleLoops($Rules, [hashtable]$Headers) {
         if ($found.Count) { break }
     }
     $out = New-Object Collections.Generic.List[object]
-    foreach ($l in @($found | Sort-Object { $_.Nodes.Count })) {
+    foreach ($l in @($found | Sort-Object { $_.Nodes.Count }, Loop)) {
         $set = [Collections.Generic.HashSet[string]]::new([string[]]$l.Nodes, $cmp)
         $again = $false
         foreach ($o in $out) { if ($set.IsSupersetOf([string[]]$o.Nodes)) { $again = $true; break } }

@@ -15,6 +15,7 @@
       pwsh scripts/release/New-NexusRevision.ps1 -SetLight RaceMenu.esp,XPMSE.esp -Layout <the -Record folder> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3 -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3
+      pwsh scripts/release/New-NexusRevision.ps1 -Discard 6 -WhatIf
 
   WHY. Until 20 October every revision was made by Patrick in Vortex and
   published on the website. The commonest one is a new file of our own mod,
@@ -98,6 +99,16 @@
   A DRAFT WAITING. Nexus keeps one draft at a time, so a real run refuses
   while there is one. -WhatIf builds on the draft instead, so the revision
   after it can be laid out and checked while the draft waits.
+
+  DISCARDING A DRAFT (30 Oct). -Discard N throws away draft revision N, with
+  the v2 GraphQL mutation discardRevision(collectionId, revisionNumber,
+  reason), read from the live schema on 30 October. Nothing else is done in
+  that run, and it refuses a revision that is not the waiting draft. A draft
+  cannot be changed once it is made, so a draft that is missing a change is
+  discarded and made again with every change in one run. Why: revision 6 was
+  drafted with Thornswood Content 1.3 and Atlas Map Markers SE taken out, but
+  without the cheddars_mashups.esl rule (#4070), and until now the only way
+  to drop a draft was the website.
 
   PATCHES AND MOD RULES (#2793). A moved entry's binary patches were made
   against files of its old archive. Each patched file is read out of the new
@@ -208,6 +219,10 @@
   Publishes this revision number, which has to be the draft. Nothing else is
   done in that run.
 
+.PARAMETER Discard
+  Throws this revision number away, which has to be the draft, as DISCARDING
+  A DRAFT above says. Nothing else is done in that run.
+
 .PARAMETER Permissions
   The record of what each mod's page allows, records\collection-permissions.json
   unless said otherwise.
@@ -239,6 +254,7 @@ param(
   [string]$Slug = '7essxf',
   [string]$Game = 'skyrimspecialedition',
   [int]$Publish = 0,
+  [int]$Discard = 0,
   [string]$Permissions,
   [int]$WaitSeconds = 600,
   [switch]$WhatIf,
@@ -417,7 +433,7 @@ Say ('  "' + (Get-NexusField $col 'name') + '", id ' + $colId + ', revision ' + 
 
 # --------------------------------------------------------------- publish ---
 if ($Publish) {
-  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $DropPatch.Count -or $From -or $Add -or $Rule -or $Remove.Count -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -DropPatch, -Add, -Rule, -Remove, -SetLight, -ClearLight or -From.' }
+  if ($Discard -or $Mod.Count -or $FileId.Count -or $Archive.Count -or $DropPatch.Count -or $From -or $Add -or $Rule -or $Remove.Count -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Discard, -Mod, -FileId, -Archive, -DropPatch, -Add, -Rule, -Remove, -SetLight, -ClearLight or -From.' }
   $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $Publish + ', domainName: "' + $Game + '") { id revisionNumber status downloadLink } }'
   $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $Publish) }) 'collectionRevision'
   $revId = [string](Get-NexusField $rev 'id')
@@ -463,8 +479,38 @@ if ($Publish) {
   exit 0
 }
 
+# --------------------------------------------------------------- discard ---
+if ($Discard) {
+  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $DropPatch.Count -or $From -or $Add -or $Rule -or $Remove.Count -or $SetLight.Count -or $ClearLight.Count) { Die '-Discard throws away a draft that is already there, so it takes no -Mod, -FileId, -Archive, -DropPatch, -Add, -Rule, -Remove, -SetLight, -ClearLight or -From.' }
+  $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $Discard + ', domainName: "' + $Game + '") { id revisionNumber status } }'
+  $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $Discard) }) 'collectionRevision'
+  $revId = [string](Get-NexusField $rev 'id')
+  $status = [string](Get-NexusField $rev 'status')
+  if (-not $revId) { Die ('Nexus has no revision ' + $Discard + ' of ' + $Slug + '.') }
+  Say ('  revision ' + $Discard + ' is ' + $status + ' (id ' + $revId + ')')
+  if ($status -ne 'draft') { Die ('Revision ' + $Discard + ' is ' + $status + ', not a draft, so there is nothing to discard.') }
+  if ([string]$draft -ne [string]$Discard) { Die ('Revision ' + $Discard + ' reads as a draft, but the collection names ' + $(if ($draft) { 'revision ' + $draft } else { 'no revision' }) + ' as its draft, so it was left alone.') }
+  $mut = 'mutation discardRevision($collectionId: ID!, $revisionNumber: Int!, $reason: String) { discardRevision(collectionId: $collectionId, revisionNumber: $revisionNumber, reason: $reason) { success } }'
+  if ($WhatIf) {
+    Say ('  would send the GraphQL mutation discardRevision(collectionId: "' + $colId + '", revisionNumber: ' + $Discard + ')') 'Yellow'
+    Write-Host ''; Say 'Nothing was written.' 'Green'
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+  }
+  $res = Step { Invoke-NexusGraph $mut ([ordered]@{ collectionId = $colId; revisionNumber = $Discard; reason = 'Made again with every change in one run (New-NexusRevision.ps1 -Discard).' }) ('Discarding revision ' + $Discard) }
+  if ((Get-NexusField (Get-NexusField $res 'discardRevision') 'success') -ne $true) { Die ('Nexus answered the discard of revision ' + $Discard + ' without saying it succeeded. Look at the collection''s page before running this again.') }
+  $script:Done.Add('revision ' + $Discard + ' discarded')
+  $now = Get-NexusField (Step { Invoke-NexusGraph $q $null ('Reading collection ' + $Slug + ' again') }) 'collection'
+  $nowDraft = Get-NexusField $now 'draftRevisionNumber'
+  if ($nowDraft) { Die ('Nexus said the discard succeeded, but the collection still names revision ' + $nowDraft + ' as its draft.') }
+  Write-Host ''
+  Say ('Revision ' + $Discard + ' is discarded, and no draft is waiting.') 'Green'
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
+
 # ------------------------------------------------------- refused up front ---
-if (-not $Mod.Count -and -not $Add -and -not $Rule -and -not $Remove.Count -and -not $SetLight.Count -and -not $ClearLight.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, which are taken out with -Remove, which plugins get a new rule with -Rule, which plugins get or lose the light flag with -SetLight and -ClearLight, or publish a draft with -Publish.' }
+if (-not $Mod.Count -and -not $Add -and -not $Rule -and -not $Remove.Count -and -not $SetLight.Count -and -not $ClearLight.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, which are taken out with -Remove, which plugins get a new rule with -Rule, which plugins get or lose the light flag with -SetLight and -ClearLight, or publish a draft with -Publish, or discard one with -Discard.' }
 $Mod = @($Mod | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $FileId = @($FileId | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 if ($Mod.Count -ne $FileId.Count -or $Mod.Count -ne $Archive.Count) { Die ('-Mod, -FileId and -Archive go together, one of each for every mod: ' + $Mod.Count + ', ' + $FileId.Count + ' and ' + $Archive.Count + ' were given.') }
@@ -524,7 +570,7 @@ if ($lights.Count) {
 # for a -WhatIf, as A DRAFT WAITING above says.
 $start = $latest; $startStatus = 'published'
 if ($draft) {
-  if (-not $WhatIf) { Die ('Revision ' + $draft + ' is already a draft on Nexus. Publish it with -Publish ' + $draft + ', or discard it on the website, before making another.') }
+  if (-not $WhatIf) { Die ('Revision ' + $draft + ' is already a draft on Nexus. Publish it with -Publish ' + $draft + ', or discard it with -Discard ' + $draft + ', before making another.') }
   $start = [int]$draft; $startStatus = 'draft'
   Say ('  Revision ' + $draft + ' is a draft, so this -WhatIf builds on it. A run that writes waits until it is published.') 'Yellow'
 }

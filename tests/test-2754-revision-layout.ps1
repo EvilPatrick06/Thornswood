@@ -210,8 +210,11 @@ $arc = [ordered]@{
     lambda = ZipExact 'Lambda' @('fomod/ModuleConfig.xml', $lambdaXml, 'opt/Lambda.txt', 'lambda text')
     mu    = ZipExact 'Mu' @('Data/mu.txt', 'lower', 'Data/MU.txt', 'upper')
     nu    = Zip 'Nu' @{ 'Data\Nu.esl' = 'nu light plugin' }
+    xi    = (P $T 'archives\Xi.rar')
 }
-$ids = @{ alpha = 900001; beta = 900002; gamma = 900003; delta = 900004; eps = 900005; kappa = 900006; lambda = 900007; mu = 900008; nu = 900009 }
+# Xi starts the way a RAR archive does and is not one, so no 7-Zip can test it.
+[IO.File]::WriteAllBytes($arc.xi, [byte[]](@(0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00) + @(1..57)))
+$ids = @{ alpha = 900001; beta = 900002; gamma = 900003; delta = 900004; eps = 900005; kappa = 900006; lambda = 900007; mu = 900008; nu = 900009; xi = 900010 }
 $serve = @{}
 foreach ($k in $arc.Keys) { $serve[[string]$ids[$k]] = @{ path = $arc[$k]; name = (Split-Path -Leaf $arc[$k]) } }
 Control @{ serve = $serve }
@@ -427,7 +430,15 @@ $cLoop.plugins = @(@{ name = 'Alpha.esp'; enabled = $true }, @{ name = 'Nu.esl';
 $cLoop.pluginRules = [ordered]@{ plugins = @([ordered]@{ name = 'nu.esl'; after = @('alpha.esp') }); groups = @() }
 Write-Col $colLoop $cLoop
 $r = Run (@('-CollectionArchive', $colLoop, '-Revision', '5', '-Cache', $cache) + (To 'game-loop'))
-YesR 'an .esl ruled to load after a plugin that is not a master stops the run, naming the loop and why, and -Game (or -Record) is untouched' ($r.Code -eq 1 -and $r.Out -match 'cyclic interaction' -and $r.Out -match 'Nu\.esl --> Alpha\.esp --> Nu\.esl \(Nu\.esl loads as a master and Alpha\.esp does not; the rule Nu\.esl loads after Alpha\.esp\)' -and $r.Out -match 'placed by name alone: Nu\.esl' -and -not (Test-Path -LiteralPath (P $T 'game-loop'))) $r
+YesR 'an .esl ruled to load after a plugin that is not a master stops the run, naming the loop and why, and -Game (or -Record) is untouched' ($r.Code -eq 1 -and $r.Out -match 'cyclic interaction' -and $r.Out -match 'Nu\.esl --> Alpha\.esp --> Nu\.esl \(Nu\.esl loads as a master and Alpha\.esp does not; the rule Nu\.esl loads after Alpha\.esp\)' -and $r.Out -match 'placed by name alone: Alpha\.esp, Nu\.esl' -and -not (Test-Path -LiteralPath (P $T 'game-loop'))) $r
+
+# 30 Oct: the stop for a RAR archive this 7-Zip cannot test began with the
+# count, so PowerShell read the + as a sum, threw "Cannot convert value" and
+# the reason never showed (the Desk, on Linux with Debian's 7z).
+$colRar = P $T 'col-rar'
+Write-Col $colRar (Collection @((Entry 'xi' 'Xi' @{})) @())
+$r = Run (@('-CollectionArchive', $colRar, '-Revision', '5', '-Cache', $cache) + (To 'game-rar'))
+YesR 'a RAR archive this 7-Zip cannot test stops the run, saying so' ($r.Code -eq 1 -and $r.Out -match '1 of the archives are RAR \(Xi\)' -and $r.Out -notmatch 'Cannot convert value' -and -not (Test-Path -LiteralPath (P $T 'game-rar'))) $r
 
 # ---- 7: -Revision through the API -----------------------------------------------------------
 $colArc = P $T 'collection_6.7z'

@@ -395,7 +395,7 @@ $rars = @($col.Entries | Where-Object {
 if ($rars.Count) {
   Step { Use-SevenZip }
   $t = Invoke-Tool $script:SevenZip @('t', $archives[$rars[0].Index])
-  if ($t.Code -ne 0) { Die ($rars.Count + ' of the archives are RAR (' + (($rars | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', ') + $(if ($rars.Count -gt 3) { ', ...' } else { '' }) + '), and ' + $script:SevenZip + ' could not test the first of them (exit ' + $t.Code + '), so it cannot unpack them.' + $(if (-not $IsWindows) { ' 7-Zip''s own Linux build unpacks RAR: pwsh scripts/release/Get-SevenZip.ps1 puts it where this script looks first.' } else { '' })) }
+  if ($t.Code -ne 0) { Die ([string]$rars.Count + ' of the archives are RAR (' + (($rars | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', ') + $(if ($rars.Count -gt 3) { ', ...' } else { '' }) + '), and ' + $script:SevenZip + ' could not test the first of them (exit ' + $t.Code + '), so it cannot unpack them.' + $(if (-not $IsWindows) { ' 7-Zip''s own Linux build unpacks RAR: pwsh scripts/release/Get-SevenZip.ps1 puts it where this script looks first.' } else { '' })) }
 }
 
 # ---------------------------------------------------------------- the install ---
@@ -564,7 +564,7 @@ foreach ($x in $placed) {
   }
   $ruleHeads[$nm] = $h
 }
-if ($byName.Count) { Say ('  no TES4 header, so placed by name alone: ' + ($byName -join ', ')) 'Yellow' }
+if ($byName.Count) { Say ('  no TES4 header, so placed by name alone: ' + (@($byName | Sort-Object) -join ', ')) 'Yellow' }
 $loops = @(Get-PluginRuleLoops $col.PluginRules $ruleHeads)
 if ($loops.Count) { Die ('The collection''s plugin rules go round in a circle with the order the game sets, which LOOT reports as a cyclic interaction on every install: ' + (($loops | ForEach-Object { $_.Loop + ' (' + ($_.Why -join '; ') + ')' }) -join '; ') + '.') }
 Say ('  ' + $order.Count + ' plugins: ' + @($order | Where-Object { $_.Enabled }).Count + ' enabled in the collection''s order' + $(if ($unlisted.Count) { ', ' + $unlisted.Count + ' it does not list, disabled: ' + ($unlisted -join ', ') } else { '' }))
