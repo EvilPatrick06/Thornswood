@@ -67,12 +67,14 @@ const PLACE_ACTORS = slice('\nfunction serverRunId(', '\n  return { made: made, 
 const HIDDEN = between('\nfunction recipesRefused(actorId) {', '\n/*\n  A NEVER-COPIED');
 const NAMES = between("  /** The rulebook's own name for a class, a half or a school. */", '  /*\n    What somebody is told when the work is not theirs.');
 const RAISE = between('  function raiseLine(raised) {', '  function credit(actorId, key) {');
+const IS_HALF = between('  /** True when the key is a half of a profession, rather than a mage\'s school. */', '\n  /*');
 const OFFICE_VIEW = between('  function officeView(actorId, profileId) {', '\n  /*\n    THE JAIL RULE');
 [['the chat command block', COMMANDS], ['the staff block', STAFF], ['the staff crafting block', CRAFT],
  ['the progression block', RULES], ['placeActors', PLACE_ACTORS], ['the recipe list writer', HIDDEN],
- ['the character block\'s names', NAMES], ['its raise lines', RAISE], ['the Office page\'s view', OFFICE_VIEW]]
+ ['the character block\'s names', NAMES], ['its raise lines', RAISE], ['isCraftHalf', IS_HALF],
+ ['the Office page\'s view', OFFICE_VIEW]]
   .forEach(function (x) { yes(x[0] + ' is in gamemode.js', !!x[1]); });
-if (!COMMANDS || !STAFF || !CRAFT || !RULES || !PLACE_ACTORS || !HIDDEN || !NAMES || !RAISE || !OFFICE_VIEW) {
+if (!COMMANDS || !STAFF || !CRAFT || !RULES || !PLACE_ACTORS || !HIDDEN || !NAMES || !RAISE || !IS_HALF || !OFFICE_VIEW) {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(1);
 }
@@ -198,8 +200,12 @@ function load(w) {
   vm.runInContext(RULES, box, { filename: 'gamemode.js (progression)' });
   const P = box.__thornswoodProgression;
   // The character block's state, as a stand-in over the world, with its own names and raise lines.
+  // A raise line also says what the new rank opened in the K book (#3149);
+  // this world has no book, so that sentence is left out here, and
+  // test-3149-rank-unlock-line.js holds it.
   vm.runInContext('var __charNames = (function () { var P = globalThis.__thornswoodProgression;' +
-                  ' function clog() { } ' + NAMES + RAISE + ' return { nameOf: nameOf, raiseLines: raiseLines }; })();', box);
+                  ' function clog() { } function recipeIndex() { return null; } ' + IS_HALF + NAMES + RAISE +
+                  ' return { nameOf: nameOf, raiseLines: raiseLines }; })();', box);
   box.__thornswoodCharacter = {
     stateOf: function (a) { return JSON.parse(JSON.stringify(w.states[a] || P.fresh())); },
     writeState: function (a, s, redraw) {
