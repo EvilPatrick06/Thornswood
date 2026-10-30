@@ -300,13 +300,15 @@ A change to the engine goes like this:
    machine; its records are never a pin's, because a Ship machine takes the
    fork's own build, and a rebuild is never the same bytes (#3399). Then
    `Build-Front.ps1 -Fork <fork> -Commit <commit> -Record`, which builds the
-   front from the same commit and writes `records\front-build.json` (#2754).
+   front from the same commit and writes `records\front-build.json` (#2754)
+   and the `records\front-licences` texts of the npm packages in build.js
+   (#3751).
 4. One pull request here with the new pin (`git update-index --cacheinfo
    160000,<commit>,engine/skymp`, or `git -C engine/skymp checkout <commit>`
    then `git add engine/skymp`), the records engine.yml handed back
    (`.\scripts\release\Get-EngineRecords.ps1 -Run <its run id>` writes them,
-   and only when the index already pins that commit), `records\front-build.json`,
-   and the commit named
+   and only when the index already pins that commit), `records\front-build.json`
+   with `records\front-licences`, and the commit named
    in `THIRD-PARTY.md` (its fork section, "On our servers" with the server's
    SHA256, and the link in "Where the source is") and in
    `site\data\site\credits.md`. `tests\test-third-party.js` is red when any of
