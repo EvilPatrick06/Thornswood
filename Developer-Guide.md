@@ -741,7 +741,7 @@ node tests\test-site-local.js
 .\scripts\dev\Check-Words.ps1
 ```
 
-Use the file in `tests\` whose name matches the area you touched. Pages, docs, and launcher help that a person will read go through `Check-Words.ps1`.
+Use the file in `tests\` whose name matches the area you touched. Pages, docs, and the launcher's window that a person will read go through `Check-Words.ps1`.
 
 ##### When the pull request will not open
 
@@ -856,7 +856,7 @@ VPS) are named by location only; never printed, pasted, committed or logged.
 What checks these, since 29 Sep (issue #460). Every pull request's build
 (`Launcher builds`, step "Check the writing rules") runs
 `scripts\dev\Check-Words.ps1` over every Markdown file outside `lore\` and
-`docs\archive\`, the launcher's help and window, the bot's channel posts,
+`docs\archive\`, the launcher's window, the bot's channel posts,
 the public pages of the site, and the installer's read
 me. Each hit names the file, the line and the rule, and turns the build red:
 
