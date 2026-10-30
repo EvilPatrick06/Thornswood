@@ -8,8 +8,11 @@
 # tag and publishes it once GitHub's own digest of each is right. Never the
 # latest Release. The script's header says what it refuses.
 #
-# WHEN. By hand, once, from the Actions tab or:
+# WHEN. By hand, once, on the day the repository goes public (Patrick, B on
+# q-3287-release-when, 27 Oct 2026), from the Actions tab or:
 #   gh workflow run frida-sources.yml --ref main
+# While the repository is private the job is skipped and the script makes
+# nothing, so a run before then costs nothing and changes nothing.
 # Run again, it finds the Release published and whole and changes nothing. A
 # new Frida in the engine is a new record and a new run, on a new tag. The
 # nightly run checks the Release every night (Publish-FridaSources.ps1 -Check).
@@ -32,6 +35,7 @@ concurrency:
 jobs:
   sources:
     name: Put Frida's sources on their Release
+    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

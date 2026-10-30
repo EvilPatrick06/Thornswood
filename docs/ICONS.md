@@ -1,13 +1,16 @@
 # Icons
 
-Three icon files. Each one has one job. They are not interchangeable.
+Three icon files. The launcher and the website tab show the same badge; the
+Dev launcher has its own.
 
 ## Main launcher
 
-`launcher/app.ico` is the Main launcher icon. Every frame is the full
-round Thornswood badge: 16, 24, 32, 48, 64, 128 and 256. Windows draws
-shortcuts and the taskbar from the small frames, so those have to be
-the badge too, not a crop of it.
+`launcher/app.ico` is the Main launcher icon. Every frame is the round
+Thornswood badge, and each size carries the lettering it can show:
+128 and 256 have Thornswood written out, 32, 48 and 64 have TW, and 16
+and 24 have no lettering. The T and the W are the badge's own letters.
+Windows draws shortcuts and the taskbar from the small frames, where the
+whole name is only a smudge.
 
 `scripts/release/Build-Launcher.ps1` finds it at line 157, embeds it as
 `app.ico` at lines 301 to 302, and stamps it on the exe as `/win32icon`.
@@ -26,25 +29,24 @@ it next to the Main icon. `Icons.cs` lines 81 to 88 pick it when
 
 ## Website tab
 
-`site/public/favicon.ico` is the website tab only. It is the crest
-alone, not the badge. `site/public/index.html` line 7 and
-`site/public/home.html` line 52 point the tab at it. It is never
-embedded in the launcher.
+`site/public/favicon.ico` is the website tab. Its 16, 32 and 48 frames
+are the same frames as `launcher/app.ico`, so the tab and the launcher
+show the same badge. `site/public/index.html` line 7 and
+`site/public/home.html` line 61 point the tab at it.
+`site/public/icon-192.png` is the badge at 192 with Thornswood written
+out; `index.html` also gives it as the touch icon.
 
-## Why they must stay apart
+## History
 
-On 5 Oct, #1581 put the crest-only favicon art into the 16, 24, 32, 48
-and 64 frames of `launcher/app.ico`. The 128 and 256 frames kept the
-badge picture (same pixels, a new PNG encoding). Windows then drew the
-Main shortcut and the taskbar from the crest, so Main looked like the
-website tab. That shipped in 1.1.106 and 1.2.0.
+On 5 Oct, #1581 put a crest into the small frames of `launcher/app.ico`,
+and Main looked like the website tab. Djinn put the badge back on 11 Oct
+(#2122), and the favicon kept the crest. In #3319 Patrick asked for the
+website tab to match the launcher. Djinn, 27 Oct 2026: the tab and the
+launcher are the same badge, with TW at the small sizes or no lettering
+where none can be read. The Dev icon stays the TF monogram.
 
-Djinn, 11 Oct 2026: the Main icon is the full badge at every size. The
-Dev icon stays the TF monogram. The crest belongs only to the favicon.
-
-`tests/test-launcher-icons.js` fails if any frame of `app.ico` matches
-a frame of the favicon, or if `app.ico` and `app-dev.ico` share a
-frame.
+`tests/test-launcher-icons.js` fails if a favicon frame is not app.ico's
+frame of the same size, or if `app.ico` and `app-dev.ico` share a frame.
 
 The Main icon reaches the installed launcher only after a launcher
 version bump and a Ship. Changing the file here does not change what

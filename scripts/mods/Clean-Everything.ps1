@@ -197,7 +197,9 @@ if ($Stage) {
 
 if ($Backups) {
   Head 'Old backups'
-  $zips = @(Get-ChildItem -LiteralPath $BackupDir -Filter 'thornswood-backup-*.zip' -File -EA SilentlyContinue |
+  # Backup-Server.ps1's copies: .zip.enc since #3582, the plain .zip before.
+  $zips = @(Get-ChildItem -LiteralPath $BackupDir -Filter 'thornswood-backup-*' -File -EA SilentlyContinue |
+            Where-Object { $_.Name -match '^thornswood-backup-\d{8}-\d{4}\.zip(\.enc)?$' } |
             Sort-Object LastWriteTime -Descending)
   if ($zips.Count -eq 0) { Say '  none' 'DarkGray' }
   else {
