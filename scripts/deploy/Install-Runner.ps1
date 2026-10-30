@@ -364,7 +364,11 @@ if ($OffBox) {
   # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, found by
   # its label, is where a runner goes when the command line names no folder.
   $runnerDrive = ''
-  try { $runnerDrive = @(Get-Volume -FileSystemLabel 'Thornswood Runners' -ErrorAction Stop | Where-Object { $_.DriveLetter } | ForEach-Object { [string]$_.DriveLetter + ':' })[0] } catch { $runnerDrive = '' }
+  # Dry-run metadata is hermetic: no label lookup; an explicit non-C: root
+  # simulates the runner drive. Otherwise the documented C: fixture wins.
+  if (-not $DryRunTo) {
+    try { $runnerDrive = @(Get-Volume -FileSystemLabel 'Thornswood Runners' -ErrorAction Stop | Where-Object { $_.DriveLetter } | ForEach-Object { [string]$_.DriveLetter + ':' })[0] } catch { $runnerDrive = '' }
+  } elseif ($PSBoundParameters.ContainsKey('Root') -and $Root -match '^[D-Zd-z]:\\') { $runnerDrive = $Root.Substring(0, 2).ToUpper() }
   if (-not $runnerDrive) { $runnerDrive = '' }
   if ($runnerDrive -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = $runnerDrive + '\Thornswood-RunnerPR' + $n }
   if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-pr' + $n }
