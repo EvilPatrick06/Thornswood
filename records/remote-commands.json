@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  75,
-    "callCount":  297,
+    "callCount":  301,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1672,6 +1672,42 @@
                       "reason":  "writes the feed, news or files store"
                   },
                   {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$made = @(Remote \"New-Item -ItemType Directory -Force -Path \u0027$rootWin\\$incoming\u0027 | Out-Null; \u0027INCOMING|ready\u0027\")",
+                      "does":  "makes the folder beside the site files that an installer signed on GitHub is checked in before it goes into files",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $exeItem.FullName \"$User@${Vps}:$Root/$incoming/$exeOut\" }",
+                      "does":  "uploads an installer signed on GitHub beside the site files, to be checked there",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$null = Remote \"Remove-Item -LiteralPath \u0027$rootWin\\$incoming\\$exeOut\u0027 -Force -ErrorAction SilentlyContinue\"",
+                      "does":  "removes an installer the publish gate refused from beside the site files",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$moved = @(Remote \"Move-Item -LiteralPath \u0027$rootWin\\$incoming\\$exeOut\u0027 -Destination \u0027$rootWin\\files\\$exeOut\u0027 -Force; \u0027MOVED|$exeOut\u0027\")",
+                      "does":  "moves an installer that passed the publish gate into the site files",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "Send-ShapeLibs",
                       "via":  "scp",
@@ -1808,10 +1844,10 @@
                   },
                   {
                       "script":  "scripts/release/Sign-OnGitHub.ps1",
-                      "scope":  "Get-SignedFileRefusal",
+                      "scope":  "Invoke-SignedCheckOnBox",
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
-                      "does":  "checks a launcher built and signed on GitHub against the signer and the launcher\u0027s own check, in a temp folder of its own that it removes",
+                      "does":  "checks a file signed on GitHub, the launcher or the installer, against the signer and the file\u0027s own check, in a temp folder of its own that it removes",
                       "class":  "read-status",
                       "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },
