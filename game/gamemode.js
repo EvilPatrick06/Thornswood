@@ -7211,7 +7211,10 @@ const GATHER_UNRANKED = {
   "110ca:HearthFires.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
   "10469:HearthFires.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
   "110c3:HearthFires.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
-  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" }
+  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
+  // The resource pack's aloe vera planter, the same kind of sack (#3141);
+  // its field plants are novice rows of the generated table.
+  "16b:_ResourcePack.esl": { "produce": "d0:_ResourcePack.esl", "name": "Aloe Vera Leaves", "rank": "novice" }
 };
 
 /** The row for a base, out of the generated table or the hand list beside it,
