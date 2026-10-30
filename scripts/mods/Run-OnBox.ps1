@@ -94,7 +94,13 @@ param(
     [string]$Server = 'dev',
 
     [string]$VpsHost = '',
-    [string]$VpsUser = ''
+    [string]$VpsUser = '',
+
+    # A folder that gets a copy of every file the tool wrote, at its
+    # repository path, as well as this checkout. The deploy gate's
+    # Rebuild-ContentTables verb sets it to the run's out folder, so what the
+    # box wrote goes back to the session that asked (Rebuild-OnBox.ps1).
+    [string]$Out = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -236,9 +242,11 @@ try {
             Say ''
             Say ('the tool wrote ' + $changed.Count + ' file(s), now in this checkout:') 'Green'
             foreach ($e in $zip.Entries) {
-                $dest = Join-Path $repo $e.FullName
-                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
-                [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $dest, $true)
+                foreach ($into in @($repo, $Out | Where-Object { $_ })) {
+                    $dest = Join-Path $into $e.FullName
+                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
+                    [IO.Compression.ZipFileExtensions]::ExtractToFile($e, $dest, $true)
+                }
                 Say ('  ' + $e.FullName)
             }
         } finally { $zip.Dispose() }

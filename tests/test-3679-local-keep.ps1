@@ -111,7 +111,8 @@ Yes ('it says the log keeps each line for ' + $days + ' days') ($sec -match ('la
 Yes ('and the support reports are kept for ' + $days + ' days') ($sec -match ('Support reports.*Each is kept for ' + $days + ' days'))
 Yes 'it names the Discord sign-in, name and picture, and the browsers'' data, until uninstall' ($sec -match 'Your Discord sign-in.*name and picture.*until you uninstall' -and $sec -match 'voice browser''s data.*until you uninstall')
 Yes 'it says the box keeps only the saves and settings and the rest goes either way' ($sec -match 'Keep this build''s saves and settings' -and $sec -match 'go either way')
-$logPara = [regex]::Match($privacy, '(?s)\*\*The launcher''s own log\.\*\*(.*?)\n\n').Groups[1].Value -replace '\s+', ' '
+# The launcher.log entry among the logs sent when a session ends (#3627).
+$logPara = [regex]::Match($privacy, '(?s)\n- \*\*launcher\.log\*\*(.*?)\n(?:- |\n)').Groups[1].Value -replace '\s+', ' '
 Yes 'the log''s paragraph names the voice address and port, the profile number and the microphone' ($logPara -match 'address and port' -and $logPara -match 'profile number' -and $logPara -match 'microphone')
 Yes ('the keeping times say the copy on the PC keeps ' + $days + ' days') (($privacy -replace '\s+', ' ') -match ('The copy on your PC keeps each line for ' + $days + ' days'))
 
