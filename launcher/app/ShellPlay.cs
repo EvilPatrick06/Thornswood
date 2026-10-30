@@ -302,6 +302,33 @@ namespace Thornswood
                 }
                 catch (Exception ex) { Swallow.Note("Shell.Play", ex); }
 
+                // The behavior files and the covered bodies are built here, on
+                // this computer, from the collection's Pandora and BodySlide
+                // (#3715, GeneratedHere): no release carries them. Only when
+                // the record of the last build is missing or stale, which an
+                // ordinary Play reads and runs nothing for. A build that fails
+                // or a nude body stops Play: the animations would be missing
+                // and the bodies would have no underwear (#405).
+                string notBuilt = null, built = null;
+                Waiting(delegate
+                {
+                    try { built = GeneratedHere.Ensure(SafeLog); }
+                    catch (GeneratedStop ex) { notBuilt = ex.Message; }
+                    catch (Exception ex)
+                    {
+                        Swallow.Note("Shell.Play, the animation and body files", ex);
+                        notBuilt = "Thornswood's animation and body files could not be built (" + ex.Message.TrimEnd('.') + ").";
+                    }
+                });
+                if (built != null) Log(built);
+                if (notBuilt != null)
+                {
+                    Log("Not launching. " + notBuilt);
+                    DrawStatus();
+                    MessageBox.Show(notBuilt + "\n\nThe launcher log on the Diagnostics page has each step it took.", "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
                 // The main menu with no Bethesda logo, the notice board's
                 // meshes and the mods' menus with no gold values are made from
                 // this machine's own game, never shipped (#2827, #3113,

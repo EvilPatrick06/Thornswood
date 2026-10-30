@@ -525,15 +525,11 @@ elseif (-not $NoVortex) {
     }
 }
 
-$shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
-# From the feed the bodies are the release's, each held to its sha256 by
-# New-FeedRoot; only a collection Ship builds them (as Publish-Update -FromFeed).
-if ($FromFeed) { Say '  the generated bodies are the release''s, by their sha256' 'DarkGray' }
-else { Assert-ShipGeneratedBodies $GameDir $ProfileDir }
+# The behavior files and bodies are built on each computer by the launcher
+# since #3715 and never go in an installer (Ship-Rules Test-ShipGenerated).
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if (Test-ThornswoodRepoPlugin $rel) { return $false }
-    if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
 

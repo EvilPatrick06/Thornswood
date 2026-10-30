@@ -67,8 +67,10 @@ and `NLayer.dll` is Thornswood's own: `ui.xaml`, `logo.png`, `logo-dev.png`, `la
 `launcher-header.mp4`, `app.ico`, `app-dev.ico`, `voice-host.html`,
 `Thornswood.ini`, `client-build.json`, `skyrim-files.json`, the list of
 the pinned Skyrim build's own file names, sizes and SHA-1s read out of Steam's
-depot manifests (no Bethesda file is in it), and `ui-gone.json`, the Daedric
-menu set and unused fork assets a refresh must not copy back. `logo-dev.png` is the emblem the dev
+depot manifests (no Bethesda file is in it), `ui-gone.json`, the Daedric
+menu set and unused fork assets a refresh must not copy back, and
+`generated.json`, the build list of the animation and body files the launcher
+makes on each computer (#3715). `logo-dev.png` is the emblem the dev
 build shows in place of `logo.png` (Art.cs) and `app-dev.ico` is the icon its
 shortcuts carry in place of `app.ico` (Icons.cs); both are drawn for
 Thornswood, the same as the two they stand in for. The setup stub,
@@ -849,6 +851,86 @@ no licence this file can name.
   (Test-ShipBethesdaLeftAlone) without deleting anybody's copy, so builds made
   after that change no longer carry it.
 
+## Built here from other people's work: behaviors and bodies
+
+The launcher builds 45 files on each computer, in Thornswood's own game
+folder, before Play and from Fix, with the collection's own Pandora and
+BodySlide, from the recipe in `records\generated.json`, which is compiled into
+it (`launcher\app\GeneratedBuild.cs` and `GeneratedHere.cs`, #1247, #3715).
+No pack and no installer carries them since 27 October 2026 (Patrick, option
+A on #3715: "The launcher makes all 45 files on each computer"): Ship-Rules.ps1
+names them (`$ShipGeneratedBodyFiles` and `$ShipGeneratedPatterns`,
+`Test-ShipGenerated`) as built on each computer, never shipped and never
+listed as removed. Until then every release carried them, as the shipping
+machine built them, and every one of them is made from somebody else's work.
+What follows is whose. Read on 27 October 2026 (#3715) from the installer on
+thornswood.net (76,735,000
+bytes, sha256 starting eefa15c5, payload built 26 October 18:24 UTC): the same
+45 files and 18,928,662 bytes the 18 October installer carried.
+`tests\fixtures\3715-generated.txt` lists each with its sha256. Which mod
+deploys each slider set, patch and Pandora was read from the collection's
+Vortex deployment record of 21 October.
+
+- **Behavior files, 39 files, 10,543,930 bytes.** 18 behavior files in
+  `Data\meshes\actors\character\behaviors`, 17 in
+  `_1stperson\behaviors`, `characters\defaultmale.hkx`,
+  `characters female\defaultfemale.hkx`, and
+  `Data\meshes\animationdatasinglefile.txt` and
+  `animationsetdatasinglefile.txt`. Pandora Behaviour Engine+ 5.0.0-beta
+  (Nexus SE 133232, by the Pandora Behaviour Engine Team) writes them from the
+  game's own animation graphs, character files and animation data, with four
+  patches merged in: `colis` from Precision 2.0.6 (Nexus SE 72347) and
+  `tdmh`, `tdmlen` and `tdmv` from True Directional Movement 2.3.1 (Nexus SE
+  51614), both by Ersh. Pandora writes each graph whole, so each file is the
+  game's graph with the patches added. Bethesda's terms for mods grant no right
+  to hand on ZeniMax's own files, edited or not ("Bethesda's own files, made on
+  each machine" below), the reading on which #2827 stopped shipping three
+  other files. Precision's and True Directional Movement's pages set the
+  same permissions: their assets may be used without asking, with credit to
+  Ersh and never in anything sold, the files may not be uploaded elsewhere,
+  and modifying them needs Ersh's permission. Pandora is under the GNU GPL
+  v3, which covers the program, run from the collection, not what it
+  writes.
+  `Data\Scripts\FNIS.pex` is allowed by the same pattern and was not in the
+  installer read.
+- **The women's body, `femalebody_0.nif` and `femalebody_1.nif`, 3,840,722
+  bytes**, in `Data\meshes\actors\character\character assets`. BodySlide
+  builds it from the set CBBE 3BBB Amazing NeverNude of CBBE 3BA (3BBB) 2.48
+  (Nexus SE 30174, by Acro), which is built on CBBE (Nexus SE 198, by Ousnius,
+  Caliente and Jeir). 3BA's page lets its assets be used without asking,
+  with credit to Acro and never in anything sold, forbids uploading the file
+  elsewhere, and asks for the author's OK for a body mesh edited so its
+  vertex order or count changes. CBBE's own terms are below.
+- **Astrid's body, `femalebodyastrid_0.nif` and `femalebodyastrid_1.nif`,
+  2,555,688 bytes.** BodySlide builds it from the set CBBE Vanilla - Body -
+  Astrid of CBBE 2.0.3 (Nexus SE 198), over Bethesda's Astrid outfit. CBBE's
+  page sets no permission lines; its author's instructions let the body be
+  used for outfits and NPCs with credit and a link back, and say "Distribution
+  by, or sub-licensing to, parties not expressly given permission is
+  disallowed." Handing a CBBE body on would have needed Ousnius' permission.
+- **The men's body, `malebody_0.nif` and `malebody_1.nif`, 1,988,322 bytes.**
+  BodySlide builds it from the set HIMBO Body - Vanilla Nevernude of
+  Highly Improved Male Body Overhaul (HIMBO) 5.8 (Nexus SE 46311, by Kreiste
+  and Novelyst). HIMBO's description, under Permission: "The main body mesh
+  along with the undies meshes are licensed CC-BY-SA-4.0." and "You are
+  allowed to make refits and/or original armors/clothings using HIMBO body as
+  long as you credit me and your files are available for free and not behind
+  any kind of paywalls." So these two are under the Creative Commons
+  Attribution-ShareAlike 4.0 licence
+  (https://creativecommons.org/licenses/by-sa/4.0/), as HIMBO built in
+  BodySlide, credited on the public credits page. LICENSE's all rights
+  reserved does not cover them.
+
+The Permissions and credits sections of 30174, 198, 72347, 51614 and 133232
+were read on 27 October 2026 on One, in a signed-in browser, onto #3715 (Nexus
+answers a cloud session with a Cloudflare 403, and its API has no permissions
+field).
+`records\asset-provenance.json` has an entry for each group, and
+`tests\test-third-party.js` holds every path Ship-Rules.ps1 names as built on
+each computer, and every file in the stand-in record, to an entry there. Made
+on each computer, nothing of theirs leaves anybody's machine, the way the
+files below are made from the person's own game.
+
 ## Bethesda's own files, made on each machine
 
 `Data\Interface\startmenu.swf` is Skyrim's own `interface\startmenu.swf` from
@@ -1311,6 +1393,13 @@ beside its `___systemPolyfill.js`.
 
 ## What is still missing
 
+- The packs and the installer published up to 27 October 2026 carry the 39
+  behavior files and the four women's body meshes, which nothing lets
+  Thornswood hand on ("Built here from other people's work: behaviors and
+  bodies"; CBBE's terms disallow distribution without permission). Since
+  #3715 the launcher makes them on each computer and no new release carries
+  them; the installer on thornswood.net carries them until the first main
+  release after #3715 replaces it.
 - The client record (`595d2997`) was measured before #3751, so
   `records\client-licences.json` has no `libraries`, and the notices of
   npm-eventemitter3-5.0.1, papyrus-vm, tilted and viet ("The other
