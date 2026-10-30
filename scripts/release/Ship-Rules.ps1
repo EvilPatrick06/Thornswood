@@ -1357,8 +1357,8 @@ $ShipOursFiles = @(
     # neither is named here.
     'Data\Interface\skyhud\skyhud.txt',
     # QuickLoot IE's settings file with its loot menu's columns weight only,
-    # no gold value (#3113). QuickLoot IE is GPL 3, so its file may go out
-    # changed, saying so.
+    # no gold value (#3113). QuickLoot IE is GPL-3.0-or-later (#3800), so its
+    # file may go out changed, saying so.
     'Data\SKSE\Plugins\QuickLootIE.json',
     # The sprite font the overhead voice mark draws its dot in, made from the
     # OFL Barlow SemiBold by scripts\mods\Build-SpriteFont.py, and the OFL

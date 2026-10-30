@@ -206,15 +206,24 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
             if ($null -ne $before) { $yes = $before.Contains($commit) }
             elseif ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $target)).Code -eq 0) { $yes = $true }
             if (-not $yes) {
-                $base = Invoke-ReleaseGit $sourceRepo @('merge-base', $commit, $target)
-                if ($base.Code -eq 0 -and $base.First -match '^[0-9a-f]{40}$') {
-                    $files = @((Invoke-ReleaseGit $sourceRepo @('diff', '--name-only', $base.First, $commit)).Lines |
-                        Where-Object { $_ } | ForEach-Object { ([string]$_).Trim() })
+                # What the commit changed since it parted from the target, in
+                # one git: diff target...commit is the diff from their merge
+                # base, and fails where they have none, as merge-base did.
+                # It was a merge-base and then a diff, 117 of each in
+                # tests\test-2401-legacy-dev-marks.ps1, each two processes on
+                # the box behind Git's cmd\git.exe and each a Defender scan
+                # (#3835).
+                $changed = Invoke-ReleaseGit $sourceRepo @('diff', '--name-only', ($target + '...' + $commit))
+                if ($changed.Code -eq 0) {
+                    $files = @($changed.Lines | Where-Object { $_ } | ForEach-Object { ([string]$_).Trim() })
                     # Every Main commit since they parted that touched those
                     # files, oldest first, each with its tree. Past 200 files
                     # the list would not fit on a Windows command line, so
                     # every Main commit since they parted is tried instead.
-                    $walk = @('rev-list', '--first-parent', '--reverse', '--format=%T', ($base.First + '..' + $target))
+                    # commit..target: everything the target has that the
+                    # commit does not, which is what base..target was, the
+                    # merge base being where they parted.
+                    $walk = @('rev-list', '--first-parent', '--reverse', '--format=%T', ($commit + '..' + $target))
                     if ($files.Count -gt 0 -and $files.Count -le 200) { $walk += @('--') + $files }
                     $lines = @((Invoke-ReleaseGit $sourceRepo $walk).Lines | ForEach-Object { ([string]$_).Trim() })
                     for ($i = 0; $i + 1 -lt $lines.Count -and -not $yes; $i += 2) {

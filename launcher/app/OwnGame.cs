@@ -19,7 +19,7 @@ namespace Thornswood
     /// Until 17 September three roleplay servers all ran out of the one
     /// Steam copy of Skyrim. Every launcher wrote its own client into it, every
     /// Vortex profile switch took the other collection out of it, and on 16 Sep
-    /// that was a another server session drawing Thornswood's menu, a Daedric menu
+    /// that was another server's session drawing Thornswood's menu, a Daedric menu
     /// behind every server, and a Thornswood launcher that thought its mods were
     /// gone whenever Vortex had another profile on. With a folder of its own,
     /// Thornswood starts from Root\Game, the other servers start from theirs,
@@ -2505,7 +2505,7 @@ namespace Thornswood
         /// <summary>
         /// The SkyMP client runtime Thornswood ships: the six files the fork
         /// builds that differ from upstream, put into the game folder by
-        /// tools\Sync-Client.ps1 against tools\client-build.json. They are
+        /// scripts\release\Sync-Client.ps1 against records\client-build.json. They are
         /// never taken from the Steam copy, because until 20 September the Steam
         /// copy held another server's launcher's builds of every one of them
         /// and this class copied them across on every rebuild.
@@ -2528,7 +2528,7 @@ namespace Thornswood
 
         /// <summary>
         /// Not one of ours, by what belongs rather than by whose it is. The
-        /// same shape as Test-ShipOtherServer in tools\Ship-Rules.ps1; change
+        /// same shape as Test-ShipOtherServer in scripts\release\Ship-Rules.ps1; change
         /// both together. Nothing here names another server: the list is what
         /// Thornswood's folder holds, and anything else in these places is
         /// left out whoever wrote it.
@@ -3400,8 +3400,7 @@ namespace Thornswood
         /// mod's folder in Vortex's mods folder, and that folder carries the
         /// mod's name. Null when there is no record or it does not list the
         /// plugin. Scan and Fix name it for another author's plugin whose
-        /// bytes are not the server's, which the server does not hand out
-        /// (#1180).
+        /// bytes are not the server's, which Fix has no copy of (#1180).
         /// </summary>
         public static string VortexModOf(Config cfg, string plugin)
         {
