@@ -18,9 +18,9 @@
 //     same rule Checks.All uses, and Exe, Loader and MpClient stay under Game
 //     so nothing is ever written into the Steam copy through them;
 //   - SksePluginDirs is Skyrim's plugin folder, then Game's when it differs;
-//   - BuildInstalled, Diag.Summary and Describe(cfg) read the exe, the script
-//     extender and its plugins through those, and no longer through Paths.Exe
-//     or Paths.Game;
+//   - Diag.Summary and Describe(cfg) read the exe, the script extender and its
+//     plugins through those, and no longer through Paths.Exe or Paths.Game
+//     (the What is installed facts went with the hidden Build page, #3146);
 //   - nothing in the launcher writes through Paths.Skyrim, SkyrimExe or
 //     SksePluginDirs.
 // The rule itself is run in the scenes of tests\test-own-folder-first.ps1,
@@ -82,16 +82,8 @@ yes('one folder when they are the same, Skyrim\'s first then Game\'s when not',
     /return new string\[\] \{ skyrim, game \};/.test(dirs));
 
 // ---- the readers --------------------------------------------------------------
-const installed = member(pages, 'static void BuildInstalled()');
-yes('BuildInstalled is in Pages.cs', installed.length > 0);
-yes('its game size is SkyrimExe\'s', /new FileInfo\(Paths\.SkyrimExe\)\.Length/.test(installed));
-yes('its script extender is looked for in Skyrim', /File\.Exists\(Path\.Combine\(Paths\.Skyrim, "skse64_1_6_1170\.dll"\)\)/.test(installed));
-yes('its script extender plugins are counted across SksePluginDirs, each name once',
-    /foreach \(string d in Paths\.SksePluginDirs\)/.test(installed) &&
-    /new HashSet<string>\(StringComparer\.OrdinalIgnoreCase\)/.test(installed) && /skse = names\.Count;/.test(installed));
-yes('it no longer reads Paths.Exe or the game\'s files under Paths.Game',
-    !/Paths\.Exe\b/.test(installed) && !/Path\.Combine\(Paths\.Game,/.test(installed));
-yes('the client is still Game\'s (Paths.MpClient), as Checks.All reads it', /File\.Exists\(Paths\.MpClient\)/.test(installed));
+yes('the What is installed facts are gone with the Build page (#3146), so no third reader can disagree',
+    !/static void BuildInstalled\(\)/.test(pages));
 
 const summary = member(diag, 'static string Summary(Config cfg, string launcherVersion)');
 yes('Diag.Summary is in Diag.cs', summary.length > 0);

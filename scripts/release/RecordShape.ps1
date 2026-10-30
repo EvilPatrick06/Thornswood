@@ -15,7 +15,7 @@
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
       skyrim-files        records\skyrim-files.json      every file of that build (the launcher embeds it)
       ui-gone             records\ui-gone.json           the files every pack deletes (Ship and the launcher)
-      generated           records\generated.json         what Build-Generated builds before a Ship
+      generated           records\generated.json         what the launcher builds on each computer (#3715)
       shipped-not-ours    records\shipped-not-ours.json  other authors' files our old packs shipped, deleted by sha256 (#1178)
 
       $doc = Read-ThornswoodRecord -Path <file> -Kind server-build
@@ -271,8 +271,9 @@ function Get-ThornswoodRecordProblems {
             }
         }
         'generated' {
-            # What Build-Generated builds before a Ship (#1247). Either part may
-            # be left out; what is there must be the shape Generated.ps1 reads.
+            # What the launcher builds on each computer (#1247, #3715). Either
+            # part may be left out; what is there must be the shape Generated.cs
+            # reads (GeneratedList.Parse, which the launcher holds it to as well).
             $pan = Get-ThornswoodRecordProp $Doc 'pandora'
             $bod = Get-ThornswoodRecordProp $Doc 'bodyslide'
             if ($null -eq $pan -and $null -eq $bod) { $out += 'it has neither pandora nor bodyslide, so it builds nothing' }

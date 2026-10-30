@@ -1,5 +1,5 @@
 {
-  "about": "What GitHub shows in the repository's About box: the line under its name, the website and the topics. A change is a pull request to this file; once it merges, .github/workflows/github-admin.yml has the box's admin service (scripts/vps/admin/admin.js, repo-about) make GitHub match it. Set by Patrick's A on 26 Oct 2026 (#3682). The social preview picture is not here: GitHub has no API for it.",
+  "about": "What GitHub shows in the repository's About box: the line under its name, the website and the topics. A change is a pull request to this file; once it merges, the Desk runs scripts/deploy/Set-RepoAbout.ps1, which starts github-admin.yml in the private ops repository (#4013), and that has the box's admin service (scripts/vps/admin/admin.js, repo-about) make GitHub match it. Set by Patrick's A on 26 Oct 2026 (#3682). The social preview picture is not here: GitHub has no API for it.",
   "description": "A roleplay server for Skyrim Special Edition on SkyMP, with its own launcher, website, Discord bot and voice.",
   "homepage": "https://thornswood.net",
   "topics": ["skyrim", "skyrim-special-edition", "skymp", "multiplayer", "roleplay", "skyrim-mod", "discord-bot"]

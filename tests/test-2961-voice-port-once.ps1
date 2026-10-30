@@ -135,7 +135,7 @@ Yes 'every interface and answering: up, in green, one try' ($c.Said -match 'Gree
 
 $c = Case '0.0.0.0' 'dev' 'silent for 5 s' 'answered'
 Yes 'every interface, silent, and the dev server answers: red, saying what it was' ($c.Said -match 'Red: Installed, but 192\.0\.2\.1:7789 was silent for 5 s from out here')
-Yes '  and pointing at the firewall rule' ($c.Said -match "Get-NetFirewallRule -DisplayName 'Thornswood Dev Voice'")
+Yes '  and pointing at the firewall rule' ($c.Said -match "Get-NetFirewallRule -PolicyStore ActiveStore -DisplayName 'Thornswood Dev Voice'")
 
 $c = Case '0.0.0.0' 'dev' 'refused' 'answered'
 Yes 'every interface and refused: red, saying refused' ($c.Said -match 'Red: Installed, but 192\.0\.2\.1:7789 was refused from out here')

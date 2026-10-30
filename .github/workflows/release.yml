@@ -21,52 +21,36 @@
 # again after that append (Build-Launcher.ps1, "Do NOT sign setup-stub.exe").
 #
 # WHERE IT RUNS (#2163, Patrick's decisions of 12 Oct, relayed by Smeagle;
-# switched over by #3312, Patrick, 22 Oct: "it needs to work like the VPS
-# runners where VPS is the fallback and the GitHub runner is first"). GitHub's
-# hosted windows-latest, in the job "launcher" below, the same image the
-# build check (build.yml, build-pr.yml) proves green on every pull request,
-# builds and signs every release first. The box ("launcher-vps") picks a
-# release up the way build.yml's fallback does: the repository variable
-# BUILD_RUNNER is vps, a manual run asks for the box, or the hosted job
-# failed, as a quota or billing stop fails it before any step runs. Every
-# launcher since 1.2.4.5 on dev and 1.2.5 on main is built by MSBuild (#498).
-# tests\test-release-workflow.ps1 holds the shape.
+# #4013, Patrick's A of 27 Oct 2026). GitHub's hosted windows-latest, the
+# same image the build check (build.yml, build-pr.yml) proves green on every
+# pull request, builds and signs every release, and every other job here is
+# GitHub's too. From #3312 to the day this repository went public the box
+# built and signed one when GitHub's runner could not (hosted minutes ran
+# out), on runner 3. A public repository has GitHub's runners free with no
+# minute limit and no runner of the box registered to it (#3685, #3792), so
+# that fallback ended with the flip rather than moving to the private ops
+# repository, which would have needed a second Azure federated credential
+# and a stored token that writes releases here. If GitHub's runner cannot
+# build a release, a Ship on One signs the unsigned launcher on download
+# (#921). Every launcher since 1.2.4.5 on dev and 1.2.5 on main is built by
+# MSBuild (#498). tests\test-release-workflow.ps1 holds the shape.
 #
-# THE BOX SIGNS ON RUNNER 3 ONLY (#3312, Patrick, 22 Oct: "for signing it
-# will use runner 3"). The fallback asks for the label thornswood-sign beside
-# thornswood-vps, and only the runners records\sign-runners.json lists carry
-# it (a push that changes the record puts GitHub right by itself, and
-# scripts\deploy\Set-BuildRunners.ps1 asks again, #3107). Runner 3 is the
-# light runner (docs\DECIDED.md), never a build runner, and every job a
-# workflow on main can send there runs main's code or a v tag's alone, this
-# one included (#3550; scripts\vps\Check-RunnerIsolation.ps1 reads every
-# job for it). So no workflow on main puts pull request or branch code where
-# a launcher is signed, and a branch's own copy of a workflow that asks for
-# runner 3 is ended there before its first step: runner 3 takes main's jobs
-# alone (#3889, #3930; scripts\deploy\Install-Runner.ps1).
-# The "verify" job, on the check runners (records\check-runners.json, none
-# of them runner 3), never runs where the launcher was signed.
+# HOW IT BUILDS (#498, Patrick's option C, switched 15 Oct). The launcher and
+# setup program are built by MSBuild from launcher\app\Thornswood.csproj and
+# installer\setup\Setup.csproj (Build-Launcher.ps1, which has no other way).
 #
-# HOW IT BUILDS (#498, Patrick's option C, switched 15 Oct). On both runners
-# the launcher and setup program are built by MSBuild from
-# launcher\app\Thornswood.csproj and installer\setup\Setup.csproj
-# (Build-Launcher.ps1, which has no other way). The VPS runners have MSBuild
-# from Bootstrap-VPS.ps1 -IncludeBuildTools (Patrick, 12 Oct, option A).
-#
-# HOW IT SIGNS (#2163 section 8, both runners since #3312). A federated
+# HOW IT SIGNS (#2163 section 8). A federated
 # (OIDC) identity, no secret stored anywhere: GitHub mints a short token for
 # this job only, and only in a run of main's own workflow (below), through
 # the "release" environment,
-# whose subject is the one the Azure federated credential trusts (it names the
-# environment, not the runner, so the box's job presents the same one). Pull
+# whose subject is the one the Azure federated credential trusts. Pull
 # request jobs never get it; this file has no pull_request trigger. The sign
 # step asks GitHub for the token itself, writes it to a file under
 # RUNNER_TEMP for the length of one signtool call, and names it to Microsoft's
 # signing client the way Azure's workload identity reads one
 # (AZURE_FEDERATED_TOKEN_FILE beside the app and tenant ids); the file goes
-# when the call ends. No Azure CLI is needed and no sign in is kept anywhere,
-# which matters on the box: an az login would sit in the runner account's
-# profile after the job. Sign-Artifact.ps1 -Required signs with the
+# when the call ends. No Azure CLI is needed and no sign in is kept anywhere.
+# Sign-Artifact.ps1 -Required signs with the
 # ThornswoodRelease profile, the same script and profile Ship uses, with
 # Microsoft's signing client fetched at the version and sha256
 # Setup-ShipMachine.ps1 pins. A signing failure fails the job and no draft
@@ -87,8 +71,6 @@
 # push builds nothing itself: its one job hands the tag to main's workflow
 # (gh workflow run release.yml --ref main -f tag=<tag> -f expected_sha=<its
 # commit>), so pushing a tag still starts a signed release, through main.
-# The signing runner refuses any job that is not main's (Install-Runner.ps1,
-# #3889), so a tag's own job never reaches it.
 #
 # DEV NUMBERS (#3312). A dev Ship's launcher carries a fourth number
 # (1.2.6.7) that only ever lives in the dev feed: Ship works it out from what
@@ -99,10 +81,10 @@
 # the same way Ship does. A three part tag is a main release and must be the
 # number Updater.cs already says (Bump-Version.ps1 moved it).
 #
-# CHECKED ON A SECOND MACHINE (#2163, "a clean machine verifies"). When either
-# job drafted a signed launcher, the "verify" job downloads the draft's files
-# onto a VPS build runner, which holds no signing setup and is never the
-# runner that signed, and runs scripts\release\Test-ReleaseFiles.ps1
+# CHECKED ON A SECOND MACHINE (#2163, "a clean machine verifies"). When the
+# build drafted a signed launcher, the "verify" job downloads the draft's
+# files onto a fresh GitHub runner of its own, which holds no signing setup
+# and is not the one that signed, and runs scripts\release\Test-ReleaseFiles.ps1
 # -RequireSigned: each file against SHA256SUMS, then the publish gate and the
 # launcher's own Signature.cs on the launcher. A red verify means the draft
 # must not be shipped. Off the box altogether, the engine fork's
@@ -138,7 +120,7 @@ on:
   # a runner that died halfway. A signed draft needs the run started on main
   # (header, ONLY A RUN OF MAIN'S OWN WORKFLOW SIGNS):
   #   gh workflow run release.yml --ref main -f tag=v<version>
-  # A run started from any other ref builds unsigned, on GitHub's runner only.
+  # A run started from any other ref builds unsigned.
   workflow_dispatch:
     inputs:
       tag:
@@ -148,13 +130,8 @@ on:
         description: The commit the tag must be (optional; the tag's commit must be on main either way)
         required: false
         default: ''
-      runner:
-        description: 'hosted (GitHub, the default) or vps (the box, the fallback, signing on runner 3)'
-        type: choice
-        options: [hosted, vps]
-        default: hosted
 # The draft release is created with the repository token, which needs write.
-# The two build jobs add id-token: write for themselves only.
+# The build job adds id-token: write for itself only.
 permissions:
   contents: write
 # One run per TAG, whichever way it was started. A release build is not
@@ -173,13 +150,12 @@ jobs:
   # copy checks the tag is that commit and on main before it builds. No
   # checkout and no repository code: one REST call with the repository token
   # (a workflow_dispatch the repository token asks for does start a run). On
-  # a check runner, as the light verify job below: the signing runner takes
-  # main's jobs alone (#3889), and GitHub's runner has no minutes to spend on
-  # a handover.
+  # GitHub's Linux runner, the lightest it has: no runner of the box is
+  # registered to a public repository (#4013).
   handoff:
     name: Hand the tag to main's release workflow
     if: ${{ github.event_name == 'push' }}
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-check]
+    runs-on: ubuntu-latest
     permissions:
       actions: write
     timeout-minutes: 5
@@ -196,13 +172,11 @@ jobs:
           Invoke-RestMethod -Method Post -Uri "$api/actions/workflows/release.yml/dispatches" -Headers $headers -ContentType 'application/json' -Body $run | Out-Null
           Write-Host ("started main's release.yml for {0} (commit {1}); it builds, signs and drafts there" -f $env:GITHUB_REF_NAME, $env:GITHUB_SHA)
 
-  # GitHub's hosted Windows runner (#2163), first (header, WHERE IT RUNS).
-  # Skipped when BUILD_RUNNER is vps or a manual run asked for the box, and
-  # then the VPS job below builds the release instead. A manual run only: a
-  # tag push is handed over above.
+  # GitHub's hosted Windows runner (#2163, header WHERE IT RUNS). A manual
+  # run only: a tag push is handed over above.
   launcher:
     name: Build the release launcher
-    if: ${{ github.event_name == 'workflow_dispatch' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: windows-latest
     # The "release" environment only in a run of main's own workflow: its
     # subject is what the Azure federated credential trusts, and its
@@ -218,7 +192,7 @@ jobs:
       signed: ${{ steps.draft.outputs.signed }}
     # The build is a few minutes; past this it is stuck, not slow.
     timeout-minutes: 30
-    steps: &release
+    steps:
       # THE TAG IS CHECKED BEFORE IT IS BUILT (#2202). A manual run used to
       # hand its free-form tag input straight to checkout and draft the
       # release against the run's own SHA, so a branch, a bare SHA or a tag
@@ -308,8 +282,8 @@ jobs:
           # The setup program the same build compiled (issue #932).
           if (-not (Test-Path 'out\setup-stub.exe')) { Write-Host '::error::no setup-stub.exe came out of the build'; exit 1 }
 
-      # SIGNING (#2163 section 8, both runners since #3312): a run of main's
-      # own workflow, nothing else (#3930). Microsoft's signing client comes first, at the version and
+      # SIGNING (#2163 section 8): a run of main's own workflow, nothing
+      # else (#3930). Microsoft's signing client comes first, at the version and
       # sha256 Setup-ShipMachine.ps1 pins, lifted out of it by the parser so
       # the pin lives in one place; nothing is unpacked unless the bytes match.
       # It goes into records\signing\client of this checkout, which git
@@ -396,7 +370,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.tag.outputs.tag }}
           RELEASE_COMMIT: ${{ steps.tag.outputs.commit }}
-          RUNNER_KIND: ${{ runner.environment }}
         run: |
           # The tag and commit the check above settled, so the draft names the
           # commit that was built, not whatever ref started the run (#2202).
@@ -407,8 +380,7 @@ jobs:
           $stub = Join-Path $out 'setup-stub.exe'
           $sums = Join-Path $out 'SHA256SUMS'
           $signed = (Get-AuthenticodeSignature -LiteralPath $exe).Status -eq 'Valid'
-          $how = 'built on the VPS runner with MSBuild (#498), the fallback when GitHub''s runner did not build it (#3312)'
-          if ($env:RUNNER_KIND -eq 'github-hosted') { $how = 'built on GitHub''s runner with MSBuild (#498)' }
+          $how = 'built on GitHub''s runner with MSBuild (#498)'
           if ($signed) { $how += ', the launcher signed by ThornswoodRelease (#2163)' }
           else { $how += ', UNSIGNED (not a run of main''s workflow, #3930): Ship signs it on download (#921)' }
           $notes = "Launcher exe and setup program for $tag, $how, and verified by SHA256SUMS. Ship downloads these and checks the checksums instead of compiling the shipped binaries (issues #457 and #932).`n`nSource for the SkyMP files Thornswood ships: https://thornswood.net/credits#source"
@@ -447,8 +419,8 @@ jobs:
             }
             Write-Host ("uploading into the draft {0} that tag {1} already has" -f $release.id, $tag)
             # Its notes were written by the run that made it, and this run's
-            # files replace that run's: a VPS draft rebuilt signed on GitHub's
-            # runner kept saying UNSIGNED. The notes say how THESE files were
+            # files replace that run's: a draft built unsigned and rebuilt
+            # signed kept saying UNSIGNED. The notes say how THESE files were
             # built, so they are written again with them.
             $patch = @{ body = $notes } | ConvertTo-Json
             $release = Invoke-RestMethod -Method Patch -Uri "$api/releases/$($release.id)" -Headers $headers -ContentType 'application/json' -Body $patch -ErrorAction Stop
@@ -489,62 +461,26 @@ jobs:
             if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force }
           }
 
-  # THE VPS JOB, the fallback the same way build.yml has it (#1306, #2163,
-  # #3312). It runs whenever the hosted job did not succeed and the run was
-  # not cancelled:
-  #   - BUILD_RUNNER is vps, or a manual run asked for runner: vps, which
-  #     skip the hosted job;
-  #   - the hosted job failed (a quota or billing stop fails it before any
-  #     step runs). A real red fails here too; that is the price of not
-  #     telling a quota stop from a build failure.
-  # !cancelled(), not always() (#2422): a cancelled run never leaves the box
-  # building a release nobody wants. The steps are the hosted job's own, by
-  # the YAML anchor, so the two cannot drift, the signing included: in a run
-  # of main's own workflow this job has the release environment and its OIDC
-  # token the way the hosted job does, and signs on runner 3 alone (header,
-  # THE BOX SIGNS ON RUNNER 3 ONLY). Only then (#3930): a run on any other
-  # ref, and a tag push, never reach runner 3, which refuses them (#3889).
-  launcher-vps:
-    name: Build the release launcher (VPS)
-    needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, Windows, X64, thornswood-vps, thornswood-sign]
-    environment: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && 'release' || '' }}
-    permissions:
-      contents: write
-      id-token: write
-    outputs:
-      release_id: ${{ steps.draft.outputs.release_id }}
-      commit: ${{ steps.tag.outputs.commit }}
-      signed: ${{ steps.draft.outputs.signed }}
-    # The build is about two minutes; past this it is stuck, not slow.
-    timeout-minutes: 20
-    steps: *release
-
-  # A SECOND MACHINE CHECKS THE SIGNED DRAFT (#2163). After whichever job
-  # drafted a signed launcher. It asks for thornswood-check, which only the
-  # runners records\check-runners.json lists carry, and that record never
-  # names runner 3, which signs, so the runner that checks holds no signing
-  # client, no signing.json and no Azure token and is not the one that
-  # signed: what it accepts it accepts on the files alone, the way an
-  # installed launcher does. Not thornswood-build (#3956): it asked for that
-  # until 27 Oct only because the build runners are never runner 3, and the
-  # v1.2.7 check waited 49 minutes behind pull request builds for one, near
-  # the hour a Ship from the feed waits for this run. The record lists a
-  # runner no heavy job asks for, so the check starts as soon as the draft
-  # is made. contents: write only because a draft release is visible to
-  # nobody without push access.
+  # A SECOND MACHINE CHECKS THE SIGNED DRAFT (#2163). After the build drafted
+  # a signed launcher. A job of its own gets a fresh GitHub runner, so the
+  # machine that checks holds no signing client, no signing.json and no
+  # Azure token and is not the one that signed: what it accepts it accepts
+  # on the files alone, the way an installed launcher does. No VPS runner
+  # checks it any more (#4013); the check runners' label is the nightly's
+  # bot harnesses' alone now (#4914), and #4033 took the signing runner's
+  # off. contents: write only because a draft release is visible to nobody
+  # without push access.
   verify:
-    name: Check the signed draft on a second machine (VPS)
-    needs: [launcher, launcher-vps]
-    if: ${{ !cancelled() && ((needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true') || (needs.launcher-vps.result == 'success' && needs.launcher-vps.outputs.signed == 'true')) }}
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-check]
+    name: Check the signed draft on a second machine
+    needs: launcher
+    if: ${{ !cancelled() && needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true' }}
+    runs-on: windows-latest
     permissions:
       contents: write
     timeout-minutes: 10
     env:
-      DRAFT_ID: ${{ needs.launcher.result == 'success' && needs.launcher.outputs.release_id || needs.launcher-vps.outputs.release_id }}
-      DRAFT_COMMIT: ${{ needs.launcher.result == 'success' && needs.launcher.outputs.commit || needs.launcher-vps.outputs.commit }}
+      DRAFT_ID: ${{ needs.launcher.outputs.release_id }}
+      DRAFT_COMMIT: ${{ needs.launcher.outputs.commit }}
     steps:
       - name: Check out the commit the draft was built from
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -552,20 +488,6 @@ jobs:
           ref: ${{ env.DRAFT_COMMIT }}
           clean: true
           submodules: false
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Download the draft's files and check them
         shell: pwsh

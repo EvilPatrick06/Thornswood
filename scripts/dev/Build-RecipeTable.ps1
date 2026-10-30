@@ -2046,6 +2046,61 @@ $BENCH_OWNER = [ordered]@{
     'CraftingSmelter'         = @{ Owner = '';           Why = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose.' }
 }
 
+# THE BENCHES EACH TRADE WORKS AT, AND WHERE A ROW AT ANY OTHER IS MOVED (#3120).
+#
+# Patrick, 21 October, in the #3080 thread: "fix the benches so only the
+# correct people can do things and they have the correct recpipes for eah
+# cbnech", and "make sure if a bench has a recipoe that should be on adifferent
+# bench it should get moved". A bench opens for somebody craftAnswer allows one
+# of its rows (Build-BenchTable.py, #3080), so who a bench opens for follows
+# from which rows sit at it. Measured 26 October on recipes.json: 51 Tailor
+# rows people can make sat at the forge (Immersive Armors' fur hoods, capes,
+# robes and unarmoured mage sets, three Riekling clothes), and 9 Woodwright
+# rows (two arrows, the Falmer bow, the flute, the lute, the drum and the
+# Riekling spears), so the forge opened for every Tailor and every Woodwright.
+#
+# The owner is read off the output, wherever the mod put the recipe, and that
+# does not change. What changes is the bench: a row whose owner does not work
+# at the bench its mod put it at goes to that trade's Home bench. Benches is
+# every bench the trade works at; Only narrows one of them to the families of
+# work done there (a Smith at the tanning rack tans, and makes no armour there).
+#
+# Only rows somebody can make are moved: a row that fires and is not cut. A
+# row nobody makes opens no bench, and a cut row put back for an event is moved
+# on the build that puts it back. A row the server never sees (a temper at the
+# sharpening wheel or the armour table) opens no bench either.
+#
+# The rows nobody owns are not moved: a row nobody owns is made by whoever the
+# bench opens for, which is Patrick's answer on 22 October (A on the report
+# page): rings, necklaces and circlets are Smith work at the forge, either
+# half, and the rest of the unowned rows go to the trade of the bench they sit
+# at. With the Tailor and Woodwright rows off the forge, the forge opens for
+# Smiths alone, and that is the answer.
+#
+# Where the row is made now goes in bench and benchName, so every reader of
+# recipes.json (the bench gate, the fuel table, the re-cost, the merchant
+# tables) reads the bench the row is made at. movedFrom and movedFromName say
+# where its mod put it. scripts/mods/Build-LastPlugin.py carries each move in
+# Thornswood-Last.esp, or, for a plugin it never copies from, hands it to each
+# person's game (RECIPES_MOVED_IN_GAME).
+$TRADE_BENCHES = [ordered]@{
+    'Smith'      = @{ Home = 'CraftingSmithingForge'
+                      Benches = @('CraftingSmithingForge', 'CraftingSmithingSkyforge', 'CraftingSmelter', 'CraftingSmithingArmorTable',
+                                  'CraftingSmithingSharpeningWheel', 'DLC1LD_CraftingForgeAetherium', 'CraftingTanningRack')
+                      Only = @{ 'CraftingTanningRack' = @('Leather') } }
+    'Tailor'     = @{ Home = 'MCE_CraftingLoom'; Benches = @('MCE_CraftingLoom', 'CraftingTanningRack') }
+    'Woodworker' = @{ Home = 'ThornswoodCraftingWoodworking'
+                      Benches = @('ThornswoodCraftingWoodworking', 'ThornswoodCraftingCharcoalKiln', 'DLC1CraftingDawnguard') }
+    'Enchanter'  = @{ Home = 'DLC2StaffEnchanter'; Benches = @('DLC2StaffEnchanter', 'DLC1LD_CraftingForgeAetherium') }
+    'Cook'       = @{ Home = 'CraftingCookpot'; Benches = @('CraftingCookpot', 'BYOHCraftingOven', 'isGrainMill') }
+    'Alchemist'  = @{ Home = 'ThornswoodCraftingAlchemy'; Benches = @('ThornswoodCraftingAlchemy') }
+}
+
+# The plugin Build-LastPlugin.py writes. Its BNAM is never read as where a mod
+# put a recipe: it is where this table moved it, so reading it back would take
+# every move off on the next build (#3120).
+$LAST_PLUGIN = 'Thornswood-Last.esp'
+
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\recipes.json' }
 
 $fail = 0
@@ -3034,6 +3089,10 @@ foreach ($pl in $order) {
                         if ($hasCnam -and $cnam -ne 0) { $outDesc = DescOf ([uint32]$cnam) $masters $pl }
                         $benchDesc = ''
                         if ($hasBnam -and $bnam -ne 0) { $benchDesc = DescOf ([uint32]$bnam) $masters $pl }
+                        # Thornswood-Last.esp's BNAM is a move this table made
+                        # ($TRADE_BENCHES), so the bench stays the one the
+                        # plugin before it named (#3120).
+                        if ($pl -eq $LAST_PLUGIN -and $recipes.Contains($desc)) { $benchDesc = $recipes[$desc].BenchDesc }
                         # The inputs, as descs, resolved here where the master
                         # list of the plugin that carried the record is still
                         # in hand. The same two lines the output and the bench
@@ -5272,6 +5331,61 @@ if (-not (Test-Path -LiteralPath $CUT_FILE)) {
     }
 }
 
+# --------------------------------------------------- the rows that move -
+#
+# See $TRADE_BENCHES. After the cut file, because only a row somebody can make
+# is moved, and after every rank and count, so a move changes no ladder.
+
+Write-Host ''
+Write-Host 'the rows at a bench their trade does not work at' -ForegroundColor Cyan
+$kwByName = @{}
+foreach ($kd in $kwName.Keys) {
+    $kn = [string]$kwName[$kd]
+    if ($kwByName.ContainsKey($kn) -and $kwByName[$kn] -ne $kd) {
+        $kwByName[$kn] = ''
+    } else {
+        $kwByName[$kn] = $kd
+    }
+}
+foreach ($trade in $TRADE_BENCHES.Keys) {
+    $homeBench = [string]$TRADE_BENCHES[$trade].Home
+    if (-not $kwByName.ContainsKey($homeBench)) {
+        Bad ("the {0}'s home bench {1} is no keyword in this load order" -f $trade, $homeBench)
+    } elseif (-not $kwByName[$homeBench]) {
+        Bad ("more than one keyword in this load order is called {0}, so the {1}'s home bench cannot be named" -f $homeBench, $trade)
+    }
+}
+$movedCount = @{}
+foreach ($desc in $owned.Keys) {
+    $r = $owned[$desc]
+    if (-not $r.Fires) { continue }
+    if ($r.PSObject.Properties['Book'] -and $r.Book -eq 'cut') { continue }
+    if (-not $TRADE_BENCHES.Contains($r.Owner)) {
+        Bad ("{0} ({1}) is owned by {2}, which names no benches in TRADE_BENCHES" -f $r.Edid, $desc, $r.Owner)
+        continue
+    }
+    $tb = $TRADE_BENCHES[$r.Owner]
+    $works = $tb.Benches -contains $r.BenchName
+    if ($works -and $tb.ContainsKey('Only') -and $tb.Only.ContainsKey($r.BenchName)) {
+        $works = $tb.Only[$r.BenchName] -contains $r.Family
+    }
+    if ($works) { continue }
+    $homeBench = [string]$tb.Home
+    if (-not $kwByName[$homeBench]) { continue }
+    $r | Add-Member -NotePropertyName MovedFrom -NotePropertyValue $r.BenchDesc -Force
+    $r | Add-Member -NotePropertyName MovedFromName -NotePropertyValue $r.BenchName -Force
+    $r.BenchDesc = $kwByName[$homeBench]
+    $r.BenchName = $homeBench
+    $mk = $r.MovedFromName + ' -> ' + $homeBench + ' (' + $r.Owner + ')'
+    if (-not $movedCount.ContainsKey($mk)) { $movedCount[$mk] = 0 }
+    $movedCount[$mk] = $movedCount[$mk] + 1
+}
+if ($movedCount.Count -eq 0) {
+    Ok 'every row somebody can make is at a bench its trade works at'
+} else {
+    foreach ($mk in ($movedCount.Keys | Sort-Object)) { Ok ("{0,4} moved: {1}" -f $movedCount[$mk], $mk) }
+}
+
 # ------------------------------------------------------------- the writing -
 
 Write-Host ''
@@ -5312,6 +5426,7 @@ $doc.Add('  "family": ' + (JsonStr 'what kind of thing the row makes, which is h
 $doc.Add('  "sisterHalf": ' + (JsonStr 'classes.md gives you the novice work of the other half of your own profession for nothing, and no further than novice. The gate can answer that because every row carries a rank.') + ',')
 $doc.Add('  "needs": ' + (JsonStr 'the recipe''s own conditions, read out of its CTDA subrecords. An empty list means anybody standing at the bench can make it. serverSees false means the fork has no function for that condition and the server answers True, so the only thing enforcing it is the crafting menu on the machine in front of the person, which hides the recipe rather than refusing it.') + ',')
 $doc.Add('  "default": ' + (JsonStr 'a recipe id this table does not carry is one nobody owns, and anybody may make it') + ',')
+$doc.Add('  "movedFrom": ' + (JsonStr 'on a row its mod put at a bench its trade does not work at (TRADE_BENCHES, #3120): the bench keyword the mod put it at, and movedFromName its editor id. bench and benchName are where it is made now, its trade''s home bench. scripts\mods\Build-LastPlugin.py carries the move in Thornswood-Last.esp, or hands it to each person''s game for a plugin it never copies from.') + ',')
 $doc.Add('  "fires": ' + (JsonStr 'false means the server is never asked about this recipe. CraftService::RecipeItemsMatch throws out the armour table (adb78) and the sharpening wheel (88108) before it considers anything, so tempering never reaches onCraft.') + ',')
 $doc.Add('  "count": ' + ($owned.Count + $unowned.Count + $refusedRows.Count) + ',')
 $doc.Add('  "owned": ' + $owned.Count + ',')
@@ -5470,6 +5585,7 @@ foreach ($desc in $owned.Keys) {
              ', "type": ' + (JsonStr $r.OutType) + ', "makes": ' + $r.Count +
              ', "inputs": ' + $r.Inputs + ', "inputItems": ' + (InputsJson $r) + ', "worth": ' + $r.Value +
              ', "bench": ' + (JsonStr $r.BenchDesc) + ', "benchName": ' + (JsonStr $r.BenchName) +
+             $(if ($r.PSObject.Properties['MovedFrom']) { ', "movedFrom": ' + (JsonStr $r.MovedFrom) + ', "movedFromName": ' + (JsonStr $r.MovedFromName) } else { '' }) +
              ', "owner": ' + (JsonStr $r.Owner) + ', "half": ' + (JsonStr $r.Half) +
              ', "race": ' + (JsonStr $r.Race) +
              ', "rank": ' + (JsonStr $r.Rank) +

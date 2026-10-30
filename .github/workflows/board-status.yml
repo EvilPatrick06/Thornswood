@@ -75,7 +75,7 @@ jobs:
   status:
     name: Set the card's Status or Order
     if: ${{ startsWith(github.event.label.name, 'board:') || startsWith(github.event.label.name, 'order:') }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     environment: board
     # On the job, not the workflow: the job's if is read first, so a run for
     # some other label never joins the queue and cannot push a board run out.

@@ -22,6 +22,10 @@ on [People who are not people](npcs.md). You speak to the trader.
 The server accepts the goods, because the actor's own scripts do
 not run.
 
+A new character's first errand, from the Cook of the town they start in, is
+not one of these. It pays nothing and moves no goods, and it is on
+[Creation](creation.md), under The first steps (#3166).
+
 ## What they are for
 
 A supply quest moves goods. The trader asks for a count of an item

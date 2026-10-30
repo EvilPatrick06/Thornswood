@@ -64,6 +64,7 @@ $vpsPath     = P 'scripts', 'vps', 'Vps.ps1'
 $install = Text $installPath
 $setup   = Text $setupPath
 $vpsText = Text $vpsPath
+$sendScript = Text (P 'scripts', 'vps', 'Send-Script.ps1')
 
 # ---- 1. they parse --------------------------------------------------------
 foreach ($p in $installPath, $setupPath) {
@@ -120,7 +121,28 @@ $installCode = Build (@($hs | Where-Object { $_.Extent.Text -match 'BRIDGE OK' }
 Yes 'Install-Bridge.ps1 builds an artifact from the commit and checks it before sending' (
     $install -match 'New-ThornswoodArtifact -Component bridge' -and $install -match 'Assert-ThornswoodSourceIntegrity' -and
     $install -match "'scripts/vps/bridge/bridge.js', 'scripts/vps/bridge/ws.js'" -and $install -match "-AlsoSends 'scripts/vps/Server-Log.js'")
-Yes '  and records what the box runs only once it answers' ($install.IndexOf('Set-ThornswoodArtifactCurrent') -gt $install.IndexOf("-notcontains 'BRIDGE OK'"))
+Yes '  and records what the box runs only once it answers' ($install.LastIndexOf('Set-ThornswoodArtifactCurrent') -gt $install.IndexOf("-notcontains 'BRIDGE OK'"))
+# #3214: the install's own ssh rides the bridge it stops, so it goes to the
+# box as a detached run that waits for that session to end, and its report
+# is read in fresh sessions until END.
+Yes 'the install goes to the box as a detached run, never in the session the stop cuts (#3214)' (
+    $install.Contains('$run = Get-ThornswoodDetachedRun -Script $install') -and $install.Contains('@(Remote $run.Start)') -and
+    $install.Contains('@(Remote $run.Read |') -and $install -notmatch '\$out = @\(Remote @"\r?\n`\$ErrorActionPreference = ''Stop''\r?\n`\$ProgressPreference')
+Yes '  read until its END, and BRIDGE OK looked for in what it said' (
+    $install.Contains("if (`$lines[`$i] -match '^END (-?\d+)$')") -and $install.IndexOf('$endRc = [int]$Matches[1]') -lt $install.IndexOf("-notcontains 'BRIDGE OK'"))
+Yes 'the detached run waits for the session that started it to end before any of it runs (#3214)' (
+    $sendScript.Contains("WriteAllText('`$file.session'") -and $sendScript.Contains('WaitForExit(') -and
+    $sendScript.IndexOf('WaitForExit(') -lt $sendScript.IndexOf("& '`$file' *>&1"))
+$recAst = @($hs | Where-Object { $_.Extent.Text -match "'MATCHES'" })
+Yes '-Record has one script it sends' ($recAst.Count -eq 1)
+$recCode = Build $recAst[0]
+Yes '  which checks each file by hash and the port, and stops, starts and moves nothing' (
+    $recCode -match 'Get-FileHash -LiteralPath \$p -Algorithm SHA256' -and $recCode.Contains("Get-PlainAnswer 'http://127.0.0.1:7790/' 5") -and
+    $recCode -notmatch 'Stop-ScheduledTask|Start-ScheduledTask|Move-Item|Remove-Item|StopIt|Register-ScheduledTask')
+Yes '  and records only on MATCHES' ($install.IndexOf("if (`$out -notcontains 'MATCHES')") -lt $install.IndexOf('Set-ThornswoodArtifactCurrent') -and $install.IndexOf("if (`$out -notcontains 'MATCHES')") -gt 0)
+Yes '-Remove refuses from a machine whose ssh goes through the bridge' (
+    $install.IndexOf('if (Test-ThornswoodBridgeSsh $VpsHost) { Die') -gt $install.IndexOf('if ($Remove) {') -and
+    $install.IndexOf('if (Test-ThornswoodBridgeSsh $VpsHost) { Die') -lt $install.IndexOf('Unregister-ScheduledTask -TaskName ''$TaskName'' -Confirm:`$false -EA SilentlyContinue'))
 Yes 'the task is LOCAL SERVICE with its own SID, granted its folder, after the fail-safe' (
     $installCode -match 'New-ThornswoodServicePrincipal -AsSystem:\$system' -and $installCode -match 'Get-ThornswoodTaskSid' -and
     $installCode -match 'Grant-ThornswoodServiceFolder' -and

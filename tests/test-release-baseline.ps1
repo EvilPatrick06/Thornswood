@@ -387,9 +387,6 @@ try {
     Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'plugin'
     Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "# This fixture enables no additional plugins.`r`n"
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') ''
-    # The covered bodies a publish needs since d2519bb, as a build leaves them.
-    . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-    New-GeneratedBodies $inst $fake
     . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
     Install-UiFrontFixture (Join-Path $inst 'Game')
     $rel6 = Join-Path $inst 'rel'
