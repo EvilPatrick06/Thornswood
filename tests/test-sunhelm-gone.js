@@ -1,7 +1,7 @@
 // test-sunhelm-gone.js
 //
 // Nothing a customer reads still sends them to a mod that has left the
-// collection, and what the launcher says about the needs is what the server
+// collection, and what the help says about the needs is what the server
 // actually does.
 //
 // WHY THIS EXISTS. To Do List entry 133. Settled by Patrick on 17 September,
@@ -25,8 +25,9 @@
 // So this reads the text people read and checks it two ways: it names no mod
 // that has gone as though it were still here, and where it describes the
 // needs, everything it promises is something gamemode.js does. It checks what
-// the text claims rather than the words it uses, so a rewrite of the Help
-// page (entry 164 has one in flight) passes as long as what it says is true.
+// the text claims rather than the words it uses, so a rewrite of the help
+// passes as long as what it says is true. The help it reads is the panel in
+// the game since #3146 cut the launcher's Help page.
 // On a machine
 // with the game built it also checks the entry's doneWhen: no SunHelm in the
 // reference plugin list, the game folder or the client's load order, and the
@@ -64,48 +65,6 @@ function goneIn(text) {
   return hit;
 }
 
-/*
-  Every string literal in a C# file, and nothing from its comments. The
-  comments over the changed lines say SunHelm on purpose, to say why they
-  changed, and a customer never reads a comment.
-*/
-function csStrings(src) {
-  const out = [];
-  const n = src.length;
-  let i = 0;
-  while (i < n) {
-    const c = src[i], d = src[i + 1];
-    if (c === '/' && d === '/') { const e = src.indexOf('\n', i); i = e < 0 ? n : e; continue; }
-    if (c === '/' && d === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
-    if (c === '@' && d === '"') {
-      let j = i + 2, s = '';
-      while (j < n) {
-        if (src[j] === '"' && src[j + 1] === '"') { s += '"'; j += 2; continue; }
-        if (src[j] === '"') { break; }
-        s += src[j]; j++;
-      }
-      out.push(s); i = j + 1; continue;
-    }
-    if (c === '"') {
-      let j = i + 1, s = '';
-      while (j < n && src[j] !== '"' && src[j] !== '\n') {
-        if (src[j] === BS) { s += src[j] + src[j + 1]; j += 2; continue; }
-        s += src[j]; j++;
-      }
-      out.push(s); i = j + 1; continue;
-    }
-    if (c === "'") {
-      // A char literal, so that '"' never opens a string.
-      let j = i + 1;
-      j += (src[j] === BS) ? 2 : 1;
-      if (src[j] === "'") { i = j + 1; continue; }
-      i++; continue;
-    }
-    i++;
-  }
-  return out;
-}
-
 // ---------------------------------------------------------- the gamemode
 const GM = read(['game', 'gamemode.js']);
 const nA = GM.indexOf('// ==== thornswood needs');
@@ -125,32 +84,35 @@ const pB = pA >= 0 ? GM.indexOf('];', pA) : -1;
 const playerWords = (pA >= 0 && pB > pA) ? GM.slice(pA, pB) : '';
 yes('PLAYER_WORDS is in the gamemode', playerWords.length > 0);
 
-// ---------------------------------------------------------- the Help page
-const helpStrings = csStrings(read(['launcher', 'app', 'Help.cs']));
-yes('the Help page has text to read, ' + helpStrings.length + ' strings', helpStrings.length > 50);
+// ------------------------------------------------------- the help in the game
+// The launcher's Help page until #3146 cut it: help is the panel on F7 now,
+// game/ui/thornswood-help.js, and its Living topic is what says the needs.
+// Each topic's text, run with the keys a fresh install has, the way a person
+// reads it.
+function helpTopics() {
+  const page = read(['game', 'ui', 'thornswood-help.js']);
+  const a = page.indexOf('  var TOPICS = [');
+  const b = a < 0 ? -1 : page.indexOf('\n  ];\n', a);
+  const k = /var keys = (\{[\s\S]*?\});/.exec(page);
+  if (a < 0 || b < 0 || !k) { return []; }
+  try {
+    const keys = new Function('return ' + k[1])();
+    return new Function('return ' + page.slice(page.indexOf('[', a), b + 4))()
+      .map(function (t) { return { id: t.id, text: t.text(keys).join(' ') }; });
+  } catch (e) { return []; }
+}
+const topics = helpTopics();
+yes('the help in the game has its topics, ' + topics.length + ' of them', topics.length >= 5);
 const helpGone = [];
-helpStrings.forEach(function (s) {
-  goneIn(s).forEach(function (g) { helpGone.push(g + ' in "' + s.slice(0, 60) + '"'); });
+topics.forEach(function (t) {
+  goneIn(t.text).forEach(function (g) { helpGone.push(g + ' in ' + t.id); });
 });
-yes('the Help page names no mod that has left' + (helpGone.length ? ': ' + helpGone.join('; ') : ''),
+yes('the help in the game names no mod that has left' + (helpGone.length ? ': ' + helpGone.join('; ') : ''),
     helpGone.length === 0);
 
-/*
-  The needs item, found by what it is about rather than by its title. The
-  title has been "You will get hungry, thirsty and cold" and entry 164's
-  rewrite of the page calls it "Food, water, rest and warmth", and a harness
-  that looked for one exact title would go red the day the other landed with
-  nothing wrong on the page. A HelpItem is (section, title, body), so the
-  title is the string after "In game" and the body is the one after that.
-*/
-const NEEDS_TITLE = /hungry|thirsty|warmth|food, water/i;
-const needsAt = [];
-for (let i = 1; i + 1 < helpStrings.length; i++) {
-  if (helpStrings[i - 1] === 'In game' && NEEDS_TITLE.test(helpStrings[i])) { needsAt.push(i); }
-}
-yes('the needs item is on the Help page, once' + (needsAt.length > 1 ? ' (found ' + needsAt.length + ')' : ''),
-    needsAt.length === 1);
-const body = needsAt.length ? (helpStrings[needsAt[0] + 1] || '') : '';
+const living = topics.filter(function (t) { return t.id === 'living'; });
+yes('the help has a Living topic, once', living.length === 1);
+const body = living.length ? living[0].text : '';
 yes('it sends nobody to an MCM, which went with SunHelm', !/\bMCM\b/.test(body));
 
 // Where the needs are shown, checked against the thing that draws them.

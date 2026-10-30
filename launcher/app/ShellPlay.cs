@@ -161,7 +161,7 @@ namespace Thornswood
                 // update, the pack is being fetched, and a press in that gap
                 // starts Skyrim on a half extracted build.
                 if (updatePending) { Log("An update is going in. Play comes back when it is done."); return; }
-                if (collectionBarUp) { Log("The collection is not installed yet. Open it from the card above Play, then come back."); return; }
+                if (collectionBarUp) { Log(CollectionHeldLine()); return; }
                 if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done."); return; }
                 if (OwnGameRefreshIfDue()) return;
                 if (feedNotice.Hold != null) { Log(feedNotice.Hold); return; }
@@ -237,7 +237,7 @@ namespace Thornswood
                             "Thornswood", canOpen ? MessageBoxButton.YesNo : MessageBoxButton.OK, MessageBoxImage.Warning);
                         if (canOpen && open == MessageBoxResult.Yes)
                         {
-                            try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                            try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
                             catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                         }
                     }

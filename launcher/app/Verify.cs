@@ -600,6 +600,24 @@ namespace Thornswood
                 }
                 if (same) continue;
 
+                // Made here from the release's recipe (#2791, LastPlugin):
+                // never the server's copy. One that is not what the recipe
+                // makes is Scan's "made from your game" line, which Fix
+                // makes again; one that is, and still is not the server's,
+                // means the release and the server are of two builds.
+                if (LastPlugin.Makes(Paths.Game, m.filename))
+                {
+                    if (!LastPlugin.IsCurrent(Paths.Game)) continue;
+                    var made = Issue.Of(IssueKind.Plugins,
+                        m.filename + " is the one this release makes from your plugins, and it is not the server's" +
+                        (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
+                        ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server.",
+                        null, OtherBuild, true);
+                    made.Plugin = m.filename;
+                    issues.Add(made);
+                    continue;
+                }
+
                 var i = Issue.Of(IssueKind.Plugins,
                     m.filename + " is not the same file the server has" +
                     (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
@@ -648,6 +666,9 @@ namespace Thornswood
 
         /// <summary>A plugin of ours whose server copy the release does not have (#3386).</summary>
         const string NotInRelease = "Fix takes Thornswood's own plugins from the latest release, and that release does not have the copy the server runs yet, or could not be reached. The next update brings it: take it when it is waiting, then press Scan.";
+
+        /// <summary>Thornswood-Last.esp made from this release's recipe, and the server holding another (#2791).</summary>
+        const string OtherBuild = "The server and this release are of two builds: take the update when one is waiting; when none is, the server is behind, and staff deploy it again.";
 
         /// <summary>The order cannot be put right while the server names a plugin this build has no line for and that is not ours.</summary>
         const string OrderNeeds = "The server's order names a plugin this build's list does not have and that is not Thornswood's own, so only an update or Vortex can bring it: take the update when one is waiting, or deploy the Thornswood collection in Vortex, then press Scan.";
@@ -943,7 +964,8 @@ namespace Thornswood
                 var notHere = new List<string>();
                 foreach (string p in off)
                 {
-                    if (!ServedByServer(cfg, p)) notOurs.Add(p);
+                    // Ours: served, or made here from the release's recipe (#2791).
+                    if (!ServedByServer(cfg, p) && !LastPlugin.Makes(Paths.Game, p)) notOurs.Add(p);
                     else if (!InData(p)) notHere.Add(p);
                     else ours.Add(p);
                 }
@@ -961,6 +983,8 @@ namespace Thornswood
                 {
                     if (notOurs.Count > 0)
                         say("The server's order names " + string.Join(", ", notOurs.ToArray()) + ", which this build's plugin list does not enable and is not Thornswood's own, so the order was left alone. " + OrderNeeds);
+                    else if (notHere.Count == 1 && LastPlugin.Makes(Paths.Game, notHere[0]))
+                        say("The server's order names " + notHere[0] + ", which this release makes from your plugins and has not been made, so the order was left alone. Scan's line about the files made from your game says what stops it.");
                     else if (notHere.Count > 0)
                         say("The server's order names " + string.Join(", ", notHere.ToArray()) + ", which is ours and is not in Data, because the release did not have it, so the order was left alone. " + NotInRelease);
                     else
@@ -1327,7 +1351,7 @@ namespace Thornswood
             if (cfg != null)
             {
                 foreach (Issue i in Bytes(cfg))
-                    if (i.Plugin != null && FetchPlugin(cfg, i, release, say)) n++;
+                    if (i.Plugin != null && !LastPlugin.Makes(Paths.Game, i.Plugin) && FetchPlugin(cfg, i, release, say)) n++;
             }
 
             // Still missing from Data and ours by the server's served list
@@ -1354,7 +1378,8 @@ namespace Thornswood
                         {
                             bool isLight = idx >= mods.Length;
                             ServerMod m = isLight ? light[idx - mods.Length] : mods[idx];
-                            if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename) || !m.Served) continue;
+                            // The one made from the release's recipe is MadeFromGame's (#2791).
+                            if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename) || !m.Served || LastPlugin.Makes(Paths.Game, m.filename)) continue;
                             string dest = Path.Combine(dataDir, m.filename);
                             bool goneFile = false;
                             try { goneFile = !File.Exists(dest); }
@@ -1459,16 +1484,6 @@ namespace Thornswood
                 catch (Exception ex) { Swallow.Note("Verify.DeployPersonal, " + rel, ex); }
             }
             return n;
-        }
-
-        public static string[] PersonalFiles()
-        {
-            try
-            {
-                if (!Directory.Exists(Paths.Personal)) return new string[0];
-                return Directory.GetFiles(Paths.Personal, "*.*", SearchOption.AllDirectories);
-            }
-            catch { return new string[0]; }
         }
     }
 }

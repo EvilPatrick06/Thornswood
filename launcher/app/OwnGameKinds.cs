@@ -441,6 +441,8 @@ namespace Thornswood
             "Data\\Interface\\hudmenu.swf",
             "Data\\Interface\\AHZHudInfo.swf",
             "Data\\Interface\\exported\\AHZHudInfo.swf",
+            // Made from the person's own plugins by the release's recipe (#2791).
+            LastPlugin.File,
         };
 
         /// <summary>Thornswood's by its name alone: NamedOurs, WrittenInGame, MadeInGame, or the client runtime.</summary>

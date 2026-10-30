@@ -305,6 +305,10 @@ try {
     # line break, as Publish-Update's -Notes does. On 30 Oct a harness beside
     # this one ran one, and the refusal threw reading its id back out of its
     # line instead of saying who held the folder.
+    # Its line break is in the refusal from here on, before or after the
+    # node's own line by which id is lower, so a match across the lines below
+    # takes (?s): without it, the checks of step 4 failed whenever this id
+    # was the lower one (#4961).
     $nl = Start-Process -FilePath $node.Source -ArgumentList @('-e', "`"setInterval(()=>{},1000)`n// a second line`"") -PassThru -WindowStyle Hidden
     $started += $nl
     $ok = Move-ThornswoodPath $d ($d + '-moved')
@@ -318,8 +322,8 @@ try {
         $ThornswoodMoveWhy -match ('handles: .*pid ' + $c.Id + ' node: ' + [regex]::Escape($d)))
     Yes ('  and Windows''s own list of who has the folder open names it first, with its parent and start time (#3262)') (
         $ThornswoodMoveWhy -match ('^.*?open itself in: (pid \d+ \S+, )*pid ' + $c.Id + ' node\b') -and
-        $ThornswoodMoveWhy -match ('who they are: (.*; )?pid ' + $c.Id + ' node(\.exe)? \(parent ' + $PID + ' [^,]+, started \d{4}-\d\d-\d\d \d{1,2}:\d\d:\d\d\.\d{3} [AP]M\), command line ') -and
-        $ThornswoodMoveWhy -match ('started in the 2 minutes before: (.*; )?pid ' + $c.Id + ' ') -and
+        $ThornswoodMoveWhy -match ('(?s)who they are: (.*; )?pid ' + $c.Id + ' node(\.exe)? \(parent ' + $PID + ' [^,]+, started \d{4}-\d\d-\d\d \d{1,2}:\d\d:\d\d\.\d{3} [AP]M\), command line ') -and
+        $ThornswoodMoveWhy -match ('(?s)started in the 2 minutes before: (.*; )?pid ' + $c.Id + ' ') -and
         $ThornswoodMoveWhy.IndexOf('open itself in:') -lt $ThornswoodMoveWhy.IndexOf('handles:') -and
         $ThornswoodMoveWhy.IndexOf('handles:') -lt $ThornswoodMoveWhy.IndexOf('files under it open in:'))
     $held = @(Get-ThornswoodProcessHeld @($c.Id))
