@@ -1,0 +1,21 @@
+name: Work for the team
+description: For the Thornswood team. One piece of work for the board, written plain. To report a problem or an idea, pick one of the forms above.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write it the way a person would, for a stranger to read: everything here goes public with the repository. No names of who found it, no file paths with a user name, no addresses, ids or secrets, and no closing line. The evidence (files, lines, logs, what was measured) goes in the private ops repo under this issue's number, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What is wrong or wanted
+      description: Two to five plain lines.
+    validations:
+      required: true
+  - type: input
+    id: done
+    attributes:
+      label: Done when
+      description: One line somebody can check to know it is finished.
+    validations:
+      required: true

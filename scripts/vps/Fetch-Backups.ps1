@@ -185,7 +185,7 @@ if (-not $To -and -not $Unschedule) {
 # backslash (C:\...) or \\server\share. Each is used as given, and the task
 # -Schedule registers is handed both word for word, so anything else means a
 # different folder depending on where it runs. Measured 12 Oct (#2199): -To
-# given through Git Bash unquoted arrived as C:UsersevilpDownloadsThornswood-
+# given through Git Bash unquoted arrived as C:Users<you>DownloadsThornswood-
 # Repolocalbackups, a path relative to the current folder on C:. This script
 # made that folder inside the worktree it ran from and registered the task
 # with it, so the next 4:15 AM run would have fetched into a new folder under
@@ -361,7 +361,7 @@ Prune
 if ($checked) { Send-OffBoxMark } else { Say '  the box was not told of these, because none of them was opened' 'Yellow' }
 Write-Host ''
 Say "  They are in $To" 'DarkGray'
-Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
+Say '  Restoring one for real is RESTORING.md in the ops repo.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 if ($failed -or $script:pruneFailed -or $script:markFailed) { exit 1 }
 exit 0

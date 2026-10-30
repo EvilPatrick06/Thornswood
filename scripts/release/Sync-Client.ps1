@@ -26,7 +26,7 @@
   machine that takes CI's build (Setup-ShipMachine.ps1 -EngineBuild ci) the
   default -Dist is Where.ps1 EngineArtifact's client folder, named for the
   pin. When the game folder needs the client and that folder is not there
-  yet, Get-EngineArtifact.ps1 fetches engine.yml's artifact into it first,
+  yet, Get-EngineArtifact.ps1 fetches the fork's build of the pin into it first,
   held to the records, so a Ship or Go after a pin move needs no engine build.
   -Check fetches nothing.
 
