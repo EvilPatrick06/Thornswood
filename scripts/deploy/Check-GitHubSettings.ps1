@@ -17,7 +17,10 @@
   box, by the two things there that may read each part, and this only
   starts it and prints what came back:
     environments and where each may deploy from: the run's own token, given
-      actions read for it, in github-admin.yml;
+      actions read for it, in github-admin.yml. That workflow is in the
+      private ops repository since #4013, so its token reads this public
+      repository's environments the way anyone may read a public
+      repository's;
     the Actions settings (on or off, which actions may run, the workflow
       token's default, sharing, retention, fork pull requests) and the
       runners: the box's GitHub App (scripts\vps\admin\admin.js, #3107),
@@ -28,7 +31,8 @@
   GitHub never hands back a secret's value, and nothing here asks for a
   variable's.
 
-  HOW. Like Set-BuildRunners.ps1: it starts github-admin.yml on main with
+  HOW. Like Set-BuildRunners.ps1: it starts github-admin.yml on main of the
+  private ops repository, where the VPS runners are registered (#4013), with
   ask = settings, waits, and reads the runner's answer, an annotation titled
   Check-GitHubSettings. That run reads the environments with its own token,
   hands GitHub's OIDC token for it to the admin service on 127.0.0.1:7791,
@@ -59,7 +63,8 @@ param(
     [Parameter(ParameterSetName = 'Load', Mandatory = $true)]
     [switch]$Load,
     [int]$WaitMinutes = 15,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    # Where github-admin.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
 )
 
 Set-StrictMode -Version Latest
@@ -67,6 +72,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\ops\WorkflowRun.ps1')
 
 $workflow = 'github-admin.yml'
+# The repository whose settings are read and compared, which is this one,
+# not the one the workflow runs in.
+$Repo = 'EvilPatrick06/Thornswood'
 $title = 'Check-GitHubSettings'
 # The audience admin.js takes, and nothing else does.
 $audience = 'thornswood-admin'
@@ -226,7 +234,7 @@ if ($OnGitHub) {
 
     # 1. The environments, with this run's own token (actions read).
     function Get-WithRunToken([string]$path) {
-        $a = Invoke-WebRequest -Uri ($api + '/repos/' + $GitHubRepo + '/' + $path) -SkipHttpErrorCheck -TimeoutSec 60 `
+        $a = Invoke-WebRequest -Uri ($api + '/repos/' + $Repo + '/' + $path) -SkipHttpErrorCheck -TimeoutSec 60 `
             -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28'; 'User-Agent' = 'thornswood-settings' }
         $b = $null
         try { $b = [string]$a.Content | ConvertFrom-Json } catch { $b = $null }
