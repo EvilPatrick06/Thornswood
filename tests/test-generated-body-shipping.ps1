@@ -1,5 +1,8 @@
-# Generated covered body outputs must override collection defaults in updates
-# and installers. A nearby ungenerated mod asset remains collection-owned.
+# The covered bodies and the behavior files are built on each computer by the
+# launcher since #3715 (Patrick, 27 Oct: "The launcher makes all 45 files on
+# each computer"), so no update and no installer carries them, and no update
+# lists them as removed: an install keeps what its own build made. A nearby
+# file of the collection that nothing builds stays the collection's.
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
 $env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference='Stop'
@@ -8,70 +11,34 @@ $repo=Split-Path -Parent $PSScriptRoot
 $pass=0; $fail=0
 function Yes([string]$what,[bool]$ok){if($ok){$script:pass++;Write-Host "PASS $what"}else{$script:fail++;Write-Host "FAIL $what"}}
 $bodies=@(@('femalebody_0.nif','femalebody_1.nif','femalebodyastrid_0.nif','femalebodyastrid_1.nif','malebody_0.nif','malebody_1.nif') | ForEach-Object {'Data\meshes\actors\character\character assets\'+$_}) + @($ShipGeneratedOutfitFiles)
-$fixture=Join-Path ([IO.Path]::GetTempPath()) ('thornswood-body-shipping-'+[guid]::NewGuid().ToString('N'))
-$ProfileDir=Join-Path $fixture 'Profile'
-$game=Join-Path $fixture 'Game'
-$receipt=Join-Path $ProfileDir 'OwnGame\generated.txt'
-New-Item -ItemType Directory -Path (Split-Path $receipt) -Force | Out-Null
-$rows=@()
-foreach($b in $bodies){
-  $file=Join-Path $game $b
-  New-Item -ItemType Directory -Path (Split-Path $file) -Force | Out-Null
-  [IO.File]::WriteAllText($file,'covered output fixture '+$b)
-  $rows+='file '+(Get-FileHash $file).Hash.ToLowerInvariant()+' '+$b
+$behaviors=@('Data\meshes\animationdatasinglefile.txt','Data\meshes\animationsetdatasinglefile.txt','Data\meshes\actors\character\behaviors\0_master.hkx','Data\meshes\actors\character\characters\defaultmale.hkx')
+foreach($b in $bodies + $behaviors){
+  Yes "$([IO.Path]::GetFileName($b)) is built on each computer: never shipped and never listed as removed" ((Test-ShipGenerated $b) -and (Test-ShipMachine $b))
+  Yes "  and in any letter case" ((Test-ShipGenerated $b.ToUpperInvariant()) -and (Test-ShipMachine $b.ToUpperInvariant()))
 }
-[IO.File]::WriteAllLines($receipt,$rows)
-Assert-ShipGeneratedBodyFiles $game $ProfileDir
-Yes 'all six bodies and the fitted outfits match the actual receipt (#2454)' $true
+$other='Data\meshes\actors\character\character assets\femalehands_0.nif'
+Yes 'a file of the collection nothing builds is not taken for one built here' (-not (Test-ShipGenerated $other))
+$rules=[IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Ship-Rules.ps1'))
+Yes 'Ship-Rules no longer reads the record to ship what it lists' ($rules -notmatch 'function Get-ShipGeneratedFiles' -and $rules -notmatch 'function Assert-ShipGeneratedBod')
 foreach($scriptName in 'Publish-Update.ps1','Package-Thornswood.ps1'){
   $tokens=$null; $errors=$null
   $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo ('scripts\release\'+$scriptName)),[ref]$tokens,[ref]$errors)
   Yes "$scriptName parses" ($errors.Count -eq 0)
+  $text=$ast.Extent.Text
+  Yes "$scriptName neither reads nor checks the generated record" ($text -notmatch 'Get-ShipGeneratedFiles|Assert-ShipGeneratedBodies|\$shipGeneratedFiles')
   $fn=$ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Test-FromCollection'},$true) | Select-Object -First 1
+  Yes "$scriptName has Test-FromCollection" ($null -ne $fn)
+  if(-not $fn){continue}
   $vortexFiles=New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-  $assignment=$ast.FindAll({param($n) $n -is [Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$shipGeneratedFiles'},$true) | Select-Object -First 1
-  . ([scriptblock]::Create($assignment.Extent.Text))
-  Yes "$scriptName checks generated provenance before scanning" ($ast.Extent.Text.Contains('Assert-ShipGeneratedBodies $GameDir $ProfileDir'))
   foreach($b in $bodies){[void]$vortexFiles.Add($b)}
-  $other='Data\meshes\actors\character\character assets\femalehands_0.nif'
   [void]$vortexFiles.Add($other)
   . ([scriptblock]::Create($fn.Extent.Text))
-  foreach($b in $bodies){
-    Yes "$scriptName includes the generated $([IO.Path]::GetFileName($b)) beyond the collection" (-not (Test-FromCollection $b))
-    Yes "$scriptName does not discard that generated body as somebody else's loose art" (-not (Test-ShipNotOurs $b 2))
-  }
-  Yes "$scriptName still excludes an ungenerated collection asset" (Test-FromCollection $other)
-  Yes "$scriptName recognizes generated output case-insensitively" (-not (Test-FromCollection $bodies[0].ToUpperInvariant()))
+  Yes "$scriptName counts a body Vortex deploys as the collection's, so it is never taken for ours" (Test-FromCollection $bodies[0])
+  Yes "$scriptName still counts a collection file as the collection's" (Test-FromCollection $other)
 }
-function Refuses([string]$what,[scriptblock]$action,[string]$reason){$refused=$false;try{& $action}catch{$refused=(-not $reason -or $_.Exception.Message -like $reason)};Yes $what $refused}
-[IO.File]::WriteAllLines($receipt,$rows[1..5])
-Refuses 'a partial body receipt is refused' {Assert-ShipGeneratedBodyFiles $game $ProfileDir}
-[IO.File]::WriteAllLines($receipt,($rows+$rows[0]))
-Refuses 'a duplicate body receipt is refused' {Assert-ShipGeneratedBodyFiles $game $ProfileDir}
-[IO.File]::WriteAllLines($receipt,($rows+$rows[0].Replace('\','/')))
-Refuses 'an alias of an already recorded destination is refused' {Assert-ShipGeneratedBodyFiles $game $ProfileDir} '*exactly one*'
-[IO.File]::WriteAllLines($receipt,$rows)
-[IO.File]::WriteAllText((Join-Path $game $bodies[0]),'overwritten collection default')
-Refuses 'a body changed after generation is refused' {Assert-ShipGeneratedBodyFiles $game $ProfileDir}
-[IO.File]::WriteAllText((Join-Path $game $bodies[0]),'covered output fixture '+$bodies[0])
-. (Join-Path $repo 'scripts\mods\Generated.ps1')
-[IO.File]::WriteAllText((Join-Path $ProfileDir 'OwnGame\files.txt'),'')
-$inputs=Get-GeneratedInputs $fixture (Join-Path $repo 'records\generated.json')
-$outputs=@($bodies | ForEach-Object {[pscustomobject]@{Rel=$_;Sha=(Get-FileHash (Join-Path $game $_)).Hash.ToLowerInvariant()}})
-Write-GeneratedRecord $receipt $game $inputs $outputs
-Assert-ShipGeneratedBodies $game $ProfileDir
-Yes 'a complete fixture with current input provenance first succeeds' $true
-$complete=[IO.File]::ReadAllLines($receipt)
-[IO.File]::WriteAllLines($receipt,@($complete | Where-Object {$_ -notmatch '^game '}))
-Refuses 'missing source provenance is refused' {Assert-ShipGeneratedBodies $game $ProfileDir} '*exactly one source*'
-[IO.File]::WriteAllLines($receipt,$complete)
-Refuses 'a genuinely different source game folder is refused' {Assert-ShipGeneratedBodies (Join-Path $fixture 'DifferentGame') $ProfileDir} '*missing*'
-# Copy the six fixture outputs, so this fails for source identity, not absence.
-$different=Join-Path $fixture 'DifferentGame'
-foreach($b in $bodies){$dst=Join-Path $different $b;New-Item -ItemType Directory -Path (Split-Path $dst) -Force | Out-Null;Copy-Item -LiteralPath (Join-Path $game $b) -Destination $dst}
-Refuses 'matching body bytes in another source folder are refused' {Assert-ShipGeneratedBodies $different $ProfileDir} '*own game folder*'
-[IO.File]::WriteAllText((Join-Path $ProfileDir 'OwnGame\plugins.txt'),'*ChangedInput.esp')
-Refuses 'changed generated inputs are refused' {Assert-ShipGeneratedBodies $game $ProfileDir} '*Generated files are stale*'
-# The fixture is preserved for inspection; it contains no account data.
+$publish=[IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Publish-Update.ps1'))
+Yes 'Publish-Update never makes a built file hash-gone, so no update deletes what an install built' ($publish -match '\(Test-ShipBackup \$k\) -or \(Test-ShipGenerated \$k\)\) \{ continue \}')
+$package=[IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Package-Thornswood.ps1'))
+Yes 'Package-Thornswood leaves every machine file, the built ones among them, out of the installer' ($package -match 'if \(Test-ShipMachine \$rel\) \{ \$skipBytes \+= \$f\.Length; \$machineCount\+\+; continue \}')
 Write-Host "$pass passed, $fail failed"
 if($fail){exit 1}
