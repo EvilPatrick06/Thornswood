@@ -279,8 +279,13 @@ async function ready() {
    And everybody in it walking, a unit further north on every feed. The
    service sends only rows that changed since the last tick (issue #482), so
    a crowd standing still is one whole view per socket and then nothing, and
-   nothing would ever back up. */
+   nothing would ever back up.
+
+   And the crowd that fills the room below (BURST) in the world too, standing
+   in a cell of their own so nobody's view grows with them: only somebody in
+   the world holds a voice place and is on the roster (#3570). */
 let step = 0;
+const CROWD = 60;
 function bodyOf(n) {
   return JSON.stringify({ who: Array.from({ length: ROWS }, (_, i) => ({
     profileId: 100000 + i,
@@ -288,7 +293,14 @@ function bodyOf(n) {
     angleZ: 123.4,
     cell: '0x0001a26f',
     name: 'Tester ' + i
-  })) });
+  })).concat(Array.from({ length: CROWD }, (_, i) => ({
+    profileId: 200000 + i,
+    pos: [0, 0, 0],
+    angleZ: 0,
+    cell: 'elsewhere',
+    // The roster shows the feed's name for a proven join (#410), so it is the one each joins with.
+    name: ('Somebody passing through ' + i + ' ').padEnd(40, 'x')
+  }))) });
 }
 const BODY = bodyOf(0);
 // The newest feed sent, so its answer can be waited for once the feeding stops.
@@ -416,11 +428,13 @@ yes('only the 200 ms position tick uses the dropping send',
 /* And only the roster keeps just its newest while backed: each one is the
    whole room, which is not true of anything else sent. */
 /* The roster is framed once for the whole room and handed to sendLatest
-   already framed (sendRoster, #2332), so the check reads that function. */
+   already framed (sendRoster, #2332), so the check reads that function. A
+   socket that lost its voice place is handed the empty roster there
+   instead (#3570). */
 const ANNOUNCE = /function sendRoster\(\) \{[\s\S]*?\n\}/.exec(SRC);
 yes('only the roster is sent newest-only',
     SRC.split('.sendLatest(').length - 1 === 1 && !!ANNOUNCE &&
-    /frame\(JSON\.stringify\(\{ t: 'peers'/.test(ANNOUNCE[0]) && /\.sendLatest\(once\)/.test(ANNOUNCE[0]));
+    /frame\(JSON\.stringify\(\{ t: 'peers'/.test(ANNOUNCE[0]) && /\.sendLatest\(voice \? once : none\)/.test(ANNOUNCE[0]));
 
 (async () => {
   const h0 = await ready();
@@ -563,7 +577,7 @@ yes('only the roster is sent newest-only',
     so the roster it is holding differs from the last one it read, and only
     arrives if what it held is really sent.
   */
-  const BURST = 60;
+  const BURST = CROWD;
   const markR = probes.length;
   const baseQueue = probes.length ? probes[probes.length - 1].queue : 0;
   const crowd = await Promise.all(Array.from({ length: BURST }, (_, i) => open(200000 + i)));

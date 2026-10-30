@@ -23,8 +23,12 @@ world puts nothing in it, coin or anything else. A draugr's gold is
 stripped. Nothing lies on the floor at all: no coin, no coin purse,
 no weapon or armour, nothing a person could pick up that the world
 put there. What a person made, traded, or was given by another
-person stays, in a pack or in a container, and what they drop stays
-where they dropped it.
+person stays, in a pack or in a container. What a person drops lies
+where they dropped it for 2 minutes, with everything it carried, and is
+then gone, a server restart in between included. At most 10 of one
+person's drops lie at once, and an 11th takes the oldest away. Patrick decided this on his report page on 27
+October (A, [#3498](https://github.com/EvilPatrick06/Thornswood/issues/3498)).
+To leave something for somebody, put it in a container or a drop box.
 
 A chest in a dungeon, a cave, or a sewer is a different door. Opening
 one creates a small sum, on that place's tier, and the same chest

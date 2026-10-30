@@ -300,6 +300,26 @@ function send(p, text) {
   yes('D3 a write that changes nothing on the page hands the browser nothing', handed === 0);
 }
 
+// ------------------------- F. rent still owed on a place you no longer hold --
+{
+  // #3893: the deed went to somebody else and the debt stayed Alice's.
+  W.arrears()[HOME] = [{ by: ALICE.pid, name: 'Alice', owed: 40, at: clock.t }];
+  write(ALICE, true);
+  const rows = (refs[ALICE.a][C.PROPERTY].panel || {}).property || [];
+  yes('F1 somebody who holds nothing but owes on a place they held gets a row for it (' + JSON.stringify(rows) + ')',
+      rows.length === 1 && rows[0].name === 'Honeyside' && rows[0].mine === false && rows[0].owes === 40 &&
+      rows[0].by === 'Carol' && !rows[0].keyed);
+  const row = alice.navRow('Property');
+  yes('F2 Property is in their K list, saying rent is owed (' + (row ? row.children[1].textContent : '') + ')',
+      !!row && row.children[1].textContent === 'rent owed');
+  if (row) { row.onclick(); }
+  yes('F3 and the page says what they owe, from when, and how it is paid (' + alice.body.textContent.slice(0, 400) + ')',
+      /Honeyside/.test(alice.body.textContent) && /rent owed/.test(alice.body.textContent) &&
+      /Held by Carol now\. You still owe 40 gold of rent on it from when you held it\./.test(alice.body.textContent) &&
+      /drop box pays it, or hand it to the steward of its hold\./.test(alice.body.textContent));
+  delete W.arrears()[HOME];
+}
+
 // --------------------------------------------------------- E. the source --
 {
   const strip = function (t) { return String(t || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' '); };

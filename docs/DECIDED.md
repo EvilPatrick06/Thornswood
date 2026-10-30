@@ -134,6 +134,10 @@ link, and the old line goes.
 - **A pack does not spoil while its owner is offline;** chests and shops
   keep spoiling. 22 Oct 2026,
   [#3163](https://github.com/EvilPatrick06/Thornswood/issues/3163#issuecomment-6335272878).
+- **A drop lies on the ground for 2 minutes, then is gone,** a restart in
+  between included, and it keeps what it carried. So food never spoils on
+  the ground. 27 Oct 2026,
+  [#3498](https://github.com/EvilPatrick06/Thornswood/issues/3498#issuecomment-6431943093).
 - **Hangover: stamina regen down 25% for 10 minutes. Withdrawal after 3 uses
   in a day: stamina and magicka regen down 10% for 30 minutes.** Drunk,
   high, hangover and withdrawal each have visual effects as well (Patrick:
@@ -193,6 +197,10 @@ link, and the old line goes.
   only by the Discord staff roles; when it is full, people wait in line at
   the main menu. 29 Sep 2026,
   [#481](https://github.com/EvilPatrick06/Thornswood/issues/481).
+- **One Discord account holds one seat**, on main and on dev: a second game
+  from an account already in the world is told why and ended. Staff testing
+  two-person scenes on dev use a second Discord account. 20 Oct 2026,
+  [#2887](https://github.com/EvilPatrick06/Thornswood/issues/2887).
 - **Dev is never rolled back;** a fault on dev is fixed forward. Only main is
   rolled back, then fixed. 29 Sep 2026,
   [#1158](https://github.com/EvilPatrick06/Thornswood/issues/1158).
@@ -256,7 +264,7 @@ link, and the old line goes.
   [#2929](https://github.com/EvilPatrick06/Thornswood/issues/2929#issuecomment-6335266070).
 - **The watchdog and maintenance tasks stay SYSTEM, by design;** the
   services that run code we deploy, and the nightly backup, run on accounts
-  of their own (docs/DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
+  of their own (the ops repo's DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6335268289),
   the backup
   [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6342972359).
@@ -383,3 +391,7 @@ removal again:
   [#3158](https://github.com/EvilPatrick06/Thornswood/issues/3158#issuecomment-6333340060).
 - **Apprentices rank faster** beside a higher-rank crafter. 21 Oct 2026,
   [#3171](https://github.com/EvilPatrick06/Thornswood/issues/3171#issuecomment-6333339289).
+- **The collection's edited menu files are made from each person's own copy,
+  never shipped.** SkyUI's and SkyHUD's page terms (patches that need the
+  original file, credit for changes) change nothing. 26 Oct 2026,
+  [#3800](https://github.com/EvilPatrick06/Thornswood/issues/3800#issuecomment-6431656924).
