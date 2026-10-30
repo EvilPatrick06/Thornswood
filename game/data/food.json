@@ -1,6 +1,6 @@
 {
  "builtBy": "scriptsdevBuild-FoodTable.js",
- "builtAt": "2026-10-27T06:52:25.693Z",
+ "builtAt": "2026-10-30T17:07:04.157Z",
  "source": "the ALCH records of the plugins in load order",
  "readFrom": "ENIT for the food and poison flags, FULL for the name",
  "note": "what a kind is WORTH is balance and lives in NEEDS in gamemode.js",

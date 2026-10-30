@@ -167,8 +167,8 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Woodcutter's Axe | A class pick's tool | Smith/Edgewright at SmithingForge | `2f2f4:Skyrim.esm` |
 | Belted Tunic | A new character's clothes | Tailor/Haberdasher at MCE_CraftingLoom | `1be1a:Skyrim.esm` |
 | Boots | A new character's clothes | Tailor/Haberdasher at MCE_CraftingLoom | `1be1b:Skyrim.esm` |
-| Riekling Belted Tunic | A new character's clothes | Tailor/Haberdasher at SmithingForge | `bfd98:Playable Rieklings.esp` |
-| Riekling Footwraps | A new character's clothes | Tailor/Haberdasher at SmithingForge | `bfdb1:Playable Rieklings.esp` |
+| Riekling Belted Tunic | A new character's clothes | Tailor/Haberdasher at MCE_CraftingLoom | `bfd98:Playable Rieklings.esp` |
+| Riekling Footwraps | A new character's clothes | Tailor/Haberdasher at MCE_CraftingLoom | `bfdb1:Playable Rieklings.esp` |
 | Ash Hopper Leg | Asked for by a recipe | Hunter, advanced | `3d125:Dragonborn.esm` |
 | Ash Hopper Meat | Asked for by a recipe | Hunter, advanced | `3bd15:Dragonborn.esm` |
 | Ash Yam | Asked for by a recipe | Farmer, advanced | `206e7:Dragonborn.esm` |
