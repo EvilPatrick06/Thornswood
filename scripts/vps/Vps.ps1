@@ -90,7 +90,7 @@ function Get-ThornswoodVpsUser {
 # PowerShell 5.1 and PowerShell 7. Issue #941: from 28 September the box's
 # OpenSSH (9.5) made the client here print "** WARNING: connection is not
 # using a post-quantum key exchange algorithm" on stderr for every
-# connection. Under Windows PowerShell 5.1 a native program's stderr line
+# connection, until the box moved to OpenSSH 10.4 on 26 Oct 2026 (#1043). Under Windows PowerShell 5.1 a native program's stderr line
 # becomes an error record whenever stderr is redirected (2>&1, 2>$null, or a
 # caller that redirected the whole script), and with $ErrorActionPreference
 # = 'Stop', which every script here sets, the first one stops the script.

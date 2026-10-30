@@ -20,7 +20,10 @@ nightly runs the bot's own tests against the whole module. It proves:
   - a server whose member list is not whole is never marked, only aged;
   - a mark that is not a time is left, with its number;
 and that the deletion request, the hourly watch and arrival_number all use
-the marks. Synthetic ids only. Read only.
+the marks. And (#3620) that age_restore_copies deletes a joins.json a restore
+set aside 30 days after the time in its name, in a scratch folder, and the
+hourly watch runs it. Synthetic ids only; nothing outside the scratch folder
+is written.
 """
 import ast
 import pathlib
@@ -106,6 +109,40 @@ yes('somebody who comes back is unmarked at once', "left = g.get('left')" in arr
 dele = lift('apply_deletion_requests')
 yes('a deletion request takes their mark as well as their number',
     "g.get('left')" in dele and 'del left[i]' in dele and 'if numbers or marks:' in dele)
+
+# The joins.json a restore set aside (#3620, Patrick's B): gone 30 days after
+# the time in its name, by the hourly watch.
+import datetime
+import os
+import re
+import tempfile
+import time
+aside = {'os': os, 're': re, 'datetime': datetime}
+exec(compile(ast.Module(body=[n for n in TREE.body
+                              if isinstance(n, ast.Assign) and any(getattr(t, 'id', '') in ('RESTORE_ASIDE_DAYS', 'RESTORE_ASIDE') for t in n.targets)],
+                        type_ignores=[]), 'bot.py', 'exec'), aside)
+code = lift('age_restore_copies')
+yes('bot.py has age_restore_copies, and keeps the copies 30 days', bool(code) and aside.get('RESTORE_ASIDE_DAYS') == 30)
+exec(code, aside)
+with tempfile.TemporaryDirectory() as d:
+    t = time.time()
+    st = lambda days: datetime.datetime.fromtimestamp(t - days * 86400).strftime('%Y%m%d-%H%M%S')
+    old_name, old2, young = ('joins.json-before-restore-' + st(31), 'joins.json-before-restore-' + st(40) + '-2',
+                             'joins.json-before-restore-' + st(29))
+    others = ['joins.json', 'joins.json-before-restore-notastamp', 'open-tickets.json-before-restore-' + st(400)]
+    for n in [old_name, old2, young] + others:
+        with open(os.path.join(d, n), 'w') as f:
+            f.write('{}')
+    os.mkdir(os.path.join(d, 'joins.json-before-restore-' + st(50)))
+    gone, stuck = aside['age_restore_copies'](d, t)
+    left = set(os.listdir(d))
+    yes('a copy a restore set aside 31 days ago goes, and a second one that second too', sorted(gone) == sorted([old_name, old2]) and not stuck)
+    yes('one set aside 29 days ago stays', young in left)
+    yes('the live joins.json and names the rule does not fit are never touched', all(n in left for n in others))
+    yes('a folder where a copy should be a file is left', ('joins.json-before-restore-' + st(50)) in left)
+    yes('a folder that cannot be listed is said, not raised', aside['age_restore_copies'](os.path.join(d, 'nowhere'), t)[1] != [])
+yes('the hourly watch ages them, in a try of its own, and says each one',
+    'age_restore_copies(DATA_DIR, time.time())' in watch and 'COULD NOT DELETE' in watch)
 
 print('\n%d passed, %d failed' % (len(PASS), len(FAIL)))
 sys.exit(1 if FAIL else 0)
