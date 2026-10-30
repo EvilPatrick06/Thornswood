@@ -11,8 +11,10 @@
 
   THE GATE. Every harness scripts\dev\Gate-Harnesses.ps1 lists, run through
   scripts\dev\Nightly-Harnesses.ps1 -Throttle at once with this build's
-  share of the cores: the machine's cores over the builds the box runs at
-  once, the runners records\build-runners.json lists.
+  share of the cores: the machine's cores over the builds it runs at once.
+  On the box those are the runners records\build-runners.json lists, on One
+  the off-box runners the runner records name for it (#3860), and on
+  GitHub's hosted runner one.
 
   ON MAIN, ON THE VPS. Patrick chose on 22 Oct 2026 (option A on his page,
   q-3114-map-refresh) that every main build's gate is traced, so pull
@@ -112,8 +114,30 @@ function Write-Whole([string]$file, [string]$text) {
 
 $gate = @(& (Join-Path $Here 'Gate-Harnesses.ps1'))
 if ($LASTEXITCODE -ne 0) { exit 1 }
-$builds = @((Get-Content -LiteralPath (Join-Path $Repo 'records\build-runners.json') -Raw | ConvertFrom-Json).runners).Count
+# This build's share of the cores: the machine's cores over the builds this
+# machine runs at once. On the box, the runners records\build-runners.json
+# lists (#2994). On One, the off-box runners the runner records name for this
+# machine: until 27 Oct 2026 One's builds took the box's count too, so each
+# of its five took six of its 22 cores, thirty at once; run 40455516666 on
+# thornswood-pr-one-5 had the cores 91% busy throughout and seven harnesses
+# killed at their 300 s clock (#3860). On GitHub's hosted runner, one.
+function Get-MachineBuilds {
+    if ($env:RUNNER_ENVIRONMENT -eq 'github-hosted') { return 1 }
+    $records = Join-Path $Repo 'records'
+    if ([string]$env:RUNNER_NAME -like 'thornswood-pr-*') {
+        $machine = $(if ($env:COMPUTERNAME) { [string]$env:COMPUTERNAME } else { [Environment]::MachineName })
+        $mine = '^' + [regex]::Escape('thornswood-pr-' + $machine.ToLower()) + '(-\d+)?$'
+        $named = @(Get-ChildItem -LiteralPath $records -Filter '*-runners.json' | ForEach-Object {
+            $rec = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json
+            if ($rec.PSObject.Properties['offBox']) { @($rec.offBox) }
+        } | ForEach-Object { [string]$_ } | Where-Object { $_ -match $mine } | Sort-Object -Unique)
+        return [Math]::Max(1, $named.Count)
+    }
+    return @((Get-Content -LiteralPath (Join-Path $records 'build-runners.json') -Raw | ConvertFrom-Json).runners).Count
+}
+$builds = Get-MachineBuilds
 $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
+Say ('{0} build(s) at once on this machine, so {1} of its {2} cores are this one''s.' -f $builds, $share, [Environment]::ProcessorCount)
 
 # The runner's own folder: RUNNER_TEMP is <runner>\_work\_temp there.
 $root = ''

@@ -36,6 +36,12 @@ permissions:
 jobs:
   expire:
     name: Take off claims with nothing for three days
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so a job on that label never runs a
+    # branch's code. A dispatch on a branch skips it. scripts\vps\
+    # Check-RunnerIsolation.ps1 holds every job to that, on the gate through
+    # tests\test-runner-isolation.ps1.
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, thornswood-vps]
     # A page of issues and a timeline each for the claimed ones. Past this it
     # is stuck, not slow.

@@ -120,13 +120,16 @@ async function keptChatOnASite() {
   srv.stderr.on('data', (b) => { out += b; });
   try {
     let up = false;
-    for (let i = 0; i < 100 && !up; i++) {
-      if (out.indexOf('listening on ') >= 0) { up = true; break; }
+    /* Up once the site says ready or NOT READY: it says that right after its
+       first retention sweep, in the same callback, so the sweep's files are
+       all written by then however busy the machine is (#4082). The minute
+       only bounds a site that never comes up. */
+    for (let i = 0; i < 1200 && !up; i++) {
+      if (/\[thornswood-docs\] (ready|NOT READY): /.test(out)) { up = true; break; }
       if (srv.exitCode !== null) break;
       await wait(50);
     }
     if (!up) throw new Error('the scratch site never came up:\n' + out);
-    await wait(300);
     const set = (k) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'data', 'session-logs', k + '.json'), 'utf8')); } catch (e) { return null; } };
     const a = set('keptchat00000001');
     yes('a session kept before this existed has its chat copied by the sweep at start', a && a.chat && Array.isArray(a.chat.lines) && a.chat.lines.length === 1, JSON.stringify(a));
