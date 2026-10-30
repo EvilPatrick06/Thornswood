@@ -30,8 +30,9 @@
 //   E. THE SERVER. The list named to everybody is exactly the commands that
 //      stay; /help and a word nobody has say where the panel is; /where
 //      answers dev and testers only.
-//   F. THE PAGES THAT SAY SO: the launcher's Help, the Settings row for /,
-//      and docs/systems/commands.md row by row.
+//   F. THE PAGES THAT SAY SO: the site's help (the launcher's Help page
+//      until #3146 cut it), the Settings row for /, and
+//      docs/systems/commands.md row by row.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -54,7 +55,7 @@ function settingsRow(name) {
   const m = new RegExp("\\{ ini: '" + name + "', def: (\\d+), group: " + q + ', label: ' + q + ',\\s*what: ' + q + ' \\}').exec(settingsPage);
   return m ? { def: Number(m[1]), group: m[2], label: m[3], what: m[4].replace(/\\'/g, "'") } : null;
 }
-const helpCs = read('launcher', 'app', 'Help.cs');
+const helpMd = read('site', 'data', 'help.md');
 const commandsMd = read('docs', 'systems', 'commands.md');
 
 let pass = 0, fail = 0;
@@ -502,20 +503,22 @@ attempt('E', function () {
 
 // ======================================================= F. the pages that say so
 attempt('F', function () {
-  const lit = '"((?:[^"\\\\]|\\\\.)*)"';
-  const re = new RegExp('new HelpItem\\(\\s*' + lit + '\\s*,\\s*' + lit + '\\s*,\\s*' + lit + '\\s*\\)', 'g');
-  const items = [];
-  let m;
-  while ((m = re.exec(helpCs)) !== null) { items.push({ section: m[1], title: m[2], body: m[3] }); }
-  const chat = items.filter(function (i) { return i.section === 'Chat and commands'; })
-    .map(function (i) { return i.title + '. ' + i.body; }).join(' ');
-  const named = (chat.match(/(^|[\s(,;])\/[a-z]+\b/g) || []).map(function (w) { return w.replace(/^[\s(,;]/, ''); })
+  // The site's Keys, Talking and Getting staff in game, as a person reads
+  // them: a link's address is not words anybody is told to type.
+  function mdSection(title) {
+    const a = helpMd.indexOf('\n## ' + title + '\n');
+    if (a < 0) { return ''; }
+    const b = helpMd.indexOf('\n## ', a + 5);
+    return helpMd.slice(a, b < 0 ? undefined : b);
+  }
+  const chat = ['Keys', 'Talking', 'Getting staff in game'].map(mdSection).join('\n').replace(/\]\([^)]*\)/g, ']');
+  const named = (chat.match(/(^|[\s(,;*`])\/[a-z]+\b/g) || []).map(function (w) { return w.replace(/^[\s(,;*`]/, ''); })
     .filter(function (w, i, all) { return all.indexOf(w) === i; });
   const other = named.filter(function (w) { return STAY.indexOf(w) === -1; });
-  yes('F1 the Help page\'s Chat and commands names no command but the ones that stay' +
+  yes('F1 the site help\'s keys, talking and staff sections name no command but the ones that stay' +
       (other.length ? ' (not: ' + other.join(', ') + ')' : ''), named.length >= 5 && other.length === 0);
-  yes('F1 and sends people to the help panel on F7, not to /help',
-      /F7, unless you have moved it on Settings in the game, opens the help in the game/.test(chat) && !/\/help\b(?!me)/.test(chat));
+  yes('F1 and send people to the help panel on F7, not to /help',
+      /\*\*F7\*\* opens the help in the game/.test(chat) && !/\/help\b(?!me)/.test(chat));
   const slash = settingsRow('CommandKey');
   yes('F2 the Settings row for / says what is still typed there, and that the rest is staff\'s and dev\'s',
       !!slash && /staff and dev commands/.test(slash.what) && /\/stuck, \/helpme and \/report/.test(slash.what));
