@@ -28,7 +28,9 @@
        is refused naming them when its time is up; it gets the turn the
        moment the first ends its run, and at once after one that was killed;
        and a turn file that cannot be opened for another reason is thrown at
-       once, not waited on.
+       once, not waited on. The run after starts 4 s late and the turn is
+       given back only once it says it waits, so a slow start (a runner's
+       first build, #4342) does not decide the result.
 
   Read only apart from files under its own temp folder, and the PowerShell
   processes it starts and ends there.
@@ -170,11 +172,15 @@ $held = $null
 # went in a file, holds the turn $Hold seconds and ends.
 $childPath = Join-Path $work 'child.ps1'
 [IO.File]::WriteAllText($childPath, @'
-param([string]$Lib, [string]$Folder, [string]$Who, [int]$Wait, [int]$Hold, [string]$Said)
+param([string]$Lib, [string]$Folder, [string]$Who, [int]$Wait, [int]$Hold, [string]$Said, [int]$Late = 0)
+# -Late stands in for a slow start, as on a runner's first build (#4342).
+Start-Sleep -Seconds $Late
 . $Lib
 $heard = New-Object System.Collections.ArrayList
 try {
-  $t = Enter-ThornswoodServerFolderTurn $Folder $Who $Wait { param($m) [void]$heard.Add($m) }
+  # The first time it is told it waits, it says so in a file of its own, so
+  # the test gives the turn back only once it is waiting, not after a guess.
+  $t = Enter-ThornswoodServerFolderTurn $Folder $Who $Wait { param($m) if (-not $heard.Count) { [IO.File]::WriteAllText($Said + '.waiting', $m) }; [void]$heard.Add($m) }
   [IO.File]::WriteAllText($Said, ('TAKEN' + "`n" + ($heard -join "`n")))
   Start-Sleep -Seconds $Hold
   $t.Dispose()
@@ -182,14 +188,14 @@ try {
   [IO.File]::WriteAllText($Said, ('REFUSED ' + $_.Exception.Message + "`n" + ($heard -join "`n")))
 }
 '@)
-function Child([string]$who, [int]$wait, [int]$hold, [string]$said) {
+function Child([string]$who, [int]$wait, [int]$hold, [string]$said, [int]$late = 0) {
     # -WindowStyle is Windows only.
     $hide = @{}
     if ($OnWindows) { $hide = @{ WindowStyle = 'Hidden' } }
     $c = Start-Process -FilePath $shell -PassThru @hide -ArgumentList @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $childPath + '"'),
         '-Lib', ('"' + $libPath + '"'), '-Folder', ('"' + $folder + '"'), '-Who', ('"' + $who + '"'),
-        '-Wait', $wait, '-Hold', $hold, '-Said', ('"' + $said + '"'))
+        '-Wait', $wait, '-Hold', $hold, '-Said', ('"' + $said + '"'), '-Late', $late)
     $script:started += $c
     return $c
 }
@@ -224,8 +230,10 @@ try {
     $null = $c.WaitForExit(30000)
 
     $said = Join-Path $work 'after-release.txt'
-    $c = Child 'the run after' 60 0 $said
-    [Threading.Thread]::Sleep(3000)
+    $c = Child 'the run after' 60 0 $said 4
+    # Give it back once the run after says it is waiting, however slowly it
+    # started (#4342: a runner's first build took longer than a fixed 3 s).
+    $waiting = WaitFor ($said + '.waiting') 60
     $early = Test-Path -LiteralPath $said
     $held.Dispose()
     $held = $null
@@ -234,7 +242,7 @@ try {
     $took = ((Get-Date) - $w).TotalSeconds
     $lines = @($got -split "`n")
     Yes ('a run that waits gets the turn once the one before gives it back, ' + [Math]::Round($took, 1) + ' s after') (
-        -not $early -and $lines[0] -eq 'TAKEN' -and $took -lt 10)
+        $waiting -and -not $early -and $lines[0] -eq 'TAKEN' -and $took -lt 10)
     Yes '  having said once that it was waiting' ($lines.Count -eq 2 -and $lines[1] -match '^waiting for the server folders, which the test that holds it')
     $null = $c.WaitForExit(30000)
 
