@@ -17,7 +17,7 @@ const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join('')
 const FRONT = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'));
 const GM = read(path.join(REPO_DIR, 'game', 'gamemode.js'));
 const INI = read(path.join(REPO_DIR, 'launcher', 'Thornswood.ini'));
-const KEYS = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
+const SETTINGS = read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-settings.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -26,7 +26,7 @@ function yes(what, cond) {
 }
 
 yes('Thornswood.ini has LockKey = 45', /^\s*LockKey\s*=\s*45\s*$/m.test(INI));
-yes('Keys.cs has a Controls row for LockKey at 45', /ThornIni, "LockKey", 45\)/.test(KEYS));
+yes('Settings in the game has a row for LockKey at 45', /\{ ini: 'LockKey', def: 45,/.test(SETTINGS));
 yes('front reads LockKey with default 45', /iniNumber\(ini, 'LockKey', 45\)/.test(FRONT));
 yes('front has lockPress', /function lockPress\(\)/.test(FRONT));
 yes('lockPress tells the server the line\'s word and the id under the crosshair',

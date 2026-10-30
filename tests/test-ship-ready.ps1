@@ -53,8 +53,9 @@
        when the Ship keeps the feed's and the feed names a whole launcher
        for it to download, check and put there; warning when it names none.
        And the script's text: no "Install Thornswood from thornswood.net",
-       no "press Play", and the game folder's fix is Update-ShipRoot then
-       Build-Generated.
+       no "press Play", and the game folder's fix is Update-ShipRoot alone:
+       the animation and body files are built on each computer by the
+       launcher since #3715, so nothing builds them in a ship root.
 
   Writes only to a temp folder of its own, and removes it.
 #>
@@ -380,8 +381,8 @@ try {
     Yes '8. no fix says to install Thornswood from thornswood.net' ($text -notmatch 'Install Thornswood from thornswood\.net')
     Yes '8. no fix says to open the launcher and press Play' ($text -notmatch 'press Play')
     Yes '8. the old row is gone' ($text -notmatch "Ready 'a launcher is installed'")
-    Yes '8. the game folder''s fix is Update-ShipRoot, with -SkyrimFrom named, then Build-Generated' (
-        $text -match "(?s)Ready 'it has its own game folder'.{0,400}Update-ShipRoot\.ps1 -Channel.{0,300}-SkyrimFrom.{0,200}Build-Generated\.ps1 -Channel")
+    Yes '8. the game folder''s fix is Update-ShipRoot, with -SkyrimFrom named, and no Build-Generated (#3715)' (
+        $text -match "(?s)Ready 'it has its own game folder'.{0,400}Update-ShipRoot\.ps1 -Channel.{0,300}-SkyrimFrom" -and $text -notmatch 'Build-Generated' -and $text -notmatch 'Get-GeneratedRows')
     Yes '8. the launcher row is asked of the folder Ship would build from' ($text -match 'foreach \(\$r in @\(Get-LauncherRows \$Channel \$Root \$rootNamed\)\) \{ Show-Row \$r \}')
     Yes '8. the -Package launcher row is asked on main only, beside the other -Package row' (
         $text -match '(?s)if \(-not \$Dev\) \{\s*Head [^\n]*\n\s*foreach \(\$r in @\(Get-MainOnlyRows.{0,1200}Get-PackageLauncherRows')

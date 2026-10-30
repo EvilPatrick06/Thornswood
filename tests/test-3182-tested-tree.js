@@ -165,8 +165,8 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   const job = /\njobs:\n(?:  #.*\n)*  tested:\n([\s\S]*?)\n\n/.exec(build);
   const tj = job ? job[1] : '';
   yes('build.yml\'s first job is "tested"', !!job);
-  yes('  on a push only, so a manual run always builds, and not while BUILD_RUNNER sends builds to the box',
-      /\n    if: \$\{\{ github\.event_name == 'push' && vars\.BUILD_RUNNER != 'vps' \}\}\n/.test(tj));
+  yes('  on a push only, so a manual run always builds, and not while BUILD_RUNNER sends builds to the box of a private repository (#3685)',
+      /\n    if: \$\{\{ github\.event_name == 'push' && \(!github\.event\.repository\.private \|\| vars\.BUILD_RUNNER != 'vps'\) \}\}\n/.test(tj));
   // #3551: both build jobs wait for this answer. On a VPS runner alone, the
   // hosted build waited for a free box runner, or for ever with the box down.
   const runsOn = (/\n    runs-on: ([^\n]*)\n/.exec(tj) || ['', ''])[1];
@@ -176,8 +176,8 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   yes('its VPS fallback, tested-vps, comes right after it', !!fb && build.indexOf('\n  tested-vps:\n') > build.indexOf('\n  tested:\n') &&
       build.slice(build.indexOf('\n  tested:\n') + 1, build.indexOf('\n  tested-vps:\n')).split(/\n  [A-Za-z0-9_-]+:\n/).length === 1);
   yes('  on any VPS runner, not a build one', /\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.test(fj));
-  yes('  only on a push, and only when the hosted job did not succeed',
-      /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && github\.event_name == 'push' && needs\.tested\.result != 'success' \}\}\n/.test(fj));
+  yes('  only while the repository is private (#3685), on a push, and only when the hosted job did not succeed',
+      /\n    needs: tested\n    if: \$\{\{ !cancelled\(\) && github\.event\.repository\.private && github\.event_name == 'push' && needs\.tested\.result != 'success' \}\}\n/.test(fj));
   yes('  with the hosted job\'s own steps, permissions and output', /\n    steps: &look\n/.test(tj) && /\n    steps: \*look$/.test(fj) &&
       /\n    permissions:\n      actions: read\n      contents: read\n      pull-requests: read\n    outputs:\n      run: \$\{\{ steps\.look\.outputs\.run \}\}\n/.test(fj));
   yes('  and no secrets', !/secrets\./.test(fj));
@@ -187,7 +187,7 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
       /node scripts\/dev\/Tested-Tree\.js --tree \$tree --commit \$env:GITHUB_SHA --repo \$env:GITHUB_REPOSITORY\n/.test(tj) && /git rev-parse 'HEAD\^\{tree\}'/.test(tj));
   yes('the hosted job waits for both answers and builds only when neither found anything',
       /\n  launcher:\n    name: Launcher builds\n    needs: \[tested, tested-vps\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && /.test(build));
-  yes('so does the fallback', /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, tested-vps, launcher\]\n    if: \$\{\{ !cancelled\(\) && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && /.test(build));
+  yes('so does the fallback', /\n  launcher-vps:\n    name: [^\n]*\n    needs: \[tested, tested-vps, launcher\]\n    if: \$\{\{ !cancelled\(\) && github\.event\.repository\.private && needs\.tested\.outputs\.run == '' && needs\.tested-vps\.outputs\.run == '' && /.test(build));
   const checks = (/steps: &checks\n([\s\S]*?)\n\n  # The default:/.exec(build) || ['', ''])[1];
   const steps = checks.split(/\n(?=      - )/).filter(s => /^      - /.test(s));
   const note = steps[steps.length - 1] || '';

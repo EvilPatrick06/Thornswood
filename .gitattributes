@@ -16,6 +16,9 @@ tests/fixtures/merchant-retrieval-records.json text eol=lf
 docs/HUNTING-SPOTS.csv text eol=lf
 docs/NPC-SPAWNS.csv text eol=lf
 docs/NPC-POPULATION.md text eol=lf
+# Except the recipe for Thornswood-Last.esp (#2791), which is bytes and not
+# text: a line end turned inside it would make a recipe that builds nothing.
+game/data/last-plugin.recipe -text !eol
 
 # The licence texts of the vcpkg libraries in the client files (#3099), byte
 # for byte as vcpkg installed them: records\client-licences.json holds each

@@ -201,7 +201,10 @@ WHAT IT READS
 
 WHAT IT WRITES
 
-  game/content/Thornswood-Last.esp, and game/data/last-plugin.json, the
+  game/content/Thornswood-Last.esp; game/data/last-plugin.recipe, the
+  recipe each machine builds the plugin from out of its own plugins
+  (scripts/mods/last_recipe.py says what it holds and why, #2791), held to
+  make these exact bytes back on every build; and game/data/last-plugin.json, the
   manifest: the plugin's sha256, the load order it was built against, every
   cut actor it switches off and every one it leaves and why, every quest it
   stops and every quest it keeps, and every place it gives a hold, with the
@@ -261,6 +264,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'scripts', 'dev'))
 import bsa  # noqa: E402  (the repository's archive reader)
+sys.path.insert(0, HERE)
+import last_recipe  # noqa: E402  (the recipe each machine builds this plugin from, #2791)
 import own_plugins  # noqa: E402  (where each plugin of the load order is read from, #2923)
 
 PLUGIN = 'Thornswood-Last.esp'
@@ -273,6 +278,7 @@ MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
 RECOST = os.path.join(ROOT, 'game', 'data', 'recost.json')
 RECIPES = os.path.join(ROOT, 'game', 'data', 'recipes.json')
 OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
+RECIPE = os.path.join(ROOT, 'game', 'data', 'last-plugin.recipe')
 GAMEMODE = os.path.join(ROOT, 'game', 'gamemode.js')
 HELD_BLOCK = ('// ==== HELD_BY_SERVER, generated ====', '// ==== end HELD_BY_SERVER ====')
 MOVED_BLOCK = ('// ==== RECIPES_MOVED_IN_GAME, generated ====', '// ==== end RECIPES_MOVED_IN_GAME ====')
@@ -424,6 +430,10 @@ class Plugin(object):
         return out
 
 
+# (plugin, kind): (the table's file name, its bytes), of every table read.
+RAW_TABLES = {}
+
+
 def string_table(data_dir, plugin, kind):
     """{string id: raw bytes} for one plugin's .STRINGS, .DLSTRINGS or
     .ILSTRINGS, loose files first and then the archives, the order the game
@@ -447,6 +457,8 @@ def string_table(data_dir, plugin, kind):
                 break
     if data is None:
         raise SystemExit('STOP. no %s for %s in %s. Nothing was written.' % (kind, plugin, data_dir))
+    # The table's own bytes, for the recipe to name by its sha256 (#2791).
+    RAW_TABLES[(plugin, kind)] = (name, data)
     count = struct.unpack_from('<I', data, 0)[0]
     base = 8 + count * 8
     out = {}
@@ -1569,6 +1581,7 @@ def build(data_dir):
     made = copies()
     masters = [canon[m] for m in rn.masters]
     plugin = write_plugin(made, masters, plugins, rn)
+    recipe, recipe_stats = make_recipe(plugin, made, plugins)
     manifest = {
         'version': 1,
         'builtBy': 'scripts/mods/Build-LastPlugin.py',
@@ -1634,6 +1647,16 @@ def build(data_dir):
         },
     }
     manifest['counts']['floorItemsOff'] = len(floor)
+    # The recipe each machine builds the plugin from (#2791): its bytes, how
+    # many plugins and string tables it reads, and how much of the plugin
+    # it writes as Thornswood's own (headers, renumbered form ids, the
+    # build's own values) rather than copying from those.
+    manifest['recipe'] = {'name': os.path.basename(RECIPE), 'size': len(recipe),
+                          'sha256': hashlib.sha256(recipe).hexdigest(),
+                          'sources': recipe_stats['sources'], 'records': recipe_stats['records'],
+                          'ownBytes': recipe_stats['litBytes'],
+                          'ownBytesInRecords': recipe_stats['litInRecords'],
+                          'addedSubrecords': dict(sorted(recipe_stats['addedSubrecords'].items()))}
     # The cells and worlds a never-copied plugin wins, copied from the plugin
     # below it, whose record that plugin does not change (step 6), and the
     # records the policy carries from it.
@@ -1643,7 +1666,34 @@ def build(data_dir):
                                                             plugins[e.pi].name) for k, g, e, p in swapped),
         'carried': sorted(carried[k] for k in used),
     }
-    return plugin, manifest
+    return plugin, manifest, recipe
+
+
+def make_recipe(plugin, made, plugins):
+    """The recipe for the plugin (scripts/mods/last_recipe.py, #2791), held
+    to make these exact bytes back from the plugins and tables it read."""
+    index = {}
+    for tag, rows in ((b'ACHR', made['achr']), (None, made['refr']), (b'CELL', made['cell'].values()),
+                      (b'WRLD', made['wrld'].values()), (b'QUST', made['qust']), (b'LCTN', made['lctn']),
+                      (b'COBJ', made['cobj'])):
+        for fid, flags, data, e in rows:
+            key = (tag or e.tag, fid)
+            if key in index:
+                raise SystemExit('STOP. the build made %s 0x%08X twice. Nothing was written.' % (key[0].decode(), fid))
+            index[key] = (data, e)
+    tables = {}
+    for (name, kind), (fname, data) in RAW_TABLES.items():
+        tables[(name, kind)] = (fname, data)
+    try:
+        recipe, stats = last_recipe.make(plugin, index, plugins, tables, PLUGIN)
+        by_name = {p.name.lower(): p.buf for p in plugins}
+        by_table = {fname.lower(): data for fname, data in tables.values()}
+        again = last_recipe.apply(recipe, lambda n: by_name.get(n.lower()), lambda n: by_table.get(n.lower()))
+    except last_recipe.RecipeError as x:
+        raise SystemExit('STOP. the recipe for %s: %s. Nothing was written.' % (PLUGIN, x))
+    if again != plugin:
+        raise SystemExit('STOP. the recipe does not make %s back byte for byte. Nothing was written.' % PLUGIN)
+    return recipe, stats
 
 
 def move_entries(table, plugins, win, canon, blocked, carries):
@@ -2106,7 +2156,7 @@ def main():
 
     committed = {m.lower() for m in json.load(open(MANIFEST, encoding='utf-8'))['masters']} \
         if os.path.isfile(MANIFEST) else set()
-    plugin, manifest = build(args.data)
+    plugin, manifest, recipe = build(args.data)
     c = manifest['counts']
     print('Built %s: %s bytes, %d masters' % (PLUGIN, format(len(plugin), ','), len(manifest['masters'])))
     print('  %d cut actors off, in %d cells and %d worldspaces' % (c['actorsOff'], c['cells'], c['worlds']))
@@ -2145,8 +2195,13 @@ def main():
         return 1
     print('  ok    read back in the load order: every cut actor off, every cut quest unable to start, '
           'every place in the hold the policy gives it, no floor item able to show')
+    r = manifest['recipe']
+    print('  ok    the recipe makes it back byte for byte from %d plugins and string tables: %s bytes, '
+          '%s of them Thornswood\'s own (%s inside records)'
+          % (r['sources'], format(r['size'], ','), format(r['ownBytes'], ','), format(r['ownBytesInRecords'], ',')))
     if args.check:
         a = same_or_say(OUT, plugin, 'game/content/' + PLUGIN)
+        a = same_or_say(RECIPE, recipe, 'game/data/' + os.path.basename(RECIPE)) and a
         # The manifest is compared as what it says, not as bytes.
         have = json.load(open(MANIFEST, encoding='utf-8')) if os.path.isfile(MANIFEST) else None
         b = have == json.loads(manifest_bytes(manifest).decode('utf-8'))
@@ -2163,13 +2218,15 @@ def main():
     gm = moved_block(manifest, held_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read()))
     with open(OUT, 'wb') as f:
         f.write(plugin)
+    with open(RECIPE, 'wb') as f:
+        f.write(recipe)
     with open(MANIFEST, 'wb') as f:
         f.write(manifest_bytes(manifest))
     with io.open(GAMEMODE, 'w', encoding='utf-8', newline='') as f:
         f.write(gm)
-    print('Wrote game/content/%s, game/data/last-plugin.json, the HELD_BY_SERVER block (%d) and the '
+    print('Wrote game/content/%s, game/data/%s, game/data/last-plugin.json, the HELD_BY_SERVER block (%d) and the '
           'RECIPES_MOVED_IN_GAME block (%d)'
-          % (PLUGIN, len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']),
+          % (PLUGIN, os.path.basename(RECIPE), len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']),
              len(manifest['benchMovesInGame'])))
     return 0
 

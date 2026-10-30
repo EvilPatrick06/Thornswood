@@ -40,7 +40,8 @@ $text = [IO.File]::ReadAllText($path)
 $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
 # The bot harnesses run in the nightly checks since 25 September.
 $night = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\nightly.yml'))
-$nightRunsOn = [regex]::Match($night, 'runs-on:\s*(\[[^\]]+\])').Groups[1].Value
+# A list, or the list a job picks while the repository is private (#3685).
+$nightRunsOn = [regex]::Match($night, 'runs-on:\s*(?:\$\{\{[^\n]*?fromJSON\(.)?(\[[^\]]+\])').Groups[1].Value
 
 $t = $null; $e = $null
 [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$t, [ref]$e)

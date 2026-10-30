@@ -83,6 +83,10 @@ Yes 'a switch and a quoted text value become their words, in order' ((Words 'Dep
 Yes 'a verb''s fixed words come first' ((Words 'Install-Bot -PutBack') -eq '-CodeOnly|-NoPause|-PutBack')
 Yes 'Get-Logs takes -Dev and -Lines, and names its out parameter' ((Words 'Get-Logs -Dev -Lines 2000') -eq '-NoPause|-Dev|-Lines|2000' -and (Test-ThornswoodGateRequest -Line 'Get-Logs' -Verbs $verbs).Out -eq '-Out')
 Yes 'an enum value outside its list is refused' ((Words 'Deploy-DevGamemode -Npcs maybe') -eq 'REFUSED')
+# The weekly review's launcher start read (#3534): a number of days and
+# nothing else, never the folder it reads.
+Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-LauncherStarts -Days 7') -eq '-Days|7' -and (Words 'Read-LauncherStarts') -eq '' -and
+    (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
 $refused = @(
     @('', 'an empty line'),
     @('Remove-Item C:\', 'a verb that is not on the list'),
@@ -196,7 +200,7 @@ Yes 'what runs is the tip of main: fetched into origin/main and checked out from
     $brokerCode.Contains("'+refs/heads/main:refs/remotes/origin/main'") -and $brokerCode.Contains("'--detach', 'refs/remotes/origin/main'") -and $brokerCode.Contains("'clean', '-ffdxq'"))
 Yes 'the script is the verb''s from verbs.json, under the checkout' ($brokerCode.Contains('Join-Path $Repo ($req.Script.Replace(''/'', ''\'')'))
 Yes 'the program starts with no shell, and nothing on its input' ($brokerCode.Contains('$si.UseShellExecute = $false') -and $brokerCode.Contains('$p.StandardInput.Close()') -and $brokerCode -notmatch 'Invoke-Expression|\biex\b|cmd(\.exe)? /c')
-Yes 'a run past its time is ended with everything it started' ($brokerCode.Contains('taskkill.exe" /T /F /PID'))
+Yes 'a run past its time is ended with everything it started' ($brokerCode.Contains('taskkill.exe" @(''/T'', ''/F'', ''/PID'''))
 Yes 'git reads with the deploy key and pinned host keys only' ($brokerCode.Contains('-F none -i') -and $brokerCode.Contains('StrictHostKeyChecking=yes') -and $brokerCode.Contains('github_known_hosts'))
 Yes 'every request is logged, refusals too' ($brokerCode.Contains("Log ('REFUSED [") -and $brokerCode.Contains("Log ('START ") -and $brokerCode.Contains("Log ('END "))
 
@@ -214,6 +218,38 @@ Yes 'the GitHub key goes on read only' ($inst.Contains('read_only = $true') -and
 Yes 'the gate''s admin key is taken only from 127.0.0.1' ($inst.Contains('`$want = ''from="127.0.0.1" '' + `$bare + '' thornswood-gate'''))
 Yes 'the box''s host keys are held to vps.json''s pins' ($inst.Contains('Get-ThornswoodVpsHostKeys') -and $inst.Contains('`$pins -contains `$fp'))
 Yes 'the task runs the installed broker, not anything in the checkout' ($inst.Contains('(Join-Path `$root ''GateBroker.ps1'')'))
+
+# The box's host keys are fingerprinted in the script, never by ssh-keygen -l:
+# on 29 Oct the box's OpenSSH refused its old DSA key file, and what it wrote
+# to stderr stopped the install under 'Stop' in Windows PowerShell 5.1. The
+# block runs here against a folder holding GitHub's published ed25519 host key
+# (SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU), a DSA key and a file
+# that is not a key.
+Yes 'no ssh-keygen -l on the box' ($inst -notmatch 'keygen\s+-l')
+Yes 'ssh-keygen''s stderr cannot stop the key making before the second way is tried' ([regex]::Match($inst, '(?s)function New-GateKey.*?\n\}').Value -match "ErrorActionPreference = 'Continue'")
+$hostBlock = [regex]::Match($inst, "(?s)# ---- the box's own host keys.*?(?=\nif \(-not ``\`$lines\.Count\))").Value
+Yes 'the host key block is found' ($hostBlock.Length -gt 0)
+$keysDir = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-keys-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path (Join-Path $keysDir 'ssh') -Force | Out-Null
+try {
+    [IO.File]::WriteAllText((Join-Path $keysDir 'ssh/ssh_host_ed25519_key.pub'), "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl root@box`n")
+    [IO.File]::WriteAllText((Join-Path $keysDir 'ssh/ssh_host_dsa_key.pub'), "ssh-dss AAAAB3NzaC1kc3MAAACBAP1/U4EddRIpUt9KnC7s5Of2EbdSPO9EAMMeP4C2USZpRV1AIlH7WT2NWPq/xfW6MPbLm1Vs14E7gB00b/JmYLdrmVClpJ+f6AR7ECLCT7up1/63xhv4O1fnxqimFQ8E+4P208UewwI1VBNaFpEy9nXzrith1yrv8iIDGZ3RSAHHAAAAFQCXYFCPFSMLzLKSuYKi64QL8Fgc9QAAAIEA9+GghdabPd7LvKtcNrhXuXmUr7v6OuqC+VdMCz0HgmdRWVeOutRZT+ZxBxCBgLRJFnEj6EwoFhO3zwkyjMim4TwWeotUfI0o4KOuHiuzpnWRbqN/C/ohNWLx+2J6ASQ7zKTxvqhRkImog9/hWuWfBpKLZl6Ae1UlZAFMO/7PSSo= root@box`n")
+    [IO.File]::WriteAllText((Join-Path $keysDir 'ssh/ssh_host_bad_key.pub'), "not a key`n")
+    $run = $hostBlock.Replace('`$', '$').Replace('@($pinned)', "@('SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU')").Replace('$Address', '192.0.2.1') + "`n" + '$lines'
+    $oldPd = $env:ProgramData; $env:ProgramData = $keysDir
+    $ErrorActionPreference = 'Stop'
+    $got = @(& ([scriptblock]::Create($run)))
+    $env:ProgramData = $oldPd
+    Yes "the pinned ed25519 key is found by its fingerprint, past a DSA key and a file that is not a key (got $($got.Count))" ($got.Count -eq 1 -and $got[0] -eq '192.0.2.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl')
+}
+catch { $env:ProgramData = $oldPd; Yes ('the host key block runs: ' + $_.Exception.Message) $false }
+finally { Remove-Item -LiteralPath $keysDir -Recurse -Force -ErrorAction SilentlyContinue }
+
+# The broker runs under Windows PowerShell 5.1 too: every short program whose
+# stderr it reads goes through Invoke-Short, which holds 'Continue' for itself.
+$bk = Text 'scripts/vps/gate/GateBroker.ps1'
+$shortFn = [regex]::Match($bk, '(?s)function Invoke-Short.*?\n\}').Value
+Yes 'the broker''s short programs run with stderr unable to stop it' ($shortFn -match "ErrorActionPreference = 'Continue'" -and @([regex]::Matches($bk, '2>&1')).Count -eq 1 -and $bk -notmatch '2>\$null')
 
 # ---- 7. Grant-BoxAccess -Deploy ------------------------------------------------
 Invoke-Expression (Import-Functions 'scripts/vps/Grant-BoxAccess.ps1' @('Get-BoxKeyLine', 'Read-BoxKeyLine'))
