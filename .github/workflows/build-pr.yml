@@ -50,10 +50,12 @@ jobs:
     # the harness step alone and the limit below cancelled passing builds.
     # Main's build stays on the box: only the box's runners have the trace
     # task, and a main build is what leaves the gate map the next pull
-    # requests measure from (#3114, #3874). Build-PrWorkflow.js drops
-    # thornswood-vps for build-pr.yml only, so a pull request's fallback can
-    # also land on One's off-box build runners (#3860).
-    runs-on: [self-hosted, Windows, thornswood-build]
+    # requests measure from (#3114, #3874). Build-PrWorkflow.js gives
+    # build-pr.yml's fallback the pull request build label alone instead
+    # (records/pr-build-runners.json): box runner 2 and One's off-box runners
+    # carry it and runner 1 does not, so main's build never waits behind pull
+    # requests for runner 1 (#3860; #4010, Patrick's A, 27 Oct 2026).
+    runs-on: [self-hosted, Windows, thornswood-pr-build]
     # actions: read for the gate step off the box, which reads the map main's
     # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
     permissions:
