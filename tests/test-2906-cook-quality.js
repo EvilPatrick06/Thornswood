@@ -69,10 +69,11 @@ for (const k in recipes) {
   const r = recipes[k];
   if (r.owner !== 'Cook' || (r.benchName !== 'CraftingCookpot' && r.benchName !== 'BYOHCraftingOven')) { continue; }
   const g = GROUPS.items[r.out];
-  if (g === 'cooked' || g === 'soup') { dishes[r.out] = r.name; }
+  // A festival feast (#3152) is a dish as well.
+  if (g === 'cooked' || g === 'soup' || g === 'feast') { dishes[r.out] = r.name; }
 }
 yes('1 every dish the Cook makes at the pot and the oven has a fine record (' + Object.keys(dishes).length + ')',
-  Object.keys(dishes).length === 63 && Object.keys(dishes).every(function (d) { return !!FINE[d]; }));
+  Object.keys(dishes).length === 67 && Object.keys(dishes).every(function (d) { return !!FINE[d]; }));
 yes('1 and nothing else has one', Object.keys(FINE).every(function (d) { return !!dishes[d]; }));
 const fineIds = Object.values(FINE);
 yes('1 each fine record is the content plugin\'s own, one record each',
@@ -172,7 +173,7 @@ if (N && typeof N.cookedAs === 'function') {
   yes('2 the needs block answers cookedAs', false);
 }
 yes('2 a guard from a fine dish is told its 30 minutes (the injury block\'s guarded takes them)',
-  /H\.guarded\(actorId, false, lasts\)/.test(gm) &&
+  /H\.guarded\(actorId, !!feast, lasts\)/.test(gm) &&
   /function guarded\(actorId, feast, minutes\) \{\s*var row = feast \? MEAL_GUARD\.feast : MEAL_GUARD\.cooked;\s*var lasts = Number\(minutes\) > 0 \? Number\(minutes\) : row\.min;/.test(gm));
 
 // ------------------------------------------------- 3. cookedOutput, onCraft --
@@ -388,7 +389,7 @@ try {
   yes('5 python is on this machine', run !== null);
   if (run) {
     yes('5 the tool makes the records from the masters and writes the plugin', run.status === 0 &&
-      /Cooking quality \(#2906/.test(run.stdout) && /64 made now from the masters/.test(run.stdout));
+      /Cooking quality \(#2906/.test(run.stdout) && /68 made now from the masters/.test(run.stdout));
     if (run.status !== 0) { console.log(run.stdout + run.stderr); }
     const made = readPlugin(fs.readFileSync(path.join(dir, 'Thornswood-Content.esp')));
     const by = checkRecords(made, '5');
@@ -407,7 +408,7 @@ try {
       !!g1 && sub(g1, 'YNAM').body.readUInt32LE(0) === SOUND);
     const again = python([TOOL, '--data', dir, '--masters', path.join(dir, 'no-game')]);
     yes('5 run again with no game, it finds them all made and writes nothing',
-      !!again && again.status === 0 && /Nothing was written/.test(again.stdout) && /64 already here, 0 made now/.test(again.stdout));
+      !!again && again.status === 0 && /Nothing was written/.test(again.stdout) && /68 already here, 0 made now/.test(again.stdout));
 
     // A Gourmet dish whose sound is Gourmet's own: this plugin does not master
     // Gourmet.esp, so it cannot point at it, and the tool says which dishes.
