@@ -18,7 +18,8 @@ namespace Thornswood
     // loses its entry in the same change, so the launcher never sends anybody
     // to a page for something they cannot have. Revision 5 of the collection
     // took out Tavern Games, SunHelm Survival and SunHelm Diseases, and their
-    // entries came out with them.
+    // entries came out with them. Revision 6 took out Atlas Map Markers, whose
+    // page does not allow it in a collection (#3649).
     static class Links
     {
         const string N = "https://www.nexusmods.com/skyrimspecialedition/mods/";
@@ -58,7 +59,6 @@ namespace Thornswood
             A("CompassNavigationOverhaul", 74484);
             A("LocalMapUpgrade", 129756);
             A("MapMarkerFramework", 56123);
-            A("atlas map markers", 24104);
             A("IcePenguinWorldMap", 5804);
             A("MCMHelper", 53000);
             A("McmRecorder", 61719);
