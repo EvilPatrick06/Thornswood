@@ -103,7 +103,7 @@ Yes '  and both say so when the box does not finish' (([regex]::Matches($text, '
 if ($all) {
     Yes '-Lock finds the runners by their Windows services' ($all -match "Name LIKE 'actions\.runner\.%'")
     Yes '  their folders by where RunnerService.exe is, their accounts by what they run as' ($all -match 'PathName' -and $all -match 'StartName')
-    Yes '  only folders under C:\Thornswood-Runner' ($all.Contains("-notlike 'C:\Thornswood-Runner*'"))
+    Yes '  only Thornswood-Runner folders at a drive''s root: C:, or One''s runner drive (#3861)' ($all.Contains("-notmatch '^[A-Za-z]:\\Thornswood-Runner'"))
     Yes '  and touches no runner: no service stopped, removed or registered' ($all -notmatch '(?i)Stop-Service|Restart-Service|sc\.exe|config\.cmd|Remove-LocalUser|Set-LocalUser')
 }
 # ---- crash dumps (#2127, #2488) ---------------------------------------------------
