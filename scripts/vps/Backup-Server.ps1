@@ -281,7 +281,7 @@ foreach (`$exe in @('node','python','npm','git')) {
 }
 `$notes += ''
 `$notes += 'firewall rules that let anything in:'
-foreach (`$r in (Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -EA SilentlyContinue)) {
+foreach (`$r in (Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -Action Allow -EA SilentlyContinue)) {
   `$p = `$r | Get-NetFirewallPortFilter -EA SilentlyContinue
   if (`$p -and `$p.LocalPort -and `$p.LocalPort -ne 'Any') {
     `$notes += '  ' + `$r.DisplayName + '   ' + `$p.Protocol + ' ' + (`$p.LocalPort -join ',')
