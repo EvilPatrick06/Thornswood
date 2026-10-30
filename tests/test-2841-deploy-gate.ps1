@@ -27,8 +27,10 @@
        and Administrators may change, it may read Gate.ps1 alone, and the
        files go up from HEAD.
     7. Grant-BoxAccess.ps1 -Deploy: the line it writes, and its reader.
-    8. box-run.yml: main-only environment, the key in one step's
-       environment, no input pasted into a script, actions pinned by SHA.
+    8. box-run.yml is not in this repository but in the private ops
+       repository, with the VPS runners (#4013), and Box-Run.ps1 starts it
+       there; the ops repository's tests\test-box-workflows.ps1 holds its
+       shape.
     9. The seal (scripts\ops\Sealed.ps1) opens with its own key only, and a changed byte
        is refused; the box half uses the signed ssh.exe by full path.
   Nothing connects anywhere and nothing outside the temp folder is touched.
@@ -310,15 +312,10 @@ Yes 'a deploy key goes into the gate account''s authorized_keys, and stops witho
 Yes 'its proof needs a refused command and GATE READY' ($grant.Contains("@('echo THORNSWOOD_OK', 'ping')") -and $grant.Contains("'^\| GATE READY'") -and $grant.Contains('($NoticesOnly -or $Deploy) -and @($proof | Where-Object { $_ -match ''THORNSWOOD_OK'' }).Count'))
 Yes 'it goes into DESK_KEY_B64 of a main-only environment' ($grant.Contains("if (`$Deploy) { 'DESK_KEY_B64' }") -and $grant.Contains('gh secret set $SecretName --env $ToEnvironment'))
 
-# ---- 8. box-run.yml ------------------------------------------------------------
-$wf = Text '.github/workflows/box-run.yml'
-Yes 'box-run.yml starts by hand only (workflow_dispatch)' ($wf -match '(?m)^on:\s*\r?\n\s+workflow_dispatch:' -and $wf -notmatch '(?m)^\s+(push|pull_request|pull_request_target|schedule|workflow_run):')
-Yes '  in the desk environment, on a box runner' ($wf.Contains('environment: desk') -and $wf.Contains('runs-on: [self-hosted, Windows, thornswood-vps]'))
-Yes '  the key in one step''s environment, and nowhere else' (@([regex]::Matches($wf, 'secrets\.')).Count -eq 1 -and $wf.Contains('THORNSWOOD_DESK_KEY_B64: ${{ secrets.DESK_KEY_B64 }}'))
-$runBlocks = @([regex]::Matches($wf, '(?ms)^\s+run: \|\s*\r?\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
-Yes '  no input is pasted into a script; they reach it through the environment' (-not @($runBlocks | Where-Object { $_ -match '\$\{\{' }).Count)
-Yes '  every action pinned by a full commit SHA' (-not @([regex]::Matches($wf, 'uses: [^\s@]+@(?![0-9a-f]{40}\b)')).Count)
-Yes '  its output leaves the runner sealed, kept a day' ($wf.Contains('name: box-run-sealed') -and $wf.Contains('retention-days: 1'))
+# ---- 8. box-run.yml, in the ops repository (#4013) ---------------------------
+Yes 'box-run.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath ([IO.Path]::Combine($Repo, '.github', 'workflows', 'box-run.yml'))))
+$br = Text 'scripts/vps/Box-Run.ps1'
+Yes '  Box-Run.ps1 starts it in the private ops repository, where the runners are registered' ($br.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $br.Contains("`$Workflow = 'box-run.yml'"))
 
 # ---- 9. the seal, and the ssh it uses -------------------------------------------
 . (Join-Path $Repo 'scripts/ops/Sealed.ps1')
