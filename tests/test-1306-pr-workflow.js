@@ -50,6 +50,18 @@ const others = fs.readdirSync(WF).filter(f => /\.ya?ml$/.test(f)).filter(f => {
   return f !== 'build-pr.yml' || code(t).indexOf(SAME) < 0;
 });
 yes('no other workflow runs a pull request on the VPS (' + (others.join(', ') || 'none') + ')', others.length === 0);
+// #3683, Patrick's A on q-3683-required-check: the one name main's ruleset
+// requires passes only when one build succeeded, on GitHub's runner, and
+// only once the repository is public.
+const result = /\n  result:\n([\s\S]*)$/.exec(code(pr));
+const rj = result ? result[1] : '';
+yes('a "Build check result" job needs both builds (#3683)', /^    name: Build check result\n    needs: \[launcher-vps, launcher\]\n/.test(rj));
+yes('  runs unless cancelled, only once the repository is public', /\n    if: \$\{\{ !cancelled\(\) && github\.event\.repository\.private == false \}\}\n/.test(rj));
+yes('  on GitHub\'s ubuntu-latest, never the box', /\n    runs-on: ubuntu-latest\n/.test(rj) && !/self-hosted|thornswood/.test(rj));
+yes('  with no checkout, action or secret: it reads only the two results', !/uses:|secrets\.|checkout/.test(rj) &&
+    /HOSTED: \$\{\{ needs\.launcher\.result \}\}/.test(rj) && /VPS: \$\{\{ needs\.launcher-vps\.result \}\}/.test(rj));
+yes('  and passes only when one of them is success', /if \[ "\$HOSTED" = success \] \|\| \[ "\$VPS" = success \]; then exit 0; fi\n[\s\S]*exit 1/.test(rj));
+yes('  main\'s own build has no such job: only a pull request is held to it', !/\n  result:\n/.test(code(build)));
 let gen = null;
 try { gen = require(path.join(REPO, 'scripts', 'dev', 'Build-PrWorkflow.js')); } catch (e) { gen = null; }
 yes('the generator is there', !!gen);
