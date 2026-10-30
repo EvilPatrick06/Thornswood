@@ -25,7 +25,10 @@
       card, and a press that slips in opens nothing;
     - the stale and not-installed labels and the button name the revision;
     - the update log and Play's own refusal say which case holds updates;
-    - READ ME FIRST says to install the revision the launcher opens.
+    - READ ME FIRST says to install the revision the launcher opens;
+    - Publish-News links the feed's revision for the Downloads page, the
+      site's public answer carries the number, and the Downloads button,
+      join.md and help.md name it, help.md with a section for a copy ahead.
 
   Prints PASS or FAIL per check and exits 1 when any check fails.
 #>
@@ -101,6 +104,40 @@ Yes 'Play''s own refusal asks it too' ($play.Contains('string[] wait = Collectio
 # ---- what the installer tells people ---------------------------------------
 $rmf = [IO.File]::ReadAllText((Join-Path $repo 'installer\READ ME FIRST.txt')) -replace '\s+', ' '
 Yes 'READ ME FIRST says to install the revision the launcher opens' ($rmf.Contains('opens the revision the server was built against') -and $rmf.Contains('not a newer one Nexus may show first'))
+
+# ---- the site ---------------------------------------------------------------
+# Publish-News run for real over two small feeds, written to a file and sent
+# nowhere (-OutFile, a box name that cannot resolve), as test-public-news does.
+$env:THORNSWOOD_HARNESS = '1'
+$tmp = if ($Scratch) { $Scratch } else { Join-Path ([IO.Path]::GetTempPath()) ('thornswood-4115-' + [guid]::NewGuid().ToString('N')) }
+New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+function News([string]$name, $feed) {
+    $dir = Join-Path $tmp $name
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $dir 'version.json'), ($feed | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding $false))
+    $out = Join-Path $tmp ($name + '-news.json')
+    try {
+        & (Join-Path $repo 'scripts\ops\Publish-News.ps1') -ReleaseDir $dir -OutFile $out -From '2026-09-01' `
+            -Vps 'nowhere.invalid' -User 'nobody' -Root 'C:/nowhere' -Quiet *>&1 | Out-Null
+    } catch { Write-Host ('      Publish-News stopped: ' + $_.Exception.Message); return $null }
+    if (-not (Test-Path -LiteralPath $out)) { return $null }
+    return (([IO.File]::ReadAllText($out)) -replace '^\uFEFF', '') | ConvertFrom-Json
+}
+$c = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf'
+$pinned = News 'pinned' ([ordered]@{ launcherVersion = '9.9.9'; collectionUrl = $c; collectionRevision = 2; news = @() })
+Yes 'Publish-News links the feed''s revision on the Downloads page' ($null -ne $pinned -and [string]$pinned.collection -eq ($c + '/revisions/2') -and [int]$pinned.collectionRevision -eq 2)
+$bare = News 'bare' ([ordered]@{ launcherVersion = '9.9.9'; collectionUrl = $c; news = @() })
+Yes 'with no revision in the feed it links the collection as it is, revision 0' ($null -ne $bare -and [string]$bare.collection -eq $c -and [int]$bare.collectionRevision -eq 0)
+Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+$server = [IO.File]::ReadAllText((Join-Path $repo 'site\server.js'))
+Yes 'the site''s public answer carries the revision' ($server.Contains('collectionRevision: Number(feed.collectionRevision) > 0 ? Number(feed.collectionRevision) : 0,'))
+$homeJs = [IO.File]::ReadAllText((Join-Path $repo 'site\public\home.js'))
+Yes 'the Downloads button names the revision and says not to take a newer one' ($homeJs.Contains("'Open revision ' + esc(String(d.collectionRevision))") -and $homeJs.Contains('Nexus may show first.'))
+$join = [IO.File]::ReadAllText((Join-Path $repo 'site\data\site\join.md')) -replace '\s+', ' '
+Yes 'join.md step 3 names the server''s revision' ($join.Contains('opens the revision of the collection the server was built against'))
+$help = [IO.File]::ReadAllText((Join-Path $repo 'site\data\help.md')) -replace '\s+', ' '
+Yes 'help.md says to install the revision the link opens' ($help.Contains('it opens the revision the server was built against'))
+Yes 'help.md tells a copy ahead of the server nothing needs installing' ($help.Contains('## When your mods are ahead of the server') -and $help.Contains('nothing needs installing'))
 
 # ---- the real method, compiled ----------------------------------------------
 if (-not $OnWindows) {

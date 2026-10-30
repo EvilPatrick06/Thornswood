@@ -227,10 +227,23 @@ foreach ($n in $all) {
 # site would mean two copies and one of them going stale.
 $collection = ''
 try { if ($v.PSObject.Properties['collectionUrl']) { $collection = [string]$v.collectionUrl } } catch { }
+# The revision the server was built against, and the link to that revision's
+# own page (#4115). The collection's page names no revision, so Nexus shows its
+# newest, and a stranger who installed from the Downloads page while Nexus was
+# past the server landed ahead of it with Play shut. The launcher's buttons
+# open the same page (Checks.CollectionRevisionUrl).
+$collectionRevision = 0
+try { if ($v.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$v.collectionRevision, [ref]$collectionRevision) } } catch { }
+if ($collectionRevision -gt 0 -and $collection -match '^(.*?/collections/[A-Za-z0-9]+)([/?#].*)?$') {
+  $collection = $Matches[1] + '/revisions/' + $collectionRevision
+} else {
+  $collectionRevision = 0
+}
 
 $payload = [ordered]@{
   launcher   = $v.launcherVersion
   collection = $collection
+  collectionRevision = $collectionRevision
   at         = (Get-Date).ToString('o')
   news       = $news
 } | ConvertTo-Json -Depth 8
