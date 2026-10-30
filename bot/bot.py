@@ -893,6 +893,52 @@ def joins_age(rec, now_ms, here):
     return marked, dropped
 
 
+
+# A restore (scripts/vps/vps-restore-services.ps1) moves the joins.json it
+# replaces to joins.json-before-restore-<stamp> beside it in the data folder,
+# <stamp> the box's local yyyyMMdd-HHmmss, with -2, -3 for a second restore in
+# the same second, and nothing deleted it (#3620). Decided by Patrick on 26 Oct
+# (B): a set-aside copy is kept 30 days, so a restore can be undone, then
+# deleted. By the time in its name, never the file's own times, which a move
+# keeps from the original. Delete-Person.ps1 takes a deleted person out of one
+# while it is here.
+RESTORE_ASIDE_DAYS = 30
+RESTORE_ASIDE = re.compile(r'^joins\.json-before-restore-(\d{8})-(\d{6})(?:-\d+)?$')
+
+
+def age_restore_copies(folder, now):
+    """
+    Deletes the set-aside joins.json copies in folder older than
+    RESTORE_ASIDE_DAYS by the stamp in their names, now a POSIX time in
+    seconds. A link, or anything that is not a plain file, is left as it is.
+    Returns (deleted names, [(name, reason)] it could not delete).
+    """
+    cut = now - RESTORE_ASIDE_DAYS * 86400
+    deleted, failed = [], []
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError as e:
+        return deleted, [(folder, str(e))]
+    for n in names:
+        m = RESTORE_ASIDE.match(n)
+        if not m:
+            continue
+        try:
+            at = datetime.datetime.strptime(m.group(1) + m.group(2), '%Y%m%d%H%M%S').timestamp()
+        except ValueError:
+            continue
+        if at >= cut:
+            continue
+        p = os.path.join(folder, n)
+        if os.path.islink(p) or not os.path.isfile(p):
+            continue
+        try:
+            os.remove(p)
+            deleted.append(n)
+        except OSError as e:
+            failed.append((n, str(e)))
+    return deleted, failed
+
 async def watch_join_numbers():
     """
     Marks who has left and drops the numbers past JOIN_KEEP_DAYS, as the bot
@@ -925,6 +971,16 @@ async def watch_join_numbers():
         except Exception:
             log('join numbers: could not age %s, so it is as it was until the '
                 'next pass:\n%s' % (JOINS, traceback.format_exc()))
+        try:
+            gone, stuck = age_restore_copies(DATA_DIR, time.time())
+            for n in gone:
+                log('join numbers: deleted %s, set aside by a restore more than %d days ago'
+                    % (n, RESTORE_ASIDE_DAYS))
+            for n, why in stuck:
+                log('join numbers: COULD NOT DELETE %s (%s); it is tried again in an hour' % (n, why))
+        except Exception:
+            log('join numbers: could not age the copies a restore set aside:\n%s'
+                % traceback.format_exc())
         await asyncio.sleep(JOIN_KEEP_EVERY)
 
 
@@ -7182,6 +7238,11 @@ _MOD_DID = {
     'worldpropose': 'proposed moving the world to %s',
     'worldconfirm': 'confirmed moving the world to %s',
     'worlddrop': 'dropped the proposal to move the world to %s',
+    # Staff on the crafting card, the Office page of K (#3167): the why says
+    # which rank from what to what, or what was given back and why.
+    'craftrank': 'raised a rank of %s',
+    'craftrecipes': 'handed the newer recipe list to the game of %s',
+    'craftgive': 'gave back to %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).

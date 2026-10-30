@@ -637,8 +637,11 @@ function icacls { }
     $c = EnvCase @{ ("GET " + $envPath) = @(1, 'gh: Must have admin rights to Repository. (HTTP 403)') }
     Yes '  GitHub refusing the read stops it, changing nothing' ($c.Err -match '^DIE .*HTTP 403' -and $c.Changes.Count -eq 0)
     $grantText = [IO.File]::ReadAllText($grantPath)
+    # The same line sets the desk's DESK_KEY_B64 for -Deploy (#2841), so the
+    # name is a variable that is NOTICE_KEY_B64 for every other key.
     Yes 'the key goes to gh secret set NOTICE_KEY_B64 for that environment on its standard input, and to no file' (
-        $grantText -match [regex]::Escape('[Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) | & gh secret set NOTICE_KEY_B64 --env $ToEnvironment --repo $GitHubRepo') -and
+        $grantText.Contains("`$SecretName = if (`$Deploy) { 'DESK_KEY_B64' } else { 'NOTICE_KEY_B64' }") -and
+        $grantText -match [regex]::Escape('[Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) | & gh secret set $SecretName --env $ToEnvironment --repo $GitHubRepo') -and
         $grantText.IndexOf('if ($ToEnvironment) {', $grantText.IndexOf('Proving the new key through the bridge')) -lt $grantText.IndexOf('notice-access.txt', $grantText.IndexOf('Proving the new key through the bridge')))
     Yes '  and the environment is settled before the box is touched' ($grantText.IndexOf('Set-MainOnlyEnvironment $ToEnvironment') -lt $grantText.IndexOf('Get-BoxChangeScript $Name'))
 

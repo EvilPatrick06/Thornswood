@@ -38,8 +38,10 @@
   THE LAUNCHER ITSELF (#3312). A release from the feed that carries a new
   launcher cannot build or sign it where it runs. Invoke-ReleaseLauncherOnGitHub
   asks this repository's release-tag.yml to tag main's commit v<number> and
-  start release.yml on it, which builds and signs it on GitHub's runner, or
-  on the box's runner 3 when GitHub has no minutes, and waits for that run.
+  start main's release.yml for it, which builds and signs it on GitHub's
+  runner, or on the box's runner 3 when GitHub has no minutes, and waits for
+  that run. Only a run of main's own workflow signs (#3930), so the run
+  waited for is one on main whose title names the tag.
   Get-SignedFileRefusal then holds what it built to the launcher's own check
   here on Windows, or on the box anywhere else, the way the catalog is held.
 
@@ -318,7 +320,8 @@ function New-SignedFileCheckScript([string]$Path, [string]$ExpectedSigner, [stri
 }
 
 # Asks $Repo's release-tag.yml to tag $Commit (on main) as $Tag and start
-# release.yml on it, then waits for that release.yml run: GitHub's runner
+# main's release.yml for it, then waits for that release.yml run, the one on
+# main titled "Release launcher <tag>" (release.yml's run-name, #3930): GitHub's runner
 # builds and signs the launcher, or the box's runner 3 when GitHub has no
 # minutes, and a build runner checks the signed draft. '' once that run is
 # green, else why. The draft it made is then read the way a main Ship reads
@@ -351,17 +354,17 @@ function Invoke-ReleaseLauncherOnGitHub {
                     return ("release-tag.yml ended " + [string]$tagRun.conclusion + " for $Tag, so nothing was built: " + [string]$tagRun.url)
                 }
             }
-            $run = Find-ReleaseRun $Gh $Repo 'release.yml' $asked { param($r) [string]$r.headBranch -ceq $Tag }
+            $run = Find-ReleaseRun $Gh $Repo 'release.yml' $asked { param($r) [string]$r.headBranch -ceq 'main' -and [string]$r.displayTitle -ceq ('Release launcher ' + $Tag) }
         } catch { return ('the release runs could not be read: ' + $_.Exception.Message) }
         if ($null -ne $run -and [string]$run.status -eq 'completed') { break }
         if ((Get-Date) -gt $until) {
-            if ($null -eq $run) { return "no release.yml run started on $Tag in $WaitSeconds seconds" }
-            return ("the release.yml run on $Tag is still " + [string]$run.status + " after $WaitSeconds seconds: " + [string]$run.url)
+            if ($null -eq $run) { return "no release.yml run on main started for $Tag in $WaitSeconds seconds" }
+            return ("main's release.yml run for $Tag is still " + [string]$run.status + " after $WaitSeconds seconds: " + [string]$run.url)
         }
         Start-Sleep -Seconds $Poll
     }
     if ([string]$run.conclusion -ne 'success') {
-        return ("the release.yml run on $Tag ended " + [string]$run.conclusion + ', so there is no checked, signed launcher: ' + [string]$run.url)
+        return ("main's release.yml run for $Tag ended " + [string]$run.conclusion + ', so there is no checked, signed launcher: ' + [string]$run.url)
     }
     Write-Host ("  built, signed and checked on GitHub: " + [string]$run.url) -ForegroundColor DarkGray
     return ''
