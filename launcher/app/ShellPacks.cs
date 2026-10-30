@@ -221,19 +221,21 @@ namespace Thornswood
             if (wants > 0 && have < wants)
                 return CollectionCard("Your mods need updating",
                     "Vortex has collection revision " + have + " and the server was built against " +
-                    "revision " + wants + ". Open the collection and let Vortex bring it up to date.");
+                    "revision " + wants + ". Open revision " + wants + " and let Vortex bring it up to date.");
+            // No button for ahead (#4115): nothing needs installing, and the
+            // collection's pages lead to the same revision or a newer one.
             if (wants > 0 && have > wants)
                 return CollectionCard("Your mods are ahead of the server",
                     "Vortex has collection revision " + have + " and the server was built against " +
-                    "revision " + wants + ". Nothing is wrong with your install; the server has " +
-                    "not caught up yet.");
+                    "revision " + wants + ". Nothing is wrong with your install and nothing needs " +
+                    "installing; Play opens once the server is rebuilt on your revision.", false);
             return CollectionCard("Your mods: collection revision " + have,
                 "Vortex has the Thornswood collection installed" +
                 (wants > 0 ? ", the same revision the server was built against."
                            : ". The server's revision was not known just now, so it was not compared."));
         }
 
-        static UIElement CollectionCard(string title, string body)
+        static UIElement CollectionCard(string title, string body, bool button = true)
         {
             var g = new Grid();
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -256,19 +258,24 @@ namespace Thornswood
             note.Margin = new Thickness(0, 3, 12, 0);
             left.Children.Add(note);
 
-            var b = new Button();
-            b.Content = "Open the collection";
-            b.Style = (Style)win.Resources["Solid"];
-            b.VerticalAlignment = VerticalAlignment.Center;
-            b.MinWidth = 96;
-            Grid.SetColumn(b, 1); g.Children.Add(b);
-
-            string url = cfg.CollectionUrl;
-            b.Click += delegate
+            if (button)
             {
-                try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
-                catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
-            };
+                var b = new Button();
+                // The revision the server was built against, not the
+                // collection's front page, which is always its newest (#4115).
+                b.Content = CollectionButtonText();
+                b.Style = (Style)win.Resources["Solid"];
+                b.VerticalAlignment = VerticalAlignment.Center;
+                b.MinWidth = 96;
+                Grid.SetColumn(b, 1); g.Children.Add(b);
+
+                string url = CollectionLink();
+                b.Click += delegate
+                {
+                    try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+                    catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
+                };
+            }
 
             // Open to everybody (#428): anyone can download in the alpha, and
             // the same link is on the public Downloads page. It used to say
