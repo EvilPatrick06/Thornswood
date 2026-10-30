@@ -51,6 +51,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [Fix the cause, no band-aids](#fix-the-cause-no-band-aids)
     - [Buttons, not chat commands](#buttons-not-chat-commands)
     - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
+    - [How an issue and a comment are written](#how-an-issue-and-a-comment-are-written)
     - [What is not a reason to skip an issue](#what-is-not-a-reason-to-skip-an-issue)
     - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
     - [How work moves](#how-work-moves)
@@ -186,7 +187,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 
 Do this once on a new Windows PC. Stay in order. On every PC is the steps. Setting up a machine and Shipping from another machine are for a PC that will publish a release. You can read those two after the clone works.
 
-Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
+Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared clone on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
 ### On every PC
 
@@ -463,14 +464,14 @@ by hand, and no secret is written into the repository.
 Until 4 Oct only Patrick's Azure account could sign (29 Sep, #1121), so a
 second machine signed only while he sat at it and signed in. Since 4 Oct each
 person who ships signs in as themselves, with an account of their own in the
-signing tenant, Default Directory (`5a096034-ce55-40d2-b313-10ee86efe26a`, domain
-`evilpatrick06outlook.onmicrosoft.com`), that holds the Artifact Signing Certificate
+signing tenant, Default Directory (`5a096034-ce55-40d2-b313-10ee86efe26a`), that
+holds the Artifact Signing Certificate
 Profile Signer role on the ThornswoodRelease profile (Patrick, 4 Oct; #1740).
 The role is on that profile only, so the account can sign and can do nothing
 else in the subscription. What it signs carries the same publisher name as
 what Patrick signs, because the certificate comes from his identity
 validation. Accounts that can sign, 4 Oct: Patrick's own, and
-`djinn@evilpatrick06outlook.onmicrosoft.com`.
+Djinn's.
 
 ##### Patrick, once for each person
 
@@ -480,7 +481,7 @@ On a machine where `az` is signed in as Patrick, in PowerShell 7:
 az account show --query "{user:user.name, tenant:tenantId}" -o table
 ```
 
-It names evilpatrick06@outlook.com and the tenant above. Then:
+It names Patrick's own sign-in and the tenant above. Then:
 
 ```powershell
 $scope = (az resource list --name ThornswoodSigning --resource-type Microsoft.CodeSigning/codeSigningAccounts --query "[0].id" -o tsv) + "/certificateProfiles/ThornswoodRelease"; $scope
@@ -766,7 +767,7 @@ git pull
 git push --force
 ```
 
-Force push replaces the remote branch. Use it on your own branch after you rewrote that branch. Main refuses a force push. If `main` moved while you were working:
+Force push replaces the remote branch. Use it on your own branch after you rewrote that branch. Never force push main: GitHub refuses it from write access, but not from the admin account while `enforce_admins` is off, so for the admin it is a team rule kept by hand. If `main` moved while you were working:
 
 ```powershell
 git fetch origin
@@ -1001,7 +1002,8 @@ How to use it:
 - Order is the do-order. A new issue gets the Order of where it belongs, not
   the end; a number between two others (52.5) is fine.
 - Work that fits an existing issue is an edit or a comment on it, not a
-  second issue. Write down what was measured and what is left.
+  second issue. Say in it what is left; what was measured goes with the
+  evidence ("How an issue and a comment are written", below).
 - Uncommitted changes sitting in the repo are outstanding work and belong on
   the board too.
 - Labels: `area:` is the part of the project, `needs: patrick` marks what
@@ -1060,12 +1062,53 @@ How to use it:
   only a developer can make the check (Dev, below). To better the test task
   after the merge, write a newer `Test task:` comment of the same kind on
   the issue and leave it open: the Ship closes it with yours instead. A
-  Dev test task never keeps the issue open. An issue moved to Done by hand,
-  with no done-on-merge comment, is one the Ship cannot tell it carries, so
-  whoever moved it closes it, with its `Test task:` comment, when its fix is
-  on main. To see what a main Ship
+  Dev test task never keeps the issue open. Whoever moves an issue to Done
+  by hand (a fix spread over several pull requests, a pin, a change on the
+  box) writes on it a comment whose first line is `Fixed by <merge commit,
+  12 characters> (pull request #N).`, naming the last merge the fix needs,
+  then either its Main test task in a fenced block, or the line
+  `No test task: nobody would notice this fix.` The Ship reads that line as
+  it reads done-on-merge's comment, from anybody, the newer of the two
+  winning, and closes the issue when the release carries that merge (#3411).
+  A line with neither a test task nor the no-task line keeps the issue open,
+  and the Ship names it as trouble. To see what a main Ship
   would close, without closing anything:
   `.\scripts\release\Close-ShippedIssues.ps1 -Commit origin/main -Check`.
+
+#### How an issue and a comment are written
+
+Decided by Patrick on 26 Oct (#3692), before the repository goes public:
+every new issue and every comment on one is written plain, by everybody, a
+person, a lane, a Claude or a workflow. When the repository goes public,
+every issue and every comment goes public with it, open or closed, and the
+ones written the old way are re-filed and then deleted (#3692). One written
+plain never needs that.
+
+- An issue is a plain title, two to five lines a person would write, and a
+  last line `Done when:` with one thing somebody can check. The team's issue
+  form asks for exactly that.
+- A comment is the same: a few plain lines. A `Test task:` comment and a
+  `Roadmap:` comment keep their own shapes ("Test tasks and known issues").
+- Neither ever holds: who found it ("Found by the ... audit", "Written by",
+  a lane's or a Claude's name, a thread or a Desk); a "Generated by/with
+  Claude Code" line, a session link or a closing `---` written in by hand;
+  the box's address, anybody's home address, a `C:\Users\<name>` path, an
+  email, a Discord id or a person's real name; a secret's value; or for a
+  security or privacy problem, anything somebody could use to exploit it.
+- The one closing line nobody writes and nobody takes off: the platform puts
+  `_Generated by [Claude Code](https://claude.ai/code)_` under a `---` at
+  the end of everything a cloud Claude writes, on every path, and it cannot
+  be turned off. The nightly check leaves that exact line at the very end
+  alone and reads everything above it as usual.
+- The evidence (files and lines, logs, what was measured, how the fix
+  should go) goes in the private ops repo, in `issues/<number>.md` for the
+  issue's number, never on the issue. Until that repository exists, it stays
+  in the finder's own private notes and moves there with the rest.
+- A claim is the `claimed:` label and the card in In Progress, with no
+  comment. A comment saying where the work stands is fine, written plain.
+- `scripts\dev\Nightly-PlainIssues.ps1`, run by the nightly, names every
+  issue and comment of the last day that breaks this, and the night goes
+  red until it is rewritten (#3692).
 
 #### Test tasks and known issues
 
@@ -1326,16 +1369,21 @@ The short form of the rules. The same decisions, with the dates they were made, 
   tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
-  straight to main, which held while `enforce_admins` was off and stopped
-  holding the moment it went on.
+  straight to main. GitHub refuses a push to main from write access. It does
+  not refuse one from the admin account: with `enforce_admins` off, GitHub
+  holds an admin to none of main's rules, so for the admin this is a team rule
+  kept by hand.
 - What branch protection on main actually enforces, since 25 Sep:
   `enforce_admins` is **off**, there is no required check, required
   approving reviews is **0**, and the code owner review is **off**.
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
   anybody on the team merges their own pull request once `Launcher builds`
   (the build check, on the VPS) is green and they have said what it is in
-  #staff-updates. Nobody waits for Patrick. Force pushes are refused.
-  Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
+  #staff-updates. Nobody waits for Patrick. What GitHub does hold write
+  access to on main: a change comes through a pull request (with no approval
+  needed), and a force push or deleting main is refused. None of that applies
+  to the admin account while `enforce_admins` is off.
+  Because nothing enforces the build check, it has to be kept by hand: on 25 Sep 35 pull
   requests were merged with their VPS build red and 18 with no build at all,
   and main went red with them. Wait for `Launcher builds` to say pass before
   merging, every time, including your own and including a Claude's. The last
@@ -1347,9 +1395,10 @@ The short form of the rules. The same decisions, with the dates they were made, 
   with `--admin` on every one of his own pull requests, and it is now zero.
   The code owner review on `.github/CODEOWNERS` is off. And `enforce_admins`,
   which had to stay off while `Ship.ps1` pushed its own version commit
-  straight to main, went on, because Ship writes nothing to the repository now:
-  `Bump-Version.ps1` moves the number first, as an ordinary commit on a
-  branch, and Ship reads it.
+  straight to main, was turned on that day, since Ship writes nothing to the
+  repository now: `Bump-Version.ps1` moves the number first, as an ordinary
+  commit on a branch, and Ship reads it. It was off again by 25 Sep and is
+  off today, which is why the admin account is not held to main's rules.
   Check which it is rather than assuming, because this paragraph was wrong
   for a day before anybody looked:
   `gh api repos/EvilPatrick06/Thornswood/branches/main/protection`
@@ -1538,14 +1587,18 @@ this is the long form.
   shipped is already on GitHub and every other machine can `git pull` exactly
   that.
 - **Every change goes through a pull request, Patrick's included.** Nobody
-  pushes to main from any machine; GitHub refuses it. `git checkout -b
+  pushes to main from any machine. GitHub refuses it from write access; from
+  the admin account it does not, so there it is our rule. `git checkout -b
   <name>/what-it-is` (your name, then a slash; a Claude uses `claude/`; older
   branches use `gavin/`), small
   commits with plain messages, `git push -u origin <branch>`, then
   `gh pr create --fill` standing on the branch. Nothing is force pushed.
 - **What GitHub enforces on main, and what it does not.** Since 25 Sep:
   `enforce_admins` is off; there is no required check; required approving
-  reviews is 0; the code owner review is off. The build check,
+  reviews is 0; the code owner review is off. For write access a change
+  still has to come through a pull request, and a force push or deleting
+  main is refused; with `enforce_admins` off, GitHub holds an admin to none
+  of main's rules. The build check,
   `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
   request on the VPS runner, and the rule is ours rather than a setting:
   merge your own pull request once it is green, and you are confident in the change. Nothing merges by itself: auto-merge is off on the repository, so
@@ -1790,8 +1843,8 @@ git pull
 
 The version moves first and on its own. `Bump-Version.ps1` changes `Version`
 in `launcher\app\Updater.cs` (1.1.35 to 1.1.36), commits that one file, and
-prints the rest. main refuses a push from everybody, so it prints the
-commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
+prints the rest. Every change reaches main through a pull request, the
+admin's included, so it prints the commands that move that commit onto a branch, `patrick/launcher-1.1.36`,
 push it and open the pull request, which is then merged (see How work
 moves, the long form). Then, back on main:
 

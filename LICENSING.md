@@ -98,7 +98,8 @@ It does not cover:
 
 - art whose maker is not recorded (`unconfirmed` or `not recorded` in
   `records/asset-provenance.json`; none today, since Patrick said on 27
-  October 2026 that Djinn made the last three). Thornswood cannot license
+  October 2026 that Djinn made the last one, the guide's screenshot of the
+  launcher, and two unused pictures were deleted). Thornswood cannot license
   what it cannot show it owns; such a file goes under CC BY-NC-SA 4.0 once
   its maker and terms are recorded.
 - the theme, `game/ui/thornswood-theme.mp3`. An artist made it for

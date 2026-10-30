@@ -273,8 +273,12 @@ the `release` environment presents is the one trusted. Its role is
 Artifact Signing Certificate Profile Signer, given on the signing account
 ThornswoodSigning rather than on the profile; the account has one profile,
 ThornswoodRelease, so today that is the same thing. The `release`
-environment allows tags `v*` only, and the three `AZURE_SIGNING_*`
-repository variables are set.
+environment allows tags `v*` only, and the two repository variables the
+sign step reads, `AZURE_SIGNING_CLIENT_ID` and `AZURE_SIGNING_TENANT_ID`,
+are set. No subscription id is needed: the workload identity sign in takes
+only those two and the token file, and the unused
+`AZURE_SIGNING_SUBSCRIPTION_ID` was taken off this repository (Patrick,
+27 Oct, #3717). The fork's signing keeps its own copy for its azure/login.
 
 What a run proved on 12 Oct: the default path, a `v*` tag push and a manual
 run on the box, builds on the VPS as before; a manual run asking for
@@ -337,8 +341,10 @@ carry a new launcher with no One in the chain:
   Windows SDK's signtool, and its outbound rules to let the signing hosts
   through (`Install-Runner.ps1 -NetworkOnly -Number 3`, from
   `records/sign-runners.json`; #3312).
-- The `verify` job runs after whichever job signed, on a build runner, so
-  it is never the runner that signed.
+- The `verify` job runs after whichever job signed, on a check runner
+  (the `thornswood-check` label, `records/check-runners.json`, #3956),
+  which is never the runner that signed. Light runner 4 carries that label
+  and no build label, so no pull request build can hold up the check.
 - A `v<a.b.c.d>` tag is a dev number: release.yml writes it into
   Updater.cs the way a dev Ship does. A `v<a.b.c>` tag must be the number
   Updater.cs already says.

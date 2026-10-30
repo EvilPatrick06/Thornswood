@@ -7,7 +7,8 @@
 #   code      all ~380 test harnesses in tests/, plus the bot and voice harnesses, the
 #             launcher window check and the launcher build
 #   GitHub    pull requests open more than two days and branches other than
-#             main, which CONTRIBUTING.md says are merged or closed
+#             main, which CONTRIBUTING.md says are merged or closed; issues
+#             and comments of the last day not written plain (#3692)
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives: a tag is a moving pointer, and this
@@ -42,6 +43,12 @@ concurrency:
 jobs:
   nightly:
     name: Nightly checks
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so this job and "board" never run a
+    # branch's code. A dispatch on a branch runs the harness shares alone, on
+    # the build runners, and tells the board nothing: a branch's night is not
+    # main's, and the first night that passes closes the board's issue.
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 45
     steps:
@@ -162,14 +169,17 @@ jobs:
 
       - name: Check the launcher window
         if: ${{ !cancelled() }}
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           # The launcher builds its window from ui.xaml at startup and finds
           # every control by name, so a renamed control or a window that does
           # not parse compiles clean and is found by the person using it. This
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
-          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          # -ExecutionPolicy Bypass on both, as every harness starts 5.1:
+          # Windows 11 keeps 5.1 at Restricted, so on One's runners the plain
+          # shell: powershell could not run this step's own script (#3861).
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Parse every game script
@@ -321,6 +331,23 @@ jobs:
       # The monthly restore rehearsal check (#1046) reads RESTORING.md, which
       # is in the private ops repo since #3693; that repo's nightly runs it.
 
+      - name: Is the source of what is inside frida-gum.lib where the notes say
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Issue #3287. SkyrimPlatformImpl.dll links frida-gum.lib, whose
+          # LGPL parts go out under the GPL, so their source has to stay
+          # where the note beside the file says: the Release of their
+          # archives, which stays as long as the launcher ships frida-gum, and
+          # the forks while records\frida-sources.json says they are up. Red
+          # when the Release is gone or not whole once it is made (or not
+          # made once the repository is public), when a fork's tag is not
+          # its commit, or when the client files carry another Frida.
+          .\scripts\release\Publish-FridaSources.ps1 -Check
+          exit $LASTEXITCODE
+
       - name: Stray pull requests and branches
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -333,6 +360,20 @@ jobs:
           # first hundred of each (issue #1201); tests\test-nightly-stray.ps1
           # runs it against a stand-in GitHub.
           .\scripts\dev\Nightly-Stray.ps1 -Run
+
+      - name: Issues and comments written plain
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Developer-Guide.md, "How an issue and a comment are written"
+          # (#3692): every issue and comment of the last day, read through
+          # the REST API; one written the old way is named and the night is
+          # red until it is rewritten. tests\test-nightly-plain-issues.ps1
+          # runs it against a stand-in GitHub.
+          .\scripts\dev\Nightly-PlainIssues.ps1 -Run
 
   harnesses:
     # The test harnesses, in shares (#2357). One job for each entry under
@@ -413,7 +454,8 @@ jobs:
     # prints the list itself.
     name: Put the night on the board
     needs: [nightly, harnesses]
-    if: ${{ !cancelled() }}
+    # Main only, as "nightly" above says (#3550).
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 10
     steps:
