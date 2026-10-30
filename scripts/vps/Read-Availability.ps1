@@ -10,7 +10,7 @@
   of the window it was up, from the down and back lines the watchdog writes
   into alerts.jsonl. Issue #2183.
 
-  WHY THIS EXISTS. docs\SERVICE-OBJECTIVES.md proposes 99% a month for the
+  WHY THIS EXISTS. SERVICE-OBJECTIVES.md in the ops repo proposes 99% a month for the
   site and has no baseline, because nothing turned the outbox into a figure.
   The data was already there: Watch-Services.ps1 writes one JSON line each
   time a thing goes down and one when it is back (id, at, service, kind,
@@ -250,5 +250,5 @@ Head 'Limitations'
 Say ('  1. ' + $Limits[0])
 Say ('  2. ' + $Limits[1])
 Say ''
-Say '  This does not judge any service against a target. docs\SERVICE-OBJECTIVES.md does that once a baseline has been read.' DarkGray
+Say '  This does not judge any service against a target. SERVICE-OBJECTIVES.md in the ops repo does that once a baseline has been read.' DarkGray
 Done 0

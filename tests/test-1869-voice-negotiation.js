@@ -996,9 +996,20 @@ function partSix() {
   yes('the overlay gets on the chat\'s socket with board', /n\.board\(onNet\);/.test(OVERLAY_SRC) && !/n\.on\(onNet\);/.test(OVERLAY_SRC));
 }
 
+/*
+  The pages from part 2 on are in the world, since only somebody in the world
+  holds a voice place and is on the roster (#3570). The walkers of part 1 are
+  done with, so the feed is now these, standing in one room.
+*/
+function seatPages() {
+  const who = [201, 202, 301, 302, 303, 304, 401, 402].map((pid) => ({ profileId: pid, pos: [0, 0, 0], angleZ: 0, cell: 'a room' }));
+  return fetch(BASE + '/positions', { method: 'POST', body: JSON.stringify({ who: who }) });
+}
+
 (async () => {
   await start();
   await partOne();
+  await seatPages();
   await partTwo();
   await partThree();
   await partFour();
