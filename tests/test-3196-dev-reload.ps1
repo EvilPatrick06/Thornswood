@@ -219,10 +219,12 @@ try {
 
   # ---- the same gamemode, a new stamp -----------------------------------------
   $srv = New-Server @{ 'gamemode.js' = $oldGm; 'thornswood-build.json' = '{"commit":"newer"}' }
+  # A wait of 30 s, so a reload that waited is told from a busy runner that
+  # took a few seconds to start PowerShell and copy the files.
   $t0 = Get-Date
-  $out = Invoke-Reload $srv
+  $out = Invoke-Reload $srv 30
   Yes 'the gamemode it already runs, with a new stamp: RELOAD OK, the stamp moved' ($out -contains 'RELOAD OK' -and (Read-At $srv 'thornswood-build.json') -eq '{"commit":"newer"}')
-  Yes '  without waiting for a load that cannot come' (@($out | Where-Object { $_ -like '*already runs git blob*' }).Count -eq 1 -and ((Get-Date) - $t0).TotalSeconds -lt 6)
+  Yes '  without waiting for a load that cannot come' (@($out | Where-Object { $_ -like '*already runs git blob*' }).Count -eq 1 -and ((Get-Date) - $t0).TotalSeconds -lt 30)
   Stop-Server $srv
 
   # ---- a roll of server.log in the middle of the load ---------------------------

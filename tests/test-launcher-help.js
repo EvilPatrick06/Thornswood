@@ -45,7 +45,8 @@ const vplug   = read('game', 'plugins', 'thornswood-voice.js');
 const vpage   = read('game', 'ui', 'thornswood-voice.js');
 const vserver = read('voice', 'voice-server.js');
 const vinstall = read('scripts/deploy/Install-Voice.ps1');
-const keys    = read('launcher', 'app', 'Keys.cs');
+// The rows on Settings in the game (#3126), where the Controls page's were.
+const keys    = read('game', 'ui', 'thornswood-settings.js');
 // Shell is one partial class across Shell.cs and the Shell*.cs files since
 // the split (#500), so the update code the address check reads is in
 // ShellUpdate.cs now. All of them, read as the one class they compile to.
@@ -313,8 +314,8 @@ yes('the voice page says how many units are a metre (' + UPM + ')', UPM > 0);
   template's value where the template sets one (ThornIni.Ensure writes it on a
   machine with no file), and the plugin's fallback where it does not. When the
   two disagree, the page must not name a letter at all: the emote wheel is G
-  in the template and B in the code, so the page sends people to the Controls
-  page for it.
+  in the template and B in the code, so the page sends people to Settings in
+  the game for it. The fallback is the row's default on Settings (#3126).
 */
 const LETTER = {
   30: 'A', 48: 'B', 46: 'C', 32: 'D', 18: 'E', 33: 'F', 34: 'G', 35: 'H', 23: 'I',
@@ -327,7 +328,7 @@ function templateKey(name) {
   return r ? Number(r[1]) : null;
 }
 function keysFallback(name) {
-  const r = new RegExp('ThornIni, "' + name + '", (\\d+)\\)').exec(keys);
+  const r = new RegExp("\\{ ini: '" + name + "', def: (\\d+),").exec(keys);
   return r ? Number(r[1]) : null;
 }
 function freshKey(name) {
@@ -339,7 +340,7 @@ function freshKey(name) {
   ['ChatKey', 'Chat and commands', 'The chat box', function (k) { return k + ' opens it'; }],
   // The party wording is test-help-parties.js's, from main (entry 336), and
   // that harness holds the rest of the two party items to the code.
-  ['PartyKey', 'Chat and commands', 'Parties', function (k) { return k + ', unless you have moved it on the Controls page, opens your friends and your party'; }],
+  ['PartyKey', 'Chat and commands', 'Parties', function (k) { return k + ', unless you have moved it on Settings in the game, opens your friends and your party'; }],
   ['JournalKey', 'Chat and commands', 'Journals', function (k) { return k + ' opens your journals'; }],
   ['FriendKey', 'Chat and commands', 'Friends and trading', function (k) { return 'press ' + k + ' to ask them to be friends'; }],
   ['TradeWithKey', 'Chat and commands', 'Friends and trading', function (k) { return k + ' to offer a trade'; }],
@@ -349,7 +350,7 @@ function freshKey(name) {
   ['VoiceLockKey', 'Chat and commands', 'Voice', function (k) { return 'press ' + k + ' to keep the microphone open until you press ' + k + ' again'; }],
   ['CommandKey', 'Chat and commands', 'The chat box', function (k) { return k + ' opens it with the slash already typed'; }],
   // The help panel's own key (#1633).
-  ['HelpKey', 'Chat and commands', 'Everything else is on the help panel', function (k) { return k + ', unless you have moved it on the Controls page, opens the help in the game'; }]
+  ['HelpKey', 'Chat and commands', 'Everything else is on the help panel', function (k) { return k + ', unless you have moved it on Settings in the game, opens the help in the game'; }]
 ].forEach(function (row) {
   const code = freshKey(row[0]);
   const t = templateKey(row[0]);
@@ -361,11 +362,11 @@ function freshKey(name) {
 });
 {
   const t = templateKey('WheelKey');
-  const f = num(emotes, /const OPEN_KEY\s*=\s*key\('WheelKey', (\d+)\)/);
+  const f = num(emotes, /(?:const|let) OPEN_KEY\s*=\s*key\('WheelKey', (\d+)\)/);
   const wheel = item('Emotes', 'The wheel');
   yes('the wheel key differs between the template (' + LETTER[t] + ') and the code (' + LETTER[f] +
-      '), so the page names no letter for it and sends people to the Controls page',
-      t !== f ? (/Controls page/.test(wheel) && !/\b[A-Z]\b/.test(wheel)) : true);
+      '), so the page names no letter for it and sends people to Settings in the game',
+      t !== f ? (/Settings in the game/.test(wheel) && !/\b[A-Z]\b/.test(wheel)) : true);
   // Since #529 they agree (G), and then the page names it.
   yes('and when they agree the wheel item names that key (' + LETTER[t] + ')',
       t === f ? wheel.indexOf(LETTER[t] + ' opens a wheel') === 0 : true);
@@ -567,7 +568,7 @@ const site    = read('site', 'server.js');
 // ------------------------------------------------------------------ keys
 /*
   One item lists every Thornswood key a fresh install has. Each phrase below
-  is checked against the template and Keys.cs, the same way the per-item key
+  is checked against the template and the Settings rows, the same way the per-item key
   checks above are, so a key that moves fails here too.
 */
 {
@@ -592,11 +593,13 @@ const site    = read('site', 'server.js');
     const t = templateKey(row[0]);
     const f = keysFallback(row[0]);
     const letter = LETTER[t !== null ? t : f];
-    yes('the key list: ' + row[0] + ' is ' + letter + ' in the template and on the Controls page, and the page says ' +
+    yes('the key list: ' + row[0] + ' is ' + letter + ' in the template and on Settings in the game, and the page says ' +
         JSON.stringify(row[1](letter)),
         !!letter && t !== null && f !== null && t === f && all.indexOf(row[1](letter)) !== -1);
   });
-  yes('the Controls page item says keys are changed there', /Press Change/.test(item('Keys', 'The Controls page changes them')));
+  yes('the Keys item says keys are changed on Settings in the game, and at once',
+      /Press Change/.test(item('Keys', 'Settings in the game changes them')) &&
+      /works at once/.test(item('Keys', 'Settings in the game changes them')));
 }
 
 // ----------------------------------------------------------- asking staff

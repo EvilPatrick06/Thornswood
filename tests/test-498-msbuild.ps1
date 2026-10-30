@@ -79,7 +79,7 @@ function Attr($doc, [string]$xpath) { @(Select-Xml -Xml $doc -XPath $xpath -Name
 function Same([object[]]$a, [object[]]$b) { (@($a | Sort-Object) -join '|') -eq (@($b | Sort-Object) -join '|') }
 
 # The resources the launcher's code reads by name (Art.cs, Voice.cs,
-# ThornIni.cs, ClientRuntime.cs, OwnGame.cs, Shell.cs): the list the two
+# ThornIni.cs, ClientRuntime.cs, OwnGame.cs, Shell.cs, GeneratedHere.cs): the list the two
 # builds were compared on, and the file in the repository each one is.
 $appResources = [ordered]@{
     'ui.xaml'                         = 'launcher\ui.xaml'
@@ -98,6 +98,7 @@ $appResources = [ordered]@{
     'client-build.json'               = 'records\client-build.json'
     'skyrim-files.json'               = 'records\skyrim-files.json'
     'ui-gone.json'                    = 'records\ui-gone.json'
+    'generated.json'                  = 'records\generated.json'
 }
 $setupResources = [ordered]@{ 'logo.png' = 'launcher\logo-192.png' }
 $frameworkRefs = @('System', 'System.Core', 'System.Drawing', 'System.Runtime.Serialization', 'System.Xml', 'System.Security',

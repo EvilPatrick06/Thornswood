@@ -885,6 +885,16 @@ $s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue 
 # next spawn the client empties the pack and refills it from that empty record.
 # Off, the unknown item is dropped and the rest of the update is kept.
 $s | Add-Member -NotePropertyName equipmentInventoryCheckEnabled -NotePropertyValue $false -Force
+# The one equipment switch that is ON (#2262). The fork's onEquipItemAttempt
+# (skymp#73) asks the gamemode about each item an equipment update puts on that
+# the saved record does not already have on, before the update is stored, and
+# takes off only an item it answers false to. The gamemode's strength gate
+# answers it: a weapon heavier than the character's Might can wield is refused
+# there, and nothing invalid is ever saved. Off, the engine never asks, which
+# is the fork's default. With no handler in the gamemode the event answers
+# nothing and every item stands. Needs the fork at thornswood/engine-changes
+# ad97e483 or later; an older server ignores the key.
+$s | Add-Member -NotePropertyName equipItemAttemptEnabled -NotePropertyValue $true -Force
 <#
   NO "default" KEY INSIDE npcSettings, EVER. It emptied both worlds.
 

@@ -2089,6 +2089,30 @@ setInterval(() => loginPrune(Date.now()), 10 * 60 * 1000).unref?.();
 // ==== end thornswood login limits ====
 
 // ------------------------------------------------------------- downloads --
+// The payload zip the two file setup program fetches through /api/payload:
+// the stable name Publish-Installer sends, or a stamped one an older publish
+// left.
+function payloadZip(name) {
+  return /^Thornswood-Setup(?:-\d{8}-\d{4})?\.zip$/i.test(name);
+}
+
+// What /file/ serves, which is also all the Downloads list may show (#3798).
+// files.json is the list of what is published, so a name is served only when
+// it is listed there and not hidden, or is a listed payload zip, which is
+// hidden from people because the setup program fetches it itself. files.json
+// is served too: Ship's installer gate reads it at /file/files.json
+// (Read-SiteDownloads). Anything else in the folder is not published, and
+// answers 404. Until this the route served whatever sat in the folder, and a
+// read only diagnostic put there by hand on the box (a script naming a
+// staff member and the game server's address) went to anyone who asked for it
+// by name, while the Downloads page only hid it.
+function downloadServed(name, meta) {
+  if (name === 'files.json') return true;
+  const m = Object.prototype.hasOwnProperty.call(meta, name) ? meta[name] : null;
+  if (!m || typeof m !== 'object') return false;
+  return !m.hidden || payloadZip(name);
+}
+
 function listFiles() {
   const meta = jsonFile(path.join(FILES, 'files.json'), {});
   const out = [];
@@ -2101,30 +2125,25 @@ function listFiles() {
     catch (e) { console.error('[thornswood-docs] could not list the downloads in ' + FILES + ' (' + (e.code || e.message) + ')'); }
   }
   for (const name of names) {
-    if (name === 'files.json') continue;
+    // Only what /file/ serves, so the page never offers a name that answers
+    // 404, and nothing files.json does not publish is listed at all.
+    if (name === 'files.json' || !downloadServed(name, meta)) continue;
     let st;
     try { st = fs.statSync(path.join(FILES, name)); } catch (e) { continue; }
     if (!st.isFile()) continue;
-    const m = meta[name] || {};
+    const m = meta[name];
     // hidden has to survive the trip. The payload zip is marked hidden by
     // Publish-Installer because the setup program fetches it itself, and the
     // page hides it on that flag. Dropping it here put the old two file
     // instructions back on the downloads page and a 527 MB button next to
     // them that does nothing on its own.
-    //
-    // A script is never something a visitor is offered. A read only
-    // diagnostic for one machine once sat in this folder and so on the
-    // Downloads page as a file to take, naming a staff member and the game
-    // server's address. Anything with a script extension is hidden whatever
-    // files.json says about it.
-    const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
     // The installer's SHA-256, which Publish-Installer writes, so the Downloads
     // page can print it beside the size and date (To Do entry 176). Only a well
     // formed hash goes out, in lower case because Get-FileHash writes upper and
     // the page builds an address from it.
     const sha256 = String(m.sha256 || '').toLowerCase();
     const hash = /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '';
-    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
+    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden,
       label: m.label || name, version: m.version || '', note: m.note || '',
       sha256: hash });
   }
@@ -6987,6 +7006,8 @@ async function handle(req, res) {
       galleryNext: gallery.next,
       launcher: feed.launcher || '',
       collection: feed.collection || '',
+      // The revision that link opens, the one the server was built against (#4115).
+      collectionRevision: Number(feed.collectionRevision) > 0 ? Number(feed.collectionRevision) : 0,
       files: listFiles(),
       news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title })),
       // The hints and lore lines (#3147): the Discord bot's status lines.
@@ -7017,10 +7038,14 @@ async function handle(req, res) {
        answered 500. No folder is still no zip, tested for; a zip deleted by a
        publish between the listing and the look at it is left out. */
     let best = null;
+    // Only a zip files.json lists, since that is all /file/ serves (#3798): an
+    // unlisted one is a publish that never finished writing its list, and
+    // naming it would send the setup program to a 404.
+    const meta = jsonFile(path.join(FILES, 'files.json'), {});
     try {
       const names = fs.existsSync(FILES) ? fs.readdirSync(FILES) : [];
       for (const name of names) {
-        if (!/^Thornswood-Setup(?:-\d{8}-\d{4})?\.zip$/i.test(name)) continue;
+        if (!payloadZip(name) || !downloadServed(name, meta)) continue;
         let st;
         try { st = fs.statSync(path.join(FILES, name)); }
         catch (e) { if (e.code === 'ENOENT') continue; throw e; }
@@ -7041,9 +7066,7 @@ async function handle(req, res) {
     // else would make every install delete a good download. An empty value is
     // what an installer from before this sees when the field is missing; an
     // installer from #1365 on stops on it rather than fetching half a
-    // gigabyte it has no way to measure, so a publish without files.json
-    // beside the zip is an install nobody can run.
-    const meta = jsonFile(path.join(FILES, 'files.json'), {});
+    // gigabyte it has no way to measure.
     const sha = String((meta[best.name] || {}).sha256 || '');
     return sendJson(res, 200, {
       name: best.name,
@@ -7512,14 +7535,16 @@ async function handle(req, res) {
   const dl = p.match(/^\/file\/([A-Za-z0-9._ -]+)$/);
   if (dl && req.method === 'GET') {
     const file = path.join(FILES, dl[1]);
-    if (!file.startsWith(FILES + path.sep) || !fs.existsSync(file)) {
+    // Only what files.json publishes (downloadServed, #3798).
+    const meta = jsonFile(path.join(FILES, 'files.json'), {});
+    if (!file.startsWith(FILES + path.sep) || !downloadServed(dl[1], meta) ||
+        !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
     // The installer from the main release's GitHub Release, once it holds
     // this very file publicly (release copies, #3686).
     if (dl[1] === 'Thornswood-Setup.exe') {
-      const meta = jsonFile(path.join(FILES, 'files.json'), {});
       const copy = releaseInstallerCopy(String((meta[dl[1]] || {}).sha256 || '').toLowerCase(), st.size);
       if (copy) {
         res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });

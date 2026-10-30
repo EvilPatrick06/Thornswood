@@ -88,7 +88,7 @@ Yes '  and a running one is never cancelled' ($conc -match '(?m)^\s+cancel-in-pr
 $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
 $drop = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\drop-claims.yml'))
 $dropRunsOn = [regex]::Match($drop, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-Yes ("it runs on the VPS runners drop-claims uses ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]' -and $runsOn -eq $dropRunsOn)
+Yes ("it runs on the VPS runners drop-claims uses, only while the repository is private, and on GitHub's once public (#3685) ({0})" -f $runsOn) ($runsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}" -and $runsOn -eq $dropRunsOn)
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 
 # ---- 2. nothing from the repository, nothing pasted into the script ---------

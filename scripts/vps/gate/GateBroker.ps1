@@ -82,6 +82,16 @@ function Send([string]$m) {
     try { $script:Writer.WriteLine($m) } catch { $script:Gone = $true }
 }
 
+# A short program's lines, its errors among them, and its exit code. The
+# broker runs under Windows PowerShell 5.1, where a redirected line on stderr
+# under 'Stop' ends the script before the exit code is read (the gate's
+# install stopped that way on 29 Oct), so 'Continue' holds here alone.
+function Invoke-Short([string]$File, [string[]]$Words) {
+    $ErrorActionPreference = 'Continue'
+    $o = @(& $File @Words 2>&1 | ForEach-Object { "$_" })
+    return [pscustomobject]@{ Out = $o; Code = $LASTEXITCODE }
+}
+
 # One program to its end, its output sent line by line as it comes and its
 # errors after it. Returns its exit code; -1 when it outlived $Minutes and
 # was ended with everything it started.
@@ -112,7 +122,7 @@ function Invoke-Child([string]$File, [string[]]$Words, [string]$Dir, [double]$Mi
         }
         if ((Get-Date) -gt $until) {
             Send ('| the gate ended it: it ran past its ' + $Minutes + ' minutes')
-            & "$env:SystemRoot\System32\taskkill.exe" /T /F /PID $p.Id 2>&1 | Out-Null
+            Invoke-Short "$env:SystemRoot\System32\taskkill.exe" @('/T', '/F', '/PID', [string]$p.Id) | Out-Null
             $p.WaitForExit(30000) | Out-Null
             return -1
         }
@@ -140,9 +150,9 @@ function Update-Checkout {
         $c = Invoke-Child $git $step $Root 10
         if ($c -ne 0) { Send ('| git ' + $step[2] + ' ended ' + $c + ', so main could not be read'); return '' }
     }
-    $o = @(& $git -C $Repo rev-parse HEAD 2>&1 | ForEach-Object { "$_" })
-    if ($LASTEXITCODE -ne 0 -or ($o -join '') -notmatch '^[0-9a-f]{40}$') { return '' }
-    return ($o -join '')
+    $o = Invoke-Short $git @('-C', $Repo, 'rev-parse', 'HEAD')
+    if ($o.Code -ne 0 -or ($o.Out -join '') -notmatch '^[0-9a-f]{40}$') { return '' }
+    return ($o.Out -join '')
 }
 
 # A file the verb wrote, in pieces small enough for one line each.
@@ -174,9 +184,9 @@ function Invoke-Request($Pipe) {
     if ($req.Verb -eq 'ping') {
         # It also reads main's tip with the deploy key, so a ping proves the
         # way to GitHub as well as the pipe.
-        $tip = @(& ([string]$Cfg.git) ls-remote ([string]$Cfg.remote) refs/heads/main 2>&1 | ForEach-Object { "$_" })
-        $main = if ($LASTEXITCODE -eq 0 -and ($tip -join ' ') -match '^([0-9a-f]{40})\s') { $Matches[1] } else { '' }
-        if (-not $main) { Send ('| GATE BROKEN: GitHub did not answer with the deploy key: ' + (($tip | Select-Object -Last 2) -join ' ')); Send '@END 66'; Log 'PING main unreadable'; return }
+        $tip = Invoke-Short ([string]$Cfg.git) @('ls-remote', ([string]$Cfg.remote), 'refs/heads/main')
+        $main = if ($tip.Code -eq 0 -and ($tip.Out -join ' ') -match '([0-9a-f]{40})\s+refs/heads/main') { $Matches[1] } else { '' }
+        if (-not $main) { Send ('| GATE BROKEN: GitHub did not answer with the deploy key: ' + (($tip.Out | Select-Object -Last 2) -join ' ')); Send '@END 66'; Log 'PING main unreadable'; return }
         Send ('| GATE READY, installed from ' + $Cfg.commit + ', main at ' + $main + ', runs ' + ((@((Read-ThornswoodGateVerbs (Join-Path $Root 'verbs.json')).verbs.PSObject.Properties) | ForEach-Object { $_.Name }) -join ', '))
         Send '@END 0'
         Log 'PING'

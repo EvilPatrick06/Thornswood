@@ -140,11 +140,10 @@ namespace Thornswood
         static StackPanel galleryChosenList;
         static WrapPanel galleryApprovedList;
         static List<Gallery.Pending> galleryPending;
-        static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
+        static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
         static CheckBox chkCrashSnapshots; static TextBlock txtCrashFolder; static Button btnCrashFolder;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
-        static StackPanel chatFadeRow; static TextBlock txtChatFadeNote; static CheckBox chkNeedsBars;
         static CheckBox chkKeepSaves;
         static CheckBox chkDeleteMods;
         static Button btnVoiceTest;
@@ -188,7 +187,7 @@ namespace Thornswood
                       btnRefreshAddons,
                       btnScan, btnFix, btnOpenMine, btnRefreshMine, btnInstallNow,
                       btnBackupSaves, btnOpenSaveFolder, btnCopyCrash, btnOpenLogFolder, btnSaveDisplay, btnShowServer,
-                      btnAllControls, btnQuitGame;
+                      btnQuitGame;
         static Button[] navButtons;
         static UIElement[] pages;
 
@@ -292,6 +291,32 @@ namespace Thornswood
         /// </summary>
         static bool askedToUninstall;
 
+        /// <summary>
+        /// How long the mod check on the way in took, for the start line
+        /// (LogStartTime). -1 until it has run.
+        /// </summary>
+        static double startScanSeconds = -1;
+
+        /// <summary>
+        /// One line in launcher.log once the window has drawn: how long after
+        /// Windows started the process, and how much of that the mod check
+        /// on the way in took (#3534). Nothing measured the launcher's start
+        /// before, so the weekly review had no number for it. The line goes to
+        /// the site with the session's launcher.log like every other line, and
+        /// scripts\vps\Read-LauncherStarts.ps1 totals a week of them on the box.
+        /// Its words are what that script reads: change both together.
+        /// </summary>
+        static void LogStartTime()
+        {
+            double window;
+            using (var me = Process.GetCurrentProcess())
+                window = (DateTime.Now - me.StartTime).TotalSeconds;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            LogOnly("Launcher start: the window was on screen " + window.ToString("F1", inv) + " s after the launcher started" +
+                    (startScanSeconds >= 0 ? ", " + startScanSeconds.ToString("F1", inv) + " s of it the mod check" : "") +
+                    ", on launcher " + Updater.Version + ".");
+        }
+
         static void Run(string[] args)
         {
             string root = null;
@@ -326,7 +351,6 @@ namespace Thornswood
             BuildThemeRow();
             BuildThemeEditor();
             BuildDisplay();
-            BuildChat();
             BuildStatRow();
             BuildPathRows();
             BuildHelp();
@@ -403,7 +427,6 @@ namespace Thornswood
                 try { win.Dispatcher.BeginInvoke((Action)delegate { Log(cleaned); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what came out of the Steam copy", ex); }
             });
             try { string ini = ThornIni.Ensure(); if (ini != null) Log(ini); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
-            try { string fov = ThornIni.UndoShippedFov(); if (fov != null) Log(fov); } catch (Exception ex) { Swallow.Note("Shell.Run", ex); }
             // Steam's Updates setting for the Steam copy of Skyrim: logged, and set when it does not hold the version (ShellSteamUpdates.cs, #493), only until the own folder is made (#1226).
             try { if (SteamUpdates.LooksAtStart(!Paths.Collection, Downgrade.Needed(cfg))) HoldSteamUpdatesOnStart(); } catch (Exception ex) { Swallow.Note("Shell.Run, Steam's Updates setting", ex); }
             {
@@ -480,8 +503,10 @@ namespace Thornswood
             // Scan asks the server for its plugin list. The server having a bad
             // night is not a reason for the launcher to stop halfway through
             // starting, with the window built and nothing on it.
+            var scanClock = Stopwatch.StartNew();
             try { RunScan(); }
             catch (Exception ex) { Log("Could not check the mod list on the way in: " + ex.Message); }
+            startScanSeconds = scanClock.Elapsed.TotalSeconds;
             if (DrawStatus()) Log("Ready."); else Log("Something needs attention before you can play.");
             // Nobody should have to press anything to get a client file back.
             // This does nothing at all when the six are the recorded build,
@@ -527,6 +552,7 @@ namespace Thornswood
             // disappear and puts it back if this one closes first. SelfSwap.cs.
             win.ContentRendered += delegate
             {
+                try { LogStartTime(); } catch (Exception ex) { Swallow.Note("Shell.Run, saying how long the start took", ex); }
                 string self = Assembly.GetExecutingAssembly().Location;
                 ThreadPool.QueueUserWorkItem(delegate
                 {
@@ -704,9 +730,6 @@ namespace Thornswood
             logList = F<StackPanel>("LogList"); statRow = F<UniformGrid>("StatRow");
             displayModeRow = F<StackPanel>("DisplayModeRow");
             boxResolution = F<TextBox>("BoxResolution"); boxFrameLimit = F<TextBox>("BoxFrameLimit");
-            boxFov = F<TextBox>("BoxFov");
-            chatFadeRow = F<StackPanel>("ChatFadeRow"); txtChatFadeNote = F<TextBlock>("TxtChatFadeNote");
-            chkNeedsBars = F<CheckBox>("ChkNeedsBars");
             chkVSync = F<CheckBox>("ChkVSync"); chkKeepOpen = F<CheckBox>("ChkKeepOpen");
             btnBackupSaves = F<Button>("BtnBackupSaves"); btnOpenSaveFolder = F<Button>("BtnOpenSaveFolder");
             btnCopyCrash = F<Button>("BtnCopyCrash"); btnOpenLogFolder = F<Button>("BtnOpenLogFolder");
@@ -768,7 +791,6 @@ namespace Thornswood
             firstRunCard = F<StackPanel>("FirstRunCard");
             quickKeysCard = F<StackPanel>("QuickKeysCard");
             quickKeys = F<StackPanel>("QuickKeys");
-            btnAllControls = F<Button>("BtnAllControls");
             galleryCard = F<FrameworkElement>("GalleryCard");
             galleryImage = F<Image>("GalleryImage");
             galleryBy = F<TextBlock>("GalleryBy");
@@ -795,12 +817,12 @@ namespace Thornswood
             navButtons = new Button[] {
                 F<Button>("NavPlay"), F<Button>("NavNews"), F<Button>("NavServer"),
                 F<Button>("NavMods"), F<Button>("NavBuild"), F<Button>("NavSaves"),
-                F<Button>("NavControls"), F<Button>("NavLogs"), F<Button>("NavDiag"),
+                F<Button>("NavLogs"), F<Button>("NavDiag"),
                 F<Button>("NavHelp"), F<Button>("NavSettings"), F<Button>("NavGallery") };
             pages = new UIElement[] {
                 F<Grid>("PagePlay"), F<Grid>("PageNews"), F<Grid>("PageServer"),
                 F<Grid>("PageMods"), F<Grid>("PageBuild"), F<Grid>("PageSaves"),
-                F<Grid>("PageControls"), F<Grid>("PageLogs"), F<Grid>("PageDiag"),
+                F<Grid>("PageLogs"), F<Grid>("PageDiag"),
                 F<Grid>("PageHelp"), F<Grid>("PageSettings"), F<Grid>("PageGallery") };
 
             /*
@@ -811,8 +833,9 @@ namespace Thornswood
               backing up local save files is showing people something that is
               no longer where their character is, which is worse than showing
               them nothing. The other four are the read-and-diagnose pages the
-              team no longer wants in the everyday rail: Play, News, Controls,
-              Diagnostics, Help and Settings are what is left.
+              team no longer wants in the everyday rail: Play, News,
+              Diagnostics, Help and Settings are what is left. Controls was
+              cut out of the arrays when its keys moved into the game (#3126).
 
               Collapsed rather than cut out of the arrays. The three arrays
               (navButtons, pages, PageTitles) and the PageXxx constants are
@@ -1108,12 +1131,12 @@ namespace Thornswood
         // bare number in the middle of Play() sent people to the wrong page for
         // weeks without anyone noticing.
         const int PagePlay = 0, PageNews = 1, PageServer = 2, PageMods = 3, PageBuild = 4,
-                  PageSaves = 5, PageControls = 6, PageLogs = 7, PageDiag = 8,
-                  PageHelp = 9, PageSettings = 10, PageGallery = 11;
+                  PageSaves = 5, PageLogs = 6, PageDiag = 7,
+                  PageHelp = 8, PageSettings = 9, PageGallery = 10;
 
         static readonly string[] PageTitles = {
             "Play", "News", "Server", "Mods", "What is installed",
-            "Saves", "Controls", "Logs", "Diagnostics", "Help", "Settings", "Gallery" };
+            "Saves", "Logs", "Diagnostics", "Help", "Settings", "Gallery" };
 
         static void ShowPage(int i)
         {
@@ -1132,7 +1155,6 @@ namespace Thornswood
             else if (i == PageServer) BuildServer();
             else if (i == PageMods) BuildModList();
             else if (i == PageBuild) BuildInstalled();
-            else if (i == PageControls) BuildControls();
             else if (i == PageLogs) BuildLogs();
             else if (i == PageDiag) BuildDiag();
             else if (i == PageGallery) BuildGalleryPage();
@@ -2309,7 +2331,11 @@ namespace Thornswood
             {
                 if (collectionBarUp || (collectionNoteUp && !updatePending))
                 {
-                    try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                    // Ahead has nothing to open (#4115): the button is hidden
+                    // for it, and a press that slips in before the redraw
+                    // must not send this copy to another revision.
+                    if (collectionBarUp && CollectionProblem() == "ahead") return;
+                    try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
                     catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                     return;
                 }
@@ -2436,19 +2462,6 @@ namespace Thornswood
                     ? "Resolution locked. Play will leave it exactly as you set it."
                     : "Resolution unlocked. Play will match it to your screen.");
             };
-            chkNeedsBars.Click += delegate
-            {
-                bool shown = chkNeedsBars.IsChecked == true;
-                if (!NeedsBars.Set(shown))
-                {
-                    Log("Could not save the needs bars setting to Thornswood.ini.");
-                    BuildChat();
-                    return;
-                }
-                Log(shown
-                    ? "The needs bars are shown. It applies next time the game starts."
-                    : "The needs bars are hidden. The Body page on K shows the numbers. It applies next time the game starts.");
-            };
 
             tabPlugins.Click += delegate { modTab = 0; BuildModList(); };
             tabSkse.Click += delegate { modTab = 1; BuildModList(); };
@@ -2491,7 +2504,6 @@ namespace Thornswood
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
             };
 
-            btnAllControls.Click += delegate { ShowPage(PageControls); };
 
             // Gallery page (#731): upload, refresh, report send/cancel.
             WireGalleryDrop();
@@ -2897,7 +2909,7 @@ namespace Thornswood
                         "The launcher could not read which revision of the Thornswood collection " +
                         "Vortex has installed. If you have not installed it, or are not sure, open " +
                         "the collection and let Vortex install or update it. Play is not held for this.";
-                    btnInstallNow.Content = "Open the collection";
+                    btnInstallNow.Content = CollectionButtonText();
                     btnInstallNow.IsEnabled = true;
                     updateBar.Visibility = Visibility.Visible;
                     btnInstallNow.Visibility = Visibility.Visible;
@@ -2966,10 +2978,20 @@ namespace Thornswood
                 btnPlay.Content = "PREPARING THE GAME FOLDER";
                 btnPlay.ToolTip = "Thornswood's own Skyrim folder is being brought up to date from Vortex. Play comes back when it is done.";
             }
+            // Ahead is the server's to fix, not the person's (#4115). It used to
+            // read INSTALL THE MODS FIRST and say to open the collection, which
+            // cannot help and, from the newest revision, can only lead further on.
+            else if (collectionBarUp && !playing && CollectionProblem(collectionRevision) == "ahead")
+            {
+                btnPlay.Content = "WAITING FOR THE SERVER";
+                btnPlay.ToolTip = "The server was built against collection revision " + Updater.FeedCollectionRevision +
+                                  " and this copy is on " + collectionRevision + ". Nothing needs installing. " +
+                                  "Play opens once the server is rebuilt on your revision.";
+            }
             else if (collectionBarUp && !playing)
             {
-                btnPlay.Content = "INSTALL THE MODS FIRST";
-                btnPlay.ToolTip = "Open the collection from the card above, then come back.";
+                btnPlay.Content = CollectionProblem(collectionRevision) == "stale" ? "UPDATE THE MODS FIRST" : "INSTALL THE MODS FIRST";
+                btnPlay.ToolTip = "Open the collection from the card above, install the revision it opens in Vortex, then come back.";
             }
             else if (updatePending && !playing)
             {
@@ -3876,8 +3898,8 @@ namespace Thornswood
         static void Redraw()
         {
             BuildThemeRow(); BuildThemeEditor(); BuildModList(); DrawStatus(); BuildPathRows(); BuildHelp();
-            BuildStatRow(); BuildNews(); BuildLogs(); BuildDisplay(); BuildChat();
-            BuildServer(); BuildInstalled(); BuildControls(); BuildDiag(); RefreshDiscord();
+            BuildStatRow(); BuildNews(); BuildLogs(); BuildDisplay();
+            BuildServer(); BuildInstalled(); BuildDiag(); RefreshDiscord();
             boxSearch.Foreground = Res(boxSearch.Text == SearchHint ? "Faint" : "Ink");
         }
 
@@ -3989,8 +4011,8 @@ namespace Thornswood
             // The five that matter first for somebody joining the server: the
             // emote wheel, and the four keys that only make sense here, trade,
             // party, friend and journal. All are Thornswood's own, in
-            // Thornswood.ini, so each shows the key it is really bound to and
-            // the fuller Controls page below carries the rest.
+            // Thornswood.ini, so each shows the key it is really bound to, and
+            // Settings in the game carries the rest and changes them (#3126).
             List<Keys.Binding> keys;
             try { keys = Keys.All(); } catch { keys = new List<Keys.Binding>(); }
 
@@ -4175,17 +4197,13 @@ namespace Thornswood
         {
             displayModeRow.Children.Clear();
 
-            // Field of view first, and outside the check below. It lives in
-            // Thornswood.ini and is applied by the game plugin, so it works
-            // whether or not SSE Display Tweaks is in the build, and greying
-            // it out with the rest of the page would be wrong.
-            boxFov.Text = Fov.Get().ToString();
-
+            // The field of view is not here: it is set in the game, on
+            // Settings, where it can be seen while it changes (#3126).
             if (!Display.Available)
             {
-                txtDisplayNote.Text = "SSE Display Tweaks is not in this build, so only the field of view can be set here.";
+                txtDisplayNote.Text = "SSE Display Tweaks is not in this build, so none of this can be set here. The field of view is on Settings in the game.";
                 boxResolution.IsEnabled = false; boxFrameLimit.IsEnabled = false;
-                chkVSync.IsEnabled = false;
+                chkVSync.IsEnabled = false; btnSaveDisplay.IsEnabled = false;
                 return;
             }
 
@@ -4320,68 +4338,11 @@ namespace Thornswood
             }
         }
 
-        /// <summary>
-        /// How long the chat stays up after a line, and whether the needs bars
-        /// are drawn. Both live in Thornswood.ini beside the field of view and
-        /// are read by the game plugin when the game starts. See ChatFade and
-        /// NeedsBars in Display.cs.
-        /// </summary>
-        static void BuildChat()
-        {
-            chatFadeRow.Children.Clear();
-            int current = ChatFade.Get();
-            foreach (int seconds in ChatFade.Choices)
-            {
-                int captured = seconds;
-                var b = new Button();
-                b.Content = seconds == 0 ? "Never" : seconds + " s";
-                b.Style = (Style)win.Resources["Ghost"];
-                b.Margin = new Thickness(0, 0, 8, 0);
-                if (seconds == current) b.Background = Res("CardHover");
-                b.Click += delegate
-                {
-                    if (!ChatFade.Set(captured))
-                    {
-                        Log("Could not save the chat setting to Thornswood.ini.");
-                        return;
-                    }
-                    BuildChat();
-                    Log(captured == 0
-                        ? "The chat stays on screen all the time. It applies next time the game starts."
-                        : "The chat hides " + captured + " seconds after its last line and comes back with a new line or Enter. It applies next time the game starts.");
-                };
-                chatFadeRow.Children.Add(b);
-            }
-            txtChatFadeNote.Text = current == 0
-                ? "Never: the chat stays on screen all the time, as it used to."
-                : "The chat hides " + current + " seconds after its last line, whoever sent it. A new line brings it back, and so does Enter.";
-            chkNeedsBars.IsChecked = NeedsBars.Shown();
-        }
-
         static void SaveDisplay()
         {
-            // Field of view first, for the same reason it is read first.
-            string rawFov = boxFov.Text.Trim();
-            if (rawFov.Length == 0)
-            {
-                Fov.Set(Fov.Default);
-            }
-            else
-            {
-                int fov;
-                if (!int.TryParse(rawFov, out fov) || fov < Fov.Min || fov > Fov.Max)
-                {
-                    Log("Field of view has to be a number between " + Fov.Min + " and " +
-                        Fov.Max + ". Skyrim's own is " + Fov.Default + ".");
-                    return;
-                }
-                Fov.Set(fov);
-            }
-
             if (!Display.Available)
             {
                 BuildDisplay();
-                Log("Field of view saved. It applies next time the game starts.");
                 return;
             }
 
@@ -5231,10 +5192,10 @@ namespace Thornswood
                 int wants = Updater.FeedCollectionRevision;
                 txtUpdateTitle.Text = "Your mods need updating";
                 txtUpdateNote.Text =
-                    "The server was built against collection revision " + wants + " and this copy " +
-                    "is on " + mine + ", so part of what the server expects is not installed. Open " +
-                    "the collection and let Vortex bring it up to date. It is one button there and " +
-                    "it takes the lot in one go.";
+                    "The server was built against collection revision " + wants + " and this copy is on " + mine +
+                    ", so part of what the server expects is not installed. The button opens revision " +
+                    wants + " on Nexus; install that one in Vortex, not a newer one Nexus may show first. " +
+                    "It is one button there and it takes the lot in one go.";
             }
             else if (problem == "ahead")
             {
@@ -5247,9 +5208,9 @@ namespace Thornswood
                 txtUpdateTitle.Text = "The server has not caught up with you";
                 txtUpdateNote.Text =
                     "You are on collection revision " + mine + " and the server was built " +
-                    "against revision " + wants + ". Nothing is wrong with your install. Play " +
-                    "will refuse you over the load order until the server is rebuilt, which is " +
-                    "ours to do, so say so in the Discord if nobody has.";
+                    "against revision " + wants + ". Nothing is wrong with your install and " +
+                    "nothing needs installing. Play stays shut until the server is rebuilt on " +
+                    "your revision, which is ours to do, so say so in the Discord if nobody has.";
             }
             else
             {
@@ -5260,7 +5221,9 @@ namespace Thornswood
                     "here comes right until that is done, updates included.";
             }
             updateBar.Visibility = Visibility.Visible;
-            btnInstallNow.Visibility = Visibility.Visible;
+            // Ahead has no button (#4115): there is nothing to install, and
+            // every collection page leads to the same revision or a newer one.
+            btnInstallNow.Visibility = problem == "ahead" ? Visibility.Collapsed : Visibility.Visible;
             collectionBarUp = true;
 
             // Open to everybody (#428). Patrick, 28 Sep: "we are in alpha so the
@@ -5270,8 +5233,54 @@ namespace Thornswood
             // left somebody still waiting on their application with a button
             // that only said Connect Discord, which the site refuses until they
             // are accepted. The application is what unlocks Play, not the mods.
-            btnInstallNow.Content = "Open the collection";
+            btnInstallNow.Content = CollectionButtonText();
             btnInstallNow.IsEnabled = true;
+        }
+
+        /// <summary>
+        /// The page the collection buttons open: the revision the server was
+        /// built against (#4115, Checks.CollectionRevisionUrl).
+        /// </summary>
+        static string CollectionLink()
+        {
+            return Checks.CollectionRevisionUrl(cfg, Updater.FeedCollectionRevision);
+        }
+
+        /// <summary>The button's words, naming the revision it opens when one is known.</summary>
+        static string CollectionButtonText()
+        {
+            int wants = Updater.FeedCollectionRevision;
+            return wants > 0 ? "Open revision " + wants : "Open the collection";
+        }
+
+        /// <summary>
+        /// Why the mod updates wait while the collection card is up, in two
+        /// halves: what is wrong, and what they wait for (#4115). The log said
+        /// "the collection is not installed yet" for all three cases, which
+        /// was wrong for a copy behind the server and for one ahead of it.
+        /// </summary>
+        static string[] CollectionWait()
+        {
+            int mine = 0;
+            try { mine = Checks.CollectionRevision(cfg); }
+            catch (Exception ex) { Swallow.Note("Shell.CollectionWait", ex); }
+            int wants = Updater.FeedCollectionRevision;
+            string problem = CollectionProblem(mine);
+            if (problem == "stale")
+                return new[] { "The collection here is on revision " + mine + " and the server's is " + wants + ".",
+                               "for the collection to be updated to revision " + wants };
+            if (problem == "ahead")
+                return new[] { "The collection here is on revision " + mine + ", ahead of the server's " + wants + ".",
+                               "for the server to be rebuilt on revision " + mine };
+            return new[] { "The collection is not installed yet.", "for it to be installed" };
+        }
+
+        /// <summary>What Play says when a press reaches it with the collection card up (#4115).</summary>
+        static string CollectionHeldLine()
+        {
+            return CollectionWait()[0] + (CollectionProblem() == "ahead"
+                ? " Nothing needs installing; Play opens once the server is rebuilt."
+                : " Open the collection from the card above Play, then come back.");
         }
 
 
