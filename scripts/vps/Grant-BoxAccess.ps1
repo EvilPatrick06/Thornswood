@@ -347,7 +347,7 @@ if (Get-ScheduledTask -TaskName '$PutBack') { 'ARMED' }
 }
 
 function Clean($lines) {
-    @($lines | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+    @($lines | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
 }
 
 # A new connection from this machine, the way every script here makes one.
