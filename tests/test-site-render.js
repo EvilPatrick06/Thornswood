@@ -552,6 +552,9 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   yes('and the same page drawn, for a front page served without it', /<h2[ >]/.test(api.html || ''));
   const missing = await get(port, '/api/page/nothing-here');
   yes('/api/page for a page that is not there is still 404', missing.status === 404);
+  const notes = await get(port, '/api/page/lines');
+  yes('/api/page does not hand out lines.md, which is no page and holds the team\'s notes (#3656)',
+      notes.status === 404 && notes.text.indexOf('Hints and lore lines') < 0);
 
   let rm = {};
   try { rm = JSON.parse((await get(port, '/api/roadmap')).text); } catch (e) { }

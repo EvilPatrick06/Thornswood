@@ -69,10 +69,13 @@
   records of step 6 into that folder, placing no file anywhere. Each mod's
   unpacked copy is hashed and deleted as soon as it is worked out, so the
   scratch folder never holds more than one mod. This is how a revision is
-  laid out from a cloud session (#2969): there the Nexus key is the
-  environment variable, 7-Zip is the build Get-SevenZip.ps1 fetches, the cache is
-  $XDG_CACHE_HOME/thornswood/nexus-cache (~/.cache when that is not set), and
-  every path in the records is the Windows path the layout has on One.
+  laid out without One (#2969). Since #2841 a cloud session holds no Nexus
+  key, so it asks for it with
+      pwsh scripts/release/Nexus-Run.ps1 -Line 'Install-NexusRevision -Revision 3'
+  which runs this on a box runner with the key and sends the four records
+  back. Off Windows, 7-Zip is the build Get-SevenZip.ps1 fetches and the
+  cache is $XDG_CACHE_HOME/thornswood/nexus-cache (~/.cache when that is not
+  set); every path in the records is the Windows path the layout has on One.
   Laying files into a game folder is for Windows only, where the game runs.
 
   Needs PowerShell 7 (NexusLayout.cs reads JSON with System.Text.Json), 7-Zip

@@ -39,7 +39,7 @@ try {
   fs.mkdirSync(path.join(tmp, "scripts", "dev"), { recursive: true });
   fs.copyFileSync(path.join(REPO_DIR, "scripts", "dev", "Write-SystemLists.js"), path.join(tmp, "scripts", "dev", "Write-SystemLists.js"));
   fs.mkdirSync(path.join(tmp, "game", "data"), { recursive: true });
-  ["recipes", "harvests", "ores", "hunts", "races"].forEach(function (n) {
+  ["recipes", "harvests", "ores", "hunts", "races", "item-sources"].forEach(function (n) {
     fs.copyFileSync(path.join(REPO_DIR, "game", "data", n + ".json"), path.join(tmp, "game", "data", n + ".json"));
   });
   fs.copyFileSync(path.join(REPO_DIR, "game", "gamemode.js"), path.join(tmp, "game", "gamemode.js"));
