@@ -55,7 +55,7 @@
     },
     "release": {
       "deploy_from": [
-        "tag v*"
+        "branch main"
       ],
       "secrets": [],
       "variables": []
