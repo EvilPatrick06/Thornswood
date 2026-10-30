@@ -104,9 +104,10 @@
   and takings in beds.json; the embassy and remnant rolls in embassy.json; a
   dungeon chest's reservation in dungeon-rewards-ledger.json; a faction or
   business book's members, chat and owner in books.json; a line or a hand
-  out on the trade ships' manifest in trade-cargo.json (#511); a line, a
-  hand out or a journey on the trade carts' manifest in trade-carts.json
-  (#3158); a guild
+  out on the trade ships' manifest in trade-cargo.json (#511); a market
+  stall they keep, and what is laid out on it, in market-stalls.json
+  (#3160); a line, a hand out or a journey on the trade carts' manifest in
+  trade-carts.json (#3158); a guild
   trader's supply waits, commission promises and a trade waiting on them in
   merchant-ledger.json (#2652). This script never
   edits those: what happens to a house or a post held by somebody who is gone
@@ -848,7 +849,7 @@ for (const person of people) {
         left: the old copies in data.
       */
       const LIST = 'deleted-characters.json';
-      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|trade-cargo|trade-carts|merchant-ledger)\.json$/i;
+      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|trade-cargo|market-stalls|trade-carts|merchant-ledger)\.json$/i;
       handled.add(path.join(priv, LIST).toLowerCase());
       let theirs = 0;
       if (P.size) {

@@ -98,7 +98,7 @@
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
                     'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js',
-                    'thornswood-preserve.js', 'thornswood-furniture.js'];
+                    'thornswood-preserve.js', 'thornswood-furniture.js', 'thornswood-stall.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -2269,7 +2269,7 @@
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat', preserve: 'thornswoodPreserve',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip'
+    help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip', stall: 'thornswoodStall'
   };
 
   T.claimFocus = function (who, on) {
@@ -5816,6 +5816,72 @@
     ['HearthFires.esm', 0x1045e], ['HearthFires.esm', 0x1045f], ['HearthFires.esm', 0x10460],
     ['HearthFires.esm', 0x110b9], ['HearthFires.esm', 0x110ba], ['HearthFires.esm', 0x110cd]
   ];
+  /*
+    A MARKET STALL (#3160). Stalls are fixed market stalls (Patrick, 22 Oct
+    2026), and a stall's counter is a static, which the crosshair never
+    names. So the line goes up by where somebody stands: within a stall's
+    reach of the point in front of its counter, in its world or cell, with
+    nothing else of the lock key's under the crosshair, the line says Market
+    stall, and the lock key sends /stall open and the stall's id. The server
+    checks again that they stand there, and its panel does the rest
+    (game/ui/thornswood-stall.js).
+  */
+  // MARKET STALL SPOTS BEGIN
+  // Built by scripts\dev\Build-MarketStallsGamemode.js out of game\data\market-stalls.json. Do not hand edit.
+  const STALL_SPOTS = [
+    ["falkreath-e0b1", 0x3c, "Skyrim.esm", -54113, -34305, -3633, 335],
+    ["falkreath-e0b2", 0x3c, "Skyrim.esm", -54413, -34602, -3620, 335],
+    ["markarth-473a0", 0x16d71, "Skyrim.esm", -174050, 5729, -3363, 183],
+    ["markarth-473a1", 0x16d71, "Skyrim.esm", -174136, 6065, -3328, 183],
+    ["markarth-7de", 0x3c, "Skyrim.esm", -168656, 6632, -4331, 183],
+    ["morthal-bc995", 0x3c, "Skyrim.esm", -85314, 57199, -11567, 254],
+    ["morthal-bc996", 0x3c, "Skyrim.esm", -85377, 57518, -11568, 254],
+    ["riften-1b1f7a", 0x16bb4, "Skyrim.esm", 176485, -98728, 11211, 260],
+    ["riften-1b1f7c", 0x16bb4, "Skyrim.esm", 176213, -99094, 11207, 202],
+    ["riften-1dd1", 0x16bb4, "Skyrim.esm", 172370, -96376, 11128, 202],
+    ["riften-1dd2", 0x16bb4, "Skyrim.esm", 172370, -96231, 11128, 202],
+    ["riften-cc524", 0x16bb4, "Skyrim.esm", 173755, -96726, 11104, 252],
+    ["riften-cc52d", 0x16bb4, "Skyrim.esm", 173079, -97352, 11104, 309],
+    ["riften-cc52e", 0x16bb4, "Skyrim.esm", 173779, -97306, 11104, 257],
+    ["solitude-1aa3b", 0x3c, "Skyrim.esm", -59552, 100648, -13958, 224],
+    ["solitude-2a11", 0x37edf, "Skyrim.esm", -61093, 105827, -8410, 224],
+    ["solitude-2a1b", 0x37edf, "Skyrim.esm", -61315, 105933, -8418, 209],
+    ["solitude-2a49", 0x37edf, "Skyrim.esm", -60786, 105792, -8410, 224],
+    ["solitude-357d", 0x37edf, "Skyrim.esm", -59225, 107632, -8021, 224],
+    ["solitude-46f5", 0x37edf, "Skyrim.esm", -60730, 104169, -8307, 224],
+    ["solitude-4725", 0x37edf, "Skyrim.esm", -61764, 104094, -8307, 224],
+    ["solitude-50c6a", 0x37edf, "Skyrim.esm", -61161, 104924, -8335, 224],
+    ["solitude-5133", 0x3c, "Skyrim.esm", -58740, 101161, -13959, 224],
+    ["solitude-64b8c", 0x37edf, "Skyrim.esm", -61200, 104536, -8334, 224],
+    ["solitude-64b8d", 0x37edf, "Skyrim.esm", -61605, 104462, -8333, 224],
+    ["whiterun-1908f", 0x1a26f, "Skyrim.esm", 21453, -7327, -3587, 254],
+    ["whiterun-5b2e4", 0x1a26f, "Skyrim.esm", 25242, -7425, -3393, 254],
+    ["whiterun-5bee6", 0x1a26f, "Skyrim.esm", 25156, -7089, -3400, 314],
+    ["whiterun-6b0b6", 0x1a26f, "Skyrim.esm", 24382, -7187, -3399, 335],
+    ["whiterun-b7f00", 0x3c, "Skyrim.esm", 12937, -10803, -4726, 238],
+    ["whiterun-fe7f", 0x1a26f, "Skyrim.esm", 24312, -6755, -3422, 270],
+    ["windhelm-383a6", 0x1691d, "Skyrim.esm", 130794, 36455, -12272, 236],
+    ["windhelm-38403", 0x1691d, "Skyrim.esm", 130808, 35750, -12276, 236],
+    ["windhelm-38404", 0x1691d, "Skyrim.esm", 130560, 36224, -12272, 236],
+    ["windhelm-80c33", 0x3c, "Skyrim.esm", 135265, 30774, -12565, 202],
+    ["windhelm-8b01e", 0x1691d, "Skyrim.esm", 134225, 39412, -12049, 236],
+    ["windhelm-8b0a", 0x1691d, "Skyrim.esm", 129842, 36459, -12272, 236],
+    ["windhelm-8b0fb", 0x3c, "Skyrim.esm", 135301, 30408, -12581, 177],
+    ["windhelm-8b6c", 0x1691d, "Skyrim.esm", 130415, 35648, -12272, 236],
+    ["windhelm-a48fc", 0x1691d, "Skyrim.esm", 137951, 38182, -12643, 208],
+    ["windhelm-b4bb", 0x1691d, "Skyrim.esm", 137721, 38748, -12660, 219],
+    ["windhelm-f3c74", 0x1691d, "Skyrim.esm", 131041, 35666, -12272, 219],
+    ["windhelm-f3c75", 0x1691d, "Skyrim.esm", 130560, 36016, -12272, 219],
+    ["winterhold-76d1", 0x3c, "Skyrim.esm", 114289, 104184, -9405, 202],
+    ["winterhold-76d3", 0x3c, "Skyrim.esm", 114562, 104038, -9392, 183],
+    ["winterhold-76e1", 0x3c, "Skyrim.esm", 114011, 103748, -9225, 202],
+    ["winterhold-76e2", 0x3c, "Skyrim.esm", 113403, 100147, -8954, 183],
+    ["winterhold-76e4", 0x3c, "Skyrim.esm", 113628, 100266, -9020, 202],
+    ["winterhold-76e5", 0x3c, "Skyrim.esm", 112678, 100814, -8953, 202],
+    ["winterhold-76e6", 0x3c, "Skyrim.esm", 112650, 100647, -8944, 202]
+  ];
+  // MARKET STALL SPOTS END
+  let stallWorlds = null;  // null not resolved yet, else { stall id: runtime world or cell id }
   const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
   const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
   let lockAt = 0;
@@ -5911,9 +5977,61 @@
 
   const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
 
+  /** The lock key's line at a stall: what stallAt finds, with no menu over it. */
+  function stallNow() {
+    const s = stallAt();
+    if (!s || busyMenuOpenNow()) { return null; }
+    return { hex: s, verb: 'stall open', words: 'Market stall' };
+  }
+
+  /** The id of the stall somebody is standing at, by STALL_SPOTS, or ''. */
+  function stallAt() {
+    if (!STALL_SPOTS.length) { return ''; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return ''; }
+    if (!stallWorlds) {
+      const got = {};
+      let found = 0;
+      for (let i = 0; i < STALL_SPOTS.length; i++) {
+        try {
+          const f = sp.Game.getFormFromFile(STALL_SPOTS[i][1], STALL_SPOTS[i][2]);
+          const id = f ? (f.getFormID() >>> 0) : 0;
+          if (id) { got[STALL_SPOTS[i][0]] = id; found++; }
+        } catch (e) { }
+      }
+      if (!found) { return ''; }
+      stallWorlds = got;
+      say('market stalls for the lock key: ' + found + ' of ' + STALL_SPOTS.length + ' found');
+    }
+    let where = 0, x = 0, y = 0, z = 0;
+    try {
+      const w = pc.getWorldSpace();
+      const c = pc.getParentCell();
+      where = w ? (w.getFormID() >>> 0) : (c ? (c.getFormID() >>> 0) : 0);
+      x = pc.getPositionX(); y = pc.getPositionY(); z = pc.getPositionZ();
+    } catch (e) { return ''; }
+    if (!where) { return ''; }
+    // Two stalls side by side reach over each other: the nearer one is the one at hand.
+    let best = '', bestD = Infinity;
+    for (let i = 0; i < STALL_SPOTS.length; i++) {
+      const s = STALL_SPOTS[i];
+      if (stallWorlds[s[0]] !== where) { continue; }
+      const dx = x - s[3], dy = y - s[4], dz = z - s[5];
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d <= s[6] * s[6] && d < bestD) { best = s[0]; bestD = d; }
+    }
+    return best;
+  }
+
   /** What the lock key would do right now: { hex, verb, words }, or null. */
   function lockKeyNow() {
     if (anyClaim()) { return null; }
+    return lockKeyRef() || stallNow();
+  }
+
+  /** What the lock key would do at what is under the crosshair: a door, a crop or a forge. */
+  function lockKeyRef() {
     let ref = null;
     try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
     if (!ref) { return null; }
@@ -8718,6 +8836,18 @@
     }
   }));
 
+  // A market stall's panel closes when you walk away from the stall (#3160).
+  let stallWatchAt = 0;
+  sp.on('update', guard('stall distance', () => {
+    if (!T.hasFocus('stall')) { return; }
+    const now = Date.now();
+    if (now - stallWatchAt < 250) { return; }
+    stallWatchAt = now;
+    if (!stallAt()) {
+      T.js('try{window.thornswoodStall&&window.thornswoodStall.close();}catch(e){}');
+    }
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
     // Before the isDown guard, not after it.
@@ -9745,6 +9875,10 @@
     if (what === 'ship:opened') { T.claimFocus('ship', true); return; }
     if (what === 'ship:closed') { T.claimFocus('ship', false); return; }
     if (what === 'ship:ready') { log('the trade ships panel is in'); return; }
+    // A market stall's panel (#3160): the lock key at a stall.
+    if (what === 'stall:opened') { T.claimFocus('stall', true); return; }
+    if (what === 'stall:closed') { T.claimFocus('stall', false); return; }
+    if (what === 'stall:ready') { log('the market stall panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
