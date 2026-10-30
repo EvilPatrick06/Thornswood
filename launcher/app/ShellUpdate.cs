@@ -265,12 +265,14 @@ namespace Thornswood
                     if (Downgrade.Needed(cfg))
                     {
                         DrawStatus();
-                        Log("The collection is not installed yet and Skyrim is on the wrong build. The downgrade comes first; the collection card follows it. Updates wait until both are done.");
+                        string[] held = CollectionWait();
+                        Log(held[0] + " Skyrim is on the wrong build too, and the downgrade comes first; the collection card follows it. Updates wait for that and " + held[1] + ".");
                         return;
                     }
                     ShowCollectionBar();
                     DrawStatus();
-                    Log("The collection is not installed yet. Updates wait until it is.");
+                    string[] wait = CollectionWait();
+                    Log(wait[0] + " Updates wait " + wait[1] + ".");
                     return;
                 }
                 // The launcher itself needs no mods to update. Holding it back
@@ -280,7 +282,8 @@ namespace Thornswood
                 // still wait; the exe goes ahead.
                 pendingPacks = new List<Pack>();
                 collectionBarUp = false;
-                Log("The collection is not installed yet. The mod updates wait until it is; the launcher update goes ahead.");
+                string[] waits = CollectionWait();
+                Log(waits[0] + " The mod updates wait " + waits[1] + "; the launcher update goes ahead.");
             }
             else
             {

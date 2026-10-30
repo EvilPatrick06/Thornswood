@@ -6987,6 +6987,8 @@ async function handle(req, res) {
       galleryNext: gallery.next,
       launcher: feed.launcher || '',
       collection: feed.collection || '',
+      // The revision that link opens, the one the server was built against (#4115).
+      collectionRevision: Number(feed.collectionRevision) > 0 ? Number(feed.collectionRevision) : 0,
       files: listFiles(),
       news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title })),
       // The hints and lore lines (#3147): the Discord bot's status lines.

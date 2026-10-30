@@ -2331,7 +2331,11 @@ namespace Thornswood
             {
                 if (collectionBarUp || (collectionNoteUp && !updatePending))
                 {
-                    try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                    // Ahead has nothing to open (#4115): the button is hidden
+                    // for it, and a press that slips in before the redraw
+                    // must not send this copy to another revision.
+                    if (collectionBarUp && CollectionProblem() == "ahead") return;
+                    try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
                     catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                     return;
                 }
@@ -2905,7 +2909,7 @@ namespace Thornswood
                         "The launcher could not read which revision of the Thornswood collection " +
                         "Vortex has installed. If you have not installed it, or are not sure, open " +
                         "the collection and let Vortex install or update it. Play is not held for this.";
-                    btnInstallNow.Content = "Open the collection";
+                    btnInstallNow.Content = CollectionButtonText();
                     btnInstallNow.IsEnabled = true;
                     updateBar.Visibility = Visibility.Visible;
                     btnInstallNow.Visibility = Visibility.Visible;
@@ -2974,10 +2978,20 @@ namespace Thornswood
                 btnPlay.Content = "PREPARING THE GAME FOLDER";
                 btnPlay.ToolTip = "Thornswood's own Skyrim folder is being brought up to date from Vortex. Play comes back when it is done.";
             }
+            // Ahead is the server's to fix, not the person's (#4115). It used to
+            // read INSTALL THE MODS FIRST and say to open the collection, which
+            // cannot help and, from the newest revision, can only lead further on.
+            else if (collectionBarUp && !playing && CollectionProblem(collectionRevision) == "ahead")
+            {
+                btnPlay.Content = "WAITING FOR THE SERVER";
+                btnPlay.ToolTip = "The server was built against collection revision " + Updater.FeedCollectionRevision +
+                                  " and this copy is on " + collectionRevision + ". Nothing needs installing. " +
+                                  "Play opens once the server is rebuilt on your revision.";
+            }
             else if (collectionBarUp && !playing)
             {
-                btnPlay.Content = "INSTALL THE MODS FIRST";
-                btnPlay.ToolTip = "Open the collection from the card above, then come back.";
+                btnPlay.Content = CollectionProblem(collectionRevision) == "stale" ? "UPDATE THE MODS FIRST" : "INSTALL THE MODS FIRST";
+                btnPlay.ToolTip = "Open the collection from the card above, install the revision it opens in Vortex, then come back.";
             }
             else if (updatePending && !playing)
             {
@@ -5178,10 +5192,10 @@ namespace Thornswood
                 int wants = Updater.FeedCollectionRevision;
                 txtUpdateTitle.Text = "Your mods need updating";
                 txtUpdateNote.Text =
-                    "The collection is on revision " + wants + " and this copy is on " + mine +
-                    ", so part of what the server expects is not installed. Open it and let " +
-                    "Vortex bring it up to date. It is one button there and it takes the lot " +
-                    "in one go.";
+                    "The server was built against collection revision " + wants + " and this copy is on " + mine +
+                    ", so part of what the server expects is not installed. The button opens revision " +
+                    wants + " on Nexus; install that one in Vortex, not a newer one Nexus may show first. " +
+                    "It is one button there and it takes the lot in one go.";
             }
             else if (problem == "ahead")
             {
@@ -5194,9 +5208,9 @@ namespace Thornswood
                 txtUpdateTitle.Text = "The server has not caught up with you";
                 txtUpdateNote.Text =
                     "You are on collection revision " + mine + " and the server was built " +
-                    "against revision " + wants + ". Nothing is wrong with your install. Play " +
-                    "will refuse you over the load order until the server is rebuilt, which is " +
-                    "ours to do, so say so in the Discord if nobody has.";
+                    "against revision " + wants + ". Nothing is wrong with your install and " +
+                    "nothing needs installing. Play stays shut until the server is rebuilt on " +
+                    "your revision, which is ours to do, so say so in the Discord if nobody has.";
             }
             else
             {
@@ -5207,7 +5221,9 @@ namespace Thornswood
                     "here comes right until that is done, updates included.";
             }
             updateBar.Visibility = Visibility.Visible;
-            btnInstallNow.Visibility = Visibility.Visible;
+            // Ahead has no button (#4115): there is nothing to install, and
+            // every collection page leads to the same revision or a newer one.
+            btnInstallNow.Visibility = problem == "ahead" ? Visibility.Collapsed : Visibility.Visible;
             collectionBarUp = true;
 
             // Open to everybody (#428). Patrick, 28 Sep: "we are in alpha so the
@@ -5217,8 +5233,54 @@ namespace Thornswood
             // left somebody still waiting on their application with a button
             // that only said Connect Discord, which the site refuses until they
             // are accepted. The application is what unlocks Play, not the mods.
-            btnInstallNow.Content = "Open the collection";
+            btnInstallNow.Content = CollectionButtonText();
             btnInstallNow.IsEnabled = true;
+        }
+
+        /// <summary>
+        /// The page the collection buttons open: the revision the server was
+        /// built against (#4115, Checks.CollectionRevisionUrl).
+        /// </summary>
+        static string CollectionLink()
+        {
+            return Checks.CollectionRevisionUrl(cfg, Updater.FeedCollectionRevision);
+        }
+
+        /// <summary>The button's words, naming the revision it opens when one is known.</summary>
+        static string CollectionButtonText()
+        {
+            int wants = Updater.FeedCollectionRevision;
+            return wants > 0 ? "Open revision " + wants : "Open the collection";
+        }
+
+        /// <summary>
+        /// Why the mod updates wait while the collection card is up, in two
+        /// halves: what is wrong, and what they wait for (#4115). The log said
+        /// "the collection is not installed yet" for all three cases, which
+        /// was wrong for a copy behind the server and for one ahead of it.
+        /// </summary>
+        static string[] CollectionWait()
+        {
+            int mine = 0;
+            try { mine = Checks.CollectionRevision(cfg); }
+            catch (Exception ex) { Swallow.Note("Shell.CollectionWait", ex); }
+            int wants = Updater.FeedCollectionRevision;
+            string problem = CollectionProblem(mine);
+            if (problem == "stale")
+                return new[] { "The collection here is on revision " + mine + " and the server's is " + wants + ".",
+                               "for the collection to be updated to revision " + wants };
+            if (problem == "ahead")
+                return new[] { "The collection here is on revision " + mine + ", ahead of the server's " + wants + ".",
+                               "for the server to be rebuilt on revision " + mine };
+            return new[] { "The collection is not installed yet.", "for it to be installed" };
+        }
+
+        /// <summary>What Play says when a press reaches it with the collection card up (#4115).</summary>
+        static string CollectionHeldLine()
+        {
+            return CollectionWait()[0] + (CollectionProblem() == "ahead"
+                ? " Nothing needs installing; Play opens once the server is rebuilt."
+                : " Open the collection from the card above Play, then come back.");
         }
 
 
