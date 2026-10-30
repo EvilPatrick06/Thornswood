@@ -111,7 +111,16 @@ const parts = {
   isChurn: liftFn('isChurn'),
   churn: liftFn('churn'),
   waitWord: liftFn('waitWord'),
-  handler: liftHandler()
+  handler: liftHandler(),
+  // The owners of a plant no table names (#3141), the real lists and the real
+  // two functions, so the cheese is seen going to the engine through them.
+  ownerLists: (function () {
+    const a = src.indexOf('\nvar WORLD_PRODUCE_ANYBODY = {');
+    const b = src.indexOf('\nvar unownedProduceSeen = {};');
+    return (a < 0 || b < 0) ? null : src.slice(a + 1, b + '\nvar unownedProduceSeen = {};'.length);
+  })(),
+  isWorldProduce: liftFn('isWorldProduce'),
+  worldProduce: liftFn('worldProduce')
 };
 yes('churn() is in the gamemode', !!parts.churn);
 yes('and isChurn() and CHURNS beside it', !!parts.isChurn && !!parts.churnsLine);
@@ -126,6 +135,8 @@ yes('the churn waits HARVEST_COOLDOWN_MS, a wait longestWaitMs already reads',
 yes('the real cooldown block and wait sentence are where they were',
     !!parts.coolBlock && !!parts.waitWord);
 yes('the activate handler is in the gamemode', !!parts.handler);
+yes('and the owner lists and both owner functions of #3141 beside it',
+    !!parts.ownerLists && !!parts.isWorldProduce && !!parts.worldProduce);
 
 const FARMER = 0x14a, GATHERER = 0x14b, NOCLASS = 0x14c, FARMER2 = 0x14d;
 const FARM_NO = 'Only a farmer can bring a crop in. Ask one.';
@@ -189,7 +200,8 @@ function world(opts) {
     'isVein', 'mineOre', 'loot', 'milk', 'log', 'ITEMS', 'floraHanded', 'isHive', 'hive'];
   const body = "'use strict';\n" +
     [parts.coolBlock, parts.waitLine, parts.churnsLine,
-     parts.waitWord, parts.isChurn, parts.churn].filter(Boolean).join('\n') + '\n' +
+     parts.waitWord, parts.isChurn, parts.churn,
+     parts.ownerLists, parts.isWorldProduce, parts.worldProduce].filter(Boolean).join('\n') + '\n' +
     'const onActivate = ' + (parts.handler || 'null') + ';\n' +
     'return { churn: typeof churn === "function" ? churn : null,\n' +
     '         isChurn: typeof isChurn === "function" ? isChurn : null,\n' +
@@ -397,8 +409,9 @@ function world(opts) {
   // The generated blocks in the gamemode write descriptors in double quotes.
   yes('neither base is in any generated table in the gamemode, so no class branch can take either',
       src.indexOf('"' + CHURN_BASE + '"') === -1 && src.indexOf('"' + CHEESE_BASE + '"') === -1);
-  yes('and the cheese is in no hand table either, so it falls through to the engine for anybody',
-      src.indexOf("'" + CHEESE_BASE + "'") === -1);
+  yes('and the cheese is in no hand table but WORLD_PRODUCE_ANYBODY, which hands it to the engine for anybody (#3141)',
+      !!parts.ownerLists && parts.ownerLists.indexOf("'" + CHEESE_BASE + "'") !== -1 &&
+      src.split("'" + CHEESE_BASE + "'").length === 2);
 
   let r = null;
   try { r = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'game', 'data', 'recipes.json'), 'utf8').replace(BOM, '')); }

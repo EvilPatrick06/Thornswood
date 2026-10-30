@@ -94,6 +94,7 @@ try {
     Put $work 'launcher/README.md' 'the launcher'
     Put $work 'records/client-build.json' '{"forkCommit":"d0006351"}'
     Put $work 'records/ui-gone.json' '{"daedric":{},"unused":[]}'
+    Put $work 'records/generated.json' '{"version":1}'
     Put $work 'game/ui/thornswood-select.js' '1'
     Commit $work 'the tagged launcher'
     G -C $work -c tag.gpgsign=false tag v1.1.101
@@ -115,11 +116,16 @@ try {
     $d = @(Get-LauncherDrift $work 'v1.1.101')
     Yes "the ui-gone record compiled into the exe counts: '$($d -join ', ')'" ($d -contains 'records/ui-gone.json')
 
+    Put $work 'records/generated.json' '{"version":2}'
+    Commit $work 'the build list moves'
+    $d = @(Get-LauncherDrift $work 'v1.1.101')
+    Yes "the build list compiled into the exe counts (#3715): '$($d -join ', ')'" ($d -contains 'records/generated.json')
+
     Put $work 'launcher/app/Shell.cs' 'class Shell { void StartMenuMusic() { } }'
     Commit $work 'the menu music fix, as on 27 September'
     $d = @(Get-LauncherDrift $work 'v1.1.101')
     Yes "a launcher source change after the tag is named: '$($d -join ', ')'" ($d -contains 'launcher/app/Shell.cs')
-    Yes '  the records and the source, and not the README' ($d.Count -eq 3 -and $d -notcontains 'launcher/README.md')
+    Yes '  the records and the source, and not the README' ($d.Count -eq 4 -and $d -notcontains 'launcher/README.md')
 
     Yes 'a tag that is not here drifts nothing (the CI step stops that Ship)' (@(Get-LauncherDrift $work 'v9.9.9').Count -eq 0)
 

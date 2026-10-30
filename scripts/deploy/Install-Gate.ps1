@@ -218,6 +218,10 @@ function New-GateKey([string]`$path, [string]`$comment) {
   # Windows PowerShell 5.1 drops an empty argument, so the empty passphrase
   # goes as '""', which reaches ssh-keygen as an empty one; '' is tried too,
   # and each key is proved to open with no passphrase the same way.
+  # What ssh-keygen writes to stderr must not stop this under 'Stop' in
+  # Windows PowerShell 5.1 before the second way is tried; its exit code and
+  # the files it leaves are what count.
+  `$ErrorActionPreference = 'Continue'
   foreach (`$empty in '""', '') {
     Remove-Item -LiteralPath `$path, (`$path + '.pub') -Force -EA SilentlyContinue
     & `$keygen -q -t ed25519 -N `$empty -C `$comment -f `$path 2>&1 | Out-Null
@@ -247,12 +251,21 @@ foreach (`$k in `$ghKey, `$boxKey) { Set-SystemAdminsOnly `$k }
 'CHANGED GitHub''s ' + `$ghHosts.Count + ' host key(s) pinned for ssh.github.com:443'
 
 # ---- the box's own host keys, held to vps.json's pins
+# Each fingerprint is worked out here, as vps-openssh.ps1's Get-KeyPrint does,
+# not by ssh-keygen's -l: the box's OpenSSH no longer reads its old DSA key, and
+# what ssh-keygen says about that stops this script under 'Stop' in Windows
+# PowerShell 5.1, 2>`$null or not (29 Oct, the second install).
 `$pins = @($pinned)
 `$lines = @()
+`$sha = [Security.Cryptography.SHA256]::Create()
 foreach (`$pub in @(Get-ChildItem -LiteralPath (Join-Path `$env:ProgramData 'ssh') -Filter 'ssh_host_*_key.pub')) {
-  `$fp = [regex]::Match(((& `$keygen -l -E sha256 -f `$pub.FullName 2>`$null) -join ' '), 'SHA256:[A-Za-z0-9+/]+').Value
-  if (`$pins -contains `$fp) { `$t = ([IO.File]::ReadAllText(`$pub.FullName).Trim() -split '\s+'); `$lines += ('$Address ' + `$t[0] + ' ' + `$t[1]) }
+  `$t = @(([IO.File]::ReadAllText(`$pub.FullName).Trim()) -split '\s+')
+  if (`$t.Count -lt 2) { continue }
+  try { `$blob = [Convert]::FromBase64String(`$t[1]) } catch { continue }
+  `$fp = 'SHA256:' + [Convert]::ToBase64String(`$sha.ComputeHash(`$blob)).TrimEnd('=')
+  if (`$pins -contains `$fp) { `$lines += ('$Address ' + `$t[0] + ' ' + `$t[1]) }
 }
+`$sha.Dispose()
 if (-not `$lines.Count) { 'STOP none of the box''s host keys is one vps.json pins, so the gate would not know the box. Nothing more was changed.'; exit 1 }
 [IO.File]::WriteAllLines((Join-Path `$root 'keys\box_known_hosts'), [string[]]`$lines, `$utf8)
 'CHANGED ' + `$lines.Count + ' pinned host key(s) of the box for the gate'

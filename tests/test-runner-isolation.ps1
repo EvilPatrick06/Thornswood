@@ -90,9 +90,52 @@ try {
     $signRisk = @([regex]::Matches($x.Out, 'RISK  workflow \S+ job \S+ on a signing runner[^\r\n]*') | ForEach-Object { $_.Value })
     T ($signRisk.Count -eq 0) ("no job of the real workflows can put another ref's code on the signing runner" + $(if ($signRisk.Count) { ":`n      " + ($signRisk -join "`n      ") } else { '' }))
     T ($x.Out -notmatch 'RISK  workflow \S+ runs on') 'no real workflow runs a pull request on the production runners without the same-repository condition'
-    T ($x.Report -match '\| workflow \| nightly\.yml job board on a signing runner \|[^\n]*held to main[^\n]*\| ok \|' -and $x.Report -match '\| workflow \| release\.yml job launcher-vps on a signing runner \|[^\n]*held to main[^\n]*\| ok \|') 'the nightly''s board job and the release fallback that signs are read, and held to main and v tags'
+    T ($x.Report -match '\| workflow \| nightly\.yml job board on a signing runner \|[^\n]*held to main[^\n]*\| ok \|') 'the nightly''s board job is read, and held to main and v tags'
+    # release.yml signs on GitHub's runner alone since #4013, so none of its
+    # jobs is on a signing runner.
+    T ($x.Report -notmatch '\| workflow \| release\.yml job \S+ on a signing runner') 'no job of release.yml is on a signing runner (#4013)'
     T ($x.Report -notmatch '\| harnesses\.yml job harnesses on a signing runner') 'harnesses.yml asks for a build runner, which never signs'
     T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*same-repository pull requests only[^\n]*\| ok \|') 'the real build-pr.yml falls back to the VPS for same-repository pull requests only, and the check says ok (Patrick, 12 Oct 2026)'
+
+    # Anything anyone can start on a public repository (#3685): opening or
+    # closing their own issue. The real area-label.yml and drop-claims.yml
+    # take the VPS only while the repository is private.
+    foreach ($n in 'area-label.yml', 'drop-claims.yml') {
+        T ($x.Out -notmatch ('RISK  workflow ' + [regex]::Escape($n) + ' started by anyone') -and $x.Report -match ('\| workflow \| ' + [regex]::Escape($n) + ' started by anyone \|[^\n]*only while private[^\n]*\| ok \|')) "the real $n is on the VPS only while the repository is private, and the check says ok"
+    }
+    $wfIs = Join-Path $scratch 'wfis'; New-Item -ItemType Directory -Path $wfIs | Out-Null
+    Set-Content (Join-Path $wfIs 'label.yml') "on:`n  issues:`n    types: [opened]`npermissions:`n  issues: write`njobs:`n  a:`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfIs
+    T ($x.Out -match 'RISK  workflow label\.yml started by anyone') 'an issue job always on the production label is a risk, even while private'
+    Set-Content (Join-Path $wfIs 'label.yml') "on:`n  issue_comment:`npermissions:`n  issues: write`njobs:`n  a:`n    runs-on: `${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'ubuntu-latest' }}`n  b:`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfIs
+    T ($x.Out -match 'RISK  workflow label\.yml started by anyone') '  and one job left on it beside one that picks it only while private is still a risk'
+    Set-Content (Join-Path $wfIs 'label.yml') "on:`n  issue_comment:`npermissions:`n  issues: write`njobs:`n  a:`n    runs-on: `${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'ubuntu-latest' }}`n"
+    $x = Run (Facts) $wfIs
+    T ($x.Out -notmatch 'RISK  workflow label\.yml started by anyone') '  a job that picks it only while private is not'
+    $pub = Facts; $pub.github.private = $false
+    $x = Run $pub $wfIs
+    T ($x.Out -notmatch 'RISK  workflow label\.yml started by anyone') '  and stays not a risk once public, since it then runs on GitHub'
+
+    # Once public, the same-repository condition is no guard: a fork's pull
+    # request carries its own workflow files (#3685). The real build-pr.yml
+    # falls back to the box's build runners (the build label, since 26 Oct
+    # 2026 without the VPS label, and since #4010 the pull request build label,
+    # which runner 2 on the box carries), so a public repository shows it as a
+    # risk until that fallback is gone.
+    $x = Run $pub ''
+    $bp = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build-pr.yml'))
+    if ($bp -match 'runs-on:[^\n]*\bthornswood-(vps|build|pr-build)\b') {
+        T ($x.Out -match 'RISK  workflow build-pr\.yml runs on: expected not thornswood-vps for untrusted code, found [^\n]*the repository is public') 'a public repository with a runner and a pull request job on the production label is a risk, condition or not'
+    } else {
+        T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on') 'build-pr.yml has no job on the production label, so a public repository is safe from it'
+    }
+    T ($x.Out -match 'RISK  github self-hosted runners on a public repository: expected none, found 1') '  and a public repository with any self-hosted runner registered is a risk'
+    # Patrick's A of 26 Oct 2026: on the day it goes public the runners move
+    # to the private ops repository, and then nothing here can reach them.
+    $gone = Facts; $gone.github.private = $false; $gone.github.runners = @()
+    $x = Run $gone ''
+    T ($x.Out -notmatch 'RISK  workflow [^\n]* runs on' -and $x.Out -notmatch 'RISK  workflow [^\n]* started by anyone' -and $x.Out -notmatch 'RISK  github self-hosted runners') 'once public with the runners moved off, no real workflow is a risk'
 
     # A pull request on the production label without the same-repository
     # condition is a risk; with it, it is not.

@@ -74,8 +74,10 @@ param(
     # Build from main's feed, not a game folder (#3412, the note at the top).
     # -Root is the folder New-FeedRoot.ps1 stages, Feed-Store.ps1
     # Get-FeedRootDir main unless given; -Stub is the setup program CI built
-    # (Ship.ps1 Get-ReleaseStub). The installer is not signed here and not
-    # published, so it needs -NoPublish until signing from the feed lands.
+    # (Ship.ps1 Get-ReleaseStub). It signs when this machine can, as any
+    # build does, and never publishes: installer.yml builds and signs it on
+    # GitHub and keeps it on the launcher's draft release, so it needs
+    # -NoPublish.
     [switch]$FromFeed
 )
 
@@ -117,11 +119,13 @@ if ($FromFeed) {
              'which a machine building from the feed does not have. Nothing was built.')
     }
 }
-# Publishing from the feed waits on signing there (#3412): the one place this
-# publishes is the if (-not $NoPublish) at the end, which never sees -FromFeed.
+# An installer from the feed is published by the Ship that publishes its
+# release, from the draft installer.yml keeps it on (#3412), never from here:
+# the one place this publishes is the if (-not $NoPublish) at the end, which
+# never sees -FromFeed.
 if ($FromFeed -and -not $NoPublish) {
-    Die ('-FromFeed does not sign the installer yet, and an unsigned installer is never published (#3412). ' +
-         'Add -NoPublish to build it without publishing. Nothing was built.')
+    Die ('-FromFeed never publishes the installer itself: installer.yml builds and signs it on GitHub (#3412). ' +
+         'Add -NoPublish to build it here without publishing. Nothing was built.')
 }
 
 $GameDir    = Join-Path $Root 'Game'
@@ -525,15 +529,11 @@ elseif (-not $NoVortex) {
     }
 }
 
-$shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
-# From the feed the bodies are the release's, each held to its sha256 by
-# New-FeedRoot; only a collection Ship builds them (as Publish-Update -FromFeed).
-if ($FromFeed) { Say '  the generated bodies are the release''s, by their sha256' 'DarkGray' }
-else { Assert-ShipGeneratedBodies $GameDir $ProfileDir }
+# The behavior files and bodies are built on each computer by the launcher
+# since #3715 and never go in an installer (Ship-Rules Test-ShipGenerated).
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if (Test-ThornswoodRepoPlugin $rel) { return $false }
-    if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
 
@@ -1335,14 +1335,10 @@ if ($OneFile) {
 # Does nothing without records\signing\signing.json, so a machine with no certificate
 # still produces a working, unsigned installer.
 $signer = Join-Path $here 'Sign-Artifact.ps1'
-# From the feed nothing here can sign (no signing setup, no Windows), and an
-# unsigned installer is never published, which is why -FromFeed takes only
-# -NoPublish for now. Signing it on GitHub is #3412's next step.
-if ($FromFeed) {
-    Head 'Signing the installer'
-    Say '  not signed: built from the feed, where nothing signs yet (#3412), so it is not fit to publish' 'Yellow'
-}
-elseif (Test-Path -LiteralPath $signer) {
+# From the feed the same: installer.yml gives its job the signing setup and
+# the identity on GitHub (#3412), and a machine without them builds it
+# unsigned, which nothing publishes.
+if (Test-Path -LiteralPath $signer) {
     Head 'Signing the installer'
     & $signer -Path $exe
     if ($LASTEXITCODE -ne 0) {
