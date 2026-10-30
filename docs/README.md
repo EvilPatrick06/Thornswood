@@ -18,11 +18,13 @@ at the root.
 | [GLOSSARY.md](GLOSSARY.md) | The words used everywhere here, Keep, Hold, pack, baseline, door and the rest, one line each. |
 | [../engine/README.md](../engine/README.md) | Building the SkyMP fork: the submodule, the configure line, the build and the records. |
 | [studies/in-game-ui](studies/in-game-ui/README.md) | The options for voice, chat, emotes and the in-game UI without a browser (#3208): today's voice measured by room size, a box forwarder measured, each option's pros and cons, and the recommendations Patrick picks from. |
+| [studies/launcher-stack](studies/launcher-stack/README.md) | The options for a more modern launcher and installer (#3209): every stack measured with the same prototype window, each option's pros and cons, and what Patrick picked. |
 | [AFFECTED-HARNESSES.md](AFFECTED-HARNESSES.md) | Running only the gate harnesses a pull request can affect (#3114): the Linux study, the read map, the rules, and the trace of the gate on the VPS. |
 | [SIGNED-RELEASES.md](SIGNED-RELEASES.md) | The signed release design (#2163): what gets signed and how, custody, rotation, revocation, the rollout that keeps every checksum, and the test-only pilot. |
 | [CLEAN-INSTALL-RUN.md](CLEAN-INSTALL-RUN.md) | The checklist for a stranger's first install, and what each step should show. |
 | [COLLECTION-REVISION-2.md](COLLECTION-REVISION-2.md) | The Vortex pass for collection revision 2, step by step, and the exact plugin order a clean install must land in. |
 | [COLLECTION-REVISION-3.md](COLLECTION-REVISION-3.md) | Collection revision 3 (#1262): the Unofficial Skyrim Special Edition Patch at 4.3.8a, its two rules and the 49-position order. Local side only until published. |
+| [COLLECTION-REVISION-6.md](COLLECTION-REVISION-6.md) | Collection revision 6: Thornswood Content 1.3, Atlas Map Markers SE out, and the cheddars_mashups.esl rule that ended LOOT's cyclic interactions (#4070), made in one run. |
 | [COLLECTION-REBUILD-7ESSXF.md](COLLECTION-REBUILD-7ESSXF.md) | Rebuilding onto the 7essxf Nexus collection and the steps on the ship PC. |
 | [COLLECTION-METHOD.md](COLLECTION-METHOD.md) | Why the mods come from a Nexus collection (half of the 15 September plan was reversed; it says which). |
 | [VIRUSTOTAL-FALSE-POSITIVE.md](VIRUSTOTAL-FALSE-POSITIVE.md) | Historical notes on scanner flags and vendor reports. Publish no longer uploads to VirusTotal; signing (#390) is the trust path. |

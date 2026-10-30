@@ -71,13 +71,15 @@ try {
     Yes '  and one that shapes the breasts is refused (#1004)' ((Test-BodySlideRules $s (Get-BodySlideValues $s $mv) $mv).Count -gt 0)
 } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 
-# Build-Generated wires the outfits in: built after the bodies, checked for
-# bodies they must not write, and for exactly the files their sets name.
-$bg = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\mods\Build-Generated.ps1'))
-Yes 'Build-Generated builds the outfit sets from the list' ($bg.Contains('$list.Outfits'))
-Yes '  refuses an outfit that writes a body' ($bg.Contains('Test-GeneratedBodyPath $_') -and $bg.Contains('writes a body'))
+# The build wires the outfits in: built after the bodies, checked for bodies
+# they must not write, and for exactly the files their sets name. The build is
+# the launcher's own since #3715 (launcher\app\GeneratedBuild.cs), which
+# Build-Generated.ps1 runs.
+$bg = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\GeneratedBuild.cs'))
+Yes 'the build builds the outfit sets from the list' ($bg.Contains('List.Outfits'))
+Yes '  refuses an outfit that writes a body' ($bg.Contains('Generated.IsBodyPath(e)') -and $bg.Contains('writes a body'))
 Yes '  refuses a missing or stray outfit file' ($bg.Contains('did not build every outfit file') -and $bg.Contains('built files no set names'))
-Yes '  and still refuses any .tri morph' ($bg.Contains("Extension -ieq '.tri'"))
+Yes '  and still refuses any .tri morph' ($bg.Contains('Equals(".tri", StringComparison.OrdinalIgnoreCase)'))
 
 # Each outfit group's permissions are recorded in the provenance register,
 # read off the mod pages (#2454): who made it, the licence, the credit.

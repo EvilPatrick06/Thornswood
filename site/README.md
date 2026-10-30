@@ -35,6 +35,13 @@ else does.
 | `/api/report/game`, `/dev/api/report/game` | POST | each game server, with the bot's key in a header, when somebody types /helpme or /report; the row goes into the inbox and the bot says it in the staff channel (`game\gamemode.js`, the asking staff block) |
 | `/api/play/who` | POST | nothing in the repo asks it now. It says who a ticket belongs to and writes nothing, which makes it the one to try by hand |
 
+The downloads under `/file/` are only what `files\files.json` publishes: a
+name it lists and does not mark hidden, the payload zip it lists (hidden
+because `/api/payload` hands it to the setup program), and `files.json`
+itself, which Ship's installer gate reads (`Read-SiteDownloads` in
+`scripts\release\Feed-Store.ps1`). Anything else put in that folder answers
+404 and is not on the Downloads page (#3798).
+
 Every request that is not a GET has to come from this site (#1367). A
 browser names the page that sent it in `Origin`, or in `Referer` when an old
 one leaves `Origin` off, and either has to be this site's own address, the
