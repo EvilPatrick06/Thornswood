@@ -336,6 +336,7 @@
       '<div class="foot"><span id="' + ID + '-foot"></span>' +
       '<span style="flex:1"></span>' +
       '<button id="' + ID + '-help">Help</button>' +
+      '<button id="' + ID + '-settings">Settings</button>' +
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
@@ -344,6 +345,7 @@
     document.body.appendChild(askEl);
     root.querySelector('#' + ID + '-close').onclick = close;
     root.querySelector('#' + ID + '-help').onclick = help;
+    root.querySelector('#' + ID + '-settings').onclick = settings;
 
     /*
       Escape and P close it, and the page has to handle both itself.
@@ -664,6 +666,12 @@
   */
   function help() {
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('people'); } } catch (e) { }
+    close();
+  }
+
+  /* Settings beside Help (#3126): the Settings panel, the same way. */
+  function settings() {
+    try { if (window.thornswoodSettings) { window.thornswoodSettings.open(); } } catch (e) { }
     close();
   }
 
