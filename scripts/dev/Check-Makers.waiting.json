@@ -660,6 +660,12 @@
       "name": "Spider Egg",
       "issue": "#3465",
       "why": "an animal part no hunt gives yet"
+    },
+    {
+      "desc": "f2012:Skyrim.esm",
+      "name": "Empty Wine Bottle",
+      "issue": "#4652",
+      "why": "water is carried in it (NEEDS.waterItems), and nothing hands one out."
     }
   ],
   "exempt": [

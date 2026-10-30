@@ -25,7 +25,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Drum | Drum | `daba9:Skyrim.esm` |
 | Dwarven Oil | Dwemer Fire Paste | `f11c0:Skyrim.esm` |
 | Eidar Cheese Wheel | Eidar Cheese Fondue | `64b34:Skyrim.esm` |
-| Empty Wine Bottle | a hair dye or a bottle of water | `f2012:Skyrim.esm` |
+| Empty Wine Bottle | a bottle of water | `f2012:Skyrim.esm` |
 | Flute | Flute | `daba7:Skyrim.esm` |
 | Honey | Honey Nut Treat | `10394d:Skyrim.esm` |
 | Linen Wrap | Apotheus Scarf, Bandana, Bandana, Tied, College of Winterhold Cloak, Dark Brotherhood Cloak, Dawngaurd Cloak and 40 more | `34cd6:Skyrim.esm` |
@@ -45,7 +45,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 | Item | Sources | Id |
 | --- | --- | --- |
-| Crimson Nirnroot | quest crimson (game/data/merchant-scarce-harvest.json) | `b701a:Skyrim.esm` |
+| Crimson Nirnroot | quest gatherer crimson novice (game/data/merchant-scarce-harvest.json) | `b701a:Skyrim.esm` |
 | Guild Ledger | quest ledger (game/data/merchant-retrievals.json) | `17001:Thornswood-Content.esp` |
 | Guild Locket | quest locket (game/data/merchant-retrievals.json) | `17003:Thornswood-Content.esp` |
 | Guild Satchel | quest satchel (game/data/merchant-retrievals.json) | `17000:Thornswood-Content.esp` |
