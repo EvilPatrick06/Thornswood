@@ -42,7 +42,8 @@
 <!-- What a link to this site looks like when it is pasted into Discord. Without
      these every address unfurled with the same generic home text, so a link to
      the rules and a link to the roadmap read identically in a channel. The
-     router below rewrites them per page once it knows which page this is. -->
+     server writes each page's own words into them before it sends the page,
+     from its one list (BLURB in server.js, #3138). -->
 <meta property="og:site_name" content="Thornswood">
 <meta property="og:type" content="website">
 <meta property="og:title" id="ogTitle" content="Thornswood">
@@ -212,21 +213,23 @@
 <section id="what">
   <div class="wrap">
     <div class="eyebrow">What this is</div>
-    <h2>A world that is not empty at three in the morning</h2>
-    <p class="lede">Thornswood is built around a smaller population of people
-      in the towns, alongside the characters you and others bring into the world.
-      <strong>Thornswood keeps a chosen few.</strong> Enough that a hold feels
-      lived in when two of you are online, few enough that you are still the
-      reason anything happens.</p>
+    <h2>A world run by the people in it</h2>
+    <p class="lede">The towns are yours to fill. The game's own guards, courts and
+      wandering townsfolk are gone, so the guard on the wall, the Jarl in the
+      hall and the smith at the forge are other people playing.
+      <strong>Thornswood keeps a chosen few.</strong> The traders, the
+      drivers and the ferrymen stay, so a hold still works when two of you are
+      online, and you are still the reason anything happens.</p>
 
     <div class="three">
       <div>
         <div class="num">01</div>
         <h3>Fewer, and worth talking to</h3>
-        <p>Most of the crowd goes. What stays is what a town actually needs:
-          the innkeeper, the smith, the shopkeeper, the guards on the wall.
-          Trading and routines are still being tested. Read the
-          <a href="/known">known issues</a> for what works today.</p>
+        <p>What stays is what a hold needs from somebody who is not a person:
+          six guild traders in each, the Smith, the Woodworker, the Tailor, the
+          Enchanter, the Cook and the Alchemist, who buy, sell and hand out
+          work, and the drivers who carry you between the holds. The
+          <a href="/known">known issues</a> say what is broken right now.</p>
       </div>
       <div>
         <div class="num">02</div>
@@ -272,10 +275,7 @@
       <p class="mt-28"><a href="/world">The full history and the Accord &rarr;</a></p>
     </div>
     <div>
-      <blockquote class="chron">The terms were short. Skyrim would govern
-        Skyrim. Imperial soldiers would leave by the first thaw. The Empire kept
-        its claim on paper and nothing else.
-        <cite>A Free Skyrim, Windhelm, 4E 252</cite></blockquote>
+      <blockquote class="chron" id="loreLine" hidden></blockquote>
       <div class="play-box">
         <h3>You can play</h3>
         <p>
@@ -316,17 +316,18 @@
       <div class="feat">
         <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 5h16v13H4z"/><path d="M7 9h7M7 12.5h10M7 16h5"/></svg>
         <h3>Notice boards in every hold</h3>
-        <p>Pay coin to pin a notice or a job at a board outside. Anyone can read
-          what is up. Take a job and it goes on your list. Nothing takes a
-          notice down yet.</p>
+        <p>Pay coin to pin a notice, a job with its reward held, or a sealed
+          letter for somebody to carry. Anyone can read what is up, and J reads
+          every town's board from anywhere. Take a job and it goes on your
+          list.</p>
       </div>
       <div class="feat">
         <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg>
         <h3>Nobody can do everything</h3>
         <p>You pick a profession, one half of it, and a class. An Edgewright
-          cannot make steel armour. Only a hunter can loot an animal, only a miner can
-          mine. So the leather in your armour came off somebody, and they
-          remember. <a href="/classes">Professions and classes</a>.</p>
+          cannot make steel armour. Only a hunter can loot an animal, only a
+          miner can mine. So the leather in your armour came off somebody, and
+          they remember. <a href="/classes">Professions and classes</a>.</p>
       </div>
       <div class="feat">
         <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 20h18M6 20V9l6-5 6 5v11"/><path d="M10 20v-6h4v6"/></svg>
@@ -335,30 +336,19 @@
           and can evict. The house is yours because you hold the paper, not
           because a menu sold you a plot.</p>
       </div>
+      <div class="feat">
+        <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3 4 7v6c0 4.4 3.4 7.4 8 8 4.6-.6 8-3.6 8-8V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
+        <h3>Law with people behind it</h3>
+        <p>Every guard is somebody, named by the Jarl of their hold, and the
+          cells are theirs to keep. Nothing in the game puts a price on your
+          head, so getting caught is not a fine and a loading screen. Somebody
+          has to decide what happens to you.</p>
+      </div>
     </div>
 
     <div class="being-built">
-      <div class="eyebrow">Being built</div>
-      <h3 class="built-title">Still on the roadmap</h3>
-      <p class="built-lead">These are written for where the world is going, not
-        what runs today. See the <a href="/roadmap">roadmap</a>.</p>
-      <div class="feats">
-        <div class="feat">
-          <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3 4 7v6c0 4.4 3.4 7.4 8 8 4.6-.6 8-3.6 8-8V7l-8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
-          <h3>Law with people behind it</h3>
-          <p>Every guard is somebody. Nothing in the game puts a price on your
-            head: cells and courts are run by the people holding the keys, so
-            getting caught is not a fine and a loading screen. Somebody has to
-            decide what happens to you.</p>
-        </div>
-        <div class="feat">
-          <svg aria-hidden="true" focusable="false" class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="8" r="3.4"/><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M18 3.5l1 2 2 .6-1.5 1.5.3 2.1-1.8-1-1.8 1 .3-2.1L15 6.1l2-.6Z"/></svg>
-          <h3>People with their own work</h3>
-          <p>The ones who stayed are getting jobs, routines and errands of their
-            own, so a quiet hold still has something happening in it and somebody
-            to ask.</p>
-        </div>
-      </div>
+      <p class="built-lead">What is being added next is on the
+        <a href="/roadmap">roadmap</a>.</p>
     </div>
   </div>
 </section>
@@ -414,7 +404,7 @@
       </div>
       <div>
         <h2>Playing</h2>
-        <a href="/downloads">How to join</a>
+        <a href="/join">How to join</a>
         <a href="/downloads">Download</a>
         <a href="/classes">Professions</a>
         <a href="/help">Help</a>
@@ -427,13 +417,11 @@
         <a href="DISCORD_URL" target="_blank" rel="noopener">Discord</a>
         <a href="https://www.patreon.com/thornswood" id="footPatreon"
            target="_blank" rel="noopener">Patreon</a>
-        <a href="/roadmap">Roadmap</a>
         <a href="/news">Release notes</a>
       </div>
       <div>
         <h2>Behind it</h2>
         <a href="/hub">Admin login</a>
-        <a href="/news">Release notes</a>
         <a href="/credits">Credits</a>
         <a href="/privacy">Privacy</a>
         <a href="/terms">Terms</a>

@@ -30,6 +30,7 @@ else does.
 | `/api/play/owns` | POST | the voice service, before it keeps a character creation choice (`voice\voice-server.js`) |
 | `/api/payload` | GET | the installer, which then downloads the zip it names from `/file/` (`installer\setup\Bootstrap.cs`) |
 | `/api/ticket` | POST | the Discord bot, for a support ticket (`bot\bot.py`) |
+| `/api/public` | GET | the front page and the launchers, for the news and the files; the Discord bot, for the open switch and the hints and lore lines it shows as its status, from `data\site\lines.md` (#3147, `bot\bot.py`) |
 | `/api/report/game`, `/dev/api/report/game` | POST | each game server, with the bot's key in a header, when somebody types /helpme or /report; the row goes into the inbox and the bot says it in the staff channel (`game\gamemode.js`, the asking staff block) |
 | `/api/play/who` | POST | nothing in the repo asks it now. It says who a ticket belongs to and writes nothing, which makes it the one to try by hand |
 
@@ -107,10 +108,12 @@ and the cookie secret, and is never in the repo. `.\scripts\deploy\Deploy-Docs.p
 sends `server.js` and everything in `public\` and restarts the task, and
 `-Site` also sends the public pages. A plain deploy never overwrites a
 document somebody has typed into on the site; `-Boards`, `-Docs` and
-`-SeedDocs` do, after a `.bak` of each. `-Board known` replaces that one board
-inside the live `board.json` and leaves every other board as typed: the
-public Known Issues page is the known board, written out at `/known`, and
-the hub edits it at `/hub/known`. `-Password` asks for the new member
+`-SeedDocs` do, after a `.bak` of each. `-Board active` replaces that one board
+inside the live `board.json` and leaves every other board as typed. The
+public Known Issues page (`/known`) and the roadmap (`/roadmap`) are not
+boards: the bot writes both from the issue board into `data\from-bot\lists.json`,
+which the site makes and reads (#3140; bot/README.md, "The site's known
+issues and roadmap"). `-Password` asks for the new member
 password without showing it, never typed on the command line, where the
 shell's history would keep it. `-Password` reads the `config.json`
 on the VPS, changes the member password in it and keeps every other setting.
@@ -183,8 +186,7 @@ leaves the queue and is public at `/shot`, and `/up` closes behind it.
 | `/api/gallery/copy` | POST | whoever sent a waiting picture, once for each width, or staff at any time (#3218) | one smaller copy is the body, a WebP or a JPEG named by its Content-Type; `name` (the picture), `w` (800 or 1600) and, for the launcher, `ticket` in the query | `200 {ok,name,w}`, kept as `uploads/small/<name>.w<w>.webp` or `.jpg` and listed in the queue entry's `copies`; a staff copy of a picture already on the gallery goes into its `srcset` at once; `403` for anybody else, `409` for a width the sender already sent, `400` for another width or a picture no wider than it, `415` for another kind, `422` for a copy that is not exactly that width and the picture's shape |
 | `/api/gallery/pending` | GET | staff (`access.dev`), by the hub cookie or a launcher ticket | none | `200 {pending:[...]}`, each with `copies` (the widths sent); `403` otherwise |
 | `/api/gallery/approve` | POST | staff | `{name, by?, copies?}` | `200 {ok,approved,copies}`; upserts the name onto `gallery.json`, removes it from the queue, idempotent; only the copies named in `copies`, the ones the card showed, go into the item's `srcset`; `400` with no name |
-| `/api/gallery/reject` | POST | staff | `{name, deleteFile?}` | `200 {ok,removed}`; drops it from the queue and unlinks the upload when `deleteFile` is set; `gallery.json` is untouched; `400` with no name |
-| `/api/gallery/approved` | DELETE | staff | `{name, deleteFile?}` | `200 {ok,removed}`; takes an approved shot off `gallery.json` (not the same as reject); clears reports on that name; unlinks when asked |
+| `/api/gallery/approved` | DELETE | staff | `{name}`; a `deleteFile` is no longer read | `200 {ok,removed,removedApproved,removedPending,fileDeleted}`; takes the name off `gallery.json` and off the pending queue, which is how staff turn down a waiting picture (there is no Reject); clears reports on that name; deletes the file, unless the picture had an open report, when it is kept unshown for `GALLERY_HOLD_DAYS` (#2352); `400` with no name |
 | `/api/gallery/report` | POST | signed-in play member, or launcher ticket | `{name, why?}` | `200 {ok,id}`; writes to `gallery-reports.json`; does not take the shot down; `404` if the name is not approved |
 | `/api/gallery/reports` | GET | staff | none | `200 {reports:[...]}` |
 | `/api/gallery/report/dismiss` | POST | staff | `{id}` | `200 {ok,removed}` |

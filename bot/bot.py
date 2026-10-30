@@ -25,7 +25,9 @@ What it does:
            python bot.py --post-task). #dev-test-tasks, a staff only forum
            in Staff, holds the test tasks whose comment says "Server: Dev":
            a measurement someone on dev has to take, open issue or closed,
-           and any posted by hand tagged Dev.
+           and any posted by hand tagged Dev. The same read writes the
+           site's Known Issues page (the #known-issues list) and its
+           roadmap (the "roadmap:" labels) for the site to show (#3140).
            The channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
@@ -76,6 +78,8 @@ Everything it needs is in env:
   KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
   KNOWN_ISSUES_LABELS default Dev Findings,Main Findings
   KNOWN_ISSUES_EVERY  seconds between GitHub reads, default 300, never under 60
+  PUBLIC_LISTS_FILE   where the site's known issues and roadmap are written,
+                      default the site's data/from-bot/lists.json on the VPS
   HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
                    file, which is where the watchdog reads it
   HEARTBEAT_EVERY  seconds between heartbeats, default 60
@@ -101,6 +105,7 @@ import time
 import traceback
 import sys
 import typing
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -150,22 +155,15 @@ CONTEXT = trust.context(ROOTS)
 urllib.request.install_opener(
     urllib.request.build_opener(urllib.request.HTTPSHandler(context=CONTEXT)))
 
-import aiohttp
 import discord
 
 import card
 
 
-class TrustedClient(discord.Client):
-    """
-    A discord.Client whose every request and gateway connection verifies
-    against CONTEXT (#3111). discord.py makes its aiohttp session in login()
-    with whatever connector its HTTPClient holds, and a connector can only
-    be made once the event loop is running, so it is given here.
-    """
-    async def login(self, token):
-        self.http.connector = aiohttp.TCPConnector(limit=0, ssl=CONTEXT)
-        await super().login(token)
+# A discord.Client whose every request and gateway connection verifies
+# against CONTEXT (#3111). trust.py makes the class, the one every script in
+# bot/ that logs in to Discord makes its client from (#3604).
+TrustedClient = trust.client_class(CONTEXT)
 
 
 def _load_env_file(argv):
@@ -451,6 +449,10 @@ TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 TROUBLE_FILE = os.environ.get(
     'TROUBLE_FILE', r'C:\Thornswood-Docs\data\for-bot\trouble.json')
 TROUBLE_EVERY = _int_env('TROUBLE_EVERY', 120)
+
+# Which message in Discord says which session went wrong, so the post goes
+# when its row leaves trouble.json (#3942). The bot's own, beside joins.json.
+TROUBLE_POSTS = os.path.join(DATA_DIR, 'trouble-posts.json')
 
 # Where the site writes what people send in on its public report page, read
 # the same way as trouble.json and said in the same staff channel.
@@ -2231,24 +2233,85 @@ async def age_closed_tickets(guild, bot_id, now):
     return deleted, failed
 
 
+# THE STAFF TICKET LOG IS KEPT THE SAME 365 DAYS (#3634). The bot writes two
+# things into the TICKET_LOG channel: a whole ticket whose private thread
+# would not open (its title with the opener's name, the opener's mention and
+# every answer they typed), and a Closed line naming the thread, which is the
+# opener's name, at every close. age_closed_tickets deletes the threads and
+# never read this channel, so those copies had no keeping time while the
+# privacy page said a ticket goes after 365 days. Each of the bot's own
+# messages there now goes TICKET_KEEP_DAYS after it was posted: a fallback
+# ticket the same year as a ticket in a thread, and a Closed line the same
+# year as the thread it points at, which is deleted a year after that close.
+# Only the bot's own messages, and never in a channel tickets open off, so a
+# panel is never touched if TICKET_LOG is ever pointed at one.
+async def age_ticket_log(guild, bot_id, now):
+    """
+    Deletes the bot's own messages in this server's TICKET_LOG channels that
+    were posted more than TICKET_KEEP_DAYS before now, and returns (deleted,
+    failed). Said in bot.log as counts a channel, never what a message said.
+    A history that cannot be read, or a delete Discord refuses, is a line
+    with Discord's reason, and the message stays until the next pass.
+    """
+    if bot_id is None:
+        return 0, 0
+    cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
+    deleted = failed = 0
+    for ch in getattr(guild, 'text_channels', []):
+        name = (getattr(ch, 'name', '') or '').lower()
+        if name not in TICKET_LOG or name in TICKET_NAMES:
+            continue
+        due = []
+        try:
+            async for m in ch.history(limit=None, before=cut):
+                at = getattr(m, 'created_at', None)
+                if (getattr(getattr(m, 'author', None), 'id', None) == bot_id
+                        and isinstance(at, datetime.datetime)
+                        and at.tzinfo is not None and at < cut):
+                    due.append(m)
+        except Exception as e:
+            failed += 1
+            log('ticket log: could not read #%s of "%s", so none of it was '
+                'deleted this pass: %s: %s'
+                % (ch.name, guild.name, type(e).__name__, e))
+            continue
+        gone = 0
+        for m in due:
+            try:
+                await m.delete()
+            except Exception as e:
+                failed += 1
+                log('ticket log: could not delete message %s in #%s, posted '
+                    '%s: %s: %s' % (m.id, ch.name, m.created_at.date().isoformat(),
+                                    type(e).__name__, e))
+                continue
+            gone += 1
+        if gone:
+            deleted += gone
+            log('ticket log: deleted %d of the bot\'s messages in #%s posted '
+                'more than %d days ago' % (gone, ch.name, TICKET_KEEP_DAYS))
+    return deleted, failed
+
+
 async def watch_closed_tickets():
     """
-    Runs age_closed_tickets on every server as the bot comes up and every
-    TICKET_KEEP_EVERY seconds, like watch_join_numbers. Nothing in here may
-    end the loop: a pass that fails is said in bot.log, and the threads it
-    did not reach are there for the next one.
+    Runs age_closed_tickets and age_ticket_log on every server as the bot
+    comes up and every TICKET_KEEP_EVERY seconds, like watch_join_numbers.
+    Nothing in here may end the loop: a pass that fails is said in bot.log,
+    and the threads and messages it did not reach are there for the next one.
     """
     await client.wait_until_ready()
     while not client.is_closed():
         now = datetime.datetime.now(datetime.timezone.utc)
         bot_id = getattr(client.user, 'id', None)
         for gd in list(client.guilds):
-            try:
-                await age_closed_tickets(gd, bot_id, now)
-            except Exception:
-                log('closed tickets: the pass on "%s" stopped part way, so '
-                    'what it did not reach waits for the next one:\n%s'
-                    % (gd.name, traceback.format_exc()))
+            for age in (age_closed_tickets, age_ticket_log):
+                try:
+                    await age(gd, bot_id, now)
+                except Exception:
+                    log('closed tickets: the %s pass on "%s" stopped part way, '
+                        'so what it did not reach waits for the next one:\n%s'
+                        % (age.__name__, gd.name, traceback.format_exc()))
         await asyncio.sleep(TICKET_KEEP_EVERY)
 
 
@@ -2379,6 +2442,62 @@ def site_open():
         log('could not ask the site whether the world is open, so the panel is '
             'the alpha one:', e)
         return False
+
+
+#
+# THE STATUS LINES (#3147). The bot's status, under its name in the member
+# list, is one of Thornswood's hints and lore lines, a new one every
+# LINES_EVERY seconds. Their one copy is site\data\site\lines.md; the site
+# hands them out in /api/public as "lines", read here at every change, so a
+# line edited there reaches the bot at the next Deploy-Docs.ps1 -Site, with
+# no bot install. Hints and lore lines take turns, each list in its own order.
+LINES_EVERY = 15 * 60
+
+
+def status_lines(lines):
+    """The lines the status steps through: a hint, then a lore line, in turn,
+       until both lists are used up. A lore line is its quote alone; its source
+       does not fit in a status."""
+    lines = lines if isinstance(lines, dict) else {}
+    hints = [h for h in (lines.get('hints') or []) if isinstance(h, str) and h]
+    lore = [x.get('text') for x in (lines.get('lore') or [])
+            if isinstance(x, dict) and isinstance(x.get('text'), str) and x.get('text')]
+    out = []
+    for i in range(max(len(hints), len(lore))):
+        out.extend(([hints[i]] if i < len(hints) else []) + ([lore[i]] if i < len(lore) else []))
+    return out
+
+
+def site_lines():
+    """The status lines from the site's /api/public. Raises when the site
+       cannot be read, for watch_lines to say."""
+    with urllib.request.urlopen(SITE + '/api/public', timeout=8) as r:
+        return status_lines(json.loads(r.read().decode('utf-8')).get('lines'))
+
+
+async def watch_lines():
+    """
+    Sets the status to the next line every LINES_EVERY seconds. When the site
+    cannot be read, or hands out no lines, that is said in bot.log and the
+    status stays as it is until the next pass. Nothing in here may end the
+    loop.
+    """
+    await client.wait_until_ready()
+    at = 0
+    while not client.is_closed():
+        try:
+            texts = await asyncio.get_running_loop().run_in_executor(None, site_lines)
+            if texts:
+                await client.change_presence(
+                    activity=discord.CustomActivity(name=texts[at % len(texts)]))
+                at += 1
+            else:
+                log('status lines: the site handed out none, so the status '
+                    'stays as it is until the next pass')
+        except Exception:
+            log('status lines: could not set the next one, so the status stays '
+                'as it is until the next pass:\n' + traceback.format_exc())
+        await asyncio.sleep(LINES_EVERY)
 
 
 def set_open(on):
@@ -4327,9 +4446,30 @@ TASK_TAG = 'Main'
 # not in the post (22 Oct).
 # 4 (and KNOWN_FORM 4, DEV_FORM 3): no post ends with a "---" rule or any
 # "Generated by/with" footer (Patrick, 22 Oct).
+# KNOWN_FORM 5: done-on-merge.yml's comment takes a known post down
+# (merged_fix, 26 Oct), so every finding's comments are read again once.
 TASK_FORM = 4
-KNOWN_FORM = 4
+KNOWN_FORM = 5
 DEV_FORM = 3
+# The board's column for a fix that is merged and waits on main
+# (done-on-merge.yml puts it on, with the test task). The label is an
+# instruction, not a record: board-status.yml moves the card and takes it off
+# again within a minute (#2863), so a pass rarely sees it. What stays is
+# done-on-merge.yml's comment, written by the workflow and starting
+# "Pull request #N merged (", which Close-ShippedIssues.ps1 reads as well.
+BOARD_DONE = 'board: Done'
+DONE_ON_MERGE = re.compile(r'^Pull request #\d+ merged \(')
+DONE_ON_MERGE_BY = 'github-actions[bot]'
+
+
+def merged_fix(comments):
+    """True when done-on-merge.yml has written its record of a merged fix
+       on the issue: the issue is in Done and its fix has landed."""
+    for c in comments or []:
+        who = str(((c.get('user') or {}).get('login')) or '')
+        if who == DONE_ON_MERGE_BY and DONE_ON_MERGE.match(str(c.get('body') or '')):
+            return True
+    return False
 
 
 def _github_get(url):
@@ -4343,6 +4483,18 @@ def _github_get(url):
         return json.loads(r.read().decode('utf-8'))
 
 
+def _github_rows(got, url):
+    """A page of a GitHub list, which is a list. Anything else is an answer
+       that is not the list, and is raised, never read as no issues: a pass
+       that read no findings would take every #known-issues post down."""
+    if got is None:
+        return []
+    if not isinstance(got, list):
+        raise ValueError('GitHub answered %s with a %s, not a list'
+                         % (url.split('?')[0], type(got).__name__))
+    return got
+
+
 def github_open_findings(get=None):
     """Every open issue (not pull request) carrying one of KNOWN_LABELS, by
        number. One query per label because GitHub ANDs labels in one."""
@@ -4354,7 +4506,7 @@ def github_open_findings(get=None):
             url = ('%s/repos/%s/issues?state=open&per_page=100&page=%d&labels=%s'
                    % (GITHUB_API, KNOWN_REPO, page,
                       urllib.parse.quote(label)))
-            rows = get(url) or []
+            rows = _github_rows(get(url), url)
             for row in rows:
                 if isinstance(row, dict) and 'pull_request' not in row:
                     out.setdefault(int(row['number']), row)
@@ -4411,6 +4563,38 @@ def github_changed_since(since, get=None):
 def github_issue(number, get=None):
     get = get or _github_get
     return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
+
+
+def finding_gone(number, get=None):
+    """Why issue number is no longer an open finding, read from the issue
+       itself, or None when it still is one: open, in KNOWN_REPO, carrying
+       one of KNOWN_LABELS.
+
+       The label lists (github_open_findings) are not the issue. On 22 Oct
+       one list, then the other, then both came back from GitHub without
+       issues that were open and labelled the whole time (no label, close or
+       reopen on their timelines), and the same ten #known-issues posts came
+       down and went back up as a set three times in one process (#3438).
+       So a post whose issue a list left out comes down on this answer, not
+       on the list's. Any other failure to read raises, and the pass that
+       asked changes nothing."""
+    try:
+        issue = github_issue(number, get)
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 410):
+            return 'GitHub has no issue #%d any more (%d)' % (int(number), e.code)
+        raise
+    if not isinstance(issue, dict):
+        raise ValueError('GitHub answered issue #%d with a %s, not an issue'
+                         % (int(number), type(issue).__name__))
+    where = str(issue.get('repository_url') or '').lower()
+    if not where.endswith('/repos/' + KNOWN_REPO.lower()):
+        return 'it moved to %s' % (where.split('/repos/')[-1] or 'another repository')
+    if str(issue.get('state')) != 'open':
+        return 'it is closed'
+    if not issue_tags_found(issue):
+        return 'it no longer carries %s' % ' or '.join(KNOWN_LABELS)
+    return None
 
 
 def github_comments(number, get=None):
@@ -4717,6 +4901,9 @@ STEP_LINE = re.compile(r'^\s*\d+[.)]\s+\S', re.M)
 ISSUE_NUMBER = re.compile(r'(?<![\w&])#\d+\b')
 LINK = re.compile(r'https?://|www\.', re.I)
 CODE = re.compile(r'`')
+# Built from its code point, never pasted, as Check-Words.ps1 explains.
+EM_DASH = re.compile(chr(0x2014) + r'|&mdash;|&#8212;|&#x2014;', re.I)
+BANNED_WORD = re.compile(r'\bplayers?\b', re.I)
 # Steps a Claude, the Desk, a harness, a workflow or a command can do: a
 # dev test task is only for what a human dev must do in the game.
 AUTOMATABLE = re.compile(
@@ -4782,6 +4969,22 @@ def post_problems(channel, title, body, *, server=None, issue=None,
     if ISSUE_NUMBER.search(text) or LINK.search(text) or CODE.search(text):
         out.append('Format: the text has an issue number, a link or code; '
                    'posts carry none.')
+    if channel in ('known', 'roadmap'):
+        # The site shows these two to anybody (#3140), so the writing rules
+        # every public page keeps hold here too (Check-Words.ps1 reads the
+        # repository; these words are on GitHub, so the bot reads them).
+        words = '%s\n%s' % (title or '', text)
+        if EM_DASH.search(words):
+            out.append('Words: the text has an em dash; nothing written for '
+                       'people has one.')
+        if BANNED_WORD.search(words):
+            out.append('Words: the text says "player"; write "people", '
+                       '"characters" or "testers" instead.')
+    if channel == 'roadmap':
+        if not text.strip():
+            out.append('Roadmap: the "Roadmap:" comment has nothing under its '
+                       'first line, which is where the work stands.')
+        return out
     if channel == 'known':
         if issue is not None and str(issue.get('state')) != 'open':
             out.append('Known issues: the issue is closed.')
@@ -4837,6 +5040,9 @@ def github_say(number, text):
 
 CHANNEL_NAMES = {'dev': 'dev-test-tasks', 'main': 'test-tasks',
                  'known': 'known-issues'}
+# Where each kind of post goes, as the refusal comment says it.
+POST_PLACES = {'dev': 'in #dev-test-tasks', 'main': 'in #test-tasks',
+               'known': 'in #known-issues', 'roadmap': "on the site's roadmap"}
 
 
 def refuse(state, channel, num, problems, say=None):
@@ -4855,10 +5061,13 @@ def refuse(state, channel, num, problems, say=None):
     sig = '\n'.join(problems)
     if seen.get(key) == sig:
         return True
-    text = ('The bot did not post this issue in #%s, because the post breaks '
-            'these rules (Developer-Guide.md, "Test tasks and known issues"):\n\n%s'
+    text = ('The bot did not post this issue %s, because the post breaks '
+            'these rules (%s):\n\n%s'
             '\n\nFix the comment and the bot tries again on its next pass.'
-            % (CHANNEL_NAMES.get(channel, channel),
+            % (POST_PLACES.get(channel, 'in #' + channel),
+               'bot/README.md, "The site\'s known issues and roadmap"'
+               if channel == 'roadmap'
+               else 'Developer-Guide.md, "Test tasks and known issues"',
                '\n'.join('- ' + p for p in problems)))
     try:
         (say or github_say)(num, text)
@@ -5072,18 +5281,25 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
     known-issues.json, changed in place; the caller writes it. Returns the
     issue numbers posted, edited and removed.
 
-    A known issue is a finding nothing has been done about yet (Patrick, 22
-    Oct): an open issue labelled Dev Findings or Main Findings with no merged
-    pull request that names it and no "Test task:" comment. The moment one of
-    those comes, or the issue closes or loses its label, its post goes: the
-    work on it is then a test task, not a known issue.
+    A known issue is a finding people still meet: an open issue labelled
+    Dev Findings or Main Findings whose fix has not landed (Patrick, 22 Oct,
+    and #3140). Its fix has landed when the issue gets a "Test task:"
+    comment or is in Done: done-on-merge.yml's comment on it (merged_fix),
+    or the board: Done label for the minute it is on (BOARD_DONE). A card
+    moved to Done by hand, with no merge, is not seen: the bot cannot read
+    the board. A closed or unlabelled issue is not a finding at all. Then its post goes: the fix is a test task, not
+    a known issue. A merged pull request alone does not take it down: until
+    26 Oct any one that named the issue did, and a measuring step on the
+    scripts finding, a partial fix, and a Refs written by mistake each kept
+    a bug people still meet off the list (#3140).
+    An issue the label lists leave out is read itself first, and its post
+    stays unless that read says it is closed, unlabelled, moved or deleted
+    (finding_gone, #3438).
 
     Comments are read only for an issue GitHub says changed since the last
     pass (its updated_at), or whose record was made with an older form of
-    the post (KNOWN_FORM), so an untouched issue costs nothing. A pull
-    request merging does not change the issue's updated_at, so the timeline
-    of each finding is read every pass until a merged pull request is found
-    in it; that is remembered (state['known_changed']), since a merge stays.
+    the post (KNOWN_FORM), so an untouched issue costs nothing. A label put
+    on or a comment written moves updated_at, so nothing else is read.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
@@ -5094,36 +5310,40 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         if have.get('channel_id') != getattr(forum, 'id', None) or 'thread_id' not in have:
             rec.pop(key, None)
             state['_dirty'] = True
-    changed = state.setdefault('known_changed', {})
-    for key in [k for k in changed if int(k) not in issues]:
-        changed.pop(key, None)      # closed or unlabelled: asked again if it is back
-        state['_dirty'] = True
+    if state.pop('known_changed', None) is not None:
+        state['_dirty'] = True      # the merged pull requests the old rule kept
     posted, edited, removed, listed = [], [], [], set()
+    # Why each issue that is not listed is not, said when its post comes
+    # down. Ten posts came down and went back up as a set several times
+    # before 26 Oct with no line saying why (#3140).
+    why = {}
     for num in sorted(issues):
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
-        if key not in changed:
-            timeline = await loop.run_in_executor(None, github_timeline, num, get)
-            if any(p.get('merged_at') for p in fix_refs(timeline)[0]):
-                changed[key] = True
-                state['_dirty'] = True
-        if key in changed:
-            continue                # a change for it is merged: not a known issue
+        if BOARD_DONE.lower() in [str(l.get('name', '')).lower()
+                                  for l in issue.get('labels') or []]:
+            why[key] = 'it is on the board as Done: its fix is merged'
+            continue                # fixed, waiting on main: not a known issue
         if (have and have.get('updated') == issue.get('updated_at')
                 and have.get('form') == KNOWN_FORM):
             listed.add(num)
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
         if _all_marked(issue, comments, TASK_MARK, room=None):
+            why[key] = 'it has a "Test task:" comment'
             continue                # it has a test task: being checked, not known
+        if merged_fix(comments):
+            why[key] = 'done-on-merge wrote its merged fix on it'
+            continue                # fixed, waiting on main: not a known issue
         title, body, tags = known_of(issue, comments)
         taken = [v.get('sig', '').split('\n')[0] for k, v in rec.items() if k != key]
         if refuse(state, 'known', num, post_problems(
-                'known', title, body, issue=issue, merged_pr=key in changed,
+                'known', title, body, issue=issue,
                 has_task=False, taken_titles=taken), say):
             if have:
                 listed.add(num)     # the post already up stays as it was
+            why[key] = 'its post breaks a rule'
             continue
         listed.add(num)
         sig = _sig(title, body, tags)
@@ -5149,6 +5369,19 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         if save:
             save(state)      # straight away, so a crash cannot double it
         posted.append(num)
+    # An issue the label lists left out is read itself before its post comes
+    # down (finding_gone). Every read is made before anything is taken down,
+    # so a read that fails fails the pass with every post still up.
+    for key in list(rec):
+        if int(key) in listed or int(key) in issues:
+            continue                # listed, or not for a reason found above
+        gone = await loop.run_in_executor(None, finding_gone, int(key), get)
+        if gone is None:
+            log('known issues: the open findings GitHub listed left out #%s, '
+                'which is still open and labelled; its post stays' % key)
+            listed.add(int(key))
+        else:
+            why[key] = gone
     for key, have in list(rec.items()):
         if int(key) in listed:
             continue
@@ -5159,6 +5392,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None, say=N
         rec.pop(key, None)
         state['_dirty'] = True
         removed.append(int(key))
+        log('known issues: took #%s down: %s'
+            % (key, why.get(key, 'no reason was recorded')))
     return posted, edited, removed
 
 
@@ -5465,6 +5700,155 @@ def adopt_task(number, thread_id, path=None):
     return 'issue %d now owns test task post %d' % (int(number), int(thread_id))
 
 
+# -------------------------------------- the site's known issues and roadmap --
+#
+# Issue #3140 (Patrick): the site's Known Issues page and its roadmap are built
+# from the board, so they cannot go stale. Until then both were boards typed
+# into site/data/board.json; the roadmap's Later lane said the emote wheel was
+# never started while it shipped (test-roadmap.js), and the known board kept
+# NPC behaviour that #504 had fixed. The bot already reads the board for the
+# Discord forums, with the one issues token there is, so it writes both lists
+# into one file the site reads:
+#
+#   known    the posts that are up in #known-issues, the same list, each as
+#            its title, its words and where it was found (Main, Dev). One
+#            rule decides both: known_issues_once.
+#   roadmap  every open issue labelled "roadmap: now", "roadmap: next" or
+#            "roadmap: later", in that lane. A closed one is off the
+#            roadmap: it has no Done lane (Patrick, 26 Oct).
+#            Its words are its last "Roadmap:" comment: the first line is
+#            what is being built (45 characters at most), the lines under it
+#            where it stands. The rules of a known issue hold for it (no
+#            footer, no issue number, link or code), and so do the writing
+#            rules of a public page (no em dash, never "player"). An issue
+#            with a lane and no such comment, or one that breaks a rule, is
+#            left off and gets one comment saying why (refuse).
+#
+# The file is PUBLIC_LISTS_FILE, in the site's data\from-bot folder, which
+# holds only what the bot writes for the site: the site makes it, and
+# Install-Bot.ps1 gives the bot's account Modify on it and nothing else of the
+# site's (the other way round from for-bot, #1102). It is written whole after
+# every pass, with the time of the pass, so the site can say how old it is;
+# a part the bot could not read this pass is left out rather than written
+# empty, and the site says that part could not be read.
+PUBLIC_LISTS_FILE = os.environ.get(
+    'PUBLIC_LISTS_FILE', r'C:\Thornswood-Docs\data\from-bot\lists.json')
+ROADMAP_LANES = (('now', 'Being built now'), ('next', 'Next'), ('later', 'Later'))
+ROADMAP_MARK = re.compile(r'^\s*roadmap\s*:\s*(.*)$', re.I)
+
+
+def roadmap_label(lane):
+    return 'roadmap: %s' % lane
+
+
+def github_labelled(label, state, get=None):
+    """Every issue (not pull request) with the label, open or closed (state),
+       by number."""
+    get = get or _github_get
+    out = {}
+    page = 1
+    while True:
+        url = ('%s/repos/%s/issues?state=%s&per_page=100&page=%d&labels=%s'
+               % (GITHUB_API, KNOWN_REPO, state, page, urllib.parse.quote(label)))
+        rows = get(url) or []
+        for row in rows:
+            if isinstance(row, dict) and 'pull_request' not in row:
+                out.setdefault(int(row['number']), row)
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
+def roadmap_lanes_of(issue):
+    """The lanes (now, next, later) the issue is labelled with."""
+    names = [n.lower() for n in _labels(issue)]
+    return [lane for lane, _name in ROADMAP_LANES if roadmap_label(lane) in names]
+
+
+def roadmap_of(issue, comments):
+    """(title, words, problems) for the issue's roadmap row, from its last
+       "Roadmap:" comment. problems is empty when it may go on the site."""
+    got = _marked(issue, comments, ROADMAP_MARK, room=None)
+    if got is None:
+        return None, None, ['Roadmap: the issue has a roadmap label and no '
+                            'comment whose first line starts "Roadmap:", '
+                            'which holds the words the site shows.']
+    title, body = got[0], strip_footer(got[1])
+    return title, body, post_problems('roadmap', title, body)
+
+
+def roadmap_once(state, get=None, say=None):
+    """
+    One read of the roadmap off the board. state is the dict kept in
+    known-issues.json, changed in place; its 'roadmap' part remembers each
+    labelled issue's row by its updated_at, so comments are read only for an
+    issue that changed (a label, a close and a comment all move it). Returns
+    the roadmap as the site draws it: {lanes: [{name, rows: [{title, text}]}]},
+    the lanes in order, each by issue number. Only open issues are read: the
+    roadmap has no Done lane (Patrick, 26 Oct, "Done section needs removed
+    from the roadmap"), so an issue that closes leaves it.
+    """
+    seen = {}
+    for lane, _name in ROADMAP_LANES:
+        for num, issue in github_labelled(roadmap_label(lane), 'open', get).items():
+            seen[num] = issue
+    rec = state.setdefault('roadmap', {})
+    for key in [k for k in rec if int(k) not in seen]:
+        rec.pop(key, None)
+        state['_dirty'] = True
+    rows = dict((name, []) for _lane, name in ROADMAP_LANES)
+    for num in sorted(seen):
+        issue = seen[num]
+        key = str(num)
+        have = rec.get(key)
+        if not have or have.get('updated') != issue.get('updated_at'):
+            title, body, problems = roadmap_of(issue, github_comments(num, get))
+            lanes = roadmap_lanes_of(issue)
+            if len(lanes) > 1:
+                problems = problems + ['Roadmap: the issue is in %s at once; '
+                                       'one lane only.' % ', '.join(
+                                           roadmap_label(l) for l in lanes)]
+            have = rec[key] = {'updated': issue.get('updated_at'),
+                               'title': title, 'text': body,
+                               'problems': problems}
+            state['_dirty'] = True
+        if refuse(state, 'roadmap', num, have.get('problems') or [], say):
+            continue
+        rows[dict(ROADMAP_LANES)[roadmap_lanes_of(issue)[0]]].append(
+            {'title': have['title'], 'text': have['text']})
+    return {'lanes': [{'name': name, 'rows': rows[name]}
+                      for _lane, name in ROADMAP_LANES]}
+
+
+def known_list(state):
+    """The posts up in #known-issues, as the site shows them: title, words
+       and where (Main, Dev), by issue number. The records hold each post's
+       sig, which is exactly what went up (_sig)."""
+    out = []
+    for key in sorted((state.get('issues') or {}), key=int):
+        sig = str((state['issues'][key] or {}).get('sig') or '')
+        if not sig:
+            continue
+        title, rest = (sig.split('\n', 1) + [''])[:2]
+        body, _, tags = rest.rpartition('\n')
+        out.append({'title': title, 'text': body,
+                    'where': [t for t in tags.split(',') if t]})
+    return out
+
+
+def write_public_lists(known, roadmap, path=None, now=None):
+    """Writes the site's lists: known and roadmap as the passes made them,
+       either None when it could not be read this pass, and so left out."""
+    data = {'at': now or _utc_stamp()}
+    if known is not None:
+        data['known'] = known
+    if roadmap is not None:
+        data['roadmap'] = roadmap
+    _state_write(path or PUBLIC_LISTS_FILE, data)
+    return data
+
+
 def issue_tags_found(issue):
     names = _labels(issue)
     return any(l in names for l in KNOWN_LABELS)
@@ -5488,7 +5872,7 @@ async def watch_known_issues():
             'fixed by hand (posting from empty would double every post)'
             % KNOWN_STATE)
         return
-    said_text = said_dev = False
+    said_text = said_dev = said_lists = False
     while not client.is_closed():
         try:
             known = tasks = dev = None
@@ -5530,8 +5914,24 @@ async def watch_known_issues():
                 if posted or edited or removed:
                     log('dev test tasks: posted %s, edited %s, removed %s'
                         % (posted or 'none', edited or 'none', removed or 'none'))
+            # The site's lists (#3140): known only when #known-issues was
+            # kept this pass, since it is that forum's list.
+            roadmap = await asyncio.get_running_loop().run_in_executor(
+                None, roadmap_once, state)
             if state.get('_dirty'):
                 _known_save(state)
+            try:
+                write_public_lists(known_list(state) if known is not None else None,
+                                   roadmap)
+            except OSError as e:
+                if not said_lists:
+                    log('known issues: could not write the site\'s lists to %s '
+                        '(%s). Install-Bot.ps1 gives the bot Modify on that '
+                        'folder once Deploy-Docs.ps1 has made it.'
+                        % (PUBLIC_LISTS_FILE, type(e).__name__))
+                    said_lists = True
+            else:
+                said_lists = False
         except Exception as e:
             # Never the URL with the token, and never the token: the request
             # carries it in a header, which str(e) does not print.
@@ -5616,6 +6016,11 @@ def _clock(ms):
 # own end-of-session upload, not a backlog, so its arrival is not called out.
 TROUBLE_LATE_MS = 5 * 60 * 1000
 
+# How every post _trouble_line makes begins, which is how the one-time look
+# through the channel (trouble_backfill) tells one from anything else the bot
+# says there.
+TROUBLE_HEAD = '**A session went wrong.**'
+
 
 def _trouble_line(row):
     """
@@ -5655,7 +6060,7 @@ def _trouble_line(row):
                     'so this is a late upload rather than a new failure.' % got)
 
     return (
-        '**A session went wrong.** %s, on %s%s.%s%s\n%s\n%s\n'
+        TROUBLE_HEAD + ' %s, on %s%s.%s%s\n%s\n%s\n'
         'The logs are on the sessions page under that session, '
         'and it is the red one.'
         % (who,
@@ -5667,9 +6072,196 @@ def _trouble_line(row):
            ('```\n%s\n```' % line[:400]) if line else ''))
 
 
+def _trouble_rows():
+    """
+    The rows in trouble.json, or None when the file is not there or cannot be
+    read. None is never taken for an empty file: a post is deleted because its
+    row has gone, so a file that could not be read must delete nothing.
+    """
+    try:
+        with open(TROUBLE_FILE, encoding='utf-8') as f:
+            rows = json.load(f)
+    except Exception:
+        return None
+    return rows if isinstance(rows, list) else None
+
+
+def _trouble_sessions(rows):
+    return set(r['session'] for r in rows
+               if isinstance(r, dict) and r.get('session'))
+
+
+def trouble_remember(sid, msg, path=None):
+    """Writes down which message said session sid went wrong."""
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None:
+        log('trouble: %s cannot be read, so the post for session %s is not '
+            'written down and will not be deleted when its logs go'
+            % (path, sid))
+        return False
+    posts = state.setdefault('posts', {})
+    posts[str(sid)] = {'channel': msg.channel.id, 'message': msg.id}
+    try:
+        _state_write(path, state)
+    except Exception as e:
+        log('trouble: could not write %s, so the post for session %s will not '
+            'be deleted when its logs go: %s: %s'
+            % (path, sid, type(e).__name__, e))
+        return False
+    return True
+
+
+async def trouble_forget(rows, path=None):
+    """
+    A FAILED SESSION'S POST GOES WHEN ITS ROW GOES (#3942). The post carries
+    the person's name and a line out of their logs. The site keeps the row in
+    trouble.json exactly as long as the session and its logs: it ages out at
+    365 days, stays while staff keep the session, and goes with a deletion
+    request (freshTrouble and the deletion sweep in site/server.js). The
+    oldest also goes past the file's last 200 rows. Nothing deleted the post,
+    so it stayed in the channel after all of that.
+
+    So every post this bot makes is written down against its session in
+    TROUBLE_POSTS, and here each one whose session is no longer in rows is
+    deleted. Returns (deleted, failed). A post already gone from Discord (staff
+    deleted it) is taken off the list; any other failure is a line with
+    Discord's reason, and the post stays on the list for the next pass. Said
+    in bot.log by session id and count, never what a post said.
+    """
+    if rows is None:
+        return 0, 0
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None:
+        log('trouble: %s cannot be read, so no post was deleted this pass'
+            % path)
+        return 0, 1
+    posts = state.get('posts') or {}
+    present = _trouble_sessions(rows)
+    deleted = failed = 0
+    changed = False
+    for sid in [k for k in posts if k not in present]:
+        rec = posts.get(sid) if isinstance(posts.get(sid), dict) else {}
+        try:
+            cid, mid = int(rec.get('channel')), int(rec.get('message'))
+        except (TypeError, ValueError):
+            log('trouble: the post for session %s has no message written down, '
+                'so it is taken off the list' % sid)
+            del posts[sid]
+            changed = True
+            continue
+        ch = client.get_channel(cid)
+        if ch is None:
+            failed += 1
+            log('trouble: channel %d of the post for session %s is not one this '
+                'bot can see, so it is not deleted this pass' % (cid, sid))
+            continue
+        try:
+            await ch.get_partial_message(mid).delete()
+            deleted += 1
+        except discord.NotFound:  # staff deleted it already: it is gone, as wanted
+            pass
+        except Exception as e:
+            failed += 1
+            log('trouble: could not delete the post for session %s: %s: %s'
+                % (sid, type(e).__name__, e))
+            continue
+        del posts[sid]
+        changed = True
+    if changed:
+        state['posts'] = posts
+        try:
+            _state_write(path, state)
+        except Exception as e:
+            log('trouble: could not write %s after deleting posts: %s: %s'
+                % (path, type(e).__name__, e))
+    if deleted:
+        log('trouble: deleted %d failed-session post(s) whose session has left '
+            'trouble.json' % deleted)
+    return deleted, failed
+
+
+def _trouble_post_matches(content, row):
+    """
+    True when a post the bot made before #3942 is about this row. The wording
+    has changed since the first posts (#532), so the row's own text is looked
+    for rather than the whole line: the name, and the log line in its code
+    block or, with no line, the reason.
+    """
+    if content == _trouble_line(row)[:1900]:
+        return True
+    who = row.get('name') or row.get('who') or ''
+    line = (row.get('line') or '').strip()
+    mark = ('```\n%s\n```' % line[:400]) if line else (row.get('why') or '')
+    return bool(who) and bool(mark) and who in content and mark in content
+
+
+async def trouble_backfill(rows, path=None):
+    """
+    The posts made before #3942 were never written down. Once, the first time
+    the bot comes up with this, it looks through the trouble channel for its
+    own posts that begin with TROUBLE_HEAD, writes down each whose row is still
+    in trouble.json, and deletes the rest, whose session and logs are already
+    gone. A post it cannot match to a row is one of those. Returns
+    (deleted, failed); with any failure the look runs again next start.
+    """
+    if rows is None:
+        return 0, 0
+    path = path or TROUBLE_POSTS
+    state = _state_read(path)
+    if state is None or state.get('backfilled'):
+        return 0, 0
+    ch = _trouble_channel()
+    bot_id = getattr(client.user, 'id', None)
+    if ch is None or bot_id is None:
+        return 0, 0
+    posts = state.setdefault('posts', {})
+    known = set(str(r.get('message')) for r in posts.values()
+                if isinstance(r, dict))
+    rows = [r for r in rows if isinstance(r, dict) and r.get('session')]
+    deleted = failed = 0
+    try:
+        async for m in ch.history(limit=None):
+            if getattr(getattr(m, 'author', None), 'id', None) != bot_id:
+                continue
+            content = getattr(m, 'content', '') or ''
+            if not content.startswith(TROUBLE_HEAD) or str(m.id) in known:
+                continue
+            row = next((r for r in rows if str(r['session']) not in posts
+                        and _trouble_post_matches(content, r)), None)
+            if row is not None:
+                posts[str(row['session'])] = {'channel': ch.id, 'message': m.id}
+                continue
+            try:
+                await m.delete()
+                deleted += 1
+            except discord.NotFound:  # already gone from the channel, as wanted
+                pass
+            except Exception as e:
+                failed += 1
+                log('trouble: could not delete an old failed-session post '
+                    '(%s): %s: %s' % (m.id, type(e).__name__, e))
+    except Exception as e:
+        failed += 1
+        log('trouble: could not read #%s for the old failed-session posts: '
+            '%s: %s' % (getattr(ch, 'name', '?'), type(e).__name__, e))
+    if not failed:
+        state['backfilled'] = True
+    try:
+        _state_write(path, state)
+    except Exception as e:
+        log('trouble: could not write %s after the look for old posts: %s: %s'
+            % (path, type(e).__name__, e))
+    log('trouble: the old failed-session posts: %d written down, %d deleted, '
+        '%d failed' % (len(posts), deleted, failed))
+    return deleted, failed
+
+
 async def watch_trouble():
     """
-    Say in the staff channel when a session goes wrong.
+    Say in the staff channel when a session goes wrong, and take the post down
+    when that session's logs go (trouble_forget).
 
     The site reads every session's logs as they arrive and appends the ones
     that went wrong to trouble.json. This reads that file and says each new one
@@ -5687,19 +6279,8 @@ async def watch_trouble():
     """
     await client.wait_until_ready()
 
-    def read_all():
-        try:
-            with open(TROUBLE_FILE, encoding='utf-8') as f:
-                rows = json.load(f)
-            return rows if isinstance(rows, list) else []
-        except Exception:
-            return []
-
     loop = asyncio.get_running_loop()
-    said = set()
-    for row in await loop.run_in_executor(None, read_all):
-        if isinstance(row, dict) and row.get('session'):
-            said.add(row['session'])
+    said = _trouble_sessions(await loop.run_in_executor(None, _trouble_rows) or [])
     ch = _trouble_channel()
     log('trouble: watching %s every %ds, speaking in %s, %d already there and '
         'treated as said'
@@ -5707,16 +6288,24 @@ async def watch_trouble():
            ('#' + ch.name) if ch is not None else 'NOWHERE, see above',
            len(said)))
 
+    first = True
     while not client.is_closed():
         try:
-            for row in await loop.run_in_executor(None, read_all):
+            rows = await loop.run_in_executor(None, _trouble_rows)
+            if first:
+                first = False
+                await trouble_backfill(rows)
+            for row in rows or []:
                 if not isinstance(row, dict):
                     continue
                 sid = row.get('session') or ''
                 if not sid or sid in said:
                     continue
                 said.add(sid)
-                await trouble_say(_trouble_line(row))
+                msg = await trouble_say(_trouble_line(row))
+                if msg is not None:
+                    trouble_remember(sid, msg)
+            await trouble_forget(rows)
         except Exception:
             log('trouble: the check itself failed, carrying on:\n'
                 + traceback.format_exc())
@@ -5749,19 +6338,21 @@ def _trouble_channel():
 
 
 async def trouble_say(text):
-    """Say it once, in the staff channel. Same rules as watch_say."""
+    """Say it once, in the staff channel. Same rules as watch_say. The
+    message, or None when nothing was said."""
     ch = _trouble_channel()
     if ch is None:
-        return
+        return None
     try:
         # The line carries a name and a line from a log, both from somewhere
         # else. Mentions stay off, as in watch_say and report_say, so an
         # @everyone in it is text and not a ping.
-        await ch.send(text[:1900],
-                      allowed_mentions=discord.AllowedMentions.none())
+        return await ch.send(text[:1900],
+                             allowed_mentions=discord.AllowedMentions.none())
     except Exception:
         log('trouble: could not post in #%s:\n' % getattr(ch, 'name', '?')
             + traceback.format_exc())
+        return None
 
 
 # ------------------------------------------------------ the box's watchdog --
@@ -6208,11 +6799,18 @@ _MOD_DID = {
     'evict': 'ended the claim of %s',
     'rent': 'set the rent on the claim of %s',
     'norent': 'took the rent off the claim of %s',
+    # Rent handed over in person, marked paid on the Office page (#3895).
+    'rentpaid': 'marked rent paid by %s',
     # Staff on the world's card, the Office page of K (#513): the stage is
     # the who, and the why says from where, to where, and the force.
     'worldpropose': 'proposed moving the world to %s',
     'worldconfirm': 'confirmed moving the world to %s',
     'worlddrop': 'dropped the proposal to move the world to %s',
+    # Staff on the crafting card, the Office page of K (#3167): the why says
+    # which rank from what to what, or what was given back and why.
+    'craftrank': 'raised a rank of %s',
+    'craftrecipes': 'handed the newer recipe list to the game of %s',
+    'craftgive': 'gave back to %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).
@@ -6724,6 +7322,7 @@ async def on_ready():
         asyncio.create_task(watch_known_issues())
         asyncio.create_task(watch_join_numbers())
         asyncio.create_task(watch_closed_tickets())
+        asyncio.create_task(watch_lines())
 
     log('up as %s' % client.user)
 

@@ -113,9 +113,16 @@ const GONE = ['/eat', '/drink', '/bard'];
       !!PW && PW.indexOf('/needs') !== -1 && W.indexOf('/needs') !== -1 && W.indexOf('/need') !== -1);
   yes('A3 nothing in the chat commands gives food or drink without an item',
       !/needs\.ate\(/.test(chatBlock) && !/\.ate\(actorId, '(food|drink|ale)'\)/.test(chatBlock));
-  yes('A3 and eating or drinking the item is still reported and valued: /ate and consumed',
-      W.indexOf('/ate') !== -1 && /function consumed\(actorId, baseId\)/.test(needsBlock) &&
-      /tellServer\('\/ate ' \+ id\.toString\(16\)\)/.test(read('game', 'plugins', 'thornswood-front.js')));
+  /*
+    Eating or drinking the item is still valued, from the engine's own
+    record of it (mp.onEatItem hands it to eaten, #3136), and from no line
+    the client sends: /ate was a meal anybody could type.
+  */
+  yes('A3 and eating or drinking the item is still valued, from mp.onEatItem and never a chat word',
+      W.indexOf('/ate') === -1 && gm.indexOf("word === '/ate'") === -1 &&
+      /function eaten\(actorId, baseId\)[\s\S]{0,800}?return consumed\(actorId, baseId\);/.test(needsBlock) &&
+      /mp\.onEatItem = guard\('onEatItem'[\s\S]{0,3000}?needsApi\.eaten\(actorId, Number\(baseId\) \|\| 0\)/.test(gm) &&
+      read('game', 'plugins', 'thornswood-front.js').indexOf("'/ate '") === -1);
 
   // Every quoted string in the gamemode: none tells anybody to type them.
   const said = (gm.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(function (s) {
@@ -143,11 +150,11 @@ const GONE = ['/eat', '/drink', '/bard'];
   const pages = [['docs', 'systems', 'exhaustion.md'], ['docs', 'systems', 'thirst.md'],
     ['docs', 'systems', 'hunger.md'], ['docs', 'systems', 'temperature.md'], ['docs', 'systems', 'emotes.md'],
     ['docs', 'systems', 'people.md'], ['docs', 'systems', 'chat.md'], ['site', 'data', 'site', 'classes.md'],
-    ['known board']];
+    ['known page']];
   const stale = [];
   pages.forEach(function (p) {
-    // Known Issues is the known board, as /known writes it (#2414).
-    const t = p[0] === 'known board' ? (require('./fixtures/known-page').knownPage() || '') : read.apply(null, p);
+    // Known Issues is the page /known writes, from the bot's list since #3140 (#2414).
+    const t = p[0] === 'known page' ? (require('./fixtures/known-page').knownPage() || '') : read.apply(null, p);
     if (/`\/(eat|drink|bard)\b|`\/rest bed`/.test(t) || /\/needs gives/.test(t)) { stale.push(p[p.length - 1]); }
   });
   yes('A7 no page the issue names tells anybody to type them' + (stale.length ? ' (' + stale.join(', ') + ')' : ''),
