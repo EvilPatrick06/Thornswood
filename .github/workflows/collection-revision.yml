@@ -34,6 +34,10 @@ concurrency:
 jobs:
   check:
     name: Hold Nexus, the record and both feeds to one revision
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so a job on that label never runs a
+    # branch's code. A dispatch on a branch skips it.
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, thornswood-vps]
     # Four reads and a few calls to GitHub. Past this it is stuck, not slow.
     timeout-minutes: 5
