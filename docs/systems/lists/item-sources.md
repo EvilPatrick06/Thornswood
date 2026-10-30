@@ -1,17 +1,17 @@
 # Where every item comes from
 
-Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1070 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
+Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1075 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
-| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 731 | 674 |
+| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 736 | 674 |
 | race | a recipe only the named race may make | 38 | 25 |
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
 | faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
 | quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 11 |
 | gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 138 | 113 |
 | found | created by a dungeon chest or a body | 180 | 112 |
-| start | handed to a new character: first clothes, a class's tool, a farmer's first seeds | 11 | 0 |
+| start | handed to a new character: first clothes, a class's tool, a farmer's first seeds | 16 | 0 |
 
 Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearthfire building row, a deed, key or key mold (named claim papers), and gold.
 
@@ -274,18 +274,23 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 ## Handed to a new character
 
-11 items. The first clothes, a class's tool and a farmer's first seeds, with whatever else makes them.
+16 items. The first clothes, a class's tool and a farmer's first seeds, with whatever else makes them.
 
 | Item | Sources | Id |
 | --- | --- | --- |
+| Alembic | crafted Smith/Edgewright novice; start alchemist (game/gamemode.js TOOLS) | `154f1:Thornswood-Content.esp` |
 | Belted Tunic | crafted Tailor/Haberdasher novice; start (chargen.json shift) | `1be1a:Skyrim.esm` |
 | Boots | crafted Tailor/Haberdasher novice; start (chargen.json shift) | `1be1b:Skyrim.esm` |
 | Cabbage | gathered farmer novice (harvests.json crops); found tier 1 (dungeon goods); start farmer (game/gamemode.js startingCrops) | `64b3f:Skyrim.esm` |
 | Crude Fishing Pole | crafted Woodworker/Woodwright novice; start fisher (game/gamemode.js TOOLS) | `15498:Thornswood-Content.esp` |
+| Hammer | crafted Smith/Edgewright novice; start smith (game/gamemode.js TOOLS) | `5cae1:Skyrim.esm` |
 | Leek | gathered farmer novice (harvests.json crops); found tier 1 (dungeon goods); start farmer (game/gamemode.js startingCrops) | `669a5:Skyrim.esm` |
 | Pickaxe | crafted Smith/Edgewright novice; start miner (game/gamemode.js TOOLS) | `e3c16:Skyrim.esm` |
 | Potato | gathered farmer novice (harvests.json crops); found tier 1 (dungeon goods); start farmer (game/gamemode.js startingCrops) | `64b41:Skyrim.esm` |
 | Riekling Belted Tunic | race Tailor/Haberdasher riekling novice; company; start (chargen.json rieklingShift) | `bfd98:Playable Rieklings.esp` |
 | Riekling Footwraps | race Tailor/Haberdasher riekling novice; company; start (chargen.json rieklingShift) | `bfdb1:Playable Rieklings.esp` |
+| Rune Knife | crafted Smith/Edgewright novice; start enchanter (game/gamemode.js TOOLS) | `154f2:Thornswood-Content.esp` |
+| Shears | crafted Smith/Edgewright novice; start tailor (game/gamemode.js TOOLS) | `154f0:Thornswood-Content.esp` |
 | Shovel | crafted Smith/Edgewright novice; start farmer (game/gamemode.js TOOLS) | `f5d05:Skyrim.esm` |
 | Woodcutter's Axe | crafted Smith/Edgewright novice; start woodworker (game/gamemode.js TOOLS) | `2f2f4:Skyrim.esm` |
+| Wooden Ladle | crafted Woodworker/Woodwright novice; start cook (game/gamemode.js TOOLS) | `319e5:Skyrim.esm` |

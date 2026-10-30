@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "a4c6d5157c06c0f743968d08ca36ed1a8aacc3e5f03d1937ec216a701be09569",
+    "game/data/recipes.json": "ab1d7b42f4ab3eb536982eb1db63800b3475aa09ec2a9207228cac8e3206c832",
     "game/data/harvests.json": "b977670daf535dede75a5eaa794365865953d85f554c3ca6f8cf0b6dbcb657a1",
     "game/data/hunts.json": "6618519178eb470173f7312c56527a3bc844ed53f0f93b23f7563c77202557a2",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
@@ -267,7 +267,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "bea10873c87b2c8bc0dc759ae286effc980723b17c5d8b84b6b671b8fdde57a0",
+      "sha256": "b3673431a535845c27a921c45edbbc19d0b6ef7ec692ebde8df7cfe6dffad406",
       "repository": true
     },
     {
@@ -1556,6 +1556,24 @@
       "type": "MISC",
       "flags": 0,
       "edid": "ThornswoodMiscRemedy",
+      "winner": "Thornswood-Content.esp"
+    },
+    "154f0:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodMiscToolShears",
+      "winner": "Thornswood-Content.esp"
+    },
+    "154f1:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodMiscToolAlembic",
+      "winner": "Thornswood-Content.esp"
+    },
+    "154f2:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodMiscToolRuneKnife",
       "winner": "Thornswood-Content.esp"
     },
     "15516:Skyrim.esm": {
@@ -2861,6 +2879,12 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "319e5:Skyrim.esm": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "WoodenLadle01",
+      "winner": "Skyrim.esm"
+    },
     "330b3:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -3639,6 +3663,12 @@
       "flags": 64,
       "edid": "ArmorFalmerShield",
       "winner": "Update.esm"
+    },
+    "5cae1:Skyrim.esm": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "BlacksmithHammer01",
+      "winner": "Skyrim.esm"
     },
     "5db7b:Skyrim.esm": {
       "type": "ARMO",
@@ -5499,6 +5529,9 @@
         "15495:Thornswood-Content.esp",
         "154b0:Thornswood-Content.esp",
         "154b1:Thornswood-Content.esp",
+        "154f0:Thornswood-Content.esp",
+        "154f1:Thornswood-Content.esp",
+        "154f2:Thornswood-Content.esp",
         "16e26:Dragonborn.esm",
         "17e97:Dragonborn.esm",
         "18388:Skyrim.esm",
@@ -5612,6 +5645,7 @@
         "5ada0:Skyrim.esm",
         "5ada1:Skyrim.esm",
         "5c06c:Skyrim.esm",
+        "5cae1:Skyrim.esm",
         "6bc02:Skyrim.esm",
         "6bc04:Skyrim.esm",
         "6bc0b:Skyrim.esm",
@@ -5766,6 +5800,9 @@
         "15495:Thornswood-Content.esp",
         "154b0:Thornswood-Content.esp",
         "154b1:Thornswood-Content.esp",
+        "154f0:Thornswood-Content.esp",
+        "154f1:Thornswood-Content.esp",
+        "154f2:Thornswood-Content.esp",
         "16e26:Dragonborn.esm",
         "17e97:Dragonborn.esm",
         "18388:Skyrim.esm",
@@ -5879,6 +5916,7 @@
         "5ada0:Skyrim.esm",
         "5ada1:Skyrim.esm",
         "5c06c:Skyrim.esm",
+        "5cae1:Skyrim.esm",
         "6bc02:Skyrim.esm",
         "6bc04:Skyrim.esm",
         "6bc0b:Skyrim.esm",
@@ -6014,6 +6052,7 @@
         "2623b:Dragonborn.esm",
         "287f:PlayFluteLuteDrum.esp",
         "2b06b:Dragonborn.esm",
+        "319e5:Skyrim.esm",
         "38340:Skyrim.esm",
         "38341:Skyrim.esm",
         "3ad57:Skyrim.esm",
@@ -6081,6 +6120,7 @@
         "2623b:Dragonborn.esm",
         "287f:PlayFluteLuteDrum.esp",
         "2b06b:Dragonborn.esm",
+        "319e5:Skyrim.esm",
         "38340:Skyrim.esm",
         "38341:Skyrim.esm",
         "3ad57:Skyrim.esm",
@@ -8617,6 +8657,7 @@
       "Smith:recipe:1548d:Thornswood-Content.esp:input:1",
       "Smith:recipe:1548e:Thornswood-Content.esp:input:1",
       "Smith:recipe:15492:Thornswood-Content.esp:input:1",
+      "Smith:recipe:154f3:Thornswood-Content.esp:input:1",
       "Woodworker:recipe:15491:Thornswood-Content.esp:out"
     ],
     "15494:Thornswood-Content.esp": [
@@ -8657,6 +8698,15 @@
     ],
     "154c3:Thornswood-Content.esp": [
       "Alchemist:recipe:154c7:Thornswood-Content.esp:out"
+    ],
+    "154f0:Thornswood-Content.esp": [
+      "Smith:recipe:154f4:Thornswood-Content.esp:out"
+    ],
+    "154f1:Thornswood-Content.esp": [
+      "Smith:recipe:154f5:Thornswood-Content.esp:out"
+    ],
+    "154f2:Thornswood-Content.esp": [
+      "Smith:recipe:154f6:Thornswood-Content.esp:out"
     ],
     "15516:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -9526,6 +9576,9 @@
       "Cook:recipe:812:Gourmet.esp:input:0",
       "Cook:recipe:813:Gourmet.esp:input:0"
     ],
+    "319e5:Skyrim.esm": [
+      "Woodworker:recipe:154f7:Thornswood-Content.esp:out"
+    ],
     "330b3:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:979:MoreCraftableEquipment.esp:out"
@@ -10254,6 +10307,10 @@
       "Smith:recipe:15497:Thornswood-Content.esp:input:0",
       "Smith:recipe:154b3:Thornswood-Content.esp:input:0",
       "Smith:recipe:154b4:Thornswood-Content.esp:input:0",
+      "Smith:recipe:154f3:Thornswood-Content.esp:input:0",
+      "Smith:recipe:154f4:Thornswood-Content.esp:input:0",
+      "Smith:recipe:154f5:Thornswood-Content.esp:input:0",
+      "Smith:recipe:154f6:Thornswood-Content.esp:input:0",
       "Smith:recipe:19f8f:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f97:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f9d:Playable Rieklings.esp:input:0",
@@ -10638,6 +10695,9 @@
     "5c06c:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:8a9:MoreCraftableEquipment.esp:out"
+    ],
+    "5cae1:Skyrim.esm": [
+      "Smith:recipe:154f3:Thornswood-Content.esp:out"
     ],
     "5db7b:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -11215,6 +11275,7 @@
       "Woodworker:recipe:1549e:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:1549f:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:154c5:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:154f7:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:16080:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:16081:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:16082:Thornswood-Content.esp:input:0",
@@ -11347,6 +11408,7 @@
     ],
     "800e4:Skyrim.esm": [
       "Smith:recipe:154b3:Thornswood-Content.esp:input:1",
+      "Smith:recipe:154f6:Thornswood-Content.esp:input:1",
       "Smith:recipe:19f8c:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f8d:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f8e:Playable Rieklings.esp:input:0",
@@ -12578,13 +12640,13 @@
   },
   "counts": {
     "Smith": {
-      "buy": 265,
-      "sell": 265,
+      "buy": 269,
+      "sell": 269,
       "supply": 40
     },
     "Woodworker": {
-      "buy": 65,
-      "sell": 65,
+      "buy": 66,
+      "sell": 66,
       "supply": 16
     },
     "Tailor": {
