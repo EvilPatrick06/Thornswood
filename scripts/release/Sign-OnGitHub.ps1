@@ -273,7 +273,21 @@ function Get-SignedFileRefusal([string]$Path, [string]$ExpectedSigner, [string]$
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return "there is no file at $Path to check" }
     $onWindows = ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT)
     if ($onWindows -and -not $Box) { return (Get-PublishSignRefusal -Path $Path -ExpectedSigner $ExpectedSigner) }
-    $script = New-SignedFileCheckScript $Path $ExpectedSigner $RepoDir
+    return (Invoke-SignedCheckOnBox (New-SignedFileCheckScript $Path $ExpectedSigner $RepoDir) (Split-Path -Leaf $Path) $Box)
+}
+
+# The same check for a file already on the box at $BoxPath, one too big to
+# send inside a script: the installer, which Publish-Installer sends to the
+# box first and holds there before it replaces the one people download
+# (#3412). '' when it passes, else why.
+function Get-SignedBoxFileRefusal([string]$BoxPath, [string]$ExpectedSigner, [string]$RepoDir, [scriptblock]$Box) {
+    $leaf = @($BoxPath -split '[\\/]')[-1]
+    return (Invoke-SignedCheckOnBox (New-SignedFileCheckScript '' $ExpectedSigner $RepoDir $BoxPath) $leaf $Box)
+}
+
+# Runs a script New-SignedFileCheckScript made on the box (-Box stands in for
+# it) and reads its one line back: '' when the box accepted $leaf, else why.
+function Invoke-SignedCheckOnBox([string]$script, [string]$leaf, [scriptblock]$Box) {
     $lines = @()
     try {
         if ($Box) { $lines = @(& $Box $script) }
@@ -283,32 +297,38 @@ function Get-SignedFileRefusal([string]$Path, [string]$ExpectedSigner, [string]$
             $target = (Get-ThornswoodVpsUser) + '@' + (Get-ThornswoodVpsAddress)
             $lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes') -Script $script)
         }
-    } catch { return ('the box could not check ' + (Split-Path -Leaf $Path) + ': ' + $_.Exception.Message) }
+    } catch { return ('the box could not check ' + $leaf + ': ' + $_.Exception.Message) }
     $said = @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ -match '^SIGNED ' })
     if ($said.Count -ne 1) {
-        return ('the box did not say whether ' + (Split-Path -Leaf $Path) + ' passes (it answered: ' + ((@($lines | ForEach-Object { [string]$_ }) | Select-Object -Last 3) -join ' | ') + ')')
+        return ('the box did not say whether ' + $leaf + ' passes (it answered: ' + ((@($lines | ForEach-Object { [string]$_ }) | Select-Object -Last 3) -join ' | ') + ')')
     }
-    if ($said[0] -eq 'SIGNED ACCEPTED') { Write-Host ('  the box, which holds no signing setup, accepts ' + (Split-Path -Leaf $Path) + ' with the launcher''s own check') -ForegroundColor DarkGray; return '' }
+    if ($said[0] -eq 'SIGNED ACCEPTED') { Write-Host ('  the box, which holds no signing setup, accepts ' + $leaf + ' with the launcher''s own check') -ForegroundColor DarkGray; return '' }
     return ($said[0] -replace '^SIGNED REFUSED ', '')
 }
 
 # The script the box runs for one file: the file and Signature.cs as base64
 # (Send-Script.ps1 sends a long script by scp), the check from
 # Assert-PublishSigned.ps1 as it is here, and one line back, SIGNED ACCEPTED
-# or SIGNED REFUSED <why>. Its folder goes whatever happens.
-function New-SignedFileCheckScript([string]$Path, [string]$ExpectedSigner, [string]$RepoDir) {
+# or SIGNED REFUSED <why>. Its folder goes whatever happens. With $BoxPath the
+# file is the one already there, and only Signature.cs is sent.
+function New-SignedFileCheckScript([string]$Path, [string]$ExpectedSigner, [string]$RepoDir, [string]$BoxPath = '') {
     $b64 = { param($p) [Convert]::ToBase64String([IO.File]::ReadAllBytes($p)) }
     $assert = [IO.File]::ReadAllText((Join-Path $RepoDir 'scripts\release\Assert-PublishSigned.ps1'))
     $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
-    $leaf = [IO.Path]::GetFileName($Path)
-    if ($leaf -notmatch '^[A-Za-z0-9._-]+$') { $leaf = 'file.bin' }
+    if ($BoxPath) {
+        $file = @(('    $f = ' + (& $q $BoxPath)))
+    } else {
+        $leaf = [IO.Path]::GetFileName($Path)
+        if ($leaf -notmatch '^[A-Za-z0-9._-]+$') { $leaf = 'file.bin' }
+        $file = @(('    $f = Join-Path $d ' + (& $q $leaf)),
+                  ('    [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String(' + (& $q (& $b64 $Path)) + '))'))
+    }
     return @(
         '$ErrorActionPreference = ''Stop'''
         '$d = Join-Path $env:TEMP (''thornswood-signed-'' + [Guid]::NewGuid().ToString(''N''))'
         'New-Item -ItemType Directory -Force -Path $d | Out-Null'
         'try {'
-        ('    $f = Join-Path $d ' + (& $q $leaf))
-        ('    [IO.File]::WriteAllBytes($f, [Convert]::FromBase64String(' + (& $q (& $b64 $Path)) + '))')
+        $file
         ('    [IO.File]::WriteAllBytes((Join-Path $d ''Signature.cs''), [Convert]::FromBase64String(' + (& $q (& $b64 (Join-Path $RepoDir 'launcher\app\Signature.cs'))) + '))')
         $assert
         '    $AssertPublishSignedCs = Join-Path $d ''Signature.cs'''
