@@ -231,9 +231,9 @@ Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 #
 # 2>&1 means anything ssh writes to stderr comes back in the same stream as the
 # output, as an ErrorRecord rather than a string. Callers that only print are
-# fine with that. Callers that treat the result as text are not: OpenSSH now
-# warns about post-quantum key exchange on every connection, that warning
-# arrived among the filenames, and $_.Trim() stopped the deploy with "does not
+# fine with that. Callers that treat the result as text are not: until the
+# box's OpenSSH 10.4 (#1043, 26 Oct 2026) ssh warned about post-quantum key
+# exchange on every connection, that warning arrived among the filenames, and $_.Trim() stopped the deploy with "does not
 # contain a method named 'Trim'" after the files had already gone up. The two
 # places that build a list from this take only the strings.
 function Remote($script) {

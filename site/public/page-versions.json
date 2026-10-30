@@ -387,6 +387,22 @@
       {
         "sha256": "19a9aa63c2b8c124f06040b81feb5d6e4dd8674e17e27587ac11c5969efffafc",
         "changed": "2026-10-26"
+      },
+      {
+        "sha256": "40efea503a270df892b453fab37e808e96fd3a8a699b5021b4d7f5ba4833c8ae",
+        "changed": "2026-10-26"
+      },
+      {
+        "sha256": "1419c32131db909f413e6d849aeb71bb9ef65b0e20017aa745ae6470449085cf",
+        "changed": "2026-10-26"
+      },
+      {
+        "sha256": "1ed7051a388a593e2870c1ad7effde871310f9b6a569b6843004bfc3f338316a",
+        "changed": "2026-10-26"
+      },
+      {
+        "sha256": "386c6e355d4c2ec1147105ea598151d27042620651cb362d7f143b467bac0b97",
+        "changed": "2026-10-26"
       }
     ],
     "rules": [

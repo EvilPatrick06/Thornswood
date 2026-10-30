@@ -82,14 +82,19 @@ the game: which mods are installed, what failed to start, which version you
 are on. It is how somebody who cannot play gets helped without a conversation.
 
 **Gallery submissions.** The picture or recording, your signed-in account,
-the name for its caption and any note for staff are kept for review. Only
-approved submissions appear publicly. Their caption and media then become
-public too. With a picture, your browser or the launcher also sends smaller
-copies of it, which are shown in its place on smaller screens and deleted
-with it. Submit only material you have permission to share, without
-private information about other people. Ask in the Discord to have a
-submission removed. Removing one deletes its file from the site. See
-[Terms](/terms) for publication permissions.
+the name for its caption and any note for staff are kept for review. A
+picture or recording can also say inside the file where it was taken (a
+phone or camera often writes the GPS position), when, and with which camera
+or program. The site takes all of that out as the file arrives, so none of
+it is kept or shown. Of the file, only the picture or recording itself is
+kept, with its colours and which way up it is shown. Only approved
+submissions appear publicly. Their caption and media then become public too.
+With a picture, your browser or the launcher also sends smaller copies of
+it, which are shown in its place on smaller screens and deleted with it.
+Submit only material you have permission to share, without private
+information about other people. Ask in the Discord to have a submission
+removed. Removing one deletes its file from the site. See [Terms](/terms)
+for publication permissions.
 
 ## What is not stored
 
@@ -172,7 +177,10 @@ until 24 September 2026, and both are served from here now.
   they change, this line changes with them.
 
 - **Your character** is kept until you ask for it to be deleted, or until a
-  wipe, which is announced first.
+  wipe, which is announced first. A wipe, a character reset or putting a
+  backup back leaves the characters it replaced set aside on the server for
+  30 days, so it can be undone, and then deleted. The server checks every
+  hour.
 - **Launcher logs** are kept for 365 days, like session records, unless staff
   mark the session kept.
 - **A gallery submission that is removed** has its file deleted then. One
@@ -219,11 +227,15 @@ until 24 September 2026, and both are served from here now.
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the
 operator's computer are kept for 30 days, with at least seven retained for
-recovery. These are private recovery copies, not public downloads. Removing
+recovery. A whole copy of the server taken by hand, before moving it to a
+new machine, is encrypted the same way and kept on the operator's computer
+for 30 days. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
 retention schedule. The game server's log is not in them. Staff must
 reapply completed deletion requests before putting an older backup back
-into service.
+into service. What putting a backup back replaces (the site's records and
+uploads, the bot's join numbers, characters) is set aside on the server for
+30 days, so it can be undone, and then deleted.
 
 ## Deleting it
 

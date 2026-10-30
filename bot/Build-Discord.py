@@ -145,6 +145,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import content as C
+import trust
 
 TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
 # Deleting is off unless asked for, because a script that quietly removes
@@ -190,9 +191,15 @@ CHECK = os.environ.get('DISCORD_CHECK', '') == '1'
 # A category named here is made if missing, with every channel PLAN puts in
 # it; a channel named here is made or kept in its own category, which is not
 # made for it. No role is made or moved, nothing is listed for pruning or
-# pruned, no post is written, no webhook is made, and no server setting is
-# changed. A name PLAN does not have stops the run before Discord is asked
-# anything.
+# pruned, no webhook is made, and no server setting is changed. A name PLAN
+# does not have stops the run before Discord is asked anything.
+#
+# With POSTS as well, the read only posts of the channels named, and of no
+# other channel, are rewritten with their Changelog threads (#3656: the -Only
+# lore,factions -Posts run of 27 Oct wrote nothing, because ONLY returned
+# before the post step, and the one other way to rewrite two posts was a
+# whole run, which rewrites all seven and moves roles). Without POSTS no post
+# is written.
 ONLY = [n.strip() for n in os.environ.get('DISCORD_ONLY', '').split(',') if n.strip()]
 
 # THE AUDIT (#3317). Reads the live server and says where it differs from this
@@ -980,7 +987,10 @@ SPACE_GUESTS = {'Gamemasters': ('Moderator',)}
 # refuse the whole connection, because it is a privileged intent that is off by
 # default and nothing here reads a message's text: the bot posts, and deletes
 # its own posts by author id.
-client = discord.Client(intents=discord.Intents(guilds=True, members=True))
+# It logs in with the bot's token, so it trusts what the bot trusts: the
+# bot's roots alone, never the machine's stores, which on the box hold an
+# emSign root (#3111, #3604). The roots are made at login.
+client = trust.client_class()(intents=discord.Intents(guilds=True, members=True))
 made, kept, failed = [], [], []
 
 
@@ -1937,7 +1947,9 @@ def doc_keys():
 
 def check_docs():
     """What stops a build: a written channel with no words, or whose words
-       have no change line. [] when every doc is in order."""
+       have no change line, or a change line or live words that say what a
+       public line never says (content.py, NOT_PUBLIC). [] when every doc is
+       in order."""
     bad = []
     keys = []
     for key in doc_keys():
@@ -1949,6 +1961,9 @@ def check_docs():
         bad.append('%s: its words have no change line. Add (\'<YYYY-MM-DD>\', '
                    '\'<what changed and why>\', \'%s\') to the end of '
                    'CHANGES[\'%s\'] in content.py' % (key, fp, key))
+    for key, where, what, words in C.unpublic(keys):
+        bad.append('%s, %s: %s, which a public line never says (#3656): "%s"'
+                   % (key, where, what, words))
     return bad
 
 
@@ -1994,10 +2009,15 @@ async def find_changelog(channel):
 
 
 async def keep_changelog(channel, key):
-    """The channel's Changelog thread, made and locked if missing, with
-       every change line of its doc posted once, in order, and handed back
-       for the post to link (None when it could not be had). Nothing in it
-       is ever deleted or rewritten, so it is the record of what changed."""
+    """The channel's Changelog thread, made and locked if missing, holding
+       its doc's change lines as content.py has them, once each and in order,
+       and handed back for the post to link (None when it could not be had).
+       content.py is the record of what changed. A line reworded or taken
+       out there is reworded or taken out here as well (#3656: two lines
+       went out saying "Patrick confirmed it (#3656)" and, until then, the
+       thread kept every line it was ever sent): the bot's lines from the
+       first one that differs on are taken down and the rest posted again,
+       so the order stays the order of the changes."""
     if channel is None or not hasattr(channel, 'create_thread'):
         return None
     try:
@@ -2019,17 +2039,37 @@ async def keep_changelog(channel, key):
         except discord.HTTPException as e:
             failed.append('#%s: its Changelog thread could not be made (%s)' % (channel.name, refused(e)))
             return None
-    have = set()
+    want = change_lines(key)
     try:
-        async for m in thread.history(limit=500):
-            if m.author.id == client.user.id:
-                have.add(m.content)
-        for line in change_lines(key):
-            if line not in have:
-                await thread.send(line)
+        mine = await changelog_lines(thread, client.user.id)
+        same = 0
+        while same < len(mine) and same < len(want) and mine[same].content == want[same]:
+            same += 1
+        if same < len(mine) and getattr(thread, 'archived', False):
+            # Discord refuses a delete in an archived thread, and a send
+            # would only bring it back after the deletes were refused.
+            await thread.edit(archived=False)
+        for m in mine[same:]:
+            await m.delete()
+        for line in want[same:]:
+            await thread.send(line)
+        if same < len(mine):
+            say('changelog', '#%s: %d line(s) no longer in content.py taken down, %d posted again'
+                % (channel.name, len(mine) - same, len(want) - same))
     except discord.HTTPException as e:
         failed.append('#%s: its changelog was not brought up to date (%s)' % (channel.name, refused(e)))
     return thread
+
+
+async def changelog_lines(thread, me_id):
+    """The bot's change lines in a Changelog thread, oldest first: its own
+       plain messages, never a line Discord adds or anybody else's."""
+    out = []
+    async for m in thread.history(limit=500, oldest_first=True):
+        if (getattr(getattr(m, 'author', None), 'id', None) == me_id and
+                getattr(m, 'type', None) in (discord.MessageType.default, discord.MessageType.reply)):
+            out.append(m)
+    return out
 
 
 async def changelog_drift(channel, key, me_id):
@@ -2044,13 +2084,17 @@ async def changelog_drift(channel, key, me_id):
         return ['it has no Changelog thread; -Posts makes it']
     out = []
     try:
-        have = set()
-        async for m in thread.history(limit=500):
-            if getattr(m.author, 'id', None) == me_id:
-                have.add(m.content)
-        gone = [l for l in change_lines(key) if l not in have]
+        have = [m.content for m in await changelog_lines(thread, me_id)]
+        want = change_lines(key)
+        gone = [l for l in want if l not in have]
+        stale = [l for l in have if l not in want]
         if gone:
             out.append('its Changelog thread is missing %d change line(s); -Posts adds them' % len(gone))
+        if stale:
+            out.append('its Changelog thread has %d line(s) content.py no longer has; '
+                       '-Posts takes them down' % len(stale))
+        elif not gone and have != want:
+            out.append('its Changelog thread has its lines out of order or twice; -Posts puts them right')
         linked = False
         async for m in channel.history(limit=50):
             if doc_post_of_mine(m, me_id) and thread.mention in (m.content or ''):
@@ -2124,6 +2168,59 @@ async def post(channel, text, found):
         except discord.HTTPException as e:
             failed.append('#%s: its first post could not be pinned (%s)' % (channel.name, refused(e)))
     say('wrote', '#' + channel.name)
+
+
+async def write_posts(posts, found):
+    """The read only posts of this run's channels, (channel, key) pairs: each
+       rewritten with its Changelog thread under -Posts, said under -Check,
+       and left alone without -Posts. A whole run and an ONLY run both come
+       through here, so they write a post the same way (#3656)."""
+    # A draft waits for its lead and Patrick (#3317) and is never written.
+    drafts = [(ch, k) for ch, k in posts if k in C.DRAFTS]
+    posts = [(ch, k) for ch, k in posts if k not in C.DRAFTS]
+    for ch, k in drafts:
+        say('left alone', '#%s: its words are a draft waiting on approval'
+            % getattr(ch, 'name', k.lower()))
+    if CHECK and POSTS:
+        for ch, key in posts:
+            if ch is not None:
+                say('would write', '#' + ch.name + ' and its changelog')
+    elif CHECK and posts:
+        # What the same run without -Check does: it leaves them alone.
+        # This said would write for all seven whether or not -Posts was
+        # given (#2519, 22 Oct).
+        say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
+    elif POSTS:
+        for ch, key in posts:
+            # The thread first, so the post can link it.
+            thread = await keep_changelog(ch, key)
+            await post(ch, doc_with_footer(key, thread), found)
+    elif posts:
+        say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
+
+
+def look_up(guild, found):
+    """Under ONLY, the channels of PLAN the run did not reach, found by name
+       in their own category and put in found, so a named channel's post
+       links the live channels it mentions instead of saying their names
+       as plain words. Asks Discord for nothing and changes nothing: a
+       channel that is not there stays out of found."""
+    def want(spec):
+        return spec['name'] if spec['kind'] == 'voice' else spec['name'].lower().replace(' ', '-')
+    for catname, specs in PLAN:
+        cat = None
+        if catname:
+            cat = discord.utils.get(guild.categories, name=catname)
+            if cat is None:
+                continue
+        for spec in specs:
+            key = spec.get('key')
+            if not key or found.get(key) is not None:
+                continue
+            for ch in guild.channels:
+                if ch.name == want(spec) and getattr(ch, 'category', None) == cat:
+                    found[key] = ch
+                    break
 
 
 def _flags_differ(guild, flags):
@@ -3209,8 +3306,13 @@ async def on_ready():
                         await keep_bot(ch)
 
         if ONLY:
-            # Nothing past the parts named: no prune list, no post, no
-            # webhook, no server setting.
+            # Nothing past the parts named: no prune list, no webhook, no
+            # server setting, and no post but the named channels' own, and
+            # those only under -Posts (#3656).
+            if posts:
+                print('')
+                look_up(guild, found)
+                await write_posts(posts, found)
             say('only', ', '.join(ONLY) + '. Nothing else was touched')
             print('\n  made %d, already there %d' % (len(made), len(kept)))
             if failed:
@@ -3303,28 +3405,7 @@ async def on_ready():
                     failed.append('could not remove category %s (%s)' % (name, refused(e)))
 
         print('')
-        # A draft waits for its lead and Patrick (#3317) and is never written.
-        drafts = [(ch, k) for ch, k in posts if k in C.DRAFTS]
-        posts = [(ch, k) for ch, k in posts if k not in C.DRAFTS]
-        for ch, k in drafts:
-            say('left alone', '#%s: its words are a draft waiting on approval'
-                % getattr(ch, 'name', k.lower()))
-        if CHECK and POSTS:
-            for ch, key in posts:
-                if ch is not None:
-                    say('would write', '#' + ch.name + ' and its changelog')
-        elif CHECK and posts:
-            # What the same run without -Check does: it leaves them alone.
-            # This said would write for all seven whether or not -Posts was
-            # given (#2519, 22 Oct).
-            say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
-        elif POSTS:
-            for ch, key in posts:
-                # The thread first, so the post can link it.
-                thread = await keep_changelog(ch, key)
-                await post(ch, doc_with_footer(key, thread), found)
-        elif posts:
-            say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
+        await write_posts(posts, found)
 
         # A webhook in news, so a release can announce itself without the bot
         # having to be running.
@@ -3387,8 +3468,9 @@ if __name__ == '__main__' and '--layout' in sys.argv:
 if __name__ == '__main__':
     _bad = check_docs()
     if _bad and not AUDIT:
-        sys.exit('A doc has words with no change line, so nothing was asked of '
-                 'Discord (#3317):\n  ' + '\n  '.join(_bad))
+        sys.exit('A doc has words with no change line, or a line a public post '
+                 'never says, so nothing was asked of Discord (#3317, #3656):\n  '
+                 + '\n  '.join(_bad))
     try:
         plan_for(ONLY)
     except ValueError as e:

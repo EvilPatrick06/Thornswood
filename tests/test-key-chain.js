@@ -143,7 +143,7 @@ yes('the recipe the gate watches for is the one the plugin adds',
     yes('most properties have more than one door, ' + multi.length + ' of ' + buildings.length,
         multi.length > 100);
     yes('and a key is named for the property rather than the door',
-        /function keyLabel\(building\) \{ return 'Key to ' \+ nameOf\(building\); \}/.test(code));
+        /function keyLabel\(building\) \{ return 'Key to ' \+ placeOf\(building\); \}/.test(code));
     yes('and the door is resolved to its property before the key is asked about',
         /function mayPass\(actorId, profileId, building\)/.test(code) &&
         /holdsKey\(actorId, building\)/.test(code));
