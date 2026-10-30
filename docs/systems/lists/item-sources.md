@@ -4,13 +4,13 @@ Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.j
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
-| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 719 | 662 |
+| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 731 | 673 |
 | race | a recipe only the named race may make | 38 | 25 |
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
 | faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
-| quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 11 |
-| gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 138 | 113 |
-| found | created by a dungeon chest or a body | 180 | 112 |
+| quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 10 |
+| gathered | a class's work: picked, grown, fished, hunted, mined or pressed | 138 | 106 |
+| found | created by a dungeon chest or a body | 177 | 100 |
 | start | handed to a new character: first clothes, a class's tool, a farmer's first seeds | 11 | 0 |
 
 Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearthfire building row, a deed, key or key mold (named claim papers), and gold.
@@ -41,7 +41,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 ## Only from a quest
 
-11 items. Drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token.
+10 items. Drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token.
 
 | Item | Sources | Id |
 | --- | --- | --- |
@@ -52,14 +52,13 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Guild Seal | quest seal (game/data/merchant-retrievals.json) | `17006:Thornswood-Content.esp` |
 | Guild Signet | quest signet (game/data/merchant-retrievals.json) | `17002:Thornswood-Content.esp` |
 | Heart Stone | quest miner heartstone master (ores.json, the rare seams of game/gamemode.js custom quests) | `17749:Dragonborn.esm` |
-| Petty Soul Gem | quest geode (game/data/merchant-scarce-geodes.json) | `2e4e2:Skyrim.esm` |
 | Sealed Guild Case | quest case (game/data/merchant-retrievals.json) | `17004:Thornswood-Content.esp` |
 | Sealed Guild Dispatch | quest dispatch (game/data/merchant-retrievals.json) | `17005:Thornswood-Content.esp` |
 | Stalhrim | quest miner stalhrim master (ores.json, the rare seams of game/gamemode.js custom quests) | `2b06b:Dragonborn.esm` |
 
 ## Only found
 
-112 items. Created only by a dungeon chest or a body.
+100 items. Created only by a dungeon chest or a body.
 
 | Item | Sources | Id |
 | --- | --- | --- |
@@ -87,18 +86,6 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Lesser Soul Gem | found tier 2 (dungeon goods) | `2e4e4:Skyrim.esm` |
 | Lockpick | found tier 1 (dungeon goods) | `a:Skyrim.esm` |
 | Long Bow | found tier 1 (dungeon goods) | `3b562:Skyrim.esm` |
-| Orichalcum Ingot | found tier 4 (dungeon goods) | `43e27:Skyrim.esm` |
-| Petty Soul Gem | found tier 1 (dungeon goods) | `1fe9b:Skyrim.esm` |
-| Potion of Healing | found tier 2 (dungeon goods) | `3eade:Skyrim.esm` |
-| Potion of Magicka | found tier 2 (dungeon goods) | `3eae1:Skyrim.esm` |
-| Potion of Minor Healing | found tier 1 (dungeon goods) | `3eadd:Skyrim.esm` |
-| Potion of Minor Magicka | found tier 1 (dungeon goods) | `3eae0:Skyrim.esm` |
-| Potion of Minor Stamina | found tier 1 (dungeon goods) | `3eae5:Skyrim.esm` |
-| Potion of Plentiful Healing | found tier 3 (dungeon goods) | `3eadf:Skyrim.esm` |
-| Potion of Resist Fire | found tier 2 (dungeon goods) | `39b4a:Skyrim.esm` |
-| Potion of Resist Shock | found tier 2 (dungeon goods) | `39be1:Skyrim.esm` |
-| Potion of Stamina | found tier 2 (dungeon goods) | `39be8:Skyrim.esm` |
-| Potion of Vigorous Healing | found tier 4 (dungeon goods) | `3eae3:Skyrim.esm` |
 | Spell Tome: Bane of the Undead | found (dungeon tomes master) | `dd647:Skyrim.esm` |
 | Spell Tome: Blizzard | found (dungeon tomes master) | `a270d:Skyrim.esm` |
 | Spell Tome: Bound Battleaxe | found (dungeon tomes adept) | `a26ed:Skyrim.esm` |
