@@ -117,6 +117,13 @@ the longfin water count what their work hands over, not the season.
 One successful press is one piece of work, whatever the yield. 100,
 then 250, then 600.
 
+## The catch laid out in Windhelm
+
+Fish laid out and hung up in Windhelm (three records in
+WindhelmSSE.esp) are the fisher's. They are taken by hand, so no pole
+is asked. They are novice, wait the novice water's 10 minutes, and give
+the novice catch, one of whatever fish the record's own list holds.
+
 ## What you are handed
 
 1 in Vigor (+10% stamina recovery).

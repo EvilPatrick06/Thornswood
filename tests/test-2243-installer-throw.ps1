@@ -36,11 +36,11 @@ $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-2243-' + [guid]::NewGuid().ToSt
 New-Item -ItemType Directory $tmp | Out-Null
 $code = [scriptblock]::Create($step + "`n`$script:after = `$true`n" + $done)
 
-function Run([string]$packager, [int]$before = 0) {
+function Run([string]$packager, [int]$before = 0, [bool]$fromFeed = $false) {
     Set-Content -LiteralPath (Join-Path $tmp 'Package-Thornswood.ps1') -Value $packager
     $script:said = New-Object System.Collections.Generic.List[string]
     $script:InstallerFailed = 0; $script:InstallerWhy = ''; $script:after = $false
-    $Here = $tmp; $Root = $tmp; $DistDir = $tmp; $ciStub = $null; $AllowStaleCheckout = $false
+    $Here = $tmp; $Root = $tmp; $DistDir = $tmp; $ciStub = $null; $AllowStaleCheckout = $false; $FromFeed = $fromFeed
     function Say([string]$t, [string]$c = 'Gray') { $script:said.Add("$c|$t") }
     $global:LASTEXITCODE = $before
     $threw = $null
@@ -57,6 +57,13 @@ try {
     Yes 'T5 said in red where it happened, with the reason' (@($r.Said | Where-Object { $_ -like 'Red|  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 stopped: Generated files are stale*' }).Count -eq 1)
     Yes 'T6 and again on the Done screen, with the reason' (@($r.Said | Where-Object { $_ -like 'Red|The installer did NOT rebuild*' }).Count -eq 1 -and @($r.Said | Where-Object { $_ -like 'Red|  It stopped with: Generated files are stale*' }).Count -eq 1)
     Yes 'T7 with the command to put it right' (@($r.Said | Where-Object { $_ -like 'Yellow|*Package-Thornswood.ps1 -OneFile*' }).Count -ge 1)
+    # A Ship from the feed builds the installer on GitHub (#3412), so its Done
+    # screen names the command that does that again. The step run here is the
+    # One one, which says its own -OneFile line, so only the Done screen's line
+    # changes: one -OneFile line where T7 had two.
+    $r = Run "throw 'Generated files are stale'" 0 $true
+    Yes 'T8 from the feed, the Done screen names Publish-InstallerFromGitHub.ps1 instead' (
+        @($r.Said | Where-Object { $_ -like 'Yellow|*Publish-InstallerFromGitHub.ps1*' }).Count -eq 1 -and @($r.Said | Where-Object { $_ -like 'Yellow|*Package-Thornswood.ps1 -OneFile*' }).Count -eq 1)
 
     $r = Run "Write-Error 'winget is not on this machine'"
     Yes 'W1 a Write-Error under Stop is caught the same way' ($null -eq $r.Threw -and $r.After -and $r.Failed -ne 0 -and $r.Why -match 'winget')

@@ -150,11 +150,14 @@ const plantCtx = {
   addItem: (id, desc, n) => { given.push(n); return true; },
   stampCooldown: (who, ref) => { stamped.push(ref); plantCtx.lastUse.set(who + ':' + ref, 5000000000); },
   creditWork: (id, verb) => { work.push(verb); return null; },
-  harvestCrimson: () => 'crimson'
+  harvestCrimson: () => 'crimson',
+  // No seasonal herb here (#3152): every plant is in season, so only the
+  // quarter decides what a pick gives.
+  FOOD_GROUPS: { inSeason: {} }
 };
 plantCtx.globalThis = { __thornswoodSeason: S };
 vm.createContext(plantCtx);
-vm.runInContext(topFn('harvest'), plantCtx);
+vm.runInContext(topFn('harvest') + '\n' + topFn('outOfSeason'), plantCtx);
 function pick(ref) { given.length = 0; work.length = 0; stamped.length = 0; return plantCtx.harvest(1, ref, 'x'); }
 
 season('winter');

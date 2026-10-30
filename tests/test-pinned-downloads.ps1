@@ -81,6 +81,8 @@ function HereStrings($ast) {
 # calls Get-ThornswoodLockedFolderScript (#2105), so it is loaded here the same
 # way. Loading it locks nothing; only the text it returns is read.
 . (Join-Path $RepoPath 'scripts\vps\Lock-Folder.ps1')
+# Its web rules block calls Get-ThornswoodFirewallScript (#3896) the same way.
+. (Join-Path $RepoPath 'scripts\vps\BoxFirewall.ps1')
 function Expand([string]$hereString, [hashtable]$vars) {
     $sb = [scriptblock]::Create($hereString)
     return (& {

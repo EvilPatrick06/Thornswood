@@ -27,6 +27,15 @@
 # Set-NexusKey keeps there. It is in the environment of one step, the one
 # that runs the script, and of no other.
 #
+# WHERE IT RUNS. On GitHub's Windows runner (Patrick, 30 Oct 2026, with the
+# flip, #4013): nothing it does needs the box. Every script it runs talks to
+# api.nexusmods.com and Nexus's upload addresses alone, and 7-Zip is on
+# GitHub's image. No runner of the box is registered to a public
+# repository, and box-run.yml, which does need the box, moved to the private
+# ops repository. The run's log and artifacts are public, which is why the
+# output is sealed (above), and the key stays in the main-only "desk"
+# environment, which a fork's pull request never reaches.
+#
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Nexus run
@@ -50,7 +59,9 @@ concurrency:
 jobs:
   run:
     name: Run a Nexus script
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    # Main only (#3550), as the environment is.
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
     environment: desk
     # The longest verb's timeoutMinutes in nexus-verbs.json (Install-NexusRevision
     # downloads every mod of the collection), and the steps around it.
@@ -59,20 +70,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Run the script
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"

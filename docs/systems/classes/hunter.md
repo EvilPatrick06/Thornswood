@@ -40,6 +40,7 @@ and it is a different yield and a different wait from dressing a body.
 | Pheasant, gives Pheasant Breast | 2 (`38b0c`, `38b0d`, both Skyrim.esm) | Novice |
 | Rabbit, gives Raw Rabbit Leg | 2 (`38b0e`, `38b0f`, both Skyrim.esm) | Novice |
 | Charred skeever, gives Cooked Skeever | 1 advanced (`775fe:Skyrim.esm`), 2 expert (`52185`, `52189`, both Skyrim.esm) | The record's own rank |
+| Dead horker in the Skaal village, gives what its record's list holds | 1 (`38a83:Dragonborn.esm`) | Advanced, the rank of a horker body |
 
 The wait is the rack's rank, not yours. It is kept on the rack, not
 on you: once a rack is picked, it is picked for every hunter until the

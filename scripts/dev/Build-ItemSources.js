@@ -108,10 +108,11 @@ function die(why) { console.error('Build-ItemSources: ' + why); process.exit(1);
 // The dungeon pile, the starting tools, the farmer's first seeds and the rare
 // seams are written into game/gamemode.js as plain literals. Each is read
 // between the brackets that follow its declaration and evaluated on its own,
-// with nothing else of the file in scope, so only a literal can be read.
+// with nothing else of the file in scope, so only a literal can be read
+// (or a literal naming another literal read the same way, given as scope).
 const GM = read('game/gamemode.js').split('\r').join('');
 
-function literalAfter(marker, from) {
+function literalAfter(marker, from, scope) {
   const at = GM.indexOf(marker, from || 0);
   if (at < 0) { die('game/gamemode.js no longer declares ' + marker.trim()); }
   let i = at + marker.length;
@@ -132,7 +133,7 @@ function literalAfter(marker, from) {
     if (c === '{' || c === '[') { depth++; }
     if (c === '}' || c === ']') {
       depth--;
-      if (depth === 0) { return vm.runInNewContext('(' + GM.slice(open, i + 1) + ')', Object.create(null)); }
+      if (depth === 0) { return vm.runInNewContext('(' + GM.slice(open, i + 1) + ')', Object.assign(Object.create(null), scope || {})); }
     }
   }
   return die('the literal after ' + marker.trim() + ' in game/gamemode.js does not close');
@@ -146,6 +147,15 @@ const dungeonTomes = literalAfter('var TOMES = ', DUNGEON);
 const dungeonExclusive = literalAfter('var EXCLUSIVE = ', DUNGEON);
 const tools = literalAfter('const TOOLS = ');
 const rareSeams = literalAfter('var RARE = ', QUESTS);
+// Who works each scarce draw: its gate, as the trader offers it.
+const scarceWork = {};
+literalAfter('var SCARCE = ', QUESTS, { GEMS: literalAfter('var GEMS = ', QUESTS) }).forEach(function (row) {
+  scarceWork[row.id] = { by: row.gate.classKey || row.gate.profession, rank: row.gate.rank || '' };
+});
+function worker(quest) {
+  if (!scarceWork[quest]) { die('the scarce work ' + quest + ' is not in SCARCE in game/gamemode.js'); }
+  return scarceWork[quest];
+}
 const seeds = (function () {
   const m = /startingSeeds:\s*(\d+),\s*startingCrops:\s*(\[[^\]]*\])/.exec(GM);
   if (!m) { die('game/gamemode.js no longer says startingSeeds and startingCrops together'); }
@@ -211,10 +221,17 @@ function add(desc, via) {
   if (same) { return; }
   r.via.push(via);
 }
-function asked(desc, name, type) {
-  if (!desc || isGold(desc)) { return; }
+// by is what asks for it: a recipe id, a hair dye's row, or the water bottle.
+// Gold is never a row; what asks for it is kept apart, since no recipe may
+// (#3115).
+const goldAskedBy = [];
+function asked(desc, name, type, by) {
+  if (!desc) { return; }
+  if (isGold(desc)) { if (goldAskedBy.indexOf(by) < 0) { goldAskedBy.push(by); } return; }
   note(desc, name, type);
-  row(desc);
+  const r = row(desc);
+  if (!r.askedBy) { r.askedBy = []; }
+  if (r.askedBy.indexOf(by) < 0) { r.askedBy.push(by); }
 }
 
 // The cut list: an item reference in it is not found and not made. A recipe
@@ -256,7 +273,7 @@ Object.keys(recipes.recipes).sort().forEach(function (id) {
     companyNames[r.name]++;
     add(r.out, { kind: 'company', recipe: id });
   }
-  (r.inputItems || []).forEach(function (it) { asked(it.item, it.name, it.type); });
+  (r.inputItems || []).forEach(function (it) { asked(it.item, it.name, it.type, id); });
 });
 
 // Recipes nobody owns: anybody may make them (recipes.json "default").
@@ -265,6 +282,7 @@ Object.keys(recipes.unowned || {}).sort().forEach(function (id) {
   if (!live(id, r)) { return; }
   note(r.out, r.name, r.type);
   add(r.out, { kind: 'crafted', by: 'anybody', rank: '', recipe: id });
+  (r.inputItems || []).forEach(function (it) { asked(it.item, it.name, it.type, id); });
 });
 
 // What the server makes in place of a recipe's output: the cook's fine and
@@ -291,7 +309,7 @@ if (quality.burnt) { add(quality.burnt, { kind: 'crafted', by: 'Cook', rank: '',
     add(key, { kind: 'crafted', by: by, rank: hairDyes.who.halves[half], table: 'hair-dyes.json' });
   });
   note(key, d.name, 'MISC');
-  (d.inputs || []).forEach(function (it) { asked(it.item); });
+  (d.inputs || []).forEach(function (it) { asked(it.item, '', '', key); });
 });
 
 // Class work. A rare seam is a miner's draw too, but only inside the one
@@ -343,7 +361,7 @@ Object.keys(STATIONS).forEach(function (k) {
 // Water: anybody fills an empty bottle at a well or the water bucket
 // (docs/systems/drink.md), and the bottle of water is a new item.
 const water = literalAfter('waterItems: ');
-asked(water.empty);
+asked(water.empty, '', '', 'NEEDS.waterItems');
 add(water.full, { kind: 'gathered', by: 'anybody', rank: '', table: 'game/gamemode.js NEEDS.waterItems, an empty bottle filled at a well or the water bucket' });
 
 // Quests. The scarce work draws (each file names its item), the longfin
@@ -353,7 +371,8 @@ function scarce(rel, data) {
   const counts = {};
   (data.sources || []).forEach(function (s) { counts[s.item] = (counts[s.item] || 0) + 1; });
   Object.keys(counts).sort().forEach(function (item) {
-    add(item, { kind: 'quest', quest: data.quest, table: rel, records: counts[item] });
+    const w = worker(data.quest);
+    add(item, { kind: 'quest', quest: data.quest, by: w.by, rank: w.rank, table: rel, records: counts[item] });
   });
 }
 ['game/data/merchant-scarce-fishing.json', 'game/data/merchant-scarce-geodes.json',
@@ -362,7 +381,7 @@ scarce('game/data/quest-content.json longfin sites', longfinSources(questContent
 const MAMMOTH = 'dd641:Skyrim.esm';
 if (!hunts.hunts[MAMMOTH]) { die('game/data/hunts.json has no mammoth (' + MAMMOTH + ')'); }
 hunts.hunts[MAMMOTH].gives.forEach(function (part) {
-  add(part.item, { kind: 'quest', quest: 'mammoth', table: 'hunts.json ' + MAMMOTH, records: 3 });
+  add(part.item, { kind: 'quest', quest: 'mammoth', by: worker('mammoth').by, rank: worker('mammoth').rank, table: 'hunts.json ' + MAMMOTH, records: 3 });
 });
 (questContent.items || []).forEach(function (q) { note(q.ref, q.name, 'MISC'); });
 (retrievals.sources || []).forEach(function (s) {
@@ -441,6 +460,7 @@ ids.forEach(function (desc) {
   if (sources.length === 1) { only[sources[0]]++; }
   if (!sources.length) { noSource.push(desc); }
   const out = { name: names[desc] || adminNames[desc] || lowNames[desc] || '', type: types[desc] || recordTypes[desc] || '', sources: sources, via: r.via };
+  if (r.askedBy) { out.askedBy = r.askedBy.slice().sort(); }
   lines.push('  ' + JSON.stringify(desc) + ': ' + JSON.stringify(out));
 });
 
@@ -452,7 +472,7 @@ const readFrom = INPUTS.concat(['scripts/dev/MerchantScarceLongfinSources.js']);
 const head = {
   builtBy: 'scripts/dev/Build-ItemSources.js',
   issue: 3145,
-  about: 'Every item somebody can come to hold and every way it comes into the world. sources is the kinds, in this order; via is each source with where it was read. An item with no sources is one a live recipe asks for and nothing hands out. Balance is what a thing takes to make or get plus its stats, never gold (Patrick, 22 Oct 2026, #3135).',
+  about: 'Every item somebody can come to hold and every way it comes into the world. sources is the kinds, in this order; via is each source with where it was read; askedBy is every live recipe (by id), hair dye (hair-dye:<id>) or the water bottle (NEEDS.waterItems) that asks for it. An item with no sources is one something asks for and nothing hands out. Balance is what a thing takes to make or get plus its stats, never gold (Patrick, 22 Oct 2026, #3135).',
   kinds: {
     crafted: 'made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe\'s output (fine and burnt dishes, hair dye)',
     race: 'a recipe only the named race may make',
@@ -468,7 +488,8 @@ const head = {
   count: ids.length,
   counts: counts,
   only: only,
-  noSource: noSource
+  noSource: noSource,
+  goldAskedBy: goldAskedBy.slice().sort()
 };
 let text = JSON.stringify(head, null, 1);
 text = text.slice(0, text.length - 2) + ',\n "items": {\n' + lines.join(',\n') + '\n }\n}\n';

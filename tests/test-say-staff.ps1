@@ -29,7 +29,7 @@
        own sshd at 127.0.0.1 with only the notices key, the host key held to
        the pins in a known_hosts of its own, both gone when it ends, and the
        answer left as an annotation. With no ssh, through GitHub: it starts
-       staff-notice.yml on main with the text on gh's standard input, reads
+       the ops repository's staff-notice.yml on main with the text on gh's standard input, reads
        the runner's annotation, and says what the box said; -From other than
        claude, a stopped runner, a run with no answer, a run not taken in
        time and -Run of another workflow each say so. A run GitHub has
@@ -44,10 +44,10 @@
        makes the GitHub environment main's alone, or stops naming the other
        branch it lets in, before the box is touched, and the key goes to gh
        secret set on standard input.
-    6. .github\workflows\staff-notice.yml: started by hand only, contents
-       read, on the VPS runners, the notices environment's key, no token
-       kept by the checkout, pwsh with no profile, nothing pasted into its
-       script; and that script, run against a stand-in Say-Staff.ps1.
+    6. staff-notice.yml is not here: it moved to the private ops repository
+       with the VPS runners (#4013), whose tests\test-box-workflows.ps1
+       holds its shape and runs its step; Say-Staff.ps1 starts it there and
+       Grant-BoxAccess.ps1 puts its key there.
   Nothing connects anywhere and nothing outside the temp folder is touched.
 #>
 [CmdletBinding()]
@@ -497,10 +497,10 @@ no('gh: Not Found (HTTP 404)');
     $g = ThroughGitHub @('-From', 'claude', '-Text', $text) $done @((Note 'failure' '' 'Process completed with exit code 1.'), (Note 'notice' 'Say-Staff' $queued))
     Yes 'no ssh: it starts staff-notice.yml on main, with the text, and asks for the run' (
         $g.Body -and $g.Body.ref -eq 'main' -and $g.Body.inputs.text -eq $text -and -not $g.Body.inputs.PSObject.Properties['check'] -and $g.Body.return_run_details -eq $true -and
-        @($g.Calls | Where-Object { $_ -match '^api -X POST repos/EvilPatrick06/Thornswood/actions/workflows/staff-notice\.yml/dispatches --input -$' }).Count -eq 1)
+        @($g.Calls | Where-Object { $_ -match '^api -X POST repos/EvilPatrick06/Thornswood-Ops/actions/workflows/staff-notice\.yml/dispatches --input -$' }).Count -eq 1)
     Yes '  the text went on gh''s standard input and is on no command line' (-not (($g.Calls -join ' ').Contains('scan button')))
     Yes '  it reads the runner''s Say-Staff annotation off the run''s job and says queued, exit 0' (
-        $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-20261021130000-0a1b2c' -and @($g.Calls | Where-Object { $_ -like 'api repos/EvilPatrick06/Thornswood/check-runs/555/annotations*' }).Count -eq 1)
+        $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-20261021130000-0a1b2c' -and @($g.Calls | Where-Object { $_ -like 'api repos/EvilPatrick06/Thornswood-Ops/check-runs/555/annotations*' }).Count -eq 1)
     $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued))
     Yes '  -From is not needed there' ($g.Code -eq 0 -and $g.Out -match 'queued agent-claude-')
     $g = ThroughGitHub @('-From', 'codex', '-Text', $text) $done @()
@@ -522,7 +522,7 @@ no('gh: Not Found (HTTP 404)');
     Yes '  and refuses a run of another workflow' ($g.Code -eq 1 -and $g.Out -match 'not a staff-notice run')
 
     # #3081: the dispatch names the run before every read of GitHub serves it.
-    $runReads = { param($calls) @($calls | Where-Object { $_ -eq 'api repos/EvilPatrick06/Thornswood/actions/runs/77' }).Count }
+    $runReads = { param($calls) @($calls | Where-Object { $_ -eq 'api repos/EvilPatrick06/Thornswood-Ops/actions/runs/77' }).Count }
     $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued)) 1
     Yes 'a started run GitHub does not serve yet is waited for, then read: queued, exit 0, no stop' (
         $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-' -and $g.Out -match 'does not serve the new run yet' -and $g.Out -notmatch 'STOP' -and (& $runReads $g.Calls) -eq 2)
@@ -645,68 +645,12 @@ function icacls { }
         $grantText.IndexOf('if ($ToEnvironment) {', $grantText.IndexOf('Proving the new key through the bridge')) -lt $grantText.IndexOf('notice-access.txt', $grantText.IndexOf('Proving the new key through the bridge')))
     Yes '  and the environment is settled before the box is touched' ($grantText.IndexOf('Set-MainOnlyEnvironment $ToEnvironment') -lt $grantText.IndexOf('Get-BoxChangeScript $Name'))
 
-    # ---- 6. .github\workflows\staff-notice.yml (#3045) ---------------------
-    $wfPath = P '.github', 'workflows', 'staff-notice.yml'
-    Yes 'staff-notice.yml is there' (Test-Path -LiteralPath $wfPath)
-    $wf = ([IO.File]::ReadAllText($wfPath)) -replace "`r`n", "`n"
-    $on = [regex]::Match($wf, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
-    Yes 'it is started by hand (workflow_dispatch) and by nothing else' ($on -match '(?m)^  workflow_dispatch:\s*$' -and @([regex]::Matches($on, '(?m)^  [a-z_]+:')).Count -eq 1)
-    Yes '  with a text and a check input, neither required' ($on -match '(?ms)^      text:\n.*?required: false' -and $on -match '(?ms)^      check:\n.*?required: false')
-    $perm = [regex]::Match($wf, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value
-    $grants = @([regex]::Matches($perm, '(?m)^\s+([a-z-]+):\s*(\S+)') | ForEach-Object { $_.Groups[1].Value + ': ' + $_.Groups[2].Value })
-    Yes ('its token can read the repository and nothing more (' + ($grants -join ', ') + '), and no job widens it') ($grants.Count -eq 1 -and $grants[0] -eq 'contents: read' -and @([regex]::Matches($wf, '(?m)^\s+permissions:')).Count -eq 0)
-    $runsOn = [regex]::Match($wf, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-    Yes ('it runs on the VPS runners, which are on the box the key works from (' + $runsOn + ')') ($runsOn -eq '[self-hosted, Windows, thornswood-vps]')
-    Yes '  in the "notices" environment, with a timeout' ($wf -match '(?m)^    environment:\s*notices\s*$' -and $wf -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
-    Yes '  the key is that environment''s NOTICE_KEY_B64, handed over as THORNSWOOD_NOTICE_KEY_B64' ($wf -match [regex]::Escape('THORNSWOOD_NOTICE_KEY_B64: ${{ secrets.NOTICE_KEY_B64 }}') -and @([regex]::Matches($wf, 'secrets\.')).Count -eq 1)
-    Yes '  the checkout keeps no token in the runner''s folder' ($wf -match '(?ms)uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
-    Yes '  its script runs under pwsh with no profile' ($wf -match [regex]::Escape('shell: pwsh -NoProfile -NonInteractive -Command ". ''{0}''"'))
-    # The notice step's script, not the re-checkout step's before it (#3029).
-    $run = [regex]::Match($wf, '(?ms)- name: Hand the notice to the box\n.*?^(\s+)run: \|\n(.*)$')
-    $wfScript = ''
-    if ($run.Success) {
-        $lines = $run.Groups[2].Value -split "`n"
-        $indent = [regex]::Match($lines[0], '^\s*').Value
-        $body = @()
-        foreach ($l in $lines) {
-            if ($l.Trim().Length -and -not $l.StartsWith($indent)) { break }
-            $body += $(if ($l.Length -ge $indent.Length) { $l.Substring($indent.Length) } else { '' })
-        }
-        $wfScript = ($body -join "`n").TrimEnd() + "`n"
-    }
-    Yes 'the script has no ${{ }} in it: the text and the id come in through the environment' ($wfScript.Length -gt 0 -and $wfScript -match 'OnTheBox' -and $wfScript -notmatch 'git ' -and $wfScript -notmatch '\$\{\{' -and
-        $wf -match [regex]::Escape('NOTICE_TEXT: ${{ inputs.text }}') -and $wf -match [regex]::Escape('NOTICE_CHECK: ${{ inputs.check }}'))
+    # ---- 6. staff-notice.yml is in the ops repository (#4013) --------------
+    Yes 'staff-notice.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath (P '.github', 'workflows', 'staff-notice.yml')))
     $sayText = [IO.File]::ReadAllText($say)
-    Yes 'Say-Staff.ps1 starts this workflow by its file name, and says notices through it are from claude' (
-        $sayText.Contains("`$workflow = 'staff-notice.yml'") -and $sayText.Contains("`$workflowSender = 'claude'") -and $wf.Contains('-Name claude -MakeKey -NoticesOnly'))
-
-    # The script itself, against a stand-in Say-Staff.ps1 that writes down how
-    # it was called and exits with the case's code.
-    $ws = Join-Path $tmp 'workspace'
-    New-Item -ItemType Directory -Path (Join-Path (Join-Path $ws 'scripts') 'ops') -Force | Out-Null
-    $called = Join-Path $tmp 'called.txt'
-    [IO.File]::WriteAllText((Join-Path (Join-Path (Join-Path $ws 'scripts') 'ops') 'Say-Staff.ps1'), @"
-param([switch]`$OnTheBox, [string]`$Text, [string]`$Check)
-[IO.File]::WriteAllText('$called', ('OnTheBox=' + `$OnTheBox + ' Text=' + `$Text + ' Check=' + `$Check))
-exit [int]`$env:STAND_IN_EXIT
-"@, $enc)
-    $wfFile = Join-Path $tmp 'staff-notice-step.ps1'
-    [IO.File]::WriteAllText($wfFile, $wfScript, $enc)
-    function Step([string]$text, [string]$check, [int]$exit) {
-        Remove-Item -LiteralPath $called -ErrorAction SilentlyContinue
-        $env:GITHUB_WORKSPACE = $ws; $env:NOTICE_TEXT = $text; $env:NOTICE_CHECK = $check; $env:STAND_IN_EXIT = [string]$exit
-        try { $out = @(& $shell -NoProfile -NonInteractive -Command ". '$wfFile'" 2>&1 | ForEach-Object { "$_" }) }
-        finally { Remove-Item Env:GITHUB_WORKSPACE, Env:NOTICE_TEXT, Env:NOTICE_CHECK, Env:STAND_IN_EXIT -ErrorAction SilentlyContinue }
-        return [pscustomobject]@{ Out = ($out -join "`n"); Code = $LASTEXITCODE; Called = $(if (Test-Path -LiteralPath $called) { [IO.File]::ReadAllText($called) } else { '' }) }
-    }
-    $st = Step 'Merged it.' '' 0
-    Yes 'the step: a text is said with -OnTheBox, exit 0' ($st.Code -eq 0 -and $st.Called -eq 'OnTheBox=True Text=Merged it. Check=')
-    $st = Step '' 'agent-claude-1' 2
-    Yes '  an id is checked, and "not said yet" (2) is a green run' ($st.Code -eq 0 -and $st.Called -eq 'OnTheBox=True Text= Check=agent-claude-1')
-    $st = Step 'Merged it.' '' 1
-    Yes '  Say-Staff.ps1 stopping turns the run red' ($st.Code -eq 1)
-    $st = Step 'Merged it.' 'agent-claude-1' 0
-    Yes '  both, or neither, is refused with a Say-Staff error and nothing is run' ($st.Code -eq 1 -and $st.Out -match '::error title=Say-Staff::' -and -not $st.Called -and (Step '' '' 0).Code -eq 1)
+    Yes '  Say-Staff.ps1 starts it in the private ops repository by its file name, and says notices through it are from claude' (
+        $sayText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'") -and $sayText.Contains("`$workflow = 'staff-notice.yml'") -and $sayText.Contains("`$workflowSender = 'claude'"))
+    Yes '  and Grant-BoxAccess.ps1 -ToEnvironment puts the key in that repository''s environment' ($grantText.Contains("[string]`$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'"))
 }
 finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

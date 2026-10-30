@@ -60,7 +60,9 @@ if (strip && GROUPS) {
   }
 }
 yes('118 records lose their own magic, the list in the design comment', stripCount === 118);
-yes('and so do the 63 fine dishes, which are in their plain dishes\' groups (#2906)', FINE.size === 63 && fineStripped === 63);
+// The four fine feasts (#3152) are in the feast group, which keeps its own
+// magic: a feast carries only the effect that says what the server does.
+yes('and so do the 63 fine dishes, which are in their plain dishes\' groups (#2906)', FINE.size === 67 && fineStripped === 63);
 yes('a soup warms by default, and nothing else does', !!season && JSON.stringify(season.plain) === JSON.stringify({ soup: 'warm' }));
 yes('garlic gives the guard and salt gives stamina',
   !!season && !!season.extras && season.extras['34d22:Skyrim.esm'] === 'guard' &&
