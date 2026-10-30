@@ -105,6 +105,17 @@ if (N && NEEDS && NEEDS.drug) {
   clock.now += 6000;
   N.consumed(C, idOf('57a7a:Skyrim.esm'));   // after them
   yes('after the 8 seconds it takes', store[C].drugCrash === 1 && store[C].drugUntil > clock.now);
+
+  // High, for the HUD's icon (#3143): on the record while the window is
+  // open, kept by a read, and off at the settle that pays the crash.
+  const D = person();
+  yes('high is not on a record that took nothing', !store[D].drugged);
+  N.consumed(D, idOf('57a7a:Skyrim.esm'));
+  yes('a dose puts high on the record', store[D].drugged === true);
+  clock.now += 5 * 60000; N.settle(D);
+  yes('still high 5 minutes in, and a read keeps it', store[D].drugged === true && N.read(D).drugged === true);
+  clock.now += 6 * 60000; N.settle(D);
+  yes('not high once the window ends and the crash is paid', store[D].drugged === false && store[D].drugCrash === 0);
 }
 
 console.log(pass + ' passed, ' + fail + ' failed');
