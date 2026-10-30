@@ -137,17 +137,34 @@ Write-Host 'Setting up Caddy on the VPS...'
 # The Caddyfile is scripts\deploy\Caddyfile, the tracked copy of the live one, and not
 # one written here. This used to write its own four line file that proxied the
 # domain to 3001 and nothing else, so a full run on a new box, as
-# MOVING-THE-SERVER.md says to do, would have taken the /voice and /voice-dev
+# MOVING-THE-SERVER.md (in the ops repo) says to do, would have taken the /voice and /voice-dev
 # routes off the site and voice from everybody (issue #543). -Domain and
-# -Email still apply: the tracked file names thornswood.net and its own
-# address, and those two are swapped for what was asked.
+# -Email still apply: the tracked file names thornswood.net, which is swapped
+# for what was asked, and no contact address (#3838), so -Email goes in as
+# the first line of the global options block, or replaces an email line that
+# is there.
 $tracked = Join-Path $Here 'Caddyfile'
 if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The site's Caddyfile is kept in the repository, and nothing is sent without it." }
 $caddyfile = [IO.File]::ReadAllText($tracked, [Text.Encoding]::UTF8)
 if ($Domain -ne 'thornswood.net') { $caddyfile = $caddyfile.Replace('thornswood.net', $Domain) }
-if ($Email) { $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+', { param($m) $m.Groups[1].Value + $Email }) }
+if ($Email) {
+  if ($caddyfile -match '(?m)^\s*email\s+\S+') {
+    $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+', { param($m) $m.Groups[1].Value + $Email })
+  } else {
+    $open = [regex]::Match($caddyfile, '(?m)^\{(\r?\n)')
+    if (-not $open.Success) { throw "scripts\deploy\Caddyfile has no global options block ('{' on a line of its own) for -Email to go in. Nothing was sent." }
+    $caddyfile = $caddyfile.Insert($open.Index + $open.Length, "`temail $Email" + $open.Groups[1].Value)
+  }
+}
 foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'handle_path /box/*', 'handle_path /github-app/*', 'reverse_proxy 127.0.0.1:3001')) {
   if ($caddyfile.IndexOf($need) -lt 0) { throw "scripts\deploy\Caddyfile has no '$need' line, so it would take part of the site away. Nothing was sent." }
+}
+# The headers every answer from the name carries are set at the door (#2762),
+# so a Caddyfile without them would send voice, the box bridge and the admin
+# App's answers out bare again.
+foreach ($need in @('Strict-Transport-Security', 'X-Content-Type-Options', 'Referrer-Policy', 'Permissions-Policy')) {
+  # A line that sets it, not a comment that names it.
+  if (-not [regex]::IsMatch($caddyfile, '(?m)^\s*' + [regex]::Escape($need) + '\s')) { throw "scripts\deploy\Caddyfile sets no $need header, so what Caddy carries would go out without it (#2762). Nothing was sent." }
 }
 $cfg64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caddyfile))
 

@@ -95,6 +95,39 @@ A recipe can also demand a race. [Races](races.md). The locked rows
 are marked in the lists and collected in
 [lists/race-locks.md](lists/race-locks.md).
 
+## Crude, fine and masterwork
+
+Patrick, 22 October 2026 (#3151): a weapon or an armour piece made at
+a bench comes out crude, fine or masterwork. Crude is a tenth worse
+than the piece as its record has it, and masterwork a tenth better: a
+weapon's damage, an armour piece's rating. Fine is the piece as its
+record has it, the same as anything that was not made at a bench.
+
+What decides it is your skill over the materials. A recipe's rank is
+the rank of the dearest thing it asks for, so the question is how many
+ranks you stand above that rank in the half the recipe is, before this
+piece counts toward your next one.
+
+| Ranks above the recipe | Crude | Masterwork |
+| --- | --- | --- |
+| 0, at the edge of what you can | 25% | 5% |
+| 1 | 10% | 15% |
+| 2 | 5% | 25% |
+| 3, a master on novice stock | never | 35% |
+
+The rest is fine. A batch is one roll. The tier is on the piece's
+name, `Iron Sword (Crude)` or `Steel Armor (Masterwork)`, and a
+condition goes after it: `Steel Armor (Masterwork) (85%)`. A repair
+never changes the tier. A Master Weaver's mark goes in front:
+`Master-Lined Leather Armor (Masterwork)`.
+
+Only what strikes or holds is rolled: swords, daggers, greatswords, war
+axes, battleaxes, maces, warhammers, bows, and light and heavy armour
+with shields. Clothing, jewellery, staves, instruments, arrows and
+tools are not, because none of them has a damage or a rating to move.
+A cook's dish has its own three, on the [Cook](professions/cook.md)
+page.
+
 ## Apprentices
 
 The rules, the two arrangements, and what a taught novice can and
@@ -180,7 +213,13 @@ those recipes off every bench until the answer changes, so a rank, a
 Master taking you on or a roll changes the list straight away. A recipe
 nobody owns is listed for everybody.
 
-Not in the world yet: the parts of a warrior's maneuvers the game
+A weapon or an armour piece comes out crude, fine or masterwork, and
+the tier is on its name, in the server.
+
+Not in the world yet: the tenth less or more for a crude or masterwork
+piece, which the engine's damage formula has to read off the name (the
+fork change for it waits on the next engine pin), the parts of a
+warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), the check of which effect a
 brew or an enchantment carries (the engine does not pass it yet),

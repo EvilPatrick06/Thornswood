@@ -3,16 +3,18 @@
 
   Finds the public fork's own build of an engine commit, and puts it where a
   build of that commit on this machine would be, for engine.yml to record.
-  Dot-sourced by .github\workflows\engine.yml and tests\test-459-fork-build.ps1.
+  Dot-sourced by .github\workflows\engine.yml, scripts\release\EngineArtifact.ps1
+  (a Ship machine takes the same build, #3399) and tests\test-459-fork-build.ps1.
 
   WHY, issue #459. Patrick's B of 16 Oct: the fork, EvilPatrick06/skymp, is
   public, so GitHub builds it at no cost, and since fork #79 every push to
   thornswood/engine-changes builds the engine there and keeps what Thornswood
   records as one artifact, thornswood-engine-<commit> (the fork's
   .github\workflows\thornswood-pr-windows.yml says what is in it). engine.yml
-  takes that build and records it, and builds the engine on GitHub's runner
-  here or on the VPS only when the fork has no build of the commit. Recording
-  is light work (no compiler), so the hour of compiling stays off the box the
+  takes that build and records it, and compiles nothing (#3014, #3399): a
+  Ship machine takes the same build from the fork (EngineArtifact.ps1), so a
+  build compiled anywhere else would be bytes no Ship machine could take.
+  Recording is light work, so the hour of compiling stays off the box the
   game servers run on.
 
   WHICH BUILD. Only a push to thornswood/engine-changes in the fork itself,
@@ -20,13 +22,12 @@
   kept (90 days):
     - none at all, or a green one that kept no artifact (it ran before fork
       #79, or its 90 days are over): there is no fork build, and engine.yml
-      builds it here;
-    - one still running: engine.yml stops and says so, because building here
-      what GitHub is building free is the hour this exists to save;
+      stops saying so;
+    - one still running: engine.yml stops and says to start it again once
+      that has finished;
     - one that ended red (a compile error or a unit test): engine.yml stops
       and names it. The fork is public, so its runner is never refused for
-      billing, and a red there is a red engine, not a reason to build it here
-      without its tests.
+      billing, and a red there is a red engine.
   A lookup that fails (the network, the token) stops the run with the error:
   it is not "the fork has none".
 
@@ -64,28 +65,35 @@ function Get-ForkEngineValue($Object, [string]$Name) {
     return $null
 }
 
+# Every run of the fork's build of a push of $Commit to its branch, newest
+# first. $Get as for Find-ForkEngineBuild.
+function Get-ForkEngineBuildRuns([string]$Commit, [scriptblock]$Get) {
+    $Commit = $Commit.ToLowerInvariant()
+    $list = & $Get ("repos/{0}/actions/workflows/{1}/runs?head_sha={2}&event=push&branch={3}&per_page=100" -f $ForkEngineRepo, $ForkEngineWorkflow, $Commit, [Uri]::EscapeDataString($ForkEngineBranch))
+    # Held again here, whatever the query gave: this repository, a push, the
+    # branch, this commit.
+    return @(@(Get-ForkEngineValue $list 'workflow_runs') | Where-Object {
+            $_ -and [string]$_.head_sha -eq $Commit -and [string]$_.event -eq 'push' -and [string]$_.head_branch -eq $ForkEngineBranch -and
+            [string](Get-ForkEngineValue (Get-ForkEngineValue $_ 'repository') 'full_name') -eq $ForkEngineRepo
+        } | Sort-Object { [long]$_.id } -Descending)
+}
+
 <#
   Which fork build of $Commit there is. $Get is called with a path under
   https://api.github.com/ and returns the parsed JSON, or throws on any
   failure. Returns @{ State; Why; Run; Artifact }, State one of:
     found  Run and Artifact are the fork's green push build and its artifact
-    none   the fork has no build of it: build it here
+    none   the fork has no build of it: Why says what it has
     stop   the fork is still building it, or its build ended red: Why says
 #>
 function Find-ForkEngineBuild([string]$Commit, [scriptblock]$Get) {
     $Commit = $Commit.ToLowerInvariant()
     $name = Get-ForkEngineArtifactName $Commit
-    $list = & $Get ("repos/{0}/actions/workflows/{1}/runs?head_sha={2}&event=push&branch={3}&per_page=100" -f $ForkEngineRepo, $ForkEngineWorkflow, $Commit, [Uri]::EscapeDataString($ForkEngineBranch))
-    # Held again here, whatever the query gave: this repository, a push, the
-    # branch, this commit. Newest first.
-    $runs = @(@(Get-ForkEngineValue $list 'workflow_runs') | Where-Object {
-            $_ -and [string]$_.head_sha -eq $Commit -and [string]$_.event -eq 'push' -and [string]$_.head_branch -eq $ForkEngineBranch -and
-            [string](Get-ForkEngineValue (Get-ForkEngineValue $_ 'repository') 'full_name') -eq $ForkEngineRepo
-        } | Sort-Object { [long]$_.id } -Descending)
+    $runs = @(Get-ForkEngineBuildRuns $Commit $Get)
     $what = "the fork's $ForkEngineWorkflow"
     if (-not $runs.Count) {
         return [pscustomobject]@{ State = 'none'; Run = $null; Artifact = $null
-            Why = "$what has no build of a push of $Commit to $ForkEngineBranch, so this run builds it" }
+            Why = "$what has no build of a push of $Commit to $ForkEngineBranch, so there is no build of it to record. A pin names a head of $ForkEngineBranch, which the push that made it the head built." }
     }
     $green = @($runs | Where-Object { [string]$_.status -eq 'completed' -and [string]$_.conclusion -eq 'success' })
     foreach ($r in $green) {
@@ -99,14 +107,14 @@ function Find-ForkEngineBuild([string]$Commit, [scriptblock]$Get) {
     $going = @($runs | Where-Object { [string]$_.status -ne 'completed' })
     if ($going.Count) {
         return [pscustomobject]@{ State = 'stop'; Run = $going[0]; Artifact = $null
-            Why = ("$what is still building $Commit ({0}, {1}). Start this again once it has finished, and it records that build instead of building the engine a second time." -f $going[0].html_url, $going[0].status) }
+            Why = ("$what is still building $Commit ({0}, {1}). Start this again once it has finished, and it records that build." -f $going[0].html_url, $going[0].status) }
     }
     if ($green.Count) {
         return [pscustomobject]@{ State = 'none'; Run = $green[0]; Artifact = $null
-            Why = ("$what built $Commit ({0}) but keeps no {1}: it ran before the fork kept one, or its 90 days are over. So this run builds it." -f $green[0].html_url, $name) }
+            Why = ("$what built $Commit ({0}) but keeps no {1}: it ran before the fork kept one, or its 90 days are over. Run that build again in the fork, then this: a build run again is new bytes, and the records are made from them." -f $green[0].html_url, $name) }
     }
     return [pscustomobject]@{ State = 'stop'; Run = $runs[0]; Artifact = $null
-        Why = ("$what build of $Commit ended {0} ({1}). A red engine build is not built again here without its tests: fix it in the fork, or run that build again there if it failed for a reason of GitHub's own." -f $runs[0].conclusion, $runs[0].html_url) }
+        Why = ("$what build of $Commit ended {0} ({1}). A red engine build is not recorded: fix it in the fork, or run that build again there if it failed for a reason of GitHub's own." -f $runs[0].conclusion, $runs[0].html_url) }
 }
 
 # A time fork-build.json gives, as UTC. ConvertFrom-Json in pwsh turns an ISO
@@ -123,6 +131,54 @@ function ConvertTo-ForkEngineUtc($Value) {
 
 function Get-ForkEngineSha256([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+<#
+  Why the fork's build unpacked at $Dir (fork-build.json and build\ beside it)
+  is not the push build of $Commit that run $RunId kept, one sentence each
+  (the header, WHAT IS HELD). Returns @{ Manifest; Why }: Manifest is
+  fork-build.json, parsed, or $null when there is none to read.
+  Expand-ForkEngineBuild holds a download to it before anything goes in the
+  fork, and Get-EngineArtifact.ps1 before a Ship machine takes it (#3399).
+#>
+function Get-ForkEngineBuildProblems([string]$Dir, [string]$Commit, [long]$RunId) {
+    $Commit = $Commit.ToLowerInvariant()
+    $mf = Join-Path $Dir 'fork-build.json'
+    if (-not (Test-Path -LiteralPath $mf)) { return [pscustomobject]@{ Manifest = $null; Why = @('the artifact has no fork-build.json, so nothing says what it is') } }
+    $m = [IO.File]::ReadAllText($mf) | ConvertFrom-Json
+    $why = @()
+    if ([string]$m.commit -ne $Commit) { $why += "fork-build.json names commit $($m.commit), not $Commit" }
+    if ([long]$m.runId -ne $RunId) { $why += "fork-build.json names run $($m.runId), not $RunId" }
+    if ([string]$m.repository -ne $ForkEngineRepo) { $why += "fork-build.json names repository $($m.repository), not $ForkEngineRepo" }
+    if ([string]$m.event -ne 'push' -or [string]$m.ref -ne ('refs/heads/' + $ForkEngineBranch)) { $why += "fork-build.json is of a $($m.event) of $($m.ref), not a push to $ForkEngineBranch" }
+    $files = Get-ForkEngineValue $m 'files'
+    $named = @{}
+    if ($null -eq $files) { $why += 'fork-build.json names no files' }
+    else {
+        foreach ($p in $files.PSObject.Properties) {
+            $rel = [string]$p.Name
+            if ($rel -notmatch '^build/' -or $rel -match '(^|/)\.\.?(/|$)' -or $rel -match '[\\:]') { $why += "fork-build.json names $rel, which is not a path under build/"; continue }
+            $named[$rel] = $true
+            $path = Join-Path $Dir ($rel.Replace('/', '\'))
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { $why += "$rel is in fork-build.json and not in the artifact"; continue }
+            if ((Get-ForkEngineSha256 $path) -ne ([string]$p.Value.sha256).ToLowerInvariant()) { $why += "$rel is not the file fork-build.json names (sha256)" }
+            elseif ((Get-Item -LiteralPath $path).Length -ne [long]$p.Value.bytes) { $why += "$rel is not the size fork-build.json gives" }
+            try { $null = ConvertTo-ForkEngineUtc $p.Value.lastWriteUtc } catch { $why += "$($rel): $($_.Exception.Message)" }
+        }
+    }
+    $base = (Resolve-Path -LiteralPath $Dir).ProviderPath.TrimEnd('\')
+    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -Recurse -File -Force)) {
+        $rel = $f.FullName.Substring($base.Length + 1).Replace('\', '/')
+        if ($rel -eq 'fork-build.json') { continue }
+        if (-not $named.ContainsKey($rel)) { $why += "$rel is in the artifact and fork-build.json does not name it" }
+    }
+    # build/licences/licences.json: which vcpkg libraries are in the client
+    # files, with their texts beside it, which New-ClientLicenceRecord.ps1
+    # records (#3099). A build from before the fork measured them has none.
+    foreach ($must in 'build/dist/server/scam_native.node', 'build/skymp5-server/launch_server.bat.tmp', 'build/licences/licences.json') {
+        if (-not $named.ContainsKey($must)) { $why += "fork-build.json does not name $must" }
+    }
+    return [pscustomobject]@{ Manifest = $m; Why = @($why) }
 }
 
 <#
@@ -149,42 +205,11 @@ function Expand-ForkEngineBuild([string]$Zip, [string]$Commit, [long]$RunId, [st
     # ExtractToDirectory refuses an entry that would land outside $Scratch.
     [IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Scratch)
 
-    $mf = Join-Path $Scratch 'fork-build.json'
-    if (-not (Test-Path -LiteralPath $mf)) { throw 'the artifact has no fork-build.json, so nothing says what it is' }
-    $m = [IO.File]::ReadAllText($mf) | ConvertFrom-Json
-    $why = @()
-    if ([string]$m.commit -ne $Commit) { $why += "fork-build.json names commit $($m.commit), not $Commit" }
-    if ([long]$m.runId -ne $RunId) { $why += "fork-build.json names run $($m.runId), not $RunId" }
-    if ([string]$m.repository -ne $ForkEngineRepo) { $why += "fork-build.json names repository $($m.repository), not $ForkEngineRepo" }
-    if ([string]$m.event -ne 'push' -or [string]$m.ref -ne ('refs/heads/' + $ForkEngineBranch)) { $why += "fork-build.json is of a $($m.event) of $($m.ref), not a push to $ForkEngineBranch" }
+    $held = Get-ForkEngineBuildProblems $Scratch $Commit $RunId
+    if (-not $held.Manifest) { throw $held.Why[0] }
+    if ($held.Why.Count) { throw ('the fork''s build is not the one asked for, and nothing was put in the fork: ' + ($held.Why -join '; ')) }
+    $m = $held.Manifest
     $files = Get-ForkEngineValue $m 'files'
-    $named = @{}
-    if ($null -eq $files) { $why += 'fork-build.json names no files' }
-    else {
-        foreach ($p in $files.PSObject.Properties) {
-            $rel = [string]$p.Name
-            if ($rel -notmatch '^build/' -or $rel -match '(^|/)\.\.?(/|$)' -or $rel -match '[\\:]') { $why += "fork-build.json names $rel, which is not a path under build/"; continue }
-            $named[$rel] = $true
-            $path = Join-Path $Scratch ($rel.Replace('/', '\'))
-            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { $why += "$rel is in fork-build.json and not in the artifact"; continue }
-            if ((Get-ForkEngineSha256 $path) -ne ([string]$p.Value.sha256).ToLowerInvariant()) { $why += "$rel is not the file fork-build.json names (sha256)" }
-            elseif ((Get-Item -LiteralPath $path).Length -ne [long]$p.Value.bytes) { $why += "$rel is not the size fork-build.json gives" }
-            try { $null = ConvertTo-ForkEngineUtc $p.Value.lastWriteUtc } catch { $why += "$($rel): $($_.Exception.Message)" }
-        }
-    }
-    $base = (Resolve-Path -LiteralPath $Scratch).ProviderPath.TrimEnd('\')
-    foreach ($f in @(Get-ChildItem -LiteralPath $Scratch -Recurse -File -Force)) {
-        $rel = $f.FullName.Substring($base.Length + 1).Replace('\', '/')
-        if ($rel -eq 'fork-build.json') { continue }
-        if (-not $named.ContainsKey($rel)) { $why += "$rel is in the artifact and fork-build.json does not name it" }
-    }
-    # build/licences/licences.json: which vcpkg libraries are in the client
-    # files, with their texts beside it, which New-ClientLicenceRecord.ps1
-    # records (#3099). A build from before the fork measured them has none.
-    foreach ($must in 'build/dist/server/scam_native.node', 'build/skymp5-server/launch_server.bat.tmp', 'build/licences/licences.json') {
-        if (-not $named.ContainsKey($must)) { $why += "fork-build.json does not name $must" }
-    }
-    if ($why.Count) { throw ('the fork''s build is not the one asked for, and nothing was put in the fork: ' + ($why -join '; ')) }
 
     Move-Item -LiteralPath (Join-Path $Scratch 'build') -Destination $target
     foreach ($p in $files.PSObject.Properties) {

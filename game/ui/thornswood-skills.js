@@ -152,14 +152,16 @@
       'weave'.
 
     property: [ { name, mine: <bool>, locked, keyed, master (#2254), b, by,
-                  rent: { amount, every, owed } | null,
+                  rent: { amount, every, owed } | null, before, owes (#3893),
                   sleep: [ { pid, name } ], farm, days, reach } ]
       The property page (#1637, #1603), sent once somebody holds a building
       or a farm or carries a key to one, and left out otherwise: the page is
       drawn from whether this arrived. mine is a place you hold, b is its
       building id, and sleep is tonight's guests there; Stop beside a guest
       sends '/sleephere stop <pid> <b>' through window.thornswoodNet.say.
-      A farm row has farm, days and reach and nothing else.
+      A farm row has farm, days and reach and nothing else. owes is rent
+      still owed on a place you no longer hold, and before the same on one
+      you hold again (#3893); a row with owes and no key is that alone.
 
     body: { food, drink, rest, temp, foodBand, drinkBand, restBand, tempBand,
             resting, place, roof, night, fireAway, fireWorth, tempTarget,
@@ -1637,12 +1639,17 @@
       // and a local of either name blanks out the line above that reads
       // mine['class'] for every other section as well.
       var pRows = propertyRows();
-      var pHeld = 0;
-      for (var pi = 0; pi < pRows.length; pi++) if (pRows[pi].mine) pHeld++;
-      var pKeys = pRows.length - pHeld;
+      var pHeld = 0, pKeys = 0, pOwes = 0;
+      for (var pi = 0; pi < pRows.length; pi++) {
+        if (pRows[pi].mine) pHeld++;
+        else if (pRows[pi].keyed) pKeys++;
+        else if (pRows[pi].owes) pOwes++;
+      }
       if (!pRows.length) return { t: 'nothing yet', c: '' };
-      return { t: pHeld ? pHeld + ' held' + (pKeys ? ', ' + pKeys + ' keyed' : '')
-                        : pKeys + (pKeys === 1 ? ' key' : ' keys'),
+      // Rent you still owe on a place you no longer hold (#3893) says so.
+      var pOwed = pOwes ? (pHeld || pKeys ? ', rent owed' : 'rent owed') : '';
+      return { t: (pHeld ? pHeld + ' held' + (pKeys ? ', ' + pKeys + ' keyed' : '')
+                         : (pKeys ? pKeys + (pKeys === 1 ? ' key' : ' keys') : '')) + pOwed,
                c: pHeld ? 'set' : '' };
     }
     if (sec === 'recipes') {
@@ -2003,9 +2010,11 @@
         'press the key the line under the crosshair names: claiming costs nothing.'));
       return;
     }
-    var pHeld = 0;
-    for (var i = 0; i < pRows.length; i++) if (pRows[i].mine) pHeld++;
-    var pKeys = pRows.length - pHeld;
+    var pHeld = 0, pKeys = 0;
+    for (var i = 0; i < pRows.length; i++) {
+      if (pRows[i].mine) pHeld++;
+      else if (pRows[i].keyed) pKeys++;
+    }
 
     var bar = el('div', 'spellbar');
     bar.appendChild(el('div', 'spellpts',
@@ -2021,8 +2030,14 @@
     pRows.forEach(function (r) {
       var card = el('div', 'card' + (r.mine ? ' mine' : ' off'));
       var name = el('div', 'name', String(r.name || 'somewhere'));
-      name.appendChild(el('span', 'tag', r.farm ? 'farm' : (r.mine ? 'yours' : (r.master ? 'master key' : 'key only'))));
+      name.appendChild(el('span', 'tag', r.farm ? 'farm' : (r.mine ? 'yours' : (r.master ? 'master key' : (r.keyed ? 'key only' : 'rent owed')))));
       card.appendChild(name);
+      // Rent you still owe on a place you no longer hold (#3893): the debt stayed yours.
+      if (!r.mine && !r.keyed && r.owes) {
+        card.appendChild(el('div', 'desc', (r.by ? 'Held by ' + r.by + ' now. ' : 'Nobody holds it now. ') + owesLine(r.owes)));
+        wrap.appendChild(card);
+        return;
+      }
       if (r.farm) {
         var days = Number(r.days) || 0;
         card.appendChild(el('div', 'desc', 'The ground ' + (Number(r.reach) || 0) +
@@ -2036,17 +2051,25 @@
                       'key the line names unlocks it.'
                     : 'Unlocked. Open its door and the key the line names locks it.') +
           (r.master ? ' You are carrying its master key.' : '') +
-          (r.keyed ? ' You are carrying a key to it as well.' : '') + rentLine(r.rent)
+          (r.keyed ? ' You are carrying a key to it as well.' : '') + rentLine(r.rent) +
+          (r.before ? ' ' + Number(r.before) + ' gold more is owed from when you held it before.' : '')
         : (r.by ? 'Held by ' + r.by + '. ' : 'Nobody holds it. ') +
           // A master key opens the door and turns the lock (#2254).
           (r.master ? 'Your master key opens the door, and at the door the key the line names ' +
                       (r.locked ? 'unlocks it.' : 'locks it.')
                     : (r.locked ? 'Your key opens the door.'
-                                : 'It is not locked, so your key is not needed yet.'))));
+                                : 'It is not locked, so your key is not needed yet.')) +
+          (r.owes ? ' ' + owesLine(r.owes) : '')));
       if (r.mine) drawGuests(card, r);
       wrap.appendChild(card);
     });
     elBody.appendChild(wrap);
+  }
+
+  /* What you still owe on a place you no longer hold (#3893), and how it is paid. */
+  function owesLine(n) {
+    return 'You still owe ' + (Number(n) || 0) + ' gold of rent on it from when you held it. Gold you put in ' +
+      'a hold\'s drop box pays it, or hand it to the steward of its hold.';
   }
 
   /* The rent on a place you hold, and what is owed on it now (#1637). */
@@ -2351,6 +2374,8 @@
       return card;
     }
     var r = d.rent;
+    // Who owes rent here: the holder, and anybody who held it before (#3893).
+    var owing = Array.isArray(d.owing) ? d.owing : [];
     card.appendChild(el('div', 'desc', (d.by ? 'Held by ' + d.by + '. ' : 'Nobody holds it. ') +
       (r ? 'Rent ' + r.amount + ' gold every ' + r.every + ' days, ' + r.owed + ' owed.' : 'No rent on it.')));
     // A steward settles only their own hold's buildings (#2551); the server says whose this one is.
@@ -2364,6 +2389,8 @@
         : 'It answers to no hold the server knows, so no steward ends a claim or sets rent here.'));
       return card;
     }
+    // Rent handed over in person (#3895): Rent paid beside each who owes, the clock untouched.
+    owing.forEach(function (o) { officeRow(card, String(o.name || 'somebody'), rentOwedText(o), rentPaidButtons(o)); });
     if (!d.by) return card;
     officeRow(card, '', '', [officeButton('Evict', '/evict', 'Press again to end ' + d.by + '\'s claim')]);
     var input = document.createElement('input');
@@ -2382,6 +2409,28 @@
     if (r) buttons.push(officeButton('No rent', '/rent -'));
     officeRow(card, 'Rent every 7 days', '', buttons);
     return card;
+  }
+
+  function rentOwedText(o) {
+    return (Number(o.owed) || 0) + ' gold owed' + (o.holds ? '' : ', from when they held it');
+  }
+
+  /* An amount and Rent paid, for gold of rent somebody handed the steward (#3895). */
+  function rentPaidButtons(o) {
+    var input = document.createElement('input');
+    input.placeholder = String(Number(o.owed) || 0);
+    var paid = officeButton('Rent paid', function () {
+      var raw = String(input.value || '').trim();
+      var n = raw ? Number(raw) : (Number(o.owed) || 0);
+      if (!(n > 0) || Math.floor(n) !== n) {
+        status = 'Say how much gold was paid, as a whole number above 0.'; statusKind = 'no';
+        drawFoot();
+        return '';
+      }
+      return '/rent paid ' + (Number(o.pid) || 0) + ' ' + n;
+    });
+    input.onkeydown = function (ev) { if (ev && ev.key === 'Enter') paid.onclick(ev); };
+    return [input, paid];
   }
 
   /*

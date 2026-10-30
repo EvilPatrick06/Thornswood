@@ -44,7 +44,7 @@
   Read only apart from its own scratch folder. Never connects to anything.
 #>
 [CmdletBinding()]
-param([string]$Record, [string]$OwnGameList = 'C:\Thornswood\Profile\OwnGame\files.txt')
+param([string]$Record, [string]$OwnGameList = (Join-Path ([string](& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Install)) 'Profile\OwnGame\files.txt'))
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
 $env:THORNSWOOD_HARNESS = '1'
 
