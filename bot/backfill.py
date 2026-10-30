@@ -46,7 +46,9 @@ if not TOKEN:
     raise SystemExit('No DISCORD_TOKEN in the environment. Set it from bot.env.json first.')
 
 intents = discord.Intents(guilds=True, members=True)
-client = discord.Client(intents=intents)
+# The bot's own client class, which verifies against the bot's roots alone
+# and never the machine's stores (#3111, #3604).
+client = bot.TrustedClient(intents=intents)
 
 
 def say(*a):

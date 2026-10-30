@@ -91,8 +91,12 @@ function Invoke-51([string]$text) {
     $out = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -EncodedCommand $e 2>&1 | ForEach-Object { "$_" })
     return [pscustomobject]@{ Out = $out; Code = $LASTEXITCODE }
 }
-# Starts a run and reads its report until END, a minute at most.
-function Invoke-Run([string]$script) {
+# Starts a run and reads its report until END, a minute at most. With -Go,
+# the run waits for that file, which is made only once the first read is
+# done, so the first read finds it still going however slowly this machine
+# starts a Windows PowerShell (a fixed three seconds was not enough on One,
+# where the start and the first read took longer, #3861).
+function Invoke-Run([string]$script, [string]$Go = '') {
     $run = Get-ThornswoodDetachedRun -Script $script -Folder $scratch
     $s = Invoke-51 $run.Start
     $runPid = 0
@@ -107,7 +111,10 @@ function Invoke-Run([string]$script) {
     $until = (Get-Date).AddMinutes(1)
     while ((Get-Date) -lt $until) {
         $rd = Invoke-51 $run.Read
-        if ($null -eq $first) { $first = ($rd.Out -join '|') }
+        if ($null -eq $first) {
+            $first = ($rd.Out -join '|')
+            if ($Go) { [IO.File]::WriteAllText($Go, 'go') }
+        }
         if ($rd.Out.Count -and $rd.Out[0] -match '^REPORT \d+$') {
             $lines = @($rd.Out | Select-Object -Skip 1)
             if ($lines.Count -and $lines[-1] -match '^END ') { break }
@@ -120,8 +127,10 @@ function Invoke-Run([string]$script) {
 
 try {
     Write-Host ''
-    Write-Host 'A run that says things, errs, waits and exits 3:'
-    $a = Invoke-Run "'first line'`r`nWrite-Error 'an error line'`r`nStart-Sleep -Seconds 3`r`n'last line'`r`nexit 3"
+    Write-Host 'A run that says things, errs, waits to be let go and exits 3:'
+    $go = Join-Path $scratch 'go-a'
+    $wait = "`$until = [DateTime]::UtcNow.AddMinutes(1); while (-not (Test-Path -LiteralPath '" + $go + "') -and [DateTime]::UtcNow -lt `$until) { Start-Sleep -Milliseconds 100 }"
+    $a = Invoke-Run ("'first line'`r`nWrite-Error 'an error line'`r`n" + $wait + "`r`n'last line'`r`nexit 3") -Go $go
     Yes '  the start says STARTED and exits 0' ($a.Pid -gt 0 -and $a.Start.Code -eq 0)
     Yes ('  the run''s parent is the WMI service''s process (' + $a.Parent + '), not the PowerShell that started it') ($a.Parent -eq 'WmiPrvSE.exe')
     Yes ('  it is still going once that PowerShell has ended: the first read finds no END yet (' + $a.First + ')') (

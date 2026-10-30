@@ -1,3 +1,34 @@
+// Altered from zlib 1.3: deflate.c and trees.c, translated into C# by
+// Thornswood and cut down to the one setting below (level 6, window bits 15,
+// memory level 8, the default strategy). This is not the original software.
+// zlib's notice follows unaltered, as its licence asks (THIRD-PARTY.md, #3668).
+//
+// deflate.c: Copyright (C) 1995-2023 Jean-loup Gailly and Mark Adler
+// trees.c:   Copyright (C) 1995-2021 Jean-loup Gailly
+//
+// zlib.h, version 1.3, August 18th, 2023:
+//
+//   Copyright (C) 1995-2023 Jean-loup Gailly and Mark Adler
+//
+//   This software is provided 'as-is', without any express or implied
+//   warranty.  In no event will the authors be held liable for any damages
+//   arising from the use of this software.
+//
+//   Permission is granted to anyone to use this software for any purpose,
+//   including commercial applications, and to alter it and redistribute it
+//   freely, subject to the following restrictions:
+//
+//   1. The origin of this software must not be misrepresented; you must not
+//      claim that you wrote the original software. If you use this software
+//      in a product, an acknowledgment in the product documentation would be
+//      appreciated but is not required.
+//   2. Altered source versions must be plainly marked as such, and must not be
+//      misrepresented as being the original software.
+//   3. This notice may not be removed or altered from any source distribution.
+//
+//   Jean-loup Gailly        Mark Adler
+//   jloup@gzip.org          madler@alumni.caltech.edu
+
 using System;
 using System.IO;
 

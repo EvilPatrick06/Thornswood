@@ -36,6 +36,22 @@
   beside the note, the text of every library in the files it carries, and
   the note lists them. Version 2 of the note is the first that does.
 
+  THE CODE THAT DOES NOT COME THROUGH VCPKG (#3751). The same record also
+  lists, as libraries, the fork's own folders under a notice of their own
+  (Tilted Phoques' libraries under skyrim-platform\src\tilted, papyrus-vm,
+  viet and libespm) and the npm packages webpack put in skymp5-client.js,
+  each with its text in client-licences\ under its own name; a client
+  measured before #3751 has none. build.js is webpack's build of
+  skymp5-front, and front-build.json beside the client record lists the npm
+  packages in it, each with its text in front-licences\ beside it
+  (Build-Front.ps1). A download that carries build.js as that build carries
+  those texts too, in the same licences folder, and the note lists them
+  with the rest.
+
+  WHERE FRIDA'S PARTS ARE (#3287). Version 3 is the first that names the
+  Release of their archives, records\frida-sources.json; see
+  $SourceNoticeBundled below.
+
   $SourceNoticeVersion goes into the feed's clientRuntime entry. A client
   runtime already on the feed without it (or with an older one) is published
   again even though its commit did not move, so the zip that carries the note
@@ -46,7 +62,7 @@
   tests\test-source-offer.ps1 holds the two to each other.
 #>
 
-$SourceNoticeVersion = 2
+$SourceNoticeVersion = 3
 
 # Each SkyMP file the feed can carry, by its path in the game folder. Built:
 # from the fork at the commit client-build.json names. Front: build.js, which
@@ -68,22 +84,31 @@ $SourceNoticeFiles = [ordered]@{
 
 # Libraries inside a port's own prebuilt library, by port, with where their
 # source is. frida-gum's port installs Frida's devkit, and its frida-gum.lib
-# holds gum and the libraries Frida 16.0.19's releng/deps.mk builds it with
-# (#3287). glib, gobject and proxy-libintl are the LGPL, which a copy under the
-# GPL turns into a duty to say where their source is. Each is Thornswood's own
-# fork of Frida's repository, tagged thornswood-frida-16.0.19 at the commit
-# the fork's overlay_ports/frida-gum/portfile.cmake fetches its licence from
-# (Patrick, A on #3287, 22 Oct), so the directions do not depend on Frida
-# keeping that commit.
+# holds gum and the libraries Frida's releng/deps.mk builds it with (#3287).
+# glib, gobject and proxy-libintl are the LGPL, which a copy under the GPL
+# turns into a duty to say where their source is. records\frida-sources.json
+# names each part, the commit Frida built it from and its archive on one
+# permanent Release of Thornswood's repository (Patrick, C on #3287, 26 Oct
+# 2026), and, while its forksUp is true, Thornswood's own fork of each of
+# Frida's repositories, tagged at that commit. Version 3 of the note is the
+# first that names the Release. Anybody can reach it once the repository is
+# public, and until then the note names the forks beside it, so no note ever
+# points only at something gone (Publish-FridaSources.ps1 -ForksMayGo says
+# when the forks may go).
 $SourceNoticeBundled = [ordered]@{
-    'frida-gum' = @{ Maker = 'Frida'; Parts = @(
-        @('gum',                            'frida-gum',           '698b356fef0ecfc3ac2818f0b387be90e93deeda'),
-        @('glib, gobject, gnulib, libcharset', 'frida-glib',       'f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f'),
-        @('proxy-libintl',                  'frida-proxy-libintl', 'c03e1a74b17fa7ec467e110130775409e4828a4c'),
-        @('pcre2',                          'frida-pcre2',         'b47486922fdc3486499b310dc9cf903449700474'),
-        @('capstone',                       'frida-capstone',      '22d317042ee4d251280d2960f5cf294433977db4'),
-        @('libffi',                         'frida-libffi',        '938b07aa8280bcc4f92f08a0fdbb4ad81024bde0')
-    ) }
+    'frida-gum' = @{ Maker = 'Frida'; Record = (Join-Path $PSScriptRoot '..\..\records\frida-sources.json') }
+}
+
+# A bundled port's record, read when a note needs it, so a stand-in folder
+# with no such record works until something carries the port. Throws a
+# sentence when the record is missing or names no parts: the directions are
+# owed with the file (#3287), so the release stops.
+function Get-SourceNoticeBundle([string]$Port) {
+    $path = [string]$SourceNoticeBundled[$Port].Record
+    if (-not (Test-Path -LiteralPath $path)) { throw "$path is missing. Where the source of what is inside $Port is has to go with the files it is in (#3287)." }
+    $r = [IO.File]::ReadAllText($path).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    if (-not @($r.parts).Count -or -not $r.release.tag) { throw "$path names no parts or no Release" }
+    return $r
 }
 
 <#
@@ -93,7 +118,9 @@ $SourceNoticeBundled = [ordered]@{
   record's sha256 and size) }. Empty when $Carried holds none of those files.
   Throws a sentence when the record is missing, is of another commit than the
   client record, or a text is missing or not the one it names: those texts
-  are owed with the files (#3099), so the release stops.
+  are owed with the files (#3099), so the release stops. The record's
+  libraries (#3751) come in the same list, the same way, in name order
+  after the ports.
 #>
 function Get-ClientLicences([string]$ClientRecord, [string[]]$Carried) {
     $dir = Split-Path -Parent $ClientRecord
@@ -123,7 +150,64 @@ function Get-ClientLicences([string]$ClientRecord, [string[]]$Carried) {
             Files = @($in | ForEach-Object { $_.Substring($_.LastIndexOf('\') + 1) } | Sort-Object); Bytes = $bytes
         }
     }
+    $lp = $l.PSObject.Properties['libraries']
+    if ($lp -and $lp.Value) {
+        foreach ($p in @($lp.Value.PSObject.Properties | Sort-Object Name)) {
+            $n = [string]$p.Name
+            if ($l.ports.PSObject.Properties[$n]) { throw "$path names $n as both a port and a library" }
+            $in = @()
+            foreach ($f in @($p.Value.in)) { foreach ($x in @($Carried)) { if ($x -and $x.Equals([string]$f, [StringComparison]::OrdinalIgnoreCase)) { $in += [string]$f; break } } }
+            if (-not $in.Count) { continue }
+            $out += Read-NoticeText (Join-Path $dir ('client-licences\' + $n + '.txt')) $p.Value $n $in 'client-licences.json' '#3751'
+        }
+    }
     return $out
+}
+
+# One text a record names, held to its sha256 and size, as Get-ClientLicences
+# gives it. Throws a sentence when it is missing or another text.
+function Read-NoticeText([string]$Text, $Entry, [string]$Name, [string[]]$In, [string]$Record, [string]$Issue) {
+    if (-not (Test-Path -LiteralPath $Text -PathType Leaf)) { throw "$Text is missing. $Record names it, and it has to go with the files $Name is in ($Issue)." }
+    $bytes = [IO.File]::ReadAllBytes($Text)
+    $sha = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+    if ($sha -ne ([string]$Entry.sha256).ToLowerInvariant() -or $bytes.Length -ne [long]$Entry.bytes) { throw "$Text is not the text $Record names for $Name" }
+    return [pscustomobject]@{
+        Port = $Name; Version = [string]$Entry.version; Licence = [string]$Entry.licence
+        Files = @($In | ForEach-Object { $_.Substring($_.LastIndexOf('\') + 1) } | Sort-Object); Bytes = $bytes
+    }
+}
+
+<#
+  The npm packages inside build.js (#3751), from $FrontRecord's packages and
+  their texts in front-licences beside it, in the shape Get-ClientLicences
+  gives. Throws a sentence when the record lists none (a front recorded
+  before #3751) or a text is missing or not the one it names: those texts are
+  owed with build.js, so the release stops.
+#>
+function Get-FrontLicences([string]$FrontRecord) {
+    $raw = "$(Get-Content -LiteralPath $FrontRecord -Raw)"
+    $f = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $pk = $f.PSObject.Properties['packages']
+    if (-not $pk -or $null -eq $pk.Value) { throw "$FrontRecord lists no packages. The licences of the npm packages inside build.js have to go with it (#3751): record the front with Build-Front.ps1 -Record." }
+    $dir = Join-Path (Split-Path -Parent $FrontRecord) 'front-licences'
+    $out = @()
+    foreach ($p in @($pk.Value.PSObject.Properties | Sort-Object Name)) {
+        $out += Read-NoticeText (Join-Path $dir ([string]$p.Name + '.txt')) $p.Value ([string]$p.Name) @('Data\Platform\UI\build.js') 'front-build.json' '#3751'
+    }
+    return $out
+}
+
+# Two lists in that shape as one, by name: a name in both is one text, in
+# the files of both. Throws when one name has two texts.
+function Join-NoticeLicences($A, $B) {
+    $by = [ordered]@{}
+    foreach ($x in @(@($A) + @($B) | Where-Object { $_ })) {
+        if (-not $by.Contains($x.Port)) { $by[$x.Port] = $x; continue }
+        $have = $by[$x.Port]
+        if ([Convert]::ToBase64String($have.Bytes) -ne [Convert]::ToBase64String($x.Bytes)) { throw "$($x.Port) has two different texts, and they would go out under one name" }
+        $have.Files = @(@($have.Files) + @($x.Files) | Sort-Object -Unique)
+    }
+    return @($by.Values | Sort-Object Port)
 }
 
 <#
@@ -147,16 +231,31 @@ function Get-ClientLicenceLines($Licences) {
     foreach ($x in @($Licences)) {
         if (-not $SourceNoticeBundled.Contains($x.Port)) { continue }
         $by = $SourceNoticeBundled[$x.Port]
+        $b = Get-SourceNoticeBundle $x.Port
         $lines += @(
             ($x.Port + ' is ' + $by.Maker + '''s own build, and it holds other libraries too.'),
-            ('Their licences are in licences\' + $x.Port + '.txt as well. Their source,'),
-            ('at the commits ' + $by.Maker + ' built them from, is:')
+            ('Their licences are in licences\' + $x.Port + '.txt as well. Their source, at'),
+            ('the commits ' + $by.Maker + ' built them from, is in these archives on'),
+            'Thornswood''s release of them:',
+            ('  https://github.com/' + $b.release.repo + '/releases/tag/' + $b.release.tag),
+            ''
         )
-        foreach ($b in $by.Parts) {
-            $lines += ('  ' + $b[0])
-            $lines += ('    https://github.com/EvilPatrick06/' + $b[1] + '/tree/' + $b[2])
+        foreach ($p in @($b.parts)) {
+            $lines += ('  ' + $p.holds)
+            $lines += ('    ' + $p.archive)
         }
         $lines += @('')
+        if ($b.forksUp) {
+            $lines += @(
+                'Until that repository is public, the same commits are in Thornswood''s',
+                ('copies of ' + $by.Maker + '''s repositories:')
+            )
+            foreach ($p in @($b.parts)) {
+                $lines += ('  ' + $p.holds)
+                $lines += ('    https://github.com/' + ([string]$b.release.repo).Split('/')[0] + '/' + $p.name + '/tree/' + $p.commit)
+            }
+            $lines += @('')
+        }
     }
     return $lines
 }
@@ -276,6 +375,10 @@ function Get-SourceNoticeEntries([string]$ClientRecord, [string[]]$Carried, [str
         ) + $upstream + @('')
     }
     $libs = @(Get-ClientLicences $ClientRecord $Carried)
+    # build.js as the recorded front build: the npm packages in it (#3751).
+    $frontCarried = $false
+    foreach ($x in @($Carried)) { if ($x -and $x.Equals('Data\Platform\UI\build.js', [StringComparison]::OrdinalIgnoreCase)) { $frontCarried = $true; break } }
+    if ($frontBuilt -and $frontCarried) { $libs = @(Join-NoticeLicences $libs (Get-FrontLicences $FrontRecord)) }
     $lines += @(
         'SkyMP itself is https://github.com/skyrim-multiplayer/skymp',
         '',
