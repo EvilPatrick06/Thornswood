@@ -261,30 +261,12 @@ async def _run(token, args):
 
 
 if __name__ == '__main__':
-    # The bot's own roots, the way bot.py trusts them (#3111), before
-    # discord.py makes a connection.
-    # In a folder of its own that goes at the end, never the bot's data
-    # folder, whose roots.pem the bot writes at every start.
-    import tempfile
+    # The bot's own roots, the way bot.py trusts them (#3111), made at login
+    # in a folder of its own, never the bot's data folder (trust.own_context).
     import trust
-    rootdir = tempfile.mkdtemp(prefix='thornswood-wipe-')
-    roots = os.path.join(rootdir, 'roots.pem')
-    trust.write_bundle(roots)
-    import aiohttp
     import discord
-
-    class TrustedClient(discord.Client):
-        async def login(self, token):
-            self.http.connector = aiohttp.TCPConnector(limit=0, ssl=trust.context(roots))
-            await super().login(token)
-
-    client = TrustedClient(intents=discord.Intents.none())
-    try:
-        code = main(sys.argv[1:])
-    finally:
-        import shutil
-        shutil.rmtree(rootdir, ignore_errors=True)
-    sys.exit(code)
+    client = trust.client_class()(intents=discord.Intents.none())
+    sys.exit(main(sys.argv[1:]))
 else:
     import discord  # noqa: E402  (the test reads the rules without a client)
     client = None

@@ -118,6 +118,93 @@ resources.forEach(function (name) {
   }
 });
 
+// ---------------------------------------------------------------- launcher source
+//
+// The launcher's code is compiled into it too, and one file of it,
+// FromGameDeflate.cs, is zlib 1.3 translated into C#. It went out from #2827
+// with no zlib notice and THIRD-PARTY.md calling everything compiled in
+// Thornswood's own (#3668). So the header of every .cs file under
+// launcher\app and installer\setup (its comments down to the first type it
+// declares) is read for outside projects: the libraries in
+// records\client-licences, the numeric and compression ones the launcher's
+// work touches, and any line saying code was translated, ported, adapted or
+// copied, or carrying a copyright line. Each file that names one needs a row
+// in THIRD-PARTY.md's "Launcher source that names outside work" naming what it
+// names, and a row that says a file carries a library's code needs that
+// library's notice in the file's header word for word, the file marked as
+// altered, and THIRD-PARTY.md pointing at the licence text.
+const SRC_DIRS = [path.join('launcher', 'app'), path.join('installer', 'setup')];
+const LIC_DIR = path.join(REPO, 'records', 'client-licences');
+const licNames = (fs.existsSync(LIC_DIR) ? fs.readdirSync(LIC_DIR) : [])
+  .filter(function (n) { return /\.txt$/i.test(n); })
+  .map(function (n) { return n.replace(/\.txt$/i, ''); });
+yes('records\\client-licences has licence texts to name (' + licNames.length + ')', licNames.length > 0);
+const OUTSIDE = licNames.concat(['deflate.c', 'trees.c', 'inflate.c', 'miniz', 'LZ4', 'LZMA', '7-Zip',
+  'OpenBLAS', 'LAPACK', 'BLAS', 'numpy', 'Eigen', 'Newtonsoft', 'Json.NET', 'SharpZipLib', 'DotNetZip',
+  'BouncyCastle', 'Mono', 'corefx', 'referencesource']);
+const SAYS_OUTSIDE = /\btranslat(ed|ion)\s+(of|from|into)\b|\bport(ed)?\s+(of|from)\b|\badapted\s+from\b|\bcopied\s+from\b|\bcopyright\s*(\(C\)|©)|\(C\)\s*\d{4}/i;
+function namesIn(text, name) {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^A-Za-z0-9_-])' + esc + '($|[^A-Za-z0-9_-])', 'i').test(text);
+}
+function header(src) {
+  const out = [];
+  const lines = src.replace(/\r/g, '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (/^(\[[^\]]*\]\s*)*((public|internal|static|sealed|partial|abstract)\s+)*(class|struct|enum|interface)\s/.test(t)) { break; }
+    if (t.indexOf('//') === 0) { out.push(t.replace(/^\/+ ?/, '').replace(/<\/?summary>/g, '')); }
+  }
+  return out.join('\n');
+}
+const srcSection = (/\n### Launcher source that names outside work\n([\s\S]*?)(\n## |\n### |$)/.exec(N) || [])[1] || '';
+yes('THIRD-PARTY.md has the section "Launcher source that names outside work"', srcSection.length > 0);
+const srcRows = {};
+srcSection.split('\n').forEach(function (l) {
+  const m = /^\| `([^`]+\.cs)` \| ([^|]*) \| ([^|]*) \|/.exec(l);
+  if (m) { srcRows[m[1]] = { names: m[2], carries: m[3].trim() }; }
+});
+const srcFiles = {};
+SRC_DIRS.forEach(function (d) {
+  const full = path.join(REPO, d);
+  (fs.existsSync(full) ? fs.readdirSync(full) : []).filter(function (n) { return /\.cs$/i.test(n); })
+    .forEach(function (n) { srcFiles[n] = path.join(full, n); });
+});
+yes('there is launcher source to read (' + Object.keys(srcFiles).length + ' files)', Object.keys(srcFiles).length >= 50);
+const flagged = {};
+Object.keys(srcFiles).sort().forEach(function (n) {
+  const h = header(read(srcFiles[n]) || '');
+  const names = OUTSIDE.filter(function (o) { return namesIn(h, o); });
+  if (names.length === 0 && !SAYS_OUTSIDE.test(h)) { return; }
+  flagged[n] = true;
+  const row = srcRows[n];
+  yes(n + '\'s header names outside work (' + (names.join(', ') || 'says it was taken from somewhere') +
+      ') and THIRD-PARTY.md has its row', !!row);
+  if (!row) { return; }
+  names.forEach(function (o) {
+    yes('  its row names ' + o, namesIn(row.names, o));
+  });
+  const carried = /^yes:\s*(.+)$/i.exec(row.carries);
+  yes('  its row says whether it carries outside code ("yes: <library>" or "no")', !!carried || /^no$/i.test(row.carries));
+  if (!carried) { return; }
+  carried[1].split(',').map(function (s) { return s.trim(); }).forEach(function (lib) {
+    const text = read(path.join(LIC_DIR, lib + '.txt'));
+    yes('  ' + lib + '\'s licence text is in records\\client-licences', text !== null);
+    if (text === null) { return; }
+    const body = text.replace(/\r/g, '').split('\n')
+      .filter(function (l) { return !/copyright|\(C\)/i.test(l); }).join('\n');
+    yes('  its header carries ' + lib + '\'s notice word for word', flat(h).indexOf(flat(body)) >= 0);
+    yes('  its header says it is altered and not the original software',
+        /\baltered from\b/i.test(h) && /not the original software/i.test(h));
+    yes('  THIRD-PARTY.md points at records\\client-licences\\' + lib + '.txt',
+        N.indexOf('`records\\client-licences\\' + lib + '.txt`') >= 0);
+  });
+});
+Object.keys(srcRows).forEach(function (n) {
+  yes(n + ', in "Launcher source that names outside work", is launcher source whose header names outside work',
+      !!srcFiles[n] && !!flagged[n]);
+});
+
 // ---------------------------------------------------------------- launcher\lib
 //
 // Every file, by name and by sha256, so a newer WebView2 dropped in without a
@@ -645,6 +732,90 @@ if (cl) {
     return crypto.createHash('sha256').update(b).digest('hex') !== String(cl.ports[n].sha256) || b.length !== Number(cl.ports[n].bytes);
   });
   yes('every port in it has its text in records\\client-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
+}
+// ------------------------------------- the other code inside them (#3751)
+//
+// Code that does not come through vcpkg had no record, so its notices went
+// nowhere: Tilted Phoques' libraries, the fork's MIT folders, and the npm
+// packages webpack bundles into skymp5-client.js and build.js. Every library
+// THIRD-PARTY.md names as built into a client file with a notice of its own
+// has a row in "The other code inside the client files"; each row is the
+// record's library, text and all, or, while the record has none (a client
+// measured before #3751), is named under "What is still missing". The front's
+// table is front-build.json's packages, row for row, each with its text.
+function tableRows(head) {
+  const lines = N.split('\n');
+  const at = lines.indexOf(head);
+  const rows = [];
+  for (let i = at + 2; at >= 0 && i < lines.length && lines[i].charAt(0) === '|'; i++) rows.push(lines[i]);
+  return { at: at, rows: rows };
+}
+const OTHER_HEAD = '| Library | Version | Licence, as its folder or package gives it | In |';
+const other = tableRows(OTHER_HEAD);
+const otherNames = other.rows.map(function (r) { return r.split('|')[1].trim(); });
+yes('THIRD-PARTY.md has the table of the other code inside the client files (' + other.rows.length + ' rows)', other.at >= 0 && other.rows.length > 0);
+// What the client section says is compiled into the client files, and which
+// of it carries a notice of its own: a folder named just before a licence
+// that is not the GPL's or AGPL's, and the Tilted folder.
+const compiled = (function () {
+  const a = N.indexOf('What is compiled into them:');
+  const b = N.indexOf('### The libraries inside the client files');
+  return a >= 0 && b > a ? N.slice(a, b) : '';
+})();
+const noticed = [];
+(compiled.match(/(?:`[^`]+`(?:,\s*|\s+and\s+))*`[^`]+`\s*\((?:MIT|BSD|Apache|ISC|Zlib|BSL)/g) || []).forEach(function (m) {
+  (m.match(/`([^`]+)`/g) || []).forEach(function (t) { const n = t.replace(/`/g, ''); if (noticed.indexOf(n) < 0) noticed.push(n); });
+});
+if (/skyrim-platform\\src\\tilted/.test(compiled)) noticed.push('tilted');
+const unrowed = noticed.filter(function (n) { return otherNames.indexOf(n) < 0; });
+yes('each library the client section names with a notice of its own has a row (' + noticed.join(', ') + ')' + (unrowed.length ? ', not: ' + unrowed.join(', ') : ''),
+    noticed.length >= 3 && unrowed.length === 0);
+if (cl && cl.libraries) {
+  const want = Object.keys(cl.libraries).sort().map(function (n) {
+    const p = cl.libraries[n];
+    const ver = p.kind === 'fork' ? 'the fork\'s' : String(p.version);
+    const lic = p.licence ? p.licence : 'not declared; its text is in `' + n + '.txt`';
+    const files = (p.in || []).map(function (f) { return String(f).split('\\').pop(); }).sort().map(function (f) { return '`' + f + '`'; }).join(', ');
+    return '| ' + n + ' | ' + ver + ' | ' + lic + ' | ' + files + ' |';
+  });
+  const wrong = want.filter(function (r) { return other.rows.indexOf(r) < 0; });
+  const extra = other.rows.filter(function (r) { return want.indexOf(r) < 0; });
+  wrong.forEach(function (r) { console.log('      not in THIRD-PARTY.md: ' + r); });
+  extra.forEach(function (r) { console.log('      not in the record: ' + r); });
+  yes('the table of the other code is the record\'s libraries, row for row (' + want.length + ')', want.length > 0 && wrong.length === 0 && extra.length === 0);
+  const noText = Object.keys(cl.libraries).filter(function (n) {
+    let b = null;
+    try { b = fs.readFileSync(path.join(REPO, 'records', 'client-licences', n + '.txt')); } catch (e) { return true; }
+    return crypto.createHash('sha256').update(b).digest('hex') !== String(cl.libraries[n].sha256) || b.length !== Number(cl.libraries[n].bytes);
+  });
+  yes('every library in the record has its text in records\\client-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
+} else {
+  const missing = flat(section('What is still missing'));
+  const unsaid = otherNames.filter(function (n) { return missing.indexOf(n) < 0; });
+  yes('the client record lists no libraries (measured before #3751), so "What is still missing" names every row' + (unsaid.length ? ', not: ' + unsaid.join(', ') : ''),
+      otherNames.length > 0 && unsaid.length === 0);
+}
+let fb = null;
+try { fb = JSON.parse(read(path.join(REPO, 'records', 'front-build.json')).replace(/^﻿/, '')); } catch (e) { fb = null; }
+yes('records\\front-build.json lists the npm packages in build.js', !!(fb && fb.packages && Object.keys(fb.packages).length > 0));
+if (fb && fb.packages) {
+  const front = tableRows('| Package | Version | Licence, as its package.json declares it | Text |');
+  const want = Object.keys(fb.packages).sort().map(function (n) {
+    const p = fb.packages[n];
+    return '| ' + p.package + ' | ' + p.version + ' | ' + (p.licence || 'not declared') + ' | `' + n + '.txt` |';
+  });
+  const wrong = want.filter(function (r) { return front.rows.indexOf(r) < 0; });
+  const extra = front.rows.filter(function (r) { return want.indexOf(r) < 0; });
+  wrong.forEach(function (r) { console.log('      not in THIRD-PARTY.md: ' + r); });
+  extra.forEach(function (r) { console.log('      not in the record: ' + r); });
+  yes('THIRD-PARTY.md\'s table of the npm packages in build.js is front-build.json, row for row (' + want.length + ')',
+      front.at >= 0 && wrong.length === 0 && extra.length === 0);
+  const noText = Object.keys(fb.packages).filter(function (n) {
+    let b = null;
+    try { b = fs.readFileSync(path.join(REPO, 'records', 'front-licences', n + '.txt')); } catch (e) { return true; }
+    return crypto.createHash('sha256').update(b).digest('hex') !== String(fb.packages[n].sha256) || b.length !== Number(fb.packages[n].bytes);
+  });
+  yes('every package in it has its text in records\\front-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
 }
 yes('THIRD-PARTY.md no longer says the vcpkg texts travel nowhere',
     !/None of those texts travels/.test(N) && !/vcpkg licence texts do not travel/.test(flat(section('What is still missing'))));

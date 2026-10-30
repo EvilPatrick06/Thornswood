@@ -125,7 +125,7 @@ try {
     $copy = @(
         'layout.json',
         'scripts\release\Where.ps1',
-        'scripts\vps\Backup-Server.ps1', 'scripts\vps\Fetch-Backups.ps1', 'scripts\vps\Restore-Backup.ps1',
+        'scripts\vps\Backup-Server.ps1', 'scripts\vps\Protect-BackupZip.ps1', 'scripts\vps\Fetch-Backups.ps1', 'scripts\vps\Restore-Backup.ps1',
         'scripts\vps\Vps.ps1', 'scripts\vps\Send-Script.ps1', 'scripts\vps\vps.json',
         'scripts\mods\Clean-Everything.ps1', 'scripts\mods\OnBox.ps1'
     )
@@ -214,12 +214,13 @@ try {
     Yes ('Backup-Server with no -Out names a zip in local\backups') ($r.Out -match ('to\s+' + [regex]::Escape($mainBackups) + '[\\/]thornswood-backup-\d{8}-\d{4}\.zip'))
 
     # Clean-Everything -Backups looks in local\backups, deleting nothing.
-    foreach ($n in 'thornswood-backup-20261001-0100.zip', 'thornswood-backup-20261002-0100.zip', 'thornswood-backup-20261003-0100.zip') {
+    # The plain .zip Backup-Server made before #3582 and the .zip.enc it makes now.
+    foreach ($n in 'thornswood-backup-20261001-0100.zip', 'thornswood-backup-20261002-0100.zip', 'thornswood-backup-20261003-0100.zip', 'thornswood-backup-20261027-0100.zip.enc') {
         [IO.File]::WriteAllText((Join-Path $mainBackups $n), 'x')
     }
     $r = Run (Join-Path $main 'scripts\mods\Clean-Everything.ps1') @('-Backups', '-Vps', '127.0.0.1', '-User', 'nobody', '-NoPause')
-    Yes ("Clean-Everything -Backups finds the three in local\backups (exit $($r.Code))") ($r.Out -match '3 backup\(s\), keeping the newest 2' -and $r.Out.Contains('thornswood-backup-20261001-0100.zip'))
-    Yes '  and deletes none of them without -Delete' (@(Get-ChildItem -LiteralPath $mainBackups -Filter 'thornswood-backup-*.zip').Count -eq 3)
+    Yes ("Clean-Everything -Backups finds the four in local\backups, encrypted or not (exit $($r.Code))") ($r.Out -match '4 backup\(s\), keeping the newest 2' -and $r.Out.Contains('thornswood-backup-20261001-0100.zip') -and $r.Out.Contains('thornswood-backup-20261027-0100.zip.enc'))
+    Yes '  and deletes none of them without -Delete' (@(Get-ChildItem -LiteralPath $mainBackups -Filter 'thornswood-backup-*').Count -eq 4)
 }
 finally {
     $env:PATH = $savedPath
