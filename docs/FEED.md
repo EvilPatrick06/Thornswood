@@ -266,7 +266,7 @@ application id (`Config.cs:DiscordAppId`).
   "launcherVersion": "1.1.95",
   "launcherUrl": "https://api.github.com/repos/EvilPatrick06/Thornswood-Releases/releases/assets/591560398",
   "launcherSha256": "8dc36e32eb3dde35691e7a68e46195c6354968c3ea01585d03eb53289dca3070",
-  "serverAddress": "192.135.112.23",
+  "serverAddress": "play.thornswood.net",
   "serverPort": "7777",
   "message": "",
   "packs": [
@@ -336,7 +336,7 @@ saved fields that come from elsewhere, as their rows say.
 | `serverAddress` | string | `Publish-Update.ps1:@('ServerAddress', 'serverAddress')` from config `ServerAddress`; `Set-Server.ps1:@('serverAddress', $Address)`. Not `Set-Vps.ps1`, which moves the launcher's built-in address and leaves the feed to `Set-Server.ps1` (`Set-Vps.ps1:What it does NOT do, because Set-Server.ps1 already does it properly`) | `ShellUpdate.cs:v.serverAddress != cfg.ServerAddress` | Saved. A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:-not $MoveServer -and -not $Dev`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `ShellUpdate.cs:OnVersionDoc` | Saved. Must be a string; the launcher field is a string. |
 | `maxOnline` | number | `Publish-Update.ps1`, from `records\most-online.json` by way of `scripts\deploy\MaxOnline.ps1` (#481): the channel's seats, people and staff seats together (30 on main, 5 on dev from its `dev` numbers; Patrick, 12 Oct) | `ShellUpdate.cs:v.maxOnline > 0` | Saved when above 0. Written as a number because a quoted `"30"` reads as 0. It is the M of "N of M awake". The Play page prefers the number the running server announces as `max` in its `online.json` (`Online.cs`), which is the same seats. |
-| `collectionUrl` | string | `Set-Collection.ps1:$doc.collectionUrl = $Url` only; Ship carries it forward untouched | `ShellUpdate.cs:OnVersionDoc` | Saved. Where the Collection button sends people. |
+| `collectionUrl` | string | `Set-Collection.ps1:$doc.collectionUrl = $Url` only; Ship carries it forward untouched | `ShellUpdate.cs:OnVersionDoc` | Saved. The collection the buttons send people to; they open its page for the feed's `collectionRevision` (`Checks.CollectionRevisionUrl`, `.../revisions/<N>`), never the bare page, which Nexus shows at its newest revision (#4115). |
 | `collectionRevision` | number | `Publish-Update.ps1:Set-Prop $doc 'collectionRevision' $rev`, read off the shipping machine's Vortex | `ShellUpdate.cs:Updater.FeedCollectionRevision = v.collectionRevision`, then `Shell.cs:CollectionProblem` | Not saved. 0 or missing: the launcher says nothing about the collection being behind or ahead. Wrong: tells people to reinstall a collection that is fine. |
 | `updateRepo` | string `owner/name` | Nobody since #907: `Publish-Update.ps1` takes it out of the feed | `Feed-Rules.ps1` only (a feed that still names one keeps its GitHub pack urls legal until its next Ship) | Launchers from #907 on ignore it. Older ones save it and ask that repository, via the GitHub Contents API, when the site does not answer; once it is deleted that answers 404 and they ask the site again. |
 | `updateFeedUrl` | string, https | `Publish-Update.ps1` from `UpdateFeedUrl` (defaults to the site live/dev URL by channel) | `Shell.cs`, `Updater.FeedUrl` | Saved, quietly. The one `version.json` fetch since #907. Publish the new URL under the old feed first, then move. Since #937 only an https address on thornswood.net is used; anything else in `config.json`, empty included, is the built-in live or dev address, so editing the file cannot switch the update check off. |
@@ -530,7 +530,7 @@ its card; the note is on its News tab as before. After it, version.json is:
   "launcherVersion": "1.1.103", "minLauncher": "1.1.103",
   "launcherUrl": "https://thornswood.net/feed/assets/<sha256>", "launcherSha256": "<sha256>",
   "launcherInputs": "<sha256>",
-  "serverAddress": "192.135.112.23", "serverPort": "7777", "voicePort": "7778",
+  "serverAddress": "play.thornswood.net", "serverPort": "7777", "voicePort": "7778",
   "voiceUrl": "https://thornswood.net/voice", "updateFeedUrl": "https://thornswood.net/feed/version.json",
   "collectionUrl": "...", "collectionRevision": 1, "maxOnline": 25,
   "discordAppId": "...", "siteUrl": "https://thornswood.net", "presenceImage": "...",

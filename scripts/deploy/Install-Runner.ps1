@@ -321,7 +321,7 @@
 
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
-  Replacing one stops the job it is running; -Lock does not.
+  Replacing or removing one refuses while it is running a job, and touches nothing (#3889); -Lock does not stop jobs either.
 #>
 [CmdletBinding()]
 param(
@@ -797,6 +797,29 @@ function Remove-LeftProfiles([string[]]$like, [string]$users = 'C:\Users') {
     Remove-Item -LiteralPath $d.FullName -Recurse -Force -EA SilentlyContinue
     if (Test-Path -LiteralPath $d.FullName) { 'LEFT ' + $d.FullName + ': no profile owns it and something holds a file in it' }
     else { 'took off ' + $d.FullName + ', a profile folder no account owned (#3119)' }
+  }
+}
+# A runner is never taken off mid-job or by halves (#3889, 30 Oct: a job
+# started between the idle check and a reinstall, Stop-Service and the removal
+# of the old configuration failed without a word, the old listener kept running
+# with its files open, and runner 3 was left with no service). The install and
+# -Remove both ask this first, and stop with what is wrong.
+function Get-RunnerProcesses([string]$root) {
+  # -EA Stop: a process list that cannot be read is a stop, never an empty list.
+  @(Get-CimInstance Win32_Process -EA Stop | Where-Object { ('' + $_.ExecutablePath) -like ($root.TrimEnd('\') + '\*') })
+}
+function Assert-RunnerIdle([string]$root) {
+  $worker = @(Get-RunnerProcesses $root | Where-Object { $_.Name -eq 'Runner.Worker.exe' })
+  if ($worker.Count) { throw ('this runner is running a job (Runner.Worker ' + (($worker | ForEach-Object { $_.ProcessId }) -join ', ') + '); nothing was changed. Run it again once -Status says it is idle.') }
+}
+function Stop-RunnerHere([string]$root, [string]$svc) {
+  if (Get-Service -Name $svc -EA SilentlyContinue) { Stop-Service -Name $svc -Force -EA Stop }
+  $left = @(Get-RunnerProcesses $root)
+  if ($left.Count) { throw ('still running from ' + $root + ' after the stop: ' + (($left | ForEach-Object { $_.Name + ' ' + $_.ProcessId }) -join ', ')) }
+  if (Get-Service -Name $svc -EA SilentlyContinue) {
+    & sc.exe delete $svc 2>&1 | Out-Null
+    if (Get-Service -Name $svc -EA SilentlyContinue) { throw ('the service ' + $svc + ' is still registered after sc.exe delete') }
+    'the service that was there is removed'
   }
 }
 '@
@@ -1276,6 +1299,8 @@ if ($Remove) {
   $said = @(Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+# Never mid-job, before GitHub is told anything (#3889).
+Assert-RunnerIdle '$Root'
 if ((Test-Path '$Root\config.cmd') -and `$t) {
   Push-Location '$Root'
   `$env:ACTIONS_RUNNER_INPUT_TOKEN = `$t; `$t = `$null
@@ -1283,8 +1308,7 @@ if ((Test-Path '$Root\config.cmd') -and `$t) {
   Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN -EA SilentlyContinue
   Pop-Location
 }
-Stop-Service -Name '$service' -Force -EA SilentlyContinue
-& sc.exe delete '$service' 2>&1 | Out-Null
+Stop-RunnerHere '$Root' '$service'
 Remove-RunnerWatchers
 Open-RunnerAccount '$Account' '$Root' 'C:\' '$liveFilter' $alsoDenyList
 $(if ($onRunnerDrive) { "Open-RunnerAccount '" + $Account + "' '" + $Root + "' '" + $rootDrive + "\' '" + $liveFilter + "'" })
@@ -1431,6 +1455,17 @@ $out = Send-WithSecret $token ($lockLib + $watcherLib + "`n" + @"
 if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
 `$root = '$Root'
 `$acct = '$Account'
+# The service's name, read further down (the runner drive's start setting and
+# the read back at the end). #4599 took this line out with the old stop, and
+# the read back then listed every service on the box (#3889, 30 Oct).
+`$svc = '$service'
+
+# A runner already here is taken off first, so a second run replaces it:
+# never one in the middle of a job, and never by halves (Assert-RunnerIdle and
+# Stop-RunnerHere, #3889). Before the account's password changes, so a refusal
+# leaves the old service and the password it was registered with as they were.
+Assert-RunnerIdle `$root
+Stop-RunnerHere `$root '$service'
 
 # The account. In Users and nothing else. A password nobody ever sees: made
 # here, set, handed to config.cmd for the service, and dropped. Letters and
@@ -1473,16 +1508,14 @@ $(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: the other runners' folders there
 # The guard above, before the runner can take a job.
 $guard
 
-# A runner already here is taken off first, so a second run replaces it.
-`$svc = '$service'
-if (Get-Service -Name `$svc -EA SilentlyContinue) {
-  Stop-Service -Name `$svc -Force -EA SilentlyContinue
-  & sc.exe delete `$svc 2>&1 | Out-Null
-  'the service that was there is removed'
-}
-if (Test-Path (Join-Path `$root '.runner')) {
-  Remove-Item -LiteralPath (Join-Path `$root '.runner'), (Join-Path `$root '.credentials'), (Join-Path `$root '.credentials_rsaparams') -Force -EA SilentlyContinue
-}
+# Everything config.cmd reads as "already configured": actions/runner keeps a
+# runner moved to the broker as .runner_migrated and .credentials_migrated, and
+# a reinstall that left those got "Cannot configure the runner because it is
+# already configured" (#3889, runner 3, 30 Oct).
+`$oldConfig = @('.runner', '.runner_migrated', '.credentials', '.credentials_migrated', '.credentials_rsaparams') | ForEach-Object { Join-Path `$root `$_ }
+foreach (`$f in `$oldConfig) { if (Test-Path -LiteralPath `$f) { Remove-Item -LiteralPath `$f -Force -EA Stop } }
+`$left = @(`$oldConfig | Where-Object { Test-Path -LiteralPath `$_ })
+if (`$left.Count) { throw ('the old configuration is still there: ' + (`$left -join ', ')) }
 if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force | Out-Null }
 # Locked before config.cmd writes GitHub's credentials into it.
 Lock-RunnerRoot `$root `$acct

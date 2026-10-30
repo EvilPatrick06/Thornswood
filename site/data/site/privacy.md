@@ -79,11 +79,11 @@ back.
 
 **The launcher's own log.** Sent to the site when a session ends. It is mostly
 about the game: which mods are installed, what failed to start, which version
-you are on. It also names the voice server's address and port, the profile
-number voice used and your microphone's name as Windows gives it, and its
-file paths can hold your Windows user name. It is how somebody who cannot
-play gets helped without a conversation. A copy stays on your PC as well
-(below).
+you are on, and how long the launcher took to open. It also names the voice
+server's address and port, the profile number voice used and your
+microphone's name as Windows gives it, and its file paths can hold your
+Windows user name. It is how somebody who cannot play gets helped without a
+conversation. A copy stays on your PC as well (below).
 
 **Gallery submissions.** The picture or recording, your signed-in account,
 the name for its caption and any note for staff are kept for review. A
