@@ -115,8 +115,16 @@ Yes 'Deploy-Server takes no host, folder, build folder or role list' ((Words "De
 # whole chain against a server's plugins, its files back through -Out.
 Yes 'Rebuild-ContentTables takes -Server dev or main, and names its out parameter' ((Words 'Rebuild-ContentTables') -eq '' -and (Words 'Rebuild-ContentTables -Server main') -eq '-Server|main' -and
     (Words 'Rebuild-ContentTables -Server live') -eq 'REFUSED' -and (Test-ThornswoodGateRequest -Line 'Rebuild-ContentTables' -Verbs $verbs).Out -eq '-Out')
-Yes '  and cannot name a commit, a branch or a tool' ((Words "Rebuild-ContentTables -Build $sha") -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Script x') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Branch x') -eq 'REFUSED')
+Yes '  and cannot name a branch, a tool or a build' ((Words "Rebuild-ContentTables -Build $sha") -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Script x') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Branch x') -eq 'REFUSED')
 $rebuild = Text 'scripts/mods/Rebuild-OnBox.ps1'
+# A pull request's data, never its code (Patrick's B on the #4835 card).
+Yes '  a pull request by number and its full head commit' ((Words "Rebuild-ContentTables -Pull 4835 -Head $sha") -eq "-Pull|4835|-Head|$sha" -and
+    (Words 'Rebuild-ContentTables -Pull 0') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Head abc') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Pull x') -eq 'REFUSED')
+Yes '  it takes only the listed data files from the pull request, held to its head, and commits them for Run-OnBox.ps1' (
+    $rebuild.Contains("`$DataFromPull = @('game/content/Thornswood-Content.esp', 'records/recipe-owners.json')") -and
+    $rebuild.Contains("'checkout', `$Head, '--', `$p") -and $rebuild.Contains('if ($at -cne $Head)') -and $rebuild.Contains("'commit', '--quiet', '--allow-empty'") -and
+    $rebuild.IndexOf("'commit', '--quiet'") -lt $rebuild.IndexOf("Run-OnBox.ps1')"))
+Yes '  and no file of the list is a script' (@([regex]::Match($rebuild, '\$DataFromPull = @\(([^)]*)\)').Groups[1].Value -split ',' | Where-Object { $_ -match '\.(ps1|psm1|py|js|cmd|bat|exe|dll)''' }).Count -eq 0)
 Yes '  it runs the chain by Run-OnBox.ps1, its words quoted so none is read as a parameter' ($rebuild.Contains("'scripts/mods/Rebuild-ContentTables.ps1' '-Data' '{data}' '-PluginsTxt' '{plugins}' -Server `$Server -Out `$Out"))
 Yes '  and Run-OnBox.ps1 copies what came back into -Out as well as the checkout' ((Text 'scripts/mods/Run-OnBox.ps1').Contains('foreach ($into in @($repo, $Out | Where-Object { $_ }))'))
 $refused = @(
