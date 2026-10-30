@@ -13,7 +13,7 @@
   reaches.
 
       .\scripts\dev\Gate-Map.ps1 -Hand
-      .\scripts\dev\Gate-Map.ps1 -Fetch <dir> -Token <token>
+      .\scripts\dev\Gate-Map.ps1 -Fetch <dir>      (the token in GATE_MAP_TOKEN)
 
   -Hand, in main's push build on a box build runner (build.yml, after the
   gate; in any other build it says so and prints nothing):
@@ -48,17 +48,17 @@
   part of it, as on the box.
 
   The token is the job's own (actions: read, for another run's job logs).
-  Run-Gate.ps1 takes it out of the environment before any harness starts.
-  tests\test-4009-gate-map.ps1 holds both halves.
+  -Fetch reads it from GATE_MAP_TOKEN and takes it out of the environment
+  before anything else, so it is never typed or on a command line (#4079,
+  tests\test-secrets-off-command-lines.ps1). Run-Gate.ps1 takes it out of
+  the step's environment before any harness starts and sets it only around
+  this call. tests\test-4009-gate-map.ps1 holds both halves.
 
 .PARAMETER Hand
   Print this runner's newest map into the job's log.
 
 .PARAMETER Fetch
   The folder to write main's newest handed-on map into.
-
-.PARAMETER Token
-  A token that may read this repository's Actions runs and job logs.
 
 .PARAMETER Repository
   owner/name, GITHUB_REPOSITORY by default.
@@ -69,8 +69,6 @@ param(
     [switch]$Hand,
     [Parameter(ParameterSetName = 'Fetch', Mandatory = $true)]
     [string]$Fetch,
-    [Parameter(ParameterSetName = 'Fetch')]
-    [string]$Token = '',
     [Parameter(ParameterSetName = 'Fetch')]
     [string]$Repository = $env:GITHUB_REPOSITORY
 )
@@ -88,6 +86,13 @@ $JobNames = @('Launcher builds (VPS fallback)', 'Launcher builds')
 $StepName = 'Hand the traced map to runners off the box'
 
 function Say([string]$m) { Write-Host $m }
+# -Fetch only: a token that may read this repository's Actions runs and job
+# logs, out of the environment at once (#4079).
+$Token = ''
+if ($PSCmdlet.ParameterSetName -eq 'Fetch') {
+    $Token = [string]$env:GATE_MAP_TOKEN
+    Remove-Item -LiteralPath Env:GATE_MAP_TOKEN -ErrorAction SilentlyContinue
+}
 function Get-Sha256([byte[]]$bytes) {
     $h = [Security.Cryptography.SHA256]::Create()
     try { return (($h.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $h.Dispose() }

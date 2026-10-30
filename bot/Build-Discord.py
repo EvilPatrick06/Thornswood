@@ -145,6 +145,7 @@ except ImportError:
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import content as C
+import trust
 
 TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
 # Deleting is off unless asked for, because a script that quietly removes
@@ -980,7 +981,10 @@ SPACE_GUESTS = {'Gamemasters': ('Moderator',)}
 # refuse the whole connection, because it is a privileged intent that is off by
 # default and nothing here reads a message's text: the bot posts, and deletes
 # its own posts by author id.
-client = discord.Client(intents=discord.Intents(guilds=True, members=True))
+# It logs in with the bot's token, so it trusts what the bot trusts: the
+# bot's roots alone, never the machine's stores, which on the box hold an
+# emSign root (#3111, #3604). The roots are made at login.
+client = trust.client_class()(intents=discord.Intents(guilds=True, members=True))
 made, kept, failed = [], [], []
 
 
