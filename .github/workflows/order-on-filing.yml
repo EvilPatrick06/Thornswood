@@ -25,10 +25,12 @@
 # as in board-status.yml (its header says why it is a classic token). The
 # run's own token is given nothing.
 #
-# WHERE IT RUNS. On the VPS runners while the repository is private, like
-# board-status.yml and area-label.yml, for a few seconds per new issue, and on
-# GitHub's runner once it is public, since anyone can open an issue on a
-# public repository (#3685).
+# WHERE IT RUNS. On the VPS runners while the repository is private, and on
+# GitHub's own runners once it is public, like board-status.yml and
+# area-label.yml (#3685). Opening an issue is something anyone can do on a
+# public repository, so this job must not reach the box that runs the live
+# game then; while private only collaborators can open one, and GitHub's own
+# runners are blocked on billing (#437). It takes a few seconds per new issue.
 name: Order for a new issue
 on:
   issues:
