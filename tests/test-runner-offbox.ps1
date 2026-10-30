@@ -199,7 +199,8 @@ try {
     Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
     $r = Dry @('-OffBox', '-Remove')
     Yes '-OffBox -Remove takes the firewall rules and the read denies off' ($r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape('Open-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct -Own $grdOwn)'))
-    # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, R: here.
+    # ON THE RUNNER DRIVE (#3861): explicit R: is fixture metadata, not a
+    # lookup of One's attached labelled drive (#4048). Defaults above are C:.
     $r = Dry @('-OffBox', '-Number', '3', '-Root', 'R:\Thornswood-RunnerPR3')
     $t = $r.Text
     Yes "-OffBox on the runner drive installs there (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$root = 'R:\Thornswood-RunnerPR3'"))
