@@ -581,12 +581,15 @@ $notOursBytes = 0; $notOursCount = 0
 # so its functions do not change anything else this script asks.
 # From the feed there is no Vortex to ask: it is the revision main's feed says
 # its release was built against, as Publish-Update -FromFeed reads it.
-if ($FromFeed) {
-    $ShipCollectionRevision = 0
-    if ($feedDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedDoc.collectionRevision, [ref]$ShipCollectionRevision) }
-    if ($ShipCollectionRevision -le 0) { Die "main's feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+# One assignment either way: tests\test-package-client-record.ps1 lifts the
+# listing below and leaves out only the statement that sets this (#4091).
+$ShipCollectionRevision = if ($FromFeed) {
+    $feedRevision = 0
+    if ($feedDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$feedDoc.collectionRevision, [ref]$feedRevision) }
+    if ($feedRevision -le 0) { Die "main's feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+    $feedRevision
 } else {
-    $ShipCollectionRevision = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
+    & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); Get-ShipCollectionRevision $Root }
 }
 Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 $clientShipped = 0
@@ -975,15 +978,34 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
 }
 $srcNote = Join-Path $stage 'SOURCE CODE.txt'
 try {
-    # Every library inside the six, with its text (#3099).
+    # Every library inside the six, with its text (#3099), and the fork's own
+    # noticed folders and npm packages the record lists beside them (#3751).
     $clientLicences = @(Get-ClientLicences $clientRecordPath @($resolvedClient.Record.files.PSObject.Properties.Name))
-    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir -Licences $clientLicences
+    $clientMeasured = [bool](((Get-Content -LiteralPath (Join-Path $clientRecordDir 'client-licences.json') -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json).PSObject.Properties['libraries'])
+    # build.js is the front Thornswood built and recorded only when it is the
+    # recorded bytes; then the note says so and the npm packages in it go in
+    # licences\ too (#3751). The client record here is a copy in a scratch
+    # folder, so the front record is named rather than looked for beside it;
+    # any other build.js (main's 13 September one) is said as not built.
+    $frontRecordPath = Join-Path $PSScriptRoot '..\..\records\front-build.json'
+    $frontFor = $null
+    $payloadFront = Join-Path $payloadDir 'Data\Platform\UI\build.js'
+    if ((Test-Path -LiteralPath $payloadFront -PathType Leaf) -and (Test-Path -LiteralPath $frontRecordPath -PathType Leaf)) {
+        $frontWant = [string]((Get-Content -LiteralPath $frontRecordPath -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json).files.'build.js'.sha256
+        if ($frontWant -and (Get-FileHash -LiteralPath $payloadFront -Algorithm SHA256).Hash.ToLowerInvariant() -eq $frontWant.ToLowerInvariant()) { $frontFor = $frontRecordPath }
+    }
+    $frontLicences = @()
+    if ($frontFor) { $frontLicences = @(Get-FrontLicences $frontFor); $clientLicences = @(Join-NoticeLicences $clientLicences $frontLicences) }
+    $noteText = Get-SourceNotice $clientRecordPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') $payloadDir -FrontRecord $frontFor -Licences $clientLicences
     [IO.File]::WriteAllText($srcNote, $noteText, (New-Object Text.UTF8Encoding($false)))
     $libDir = Join-Path $stage 'licences'
     $null = New-Item -ItemType Directory -Force -Path $libDir
     foreach ($x in $clientLicences) { [IO.File]::WriteAllBytes((Join-Path $libDir ($x.Port + '.txt')), $x.Bytes) }
     Say '  SOURCE CODE.txt names the fork commit this build came from' 'Green'
-    Say ("  licences\ holds the texts of the {0} libraries inside the client files ({1})" -f $clientLicences.Count, $(if ($licencesFrom -eq 'checkout') { 'this checkout''s record' } else { 'the record committed at ' + $licencesFrom.Substring(0, 8) })) 'Green'
+    Say ("  licences\ holds the texts of the {0} libraries inside the client files and build.js ({1})" -f $clientLicences.Count, $(if ($licencesFrom -eq 'checkout') { 'this checkout''s record' } else { 'the record committed at ' + $licencesFrom.Substring(0, 8) })) 'Green'
+    if (-not $clientMeasured) { Say '  that record lists no library beside the vcpkg ports: its client was measured before #3751, so the Tilted, papyrus-vm and viet notices and the npm package in skymp5-client.js are not in licences\ (THIRD-PARTY.md, What is still missing)' 'Yellow' }
+    if ($frontFor) { Say ("  build.js is the recorded front, and its {0} npm packages' texts are among them" -f $frontLicences.Count) 'Green' }
+    elseif (Test-Path -LiteralPath $payloadFront -PathType Leaf) { Say '  build.js is not the recorded front, so no list of the npm packages in it goes with it (THIRD-PARTY.md, What is still missing)' 'Yellow' }
 } catch {
     Die ("SOURCE CODE.txt could not be written: " + $_.Exception.Message + ". This installer carries SkyMP's GPL and AGPL files and has to say where their source is.")
 }
