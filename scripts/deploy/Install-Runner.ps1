@@ -77,6 +77,36 @@
   actions list is. The install registers such a runner with the record's
   label too, the way a build runner gets its label.
 
+  THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS (#3889). A runner
+  takes any job whose labels it all carries, and the labels come from the
+  workflow file of the ref that runs, so a branch's own copy of a workflow
+  could ask for the signing runner's labels and run there, whatever the
+  workflows on main say (#3550 holds those). What such a job leaves in the
+  runner's folder, its profile or its caches, the next sign job runs with.
+  So a runner records\sign-runners.json lists gets a job-started hook,
+  C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1, which actions/runner
+  runs first in every job, before any of the job's own steps
+  (ACTIONS_RUNNER_HOOK_JOB_STARTED in its .env, read when its service
+  starts). The hook lets a job through only when its
+  repository is this one and its ref and its workflow's ref are both
+  refs/heads/main. Those are the job's github context,
+  which the runner writes over any env a workflow sets (actions/runner
+  v2.337.0, Handlers\ScriptHandler.cs). Refusing ends the job: a failed hook
+  is only a failed step, and a later step marked if: always() still runs
+  (StepsRunner.cs), so the hook stops the Runner.Worker that started it, the
+  job's own process, and the runner reports the job failed and takes the
+  next one (Runner.Listener\JobDispatcher.cs). The hook's folder is SYSTEM's
+  and Administrators' to change; every account may read it. The install
+  writes the hook and the .env line before the service first starts, and
+  -Lock writes both again for every signing runner on the box (and takes the
+  line off any other runner, whose branch jobs it would refuse); a runner
+  already running takes the line at its next start. Main alone, not v tags
+  as well (#3930, Patrick, 27 Oct): a v tag push runs the tagged commit's
+  own copy of a workflow, and a tag can be pushed on any commit, while
+  release.yml now signs only in a run of main's own workflow and hands a
+  tag push over to one, so no job a signing runner should take runs on a
+  tag ref.
+
   WHAT A PULL REQUEST JOB MAY REACH (-OffBox, or -NetworkOnly for the network
   alone). Two guards, put on by the
   install and by -OffBox -Lock, taken off by -OffBox -Remove, shown by -Status
@@ -291,7 +321,7 @@
 
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
-  Replacing one stops the job it is running; -Lock does not.
+  Replacing or removing one refuses while it is running a job, and touches nothing (#3889); -Lock does not stop jobs either.
 #>
 [CmdletBinding()]
 param(
@@ -406,6 +436,11 @@ if (-not $PSBoundParameters.ContainsKey('Label')) {
 $signRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\sign-runners.json') -Raw | ConvertFrom-Json
 $signs = (-not $OffBox) -and (@($signRecord.runners | ForEach-Object { [int]$_ }) -contains $Number)
 if ($signs -and -not $PSBoundParameters.ContainsKey('Label')) { $registerLabels = $registerLabels + ',' + $signRecord.label }
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889): where the hook lives on the box, and the accounts of the runners
+# the record lists, by the names -Number gives them, for -Lock.
+$hookPath = 'C:\ProgramData\Thornswood-RunnerHooks\job-started.ps1'
+$signAccounts = @($signRecord.runners | ForEach-Object { 'thornswood-runner' + $(if ([int]$_ -gt 1) { '' + [int]$_ } else { '' }) })
 # THE CHECK RUNNERS (#3956). A VPS runner records\check-runners.json lists
 # is registered with its label, so release.yml's check of a signed draft
 # can run on it.
@@ -545,6 +580,64 @@ function Set-RunnerTemp([string]$root, [string]$svcName, [bool]$ownInstall = $fa
   $svc = Get-CimInstance Win32_Service -Filter ("Name='" + $svcName + "'") -EA SilentlyContinue
   if ($svc -and $svc.State -eq 'Running') { $line += '; its runner is running, so this takes effect when ' + $svcName + ' next starts' }
   return $line
+}
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889). Set-RunnerHook names $hook as the runner's job-started hook in its
+# .env, or, given '', takes that line off; lines of the runner's own and
+# TEMP and TMP are kept. Like TEMP, the runner reads it when its service
+# starts, so one written while the runner runs is said.
+function Set-RunnerHook([string]$root, [string]$svcName, [string]$hook) {
+  $file = Join-Path $root '.env'
+  $had = @()
+  if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
+  $new = @($had | Where-Object { $_ -notmatch '^ACTIONS_RUNNER_HOOK_JOB_STARTED=' })
+  if ($hook) { $new += ('ACTIONS_RUNNER_HOOK_JOB_STARTED=' + $hook) }
+  $what = $(if ($hook) { ' refuses any job but main''s, through ' + $hook } else { ' has no job-started hook, as a runner that does not sign' })
+  if (($had -join "`n") -eq ($new -join "`n")) { return ($root + $what + ' already') }
+  [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
+  $line = $root + ' now' + $what
+  $svc = Get-CimInstance Win32_Service -Filter ("Name='" + $svcName + "'") -EA SilentlyContinue
+  if ($svc -and $svc.State -eq 'Running') { $line += '; its runner is running, so this takes effect when ' + $svcName + ' next starts' }
+  return $line
+}
+# Writes the hook to $path, in a folder only SYSTEM and Administrators may
+# change and every account may read (a runner's job runs it as the runner's
+# account), and reads the rules back. It throws, and the .env is not
+# pointed at it, when the folder is not that.
+function Set-RunnerHookFile([string]$path, [string]$text) {
+  $ErrorActionPreference = 'Continue'
+  $dir = Split-Path -Parent $path
+  if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+  # Every account may make a folder in C:\ProgramData, and a folder's owner
+  # may change its rules whatever they say, so the folder and what is in it
+  # are given to Administrators, and every rule anybody put on them goes,
+  # before the folder gets its own.
+  $steps = @(
+    @{ What = 'give ' + $dir + ' to Administrators'; Args = @($dir, '/setowner', '*S-1-5-32-544', '/T') },
+    @{ What = 'take every rule off ' + $dir; Args = @($dir, '/reset', '/T') },
+    @{ What = 'give ' + $dir + ' its rules'; Args = @($dir, '/grant:r', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX') },
+    @{ What = 'stop ' + $dir + ' taking rules from above it'; Args = @($dir, '/inheritance:r') })
+  foreach ($st in $steps) {
+    $out = & icacls.exe @($st.Args + @('/C', '/Q')) 2>&1
+    if ($LASTEXITCODE -ne 0) { throw ('icacls could not ' + $st.What + ': ' + (($out | ForEach-Object { "$_" }) -join ' ')) }
+  }
+  [IO.File]::WriteAllText($path, $text, (New-Object Text.UTF8Encoding($true)))
+  $out = & icacls.exe $path /setowner '*S-1-5-32-544' /C /Q 2>&1
+  if ($LASTEXITCODE -ne 0) { throw ('icacls could not give ' + $path + ' to Administrators: ' + (($out | ForEach-Object { "$_" }) -join ' ')) }
+  # Read back: the folder and the file are Administrators', only SYSTEM and
+  # Administrators may write, and nothing is taken from above the folder.
+  $admins = @('S-1-5-18', 'S-1-5-32-544')
+  $writes = [int]([Security.AccessControl.FileSystemRights]'WriteData, AppendData, WriteExtendedAttributes, WriteAttributes, Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership')
+  foreach ($p in $dir, $path) {
+    $acl = Get-Acl -LiteralPath $p
+    $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+    if ($admins -notcontains $owner) { throw ($p + ' is owned by ' + $owner + ', not Administrators, so the hook was not trusted') }
+    $open = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
+              Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $admins -notcontains $_.IdentityReference.Value -and ([int]$_.FileSystemRights -band $writes) })
+    if ($open.Count) { throw ($p + ' may be changed by ' + (@($open | ForEach-Object { $_.IdentityReference.Value }) -join ', ') + ', so the hook was not trusted') }
+  }
+  if (-not (Get-Acl -LiteralPath $dir).AreAccessRulesProtected) { throw ($dir + ' still takes rules from above it, so the hook was not trusted') }
+  $path + ': the signing runner''s job-started hook, which only SYSTEM and Administrators may change'
 }
 function Lock-RunnerRoot([string]$root, [string]$acct) {
   $ErrorActionPreference = 'Continue'
@@ -706,6 +799,29 @@ function Remove-LeftProfiles([string[]]$like, [string]$users = 'C:\Users') {
     else { 'took off ' + $d.FullName + ', a profile folder no account owned (#3119)' }
   }
 }
+# A runner is never taken off mid-job or by halves (#3889, 30 Oct: a job
+# started between the idle check and a reinstall, Stop-Service and the removal
+# of the old configuration failed without a word, the old listener kept running
+# with its files open, and runner 3 was left with no service). The install and
+# -Remove both ask this first, and stop with what is wrong.
+function Get-RunnerProcesses([string]$root) {
+  # -EA Stop: a process list that cannot be read is a stop, never an empty list.
+  @(Get-CimInstance Win32_Process -EA Stop | Where-Object { ('' + $_.ExecutablePath) -like ($root.TrimEnd('\') + '\*') })
+}
+function Assert-RunnerIdle([string]$root) {
+  $worker = @(Get-RunnerProcesses $root | Where-Object { $_.Name -eq 'Runner.Worker.exe' })
+  if ($worker.Count) { throw ('this runner is running a job (Runner.Worker ' + (($worker | ForEach-Object { $_.ProcessId }) -join ', ') + '); nothing was changed. Run it again once -Status says it is idle.') }
+}
+function Stop-RunnerHere([string]$root, [string]$svc) {
+  if (Get-Service -Name $svc -EA SilentlyContinue) { Stop-Service -Name $svc -Force -EA Stop }
+  $left = @(Get-RunnerProcesses $root)
+  if ($left.Count) { throw ('still running from ' + $root + ' after the stop: ' + (($left | ForEach-Object { $_.Name + ' ' + $_.ProcessId }) -join ', ')) }
+  if (Get-Service -Name $svc -EA SilentlyContinue) {
+    & sc.exe delete $svc 2>&1 | Out-Null
+    if (Get-Service -Name $svc -EA SilentlyContinue) { throw ('the service ' + $svc + ' is still registered after sc.exe delete') }
+    'the service that was there is removed'
+  }
+}
 '@
 
 # ------------------------------------------------------ the old watchers --
@@ -730,6 +846,71 @@ function Remove-RunnerWatchers([string]$prefix = 'Thornswood Runner') {
   }
 }
 '@
+
+# ------------------------------------------------- the signing runner's hook --
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889). $hookLib decides; tests\test-runner-hook.ps1 lifts it out and
+# runs it against every kind of ref. $hookText is the whole hook as the box
+# gets it, for this repository.
+$hookLib = @'
+# '' when a job of $repo may run on the signing runner, else why not.
+# Repository names are matched as GitHub matches them, without case; a ref
+# is matched as git does, with case. GITHUB_WORKFLOW_REF has to be a file
+# of this repository's .github/workflows, then @ and the job's own ref: a
+# run of main's copy of the workflow (#3930: a v tag's copy is the tagged
+# commit's own, which nothing reviewed).
+function Test-SignJobRef([string]$repo, [string]$repository, [string]$ref, [string]$workflowRef) {
+  if (-not $repository -or -not $ref -or -not $workflowRef) { return 'the job does not say its repository, its ref and its workflow (GITHUB_REPOSITORY, GITHUB_REF, GITHUB_WORKFLOW_REF)' }
+  if ($repository -ne $repo) { return ('it is a job of ' + $repository + ', and this runner signs for ' + $repo + ' alone') }
+  if ($ref -cne 'refs/heads/main') { return ('it runs ' + $ref + ', which is not main') }
+  if (-not $workflowRef.EndsWith('@' + $ref, [StringComparison]::Ordinal)) { return ('its workflow, ' + $workflowRef + ', is not the copy on ' + $ref) }
+  $file = $workflowRef.Substring(0, $workflowRef.Length - $ref.Length - 1)
+  if (-not $file.StartsWith($repo + '/.github/workflows/', [StringComparison]::OrdinalIgnoreCase) -or $file.Contains('@')) { return ('its workflow, ' + $file + ', is not one of ' + $repo + '''s') }
+  return ''
+}
+'@
+$hookText = @'
+# The signing runner's job-started hook (#3889). scripts\deploy\
+# Install-Runner.ps1 writes it, at every install and -Lock, for the runners
+# records\sign-runners.json lists, which name it in their .env as
+# ACTIONS_RUNNER_HOOK_JOB_STARTED. Only SYSTEM and Administrators may change
+# it; a change here is undone by the next -Lock, so change Install-Runner.ps1.
+#
+# A runner takes any job whose labels it all carries, and the labels come
+# from the workflow file of the ref that runs, so a branch's own copy of a
+# workflow could ask for this runner. actions/runner runs this first in
+# every job, before any of the job's own steps, and it lets a job through
+# only when the job is this repository's and its ref and its workflow's ref
+# are both main. GITHUB_REPOSITORY, GITHUB_REF and
+# GITHUB_WORKFLOW_REF are the job's github context, which the runner writes
+# over any env a workflow sets.
+#
+# Refusing ends the job, not only this step: a failed hook is one failed
+# step, and a later step marked if: always() still runs. So it stops the
+# Runner.Worker that started it, the job's own process, and the runner
+# reports the job failed and takes the next one.
+'@ + "`n`$repo = '" + $Repo.Replace("'", "''") + "'`n" + $hookLib + @'
+$why = Test-SignJobRef $repo $env:GITHUB_REPOSITORY $env:GITHUB_REF $env:GITHUB_WORKFLOW_REF
+if (-not $why) {
+  'The signing runner takes this job: ' + $env:GITHUB_WORKFLOW_REF + ' is main''s (#3889).'
+  exit 0
+}
+'::error::REFUSED on the signing runner (#3889): ' + $why + '. The job is ended here, before any of its steps.'
+$ErrorActionPreference = 'Continue'
+$parent = $null
+try {
+  $me = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID) -EA Stop
+  $parent = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $me.ParentProcessId) -EA Stop
+} catch { '::error::the process that started this hook could not be read: ' + $_.Exception.Message }
+if ($parent -and $parent.Name -eq 'Runner.Worker.exe') {
+  Stop-Process -Id $parent.ProcessId -Force
+} else {
+  '::error::this hook was not started by Runner.Worker.exe' + $(if ($parent) { ' but by ' + $parent.Name }) + ', so the job could not be ended; a later step marked if: always() may still run'
+}
+exit 1
+'@
+$hookLiteral = "'" + $hookText.Replace("'", "''") + "'"
+$signAccountList = '@(' + ((@($signAccounts) | ForEach-Object { "'" + $_ + "'" }) -join ', ') + ')'
 
 # ------------------------------------------------- the off-box guards --
 # The header's WHAT A PULL REQUEST JOB MAY REACH. $rangeLib runs here, on the
@@ -1000,13 +1181,23 @@ function Get-GuardBlocks {
 # the one its RunnerService.exe is in, its account the one it runs as. Then
 # the old priority watchers, which belong to no one runner.
 $profileLike = $(if ($OffBox) { 'thornswood-pr*' } else { 'thornswood-runner*' })
-$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n`$profileLike = '" + $profileLike + "'`n" + @'
+# The signing runners' hook goes with it on the box, never off it: an
+# off-box runner signs nothing (THE SIGNING RUNNER TAKES ONLY MAIN'S AND A V
+# TAG'S JOBS).
+$lockSign = $(if ($OffBox) { "`$signAccounts = @()`n`$hookPath = ''`n`$hookText = ''`n" } else { "`$signAccounts = " + $signAccountList + "`n`$hookPath = '" + $hookPath + "'`n`$hookText = " + $hookLiteral + "`n" })
+$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n`$profileLike = '" + $profileLike + "'`n" + $lockSign + @'
 
 $ErrorActionPreference = 'Continue'
 $bad = 0
 foreach ($line in @(Remove-RunnerWatchers)) { $line; if ($line -like 'COULD NOT*') { $bad++ } }
 $services = @(Get-CimInstance Win32_Service -Filter "Name LIKE 'actions.runner.%'" -EA SilentlyContinue)
 if (-not $services.Count) { 'no runner service on this box' }
+# The hook first, so no .env names a hook that is not there, or one an
+# account other than SYSTEM and Administrators could have changed.
+$hookOk = $false
+if ($signAccounts.Count) {
+  try { Set-RunnerHookFile $hookPath $hookText; $hookOk = $true } catch { 'HOOK NOT WRITTEN, so no signing runner was pointed at it: ' + $_.Exception.Message; $bad++ }
+}
 foreach ($svc in $services) {
   $exe = ('' + $svc.PathName).Trim().Trim('"')
   $root = Split-Path -Parent (Split-Path -Parent $exe)
@@ -1020,6 +1211,11 @@ foreach ($svc in $services) {
     if ($root -notlike 'C:\*') { Close-RunnerAccount $acct $root $root.Substring(0, 3) $liveFilter }
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
   try { Set-RunnerTemp $root $svc.Name ($acct -like 'thornswood-pr*') } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  if ($signAccounts -contains $acct) {
+    if ($hookOk) { try { Set-RunnerHook $root $svc.Name $hookPath } catch { 'HOOK NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ } }
+  } else {
+    try { Set-RunnerHook $root $svc.Name '' } catch { 'HOOK NOT TAKEN OFF: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  }
 }
 Show-LeftFolders 'C:\' $leave
 # A removed runner's profile is not a lock, so one still left is said and
@@ -1070,6 +1266,10 @@ if (Test-Path '$Root') {
   `$wide = @(`$a.GetAccessRules(`$true, `$true, [Security.Principal.SecurityIdentifier]) | Where-Object { "`$(`$_.AccessControlType)" -eq 'Allow' -and @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0') -contains `$_.IdentityReference.Value })
   if (`$a.AreAccessRulesProtected -and -not `$wide.Count) { 'folder    locked: takes nothing from C:\' } else { 'folder    OPEN to every account on the box: -Lock locks it' }
 }
+`$hl = @(Get-Content -LiteralPath '$Root\.env' -EA SilentlyContinue | Where-Object { `$_ -like 'ACTIONS_RUNNER_HOOK_JOB_STARTED=*' } | ForEach-Object { `$_.Substring(32) })
+if (`$hl.Count) { 'hook      ' + `$hl[-1] + `$(if (Test-Path -LiteralPath `$hl[-1]) { ', refuses any job but main''s (#3889)' } else { ': THE FILE IS NOT THERE. -Lock writes it' }) }
+elseif ('$signs' -eq 'True') { 'hook      NONE: this runner signs and takes a branch''s job. -Lock gives it the hook (#3889)' }
+else { 'hook      none, as a runner that does not sign' }
 `$old = @(Get-RunnerWatchers)
 if (`$old.Count) { 'priority  OLD WATCHER TASK still here: ' + ((`$old | ForEach-Object { `$_.TaskName }) -join ', ') + '. -Lock takes it off' }
 else { 'priority  no watcher task; the service starts the runner at normal' }
@@ -1099,6 +1299,8 @@ if ($Remove) {
   $said = @(Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+# Never mid-job, before GitHub is told anything (#3889).
+Assert-RunnerIdle '$Root'
 if ((Test-Path '$Root\config.cmd') -and `$t) {
   Push-Location '$Root'
   `$env:ACTIONS_RUNNER_INPUT_TOKEN = `$t; `$t = `$null
@@ -1106,8 +1308,7 @@ if ((Test-Path '$Root\config.cmd') -and `$t) {
   Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN -EA SilentlyContinue
   Pop-Location
 }
-Stop-Service -Name '$service' -Force -EA SilentlyContinue
-& sc.exe delete '$service' 2>&1 | Out-Null
+Stop-RunnerHere '$Root' '$service'
 Remove-RunnerWatchers
 Open-RunnerAccount '$Account' '$Root' 'C:\' '$liveFilter' $alsoDenyList
 $(if ($onRunnerDrive) { "Open-RunnerAccount '" + $Account + "' '" + $Root + "' '" + $rootDrive + "\' '" + $liveFilter + "'" })
@@ -1240,6 +1441,10 @@ try { $guard = Get-GuardScript $(if ($OffBox) { 'apply' } else { 'network' }) @(
 Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
 
 Head "Installing it on $where"
+# The header's THE SIGNING RUNNER TAKES ONLY MAIN'S JOBS
+# (#3889). A signing runner's .env names the hook only once the hook is
+# written and read back.
+$installHook = $(if ($signs) { "`$hookText = " + $hookLiteral + "`nSet-RunnerHookFile '" + $hookPath + "' `$hookText`nSet-RunnerHook `$root '" + $service + "' '" + $hookPath + "'" } else { "Set-RunnerHook `$root '" + $service + "' ''" })
 # The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
 # command line and in no file on either machine. Until then it was written
 # into this script, which is long enough to go up as a file, so it sat in
@@ -1250,6 +1455,13 @@ $out = Send-WithSecret $token ($lockLib + $watcherLib + "`n" + @"
 if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
 `$root = '$Root'
 `$acct = '$Account'
+
+# A runner already here is taken off first, so a second run replaces it:
+# never one in the middle of a job, and never by halves (Assert-RunnerIdle and
+# Stop-RunnerHere, #3889). Before the account's password changes, so a refusal
+# leaves the old service and the password it was registered with as they were.
+Assert-RunnerIdle `$root
+Stop-RunnerHere `$root '$service'
 
 # The account. In Users and nothing else. A password nobody ever sees: made
 # here, set, handed to config.cmd for the service, and dropped. Letters and
@@ -1292,21 +1504,22 @@ $(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: the other runners' folders there
 # The guard above, before the runner can take a job.
 $guard
 
-# A runner already here is taken off first, so a second run replaces it.
-`$svc = '$service'
-if (Get-Service -Name `$svc -EA SilentlyContinue) {
-  Stop-Service -Name `$svc -Force -EA SilentlyContinue
-  & sc.exe delete `$svc 2>&1 | Out-Null
-  'the service that was there is removed'
-}
-if (Test-Path (Join-Path `$root '.runner')) {
-  Remove-Item -LiteralPath (Join-Path `$root '.runner'), (Join-Path `$root '.credentials'), (Join-Path `$root '.credentials_rsaparams') -Force -EA SilentlyContinue
-}
+# Everything config.cmd reads as "already configured": actions/runner keeps a
+# runner moved to the broker as .runner_migrated and .credentials_migrated, and
+# a reinstall that left those got "Cannot configure the runner because it is
+# already configured" (#3889, runner 3, 30 Oct).
+`$oldConfig = @('.runner', '.runner_migrated', '.credentials', '.credentials_migrated', '.credentials_rsaparams') | ForEach-Object { Join-Path `$root `$_ }
+foreach (`$f in `$oldConfig) { if (Test-Path -LiteralPath `$f) { Remove-Item -LiteralPath `$f -Force -EA Stop } }
+`$left = @(`$oldConfig | Where-Object { Test-Path -LiteralPath `$_ })
+if (`$left.Count) { throw ('the old configuration is still there: ' + (`$left -join ', ')) }
 if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force | Out-Null }
 # Locked before config.cmd writes GitHub's credentials into it.
 Lock-RunnerRoot `$root `$acct
 # Before the service first starts, so its first job already has it (#3117).
 Set-RunnerTemp `$root '$service' `$$(if ($OffBox) { 'true' } else { 'false' })
+# The signing runner's hook, before the service first starts too, so it never
+# takes a job without it; any other runner has no hook line (#3889).
+$installHook
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {

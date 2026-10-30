@@ -1801,8 +1801,8 @@
                       "script":  "scripts/vps/Backup-Server.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + \"`r`n\" + $gather)",
-                      "does":  "gathers a backup into the run\u0027s folder in C:\\Windows\\Temp, which its keeper removes (#3035)",
+                      "anchor":  "$lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + \"`r`n\" + $protect + \"`r`n\" + $gather)",
+                      "does":  "gathers a backup into the run\u0027s folder in C:\\Windows\\Temp and encrypts it there with the backup passphrase (#3582), which its keeper removes with the folder (#3035)",
                       "class":  "admin",
                       "reason":  "reads every secret and config"
                   },
@@ -1811,7 +1811,7 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
                       "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh \"${User}@${Vps}:$remoteZip\" \"$localZip\" } 2\u003e\u00261 | Out-Host",
-                      "does":  "downloads the backup",
+                      "does":  "downloads the encrypted backup (#3582)",
                       "class":  "admin",
                       "reason":  "carries every secret"
                   },

@@ -246,7 +246,7 @@ function send(p, text) {
       Array.isArray(rows) && rows.length === 3);
   yes('A1 and not at the top of the stored value, nor anywhere the page calls DATA',
       stored && stored.property === undefined && stored.DATA === undefined);
-  const home = (rows || []).filter(function (r) { return r.name === 'Honeyside'; })[0];
+  const home = (rows || []).filter(function (r) { return r.name === W.placeOf(HOME); })[0];
   yes('A2 Honeyside is Carol\'s, with the building id and the rent owed up to now',
       !!home && home.mine === true && home.b === HOME && !!home.rent && home.rent.owed === 50);
 }
@@ -307,7 +307,7 @@ function send(p, text) {
   write(ALICE, true);
   const rows = (refs[ALICE.a][C.PROPERTY].panel || {}).property || [];
   yes('F1 somebody who holds nothing but owes on a place they held gets a row for it (' + JSON.stringify(rows) + ')',
-      rows.length === 1 && rows[0].name === 'Honeyside' && rows[0].mine === false && rows[0].owes === 40 &&
+      rows.length === 1 && rows[0].name === W.placeOf(HOME) && rows[0].mine === false && rows[0].owes === 40 &&
       rows[0].by === 'Carol' && !rows[0].keyed);
   const row = alice.navRow('Property');
   yes('F2 Property is in their K list, saying rent is owed (' + (row ? row.children[1].textContent : '') + ')',
