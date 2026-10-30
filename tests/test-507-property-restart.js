@@ -270,7 +270,7 @@ let h = held(HOUSE);
 yes('C1 the lock key at the door claims Honeyside for Hulda', !!h && h.by === HULDA.pid && h.name === 'Hulda' && h.at === CLAIMED_AT);
 yes('C2 with the ground outside its door', !!h && same(h.ground, GROUND));
 yes('C3 and hands her the deed and master key no. 1',
-    inv(HULDA).some(function (e) { return e.baseId === idOf(DEED_DESC) && e.name === 'Deed to Honeyside'; }) &&
+    inv(HULDA).some(function (e) { return e.baseId === idOf(DEED_DESC) && e.name === W.deedLabel(HOUSE); }) &&
     !!h && !!h.master && h.master.no === 1 && h.master.for === HULDA.pid);
 open(HULDA, DOOR);
 word(HULDA, '/lock', [hex(DOOR)]);
@@ -336,7 +336,7 @@ open(EVE, DOOR);
 const pushed = refs[EVE.a].thornswoodLocks;
 yes('W2 and opening a door pushes that to her game, with the way out left open',
     !!pushed && pushed.shut.indexOf(idOf(DOOR)) !== -1 && pushed.open.indexOf(idOf(DOOR_IN)) !== -1);
-give(CAROL, KEY_DESC, 'Key to Honeyside');
+give(CAROL, KEY_DESC, W.keyLabel(HOUSE));
 yes('W3 a key cut before the restart still opens it', shutTo(CAROL, DOOR) === false);
 yes('W4 the holder still gets in, and her master key and deed still count',
     shutTo(HULDA, DOOR) === false &&
