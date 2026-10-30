@@ -346,9 +346,12 @@ four Dragonborn bows/arrows, and our own three poles plus the fish trap) have th
 BNAM pointed at that keyword. The charcoal kiln is not used until #2337 is fixed.
 
 (i) The other 53 rows live in plugins that load after this one (or that would force
-a master renumber if added here). scripts/mods/Build-WoodworkerTrailOverrides.py
-and woodworker-trail-recipes.json prepare a small trailing plugin for the next
-collection revision. Until that ships, the server refusal stays the gate for those.
+a master renumber if added here). Their live ones are moved to the woodworking bench
+by Thornswood-Last.esp, which loads after them all: Build-RecipeTable.ps1 names the
+rows of a trade at a bench it does not work at, and Build-LastPlugin.py copies each
+with its BNAM pointed at the trade's own bench (#3120). That replaced the small
+trailing plugin (Thornswood-WoodworkerTrail.esp) this paragraph used to promise,
+which never shipped.
 
 Placements of the furniture in the world are Claude's: at least one beside a forge
 in every major hold and some minor towns. This script only adds the base records.

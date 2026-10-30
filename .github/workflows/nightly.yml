@@ -387,8 +387,8 @@ jobs:
 
   bot:
     # The bot harnesses install discord.py from pypi, and the signing runner
-    # (runner 3, records/sign-runners.json) reaches GitHub and the signing
-    # service only. Patrick, 30 Oct 2026, on the report page
+    # (runner 3, until #4033 took records/sign-runners.json off) reached
+    # GitHub and the signing service only. Patrick, 30 Oct 2026, on the report page
     # (q-4914-signing-runner-feeds, A): keep it shut and move the bot checks.
     # So they run here, on a check runner (records/check-runners.json:
     # runners 1, 2 and 4, which reach the package feeds), never on the one
