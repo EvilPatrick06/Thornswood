@@ -7862,7 +7862,7 @@ function harvest(actorId, refrId, baseDesc) {
   }
   if (!addItem(actorId, plant.produce, got)) return null;
   stampCooldown('plant', refrId);
-  economyGathered(actorId, plant.produce, 1);
+  economyGathered(actorId, plant.produce, got);
   const rank = creditWork(actorId, 'harvest');
   const took = got === 1 ? 'You pick the ' + plant.name + '.' : 'You pick ' + got + ' ' + plant.name + '.';
   return took + (got !== 1 && word ? ' ' + word : '') + (rank ? ' ' + rank : '');
