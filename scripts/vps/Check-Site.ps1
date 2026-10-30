@@ -61,8 +61,9 @@ if ($Who -and $Who -notmatch '^[0-9]{17,20}$') {
 
 # ------------------------------------------------------------ where it is
 # The launcher's config is what every installed copy uses, so it is the one
-# place the address and the site are true. Set-Vps.ps1 rewrites it when the
-# box moves, and this follows without being told.
+# place the address and the site are true. The address is the game's name
+# (#3690), so a box move changes nothing here, and Set-Vps.ps1 rewrites it
+# when the name itself changes.
 $configCs = Join-Path $Here '..\..\launcher\app\Config.cs'
 $cs = ''
 if (Test-Path -LiteralPath $configCs) { $cs = [IO.File]::ReadAllText($configCs) }

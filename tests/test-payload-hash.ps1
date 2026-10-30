@@ -248,7 +248,18 @@ let sent = null;
 // The real one is send(res, code, JSON.stringify(obj)); the string is what
 // crosses the wire and what Bootstrap.cs searches.
 const sendJson = (r, code, obj) => { sent = JSON.stringify(obj); return true; };
-eval(text.slice(j0, j1) + '\n(function () {\n' + block + '\n})();');
+// The route asks downloadServed which zips files.json publishes (#3798).
+function fn(head) {
+  const a = text.indexOf(head);
+  if (a < 0) { process.stdout.write('NOT FOUND ' + head); process.exit(2); }
+  let d = 0;
+  for (let i = text.indexOf('{', a); i < text.length; i++) {
+    if (text[i] === '{') d++;
+    else if (text[i] === '}') { d--; if (d === 0) return text.slice(a, i + 1); }
+  }
+}
+eval(text.slice(j0, j1) + '\n' + fn('function payloadZip(') + '\n' + fn('function downloadServed(') +
+     '\n(function () {\n' + block + '\n})();');
 process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
 '@
     [IO.File]::WriteAllText($driver, $js, $noBom)
@@ -273,13 +284,18 @@ process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
     Yes 'and a sha256' ($siteSha.Length -gt 0)
     Yes 'which is the hash Get-FileHash prints, ignoring case' ($siteSha -ieq $want)
 
-    # A publish from before this wrote no hash. The route still answers, with
-    # an empty one, which the installer refuses to fetch anything against.
+    # A zip files.json does not list is a publish that never wrote its list.
+    # /file/ does not serve it (#3798), so the route names no zip at all
+    # rather than send the setup program to a 404.
     $old = Join-Path $work 'files-old'
     New-Item -ItemType Directory -Path $old -Force | Out-Null
     Copy-Item -LiteralPath $zipPath -Destination (Join-Path $old $zipOut)
+    Yes 'no files.json names no zip' ((Reply $old) -eq '{}')
+    # A listed zip from before the hash was written still answers, with an
+    # empty one, which the installer refuses to fetch anything against.
+    [IO.File]::WriteAllText((Join-Path $old 'files.json'), ('{"' + $zipOut + '":{"hidden":true}}'), $noBom)
     $o = Parse (Reply $old)
-    Yes 'no files.json still names the zip' ((Field $o 'name') -eq $zipOut)
+    Yes 'a listed zip with no hash is still named' ((Field $o 'name') -eq $zipOut)
     Yes 'and gives an empty hash rather than none at all' ((Field $o 'sha256') -eq '')
 
     # Something in files.json that is not a hash would make every install

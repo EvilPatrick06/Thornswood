@@ -41,7 +41,7 @@ const b = c < 0 ? -1 : front.indexOf('\n  }\n', c) + 4;
 const block = a >= 0 && c > a && b > c ? front.slice(a, b) : null;
 yes('the / block is in the plugin', block !== null);
 yes('the plugin reads CommandKey, / by default',
-    /const COMMAND_KEY = iniNumber\(ini, 'CommandKey', 53\);/.test(front));
+    /(?:const|let) COMMAND_KEY = iniNumber\(ini, 'CommandKey', 53\);/.test(front));
 const bm = front.indexOf('  function busyMenuOpenNow(except) {');
 const busyFn = bm >= 0 ? front.slice(bm, front.indexOf('\n  }\n', bm) + 4) : null;
 yes('the menu check takes the one menu a key of ours just opened', busyFn !== null);

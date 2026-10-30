@@ -15,16 +15,18 @@
   again on the box. What runs is always that script of main as main is on
   GitHub when the box reads it, never this checkout.
 
-  HOW. It starts .github\workflows\box-run.yml on main with the line. That
-  run takes a box runner and the desk's deploy key out of the "desk"
-  environment, which only main may use (Grant-BoxAccess.ps1 -Deploy puts it
-  there), and asks the gate over the box's own sshd on 127.0.0.1 with
+  HOW. It starts box-run.yml on main of the private ops repository,
+  EvilPatrick06/Thornswood-Ops, where the VPS runners are registered since
+  this repository went public (#4013), with the line. That run checks out
+  this repository's main, takes a box runner and the desk's deploy key out
+  of the ops repository's "desk" environment, which only main may use
+  (Grant-BoxAccess.ps1 -Deploy puts it there), and asks the gate over the box's own sshd on 127.0.0.1 with
   this script's -OnTheBox half. The key logs in as thornswood-deploy and can
   only hand the gate a line (scripts\vps\gate\Gate.ps1).
 
   WHAT COMES BACK, AND TO WHOM. A deploy prints paths and a Get-Logs run
-  brings back the servers' logs, and once the repository is public a run's
-  log and files are readable by anyone. So the run's log carries only the
+  brings back the servers' logs, and a run's log and files are readable by
+  everyone who can read the repository it runs in. So the run's log carries only the
   verb, main's commit and the exit code. Everything the verb printed and
   every file it wrote is sealed on the runner to a key made here for this
   run alone (RSA-OAEP over an AES-GCM key) and uploaded as the run's
@@ -39,7 +41,8 @@ param(
     [string]$Line = '',
     [long]$Run = 0,
     [switch]$OnTheBox,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    # Where box-run.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,7 +77,7 @@ if ($OnTheBox) {
     $req = Test-ThornswoodGateRequest -Line $Line -Verbs (Read-ThornswoodGateVerbs (Join-Path $Here 'gate\verbs.json'))
     if (-not $req.Ok) { Die $req.Why }
     $keyB64 = [string]$env:THORNSWOOD_DESK_KEY_B64
-    if (-not $keyB64) { Die 'THORNSWOOD_DESK_KEY_B64 is not set. In box-run.yml it is the DESK_KEY_B64 secret of the "desk" environment, which .\scripts\vps\Grant-BoxAccess.ps1 -Name desk -Deploy -MakeKey -ToEnvironment desk puts there from One. Nothing was run.' }
+    if (-not $keyB64) { Die 'THORNSWOOD_DESK_KEY_B64 is not set. In box-run.yml it is the DESK_KEY_B64 secret of the ops repository''s "desk" environment, which .\scripts\vps\Grant-BoxAccess.ps1 -Name desk -Deploy -MakeKey -ToEnvironment desk puts there from One. Nothing was run.' }
     $recipient = ([string]$env:BOX_RECIPIENT).Trim()
     $sshExe = Get-SignedSsh
     if (-not $sshExe) { Die 'there is no Microsoft-signed ssh.exe in Program Files\OpenSSH or System32\OpenSSH on this runner. Nothing was run.' }

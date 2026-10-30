@@ -79,7 +79,7 @@ Yes 'the board token comes from the "board" environment, which only main may use
 $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
 $status = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\board-status.yml'))
 $statusRunsOn = [regex]::Match($status, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-Yes ("it runs on the VPS runners board-status uses ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]' -and $runsOn -eq $statusRunsOn)
+Yes ("it runs on the VPS runners board-status uses, only while the repository is private, and on GitHub's once public (#3685) ({0})" -f $runsOn) ($runsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}" -and $runsOn -eq $statusRunsOn)
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 
 Yes 'it keeps no artifact: the board comes back in the log (#3410)' ($text -notmatch 'upload-artifact' -and $text -notmatch '(?m)^\s+uses:')

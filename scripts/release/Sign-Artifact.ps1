@@ -51,6 +51,17 @@
   Never put a password or a key in that file. Trusted Signing does not need one,
   and a thumbprint names a certificate rather than carrying it.
 
+  IN A GITHUB JOB (#3412). A job that holds the signing identity (the
+  "release" environment, id-token: write) signs with Artifact Signing through
+  a federated token, no secret. A caller can name its own token file in
+  AZURE_FEDERATED_TOKEN_FILE, as release.yml does right before its one call.
+  When none is named and GitHub gave the job a way to ask for one, this asks
+  for it itself, right before each file: the token lasts minutes, and the
+  installer from the feed (installer.yml) fetches the release for longer than
+  that before it gets here. The token is written to a file under RUNNER_TEMP
+  for that one signtool call and removed with it. AZURE_CLIENT_ID and
+  AZURE_TENANT_ID come from the job, as release.yml sets them.
+
 .PARAMETER Path
   One or more files to sign. Missing files are reported and skipped rather than
   stopping the build.
@@ -163,6 +174,26 @@ if ($m -and (Test-Path -LiteralPath $m)) {
     }
 }
 
+# ------------------------------------------------------ a GitHub job's token --
+# The header, IN A GITHUB JOB. '' when no token was asked for here (a token
+# file was named, or this is not a job GitHub lets ask), the file's path when
+# one was, or a throw that says why it could not be had.
+function New-GitHubSigningToken {
+    if ($env:AZURE_FEDERATED_TOKEN_FILE) { return '' }
+    if (-not $env:ACTIONS_ID_TOKEN_REQUEST_URL -or -not $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN) { return '' }
+    if (-not $env:AZURE_CLIENT_ID -or -not $env:AZURE_TENANT_ID) {
+        throw 'this GitHub job may ask for a signing token, but AZURE_CLIENT_ID and AZURE_TENANT_ID are not set (release.yml sets them from the repository variables)'
+    }
+    $answer = Invoke-RestMethod -Uri ($env:ACTIONS_ID_TOKEN_REQUEST_URL + '&audience=api://AzureADTokenExchange') -Headers @{ Authorization = ('bearer ' + $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN) } -ErrorAction Stop
+    if (-not $answer -or -not $answer.value) { throw 'GitHub answered the request for a signing token with no token' }
+    # Masked before anything could print it.
+    Write-Host ('::add-mask::' + [string]$answer.value)
+    $dir = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+    $file = Join-Path $dir ('azure-federated-token-' + [Guid]::NewGuid().ToString('N'))
+    [IO.File]::WriteAllText($file, [string]$answer.value)
+    return $file
+}
+
 # ---------------------------------------------------------------- signtool --
 # Newest first. The Windows SDK installs one per version and they are not
 # interchangeable: older ones cannot drive a Trusted Signing dlib.
@@ -237,9 +268,25 @@ foreach ($p in $Path) {
     # The exit code decides, not stderr. signtool writes "SignTool Error" there,
     # and under Stop Windows PowerShell 5.1 made that line a thrown error: the
     # first file that failed ended the script, with no count and no read-back.
+    $tokenFile = ''
+    if ($method -eq 'artifactsigning') {
+        try { $tokenFile = New-GitHubSigningToken }
+        catch {
+            Say ("  no signing token for " + $name + ": " + $_.Exception.Message) 'Red'
+            $failed++
+            continue
+        }
+        if ($tokenFile) { $env:AZURE_FEDERATED_TOKEN_FILE = $tokenFile }
+    }
     $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try { & $signtool @args 2>&1 | ForEach-Object { Say ("    " + $_) 'DarkGray' } }
-    finally { $ErrorActionPreference = $was }
+    finally {
+        $ErrorActionPreference = $was
+        if ($tokenFile) {
+            Remove-Item -LiteralPath $tokenFile -Force -ErrorAction SilentlyContinue
+            Remove-Item Env:\AZURE_FEDERATED_TOKEN_FILE -ErrorAction SilentlyContinue
+        }
+    }
     if ($LASTEXITCODE -ne 0) {
         Say ("  signtool exited with " + $LASTEXITCODE + " on " + $name) 'Red'
         $failed++

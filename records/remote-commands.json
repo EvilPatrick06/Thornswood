@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  74,
-    "callCount":  293,
+    "scriptCount":  75,
+    "callCount":  301,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -370,10 +370,19 @@
                       "script":  "scripts/deploy/Deploy-Docs.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$swapOut = @(Remote ($vars + $siteHooks + $pick + $serviceSwapBlock) |",
+                      "anchor":  "$swapOut = @(Remote ($ownerVars + $vars + $siteHooks + $pick + $serviceSwapBlock) |",
                       "does":  "service swap of the site",
                       "class":  "swap",
-                      "reason":  "StopIt kills node.exe by pid with Stop-Process as well as stopping the task"
+                      "reason":  "StopIt kills node.exe by pid with Stop-Process as well as stopping the task. Since #4077 its StartIt also gives the site's task anything LOCAL SERVICE still owns in the site folder, which takes the restore privilege; once the site runs through the owner launcher there is none, and it only reads"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Docs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$restartOut = @(Remote ($ownerVars + $restartVars + $ThornswoodStopAndMoveText + $siteHooks + @'",
+                      "does":  "restarts the site onto the owner launcher when nothing is swapped (#4077)",
+                      "class":  "admin",
+                      "reason":  "gives the site's task what LOCAL SERVICE owns in its folder, which takes the restore privilege, then stops and starts the task"
                   },
                   {
                       "script":  "scripts/deploy/DeployedBuild.ps1",
@@ -829,10 +838,28 @@
                       "script":  "scripts/deploy/Install-Bridge.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "\u0027BRIDGE OK\u0027; exit 0",
-                      "does":  "checks the stage, swaps it in and registers and starts the bridge task, or puts the old one back",
+                      "anchor":  "if (`$off) { \u0027NOT RECORDED\u0027 } else { \u0027MATCHES\u0027 }",
+                      "does":  "reads the hashes of the three bridge files and asks its port, so -Record records what runs and changes nothing (#3214)",
+                      "class":  "read-status",
+                      "reason":  "reads file hashes and the port only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$started = @(Remote $run.Start)",
+                      "does":  "starts the check of the stage, the swap and the registering and starting of the bridge task, or the put-back, on the box on its own, through WMI (#3214)",
                       "class":  "admin",
-                      "reason":  "sends Register-ScheduledTask"
+                      "reason":  "the run it starts sends Register-ScheduledTask"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$read = @(Remote $run.Read",
+                      "does":  "reads the report of that run, and deletes it once it holds END (#3214)",
+                      "class":  "read-status",
+                      "reason":  "reads a report file"
                   },
                   {
                       "script":  "scripts/deploy/Install-AdminService.ps1",
@@ -1261,7 +1288,7 @@
                       "script":  "scripts/deploy/Setup-Domain.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "Get-NetFirewallRule -DisplayName \u0027Thornswood Docs\u0027 -EA SilentlyContinue |",
+                      "anchor":  "if (Get-NetFirewallRule -PolicyStore localhost -DisplayName \u0027Thornswood Docs\u0027 -EA SilentlyContinue) {",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends NetFirewall"
@@ -1645,6 +1672,42 @@
                       "reason":  "writes the feed, news or files store"
                   },
                   {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$made = @(Remote \"New-Item -ItemType Directory -Force -Path \u0027$rootWin\\$incoming\u0027 | Out-Null; \u0027INCOMING|ready\u0027\")",
+                      "does":  "makes the folder beside the site files that an installer signed on GitHub is checked in before it goes into files",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $exeItem.FullName \"$User@${Vps}:$Root/$incoming/$exeOut\" }",
+                      "does":  "uploads an installer signed on GitHub beside the site files, to be checked there",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$null = Remote \"Remove-Item -LiteralPath \u0027$rootWin\\$incoming\\$exeOut\u0027 -Force -ErrorAction SilentlyContinue\"",
+                      "does":  "removes an installer the publish gate refused from beside the site files",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$moved = @(Remote \"Move-Item -LiteralPath \u0027$rootWin\\$incoming\\$exeOut\u0027 -Destination \u0027$rootWin\\files\\$exeOut\u0027 -Force; \u0027MOVED|$exeOut\u0027\")",
+                      "does":  "moves an installer that passed the publish gate into the site files",
+                      "class":  "feed-send",
+                      "reason":  "files store"
+                  },
+                  {
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "Send-ShapeLibs",
                       "via":  "scp",
@@ -1781,10 +1844,10 @@
                   },
                   {
                       "script":  "scripts/release/Sign-OnGitHub.ps1",
-                      "scope":  "Get-SignedFileRefusal",
+                      "scope":  "Invoke-SignedCheckOnBox",
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
-                      "does":  "checks a launcher built and signed on GitHub against the signer and the launcher\u0027s own check, in a temp folder of its own that it removes",
+                      "does":  "checks a file signed on GitHub, the launcher or the installer, against the signer and the file\u0027s own check, in a temp folder of its own that it removes",
                       "class":  "read-status",
                       "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },
@@ -1886,6 +1949,15 @@
                       "does":  "reads the priority the game servers and voice run at",
                       "class":  "read-status",
                       "reason":  "reads process and task settings only, changes nothing"
+                  },
+                  {
+                      "script":  "scripts/vps/Check-ServiceOwners.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $far | ForEach-Object { \"$_\".Trim() } | Where-Object { $_ })",
+                      "does":  "reads who owns what in each box folder and how each LOCAL SERVICE task starts (#4077)",
+                      "class":  "read-status",
+                      "reason":  "reads owners, rules and task actions only, changes nothing"
                   },
                   {
                       "script":  "scripts/vps/Check-Site.ps1",
@@ -2225,7 +2297,7 @@
                       "scope":  "Invoke-Box",
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
-                      "does":  "runs vps-inbound-rules.ps1, sent on standard input (#3035), which turns off every inbound Allow rule not on the box's list (#3807)",
+                      "does":  "runs vps-inbound-rules.ps1, sent on standard input (#3035), which turns off every inbound Allow rule not on the box's list (#3807), or with -Own vps-firewall-policy.ps1, which moves the kept rules into the box's policy (#3896)",
                       "class":  "admin",
                       "reason":  "firewall change"
                   },

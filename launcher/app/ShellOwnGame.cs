@@ -436,36 +436,22 @@ namespace Thornswood
                 catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, pointing Paths at the new folder", ex); }
             }
 
-            // Same light-flag and load-order steps Fix runs. Refresh can
-            // bring Vortex's unflagged staging copy of a MustBeLight
-            // plugin (CBBE.esp and the rest) over a Separated flagged
-            // copy, or place a fresh one that never had the ESL bit.
-            // SettleSettings on a full Refresh used to lay Golden's
-            // plugins.txt over Live, which put Thornswood-Content.esp out
-            // of the server's order (Gavin: Mod list red at position 21
-            // after "already matches"). FlagLight then PutInServerOrder
-            // (the same write Scan and Fix uses) so Mod list stays green.
-            // Verify.Run follows; when Refresh already matched, skip the
-            // Bytes CRC pass so finishing is not held on hashing every
-            // plugin, and skip Run entirely when nothing changed and a
-            // server-aware LastIssues is already shared.
+            // The same load-order step Fix runs. SettleSettings on a full
+            // Refresh used to lay Golden's plugins.txt over Live, which put
+            // Thornswood-Content.esp out of the server's order (Gavin: Mod
+            // list red at position 21 after "already matches"), so
+            // PutInServerOrder (the same write Scan and Fix uses) keeps Mod
+            // list green. Light flags are not written here or anywhere: the
+            // collection installs them (#2979, #3022), and Verify.Run names a
+            // copy whose flag is not the server's. Verify.Run follows; when
+            // Refresh already matched, skip the Bytes CRC pass so finishing is
+            // not held on hashing every plugin, and skip Run entirely when
+            // nothing changed and a server-aware LastIssues is already shared.
             if (fail == null)
             {
                 bool already = said != null
                     && said.IndexOf("already matches what Vortex has deployed", StringComparison.Ordinal) >= 0;
-                int flagged = 0, ordered = 0;
-                try
-                {
-                    flagged = Checks.FlagLight(Verify.MustBeLight(c), say);
-                    if (flagged > 0)
-                        say("Flagged " + flagged + " plugin" + (flagged == 1 ? "" : "s") +
-                            " light so the load order matches the server after the Vortex update.");
-                }
-                catch (Exception ex)
-                {
-                    Swallow.Note("ShellOwnGame.StartOwnGame, FlagLight after Vortex bring-up-to-date", ex);
-                    say("Could not flag light plugins after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
-                }
+                int ordered = 0;
                 try
                 {
                     ordered = Verify.PutInServerOrder(c, say);
@@ -475,7 +461,7 @@ namespace Thornswood
                     Swallow.Note("ShellOwnGame.StartOwnGame, PutInServerOrder after Vortex bring-up-to-date", ex);
                     say("Could not put the plugin list into the server's order after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
                 }
-                bool needVerify = !already || flagged > 0 || ordered > 0
+                bool needVerify = !already || ordered > 0
                     || !Verify.LastUsedServer || Verify.LastIssues == null;
                 if (needVerify)
                 {
@@ -515,9 +501,8 @@ namespace Thornswood
                             return;
                         }
                         // LastIssues was refreshed on the pool thread after
-                        // FlagLight and PutInServerOrder; paint Scan and Fix
-                        // and Ready from it so the card does not stay on the
-                        // pre-Vortex state. The folder is up to date now, so
+                        // PutInServerOrder; paint Scan and Fix and Ready from
+                        // it so the card does not stay on the pre-Vortex state. The folder is up to date now, so
                         // the card stops saying it is behind.
                         Upkeep.Forget(IssueKind.Behind);
                         if (Verify.LastUsedServer && Verify.LastIssues != null)

@@ -79,7 +79,7 @@ $ThornswoodInstallKeys = @('loadOrder', 'startPoints', 'thornswoodMostOnline', '
 $ThornswoodGamemodeKeys = @($ThornswoodInstallKeys + @(
     'offlineMode', 'thornswoodVoicePort', 'thornswoodServer', 'npcEnabled', 'npcAllowCrimeFaction',
     'npcAllowEssential', 'npcSettings', 'forbiddenReloot', 'forbiddenBaseContainer', 'equipmentSlotCheckEnabled',
-    'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled', 'damageMultFormulaSettings'))
+    'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled', 'equipItemAttemptEnabled', 'damageMultFormulaSettings'))
 # The keys only the person deploying sets, in that run, never a build (#1223):
 # Deploy-Server.ps1 -RequirePass, -Devs and -Playtesters.
 $ThornswoodAskedKeys = @('thornswoodRequirePass', 'thornswoodDevs', 'thornswoodPlaytesters')

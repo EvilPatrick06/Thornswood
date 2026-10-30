@@ -384,6 +384,8 @@ namespace Thornswood
         public string Expected;
         /// <summary>Why it was not made, or null when Bytes is the file.</summary>
         public string Problem;
+        /// <summary>Not made because the game is set to another language than English (#4007, LastPlugin).</summary>
+        public bool NotEnglish;
     }
 
     /// <summary>One edit to the menu: at At in the game's file, uncompressed, Remove bytes go and Insert (hex) comes in.</summary>
