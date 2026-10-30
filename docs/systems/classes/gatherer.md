@@ -95,6 +95,7 @@ Generated from the work tables by `scripts/dev/Write-SystemLists.js`. The same r
 
 | Name | Rank | Records | You receive | In the world |
 | --- | --- | --- | --- | --- |
+| Aloe Vera Leaves | novice | 2 | Aloe Vera Leaves | Aloe Vera |
 | Ashen Grass Pod | novice | 2 | Ashen Grass Pod | Spiky Grass |
 | Canticle Bark | novice | 1 | Canticle Bark | This should not be visible |
 | Creep Cluster | novice | 2 | Creep Cluster | Creep Cluster |

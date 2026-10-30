@@ -96,7 +96,11 @@ const NOT_A_GATHER = {
   'Horker': 'the hunter',
   // Update.esm's Creation Club records: Special Edition only (#479).
   'Rot Scale': 'a Creation Club record', 'Screaming Maw': 'a Creation Club record',
-  'Thorn Hook': 'a Creation Club record'
+  'Thorn Hook': 'a Creation Club record',
+  // _ResourcePack.esl's planter Aloe Vera, whose produce is a sack only a
+  // Papyrus script opens; the wild Aloe Vera is on the ladder. The tables
+  // read _ResourcePack.esl since #3105, as both servers load it.
+  'Aloe Vera': 'a sack only Papyrus opens'
 };
 // The three that kept a produce of their own were the Creation Club roots,
 // and they are off the gatherer now, so no unranked row keeps its own.
@@ -108,7 +112,7 @@ unrankedPage.split('\n').forEach(function (line) {
   const cells = line.split('|').slice(1, -1).map(function (c) { return c.trim(); });
   if (cells[0]) unrankedNames.push(cells[0]);
 });
-yes('unranked.md was read and still lists the filed records', unrankedNames.length === 44);
+yes('unranked.md was read and still lists the filed records', unrankedNames.length === 45);
 
 const byGatherName = {};
 if (GATHER_UNRANKED) {

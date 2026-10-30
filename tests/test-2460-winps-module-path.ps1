@@ -50,7 +50,7 @@ if (-not $OnWindows) {
         $outer = Join-Path $tmp 'outer.ps1'
         [IO.File]::WriteAllText($outer, (@(
             'param([string]$Probe)',
-            ('& ''' + $ps51.Replace("'", "''") + ''' -NoProfile -File $Probe')
+            ('& ''' + $ps51.Replace("'", "''") + ''' -NoProfile -ExecutionPolicy Bypass -File $Probe')
         ) -join "`r`n"), $utf8)
 
         # A PowerShell 7 module path, the shape Git Bash passes on from a pwsh terminal.
@@ -63,6 +63,12 @@ if (-not $OnWindows) {
             (Get-WindowsPath 'System32\WindowsPowerShell\v1.0\Modules')
         ) -join ';'
 
+        # 5.1 is started with -ExecutionPolicy Bypass, as every other harness
+        # starts it with -File: Windows 11 keeps 5.1 at Restricted unless
+        # somebody changed it, where Windows Server (the box) has
+        # RemoteSigned. On One's runners all four checks below read an empty
+        # probe (#3861). The policy has no part in which Utility module 5.1
+        # finds first.
         function Read-Probe([string]$exe, [string]$argLine) {
             $psi = New-Object Diagnostics.ProcessStartInfo
             $psi.FileName = $exe
@@ -73,14 +79,17 @@ if (-not $OnWindows) {
             $psi.CreateNoWindow = $true
             $psi.EnvironmentVariables['PSModulePath'] = $polluted
             $p = [Diagnostics.Process]::Start($psi)
+            $errTask = $p.StandardError.ReadToEndAsync()
             $out = $p.StandardOutput.ReadToEnd()
-            $null = $p.StandardError.ReadToEnd()
+            $err = $errTask.GetAwaiter().GetResult()
             $null = $p.WaitForExit(60000)
             $r = @{ First = ''; Hash = '' }
             foreach ($line in ($out -split "`r?`n")) {
                 if ($line.StartsWith('FIRST=')) { $r.First = $line.Substring(6) }
                 if ($line.StartsWith('HASH=')) { $r.Hash = $line.Substring(5) }
             }
+            # A probe that said nothing says why, so a red here is never a guess.
+            if (-not $r.Hash) { Write-Host ('      the probe said nothing; it wrote: ' + (($out + ' ' + $err).Trim() -replace '\s+', ' ')) }
             return $r
         }
 
@@ -89,7 +98,7 @@ if (-not $OnWindows) {
         Yes 'the guide route (pwsh started with that path, then 5.1) keeps Get-FileHash' ($via.Hash -eq 'yes')
         Yes 'and that 5.1 loads Windows PowerShell''s own Utility module' ($via.First.StartsWith($sys, [StringComparison]::OrdinalIgnoreCase))
 
-        $direct = Read-Probe $ps51 ('-NoProfile -File "' + $probe + '"')
+        $direct = Read-Probe $ps51 ('-NoProfile -ExecutionPolicy Bypass -File "' + $probe + '"')
         Yes '5.1 started straight with a PowerShell 7 module path loses Get-FileHash (the failure the guide warns of)' ($direct.Hash -eq 'no')
         Yes 'because it finds PowerShell 7''s Utility module first' ($direct.First.StartsWith((Join-Path $home7 'Modules'), [StringComparison]::OrdinalIgnoreCase))
     } finally {
