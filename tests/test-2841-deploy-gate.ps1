@@ -190,11 +190,54 @@ Yes '  loads no module and writes through [Console] (#3059)' ($gateCode -notmatc
 # ---- 5. the broker -----------------------------------------------------------
 $broker = Text 'scripts/vps/gate/GateBroker.ps1'
 $brokerCode = ($broker -replace '(?s)<#.*?#>', '')
-Yes 'the pipe denies every other machine (NETWORK)' ($brokerCode -match "S-1-5-2'\)\), \[IO\.Pipes\.PipeAccessRights\]::FullControl, \[Security\.AccessControl\.AccessControlType\]::Deny")
+# The pipe keeps other machines out with PIPE_REJECT_REMOTE_CLIENTS and
+# denies nothing: a NETWORK deny also shut out thornswood-deploy, whose ssh
+# key login is a network logon (30 Oct, the first ping through the gate).
+Yes 'the pipe refuses other machines itself (PIPE_REJECT_REMOTE_CLIENTS), takes one connection at a time, and nothing else may take its name first' ($brokerCode -match 'RejectRemote = 0x8' -and $brokerCode -match 'FirstInstance \| Overlapped, RejectRemote, 1,')
+Yes '  and its access list denies nothing, NETWORK above all' ($brokerCode -notmatch 'AccessControlType\]::Deny' -and $brokerCode -notmatch "'S-1-5-2'")
 Yes '  and allows SYSTEM and the deploy account alone' (
     $brokerCode.Contains("SecurityIdentifier('S-1-5-18')") -and $brokerCode.Contains('[string]$Cfg.deploySid') -and
     @([regex]::Matches($brokerCode, 'AccessControlType\]::Allow')).Count -eq 2)
-Yes '  and takes one connection at a time' ($brokerCode -match "NamedPipeServerStream\('thornswood-gate', \[IO\.Pipes\.PipeDirection\]::InOut, 1,")
+$pipeBlock = [regex]::Match($broker, "(?s)\`$GatePipeCode = @'.*?\nfunction New-GatePipe.*?\n\}\r?\n").Value
+Yes '  and the pipe is made in one block a harness can run' ($pipeBlock.Length -gt 0)
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the pipe under Windows PowerShell 5.1, which the broker runs under: this is not Windows'
+} else {
+    # Under 5.1, as the broker runs it: the pipe made for this account, a
+    # line through it, its access list read back, and its name refused to a
+    # second maker while the first holds it.
+    $pipeProbe = Join-Path ([IO.Path]::GetTempPath()) ('tw-2841-pipe-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.ps1')
+    $pipeRun = @'
+$name = 'tw-2841-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+$server = New-GatePipe $name
+try {
+    $wait = $server.BeginWaitForConnection($null, $null)
+    $client = New-Object IO.Pipes.NamedPipeClientStream('.', $name, [IO.Pipes.PipeDirection]::InOut)
+    $client.Connect(5000)
+    if (-not $wait.AsyncWaitHandle.WaitOne(5000)) { 'NO CONNECTION'; exit 1 }
+    $server.EndWaitForConnection($wait)
+    $w = New-Object IO.StreamWriter($client)
+    $w.AutoFlush = $true
+    $w.WriteLine('LINE x')
+    'GOT ' + (New-Object IO.StreamReader($server)).ReadLine()
+    $rules = @($server.GetAccessControl().GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))
+    'DENY ' + @($rules | Where-Object { $_.AccessControlType -eq 'Deny' }).Count
+    'ALLOW ' + ((@($rules | ForEach-Object { $_.IdentityReference.Value }) | Sort-Object -Unique) -join ',')
+    $second = $null
+    try { $second = New-GatePipe $name; 'SECOND MADE' } catch { 'SECOND REFUSED' } finally { if ($second) { $second.Dispose() } }
+    $client.Dispose()
+} finally { $server.Dispose() }
+'@
+    try {
+        $head = "`$ErrorActionPreference = 'Stop'`r`n`$Cfg = @{ deploySid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value }`r`n"
+        [IO.File]::WriteAllText($pipeProbe, $head + $pipeBlock + $pipeRun)
+        $said = @(& (Get-WindowsPowerShell) -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $pipeProbe 2>&1 | ForEach-Object { "$_" })
+        $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $want = @('GOT LINE x', 'DENY 0', ('ALLOW ' + ((@('S-1-5-18', $me) | Sort-Object -Unique) -join ',')), 'SECOND REFUSED')
+        Yes 'under Windows PowerShell 5.1 the pipe takes its account''s line, denies nothing, allows SYSTEM and that account, and holds its name' (($said -join ';') -eq ($want -join ';'))
+        if (($said -join ';') -ne ($want -join ';')) { $said | Write-Host }
+    } finally { Remove-Item -LiteralPath $pipeProbe -Force -ErrorAction SilentlyContinue }
+}
 $tested = $brokerCode.IndexOf('Test-ThornswoodGateRequest -Line $line')
 Yes 'every line goes through the rules before anything runs' ($tested -gt 0 -and $tested -lt $brokerCode.IndexOf('$commit = Update-Checkout') -and $tested -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
 Yes '  and the rules are the installed verbs.json, not anything sent' ($brokerCode.Contains("Read-ThornswoodGateVerbs (Join-Path `$Root 'verbs.json')"))
