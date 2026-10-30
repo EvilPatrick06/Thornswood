@@ -28,7 +28,9 @@
        for the user. For one shell or one scheduled task.
 
   So a machine that reaches the box by another address, or a new box being
-  tried before Set-Vps.ps1 moves everybody, needs no edit to a tracked file.
+  set up before its name points at it (docs\MOVING-THE-SERVER.md, step 3),
+  needs no edit to a tracked file. The tracked address is the game's name,
+  never the box's address (#3690).
   tests\test-vps-defaults.ps1 fails on the address written anywhere else in a
   script.
 #>

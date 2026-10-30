@@ -1,7 +1,8 @@
 <#
   Read-LauncherStarts.ps1
 
-      pwsh scripts/vps/Remote.ps1 -File scripts/vps/Read-LauncherStarts.ps1                    the last 7 days, on the box
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Read-LauncherStarts -Days 7'                          from any session with gh, a cloud thread included
+      pwsh scripts/vps/Remote.ps1 -File scripts/vps/Read-LauncherStarts.ps1                    the last 7 days, on the box, from One
       pwsh scripts/vps/Remote.ps1 -File scripts/vps/Read-LauncherStarts.ps1 -Arguments '-Days 28'
       .\scripts\vps\Read-LauncherStarts.ps1 -Folder <a folder of session log sets>              anywhere, for the harness
 
@@ -33,6 +34,12 @@
 
   Reads only. Opens the folder's files, writes nothing, connects to nothing.
   Runs in Windows PowerShell 5.1 on the box and in pwsh anywhere.
+  WHO CAN RUN IT. A cloud thread, the weekly review's included, holds no key
+  to the box (#2841), so it asks the deploy gate: Read-LauncherStarts is one
+  of the gate's verbs (scripts\vps\gate\verbs.json), run from main on the
+  box with -Days alone, and Box-Run.ps1 seals what it prints to the asker,
+  so the run's log carries none of it. It only reads.
+
   tests\test-3534-launcher-starts.ps1 runs it against sets of its own.
 
   Exits 0 with the table (or "no starts in the window" and how many sets were

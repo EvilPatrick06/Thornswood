@@ -196,6 +196,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\client-build.json') -Destination (Join-Path $fakeRepo 'records')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\skyrim-files.json') -Destination (Join-Path $fakeRepo 'records')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\ui-gone.json') -Destination (Join-Path $fakeRepo 'records')
+    Copy-Item -LiteralPath (Join-Path $realRepo 'records\generated.json') -Destination (Join-Path $fakeRepo 'records')
     Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
     # Both projects read the version off Updater.cs, as the real one has it.
     Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Updater.cs') -Value 'static class Updater { public const string Version = "1.0.0"; }' -Encoding ASCII

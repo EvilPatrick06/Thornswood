@@ -38,8 +38,10 @@ profile and running Purge Mods leaves your own Skyrim the way it was.
    **Downgrade** and Steam downloads that build under your own account. It is
    a few gigabytes, so give it a while.
 3. Install the collection in Vortex. The link is on the Downloads page and on
-   the launcher's Diagnostics page. Not optional: without it you have a launcher
-   and no mods, and the server turns you away when you press Play.
+   the launcher's Diagnostics page, and it opens the revision the server was
+   built against. Install that revision, not a newer one Nexus may show first.
+   Not optional: without it you have a launcher and no mods, and the server
+   turns you away when you press Play.
 4. Press **Connect Discord** on the launcher's Play page. Your browser opens,
    you say yes, and it closes itself. You never do this again.
 <!-- alpha -->
@@ -54,14 +56,24 @@ The mods are a collection on Nexus, and the collection has revisions. When the
 server moves to a new one, the launcher says **Your mods need updating** above
 Play and names the revision.
 
-Close the game, select the Thornswood profile in Vortex, and update the
-collection to that revision. Let Vortex finish installing and deploying it,
+Close the game, select the Thornswood profile in Vortex, and press the card's
+**Open revision** button. It opens that revision's page on Nexus; install it
+from there, not the newest one the collection's own page shows. Let Vortex
+finish installing and deploying it,
 then open the launcher and let its own update finish before you press Play.
 The collection brings the other authors' mods; the launcher brings
 Thornswood's own files.
 
 If the launcher reports a plugin mismatch after that, open **Diagnostics**,
 press **Scan**, then **Fix**.
+
+## When your mods are ahead of the server
+
+If the launcher says **The server has not caught up with you** and Play reads
+**WAITING FOR THE SERVER**, your collection is on a newer revision than the
+one the server was built against. Nothing is wrong with your install and
+nothing needs installing. Play opens once the server is rebuilt on your
+revision. Say so in the Discord if nobody has.
 
 <a id='defender'></a>
 
