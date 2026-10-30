@@ -15,7 +15,11 @@
 // pull request and its head. It is the last step, so it is only there when
 // every check before it passed, and it runs only when the gate step ran every
 // gate harness (#3114: a pull request built on the VPS may run only those its
-// change can reach, and then main builds in full and is traced). It was an
+// change can reach, and then main builds in full and is traced), and only on
+// GitHub's hosted runner (#3874: on the VPS a whole gate means the traced map
+// could not serve the pull request, and a main build skipped here is not
+// traced, so the map stayed stale and every pull request after it ran the
+// whole gate as well). It was an
 // artifact, tested-tree-<tree>, until #3399: a private repository's artifact
 // storage is counted by the hour, this one used October's whole allowance by
 // 23 Oct 2026 (Patrick's billing report, on #3399), and from then every
