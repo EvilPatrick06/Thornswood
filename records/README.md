@@ -36,12 +36,25 @@ read it (issue #440, phase 8):
   because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
   they disagree.
 - `ui-gone.json`: the 37 Daedric Online menu files (name and sha256) and the
-  42 unused skymp5-front svgs plus bg.png that must never ship and that every
-  pack deletes (issue #1318). `Ship-Rules.ps1` loads it; Build-Launcher puts
+  41 unused skymp5-front svgs, bg.png, and the four Futura PT and DIN Pro
+  faces main's older front build named (#1317), that must never ship and that
+  every pack deletes (issue #1318). `Ship-Rules.ps1` loads it; Build-Launcher puts
   it inside the launcher; OwnGame.Foreign reads that copy so a refresh cannot
   copy those files back. No script writes this one: it is changed by hand, in
   a pull request. `tests\test-ship-rules.ps1` fails while Ship-Rules and
   OwnGame disagree with it.
+- `shipped-not-ours.json`: 165 of the 166 loose files of other authors
+  (67.6 MB) that our packs shipped as ours until the scrub of 29 September,
+  each with the bytes and sha256 it had, measured on 12 October 2026 on the
+  shipping machine's main install (#1178). The 166th, the other server's
+  haybale, would name that server, which no tracked file may (#400), so the
+  launcher's `Leaks.cs` takes it out of Thornswood's own folder by its shape
+  and bytes instead. `Ship-Rules.ps1` reads it and stops on any
+  path it does not call another author's; Publish-Update puts every one in
+  each release record as gone at its sha256, and the launcher deletes one only
+  while it still has those bytes and Vortex does not deploy the path. No
+  script writes this one: it is changed by hand, in a pull request.
+  `tests\test-shipped-not-ours.ps1` holds it.
 - `skyrim-files.json`: every file of the pinned build, 46 on 1.6.1170, with
   its bytes, SHA-1 and depot, read out of Steam's own manifests of the three
   depots `skyrim-pin.json` names by `scripts\release\New-SkyrimFilesRecord.ps1`
@@ -50,6 +63,15 @@ read it (issue #440, phase 8):
   on this list, so a mod put into the Steam copy by hand never gets in. Run
   the script again in the same pull request as a pin move;
   `tests\test-skyrim-pin.ps1` fails while the two disagree.
+- `recipe-owners.json`: the recipes whose owner or rank is a decision rather
+  than a reading, each with the measured reason it cannot be derived:
+  `"owner"` is RECIPE_OWNER and `"rank"` is RECIPE_RANK in
+  `scripts\dev\Build-RecipeTable.ps1`, which reads them from here. No script
+  writes this one: it is changed by hand, in the pull request that adds the
+  recipe it names. It is data so that a recipe change is this file and
+  `game\content\Thornswood-Content.esp` and nothing else, the two files the
+  box's Rebuild-ContentTables takes from a pull request to rebuild its tables
+  with main's own builders (Patrick, 30 Oct 2026, B on the report page, #3470).
 - `game-strings.json`: the loose string tables of the localized masters the
   content tools read whose names are in no Skyrim archive, by size and
   sha256 (#2899): RaceCompatibility.esm's three, measured 20 Oct 2026.

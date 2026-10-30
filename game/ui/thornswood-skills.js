@@ -66,7 +66,8 @@
     window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn, setKey }
     setKey(name)    SkillsKey's name, K unless it is bound elsewhere (#1919)
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
-                    'skills:refresh' | 'skills:pick <words>'
+                    'skills:refresh' | 'skills:pick <words>' |
+                    'skills:switch' (Change character, #3128)
     the plugin turns 'skills:pick X' into the chat line '/pick X'
 
   THE CONTRACT with the server, agreed 20 September, written down here
@@ -304,7 +305,8 @@
         { key: 'health', name: 'Health', subs: [
             { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day, the blow that would kill you leaves you at 1 health.' },
             { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: during a fight, health returns at 2 a second.' },
-            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.' },
+            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.',
+              gate: [{ weight: 45, might: 5 }, { weight: 30, might: 3 }] },
             { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: nothing staggers you while you block.' },
             { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: disease does not take, and poison deals 25%.' }] },
         { key: 'magicka', name: 'Magicka', subs: [
@@ -855,6 +857,7 @@
       '<div class="nav"></div>' +
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
+        '<div class="tsbtn ghost" data-act="switch">Change character</div>' +
         '<div class="tsbtn ghost" data-act="help">Help</div>' +
         '<div class="tsbtn ghost" data-act="settings">Settings</div>' +
         '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
@@ -873,6 +876,11 @@
   // Help (#1633), beside Close: the help panel, and this one put down. Never
   // while creating, where this panel is the whole of what there is to do.
   var elHelp = root.querySelector('[data-act="help"]');
+  // Change character (#3128), beside Help and never while creating: the
+  // front waits ten seconds with the character out of combat and standing
+  // still, then takes the game to the character choice. Pressed again, it
+  // stops the wait.
+  var elSwitch = root.querySelector('[data-act="switch"]');
   // Settings beside it (#3126), and never while creating either.
   var elSettings = root.querySelector('[data-act="settings"]');
   // The word inside the Close button, so drawFoot can say Close Skyrim while
@@ -1350,6 +1358,18 @@
     if (!book || book.points === undefined || book.points === null) return null;
     return Number(book.points) || 0;
   }
+  /* The weapon line on the Might row: what each weight needs, and what you hold. */
+  function gateLine(gate, have) {
+    var bits = [];
+    for (var i = gate.length - 1; i >= 0; i--) {
+      bits.push('weapons weighing ' + gate[i].weight + (i > 0 ? ' to ' + (gate[i - 1].weight - 1) : ' or more') + ' need Might ' + gate[i].might);
+    }
+    var ok = 0;
+    for (var j = 0; j < gate.length; j++) { if (have >= gate[j].might) { ok = gate[j].might; break; } }
+    var holds = !ok ? 'You can wield neither yet.' : (ok >= gate[0].might ? 'You can wield any of them.' : 'You can wield the first, not the second.');
+    return 'Strength: ' + bits.join(', and ') + '. ' + holds;
+  }
+
   /* The marked staff spells, in the order the page draws them, which is the order they are sent in. */
   function markedStaffDescs() {
     var out = [];
@@ -3463,6 +3483,14 @@
           use.onclick = function (ev) { ev.stopPropagation(); usePerk('fontofmagic'); };
           row.appendChild(use);
         }
+        /*
+          Strength (#2262): Might is what a heavy weapon needs. The server
+          refuses the equip (the strength weapons block in game/gamemode.js);
+          this line says so first, so nobody finds out by trying. The two
+          rows are the server's STRENGTH.tiers, kept equal by
+          tests/test-2262-strength-weapons.js.
+        */
+        if (s.gate) row.appendChild(el('div', 'sd gate', gateLine(s.gate, have)));
         row.onclick = function () { rowAt = idx; draw(); };
         col.appendChild(row);
       });
@@ -3522,6 +3550,7 @@
     elCloseKey.textContent = keyName;
     elCloseKey.style.display = (cr || !keyName) ? 'none' : '';
     elHelp.style.display = cr ? 'none' : '';
+    elSwitch.style.display = cr ? 'none' : '';
     elSettings.style.display = cr ? 'none' : '';
   }
 
@@ -4249,6 +4278,12 @@
   elHelp.onclick = function () {
     if (creating()) return;
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('work'); } } catch (e) { }
+    api.close();
+  };
+  // The panel goes down so the wait's lines are seen; nothing is decided here.
+  elSwitch.onclick = function () {
+    if (creating()) return;
+    tell('switch');
     api.close();
   };
   elSettings.onclick = function () {

@@ -71,7 +71,7 @@ $link = Method $shell 'static string CollectionLink()'
 Yes 'Shell.CollectionLink opens the feed''s revision' ($link.Contains('Checks.CollectionRevisionUrl(cfg, Updater.FeedCollectionRevision)'))
 Yes 'nothing opens the bare collection address any more' (-not ([regex]::IsMatch($all, 'ProcessStartInfo\(cfg\.CollectionUrl\)')))
 Yes 'the bar''s button, the missing-mods box and the cards open CollectionLink' (
-    ([regex]::Matches($shell, 'new ProcessStartInfo\(CollectionLink\(\)\)')).Count -eq 1 -and
+    ([regex]::Matches($update, 'new ProcessStartInfo\(CollectionLink\(\)\)')).Count -eq 1 -and
     ([regex]::Matches($play, 'new ProcessStartInfo\(CollectionLink\(\)\)')).Count -eq 1 -and
     $packs.Contains('string url = CollectionLink();'))
 $buttonText = Method $shell 'static string CollectionButtonText()'
@@ -80,8 +80,11 @@ Yes 'the button names the revision it opens' ($buttonText.Contains('"Open revisi
 # ---- ahead ------------------------------------------------------------------
 $bar = Method $shell 'static void ShowCollectionBar(int revision = -1)'
 Yes 'the ahead card says nothing needs installing' ($bar.Contains('nothing needs installing'))
-Yes 'the ahead card has no install button' ($bar.Contains('btnInstallNow.Visibility = problem == "ahead" ? Visibility.Collapsed : Visibility.Visible;'))
-$click = $shell.Substring($shell.IndexOf('btnInstallNow.Click += delegate'), 900)
+# Since #3201 the card's button above Play and Settings' are one handler with
+# one label and one visibility, in ShellUpdate.cs (InstallNowPressed, InstallShown).
+Yes 'the ahead card has no install button' ($bar.Contains('InstallShown(problem == "ahead" ? Visibility.Collapsed : Visibility.Visible);') -and
+    $update -match '(?s)static void InstallShown\(Visibility shown\)\s*\{\s*if \(btnInstallNow != null\) btnInstallNow\.Visibility = shown;\s*if \(btnUpdate != null\) btnUpdate\.Visibility = shown;')
+$click = Method $update 'static void InstallNowPressed()'
 Yes 'a press on the bar''s button while ahead opens nothing' ($click.Contains('if (collectionBarUp && CollectionProblem() == "ahead") return;'))
 $draw = Method $shell 'static bool DrawStatus()'
 $aheadAt = $draw.IndexOf('CollectionProblem(collectionRevision) == "ahead"')

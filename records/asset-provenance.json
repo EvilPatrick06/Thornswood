@@ -532,6 +532,32 @@
       "status": "cleared"
     },
     {
+      "path": "game/ours/Data/Platform/Fonts/Barlow-SemiBold.spritefont",
+      "sha256": "065a8c29c35cc5611f0d30f5b3a3cdf13c35dd83a252ff54f3d1bd23296f224d",
+      "what": "Barlow SemiBold as a Skyrim Platform sprite font: printable ASCII, Latin-1, dashes, curly quotes, the bullet and the ellipsis at 30 pixels. The overhead voice mark draws its dot in it (#1317).",
+      "published": "Every pack and the installer (Data\\Platform\\Fonts)",
+      "source": "Drawn by scripts\\mods\\Build-SpriteFont.py from the fork's skymp5-front\\src\\fonts\\Barlow-SemiBold.ttf (sha256 86577cb3, the Data\\Platform\\UI\\dc3cbd21104d40477da6.ttf entry), with Pillow 12.3.0 and FreeType 2.14.3",
+      "creator": "The face: Jeremy Tribby (Tribby Type) and the Barlow Project Authors, https://github.com/jpt/barlow. The sprite font: Thornswood's script",
+      "licence": "OFL-1.1, as the font it is drawn from; Barlow names no Reserved Font Name. Its full text goes out beside it as Barlow-SemiBold-OFL.txt",
+      "attribution": "Barlow-SemiBold-OFL.txt beside it carries the copyright notice and the licence; named on the public credits page",
+      "approved": "Not needed: an open licence",
+      "evidence": "The font's name table and the fork's skymp5-front\\src\\fonts\\OFL.txt; scripts\\mods\\Build-SpriteFont.py; tests\\test-1317-fonts.ps1.",
+      "status": "cleared"
+    },
+    {
+      "path": "game/ours/Data/Platform/Fonts/Barlow-SemiBold-OFL.txt",
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+      "what": "The SIL Open Font License 1.1 with Barlow's copyright line, the licence Barlow-SemiBold.spritefont goes out under.",
+      "published": "Every pack and the installer (Data\\Platform\\Fonts)",
+      "source": "The fork's skymp5-front\\src\\fonts\\OFL.txt, byte for byte",
+      "creator": "SIL International (the licence) and the Barlow Project Authors (the copyright line)",
+      "licence": "The OFL's own text, which the OFL asks every copy of the font to carry",
+      "attribution": "None",
+      "approved": "Not needed: a licence text",
+      "evidence": "The fork's skymp5-front\\src\\fonts\\OFL.txt.",
+      "status": "cleared"
+    },
+    {
       "path": "game/ours/Data/SKSE/Plugins/CraftingCategories/Thornswood-Content.json",
       "sha256": "975ff49aecd246172497d90facb353ba455688c5787dd69a67a8b3640ab89d06",
       "what": "Thornswood's config for the collection's crafting menu, Constructible Object Custom Keyword System (#3133): three headers by item type, weapons, armour and arrows and bolts, each with its material groups inside, made of keyword names and Thornswood's own label keys. Named for Thornswood-Content.esp, so the menu reads it after the collection's own configs and it moves weapons, armour and arrows out of the one shared WEAPONS & ARMOR header. Hash as git stores it, with LF line endings.",
@@ -693,55 +719,59 @@
   "notInRepo": [
     {
       "path": "Data\\Platform\\UI\\6f802bf60c545304b09e.ttf",
-      "what": "Futura PT Cond Book, in the skymp5-front build (build.js).",
-      "published": "Every pack and the installer",
+      "what": "Futura PT Cond Book, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream SkyMP's skymp5-front\\src\\fonts, byte for byte; build.js came from local\\thornswood-front.zip with no recorded source commit",
       "creator": "ParaType Ltd",
       "licence": "ParaType's end user licence (http://www.paratype.com/eula); nothing found gives SkyMP or Thornswood the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\00e4a2200c3e5ae71d67.ttf",
-      "what": "Futura PT Cond Medium, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "Futura PT Cond Medium, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "ParaType Ltd",
       "licence": "ParaType's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\268a0df3f0e2c23d1ea6.ttf",
-      "what": "DIN Pro Regular, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "DIN Pro Regular, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "FSI FontShop International GmbH",
       "licence": "FontFont's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\fdf086661e1600f95a34.ttf",
-      "what": "DIN Pro Condensed Bold Italic, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "DIN Pro Condensed Bold Italic, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "FSI FontShop International GmbH",
       "licence": "FontFont's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\855bfaf67c57745958d3.ttf",
@@ -807,29 +837,35 @@
     },
     {
       "path": "Data\\Platform\\Fonts\\DIN-Pro-bold.spritefont",
-      "what": "A sprite font whose name says DIN Pro Bold. Nothing in skymp5-client or Thornswood asks for it by name.",
-      "published": "Every pack and the installer",
+      "what": "A sprite font of FSI FontShop's DIN Pro Bold. Until #1317 the overhead voice mark drew its dot in it.",
+      "published": "Never again: every pack deletes it from installs (#1317)",
       "source": "Upstream SkyMP client-deps, byte for byte",
       "creator": "DIN Pro is FSI FontShop's typeface",
       "licence": "None found",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317 option 1.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it; the voice mark draws in Barlow-SemiBold.spritefont instead",
+      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipCommercialFonts and OwnGame.Foreign; tests\\test-1317-fonts.ps1.",
+      "status": "withheld",
+      "record": "scripts/release/Ship-Rules.ps1#ShipCommercialFonts",
+      "paths": [
+        "Data\\Platform\\Fonts\\DIN-Pro-bold.spritefont"
+      ]
     },
     {
       "path": "Data\\Platform\\Fonts\\Futura.spritefont",
-      "what": "A sprite font dated 14 Sep. Skyrim Platform loads every sprite font in the folder, but nothing asks for this one by name.",
-      "published": "Every pack and the installer",
+      "what": "A sprite font dated 14 Sep whose name says Futura, ParaType's Futura PT. Skyrim Platform loads every sprite font in the folder, but nothing asked for this one by name.",
+      "published": "Never again: every pack deletes it from installs (#1317)",
       "source": "not recorded: not in the fork",
       "creator": "not recorded",
       "licence": "None found",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, Shipped today with no licence this file can name; #1317 names Futura.spritefont.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it; the voice mark draws in Barlow-SemiBold.spritefont instead",
+      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipCommercialFonts and OwnGame.Foreign; tests\\test-1317-fonts.ps1.",
+      "status": "withheld",
+      "record": "scripts/release/Ship-Rules.ps1#ShipCommercialFonts",
+      "paths": [
+        "Data\\Platform\\Fonts\\Futura.spritefont"
+      ]
     },
     {
       "path": "Data\\Platform\\Fonts\\ChainLink.spritefont, NoticeIcon.spritefont, VoiceIcon.spritefont",

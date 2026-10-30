@@ -7,13 +7,18 @@
       pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-DevGamemode -Restart'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Docs -Site'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Get-Logs -Dev -Lines 2000'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Server dev'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Server -GamemodeOnly -Build <main's full commit>'
       pwsh scripts/vps/Box-Run.ps1 -Line 'ping'
       pwsh scripts/vps/Box-Run.ps1 -Run 1234567890     read an earlier run again
 
   scripts\vps\gate\verbs.json is the whole list of verbs and the switches
   each takes; a line outside it is refused here before anything starts, and
   again on the box. What runs is always that script of main as main is on
-  GitHub when the box reads it, never this checkout.
+  GitHub when the box reads it, never this checkout. A live verb
+  (Deploy-Server, Publish-Server-Main) names the commit of main Patrick gave
+  his word for with -Build, and the box refuses it once main is anywhere
+  else.
 
   HOW. It starts box-run.yml on main of the private ops repository,
   EvilPatrick06/Thornswood-Ops, where the VPS runners are registered since

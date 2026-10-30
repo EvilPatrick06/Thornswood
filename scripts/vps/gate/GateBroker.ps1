@@ -18,13 +18,17 @@
        name a branch, a commit or a file;
     2. runs the verb's script from that checkout with PowerShell 7, with the
        verb's fixed words and the parameters the line gave, each held to its
-       rule. The script reaches the box the way it does from One, as
+       rule. A live verb (verbs.json "build") runs only when that tip is
+       the exact commit the line named with -Build, which only ever holds
+       it to main's tip, never runs another commit. The script reaches the
+       box the way it does from One, as
        Administrator over ssh, here over loopback with the gate's own key
        (from="127.0.0.1", thornswood-gate), because the deploy scripts'
        box halves need administrator (the ops repo's DEPLOY-IDENTITIES.md,
        section 2a);
     3. sends every line the script prints back as it comes, the files of a
-       verb that writes some (Get-Logs), and its exit code.
+       verb that writes some (Get-Logs, Rebuild-ContentTables), and its exit
+       code.
 
   One verb at a time: the pipe takes one connection, and a second caller
   waits for it or is told the gate is busy. A run that outlives its verb's
@@ -237,6 +241,9 @@ function Invoke-Request($Pipe) {
     $commit = Update-Checkout
     if (-not $commit) { Send '@END 66'; Log ('END ' + $id + ' 66 main could not be read'); return }
     Send ('| main at ' + $commit)
+    # A live verb runs only on the build it was named for (GateRules.ps1,
+    # Build): a merge that landed after Patrick gave his word is not that build.
+    if ($req.Build -and $req.Build -cne $commit) { Send ('@REFUSED main is at ' + $commit + ' now, not ' + $req.Build + ', the build this run was named for. Nothing was run.'); Send '@END 64'; Log ('END ' + $id + ' 64 main moved past the named build ' + $req.Build); return }
 
     $script = Join-Path $Repo ($req.Script.Replace('/', '\'))
     if (-not (Test-Path -LiteralPath $script)) { Send ('@REFUSED main has no ' + $req.Script + ' now. Nothing was run.'); Send '@END 64'; Log ('END ' + $id + ' 64 no script'); return }
