@@ -70,17 +70,16 @@ try {
     $r = Dry @('-OffBox')
     Yes "-OffBox dry run ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  it ran nothing: every step says DRY RUN' ($r.Said -match 'DRY RUN, nothing ran' -and $r.Said -match 'on this machine')
-    # The build label only when records\build-runners.json names this
-    # machine's runner (One's, 26 Oct 2026), so the answer depends on where
-    # the test runs.
-    $buildRec = Get-Content -LiteralPath (Join-Path $repo 'records\build-runners.json') -Raw | ConvertFrom-Json
-    $named = $buildRec.PSObject.Properties['offBox'] -and (@($buildRec.offBox) -contains ('thornswood-pr-' + $comp))
+    # The pull request build label only when records\pr-build-runners.json
+    # names this machine's runner (One's, 26 Oct 2026), so the answer depends
+    # on where the test runs. Never the build label: off the box it is not
+    # carried (#4010).
     $prRec = Get-Content -LiteralPath (Join-Path $repo 'records\pr-build-runners.json') -Raw | ConvertFrom-Json
     $prNamed = $prRec.PSObject.Properties['offBox'] -and (@($prRec.offBox) -contains ('thornswood-pr-' + $comp))
-    $wantLabels = 'thornswood-pr' + $(if ($named) { ',thornswood-build' } else { '' }) + $(if ($prNamed) { ',thornswood-pr-build' } else { '' })
+    $wantLabels = 'thornswood-pr' + $(if ($prNamed) { ',thornswood-pr-build' } else { '' })
     Yes "  registers thornswood-pr-$comp with the label(s) $wantLabels" ($r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "' --labels '" + [regex]::Escape($wantLabels) + "'"))
     Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps" -and $r.Text -notmatch "--labels '[^']*thornswood-vps")
-    Yes '  nor the build label unless the record names it (#2994)' ($named -or $r.Text -notmatch 'thornswood-build')
+    Yes '  nor the build label, which is the box''s alone (#2994, #4010)' ($r.Text -notmatch '\bthornswood-build\b')
     Yes '  in C:\Thornswood-RunnerPR, as the account thornswood-pr' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr'"))
     Yes '  its own folder is still locked before config.cmd writes into it' ($r.Text -match '(?m)^Lock-RunnerRoot \$root \$acct')
     Yes '  the install shuts it out of every C:\Thornswood* folder, hyphen or not, Dumps included (#2488)' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood*' @() @()"))
@@ -105,10 +104,11 @@ try {
     $r = Dry @()
     Yes '  and a VPS runner does not' ($r.Code -eq 0 -and $r.Text -match "(?m)^Set-RunnerTemp \`$root '[^']+' \`$false\s*$")
 
-    # Build runners on One (Patrick, 26 Oct 2026): a name the build record's
-    # offBox lists takes the build label too, and never the VPS label.
+    # Build runners on One (Patrick, 26 Oct 2026): a name the pull request
+    # record's offBox lists takes its label too, and never the build or the
+    # VPS label (#4010).
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-one')
-    Yes 'an off-box runner records\build-runners.json and records\pr-build-runners.json name takes both labels (#4010)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one' --labels 'thornswood-pr,thornswood-build,thornswood-pr-build'(?!,)")
+    Yes 'an off-box runner records\pr-build-runners.json names takes its label, not the build label (#4010)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one' --labels 'thornswood-pr,thornswood-pr-build'(?!,)")
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-elsewhere')
     Yes '  and one it does not name keeps the pull request label alone' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-elsewhere' --labels 'thornswood-pr'(?!,)")
 
@@ -199,7 +199,8 @@ try {
     Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
     $r = Dry @('-OffBox', '-Remove')
     Yes '-OffBox -Remove takes the firewall rules and the read denies off' ($r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape('Open-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct -Own $grdOwn)'))
-    # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, R: here.
+    # ON THE RUNNER DRIVE (#3861): explicit R: is fixture metadata, not a
+    # lookup of One's attached labelled drive (#4048). Defaults above are C:.
     $r = Dry @('-OffBox', '-Number', '3', '-Root', 'R:\Thornswood-RunnerPR3')
     $t = $r.Text
     Yes "-OffBox on the runner drive installs there (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$root = 'R:\Thornswood-RunnerPR3'"))
@@ -213,10 +214,19 @@ try {
     Yes '-OffBox -Status says what the firewall has' ($r.Text -match [regex]::Escape('Get-RunnerFirewall $grdGroup'))
     $r = Dry @('-OffBox', '-Number', '2')
     Yes '-Number 2 gets a firewall group of its own' ($r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-pr2'"))
-    foreach ($m in @(@(), @('-Lock'), @('-Status'))) {
+    foreach ($m in @(@('-Lock'), @('-Status'))) {
         $r = Dry $m
         Yes ("the VPS (no -OffBox) $($m -join ' ') gets no firewall rule and no read deny") ($r.Code -eq 0 -and $r.Text -notmatch 'RunnerFirewall|RunnerReads')
     }
+    # #3956: an install on the VPS puts its outbound rules on in the same run,
+    # before the runner can take a job; until 27 Oct 2026 it took a -NetworkOnly
+    # run after it. Still no read deny there.
+    $r = Dry @('-Number', '4', '-AllowHost', 'localhost')
+    $iFw = $r.Text.IndexOf('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks'); $iCfg = $r.Text.IndexOf('config.cmd --unattended')
+    Yes 'the VPS install puts the account''s outbound rules on in the same run (#3956)' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner4'") -and $iFw -gt 0)
+    Yes '  before config.cmd registers the runner, so it takes no job without them' ($iCfg -gt $iFw)
+    Yes '  with -AllowHost let through' ($r.Said -match '-AllowHost localhost: ')
+    Yes '  and no read deny on the VPS' ($r.Text -notmatch 'Close-RunnerReads \$grdAcct')
     # Since #2161 a VPS account may carry -NetworkOnly's rules, so its removal takes them off, and still no read deny.
     $r = Dry @('-Remove')
     Yes 'the VPS (no -OffBox) -Remove takes off its outbound rules and touches no read deny' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -notmatch 'Set-RunnerFirewall \$grdAcct|Open-RunnerReads \$grdAcct|Close-RunnerReads \$grdAcct')

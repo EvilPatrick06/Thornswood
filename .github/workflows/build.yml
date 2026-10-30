@@ -194,9 +194,11 @@ jobs:
     # the harness step alone and the limit below cancelled passing builds.
     # Main's build stays on the box: only the box's runners have the trace
     # task, and a main build is what leaves the gate map the next pull
-    # requests measure from (#3114, #3874). Build-PrWorkflow.js drops
-    # thornswood-vps for build-pr.yml only, so a pull request's fallback can
-    # also land on One's off-box build runners (#3860).
+    # requests measure from (#3114, #3874). Build-PrWorkflow.js gives
+    # build-pr.yml's fallback the pull request build label alone instead
+    # (records/pr-build-runners.json): box runner 2 and One's off-box runners
+    # carry it and runner 1 does not, so main's build never waits behind pull
+    # requests for runner 1 (#3860; #4010, Patrick's A, 27 Oct 2026).
     runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
     # actions: read for the gate step off the box, which reads the map main's
     # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
@@ -579,9 +581,16 @@ jobs:
           # which this already covers, is gone (#3114). The nightly keeps it.
           # ruff comes into a venv of this run's own, never the machine's
           # Python, pinned by version and hash in .github\ruff-requirements.txt.
-          # By hand, from the repository folder, in any venv:
-          #   python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
-          #   python -m ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
+          # By hand, from the repository folder, into .venv (git ignores it).
+          # With uv, which needs no python on the PATH (uv's own Python
+          # refuses pip as "externally-managed", and a uv venv has no pip):
+          #   uv venv .venv
+          #   uv pip install --python .venv --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # or with Python's own pip:
+          #   python -m venv .venv
+          #   .venv\Scripts\python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # then:
+          #   .venv\Scripts\ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
           $venv = Join-Path $env:RUNNER_TEMP 'ruff-venv'
           python -m venv $venv
           $py = Join-Path $venv 'Scripts\python.exe'
