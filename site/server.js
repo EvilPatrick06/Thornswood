@@ -7346,7 +7346,10 @@ async function handle(req, res) {
     // without it. html is the one to show; md is kept for anything reading it.
     // sha256 is what the installer stores. changed is the day that wording last changed,
     // or null when the list has no row for this text.
-    const md = pageMarkdown(pg[1]);
+    // Only the pages the site shows (#3656): every .md in data\site was
+    // served here, lines.md's notes for the team included, though no page
+    // shows them.
+    const md = MD_PAGES.indexOf('/' + pg[1]) >= 0 ? pageMarkdown(pg[1]) : null;
     if (md === null) return sendJson(res, 404, { error: 'no such page' });
     const sha = pageSha256(md);
     const ver = findPageVersion(sha);
