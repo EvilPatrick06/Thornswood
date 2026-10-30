@@ -5,18 +5,22 @@
 
   scripts\mods\Build-Generated.ps1 builds Thornswood's animation and body
   files in Thornswood's own folder and nowhere else, records them as
-  Thornswood's, refuses while the folder is in use, keeps the bodies covered
-  and unshaped, and Ship stops when what it built is stale. Issue #1247.
+  Thornswood's, refuses while the folder is in use, and keeps the bodies
+  covered and unshaped. Issue #1247. Since #3715 the build is the launcher's
+  own (launcher\app\GeneratedBuild.cs), which runs it on each computer
+  before Play, and Build-Generated.ps1 runs that same code; so this holds the
+  launcher's build to all of it too, and no release carries what it builds.
 
   WHY THIS EXISTS. Patrick, 29 Sep: the behavior files and BodySlide's body
-  meshes are made in Thornswood's own folder, as a scripted step on the
-  shipping PC before a Ship; Steam's copy stays the person's own. The behavior
+  meshes are made in Thornswood's own folder; Steam's copy stays the person's
+  own. Patrick, 27 Oct (#3715): "The launcher makes all 45 files on each
+  computer", because they are other people's work. The behavior
   files come from Pandora Behaviour Engine+, because Nemesis' -generate never
   starts its work. Most of Thornswood's folder is hard links to Vortex's
   copies, which the Steam copy links too, and a tool that writes in place
   there writes into Vortex's copy and the Steam copy as well. And a build the
-  launcher or the release does not know is Thornswood's is either put back to
-  Vortex's at the next refresh or left out of the release.
+  launcher does not know is Thornswood's is put back to Vortex's at the next
+  refresh.
 
   HOW. Stand-ins for the two tools, compiled here with the .NET Framework csc,
   do what the real ones do: Pandora reads its folders from the Settings.json
@@ -33,10 +37,11 @@
        the Steam copy and Vortex's staging byte and time identical; the bodies
        are covered; the preset names every slider at its default and no morph
        file is asked for; the record lists every file made and nothing of the
-       tools' own folders; Ship-Rules lets the release carry them
+       tools' own folders; Ship-Rules keeps them off every release, never
+       shipped and never removed
     B  stale: the mod list, a file Pandora reads, a file BodySlide reads, the
-       build list, a built file changed, and no record, each make it stale,
-       and Ship and Check-ShipReady stop on it
+       build list, a built file changed, and no record, each make it stale;
+       Ship asks a dry run whether the collection can build them
     C  in use: Skyrim or the launcher run from the install: refused, nothing written
     D  never the Steam copy: a folder with Vortex's record in it, or the one the
        launcher made the folder from: refused, nothing written
@@ -582,18 +587,19 @@ exit code $code"
     foreach ($f in $rec.Files) { if ((Get-FileHash -LiteralPath (Join-Path $game $f.Rel) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $f.Sha) { $shaOk = $false } }
     Yes 'A: each with the sha256 of what is in the folder' $shaOk
     Yes 'A: and what it was built from: the build list, the mod list, Pandora''s files, BodySlide''s' (
-        $rec.Parts.Contains('list') -and $rec.Parts.Contains('plugins') -and $rec.Parts.Contains('behaviors') -and $rec.Parts.Contains('bodyslide') -and $rec.Game -eq $game)
+        $rec.Part('list') -and $rec.Part('plugins') -and $rec.Part('behaviors') -and $rec.Part('bodyslide') -and $rec.Game -eq $game)
     Yes 'A: its work folder is gone' (-not (Test-Path -LiteralPath (Join-Path $own 'build-generated')))
     $state = Get-GeneratedState $root $list
     Yes 'A: and it reads back as current' ($state.Current)
 
     . (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
+    $machine = @($got | Where-Object { (Test-ShipGenerated $_) -and (Test-ShipMachine $_) })
+    Yes 'A: no release carries them: Ship-Rules counts every file the record has as built on each computer, never shipped and never removed (#3715)' (
+        $machine.Count -eq $want.Count)
     $col = Get-ShipOwnGameCollection (Join-Path $root 'Profile')
-    Yes 'A: a release carries them: Ship-Rules no longer counts the body or the behavior file as the collection''s, though Vortex deploys those names' (
-        -not $col.Contains($A + 'femalebody_1.nif') -and -not $col.Contains('Data\meshes\actors\character\behaviors\0_master.hkx'))
     Yes 'A: and still counts the rest of Vortex''s files as the collection''s, the tools among them' (
         $col.Contains('Data\meshes\ts\bench.nif') -and $col.Contains('Data\Pandora Behaviour Engine\Pandora Behaviour Engine+.exe') -and $col.Contains('Data\CalienteTools\BodySlide\BodySlide.exe'))
-    Yes 'A: Get-ShipGeneratedFiles reads the same files the record has' ((Get-ShipGeneratedFiles (Join-Path $root 'Profile')).Count -eq $want.Count)
+    Yes 'A: and a file of the collection is not taken for one built here' (-not (Test-ShipGenerated 'Data\meshes\ts\bench.nif'))
 
     # ======================================================== B: stale
     $plugins = Join-Path $own 'plugins.txt'
@@ -601,8 +607,6 @@ exit code $code"
     Put $plugins ($keep + "*NewMod.esp`r`n")
     $s = Get-GeneratedState $root $list
     Yes 'B: a changed mod list makes it stale, and says so' (-not $s.Current -and ($s.Why -join ';') -match 'the mod list changed')
-    $says = Get-GeneratedStaleSays $s 'dev'
-    Yes 'B: the sentence says what to run, with the channel' ($says -match [regex]::Escape('.\scripts\mods\Build-Generated.ps1 -Channel dev') -and $says -notmatch [char]0x2014 -and $says -notmatch '(?i)player')
     Put $plugins $keep
     Yes 'B: put back, it is current again' ((Get-GeneratedState $root $list).Current)
 
@@ -634,44 +638,28 @@ exit code $code"
     $s = Get-GeneratedState $root $list
     Yes 'B: no record at all is stale: never built' (-not $s.Current -and ($s.Why -join ';') -match 'never been built')
 
-    # Check-ShipReady's row, lifted out of the script and run.
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Ready, [ref]$null, [ref]$null)
-    foreach ($n in 'New-Row', 'Get-GeneratedRows') {
-        $fn = $ast.Find({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq $n }, $true)
-        Yes "Check-ShipReady.ps1 has $n" ($null -ne $fn)
-        if ($fn) { . ([scriptblock]::Create($fn.Extent.Text)) }
-    }
-    $row = @(Get-GeneratedRows $root $list 'dev')[0]
-    Yes 'B: Check-ShipReady says NO on it, a gap that stops a Ship, with the command that closes it' (
-        -not $row.Ok -and $row.Level -eq 'need' -and $row.Fix -match 'Build-Generated\.ps1 -Channel dev')
     Move-Item -LiteralPath ($record + '.aside') -Destination $record
-    $row = @(Get-GeneratedRows $root $list 'dev')[0]
-    Yes 'B: and yes once it is current' ($row.Ok)
-    # With -Root given, the command names that folder, not the recorded one (#2603).
-    Move-Item -LiteralPath $record -Destination ($record + '.aside')
-    $row = @(Get-GeneratedRows $root $list 'main' (' -Root "' + $root + '"'))[0]
-    Yes 'B: with -Root given to Check-ShipReady, the command builds in that folder' ($row.Fix.Contains('Build-Generated.ps1 -Channel main -Root "' + $root + '"'))
-    Move-Item -LiteralPath ($record + '.aside') -Destination $record
+    Yes 'B: and put back, current' ((Get-GeneratedState $root $list).Current)
     $readyText = [IO.File]::ReadAllText($Ready)
-    Yes 'B: Check-ShipReady asks it whenever there is a game folder' ($readyText -match "if \(\`$hasGame\) \{\s*foreach \(\`$r in @\(Get-GeneratedRows \`$Root \(Join-Path \`$RepoDir 'records\\generated\.json'\) \`$Channel \`$rootArg\)\) \{ Show-Row \`$r \}")
+    Yes 'B: Check-ShipReady asks nothing of them: no release carries them (#3715)' ($readyText -notmatch 'Get-GeneratedRows' -and $readyText -notmatch 'Generated\.ps1')
 
-    # Ship's step, read out of Ship.ps1.
+    # Ship's step, read out of Ship.ps1: a dry run of this script, which
+    # writes nothing and starts no tool, says whether the collection installed
+    # here can build them. Every launcher builds them before Play.
     $shipText = [IO.File]::ReadAllText($Ship)
-    $at = $shipText.IndexOf("Head 'Generated files'")
-    $bodies = $shipText.IndexOf("Head 'Covered bodies'")
-    Yes 'B: Ship.ps1 has a Generated files step' ($at -gt 0)
-    # The step runs to the launcher build, which comes after it since #1692.
-    $buildAt = if ($at -gt 0) { $shipText.IndexOf('# ------------------------------------------------------------ build', $at) } else { -1 }
+    $at = $shipText.IndexOf("Head 'Animation and body files'")
+    Yes 'B: Ship.ps1 has an Animation and body files step' ($at -gt 0)
+    $buildAt = if ($at -gt 0) { $shipText.IndexOf('# ------------------------------------------------------------ node', $at) } else { -1 }
     $step = if ($at -gt 0 -and $buildAt -gt $at) { $shipText.Substring($at, $buildAt - $at) } else { '' }
-    Yes 'B: it reads the state of this install''s folder against records\generated.json' (
-        $step -match "\. \(Join-Path \`$Here '\.\.\\mods\\Generated\.ps1'\)" -and $step -match "Get-GeneratedState \`$Root \(Join-Path \`$RepoDir 'records\\generated\.json'\)")
-    Yes 'B: and stops, on both channels, with the sentence that says what to run, putting the version back' (
-        $step -match "if \(-not \`$genState\.Current\) \{\s*Unbump '[^']+'\s*Die \(Get-GeneratedStaleSays \`$genState \`$Channel\)" -and $step -notmatch '\$Dev')
-    $publish = $shipText.IndexOf("Publish-Update.ps1", $at + 1)
+    Yes 'B: it runs Build-Generated.ps1 -DryRun on this install''s folder, and stops on both channels when that stops, putting the version back' (
+        $step.Contains("& (Join-Path `$Here '..\mods\Build-Generated.ps1') -Root `$Root -DryRun -NoPause") -and
+        $step -match "if \(\`$genExit -ne 0\) \{\s*Unbump '[^']+'\s*Die " -and $step -notmatch '\$Dev')
     $buildCall = $shipText.IndexOf("'Build-Launcher.ps1') -Root")
     $installCall = $shipText.IndexOf("'Install-Launcher.ps1')")
-    Yes 'B: before the launcher is built or installed (#1692), before the covered bodies (which read what it built) and before anything is published' (
-        $buildCall -gt $at -and $installCall -gt $at -and $bodies -gt $at -and ($publish -lt 0 -or $publish -gt $at))
+    $publish = $shipText.IndexOf("Publish-Update.ps1", $at + 1)
+    Yes 'B: before the launcher is built or installed (#1692) and before anything is published' (
+        $buildCall -gt $at -and $installCall -gt $at -and ($publish -lt 0 -or $publish -gt $at))
+    Yes 'B: and Ship no longer reads the record or the covered bodies itself' ($shipText -notmatch "Head 'Covered bodies'" -and $shipText -notmatch 'Get-GeneratedStaleSays')
 
     # ======================================================== C: in use
     $recBefore = Text $record
@@ -835,11 +823,16 @@ Yes 'records\generated.json builds the women''s NeverNude body and the men''s bo
 Yes 'and moves no slider, so every body is its set''s own default shape (issue #1004)' ($real.Sliders.Count -eq 0)
 Yes 'the burned body is also rebuilt from the collection, replacing the old genital mesh' ($real.Sets -contains 'CBBE Vanilla - Body - Astrid')
 Yes 'and generates with the four patches the releases were made with' (($real.Patches -join ',') -eq 'colis,tdmh,tdmlen,tdmv')
-$buildText = [IO.File]::ReadAllText($Build)
-Yes 'Build-Generated.ps1 never runs Nemesis: no -generate, no -update, no manual step' (
-    $buildText -notmatch '''-generate''|''-update''|NemesisDone|Nemesis Unlimited Behavior Engine\.exe')
+# The build itself is the launcher's (#3715), which Build-Generated.ps1 runs.
+$buildText = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\GeneratedBuild.cs'))
+$wrapText = [IO.File]::ReadAllText($Build)
+Yes 'Build-Generated.ps1 runs the launcher''s build, and builds nothing of its own' (
+    $wrapText -match 'New-Object Thornswood\.GeneratedBuild' -and $wrapText -match '\$build\.Run\(\)' -and $wrapText -notmatch 'Invoke-Tool|Start-Process')
+Yes 'the build never runs Nemesis: no -generate, no -update, no manual step' (
+    $buildText -notmatch '"-generate"|"-update"|NemesisDone|Nemesis Unlimited Behavior Engine\.exe')
 Yes 'and gives Pandora its folders by Settings.json beside a copy of it, the game folder''s Data and a work folder' (
-    $buildText -match "Join-Path \`$pRun 'Settings\.json'" -and $buildText -match 'gameDataPath = \$Data; outputPath = \$pOut' -and $buildText -match "\`$pOut = Join-Path \`$script:WorkDir 'pandora-out'")
-Yes 'Build-Generated.ps1 never asks BodySlide for RaceMenu morph files' ($buildText -notmatch '--trimorphs''|"--trimorphs"|''-tri''')
+    $buildText.Contains('File.WriteAllText(Path.Combine(pRun, "Settings.json")') -and $buildText.Contains('"gameDataPath\": ").Append(Json(data))') -and
+    $buildText.Contains('"outputPath\": ").Append(Json(pOut))') -and $buildText.Contains('string pOut = Path.Combine(workDir, "pandora-out");'))
+Yes 'the build never asks BodySlide for RaceMenu morph files' ($buildText -notmatch '"--trimorphs"|"-tri"')
 
 Done

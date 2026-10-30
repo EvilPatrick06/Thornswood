@@ -32,7 +32,7 @@
        was;
     5. an installer that fails, or that puts nothing in place, stops too.
   It also checks the order in Ship.ps1: after the keep decision and the
-  generated files and node checks (#1692), on main with -Package and not on
+  animation and body files and node checks (#1692), on main with -Package and not on
   a dry run, before Publish-Update and Package-Thornswood, and that a reason
   stops the Ship. If a name moves, this says so rather than
   quietly testing nothing.
@@ -84,7 +84,7 @@ $iAssert  = $src.IndexOf(". (Join-Path `$Here 'Assert-PublishSigned.ps1')")
 $iSeed    = $src.IndexOf("`n`$pubLauncher = `$null")
 $iKeep    = $src.IndexOf('if (Test-KeepFeedLauncher $pubLauncher')
 $iKept    = $src.IndexOf('$ModsOnly = $true')
-$iGen     = $src.IndexOf("Head 'Generated files'")
+$iGen     = $src.IndexOf("Head 'Animation and body files'")
 $iNode    = $src.IndexOf("Die ('node is not on this machine")
 $iWhen    = $src.IndexOf('if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {')
 $iStep    = $src.IndexOf('$fed = Install-FeedLauncher $pubLauncher $Root $feedLauncherDir $feedSigner (Join-Path $Here ''Install-Launcher.ps1'')')
@@ -98,7 +98,7 @@ Yes 'Ship puts the feed''s launcher in the root on main with -Package, not on a 
 Yes '  through Install-FeedLauncher with Install-Launcher.ps1' ($iStep -gt $iWhen)
 Yes '  and a reason stops the Ship' ($iDie -gt $iStep)
 Yes '  after the keep decision' ($iWhen -gt $iKept)
-Yes '  after the generated files and node checks, so nothing is installed for a release that stops there (#1692)' (
+Yes '  after the animation and body files and node checks, so nothing is installed for a release that stops there (#1692)' (
     $iGen -ge 0 -and $iNode -ge 0 -and $iWhen -gt $iGen -and $iWhen -gt $iNode)
 Yes '  with the sign helpers loaded before it' ($iAssert -ge 0 -and $iAssert -lt $iWhen)
 $iPlugins = $src.IndexOf("Head 'The in game plugins'")
