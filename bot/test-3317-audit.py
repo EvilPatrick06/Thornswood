@@ -107,8 +107,9 @@ class Place(object):
         for t in ():
             yield t
 
-    async def history(self, limit=None):
-        for m in list(self.msgs):
+    async def history(self, limit=None, oldest_first=False):
+        # Discord's order: newest first unless asked otherwise.
+        for m in (list(self.msgs) if oldest_first else list(self.msgs)[::-1]):
             yield m
 
     def overwrites_for(self, target):

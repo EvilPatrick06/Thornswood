@@ -49,9 +49,6 @@
     "reads": ["game/data/recipes.json"], "writes": ["game/data/recost.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Write-CutItems.js", "data": null, "plugins": null,
     "reads": ["game/data/recipes.json"], "writes": ["docs/systems/cut-items.json", "docs/systems/cut-items.md"] },
-  { "tool": "scripts/dev/Write-SystemLists.js", "data": null, "plugins": null,
-    "reads": ["game/data/recipes.json", "game/data/harvests.json", "game/data/ores.json", "game/data/hunts.json", "game/data/races.json"],
-    "writes": ["docs/systems/lists", "docs/systems/classes", "docs/systems/professions"] },
   { "tool": "scripts/dev/Build-FuelTable.js", "data": null, "plugins": null,
     "reads": ["game/data/recipes.json"], "writes": ["game/gamemode.js"] },
   { "tool": "scripts/dev/Build-ItemNameTable.js", "data": null, "plugins": null,
@@ -75,7 +72,13 @@
     "uses": ["game/kill-contracts.js", "game/merchant-commission-state.js", "game/merchant-commissions.js", "game/merchant-ledger-native.js", "game/merchant-role-stage.js",
              "game/merchant-settlement.js", "game/merchant-trading.js", "game/quest-eligibility.js", "game/quest-hunt-bundles.js", "game/quest-items.js",
              "game/quest-mammoth-sources.js", "game/quest-orchard-plots.js", "game/quest-resource-sources.js", "game/quest-transactions.js", "game/scene-reward-budget.js"],
-    "writes": ["game/gamemode.js"] }
+    "writes": ["game/gamemode.js"] },
+  { "tool": "scripts/dev/Build-ItemSources.js", "data": null, "plugins": null,
+    "reads": ["game/data/recipes.json", "docs/systems/cut-items.json", "game/data/harvests.json", "game/data/hunts.json", "game/data/ores.json", "game/data/merchant-role-tables.json", "game/data/merchant-retrievals.json", "game/gamemode.js"],
+    "writes": ["game/data/item-sources.json"] },
+  { "tool": "scripts/dev/Write-SystemLists.js", "data": null, "plugins": null,
+    "reads": ["game/data/recipes.json", "game/data/harvests.json", "game/data/ores.json", "game/data/hunts.json", "game/data/races.json", "game/data/item-sources.json"],
+    "writes": ["docs/systems/lists", "docs/systems/classes", "docs/systems/professions"] }
  ],
  "notInChain": {
   "scripts/dev/Build-NpcPopulation.py": "Reads the server's load order from a server-settings file (or, with --data, its own committed load order out of one folder, which is how Run-OnBox.ps1 rebuilds it after Build-LastPlugin.py), and reads placed actors: Thornswood-Content.esp places none (measured 20 Oct: IMAD, ALCH, MGEF, MESG, WRLD, CELL, REFR, COBJ, FURN, FLOR, MISC, BOOK, ACTI and KYWD records, no ACHR). It is rebuilt when the collection's load order moves, and Build-LastPlugin.py says so when it has.",

@@ -15,6 +15,7 @@ const HARVESTS = path.join(ROOT, 'game', 'data', 'harvests.json');
 const ORES = path.join(ROOT, 'game', 'data', 'ores.json');
 const HUNTS = path.join(ROOT, 'game', 'data', 'hunts.json');
 const RACES = path.join(ROOT, 'game', 'data', 'races.json');
+const SOURCES = path.join(ROOT, 'game', 'data', 'item-sources.json');
 
 function clean(s) {
   return String(s == null ? '' : s)
@@ -52,6 +53,7 @@ const harvests = JSON.parse(fs.readFileSync(HARVESTS, 'utf8'));
 const ores = JSON.parse(fs.readFileSync(ORES, 'utf8'));
 const hunts = JSON.parse(fs.readFileSync(HUNTS, 'utf8'));
 const races = JSON.parse(fs.readFileSync(RACES, 'utf8'));
+const sources = JSON.parse(fs.readFileSync(SOURCES, 'utf8'));
 
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -187,6 +189,84 @@ raceRows.forEach(function (row) {
 });
 write('race-locks.md', raceBody);
 index.push('- [Race locks](race-locks.md) (' + raceRows.length + ')');
+
+// Where every item comes from (#3145), off scripts/dev/Build-ItemSources.js.
+// The page lists what is not ordinary bench or class work, because that is
+// what the balance against race, company, faction and quest goods (#3135)
+// reads; the bench and class rows are on their own pages already.
+(function () {
+  const kinds = Object.keys(sources.kinds);
+  const askedBy = {};
+  Object.keys(recipes.recipes || {}).forEach(function (id) {
+    const row = recipes.recipes[id];
+    if (row.book === 'cut') { return; }
+    (row.inputItems || []).forEach(function (it) {
+      if (!askedBy[it.item]) { askedBy[it.item] = {}; }
+      askedBy[it.item][clean(row.name)] = true;
+    });
+  });
+  function nameOf(id) { return clean(sources.items[id].name) || '(no name in any table)'; }
+  function byName(a, b) {
+    const an = nameOf(a).toLowerCase();
+    const bn = nameOf(b).toLowerCase();
+    if (an !== bn) { return an < bn ? -1 : 1; }
+    return a < b ? -1 : 1;
+  }
+  function viaText(v) {
+    const parts = [v.kind];
+    ['by', 'race', 'roll', 'quest', 'rank'].forEach(function (k) { if (v[k]) { parts.push(clean(v[k])); } });
+    if (v.tier) { parts.push('tier ' + v.tier); }
+    if (v.table && v.kind !== 'crafted') { parts.push('(' + clean(v.table) + ')'); }
+    return parts.join(' ');
+  }
+  function viaAll(id) {
+    const seen = {};
+    return sources.items[id].via.map(viaText).filter(function (t) {
+      if (seen[t]) { return false; }
+      seen[t] = true;
+      return true;
+    }).join('; ');
+  }
+  let body = head('Where every item comes from', 'game/data/item-sources.json',
+    sources.count + ' items: everything somebody can come to hold, and every input a live recipe asks for. ' +
+    'Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; ' +
+    'run it, then this script, after a recipe, work, quest or dungeon table changes. ' +
+    'Balance is what a thing takes to make or get plus its stats, never gold.');
+  body += '| Kind | What it means | Items | Only this |\n| --- | --- | --- | --- |\n';
+  kinds.forEach(function (k) {
+    body += '| ' + k + ' | ' + clean(sources.kinds[k]) + ' | ' + sources.counts[k] + ' | ' + sources.only[k] + ' |\n';
+  });
+  body += '\nNot a source: ' + clean(sources.notSources) + '.\n';
+  body += '\n## Nothing hands these out\n\n' + sources.noSource.length +
+    ' items a live recipe asks for, or a hair dye or a bottle of water needs, that no recipe, class, quest, dungeon or starting kit hands out. ' +
+    'Every recipe that asks for one of them cannot be made.\n\n';
+  body += '| Item | Asked for by | Id |\n| --- | --- | --- |\n';
+  sources.noSource.slice().sort(byName).forEach(function (id) {
+    const by = Object.keys(askedBy[id] || {}).sort();
+    const shown = by.length > 6 ? by.slice(0, 6).join(', ') + ' and ' + (by.length - 6) + ' more' : by.join(', ');
+    body += '| ' + nameOf(id) + ' | ' + (shown || 'a hair dye or a bottle of water') + ' | `' + id + '` |\n';
+  });
+  const sections = [
+    ['quest', 'Only from a quest', 'Drawn only while a merchant\'s scarce work is open, a rare seam its quest opens, or a retrieval token.'],
+    ['found', 'Only found', 'Created only by a dungeon chest or a body.'],
+    ['faction', 'Faction work', 'Only the embassy roll or the remnant roll may make these.'],
+    ['race', 'Race work', 'Only the named race may make these. An item also made by another source shows it.'],
+    ['company', 'Company wares', 'The Free Skyrim Trading Company\'s wares.'],
+    ['start', 'Handed to a new character', 'The first clothes, a class\'s tool and a farmer\'s first seeds, with whatever else makes them.']
+  ];
+  sections.forEach(function (sec) {
+    const k = sec[0];
+    const ids = Object.keys(sources.items).filter(function (id) {
+      const s = sources.items[id].sources;
+      return (k === 'quest' || k === 'found') ? (s.length === 1 && s[0] === k) : s.indexOf(k) >= 0;
+    }).sort(byName);
+    body += '\n## ' + sec[1] + '\n\n' + ids.length + ' items. ' + sec[2] + '\n\n';
+    body += '| Item | Sources | Id |\n| --- | --- | --- |\n';
+    ids.forEach(function (id) { body += '| ' + nameOf(id) + ' | ' + viaAll(id) + ' | `' + id + '` |\n'; });
+  });
+  write('item-sources.md', body);
+  index.push('- [Where every item comes from](item-sources.md) (' + sources.count + ' items, ' + sources.noSource.length + ' with no source)');
+})();
 
 const playable = [];
 Object.keys(races.items || {}).forEach(function (id) {
