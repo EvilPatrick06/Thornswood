@@ -16,7 +16,7 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Anybody](anybody.md) (588)
 - [Refused](refused.md) (235)
 - [Race locks](race-locks.md) (38)
-- [Where every item comes from](item-sources.md) (1070 items, 17 with no source)
+- [Where every item comes from](item-sources.md) (1058 items, 17 with no source)
 - [Playable races](playable-races.md) (12)
 - [Miner](miner.md) (18 rows, 581 records)
 - [Gatherer](gatherer.md) (47 rows, 107 records)
@@ -25,4 +25,5 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 - [Hunter](hunter.md) (96 rows, 336 records)
 - [Eggs and wild food](wild-food.md) (4)
 - [Unranked](unranked.md) (45)
+- [Who makes what the world hands out](who-makes-it.md)
 
