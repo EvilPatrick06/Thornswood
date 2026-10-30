@@ -104,6 +104,17 @@
 // interaction; Install-NexusRevision.ps1 reads a revision's rules against the
 // plugins' headers (PluginRuleLoops.ps1) and stops on one.
 // On stdout: <plugin>\trule\tafter <old names>\tafter <new names>.
+//
+// TAKING A MOD OUT (#3649). An entry with "remove": true takes Nexus mod
+// modId out of the revision, with the plugins it puts in Data:
+//   { "remove": true, "modId": "24104" }
+// Its plugins are the ones its file hashes name at the top of Data, and each
+// comes off the plugin list. It refuses an entry with no hashes (nothing in
+// the revision says which plugins it brings), one with patches (their folder
+// is in the archive), one a mod rule names, and one whose plugin a plugin
+// rule names, because each of those needs the rest of the collection worked
+// out again in Vortex on One.
+// On stdout: <entry name>\tremoved\t\tfile <id>, and <plugin>\tplugin\t\tremoved.
 
 'use strict';
 const fs = require('fs');
@@ -199,6 +210,7 @@ function applySwaps(collection, swaps) {
     if (sw.add === true) { applyAdd(collection, sw, lines); continue; }
     if (sw.patch === true) { applyPatch(collection, sw, lines); continue; }
     if (sw.rule === true) { applyRule(collection, sw, lines); continue; }
+    if (sw.remove === true) { applyRemove(collection, sw, lines); continue; }
     for (const k of ['modId', 'fileId', 'version', 'md5', 'fileSize', 'logicalFilename']) {
       if (sw[k] === undefined || sw[k] === null || sw[k] === '') stop('A swap has no ' + k + '.');
     }
@@ -414,6 +426,38 @@ function applyRule(collection, ru, lines) {
   lines.push([String(ru.name), 'rule', 'after ' + was.join(', '), 'after ' + now.join(', ')].join('\t'));
 }
 
+function applyRemove(collection, rm, lines) {
+  if (!/^\d+$/.test(String(rm.modId))) stop('A mod to take out has no mod number.');
+  const hits = collection.mods.filter(m => m.source && m.source.type === 'nexus' && String(m.source.modId) === String(rm.modId));
+  if (hits.length !== 1) stop('The revision has ' + hits.length + ' entries for Nexus mod ' + rm.modId + ', so there is no one entry to take out.');
+  const e = hits[0];
+  if (e.patches && Object.keys(e.patches).length) stop(e.name + ' carries patches, whose folder is in the archive. Take it out in Vortex on One.');
+  const rules = (collection.modRules || []).filter(r => named(r, e));
+  if (rules.length) stop(rules.length + ' of the collection\'s mod rules name ' + e.name + '. Take it out in Vortex on One.');
+  if (!Array.isArray(e.hashes) || !e.hashes.length) stop(e.name + ' has no file hashes, so nothing in the revision says which plugins it brings. Take it out in Vortex on One.');
+  const plugins = [];
+  for (const h of e.hashes) {
+    const path = String(h.path || '');
+    if (/^[^\\/]+\.es[mpl]$/i.test(path) && plugins.indexOf(path.toLowerCase()) < 0) plugins.push(path.toLowerCase());
+  }
+  const pr = (collection.pluginRules && Array.isArray(collection.pluginRules.plugins)) ? collection.pluginRules.plugins : [];
+  for (const r of pr) {
+    const names = [r.name].concat(r.after || [], r.before || []).map(n => String(n).toLowerCase());
+    const hit = plugins.find(p => names.indexOf(p) >= 0);
+    if (hit) stop('A plugin rule names ' + hit + ', which ' + e.name + ' brings. Take it out in Vortex on One.');
+  }
+  collection.mods.splice(collection.mods.indexOf(e), 1);
+  lines.push([String(e.name), 'removed', '', 'file ' + e.source.fileId].join('\t'));
+  if (Array.isArray(collection.plugins)) {
+    for (const p of plugins) {
+      const at = collection.plugins.findIndex(q => String(q.name).toLowerCase() === p);
+      if (at < 0) continue;
+      lines.push([String(collection.plugins[at].name), 'plugin', '', 'removed'].join('\t'));
+      collection.plugins.splice(at, 1);
+    }
+  }
+}
+
 function main(argv) {
   if (argv.length !== 4) stop('usage: node nexus-collection.js <collection.json> <swaps.json> <out collection.json> <out payload.json>');
   const [inPath, swapsPath, outPath, payloadPath] = argv;
@@ -431,4 +475,4 @@ function main(argv) {
 }
 
 if (require.main === module) main(process.argv.slice(2));
-module.exports = { payloadOf, applySwaps, applyAdd, applyPatch, applyRule, filterInfo, toV3CollectionPayload };
+module.exports = { payloadOf, applySwaps, applyAdd, applyPatch, applyRule, applyRemove, filterInfo, toV3CollectionPayload };

@@ -57,6 +57,7 @@ $carriers = [ordered]@{
     'scripts/vps/vps-time-wait.ps1'              = @{ Args = '-Check';                                 Word = 'STOP ' }
     'scripts/vps/vps-ssh-scope.ps1'              = @{ Args = "-From '203.0.113.7' -DryRun";            Word = 'STOP ' }
     'scripts/vps/vps-web-firewall.ps1'           = @{ Args = "-Apply -Ranges '198.51.100.0/24' -DryRun"; Word = 'STOP ' }
+    'scripts/vps/vps-inbound-rules.ps1'          = @{ Args = '-Apply -DryRun';                         Word = 'STOP ' }
 }
 
 # ---- 1. the rule --------------------------------------------------------------
