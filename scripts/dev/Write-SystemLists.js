@@ -196,15 +196,14 @@ index.push('- [Race locks](race-locks.md) (' + raceRows.length + ')');
 // reads; the bench and class rows are on their own pages already.
 (function () {
   const kinds = Object.keys(sources.kinds);
-  const askedBy = {};
-  Object.keys(recipes.recipes || {}).forEach(function (id) {
-    const row = recipes.recipes[id];
-    if (row.book === 'cut') { return; }
-    (row.inputItems || []).forEach(function (it) {
-      if (!askedBy[it.item]) { askedBy[it.item] = {}; }
-      askedBy[it.item][clean(row.name)] = true;
-    });
-  });
+  // What asks for an item is the table's askedBy: a live recipe by id, a hair
+  // dye by its row, or the water bottle.
+  function askerName(by) {
+    const row = (recipes.recipes || {})[by] || (recipes.unowned || {})[by];
+    if (row) { return clean(row.name); }
+    if (sources.items[by]) { return clean(sources.items[by].name); }
+    return by === 'NEEDS.waterItems' ? 'a bottle of water' : by;
+  }
   function nameOf(id) { return clean(sources.items[id].name) || '(no name in any table)'; }
   function byName(a, b) {
     const an = nameOf(a).toLowerCase();
@@ -242,9 +241,9 @@ index.push('- [Race locks](race-locks.md) (' + raceRows.length + ')');
     'Every recipe that asks for one of them cannot be made.\n\n';
   body += '| Item | Asked for by | Id |\n| --- | --- | --- |\n';
   sources.noSource.slice().sort(byName).forEach(function (id) {
-    const by = Object.keys(askedBy[id] || {}).sort();
+    const by = Array.from(new Set((sources.items[id].askedBy || []).map(askerName))).sort();
     const shown = by.length > 6 ? by.slice(0, 6).join(', ') + ' and ' + (by.length - 6) + ' more' : by.join(', ');
-    body += '| ' + nameOf(id) + ' | ' + (shown || 'a hair dye or a bottle of water') + ' | `' + id + '` |\n';
+    body += '| ' + nameOf(id) + ' | ' + shown + ' | `' + id + '` |\n';
   });
   const sections = [
     ['quest', 'Only from a quest', 'Drawn only while a merchant\'s scarce work is open, a rare seam its quest opens, or a retrieval token.'],

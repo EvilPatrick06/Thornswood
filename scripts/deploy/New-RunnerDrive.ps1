@@ -10,8 +10,9 @@
       .\scripts\deploy\New-RunnerDrive.ps1 -Status    say what is there, change nothing
       .\scripts\deploy\New-RunnerDrive.ps1 -Remove    take it off again, once no runner is on it
 
-  Then Install-Runner.ps1 -OffBox puts each runner on it (it finds the drive
-  by its label, Thornswood Runners): see its header, ON THE RUNNER DRIVE.
+  Then Move-RunnersToDrive.ps1 plans and checks each move before doing it.
+  It finds the drive by its label, Thornswood Runners. Do not remove a live
+  account to move its runner; -Recover is only for accounts already removed.
 
   WHY. On the box Defender skips each runner's folder (Install-Runner.ps1,
   step 6). Off the box it keeps scanning, because pull request code runs
@@ -25,12 +26,14 @@
   files Defender had not seen before; every new checkout and every file a
   test writes is such a file.
 
-  A DEV DRIVE. A ReFS volume Windows marks for developer work. Once it is
-  trusted, Defender scans what is opened on it in performance mode: the scan
-  runs after the open instead of before it, and nothing on it goes unscanned.
-  So it keeps the protection an exclusion would take away (that option, B on
-  the page, was marked as weakening security). Windows 11 22H2 (build 22621)
-  or later; Windows does not make one smaller than 50 GB.
+  A DEV DRIVE. A ReFS volume Windows marks for developer work. A trusted
+  drive can use Defender performance mode when that setting is enabled and
+  Defender and real-time protection are active. The scan runs after a file
+  opens instead of before it. Microsoft says this gives less protection than
+  checking before the open, though more than an exclusion. Making or trusting
+  a drive does not enable a disabled performance-mode setting. This script
+  reports that setting; it does not change it or add an exclusion. Windows 11
+  22H2 (build 22621) or later; Windows does not make one smaller than 50 GB.
 
   WHAT IT DOES, in order:
     1. Checks this is PowerShell run as administrator on a Windows that makes
@@ -128,7 +131,7 @@ function Show-Status {
   $vol = Get-Volume -FileSystemLabel $Label -EA SilentlyContinue
   if ($vol) { Say ('volume    ' + $vol.DriveLetter + ':, ' + $vol.FileSystem + ', ' + [Math]::Round($vol.SizeRemaining / 1GB) + ' GB free') } else { Say ('volume    no volume labelled ' + $Label) 'Yellow' }
   if ($vol -and $vol.DriveLetter) { & fsutil.exe devdrv query ($vol.DriveLetter + ':') 2>&1 | ForEach-Object { Say ('fsutil    ' + "$_".Trim()) } }
-  try { Say ('defender  performance mode status ' + (Get-MpPreference).PerformanceModeStatus + ' (0 is on)') } catch { Say ('defender  could not be read: ' + $_.Exception.Message) 'Yellow' }
+  try { Say ('defender  performance mode status ' + (Get-MpPreference).PerformanceModeStatus + ' (0 is on; on One this read 1 while Windows Security, Dev Drive protection, See volumes said R: scans asynchronously, so that page is the one to trust, #4048)') } catch { Say ('defender  could not be read: ' + $_.Exception.Message) 'Yellow' }
   $t = Get-ScheduledTask -TaskName $Task -EA SilentlyContinue
   if ($t) { Say ('task      ' + $Task + ', ' + $t.State) } else { Say ('task      NO TASK: after a restart nothing attaches the drive') 'Yellow' }
   if ($vol -and $vol.DriveLetter) {

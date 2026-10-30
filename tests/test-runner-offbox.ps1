@@ -88,6 +88,7 @@ try {
     Yes '  Defender keeps scanning its folder' ($r.Text -match '(?m)^if \(\$false\) \{\s*$')
     Yes '  the stand-in registration token is in none of the scripts (it goes on standard input)' ($r.Text -notmatch 'DRY-RUN-TOKEN-NOT-REAL')
     Yes '  the install script is marked as taking a secret on standard input' ($r.Text -match 'with a secret on standard input')
+    Yes '  dry-run profile recovery names an approved restart of THIS PC, never a VPS script (#4048)' ($r.Text -match 'approved local PC restart' -and $r.Text -notmatch 'Set-TimeWait.ps1 -Restart')
     Yes '  GitHub was never asked (the gh on PATH was not called)' (-not (Test-Path -LiteralPath $ghCalled))
 
     $r = Dry @('-OffBox', '-DefenderSkip', '-AlsoDeny', 'D:\Somewhere Else')
@@ -133,6 +134,7 @@ try {
     Yes '  and a process list that cannot be read stops them, never reads as empty' ($r.Text -match [regex]::Escape('@(Get-CimInstance Win32_Process -EA Stop | Where-Object'))
     $rm = Dry @('-Number', '3', '-Remove')
     Yes '  -Remove refuses a runner running a job before GitHub is told, and stops it the same way' ($rm.Text -match "(?m)^Assert-RunnerIdle 'C:\\Thornswood-Runner3'" -and $rm.Text -match "(?m)^Stop-RunnerHere 'C:\\Thornswood-Runner3' " -and $rm.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue' -and $rm.Text.IndexOf('Assert-RunnerIdle ''C:\Thornswood-Runner3''') -lt $rm.Text.IndexOf('config.cmd remove'))
+    Yes '  remote VPS recovery retains VPS restart guidance (#4048)' ($r.Text -match 'Restart the VPS \(scripts\\vps\\Set-TimeWait.ps1 -Restart\)')
     Yes '  the VPS runner keeps its label, name and folder, runner 1 takes builds (#2994) and checks signed drafts (#3956), but no pull request builds (#4010)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'(?!,)" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
     $r2 = Dry @('-Number', '2')
     Yes '  runner 2 takes builds, pull request builds and checks (#4010)' ($r2.Code -eq 0 -and $r2.Text -match "--name 'thornswood-vps-2' --labels 'thornswood-vps,thornswood-build,thornswood-pr-build,thornswood-check'(?!,)")
