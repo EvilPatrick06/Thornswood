@@ -80,8 +80,10 @@ Yes 'the button names the revision it opens' ($buttonText.Contains('"Open revisi
 # ---- ahead ------------------------------------------------------------------
 $bar = Method $shell 'static void ShowCollectionBar(int revision = -1)'
 Yes 'the ahead card says nothing needs installing' ($bar.Contains('nothing needs installing'))
-Yes 'the ahead card has no install button' ($bar.Contains('btnInstallNow.Visibility = problem == "ahead" ? Visibility.Collapsed : Visibility.Visible;'))
-# Since #3201 the bar's button and Settings' are one handler, InstallNowPressed in ShellUpdate.cs.
+# Since #3201 the card's button above Play and Settings' are one handler with
+# one label and one visibility, in ShellUpdate.cs (InstallNowPressed, InstallShown).
+Yes 'the ahead card has no install button' ($bar.Contains('InstallShown(problem == "ahead" ? Visibility.Collapsed : Visibility.Visible);') -and
+    $update -match '(?s)static void InstallShown\(Visibility shown\)\s*\{\s*if \(btnInstallNow != null\) btnInstallNow\.Visibility = shown;\s*if \(btnUpdate != null\) btnUpdate\.Visibility = shown;')
 $click = Method $update 'static void InstallNowPressed()'
 Yes 'a press on the bar''s button while ahead opens nothing' ($click.Contains('if (collectionBarUp && CollectionProblem() == "ahead") return;'))
 $draw = Method $shell 'static bool DrawStatus()'

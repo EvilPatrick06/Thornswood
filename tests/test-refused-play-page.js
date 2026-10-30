@@ -119,7 +119,7 @@ CUT.forEach(function (t) {
 });
 yes('nor to the Add-ons page, a tab of the cut Mods page', words.indexOf('Add-ons') < 0);
 yes('the missing mods box offers to open the collection\'s page',
-    /MessageBoxButton\.YesNo/.test(block) && /Process\.Start\(new ProcessStartInfo\(cfg\.CollectionUrl\)/.test(block) &&
+    /MessageBoxButton\.YesNo/.test(block) && /Process\.Start\(new ProcessStartInfo\(CollectionLink\(\)\)/.test(block) &&
     words.indexOf('press Yes to open its page') >= 0);
 yes('and says Fix will not help with a mod that is not installed', words.indexOf('Pressing Fix will not help') >= 0);
 yes('no em dash and never the word the project does not use in the boxes', !/—/.test(words) && !/player/i.test(words));
