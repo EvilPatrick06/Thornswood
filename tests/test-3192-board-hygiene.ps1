@@ -18,7 +18,8 @@
        Invoke-RestMethod that answers from a table and writes down every call:
        expire-claims takes off a claim with nothing for three days and
        comments first, keeps one with a fresh comment, a fresh claim or an
-       open pull request moved today, and passes over a label already off;
+       open pull request moved today, and passes over a label already off,
+       a Hermes Bot's claimed label the same as anybody's (#4715);
        done-on-merge moves an issue whose test task the merged pull request
        carries, with the board token, writes the test task on it in a fenced
        block, and leaves alone a Refs with no test task, a closed issue and a
@@ -189,7 +190,9 @@ try {
                 @{ number = 14; created_at = (Ago 30); labels = $claim },
                 @{ number = 15; created_at = (Ago 30); labels = @(@{ name = 'area: Site' }) },
                 @{ number = 16; created_at = (Ago 30); labels = $claim; pull_request = @{ url = 'x' } },
-                @{ number = 17; created_at = (Ago 30); labels = @(@{ name = 'claimed: Claude' }, @{ name = 'claimed:GitHub' }) })
+                @{ number = 17; created_at = (Ago 30); labels = @(@{ name = 'claimed: Claude' }, @{ name = 'claimed:GitHub' }) },
+                @{ number = 18; created_at = (Ago 30); labels = @(@{ name = 'claimed: Wisp' }) },
+                @{ number = 19; created_at = (Ago 30); labels = @(@{ name = 'claimed: Sprocket' }) })
             'GET /issues/11/timeline?per_page=100&page=1' = @(
                 @{ event = 'labeled'; created_at = (Ago 9); label = @{ name = 'claimed: Claude' } },
                 @{ event = 'commented'; created_at = (Ago 5) })
@@ -204,6 +207,11 @@ try {
                 @{ event = 'cross-referenced'; created_at = (Ago 8); source = @{ issue = @{ number = 99; state = 'open'; updated_at = (Ago 0.2); pull_request = @{ url = 'x' } } } })
             'GET /issues/17/timeline?per_page=100&page=1' = @(
                 @{ event = 'referenced'; created_at = (Ago 4) })
+            # A Hermes Bot's claim (#4715): the same three days as anybody's.
+            'GET /issues/18/timeline?per_page=100&page=1' = @(
+                @{ event = 'labeled'; created_at = (Ago 5); label = @{ name = 'claimed: Wisp' } })
+            'GET /issues/19/timeline?per_page=100&page=1' = @(
+                @{ event = 'labeled'; created_at = (Ago 1); label = @{ name = 'claimed: Sprocket' } })
             '404' = @('DELETE /issues/17/labels/claimed%3AGitHub')
         }
         $r = Run-Flow $f $table @{ CLAIM_DAYS = '3' }
@@ -219,6 +227,9 @@ try {
         Yes '  #15, no claim: not read at all, and #16, a pull request: passed over' (@($w | Where-Object { $_ -match '/issues/1[56]/' }).Count -eq 0)
         Yes '  #17, two claims: both asked off, one already off said and passed over' (
             @($w | Where-Object { $_ -like 'DELETE /issues/17/labels/*' }).Count -eq 2 -and $r.Out -match 'claimed:GitHub was already off')
+        Yes '  #18, a Bot''s claim with nothing for 5 days: a comment, then claimed: Wisp comes off' (
+            @($w | Where-Object { $_ -like 'POST /issues/18/comments *' -and $_ -match 'claimed: Wisp' }).Count -eq 1 -and @($w | Where-Object { $_ -like 'DELETE /issues/18/labels/claimed%3A%20Wisp *' }).Count -eq 1)
+        Yes '  #19, a Bot claimed it yesterday: kept' (@($w | Where-Object { $_ -match '/issues/19/' }).Count -eq 0 -and $r.Out -match '#19: kept')
         Yes '  every write uses the run''s own token' (@($w | Where-Object { $_ -notmatch 'Bearer run-token' }).Count -eq 0)
     }
 
