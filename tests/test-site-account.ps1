@@ -181,11 +181,24 @@ function Build([string]$account, [string]$docsRoot, [string]$taskName = 'Thornsw
 
 $open  = '# ==== thornswood site account ===='
 $close = '# ==== end thornswood site account ===='
-function BlockOf([string]$text) {
-    $a = $text.IndexOf($open)
-    $b = $text.IndexOf($close)
+$grantsOpen  = '# ==== thornswood site grants ===='
+$grantsClose = '# ==== end thornswood site grants ===='
+function Between([string]$text, [string]$from, [string]$to) {
+    $a = $text.IndexOf($from)
+    $b = $text.IndexOf($to)
     if ($a -lt 0 -or $b -le $a) { return $null }
-    return $text.Substring($a, $b + $close.Length - $a)
+    return $text.Substring($a, $b + $to.Length - $a)
+}
+# The account block alone: who the task runs as, and its SID.
+function AccountOf([string]$text) { return (Between $text $open $close) }
+# The account block and then the grants. In the script that goes up the task
+# is registered or updated between the two, because Windows maps the task's
+# SID only once it is (#4973); run here with stand-ins, nothing is between.
+function BlockOf([string]$text) {
+    $a = AccountOf $text
+    $g = Between $text $grantsOpen $grantsClose
+    if ($null -eq $a -or $null -eq $g) { return $null }
+    return $a + "`n" + $g
 }
 function CallsOf($scriptAst, [string]$name) {
     return @($scriptAst.FindAll({ param($n)
@@ -480,7 +493,28 @@ try {
     # The scratch box itself can be under C:\Thornswood-RunnerN (#3117), so
     # its own paths are taken out before looking for a real folder.
     Yes 'LOCAL SERVICE: every folder in the block was swapped for a scratch one' ($block.Replace("'" + $tmp, "'<scratch>") -notmatch "'C:\\Thornswood-")
-    $r = Run $block
+    # With no Thornswood Docs task here, every grant is refused, and since
+    # #4973 a refused grant stops the setup script before LOCAL SERVICE's old
+    # rules come off. That is run first, with the real icacls. Then, so the
+    # rest of the block can be run here at all, icacls is given a SID that
+    # maps (INTERACTIVE, S-1-5-4) in place of the task's; the checks of what
+    # the task's SID was granted say SKIP, as before.
+    $runBlock = $block
+    if (-not $script:taskMaps) {
+        $r = Run $block
+        $said = $r.said -join "`n"
+        # icacls' two lines can come in either order, so count rather than pair them.
+        $refusedHere = @([regex]::Matches($said, 'COULD NOT GRANT')).Count
+        $noMapping = @([regex]::Matches($said, 'No mapping between account names and security IDs')).Count
+        Yes ('with no Thornswood Docs task here, every grant refused was refused only because its SID has no mapping (' + $refusedHere + ' refused, ' + $noMapping + ' for that, #4968)') (
+            $refusedHere -gt 0 -and $noMapping -ge $refusedHere -and $said -notmatch 'Access is denied')
+        Yes 'and the setup script stops there, saying what was refused, with LOCAL SERVICE''s old rules left on (#4973)' (
+            $said -match 'GRANTS REFUSED to NT TASK\\Thornswood Docs' -and $said -notmatch 'LOCAL SERVICE no longer has a rule' -and
+            (RulesFor $server 'S-1-5-19').Count -ge 1)
+        $taskSid = Get-ThornswoodTaskSidFromName 'Thornswood Docs'
+        $runBlock = 'function icacls { $a = @($args | ForEach-Object { ([string]$_).Replace(''*' + $taskSid + ':'', ''*S-1-5-4:'') }); & (Join-Path $env:SystemRoot ''System32\icacls.exe'') @a }' + "`n" + $block
+    }
+    $r = Run $runBlock
     $said = $r.said -join "`n"
     Yes 'LOCAL SERVICE: the task runs as LOCAL SERVICE' ($r.principal -and $r.principal.UserId -match 'LOCAL SERVICE$')
     $resolved = ''
@@ -499,15 +533,7 @@ try {
     Yes 'LOCAL SERVICE: as a service account, so no password is kept' ($r.principal -and "$($r.principal.LogonType)" -eq 'ServiceAccount')
     Granted 'LOCAL SERVICE: it says what it granted, to the site''s task (#4077)' ($said -match [regex]::Escape("granted NT TASK\Thornswood Docs (OI)(CI)M on $docs"))
     Yes 'LOCAL SERVICE: a folder that is not there is said and skipped, not failed' (
-        $said -match [regex]::Escape("not here, nothing granted: $dev") -and
-        ((-not $script:taskMaps) -or $said -notmatch 'COULD NOT GRANT'))
-    if (-not $script:taskMaps) {
-        # icacls' two lines can come in either order, so count rather than pair them.
-        $refusedHere = @([regex]::Matches($said, 'COULD NOT GRANT')).Count
-        $noMapping = @([regex]::Matches($said, 'No mapping between account names and security IDs')).Count
-        Yes ('with no Thornswood Docs task here, every grant refused was refused only because its SID has no mapping (' + $refusedHere + ' refused, ' + $noMapping + ' for that, #4968)') (
-            $refusedHere -gt 0 -and $noMapping -eq $refusedHere -and $said -notmatch 'Access is denied')
-    }
+        $said -match [regex]::Escape("not here, nothing granted: $dev") -and $said -notmatch 'COULD NOT GRANT')
     Yes 'LOCAL SERVICE: no folder was made that was not there' (-not (Test-Path -LiteralPath $dev))
 
     # The grants and the denies name the site's task, not LOCAL SERVICE, which
@@ -594,7 +620,7 @@ try {
     # The grants are given again at every deploy while the site is not SYSTEM,
     # so a second run has to leave the same rules, not a second copy of each.
     $before = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
-    $r = Run $block
+    $r = Run $runBlock
     $after = @($docs, $server, (Join-Path $server 'data'), $voice, $voiceDev | ForEach-Object { (RulesFor $_ $ls).Count })
     Granted ('a second run grants again without doubling a rule (' + ($before -join ',') + ' then ' + ($after -join ',') + ')') (
         ($before -join ',') -eq ($after -join ',') -and @($after | Where-Object { $_ -ne 1 }).Count -eq 0)
@@ -618,6 +644,11 @@ try {
     Yes 'a grant that fails does not throw' (-not $threw)
     Yes 'each one that fails is said, with what icacls said, and the rest are still tried' (
         $refused -eq 6 -and $said -match 'Access is denied')
+    # #4973: and then the setup script stops, naming each, before LOCAL
+    # SERVICE's old rules come off and before SETUP DONE.
+    Yes 'then it stops, naming what was refused, and takes nothing off' (
+        $said -match 'GRANTS REFUSED' -and $said -match [regex]::Escape("  (OI)(CI)M on $docs`: Access is denied.") -and
+        $said -notmatch 'LOCAL SERVICE no longer has a rule' -and $said -notmatch 'BUILTIN\\Users no longer reaches')
 
     # -- an account this box does not have: nothing is stopped ------------------
     $script:icaclsCalls = 0
@@ -842,7 +873,7 @@ try {
         function OnTask([string]$given, [int]$n) {
             $code = '$ErrorActionPreference = ''Continue''' + "`n" +
                     'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
-                    (BlockOf (Build $given $docs $scratchTask)) + "`n" +
+                    (AccountOf (Build $given $docs $scratchTask)) + "`n" +
                     ('$a = New-ScheduledTaskAction -Execute ''cmd.exe'' -Argument ''/c exit {0}''' -f $n) + "`n" +
                     $makeOrUpdate
             $script:icaclsCalls = 0
