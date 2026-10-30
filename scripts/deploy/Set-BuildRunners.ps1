@@ -15,12 +15,12 @@
   A record is { "label": ..., "runners": [1, 2] }: the runners it lists
   (thornswood-vps is 1, thornswood-vps-<n> is n) carry the label and no other
   runner does, an off-box runner (thornswood-pr-*) only when the record's
-  offBox names it and it does not carry thornswood-vps (build runners on
-  One, 26 Oct 2026). Changing one is a pull request to the record; once it
-  merges, the Desk runs this script and GitHub matches it a minute later.
-  -Check says only what differs. The workflow it starts is in the private
-  ops repository, where the runners are registered (#4013), so a push here
-  cannot start it by itself.
+  offBox names it and it does not carry thornswood-vps (One's pull request
+  build runners, 26 Oct 2026, #4010). Changing one is a pull request to the
+  record; once it merges, the Desk runs this script and GitHub matches it a
+  minute later. -Check says only what differs. The workflow it starts is in
+  the private ops repository, where the runners are registered (#4013), so a
+  push here cannot start it by itself.
 
   WHY THE BUILD LABEL (#2994). The VPS has six cores and, from 20 October,
   eight runners (#2929; three since the evening of 21 October, #3108,

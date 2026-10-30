@@ -291,7 +291,7 @@ function guard(name, fn) {
     others are the thing acted on. onDeath and onRespawn are not a person
     acting and are left. Inside guard() so it goes wherever guard() does.
   */
-  const ACTS_AS = { onActivate: 1, onCraft: 0, onReadBook: 0, onPutItem: 1, onTakeItem: 1,
+  const ACTS_AS = { onActivate: 1, onCraft: 0, onCraftWork: 0, onReadBook: 0, onPutItem: 1, onTakeItem: 1,
                     onDropItem: 0, onUpdateAppearanceAttempt: 0 };
   const acts = Object.prototype.hasOwnProperty.call(ACTS_AS, name) ? ACTS_AS[name] : -1;
   return function () {
@@ -29044,6 +29044,97 @@ function unfitToMake(actorId, workbenchId) {
   return (needs && needs.craftRefusal) ? needs.craftRefusal(actorId) : '';
 }
 
+/*
+  HOW LONG A CRAFT TAKES AT THE BENCH (#3161).
+
+  Patrick, 22 Oct 2026, his B on the report page: "small 1 s, medium 5 s,
+  large 15 s", with an animation, and moving away stops it (docs/DECIDED.md).
+
+  The game makes the item on the person's machine the moment they press
+  craft, so the wait is the engine's (engine/skymp CraftService, fork #115):
+  it asks mp.onCraftWork before anything else, with mp.onCraft's own
+  arguments, and holds the craft for the time named here. The bench's own
+  working animation plays behind its menu while they stay, the item lands in
+  the pack when the time is up, and only then is mp.onCraft asked and
+  anything taken. Getting up from the bench closes its menu, which stops the
+  work with nothing taken; so does being found away from the bench when a
+  time is up. An engine with no onCraftWork never asks, and a craft there is
+  made at once as before.
+
+  WHICH SIZE. A row's family is what kind of thing it makes (recipes.json,
+  "family"), and that is the size: a meal, an ingot or a bundle of arrows is
+  small, a blade, a bow, a helmet, boots or a garment is medium, and a
+  two-handed weapon, a cuirass or a shield is large. The amount of material a
+  row takes is no measure: a gilded ring takes more pieces than an iron
+  cuirass. A family nobody has sized is medium, and a craft with no row is
+  sized by its bench: a brew at an alchemy lab is small, an enchantment
+  medium.
+*/
+const CRAFT_WORK_MS = { small: 1000, medium: 5000, large: 15000 };
+const CRAFT_SIZE_BY_FAMILY = {
+  'Arrows and bolts': 'small', 'Ingots': 'small', 'Leather': 'small', 'Ingredients': 'small', 'Books': 'small',
+  'Bread': 'small', 'Cheese': 'small', 'Chowders': 'small', 'Crab dishes': 'small', 'Desserts': 'small',
+  'Fish dishes': 'small', 'Meat dishes': 'small', 'Other food and drink': 'small', 'Soups': 'small',
+  'Stews': 'small', 'Vegetable dishes': 'small',
+  'Daggers': 'medium', 'Swords': 'medium', 'War axes': 'medium', 'Maces': 'medium', 'Bows': 'medium',
+  'Staves': 'medium', 'Other weapons': 'medium', 'Helmets': 'medium', 'Hats and hoods': 'medium',
+  'Gauntlets': 'medium', 'Gloves': 'medium', 'Armoured boots': 'medium', 'Shoes and light boots': 'medium',
+  'Robes and body wear': 'medium', 'Other armour and clothing': 'medium', 'Other goods': 'medium',
+  'Greatswords': 'large', 'Battleaxes': 'large', 'Warhammers': 'large', 'Body armour': 'large', 'Shields': 'large'
+};
+const CRAFT_SIZE_BY_BENCH = { alchemy: 'small', enchanting: 'medium' };
+const CRAFT_SIZE_WORDS = { small: '1 second', medium: '5 seconds', large: '15 seconds' };
+
+/** small, medium or large: by the row's family, or with no row by the bench. */
+function craftSize(row, workbenchId) {
+  const own = Object.prototype.hasOwnProperty;
+  if (row && typeof row === 'object') {
+    return own.call(CRAFT_SIZE_BY_FAMILY, row.family) ? CRAFT_SIZE_BY_FAMILY[row.family] : 'medium';
+  }
+  let bench = '';
+  try {
+    const base = mp.get(workbenchId, 'baseDesc');
+    if (base && own.call(BENCH_BY_BASE, base)) { bench = String(BENCH_BY_BASE[base]); }
+  } catch (e) {
+    log('bench', (workbenchId || 0).toString(16), 'has no base to size a craft by, so it is medium:', e);
+  }
+  return own.call(CRAFT_SIZE_BY_BENCH, bench) ? CRAFT_SIZE_BY_BENCH[bench] : 'medium';
+}
+
+mp.onCraftWork = guard('onCraftWork', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
+  /*
+    Too sick, too hurt or too tired is said now, before any time passes, by
+    the gate every way of making something asks (#1733). mp.onCraft asks it
+    again when the time is up, since a craft of 15 seconds is long enough to
+    change the answer.
+  */
+  const unfit = unfitToMake(actorId, workbenchId);
+  if (unfit) {
+    notify(actorId, unfit);
+    say(actorId, unfit);
+    log(actorId.toString(16), 'was refused a craft at bench', (workbenchId || 0).toString(16) + ':', unfit);
+    return false;
+  }
+
+  // The row, found the way mp.onCraft finds it: by the recipe, or for a
+  // recipe set in each game (#613) by its output, bench and counts.
+  let desc = null;
+  if (recipeId) {
+    try { desc = mp.getDescFromId(recipeId); } catch (e) { desc = null; }
+  } else {
+    desc = recipeSetInGame(craftedItemBaseId, workbenchId, arguments[6]);
+  }
+  const row = (desc && typeof desc === 'string') ? craftRow(desc) : null;
+  const size = craftSize(row, workbenchId);
+  mp.set(actorId, 'craftWork', { ms: CRAFT_WORK_MS[size] });
+
+  if (size !== 'small') {
+    const what = (row && row.name) ? String(row.name).trim() : 'That';
+    notify(actorId, what + ' takes ' + CRAFT_SIZE_WORDS[size] + '. Stay at the bench until it is made; ' +
+                    'getting up stops the work and keeps your materials.');
+  }
+});
+
 mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {
   /*
     TOO SICK, TOO HURT OR TOO TIRED TO MAKE ANYTHING (#1383, #1676), asked
@@ -31235,16 +31326,15 @@ log('gamemode loaded:',
 
   var PLUGIN = /\.(esp|esm|esl)$/i;
 
-  // The plugins whose bytes this server hands out: Thornswood's own and
-  // nothing else (#1180). Every other plugin in the load order is somebody
-  // else's mod, which people get from its author through Vortex and the
-  // collection. Measured on 5 Oct, the main and the dev server each handed
-  // out 43 plugins to anyone who asked, 42 of them other authors' (27 MB),
-  // because the rule here named what to leave out (Bethesda's five masters)
-  // instead of what is ours. The names are the plugins
-  // scripts\release\Ship-Rules.ps1 calls ours ($ShipOursFiles), and
-  // tests\test-1180-own-plugins.js holds the two lists to each other, so a
-  // plugin the repo makes goes into both in one change.
+  // Thornswood's own plugins (#1180), which the manifest names as served so
+  // the launcher can tell ours from another author's. Every other plugin in
+  // the load order is somebody else's mod, which people get from its author
+  // through Vortex and the collection. The bytes of ours are not served here
+  // (#3386): this port is plain http, so the launcher's Fix takes them from
+  // the signed release over https, by the sha256 its record gives them.
+  // The names are the plugins scripts\release\Ship-Rules.ps1 calls ours
+  // ($ShipOursFiles), and tests\test-1180-own-plugins.js holds the two lists
+  // to each other, so a plugin the repo makes goes into both in one change.
   var OURS = { 'thornswood-content.esp': 1, 'thornswood-last.esp': 1 };
 
   // Returns '' once the manifest is published, otherwise why it was not.
@@ -31280,11 +31370,10 @@ log('gamemode loaded:',
       // The whole order, full and light together, the order the launcher
       // puts a plugin list into when there is a light list.
       loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
-      // Which of those the launcher's Fix may fetch from /plugins/ (#1180):
-      // ours, full and light (#2627). The client reads mods, loadOrder and,
-      // when it is there, light, and never this list, so a light name in it
-      // changes nothing for the client; a launcher from before #2627 marks
-      // only mods entries as served and so never asks for a light one.
+      // Which of those are ours (#1180), full and light (#2627), the ones
+      // the launcher's Fix puts in from the release (#3386). The client
+      // reads mods, loadOrder and, when it is there, light, and never this
+      // list.
       served: mods.concat(light).filter(function (m) { return OURS[m.filename.toLowerCase()]; })
                   .map(function (m) { return m.filename; })
     };
@@ -31311,84 +31400,7 @@ log('gamemode loaded:',
                 '/manifest.json, ' + mods.length + ' plugins' +
                 (light.length ? ' and ' + light.length + ' light plugins' : '') +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
-    try { publishFiles(mods, light); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
     return '';
-  }
-
-  // Our own plugins themselves, beside the manifest, for the launcher's Fix.
-  //
-  // A plugin with the right name in the right place and the wrong bytes paints
-  // LOAD ORDER ERROR over somebody's screen for the whole session (17 Sep).
-  // For Thornswood's own plugin this box has the bytes the manifest describes,
-  // and they are ours to hand out, so it is served under
-  //
-  //     /api/servers/thornswood/plugins/<file>
-  //
-  // as a hard link into the plugins folder, so there is no second copy on disk
-  // (a copy when a link is refused). Relinked at every start, because a deploy
-  // may have replaced the file behind the link.
-  //
-  // Nothing else is (#1180). Another author's plugin with the wrong bytes is
-  // put right by updating or reinstalling that mod in Vortex, which fetches it
-  // from its author; the launcher's Fix says which mod. Bethesda's masters
-  // were never served. The clearing below takes the files an older start
-  // published off this box.
-  //
-  // Our light plugins too, since #2627, as light-<index>.bin at their place
-  // in the manifest's light list, so the two lists never name one file. On
-  // 16 Oct the server's light order named Thornswood-Last.esp, which is ours
-  // and light, a machine whose launcher had not taken the release carrying
-  // it had none, and Fix had nothing to fetch: only mods entries were
-  // published, and the launcher only ever asked for those.
-
-  function publishFiles(mods, light) {
-    var order = [];
-    try { order = JSON.parse(fs.readFileSync('server-settings.json', 'utf8')).loadOrder || []; } catch (e) { return; }
-    var byName = {};
-    for (var i = 0; i < order.length; i++) {
-      byName[path.basename(String(order[i])).toLowerCase()] = String(order[i]);
-    }
-    var PLUG = path.join(DIR, 'plugins');
-    try { fs.mkdirSync(PLUG, { recursive: true }); } catch (e) { }
-    // Clear what a previous start left here. 1.1.43 published these under their
-    // real names, and the resources server refuses any file whose name contains
-    // .esp, .esm or .esl (a 403), so those never served. The name is gone now:
-    // each file is served as its position in the manifest with a .bin
-    // extension, which the resources server does hand over. The launcher
-    // fetches /plugins/<index>.bin for the manifest entry at that index.
-    // Since #1180 this is also what takes other authors' plugins, which an
-    // older start published, off this box, so a file that stays is said.
-    try {
-      var stale = fs.readdirSync(PLUG);
-      for (var s = 0; s < stale.length; s++) {
-        try { fs.unlinkSync(path.join(PLUG, stale[s])); }
-        catch (e) { console.log('[thornswood] could not take ' + stale[s] + ' off /plugins/, so it is still served: ' + e.message); }
-      }
-    } catch (e) { console.log('[thornswood] could not read /plugins/ to clear it: ' + e.message); }
-    var linked = 0, copied = 0, missing = 0, bytes = 0;
-    var lists = [[mods, ''], [light || [], 'light-']];
-    for (var k = 0; k < lists.length; k++) {
-      var list = lists[k][0], prefix = lists[k][1];
-      for (var j = 0; j < list.length; j++) {
-        var name = list[j].filename;
-        if (!OURS[name.toLowerCase()]) continue;
-        var src = byName[name.toLowerCase()];
-        if (!src || !fs.existsSync(src)) { missing++; continue; }
-        var dst = path.join(PLUG, prefix + j + '.bin');
-        try {
-          fs.linkSync(src, dst);
-          linked++;
-        } catch (e) {
-          try { fs.copyFileSync(src, dst); copied++; }
-          catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
-        }
-        bytes += Number(list[j].size) || 0;
-      }
-    }
-    console.log('[thornswood] ' + (linked + copied) + ' of our plugin files published at /api/servers/' + KEY +
-                '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +
-                (copied ? ', ' + copied + ' copied rather than linked' : '') +
-                (missing ? ', ' + missing + ' not found on this box' : ''));
   }
 
   // Once, at load, with nothing trying again (#1885). The engine's main()
@@ -31855,6 +31867,22 @@ log('gamemode loaded:',
   game login itself, checked before the engine hands over the character, is a
   fork change, written out on #1320.
 
+  ONE DISCORD ACCOUNT, ONE SEAT (#2887). Patrick, 20 Oct, on both servers,
+  dev included: a second game from an account already in the world is told
+  why and ended. The seats counted characters, so one account running a
+  second game under another of its characters took a second seat. Every pass
+  names the Discord account the site signed it for (d), so the moment a pass
+  proves a session, here in take() or at the sweep for a pass picked up at
+  the menu, it is compared with every other session in the world: one whose
+  own pass proves it, on the connection that pass proved. When one names the
+  same account, the later session is told ACCOUNT_SENTENCE and ended, its
+  pass is not kept, and the log names both profiles. The first keeps its
+  seat. A reconnect is the same profile, so it is never its own twin; a
+  connection the engine has already let go does not count, so closing one
+  game and starting another goes through once the engine sees the first one
+  gone. Staff seats are no different. The check waits for the pass, so a
+  second game sits in the world held (#410) until its pass arrives.
+
   THE SERVER'S OWN FAILURES REFUSE TOO, decided on purpose (the standing rule
   is that refusing is the secure side, #937): no passKey in door.json, a relay
   that is down, a site that would not issue a pass. Each leaves a session with
@@ -31895,6 +31923,9 @@ log('gamemode loaded:',
   var SENTENCE = 'This game was not started from an up to date Thornswood launcher, so ' +
                  'the session is being ended. Open the Thornswood launcher, let it update, ' +
                  'then press Play.';
+  var ACCOUNT_SENTENCE = 'Your Discord account already has a character in the world, so this ' +
+                         'second game is being ended: one account holds one seat. If you just ' +
+                         'closed the other game, wait a minute, then press Play again.';
   var WAIT_SAY_MS = 15000;    // held this long with no pass: told why nothing works (#410)
   var WAITING = 'Your launcher\'s pass has not reached the server yet, so nothing you do ' +
                 'counts until it does. Keep the Thornswood launcher open; if this does not ' +
@@ -32057,6 +32088,25 @@ log('gamemode loaded:',
     return e;
   }
 
+  /*
+    Another profile in the world on Discord account d (#2887), or 0: a
+    session whose own pass proves it and names d, still on the connection
+    that pass proved, and not being ended for this itself.
+  */
+  function inWorld(pid, d) {
+    if (!d) { return 0; }
+    for (var k in seen.online) {
+      if (!Object.prototype.hasOwnProperty.call(seen.online, k) || Number(k) === pid) { continue; }
+      var o = seen.online[k];
+      var h = seen.passes[k];
+      if (o.twin || !h || h.s !== o.sid || h.d !== d) { continue; }
+      var c = o.actorId ? connOf(o.actorId) : '';
+      if (!c || (o.conn && c !== o.conn)) { continue; }
+      return Number(k);
+    }
+    return 0;
+  }
+
   /* One "/joinpass <pass>" from the relay, sent under profileId. */
   function take(profileId, raw, now) {
     var r = readPass(raw, passKey(now), now, serverName());
@@ -32073,6 +32123,14 @@ log('gamemode loaded:',
       if (moved(profileId, connNow)) { begin(profileId, connNow, now).actorId = rec.actorId; }
     }
     if (r.ok) { r = bind(profileId, r); }
+    // It proves a session now, so that session is judged now (#2887); one
+    // at the menu is judged at the sweep that starts its session.
+    var twin = r.ok && r.s ? inWorld(profileId, r.d) : 0;
+    if (twin) {
+      seen.online[profileId].twin = twin;
+      if (seen.passes[profileId] && seen.passes[profileId].s === r.s) { delete seen.passes[profileId]; }
+      r = { why: 'its Discord account is already in the world as profile ' + twin, p: r.p };
+    }
     if (!r.ok) {
       if (fresh('bad ' + profileId + ' ' + r.why, now)) {
         console.log('[thornswood] join pass from profile ' + profileId + ' not taken: ' + r.why);
@@ -32089,9 +32147,9 @@ log('gamemode loaded:',
   // After the sentence, so it is on screen before the connection goes. Their
   // game is told the session ends (#1157), so it closes its side and does not
   // connect again by itself; the kick is for a game that does not.
-  function refuseLater(profileId, actorId) {
+  function refuseLater(profileId, actorId, sentence) {
     var line = g.__thornswoodSayLine;
-    if (typeof line === 'function') { line(profileId, { end: SENTENCE }); }
+    if (typeof line === 'function') { line(profileId, { end: sentence }); }
     setTimeout(function () {
       var userId = -1;
       try { userId = mp.getUserByActor(actorId); } catch (e) { userId = -1; }
@@ -32121,7 +32179,19 @@ log('gamemode loaded:',
       e.actorId = online[i].actorId;
       if (e.judged) { continue; }
       var had = seen.passes[pid];
-      if (had && had.s === e.sid) { e.judged = true; continue; }
+      if (had && had.s === e.sid) {
+        e.twin = inWorld(pid, had.d);
+        if (!e.twin) { e.judged = true; continue; }
+        delete seen.passes[pid];
+      }
+      // A second game from an account already in the world (#2887).
+      if (e.twin) {
+        e.judged = true;
+        tell(pid, ACCOUNT_SENTENCE);
+        console.log('[thornswood] refusing profile ' + pid + ': its Discord account is already in the world as profile ' + e.twin);
+        refuseLater(pid, e.actorId, ACCOUNT_SENTENCE);
+        continue;
+      }
       // Held until then (#410): said once, after long enough that a pass on
       // its way has had time to arrive.
       if (requiring() && !e.told && now - e.joined >= WAIT_SAY_MS) {
@@ -32135,7 +32205,7 @@ log('gamemode loaded:',
                              : 'this server has no join pass key in door.json';
       tell(pid, SENTENCE);
       console.log('[thornswood] refusing profile ' + pid + ': ' + why);
-      refuseLater(pid, e.actorId);
+      refuseLater(pid, e.actorId, SENTENCE);
     }
     // Gone: the next session under that number needs a pass of its own.
     for (var k in seen.online) {
@@ -32260,6 +32330,7 @@ log('gamemode loaded:',
 
   g.__thornswoodJoinPass = { take: take, sweep: sweep, readPass: readPass,
                              grace: GRACE_MS, sentence: SENTENCE, waiting: WAITING,
+                             accountSentence: ACCOUNT_SENTENCE,
                              shown: shown, proven: proven, held: held, trusts: trusts,
                              requiring: requiring, loginProof: loginProof, onLogin: onLogin };
 
@@ -32319,6 +32390,10 @@ log('gamemode loaded:',
   and the difference is the staff seats. The deploy scripts write both from
   records\most-online.json, the one place they live (25 and 5, so maxPlayers
   30). No thornswoodMostOnline means nobody is turned away and nobody waits.
+
+  A SEAT IS AN ACCOUNT'S, NOT A CHARACTER'S (#2887). The seats count
+  characters, so the join pass block ends a second game from a Discord
+  account already in the world, on both servers. 25 seats are 25 people.
 
   WHO MAY TAKE A STAFF SEAT. Only a profile whose Discord account holds one of
   the site's staff roles (access.dev, which folds access.admin in: Owner, Dev,
@@ -39966,7 +40041,7 @@ module.exports = {
     var inv = null;
     try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
     var entries = (inv && inv.entries) || [];
-    entries.push({ baseId: baseId, count: 1, name: 'Deed to ' + nameOf(building) });
+    entries.push({ baseId: baseId, count: 1, name: deedLabel(building) });
     try {
       mp.set(actorId, 'inventory', { entries: entries });
     } catch (e) {
@@ -40081,7 +40156,7 @@ module.exports = {
     var mine = [];
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
-      if (holderOf(b) && claims[b].by === profileId) { mine.push(nameOf(b)); }
+      if (holderOf(b) && claims[b].by === profileId) { mine.push(placeOf(b)); }
     }
     if (!mine.length) {
       toProfile(profileId, 'You hold nothing. Open the door of a building nobody holds and ' +
@@ -40248,9 +40323,91 @@ module.exports = {
     return false;
   }
 
-  function keyLabel(building) { return 'Key to ' + nameOf(building); }
-  function moldLabel(building) { return 'Key mold for ' + nameOf(building); }
-  function deedLabel(building) { return 'Deed to ' + nameOf(building); }
+  /*
+    WHAT A KEY, A MOLD AND A DEED CALL A BUILDING (#3899).
+
+    A key IS its name (holdsNamed), so the name has to be one building and no
+    other. The display name is not: BUILDING_NAME has 22 names that more than
+    one building carries, six Halls of the Dead among them, so a key cut for
+    one opened all six and a deed to one, presented at another's door, handed
+    that other one over. Patrick, 27 Oct, answer A: the hold goes on the name,
+    "Key to Hall of the Dead, Whiterun", and where name and hold still clash a
+    short number goes after it, the way the master key carries one.
+
+    LABEL_NO is those numbers. They are written down here rather than worked
+    out from the order of the table, because a key already in a pack names a
+    number and the door table is regenerated: a new building sorting in
+    front of an old one would hand the old one's number, and so its keys, to
+    the new one. So a number is never moved: a building that joins a clash
+    gets the next number of its group, and one that leaves the table has its
+    row taken out. tests/test-3899-key-labels.js fails the build whenever
+    two buildings that can be held come out with the same label, and names
+    them.
+  */
+  var LABEL_NO = {
+    // Apocrypha
+    '142f3:Dragonborn.esm': 1,
+    '142f4:Dragonborn.esm': 2,
+    '1ede2:Dragonborn.esm': 3,
+    '3109d:Dragonborn.esm': 4,
+    '3b065:Dragonborn.esm': 5,
+    // Bloodskal Barrow, Raven Rock
+    '1e8cc:Dragonborn.esm': 1,
+    '24cad:Dragonborn.esm': 2,
+    // Broken Tower Redoubt, Markarth
+    '152af:Skyrim.esm': 1,
+    '7284e:Skyrim.esm': 2,
+    // Creation Club Cell
+    '2fd1:Update.esm': 1,
+    '2fd2:Update.esm': 2,
+    '2fd3:Update.esm': 3,
+    '30e2:Update.esm': 4,
+    '30eb:Update.esm': 5,
+    '30ec:Update.esm': 6,
+    // Creation Club Cell, Raven Rock
+    '30e7:Update.esm': 1,
+    '30e8:Update.esm': 2,
+    // Guard Barracks, Whiterun
+    '36ed6:Skyrim.esm': 1,
+    '580a2:Skyrim.esm': 2,
+    // Miner's Barracks, Markarth
+    '13979:Skyrim.esm': 1,
+    '198df:Skyrim.esm': 2,
+    // Palace of the Kings, Upstairs, Windhelm
+    '97298:Skyrim.esm': 1,
+    '97299:Skyrim.esm': 2,
+    // Quick Test Cell
+    '2f99:Update.esm': 1,
+    '2f9b:Update.esm': 2,
+    // Quick Test Cell, Solitude
+    '2f9c:Update.esm': 1,
+    'b1783:Skyrim.esm': 2,
+    // Ruins of Old Haafingar, Solitude
+    '186c2:SkyrimSewers.esp': 1,
+    '64fc2:SkyrimSewers.esp': 2,
+    // Skuldafn Temple, Windhelm
+    'a0877:Skyrim.esm': 1,
+    'a73f4:Skyrim.esm': 2,
+    // Storm's Tale Dormitory, Falkreath
+    '37a28:AnotherOakwood.esp': 1,
+    '37a29:AnotherOakwood.esp': 2,
+    // Warehouse, Windhelm
+    '90232:WindhelmSSE.esp': 1,
+    '965b3:Skyrim.esm': 2
+  };
+
+  /** The building as a key, a mold and a deed name it: unique, see above. */
+  function placeOf(building) {
+    var hold = holdOfBuilding(building);
+    var place = nameOf(building);
+    if (hold && Object.prototype.hasOwnProperty.call(HOLD_TOWN, hold)) { place += ', ' + HOLD_TOWN[hold]; }
+    if (Object.prototype.hasOwnProperty.call(LABEL_NO, building)) { place += ', no. ' + LABEL_NO[building]; }
+    return place;
+  }
+
+  function keyLabel(building) { return 'Key to ' + placeOf(building); }
+  function moldLabel(building) { return 'Key mold for ' + placeOf(building); }
+  function deedLabel(building) { return 'Deed to ' + placeOf(building); }
 
   function holdsKey(actorId, building) { return holdsNamed(actorId, KEY, keyLabel(building)); }
   function holdsMold(actorId, building) { return holdsNamed(actorId, MOLD, moldLabel(building)); }
@@ -40559,10 +40716,10 @@ module.exports = {
       return true;
     }
     plog('a mold for', nameOf(building), 'was cut for', held.name);
-    toProfile(profileId, 'You cut a mold for ' + nameOf(building) + ' and hand it to ' +
+    toProfile(profileId, 'You cut a mold for ' + placeOf(building) + ' and hand it to ' +
                          held.name + '. Keys come off the mold at a forge.');
     if (owner.profileId !== profileId) {
-      toProfile(owner.profileId, 'The mold for ' + nameOf(building) + ' is yours. Bring it to ' +
+      toProfile(owner.profileId, 'The mold for ' + placeOf(building) + ' is yours. Bring it to ' +
                                  'a smith at a forge for as many keys as you want.');
     }
     return true;
@@ -40693,12 +40850,12 @@ module.exports = {
     }
     plog('a mold for', nameOf(building), 'was pressed at the door for', held.name);
     var yours = owner.actorId === actorId;
-    toProfile(profileId, 'You press the blank into the lock of ' + nameOf(building) + '. It is ' +
+    toProfile(profileId, 'You press the blank into the lock of ' + placeOf(building) + '. It is ' +
                          'the mold for it now' + (yours ? ' and it is in your pack' :
                          ', and it goes to the holder standing with you') +
                          '. Keys come off it at a forge, as many as you want.');
     if (!yours && owner.profileId && owner.profileId !== profileId) {
-      toProfile(owner.profileId, 'The mold for ' + nameOf(building) + ' is yours. Bring it to ' +
+      toProfile(owner.profileId, 'The mold for ' + placeOf(building) + ' is yours. Bring it to ' +
                                  'a smith at a forge for as many keys as you want.');
     }
     return true;
@@ -40785,7 +40942,7 @@ module.exports = {
         building = mine[0];
       } else if (mine.length > 1) {
         var names = [];
-        for (var i = 0; i < mine.length; i++) { names.push(nameOf(mine[i])); }
+        for (var i = 0; i < mine.length; i++) { names.push(placeOf(mine[i])); }
         toProfile(profileId, 'You hold ' + names.join(', ') + '. A key comes off the mold of ' +
                              'the one you mean, so press a blank key mold into its door first.');
         return true;
@@ -40815,7 +40972,7 @@ module.exports = {
       return true;
     }
     plog('a key to', nameOf(building), 'was cut');
-    toProfile(profileId, 'You cut a key to ' + nameOf(building) + '. It opens the door for ' +
+    toProfile(profileId, 'You cut a key to ' + placeOf(building) + '. It opens the door for ' +
                          'whoever is carrying it, so hand it over yourself.');
     return true;
   }
@@ -46042,6 +46199,10 @@ module.exports = {
     var companyApi = g['__thornswoodCompany'];
     try { view.company = (staff && companyApi && companyApi.staffView) ? companyApi.staffView(pid) : null; }
     catch (eCompany) { view.company = null; }
+    // The crafting tools, for staff only (#3167): the staff crafting block's card.
+    var craftApi = g['__thornswoodStaffCraft'];
+    try { view.craft = (staff && craftApi && craftApi.staffView) ? craftApi.staffView(pid) : null; }
+    catch (eCraft) { view.craft = null; }
 
     var building = here(actorId);
     if (building) {
@@ -46279,7 +46440,8 @@ module.exports = {
     wordBook: function () { return wordBook; },
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
     takeBlankMold: takeBlankMold, blankMoldsExist: blankMoldsExist,
-    keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
+    keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel, placeOf: placeOf,
+    LABEL_NO: LABEL_NO,
     KEY: KEY, MOLD: MOLD, LOCK_PROPERTY: LOCK_PROPERTY,
     BENCH_PROPERTY: BENCH_PROPERTY, FORGE: FORGE,
     lapseDays: lapseDays, DEED: DEED, DOOR_MEMORY_MS: DOOR_MEMORY_MS,
@@ -50555,7 +50717,7 @@ return module.exports;
         var rent = held.rent ? { amount: Number(held.rent.amount) || 0,
                                  every: Number(held.rent.everyDays) || 7,
                                  owed: Number(held.rent.owed) || 0 } : null;
-        rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
+        rows.push({ name: W.placeOf(b), mine: true, locked: !!held.locked, rent: rent,
                     before: Object.prototype.hasOwnProperty.call(before, b) ? before[b] : 0,
                     master: !!(W.holdsMasterKey && W.holdsMasterKey(actorId, b)),
                     keyed: W.holdsKey(actorId, b), b: b,
@@ -50577,7 +50739,7 @@ return module.exports;
         if (seen[mb]) { continue; }
         seen[mb] = true;
         var mh = W.holderOf(mb);
-        rows.push({ name: W.nameOf(mb), mine: false, locked: !!(mh && mh.locked),
+        rows.push({ name: W.placeOf(mb), mine: false, locked: !!(mh && mh.locked),
                     keyed: true, master: true, by: mh ? mh.name : null, b: mb });
       }
       // Then the places somebody let you into. A key to a building you already
@@ -50596,7 +50758,7 @@ return module.exports;
           if (label !== W.keyLabel(b2) || seen[b2]) { continue; }
           seen[b2] = true;
           var h2 = W.holderOf(b2);
-          rows.push({ name: W.nameOf(b2), mine: false, locked: !!(h2 && h2.locked),
+          rows.push({ name: W.placeOf(b2), mine: false, locked: !!(h2 && h2.locked),
                       keyed: true, by: h2 ? h2.name : null, b: b2 });
           break;
         }
@@ -50609,7 +50771,7 @@ return module.exports;
         if (seen[ob] || rows.length >= PROPERTY_PAGE_MAX) { continue; }
         seen[ob] = true;
         var oh = W.holderOf(ob);
-        rows.push({ name: W.nameOf(ob), mine: false, owes: before[ob], by: oh ? oh.name : null, b: ob });
+        rows.push({ name: W.placeOf(ob), mine: false, owes: before[ob], by: oh ? oh.name : null, b: ob });
       }
     } catch (e) {
       clog('the property page threw, so it is left off:', e);
@@ -51240,6 +51402,59 @@ return module.exports;
   }
 
   /*
+    WHAT THE NEW RANK OPENED (#3149). Patrick, 26 October, on his report page:
+    at each rank up the person is told what just opened, from the same count
+    the recipe book on K uses. So this reads recipeIndex, the book's own
+    index, at the one rank just reached: the rows of that half at exactly that
+    rank, by family, and how many of them Skyrim will list.
+
+    A half only. A class verb and a mage's school own no recipe, and a half
+    with nothing at the new rank (a Physicker at expert) says nothing more
+    than the rank line already does.
+
+    THE SECOND NUMBER IS THE BOOK'S open, said rather than left out. A row
+    with open false carries a condition of its own that Skyrim's crafting menu
+    checks before the server is asked, and telling a new Advanced Platewright
+    that 71 recipes are theirs when the menu lists 2 is the promise bookHalf
+    stopped making on 21 September. When #1402 takes the vanilla perk lines
+    off and Build-RecipeTable.ps1 writes open again, this sentence shrinks by
+    itself.
+  */
+  function unlockLine(actorId, raised) {
+    if (!raised || !isCraftHalf(raised.key)) { return null; }
+    var idx = recipeIndex(actorId);
+    var got = (idx && P.has(idx, raised.key)) ? idx[raised.key] : null;
+    var to = String(raised.to || '');
+    var n = (got && P.has(got.byRank, to)) ? got.byRank[to] : 0;
+    if (!n) { return null; }
+    var open = P.has(got.openByRank, to) ? got.openByRank[to] : 0;
+    var fams = [];
+    for (var i = 0; i < got.families.length; i++) {
+      var f = got.families[i];
+      var c = P.has(f.byRank, to) ? f.byRank[to] : 0;
+      if (c) { fams.push({ name: String(f.name).toLowerCase(), n: c, at: i }); }
+    }
+    // The biggest kinds first, and the book's own order between equals.
+    fams.sort(function (a, b) { return (b.n - a.n) || (a.at - b.at); });
+    var names = fams.map(function (x) { return x.name; });
+    var list = names.length > 1
+      ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]
+      : names[0];
+    var line = rankName(to) + ' ' + nameOf(raised.key) + ' work opens ' + n + ' more recipe' +
+               (n === 1 ? '' : 's') + ' to you: ' + list + '.';
+    if (open < n) {
+      var held = n - open;
+      line += (open === 0)
+        ? ' Skyrim will not list ' + (n === 1 ? 'it' : 'any of them') + ' at the bench: ' +
+          (n === 1 ? 'it carries' : 'each carries') + ' a condition of its own,'
+        : ' Skyrim lists ' + open + ' of them at the bench. The other ' + held + ' ' +
+          (held === 1 ? 'carries' : 'each carry') + ' a condition of ' + (held === 1 ? 'its' : 'their') + ' own,';
+      line += ' a perk or a spell or something you have to be holding.';
+    }
+    return line;
+  }
+
+  /*
     Every rank that came out of one action, in the order it happened: the one
     the work was for, and then whatever a mage's schools took from it. Each
     one is a sentence of its own rather than a list, because that is how a
@@ -51253,7 +51468,8 @@ return module.exports;
     if (!raises.length) { return null; }
     var out = [];
     for (var j = 0; j < raises.length; j++) {
-      out.push(raiseLine(raises[j]));
+      var opened = unlockLine(actorId, raises[j]);
+      out.push(opened ? raiseLine(raises[j]) + ' ' + opened : raiseLine(raises[j]));
       clog(actorId.toString(16), raises[j].key, raises[j].from, '->', raises[j].to);
     }
     return out.join(' ');
@@ -57048,6 +57264,11 @@ const WORDS = ['/ooc', '/o',
                // A creature a spawn command made, taken out for good by
                // staff, kept or not (#2623). See the staff block.
                '/despawn',
+               // The crafting card on the Office page of K, for staff
+               // (#3167): pick somebody, raise a rank, check a recipe, give
+               // back. Sent by the page, never typed. See the staff crafting
+               // block, after the staff block.
+               '/craftstaff',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -72032,7 +72253,7 @@ module.exports = {
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
                      '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk',
-                     '/hurt', '/despawn'];
+                     '/hurt', '/despawn', '/craftstaff'];
   var DESPAWN_REACH = 1500;         // units: about 21 m, the creature beside or near you
   var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
@@ -72826,6 +73047,15 @@ module.exports = {
       record('despawn', pid, me, 0, '', (best.keep ? 'kept ' : '') + what + ' ' + best.id.toString(16), 0);
       return true;
     }
+    // The crafting card on the Office page of K (#3167): the staff crafting block answers it.
+    if (word === '/craftstaff') {
+      var craft = g.__thornswoodStaffCraft;
+      if (!craft || !craft.command) {
+        tell(pid, 'The staff crafting tools are not running on this server. Say so in the dev channel.');
+        return true;
+      }
+      return craft.command(words, pid, actorId, me, look);
+    }
     if (!words.length) {
       tell(pid, word + ' who? ' + word + ' <name, or the start of it, or a profile number>.');
       return true;
@@ -72979,6 +73209,337 @@ module.exports = {
       ' at a person, for the staff roles with a join pass');
 })();
 // ==== end thornswood staff ====
+
+// ==== thornswood staff crafting ====
+/*
+  STAFF CRAFTING TOOLS, ON THE OFFICE PAGE OF K (#3167). Patrick, 22 Oct
+  2026, on his report page: in game, on the K panel's Office page, and not
+  commands. Three tools, for one person in the world that the staff member
+  picks on the card:
+
+    Ranks        every class, half and school the person has standing in,
+                 with its rank and the work toward the next, and a Raise
+                 button. A raise is one step through the rulebook's own
+                 rankUp, so every ceiling holds (a taught trade stays at
+                 novice, a sister half past novice needs its Master, a Master
+                 is done), and it hands what a rank always hands: the skill
+                 point, a mage's spell point, an Enchanter's staff spell
+                 point. The count toward the next rank starts again at 0, as
+                 it does when work raises the rank (professions.md).
+    A recipe     recipes asked by what they make, for that person. A recipe
+                 is stuck for one of four reasons, and the card names which:
+                   - the craft gate refuses it, and says why (a rank, a half,
+                     a race, a roll), which the rank tool or the person's own
+                     picks change;
+                   - their game was handed an older answer than the gate
+                     gives now. Hand their game the list asks
+                     handRecipesHidden, the one writer of that list, which
+                     writes only when the answer changed, and a write is
+                     logged as a finding, because everything that changes the
+                     answer writes the character and hands the list itself;
+                   - the game's own recipe asks for something first (a perk,
+                     an item or a spell: the table's open is false), which
+                     Skyrim's menu decides before the server is ever asked;
+                   - none of those, and the server lists it for them.
+    Give back    any item, by name or form id, with a count and a reason,
+                 into their pack. NOTHING RECORDS WHAT SOMEBODY LOST: the
+                 engine keeps the pack and nothing keeps what it used to
+                 hold, so staff go on what the person and the logs say, and
+                 the reason is the record. It is in the staff log with the
+                 count and the item, and the person is told.
+
+  WHO MAY. The staff block's own gate, before anything here runs: /craftstaff
+  is in its WORDS_STAFF, so somebody who is not staff is told "That one is not
+  yours to run.", and staff need the proven chat and the join pass. Nobody
+  raises their own rank or gives themselves anything here: another staff
+  member does it, so the staff log names two people.
+
+  /craftstaff is a line the page sends, never one anybody is told to type:
+    pick <profile>|-                     the person the card is for, or nobody
+    raise <profile> <key>                one rank up in that class, half or school
+    recipe <profile> <words>             what the gate says about recipes making that
+    recipes <profile>                    hand their game the gate's list now
+    give <profile> <n> <item> | <why>    give back n of an item, with the reason
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var PEOPLE_MAX = 40;          // people the card offers to pick from
+  var CHECK_MAX = 8;            // recipe rows one check lists
+  var ASK_MOST = 60;            // characters of a recipe check kept
+  var GIVE_MOST = 1000;         // the most of one thing given back in one press
+  var WHY_MOST = 200;           // characters of a reason kept in the log
+
+  // On globalThis, so a hot reload keeps who each staff member picked and
+  // what they last checked; a restart forgets both, and the card says so by
+  // offering the people again.
+  if (!g.__thornswoodStaffCraftState) { g.__thornswoodStaffCraftState = { picked: {}, checks: {} }; }
+  var state = g.__thornswoodStaffCraftState;
+
+  function clog() {
+    log.apply(null, ['staff crafting:'].concat(Array.prototype.slice.call(arguments)));
+  }
+  function tell(pid, text) {
+    var t = g.__thornswoodToProfile;
+    if (t && pid) { t(pid, text); }
+  }
+  function online() {
+    try { return mp.get(0, 'onlinePlayers') || []; } catch (e) { return []; }
+  }
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+  function nameOfActor(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+  function actorOf(pid) {
+    var all = online();
+    for (var i = 0; i < all.length; i++) { if (profileOf(all[i]) === pid) { return all[i]; } }
+    return 0;
+  }
+  function rankWord(r) { return String(r || '').charAt(0).toUpperCase() + String(r || '').slice(1); }
+  function sentence(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  /* How many of a record the pack holds, plain stock only, the way addItem counts it. */
+  function carried(actorId, desc) {
+    var id = idOf(desc);
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
+    var n = 0;
+    var entries = (inv && Array.isArray(inv.entries)) ? inv.entries : [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === id && !mintedEntry(e)) { n += Number(e.count) || 0; }
+    }
+    return n;
+  }
+
+  // ----------------------------------------------------------- the ranks --
+  function rules() {
+    var P = g.__thornswoodProgression, C = g.__thornswoodCharacter;
+    return (P && C && C.stateOf && C.writeState) ? { P: P, C: C } : null;
+  }
+
+  /* One step up in key, as rankUp takes it, with the count started again, or the rulebook's reason it will not. */
+  function raiseOf(r, actorId, s, key) {
+    var up = r.P.rankUp(s, key, r.C.masterFor ? r.C.masterFor(actorId, s, key) : null);
+    if (!up.ok) { return { ok: false, why: String(up.why || '') }; }
+    up.state.work = up.state.work || {};
+    up.state.work[key] = 0;
+    return { ok: true, state: up.state };
+  }
+
+  function ranksOf(r, actorId, s) {
+    var out = [];
+    var ranks = (s && s.ranks) || {};
+    for (var key in ranks) {
+      if (!Object.prototype.hasOwnProperty.call(ranks, key)) { continue; }
+      var up = raiseOf(r, actorId, s, key);
+      out.push({ key: key, name: r.C.nameOf ? r.C.nameOf(key) : key, rank: ranks[key],
+                 next: up.ok ? r.P.rankOf(up.state, key) : null,
+                 work: r.P.workDone(s, key), need: r.P.workNeeded(s, key),
+                 why: up.ok ? '' : sentence(up.why) });
+    }
+    out.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+    return out;
+  }
+
+  // ---------------------------------------------------------- the recipes --
+  /* The owned recipe rows whose output's name holds the words, at most CHECK_MAX. */
+  function recipeRows(want) {
+    var w = String(want || '').replace(/[‘’`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+    var out = [], more = false;
+    if (!w) { return { rows: out, more: more }; }
+    var tables = [RECIPES_BY_ID, KEPT_SMELT];
+    for (var t = 0; t < tables.length && !more; t++) {
+      for (var desc in tables[t]) {
+        if (!Object.prototype.hasOwnProperty.call(tables[t], desc)) { continue; }
+        var row = tables[t][desc];
+        if (!row || typeof row !== 'object' || String(row.name || '').toLowerCase().indexOf(w) === -1) { continue; }
+        if (out.length >= CHECK_MAX) { more = true; break; }
+        out.push({ desc: desc, row: row });
+      }
+    }
+    return { rows: out, more: more };
+  }
+
+  /* Whether the person's game was handed this row as one to leave off the benches. */
+  function handedHidden(actorId, desc) {
+    var v = null;
+    try { v = mp.get(actorId, RECIPES_HIDDEN_PROPERTY); } catch (e) { v = null; }
+    var at = desc.indexOf(':');
+    var files = (v && v.files) || {};
+    return String(files[desc.slice(at + 1)] || '').split(',').indexOf(desc.slice(0, at)) !== -1;
+  }
+
+  function checkOf(actorId, want) {
+    var found = recipeRows(want);
+    return {
+      want: String(want), more: found.more,
+      rows: found.rows.map(function (x) {
+        var refusal = craftAnswer(actorId, x.row).refusal;
+        var hidden = handedHidden(actorId, x.desc);
+        return { name: String(x.row.name || x.desc), half: String(x.row.half || ''), rank: String(x.row.rank || ''),
+                 may: !refusal, why: refusal ? String(refusal) : '', hidden: hidden,
+                 stale: (!refusal) === hidden, asks: x.row.open === false };
+      })
+    };
+  }
+
+  // ------------------------------------------------------------- the card --
+  /** The Office page's crafting card for this staff member, or null when the tools are not running. */
+  function staffView(staffPid) {
+    var pid = Number(staffPid) || 0;
+    var r = rules();
+    if (!pid || !r) { return null; }
+    var people = [];
+    var all = online();
+    for (var i = 0; i < all.length; i++) {
+      var op = profileOf(all[i]);
+      if (op) { people.push({ pid: op, name: nameOfActor(all[i]) }); }
+    }
+    people.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : a.pid - b.pid); });
+    var view = { people: people.slice(0, PEOPLE_MAX), them: null };
+    var picked = Number(state.picked[pid]) || 0;
+    var actorId = picked ? actorOf(picked) : 0;
+    if (!actorId) { return view; }
+    var check = state.checks[pid];
+    view.them = {
+      pid: picked, name: nameOfActor(actorId), self: picked === pid,
+      ranks: ranksOf(r, actorId, r.C.stateOf(actorId)),
+      check: (check && check.pid === picked) ? checkOf(actorId, check.want) : null
+    };
+    return view;
+  }
+
+  /* This staff member's own K panel again, so the card says what is true now. */
+  function redraw(actorId) {
+    var r = rules();
+    if (!r || !actorId) { return; }
+    try { r.C.writeState(actorId, r.C.stateOf(actorId), true); } catch (e) { clog('the card could not be drawn again:', e); }
+  }
+
+  // ------------------------------------------------------------ the lines --
+  /*
+    From the staff block's command, once it has said this is staff with the
+    proven chat and the join pass. words is the line after /craftstaff, me is
+    the staff member's name, and look is /give's own lookups.
+  */
+  function command(words, pid, actorId, me, look) {
+    var st = g.__thornswoodStaff;
+    var verb = String(words[0] || '').toLowerCase();
+    var r = rules();
+    if (!r || !st || !st.record) {
+      tell(pid, 'The staff crafting tools are not running on this server. Say so in the dev channel.');
+      return true;
+    }
+    if (verb === 'pick') {
+      var want = String(words[1] || '');
+      delete state.checks[pid];
+      if (want === '-') { delete state.picked[pid]; redraw(actorId); return true; }
+      var n = /^\d+$/.test(want) ? Number(want) : 0;
+      if (!n || !actorOf(n)) { tell(pid, 'That person is not in the world now.'); redraw(actorId); return true; }
+      state.picked[pid] = n;
+      redraw(actorId);
+      return true;
+    }
+
+    var whoPid = /^\d+$/.test(String(words[1] || '')) ? Number(words[1]) : 0;
+    var them = whoPid ? actorOf(whoPid) : 0;
+    if (!them) { tell(pid, 'That person is not in the world now, so nothing changed.'); redraw(actorId); return true; }
+    var name = nameOfActor(them);
+
+    if (verb === 'recipe') {
+      var asked = words.slice(2).join(' ').trim().slice(0, ASK_MOST);
+      if (!asked) { tell(pid, 'Type part of the name of what the recipe makes, then press Check.'); return true; }
+      state.checks[pid] = { pid: whoPid, want: asked };
+      if (!recipeRows(asked).rows.length) { tell(pid, 'No recipe anybody owns makes anything called ' + asked + '.'); }
+      redraw(actorId);
+      return true;
+    }
+    if (verb === 'recipes') {
+      var had = null, has = null;
+      try { had = JSON.stringify(mp.get(them, RECIPES_HIDDEN_PROPERTY)); } catch (e) { had = null; }
+      handRecipesHidden(them);
+      try { has = JSON.stringify(mp.get(them, RECIPES_HIDDEN_PROPERTY)); } catch (e2) { has = null; }
+      if (had !== has) {
+        // A finding: the gate's answer changed with nothing writing the character.
+        clog(name, '(profile ' + whoPid + ') had an older recipe list than the craft gate gives now, so it was handed the new one');
+        st.record('craftrecipes', pid, me, whoPid, name, 'their game had an older recipe list than the craft gate gives now', 0);
+        tell(pid, name + '\'s game had an older recipe list than the craft gate gives now. It has the new one, and their benches change as it lands. It is in the staff log.');
+      } else {
+        tell(pid, name + '\'s game already has the list the craft gate gives now, so nothing changed.');
+      }
+      redraw(actorId);
+      return true;
+    }
+
+    // Everything below changes the person, so it is never your own.
+    if (whoPid === pid) {
+      tell(pid, 'Not on yourself: another staff member does it, so the staff log names two people. Nothing changed.');
+      return true;
+    }
+
+    if (verb === 'raise') {
+      var key = String(words[2] || '').toLowerCase();
+      var s = r.C.stateOf(them);
+      var was = r.P.rankOf(s, key);
+      if (!was) { tell(pid, name + ' has no standing in that, so nothing changed.'); redraw(actorId); return true; }
+      var up = raiseOf(r, them, s, key);
+      if (!up.ok) { tell(pid, name + ': ' + sentence(up.why) + '. Nothing changed.'); redraw(actorId); return true; }
+      var ns = up.state;
+      var gave = { key: key, from: was, to: r.P.rankOf(ns, key),
+                   points: (ns.points || 0) - (s.points || 0),
+                   spellPoints: ((ns.spells && ns.spells.points) || 0) - ((s.spells && s.spells.points) || 0),
+                   staffPoints: ns.prof === 'enchanter' ? r.P.staffPoints(ns) - r.P.staffPoints(s) : 0 };
+      r.C.writeState(them, ns);
+      var what = r.C.nameOf ? r.C.nameOf(key) : key;
+      tell(whoPid, 'Staff raised your rank. ' + (r.C.raiseLines(them, { raised: gave }) || ''));
+      tell(pid, name + ' is now ' + rankWord(gave.to) + ' in ' + what + '. It is in the staff log.');
+      st.record('craftrank', pid, me, whoPid, name, what + ' from ' + rankWord(was) + ' to ' + rankWord(gave.to), 0,
+                { key: key, from: was, to: gave.to });
+      redraw(actorId);
+      return true;
+    }
+
+    if (verb === 'give') {
+      var rest = words.slice(2).join(' ');
+      var bar = rest.indexOf('|');
+      var why = bar < 0 ? '' : rest.slice(bar + 1).replace(/\s+/g, ' ').trim().slice(0, WHY_MOST);
+      var head = (bar < 0 ? rest : rest.slice(0, bar)).trim().split(/\s+/);
+      var count = /^\d+$/.test(head[0] || '') ? Number(head[0]) : 0;
+      var thing = head.slice(1).join(' ').trim().toLowerCase();
+      if (!(count > 0) || count > GIVE_MOST) { tell(pid, 'Give back 1 to ' + GIVE_MOST + ' at a time. Nothing changed.'); return true; }
+      if (!thing) { tell(pid, 'Give back what? Type its name. Nothing changed.'); return true; }
+      if (!why) { tell(pid, 'Say why: what they lost, and how. It goes in the staff log. Nothing changed.'); return true; }
+      var hit = (look && look.findThing) ? look.findThing(thing) : { why: 'The server has no item list right now.' };
+      if (!hit.desc && look && look.byFormId) { hit = look.byFormId(thing) || hit; }
+      if (!hit.desc) { tell(pid, String(hit.why || 'Nothing is called that.') + ' Nothing changed.'); return true; }
+      if (!addItem(them, hit.desc, count)) {
+        tell(pid, hit.name + '\'s plugin is not in this load order, so there is nothing to give back.');
+        return true;
+      }
+      tell(whoPid, 'Staff gave you back ' + count + ' ' + hit.name + '.');
+      tell(pid, 'Gave ' + name + ' back ' + count + ' ' + hit.name + '. They carry ' + carried(them, hit.desc) +
+                ' now. It is in the staff log.');
+      st.record('craftgive', pid, me, whoPid, name, count + ' ' + hit.name + ': ' + why, 0,
+                { item: hit.desc, count: count });
+      redraw(actorId);
+      return true;
+    }
+
+    tell(pid, 'The crafting card on the Office page of K picks somebody, raises a rank, checks a recipe and gives back. Nothing changed.');
+    return true;
+  }
+
+  g.__thornswoodStaffCraft = { staffView: staffView, command: command, state: state };
+  clog('ready');
+})();
+// ==== end thornswood staff crafting ====
 
 // SHARED RESOURCE STOCK BEGIN
 function createSharedResourceStock(api, now) {

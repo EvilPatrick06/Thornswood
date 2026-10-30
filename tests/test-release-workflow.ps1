@@ -71,13 +71,23 @@ $code = (($wf -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n")
 # ---- triggers -----------------------------------------------------------------
 Yes 'release.yml has no pull_request trigger (no PR run may reach the signing identity)' (-not ($top -match '(?m)^\s+pull_request(_target)?:'))
 Yes 'a push runs it only for v* tags' ($top -match "(?m)^  push:\n    tags:\n      - 'v\*'\n" -and -not ($top -match '(?m)^    branches:'))
+Yes 'the run is titled with the tag, for Sign-OnGitHub.ps1 to find main''s run for it (#3930)' ($top.Contains('run-name: Release launcher ${{ inputs.tag || github.ref_name }}'))
+
+# ---- only a run of main's own workflow signs (#3930) ---------------------------
+$main = "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
+$hand = Get-Job 'handoff'
+Yes 'a tag push has one job, "handoff", which hands the tag to main''s workflow' ($hand -ne '' -and $hand.Contains("if: `${{ github.event_name == 'push' }}"))
+Yes '  it starts release.yml on main with the tag and the commit it named, by the repository token' ($hand.Contains("ref = 'main'; inputs = @{ tag = `$env:GITHUB_REF_NAME; expected_sha = `$env:GITHUB_SHA }") -and $hand.Contains('actions/workflows/release.yml/dispatches') -and $hand.Contains('GH_TOKEN: ${{ github.token }}'))
+Yes '  with actions: write alone, no contents, no id-token, no environment, no checkout' ($hand -match '(?m)^    permissions:\n      actions: write\n    timeout' -and -not $hand.Contains('id-token') -and -not $hand.Contains('environment:') -and -not $hand.Contains('actions/checkout'))
+Yes '  on GitHub''s runner, not the box (#4013)' ($hand -match '(?m)^    runs-on: ubuntu-latest$')
+Yes 'no "refs/tags/v" gate is left on the environment or a sign step' (-not ($code -match "startsWith\(github\.ref, 'refs/tags/v'\)"))
 Yes 'a manual run cannot ask for the box: there is no runner input (#4013)' (-not ($top -match '(?m)^      runner:') -and -not $top.Contains('options: [hosted, vps]'))
 Yes 'workflow-level permissions are contents: write only, no id-token for every job' ($top -match "(?m)^permissions:\n  contents: write\n" -and -not (($top -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n").Contains('id-token'))
 Yes 'one concurrency group per tag, however the run started (v1.1.96 got two drafts when it was per ref)' ($top.Contains('group: release-${{ github.event.inputs.tag || github.ref_name }}') -and $top.Contains('cancel-in-progress: false'))
 
 # ---- GitHub's runner alone, no box job (#4013) ---------------------------------
 $hosted = Get-Job 'launcher'
-Yes 'the hosted job runs whatever BUILD_RUNNER says: it has no condition' (-not ($hosted -match '(?m)^    if:') -and -not $code.Contains('BUILD_RUNNER'))
+Yes 'the hosted job runs on every manual run, whatever BUILD_RUNNER says' ($hosted.Contains("if: `${{ github.event_name == 'workflow_dispatch' }}") -and -not $code.Contains('BUILD_RUNNER'))
 Yes 'no job runs on a self-hosted runner, the box''s or any other' (-not ($code -match 'self-hosted|thornswood-vps|thornswood-sign|thornswood-build'))
 Yes 'and there is no VPS job "launcher-vps"' ((Get-Job 'launcher-vps') -eq '' -and -not ($code -match '\*release\b|&release\b'))
 
@@ -85,7 +95,7 @@ Yes 'and there is no VPS job "launcher-vps"' ((Get-Job 'launcher-vps') -eq '' -a
 Yes 'there is a hosted job "launcher"' ($hosted -ne '')
 Yes '  it runs on GitHub''s windows-latest, the image the build check proves every PR' ($hosted -match '(?m)^    runs-on: windows-latest$')
 Yes '  it holds id-token: write and contents: write at job level' ($hosted -match '(?m)^    permissions:\n      contents: write\n      id-token: write$')
-Yes '  the release environment only on a refs/tags/v ref' ($hosted.Contains("environment: `${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}"))
+Yes '  the release environment only in a run of main''s own workflow (#3930)' ($hosted.Contains("environment: `${{ $main && 'release' || '' }}"))
 Yes '  it hands the verify job the release id, the commit and whether it signed' ($hosted.Contains('release_id: ${{ steps.draft.outputs.release_id }}') -and $hosted.Contains('commit: ${{ steps.tag.outputs.commit }}') -and $hosted.Contains('signed: ${{ steps.draft.outputs.signed }}'))
 Yes '  its steps are its own, no anchor another job shares' ($hosted -match '(?m)^    steps:$')
 
@@ -93,12 +103,14 @@ Yes '  its steps are its own, no anchor another job shares' ($hosted -match '(?m
 $fetch = Get-Step $wf 'Fetch the signing client'
 $sign = Get-Step $wf 'Sign the launcher'
 $clean = Get-Step $wf 'Take the signing setup off'
-$gate = "if: `${{ startsWith(github.ref, 'refs/tags/v') }}"
+$gate = "if: `${{ $main }}"
 Yes 'no azure/login: the box keeps no Azure sign in after the job (#3312)' (-not ($code -match 'azure/login'))
-Yes 'the signing client is fetched on a v tag ref, on either runner' ($fetch.Contains($gate))
+Yes 'the signing client is fetched only in a run of main''s own workflow, on either runner' ($fetch.Contains($gate))
 Yes '  with the pin from Setup-ShipMachine.ps1, not a second copy' ($fetch.Contains("'Get-SigningClientPin'") -and -not ($fetch -match '[0-9a-f]{64}'))
 Yes 'the sign step has the same gate and signs -Required' ($sign.Contains($gate) -and $sign.Contains('Sign-Artifact.ps1 -Path $exe -Required'))
 Yes '  with the app and tenant ids from repository variables, no secret' ($sign.Contains('AZURE_CLIENT_ID: ${{ vars.AZURE_SIGNING_CLIENT_ID }}') -and $sign.Contains('AZURE_TENANT_ID: ${{ vars.AZURE_SIGNING_TENANT_ID }}') -and -not ($sign -match 'secrets\.|CLIENT_SECRET|client-secret'))
+$signDoc = [IO.File]::ReadAllText((Join-Path (Split-Path -Parent $Here) 'docs/SIGNED-RELEASES.md')).Replace("`r`n", "`n")
+Yes '  and SIGNED-RELEASES.md names those two variables, not three, and no subscription id is read (#3717)' ($signDoc.Contains('`AZURE_SIGNING_CLIENT_ID` and `AZURE_SIGNING_TENANT_ID`') -and -not ($signDoc -match 'three `AZURE_SIGNING_') -and -not ($code -match 'SUBSCRIPTION_ID'))
 Yes '  asks GitHub for the OIDC token with the audience Azure trusts' ($sign.Contains("&audience=api://AzureADTokenExchange") -and $sign.Contains('ACTIONS_ID_TOKEN_REQUEST_TOKEN'))
 Yes '  masks it and names it to the signing client as a workload identity file' ($sign.Contains("'::add-mask::' + `$answer.value") -and $sign.Contains('$env:AZURE_FEDERATED_TOKEN_FILE = $tokenFile'))
 Yes '  and removes the file in a finally, whatever signtool did' ($sign -match '(?s)\} finally \{\s*Remove-Item -LiteralPath \$tokenFile')
@@ -130,7 +142,7 @@ Yes '  and stops when the tag has more than one release, naming them' ($draft.Co
 Yes '  and never replaces the files of a published release' ($draft.Contains('if (-not $release.draft)'))
 Yes '  and rewrites an existing draft''s notes with the files it uploads (a signed rebuild kept saying UNSIGNED)' ($draft.Contains('-Method Patch -Uri "$api/releases/$($release.id)"') -and $draft.Contains('@{ body = $notes }'))
 Yes '  and the notes name MSBuild on GitHub''s runner, not the csc #498 retired' ($draft.Contains("'built on GitHub''s runner with MSBuild (#498)'") -and -not $draft.Contains('csc') -and -not $draft.Contains('VPS'))
-Yes '  and an unsigned draft says UNSIGNED' ($draft.Contains("else { `$how += ', UNSIGNED (not a v tag ref)"))
+Yes '  and an unsigned draft says UNSIGNED' ($draft.Contains("else { `$how += ', UNSIGNED (not a run of main''s workflow, #3930)"))
 Yes '  and writes release_id and signed for the verify job' ($draft.Contains('"release_id=" + $release.id') -and $draft.Contains('("signed=" +'))
 
 # ---- the second machine -------------------------------------------------------
@@ -164,7 +176,7 @@ if (Test-Path -LiteralPath $tpath) {
     Yes '  holds the tag to v<a.b.c> or v<a.b.c.d> and the commit to a full SHA' ($tcode.Contains("'^v\d+\.\d+\.\d+(\.\d+)?$'") -and $tcode.Contains("'^[0-9a-f]{40}$'"))
     Yes '  holds the commit to main through GitHub''s compare' ($tcode.Contains('compare/$commit...main') -and $tcode.Contains("-notin 'identical', 'ahead'"))
     Yes '  never moves a tag that is already on another commit' ($tcode.Contains('if ($sha -ne $commit)'))
-    Yes '  and starts release.yml on the tag, with the commit as expected_sha' ($tcode.Contains('actions/workflows/release.yml/dispatches') -and $tcode.Contains('ref = $tag') -and $tcode.Contains('expected_sha = $commit'))
+    Yes '  and starts main''s release.yml for the tag, with the commit as expected_sha (#3930)' ($tcode.Contains('actions/workflows/release.yml/dispatches') -and $tcode.Contains("ref = 'main'; inputs = @{ tag = `$tag") -and -not $tcode.Contains('ref = $tag') -and $tcode.Contains('expected_sha = $commit'))
     Yes '  runs no repository code (no checkout)' (-not $tcode.Contains('actions/checkout'))
     Yes '  and has no runner input to pass on, since release.yml has none (#4013)' (-not ($tcode -match '(?m)^      runner:|INPUT_RUNNER|runner = '))
 }

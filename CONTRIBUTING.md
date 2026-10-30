@@ -24,6 +24,26 @@ the short one, for anybody.
    at its top what it checks (`node tests/test-<name>.js`, or
    `pwsh tests/test-<name>.ps1`). `pwsh scripts/dev/Check-Words.ps1` checks
    the writing in every file people read.
+   - **Python:** the build check runs ruff, pinned in
+     `.github/ruff-requirements.txt`. To run it yourself, put it in a `.venv`
+     folder in the repository (git ignores it). With
+     [uv](https://docs.astral.sh/uv/), which works when there is no `python`
+     on the PATH:
+
+     ```
+     uv venv .venv
+     uv pip install --python .venv --only-binary :all: --require-hashes -r .github/ruff-requirements.txt
+     ```
+
+     Or with Python's own pip:
+
+     ```
+     python -m venv .venv
+     .venv/Scripts/python -m pip install --only-binary :all: --require-hashes -r .github/ruff-requirements.txt
+     ```
+
+     Then, in PowerShell, `.venv/Scripts/ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')`.
+     On Linux or macOS, the folder is `.venv/bin` instead of `.venv/Scripts`.
 5. Open the pull request and fill in its first three parts. Leave the part
    for the Thornswood team as it is.
 
