@@ -299,6 +299,27 @@ try:
     yes('M15 no em dash and never the forbidden word',
         all(chr(0x2014) not in t and ('pla' + 'yer') not in t.lower() for t in (wp, wc, wd)))
 
+    # M16: staff on the crafting card, the Office page of K (#3167): each
+    # press comes through the staff block's record, and reads as who did what
+    # to whom, with the why the gamemode writes.
+    yes('M16 the staff crafting block records each change on the card, and each has a sentence here',
+        all(("st.record('%s'" % d) in gm and d in bot._MOD_DID
+            for d in ('craftrank', 'craftrecipes', 'craftgive')))
+    cr = bot.moderation_text('dev', json.loads(row('craftrank', who='Alice', why='Platewright from Novice to Advanced')))
+    yes('M16 a raise says who raised whose rank, from what to what',
+        cr == '**Staff on the dev server:** Aela (profile 1001) raised a rank of Alice (profile 2002): '
+              'Platewright from Novice to Advanced')
+    cg = bot.moderation_text('live', json.loads(row('craftgive', who='Alice', why='2 Iron Ingot: lost in the crash at 4 PM')))
+    yes('M16 a give back says what, how many, and why',
+        cg == '**Staff on the live server:** Aela (profile 1001) gave back to Alice (profile 2002): '
+              '2 Iron Ingot: lost in the crash at 4 PM')
+    cl = bot.moderation_text('dev', json.loads(row('craftrecipes', who='@everyone', why='<@&111111111111111111>')))
+    yes('M16 a list handed again says so, and nothing in it pings anybody',
+        cl.startswith('**Staff on the dev server:** Aela (profile 1001) handed the newer recipe list to the game of ')
+        and '@everyone' not in cl and '<@&111111111111111111>' not in cl)
+    yes('M16 no em dash and never the forbidden word',
+        all(chr(0x2014) not in t and ('pla' + 'yer') not in t.lower() for t in (cr, cg, cl)))
+
     # M9: started with the others, and sent through report_say (mentions off).
     src = inspect.getsource(bot.on_ready)
     yes('M9 on_ready starts it', 'asyncio.create_task(watch_moderation())' in src)

@@ -119,7 +119,7 @@ Against the floor:
 8.5073862 times too few pixels
 ```
 
-The picture measured on 16 Sep is still in the folder, and nothing builds from it:
+The picture measured on 16 Sep, which nothing built from after 20 Sep, was removed from the repository on 27 Oct (#3680). What it measured:
 
 ```
 launcher\art\thornswood-art-1536.png

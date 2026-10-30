@@ -26,6 +26,10 @@ _to_delete/
 __pycache__/
 *.pyc
 
+# A Python virtual environment in the repository folder, where CONTRIBUTING.md
+# puts ruff to run the build check's Python step by hand.
+.venv/
+
 # What Publish-Discord.ps1 has already announced, one line per channel. Not a
 # credential, and not shared either: the two builds announce different
 # versions and each shipping machine has its own history, so a tracked copy

@@ -22,3 +22,6 @@ docs/NPC-POPULATION.md text eol=lf
 # by sha256, and the downloads carry them as they are, so no checkout may
 # turn their line ends.
 records/client-licences/** -text
+# The same for the npm packages' texts in build.js (#3751), which
+# records\front-build.json holds by sha256.
+records/front-licences/** -text
