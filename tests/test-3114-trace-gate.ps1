@@ -8,12 +8,10 @@
   measured where the gate runs. Nothing here starts a trace: it holds the
   three parts to each other and to build.yml.
 
-    1. .github\workflows\trace-gate.yml starts only by dispatch, reads the
-       repository and nothing more, runs on a build runner, and runs the gate
-       with the same list, share, throttle and budget as build.yml's gate
-       step (scripts\dev\Run-Gate.ps1), with -StartLog, keeping the start
-       log as the artifact
-       Trace-Gate.ps1 downloads;
+    1. trace-gate.yml is not here: it moved to the private ops repository
+       with the VPS runners (#4013), whose tests\test-box-workflows.ps1
+       holds it to build.yml's gate step; Trace-Gate.ps1 dispatches it there
+       on main with the branch to trace, and downloads its start log;
     2. Trace-Gate.ps1 runs the self-test first, stops the session in a
        finally, deletes a trace that was refused or not read, and pushes
        only to a claude/3114-trace-<run> branch it makes, from an index of
@@ -41,17 +39,8 @@ function Yes([string]$what, [bool]$cond) {
 }
 function Text([string]$rel) { [IO.File]::ReadAllText((Join-Path $repo $rel)) }
 
-# ---- 1. the workflow -----------------------------------------------------------
-$y = Text '.github\workflows\trace-gate.yml'
-$b = Text '.github\workflows\build.yml'
-Yes 'trace-gate.yml starts only by dispatch' ($y -match '(?m)^on:\s*\r?\n  workflow_dispatch:\s*$' -and $y -notmatch '(?m)^  (push|pull_request|pull_request_target|schedule|workflow_run):')
-Yes '  reads the repository and nothing more' ($y -match '(?m)^permissions:\s*\r?\n  contents: read\s*$' -and $y -notmatch '(?m)^\s+permissions:')
-Yes '  on a build runner, as the gate runs' ($y -match '(?m)^\s+runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\s*$')
-$want = [regex]::Match($b, '(?m)^\s+\.\\scripts\\dev\\Run-Gate\.ps1 -Throttle \d+ -BudgetSeconds \d+\s*$').Value.Trim()
-$got = [regex]::Match($y, '(?m)^\s+\.\\scripts\\dev\\Run-Gate\.ps1 .*$').Value.Trim()
-Yes ('  the gate step''s own run, its list, share and budget, with -StartLog (' + $got + ')') ($want -and $got.StartsWith($want + ' -StartLog '))
-Yes '  every tracked file checked out again first, as build.yml does' ($y -match 'git rm -r -q --cached \.' -and $y -match 'git reset -q --hard HEAD')
-Yes '  and the start log kept, even when a harness fails, as gate-trace' ($y -match '(?ms)- name: Keep the start log\s*\r?\n\s+if: always\(\)\s*\r?\n\s+uses: actions/upload-artifact@[0-9a-f]{40} # v\d+\s*\r?\n\s+with:\s*\r?\n\s+name: gate-trace\s*$')
+# ---- 1. the workflow is in the ops repository (#4013) ----------------------------
+Yes 'trace-gate.yml is not in this repository, which has no VPS runner once public' (-not (Test-Path -LiteralPath (Join-Path $repo '.github\workflows\trace-gate.yml')))
 
 # ---- 2. the script on the shipping machine --------------------------------------
 $t = Text 'scripts\dev\Trace-Gate.ps1'
@@ -59,7 +48,8 @@ $e = $null; $null = [Management.Automation.Language.Parser]::ParseInput($t, [ref
 Yes 'Trace-Gate.ps1 parses' (-not $e.Count)
 $self = $t.IndexOf("Invoke-Box 'selftest'"); $start = $t.IndexOf("Invoke-Box 'start'")
 Yes '  runs the self-test before it starts the session' ($self -gt 0 -and $start -gt $self -and $t -match "if \(\`$b\.Code -ne 0\) \{ Die \('the self-test did not pass")
-Yes '  dispatches trace-gate.yml and downloads its gate-trace artifact' ($t -match 'workflow run trace-gate\.yml' -and $t -match 'run download \$run\.databaseId --repo \$Repo -n gate-trace')
+Yes '  dispatches trace-gate.yml in the private ops repository, on its main, with the branch to trace as ref' ($t.Contains("[string]`$Repo = 'EvilPatrick06/Thornswood-Ops'") -and $t.Contains("workflow run trace-gate.yml --repo `$Repo --ref main '-f' ('ref=' + `$Ref)") -and $t.Contains('--workflow trace-gate.yml --branch main --event workflow_dispatch'))
+Yes '  and downloads its gate-trace artifact' ($t -match 'run download \$run\.databaseId --repo \$Repo -n gate-trace')
 Yes '  stops the session in a finally, whatever the run did' ($t -match "(?s)\} finally \{\s*Head '3\. The session stopped'\s*\`$s = Invoke-Box 'stop'")
 Yes '  deletes the trace when there is no finished run, a refusal, or no read' (@([regex]::Matches($t, "\`$null = Invoke-Box 'clean'; Die")).Count -eq 3)
 Yes '  pushes only to the branch it names for the run' (@([regex]::Matches($t, 'git -C \$RepoRoot push')).Count -eq 1 -and $t -match "\`$branch = 'claude/3114-trace-' \+ \`$runId" -and $t -match "\(\`$commit \+ ':refs/heads/' \+ \`$branch\)" -and $t -match 'Push-Trace \$run\.databaseId \$work' -and $t -match 'Push-Trace \$PushRun \$work')

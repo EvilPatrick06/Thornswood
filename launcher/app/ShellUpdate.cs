@@ -184,7 +184,6 @@ namespace Thornswood
             if (moved)
             {
                 cfg.Save(Paths.CfgFile);
-                PaintServerBoxes();
                 Log("The server moved. The launcher already has the new address.");
                 StartPing();
             }
@@ -225,16 +224,13 @@ namespace Thornswood
             if (quiet)
             {
                 cfg.Save(Paths.CfgFile);
-                if (txtUpdateSource != null) txtUpdateSource.Text = Updater.FeedUrl(cfg);
-                DrawVoiceState();
+                CheckVoice();
             }
             ShowNotice(v);
             BuildNews();
 
             // The add-ons are drawn straight from this document, so redraw
-            // them when the check lands: the Mods page's tab if somebody is
-            // sitting on it, and their place on Diagnostics (#1170).
-            if (modTab == 3) BuildModList();
+            // their place on Diagnostics when the check lands (#1170).
             DrawAddons();
 
             // Packs a launcher before 1.1.32 marked as applied on a collection
@@ -266,12 +262,14 @@ namespace Thornswood
                     if (Downgrade.Needed(cfg))
                     {
                         DrawStatus();
-                        Log("The collection is not installed yet and Skyrim is on the wrong build. The downgrade comes first; the collection card follows it. Updates wait until both are done.");
+                        string[] held = CollectionWait();
+                        Log(held[0] + " Skyrim is on the wrong build too, and the downgrade comes first; the collection card follows it. Updates wait for that and " + held[1] + ".");
                         return;
                     }
                     ShowCollectionBar();
                     DrawStatus();
-                    Log("The collection is not installed yet. Updates wait until it is.");
+                    string[] wait = CollectionWait();
+                    Log(wait[0] + " Updates wait " + wait[1] + ".");
                     return;
                 }
                 // The launcher itself needs no mods to update. Holding it back
@@ -281,7 +279,8 @@ namespace Thornswood
                 // still wait; the exe goes ahead.
                 pendingPacks = new List<Pack>();
                 collectionBarUp = false;
-                Log("The collection is not installed yet. The mod updates wait until it is; the launcher update goes ahead.");
+                string[] waits = CollectionWait();
+                Log(waits[0] + " The mod updates wait " + waits[1] + "; the launcher update goes ahead.");
             }
             else
             {
@@ -509,7 +508,11 @@ namespace Thornswood
         {
             if (collectionBarUp || (collectionNoteUp && !updatePending))
             {
-                try { Process.Start(new ProcessStartInfo(cfg.CollectionUrl) { UseShellExecute = true }); }
+                // Ahead has nothing to open (#4115): the button is hidden
+                // for it, and a press that slips in before the redraw
+                // must not send this copy to another revision.
+                if (collectionBarUp && CollectionProblem() == "ahead") return;
+                try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
                 catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
                 return;
             }
@@ -619,7 +622,7 @@ namespace Thornswood
                         PlayProgress.End();
                         updatePending = false;
                         updating = false;
-                        DrawStatus(); BuildModList();
+                        DrawStatus();
                         updateTried = UpdateParts(packs, doc, withLauncher);
                         updateTriedWentIn = true;
                         Log("Update finished.");

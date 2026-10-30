@@ -374,8 +374,6 @@ try {
             [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
         }
         Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
-        . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-        New-GeneratedBodies $inst $fake
         . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
         Install-UiFrontFixture (Join-Path $inst 'Game')
         $node = Get-Command node -ErrorAction SilentlyContinue

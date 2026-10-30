@@ -49,7 +49,7 @@ jobs:
     # job asking for thornswood-vps alone, signs the release launchers. Nine
     # runs of claude/* branches landed there from 22 to 26 Oct. A share of
     # harnesses, or the whole gate, is a build runner's kind of work anyway.
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') || 'windows-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
