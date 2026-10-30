@@ -90,6 +90,9 @@ if (-not $RepoPath) { $RepoPath = $Here }
 # The principal and the fail-safe the account block calls (#2578, #2613).
 # Deploy-Docs sends these up as text in front of the setup script.
 . (Join-Path $RepoPath 'scripts\deploy\ServiceAccount.ps1')
+# Deploy-Docs also loads BoxFirewall.ps1 and puts Sync-ThornswoodFirewall in
+# the setup script (#3896).
+. (Join-Path $RepoPath 'scripts\vps\BoxFirewall.ps1')
 # The places no service may read, swapped for scratch ones the test sets, so
 # the fail-safe never reads this machine's own C:\Thornswood-* folders.
 $script:neverReach = @()
@@ -154,12 +157,12 @@ $remote = $remotes[0]
 # ServiceAccount.ps1 functions sent up in front of it (#2613). Anything else would be
 # built from a variable this does not set, and the test would be testing a
 # different script from the one that goes up.
-$known = @('Task', 'Port', 'rootWin', 'boxWin', 'RunAs', 'siteAccountHelpers')
+$known = @('Task', 'Port', 'rootWin', 'boxWin', 'RunAs', 'siteAccountHelpers', '$(Get-ThornswoodFirewallScript)')
 $used = @($remote.NestedExpressions | ForEach-Object {
     if ($_ -is [System.Management.Automation.Language.VariableExpressionAst]) { $_.VariablePath.UserPath } else { $_.Extent.Text }
 } | Sort-Object -Unique)
 $strangers = @($used | Where-Object { $known -notcontains $_ })
-Yes ('the script is filled in from $Task, $Port, $rootWin, $boxWin, $RunAs and $siteAccountHelpers and nothing else' +
+Yes ('the script is filled in from $Task, $Port, $rootWin, $boxWin, $RunAs, $siteAccountHelpers and BoxFirewall.ps1''s function (#3896) and nothing else' +
      $(if ($strangers.Count) { ' (also ' + ($strangers -join ', ') + ')' } else { '' })) ($strangers.Count -eq 0)
 
 # The here-string, evaluated exactly as Deploy-Docs evaluates it. An empty

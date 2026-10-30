@@ -1080,7 +1080,7 @@ if ($outside.Answered) {
     # inbound rule for it, or something between, and the previous folder would
     # not change it: the new server stays. The rule is what to look at.
     Say ("  The box's inbound rule for TCP {0} is not letting it in. What the box holds for it:" -f $ResPort) 'Red'
-    Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $ResPort) 'DarkGray'
+    Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -PolicyStore ActiveStore -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $ResPort) 'DarkGray'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
     exit 1
