@@ -58,7 +58,8 @@ function helpTopic(id) {
 }
 const front = read(process.env.FRONT || path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'));
 const skills = read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-skills.js'));
-const keysCs = read(path.join(REPO_DIR, 'launcher', 'app', 'Keys.cs'));
+// The rows on Settings in the game (#3126), where the Controls page's were.
+const settingsPage = read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-settings.js'));
 const ini = read(path.join(REPO_DIR, 'launcher', 'Thornswood.ini'));
 
 let pass = 0, fail = 0;
@@ -494,9 +495,9 @@ const missing = Object.keys(CLIENT).filter(function (k) { return !CLIENT[k]; });
 yes('every piece of the plugin half is in thornswood-front.js' + (missing.length ? ' (missing: ' + missing.join(', ') + ')' : ''),
     missing.length === 0);
 yes('the key handler asks lockPress for the lock key', /e\.code === LOCK_KEY && lockPress\(\)/.test(front));
-yes('the lock key is still X, LockKey in Thornswood.ini, with its row on the Controls page',
-    /const LOCK_KEY\s*=\s*iniNumber\(ini, 'LockKey', 45\);/.test(front) &&
-    /^\s*LockKey\s*=\s*45\s*$/m.test(ini) && /ThornIni, "LockKey", 45\)/.test(keysCs));
+yes('the lock key is still X, LockKey in Thornswood.ini, with its row on Settings in the game',
+    /(?:const|let) LOCK_KEY\s*=\s*iniNumber\(ini, 'LockKey', 45\);/.test(front) &&
+    /^\s*LockKey\s*=\s*45\s*$/m.test(ini) && /\{ ini: 'LockKey', def: 45,/.test(settingsPage));
 
 const MOLD_RT = 0x0a015495;
 const FORGE_HERE = 0x00a00010;
@@ -717,8 +718,8 @@ try {
   });
   yes('H5 property.md, embassy.md and thalmor.md tell nobody to type them' + (stale.length ? ' (' + stale.join(', ') + ')' : ''),
       stale.length === 0);
-  const row = (/Dx\("lockkey",[\s\S]*?ThornIni, "LockKey", 45\)\);/.exec(keysCs) || [''])[0];
-  yes('H6 the Controls page row says what the key does, and names no command',
+  const row = (/\{ ini: 'LockKey', def: 45,[^}]*\}/.exec(settingsPage) || [''])[0];
+  yes('H6 the Settings row says what the key does, and names no command',
       /claims the building/.test(row) && /locks or unlocks/.test(row) && /cuts a key/.test(row) && !/\/(claim|lock|unlock|key)\b/.test(row));
   const iniBlock = (/((?:;[^\n]*\n)+)LockKey = 45/.exec(ini) || ['', ''])[1];
   yes('H7 and so does its line in Thornswood.ini', /claims the building/.test(iniBlock) && !/\/(claim|lock|unlock|key)\b/.test(iniBlock));
