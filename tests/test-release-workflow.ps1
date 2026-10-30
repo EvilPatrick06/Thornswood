@@ -74,7 +74,7 @@ $hand = Get-Job 'handoff'
 Yes 'a tag push has one job, "handoff", which hands the tag to main''s workflow' ($hand -ne '' -and $hand.Contains("if: `${{ github.event_name == 'push' }}"))
 Yes '  it starts release.yml on main with the tag and the commit it named, by the repository token' ($hand.Contains("ref = 'main'; inputs = @{ tag = `$env:GITHUB_REF_NAME; expected_sha = `$env:GITHUB_SHA }") -and $hand.Contains('actions/workflows/release.yml/dispatches') -and $hand.Contains('GH_TOKEN: ${{ github.token }}'))
 Yes '  with actions: write alone, no contents, no id-token, no environment, no checkout' ($hand -match '(?m)^    permissions:\n      actions: write\n    timeout' -and -not $hand.Contains('id-token') -and -not $hand.Contains('environment:') -and -not $hand.Contains('actions/checkout'))
-Yes '  on a check runner, never the signing runner (which takes main''s jobs alone, #3889)' ($hand -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-check\]$')
+Yes '  on a check runner, never the signing runner (which takes main''s jobs alone, #3889), while the repository is private, and on GitHub''s once public (#3685)' ($hand -match ('(?m)^    runs-on: ' + [regex]::Escape("`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`", `"thornswood-check`"]') || 'windows-latest' }}") + '$'))
 Yes 'no "refs/tags/v" gate is left on the environment or a sign step' (-not ($code -match "startsWith\(github\.ref, 'refs/tags/v'\)"))
 Yes 'a manual run can ask for either runner (runner input: hosted or vps)' ($top.Contains('options: [hosted, vps]'))
 Yes 'workflow-level permissions are contents: write only, no id-token for every job' ($top -match "(?m)^permissions:\n  contents: write\n" -and -not (($top -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n").Contains('id-token'))
@@ -83,7 +83,7 @@ Yes 'one concurrency group per tag, however the run started (v1.1.96 got two dra
 # ---- hosted first, the box as the fallback (#3312) ----------------------------
 $hosted = Get-Job 'launcher'
 Yes 'a manual run defaults to GitHub''s runner' ($top -match "(?m)^        default: hosted$")
-Yes 'the hosted job runs on a manual run unless BUILD_RUNNER or the run asks for the box, as build.yml''s does' ($hosted.Contains("if: `${{ github.event_name == 'workflow_dispatch' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}"))
+Yes 'the hosted job runs on a manual run unless BUILD_RUNNER or the run asks for the box while the repository is private, as build.yml''s does (#3685)' ($hosted.Contains("if: `${{ github.event_name == 'workflow_dispatch' && (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}"))
 
 # ---- the hosted job -----------------------------------------------------------
 Yes 'there is a hosted job "launcher"' ($hosted -ne '')
@@ -143,7 +143,7 @@ Yes '  and writes release_id and signed for the verify job' ($draft.Contains('"r
 $vps = Get-Job 'launcher-vps'
 Yes 'there is a VPS job "launcher-vps"' ($vps -ne '')
 Yes '  it needs the hosted job' ($vps -match '(?m)^    needs: launcher$')
-Yes '  it runs when the hosted job did not succeed (skipped included) and the run was not cancelled (!cancelled, #2422), in a run of main''s own workflow only (#3930)' ($vps.Contains("if: `${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && $main }}"))
+Yes '  it runs when the hosted job did not succeed (skipped included) and the run was not cancelled (!cancelled, #2422), only while the repository is private (#3685), in a run of main''s own workflow only (#3930)' ($vps.Contains("if: `${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && $main }}"))
 Yes '  on the signing runner only, by its exact labels (thornswood-sign, runner 3)' ($vps -match '(?m)^    runs-on: \[self-hosted, Windows, X64, thornswood-vps, thornswood-sign\]$')
 Yes '  with id-token: write and contents: write at job level' ($vps -match '(?m)^    permissions:\n      contents: write\n      id-token: write$')
 Yes '  the release environment only in a run of main''s own workflow, as the hosted job' ($vps.Contains("environment: `${{ $main && 'release' || '' }}"))
@@ -154,7 +154,7 @@ Yes '  and with the hosted job''s own steps' ($vps -match '(?m)^    steps: \*rel
 $ver = Get-Job 'verify'
 Yes 'there is a "verify" job' ($ver -ne '')
 Yes '  it runs after whichever job drafted a signed launcher' ($ver -match '(?m)^    needs: \[launcher, launcher-vps\]$' -and $ver.Contains("(needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true') || (needs.launcher-vps.result == 'success' && needs.launcher-vps.outputs.signed == 'true')"))
-Yes '  on a check runner, never the runner that signs, and never waiting on a build label (#3956)' ($ver -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-check\]$')
+Yes '  on a check runner, never the runner that signs, and never waiting on a build label (#3956), while the repository is private, and on GitHub''s once public (#3685)' ($ver -match ('(?m)^    runs-on: ' + [regex]::Escape("`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`", `"thornswood-check`"]') || 'windows-latest' }}") + '$'))
 Yes '  without id-token or the release environment' (-not $ver.Contains('id-token') -and -not $ver.Contains('environment:'))
 Yes '  it checks out the commit the draft was built from, by the job that built it' ($ver.Contains('ref: ${{ env.DRAFT_COMMIT }}') -and $ver.Contains("DRAFT_COMMIT: `${{ needs.launcher.result == 'success' && needs.launcher.outputs.commit || needs.launcher-vps.outputs.commit }}"))
 Yes '  downloads each file by its asset id' ($ver.Contains('releases/assets/$($a[0].id)') -and $ver.Contains("Accept = 'application/octet-stream'"))

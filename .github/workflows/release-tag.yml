@@ -52,7 +52,7 @@ jobs:
   tag:
     name: Tag the commit and start release.yml on it
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     timeout-minutes: 5
     steps:
       # The inputs reach the script through env, never pasted into its text.
