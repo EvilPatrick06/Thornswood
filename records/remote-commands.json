@@ -1288,7 +1288,7 @@
                       "script":  "scripts/deploy/Setup-Domain.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "Get-NetFirewallRule -DisplayName \u0027Thornswood Docs\u0027 -EA SilentlyContinue |",
+                      "anchor":  "if (Get-NetFirewallRule -PolicyStore localhost -DisplayName \u0027Thornswood Docs\u0027 -EA SilentlyContinue) {",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends NetFirewall"
@@ -2297,7 +2297,7 @@
                       "scope":  "Invoke-Box",
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
-                      "does":  "runs vps-inbound-rules.ps1, sent on standard input (#3035), which turns off every inbound Allow rule not on the box's list (#3807)",
+                      "does":  "runs vps-inbound-rules.ps1, sent on standard input (#3035), which turns off every inbound Allow rule not on the box's list (#3807), or with -Own vps-firewall-policy.ps1, which moves the kept rules into the box's policy (#3896)",
                       "class":  "admin",
                       "reason":  "firewall change"
                   },
