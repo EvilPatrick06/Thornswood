@@ -2919,10 +2919,13 @@ opens nothing either way.
 
 **Copies.** The nightly backups, on the box and in `local\backups` in the
 repository folder once `Fetch-Backups.ps1` has brought them down, are encrypted with the
-passphrase. `Backup-Server.ps1` makes a plain zip in that same folder, with
-the site's config, the bot and voice folders whole and every game server's
-`private` folder, so a machine that has run it holds every VPS secret above
-except the backup passphrase, in the clear.
+passphrase. `Backup-Server.ps1`, the whole-server copy taken by hand,
+encrypts its zip on the box with the same passphrase and brings down only
+`thornswood-backup-<stamp>.zip.enc` (the site's config, the bot and voice
+folders whole, voice chat included, and every game server's `private`
+folder), so no plain copy reaches a machine that runs it. `Fetch-Backups.ps1`
+deletes a copy taken by hand 30 days after the day in its name, as the
+privacy page says.
 
 **Checking a row.** Each of these reads, and none prints a value:
 
