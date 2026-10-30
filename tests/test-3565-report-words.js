@@ -130,10 +130,11 @@ yes('Summary() writes no line of its own outside Add and Section' + (stray.lengt
 // ---- what came out ------------------------------------------------------------------
 yes('the report does not write the machine\'s name', !/MachineName/.test(diag));
 yes('the report does not write the user name on a line of its own', !/Environment\.UserName/.test(diag));
-yes('the report does not write the server\'s address, only main or dev and the port (Pages.cs keeps it off every page)',
+yes('the report does not write the server\'s address, only main or dev and the port (no page shows it)',
     !/ServerAddress/.test(diag) && /Add\("server", \(cfg\.IsDev \? "dev" : "main"\) \+ ", port " \+ cfg\.ServerPort\);/.test(summary));
-yes('Pages.cs still keeps the address off the page, the rule the report now follows',
-    /btnSrvCopy\.Visibility = Visibility\.Collapsed;/.test(pages));
+// The Server page, the one place that could show it, went with #3146.
+yes('no launcher page shows the address, the rule the report now follows',
+    !/ServerAddress|txtSrvAddress/.test(pages) && !/TxtSrvAddress/.test(xaml));
 
 // ---- the page's words -------------------------------------------------------------------
 const words = member(diag, 'public static string WhatTheReportHolds()');

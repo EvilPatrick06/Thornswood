@@ -11,12 +11,16 @@
   right, its key lives here and nowhere else, and this is the only thing
   that uses it.
 
-  WHAT IT DOES. It makes GitHub's admin settings match what main records, or
-  says where the App is installed, and nothing else:
+  WHAT IT DOES. It makes GitHub's admin settings match what this
+  repository's main records, or says where the App is installed, and
+  nothing else:
     runner-labels   every records/<name>-runners.json on main, { label,
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
-                    runner does. records/build-runners.json is the build cap
+                    runner does. The runners are registered to the private
+                    ops repository, EvilPatrick06/Thornswood-Ops, since
+                    this one went public (#4013, Patrick's A on #3685).
+                    records/build-runners.json is the build cap
                     (#2994). A record may also list off-box runners by
                     name (offBox, thornswood-pr-*), which carry its label
                     too (build runners on One, 26 Oct 2026); they never
@@ -33,6 +37,15 @@
                     5:13 PM), and the App's administration write covers
                     them. It stops for a record that is not a plain line,
                     an https website, or GitHub's own topic shape.
+    settings        reads, and changes nothing (#3534): the Actions settings
+                    (on or off, which actions may run, the workflow token's
+                    default, sharing, log and artifact retention, fork pull
+                    requests), the runners, and the names (never the values,
+                    which GitHub never gives) of the secrets and variables of
+                    the repository and of each environment
+                    records/github-settings.json on main names. A name the
+                    App has no permission to read is said, with the
+                    permission it needs, instead of being read.
     installation-repos
                     the repositories the App is installed on, read with a
                     token that can read their metadata and nothing more, and
@@ -53,17 +66,22 @@
                     nobody wrote down is a pull request to the record or a
                     deliberate removal, never a silent loss. A repository
                     the App is not installed on stops the run for it, with
-                    the link that installs it, and the others go on.
+                    the link to the installation's settings, and the others
+                    go on.
   What to do comes from Thornswood's main, read through the App, never from the caller,
   so whoever asks can only make GitHub match main. A change is a pull
   request to the record.
 
-  WHO MAY ASK. A run of .github/workflows/github-admin.yml on main, and
-  nothing else: it sends the OIDC token GitHub gave that run, for the
-  audience thornswood-admin, and this checks it against GitHub's published
-  keys (fetched each time) and its claims: GitHub's issuer, the audience,
-  not expired, this repository, refs/heads/main, that exact workflow on
-  main, started by hand or by a push. A pull request's run has another ref
+  WHO MAY ASK. A run of the ops repository's .github/workflows/
+  github-admin.yml on its main, and nothing else: it sends the OIDC token
+  GitHub gave that run, for the audience thornswood-admin, and this checks it
+  against GitHub's published keys (fetched each time) and its claims:
+  GitHub's issuer, the audience, not expired, the ops repository,
+  refs/heads/main, that exact workflow on main, started by hand. A push here
+  cannot start it there, so the Desk runs Set-BuildRunners.ps1 (with
+  -RepoSettings for the repository settings) or Set-RepoAbout.ps1 after a
+  merge that changes a record. A pull request's
+  run has another ref
   and another workflow ref, so it cannot. No secret is involved: the token
   is GitHub's word for which run is asking.
 
@@ -76,7 +94,9 @@
   with a one-time state and an hour to live, and prints the address
   https://thornswood.net/github-app/setup?state=<state>. That page sends the
   App's manifest to GitHub (name, no webhook, private, administration write
-  and contents read on the repositories it is installed on); Patrick creates
+  and contents read on the repositories it is installed on, and since #3534
+  read of the names of its secrets, variables and environments, never their
+  values); Patrick creates
   it, GitHub sends him back to /setup/done with a one-time code, and this
   trades the code for the App's key straight from GitHub. The key goes into
   state\key.pem, the App's id and name into state\app.json, the setup is
@@ -114,34 +134,35 @@ const WEB = (process.env.THORNSWOOD_ADMIN_GITHUB_WEB || 'https://github.com').re
 const JWKS = process.env.THORNSWOOD_ADMIN_JWKS || 'https://token.actions.githubusercontent.com/.well-known/jwks';
 const PLAIN = 'box admin: not here';
 
+// Where the records are, and where the runners and the workflow that asks
+// are (#4013).
 const REPO = 'EvilPatrick06/Thornswood';
+const RUNNERS_REPO = 'EvilPatrick06/Thornswood-Ops';
 const OWNER = 'EvilPatrick06';
 const RULES = {
   iss: 'https://token.actions.githubusercontent.com',
   aud: 'thornswood-admin',
-  repository: REPO,
+  repository: RUNNERS_REPO,
   ref: 'refs/heads/main',
-  workflow: REPO + '/.github/workflows/github-admin.yml@refs/heads/main',
-  events: ['workflow_dispatch', 'push'],
+  workflow: RUNNERS_REPO + '/.github/workflows/github-admin.yml@refs/heads/main',
+  events: ['workflow_dispatch'],
 };
 // The labels every VPS runner carries, or GitHub gives itself; a record may
 // never name one, since taking it off would strand every job that asks.
 const RESERVED = ['self-hosted', 'windows', 'linux', 'macos', 'x64', 'arm64', 'thornswood-vps', 'thornswood-pr'];
 // What a run may ask for. None takes anything from the caller but the
 // check: runner-labels, repo-about and repo-settings each read their record
-// from main.
-const ASKS = ['runner-labels', 'installation-repos', 'repo-about', 'repo-settings'];
+// from main, and settings reads GitHub's settings alone.
+const ASKS = ['runner-labels', 'installation-repos', 'repo-about', 'settings', 'repo-settings'];
 const SETTINGS_FILE = 'records/github-repo-settings.json';
 // The repositories repo-settings may change: this one and the engine fork.
 // The App reaches only those it is installed on, and this stops a record
 // naming any other even then.
 const SETTINGS_REPOS = [REPO, OWNER + '/skymp'];
-// What each installation token may do: Thornswood's reads main's records
-// too; the fork's only needs its settings.
+// What repo-settings' token for each repository may do: Thornswood's reads
+// main's record too; the fork's only needs its settings.
 const HOME_PERMISSIONS = { administration: 'write', contents: 'read' };
 const FORK_PERMISSIONS = { administration: 'write' };
-const homeScope = () => ({ repositories: [REPO.split('/')[1]], permissions: HOME_PERMISSIONS });
-const forkScope = repo => ({ repositories: [repo.split('/')[1]], permissions: FORK_PERMISSIONS });
 // The parts of a ruleset the record says and GitHub is made to match. Any
 // other key in a record entry (why) is the record's own note and never sent.
 const RULESET_KEYS = ['name', 'target', 'enforcement', 'conditions', 'rules', 'bypass_actors'];
@@ -400,21 +421,35 @@ function readApp() {
   return { pem: fs.readFileSync(keyPath, 'utf8'), app: JSON.parse(fs.readFileSync(appPath, 'utf8')) };
 }
 
-// A token for the hour GitHub gives it, with only what the ask needs, and
-// nothing keeps it after the request: for runner-labels and repo-about
-// Thornswood alone, administration write and contents read; for
-// repo-settings one such token per repository it changes (the fork's
-// administration write alone); for installation-repos the metadata of the
-// repositories the installation holds, read only, which is all GitHub needs
-// to list them. repo is where GitHub is asked which installation holds the
-// App.
-async function installationToken(held, now, repo, scope) {
+// What settings reads with, all of it read only. The last three are asked for
+// only when the installation holds them (SETTINGS_EXTRA): the App was first
+// made with administration and contents alone, and Patrick chose on 26 Oct
+// (#3534) to give it Secrets, Variables and Environments read, which an App
+// already made takes only once he adds them on its page and accepts them on
+// the installation. GitHub calls the Variables permission actions_variables.
+const SETTINGS_PERMISSIONS = { administration: 'read', contents: 'read' };
+const SETTINGS_EXTRA = ['secrets', 'actions_variables', 'environments'];
+
+// Which permissions the installation holds, and where it is:
+// { id, permissions }. One App on one account has one installation, found
+// by any repository it holds.
+async function installation(held, now) {
   const jwt = appJwt(held.app.id, held.pem, now);
-  const auth = { Authorization: 'Bearer ' + jwt };
-  const inst = await call('GET', API + '/repos/' + repo + '/installation', auth);
-  if (inst.status === 404) throw new Error('the App is not installed on ' + repo + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
-  if (inst.status !== 200) throw new Error('GitHub would not say where the App is installed on ' + repo + ' (' + said(inst) + ')');
-  const tok = await call('POST', API + '/app/installations/' + inst.body.id + '/access_tokens', auth, scope);
+  const inst = await call('GET', API + '/repos/' + REPO + '/installation', { Authorization: 'Bearer ' + jwt });
+  if (inst.status === 404) throw new Error('the App is not installed on ' + REPO + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
+  if (inst.status !== 200) throw new Error('GitHub would not say where the App is installed (' + said(inst) + ')');
+  return { id: inst.body.id, permissions: (inst.body && inst.body.permissions) || {} };
+}
+
+// A token for the hour GitHub gives it, with only the permissions given,
+// for one repository, or with repo null for every repository the
+// installation holds (installation-repos, which asks for their metadata
+// alone); nothing keeps it after the request.
+async function installationToken(held, now, repo, permissions, inst) {
+  const where = inst || await installation(held, now);
+  const jwt = appJwt(held.app.id, held.pem, now);
+  const tok = await call('POST', API + '/app/installations/' + where.id + '/access_tokens', { Authorization: 'Bearer ' + jwt },
+    repo ? { repositories: [repo.split('/')[1]], permissions } : { permissions });
   if (tok.status !== 201) throw new Error('GitHub gave the App no token (' + said(tok) + ')');
   return tok.body.token;
 }
@@ -516,14 +551,20 @@ async function reporting(token, repo, want, check) {
 // with check says only what differs. One repository's stop does not keep
 // the others from being matched. { ok, lines, changed, differs }.
 async function repoSettings(held, now, check) {
-  const home = await installationToken(held, now, REPO, homeScope());
+  const inst = await installation(held, now);
+  const home = await installationToken(held, now, REPO, HOME_PERMISSIONS, inst);
   const doc = await mainSettings(home);
   checkSettings(doc);
   const out = { ok: true, lines: [], changed: 0, differs: 0 };
   const add = r => { out.ok = out.ok && r.ok; out.lines.push(...r.lines); out.changed += r.changed; out.differs += r.differs; };
   for (const e of doc.repositories) {
     try {
-      const token = e.repository === REPO ? home : await installationToken(held, now, e.repository, forkScope(e.repository));
+      let token = home;
+      if (e.repository !== REPO) {
+        // GitHub gives no token for a repository the installation does not hold.
+        try { token = await installationToken(held, now, e.repository, FORK_PERMISSIONS, inst); }
+        catch (err) { throw new Error(err.message + '; is the App installed on it? ' + WEB + '/settings/installations/' + inst.id); }
+      }
       add(await rulesets(token, e.repository, e.rulesets, check));
       if (typeof e.private_vulnerability_reporting === 'boolean') add(await reporting(token, e.repository, e.private_vulnerability_reporting, check));
     } catch (err) {
@@ -581,15 +622,16 @@ async function repoAbout(token, check) {
 }
 
 async function listRunners(token) {
-  const a = await call('GET', API + '/repos/' + REPO + '/actions/runners?per_page=100', { Authorization: 'Bearer ' + token });
+  const a = await call('GET', API + '/repos/' + RUNNERS_REPO + '/actions/runners?per_page=100', { Authorization: 'Bearer ' + token });
   if (a.status !== 200 || !a.body || !Array.isArray(a.body.runners)) throw new Error('GitHub would not list the runners (' + said(a) + ')');
   return a.body.runners;
 }
 
 // Makes the runners' labels match main's records, or with check says only
-// what differs. { ok, lines, changed, differs }.
-async function runnerLabels(token, check) {
-  const records = await mainRecords(token);
+// what differs. { ok, lines, changed, differs }. read reads the records,
+// token changes the runners.
+async function runnerLabels(read, token, check) {
+  const records = await mainRecords(read);
   if (!records.length) throw new Error('main has no records/*-runners.json, so there is nothing to match');
   checkRecords(records);
   const runners = await listRunners(token);
@@ -607,8 +649,8 @@ async function runnerLabels(token, check) {
       if (check) { lines.push(rec.file + ': ' + c.name + ' would have ' + rec.label + ' ' + (c.do === 'put on' ? 'put on' : 'taken off')); continue; }
       const auth = { Authorization: 'Bearer ' + token };
       const a = c.do === 'put on'
-        ? await call('POST', API + '/repos/' + REPO + '/actions/runners/' + c.id + '/labels', auth, { labels: [rec.label] })
-        : await call('DELETE', API + '/repos/' + REPO + '/actions/runners/' + c.id + '/labels/' + encodeURIComponent(rec.label), auth);
+        ? await call('POST', API + '/repos/' + RUNNERS_REPO + '/actions/runners/' + c.id + '/labels', auth, { labels: [rec.label] })
+        : await call('DELETE', API + '/repos/' + RUNNERS_REPO + '/actions/runners/' + c.id + '/labels/' + encodeURIComponent(rec.label), auth);
       if (a.status !== 200) { lines.push('STOP ' + c.name + ': GitHub did not ' + c.do + ' ' + rec.label + ' (' + said(a) + ')'); ok = false; continue; }
       changed++;
       lines.push(rec.file + ': ' + c.name + ', ' + rec.label + ' ' + (c.do === 'put on' ? 'put on' : 'taken off'));
@@ -623,6 +665,81 @@ async function runnerLabels(token, check) {
     }
   }
   return { ok, lines, changed, differs };
+}
+
+// ---------------------------------------------------------------- settings --
+// The environments records/github-settings.json on main names, read through
+// the App, so the caller never says which to read.
+async function mainSettingsRecord(token) {
+  const got = await call('GET', API + '/repos/' + REPO + '/contents/records/github-settings.json?ref=main', { Authorization: 'Bearer ' + token });
+  if (got.status === 404) return { environments: [] };
+  if (got.status !== 200 || !got.body || !got.body.content) throw new Error('GitHub would not give records/github-settings.json on main (' + said(got) + ')');
+  let j;
+  try { j = JSON.parse(Buffer.from(got.body.content, 'base64').toString('utf8').replace(/^\uFEFF/, '')); }
+  catch (e) { throw new Error('records/github-settings.json on main is not JSON'); }
+  const envs = Object.keys((j && j.environments) || {}).filter(n => /^[A-Za-z0-9._-]{1,255}$/.test(n)).sort();
+  return { environments: envs };
+}
+
+// Every name on every page of a list GitHub pages, key being the array's
+// name in the answer (secrets, variables, runners).
+async function pagedNames(token, pathPart, key, pick) {
+  const out = [];
+  for (let page = 1; page <= 20; page++) {
+    const a = await call('GET', API + '/repos/' + REPO + '/' + pathPart + (pathPart.indexOf('?') >= 0 ? '&' : '?') + 'per_page=100&page=' + page, { Authorization: 'Bearer ' + token });
+    if (a.status !== 200 || !a.body || !Array.isArray(a.body[key])) return { ok: false, why: 'GET ' + pathPart + ' answered ' + said(a) };
+    for (const x of a.body[key]) out.push(pick ? pick(x) : x.name);
+    if (a.body[key].length < 100) break;
+  }
+  return { ok: true, items: out };
+}
+
+// The settings, read and never changed: { ok, readings, unread }. unread
+// says, per thing not read, why. held is what the installation holds.
+async function readSettings(token, held) {
+  const auth = { Authorization: 'Bearer ' + token };
+  const readings = {};
+  const unread = [];
+  const one = async (key, pathPart) => {
+    const a = await call('GET', API + '/repos/' + REPO + '/' + pathPart, auth);
+    if (a.status === 200) readings[key] = a.body;
+    else unread.push(key + ': GET ' + pathPart + ' answered ' + said(a));
+  };
+  await one('actions', 'actions/permissions');
+  if (readings.actions && readings.actions.allowed_actions === 'selected') await one('selected_actions', 'actions/permissions/selected-actions');
+  await one('workflow_token', 'actions/permissions/workflow');
+  await one('sharing', 'actions/permissions/access');
+  await one('retention', 'actions/permissions/artifact-and-log-retention');
+  await one('fork_pull_requests', 'actions/permissions/fork-pr-workflows-private-repos');
+  const runners = await pagedNames(token, 'actions/runners', 'runners', r => ({ name: r.name, status: r.status, labels: (r.labels || []).map(l => l.name).sort() }));
+  if (runners.ok) readings.runners = runners.items; else unread.push('runners: ' + runners.why);
+
+  const has = p => held[p] === 'read' || held[p] === 'write';
+  const need = what => 'the App has no ' + what + ' permission, so GitHub gives it none of these names';
+  if (has('secrets')) {
+    const r = await pagedNames(token, 'actions/secrets', 'secrets');
+    if (r.ok) readings.secrets = r.items.sort(); else unread.push('secrets: ' + r.why);
+  } else unread.push('secrets: ' + need('Secrets'));
+  if (has('actions_variables')) {
+    const r = await pagedNames(token, 'actions/variables', 'variables');
+    if (r.ok) readings.variables = r.items.sort(); else unread.push('variables: ' + r.why);
+  } else unread.push('variables: ' + need('Variables'));
+
+  const rec = await mainSettingsRecord(token);
+  readings.environments = {};
+  for (const env of rec.environments) {
+    const e = {};
+    const at = 'environments/' + encodeURIComponent(env);
+    if (has('environments')) {
+      const s = await pagedNames(token, at + '/secrets', 'secrets');
+      if (s.ok) e.secrets = s.items.sort(); else unread.push('environment ' + env + ' secrets: ' + s.why);
+      const v = await pagedNames(token, at + '/variables', 'variables');
+      if (v.ok) e.variables = v.items.sort(); else unread.push('environment ' + env + ' variables: ' + v.why);
+    }
+    readings.environments[env] = e;
+  }
+  if (rec.environments.length && !has('environments')) unread.push('environment secrets and variables: ' + need('Environments'));
+  return { ok: true, readings, unread };
 }
 
 // The repositories the App's installation holds, and nothing changed.
@@ -655,7 +772,7 @@ function manifest() {
     hook_attributes: { url: 'https://thornswood.net/github-app/hook', active: false },
     redirect_url: 'https://thornswood.net/github-app/setup/done',
     public: false,
-    default_permissions: { administration: 'write', contents: 'read' },
+    default_permissions: { administration: 'write', contents: 'read', secrets: 'read', actions_variables: 'read', environments: 'read' },
     default_events: [],
   };
 }
@@ -744,17 +861,45 @@ async function converge(req, res, now) {
   const run = claims.run_id + ' (' + claims.event_name + ' by ' + claims.actor + ')';
   const held = readApp();
   if (!held) { log('run ' + run + ': no App yet'); json(res, 503, { ok: false, lines: ['there is no App here yet: Install-AdminService.ps1 -Setup makes it'] }); return; }
+  if (ask.what === 'settings') {
+    try {
+      const inst = await installation(held, now);
+      // This repository alone, read only (SETTINGS_PERMISSIONS, and whichever
+      // of SETTINGS_EXTRA the installation holds).
+      const perms = Object.assign({}, SETTINGS_PERMISSIONS);
+      for (const p of SETTINGS_EXTRA) if (inst.permissions[p] === 'read' || inst.permissions[p] === 'write') perms[p] = 'read';
+      const token = await installationToken(held, now, REPO, perms, inst);
+      const r = await readSettings(token, inst.permissions);
+      log('run ' + run + ': settings read, ' + r.unread.length + ' not read');
+      for (const l of r.unread) log('  not read: ' + l);
+      json(res, 200, { ok: true, readings: r.readings, unread: r.unread, lines: r.unread.map(l => 'not read: ' + l) });
+    } catch (e) {
+      log('run ' + run + ': settings: ' + e.message);
+      json(res, 502, { ok: false, lines: [e.message] });
+    }
+    return;
+  }
   try {
     if (ask.what === 'installation-repos') {
-      const r = await installationRepos(await installationToken(held, now, REPO, { permissions: { metadata: 'read' } }));
+      const r = await installationRepos(await installationToken(held, now, null, { metadata: 'read' }));
       log('run ' + run + ': installation-repos, ' + r.repos.length + ' repositor' + (r.repos.length === 1 ? 'y' : 'ies'));
       for (const l of r.lines) log('  ' + l);
       json(res, 200, r);
       return;
     }
-    const r = ask.what === 'repo-settings'
-      ? await repoSettings(held, now, !!ask.check)
-      : await (ask.what === 'repo-about' ? repoAbout : runnerLabels)(await installationToken(held, now, REPO, homeScope()), !!ask.check);
+    // Reading the records here and changing the runners there are two
+    // tokens, so neither can do the other's work. The About box is this
+    // repository's own, so one token here reads its record and writes it.
+    let r;
+    if (ask.what === 'repo-settings') {
+      r = await repoSettings(held, now, !!ask.check);
+    } else if (ask.what === 'repo-about') {
+      r = await repoAbout(await installationToken(held, now, REPO, { administration: 'write', contents: 'read' }), !!ask.check);
+    } else {
+      const read = await installationToken(held, now, REPO, { contents: 'read' });
+      const token = await installationToken(held, now, RUNNERS_REPO, { administration: 'write' });
+      r = await runnerLabels(read, token, !!ask.check);
+    }
     log('run ' + run + ': ' + ask.what + (ask.check ? ' check' : '') + ', ' + r.changed + ' changed, ' + (r.ok ? 'ok' : 'stopped'));
     for (const l of r.lines) log('  ' + l);
     json(res, r.ok ? 200 : 409, r);
@@ -785,5 +930,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planLabels, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, SETTINGS_REPOS, serve };
+module.exports = { verifyOidc, appJwt, planLabels, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();

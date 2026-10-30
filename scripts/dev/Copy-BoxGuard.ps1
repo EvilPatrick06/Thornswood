@@ -19,30 +19,44 @@
   tests\test-3041-box-guard.ps1 fails while any copy differs, and runs this
   against a planted copy.
 
+  -Source BoxFirewall does the same for scripts\vps\BoxFirewall.ps1's
+  Sync-ThornswoodFirewall, between the lines
+      # ---- BoxFirewall.ps1 (copy) ----
+      # ---- end BoxFirewall.ps1 ----
+  (#3896), and tests\test-3896-firewall-policy.ps1 holds those copies.
+
+.PARAMETER Source
+  BoxGuard (the default) or BoxFirewall: which file's function is written.
+
 .PARAMETER Root
   The folder whose scripts are written. The repository's scripts folder when
   empty; only the harness passes another.
 #>
 [CmdletBinding()]
-param([string]$Root = '')
+param(
+    [string]$Root = '',
+    [ValidateSet('BoxGuard', 'BoxFirewall')]
+    [string]$Source = 'BoxGuard'
+)
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $Root) { $Root = [IO.Path]::Combine($repo, 'scripts') }
-$source = [IO.Path]::Combine($repo, 'scripts', 'vps', 'BoxGuard.ps1')
+$fnName = @{ BoxGuard = 'Get-ThornswoodBoxRefusal'; BoxFirewall = 'Sync-ThornswoodFirewall' }[$Source]
+$sourceFile = [IO.Path]::Combine($repo, 'scripts', 'vps', $Source + '.ps1')
 
 $errs = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($source, [ref]$null, [ref]$errs)
-if ($errs -and $errs.Count) { throw "$source does not parse, so nothing was written." }
-$fn = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-ThornswoodBoxRefusal' }, $true))
-if ($fn.Count -ne 1) { throw "$source does not define Get-ThornswoodBoxRefusal once, so nothing was written." }
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($sourceFile, [ref]$null, [ref]$errs)
+if ($errs -and $errs.Count) { throw "$sourceFile does not parse, so nothing was written." }
+$fn = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $fnName }, $true))
+if ($fn.Count -ne 1) { throw "$sourceFile does not define $fnName once, so nothing was written." }
 $body = $fn[0].Extent.Text.Replace("`r`n", "`n")
 
-$open = '# ---- BoxGuard.ps1 (copy) ----'
-$close = '# ---- end BoxGuard.ps1 ----'
+$open = '# ---- ' + $Source + '.ps1 (copy) ----'
+$close = '# ---- end ' + $Source + '.ps1 ----'
 $bad = 0
 foreach ($f in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.ps1')) {
-    if ($f.FullName -eq $source) { continue }
+    if ($f.FullName -eq $sourceFile) { continue }
     $text = [IO.File]::ReadAllText($f.FullName)
     $nl = $(if ($text.Contains("`r`n")) { "`r`n" } else { "`n" })
     $lf = $text.Replace("`r`n", "`n")

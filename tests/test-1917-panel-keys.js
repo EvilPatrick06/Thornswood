@@ -305,6 +305,8 @@ const ROWS = [
 ];
 const OPEN = {
   'thornswood-help.js': { name: 'thornswoodHelp', open(p) { p.win.thornswoodHelp.open(); } },
+  // Settings in the game (#3126): it listens for the key it is changing.
+  'thornswood-settings.js': { name: 'thornswoodSettings', open(p) { p.win.thornswoodSettings.open(); } },
   'thornswood-maneuvers.js': { name: 'thornswoodManeuvers', open(p) { p.win.thornswoodManeuvers.setRows(ROWS, '9'); p.win.thornswoodManeuvers.open(); } },
   'thornswood-board.js': { name: 'thornswoodBoard', open(p) {
     p.win.thornswoodBoard.setData({ board: { hold: 'whiterun', x: 1, y: 2, z: 3, where: 'Whiterun', here: true, wall: [], jobs: [] } });
@@ -315,6 +317,8 @@ const OPEN = {
   'thornswood-box.js': { name: 'thornswoodBox', open(p) { p.win.thornswoodBox.setData({ open: true, hold: 'whiterun', where: 'Whiterun', rows: [], pack: [], packGold: 5 }); } },
   'thornswood-repair.js': { name: 'thornswoodRepair', open(p) { p.win.thornswoodRepair.setData({ open: true, items: [] }); } },
   'thornswood-treat.js': { name: 'thornswoodTreat', open(p) { p.win.thornswoodTreat.setData({ open: true, needs: [] }); } },
+  // Salting and smoking (#3163): the server's view, with open, opens it.
+  'thornswood-preserve.js': { name: 'thornswoodPreserve', open(p) { p.win.thornswoodPreserve.setData({ open: true, may: true, salt: 2, wood: 1, fire: true, perWood: 5, rows: [] }); } },
   'thornswood-furniture.js': { name: 'thornswoodFurniture', open(p) { p.win.thornswoodFurniture.setData({ open: true, rows: [] }); } },
   'thornswood-merchant.js': { name: 'thornswoodMerchant', open(p) { p.win.thornswoodMerchant.setData({ open: true, trader: 'Belethor', offers: [] }); } },
   // The trade ships' dock (#2700): the server's view, with open, opens it.
@@ -415,10 +419,12 @@ function escCloses(file, name, more) {
   });
 }
 escCloses('thornswood-board.js', 'board');
+escCloses('thornswood-settings.js', 'settings');
 escCloses('thornswood-box.js', 'box');
 escCloses('thornswood-ride.js', 'ride');
 escCloses('thornswood-repair.js', 'repair');
 escCloses('thornswood-treat.js', 'treat');
+escCloses('thornswood-preserve.js', 'preserve');
 escCloses('thornswood-furniture.js', 'furniture');
 escCloses('thornswood-party.js', 'party');
 escCloses('thornswood-ship.js', 'ship', function (p) {

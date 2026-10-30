@@ -119,7 +119,7 @@ jobs:
   # it accepts, and why a tree is enough is in the script's header.
   tested:
     name: Already tested in its pull request
-    if: ${{ github.event_name == 'push' && vars.BUILD_RUNNER != 'vps' }}
+    if: ${{ github.event_name == 'push' && (!github.event.repository.private || vars.BUILD_RUNNER != 'vps') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -158,7 +158,7 @@ jobs:
   tested-vps:
     name: Already tested in its pull request (VPS fallback)
     needs: tested
-    if: ${{ !cancelled() && github.event_name == 'push' && needs.tested.result != 'success' }}
+    if: ${{ !cancelled() && github.event.repository.private && github.event_name == 'push' && needs.tested.result != 'success' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 5
     permissions:
@@ -187,7 +187,7 @@ jobs:
   launcher-vps:
     name: Launcher builds (VPS fallback)
     needs: [tested, tested-vps, launcher]
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    if: ${{ !cancelled() && github.event.repository.private && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     # thornswood-build (#2994): only the runners records/build-runners.json
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
@@ -731,7 +731,7 @@ jobs:
   launcher:
     name: Launcher builds
     needs: [tested, tested-vps]
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}
     runs-on: windows-latest
     # As the fallback's: the gate step reads the map main's build handed on.
     permissions:

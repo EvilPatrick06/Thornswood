@@ -29,6 +29,10 @@
 // 403 Nexus gives a free account, and addRevision adds a revision with the
 // local collection archive its download serves.
 //
+// For New-NexusRevision.ps1 -Discard (#4070) it answers discardRevision as the
+// live schema has it (read 30 October), and addRevision with status draft
+// makes that revision the waiting draft.
+//
 // For New-NexusRevision.ps1 -Add (#2969) it also knows a mod of somebody
 // else's, 1932, with an optional file 8662, and answers legacyModsByDomain
 // with each mod's author and category.
@@ -254,6 +258,15 @@ function graph(req, res, json) {
     collection.revisions[n].status = 'published'; collection.latest = Number(n); collection.draft = null;
     return send(res, 200, { data: { publishRevision: { success: true } } });
   }
+  if (/mutation/.test(q) && /discardRevision/.test(q)) {
+    const v = json.variables || {};
+    const n = String(v.revisionNumber);
+    if (String(v.collectionId) !== String(collection.id)) return send(res, 200, { errors: [{ message: 'No collection ' + v.collectionId }] });
+    if (!collection.revisions[n] || collection.revisions[n].status !== 'draft') return send(res, 200, { errors: [{ message: 'No draft revision ' + n }] });
+    delete collection.revisions[n];
+    if (String(collection.draft) === n) collection.draft = null;
+    return send(res, 200, { data: { discardRevision: { success: true } } });
+  }
   if ((m = q.match(/legacyModsByDomain\(ids: \[\{gameDomain: "skyrimspecialedition", modId: (\d+)\}\]\)/))) {
     const mod = mods[m[1]];
     return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, author: mod.author, modCategory: { name: mod.category }, description: mod.cached !== undefined ? mod.cached : mod.description }] : [] } } });
@@ -354,7 +367,7 @@ const server = http.createServer((req, res) => {
       // A description put straight into the stored form, to give the scripts one they cannot read back.
       if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; mods[c.setStored.mod].cached = undefined; delete c.setStored; }
       // A revision whose download is a local collection archive.
-      if (c.addRevision) { collection.revisions[c.addRevision.n] = { id: String(c.addRevision.id), status: c.addRevision.status || 'published', upload: null, archive: c.addRevision.archive }; delete c.addRevision; }
+      if (c.addRevision) { collection.revisions[c.addRevision.n] = { id: String(c.addRevision.id), status: c.addRevision.status || 'published', upload: null, archive: c.addRevision.archive }; if (c.addRevision.status === 'draft') collection.draft = c.addRevision.n; delete c.addRevision; }
       Object.assign(control, c);
       return send(res, 200, control);
     }
