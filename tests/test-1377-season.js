@@ -100,9 +100,10 @@ yes('outdoor shifts are 0, +4, -2, -6',
   S.outdoorShift(EPOCH + 3 * WEEK) === -6);
 
 const outdoorSrc = liftFn('outdoorSeason');
+const underSrc = liftFn('underSeason');
 let outdoorSeason = null;
-if (outdoorSrc) {
-  outdoorSeason = new Function('g', outdoorSrc + '\nreturn outdoorSeason;')(global);
+if (outdoorSrc && underSrc) {
+  outdoorSeason = new Function('g', underSrc + '\n' + outdoorSrc + '\nreturn outdoorSeason;')(global);
 }
 if (S) { S.setEpoch(Date.now() - (3 * WEEK) - 1000); }
 yes('indoors and a roof ignore the season shift, and winter outdoors is -6',

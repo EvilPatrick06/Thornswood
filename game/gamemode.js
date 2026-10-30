@@ -7847,11 +7847,25 @@ function harvest(actorId, refrId, baseDesc) {
   if (Date.now() - prev < HARVEST_COOLDOWN_MS) {
     return 'This one has already been picked.';
   }
-  if (!addItem(actorId, plant.produce, 1)) return null;
+  /*
+    The season's share of the one a pick gives (#3144): a second a quarter of
+    the time in summer, nothing a quarter of the time in winter. A bare plant
+    still waits its ten minutes, or pressing it again would take the quarter
+    back, and nothing picked is no piece of work.
+  */
+  const season = globalThis.__thornswoodSeason;
+  const got = (season && season.seasonYield) ? season.seasonYield(1) : 1;
+  const word = (season && season.yieldWord) ? season.yieldWord() : '';
+  if (got <= 0) {
+    stampCooldown('plant', refrId);
+    return 'The ' + plant.name + ' has nothing to pick this time.' + (word ? ' ' + word : '');
+  }
+  if (!addItem(actorId, plant.produce, got)) return null;
   stampCooldown('plant', refrId);
   economyGathered(actorId, plant.produce, 1);
   const rank = creditWork(actorId, 'harvest');
-  return 'You pick the ' + plant.name + '.' + (rank ? ' ' + rank : '');
+  const took = got === 1 ? 'You pick the ' + plant.name + '.' : 'You pick ' + got + ' ' + plant.name + '.';
+  return took + (got !== 1 && word ? ' ' + word : '') + (rank ? ' ' + rank : '');
 }
 
 /*
@@ -8091,7 +8105,23 @@ function fish(actorId, refrId, baseDesc) {
       if(!result || !result.ok)return result && result.text || unavailable;
       got=result.count;
     }catch(error){return unavailable;}
-  }else result=stock.take(refrId,span,()=>addItemsAtomic(actorId,[{item:caught.produce,count:got}]));
+  }else{
+    /*
+      The season's share of the catch (#3144), on ordinary water only: the
+      pearl bed and the longfin count what their quest hands over. A catch
+      that comes to nothing in winter still fishes the water out for its wait,
+      and is no piece of work.
+    */
+    const season=globalThis.__thornswoodSeason;
+    if(season && season.seasonYield)got=season.seasonYield(got);
+    if(got<=0) {
+      const word=season && season.yieldWord ? season.yieldWord() : '';
+      const empty=stock.take(refrId,span,()=>true);
+      if(!empty.ok)return 'This water is unavailable for now.';
+      return 'Nothing comes out of the water this time.' + (word ? ' ' + word : '');
+    }
+    result=stock.take(refrId,span,()=>addItemsAtomic(actorId,[{item:caught.produce,count:got}]));
+  }
   if (!result.ok) {
     return 'There is ' + caught.name + ' here and nothing in this load order to ' +
            'put in your hands. Say so in the dev channel.';
@@ -8109,8 +8139,10 @@ function fish(actorId, refrId, baseDesc) {
   */
   const doubled = String(caught.from).toLowerCase() === String(caught.name).toLowerCase();
   const where = doubled ? 'the water' : 'the ' + caught.from;
+  const season=selected ? null : globalThis.__thornswoodSeason;
+  const word=season && season.yieldWord ? season.yieldWord() : '';
   return 'You take ' + got + ' ' + caught.name + ' out of ' + where + '.' +
-         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
+         (word ? ' ' + word : '') + (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
 }
 
 /**
@@ -27680,7 +27712,7 @@ function raceGate(actorId, row) {
              station, which has no rows
      shut    nothing can be made here by anybody (SHUT_BENCHES), and this is
              what the gate says instead of opening it */
-const BENCH_ACCESS = {"117f7:HearthFires.esm":{"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven","rows":["117f6:HearthFires.esm","117f8:HearthFires.esm","117f9:HearthFires.esm","117fa:HearthFires.esm","117fb:HearthFires.esm","117fc:HearthFires.esm","117fd:HearthFires.esm","117fe:HearthFires.esm","11800:HearthFires.esm","11802:HearthFires.esm","1a020:Thornswood-Content.esp","1a021:Thornswood-Content.esp","1a023:Thornswood-Content.esp","80e:Gourmet.esp","80f:Gourmet.esp","81f:Gourmet.esp","820:Gourmet.esp","84b:Gourmet.esp","8a4:Gourmet.esp","8a6:Gourmet.esp","8e3:Gourmet.esp","98b:Gourmet.esp","994:Gourmet.esp","995:Gourmet.esp","996:Gourmet.esp","997:Gourmet.esp","99f:Gourmet.esp","9a0:Gourmet.esp","9a1:Gourmet.esp","9a5:Gourmet.esp","9ad:Gourmet.esp","9b4:Gourmet.esp","9b6:Gourmet.esp","9b7:Gourmet.esp","9b8:Gourmet.esp","9b9:Gourmet.esp","9ba:Gourmet.esp","9c8:Gourmet.esp","9c9:Gourmet.esp","9d0:Gourmet.esp","9d1:Gourmet.esp","9d2:Gourmet.esp","a11:HearthFires.esm","a12:HearthFires.esm"]},"1547f:Thornswood-Content.esp":{"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln","rows":["15480:Thornswood-Content.esp","15486:Thornswood-Content.esp","15487:Thornswood-Content.esp","15488:Thornswood-Content.esp","15491:Thornswood-Content.esp","154c5:Thornswood-Content.esp"]},"154e1:Thornswood-Content.esp":{"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking","rows":["108cf7:Skyrim.esm","108cf8:Skyrim.esm","108cf9:Skyrim.esm","108cfa:Skyrim.esm","108cfb:Skyrim.esm","108cfc:Skyrim.esm","1549c:Thornswood-Content.esp","1549d:Thornswood-Content.esp","1549e:Thornswood-Content.esp","1549f:Thornswood-Content.esp","16080:Thornswood-Content.esp","16081:Thornswood-Content.esp","16082:Thornswood-Content.esp","16083:Thornswood-Content.esp","16084:Thornswood-Content.esp","16085:Thornswood-Content.esp","16086:Thornswood-Content.esp","16087:Thornswood-Content.esp","16088:Thornswood-Content.esp","16089:Thornswood-Content.esp","1608a:Thornswood-Content.esp","19824:Dawnguard.esm","2b077:Dragonborn.esm","2b07f:Dragonborn.esm","3987:Dawnguard.esm","3cf53:Dragonborn.esm","3cf54:Dragonborn.esm","6928:Dawnguard.esm","b64f:Dawnguard.esm","b650:Dawnguard.esm","b651:Dawnguard.esm","b652:Dawnguard.esm","b653:Dawnguard.esm","b654:Dawnguard.esm","b655:Dawnguard.esm","f813:Dawnguard.esm","f814:Dawnguard.esm"]},"17738:Dragonborn.esm":{"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter","rows":["10983d:Apocalypse - Magic of Skyrim.esp","10c70a:Apocalypse - Magic of Skyrim.esp","161624:Apocalypse - Magic of Skyrim.esp","161633:Apocalypse - Magic of Skyrim.esp","17737:Dragonborn.esm","1774a:Dragonborn.esm","1774b:Dragonborn.esm","1774c:Dragonborn.esm","1774d:Dragonborn.esm","1774e:Dragonborn.esm","1774f:Dragonborn.esm","17750:Dragonborn.esm","17751:Dragonborn.esm","17752:Dragonborn.esm","17753:Dragonborn.esm","17754:Dragonborn.esm","17755:Dragonborn.esm","17756:Dragonborn.esm","17757:Dragonborn.esm","17758:Dragonborn.esm","17759:Dragonborn.esm","1775a:Dragonborn.esm","1775b:Dragonborn.esm","1775c:Dragonborn.esm","1775d:Dragonborn.esm","1775e:Dragonborn.esm","1775f:Dragonborn.esm","17760:Dragonborn.esm","17761:Dragonborn.esm","17762:Dragonborn.esm","17763:Dragonborn.esm","17764:Dragonborn.esm","17765:Dragonborn.esm","17766:Dragonborn.esm","17767:Dragonborn.esm","17768:Dragonborn.esm","17769:Dragonborn.esm","1776a:Dragonborn.esm","1776b:Dragonborn.esm","1776c:Dragonborn.esm","1776d:Dragonborn.esm","1776e:Dragonborn.esm","1776f:Dragonborn.esm","17770:Dragonborn.esm","17771:Dragonborn.esm","17772:Dragonborn.esm","17773:Dragonborn.esm","17b5e1:Odin - Skyrim Magic Overhaul.esp","17b5e2:Odin - Skyrim Magic Overhaul.esp","17b5e3:Odin - Skyrim Magic Overhaul.esp","17b5e4:Odin - Skyrim Magic Overhaul.esp","17b5e5:Odin - Skyrim Magic Overhaul.esp","1a792f:Apocalypse - Magic of Skyrim.esp","1a7933:Apocalypse - Magic of Skyrim.esp","1a7937:Apocalypse - Magic of Skyrim.esp","1a793b:Apocalypse - Magic of Skyrim.esp","1a793f:Apocalypse - Magic of Skyrim.esp","2a8163:Odin - Skyrim Magic Overhaul.esp","2a8164:Odin - Skyrim Magic Overhaul.esp","2a8165:Odin - Skyrim Magic Overhaul.esp","2a8166:Odin - Skyrim Magic Overhaul.esp","2a8167:Odin - Skyrim Magic Overhaul.esp","2a8168:Odin - Skyrim Magic Overhaul.esp","2a8169:Odin - Skyrim Magic Overhaul.esp","2a816a:Odin - Skyrim Magic Overhaul.esp","2a816b:Odin - Skyrim Magic Overhaul.esp","2a816c:Odin - Skyrim Magic Overhaul.esp","2a816d:Odin - Skyrim Magic Overhaul.esp","2a816e:Odin - Skyrim Magic Overhaul.esp","2a816f:Odin - Skyrim Magic Overhaul.esp","2a8170:Odin - Skyrim Magic Overhaul.esp","2a8171:Odin - Skyrim Magic Overhaul.esp","2a8172:Odin - Skyrim Magic Overhaul.esp","2a8173:Odin - Skyrim Magic Overhaul.esp","2a8174:Odin - Skyrim Magic Overhaul.esp","2a8175:Odin - Skyrim Magic Overhaul.esp","2a8176:Odin - Skyrim Magic Overhaul.esp","2a8177:Odin - Skyrim Magic Overhaul.esp","2a8178:Odin - Skyrim Magic Overhaul.esp","2a8179:Odin - Skyrim Magic Overhaul.esp","2a817a:Odin - Skyrim Magic Overhaul.esp","2a817b:Odin - Skyrim Magic Overhaul.esp","2a817c:Odin - Skyrim Magic Overhaul.esp","2a817d:Odin - Skyrim Magic Overhaul.esp","2a817e:Odin - Skyrim Magic Overhaul.esp","2a817f:Odin - Skyrim Magic Overhaul.esp","2a8180:Odin - Skyrim Magic Overhaul.esp","2a8181:Odin - Skyrim Magic Overhaul.esp","2a8185:Odin - Skyrim Magic Overhaul.esp","2a8186:Odin - Skyrim Magic Overhaul.esp","2a8187:Odin - Skyrim Magic Overhaul.esp","2a8188:Odin - Skyrim Magic Overhaul.esp","2a8189:Odin - Skyrim Magic Overhaul.esp","2a818a:Odin - Skyrim Magic Overhaul.esp","2a818b:Odin - Skyrim Magic Overhaul.esp","2c16a7:Odin - Skyrim Magic Overhaul.esp","bae2f:Odin - Skyrim Magic Overhaul.esp","bae30:Odin - Skyrim Magic Overhaul.esp","bae31:Odin - Skyrim Magic Overhaul.esp","d1e66:Apocalypse - Magic of Skyrim.esp","d1e67:Apocalypse - Magic of Skyrim.esp","d1e68:Apocalypse - Magic of Skyrim.esp","d1e69:Apocalypse - Magic of Skyrim.esp","d1e6a:Apocalypse - Magic of Skyrim.esp","d1e6b:Apocalypse - Magic of Skyrim.esp","d1e6c:Apocalypse - Magic of Skyrim.esp","d1e6d:Apocalypse - Magic of Skyrim.esp","d1e6e:Apocalypse - Magic of Skyrim.esp","d1e6f:Apocalypse - Magic of Skyrim.esp","d1e70:Apocalypse - Magic of Skyrim.esp","d1e71:Apocalypse - Magic of Skyrim.esp","d1e72:Apocalypse - Magic of Skyrim.esp","d1e73:Apocalypse - Magic of Skyrim.esp","d1e74:Apocalypse - Magic of Skyrim.esp","d1e75:Apocalypse - Magic of Skyrim.esp","d1e76:Apocalypse - Magic of Skyrim.esp","d1e77:Apocalypse - Magic of Skyrim.esp","d1e78:Apocalypse - Magic of Skyrim.esp","d1e78:Odin - Skyrim Magic Overhaul.esp","d1e79:Apocalypse - Magic of Skyrim.esp","d1e7a:Apocalypse - Magic of Skyrim.esp","d1e7b:Apocalypse - Magic of Skyrim.esp","d1e7c:Apocalypse - Magic of Skyrim.esp","d1e7d:Apocalypse - Magic of Skyrim.esp","d1e7d:Odin - Skyrim Magic Overhaul.esp","d1e7e:Apocalypse - Magic of Skyrim.esp","d1e7f:Apocalypse - Magic of Skyrim.esp","d1e80:Apocalypse - Magic of Skyrim.esp","d1e81:Apocalypse - Magic of Skyrim.esp","d1e82:Apocalypse - Magic of Skyrim.esp","d1e83:Apocalypse - Magic of Skyrim.esp","d1e84:Apocalypse - Magic of Skyrim.esp","d1e85:Apocalypse - Magic of Skyrim.esp","d1e87:Apocalypse - Magic of Skyrim.esp","d1e88:Apocalypse - Magic of Skyrim.esp","d1e89:Apocalypse - Magic of Skyrim.esp","d1e8a:Apocalypse - Magic of Skyrim.esp","d1e8b:Apocalypse - Magic of Skyrim.esp","d1e8c:Apocalypse - Magic of Skyrim.esp","d1e8d:Apocalypse - Magic of Skyrim.esp","d1e8e:Apocalypse - Magic of Skyrim.esp","d1e8f:Apocalypse - Magic of Skyrim.esp","d1e90:Apocalypse - Magic of Skyrim.esp","d1e91:Apocalypse - Magic of Skyrim.esp","d1e92:Apocalypse - Magic of Skyrim.esp","d1e93:Apocalypse - Magic of Skyrim.esp","d1e94:Apocalypse - Magic of Skyrim.esp","d1e95:Apocalypse - Magic of Skyrim.esp","d1e96:Apocalypse - Magic of Skyrim.esp","d1e97:Apocalypse - Magic of Skyrim.esp","d1e98:Apocalypse - Magic of Skyrim.esp","d1e99:Apocalypse - Magic of Skyrim.esp","d1e9a:Apocalypse - Magic of Skyrim.esp","d1e9b:Apocalypse - Magic of Skyrim.esp","d1e9c:Apocalypse - Magic of Skyrim.esp","d1e9d:Apocalypse - Magic of Skyrim.esp","d1e9e:Apocalypse - Magic of Skyrim.esp","d1e9f:Apocalypse - Magic of Skyrim.esp","d1ea0:Apocalypse - Magic of Skyrim.esp","d4350:Odin - Skyrim Magic Overhaul.esp"]},"3015:HearthFires.esm":{"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy","rows":["154c6:Thornswood-Content.esp","154c7:Thornswood-Content.esp"]},"5756:Dawnguard.esm":{"halves":{},"name":"DLC1LD_CraftingForgeAetherium","shut":"Nobody works the Aetherium forge."},"59d8:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom","rows":["154c4:Thornswood-Content.esp","800:MoreCraftableEquipment_CloaksandCapes.esp","801:MoreCraftableEquipment_CloaksandCapes.esp","802:MoreCraftableEquipment_CloaksandCapes.esp","803:MoreCraftableEquipment_CloaksandCapes.esp","804:MoreCraftableEquipment_CloaksandCapes.esp","805:MoreCraftableEquipment_CloaksandCapes.esp","806:MoreCraftableEquipment_CloaksandCapes.esp","807:MoreCraftableEquipment_CloaksandCapes.esp","808:MoreCraftableEquipment_CloaksandCapes.esp","809:MoreCraftableEquipment_CloaksandCapes.esp","80a:MoreCraftableEquipment_CloaksandCapes.esp","80b:MoreCraftableEquipment_CloaksandCapes.esp","80c:MoreCraftableEquipment_CloaksandCapes.esp","80e:MoreCraftableEquipment_CloaksandCapes.esp","80f:MoreCraftableEquipment_CloaksandCapes.esp","810:MoreCraftableEquipment_CloaksandCapes.esp","811:MoreCraftableEquipment_CloaksandCapes.esp","812:MoreCraftableEquipment_CloaksandCapes.esp","813:MoreCraftableEquipment_CloaksandCapes.esp","814:MoreCraftableEquipment_CloaksandCapes.esp","815:MoreCraftableEquipment_CloaksandCapes.esp","816:MoreCraftableEquipment_CloaksandCapes.esp","817:MoreCraftableEquipment_CloaksandCapes.esp","818:MoreCraftableEquipment_CloaksandCapes.esp","84a:MoreCraftableEquipment.esp","84b:MoreCraftableEquipment.esp","84c:MoreCraftableEquipment.esp","84d:MoreCraftableEquipment.esp","84e:MoreCraftableEquipment.esp","91f:MoreCraftableEquipment.esp","920:MoreCraftableEquipment.esp","921:MoreCraftableEquipment.esp","922:MoreCraftableEquipment.esp","923:MoreCraftableEquipment.esp","924:MoreCraftableEquipment.esp","925:MoreCraftableEquipment.esp","926:MoreCraftableEquipment.esp","927:MoreCraftableEquipment.esp","928:MoreCraftableEquipment.esp","929:MoreCraftableEquipment.esp","92a:MoreCraftableEquipment.esp","92b:MoreCraftableEquipment.esp","936:MoreCraftableEquipment.esp","937:MoreCraftableEquipment.esp","938:MoreCraftableEquipment.esp","939:MoreCraftableEquipment.esp","93a:MoreCraftableEquipment.esp","93b:MoreCraftableEquipment.esp","93c:MoreCraftableEquipment.esp","93d:MoreCraftableEquipment.esp","93e:MoreCraftableEquipment.esp","93f:MoreCraftableEquipment.esp","940:MoreCraftableEquipment.esp","941:MoreCraftableEquipment.esp","942:MoreCraftableEquipment.esp","943:MoreCraftableEquipment.esp","944:MoreCraftableEquipment.esp","945:MoreCraftableEquipment.esp","946:MoreCraftableEquipment.esp","947:MoreCraftableEquipment.esp","948:MoreCraftableEquipment.esp","949:MoreCraftableEquipment.esp","94a:MoreCraftableEquipment.esp","94b:MoreCraftableEquipment.esp","94c:MoreCraftableEquipment.esp","94d:MoreCraftableEquipment.esp","94e:MoreCraftableEquipment.esp","94f:MoreCraftableEquipment.esp","950:MoreCraftableEquipment.esp","951:MoreCraftableEquipment.esp","952:MoreCraftableEquipment.esp","953:MoreCraftableEquipment.esp","957:MoreCraftableEquipment.esp","958:MoreCraftableEquipment.esp","959:MoreCraftableEquipment.esp","95a:MoreCraftableEquipment.esp","95b:MoreCraftableEquipment.esp","95c:MoreCraftableEquipment.esp","95d:MoreCraftableEquipment.esp","962:MoreCraftableEquipment.esp","963:MoreCraftableEquipment.esp","964:MoreCraftableEquipment.esp","965:MoreCraftableEquipment.esp","966:MoreCraftableEquipment.esp","967:MoreCraftableEquipment.esp","96b:MoreCraftableEquipment.esp","96c:MoreCraftableEquipment.esp","96d:MoreCraftableEquipment.esp","96e:MoreCraftableEquipment.esp","96f:MoreCraftableEquipment.esp","970:MoreCraftableEquipment.esp","971:MoreCraftableEquipment.esp","972:MoreCraftableEquipment.esp","973:MoreCraftableEquipment.esp","974:MoreCraftableEquipment.esp","975:MoreCraftableEquipment.esp","976:MoreCraftableEquipment.esp","977:MoreCraftableEquipment.esp","978:MoreCraftableEquipment.esp","979:MoreCraftableEquipment.esp","97a:MoreCraftableEquipment.esp","97b:MoreCraftableEquipment.esp","97c:MoreCraftableEquipment.esp","97d:MoreCraftableEquipment.esp","97e:MoreCraftableEquipment.esp","97f:MoreCraftableEquipment.esp","980:MoreCraftableEquipment.esp","981:MoreCraftableEquipment.esp","982:MoreCraftableEquipment.esp","984:MoreCraftableEquipment.esp","985:MoreCraftableEquipment.esp","986:MoreCraftableEquipment.esp","987:MoreCraftableEquipment.esp","988:MoreCraftableEquipment.esp","989:MoreCraftableEquipment.esp","98a:MoreCraftableEquipment.esp","98b:MoreCraftableEquipment.esp","98c:MoreCraftableEquipment.esp","98d:MoreCraftableEquipment.esp","98e:MoreCraftableEquipment.esp","98f:MoreCraftableEquipment.esp","990:MoreCraftableEquipment.esp","991:MoreCraftableEquipment.esp","992:MoreCraftableEquipment.esp","993:MoreCraftableEquipment.esp","994:MoreCraftableEquipment.esp","995:MoreCraftableEquipment.esp","996:MoreCraftableEquipment.esp","997:MoreCraftableEquipment.esp","998:MoreCraftableEquipment.esp","999:MoreCraftableEquipment.esp","99a:MoreCraftableEquipment.esp","99b:MoreCraftableEquipment.esp","99c:MoreCraftableEquipment.esp","99d:MoreCraftableEquipment.esp","99e:MoreCraftableEquipment.esp","99f:MoreCraftableEquipment.esp","9a0:MoreCraftableEquipment.esp","9a1:MoreCraftableEquipment.esp","9a2:MoreCraftableEquipment.esp","9a3:MoreCraftableEquipment.esp","9a4:MoreCraftableEquipment.esp","9a5:MoreCraftableEquipment.esp","9a6:MoreCraftableEquipment.esp","9a7:MoreCraftableEquipment.esp","9a8:MoreCraftableEquipment.esp","9a9:MoreCraftableEquipment.esp","9aa:MoreCraftableEquipment.esp","9ab:MoreCraftableEquipment.esp","9ac:MoreCraftableEquipment.esp","9ad:MoreCraftableEquipment.esp","9ae:MoreCraftableEquipment.esp","9af:MoreCraftableEquipment.esp","9b0:MoreCraftableEquipment.esp","9b1:MoreCraftableEquipment.esp","9b2:MoreCraftableEquipment.esp","9b3:MoreCraftableEquipment.esp","9b4:MoreCraftableEquipment.esp","9b5:MoreCraftableEquipment.esp","9b6:MoreCraftableEquipment.esp","9b7:MoreCraftableEquipment.esp","9b8:MoreCraftableEquipment.esp","9b9:MoreCraftableEquipment.esp","9ba:MoreCraftableEquipment.esp","9bb:MoreCraftableEquipment.esp","9bc:MoreCraftableEquipment.esp","9bd:MoreCraftableEquipment.esp","9be:MoreCraftableEquipment.esp","9c0:MoreCraftableEquipment.esp","9c1:MoreCraftableEquipment.esp","9c2:MoreCraftableEquipment.esp","9c3:MoreCraftableEquipment.esp","9c4:MoreCraftableEquipment.esp","9c5:MoreCraftableEquipment.esp","9c6:MoreCraftableEquipment.esp","9c7:MoreCraftableEquipment.esp","9c8:MoreCraftableEquipment.esp","9c9:MoreCraftableEquipment.esp","9ca:MoreCraftableEquipment.esp","9cb:MoreCraftableEquipment.esp","9cc:MoreCraftableEquipment.esp","9cd:MoreCraftableEquipment.esp","9ce:MoreCraftableEquipment.esp","9cf:MoreCraftableEquipment.esp","9d0:MoreCraftableEquipment.esp","9d1:MoreCraftableEquipment.esp","9d2:MoreCraftableEquipment.esp","9dc:MoreCraftableEquipment.esp","9de:MoreCraftableEquipment.esp","9df:MoreCraftableEquipment.esp","9e0:MoreCraftableEquipment.esp","9f4:MoreCraftableEquipment.esp","9f5:MoreCraftableEquipment.esp","9f6:MoreCraftableEquipment.esp","9f7:MoreCraftableEquipment.esp","9f8:MoreCraftableEquipment.esp","9f9:MoreCraftableEquipment.esp","9fa:MoreCraftableEquipment.esp","9fb:MoreCraftableEquipment.esp","9fc:MoreCraftableEquipment.esp","9fd:MoreCraftableEquipment.esp","9fe:MoreCraftableEquipment.esp"]},"7866a:Skyrim.esm":{"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack","rows":["1033de:Skyrim.esm","154b5:Thornswood-Content.esp","2326c:Hothtrooper44_ArmorCompilation.esp","23272:Hothtrooper44_ArmorCompilation.esp","2dfc:Cloaks&Capes.esp","2dfd:Cloaks&Capes.esp","2dfe:Cloaks&Capes.esp","2dff:Cloaks&Capes.esp","2e00:Cloaks&Capes.esp","2e01:Cloaks&Capes.esp","2e02:Cloaks&Capes.esp","2e03:Cloaks&Capes.esp","2e04:Cloaks&Capes.esp","2e05:Cloaks&Capes.esp","2e06:Cloaks&Capes.esp","2e07:Cloaks&Capes.esp","2e08:Cloaks&Capes.esp","2e0a:Cloaks&Capes.esp","2e0b:Cloaks&Capes.esp","2e0c:Cloaks&Capes.esp","2e0d:Cloaks&Capes.esp","2e0e:Cloaks&Capes.esp","2e0f:Cloaks&Capes.esp","2e10:Cloaks&Capes.esp","332a:Hothtrooper44_ArmorCompilation.esp","3383:CommonClothes.esp","3384:CommonClothes.esp","3388:CommonClothes.esp","3389:CommonClothes.esp","338a:CommonClothes.esp","37664:ZIA_Complete Pack.esp","37665:ZIA_Complete Pack.esp","37666:ZIA_Complete Pack.esp","37667:ZIA_Complete Pack.esp","37668:ZIA_Complete Pack.esp","37669:ZIA_Complete Pack.esp","3766a:ZIA_Complete Pack.esp","3766b:ZIA_Complete Pack.esp","3766c:ZIA_Complete Pack.esp","3766d:ZIA_Complete Pack.esp","3766e:ZIA_Complete Pack.esp","3766f:ZIA_Complete Pack.esp","43e8:CommonClothes.esp","55ac:Cloaks&Capes.esp","55ad:Cloaks&Capes.esp","55ae:Cloaks&Capes.esp","55bd:Cloaks&Capes.esp","f7f43:Skyrim.esm"]},"88105:Skyrim.esm":{"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge","rows":["1246:Immersive Weapons.esp","12c6:Immersive Weapons.esp","12c8:Immersive Weapons.esp","12e1:Hothtrooper44_ArmorCompilation.esp","12e2:Hothtrooper44_ArmorCompilation.esp","12e5:Hothtrooper44_ArmorCompilation.esp","12e7:Hothtrooper44_ArmorCompilation.esp","145c2:Dawnguard.esm","14d64:Immersive Weapons.esp","1548d:Thornswood-Content.esp","1548e:Thornswood-Content.esp","15492:Thornswood-Content.esp","15496:Thornswood-Content.esp","15497:Thornswood-Content.esp","154b3:Thornswood-Content.esp","154b4:Thornswood-Content.esp","1828:Immersive Weapons.esp","182a:Hothtrooper44_ArmorCompilation.esp","1838:PlayFluteLuteDrum.esp","1909:Immersive Weapons.esp","19823:Dawnguard.esm","19825:Dawnguard.esm","19826:Dawnguard.esm","19827:Dawnguard.esm","19828:Dawnguard.esm","19829:Dawnguard.esm","1982a:Dawnguard.esm","19f8c:Playable Rieklings.esp","19f8d:Playable Rieklings.esp","19f8e:Playable Rieklings.esp","19f8f:Playable Rieklings.esp","19f90:Playable Rieklings.esp","19f91:Playable Rieklings.esp","19f92:Playable Rieklings.esp","19f93:Playable Rieklings.esp","19f94:Playable Rieklings.esp","19f95:Playable Rieklings.esp","19f96:Playable Rieklings.esp","19f97:Playable Rieklings.esp","19f98:Playable Rieklings.esp","19f99:Playable Rieklings.esp","19f9a:Playable Rieklings.esp","19f9b:Playable Rieklings.esp","19f9c:Playable Rieklings.esp","19f9d:Playable Rieklings.esp","19f9e:Playable Rieklings.esp","19fb4:Playable Rieklings.esp","19fb7:Playable Rieklings.esp","19fb8:Playable Rieklings.esp","1d5bb:CommonClothes.esp","1d5bc:CommonClothes.esp","1d90:Hothtrooper44_ArmorCompilation.esp","1d91:Hothtrooper44_ArmorCompilation.esp","1d9a:Immersive Weapons.esp","1dff:Immersive Weapons.esp","1f24f:FishingInSkyrim.esp","1f252:FishingInSkyrim.esp","20d64:Immersive Weapons.esp","20dd5:Hothtrooper44_ArmorCompilation.esp","20dd6:Hothtrooper44_ArmorCompilation.esp","20dd7:Hothtrooper44_ArmorCompilation.esp","20dd8:Hothtrooper44_ArmorCompilation.esp","20dd9:Hothtrooper44_ArmorCompilation.esp","20ddc:Hothtrooper44_ArmorCompilation.esp","21470:Hothtrooper44_ArmorCompilation.esp","21471:Hothtrooper44_ArmorCompilation.esp","21472:Hothtrooper44_ArmorCompilation.esp","21473:Hothtrooper44_ArmorCompilation.esp","21474:Hothtrooper44_ArmorCompilation.esp","21475:Hothtrooper44_ArmorCompilation.esp","21476:Hothtrooper44_ArmorCompilation.esp","21477:Hothtrooper44_ArmorCompilation.esp","21478:Hothtrooper44_ArmorCompilation.esp","21479:Hothtrooper44_ArmorCompilation.esp","2147a:Hothtrooper44_ArmorCompilation.esp","2147b:Hothtrooper44_ArmorCompilation.esp","2147c:Hothtrooper44_ArmorCompilation.esp","2147d:Hothtrooper44_ArmorCompilation.esp","2147e:Hothtrooper44_ArmorCompilation.esp","2147f:Hothtrooper44_ArmorCompilation.esp","216b6:Immersive Weapons.esp","216b7:Immersive Weapons.esp","216b8:Immersive Weapons.esp","216b9:Immersive Weapons.esp","216ba:Immersive Weapons.esp","216bc:Immersive Weapons.esp","216bd:Immersive Weapons.esp","216be:Immersive Weapons.esp","216bf:Immersive Weapons.esp","216c0:Immersive Weapons.esp","216c2:Immersive Weapons.esp","216c3:Immersive Weapons.esp","216c4:Immersive Weapons.esp","216c5:Immersive Weapons.esp","216c6:Immersive Weapons.esp","216c7:Immersive Weapons.esp","216c8:Immersive Weapons.esp","216c9:Immersive Weapons.esp","216ca:Immersive Weapons.esp","216cb:Immersive Weapons.esp","216cc:Immersive Weapons.esp","216d0:Immersive Weapons.esp","216d2:Immersive Weapons.esp","216d4:Immersive Weapons.esp","216d9:Immersive Weapons.esp","216db:Immersive Weapons.esp","216dd:Immersive Weapons.esp","216df:Immersive Weapons.esp","216e1:Immersive Weapons.esp","216e3:Immersive Weapons.esp","216e6:Immersive Weapons.esp","216e8:Immersive Weapons.esp","216ea:Immersive Weapons.esp","216ec:Immersive Weapons.esp","216ee:Immersive Weapons.esp","216f0:Immersive Weapons.esp","216f2:Immersive Weapons.esp","216f8:Immersive Weapons.esp","216fb:Immersive Weapons.esp","216fd:Immersive Weapons.esp","21700:Immersive Weapons.esp","21701:Immersive Weapons.esp","2180d:FishingInSkyrim.esp","21f7f:Hothtrooper44_ArmorCompilation.esp","21f92:Hothtrooper44_ArmorCompilation.esp","21f93:Hothtrooper44_ArmorCompilation.esp","21f94:Hothtrooper44_ArmorCompilation.esp","21f95:Hothtrooper44_ArmorCompilation.esp","21f96:Hothtrooper44_ArmorCompilation.esp","21f97:Hothtrooper44_ArmorCompilation.esp","21ff5:Hothtrooper44_ArmorCompilation.esp","21ff6:Hothtrooper44_ArmorCompilation.esp","21ff7:Hothtrooper44_ArmorCompilation.esp","21ff8:Hothtrooper44_ArmorCompilation.esp","21ff9:Hothtrooper44_ArmorCompilation.esp","21ffa:Hothtrooper44_ArmorCompilation.esp","21ffb:Hothtrooper44_ArmorCompilation.esp","21ffc:Hothtrooper44_ArmorCompilation.esp","21ffd:Hothtrooper44_ArmorCompilation.esp","21ffe:Hothtrooper44_ArmorCompilation.esp","21fff:Hothtrooper44_ArmorCompilation.esp","22000:Hothtrooper44_ArmorCompilation.esp","22001:Hothtrooper44_ArmorCompilation.esp","22002:Hothtrooper44_ArmorCompilation.esp","22003:Hothtrooper44_ArmorCompilation.esp","22004:Hothtrooper44_ArmorCompilation.esp","22005:Hothtrooper44_ArmorCompilation.esp","22006:Hothtrooper44_ArmorCompilation.esp","22c8d:Immersive Weapons.esp","22c8f:Immersive Weapons.esp","22c91:Immersive Weapons.esp","22c93:Immersive Weapons.esp","22c9c:Immersive Weapons.esp","22ca0:Immersive Weapons.esp","22ca3:Immersive Weapons.esp","22ca5:Immersive Weapons.esp","22f0:Immersive Weapons.esp","22f7:Hothtrooper44_ArmorCompilation.esp","22f8:Hothtrooper44_ArmorCompilation.esp","22f9:Hothtrooper44_ArmorCompilation.esp","22fa:Hothtrooper44_ArmorCompilation.esp","22fb:Hothtrooper44_ArmorCompilation.esp","22fe:Hothtrooper44_ArmorCompilation.esp","22ff:Hothtrooper44_ArmorCompilation.esp","23062:Hothtrooper44_ArmorCompilation.esp","23063:Hothtrooper44_ArmorCompilation.esp","2308f:Hothtrooper44_ArmorCompilation.esp","23090:Hothtrooper44_ArmorCompilation.esp","23091:Hothtrooper44_ArmorCompilation.esp","23092:Hothtrooper44_ArmorCompilation.esp","23093:Hothtrooper44_ArmorCompilation.esp","23094:Hothtrooper44_ArmorCompilation.esp","23095:Hothtrooper44_ArmorCompilation.esp","23096:Hothtrooper44_ArmorCompilation.esp","23097:Hothtrooper44_ArmorCompilation.esp","23098:Hothtrooper44_ArmorCompilation.esp","23099:Hothtrooper44_ArmorCompilation.esp","2309a:Hothtrooper44_ArmorCompilation.esp","230b1:Hothtrooper44_ArmorCompilation.esp","230b2:Hothtrooper44_ArmorCompilation.esp","230b3:Hothtrooper44_ArmorCompilation.esp","230b4:Hothtrooper44_ArmorCompilation.esp","230cd:Hothtrooper44_ArmorCompilation.esp","230ce:Hothtrooper44_ArmorCompilation.esp","230cf:Hothtrooper44_ArmorCompilation.esp","230d1:Hothtrooper44_ArmorCompilation.esp","230d2:Hothtrooper44_ArmorCompilation.esp","230d3:Hothtrooper44_ArmorCompilation.esp","230d4:Hothtrooper44_ArmorCompilation.esp","230d5:Hothtrooper44_ArmorCompilation.esp","230eb:Hothtrooper44_ArmorCompilation.esp","230ec:Hothtrooper44_ArmorCompilation.esp","230ed:Hothtrooper44_ArmorCompilation.esp","230ee:Hothtrooper44_ArmorCompilation.esp","230fb:Hothtrooper44_ArmorCompilation.esp","230fc:Hothtrooper44_ArmorCompilation.esp","230fd:Hothtrooper44_ArmorCompilation.esp","23190:Hothtrooper44_ArmorCompilation.esp","23191:Hothtrooper44_ArmorCompilation.esp","23192:Hothtrooper44_ArmorCompilation.esp","23193:Hothtrooper44_ArmorCompilation.esp","23194:Hothtrooper44_ArmorCompilation.esp","23195:Hothtrooper44_ArmorCompilation.esp","23196:Hothtrooper44_ArmorCompilation.esp","23197:Hothtrooper44_ArmorCompilation.esp","23198:Hothtrooper44_ArmorCompilation.esp","23199:Hothtrooper44_ArmorCompilation.esp","2319a:Hothtrooper44_ArmorCompilation.esp","2319b:Hothtrooper44_ArmorCompilation.esp","2319c:Hothtrooper44_ArmorCompilation.esp","2319d:Hothtrooper44_ArmorCompilation.esp","2319e:Hothtrooper44_ArmorCompilation.esp","2319f:Hothtrooper44_ArmorCompilation.esp","231a0:Hothtrooper44_ArmorCompilation.esp","231a1:Hothtrooper44_ArmorCompilation.esp","231a2:Hothtrooper44_ArmorCompilation.esp","231a3:Hothtrooper44_ArmorCompilation.esp","231a4:Hothtrooper44_ArmorCompilation.esp","231a5:Hothtrooper44_ArmorCompilation.esp","231a6:Hothtrooper44_ArmorCompilation.esp","231a7:Hothtrooper44_ArmorCompilation.esp","231a8:Hothtrooper44_ArmorCompilation.esp","231a9:Hothtrooper44_ArmorCompilation.esp","231aa:Hothtrooper44_ArmorCompilation.esp","231ab:Hothtrooper44_ArmorCompilation.esp","231ac:Hothtrooper44_ArmorCompilation.esp","231ad:Hothtrooper44_ArmorCompilation.esp","231ae:Hothtrooper44_ArmorCompilation.esp","231af:Hothtrooper44_ArmorCompilation.esp","231b0:Hothtrooper44_ArmorCompilation.esp","231b1:Hothtrooper44_ArmorCompilation.esp","231b2:Hothtrooper44_ArmorCompilation.esp","231b3:Hothtrooper44_ArmorCompilation.esp","231b4:Hothtrooper44_ArmorCompilation.esp","231b5:Hothtrooper44_ArmorCompilation.esp","231b6:Hothtrooper44_ArmorCompilation.esp","231b7:Hothtrooper44_ArmorCompilation.esp","231b8:Hothtrooper44_ArmorCompilation.esp","231b9:Hothtrooper44_ArmorCompilation.esp","231ba:Hothtrooper44_ArmorCompilation.esp","231bb:Hothtrooper44_ArmorCompilation.esp","231bc:Hothtrooper44_ArmorCompilation.esp","231bd:Hothtrooper44_ArmorCompilation.esp","231be:Hothtrooper44_ArmorCompilation.esp","231bf:Hothtrooper44_ArmorCompilation.esp","231c0:Hothtrooper44_ArmorCompilation.esp","231c1:Hothtrooper44_ArmorCompilation.esp","231c6:Hothtrooper44_ArmorCompilation.esp","231c7:Hothtrooper44_ArmorCompilation.esp","231c8:Hothtrooper44_ArmorCompilation.esp","231c9:Hothtrooper44_ArmorCompilation.esp","231ca:Hothtrooper44_ArmorCompilation.esp","231cb:Hothtrooper44_ArmorCompilation.esp","231cc:Hothtrooper44_ArmorCompilation.esp","231cd:Hothtrooper44_ArmorCompilation.esp","231ce:Hothtrooper44_ArmorCompilation.esp","231cf:Hothtrooper44_ArmorCompilation.esp","231d0:Hothtrooper44_ArmorCompilation.esp","231d1:Hothtrooper44_ArmorCompilation.esp","231d2:Hothtrooper44_ArmorCompilation.esp","231d3:Hothtrooper44_ArmorCompilation.esp","231d4:Hothtrooper44_ArmorCompilation.esp","231d5:Hothtrooper44_ArmorCompilation.esp","231d6:Hothtrooper44_ArmorCompilation.esp","231d7:Hothtrooper44_ArmorCompilation.esp","231d8:Hothtrooper44_ArmorCompilation.esp","231d9:Hothtrooper44_ArmorCompilation.esp","2327e:Hothtrooper44_ArmorCompilation.esp","2327f:Hothtrooper44_ArmorCompilation.esp","23280:Hothtrooper44_ArmorCompilation.esp","2328d:Hothtrooper44_ArmorCompilation.esp","2328e:Hothtrooper44_ArmorCompilation.esp","2328f:Hothtrooper44_ArmorCompilation.esp","23290:Hothtrooper44_ArmorCompilation.esp","2329d:Hothtrooper44_ArmorCompilation.esp","2329e:Hothtrooper44_ArmorCompilation.esp","2329f:Hothtrooper44_ArmorCompilation.esp","232a0:Hothtrooper44_ArmorCompilation.esp","232a1:Hothtrooper44_ArmorCompilation.esp","232a2:Hothtrooper44_ArmorCompilation.esp","232a3:Hothtrooper44_ArmorCompilation.esp","232a4:Hothtrooper44_ArmorCompilation.esp","23300:Hothtrooper44_ArmorCompilation.esp","23301:Hothtrooper44_ArmorCompilation.esp","23302:Hothtrooper44_ArmorCompilation.esp","23303:Hothtrooper44_ArmorCompilation.esp","23304:Hothtrooper44_ArmorCompilation.esp","23305:Hothtrooper44_ArmorCompilation.esp","23306:Hothtrooper44_ArmorCompilation.esp","23307:Hothtrooper44_ArmorCompilation.esp","23308:Hothtrooper44_ArmorCompilation.esp","23309:Hothtrooper44_ArmorCompilation.esp","23319:Hothtrooper44_ArmorCompilation.esp","2331a:Hothtrooper44_ArmorCompilation.esp","2331b:Hothtrooper44_ArmorCompilation.esp","2331c:Hothtrooper44_ArmorCompilation.esp","2331d:Hothtrooper44_ArmorCompilation.esp","2331e:Hothtrooper44_ArmorCompilation.esp","2331f:Hothtrooper44_ArmorCompilation.esp","23320:Hothtrooper44_ArmorCompilation.esp","23321:Hothtrooper44_ArmorCompilation.esp","23322:Hothtrooper44_ArmorCompilation.esp","23323:Hothtrooper44_ArmorCompilation.esp","23324:Hothtrooper44_ArmorCompilation.esp","23325:Hothtrooper44_ArmorCompilation.esp","23326:Hothtrooper44_ArmorCompilation.esp","23771:Immersive Weapons.esp","238fd:Hothtrooper44_ArmorCompilation.esp","238fe:Hothtrooper44_ArmorCompilation.esp","238ff:Hothtrooper44_ArmorCompilation.esp","23900:Hothtrooper44_ArmorCompilation.esp","23901:Hothtrooper44_ArmorCompilation.esp","23902:Hothtrooper44_ArmorCompilation.esp","23903:Hothtrooper44_ArmorCompilation.esp","23904:Hothtrooper44_ArmorCompilation.esp","23905:Hothtrooper44_ArmorCompilation.esp","23906:Hothtrooper44_ArmorCompilation.esp","23907:Hothtrooper44_ArmorCompilation.esp","23908:Hothtrooper44_ArmorCompilation.esp","23909:Hothtrooper44_ArmorCompilation.esp","2390a:Hothtrooper44_ArmorCompilation.esp","2390b:Hothtrooper44_ArmorCompilation.esp","2390c:Hothtrooper44_ArmorCompilation.esp","2390d:Hothtrooper44_ArmorCompilation.esp","2390e:Hothtrooper44_ArmorCompilation.esp","2390f:Hothtrooper44_ArmorCompilation.esp","23910:Hothtrooper44_ArmorCompilation.esp","23911:Hothtrooper44_ArmorCompilation.esp","23912:Hothtrooper44_ArmorCompilation.esp","23913:Hothtrooper44_ArmorCompilation.esp","23914:Hothtrooper44_ArmorCompilation.esp","23915:Hothtrooper44_ArmorCompilation.esp","23916:Hothtrooper44_ArmorCompilation.esp","23917:Hothtrooper44_ArmorCompilation.esp","23918:Hothtrooper44_ArmorCompilation.esp","23919:Hothtrooper44_ArmorCompilation.esp","2393d:Hothtrooper44_ArmorCompilation.esp","2393e:Hothtrooper44_ArmorCompilation.esp","2393f:Hothtrooper44_ArmorCompilation.esp","2394f:Hothtrooper44_ArmorCompilation.esp","23950:Hothtrooper44_ArmorCompilation.esp","23951:Hothtrooper44_ArmorCompilation.esp","23952:Hothtrooper44_ArmorCompilation.esp","23953:Hothtrooper44_ArmorCompilation.esp","23954:Hothtrooper44_ArmorCompilation.esp","23955:Hothtrooper44_ArmorCompilation.esp","23956:Hothtrooper44_ArmorCompilation.esp","23a0a:Playable Rieklings.esp","2414:Immersive Weapons.esp","25a35:Hothtrooper44_ArmorCompilation.esp","25a36:Hothtrooper44_ArmorCompilation.esp","25a37:Hothtrooper44_ArmorCompilation.esp","25d24:Immersive Weapons.esp","272fc:Immersive Weapons.esp","272fd:Immersive Weapons.esp","2854b:Hothtrooper44_ArmorCompilation.esp","2854c:Hothtrooper44_ArmorCompilation.esp","2857:Immersive Weapons.esp","285b:Immersive Weapons.esp","285e:Immersive Weapons.esp","2863:Hothtrooper44_ArmorCompilation.esp","2864:Hothtrooper44_ArmorCompilation.esp","2865:Hothtrooper44_ArmorCompilation.esp","2866:Hothtrooper44_ArmorCompilation.esp","2867:Hothtrooper44_ArmorCompilation.esp","286a:Hothtrooper44_ArmorCompilation.esp","2901:Immersive Weapons.esp","2abe:Immersive Weapons.esp","2ac2:Immersive Weapons.esp","2aca:Immersive Weapons.esp","2acb:Immersive Weapons.esp","2acc:Immersive Weapons.esp","2ad2:Immersive Weapons.esp","2b04f:Dragonborn.esm","2b050:Dragonborn.esm","2b051:Dragonborn.esm","2b052:Dragonborn.esm","2b053:Dragonborn.esm","2b054:Dragonborn.esm","2b055:Dragonborn.esm","2b056:Dragonborn.esm","2b057:Dragonborn.esm","2b058:Dragonborn.esm","2b059:Dragonborn.esm","2b05a:Dragonborn.esm","2b05b:Dragonborn.esm","2b05c:Dragonborn.esm","2b065:Dragonborn.esm","2b066:Dragonborn.esm","2b067:Dragonborn.esm","2b068:Dragonborn.esm","2b069:Dragonborn.esm","2b06a:Dragonborn.esm","2b06c:Dragonborn.esm","2b06d:Dragonborn.esm","2b06e:Dragonborn.esm","2b06f:Dragonborn.esm","2b070:Dragonborn.esm","2b071:Dragonborn.esm","2b072:Dragonborn.esm","2b075:Dragonborn.esm","2b076:Dragonborn.esm","2b078:Dragonborn.esm","2b079:Dragonborn.esm","2b07a:Dragonborn.esm","2b07b:Dragonborn.esm","2b07c:Dragonborn.esm","2b07d:Dragonborn.esm","2b07e:Dragonborn.esm","2b080:Dragonborn.esm","2b081:Dragonborn.esm","2b082:Dragonborn.esm","2b083:Dragonborn.esm","2b084:Dragonborn.esm","2b085:Dragonborn.esm","2ba5f3:WindhelmSSE.esp","2dd7:Hothtrooper44_ArmorCompilation.esp","2de4:PlayFluteLuteDrum.esp","2de5:PlayFluteLuteDrum.esp","32523:Immersive Weapons.esp","3325:Immersive Weapons.esp","3385:CommonClothes.esp","3386:CommonClothes.esp","3387:CommonClothes.esp","338b:CommonClothes.esp","338c:CommonClothes.esp","33d66:Immersive Weapons.esp","372fe:Hothtrooper44_ArmorCompilation.esp","372ff:Hothtrooper44_ArmorCompilation.esp","37300:Hothtrooper44_ArmorCompilation.esp","37301:Hothtrooper44_ArmorCompilation.esp","37306:Hothtrooper44_ArmorCompilation.esp","37307:Hothtrooper44_ArmorCompilation.esp","37308:Hothtrooper44_ArmorCompilation.esp","37309:Hothtrooper44_ArmorCompilation.esp","3730b:Hothtrooper44_ArmorCompilation.esp","3730f:Hothtrooper44_ArmorCompilation.esp","37310:Hothtrooper44_ArmorCompilation.esp","37311:Hothtrooper44_ArmorCompilation.esp","3886:Hothtrooper44_ArmorCompilation.esp","3888:Hothtrooper44_ArmorCompilation.esp","3889:Hothtrooper44_ArmorCompilation.esp","388c:Immersive Weapons.esp","38b75:Immersive Weapons.esp","3949:Immersive Weapons.esp","394a:Immersive Weapons.esp","394b:Immersive Weapons.esp","394f:Immersive Weapons.esp","3950:Immersive Weapons.esp","3953:Immersive Weapons.esp","3a104:Immersive Weapons.esp","3ab28:Dragonborn.esm","3ab29:Dragonborn.esm","3ab2a:Dragonborn.esm","3ab2b:Dragonborn.esm","3ab2c:Dragonborn.esm","3abcf:Immersive Weapons.esp","3abd0:Immersive Weapons.esp","3bbfa:Immersive Weapons.esp","3d2dd:Dragonborn.esm","3d581:Dragonborn.esm","3dee:Hothtrooper44_ArmorCompilation.esp","3e39:Hothtrooper44_ArmorCompilation.esp","3e3a:Hothtrooper44_ArmorCompilation.esp","3e3f:Hothtrooper44_ArmorCompilation.esp","3e40:Hothtrooper44_ArmorCompilation.esp","3e49:Hothtrooper44_ArmorCompilation.esp","3e4a:Hothtrooper44_ArmorCompilation.esp","3e50:Hothtrooper44_ArmorCompilation.esp","3e51:Hothtrooper44_ArmorCompilation.esp","3ecc:Hothtrooper44_ArmorCompilation.esp","3ecd:Hothtrooper44_ArmorCompilation.esp","3ece:Hothtrooper44_ArmorCompilation.esp","3ecf:Hothtrooper44_ArmorCompilation.esp","3ed1:Hothtrooper44_ArmorCompilation.esp","3ed2:Hothtrooper44_ArmorCompilation.esp","3ed3:Hothtrooper44_ArmorCompilation.esp","3ed4:Hothtrooper44_ArmorCompilation.esp","3ed5:Hothtrooper44_ArmorCompilation.esp","3ed7:Hothtrooper44_ArmorCompilation.esp","3f1ee:Immersive Weapons.esp","3f1ef:Immersive Weapons.esp","40e0a:Playable Rieklings.esp","4341:Immersive Weapons.esp","4360:Immersive Weapons.esp","44014:Immersive Weapons.esp","441011:Immersive Weapons.esp","441012:Immersive Weapons.esp","441013:Immersive Weapons.esp","441015:Immersive Weapons.esp","441016:Immersive Weapons.esp","441017:Immersive Weapons.esp","441024:Immersive Weapons.esp","441025:Immersive Weapons.esp","446d64:Immersive Weapons.esp","478d2:Immersive Weapons.esp","478d5:Immersive Weapons.esp","478d8:Immersive Weapons.esp","478db:Immersive Weapons.esp","478de:Immersive Weapons.esp","478e1:Immersive Weapons.esp","478e4:Immersive Weapons.esp","478e7:Immersive Weapons.esp","478ea:Immersive Weapons.esp","478ed:Immersive Weapons.esp","48ba:Immersive Weapons.esp","48bb:Immersive Weapons.esp","490d76:Immersive Weapons.esp","490d86:Immersive Weapons.esp","490d87:Immersive Weapons.esp","4915:Immersive Weapons.esp","491dc0:Immersive Weapons.esp","491dc4:Immersive Weapons.esp","49232a:Immersive Weapons.esp","492335:Immersive Weapons.esp","4e22:Immersive Weapons.esp","4e4e:Hothtrooper44_ArmorCompilation.esp","4e8b:Immersive Weapons.esp","4f25:Hothtrooper44_ArmorCompilation.esp","4f26:Hothtrooper44_ArmorCompilation.esp","4f27:Hothtrooper44_ArmorCompilation.esp","4f28:Hothtrooper44_ArmorCompilation.esp","4f3d:Hothtrooper44_ArmorCompilation.esp","4f3e:Hothtrooper44_ArmorCompilation.esp","4f3f:Hothtrooper44_ArmorCompilation.esp","4f41:Hothtrooper44_ArmorCompilation.esp","53b1:Hothtrooper44_ArmorCompilation.esp","53b2:Hothtrooper44_ArmorCompilation.esp","53b3:Hothtrooper44_ArmorCompilation.esp","53b4:Hothtrooper44_ArmorCompilation.esp","53b5:Hothtrooper44_ArmorCompilation.esp","53b6:Hothtrooper44_ArmorCompilation.esp","53b7:Hothtrooper44_ArmorCompilation.esp","53b8:Hothtrooper44_ArmorCompilation.esp","53c7:DIS_Heavy_Legion.esp","557d64:Immersive Weapons.esp","58c1:Immersive Weapons.esp","58d0:Immersive Weapons.esp","58d4:Immersive Weapons.esp","5939:DIS_Heavy_Legion.esp","5941:DIS_Heavy_Legion.esp","5a0c:Hothtrooper44_ArmorCompilation.esp","5a0d:Hothtrooper44_ArmorCompilation.esp","5a0e:Hothtrooper44_ArmorCompilation.esp","5a1c:Hothtrooper44_ArmorCompilation.esp","5a1d:Hothtrooper44_ArmorCompilation.esp","5a1e:Hothtrooper44_ArmorCompilation.esp","5a2a:Hothtrooper44_ArmorCompilation.esp","5a2b:Hothtrooper44_ArmorCompilation.esp","5a2c:Hothtrooper44_ArmorCompilation.esp","5a2d:Hothtrooper44_ArmorCompilation.esp","5a45:Hothtrooper44_ArmorCompilation.esp","5a46:Hothtrooper44_ArmorCompilation.esp","5a47:Hothtrooper44_ArmorCompilation.esp","5a48:Hothtrooper44_ArmorCompilation.esp","5a49:Hothtrooper44_ArmorCompilation.esp","5a4a:Hothtrooper44_ArmorCompilation.esp","5a4b:Hothtrooper44_ArmorCompilation.esp","5a4c:Hothtrooper44_ArmorCompilation.esp","5a5f:Hothtrooper44_ArmorCompilation.esp","5a60:Hothtrooper44_ArmorCompilation.esp","5a61:Hothtrooper44_ArmorCompilation.esp","5a62:Hothtrooper44_ArmorCompilation.esp","5a72:Hothtrooper44_ArmorCompilation.esp","5a73:Hothtrooper44_ArmorCompilation.esp","5a74:Hothtrooper44_ArmorCompilation.esp","5a75:Hothtrooper44_ArmorCompilation.esp","5ec3:DIS_Heavy_Legion.esp","5ec5:DIS_Heavy_Legion.esp","5ec8:DIS_Heavy_Legion.esp","5eca:DIS_Heavy_Legion.esp","5ecc:DIS_Heavy_Legion.esp","5f8ea:Hothtrooper44_ArmorCompilation.esp","5f8eb:Hothtrooper44_ArmorCompilation.esp","5f8ec:Hothtrooper44_ArmorCompilation.esp","5f8ed:Hothtrooper44_ArmorCompilation.esp","5f8ee:Hothtrooper44_ArmorCompilation.esp","5f8ef:Hothtrooper44_ArmorCompilation.esp","5f8f0:Hothtrooper44_ArmorCompilation.esp","5f8f1:Hothtrooper44_ArmorCompilation.esp","5f8f2:Hothtrooper44_ArmorCompilation.esp","5f8f3:Hothtrooper44_ArmorCompilation.esp","5f8f4:Hothtrooper44_ArmorCompilation.esp","5f8f5:Hothtrooper44_ArmorCompilation.esp","5f8f6:Hothtrooper44_ArmorCompilation.esp","5f8f7:Hothtrooper44_ArmorCompilation.esp","62ffe:Hothtrooper44_ArmorCompilation.esp","62fff:Hothtrooper44_ArmorCompilation.esp","63000:Hothtrooper44_ArmorCompilation.esp","659f:Playable Rieklings.esp","6908:Immersive Weapons.esp","6a9f4:Hothtrooper44_ArmorCompilation.esp","6a9f5:Hothtrooper44_ArmorCompilation.esp","6a9f6:Hothtrooper44_ArmorCompilation.esp","6a9f7:Hothtrooper44_ArmorCompilation.esp","6aa09:Hothtrooper44_ArmorCompilation.esp","6aa0a:Hothtrooper44_ArmorCompilation.esp","6aa0b:Hothtrooper44_ArmorCompilation.esp","6aa0c:Hothtrooper44_ArmorCompilation.esp","6aa0d:Hothtrooper44_ArmorCompilation.esp","6bf7:Immersive Weapons.esp","6eff:DIS_Heavy_Legion.esp","6f00:DIS_Heavy_Legion.esp","701009:Immersive Weapons.esp","7406:Immersive Weapons.esp","740f:Immersive Weapons.esp","7700c:Immersive Weapons.esp","77100a:Immersive Weapons.esp","7914:Immersive Weapons.esp","791a:Immersive Weapons.esp","79d64:Immersive Weapons.esp","8042:Hothtrooper44_ArmorCompilation.esp","8043:Hothtrooper44_ArmorCompilation.esp","8044:Hothtrooper44_ArmorCompilation.esp","8045:Hothtrooper44_ArmorCompilation.esp","82ebf:Hothtrooper44_ArmorCompilation.esp","82ec0:Hothtrooper44_ArmorCompilation.esp","82ec1:Hothtrooper44_ArmorCompilation.esp","82ec2:Hothtrooper44_ArmorCompilation.esp","83fc:Immersive Weapons.esp","84100b:Immersive Weapons.esp","843:MoreCraftableEquipment.esp","844:MoreCraftableEquipment.esp","845:MoreCraftableEquipment.esp","846:MoreCraftableEquipment.esp","847:MoreCraftableEquipment.esp","848:MoreCraftableEquipment.esp","849:MoreCraftableEquipment.esp","849:YokuWeapons.esp","84a:YokuWeapons.esp","84b:YokuWeapons.esp","84c:YokuWeapons.esp","84d:YokuWeapons.esp","84e:YokuWeapons.esp","84f20:Hothtrooper44_ArmorCompilation.esp","84f3a:Hothtrooper44_ArmorCompilation.esp","84f3b:Hothtrooper44_ArmorCompilation.esp","84f3c:Hothtrooper44_ArmorCompilation.esp","84f3d:Hothtrooper44_ArmorCompilation.esp","84f3e:Hothtrooper44_ArmorCompilation.esp","84f3f:Hothtrooper44_ArmorCompilation.esp","84f40:Hothtrooper44_ArmorCompilation.esp","84f41:Hothtrooper44_ArmorCompilation.esp","84f42:Hothtrooper44_ArmorCompilation.esp","84f43:Hothtrooper44_ArmorCompilation.esp","84f44:Hothtrooper44_ArmorCompilation.esp","84f5c:Hothtrooper44_ArmorCompilation.esp","84f5d:Hothtrooper44_ArmorCompilation.esp","84f5e:Hothtrooper44_ArmorCompilation.esp","84f5f:Hothtrooper44_ArmorCompilation.esp","84f60:Hothtrooper44_ArmorCompilation.esp","84f61:Hothtrooper44_ArmorCompilation.esp","84f62:Hothtrooper44_ArmorCompilation.esp","84f63:Hothtrooper44_ArmorCompilation.esp","84f64:Hothtrooper44_ArmorCompilation.esp","84f65:Hothtrooper44_ArmorCompilation.esp","84f:MoreCraftableEquipment.esp","84f:YokuWeapons.esp","850:MoreCraftableEquipment.esp","850:YokuWeapons.esp","851:MoreCraftableEquipment.esp","851:YokuWeapons.esp","852:MoreCraftableEquipment.esp","852:YokuWeapons.esp","853:MoreCraftableEquipment.esp","853:YokuWeapons.esp","854:MoreCraftableEquipment.esp","854:YokuWeapons.esp","855:YokuWeapons.esp","856:YokuWeapons.esp","857:YokuWeapons.esp","858:YokuWeapons.esp","859:MoreCraftableEquipment.esp","859:YokuWeapons.esp","85a53:Hothtrooper44_ArmorCompilation.esp","85a:MoreCraftableEquipment.esp","85a:YokuWeapons.esp","85b:MoreCraftableEquipment.esp","85c:MoreCraftableEquipment.esp","85d:MoreCraftableEquipment.esp","85d:YokuWeapons.esp","85e:MoreCraftableEquipment.esp","85f:MoreCraftableEquipment.esp","85fd7:Hothtrooper44_ArmorCompilation.esp","85fd8:Hothtrooper44_ArmorCompilation.esp","85fd9:Hothtrooper44_ArmorCompilation.esp","860:MoreCraftableEquipment.esp","861:MoreCraftableEquipment.esp","862:MoreCraftableEquipment.esp","863:MoreCraftableEquipment.esp","864:MoreCraftableEquipment.esp","865:MoreCraftableEquipment.esp","866:MoreCraftableEquipment.esp","867:MoreCraftableEquipment.esp","868:MoreCraftableEquipment.esp","869:MoreCraftableEquipment.esp","86a:MoreCraftableEquipment.esp","86b:MoreCraftableEquipment.esp","86c:MoreCraftableEquipment.esp","86d:MoreCraftableEquipment.esp","86e:MoreCraftableEquipment.esp","86f:MoreCraftableEquipment.esp","870:MoreCraftableEquipment.esp","871:MoreCraftableEquipment.esp","872:MoreCraftableEquipment.esp","873:MoreCraftableEquipment.esp","874:MoreCraftableEquipment.esp","87b:MoreCraftableEquipment.esp","87c:MoreCraftableEquipment.esp","87d:MoreCraftableEquipment.esp","882:MoreCraftableEquipment.esp","883:MoreCraftableEquipment.esp","884:MoreCraftableEquipment.esp","884:YokuWeapons.esp","88c:MoreCraftableEquipment.esp","88c:YokuWeapons.esp","88d:MoreCraftableEquipment.esp","88e:MoreCraftableEquipment.esp","8963:Immersive Weapons.esp","897:MoreCraftableEquipment.esp","89a:YokuWeapons.esp","89b:YokuWeapons.esp","89c:MoreCraftableEquipment.esp","8a0:YokuWeapons.esp","8a1:YokuWeapons.esp","8a9:MoreCraftableEquipment.esp","8aa:MoreCraftableEquipment.esp","8ab:MoreCraftableEquipment.esp","8ac:MoreCraftableEquipment.esp","8ad:MoreCraftableEquipment.esp","8ae:MoreCraftableEquipment.esp","8af:MoreCraftableEquipment.esp","8b0:MoreCraftableEquipment.esp","8b10:Hothtrooper44_ArmorCompilation.esp","8b1:MoreCraftableEquipment.esp","8b2:MoreCraftableEquipment.esp","8b3:MoreCraftableEquipment.esp","8b4:MoreCraftableEquipment.esp","8b5:MoreCraftableEquipment.esp","8b6:MoreCraftableEquipment.esp","8b7:MoreCraftableEquipment.esp","8b8:MoreCraftableEquipment.esp","8b9:MoreCraftableEquipment.esp","8ba:MoreCraftableEquipment.esp","8bb:MoreCraftableEquipment.esp","8bc:MoreCraftableEquipment.esp","8bd:MoreCraftableEquipment.esp","8be:MoreCraftableEquipment.esp","8bf:MoreCraftableEquipment.esp","8c0:MoreCraftableEquipment.esp","8c1:MoreCraftableEquipment.esp","8c2:MoreCraftableEquipment.esp","8c3:MoreCraftableEquipment.esp","8c4:MoreCraftableEquipment.esp","8c5:MoreCraftableEquipment.esp","8c651:Hothtrooper44_ArmorCompilation.esp","8c6:MoreCraftableEquipment.esp","8c6:YokuWeapons.esp","8c7:MoreCraftableEquipment.esp","8c8:MoreCraftableEquipment.esp","8c9:MoreCraftableEquipment.esp","8ca:MoreCraftableEquipment.esp","8cb:MoreCraftableEquipment.esp","8cc:MoreCraftableEquipment.esp","8ce:MoreCraftableEquipment.esp","8cf:MoreCraftableEquipment.esp","8d0:MoreCraftableEquipment.esp","8d1:MoreCraftableEquipment.esp","8d2:MoreCraftableEquipment.esp","8d2:YokuWeapons.esp","8d3:MoreCraftableEquipment.esp","8d3:YokuWeapons.esp","8d4:MoreCraftableEquipment.esp","8d5:MoreCraftableEquipment.esp","8d6:MoreCraftableEquipment.esp","8d7:MoreCraftableEquipment.esp","8d8:MoreCraftableEquipment.esp","8d9:MoreCraftableEquipment.esp","8da:MoreCraftableEquipment.esp","8db:MoreCraftableEquipment.esp","8dc:MoreCraftableEquipment.esp","8dd:MoreCraftableEquipment.esp","8de:MoreCraftableEquipment.esp","8df:MoreCraftableEquipment.esp","8e0:MoreCraftableEquipment.esp","8e1:MoreCraftableEquipment.esp","8e2:MoreCraftableEquipment.esp","8e3:MoreCraftableEquipment.esp","8e4:MoreCraftableEquipment.esp","8e5:MoreCraftableEquipment.esp","8e6:MoreCraftableEquipment.esp","8e7:MoreCraftableEquipment.esp","8e8:MoreCraftableEquipment.esp","8e9:MoreCraftableEquipment.esp","8ea:MoreCraftableEquipment.esp","8eb:MoreCraftableEquipment.esp","8ec:MoreCraftableEquipment.esp","8f0:MoreCraftableEquipment.esp","8f1:MoreCraftableEquipment.esp","8f3:MoreCraftableEquipment.esp","8f4:MoreCraftableEquipment.esp","8f5:MoreCraftableEquipment.esp","8f6:MoreCraftableEquipment.esp","8f7:MoreCraftableEquipment.esp","8f8:MoreCraftableEquipment.esp","8f9:MoreCraftableEquipment.esp","8fa:MoreCraftableEquipment.esp","8fb:MoreCraftableEquipment.esp","8fc:MoreCraftableEquipment.esp","8fd:MoreCraftableEquipment.esp","8fe:MoreCraftableEquipment.esp","8ff:MoreCraftableEquipment.esp","900:MoreCraftableEquipment.esp","901:MoreCraftableEquipment.esp","904:Immersive Weapons.esp","906:Immersive Weapons.esp","90d64:Immersive Weapons.esp","90d:YokuWeapons.esp","90e:YokuWeapons.esp","90f:YokuWeapons.esp","910:Immersive Weapons.esp","910:YokuWeapons.esp","911:Immersive Weapons.esp","919:YokuWeapons.esp","91a:YokuWeapons.esp","91b:YokuWeapons.esp","91c:YokuWeapons.esp","921:YokuWeapons.esp","922:YokuWeapons.esp","923:YokuWeapons.esp","924:YokuWeapons.esp","929:YokuWeapons.esp","92a:YokuWeapons.esp","92b:YokuWeapons.esp","92c:YokuWeapons.esp","931:YokuWeapons.esp","932:YokuWeapons.esp","933:YokuWeapons.esp","934:YokuWeapons.esp","935:YokuWeapons.esp","93b:YokuWeapons.esp","93c:YokuWeapons.esp","93d:YokuWeapons.esp","93e:YokuWeapons.esp","9406:Immersive Weapons.esp","9408:Immersive Weapons.esp","940a:Immersive Weapons.esp","940c:Immersive Weapons.esp","940d78:Immersive Weapons.esp","940d79:Immersive Weapons.esp","940d7c:Immersive Weapons.esp","940d7d:Immersive Weapons.esp","9412f4:Immersive Weapons.esp","94185a:Immersive Weapons.esp","942331:Immersive Weapons.esp","94289e:Immersive Weapons.esp","943:YokuWeapons.esp","944:YokuWeapons.esp","945:YokuWeapons.esp","946:YokuWeapons.esp","94b:YokuWeapons.esp","94d:YokuWeapons.esp","94f:YokuWeapons.esp","950:YokuWeapons.esp","95e:MoreCraftableEquipment.esp","95f:MoreCraftableEquipment.esp","960:MoreCraftableEquipment.esp","961015:Immersive Weapons.esp","961016:Immersive Weapons.esp","96101c:Immersive Weapons.esp","96101d:Immersive Weapons.esp","961:MoreCraftableEquipment.esp","96d64:Immersive Weapons.esp","998d:Immersive Weapons.esp","9cf:Update.esm","9d0:Update.esm","9d1:Update.esm","9d2:Update.esm","9d3:Update.esm","9d68:Immersive Weapons.esp","9dd:MoreCraftableEquipment.esp","9e775:Playable Rieklings.esp","9e776:Playable Rieklings.esp","9e777:Playable Rieklings.esp","9eda:Immersive Weapons.esp","9ee:MoreCraftableEquipment.esp","9ff:MoreCraftableEquipment.esp","a1113:Immersive Weapons.esp","a438:Immersive Weapons.esp","a43a:Immersive Weapons.esp","a455:Immersive Weapons.esp","a5cd6:Skyrim.esm","ab6d:Hothtrooper44_ArmorCompilation.esp","ab72:Hothtrooper44_ArmorCompilation.esp","ab73:Hothtrooper44_ArmorCompilation.esp","ab74:Hothtrooper44_ArmorCompilation.esp","ab75:Hothtrooper44_ArmorCompilation.esp","af29:Immersive Weapons.esp","b473:Immersive Weapons.esp","b48f:Immersive Weapons.esp","b9d9:Immersive Weapons.esp","bab8c:Playable Rieklings.esp","bab90:Playable Rieklings.esp","babbc:Playable Rieklings.esp","babbd:Playable Rieklings.esp","bc99a:Hothtrooper44_ArmorCompilation.esp","bc99b:Hothtrooper44_ArmorCompilation.esp","bc99c:Hothtrooper44_ArmorCompilation.esp","bfe63:Playable Rieklings.esp","bfe65:Playable Rieklings.esp","bfe66:Playable Rieklings.esp","bfe67:Playable Rieklings.esp","bfe68:Playable Rieklings.esp","bfe69:Playable Rieklings.esp","bfe6a:Playable Rieklings.esp","bfe6b:Playable Rieklings.esp","bfe6c:Playable Rieklings.esp","bfe6d:Playable Rieklings.esp","bfe6e:Playable Rieklings.esp","bfe70:Playable Rieklings.esp","bfe72:Playable Rieklings.esp","bfe74:Playable Rieklings.esp","bfe76:Playable Rieklings.esp","bfe78:Playable Rieklings.esp","bfe7a:Playable Rieklings.esp","bfe7c:Playable Rieklings.esp","bfe7e:Playable Rieklings.esp","bfe80:Playable Rieklings.esp","bfe82:Playable Rieklings.esp","bfe84:Playable Rieklings.esp","bfe86:Playable Rieklings.esp","bfe88:Playable Rieklings.esp","bfe8a:Playable Rieklings.esp","bfe8c:Playable Rieklings.esp","bfe8e:Playable Rieklings.esp","bfe90:Playable Rieklings.esp","bfe92:Playable Rieklings.esp","bfe94:Playable Rieklings.esp","bfe96:Playable Rieklings.esp","bfe98:Playable Rieklings.esp","bfe9a:Playable Rieklings.esp","bfe9c:Playable Rieklings.esp","bfe9e:Playable Rieklings.esp","bfea0:Playable Rieklings.esp","bfea2:Playable Rieklings.esp","bfea4:Playable Rieklings.esp","bfea6:Playable Rieklings.esp","bfea8:Playable Rieklings.esp","bfeaa:Playable Rieklings.esp","bfeac:Playable Rieklings.esp","bfeae:Playable Rieklings.esp","bfeb0:Playable Rieklings.esp","bfeb2:Playable Rieklings.esp","bfeb4:Playable Rieklings.esp","bfeb6:Playable Rieklings.esp","bfeb8:Playable Rieklings.esp","bfeba:Playable Rieklings.esp","bfebc:Playable Rieklings.esp","bfebe:Playable Rieklings.esp","bfec0:Playable Rieklings.esp","bfec2:Playable Rieklings.esp","bfec4:Playable Rieklings.esp","bfec6:Playable Rieklings.esp","bfec8:Playable Rieklings.esp","bfeca:Playable Rieklings.esp","bfecc:Playable Rieklings.esp","bfece:Playable Rieklings.esp","bfed0:Playable Rieklings.esp","bfed2:Playable Rieklings.esp","bfed4:Playable Rieklings.esp","bfed6:Playable Rieklings.esp","bfed8:Playable Rieklings.esp","bfedb:Playable Rieklings.esp","bfedc:Playable Rieklings.esp","bfedd:Playable Rieklings.esp","bfede:Playable Rieklings.esp","bfedf:Playable Rieklings.esp","bfee0:Playable Rieklings.esp","bfee1:Playable Rieklings.esp","bfee2:Playable Rieklings.esp","bfee3:Playable Rieklings.esp","bfee4:Playable Rieklings.esp","bfee5:Playable Rieklings.esp","bfee6:Playable Rieklings.esp","bfee7:Playable Rieklings.esp","bfee8:Playable Rieklings.esp","bfee9:Playable Rieklings.esp","bfeea:Playable Rieklings.esp","bfeeb:Playable Rieklings.esp","bfeec:Playable Rieklings.esp","bfeed:Playable Rieklings.esp","bfeee:Playable Rieklings.esp","bfeef:Playable Rieklings.esp","bfef0:Playable Rieklings.esp","bfef1:Playable Rieklings.esp","bfef2:Playable Rieklings.esp","bfef3:Playable Rieklings.esp","bfef4:Playable Rieklings.esp","bfef5:Playable Rieklings.esp","bfef6:Playable Rieklings.esp","bfef7:Playable Rieklings.esp","bfef8:Playable Rieklings.esp","bfef9:Playable Rieklings.esp","bfefa:Playable Rieklings.esp","bfefb:Playable Rieklings.esp","bfefc:Playable Rieklings.esp","bfefd:Playable Rieklings.esp","bfefe:Playable Rieklings.esp","bfeff:Playable Rieklings.esp","bff00:Playable Rieklings.esp","bff02:Playable Rieklings.esp","bff03:Playable Rieklings.esp","bff04:Playable Rieklings.esp","bff05:Playable Rieklings.esp","bff06:Playable Rieklings.esp","bff07:Playable Rieklings.esp","bff08:Playable Rieklings.esp","bff0a:Playable Rieklings.esp","bff26:Playable Rieklings.esp","bff27:Playable Rieklings.esp","bff32:Playable Rieklings.esp","bff34:Playable Rieklings.esp","bff38:Playable Rieklings.esp","c0374:Playable Rieklings.esp","c33c:Playable Rieklings.esp","c695:Hothtrooper44_ArmorCompilation.esp","c696:Hothtrooper44_ArmorCompilation.esp","c697:Hothtrooper44_ArmorCompilation.esp","c698:Hothtrooper44_ArmorCompilation.esp","c74701:Immersive Weapons.esp","c74703:Immersive Weapons.esp","c74704:Immersive Weapons.esp","c74705:Immersive Weapons.esp","c74706:Immersive Weapons.esp","c74707:Immersive Weapons.esp","c74708:Immersive Weapons.esp","c74709:Immersive Weapons.esp","c7470a:Immersive Weapons.esp","c7470b:Immersive Weapons.esp","c7470c:Immersive Weapons.esp","c7470d:Immersive Weapons.esp","c7470e:Immersive Weapons.esp","c74710:Immersive Weapons.esp","c74713:Immersive Weapons.esp","c74714:Immersive Weapons.esp","c74715:Immersive Weapons.esp","c74716:Immersive Weapons.esp","c74717:Immersive Weapons.esp","c74718:Immersive Weapons.esp","c74719:Immersive Weapons.esp","c7471a:Immersive Weapons.esp","c7471b:Immersive Weapons.esp","c7471c:Immersive Weapons.esp","c7471d:Immersive Weapons.esp","c7471e:Immersive Weapons.esp","c7471f:Immersive Weapons.esp","c74720:Immersive Weapons.esp","c74721:Immersive Weapons.esp","c74722:Immersive Weapons.esp","c74723:Immersive Weapons.esp","c74724:Immersive Weapons.esp","c74725:Immersive Weapons.esp","c74726:Immersive Weapons.esp","c74727:Immersive Weapons.esp","c74728:Immersive Weapons.esp","c74729:Immersive Weapons.esp","c7472a:Immersive Weapons.esp","c7472c:Immersive Weapons.esp","c7472d:Immersive Weapons.esp","c74734:Immersive Weapons.esp","c74735:Immersive Weapons.esp","c74736:Immersive Weapons.esp","c74737:Immersive Weapons.esp","c74738:Immersive Weapons.esp","c74739:Immersive Weapons.esp","c7473a:Immersive Weapons.esp","c7473b:Immersive Weapons.esp","c7473c:Immersive Weapons.esp","ca05:Immersive Weapons.esp","d175:Hothtrooper44_ArmorCompilation.esp","d176:Hothtrooper44_ArmorCompilation.esp","d177:Hothtrooper44_ArmorCompilation.esp","d178:Hothtrooper44_ArmorCompilation.esp","d17d:Hothtrooper44_ArmorCompilation.esp","d17e:Hothtrooper44_ArmorCompilation.esp","d17f:Hothtrooper44_ArmorCompilation.esp","d180:Hothtrooper44_ArmorCompilation.esp","d64:Immersive Weapons.esp","d9a:Hothtrooper44_ArmorCompilation.esp","d9c:Hothtrooper44_ArmorCompilation.esp","d9d:Hothtrooper44_ArmorCompilation.esp","d9e:Hothtrooper44_ArmorCompilation.esp","d9f:Hothtrooper44_ArmorCompilation.esp","da0:Hothtrooper44_ArmorCompilation.esp","da1:Hothtrooper44_ArmorCompilation.esp","da2:Hothtrooper44_ArmorCompilation.esp","da3:Hothtrooper44_ArmorCompilation.esp","da4:Hothtrooper44_ArmorCompilation.esp","da5:Hothtrooper44_ArmorCompilation.esp","da6:Hothtrooper44_ArmorCompilation.esp","da769:Skyrim.esm","da76a:Skyrim.esm","da76b:Skyrim.esm","da76c:Skyrim.esm","da76d:Skyrim.esm","da76e:Skyrim.esm","da76f:Skyrim.esm","da7:Hothtrooper44_ArmorCompilation.esp","da8:Hothtrooper44_ArmorCompilation.esp","da9:Hothtrooper44_ArmorCompilation.esp","daa:Hothtrooper44_ArmorCompilation.esp","dad:Hothtrooper44_ArmorCompilation.esp","dae:Hothtrooper44_ArmorCompilation.esp","daf:Hothtrooper44_ArmorCompilation.esp","db0:Hothtrooper44_ArmorCompilation.esp","db1:Hothtrooper44_ArmorCompilation.esp","db28e:Skyrim.esm","db28f:Skyrim.esm","db290:Skyrim.esm","db291:Skyrim.esm","db292:Skyrim.esm","db293:Skyrim.esm","db2:Hothtrooper44_ArmorCompilation.esp","db3:Hothtrooper44_ArmorCompilation.esp","db4:Hothtrooper44_ArmorCompilation.esp","db5:Hothtrooper44_ArmorCompilation.esp","db5d3:Skyrim.esm","db5d4:Skyrim.esm","db5d5:Skyrim.esm","db5d6:Skyrim.esm","db5d7:Skyrim.esm","db6:Hothtrooper44_ArmorCompilation.esp","db7:Hothtrooper44_ArmorCompilation.esp","db896:Skyrim.esm","db897:Skyrim.esm","db898:Skyrim.esm","db899:Skyrim.esm","db89a:Skyrim.esm","db89b:Skyrim.esm","db89c:Skyrim.esm","db89d:Skyrim.esm","db89e:Skyrim.esm","db89f:Skyrim.esm","db8:Hothtrooper44_ArmorCompilation.esp","db8a0:Skyrim.esm","db8a1:Skyrim.esm","db8a3:Skyrim.esm","db8a4:Skyrim.esm","db8a5:Skyrim.esm","db8a6:Skyrim.esm","db8a7:Skyrim.esm","db8a8:Skyrim.esm","db8a9:Skyrim.esm","db8aa:Skyrim.esm","db8ab:Skyrim.esm","db8ac:Skyrim.esm","db8ad:Skyrim.esm","db8ae:Skyrim.esm","db8af:Skyrim.esm","db8b0:Skyrim.esm","db8b1:Skyrim.esm","db8b2:Skyrim.esm","db8b3:Skyrim.esm","db8b4:Skyrim.esm","db8b5:Skyrim.esm","db8b6:Skyrim.esm","db8b7:Skyrim.esm","db8b8:Skyrim.esm","db8b9:Skyrim.esm","db8ba:Skyrim.esm","db8bb:Skyrim.esm","db8bc:Skyrim.esm","db8bd:Skyrim.esm","db8be:Skyrim.esm","db8bf:Skyrim.esm","db8c0:Skyrim.esm","db8c1:Skyrim.esm","db8c2:Skyrim.esm","db8c3:Skyrim.esm","db8c4:Skyrim.esm","db8c5:Skyrim.esm","dbb:Hothtrooper44_ArmorCompilation.esp","dbc:Hothtrooper44_ArmorCompilation.esp","dbd:Hothtrooper44_ArmorCompilation.esp","dbe:Hothtrooper44_ArmorCompilation.esp","dbf:Hothtrooper44_ArmorCompilation.esp","dc0:Hothtrooper44_ArmorCompilation.esp","dc1:Hothtrooper44_ArmorCompilation.esp","dc2:Hothtrooper44_ArmorCompilation.esp","dc3:Hothtrooper44_ArmorCompilation.esp","dc6:Hothtrooper44_ArmorCompilation.esp","dc7:Hothtrooper44_ArmorCompilation.esp","dc8:Hothtrooper44_ArmorCompilation.esp","dc9:Hothtrooper44_ArmorCompilation.esp","dc9f4:Skyrim.esm","dc9f5:Skyrim.esm","dc9f6:Skyrim.esm","dc9f7:Skyrim.esm","dc9f8:Skyrim.esm","dc9f9:Skyrim.esm","dc9fa:Skyrim.esm","dc9fb:Skyrim.esm","dc9fc:Skyrim.esm","dc9fd:Skyrim.esm","dc9fe:Skyrim.esm","dc9ff:Skyrim.esm","dca00:Skyrim.esm","dca01:Skyrim.esm","dca02:Skyrim.esm","dca03:Skyrim.esm","dca04:Skyrim.esm","dca05:Skyrim.esm","dca06:Skyrim.esm","dca07:Skyrim.esm","dca08:Skyrim.esm","dca0a:Skyrim.esm","dca0e:Skyrim.esm","dca0f:Skyrim.esm","dca10:Skyrim.esm","dca11:Skyrim.esm","dca12:Skyrim.esm","dca13:Skyrim.esm","dca14:Skyrim.esm","dca15:Skyrim.esm","dca16:Skyrim.esm","dca17:Skyrim.esm","dca:Hothtrooper44_ArmorCompilation.esp","dcb:Hothtrooper44_ArmorCompilation.esp","dd974:Skyrim.esm","dd975:Skyrim.esm","dd976:Skyrim.esm","dd977:Skyrim.esm","dd978:Skyrim.esm","dd979:Skyrim.esm","dd97a:Skyrim.esm","dd97b:Skyrim.esm","dd97c:Skyrim.esm","dd97d:Skyrim.esm","dd97e:Skyrim.esm","dd97f:Skyrim.esm","dd980:Skyrim.esm","dd981:Skyrim.esm","dd983:Skyrim.esm","dd984:Skyrim.esm","dd985:Skyrim.esm","dd986:Skyrim.esm","dd987:Skyrim.esm","dd988:Skyrim.esm","dd989:Skyrim.esm","dd98a:Skyrim.esm","dd98b:Skyrim.esm","dd98c:Skyrim.esm","dd98d:Skyrim.esm","dd98e:Skyrim.esm","dd98f:Skyrim.esm","dd990:Skyrim.esm","dd991:Skyrim.esm","dd992:Skyrim.esm","dd993:Skyrim.esm","dd994:Skyrim.esm","dd995:Skyrim.esm","dd996:Skyrim.esm","f19:YokuWeapons.esp","f6f2a:Skyrim.esm","f6f2c:Skyrim.esm","f6f2e:Skyrim.esm","f6f30:Skyrim.esm","f74d:Hothtrooper44_ArmorCompilation.esp"]},"88108:Skyrim.esm":{"halves":{},"name":"CraftingSmithingSharpeningWheel","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"910:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"halves":{"hearthcook":"novice"},"name":"isGrainMill","rows":["17ec3:HearthFires.esm"]},"a0c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"halves":{"hearthcook":"novice"},"name":"CraftingCookpot","rows":["18011:Thornswood-Content.esp","18012:Thornswood-Content.esp","18013:Thornswood-Content.esp","1a022:Thornswood-Content.esp","1a050:Thornswood-Content.esp","1a051:Thornswood-Content.esp","1a052:Thornswood-Content.esp","1a053:Thornswood-Content.esp","3542:HearthFires.esm","3543:HearthFires.esm","3544:HearthFires.esm","3cd5c:Dragonborn.esm","3cd5d:Dragonborn.esm","811:Gourmet.esp","812:Gourmet.esp","813:Gourmet.esp","814:Gourmet.esp","819:Gourmet.esp","81a:Gourmet.esp","81b:Gourmet.esp","81d:Gourmet.esp","81e:Gourmet.esp","8ab:Gourmet.esp","8ad:Gourmet.esp","8af:Gourmet.esp","8b4:Gourmet.esp","8b5:Gourmet.esp","8ba:Gourmet.esp","8bb:Gourmet.esp","8e5:Gourmet.esp","8ec:Gourmet.esp","8ed:Gourmet.esp","8f8:Gourmet.esp","8f9:Gourmet.esp","8fa:Gourmet.esp","904:Gourmet.esp","905:Gourmet.esp","906:Gourmet.esp","92d4:FishingInSkyrim.esp","998:Gourmet.esp","999:Gourmet.esp","99a:Gourmet.esp","99b:Gourmet.esp","99c:Gourmet.esp","99d:Gourmet.esp","99e:Gourmet.esp","9a2:Gourmet.esp","9a3:Gourmet.esp","9a4:Gourmet.esp","9a6:Gourmet.esp","9a7:Gourmet.esp","9a8:Gourmet.esp","9a9:Gourmet.esp","9aa:Gourmet.esp","9ab:Gourmet.esp","9ac:Gourmet.esp","9ae:Gourmet.esp","9af:Gourmet.esp","9b0:Gourmet.esp","9b1:Gourmet.esp","9b2:Gourmet.esp","9b3:Gourmet.esp","9b5:Gourmet.esp","9bb:Gourmet.esp","9bc:Gourmet.esp","9bd:Gourmet.esp","9be:Gourmet.esp","9bf:Gourmet.esp","9c0:Gourmet.esp","9c1:Gourmet.esp","9c2:Gourmet.esp","9c3:Gourmet.esp","9c4:Gourmet.esp","9c5:Gourmet.esp","9c6:Gourmet.esp","9c7:Gourmet.esp","9ca:Gourmet.esp","9cb:Gourmet.esp","9cc:Gourmet.esp","9cd:Gourmet.esp","9ce:Gourmet.esp","9cf:Gourmet.esp","9d3:Gourmet.esp","9d4:Gourmet.esp","9d5:Gourmet.esp","9d6:Gourmet.esp","9eb:Gourmet.esp","a09:Gourmet.esp","f4308:Skyrim.esm","f4309:Skyrim.esm","f430a:Skyrim.esm","f430b:Skyrim.esm","f430c:Skyrim.esm","f430d:Skyrim.esm","f430e:Skyrim.esm","f430f:Skyrim.esm","f4310:Skyrim.esm","f4311:Skyrim.esm","f4312:Skyrim.esm","f4313:Skyrim.esm","f4316:Skyrim.esm","f4317:Skyrim.esm","f4318:Skyrim.esm","f4319:Skyrim.esm","f431a:Skyrim.esm","f431f:Skyrim.esm"]},"a5cce:Skyrim.esm":{"halves":{"platewright":"novice"},"name":"CraftingSmelter","rows":["a30c3:Skyrim.esm","a30cb:Skyrim.esm","a30d3:Skyrim.esm","a30d4:Skyrim.esm","a30d9:Skyrim.esm","a30da:Skyrim.esm","a30db:Skyrim.esm","a30dc:Skyrim.esm","a30dd:Skyrim.esm","a30e4:Skyrim.esm","da0c03:Update.esm"]},"adb78:Skyrim.esm":{"halves":{},"name":"CraftingSmithingArmorTable","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"alchemy":{"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge","rows":["108cfd:Skyrim.esm","214a2:Hothtrooper44_ArmorCompilation.esp","214a3:Hothtrooper44_ArmorCompilation.esp","214a4:Hothtrooper44_ArmorCompilation.esp","214a5:Hothtrooper44_ArmorCompilation.esp","214a6:Hothtrooper44_ArmorCompilation.esp","214a7:Hothtrooper44_ArmorCompilation.esp","214a8:Hothtrooper44_ArmorCompilation.esp","214a9:Hothtrooper44_ArmorCompilation.esp","214aa:Hothtrooper44_ArmorCompilation.esp","48b9:Hothtrooper44_ArmorCompilation.esp","590d4:Hothtrooper44_ArmorCompilation.esp","5d7a7:Hothtrooper44_ArmorCompilation.esp","855:MoreCraftableEquipment.esp","856:MoreCraftableEquipment.esp","857:MoreCraftableEquipment.esp","858:MoreCraftableEquipment.esp","8ed:MoreCraftableEquipment.esp","8ee:MoreCraftableEquipment.esp","8ef:MoreCraftableEquipment.esp","b651:Hothtrooper44_ArmorCompilation.esp","b652:Hothtrooper44_ArmorCompilation.esp","b653:Hothtrooper44_ArmorCompilation.esp","b654:Hothtrooper44_ArmorCompilation.esp","f46c8:Skyrim.esm","f46c9:Skyrim.esm","f46ca:Skyrim.esm","f46cb:Skyrim.esm","f46cc:Skyrim.esm","f46cd:Skyrim.esm","f46cf:Skyrim.esm","f46d0:Skyrim.esm"]},"f806:Dawnguard.esm":{"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard","rows":["f807:Dawnguard.esm","f808:Dawnguard.esm","f809:Dawnguard.esm","f80a:Dawnguard.esm","f80b:Dawnguard.esm","f80c:Dawnguard.esm","f80d:Dawnguard.esm","f80e:Dawnguard.esm","f80f:Dawnguard.esm","f810:Dawnguard.esm"]}};
+const BENCH_ACCESS = {"117f7:HearthFires.esm":{"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven","rows":["117f6:HearthFires.esm","117f8:HearthFires.esm","117f9:HearthFires.esm","117fa:HearthFires.esm","117fb:HearthFires.esm","117fc:HearthFires.esm","117fd:HearthFires.esm","117fe:HearthFires.esm","11800:HearthFires.esm","11802:HearthFires.esm","1a020:Thornswood-Content.esp","1a021:Thornswood-Content.esp","1a023:Thornswood-Content.esp","80e:Gourmet.esp","80f:Gourmet.esp","81f:Gourmet.esp","820:Gourmet.esp","84b:Gourmet.esp","8a4:Gourmet.esp","8a6:Gourmet.esp","8e3:Gourmet.esp","98b:Gourmet.esp","994:Gourmet.esp","995:Gourmet.esp","996:Gourmet.esp","997:Gourmet.esp","99f:Gourmet.esp","9a0:Gourmet.esp","9a1:Gourmet.esp","9a5:Gourmet.esp","9ad:Gourmet.esp","9b4:Gourmet.esp","9b6:Gourmet.esp","9b7:Gourmet.esp","9b8:Gourmet.esp","9b9:Gourmet.esp","9ba:Gourmet.esp","9c8:Gourmet.esp","9c9:Gourmet.esp","9d0:Gourmet.esp","9d1:Gourmet.esp","9d2:Gourmet.esp","a11:HearthFires.esm","a12:HearthFires.esm"]},"1547f:Thornswood-Content.esp":{"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln","rows":["15480:Thornswood-Content.esp","15486:Thornswood-Content.esp","15487:Thornswood-Content.esp","15488:Thornswood-Content.esp","15491:Thornswood-Content.esp","154c5:Thornswood-Content.esp"]},"154e1:Thornswood-Content.esp":{"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking","rows":["108cf7:Skyrim.esm","108cf8:Skyrim.esm","108cf9:Skyrim.esm","108cfa:Skyrim.esm","108cfb:Skyrim.esm","108cfc:Skyrim.esm","1549c:Thornswood-Content.esp","1549d:Thornswood-Content.esp","1549e:Thornswood-Content.esp","1549f:Thornswood-Content.esp","16080:Thornswood-Content.esp","16081:Thornswood-Content.esp","16082:Thornswood-Content.esp","16083:Thornswood-Content.esp","16084:Thornswood-Content.esp","16085:Thornswood-Content.esp","16086:Thornswood-Content.esp","16087:Thornswood-Content.esp","16088:Thornswood-Content.esp","16089:Thornswood-Content.esp","1608a:Thornswood-Content.esp","1838:PlayFluteLuteDrum.esp","19824:Dawnguard.esm","19fb4:Playable Rieklings.esp","19fb7:Playable Rieklings.esp","19fb8:Playable Rieklings.esp","2b077:Dragonborn.esm","2b07f:Dragonborn.esm","2de4:PlayFluteLuteDrum.esp","2de5:PlayFluteLuteDrum.esp","3987:Dawnguard.esm","3cf53:Dragonborn.esm","3cf54:Dragonborn.esm","490d86:Immersive Weapons.esp","6928:Dawnguard.esm","8f0:MoreCraftableEquipment.esp","8f7:MoreCraftableEquipment.esp","b64f:Dawnguard.esm","b650:Dawnguard.esm","b651:Dawnguard.esm","b652:Dawnguard.esm","b653:Dawnguard.esm","b654:Dawnguard.esm","b655:Dawnguard.esm","f813:Dawnguard.esm","f814:Dawnguard.esm"]},"17738:Dragonborn.esm":{"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter","rows":["10983d:Apocalypse - Magic of Skyrim.esp","10c70a:Apocalypse - Magic of Skyrim.esp","161624:Apocalypse - Magic of Skyrim.esp","161633:Apocalypse - Magic of Skyrim.esp","17737:Dragonborn.esm","1774a:Dragonborn.esm","1774b:Dragonborn.esm","1774c:Dragonborn.esm","1774d:Dragonborn.esm","1774e:Dragonborn.esm","1774f:Dragonborn.esm","17750:Dragonborn.esm","17751:Dragonborn.esm","17752:Dragonborn.esm","17753:Dragonborn.esm","17754:Dragonborn.esm","17755:Dragonborn.esm","17756:Dragonborn.esm","17757:Dragonborn.esm","17758:Dragonborn.esm","17759:Dragonborn.esm","1775a:Dragonborn.esm","1775b:Dragonborn.esm","1775c:Dragonborn.esm","1775d:Dragonborn.esm","1775e:Dragonborn.esm","1775f:Dragonborn.esm","17760:Dragonborn.esm","17761:Dragonborn.esm","17762:Dragonborn.esm","17763:Dragonborn.esm","17764:Dragonborn.esm","17765:Dragonborn.esm","17766:Dragonborn.esm","17767:Dragonborn.esm","17768:Dragonborn.esm","17769:Dragonborn.esm","1776a:Dragonborn.esm","1776b:Dragonborn.esm","1776c:Dragonborn.esm","1776d:Dragonborn.esm","1776e:Dragonborn.esm","1776f:Dragonborn.esm","17770:Dragonborn.esm","17771:Dragonborn.esm","17772:Dragonborn.esm","17773:Dragonborn.esm","17b5e1:Odin - Skyrim Magic Overhaul.esp","17b5e2:Odin - Skyrim Magic Overhaul.esp","17b5e3:Odin - Skyrim Magic Overhaul.esp","17b5e4:Odin - Skyrim Magic Overhaul.esp","17b5e5:Odin - Skyrim Magic Overhaul.esp","1a792f:Apocalypse - Magic of Skyrim.esp","1a7933:Apocalypse - Magic of Skyrim.esp","1a7937:Apocalypse - Magic of Skyrim.esp","1a793b:Apocalypse - Magic of Skyrim.esp","1a793f:Apocalypse - Magic of Skyrim.esp","2a8163:Odin - Skyrim Magic Overhaul.esp","2a8164:Odin - Skyrim Magic Overhaul.esp","2a8165:Odin - Skyrim Magic Overhaul.esp","2a8166:Odin - Skyrim Magic Overhaul.esp","2a8167:Odin - Skyrim Magic Overhaul.esp","2a8168:Odin - Skyrim Magic Overhaul.esp","2a8169:Odin - Skyrim Magic Overhaul.esp","2a816a:Odin - Skyrim Magic Overhaul.esp","2a816b:Odin - Skyrim Magic Overhaul.esp","2a816c:Odin - Skyrim Magic Overhaul.esp","2a816d:Odin - Skyrim Magic Overhaul.esp","2a816e:Odin - Skyrim Magic Overhaul.esp","2a816f:Odin - Skyrim Magic Overhaul.esp","2a8170:Odin - Skyrim Magic Overhaul.esp","2a8171:Odin - Skyrim Magic Overhaul.esp","2a8172:Odin - Skyrim Magic Overhaul.esp","2a8173:Odin - Skyrim Magic Overhaul.esp","2a8174:Odin - Skyrim Magic Overhaul.esp","2a8175:Odin - Skyrim Magic Overhaul.esp","2a8176:Odin - Skyrim Magic Overhaul.esp","2a8177:Odin - Skyrim Magic Overhaul.esp","2a8178:Odin - Skyrim Magic Overhaul.esp","2a8179:Odin - Skyrim Magic Overhaul.esp","2a817a:Odin - Skyrim Magic Overhaul.esp","2a817b:Odin - Skyrim Magic Overhaul.esp","2a817c:Odin - Skyrim Magic Overhaul.esp","2a817d:Odin - Skyrim Magic Overhaul.esp","2a817e:Odin - Skyrim Magic Overhaul.esp","2a817f:Odin - Skyrim Magic Overhaul.esp","2a8180:Odin - Skyrim Magic Overhaul.esp","2a8181:Odin - Skyrim Magic Overhaul.esp","2a8185:Odin - Skyrim Magic Overhaul.esp","2a8186:Odin - Skyrim Magic Overhaul.esp","2a8187:Odin - Skyrim Magic Overhaul.esp","2a8188:Odin - Skyrim Magic Overhaul.esp","2a8189:Odin - Skyrim Magic Overhaul.esp","2a818a:Odin - Skyrim Magic Overhaul.esp","2a818b:Odin - Skyrim Magic Overhaul.esp","2c16a7:Odin - Skyrim Magic Overhaul.esp","bae2f:Odin - Skyrim Magic Overhaul.esp","bae30:Odin - Skyrim Magic Overhaul.esp","bae31:Odin - Skyrim Magic Overhaul.esp","d1e66:Apocalypse - Magic of Skyrim.esp","d1e67:Apocalypse - Magic of Skyrim.esp","d1e68:Apocalypse - Magic of Skyrim.esp","d1e69:Apocalypse - Magic of Skyrim.esp","d1e6a:Apocalypse - Magic of Skyrim.esp","d1e6b:Apocalypse - Magic of Skyrim.esp","d1e6c:Apocalypse - Magic of Skyrim.esp","d1e6d:Apocalypse - Magic of Skyrim.esp","d1e6e:Apocalypse - Magic of Skyrim.esp","d1e6f:Apocalypse - Magic of Skyrim.esp","d1e70:Apocalypse - Magic of Skyrim.esp","d1e71:Apocalypse - Magic of Skyrim.esp","d1e72:Apocalypse - Magic of Skyrim.esp","d1e73:Apocalypse - Magic of Skyrim.esp","d1e74:Apocalypse - Magic of Skyrim.esp","d1e75:Apocalypse - Magic of Skyrim.esp","d1e76:Apocalypse - Magic of Skyrim.esp","d1e77:Apocalypse - Magic of Skyrim.esp","d1e78:Apocalypse - Magic of Skyrim.esp","d1e78:Odin - Skyrim Magic Overhaul.esp","d1e79:Apocalypse - Magic of Skyrim.esp","d1e7a:Apocalypse - Magic of Skyrim.esp","d1e7b:Apocalypse - Magic of Skyrim.esp","d1e7c:Apocalypse - Magic of Skyrim.esp","d1e7d:Apocalypse - Magic of Skyrim.esp","d1e7d:Odin - Skyrim Magic Overhaul.esp","d1e7e:Apocalypse - Magic of Skyrim.esp","d1e7f:Apocalypse - Magic of Skyrim.esp","d1e80:Apocalypse - Magic of Skyrim.esp","d1e81:Apocalypse - Magic of Skyrim.esp","d1e82:Apocalypse - Magic of Skyrim.esp","d1e83:Apocalypse - Magic of Skyrim.esp","d1e84:Apocalypse - Magic of Skyrim.esp","d1e85:Apocalypse - Magic of Skyrim.esp","d1e87:Apocalypse - Magic of Skyrim.esp","d1e88:Apocalypse - Magic of Skyrim.esp","d1e89:Apocalypse - Magic of Skyrim.esp","d1e8a:Apocalypse - Magic of Skyrim.esp","d1e8b:Apocalypse - Magic of Skyrim.esp","d1e8c:Apocalypse - Magic of Skyrim.esp","d1e8d:Apocalypse - Magic of Skyrim.esp","d1e8e:Apocalypse - Magic of Skyrim.esp","d1e8f:Apocalypse - Magic of Skyrim.esp","d1e90:Apocalypse - Magic of Skyrim.esp","d1e91:Apocalypse - Magic of Skyrim.esp","d1e92:Apocalypse - Magic of Skyrim.esp","d1e93:Apocalypse - Magic of Skyrim.esp","d1e94:Apocalypse - Magic of Skyrim.esp","d1e95:Apocalypse - Magic of Skyrim.esp","d1e96:Apocalypse - Magic of Skyrim.esp","d1e97:Apocalypse - Magic of Skyrim.esp","d1e98:Apocalypse - Magic of Skyrim.esp","d1e99:Apocalypse - Magic of Skyrim.esp","d1e9a:Apocalypse - Magic of Skyrim.esp","d1e9b:Apocalypse - Magic of Skyrim.esp","d1e9c:Apocalypse - Magic of Skyrim.esp","d1e9d:Apocalypse - Magic of Skyrim.esp","d1e9e:Apocalypse - Magic of Skyrim.esp","d1e9f:Apocalypse - Magic of Skyrim.esp","d1ea0:Apocalypse - Magic of Skyrim.esp","d4350:Odin - Skyrim Magic Overhaul.esp"]},"3015:HearthFires.esm":{"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy","rows":["154c6:Thornswood-Content.esp","154c7:Thornswood-Content.esp"]},"5756:Dawnguard.esm":{"halves":{},"name":"DLC1LD_CraftingForgeAetherium","shut":"Nobody works the Aetherium forge."},"59d8:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom","rows":["154c4:Thornswood-Content.esp","1d90:Hothtrooper44_ArmorCompilation.esp","22fe:Hothtrooper44_ArmorCompilation.esp","23062:Hothtrooper44_ArmorCompilation.esp","23063:Hothtrooper44_ArmorCompilation.esp","231c6:Hothtrooper44_ArmorCompilation.esp","231c7:Hothtrooper44_ArmorCompilation.esp","231c8:Hothtrooper44_ArmorCompilation.esp","231c9:Hothtrooper44_ArmorCompilation.esp","231ca:Hothtrooper44_ArmorCompilation.esp","231cb:Hothtrooper44_ArmorCompilation.esp","231cc:Hothtrooper44_ArmorCompilation.esp","231cd:Hothtrooper44_ArmorCompilation.esp","231ce:Hothtrooper44_ArmorCompilation.esp","231cf:Hothtrooper44_ArmorCompilation.esp","231d0:Hothtrooper44_ArmorCompilation.esp","231d1:Hothtrooper44_ArmorCompilation.esp","231d2:Hothtrooper44_ArmorCompilation.esp","231d3:Hothtrooper44_ArmorCompilation.esp","231d4:Hothtrooper44_ArmorCompilation.esp","231d5:Hothtrooper44_ArmorCompilation.esp","231d6:Hothtrooper44_ArmorCompilation.esp","231d7:Hothtrooper44_ArmorCompilation.esp","231d8:Hothtrooper44_ArmorCompilation.esp","231d9:Hothtrooper44_ArmorCompilation.esp","238fe:Hothtrooper44_ArmorCompilation.esp","23907:Hothtrooper44_ArmorCompilation.esp","23918:Hothtrooper44_ArmorCompilation.esp","23919:Hothtrooper44_ArmorCompilation.esp","23a0a:Playable Rieklings.esp","286a:Hothtrooper44_ArmorCompilation.esp","2dd7:Hothtrooper44_ArmorCompilation.esp","372fe:Hothtrooper44_ArmorCompilation.esp","372ff:Hothtrooper44_ArmorCompilation.esp","37300:Hothtrooper44_ArmorCompilation.esp","37301:Hothtrooper44_ArmorCompilation.esp","37306:Hothtrooper44_ArmorCompilation.esp","37307:Hothtrooper44_ArmorCompilation.esp","37308:Hothtrooper44_ArmorCompilation.esp","37309:Hothtrooper44_ArmorCompilation.esp","53b3:Hothtrooper44_ArmorCompilation.esp","53b5:Hothtrooper44_ArmorCompilation.esp","53b7:Hothtrooper44_ArmorCompilation.esp","6aa09:Hothtrooper44_ArmorCompilation.esp","800:MoreCraftableEquipment_CloaksandCapes.esp","801:MoreCraftableEquipment_CloaksandCapes.esp","802:MoreCraftableEquipment_CloaksandCapes.esp","803:MoreCraftableEquipment_CloaksandCapes.esp","804:MoreCraftableEquipment_CloaksandCapes.esp","805:MoreCraftableEquipment_CloaksandCapes.esp","806:MoreCraftableEquipment_CloaksandCapes.esp","807:MoreCraftableEquipment_CloaksandCapes.esp","808:MoreCraftableEquipment_CloaksandCapes.esp","809:MoreCraftableEquipment_CloaksandCapes.esp","80a:MoreCraftableEquipment_CloaksandCapes.esp","80b:MoreCraftableEquipment_CloaksandCapes.esp","80c:MoreCraftableEquipment_CloaksandCapes.esp","80e:MoreCraftableEquipment_CloaksandCapes.esp","80f:MoreCraftableEquipment_CloaksandCapes.esp","810:MoreCraftableEquipment_CloaksandCapes.esp","811:MoreCraftableEquipment_CloaksandCapes.esp","812:MoreCraftableEquipment_CloaksandCapes.esp","813:MoreCraftableEquipment_CloaksandCapes.esp","814:MoreCraftableEquipment_CloaksandCapes.esp","815:MoreCraftableEquipment_CloaksandCapes.esp","816:MoreCraftableEquipment_CloaksandCapes.esp","817:MoreCraftableEquipment_CloaksandCapes.esp","818:MoreCraftableEquipment_CloaksandCapes.esp","82ebf:Hothtrooper44_ArmorCompilation.esp","82ec0:Hothtrooper44_ArmorCompilation.esp","82ec1:Hothtrooper44_ArmorCompilation.esp","82ec2:Hothtrooper44_ArmorCompilation.esp","84a:MoreCraftableEquipment.esp","84b:MoreCraftableEquipment.esp","84c:MoreCraftableEquipment.esp","84d:MoreCraftableEquipment.esp","84e:MoreCraftableEquipment.esp","91f:MoreCraftableEquipment.esp","920:MoreCraftableEquipment.esp","921:MoreCraftableEquipment.esp","922:MoreCraftableEquipment.esp","923:MoreCraftableEquipment.esp","924:MoreCraftableEquipment.esp","925:MoreCraftableEquipment.esp","926:MoreCraftableEquipment.esp","927:MoreCraftableEquipment.esp","928:MoreCraftableEquipment.esp","929:MoreCraftableEquipment.esp","92a:MoreCraftableEquipment.esp","92b:MoreCraftableEquipment.esp","936:MoreCraftableEquipment.esp","937:MoreCraftableEquipment.esp","938:MoreCraftableEquipment.esp","939:MoreCraftableEquipment.esp","93a:MoreCraftableEquipment.esp","93b:MoreCraftableEquipment.esp","93c:MoreCraftableEquipment.esp","93d:MoreCraftableEquipment.esp","93e:MoreCraftableEquipment.esp","93f:MoreCraftableEquipment.esp","940:MoreCraftableEquipment.esp","941:MoreCraftableEquipment.esp","942:MoreCraftableEquipment.esp","943:MoreCraftableEquipment.esp","944:MoreCraftableEquipment.esp","945:MoreCraftableEquipment.esp","946:MoreCraftableEquipment.esp","947:MoreCraftableEquipment.esp","948:MoreCraftableEquipment.esp","949:MoreCraftableEquipment.esp","94a:MoreCraftableEquipment.esp","94b:MoreCraftableEquipment.esp","94c:MoreCraftableEquipment.esp","94d:MoreCraftableEquipment.esp","94e:MoreCraftableEquipment.esp","94f:MoreCraftableEquipment.esp","950:MoreCraftableEquipment.esp","951:MoreCraftableEquipment.esp","952:MoreCraftableEquipment.esp","953:MoreCraftableEquipment.esp","957:MoreCraftableEquipment.esp","958:MoreCraftableEquipment.esp","959:MoreCraftableEquipment.esp","95a:MoreCraftableEquipment.esp","95b:MoreCraftableEquipment.esp","95c:MoreCraftableEquipment.esp","95d:MoreCraftableEquipment.esp","962:MoreCraftableEquipment.esp","963:MoreCraftableEquipment.esp","964:MoreCraftableEquipment.esp","965:MoreCraftableEquipment.esp","966:MoreCraftableEquipment.esp","967:MoreCraftableEquipment.esp","96b:MoreCraftableEquipment.esp","96c:MoreCraftableEquipment.esp","96d:MoreCraftableEquipment.esp","96e:MoreCraftableEquipment.esp","96f:MoreCraftableEquipment.esp","970:MoreCraftableEquipment.esp","971:MoreCraftableEquipment.esp","972:MoreCraftableEquipment.esp","973:MoreCraftableEquipment.esp","974:MoreCraftableEquipment.esp","975:MoreCraftableEquipment.esp","976:MoreCraftableEquipment.esp","977:MoreCraftableEquipment.esp","978:MoreCraftableEquipment.esp","979:MoreCraftableEquipment.esp","97a:MoreCraftableEquipment.esp","97b:MoreCraftableEquipment.esp","97c:MoreCraftableEquipment.esp","97d:MoreCraftableEquipment.esp","97e:MoreCraftableEquipment.esp","97f:MoreCraftableEquipment.esp","980:MoreCraftableEquipment.esp","981:MoreCraftableEquipment.esp","982:MoreCraftableEquipment.esp","984:MoreCraftableEquipment.esp","985:MoreCraftableEquipment.esp","986:MoreCraftableEquipment.esp","987:MoreCraftableEquipment.esp","988:MoreCraftableEquipment.esp","989:MoreCraftableEquipment.esp","98a:MoreCraftableEquipment.esp","98b:MoreCraftableEquipment.esp","98c:MoreCraftableEquipment.esp","98d:MoreCraftableEquipment.esp","98e:MoreCraftableEquipment.esp","98f:MoreCraftableEquipment.esp","990:MoreCraftableEquipment.esp","991:MoreCraftableEquipment.esp","992:MoreCraftableEquipment.esp","993:MoreCraftableEquipment.esp","994:MoreCraftableEquipment.esp","995:MoreCraftableEquipment.esp","996:MoreCraftableEquipment.esp","997:MoreCraftableEquipment.esp","998:MoreCraftableEquipment.esp","999:MoreCraftableEquipment.esp","99a:MoreCraftableEquipment.esp","99b:MoreCraftableEquipment.esp","99c:MoreCraftableEquipment.esp","99d:MoreCraftableEquipment.esp","99e:MoreCraftableEquipment.esp","99f:MoreCraftableEquipment.esp","9a0:MoreCraftableEquipment.esp","9a1:MoreCraftableEquipment.esp","9a2:MoreCraftableEquipment.esp","9a3:MoreCraftableEquipment.esp","9a4:MoreCraftableEquipment.esp","9a5:MoreCraftableEquipment.esp","9a6:MoreCraftableEquipment.esp","9a7:MoreCraftableEquipment.esp","9a8:MoreCraftableEquipment.esp","9a9:MoreCraftableEquipment.esp","9aa:MoreCraftableEquipment.esp","9ab:MoreCraftableEquipment.esp","9ac:MoreCraftableEquipment.esp","9ad:MoreCraftableEquipment.esp","9ae:MoreCraftableEquipment.esp","9af:MoreCraftableEquipment.esp","9b0:MoreCraftableEquipment.esp","9b1:MoreCraftableEquipment.esp","9b2:MoreCraftableEquipment.esp","9b3:MoreCraftableEquipment.esp","9b4:MoreCraftableEquipment.esp","9b5:MoreCraftableEquipment.esp","9b6:MoreCraftableEquipment.esp","9b7:MoreCraftableEquipment.esp","9b8:MoreCraftableEquipment.esp","9b9:MoreCraftableEquipment.esp","9ba:MoreCraftableEquipment.esp","9bb:MoreCraftableEquipment.esp","9bc:MoreCraftableEquipment.esp","9bd:MoreCraftableEquipment.esp","9be:MoreCraftableEquipment.esp","9c0:MoreCraftableEquipment.esp","9c1:MoreCraftableEquipment.esp","9c2:MoreCraftableEquipment.esp","9c3:MoreCraftableEquipment.esp","9c4:MoreCraftableEquipment.esp","9c5:MoreCraftableEquipment.esp","9c6:MoreCraftableEquipment.esp","9c7:MoreCraftableEquipment.esp","9c8:MoreCraftableEquipment.esp","9c9:MoreCraftableEquipment.esp","9ca:MoreCraftableEquipment.esp","9cb:MoreCraftableEquipment.esp","9cc:MoreCraftableEquipment.esp","9cd:MoreCraftableEquipment.esp","9ce:MoreCraftableEquipment.esp","9cf:MoreCraftableEquipment.esp","9d0:MoreCraftableEquipment.esp","9d1:MoreCraftableEquipment.esp","9d2:MoreCraftableEquipment.esp","9dc:MoreCraftableEquipment.esp","9de:MoreCraftableEquipment.esp","9df:MoreCraftableEquipment.esp","9e0:MoreCraftableEquipment.esp","9f4:MoreCraftableEquipment.esp","9f5:MoreCraftableEquipment.esp","9f6:MoreCraftableEquipment.esp","9f7:MoreCraftableEquipment.esp","9f8:MoreCraftableEquipment.esp","9f9:MoreCraftableEquipment.esp","9fa:MoreCraftableEquipment.esp","9fb:MoreCraftableEquipment.esp","9fc:MoreCraftableEquipment.esp","9fd:MoreCraftableEquipment.esp","9fe:MoreCraftableEquipment.esp","bc99a:Hothtrooper44_ArmorCompilation.esp","bfee5:Playable Rieklings.esp","bfefb:Playable Rieklings.esp","f74d:Hothtrooper44_ArmorCompilation.esp"]},"7866a:Skyrim.esm":{"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack","rows":["1033de:Skyrim.esm","154b5:Thornswood-Content.esp","2326c:Hothtrooper44_ArmorCompilation.esp","23272:Hothtrooper44_ArmorCompilation.esp","2dfc:Cloaks&Capes.esp","2dfd:Cloaks&Capes.esp","2dfe:Cloaks&Capes.esp","2dff:Cloaks&Capes.esp","2e00:Cloaks&Capes.esp","2e01:Cloaks&Capes.esp","2e02:Cloaks&Capes.esp","2e03:Cloaks&Capes.esp","2e04:Cloaks&Capes.esp","2e05:Cloaks&Capes.esp","2e06:Cloaks&Capes.esp","2e07:Cloaks&Capes.esp","2e08:Cloaks&Capes.esp","2e0a:Cloaks&Capes.esp","2e0b:Cloaks&Capes.esp","2e0c:Cloaks&Capes.esp","2e0d:Cloaks&Capes.esp","2e0e:Cloaks&Capes.esp","2e0f:Cloaks&Capes.esp","2e10:Cloaks&Capes.esp","332a:Hothtrooper44_ArmorCompilation.esp","3383:CommonClothes.esp","3384:CommonClothes.esp","3388:CommonClothes.esp","3389:CommonClothes.esp","338a:CommonClothes.esp","37664:ZIA_Complete Pack.esp","37665:ZIA_Complete Pack.esp","37666:ZIA_Complete Pack.esp","37667:ZIA_Complete Pack.esp","37668:ZIA_Complete Pack.esp","37669:ZIA_Complete Pack.esp","3766a:ZIA_Complete Pack.esp","3766b:ZIA_Complete Pack.esp","3766c:ZIA_Complete Pack.esp","3766d:ZIA_Complete Pack.esp","3766e:ZIA_Complete Pack.esp","3766f:ZIA_Complete Pack.esp","43e8:CommonClothes.esp","55ac:Cloaks&Capes.esp","55ad:Cloaks&Capes.esp","55ae:Cloaks&Capes.esp","55bd:Cloaks&Capes.esp","f7f43:Skyrim.esm"]},"88105:Skyrim.esm":{"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge","rows":["1246:Immersive Weapons.esp","12c6:Immersive Weapons.esp","12c8:Immersive Weapons.esp","12e1:Hothtrooper44_ArmorCompilation.esp","12e2:Hothtrooper44_ArmorCompilation.esp","12e5:Hothtrooper44_ArmorCompilation.esp","12e7:Hothtrooper44_ArmorCompilation.esp","145c2:Dawnguard.esm","14d64:Immersive Weapons.esp","1548d:Thornswood-Content.esp","1548e:Thornswood-Content.esp","15492:Thornswood-Content.esp","15496:Thornswood-Content.esp","15497:Thornswood-Content.esp","154b3:Thornswood-Content.esp","154b4:Thornswood-Content.esp","1828:Immersive Weapons.esp","182a:Hothtrooper44_ArmorCompilation.esp","1909:Immersive Weapons.esp","19823:Dawnguard.esm","19825:Dawnguard.esm","19826:Dawnguard.esm","19827:Dawnguard.esm","19828:Dawnguard.esm","19829:Dawnguard.esm","1982a:Dawnguard.esm","19f8c:Playable Rieklings.esp","19f8d:Playable Rieklings.esp","19f8e:Playable Rieklings.esp","19f8f:Playable Rieklings.esp","19f90:Playable Rieklings.esp","19f91:Playable Rieklings.esp","19f92:Playable Rieklings.esp","19f93:Playable Rieklings.esp","19f94:Playable Rieklings.esp","19f95:Playable Rieklings.esp","19f96:Playable Rieklings.esp","19f97:Playable Rieklings.esp","19f98:Playable Rieklings.esp","19f99:Playable Rieklings.esp","19f9a:Playable Rieklings.esp","19f9b:Playable Rieklings.esp","19f9c:Playable Rieklings.esp","19f9d:Playable Rieklings.esp","19f9e:Playable Rieklings.esp","1d5bb:CommonClothes.esp","1d5bc:CommonClothes.esp","1d91:Hothtrooper44_ArmorCompilation.esp","1d9a:Immersive Weapons.esp","1dff:Immersive Weapons.esp","1f24f:FishingInSkyrim.esp","1f252:FishingInSkyrim.esp","20d64:Immersive Weapons.esp","20dd5:Hothtrooper44_ArmorCompilation.esp","20dd6:Hothtrooper44_ArmorCompilation.esp","20dd7:Hothtrooper44_ArmorCompilation.esp","20dd8:Hothtrooper44_ArmorCompilation.esp","20dd9:Hothtrooper44_ArmorCompilation.esp","20ddc:Hothtrooper44_ArmorCompilation.esp","21470:Hothtrooper44_ArmorCompilation.esp","21471:Hothtrooper44_ArmorCompilation.esp","21472:Hothtrooper44_ArmorCompilation.esp","21473:Hothtrooper44_ArmorCompilation.esp","21474:Hothtrooper44_ArmorCompilation.esp","21475:Hothtrooper44_ArmorCompilation.esp","21476:Hothtrooper44_ArmorCompilation.esp","21477:Hothtrooper44_ArmorCompilation.esp","21478:Hothtrooper44_ArmorCompilation.esp","21479:Hothtrooper44_ArmorCompilation.esp","2147a:Hothtrooper44_ArmorCompilation.esp","2147b:Hothtrooper44_ArmorCompilation.esp","2147c:Hothtrooper44_ArmorCompilation.esp","2147d:Hothtrooper44_ArmorCompilation.esp","2147e:Hothtrooper44_ArmorCompilation.esp","2147f:Hothtrooper44_ArmorCompilation.esp","216b6:Immersive Weapons.esp","216b7:Immersive Weapons.esp","216b8:Immersive Weapons.esp","216b9:Immersive Weapons.esp","216ba:Immersive Weapons.esp","216bc:Immersive Weapons.esp","216bd:Immersive Weapons.esp","216be:Immersive Weapons.esp","216bf:Immersive Weapons.esp","216c0:Immersive Weapons.esp","216c2:Immersive Weapons.esp","216c3:Immersive Weapons.esp","216c4:Immersive Weapons.esp","216c5:Immersive Weapons.esp","216c6:Immersive Weapons.esp","216c7:Immersive Weapons.esp","216c8:Immersive Weapons.esp","216c9:Immersive Weapons.esp","216ca:Immersive Weapons.esp","216cb:Immersive Weapons.esp","216cc:Immersive Weapons.esp","216d0:Immersive Weapons.esp","216d2:Immersive Weapons.esp","216d4:Immersive Weapons.esp","216d9:Immersive Weapons.esp","216db:Immersive Weapons.esp","216dd:Immersive Weapons.esp","216df:Immersive Weapons.esp","216e1:Immersive Weapons.esp","216e3:Immersive Weapons.esp","216e6:Immersive Weapons.esp","216e8:Immersive Weapons.esp","216ea:Immersive Weapons.esp","216ec:Immersive Weapons.esp","216ee:Immersive Weapons.esp","216f0:Immersive Weapons.esp","216f2:Immersive Weapons.esp","216f8:Immersive Weapons.esp","216fb:Immersive Weapons.esp","216fd:Immersive Weapons.esp","21700:Immersive Weapons.esp","21701:Immersive Weapons.esp","2180d:FishingInSkyrim.esp","21f7f:Hothtrooper44_ArmorCompilation.esp","21f92:Hothtrooper44_ArmorCompilation.esp","21f93:Hothtrooper44_ArmorCompilation.esp","21f94:Hothtrooper44_ArmorCompilation.esp","21f95:Hothtrooper44_ArmorCompilation.esp","21f96:Hothtrooper44_ArmorCompilation.esp","21f97:Hothtrooper44_ArmorCompilation.esp","21ff5:Hothtrooper44_ArmorCompilation.esp","21ff6:Hothtrooper44_ArmorCompilation.esp","21ff7:Hothtrooper44_ArmorCompilation.esp","21ff8:Hothtrooper44_ArmorCompilation.esp","21ff9:Hothtrooper44_ArmorCompilation.esp","21ffa:Hothtrooper44_ArmorCompilation.esp","21ffb:Hothtrooper44_ArmorCompilation.esp","21ffc:Hothtrooper44_ArmorCompilation.esp","21ffd:Hothtrooper44_ArmorCompilation.esp","21ffe:Hothtrooper44_ArmorCompilation.esp","21fff:Hothtrooper44_ArmorCompilation.esp","22000:Hothtrooper44_ArmorCompilation.esp","22001:Hothtrooper44_ArmorCompilation.esp","22002:Hothtrooper44_ArmorCompilation.esp","22003:Hothtrooper44_ArmorCompilation.esp","22004:Hothtrooper44_ArmorCompilation.esp","22005:Hothtrooper44_ArmorCompilation.esp","22006:Hothtrooper44_ArmorCompilation.esp","22c8d:Immersive Weapons.esp","22c8f:Immersive Weapons.esp","22c91:Immersive Weapons.esp","22c93:Immersive Weapons.esp","22c9c:Immersive Weapons.esp","22ca0:Immersive Weapons.esp","22ca3:Immersive Weapons.esp","22ca5:Immersive Weapons.esp","22f0:Immersive Weapons.esp","22f7:Hothtrooper44_ArmorCompilation.esp","22f8:Hothtrooper44_ArmorCompilation.esp","22f9:Hothtrooper44_ArmorCompilation.esp","22fa:Hothtrooper44_ArmorCompilation.esp","22fb:Hothtrooper44_ArmorCompilation.esp","22ff:Hothtrooper44_ArmorCompilation.esp","2308f:Hothtrooper44_ArmorCompilation.esp","23090:Hothtrooper44_ArmorCompilation.esp","23091:Hothtrooper44_ArmorCompilation.esp","23092:Hothtrooper44_ArmorCompilation.esp","23093:Hothtrooper44_ArmorCompilation.esp","23094:Hothtrooper44_ArmorCompilation.esp","23095:Hothtrooper44_ArmorCompilation.esp","23096:Hothtrooper44_ArmorCompilation.esp","23097:Hothtrooper44_ArmorCompilation.esp","23098:Hothtrooper44_ArmorCompilation.esp","23099:Hothtrooper44_ArmorCompilation.esp","2309a:Hothtrooper44_ArmorCompilation.esp","230b1:Hothtrooper44_ArmorCompilation.esp","230b2:Hothtrooper44_ArmorCompilation.esp","230b3:Hothtrooper44_ArmorCompilation.esp","230b4:Hothtrooper44_ArmorCompilation.esp","230cd:Hothtrooper44_ArmorCompilation.esp","230ce:Hothtrooper44_ArmorCompilation.esp","230cf:Hothtrooper44_ArmorCompilation.esp","230d1:Hothtrooper44_ArmorCompilation.esp","230d2:Hothtrooper44_ArmorCompilation.esp","230d3:Hothtrooper44_ArmorCompilation.esp","230d4:Hothtrooper44_ArmorCompilation.esp","230d5:Hothtrooper44_ArmorCompilation.esp","230eb:Hothtrooper44_ArmorCompilation.esp","230ec:Hothtrooper44_ArmorCompilation.esp","230ed:Hothtrooper44_ArmorCompilation.esp","230ee:Hothtrooper44_ArmorCompilation.esp","230fb:Hothtrooper44_ArmorCompilation.esp","230fc:Hothtrooper44_ArmorCompilation.esp","230fd:Hothtrooper44_ArmorCompilation.esp","23190:Hothtrooper44_ArmorCompilation.esp","23191:Hothtrooper44_ArmorCompilation.esp","23192:Hothtrooper44_ArmorCompilation.esp","23193:Hothtrooper44_ArmorCompilation.esp","23194:Hothtrooper44_ArmorCompilation.esp","23195:Hothtrooper44_ArmorCompilation.esp","23196:Hothtrooper44_ArmorCompilation.esp","23197:Hothtrooper44_ArmorCompilation.esp","23198:Hothtrooper44_ArmorCompilation.esp","23199:Hothtrooper44_ArmorCompilation.esp","2319a:Hothtrooper44_ArmorCompilation.esp","2319b:Hothtrooper44_ArmorCompilation.esp","2319c:Hothtrooper44_ArmorCompilation.esp","2319d:Hothtrooper44_ArmorCompilation.esp","2319e:Hothtrooper44_ArmorCompilation.esp","2319f:Hothtrooper44_ArmorCompilation.esp","231a0:Hothtrooper44_ArmorCompilation.esp","231a1:Hothtrooper44_ArmorCompilation.esp","231a2:Hothtrooper44_ArmorCompilation.esp","231a3:Hothtrooper44_ArmorCompilation.esp","231a4:Hothtrooper44_ArmorCompilation.esp","231a5:Hothtrooper44_ArmorCompilation.esp","231a6:Hothtrooper44_ArmorCompilation.esp","231a7:Hothtrooper44_ArmorCompilation.esp","231a8:Hothtrooper44_ArmorCompilation.esp","231a9:Hothtrooper44_ArmorCompilation.esp","231aa:Hothtrooper44_ArmorCompilation.esp","231ab:Hothtrooper44_ArmorCompilation.esp","231ac:Hothtrooper44_ArmorCompilation.esp","231ad:Hothtrooper44_ArmorCompilation.esp","231ae:Hothtrooper44_ArmorCompilation.esp","231af:Hothtrooper44_ArmorCompilation.esp","231b0:Hothtrooper44_ArmorCompilation.esp","231b1:Hothtrooper44_ArmorCompilation.esp","231b2:Hothtrooper44_ArmorCompilation.esp","231b3:Hothtrooper44_ArmorCompilation.esp","231b4:Hothtrooper44_ArmorCompilation.esp","231b5:Hothtrooper44_ArmorCompilation.esp","231b6:Hothtrooper44_ArmorCompilation.esp","231b7:Hothtrooper44_ArmorCompilation.esp","231b8:Hothtrooper44_ArmorCompilation.esp","231b9:Hothtrooper44_ArmorCompilation.esp","231ba:Hothtrooper44_ArmorCompilation.esp","231bb:Hothtrooper44_ArmorCompilation.esp","231bc:Hothtrooper44_ArmorCompilation.esp","231bd:Hothtrooper44_ArmorCompilation.esp","231be:Hothtrooper44_ArmorCompilation.esp","231bf:Hothtrooper44_ArmorCompilation.esp","231c0:Hothtrooper44_ArmorCompilation.esp","231c1:Hothtrooper44_ArmorCompilation.esp","2327e:Hothtrooper44_ArmorCompilation.esp","2327f:Hothtrooper44_ArmorCompilation.esp","23280:Hothtrooper44_ArmorCompilation.esp","2328d:Hothtrooper44_ArmorCompilation.esp","2328e:Hothtrooper44_ArmorCompilation.esp","2328f:Hothtrooper44_ArmorCompilation.esp","23290:Hothtrooper44_ArmorCompilation.esp","2329d:Hothtrooper44_ArmorCompilation.esp","2329e:Hothtrooper44_ArmorCompilation.esp","2329f:Hothtrooper44_ArmorCompilation.esp","232a0:Hothtrooper44_ArmorCompilation.esp","232a1:Hothtrooper44_ArmorCompilation.esp","232a2:Hothtrooper44_ArmorCompilation.esp","232a3:Hothtrooper44_ArmorCompilation.esp","232a4:Hothtrooper44_ArmorCompilation.esp","23300:Hothtrooper44_ArmorCompilation.esp","23301:Hothtrooper44_ArmorCompilation.esp","23302:Hothtrooper44_ArmorCompilation.esp","23303:Hothtrooper44_ArmorCompilation.esp","23304:Hothtrooper44_ArmorCompilation.esp","23305:Hothtrooper44_ArmorCompilation.esp","23306:Hothtrooper44_ArmorCompilation.esp","23307:Hothtrooper44_ArmorCompilation.esp","23308:Hothtrooper44_ArmorCompilation.esp","23309:Hothtrooper44_ArmorCompilation.esp","23319:Hothtrooper44_ArmorCompilation.esp","2331a:Hothtrooper44_ArmorCompilation.esp","2331b:Hothtrooper44_ArmorCompilation.esp","2331c:Hothtrooper44_ArmorCompilation.esp","2331d:Hothtrooper44_ArmorCompilation.esp","2331e:Hothtrooper44_ArmorCompilation.esp","2331f:Hothtrooper44_ArmorCompilation.esp","23320:Hothtrooper44_ArmorCompilation.esp","23321:Hothtrooper44_ArmorCompilation.esp","23322:Hothtrooper44_ArmorCompilation.esp","23323:Hothtrooper44_ArmorCompilation.esp","23324:Hothtrooper44_ArmorCompilation.esp","23325:Hothtrooper44_ArmorCompilation.esp","23326:Hothtrooper44_ArmorCompilation.esp","23771:Immersive Weapons.esp","238fd:Hothtrooper44_ArmorCompilation.esp","238ff:Hothtrooper44_ArmorCompilation.esp","23900:Hothtrooper44_ArmorCompilation.esp","23901:Hothtrooper44_ArmorCompilation.esp","23902:Hothtrooper44_ArmorCompilation.esp","23903:Hothtrooper44_ArmorCompilation.esp","23904:Hothtrooper44_ArmorCompilation.esp","23905:Hothtrooper44_ArmorCompilation.esp","23906:Hothtrooper44_ArmorCompilation.esp","23908:Hothtrooper44_ArmorCompilation.esp","23909:Hothtrooper44_ArmorCompilation.esp","2390a:Hothtrooper44_ArmorCompilation.esp","2390b:Hothtrooper44_ArmorCompilation.esp","2390c:Hothtrooper44_ArmorCompilation.esp","2390d:Hothtrooper44_ArmorCompilation.esp","2390e:Hothtrooper44_ArmorCompilation.esp","2390f:Hothtrooper44_ArmorCompilation.esp","23910:Hothtrooper44_ArmorCompilation.esp","23911:Hothtrooper44_ArmorCompilation.esp","23912:Hothtrooper44_ArmorCompilation.esp","23913:Hothtrooper44_ArmorCompilation.esp","23914:Hothtrooper44_ArmorCompilation.esp","23915:Hothtrooper44_ArmorCompilation.esp","23916:Hothtrooper44_ArmorCompilation.esp","23917:Hothtrooper44_ArmorCompilation.esp","2393d:Hothtrooper44_ArmorCompilation.esp","2393e:Hothtrooper44_ArmorCompilation.esp","2393f:Hothtrooper44_ArmorCompilation.esp","2394f:Hothtrooper44_ArmorCompilation.esp","23950:Hothtrooper44_ArmorCompilation.esp","23951:Hothtrooper44_ArmorCompilation.esp","23952:Hothtrooper44_ArmorCompilation.esp","23953:Hothtrooper44_ArmorCompilation.esp","23954:Hothtrooper44_ArmorCompilation.esp","23955:Hothtrooper44_ArmorCompilation.esp","23956:Hothtrooper44_ArmorCompilation.esp","2414:Immersive Weapons.esp","25a35:Hothtrooper44_ArmorCompilation.esp","25a36:Hothtrooper44_ArmorCompilation.esp","25a37:Hothtrooper44_ArmorCompilation.esp","25d24:Immersive Weapons.esp","272fc:Immersive Weapons.esp","272fd:Immersive Weapons.esp","2854b:Hothtrooper44_ArmorCompilation.esp","2854c:Hothtrooper44_ArmorCompilation.esp","2857:Immersive Weapons.esp","285b:Immersive Weapons.esp","285e:Immersive Weapons.esp","2863:Hothtrooper44_ArmorCompilation.esp","2864:Hothtrooper44_ArmorCompilation.esp","2865:Hothtrooper44_ArmorCompilation.esp","2866:Hothtrooper44_ArmorCompilation.esp","2867:Hothtrooper44_ArmorCompilation.esp","2901:Immersive Weapons.esp","2abe:Immersive Weapons.esp","2ac2:Immersive Weapons.esp","2aca:Immersive Weapons.esp","2acb:Immersive Weapons.esp","2acc:Immersive Weapons.esp","2ad2:Immersive Weapons.esp","2b04f:Dragonborn.esm","2b050:Dragonborn.esm","2b051:Dragonborn.esm","2b052:Dragonborn.esm","2b053:Dragonborn.esm","2b054:Dragonborn.esm","2b055:Dragonborn.esm","2b056:Dragonborn.esm","2b057:Dragonborn.esm","2b058:Dragonborn.esm","2b059:Dragonborn.esm","2b05a:Dragonborn.esm","2b05b:Dragonborn.esm","2b05c:Dragonborn.esm","2b065:Dragonborn.esm","2b066:Dragonborn.esm","2b067:Dragonborn.esm","2b068:Dragonborn.esm","2b069:Dragonborn.esm","2b06a:Dragonborn.esm","2b06c:Dragonborn.esm","2b06d:Dragonborn.esm","2b06e:Dragonborn.esm","2b06f:Dragonborn.esm","2b070:Dragonborn.esm","2b071:Dragonborn.esm","2b072:Dragonborn.esm","2b075:Dragonborn.esm","2b076:Dragonborn.esm","2b078:Dragonborn.esm","2b079:Dragonborn.esm","2b07a:Dragonborn.esm","2b07b:Dragonborn.esm","2b07c:Dragonborn.esm","2b07d:Dragonborn.esm","2b07e:Dragonborn.esm","2b080:Dragonborn.esm","2b081:Dragonborn.esm","2b082:Dragonborn.esm","2b083:Dragonborn.esm","2b084:Dragonborn.esm","2b085:Dragonborn.esm","2ba5f3:WindhelmSSE.esp","32523:Immersive Weapons.esp","3325:Immersive Weapons.esp","3385:CommonClothes.esp","3386:CommonClothes.esp","3387:CommonClothes.esp","338b:CommonClothes.esp","338c:CommonClothes.esp","33d66:Immersive Weapons.esp","3730b:Hothtrooper44_ArmorCompilation.esp","3730f:Hothtrooper44_ArmorCompilation.esp","37310:Hothtrooper44_ArmorCompilation.esp","37311:Hothtrooper44_ArmorCompilation.esp","3886:Hothtrooper44_ArmorCompilation.esp","3888:Hothtrooper44_ArmorCompilation.esp","3889:Hothtrooper44_ArmorCompilation.esp","388c:Immersive Weapons.esp","38b75:Immersive Weapons.esp","3949:Immersive Weapons.esp","394a:Immersive Weapons.esp","394b:Immersive Weapons.esp","394f:Immersive Weapons.esp","3950:Immersive Weapons.esp","3953:Immersive Weapons.esp","3a104:Immersive Weapons.esp","3ab28:Dragonborn.esm","3ab29:Dragonborn.esm","3ab2a:Dragonborn.esm","3ab2b:Dragonborn.esm","3ab2c:Dragonborn.esm","3abcf:Immersive Weapons.esp","3abd0:Immersive Weapons.esp","3bbfa:Immersive Weapons.esp","3d2dd:Dragonborn.esm","3d581:Dragonborn.esm","3dee:Hothtrooper44_ArmorCompilation.esp","3e39:Hothtrooper44_ArmorCompilation.esp","3e3a:Hothtrooper44_ArmorCompilation.esp","3e3f:Hothtrooper44_ArmorCompilation.esp","3e40:Hothtrooper44_ArmorCompilation.esp","3e49:Hothtrooper44_ArmorCompilation.esp","3e4a:Hothtrooper44_ArmorCompilation.esp","3e50:Hothtrooper44_ArmorCompilation.esp","3e51:Hothtrooper44_ArmorCompilation.esp","3ecc:Hothtrooper44_ArmorCompilation.esp","3ecd:Hothtrooper44_ArmorCompilation.esp","3ece:Hothtrooper44_ArmorCompilation.esp","3ecf:Hothtrooper44_ArmorCompilation.esp","3ed1:Hothtrooper44_ArmorCompilation.esp","3ed2:Hothtrooper44_ArmorCompilation.esp","3ed3:Hothtrooper44_ArmorCompilation.esp","3ed4:Hothtrooper44_ArmorCompilation.esp","3ed5:Hothtrooper44_ArmorCompilation.esp","3ed7:Hothtrooper44_ArmorCompilation.esp","3f1ee:Immersive Weapons.esp","3f1ef:Immersive Weapons.esp","40e0a:Playable Rieklings.esp","4341:Immersive Weapons.esp","4360:Immersive Weapons.esp","44014:Immersive Weapons.esp","441011:Immersive Weapons.esp","441012:Immersive Weapons.esp","441013:Immersive Weapons.esp","441015:Immersive Weapons.esp","441016:Immersive Weapons.esp","441017:Immersive Weapons.esp","441024:Immersive Weapons.esp","441025:Immersive Weapons.esp","446d64:Immersive Weapons.esp","478d2:Immersive Weapons.esp","478d5:Immersive Weapons.esp","478d8:Immersive Weapons.esp","478db:Immersive Weapons.esp","478de:Immersive Weapons.esp","478e1:Immersive Weapons.esp","478e4:Immersive Weapons.esp","478e7:Immersive Weapons.esp","478ea:Immersive Weapons.esp","478ed:Immersive Weapons.esp","48ba:Immersive Weapons.esp","48bb:Immersive Weapons.esp","490d76:Immersive Weapons.esp","490d87:Immersive Weapons.esp","4915:Immersive Weapons.esp","491dc0:Immersive Weapons.esp","491dc4:Immersive Weapons.esp","49232a:Immersive Weapons.esp","492335:Immersive Weapons.esp","4e22:Immersive Weapons.esp","4e4e:Hothtrooper44_ArmorCompilation.esp","4e8b:Immersive Weapons.esp","4f25:Hothtrooper44_ArmorCompilation.esp","4f26:Hothtrooper44_ArmorCompilation.esp","4f27:Hothtrooper44_ArmorCompilation.esp","4f28:Hothtrooper44_ArmorCompilation.esp","4f3d:Hothtrooper44_ArmorCompilation.esp","4f3e:Hothtrooper44_ArmorCompilation.esp","4f3f:Hothtrooper44_ArmorCompilation.esp","4f41:Hothtrooper44_ArmorCompilation.esp","53b1:Hothtrooper44_ArmorCompilation.esp","53b2:Hothtrooper44_ArmorCompilation.esp","53b4:Hothtrooper44_ArmorCompilation.esp","53b6:Hothtrooper44_ArmorCompilation.esp","53b8:Hothtrooper44_ArmorCompilation.esp","53c7:DIS_Heavy_Legion.esp","557d64:Immersive Weapons.esp","58c1:Immersive Weapons.esp","58d0:Immersive Weapons.esp","58d4:Immersive Weapons.esp","5939:DIS_Heavy_Legion.esp","5941:DIS_Heavy_Legion.esp","5a0c:Hothtrooper44_ArmorCompilation.esp","5a0d:Hothtrooper44_ArmorCompilation.esp","5a0e:Hothtrooper44_ArmorCompilation.esp","5a1c:Hothtrooper44_ArmorCompilation.esp","5a1d:Hothtrooper44_ArmorCompilation.esp","5a1e:Hothtrooper44_ArmorCompilation.esp","5a2a:Hothtrooper44_ArmorCompilation.esp","5a2b:Hothtrooper44_ArmorCompilation.esp","5a2c:Hothtrooper44_ArmorCompilation.esp","5a2d:Hothtrooper44_ArmorCompilation.esp","5a45:Hothtrooper44_ArmorCompilation.esp","5a46:Hothtrooper44_ArmorCompilation.esp","5a47:Hothtrooper44_ArmorCompilation.esp","5a48:Hothtrooper44_ArmorCompilation.esp","5a49:Hothtrooper44_ArmorCompilation.esp","5a4a:Hothtrooper44_ArmorCompilation.esp","5a4b:Hothtrooper44_ArmorCompilation.esp","5a4c:Hothtrooper44_ArmorCompilation.esp","5a5f:Hothtrooper44_ArmorCompilation.esp","5a60:Hothtrooper44_ArmorCompilation.esp","5a61:Hothtrooper44_ArmorCompilation.esp","5a62:Hothtrooper44_ArmorCompilation.esp","5a72:Hothtrooper44_ArmorCompilation.esp","5a73:Hothtrooper44_ArmorCompilation.esp","5a74:Hothtrooper44_ArmorCompilation.esp","5a75:Hothtrooper44_ArmorCompilation.esp","5ec3:DIS_Heavy_Legion.esp","5ec5:DIS_Heavy_Legion.esp","5ec8:DIS_Heavy_Legion.esp","5eca:DIS_Heavy_Legion.esp","5ecc:DIS_Heavy_Legion.esp","5f8ea:Hothtrooper44_ArmorCompilation.esp","5f8eb:Hothtrooper44_ArmorCompilation.esp","5f8ec:Hothtrooper44_ArmorCompilation.esp","5f8ed:Hothtrooper44_ArmorCompilation.esp","5f8ee:Hothtrooper44_ArmorCompilation.esp","5f8ef:Hothtrooper44_ArmorCompilation.esp","5f8f0:Hothtrooper44_ArmorCompilation.esp","5f8f1:Hothtrooper44_ArmorCompilation.esp","5f8f2:Hothtrooper44_ArmorCompilation.esp","5f8f3:Hothtrooper44_ArmorCompilation.esp","5f8f4:Hothtrooper44_ArmorCompilation.esp","5f8f5:Hothtrooper44_ArmorCompilation.esp","5f8f6:Hothtrooper44_ArmorCompilation.esp","5f8f7:Hothtrooper44_ArmorCompilation.esp","62ffe:Hothtrooper44_ArmorCompilation.esp","62fff:Hothtrooper44_ArmorCompilation.esp","63000:Hothtrooper44_ArmorCompilation.esp","659f:Playable Rieklings.esp","6908:Immersive Weapons.esp","6a9f4:Hothtrooper44_ArmorCompilation.esp","6a9f5:Hothtrooper44_ArmorCompilation.esp","6a9f6:Hothtrooper44_ArmorCompilation.esp","6a9f7:Hothtrooper44_ArmorCompilation.esp","6aa0a:Hothtrooper44_ArmorCompilation.esp","6aa0b:Hothtrooper44_ArmorCompilation.esp","6aa0c:Hothtrooper44_ArmorCompilation.esp","6aa0d:Hothtrooper44_ArmorCompilation.esp","6bf7:Immersive Weapons.esp","6eff:DIS_Heavy_Legion.esp","6f00:DIS_Heavy_Legion.esp","701009:Immersive Weapons.esp","7406:Immersive Weapons.esp","740f:Immersive Weapons.esp","7700c:Immersive Weapons.esp","77100a:Immersive Weapons.esp","7914:Immersive Weapons.esp","791a:Immersive Weapons.esp","79d64:Immersive Weapons.esp","8042:Hothtrooper44_ArmorCompilation.esp","8043:Hothtrooper44_ArmorCompilation.esp","8044:Hothtrooper44_ArmorCompilation.esp","8045:Hothtrooper44_ArmorCompilation.esp","83fc:Immersive Weapons.esp","84100b:Immersive Weapons.esp","843:MoreCraftableEquipment.esp","844:MoreCraftableEquipment.esp","845:MoreCraftableEquipment.esp","846:MoreCraftableEquipment.esp","847:MoreCraftableEquipment.esp","848:MoreCraftableEquipment.esp","849:MoreCraftableEquipment.esp","849:YokuWeapons.esp","84a:YokuWeapons.esp","84b:YokuWeapons.esp","84c:YokuWeapons.esp","84d:YokuWeapons.esp","84e:YokuWeapons.esp","84f20:Hothtrooper44_ArmorCompilation.esp","84f3a:Hothtrooper44_ArmorCompilation.esp","84f3b:Hothtrooper44_ArmorCompilation.esp","84f3c:Hothtrooper44_ArmorCompilation.esp","84f3d:Hothtrooper44_ArmorCompilation.esp","84f3e:Hothtrooper44_ArmorCompilation.esp","84f3f:Hothtrooper44_ArmorCompilation.esp","84f40:Hothtrooper44_ArmorCompilation.esp","84f41:Hothtrooper44_ArmorCompilation.esp","84f42:Hothtrooper44_ArmorCompilation.esp","84f43:Hothtrooper44_ArmorCompilation.esp","84f44:Hothtrooper44_ArmorCompilation.esp","84f5c:Hothtrooper44_ArmorCompilation.esp","84f5d:Hothtrooper44_ArmorCompilation.esp","84f5e:Hothtrooper44_ArmorCompilation.esp","84f5f:Hothtrooper44_ArmorCompilation.esp","84f60:Hothtrooper44_ArmorCompilation.esp","84f61:Hothtrooper44_ArmorCompilation.esp","84f62:Hothtrooper44_ArmorCompilation.esp","84f63:Hothtrooper44_ArmorCompilation.esp","84f64:Hothtrooper44_ArmorCompilation.esp","84f65:Hothtrooper44_ArmorCompilation.esp","84f:MoreCraftableEquipment.esp","84f:YokuWeapons.esp","850:MoreCraftableEquipment.esp","850:YokuWeapons.esp","851:MoreCraftableEquipment.esp","851:YokuWeapons.esp","852:MoreCraftableEquipment.esp","852:YokuWeapons.esp","853:MoreCraftableEquipment.esp","853:YokuWeapons.esp","854:MoreCraftableEquipment.esp","854:YokuWeapons.esp","855:YokuWeapons.esp","856:YokuWeapons.esp","857:YokuWeapons.esp","858:YokuWeapons.esp","859:MoreCraftableEquipment.esp","859:YokuWeapons.esp","85a53:Hothtrooper44_ArmorCompilation.esp","85a:MoreCraftableEquipment.esp","85a:YokuWeapons.esp","85b:MoreCraftableEquipment.esp","85c:MoreCraftableEquipment.esp","85d:MoreCraftableEquipment.esp","85d:YokuWeapons.esp","85e:MoreCraftableEquipment.esp","85f:MoreCraftableEquipment.esp","85fd7:Hothtrooper44_ArmorCompilation.esp","85fd8:Hothtrooper44_ArmorCompilation.esp","85fd9:Hothtrooper44_ArmorCompilation.esp","860:MoreCraftableEquipment.esp","861:MoreCraftableEquipment.esp","862:MoreCraftableEquipment.esp","863:MoreCraftableEquipment.esp","864:MoreCraftableEquipment.esp","865:MoreCraftableEquipment.esp","866:MoreCraftableEquipment.esp","867:MoreCraftableEquipment.esp","868:MoreCraftableEquipment.esp","869:MoreCraftableEquipment.esp","86a:MoreCraftableEquipment.esp","86b:MoreCraftableEquipment.esp","86c:MoreCraftableEquipment.esp","86d:MoreCraftableEquipment.esp","86e:MoreCraftableEquipment.esp","86f:MoreCraftableEquipment.esp","870:MoreCraftableEquipment.esp","871:MoreCraftableEquipment.esp","872:MoreCraftableEquipment.esp","873:MoreCraftableEquipment.esp","874:MoreCraftableEquipment.esp","87b:MoreCraftableEquipment.esp","87c:MoreCraftableEquipment.esp","87d:MoreCraftableEquipment.esp","882:MoreCraftableEquipment.esp","883:MoreCraftableEquipment.esp","884:MoreCraftableEquipment.esp","884:YokuWeapons.esp","88c:MoreCraftableEquipment.esp","88c:YokuWeapons.esp","88d:MoreCraftableEquipment.esp","88e:MoreCraftableEquipment.esp","8963:Immersive Weapons.esp","897:MoreCraftableEquipment.esp","89a:YokuWeapons.esp","89b:YokuWeapons.esp","89c:MoreCraftableEquipment.esp","8a0:YokuWeapons.esp","8a1:YokuWeapons.esp","8a9:MoreCraftableEquipment.esp","8aa:MoreCraftableEquipment.esp","8ab:MoreCraftableEquipment.esp","8ac:MoreCraftableEquipment.esp","8ad:MoreCraftableEquipment.esp","8ae:MoreCraftableEquipment.esp","8af:MoreCraftableEquipment.esp","8b0:MoreCraftableEquipment.esp","8b10:Hothtrooper44_ArmorCompilation.esp","8b1:MoreCraftableEquipment.esp","8b2:MoreCraftableEquipment.esp","8b3:MoreCraftableEquipment.esp","8b4:MoreCraftableEquipment.esp","8b5:MoreCraftableEquipment.esp","8b6:MoreCraftableEquipment.esp","8b7:MoreCraftableEquipment.esp","8b8:MoreCraftableEquipment.esp","8b9:MoreCraftableEquipment.esp","8ba:MoreCraftableEquipment.esp","8bb:MoreCraftableEquipment.esp","8bc:MoreCraftableEquipment.esp","8bd:MoreCraftableEquipment.esp","8be:MoreCraftableEquipment.esp","8bf:MoreCraftableEquipment.esp","8c0:MoreCraftableEquipment.esp","8c1:MoreCraftableEquipment.esp","8c2:MoreCraftableEquipment.esp","8c3:MoreCraftableEquipment.esp","8c4:MoreCraftableEquipment.esp","8c5:MoreCraftableEquipment.esp","8c651:Hothtrooper44_ArmorCompilation.esp","8c6:MoreCraftableEquipment.esp","8c6:YokuWeapons.esp","8c7:MoreCraftableEquipment.esp","8c8:MoreCraftableEquipment.esp","8c9:MoreCraftableEquipment.esp","8ca:MoreCraftableEquipment.esp","8cb:MoreCraftableEquipment.esp","8cc:MoreCraftableEquipment.esp","8ce:MoreCraftableEquipment.esp","8cf:MoreCraftableEquipment.esp","8d0:MoreCraftableEquipment.esp","8d1:MoreCraftableEquipment.esp","8d2:MoreCraftableEquipment.esp","8d2:YokuWeapons.esp","8d3:MoreCraftableEquipment.esp","8d3:YokuWeapons.esp","8d4:MoreCraftableEquipment.esp","8d5:MoreCraftableEquipment.esp","8d6:MoreCraftableEquipment.esp","8d7:MoreCraftableEquipment.esp","8d8:MoreCraftableEquipment.esp","8d9:MoreCraftableEquipment.esp","8da:MoreCraftableEquipment.esp","8db:MoreCraftableEquipment.esp","8dc:MoreCraftableEquipment.esp","8dd:MoreCraftableEquipment.esp","8de:MoreCraftableEquipment.esp","8df:MoreCraftableEquipment.esp","8e0:MoreCraftableEquipment.esp","8e1:MoreCraftableEquipment.esp","8e2:MoreCraftableEquipment.esp","8e3:MoreCraftableEquipment.esp","8e4:MoreCraftableEquipment.esp","8e5:MoreCraftableEquipment.esp","8e6:MoreCraftableEquipment.esp","8e7:MoreCraftableEquipment.esp","8e8:MoreCraftableEquipment.esp","8e9:MoreCraftableEquipment.esp","8ea:MoreCraftableEquipment.esp","8eb:MoreCraftableEquipment.esp","8ec:MoreCraftableEquipment.esp","8f1:MoreCraftableEquipment.esp","8f3:MoreCraftableEquipment.esp","8f4:MoreCraftableEquipment.esp","8f5:MoreCraftableEquipment.esp","8f6:MoreCraftableEquipment.esp","8f8:MoreCraftableEquipment.esp","8f9:MoreCraftableEquipment.esp","8fa:MoreCraftableEquipment.esp","8fb:MoreCraftableEquipment.esp","8fc:MoreCraftableEquipment.esp","8fd:MoreCraftableEquipment.esp","8fe:MoreCraftableEquipment.esp","8ff:MoreCraftableEquipment.esp","900:MoreCraftableEquipment.esp","901:MoreCraftableEquipment.esp","904:Immersive Weapons.esp","906:Immersive Weapons.esp","90d64:Immersive Weapons.esp","90d:YokuWeapons.esp","90e:YokuWeapons.esp","90f:YokuWeapons.esp","910:Immersive Weapons.esp","910:YokuWeapons.esp","911:Immersive Weapons.esp","919:YokuWeapons.esp","91a:YokuWeapons.esp","91b:YokuWeapons.esp","91c:YokuWeapons.esp","921:YokuWeapons.esp","922:YokuWeapons.esp","923:YokuWeapons.esp","924:YokuWeapons.esp","929:YokuWeapons.esp","92a:YokuWeapons.esp","92b:YokuWeapons.esp","92c:YokuWeapons.esp","931:YokuWeapons.esp","932:YokuWeapons.esp","933:YokuWeapons.esp","934:YokuWeapons.esp","935:YokuWeapons.esp","93b:YokuWeapons.esp","93c:YokuWeapons.esp","93d:YokuWeapons.esp","93e:YokuWeapons.esp","9406:Immersive Weapons.esp","9408:Immersive Weapons.esp","940a:Immersive Weapons.esp","940c:Immersive Weapons.esp","940d78:Immersive Weapons.esp","940d79:Immersive Weapons.esp","940d7c:Immersive Weapons.esp","940d7d:Immersive Weapons.esp","9412f4:Immersive Weapons.esp","94185a:Immersive Weapons.esp","942331:Immersive Weapons.esp","94289e:Immersive Weapons.esp","943:YokuWeapons.esp","944:YokuWeapons.esp","945:YokuWeapons.esp","946:YokuWeapons.esp","94b:YokuWeapons.esp","94d:YokuWeapons.esp","94f:YokuWeapons.esp","950:YokuWeapons.esp","95e:MoreCraftableEquipment.esp","95f:MoreCraftableEquipment.esp","960:MoreCraftableEquipment.esp","961015:Immersive Weapons.esp","961016:Immersive Weapons.esp","96101c:Immersive Weapons.esp","96101d:Immersive Weapons.esp","961:MoreCraftableEquipment.esp","96d64:Immersive Weapons.esp","998d:Immersive Weapons.esp","9cf:Update.esm","9d0:Update.esm","9d1:Update.esm","9d2:Update.esm","9d3:Update.esm","9d68:Immersive Weapons.esp","9dd:MoreCraftableEquipment.esp","9e775:Playable Rieklings.esp","9e776:Playable Rieklings.esp","9e777:Playable Rieklings.esp","9eda:Immersive Weapons.esp","9ee:MoreCraftableEquipment.esp","9ff:MoreCraftableEquipment.esp","a1113:Immersive Weapons.esp","a438:Immersive Weapons.esp","a43a:Immersive Weapons.esp","a455:Immersive Weapons.esp","a5cd6:Skyrim.esm","ab6d:Hothtrooper44_ArmorCompilation.esp","ab72:Hothtrooper44_ArmorCompilation.esp","ab73:Hothtrooper44_ArmorCompilation.esp","ab74:Hothtrooper44_ArmorCompilation.esp","ab75:Hothtrooper44_ArmorCompilation.esp","af29:Immersive Weapons.esp","b473:Immersive Weapons.esp","b48f:Immersive Weapons.esp","b9d9:Immersive Weapons.esp","bab8c:Playable Rieklings.esp","bab90:Playable Rieklings.esp","babbc:Playable Rieklings.esp","babbd:Playable Rieklings.esp","bc99b:Hothtrooper44_ArmorCompilation.esp","bc99c:Hothtrooper44_ArmorCompilation.esp","bfe63:Playable Rieklings.esp","bfe65:Playable Rieklings.esp","bfe66:Playable Rieklings.esp","bfe67:Playable Rieklings.esp","bfe68:Playable Rieklings.esp","bfe69:Playable Rieklings.esp","bfe6a:Playable Rieklings.esp","bfe6b:Playable Rieklings.esp","bfe6c:Playable Rieklings.esp","bfe6d:Playable Rieklings.esp","bfe6e:Playable Rieklings.esp","bfe70:Playable Rieklings.esp","bfe72:Playable Rieklings.esp","bfe74:Playable Rieklings.esp","bfe76:Playable Rieklings.esp","bfe78:Playable Rieklings.esp","bfe7a:Playable Rieklings.esp","bfe7c:Playable Rieklings.esp","bfe7e:Playable Rieklings.esp","bfe80:Playable Rieklings.esp","bfe82:Playable Rieklings.esp","bfe84:Playable Rieklings.esp","bfe86:Playable Rieklings.esp","bfe88:Playable Rieklings.esp","bfe8a:Playable Rieklings.esp","bfe8c:Playable Rieklings.esp","bfe8e:Playable Rieklings.esp","bfe90:Playable Rieklings.esp","bfe92:Playable Rieklings.esp","bfe94:Playable Rieklings.esp","bfe96:Playable Rieklings.esp","bfe98:Playable Rieklings.esp","bfe9a:Playable Rieklings.esp","bfe9c:Playable Rieklings.esp","bfe9e:Playable Rieklings.esp","bfea0:Playable Rieklings.esp","bfea2:Playable Rieklings.esp","bfea4:Playable Rieklings.esp","bfea6:Playable Rieklings.esp","bfea8:Playable Rieklings.esp","bfeaa:Playable Rieklings.esp","bfeac:Playable Rieklings.esp","bfeae:Playable Rieklings.esp","bfeb0:Playable Rieklings.esp","bfeb2:Playable Rieklings.esp","bfeb4:Playable Rieklings.esp","bfeb6:Playable Rieklings.esp","bfeb8:Playable Rieklings.esp","bfeba:Playable Rieklings.esp","bfebc:Playable Rieklings.esp","bfebe:Playable Rieklings.esp","bfec0:Playable Rieklings.esp","bfec2:Playable Rieklings.esp","bfec4:Playable Rieklings.esp","bfec6:Playable Rieklings.esp","bfec8:Playable Rieklings.esp","bfeca:Playable Rieklings.esp","bfecc:Playable Rieklings.esp","bfece:Playable Rieklings.esp","bfed0:Playable Rieklings.esp","bfed2:Playable Rieklings.esp","bfed4:Playable Rieklings.esp","bfed6:Playable Rieklings.esp","bfed8:Playable Rieklings.esp","bfedb:Playable Rieklings.esp","bfedc:Playable Rieklings.esp","bfedd:Playable Rieklings.esp","bfede:Playable Rieklings.esp","bfedf:Playable Rieklings.esp","bfee0:Playable Rieklings.esp","bfee1:Playable Rieklings.esp","bfee2:Playable Rieklings.esp","bfee3:Playable Rieklings.esp","bfee4:Playable Rieklings.esp","bfee6:Playable Rieklings.esp","bfee7:Playable Rieklings.esp","bfee8:Playable Rieklings.esp","bfee9:Playable Rieklings.esp","bfeea:Playable Rieklings.esp","bfeeb:Playable Rieklings.esp","bfeec:Playable Rieklings.esp","bfeed:Playable Rieklings.esp","bfeee:Playable Rieklings.esp","bfeef:Playable Rieklings.esp","bfef0:Playable Rieklings.esp","bfef1:Playable Rieklings.esp","bfef2:Playable Rieklings.esp","bfef3:Playable Rieklings.esp","bfef4:Playable Rieklings.esp","bfef5:Playable Rieklings.esp","bfef6:Playable Rieklings.esp","bfef7:Playable Rieklings.esp","bfef8:Playable Rieklings.esp","bfef9:Playable Rieklings.esp","bfefa:Playable Rieklings.esp","bfefc:Playable Rieklings.esp","bfefd:Playable Rieklings.esp","bfefe:Playable Rieklings.esp","bfeff:Playable Rieklings.esp","bff00:Playable Rieklings.esp","bff02:Playable Rieklings.esp","bff03:Playable Rieklings.esp","bff04:Playable Rieklings.esp","bff05:Playable Rieklings.esp","bff06:Playable Rieklings.esp","bff07:Playable Rieklings.esp","bff08:Playable Rieklings.esp","bff0a:Playable Rieklings.esp","bff26:Playable Rieklings.esp","bff27:Playable Rieklings.esp","bff32:Playable Rieklings.esp","bff34:Playable Rieklings.esp","bff38:Playable Rieklings.esp","c0374:Playable Rieklings.esp","c33c:Playable Rieklings.esp","c695:Hothtrooper44_ArmorCompilation.esp","c696:Hothtrooper44_ArmorCompilation.esp","c697:Hothtrooper44_ArmorCompilation.esp","c698:Hothtrooper44_ArmorCompilation.esp","c74701:Immersive Weapons.esp","c74703:Immersive Weapons.esp","c74704:Immersive Weapons.esp","c74705:Immersive Weapons.esp","c74706:Immersive Weapons.esp","c74707:Immersive Weapons.esp","c74708:Immersive Weapons.esp","c74709:Immersive Weapons.esp","c7470a:Immersive Weapons.esp","c7470b:Immersive Weapons.esp","c7470c:Immersive Weapons.esp","c7470d:Immersive Weapons.esp","c7470e:Immersive Weapons.esp","c74710:Immersive Weapons.esp","c74713:Immersive Weapons.esp","c74714:Immersive Weapons.esp","c74715:Immersive Weapons.esp","c74716:Immersive Weapons.esp","c74717:Immersive Weapons.esp","c74718:Immersive Weapons.esp","c74719:Immersive Weapons.esp","c7471a:Immersive Weapons.esp","c7471b:Immersive Weapons.esp","c7471c:Immersive Weapons.esp","c7471d:Immersive Weapons.esp","c7471e:Immersive Weapons.esp","c7471f:Immersive Weapons.esp","c74720:Immersive Weapons.esp","c74721:Immersive Weapons.esp","c74722:Immersive Weapons.esp","c74723:Immersive Weapons.esp","c74724:Immersive Weapons.esp","c74725:Immersive Weapons.esp","c74726:Immersive Weapons.esp","c74727:Immersive Weapons.esp","c74728:Immersive Weapons.esp","c74729:Immersive Weapons.esp","c7472a:Immersive Weapons.esp","c7472c:Immersive Weapons.esp","c7472d:Immersive Weapons.esp","c74734:Immersive Weapons.esp","c74735:Immersive Weapons.esp","c74736:Immersive Weapons.esp","c74737:Immersive Weapons.esp","c74738:Immersive Weapons.esp","c74739:Immersive Weapons.esp","c7473a:Immersive Weapons.esp","c7473b:Immersive Weapons.esp","c7473c:Immersive Weapons.esp","ca05:Immersive Weapons.esp","d175:Hothtrooper44_ArmorCompilation.esp","d176:Hothtrooper44_ArmorCompilation.esp","d177:Hothtrooper44_ArmorCompilation.esp","d178:Hothtrooper44_ArmorCompilation.esp","d17d:Hothtrooper44_ArmorCompilation.esp","d17e:Hothtrooper44_ArmorCompilation.esp","d17f:Hothtrooper44_ArmorCompilation.esp","d180:Hothtrooper44_ArmorCompilation.esp","d64:Immersive Weapons.esp","d9a:Hothtrooper44_ArmorCompilation.esp","d9c:Hothtrooper44_ArmorCompilation.esp","d9d:Hothtrooper44_ArmorCompilation.esp","d9e:Hothtrooper44_ArmorCompilation.esp","d9f:Hothtrooper44_ArmorCompilation.esp","da0:Hothtrooper44_ArmorCompilation.esp","da1:Hothtrooper44_ArmorCompilation.esp","da2:Hothtrooper44_ArmorCompilation.esp","da3:Hothtrooper44_ArmorCompilation.esp","da4:Hothtrooper44_ArmorCompilation.esp","da5:Hothtrooper44_ArmorCompilation.esp","da6:Hothtrooper44_ArmorCompilation.esp","da769:Skyrim.esm","da76a:Skyrim.esm","da76b:Skyrim.esm","da76c:Skyrim.esm","da76d:Skyrim.esm","da76e:Skyrim.esm","da76f:Skyrim.esm","da7:Hothtrooper44_ArmorCompilation.esp","da8:Hothtrooper44_ArmorCompilation.esp","da9:Hothtrooper44_ArmorCompilation.esp","daa:Hothtrooper44_ArmorCompilation.esp","dad:Hothtrooper44_ArmorCompilation.esp","dae:Hothtrooper44_ArmorCompilation.esp","daf:Hothtrooper44_ArmorCompilation.esp","db0:Hothtrooper44_ArmorCompilation.esp","db1:Hothtrooper44_ArmorCompilation.esp","db28e:Skyrim.esm","db28f:Skyrim.esm","db290:Skyrim.esm","db291:Skyrim.esm","db292:Skyrim.esm","db293:Skyrim.esm","db2:Hothtrooper44_ArmorCompilation.esp","db3:Hothtrooper44_ArmorCompilation.esp","db4:Hothtrooper44_ArmorCompilation.esp","db5:Hothtrooper44_ArmorCompilation.esp","db5d3:Skyrim.esm","db5d4:Skyrim.esm","db5d5:Skyrim.esm","db5d6:Skyrim.esm","db5d7:Skyrim.esm","db6:Hothtrooper44_ArmorCompilation.esp","db7:Hothtrooper44_ArmorCompilation.esp","db896:Skyrim.esm","db897:Skyrim.esm","db898:Skyrim.esm","db899:Skyrim.esm","db89a:Skyrim.esm","db89b:Skyrim.esm","db89c:Skyrim.esm","db89d:Skyrim.esm","db89e:Skyrim.esm","db89f:Skyrim.esm","db8:Hothtrooper44_ArmorCompilation.esp","db8a0:Skyrim.esm","db8a1:Skyrim.esm","db8a3:Skyrim.esm","db8a4:Skyrim.esm","db8a5:Skyrim.esm","db8a6:Skyrim.esm","db8a7:Skyrim.esm","db8a8:Skyrim.esm","db8a9:Skyrim.esm","db8aa:Skyrim.esm","db8ab:Skyrim.esm","db8ac:Skyrim.esm","db8ad:Skyrim.esm","db8ae:Skyrim.esm","db8af:Skyrim.esm","db8b0:Skyrim.esm","db8b1:Skyrim.esm","db8b2:Skyrim.esm","db8b3:Skyrim.esm","db8b4:Skyrim.esm","db8b5:Skyrim.esm","db8b6:Skyrim.esm","db8b7:Skyrim.esm","db8b8:Skyrim.esm","db8b9:Skyrim.esm","db8ba:Skyrim.esm","db8bb:Skyrim.esm","db8bc:Skyrim.esm","db8bd:Skyrim.esm","db8be:Skyrim.esm","db8bf:Skyrim.esm","db8c0:Skyrim.esm","db8c1:Skyrim.esm","db8c2:Skyrim.esm","db8c3:Skyrim.esm","db8c4:Skyrim.esm","db8c5:Skyrim.esm","dbb:Hothtrooper44_ArmorCompilation.esp","dbc:Hothtrooper44_ArmorCompilation.esp","dbd:Hothtrooper44_ArmorCompilation.esp","dbe:Hothtrooper44_ArmorCompilation.esp","dbf:Hothtrooper44_ArmorCompilation.esp","dc0:Hothtrooper44_ArmorCompilation.esp","dc1:Hothtrooper44_ArmorCompilation.esp","dc2:Hothtrooper44_ArmorCompilation.esp","dc3:Hothtrooper44_ArmorCompilation.esp","dc6:Hothtrooper44_ArmorCompilation.esp","dc7:Hothtrooper44_ArmorCompilation.esp","dc8:Hothtrooper44_ArmorCompilation.esp","dc9:Hothtrooper44_ArmorCompilation.esp","dc9f4:Skyrim.esm","dc9f5:Skyrim.esm","dc9f6:Skyrim.esm","dc9f7:Skyrim.esm","dc9f8:Skyrim.esm","dc9f9:Skyrim.esm","dc9fa:Skyrim.esm","dc9fb:Skyrim.esm","dc9fc:Skyrim.esm","dc9fd:Skyrim.esm","dc9fe:Skyrim.esm","dc9ff:Skyrim.esm","dca00:Skyrim.esm","dca01:Skyrim.esm","dca02:Skyrim.esm","dca03:Skyrim.esm","dca04:Skyrim.esm","dca05:Skyrim.esm","dca06:Skyrim.esm","dca07:Skyrim.esm","dca08:Skyrim.esm","dca0a:Skyrim.esm","dca0e:Skyrim.esm","dca0f:Skyrim.esm","dca10:Skyrim.esm","dca11:Skyrim.esm","dca12:Skyrim.esm","dca13:Skyrim.esm","dca14:Skyrim.esm","dca15:Skyrim.esm","dca16:Skyrim.esm","dca17:Skyrim.esm","dca:Hothtrooper44_ArmorCompilation.esp","dcb:Hothtrooper44_ArmorCompilation.esp","dd974:Skyrim.esm","dd975:Skyrim.esm","dd976:Skyrim.esm","dd977:Skyrim.esm","dd978:Skyrim.esm","dd979:Skyrim.esm","dd97a:Skyrim.esm","dd97b:Skyrim.esm","dd97c:Skyrim.esm","dd97d:Skyrim.esm","dd97e:Skyrim.esm","dd97f:Skyrim.esm","dd980:Skyrim.esm","dd981:Skyrim.esm","dd983:Skyrim.esm","dd984:Skyrim.esm","dd985:Skyrim.esm","dd986:Skyrim.esm","dd987:Skyrim.esm","dd988:Skyrim.esm","dd989:Skyrim.esm","dd98a:Skyrim.esm","dd98b:Skyrim.esm","dd98c:Skyrim.esm","dd98d:Skyrim.esm","dd98e:Skyrim.esm","dd98f:Skyrim.esm","dd990:Skyrim.esm","dd991:Skyrim.esm","dd992:Skyrim.esm","dd993:Skyrim.esm","dd994:Skyrim.esm","dd995:Skyrim.esm","dd996:Skyrim.esm","f19:YokuWeapons.esp","f6f2a:Skyrim.esm","f6f2c:Skyrim.esm","f6f2e:Skyrim.esm","f6f30:Skyrim.esm"]},"88108:Skyrim.esm":{"halves":{},"name":"CraftingSmithingSharpeningWheel","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"910:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"halves":{"hearthcook":"novice"},"name":"isGrainMill","rows":["17ec3:HearthFires.esm"]},"a0c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"halves":{"hearthcook":"novice"},"name":"CraftingCookpot","rows":["18011:Thornswood-Content.esp","18012:Thornswood-Content.esp","18013:Thornswood-Content.esp","1a022:Thornswood-Content.esp","1a050:Thornswood-Content.esp","1a051:Thornswood-Content.esp","1a052:Thornswood-Content.esp","1a053:Thornswood-Content.esp","3542:HearthFires.esm","3543:HearthFires.esm","3544:HearthFires.esm","3cd5c:Dragonborn.esm","3cd5d:Dragonborn.esm","811:Gourmet.esp","812:Gourmet.esp","813:Gourmet.esp","814:Gourmet.esp","819:Gourmet.esp","81a:Gourmet.esp","81b:Gourmet.esp","81d:Gourmet.esp","81e:Gourmet.esp","8ab:Gourmet.esp","8ad:Gourmet.esp","8af:Gourmet.esp","8b4:Gourmet.esp","8b5:Gourmet.esp","8ba:Gourmet.esp","8bb:Gourmet.esp","8e5:Gourmet.esp","8ec:Gourmet.esp","8ed:Gourmet.esp","8f8:Gourmet.esp","8f9:Gourmet.esp","8fa:Gourmet.esp","904:Gourmet.esp","905:Gourmet.esp","906:Gourmet.esp","92d4:FishingInSkyrim.esp","998:Gourmet.esp","999:Gourmet.esp","99a:Gourmet.esp","99b:Gourmet.esp","99c:Gourmet.esp","99d:Gourmet.esp","99e:Gourmet.esp","9a2:Gourmet.esp","9a3:Gourmet.esp","9a4:Gourmet.esp","9a6:Gourmet.esp","9a7:Gourmet.esp","9a8:Gourmet.esp","9a9:Gourmet.esp","9aa:Gourmet.esp","9ab:Gourmet.esp","9ac:Gourmet.esp","9ae:Gourmet.esp","9af:Gourmet.esp","9b0:Gourmet.esp","9b1:Gourmet.esp","9b2:Gourmet.esp","9b3:Gourmet.esp","9b5:Gourmet.esp","9bb:Gourmet.esp","9bc:Gourmet.esp","9bd:Gourmet.esp","9be:Gourmet.esp","9bf:Gourmet.esp","9c0:Gourmet.esp","9c1:Gourmet.esp","9c2:Gourmet.esp","9c3:Gourmet.esp","9c4:Gourmet.esp","9c5:Gourmet.esp","9c6:Gourmet.esp","9c7:Gourmet.esp","9ca:Gourmet.esp","9cb:Gourmet.esp","9cc:Gourmet.esp","9cd:Gourmet.esp","9ce:Gourmet.esp","9cf:Gourmet.esp","9d3:Gourmet.esp","9d4:Gourmet.esp","9d5:Gourmet.esp","9d6:Gourmet.esp","9eb:Gourmet.esp","a09:Gourmet.esp","f4308:Skyrim.esm","f4309:Skyrim.esm","f430a:Skyrim.esm","f430b:Skyrim.esm","f430c:Skyrim.esm","f430d:Skyrim.esm","f430e:Skyrim.esm","f430f:Skyrim.esm","f4310:Skyrim.esm","f4311:Skyrim.esm","f4312:Skyrim.esm","f4313:Skyrim.esm","f4316:Skyrim.esm","f4317:Skyrim.esm","f4318:Skyrim.esm","f4319:Skyrim.esm","f431a:Skyrim.esm","f431f:Skyrim.esm"]},"a5cce:Skyrim.esm":{"halves":{"platewright":"novice"},"name":"CraftingSmelter","rows":["a30c3:Skyrim.esm","a30cb:Skyrim.esm","a30d3:Skyrim.esm","a30d4:Skyrim.esm","a30d9:Skyrim.esm","a30da:Skyrim.esm","a30db:Skyrim.esm","a30dc:Skyrim.esm","a30dd:Skyrim.esm","a30e4:Skyrim.esm","da0c03:Update.esm"]},"adb78:Skyrim.esm":{"halves":{},"name":"CraftingSmithingArmorTable","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"alchemy":{"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge","rows":["108cfd:Skyrim.esm","214a2:Hothtrooper44_ArmorCompilation.esp","214a3:Hothtrooper44_ArmorCompilation.esp","214a4:Hothtrooper44_ArmorCompilation.esp","214a5:Hothtrooper44_ArmorCompilation.esp","214a6:Hothtrooper44_ArmorCompilation.esp","214a7:Hothtrooper44_ArmorCompilation.esp","214a8:Hothtrooper44_ArmorCompilation.esp","214a9:Hothtrooper44_ArmorCompilation.esp","214aa:Hothtrooper44_ArmorCompilation.esp","48b9:Hothtrooper44_ArmorCompilation.esp","590d4:Hothtrooper44_ArmorCompilation.esp","5d7a7:Hothtrooper44_ArmorCompilation.esp","855:MoreCraftableEquipment.esp","856:MoreCraftableEquipment.esp","857:MoreCraftableEquipment.esp","858:MoreCraftableEquipment.esp","8ed:MoreCraftableEquipment.esp","8ee:MoreCraftableEquipment.esp","8ef:MoreCraftableEquipment.esp","b651:Hothtrooper44_ArmorCompilation.esp","b652:Hothtrooper44_ArmorCompilation.esp","b653:Hothtrooper44_ArmorCompilation.esp","b654:Hothtrooper44_ArmorCompilation.esp","f46c8:Skyrim.esm","f46c9:Skyrim.esm","f46ca:Skyrim.esm","f46cb:Skyrim.esm","f46cc:Skyrim.esm","f46cd:Skyrim.esm","f46cf:Skyrim.esm","f46d0:Skyrim.esm"]},"f806:Dawnguard.esm":{"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard","rows":["f807:Dawnguard.esm","f808:Dawnguard.esm","f809:Dawnguard.esm","f80a:Dawnguard.esm","f80b:Dawnguard.esm","f80c:Dawnguard.esm","f80d:Dawnguard.esm","f80e:Dawnguard.esm","f80f:Dawnguard.esm","f810:Dawnguard.esm"]}};
 // ==== end BENCH_ACCESS ====
 
 /**
@@ -27811,10 +27843,10 @@ const CHARCOAL_GRADES = [
 
 // ==== FUEL_BY_RECIPE, generated ====
 /* Built by scripts\dev\Build-FuelTable.js out of game\data\recipes.json. Do not hand edit.
-   312 recipes at a forge, a skyforge or a smelter, out of 3739.
-   175 burn Poor Charcoal, 68 Charcoal, 53 Charcoal Briquette and 16 Coke.
+   252 recipes at a forge, a skyforge or a smelter, out of 3739.
+   127 burn Poor Charcoal, 60 Charcoal, 49 Charcoal Briquette and 16 Coke.
    Recipe desc -> [grade 1 to 4, the metal that asks for it or nothing, the bench]. */
-const FUEL_BY_RECIPE = {"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"bfee5:Playable Rieklings.esp":[1,"","forge"],"bfefb:Playable Rieklings.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"]};
+const FUEL_BY_RECIPE = {"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"]};
 // ==== end FUEL_BY_RECIPE ====
 
 /** The fuel a recipe burns, { grade, metal, bench }, or null when it burns none. */
@@ -28665,8 +28697,17 @@ function handEnchantSlots(actorId, state) {
   somebody goes onto or off a roll. A recipe nobody owns is not in the table
   and stays listed for everybody.
 
-  The value is { at, files: { plugin: 'hex,hex,...' } }, the refused rows by
-  plugin, and it is written only when the list changes. updateOwner runs
+  THE SAME SCRIPT MOVES A RECIPE TO ITS TRADE'S BENCH (#3120). A recipe of a
+  plugin Thornswood-Last.esp never copies from (Immersive Armors) that
+  recipes.json moved to its trade's bench cannot be moved in the plugin, so
+  each game moves its own copy of the record: the same SetWorkbenchKeyword,
+  to the keyword RECIPES_MOVED_IN_GAME names. A moved recipe this person is
+  refused is hidden like any other, and goes back to the bench it moved to,
+  never the one its mod put it at.
+
+  The value is { at, files: { plugin: 'hex,hex,...' }, moved: { recipe:
+  bench } }, the refused rows by plugin and the recipes each game moves, and
+  it is written only when either changes. updateOwner runs
   every frame, so the script acts on a new stamp only, and spreads the
   records over frames (RECIPES_PER_FRAME): a character with no profession is
   refused every owned row, and two thousand records in one frame is a stall.
@@ -28697,12 +28738,23 @@ function recipesHiddenScript() {
     '      var todo = [];',
     '      for (var k in want) { if (!own.call(put, k)) { todo.push(k); } }',
     '      for (var h in put) { if (own.call(put, h) && !want[h]) { todo.push(h); } }',
+    // A recipe moved to its trade's bench (#3120): moved once, unless hidden.
+    '      var moveTo = (v.moved && typeof v.moved === "object") ? v.moved : {};',
+    '      if (!st.thornswoodRecipesMoved) { st.thornswoodRecipesMoved = {}; }',
+    '      for (var m in moveTo) { if (own.call(moveTo, m) && !want[m] && st.thornswoodRecipesMoved[m] !== moveTo[m]) { todo.push(m); } }',
     '      st.thornswoodRecipesWant = want;',
+    '      st.thornswoodRecipesMoveTo = moveTo;',
     '      st.thornswoodRecipesTodo = todo;',
     '    }',
     '    var queue = st.thornswoodRecipesTodo;',
     '    if (!queue || !queue.length) { return; }',
     '    var wanted = st.thornswoodRecipesWant || {};',
+    '    var moves = st.thornswoodRecipesMoveTo || {};',
+    '    var moved = st.thornswoodRecipesMoved || {};',
+    '    var kwOf = function (d) {',
+    '      var c = d.indexOf(":");',
+    '      try { return sp.Keyword.from(sp.Game.getFormFromFile(parseInt(d.slice(0, c), 16), d.slice(c + 1))); } catch (e) { return null; }',
+    '    };',
     '    for (var n = 0; queue.length && n < ' + RECIPES_PER_FRAME + '; n++) {',
     '      var key = queue.pop();',
     '      var at = key.indexOf(":");',
@@ -28716,8 +28768,13 @@ function recipesHiddenScript() {
     '        cobj.setWorkbenchKeyword(null);',
     '      } else if (!wanted[key] && own.call(put, key)) {',
     '        var was = put[key];',
-    '        cobj.setWorkbenchKeyword(was ? sp.Keyword.from(sp.Game.getFormEx(was)) : null);',
+    '        var back = own.call(moves, key) ? kwOf(moves[key]) : null;',
+    '        cobj.setWorkbenchKeyword(back ? back : (was ? sp.Keyword.from(sp.Game.getFormEx(was)) : null));',
+    '        if (back) { moved[key] = moves[key]; }',
     '        delete put[key];',
+    '      } else if (!wanted[key] && own.call(moves, key) && moved[key] !== moves[key]) {',
+    '        var to = kwOf(moves[key]);',
+    '        if (to) { cobj.setWorkbenchKeyword(to); moved[key] = moves[key]; }',
     '      }',
     '    }',
     '  } catch (e) { }',
@@ -28765,14 +28822,29 @@ function recipesRefused(actorId) {
   return files;
 }
 
+/**
+ * The recipes each game moves to their trade's bench (#3120), by recipe, to
+ * the bench keyword it is made at now: RECIPES_MOVED_IN_GAME, below.
+ */
+function recipesMoved() {
+  var out = {};
+  if (typeof RECIPES_MOVED_IN_GAME !== 'object' || !RECIPES_MOVED_IN_GAME) { return out; }
+  for (var desc in RECIPES_MOVED_IN_GAME) {
+    if (Object.prototype.hasOwnProperty.call(RECIPES_MOVED_IN_GAME, desc)) { out[desc] = RECIPES_MOVED_IN_GAME[desc].to; }
+  }
+  return out;
+}
+
 /** Hand the owner the recipes they cannot make, when the list has changed. */
 function handRecipesHidden(actorId) {
   var files = recipesRefused(actorId);
+  var moved = recipesMoved();
   var had = null;
   try { had = mp.get(actorId, RECIPES_HIDDEN_PROPERTY); } catch (e) { had = null; }
-  if (had && typeof had === 'object' && JSON.stringify(had.files) === JSON.stringify(files)) { return; }
+  if (had && typeof had === 'object' && JSON.stringify(had.files) === JSON.stringify(files) &&
+      JSON.stringify(had.moved || {}) === JSON.stringify(moved)) { return; }
   try {
-    mp.set(actorId, RECIPES_HIDDEN_PROPERTY, { at: Date.now(), files: files });
+    mp.set(actorId, RECIPES_HIDDEN_PROPERTY, { at: Date.now(), files: files, moved: moved });
   } catch (e) {
     log(actorId.toString(16), 'was not handed the recipes they cannot make:', e);
   }
@@ -28806,7 +28878,7 @@ function handRecipesHidden(actorId) {
 // Generated by scripts\dev\Build-Recost.py from game\data\recost.json; do not hand edit.
 // The re-costed recipes of a plugin Thornswood-Last.esp never copies from (#613, #2454),
 // set in each person's game instead: each input as [item, count it had, count it asks].
-var RECIPES_SET_IN_GAME = {"21474:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ad9f:Skyrim.esm", 1, 4], ["5ada1:Skyrim.esm", 1, 4]], "name": "Glass Buckler", "out": "21464:Hothtrooper44_ArmorCompilation.esp"}, "21478:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ace4:Skyrim.esm", 1, 2], ["5ad99:Skyrim.esm", 1, 2]], "name": "Orcish Buckler", "out": "21468:Hothtrooper44_ArmorCompilation.esp"}, "2147a:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ace4:Skyrim.esm", 1, 2], ["5ace5:Skyrim.esm", 1, 2]], "name": "Steel Buckler", "out": "2146a:Hothtrooper44_ArmorCompilation.esp"}, "2147b:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ad9d:Skyrim.esm", 1, 2], ["5ada0:Skyrim.esm", 1, 2]], "name": "Winterhold Battlemage Buckler", "out": "2146b:Hothtrooper44_ArmorCompilation.esp"}, "2147c:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ace5:Skyrim.esm", 1, 2], ["5ad99:Skyrim.esm", 1, 2]], "name": "Buckler of Ysgramor", "out": "2146c:Hothtrooper44_ArmorCompilation.esp"}, "22f7:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 2, 2], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1]], "name": "Paladin Boots", "out": "ab63:Hothtrooper44_ArmorCompilation.esp"}, "22f9:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 1, 1], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1]], "name": "Paladin Gauntlets", "out": "ab61:Hothtrooper44_ArmorCompilation.esp"}, "22fa:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 2, 2], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1], ["e7ed0:Skyrim.esm", 2, 2]], "name": "Paladin Barbut", "out": "ab60:Hothtrooper44_ArmorCompilation.esp"}, "238ff:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 2, 1], ["5ace5:Skyrim.esm", 1, 1], ["5ad9f:Skyrim.esm", 2, 1], ["800e4:Skyrim.esm", 2, 1], ["9151b:Skyrim.esm", 2, 1], ["db5d2:Skyrim.esm", 1, 1], ["da0bf1:Update.esm", 2, 1]], "name": "Bosmer Coif", "out": "238e1:Hothtrooper44_ArmorCompilation.esp"}, "2390a:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 2, 1], ["5ace5:Skyrim.esm", 1, 1], ["5ad93:Skyrim.esm", 1, 1], ["5ad9f:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 1], ["9151b:Skyrim.esm", 2, 1], ["db5d2:Skyrim.esm", 1, 1], ["da0bf1:Update.esm", 2, 1]], "name": "Bosmer Reinforced Coif", "out": "238ed:Hothtrooper44_ArmorCompilation.esp"}, "286a:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 1, 0], ["800e4:Skyrim.esm", 1, 1]], "name": "Eyepatch", "out": "285f:Hothtrooper44_ArmorCompilation.esp"}, "3dee:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 2, 2], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1], ["e7ed0:Skyrim.esm", 2, 2]], "name": "Paladin Great Helm", "out": "3ded:Hothtrooper44_ArmorCompilation.esp"}, "d9a:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 1, 1], ["5ad93:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 2], ["da0bf1:Update.esm", 1, 1]], "name": "Falkreath Boots", "out": "d62:Hothtrooper44_ArmorCompilation.esp"}, "d9e:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 1, 1], ["5ad93:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 2], ["da0bf1:Update.esm", 1, 1]], "name": "Falkreath Gauntlets", "out": "d65:Hothtrooper44_ArmorCompilation.esp"}, "d9f:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 2, 2], ["5ad93:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 2], ["da0bf1:Update.esm", 1, 1]], "name": "Falkreath Helmet", "out": "d66:Hothtrooper44_ArmorCompilation.esp"}, "da1:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 2, 2], ["5ad93:Skyrim.esm", 2, 2], ["800e4:Skyrim.esm", 2, 2]], "name": "Hedge Knight Boots", "out": "d95:Hothtrooper44_ArmorCompilation.esp"}, "da3:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 2, 2], ["5ad93:Skyrim.esm", 2, 2], ["800e4:Skyrim.esm", 2, 2]], "name": "Hedge Knight Gauntlets", "out": "d97:Hothtrooper44_ArmorCompilation.esp"}};
+var RECIPES_SET_IN_GAME = {"21474:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ad9f:Skyrim.esm", 1, 4], ["5ada1:Skyrim.esm", 1, 4]], "name": "Glass Buckler", "out": "21464:Hothtrooper44_ArmorCompilation.esp"}, "21478:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ace4:Skyrim.esm", 1, 2], ["5ad99:Skyrim.esm", 1, 2]], "name": "Orcish Buckler", "out": "21468:Hothtrooper44_ArmorCompilation.esp"}, "2147a:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ace4:Skyrim.esm", 1, 2], ["5ace5:Skyrim.esm", 1, 2]], "name": "Steel Buckler", "out": "2146a:Hothtrooper44_ArmorCompilation.esp"}, "2147b:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ad9d:Skyrim.esm", 1, 2], ["5ada0:Skyrim.esm", 1, 2]], "name": "Winterhold Battlemage Buckler", "out": "2146b:Hothtrooper44_ArmorCompilation.esp"}, "2147c:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["5ace5:Skyrim.esm", 1, 2], ["5ad99:Skyrim.esm", 1, 2]], "name": "Buckler of Ysgramor", "out": "2146c:Hothtrooper44_ArmorCompilation.esp"}, "22f7:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 2, 2], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1]], "name": "Paladin Boots", "out": "ab63:Hothtrooper44_ArmorCompilation.esp"}, "22f9:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 1, 1], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1]], "name": "Paladin Gauntlets", "out": "ab61:Hothtrooper44_ArmorCompilation.esp"}, "22fa:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 2, 2], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1], ["e7ed0:Skyrim.esm", 2, 2]], "name": "Paladin Barbut", "out": "ab60:Hothtrooper44_ArmorCompilation.esp"}, "238ff:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 2, 1], ["5ace5:Skyrim.esm", 1, 1], ["5ad9f:Skyrim.esm", 2, 1], ["800e4:Skyrim.esm", 2, 1], ["9151b:Skyrim.esm", 2, 1], ["db5d2:Skyrim.esm", 1, 1], ["da0bf1:Update.esm", 2, 1]], "name": "Bosmer Coif", "out": "238e1:Hothtrooper44_ArmorCompilation.esp"}, "2390a:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 2, 1], ["5ace5:Skyrim.esm", 1, 1], ["5ad93:Skyrim.esm", 1, 1], ["5ad9f:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 1], ["9151b:Skyrim.esm", 2, 1], ["db5d2:Skyrim.esm", 1, 1], ["da0bf1:Update.esm", 2, 1]], "name": "Bosmer Reinforced Coif", "out": "238ed:Hothtrooper44_ArmorCompilation.esp"}, "286a:Hothtrooper44_ArmorCompilation.esp": {"bench": "6ce000:Update.esm", "inputs": [["f:Skyrim.esm", 1, 0], ["800e4:Skyrim.esm", 1, 1]], "name": "Eyepatch", "out": "285f:Hothtrooper44_ArmorCompilation.esp"}, "3dee:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 50, 0], ["5ad9d:Skyrim.esm", 2, 2], ["5ad9f:Skyrim.esm", 2, 2], ["db5d2:Skyrim.esm", 1, 1], ["e7ed0:Skyrim.esm", 2, 2]], "name": "Paladin Great Helm", "out": "3ded:Hothtrooper44_ArmorCompilation.esp"}, "d9a:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 1, 1], ["5ad93:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 2], ["da0bf1:Update.esm", 1, 1]], "name": "Falkreath Boots", "out": "d62:Hothtrooper44_ArmorCompilation.esp"}, "d9e:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 1, 1], ["5ad93:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 2], ["da0bf1:Update.esm", 1, 1]], "name": "Falkreath Gauntlets", "out": "d65:Hothtrooper44_ArmorCompilation.esp"}, "d9f:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 2, 2], ["5ad93:Skyrim.esm", 1, 1], ["800e4:Skyrim.esm", 2, 2], ["da0bf1:Update.esm", 1, 1]], "name": "Falkreath Helmet", "out": "d66:Hothtrooper44_ArmorCompilation.esp"}, "da1:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 2, 2], ["5ad93:Skyrim.esm", 2, 2], ["800e4:Skyrim.esm", 2, 2]], "name": "Hedge Knight Boots", "out": "d95:Hothtrooper44_ArmorCompilation.esp"}, "da3:Hothtrooper44_ArmorCompilation.esp": {"bench": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 25, 0], ["5ace5:Skyrim.esm", 2, 2], ["5ad93:Skyrim.esm", 2, 2], ["800e4:Skyrim.esm", 2, 2]], "name": "Hedge Knight Gauntlets", "out": "d97:Hothtrooper44_ArmorCompilation.esp"}};
 // ==== end RECIPES_SET_IN_GAME ====
 
 var RECIPE_COUNTS_PROPERTY = 'thornswoodRecipeCounts';
@@ -28913,6 +28985,83 @@ function recipeSetInGame(craftedItemBaseId, workbenchId, inputs) {
     var want = {};
     for (var n = 0; n < row.inputs.length; n++) {
       if (row.inputs[n][2]) { want[row.inputs[n][0]] = (want[row.inputs[n][0]] || 0) + row.inputs[n][2]; }
+    }
+    var same = Object.keys(want).length === Object.keys(held).length;
+    for (var k in want) { if (own.call(want, k) && held[k] !== want[k]) { same = false; } }
+    if (same) { return desc; }
+  }
+  return null;
+}
+
+/*
+  A NEVER-COPIED PLUGIN'S RECIPES ARE MOVED IN EACH GAME TOO (#3120).
+
+  Patrick, 21 October 2026: "make sure if a bench has a recipoe that should
+  be on adifferent bench it should get moved". recipes.json moves a row its
+  mod put at a bench its trade does not work at to that trade's bench
+  (TRADE_BENCHES in scripts/dev/Build-RecipeTable.ps1): 48 of Immersive
+  Armors' fur hoods, capes, robes and mage sets sat at the forge, so the forge
+  opened for every Tailor. Thornswood-Last.esp carries the move for every
+  other plugin. Immersive Armors is never copied (#2454), so each person's
+  game moves its own copy of the record (recipesHiddenScript, above) to the
+  bench RECIPES_MOVED_IN_GAME names.
+
+  THE SERVER STILL READS THE MOD'S BENCH. CraftService matches a craft to a
+  record only at a bench carrying the record's own keyword, so a craft at the
+  loom matches no record and arrives with no recipe id. recipeMovedInGame
+  names the recipe from its output, the bench it is made at now and exactly
+  the counts the record asks, and onCraft treats it as that recipe from
+  there. A craft at the bench its mod put it at, from a game that has not
+  moved it yet, matches the record and is refused, so the forge makes none
+  of them.
+
+  RECIPES_MOVED_IN_GAME is written by scripts/mods/Build-LastPlugin.py.
+*/
+// ==== RECIPES_MOVED_IN_GAME, generated ====
+// Generated by scripts\mods\Build-LastPlugin.py from game\data\recipes.json; do not hand edit.
+// The recipes moved to their trade's bench (#3120) of a plugin Thornswood-Last.esp never copies
+// from, moved in each person's game instead: the bench keyword each moves from and to, and its
+// inputs as [item, count] as the record asks them.
+var RECIPES_MOVED_IN_GAME = {"1d90:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 2], ["da0bf1:Update.esm", 2]], "name": "Fur Hood - White", "out": "48e0:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "22fe:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 2], ["da0bf1:Update.esm", 2]], "name": "Fur Hood - Black", "out": "48d9:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "23062:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 1], ["da0bf1:Update.esm", 1]], "name": "Fur Collar - Loose", "out": "23060:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "23063:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 1], ["da0bf1:Update.esm", 1]], "name": "Fur Collar - Tight", "out": "23061:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231c6:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 3], ["da0bf1:Update.esm", 1]], "name": "Tribunal Unarmored Boots Black", "out": "2317c:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231c7:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 3], ["da0bf1:Update.esm", 1]], "name": "Tribunal Unarmored Boots Blue", "out": "2317d:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231c8:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 3], ["da0bf1:Update.esm", 1]], "name": "Tribunal Unarmored Boots Green", "out": "2317e:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231c9:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 3], ["da0bf1:Update.esm", 1]], "name": "Tribunal Unarmored Boots Red", "out": "2317f:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231ca:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 3], ["da0bf1:Update.esm", 1]], "name": "Tribunal Unarmored Boots White", "out": "23180:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231cb:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 5]], "name": "Tribunal Unarmored Gloves Black", "out": "23181:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231cc:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 5]], "name": "Tribunal Unarmored Gloves Blue", "out": "23182:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231cd:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 5]], "name": "Tribunal Unarmored Gloves Green", "out": "23183:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231ce:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 5]], "name": "Tribunal Unarmored Gloves Red", "out": "23184:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231cf:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 5]], "name": "Tribunal Unarmored Gloves White", "out": "23185:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d0:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 6]], "name": "Tribunal Unarmored Hood Black", "out": "23186:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d1:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 6]], "name": "Tribunal Unarmored Hood Blue", "out": "23187:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d2:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 6]], "name": "Tribunal Unarmored Hood Green", "out": "23188:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d3:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 6]], "name": "Tribunal Unarmored Hood Red", "out": "23189:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d4:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 6]], "name": "Tribunal Unarmored Hood White", "out": "2318a:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d5:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["2e4e6:Skyrim.esm", 1], ["34cd6:Skyrim.esm", 2], ["3ad72:Skyrim.esm", 5], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 9]], "name": "Tribunal Unarmored Robe Black", "out": "2318b:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d6:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["2e4e6:Skyrim.esm", 1], ["34cd6:Skyrim.esm", 2], ["3ad72:Skyrim.esm", 5], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 9]], "name": "Tribunal Unarmored Robe Blue", "out": "2318c:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d7:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["2e4e6:Skyrim.esm", 1], ["34cd6:Skyrim.esm", 2], ["3ad72:Skyrim.esm", 5], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 9]], "name": "Tribunal Unarmored Robe Green", "out": "2318d:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d8:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["2e4e6:Skyrim.esm", 1], ["34cd6:Skyrim.esm", 2], ["3ad72:Skyrim.esm", 5], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 9]], "name": "Tribunal Unarmored Robe Red", "out": "2318e:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "231d9:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["2e4e6:Skyrim.esm", 1], ["34cd6:Skyrim.esm", 2], ["3ad72:Skyrim.esm", 5], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 9]], "name": "Tribunal Unarmored Robe White", "out": "2318f:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "238fe:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 4], ["5ace3:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["9151b:Skyrim.esm", 4], ["da0bf1:Update.esm", 4]], "name": "Bosmer Full Cape", "out": "238ea:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "23907:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 3], ["5ad9e:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["9151b:Skyrim.esm", 3], ["da0bf1:Update.esm", 3]], "name": "Bosmer Engraved Shoulder Cape", "out": "238e9:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "23918:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 2], ["800e4:Skyrim.esm", 2], ["9151b:Skyrim.esm", 2], ["da0bf1:Update.esm", 2]], "name": "Bosmer Mask", "out": "238fb:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "23919:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["57f91:Skyrim.esm", 3], ["5ace3:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["9151b:Skyrim.esm", 3], ["da0bf1:Update.esm", 3]], "name": "Bosmer Shoulder Cape", "out": "238fc:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "286a:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["f:Skyrim.esm", 1], ["800e4:Skyrim.esm", 1]], "name": "Eyepatch", "out": "285f:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "2dd7:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 2], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 1]], "name": "Seadog Cape", "out": "2dd5:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "372fe:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 2], ["5ad9d:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 2]], "name": "Ebony Mage Unarmored Boots", "out": "372fa:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "372ff:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 1], ["5ad9d:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 1]], "name": "Ebony Mage Unarmored Gloves", "out": "372fb:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "37300:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 1], ["5ad9d:Skyrim.esm", 1], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 3]], "name": "Ebony Mage Unarmored Hood", "out": "372fc:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "37301:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 4], ["5ad9d:Skyrim.esm", 2], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 6]], "name": "Ebony Mage Unarmored Robe", "out": "372fd:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "37306:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 1], ["800e4:Skyrim.esm", 3], ["db5d2:Skyrim.esm", 3], ["db8a2:Skyrim.esm", 2]], "name": "Dwarven Mage Unarmored Robe", "out": "37305:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "37307:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 3], ["db8a2:Skyrim.esm", 1]], "name": "Dwarven Mage Unarmored Hood", "out": "37304:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "37308:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 2], ["db8a2:Skyrim.esm", 1]], "name": "Dwarven Mage Unarmored Gauntlets", "out": "37303:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "37309:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 2], ["db8a2:Skyrim.esm", 1]], "name": "Dwarven Mage Unarmored Boots", "out": "37302:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "53b3:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 2], ["da0bf1:Update.esm", 4]], "name": "Fur Mantle", "out": "ba99a:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "53b5:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 2], ["da0bf1:Update.esm", 4]], "name": "Fur Mantle - Black", "out": "22fc:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "53b7:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 2], ["da0bf1:Update.esm", 4]], "name": "Fur Mantle - White", "out": "1d8e:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "6aa09:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 2], ["5ad93:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 1]], "name": "Imperial Knight Cape", "out": "6aa04:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "82ebf:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 2], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 2], ["da0bf1:Update.esm", 2]], "name": "Shaman Unarmored Boots", "out": "82eb5:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "82ec0:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad72:Skyrim.esm", 1], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 3]], "name": "Shaman Unarmored Gloves", "out": "82eb6:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "82ec1:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["3ad52:Skyrim.esm", 1], ["3ad72:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 2]], "name": "Shaman Unarmored Cap", "out": "82eb7:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "82ec2:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 2], ["3ad72:Skyrim.esm", 3], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 3], ["da0bf1:Update.esm", 2]], "name": "Shaman Unarmored Robe", "out": "82eb8:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "bc99a:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["800e4:Skyrim.esm", 2], ["da0bf1:Update.esm", 2]], "name": "Fur Hood", "out": "48d8:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}, "f74d:Hothtrooper44_ArmorCompilation.esp": {"from": "88105:Skyrim.esm", "inputs": [["34cd6:Skyrim.esm", 2], ["800e4:Skyrim.esm", 2], ["db5d2:Skyrim.esm", 1]], "name": "Redguard Knight Cape", "out": "f74c:Hothtrooper44_ArmorCompilation.esp", "to": "6ce000:Update.esm"}};
+// ==== end RECIPES_MOVED_IN_GAME ====
+
+/**
+ * The RECIPES_MOVED_IN_GAME recipe a craft with no recipe id is, or null:
+ * the same output, the bench keyword it is made at now, and exactly the
+ * counts its record asks, summed per item.
+ */
+function recipeMovedInGame(craftedItemBaseId, workbenchId, inputs) {
+  if (typeof RECIPES_MOVED_IN_GAME !== 'object' || !RECIPES_MOVED_IN_GAME || !Array.isArray(inputs)) { return null; }
+  var own = Object.prototype.hasOwnProperty;
+  var outDesc = null;
+  var benchKey = '';
+  try {
+    outDesc = mp.getDescFromId(craftedItemBaseId);
+    var benchBase = mp.get(workbenchId, 'baseDesc');
+    if (benchBase && own.call(BENCH_BY_BASE, benchBase)) { benchKey = String(BENCH_BY_BASE[benchBase]); }
+  } catch (e) {
+    return null;
+  }
+  if (!outDesc || !benchKey) { return null; }
+  var held = {};
+  for (var i = 0; i < inputs.length; i++) {
+    var entry = inputs[i] || {};
+    var d = null;
+    try { d = mp.getDescFromId(Number(entry.baseId) || 0); } catch (e) { d = null; }
+    if (!d) { return null; }
+    held[d] = (held[d] || 0) + (Number(entry.count) || 0);
+  }
+  for (var desc in RECIPES_MOVED_IN_GAME) {
+    if (!own.call(RECIPES_MOVED_IN_GAME, desc)) { continue; }
+    var row = RECIPES_MOVED_IN_GAME[desc];
+    if (row.out !== outDesc || row.to !== benchKey) { continue; }
+    // A recipe whose counts are set in each game too is named by
+    // recipeSetInGame at its new counts, at this bench; its record's own
+    // counts are the ones that game refuses.
+    if (typeof RECIPES_SET_IN_GAME === 'object' && RECIPES_SET_IN_GAME && own.call(RECIPES_SET_IN_GAME, desc)) { continue; }
+    var want = {};
+    for (var n = 0; n < row.inputs.length; n++) {
+      want[row.inputs[n][0]] = (want[row.inputs[n][0]] || 0) + row.inputs[n][1];
     }
     var same = Object.keys(want).length === Object.keys(held).length;
     for (var k in want) { if (own.call(want, k) && held[k] !== want[k]) { same = false; } }
@@ -29595,6 +29744,9 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   if (!recipeId && typeof recipeSetInGame === 'function') {
     desc = recipeSetInGame(craftedItemBaseId, workbenchId, arguments[6]);
   }
+  if (!recipeId && !desc && typeof recipeMovedInGame === 'function') {
+    desc = recipeMovedInGame(craftedItemBaseId, workbenchId, arguments[6]);
+  }
   if (!recipeId && !desc) {
     /*
       THE SOUL GEM FIRST (#1648): the engine's seventh argument is the inputs,
@@ -29647,6 +29799,18 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
       notify(actorId, no);
       say(actorId, no);
       log(actorId.toString(16), 'was refused', desc, '(' + asks.name + ') at the mod\'s own counts');
+      return false;
+    }
+    // The bench its mod put it at, for a recipe moved in each game: this
+    // game has not moved it yet (#3120), and that bench is not its trade's.
+    if (typeof RECIPES_MOVED_IN_GAME === 'object' && RECIPES_MOVED_IN_GAME &&
+        Object.prototype.hasOwnProperty.call(RECIPES_MOVED_IN_GAME, desc)) {
+      const moved = RECIPES_MOVED_IN_GAME[desc];
+      const no = 'The ' + String(moved.name || 'that').trim() + ' is not made at this bench here. ' +
+                 'Leave the bench and use the one it is made at.';
+      notify(actorId, no);
+      say(actorId, no);
+      log(actorId.toString(16), 'was refused', desc, '(' + moved.name + ') at', moved.from, 'and it is made at', moved.to);
       return false;
     }
   }
@@ -36028,12 +36192,24 @@ log('gamemode loaded:',
   later from where the clock stopped. Time before the first season
   count is spring, so a crop already in the ground is not thrown back
   to the start.
+
+  Yields and cooling (#3144). Patrick, 22 Oct, A: seasons are mild,
+  yields up or down a quarter, winter cold a quarter faster. A crop
+  brought in, a plant picked and a fish caught give a quarter more in
+  summer and a quarter less in winter; spring and autumn give what the
+  rank gives. The season is the one at the moment of the harvest. The
+  share is a whole number out on average: 2 and a half is 2 or 3, half
+  the time each, so a winter plant that gives 1 is bare a quarter of
+  the time. Out under the sky in winter the meter cools a quarter
+  faster; warming does not change, and a roof ignores it.
 */
 (function () {
   var g = (typeof globalThis !== 'undefined') ? globalThis : this;
   var WEEK = 7 * 24 * 60 * 60 * 1000;
   var SEASONS = ['spring', 'summer', 'autumn', 'winter'];
   var SHIFT = { spring: 0, summer: 4, autumn: -2, winter: -6 };
+  var YIELD = { spring: 1, summer: 1.25, autumn: 1, winter: 0.75 };
+  var COOLING = { spring: 1, summer: 1, autumn: 1, winter: 1.25 };
   var TABLE = {
     spring: { clear: 30, cloudy: 30, rain: 35, snow: 5 },
     summer: { clear: 40, cloudy: 30, rain: 28, snow: 2 },
@@ -36172,6 +36348,29 @@ log('gamemode loaded:',
       t = end;
     }
     return total;
+  }
+
+  /*
+    A harvest's count for the season (#3144). The quarter is kept on
+    average: the whole part always, and one more as often as the part
+    left over, so 3 in winter is 2 three times in four and 3 once.
+  */
+  function seasonYield(count, now) {
+    count = Math.floor(Number(count) || 0);
+    if (count <= 0) { return 0; }
+    var exact = count * (YIELD[seasonName(now || Date.now())] || 1);
+    var whole = Math.floor(exact);
+    if (exact > whole && unit() < exact - whole) { whole++; }
+    return whole;
+  }
+
+  // The words a harvest line adds, '' in a season that changes nothing.
+  function yieldWord(now) {
+    var season = seasonName(now || Date.now());
+    var share = YIELD[season] || 1;
+    if (share === 1) { return ''; }
+    var name = season.charAt(0).toUpperCase() + season.slice(1);
+    return share > 1 ? name + ' gives more.' : name + ' gives less.';
   }
 
   function copyOdds(season) {
@@ -36363,6 +36562,11 @@ log('gamemode loaded:',
     SHIFT: SHIFT,
     seasonAt: seasonName,
     outdoorShift: function (now) { return SHIFT[seasonName(now || Date.now())]; },
+    YIELD: YIELD,
+    COOLING: COOLING,
+    seasonYield: seasonYield,
+    yieldWord: yieldWord,
+    coolingShare: function (now) { return COOLING[seasonName(now || Date.now())]; },
     allows: allows,
     grownMs: grownMs,
     odds: adjusted,
@@ -37124,6 +37328,9 @@ log('gamemode loaded:',
     cargo     the character on every line and hand out of the trade ships'
               manifest, every piece kept where it was (the trade ships
               block, #511)
+    stalls    every market stall the character kept ends, and what was on
+              it goes to the hold's drop box with no name on it (the market
+              stalls block, #3160)
     carts     the character on every line, hand out and journey of the
               trade carts' manifest, every piece kept where it was (the
               trade carts block, #3158)
@@ -37152,7 +37359,7 @@ log('gamemode loaded:',
 (function () {
   'use strict';
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
-  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'carts', 'books', 'merchants'];
+  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'stalls', 'carts', 'books', 'merchants'];
   var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
   // Into thornswood.log with the rest of the gamemode's own lines (log, at the top of the file).
   function rlog(line) {
@@ -38404,7 +38611,17 @@ log('gamemode loaded:',
       return 'The ' + crop.name + ' comes up and there is nothing in this load ' +
              'order to put in your hands. Say so in the dev channel.';
     }
-    var n = yieldAt(plot.step) + (plot.fed ? tuning().compostExtra : 0);
+    /*
+      The sower's yield, then the season's share of it (#3144): a quarter more
+      in summer and a quarter less in winter, on average, at the bring-in.
+      The least a rank brings in is 2, so a winter plot still gives 1.
+      Compost's one more (#3526) comes on top, whatever the season.
+    */
+    var S = g.__thornswoodSeason;
+    var n = yieldAt(plot.step);
+    if (S && S.seasonYield) { n = S.seasonYield(n); }
+    n = n + (plot.fed ? tuning().compostExtra : 0);
+    var word = (S && S.yieldWord) ? S.yieldWord() : '';
     if (grant ? !awardQuestCrop(actorId,refrId,baseDesc,crop,n,original,plot,grant) : !clearPlot(refrId,original)) {
       return 'The ' + crop.name + ' will not come out of the ground. Try it again in a moment.';
     }
@@ -38434,8 +38651,8 @@ log('gamemode loaded:',
     if(grant && !grant.current())return 'The orchard work has changed.';
     var worn = wearTool(actorId, 'farmer');
     flog(actorId.toString(16), 'brought in', n, crop.name, 'at', refrId.toString(16));
-    return 'You bring in ' + n + ' ' + crop.name + '.' + (rank ? ' ' + rank : '') +
-           (worn ? ' ' + worn : '');
+    return 'You bring in ' + n + ' ' + crop.name + '.' + (word ? ' ' + word : '') +
+           (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
   }
 
   // ----------------------------------------------------------- the commands --
@@ -42920,6 +43137,40 @@ module.exports = {
     save();
     plog(who, '(profile ' + profileId + ') left', n, what, 'for', to, 'in', hold + '\'s drop box');
     return 'You left ' + (n > 1 ? n + ' ' : '') + what + ' in the box for ' + to + '.';
+  }
+
+  /*
+    What was on a market stall whose keeping ended (#3160), put in by the
+    market stalls block rather than out of a pack. For its keeper, as if they
+    had put it in themselves, so they take it back here like anything of
+    theirs; with no keeper (their character was deleted) it is the hold's
+    officers' to hand out. The receipt is kept on the row, so the same piece
+    is never put in twice. Answers whether it is in the box and written.
+  */
+  function boxKeep(hold, entry, count, receipt, keeper, why) {
+    var key = String(hold || '').toLowerCase();
+    var n = Math.floor(Number(count));
+    if (LEDGER_HOLDS.indexOf(key) < 0 || !(n > 0) || !entry || typeof receipt !== 'string' || !receipt) { return false; }
+    var d = dropboxOf(key);
+    for (var i = 0; i < d.items.length; i++) {
+      if (d.items[i].receipt === receipt) { return true; }
+    }
+    var kept = JSON.parse(JSON.stringify(entry));
+    delete kept.count; delete kept.worn; delete kept.wornLeft;
+    var what = itemName(kept);
+    var by = keeper ? (Number(keeper.profile) || 0) : 0;
+    var name = keeper ? String(keeper.name || 'the stall\'s keeper') : 'A market stall';
+    var item = { n: d.next++, by: by, name: name, kind: 'stall', baseId: Number(kept.baseId),
+                 count: n, what: what, entry: kept, at: Date.now(), receipt: receipt };
+    d.items.push(item);
+    boxLog(key, { act: 'in', n: item.n, who: by, whoName: name, by: by, byName: name,
+                  what: what, count: n, note: 'off a market stall: ' + String(why || '') });
+    if (!save()) {
+      d.items.pop();
+      return false;
+    }
+    plog(n, what, 'off a market stall into', key + '\'s drop box:', String(why || ''));
+    return true;
   }
 
   /*
@@ -47535,7 +47786,7 @@ module.exports = {
     mayPassCell: mayPassCell, lockCell: lockCell,
     jailOfBuilding: jailOfBuilding, mayHold: mayHold, jailKeyHold: jailKeyHold, lockedJailHere: lockedJailHere,
     JAIL_KEY: JAIL_KEY,
-    dropboxCmd: dropboxCmd, boxView: boxView, boxFare: boxFare, boxOfficer: boxOfficer,
+    dropboxCmd: dropboxCmd, boxView: boxView, boxFare: boxFare, boxOfficer: boxOfficer, boxKeep: boxKeep,
     dropbox: function () { return dropbox; },
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
@@ -51380,6 +51631,1009 @@ return module.exports;
   }
 })();
 // ==== end thornswood trade ships ====
+// ==== thornswood market stalls ====
+/*
+  MARKET STALLS (#3160). Patrick, 22 Oct 2026, on his report page: stalls
+  are fixed market stalls, claimed like property, and a stall sells only
+  while its keeper is there ("No this is an RP server"). The rule in prose is
+  docs/systems/stalls.md.
+
+  The book is game/market-stalls.js, bundled just below as MARKET_STALLS_BOOK
+  (scripts/dev/Build-MarketStallsGamemode.js writes it, and the stall table
+  after it; tests/test-3160-market-stalls.js fails when either is stale).
+  This block is the world's side of it: the register on disk, the packs and
+  purses a sale moves, who stands where, the panel, and the hold's drop box
+  that takes what was on a stall whose keeping ended.
+
+  WHERE A STALL IS. MARKET_STALL_TABLE, out of game/data/market-stalls.json,
+  which scripts/dev/Build-MarketStalls.py builds from the plugins: one row a
+  stall, the point in front of its counter and how far from it counts as at
+  the stall. The front plugin carries the same rows (STALL_SPOTS) and puts
+  the lock key's line up there, Market stall; the key sends /stall open and
+  the stall's id, and this checks again that they are standing at it.
+
+  THE REGISTER is private/market-stalls.json, beside the other registers that
+  name characters, because the data folder is served to anybody (#541). Every
+  change is written before it is made, the way the trade ships' manifest is:
+  the next book goes to disk and only then becomes the book, so a write that
+  fails changes nothing. A file that is there and does not read is refused
+  whole: no stall can be claimed or sold from at this start, nothing is
+  written over it, and the log says so.
+
+  WHAT MOVES IN WHAT ORDER, so a failure never makes a piece or a coin:
+    - laying out: the piece comes out of the keeper's pack, then the book is
+      written; a book that will not write puts it back in the pack;
+    - taking back and buying: the book is written first, then the packs; a
+      pack that will not take it puts the line back on the book;
+    - buying: the price comes out of the buyer's pack before the book is
+      written, and goes back to them when the book will not write.
+  The keeper's share goes into the keeper's own pack, because they are
+  standing there: a stall sells only then.
+
+  WHAT A KEEPER IS SHOWN, AND A BUYER. The keeper is never named on the
+  panel: whoever stands at the stall is who sells there, and people see
+  them. A buyer sees the wares, the prices and whether the keeper is here.
+
+  THE RELEASE (#2351, #2668). As this block loads it asks for the part
+  'stalls' through __thornswoodRelease: a deleted, reset or replaced
+  character's stalls end and their goods go to the hold's drop box with no
+  name on them, for its officers.
+*/
+// MARKET STALLS BUNDLE BEGIN
+// Built by scripts\dev\Build-MarketStallsGamemode.js out of game\market-stalls.js. Do not hand edit.
+const MARKET_STALLS_BOOK = (function () {
+const module = { exports: {} };
+'use strict';
+/*
+  MARKET STALLS: THE STALL BOOK AND ITS PANEL (#3160).
+
+  Patrick, 22 Oct 2026, on his report page: stalls are fixed market stalls,
+  claimed like property, and a stall sells only while its keeper is there
+  ("No this is an RP server"). docs/systems/stalls.md is the rule in prose.
+
+  This file is only the book: who keeps each stall, what is laid out on it
+  and at what price, and the words the stall's panel sends. It never touches
+  the world, a pack or a purse; the market stalls block in game/gamemode.js
+  does that, around these calls, and bundles this file
+  (scripts/dev/Build-MarketStallsGamemode.js).
+
+  A STALL is a row of game/data/market-stalls.json: { id, hold, place, world,
+  pos, reach }. Which stalls there are is the table's, built out of the
+  plugins; the book only ever names a stall by its id.
+
+  A KEEPER is a character, { actor, profile }, the way the trade ships'
+  manifest names people (game/trade-cargo.js): never a name.
+
+  A LINE is goods laid out on the stall: { n, entry, count, price }. entry is
+  the pack's own entry with no count, so a piece crosses as it is, the way a
+  trade carries it (docs/systems/trade.md). price is per piece, either
+  { gold: <n> } or { goods: { base, count, name } }: n gold, or count pieces
+  of the record base. An item has no gold price of its own (docs/DECIDED.md):
+  the price is the keeper's, and nothing here suggests one.
+
+  WHAT LEAVES A STALL WHEN ITS KEEPING ENDS. A claim lapses, a steward or
+  staff end it, its keeper lets it go, or its keeper's character is deleted:
+  the stall is free at once and what was laid out on it is written on the
+  book as gone to the hold's drop box, each piece with a receipt
+  (state.out). The block puts each into that box and only then takes its
+  receipt off the book, and the box keeps the receipt, so a piece is put in
+  once whichever of the two writes a crash comes between.
+
+  Coin is never laid out: gold is a price, not goods.
+*/
+
+var GOLD_BASE = 15;
+var MAX_LINES = 24;
+var LAPSE_DAYS = 14;
+var MAX_GOLD = 1000000;
+var MAX_GOODS = 1000;
+var MAX_COUNT = 2147483647;
+var NAME_CHARS = 60;
+var ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+var HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath',
+             'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+var DAY = 86400000;
+
+function copy(v) { return JSON.parse(JSON.stringify(v)); }
+function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+function whole(n) { return Number.isInteger(n) && n > 0; }
+function isCoin(base) { return (Number(base) >>> 0) === GOLD_BASE; }
+function same(a, b) { return !!a && !!b && a.actor === b.actor && a.profile === b.profile; }
+function party(v) {
+  return isObj(v) && Number.isInteger(v.actor) && v.actor > 0 && v.actor <= 0xffffffff &&
+    Number.isSafeInteger(v.profile) && v.profile > 0;
+}
+
+/* The stall table, checked whole. Answers the rows by id, or throws what is wrong. */
+function checkTable(rows) {
+  if (!Array.isArray(rows)) { throw new Error('The stall table is not a list.'); }
+  var out = {};
+  rows.forEach(function (r, i) {
+    var at = 'stall ' + (i + 1);
+    if (!isObj(r) || typeof r.id !== 'string' || !ID_RE.test(r.id)) { throw new Error(at + ' has no id.'); }
+    if (has(out, r.id)) { throw new Error(at + ': ' + r.id + ' is in the table twice.'); }
+    if (HOLDS.indexOf(r.hold) < 0) { throw new Error(r.id + ' is in no hold the ledgers know.'); }
+    if (typeof r.place !== 'string' || !r.place) { throw new Error(r.id + ' has no place name.'); }
+    if (typeof r.world !== 'string' || !/^[0-9a-f]{1,8}:[^:]+$/i.test(r.world)) { throw new Error(r.id + ' has no world or cell.'); }
+    if (!Array.isArray(r.pos) || r.pos.length !== 3 || !r.pos.every(function (x) { return typeof x === 'number' && isFinite(x); })) {
+      throw new Error(r.id + ' has no point.');
+    }
+    if (!(typeof r.reach === 'number' && r.reach > 0 && r.reach <= 2000)) { throw new Error(r.id + ' has no reach.'); }
+    out[r.id] = { id: r.id, hold: r.hold, place: r.place, world: r.world, pos: r.pos.slice(), reach: r.reach };
+  });
+  return out;
+}
+
+/* A price as the panel and the book hold it, checked, or null. */
+function priceOf(p) {
+  if (!isObj(p)) { return null; }
+  if (has(p, 'gold')) {
+    return whole(p.gold) && p.gold <= MAX_GOLD && Object.keys(p).length === 1 ? { gold: p.gold } : null;
+  }
+  if (has(p, 'goods') && Object.keys(p).length === 1 && isObj(p.goods)) {
+    var g = p.goods;
+    if (!whole(g.base) || g.base > 0xffffffff || isCoin(g.base) || !whole(g.count) || g.count > MAX_GOODS) { return null; }
+    if (typeof g.name !== 'string' || !g.name || g.name.length > NAME_CHARS) { return null; }
+    return { goods: { base: g.base, count: g.count, name: g.name } };
+  }
+  return null;
+}
+
+/* What n pieces cost: { gold } or { goods: { base, count, name } }, or null past what can be paid. */
+function costOf(price, n) {
+  if (price.gold) {
+    var t = price.gold * n;
+    return t <= MAX_COUNT ? { gold: t } : null;
+  }
+  var c = price.goods.count * n;
+  return c <= MAX_COUNT ? { goods: { base: price.goods.base, count: c, name: price.goods.name } } : null;
+}
+
+function priceWords(price) {
+  if (price.gold) { return price.gold + ' gold'; }
+  return price.goods.count + ' ' + price.goods.name;
+}
+
+function entryOk(e) {
+  return isObj(e) && Number.isInteger(e.baseId) && e.baseId > 0 && e.baseId <= 0xffffffff && !isCoin(e.baseId) &&
+    !has(e, 'count') && !has(e, 'worn') && !has(e, 'wornLeft');
+}
+function shape(e) { return JSON.stringify(e); }
+
+function emptyState() { return { stalls: {}, out: [], next: 1 }; }
+
+/*
+  THE REGISTER, private/market-stalls.json: { version: 1, state }. Read row
+  by row and refused whole when one does not verify: a book that is there
+  and does not read is never opened empty, because the next write would
+  throw away everything laid out on every stall. A stall the table no longer
+  has keeps its row, and the block ends it (whatever was on it goes to the
+  hold's box it was in).
+*/
+function openRegister(text) {
+  if (text === null || text === undefined || text === '') { return emptyState(); }
+  var o = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+  if (!isObj(o) || o.version !== 1 || !isObj(o.state)) { throw new Error('It is not a stall book.'); }
+  var s = o.state;
+  if (!isObj(s.stalls) || !Array.isArray(s.out) || !whole(s.next)) { throw new Error('It is not a stall book.'); }
+  var out = emptyState();
+  out.next = s.next;
+  Object.keys(s.stalls).forEach(function (id) {
+    var r = s.stalls[id];
+    if (!ID_RE.test(id) || !isObj(r)) { throw new Error('Stall ' + id + ' does not read.'); }
+    if (!(r.keeper === null || party(r.keeper))) { throw new Error('Stall ' + id + ' has a keeper who does not read.'); }
+    if (HOLDS.indexOf(r.hold) < 0) { throw new Error('Stall ' + id + ' is in no hold.'); }
+    if (!Number.isSafeInteger(r.since) || !Number.isSafeInteger(r.last) || !Array.isArray(r.lines)) {
+      throw new Error('Stall ' + id + ' does not read.');
+    }
+    var lines = r.lines.map(function (l) {
+      if (!isObj(l) || !whole(l.n) || l.n >= s.next || !entryOk(l.entry) || !whole(l.count) || !priceOf(l.price)) {
+        throw new Error('A line on stall ' + id + ' does not read.');
+      }
+      return { n: l.n, entry: copy(l.entry), count: l.count, price: priceOf(l.price) };
+    });
+    if (lines.length > MAX_LINES) { throw new Error('Stall ' + id + ' holds more than ' + MAX_LINES + ' lines.'); }
+    if (r.keeper === null && lines.length) { throw new Error('Stall ' + id + ' holds goods with no keeper.'); }
+    out.stalls[id] = { keeper: r.keeper ? copy(r.keeper) : null, hold: r.hold, since: r.since, last: r.last, lines: lines };
+  });
+  s.out.forEach(function (x) {
+    if (!isObj(x) || typeof x.receipt !== 'string' || !/^stall:[0-9]+$/.test(x.receipt) || HOLDS.indexOf(x.hold) < 0 ||
+        !entryOk(x.entry) || !whole(x.count) || !(x.of === null || party(x.of)) || typeof x.why !== 'string') {
+      throw new Error('A piece on its way to a drop box does not read.');
+    }
+    out.out.push({ receipt: x.receipt, hold: x.hold, entry: copy(x.entry), count: x.count, of: x.of ? copy(x.of) : null, why: x.why });
+  });
+  return out;
+}
+
+function saveRegister(state) { return JSON.stringify({ version: 1, state: state }, null, 1); }
+
+function rec(state, id) {
+  var r = state.stalls[id];
+  return r || null;
+}
+function keeperOf(state, id) { var r = rec(state, id); return r ? r.keeper : null; }
+function keeps(state, id, who) { return same(keeperOf(state, id), who); }
+
+function mine(state, id, who) {
+  var r = rec(state, id);
+  if (!r || !r.keeper) { throw new Error('Nobody keeps this stall.'); }
+  if (!same(r.keeper, who)) { throw new Error('This stall is not yours.'); }
+  return r;
+}
+
+/* Claiming costs nothing, and only a free stall can be claimed (property.md). */
+function claim(state, stall, who, now) {
+  if (!party(who)) { throw new Error('Who is claiming cannot be read.'); }
+  var r = rec(state, stall.id);
+  if (r && r.keeper) {
+    throw new Error(same(r.keeper, who) ? 'This stall is already yours.' : 'Somebody already keeps this stall.');
+  }
+  state.stalls[stall.id] = { keeper: copy(who), hold: stall.hold, since: now, last: now, lines: [] };
+}
+
+/* The keeper was here: the 14 day clock starts again, the way living in a house keeps it. */
+function touch(state, id, who, now) {
+  var r = rec(state, id);
+  if (r && same(r.keeper, who)) { r.last = now; return true; }
+  return false;
+}
+
+function lineOf(r, n) {
+  for (var i = 0; i < r.lines.length; i++) { if (r.lines[i].n === n) { return i; } }
+  return -1;
+}
+
+/* A piece out of the keeper's pack, onto the stall at a price. Onto its own line, or the line of the same piece at the same price. */
+function lay(state, id, who, piece, price) {
+  var r = mine(state, id, who);
+  var p = priceOf(price);
+  if (!p) { throw new Error('That price cannot be read.'); }
+  if (!isObj(piece) || !whole(piece.count)) { throw new Error('That cannot be laid out.'); }
+  var entry = copy(piece);
+  delete entry.count;
+  if (isCoin(entry.baseId)) { throw new Error('Gold is a price, not goods.'); }
+  if (!entryOk(entry)) { throw new Error('That cannot be laid out.'); }
+  var key = shape(entry), pk = JSON.stringify(p);
+  for (var i = 0; i < r.lines.length; i++) {
+    var l = r.lines[i];
+    if (shape(l.entry) === key && JSON.stringify(l.price) === pk) {
+      if (l.count + piece.count > MAX_COUNT) { throw new Error('That line cannot hold that many.'); }
+      l.count += piece.count;
+      return l.n;
+    }
+  }
+  if (r.lines.length >= MAX_LINES) { throw new Error('The stall holds ' + MAX_LINES + ' lines at most.'); }
+  var n = state.next++;
+  r.lines.push({ n: n, entry: entry, count: piece.count, price: p });
+  return n;
+}
+
+function setPrice(state, id, who, n, price) {
+  var r = mine(state, id, who);
+  var p = priceOf(price);
+  if (!p) { throw new Error('That price cannot be read.'); }
+  var at = lineOf(r, n);
+  if (at < 0) { throw new Error('That is not on the stall.'); }
+  r.lines[at].price = p;
+}
+
+/* count pieces of line n off the stall: answers the piece, with its count. */
+function takeOff(state, id, n, count) {
+  var r = rec(state, id);
+  var at = r ? lineOf(r, n) : -1;
+  if (at < 0) { throw new Error('That is not on the stall.'); }
+  var l = r.lines[at];
+  if (!whole(count) || count > l.count) { throw new Error('There are not that many.'); }
+  var before = copy(l);
+  var piece = copy(l.entry);
+  piece.count = count;
+  l.count -= count;
+  if (l.count <= 0) { r.lines.splice(at, 1); }
+  return { piece: piece, price: copy(l.price), line: before };
+}
+
+/* The keeper takes goods back off their own stall: the piece, and the line as it was for restoreLine. */
+function takeBack(state, id, who, n, count) {
+  mine(state, id, who);
+  var off = takeOff(state, id, n, count);
+  return { piece: off.piece, line: off.line };
+}
+
+/* A sale off the stall: the piece and what it costs. The block checks the keeper is there before it asks. */
+function sell(state, id, n, count) {
+  var r = rec(state, id);
+  if (!r || !r.keeper) { throw new Error('Nobody keeps this stall.'); }
+  var at = lineOf(r, n);
+  if (at < 0) { throw new Error('That is not on the stall any more.'); }
+  var cost = costOf(r.lines[at].price, count);
+  if (!cost) { throw new Error('That is more than can be paid at once.'); }
+  var off = takeOff(state, id, n, count);
+  return { piece: off.piece, cost: cost, keeper: copy(r.keeper), line: off.line };
+}
+
+/* A line put back as it was, when the rest of a sale or a take back could not be done. */
+function restoreLine(state, id, line) {
+  var r = rec(state, id);
+  if (!r || !r.keeper) { throw new Error('Nobody keeps this stall now.'); }
+  var at = lineOf(r, line.n);
+  if (at >= 0) { r.lines[at].count = line.count; return; }
+  r.lines.push(copy(line));
+  r.lines.sort(function (a, b) { return a.n - b.n; });
+}
+
+/*
+  The keeping ends: the stall is free, and every line goes on its way to the
+  hold's drop box with a receipt, for its keeper by name, or with no name
+  when their character was deleted. Answers how many lines went.
+*/
+function end(state, id, why, keepName) {
+  var r = rec(state, id);
+  if (!r || !r.keeper) { return 0; }
+  var of = keepName === false ? null : copy(r.keeper);
+  var n = r.lines.length;
+  r.lines.forEach(function (l) {
+    state.out.push({ receipt: 'stall:' + (state.next++), hold: r.hold, entry: copy(l.entry), count: l.count, of: of, why: String(why || '') });
+  });
+  delete state.stalls[id];
+  return n;
+}
+
+/*
+  A piece bought whose buyer's pack would not take it: on its way to the
+  hold's drop box for them, with a receipt like a stall's goods.
+*/
+function toBox(state, hold, piece, of, why) {
+  if (HOLDS.indexOf(hold) < 0) { throw new Error('That is in no hold.'); }
+  var entry = copy(piece);
+  delete entry.count;
+  if (!entryOk(entry) || !whole(piece.count)) { throw new Error('That piece cannot go to a drop box.'); }
+  state.out.push({ receipt: 'stall:' + (state.next++), hold: hold, entry: entry, count: piece.count, of: of ? copy(of) : null, why: String(why || '') });
+}
+
+/* The receipt is in the drop box: off the book. */
+function delivered(state, receipt) {
+  var before = state.out.length;
+  state.out = state.out.filter(function (x) { return x.receipt !== receipt; });
+  return state.out.length < before;
+}
+
+/* The stalls whose keeper has not been there for days. */
+function lapsed(state, now, days) {
+  var d = whole(days) ? days : LAPSE_DAYS;
+  return Object.keys(state.stalls).filter(function (id) {
+    var r = state.stalls[id];
+    return r.keeper && now - r.last > d * DAY;
+  });
+}
+
+/*
+  A deleted person, or a character reset or wiped (#2351, #2668); who is the
+  release's { actor(n), profile(n) }. A stall is kept by the character who
+  claimed it, so it ends when either is listed. When the person is deleted
+  (their profile is listed) its goods go to the hold's box with their name
+  off, and a piece already on its way loses it too, the way the box keeps a
+  deleted character's coin. When only the character goes and the person
+  stays, its goods go to the box for them, and they take them back there.
+*/
+function release(state, who) {
+  var counts = { stalls: 0, pieces: 0 };
+  var person = function (p) { return !!p && who.profile(p.profile); };
+  var character = function (p) { return !!p && (who.actor(p.actor) || who.profile(p.profile)); };
+  Object.keys(state.stalls).forEach(function (id) {
+    var k = state.stalls[id].keeper;
+    if (character(k)) { counts.stalls++; end(state, id, 'its keeper is gone', !person(k)); }
+  });
+  state.out.forEach(function (x) { if (person(x.of)) { x.of = null; counts.pieces++; } });
+  return counts;
+}
+
+function countsOf(state) {
+  var kept = 0, lines = 0;
+  Object.keys(state.stalls).forEach(function (id) {
+    if (state.stalls[id].keeper) { kept++; lines += state.stalls[id].lines.length; }
+  });
+  return { kept: kept, lines: lines, out: state.out.length };
+}
+
+/*
+  THE WORDS THE PANEL SENDS (game/ui/thornswood-stall.js), never typed:
+
+    /stall open <id>                            the lock key at a stall
+    /stall claim                                Claim this stall
+    /stall lay <base> <nth> <count> gold <n>    Lay it out, at n gold a piece
+    /stall lay <base> <nth> <count> goods <base> <n>   at n of those a piece
+    /stall price <line> gold <n> | goods <base> <n>
+    /stall back <line> <count>                  Take back
+    /stall buy <line> <count>                   Buy
+    /stall find <words ...>                     what a goods price can name
+    /stall letgo                                Let the stall go
+    /stall end                                  a steward or staff: End this claim
+    /stall close
+
+  A base is hex, every other number decimal.
+*/
+function parse(parts) {
+  var p = Array.isArray(parts) ? parts.map(function (x) { return String(x); }) : [];
+  var verb = String(p[1] || '').toLowerCase();
+  var n = function (s) { return /^[0-9]{1,10}$/.test(String(s)) ? Number(s) : NaN; };
+  var h = function (s) { return /^[0-9a-f]{1,8}$/i.test(String(s)) ? parseInt(s, 16) >>> 0 : NaN; };
+  var price = function (at) {
+    var k = String(p[at] || '').toLowerCase();
+    if (k === 'gold') { return { gold: n(p[at + 1]) }; }
+    if (k === 'goods') { return { goods: { base: h(p[at + 1]), count: n(p[at + 2]) } }; }
+    return null;
+  };
+  var priced = function (pr) {
+    if (!pr) { return false; }
+    if (pr.gold !== undefined) { return whole(pr.gold) && pr.gold <= MAX_GOLD; }
+    return whole(pr.goods.base) && !isCoin(pr.goods.base) && whole(pr.goods.count) && pr.goods.count <= MAX_GOODS;
+  };
+  if (verb === 'close' || verb === 'claim' || verb === 'letgo' || verb === 'end') { return { verb: verb }; }
+  if (verb === 'open') {
+    return ID_RE.test(String(p[2] || '')) ? { verb: 'open', id: p[2] } : { why: 'Which stall?' };
+  }
+  if (verb === 'lay') {
+    var l = { verb: 'lay', base: h(p[2]), nth: n(p[3]), count: n(p[4]), price: price(5) };
+    if (!whole(l.base) || !Number.isInteger(l.nth) || !whole(l.count)) { return { why: 'That cannot be read.' }; }
+    if (!priced(l.price)) { return { why: 'Say a price: a number of gold, or a number of something.' }; }
+    return l;
+  }
+  if (verb === 'price') {
+    var r = { verb: 'price', line: n(p[2]), price: price(3) };
+    if (!whole(r.line)) { return { why: 'That cannot be read.' }; }
+    if (!priced(r.price)) { return { why: 'Say a price: a number of gold, or a number of something.' }; }
+    return r;
+  }
+  if (verb === 'back' || verb === 'buy') {
+    var b = { verb: verb, line: n(p[2]), count: n(p[3]) };
+    return whole(b.line) && whole(b.count) ? b : { why: 'Say how many.' };
+  }
+  if (verb === 'find') {
+    var words = p.slice(2).join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+    return words.length >= 2 && words.length <= NAME_CHARS ? { verb: 'find', words: words } : { why: 'Say at least two letters of its name.' };
+  }
+  return { why: 'The stall does not know that.' };
+}
+
+/*
+  What the panel shows this person at this stall. Worked out here, never in
+  the page: the keeper's own controls only to the keeper, End this claim
+  only to an officer, and the wares to everybody. The keeper is never named:
+  whoever stands at the stall is who sells there.
+
+    input: { stall, state, viewer, keeperHere, officer, pack, packGold,
+             itemName, found, said }
+*/
+function stallView(input) {
+  var st = input.stall, r = rec(input.state, st.id);
+  var keeper = r ? r.keeper : null;
+  var mineToo = !!keeper && same(keeper, input.viewer);
+  var v = {
+    open: true, id: st.id, place: st.place, free: !keeper, mine: mineToo,
+    keeperHere: !!keeper && !!input.keeperHere, officer: !!input.officer && !!keeper && !mineToo,
+    lines: [], max: MAX_LINES, said: input.said || ''
+  };
+  if (r && keeper) {
+    v.lines = r.lines.map(function (l) {
+      return { n: l.n, what: input.itemName(Object.assign({ count: l.count }, l.entry)), count: l.count,
+               price: copy(l.price), words: priceWords(l.price) };
+    });
+  }
+  if (mineToo) {
+    v.pack = (input.pack || []).map(function (x) { return { base: x.baseId.toString(16), nth: x.nth, count: x.count, what: x.name }; });
+    v.found = (input.found || []).map(function (f) { return { base: f.base.toString(16), name: f.name }; });
+    v.lapseDays = LAPSE_DAYS;
+  }
+  if (!mineToo && keeper) { v.packGold = Number(input.packGold) || 0; }
+  return v;
+}
+
+module.exports = {
+  GOLD_BASE: GOLD_BASE, MAX_LINES: MAX_LINES, LAPSE_DAYS: LAPSE_DAYS, MAX_GOLD: MAX_GOLD, MAX_GOODS: MAX_GOODS,
+  HOLDS: HOLDS, isCoin: isCoin, same: same,
+  checkTable: checkTable, priceOf: priceOf, costOf: costOf, priceWords: priceWords,
+  openRegister: openRegister, saveRegister: saveRegister, emptyState: emptyState,
+  keeperOf: keeperOf, keeps: keeps, claim: claim, touch: touch, lay: lay, setPrice: setPrice,
+  takeBack: takeBack, sell: sell, restoreLine: restoreLine, end: end, toBox: toBox, delivered: delivered, lapsed: lapsed,
+  release: release, countsOf: countsOf, parse: parse, stallView: stallView
+};
+return module.exports;
+})();
+// MARKET STALLS BUNDLE END
+// MARKET STALL TABLE BEGIN
+// Built by scripts\dev\Build-MarketStallsGamemode.js out of game\data\market-stalls.json. Do not hand edit.
+var MARKET_STALL_TABLE = [{"id":"falkreath-e0b1","hold":"falkreath","place":"Granite Hill","world":"3c:Skyrim.esm","pos":[-54113,-34305,-3633],"reach":335},{"id":"falkreath-e0b2","hold":"falkreath","place":"Granite Hill","world":"3c:Skyrim.esm","pos":[-54413,-34602,-3620],"reach":335},{"id":"markarth-473a0","hold":"markarth","place":"Markarth","world":"16d71:Skyrim.esm","pos":[-174050,5729,-3363],"reach":183},{"id":"markarth-473a1","hold":"markarth","place":"Markarth","world":"16d71:Skyrim.esm","pos":[-174136,6065,-3328],"reach":183},{"id":"markarth-7de","hold":"markarth","place":"Markarth","world":"3c:Skyrim.esm","pos":[-168656,6632,-4331],"reach":183},{"id":"morthal-bc995","hold":"morthal","place":"Markarth Side","world":"3c:Skyrim.esm","pos":[-85314,57199,-11567],"reach":254},{"id":"morthal-bc996","hold":"morthal","place":"Markarth Side","world":"3c:Skyrim.esm","pos":[-85377,57518,-11568],"reach":254},{"id":"riften-1b1f7a","hold":"riften","place":"Riften","world":"16bb4:Skyrim.esm","pos":[176485,-98728,11211],"reach":260},{"id":"riften-1b1f7c","hold":"riften","place":"Riften","world":"16bb4:Skyrim.esm","pos":[176213,-99094,11207],"reach":202},{"id":"riften-1dd1","hold":"riften","place":"Riften","world":"16bb4:Skyrim.esm","pos":[172370,-96376,11128],"reach":202},{"id":"riften-1dd2","hold":"riften","place":"Riften","world":"16bb4:Skyrim.esm","pos":[172370,-96231,11128],"reach":202},{"id":"riften-cc524","hold":"riften","place":"Riften","world":"16bb4:Skyrim.esm","pos":[173755,-96726,11104],"reach":252},{"id":"riften-cc52d","hold":"riften","place":"Riften","world":"16bb4:Skyrim.esm","pos":[173079,-97352,11104],"reach":309},{"id":"riften-cc52e","hold":"riften","place":"Riften","world":"16bb4:Skyrim.esm","pos":[173779,-97306,11104],"reach":257},{"id":"solitude-1aa3b","hold":"solitude","place":"Solitude","world":"3c:Skyrim.esm","pos":[-59552,100648,-13958],"reach":224},{"id":"solitude-2a11","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-61093,105827,-8410],"reach":224},{"id":"solitude-2a1b","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-61315,105933,-8418],"reach":209},{"id":"solitude-2a49","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-60786,105792,-8410],"reach":224},{"id":"solitude-357d","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-59225,107632,-8021],"reach":224},{"id":"solitude-46f5","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-60730,104169,-8307],"reach":224},{"id":"solitude-4725","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-61764,104094,-8307],"reach":224},{"id":"solitude-50c6a","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-61161,104924,-8335],"reach":224},{"id":"solitude-5133","hold":"solitude","place":"Solitude","world":"3c:Skyrim.esm","pos":[-58740,101161,-13959],"reach":224},{"id":"solitude-64b8c","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-61200,104536,-8334],"reach":224},{"id":"solitude-64b8d","hold":"solitude","place":"Solitude","world":"37edf:Skyrim.esm","pos":[-61605,104462,-8333],"reach":224},{"id":"whiterun-1908f","hold":"whiterun","place":"Whiterun","world":"1a26f:Skyrim.esm","pos":[21453,-7327,-3587],"reach":254},{"id":"whiterun-5b2e4","hold":"whiterun","place":"Whiterun","world":"1a26f:Skyrim.esm","pos":[25242,-7425,-3393],"reach":254},{"id":"whiterun-5bee6","hold":"whiterun","place":"Whiterun","world":"1a26f:Skyrim.esm","pos":[25156,-7089,-3400],"reach":314},{"id":"whiterun-6b0b6","hold":"whiterun","place":"Whiterun","world":"1a26f:Skyrim.esm","pos":[24382,-7187,-3399],"reach":335},{"id":"whiterun-b7f00","hold":"whiterun","place":"Whiterun","world":"3c:Skyrim.esm","pos":[12937,-10803,-4726],"reach":238},{"id":"whiterun-fe7f","hold":"whiterun","place":"Whiterun","world":"1a26f:Skyrim.esm","pos":[24312,-6755,-3422],"reach":270},{"id":"windhelm-383a6","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[130794,36455,-12272],"reach":236},{"id":"windhelm-38403","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[130808,35750,-12276],"reach":236},{"id":"windhelm-38404","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[130560,36224,-12272],"reach":236},{"id":"windhelm-80c33","hold":"windhelm","place":"Windhelm","world":"3c:Skyrim.esm","pos":[135265,30774,-12565],"reach":202},{"id":"windhelm-8b01e","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[134225,39412,-12049],"reach":236},{"id":"windhelm-8b0a","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[129842,36459,-12272],"reach":236},{"id":"windhelm-8b0fb","hold":"windhelm","place":"Windhelm","world":"3c:Skyrim.esm","pos":[135301,30408,-12581],"reach":177},{"id":"windhelm-8b6c","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[130415,35648,-12272],"reach":236},{"id":"windhelm-a48fc","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[137951,38182,-12643],"reach":208},{"id":"windhelm-b4bb","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[137721,38748,-12660],"reach":219},{"id":"windhelm-f3c74","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[131041,35666,-12272],"reach":219},{"id":"windhelm-f3c75","hold":"windhelm","place":"Windhelm","world":"1691d:Skyrim.esm","pos":[130560,36016,-12272],"reach":219},{"id":"winterhold-76d1","hold":"winterhold","place":"Winterhold","world":"3c:Skyrim.esm","pos":[114289,104184,-9405],"reach":202},{"id":"winterhold-76d3","hold":"winterhold","place":"Winterhold","world":"3c:Skyrim.esm","pos":[114562,104038,-9392],"reach":183},{"id":"winterhold-76e1","hold":"winterhold","place":"Winterhold","world":"3c:Skyrim.esm","pos":[114011,103748,-9225],"reach":202},{"id":"winterhold-76e2","hold":"winterhold","place":"Winterhold","world":"3c:Skyrim.esm","pos":[113403,100147,-8954],"reach":183},{"id":"winterhold-76e4","hold":"winterhold","place":"Winterhold","world":"3c:Skyrim.esm","pos":[113628,100266,-9020],"reach":202},{"id":"winterhold-76e5","hold":"winterhold","place":"Winterhold","world":"3c:Skyrim.esm","pos":[112678,100814,-8953],"reach":202},{"id":"winterhold-76e6","hold":"winterhold","place":"Winterhold","world":"3c:Skyrim.esm","pos":[112650,100647,-8944],"reach":202}];
+// MARKET STALL TABLE END
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined' ? globalThis : this);
+  var fs = require('fs'), path = require('path');
+  var BOOK = MARKET_STALLS_BOOK;
+  function slog() {
+    var a = Array.prototype.slice.call(arguments);
+    if (typeof log === 'function') { log.apply(null, ['[stalls]'].concat(a)); } else { console.log('[thornswood] [stalls] ' + a.join(' ')); }
+  }
+  function copy(v) { return JSON.parse(JSON.stringify(v)); }
+
+  var stalls = null;
+  try { stalls = BOOK.checkTable(MARKET_STALL_TABLE); }
+  catch (eTable) { slog('the stall table does not read (' + ((eTable && eTable.message) || eTable) + '), so no stall is open at this start'); stalls = null; }
+
+  // The privDir server-settings.json names, or private when it names none;
+  // a settings file that will not read names no folder (#2871), as for the ships.
+  var privDir = 'private';
+  var settingsWhy = '';
+  try {
+    var cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^\uFEFF/, ''));
+    if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+  } catch (e) { settingsWhy = String((e && (e.code || e.message)) || e); }
+  var FILE = path.resolve(privDir, 'market-stalls.json');
+
+  var unreadable = settingsWhy ? 'server-settings.json could not be read' : '';
+  var state = null;
+  (function read() {
+    if (unreadable) { return; }
+    var t = null;
+    try { t = fs.readFileSync(FILE, 'utf8'); }
+    catch (e) { if (!e || e.code !== 'ENOENT') { unreadable = String((e && e.code) || e); } }
+    if (unreadable) { return; }
+    try { state = BOOK.openRegister(t); }
+    catch (e2) { unreadable = String((e2 && e2.message) || e2); state = null; }
+  })();
+  if (settingsWhy) {
+    slog('server-settings.json could not be read (' + settingsWhy + '), so where the stall book is is not known: no stall is open at this start and nothing is written');
+  } else if (unreadable) {
+    slog(FILE, 'could not be read (' + unreadable + '), so no stall is open at this start and nothing is written over it until it is put right');
+  }
+
+  function commit(next) {
+    if (unreadable || !state) { return false; }
+    try {
+      var text = BOOK.saveRegister(next);
+      fs.mkdirSync(path.dirname(FILE), { recursive: true });
+      fs.writeFileSync(FILE + '.tmp', text);
+      fs.renameSync(FILE + '.tmp', FILE);
+    } catch (e) {
+      slog('could not write', FILE + ':', (e && e.message) || e);
+      return false;
+    }
+    state = next;
+    return true;
+  }
+  /* One change to the book: f(next) on a copy, kept only when it is written. Answers what f answered. */
+  function change(f) {
+    var next = copy(state);
+    var r = f(next);
+    if (!commit(next)) { throw new Error('The stall book could not be written, so nothing changed.'); }
+    return r;
+  }
+
+  function prop() { return g.__thornswoodProperty || null; }
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+  function partyOf(actorId) { return { actor: Number(actorId) >>> 0, profile: profileOf(actorId) }; }
+  function nameOfActor(actorId) {
+    try { var ap = mp.get(actorId, 'appearance'); return ap && ap.name ? String(ap.name) : ''; } catch (e) { return ''; }
+  }
+  function itemName(entry) {
+    var p = prop();
+    try { if (p && typeof p.itemName === 'function') { return String(p.itemName(entry)); } } catch (e) { }
+    return entry && typeof entry.name === 'string' && entry.name ? entry.name : 'Goods';
+  }
+  function hook(name, pid) {
+    var f = g[name];
+    try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+  }
+
+  /* Standing at the stall: in its world or cell, within its reach of the point in front of its counter. */
+  function at(actorId, stall) {
+    try {
+      if (String(mp.get(actorId, 'worldOrCellDesc') || '').toLowerCase() !== stall.world.toLowerCase()) { return false; }
+      var a = mp.get(actorId, 'pos');
+      var dx = a[0] - stall.pos[0], dy = a[1] - stall.pos[1], dz = a[2] - stall.pos[2];
+      return dx * dx + dy * dy + dz * dz <= stall.reach * stall.reach;
+    } catch (e) { return false; }
+  }
+
+  /* The keeper is there: in the world, the same character, and at the stall. */
+  function keeperHere(id) {
+    var k = BOOK.keeperOf(state, id);
+    if (!k) { return false; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var inWorld = online.some(function (x) { return (Number(x) >>> 0) === k.actor; });
+    return inWorld && profileOf(k.actor) === k.profile && at(k.actor, stalls[id]);
+  }
+
+  // ------------------------------------------------------------ the packs --
+
+  function entriesOf(actorId) {
+    var inv = mp.get(actorId, 'inventory');
+    return copy((inv && inv.entries) || []);
+  }
+  function writePack(actorId, entries) { mp.set(actorId, 'inventory', { entries: entries }); }
+
+  /* What they carry to lay out, coin and worn pieces left out: [{ baseId, nth, count, name }]. nth is which stack of that base. */
+  function packList(actorId) {
+    var entries = [];
+    try { entries = entriesOf(actorId); } catch (e) { return []; }
+    var nth = {}, out = [];
+    entries.forEach(function (e) {
+      if (!e || !Number.isInteger(e.baseId) || !(e.count > 0)) { return; }
+      var k = nth[e.baseId] = (nth[e.baseId] === undefined ? 0 : nth[e.baseId] + 1);
+      if (BOOK.isCoin(e.baseId) || e.worn || e.wornLeft || questItemBlocked(e.baseId)) { return; }
+      out.push({ baseId: e.baseId, nth: k, count: e.count, name: itemName(e) });
+    });
+    return out.slice(0, 200);
+  }
+
+  function goldOf(actorId) {
+    var n = 0;
+    try { entriesOf(actorId).forEach(function (e) { if (e && BOOK.isCoin(e.baseId)) { n += Number(e.count) || 0; } }); } catch (e) { n = 0; }
+    return n;
+  }
+
+  /* n of that stack out of the pack, every other field kept. */
+  function packTake(actorId, base, nthOf, n) {
+    if (BOOK.isCoin(base)) { throw new Error('Gold is a price, not goods.'); }
+    if (questItemBlocked(base)) { throw new Error('Quest items stay with their assigned work.'); }
+    var entries = entriesOf(actorId);
+    var seen = -1, i = -1;
+    for (var k = 0; k < entries.length; k++) {
+      if (entries[k] && entries[k].baseId === base && ++seen === nthOf) { i = k; break; }
+    }
+    if (i < 0 || !(entries[i].count >= n)) { throw new Error('You do not carry that many.'); }
+    if (entries[i].worn || entries[i].wornLeft) { throw new Error('Take it off first.'); }
+    var piece = copy(entries[i]);
+    piece.count = n;
+    entries[i].count -= n;
+    if (entries[i].count <= 0) { entries.splice(i, 1); }
+    writePack(actorId, entries);
+    return piece;
+  }
+
+  /* Pieces into the pack, each onto the stack it matches or as its own. */
+  function packGive(actorId, pieces) {
+    var entries = entriesOf(actorId);
+    var shape = function (e) { var c = copy(e); delete c.count; return JSON.stringify(c); };
+    pieces.forEach(function (p) {
+      var want = shape(p), done = false;
+      for (var i = 0; i < entries.length && !done; i++) {
+        if (entries[i] && shape(entries[i]) === want) { entries[i].count += p.count; done = true; }
+      }
+      if (!done) { entries.push(copy(p)); }
+    });
+    writePack(actorId, entries);
+  }
+
+  /*
+    count pieces of one record out of the pack, worn ones left alone, from
+    whichever stacks hold it: the pieces as they were, each with its count.
+    Gold is the record 0xF, so a gold price comes out the same way.
+  */
+  function packPay(actorId, base, count) {
+    var entries = entriesOf(actorId);
+    var have = 0;
+    entries.forEach(function (e) { if (e && e.baseId === base && !e.worn && !e.wornLeft) { have += Number(e.count) || 0; } });
+    if (have < count) { return null; }
+    var left = count, out = [];
+    for (var i = 0; i < entries.length && left > 0; i++) {
+      var e = entries[i];
+      if (!e || e.baseId !== base || e.worn || e.wornLeft) { continue; }
+      var take = Math.min(left, Number(e.count) || 0);
+      var piece = copy(e);
+      piece.count = take;
+      out.push(piece);
+      e.count -= take;
+      left -= take;
+    }
+    writePack(actorId, entries.filter(function (e) { return !(e && e.count <= 0); }));
+    return out;
+  }
+
+  // ------------------------------------------------- the hold's drop box --
+
+  /*
+    What was on a stall whose keeping ended goes into its hold's drop box,
+    for its keeper by name, who takes it back there like anything they put
+    in; with no name, for the hold's officers, when the keeper is gone. The
+    box keeps the receipt, so a piece the book still lists after a crash is
+    not put in twice.
+  */
+  function sendOut() {
+    var p = prop();
+    if (!state || !state.out.length) { return; }
+    if (!p || typeof p.boxKeep !== 'function') {
+      slog(state.out.length, 'piece(s) wait to go to a drop box, and the property block has no box to take them');
+      return;
+    }
+    state.out.slice().forEach(function (x) {
+      var who = x.of ? { profile: x.of.profile, name: nameOfActor(x.of.actor) || 'the stall\'s keeper' } : null;
+      if (!p.boxKeep(x.hold, x.entry, x.count, x.receipt, who, x.why)) {
+        slog('a piece from a stall could not go into', x.hold + '\'s drop box; it waits on the book for the next try');
+        return;
+      }
+      try { change(function (next) { BOOK.delivered(next, x.receipt); }); }
+      catch (e) { slog('a piece is in', x.hold + '\'s drop box, and the book could not mark it; the box\'s receipt keeps it from going in twice'); }
+    });
+  }
+
+  function endStall(id, why) {
+    var n = change(function (next) { return BOOK.end(next, id, why); });
+    sendOut();
+    return n;
+  }
+
+  /* Every stall past its 14 days ends, the way a claim lapses (property.md). */
+  function lapse() {
+    BOOK.lapsed(state, Date.now(), BOOK.LAPSE_DAYS).forEach(function (id) {
+      try { var n = endStall(id, 'its keeper was away ' + BOOK.LAPSE_DAYS + ' days'); slog('a stall lapsed;', n, 'line(s) went to its hold\'s drop box'); }
+      catch (e) { slog('a stall lapsed and could not be written:', (e && e.message) || e); }
+    });
+  }
+
+  function release(who) {
+    if (unreadable || !state) { return { counts: { stalls: 0, pieces: 0 }, saved: false }; }
+    var next = copy(state);
+    var c = BOOK.release(next, who);
+    if (!c.stalls && !c.pieces) { return { counts: c, saved: true }; }
+    return { counts: c, saved: commit(next) };
+  }
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('stalls', release); }
+
+  if (!stalls || !state) { return; }
+
+  // A stall the table no longer has ends, and what was on it goes to its hold's box.
+  Object.keys(state.stalls).forEach(function (id) {
+    if (!stalls[id]) {
+      try { endStall(id, 'the stall is no longer in the market'); } catch (e) { slog('a stall that left the table could not be ended:', (e && e.message) || e); }
+    }
+  });
+  lapse();
+  sendOut();
+  var counts = BOOK.countsOf(state);
+  slog('ready:', Object.keys(stalls).length, 'stall(s),', counts.kept, 'kept,', counts.lines, 'line(s) laid out,',
+       counts.out, 'piece(s) waiting for a drop box');
+
+  // ------------------------------------------------------------ the panel --
+
+  var VIEW = 'thornswoodStallView';
+  try {
+    mp.makeProperty(VIEW, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: [
+        '(function(){',
+        '  try {',
+        '    var v = ctx.value;',
+        '    if (!v || typeof v !== "object") { return; }',
+        '    var st = ctx.state;',
+        '    if (!st || st.thornswoodStallAt === v.at) { return; }',
+        '    st.thornswoodStallAt = v.at;',
+        '    var body = JSON.stringify(v);',
+        '    ctx.sp.browser.executeJavaScript("(function(){try{var d=" + body + ";if(window.thornswoodStall&&window.thornswoodStall.setData){window.thornswoodStall.setData(d);}}catch(e){}})();");',
+        '  } catch (e) { }',
+        '})();'
+      ].join('\n'),
+      updateNeighbor: ''
+    });
+  } catch (eProp) { /* made by an earlier load. harmless. */ }
+
+  var sessions = {}, viewAt = 0;
+  var SESSION_MS = 10 * 60 * 1000;   // a panel left open this long asks for the stall again
+
+  function push(actorId, view) {
+    viewAt = Math.max(Date.now(), viewAt + 1);
+    view.at = viewAt;
+    try { mp.set(actorId, VIEW, view); } catch (e) { }
+  }
+
+  /* May this person end somebody's keeping here: a steward of the stall's hold, or staff, logged. */
+  function officer(profileId, stall) {
+    var p = prop();
+    try { if (p && typeof p.isStewardOf === 'function' && p.isStewardOf(profileId, stall.hold)) { return 'steward'; } } catch (e) { }
+    return hook('__thornswoodIsStaff', profileId) ? 'staff' : '';
+  }
+
+  function show(actorId, profileId, said) {
+    var s = sessions[actorId];
+    var st = stalls[s.id];
+    var me = partyOf(actorId);
+    push(actorId, BOOK.stallView({
+      stall: st, state: state, viewer: me, keeperHere: keeperHere(s.id), officer: !!officer(profileId, st),
+      pack: BOOK.keeps(state, s.id, me) ? packList(actorId) : [], packGold: goldOf(actorId),
+      itemName: itemName, found: s.found || [], said: said || ''
+    }));
+  }
+
+  /* Names a goods price can ask for, out of the two name tables /give reads: at most 12. */
+  function find(words) {
+    var out = [], seen = {};
+    var tables = [];
+    if (typeof ITEM_NAMES !== 'undefined') { tables.push(ITEM_NAMES); }
+    if (typeof ADMIN_ITEMS !== 'undefined') { tables.push(ADMIN_ITEMS); }
+    for (var t = 0; t < tables.length && out.length < 12; t++) {
+      for (var k in tables[t]) {
+        if (out.length >= 12) { break; }
+        if (!Object.prototype.hasOwnProperty.call(tables[t], k) || k.indexOf(words) < 0 || seen[k]) { continue; }
+        var base = typeof idOf === 'function' ? (Number(idOf(tables[t][k][1])) >>> 0) : 0;
+        if (!base || BOOK.isCoin(base)) { continue; }
+        seen[k] = true;
+        out.push({ base: base, name: String(tables[t][k][0]) });
+      }
+    }
+    return out;
+  }
+
+  function priceFor(p) {
+    if (p.gold !== undefined) { return { gold: p.gold }; }
+    var nm = itemName({ baseId: p.goods.base });
+    return { goods: { base: p.goods.base, count: p.goods.count, name: nm.slice(0, 60) } };
+  }
+
+  function lay(w, actorId) {
+    var id = sessions[actorId].id, me = partyOf(actorId);
+    if (!BOOK.keeps(state, id, me)) { throw new Error('This stall is not yours.'); }
+    var price = priceFor(w.price);
+    var piece = packTake(actorId, w.base, w.nth, w.count);
+    try { change(function (next) { BOOK.lay(next, id, me, piece, price); }); }
+    catch (e) {
+      try { packGive(actorId, [piece]); } catch (eBack) {
+        slog('could not lay out', JSON.stringify(piece), 'and could not put it back in the pack:', (eBack && eBack.message) || eBack);
+        throw new Error('It could not be laid out, and it could not be put back in your pack. Say so in the dev channel.');
+      }
+      throw e;
+    }
+    return 'Laid out at ' + BOOK.priceWords(BOOK.priceOf(price)) + ' a piece.';
+  }
+
+  function takeBack(w, actorId) {
+    var id = sessions[actorId].id, me = partyOf(actorId);
+    var off = change(function (next) { return BOOK.takeBack(next, id, me, w.line, w.count); });
+    try { packGive(actorId, [off.piece]); } catch (e) {
+      change(function (next) { BOOK.restoreLine(next, id, off.line); });
+      throw new Error('It could not be put in your pack, so it stays on the stall.');
+    }
+    return 'Taken back.';
+  }
+
+  /*
+    A sale. The keeper must be at the stall (Patrick, 22 Oct: a stall sells
+    only while its keeper is there). The price comes out of the buyer's
+    pack, the book is written, the goods go to the buyer and the price to
+    the keeper standing there.
+  */
+  function buy(w, actorId) {
+    var id = sessions[actorId].id, me = partyOf(actorId);
+    if (BOOK.keeps(state, id, me)) { throw new Error('It is your own stall.'); }
+    if (!keeperHere(id)) { throw new Error('The keeper is not at the stall, so nothing is sold.'); }
+    var probe = copy(state);
+    var sale = BOOK.sell(probe, id, w.line, w.count);
+    var base = sale.cost.gold ? BOOK.GOLD_BASE : sale.cost.goods.base;
+    var owed = sale.cost.gold || sale.cost.goods.count;
+    var paid = packPay(actorId, base, owed);
+    if (!paid) {
+      throw new Error(sale.cost.gold ? 'You do not carry ' + owed + ' gold.' : 'You do not carry ' + owed + ' ' + sale.cost.goods.name + '.');
+    }
+    var done = null;
+    try { done = change(function (next) { return BOOK.sell(next, id, w.line, w.count); }); }
+    catch (e) { packGive(actorId, paid); throw e; }
+    // The keeper is paid before the piece moves, so a pack that will not take
+    // the price undoes the whole sale and nothing is lost.
+    try { packGive(done.keeper.actor, paid); }
+    catch (ePay) {
+      change(function (next) { BOOK.restoreLine(next, id, done.line); });
+      packGive(actorId, paid);
+      throw new Error('The keeper\'s pack could not take the price, so nothing was sold.');
+    }
+    var whatName = itemName(done.piece);
+    var boxed = false;
+    try { packGive(actorId, [done.piece]); }
+    catch (eGive) {
+      // Paid for and the keeper paid: it waits in the hold's drop box for the buyer.
+      change(function (next) { BOOK.toBox(next, stalls[id].hold, done.piece, me, 'bought at a stall, and your pack would not take it'); });
+      sendOut();
+      boxed = true;
+    }
+    var keeperNote = (w.count > 1 ? w.count + ' ' : '') + whatName + ' sold for ' + (sale.cost.gold ? owed + ' gold.' : owed + ' ' + sale.cost.goods.name + '.');
+    var sayLine = g.__thornswoodSayLine;
+    if (typeof sayLine === 'function') { try { sayLine(done.keeper.profile, keeperNote); } catch (eSay) { } }
+    if (sessions[done.keeper.actor] && sessions[done.keeper.actor].id === id) {
+      show(done.keeper.actor, done.keeper.profile, keeperNote);
+    }
+    if (boxed) { return 'Bought ' + (w.count > 1 ? w.count + ' ' : '') + whatName + '. Your pack would not take it, so it is in this hold\'s drop box for you.'; }
+    return 'Bought ' + (w.count > 1 ? w.count + ' ' : '') + whatName + '.';
+  }
+
+  function endBy(actorId, profileId, cmd) {
+    var id = sessions[actorId].id, st = stalls[id];
+    var k = BOOK.keeperOf(state, id);
+    if (!k) { throw new Error('Nobody keeps this stall.'); }
+    var as = officer(profileId, st);
+    if (!as) { throw new Error('Only this hold\'s steward, or staff, can end somebody\'s keeping of a stall.'); }
+    var staff = g['__thornswoodStaff'];
+    if (as === 'staff') {
+      if (!staff || typeof staff.unproven !== 'function' || typeof staff.record !== 'function') {
+        throw new Error('The staff log is not loaded on this server, so no staff press is taken. Say so in the dev channel.');
+      }
+      var unproven = staff.unproven(cmd, profileId);
+      if (unproven) { throw new Error(unproven); }
+    }
+    var whoName = nameOfActor(k.actor) || 'somebody';
+    var n = endStall(id, as === 'staff' ? 'staff ended the keeping' : 'the steward ended the keeping');
+    if (as === 'staff') {
+      staff.record('evict', Number(profileId) || 0, nameOfActor(actorId), k.profile, whoName,
+        'the market stall ' + st.place, 0, { stall: id, hold: st.hold, as: 'staff' });
+    }
+    slog('a stall\'s keeping was ended by the', as + ';', n, 'line(s) went to its hold\'s drop box');
+    return 'The stall is free. What was on it went to the hold\'s drop box' + (n ? ', for its keeper.' : '.');
+  }
+
+  /* The panel's words. Answers a line for the chat, or ''. */
+  function command(parts, actorId, profileId, cmd) {
+    var w = BOOK.parse(parts);
+    if (w.why) { return w.why; }
+    if (w.verb === 'close') { sessions[actorId] = null; push(actorId, { open: false }); return ''; }
+    if (w.verb === 'open') {
+      var st = stalls[w.id];
+      if (!st || !at(actorId, st)) { return 'Stand at the stall.'; }
+      lapse();
+      sessions[actorId] = { id: w.id, at: Date.now(), found: [] };
+      var me = partyOf(actorId);
+      if (BOOK.keeps(state, w.id, me)) {
+        try { change(function (next) { BOOK.touch(next, w.id, me, Date.now()); }); } catch (eTouch) { }
+      }
+      show(actorId, profileId, '');
+      return '';
+    }
+    var s = sessions[actorId];
+    if (!s || Date.now() - s.at > SESSION_MS || !at(actorId, stalls[s.id])) {
+      sessions[actorId] = null;
+      push(actorId, { open: false });
+      return 'Stand at the stall.';
+    }
+    s.at = Date.now();
+    var said = '';
+    try {
+      if (w.verb === 'claim') {
+        var who = partyOf(actorId);
+        change(function (next) { BOOK.claim(next, stalls[s.id], who, Date.now()); });
+        said = 'The stall is yours. Lay out what you sell; it sells only while you are here.';
+      } else if (w.verb === 'lay') {
+        said = lay(w, actorId);
+      } else if (w.verb === 'price') {
+        var me2 = partyOf(actorId), price = priceFor(w.price);
+        change(function (next) { BOOK.setPrice(next, s.id, me2, w.line, price); });
+        said = 'The price is ' + BOOK.priceWords(BOOK.priceOf(price)) + ' a piece.';
+      } else if (w.verb === 'back') {
+        said = takeBack(w, actorId);
+      } else if (w.verb === 'buy') {
+        said = buy(w, actorId);
+      } else if (w.verb === 'find') {
+        s.found = find(w.words);
+        said = s.found.length ? '' : 'Nothing goes by that name.';
+      } else if (w.verb === 'letgo') {
+        if (!BOOK.keeps(state, s.id, partyOf(actorId))) { throw new Error('This stall is not yours.'); }
+        var n = endStall(s.id, 'its keeper let it go');
+        said = 'You let the stall go.' + (n ? ' What was on it is in the hold\'s drop box, for you.' : '');
+      } else if (w.verb === 'end') {
+        said = endBy(actorId, profileId, cmd);
+      }
+    } catch (e) { said = String((e && e.message) || e); }
+    show(actorId, profileId, said);
+    return '';
+  }
+
+  g.__thornswoodStalls = {
+    command: command,
+    counts: function () { return BOOK.countsOf(state); },
+    table: function () { return copy(stalls); },
+    keeperHere: keeperHere
+  };
+})();
+// ==== end thornswood market stalls ====
 
 // ==== thornswood trade carts ====
 /*
@@ -59881,6 +61135,10 @@ const WORDS = ['/ooc', '/o',
                // The trade ships' panel, at a dock crate or on the Office page
                // for staff (#2700). Never typed, so not in PLAYER_WORDS.
                '/ship',
+               // A market stall's panel (#3160): the lock key at a stall sends
+               // /stall open, and the panel's buttons send the rest. Never
+               // typed, so not in PLAYER_WORDS.
+               '/stall',
                // The trade carts' panel, at a cart stop's crate, from Raid
                // cart on P, or on the Office page for staff (#3158). Never typed.
                '/cart',
@@ -61110,6 +62368,15 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
       var shipSaid = shipsApi.command(parts, actorId, profileId);
       if (shipSaid) { toProfile(profileId, shipSaid); }
+      return true;
+    }
+
+    if (word === '/stall') {
+      var stallsApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodStalls;
+      if (!stallsApi || !stallsApi.command) { toProfile(profileId, 'Market stalls are not running on this server.'); return true; }
+      if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
+      var stallSaid = stallsApi.command(parts, actorId, profileId, cmd);
+      if (stallSaid) { toProfile(profileId, stallSaid); }
       return true;
     }
 
@@ -67206,9 +68473,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     */
     if (!arriving) {
       var target = warmthTarget(actorId, n);
+      // Winter out under the sky cools a quarter faster (#3144), so its half
+      // life is the cooling one cut by that share. Warming is left alone.
       var half = (target > n.temp)
         ? (NEEDS.settleWarmMinutes || NEEDS.settleMinutes)
-        : NEEDS.settleMinutes;
+        : NEEDS.settleMinutes / outdoorCooling(n);
       var k = 1 - Math.pow(0.5, (hours * 60) / half);
       if (k > 1) { k = 1; }
       if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
@@ -67270,14 +68539,30 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     blizzard is the worst thing to wear at a smelter and there is no outfit
     that wins everywhere. That is NEEDS.wear.heat.
   */
+  function underSeason(n) {
+    if (!n || n.place === 'indoors' || n.roof) { return false; }
+    return n.place === 'outdoors' || n.place === 'rain' || n.place === 'snow' ||
+           n.place === 'water' || n.place === 'shallow';
+  }
+
   function outdoorSeason(n) {
-    if (!n || n.place === 'indoors' || n.roof) { return 0; }
-    if (n.place !== 'outdoors' && n.place !== 'rain' && n.place !== 'snow' &&
-        n.place !== 'water' && n.place !== 'shallow') { return 0; }
+    if (!underSeason(n)) { return 0; }
     var S = g.__thornswoodSeason;
     if (!S || !S.outdoorShift) { return 0; }
-    try { return Number(S.outdoorShift(Date.now())) || 0; }
-    catch (e) { return 0; }
+    return Number(S.outdoorShift(Date.now())) || 0;
+  }
+
+  /*
+    How much faster the meter cools than the written half life, in the same
+    places the season shifts the target (#3144): 1.25 in winter out under the
+    sky, 1 everywhere and every season else.
+  */
+  function outdoorCooling(n) {
+    if (!underSeason(n)) { return 1; }
+    var S = g.__thornswoodSeason;
+    if (!S || !S.coolingShare) { return 1; }
+    var share = Number(S.coolingShare(Date.now()));
+    return share > 0 ? share : 1;
   }
 
   /*

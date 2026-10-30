@@ -3,7 +3,9 @@
 # LF. Without this a checkout with core.autocrlf true (One, the Windows runners)
 # held these files CRLF, so each rebuild there rewrote every one of them whether
 # it changed or not, and a table that pins its inputs by sha256 pinned bytes no
-# other checkout has (#3029). tests/test-3029-builder-eol.js holds this list to
+# other checkout has (#3029). The catalogue's pages, which Build-NpcPopulation.py
+# writes by hand with --write-runtime (writesOffChain), are written LF the same
+# way (#3120). tests/test-3029-builder-eol.js holds this list to
 # content-tables.json. What ships still goes out as scripts/release/ShippedBytes.ps1
 # reads it, whatever the checkout.
 game/data/** text eol=lf
@@ -11,6 +13,9 @@ game/gamemode.js text eol=lf
 game/plugins/thornswood-front.js text eol=lf
 docs/systems/** text eol=lf
 tests/fixtures/merchant-retrieval-records.json text eol=lf
+docs/HUNTING-SPOTS.csv text eol=lf
+docs/NPC-SPAWNS.csv text eol=lf
+docs/NPC-POPULATION.md text eol=lf
 # Except the recipe for Thornswood-Last.esp (#2791), which is bytes and not
 # text: a line end turned inside it would make a recipe that builds nothing.
 game/data/last-plugin.recipe -text !eol

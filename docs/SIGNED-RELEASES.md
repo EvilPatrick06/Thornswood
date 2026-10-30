@@ -392,7 +392,6 @@ option 1). So:
   `release-tag.yml` starts main's run (`--ref main`), and
   `Invoke-ReleaseLauncherOnGitHub` waits for the run on main titled
   `Release launcher <tag>`.
-- Runner 3's job-started hook takes main's jobs alone (#3889, #3930).
 
 A run on any other ref builds unsigned on GitHub's runner and never
 reaches runner 3. To build a tag by hand:
@@ -413,9 +412,14 @@ the fallback ever covered. Patrick picked A on the report page
 runner of its own, a fresh machine that never signed. If GitHub's runner
 cannot build a release, a Ship on One signs the unsigned launcher on
 download (#921). A `v` tag push's `handoff` job, which starts main's run,
-runs on GitHub's runner too, so the box takes no part in a release. Runner 3's `thornswood-sign` label, `records/sign-runners.json`
-and the signing hosts in its outbound rules outlive the job; #4033 takes
-them off.
+runs on GitHub's runner too, so the box takes no part in a release. #4033
+took off what the job had left behind: runner 3's `thornswood-sign` label
+(the box's admin service now takes off any label no record names),
+`records/sign-runners.json`, the signing runner's job-started hook, the
+signing hosts in runner 3's outbound rules, and Bootstrap-VPS.ps1's .NET
+runtime for Microsoft's signing client, which nothing else on the box runs.
+The check runners' `thornswood-check` stays: since #4914 the nightly's bot
+harnesses ask for it while the repository is private.
 
 ## 8. Decisions (Patrick)
 
