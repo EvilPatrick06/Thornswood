@@ -23,7 +23,12 @@
        Every connection it makes, urllib's and discord.py's, goes through a
        context made from that file alone (trust.context), because on Windows
        a default context also loads the machine's stores, and the box's
-       LocalMachine\Root holds emSign Root CA - G1 (read 21 Oct).
+       LocalMachine\Root holds emSign Root CA - G1 (read 21 Oct). Every
+       other script in bot/ that logs in to Discord (Build-Discord.py,
+       Wipe-Channels.py, backfill.py, redraw.py) makes its client from the
+       same trust.client_class, and none makes a Discord client of its own
+       (#3604: backfill.py and redraw.py did, so on the box they trusted that
+       emSign root with the bot's token).
     D  Install-Bot.ps1 packs, sends and parse-checks trust.py with the code,
        runs it against the certifi it installed before anything is stopped,
        and no longer writes an SSL_CERT_FILE of its own into bot.env.json.
@@ -139,10 +144,25 @@ try {
     head.indexOf('urllib.request.install_opener(') !== -1 &&
     !/urlopen\([^)]*context=/.test(bot));
   const after = bot.slice(iDiscord);
-  yes('C5 and so does discord.py: TrustedClient gives its HTTP client a connector on CONTEXT at login',
-    /class TrustedClient\(discord\.Client\):[\s\S]*?async def login\(self, token\):\n\s+self\.http\.connector = aiohttp\.TCPConnector\(limit=0, ssl=CONTEXT\)\n\s+await super\(\)\.login\(token\)/.test(after));
+  const trustPy = read('bot/trust.py');
+  yes('C5 and so does discord.py: TrustedClient, made by trust.client_class, gives its HTTP client a connector on CONTEXT at login',
+    after.indexOf('\nTrustedClient = trust.client_class(CONTEXT)\n') !== -1 &&
+    /\ndef client_class\(ctx=None\):[\s\S]*?class TrustedClient\(discord\.Client\):\n\s+async def login\(self, token\):\n\s+self\.http\.connector = aiohttp\.TCPConnector\(\n\s+limit=0, ssl=ctx if ctx is not None else own_context\(\)\)\n\s+await super\(\)\.login\(token\)\n\n\s+return TrustedClient\n/.test(trustPy));
   yes('C6 every client the bot makes is a TrustedClient', /\nclass Thornswood\(TrustedClient\):/.test(bot) &&
-    !/discord\.Client\(/.test(bot.replace('class TrustedClient(discord.Client):', '')));
+    !/discord\.Client\(/.test(bot));
+  // #3604: backfill.py and redraw.py made a plain discord.Client, so on the
+  // box they trusted LocalMachine Root and its emSign root with the bot's
+  // token. Every script in bot/ makes its client from trust.client_class,
+  // through bot.TrustedClient or directly, and no other Discord client.
+  const scripts = fs.readdirSync(path.join(ROOT, 'bot')).filter((f) => /\.py$/.test(f) && !/^test-/.test(f) && f !== 'trust.py');
+  const plain = /\b(?:discord\.(?:Client|AutoShardedClient)|commands\.(?:Bot|AutoShardedBot)|(?:^|[^.\w])(?:Client|AutoShardedClient|Bot|AutoShardedBot))\s*\(\s*(?:intents|\)|command_prefix)|\(\s*discord\.(?:Client|AutoShardedClient)\s*\)|from discord(?:\.ext\.commands)? import[^\n]*\b(?:Client|Bot)\b/m;
+  const wrong = scripts.filter((f) => plain.test(read('bot/' + f)));
+  yes('C7 no script in bot/ makes or subclasses a Discord client of its own (' + scripts.length + ' read)', wrong.length === 0, wrong.join(', '));
+  const logsIn = scripts.filter((f) => /\bclient\.(?:run|login|start)\(/.test(read('bot/' + f)));
+  const viaTrust = (f) => /\n\s*client = (?:bot\.TrustedClient|trust\.client_class\(\))\(intents=/.test(read('bot/' + f)) ||
+    (f === 'bot.py' && /\nclient = Thornswood\(/.test(bot));
+  yes('C8 and every one that logs in makes its client from trust.client_class: ' + logsIn.join(', '),
+    logsIn.length >= 5 && logsIn.every(viaTrust), logsIn.filter((f) => !viaTrust(f)).join(', '));
   yes('C3 and points SSL_CERT_FILE at it on every start, whatever the environment named',
     head.indexOf("\nos.environ['SSL_CERT_FILE'] = ROOTS\n") !== -1 &&
     bot.indexOf("if not os.environ.get('SSL_CERT_FILE')") === -1 &&
