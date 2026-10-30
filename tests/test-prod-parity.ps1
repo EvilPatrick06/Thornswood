@@ -54,8 +54,7 @@ function Facts { [ordered]@{
         @{ name = 'Thornswood Voice'; user = 'LOCAL SERVICE'; triggers = @('Boot') }, @{ name = 'Thornswood Dev Voice'; user = 'LOCAL SERVICE'; triggers = @('Boot') },
         @{ name = 'Thornswood Docs'; user = 'NT AUTHORITY\LOCAL SERVICE'; triggers = @('Boot') }, @{ name = 'Thornswood Web'; user = 'LOCAL SERVICE'; triggers = @('Boot', 'Time') },
         @{ name = 'Thornswood Watch'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Backup'; user = 'LOCAL SERVICE'; triggers = @('Daily') },
-        @{ name = 'Thornswood Load'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Maint Update'; user = 'SYSTEM'; triggers = @('Daily') },
-        @{ name = 'Thornswood Dev Crash Capture'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Disk History'; user = 'SYSTEM'; triggers = @('Daily') },
+        @{ name = 'Thornswood Load'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Disk History'; user = 'SYSTEM'; triggers = @('Daily') },
         @{ name = 'Thornswood Runner Logs'; user = 'SYSTEM'; triggers = @('Daily') }, @{ name = 'Thornswood Bridge'; user = 'LOCAL SERVICE'; triggers = @('Boot') },
         @{ name = 'Thornswood Gate'; user = 'SYSTEM'; triggers = @('Boot') })
     services = @(
@@ -141,8 +140,10 @@ try {
     $x = Run $h ''
     T ($x.Out -match 'REVIEW  listener udp 443') 'udp 443 held by anything but Caddy is caught'
     $rj = Get-Content (Join-Path $repo 'records\prod-parity.json') -Raw | ConvertFrom-Json
-    $new2165 = @(@($rj.listeners | Where-Object { "$($_.proto) $($_.port)" -in 'udp 443', 'tcp 135', 'tcp 445', 'udp 123', 'udp 5353', 'udp 5355' }) + @($rj.tasks | Where-Object { $_.name -in 'Thornswood Load', 'Thornswood Maint Update', 'Thornswood Dev Crash Capture' }))
-    T ($new2165.Count -eq 9 -and -not @($new2165 | Where-Object { -not $_.why })) 'the nine rows from the Oct 11 run are recorded, each with a reason'
+    $new2165 = @(@($rj.listeners | Where-Object { "$($_.proto) $($_.port)" -in 'udp 443', 'tcp 135', 'tcp 445', 'udp 123', 'udp 5353', 'udp 5355' }) + @($rj.tasks | Where-Object { $_.name -eq 'Thornswood Load' }))
+    T ($new2165.Count -eq 7 -and -not @($new2165 | Where-Object { -not $_.why })) 'the seven rows from the Oct 11 run that stay are recorded, each with a reason'
+    # Maint Update and Dev Crash Capture were made by hand and are off the box (#3288, Remove-HandMadeTasks.ps1).
+    T (-not @($rj.tasks | Where-Object { $_.name -in 'Thornswood Maint Update', 'Thornswood Dev Crash Capture' })) 'the two hand made tasks are not recorded as wanted'
     T (-not @($rj.intentional)) 'expected state is recorded as expected, not as an ignore list'
     # ---- #3807 inbound firewall rules
     $g = Facts; $g.inboundRules += @{ name = '{7606AA2C-8B97-43D0-AB9E-BF57D54DF1A7}'; displayName = 'Allow WinRM HTTPS'; protocol = 'TCP'; ports = @('5986'); remote = @('Any') }
