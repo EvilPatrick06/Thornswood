@@ -81,8 +81,8 @@ Yes 'Scan says to switch Skyrim to English when an English table is missing (#40
     (Src (Join-Path $App 'MadeFromGame.cs')) -match 'catch \(LastPlugin\.CannotMake ex\) \{ f\.Problem = ex\.Message; f\.NotEnglish = ex\.NotEnglish; \}')
 Yes 'Scan names it with the collection to put right in Vortex' ($upkeep -match 'MadeFromGame\.Make\(off\)' -and $upkeep -match 'last \? "Install the collection revision Thornswood pins in Vortex and press Deploy there')
 $verify = Src (Join-Path $App 'Verify.cs')
-Yes 'Verify''s Fix never fetches it from the server' (
-    $verify -match '!LastPlugin\.Makes\(Paths\.Game, i\.Plugin\) && FetchPlugin\(cfg, i, say\)' -and
+Yes 'Verify''s Fix never fetches it, from the release or the server (#3386)' (
+    $verify -match '!LastPlugin\.Makes\(Paths\.Game, i\.Plugin\) && FetchPlugin\(cfg, i, release, say\)' -and
     $verify -match '!m\.Served \|\| LastPlugin\.Makes\(Paths\.Game, m\.filename\)\) continue;')
 Yes '  and its byte check leaves one that is not made yet to MadeFromGame' ($verify -match 'if \(LastPlugin\.Makes\(Paths\.Game, m\.filename\)\)\s*\{\s*if \(!LastPlugin\.IsCurrent\(Paths\.Game\)\) continue;')
 Yes '  and the order counts it as ours' ($verify -match 'if \(!ServedByServer\(cfg, p\) && !LastPlugin\.Makes\(Paths\.Game, p\)\) notOurs\.Add\(p\);')
