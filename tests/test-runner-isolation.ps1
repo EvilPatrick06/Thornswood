@@ -90,7 +90,10 @@ try {
     $signRisk = @([regex]::Matches($x.Out, 'RISK  workflow \S+ job \S+ on a signing runner[^\r\n]*') | ForEach-Object { $_.Value })
     T ($signRisk.Count -eq 0) ("no job of the real workflows can put another ref's code on the signing runner" + $(if ($signRisk.Count) { ":`n      " + ($signRisk -join "`n      ") } else { '' }))
     T ($x.Out -notmatch 'RISK  workflow \S+ runs on') 'no real workflow runs a pull request on the production runners without the same-repository condition'
-    T ($x.Report -match '\| workflow \| nightly\.yml job board on a signing runner \|[^\n]*held to main[^\n]*\| ok \|' -and $x.Report -match '\| workflow \| release\.yml job launcher-vps on a signing runner \|[^\n]*held to main[^\n]*\| ok \|') 'the nightly''s board job and the release fallback that signs are read, and held to main and v tags'
+    T ($x.Report -match '\| workflow \| nightly\.yml job board on a signing runner \|[^\n]*held to main[^\n]*\| ok \|') 'the nightly''s board job is read, and held to main and v tags'
+    # release.yml signs on GitHub's runner alone since #4013, so none of its
+    # jobs is on a signing runner.
+    T ($x.Report -notmatch '\| workflow \| release\.yml job \S+ on a signing runner') 'no job of release.yml is on a signing runner (#4013)'
     T ($x.Report -notmatch '\| harnesses\.yml job harnesses on a signing runner') 'harnesses.yml asks for a build runner, which never signs'
     T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*same-repository pull requests only[^\n]*\| ok \|') 'the real build-pr.yml falls back to the VPS for same-repository pull requests only, and the check says ok (Patrick, 12 Oct 2026)'
 
