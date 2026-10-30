@@ -105,8 +105,8 @@ try {
 
     # Build runners on One (Patrick, 26 Oct 2026): a name the build record's
     # offBox lists takes the build label too, and never the VPS label.
-    $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-one-3')
-    Yes 'an off-box runner records\build-runners.json names takes the build label' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one-3' --labels 'thornswood-pr,thornswood-build'")
+    $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-one')
+    Yes 'an off-box runner records\build-runners.json names takes the build label' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one' --labels 'thornswood-pr,thornswood-build'")
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-elsewhere')
     Yes '  and one it does not name keeps the pull request label alone' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-elsewhere' --labels 'thornswood-pr'(?!,)")
 
