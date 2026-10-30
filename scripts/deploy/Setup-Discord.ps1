@@ -33,9 +33,12 @@
     .\Setup-Discord.ps1 -Only Gamemasters,welcome-travelers
                                    touches only those categories and channels
                                     of the plan: no role made or moved, no
-                                    other channel, no post, no webhook, no
-                                    server setting. For a change approved for
-                                    one part of the Discord (#2519)
+                                    other channel, no webhook, no server
+                                    setting. For a change approved for one
+                                    part of the Discord (#2519)
+    .\Setup-Discord.ps1 -Only lore,factions -Posts
+                                   also rewrites the read only posts of
+                                    those channels, and no other post (#3656)
 
   First time only, before running it:
 
