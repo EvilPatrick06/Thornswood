@@ -319,7 +319,7 @@ if ($open -ge 0 -and $close -gt $marker) {
         [IO.File]::WriteAllText((Join-Path $root 'server-settings.json'),
             ('{"port":7787,"name":"Thornswood Dev",' + $max + '"thornswoodVoicePort":7789,' +
              '"equipmentSlotCheckEnabled":false,"equipmentSpellCheckEnabled":false,' +
-             '"equipmentInventoryCheckEnabled":false,"dataDir":"data",' +
+             '"equipmentInventoryCheckEnabled":false,"equipItemAttemptEnabled":true,"dataDir":"data",' +
              '"npcAllowCrimeFaction":true,"npcAllowEssential":true,"thornswoodServer":"dev",' +
              '"loadOrder":["C:/Thornswood-Server-Dev/plugins/Skyrim.esm"]}'), $utf8)
     }
