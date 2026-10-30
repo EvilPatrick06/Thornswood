@@ -162,7 +162,9 @@ if (-not `$u) {
   `$bytes = New-Object byte[] 48
   [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes(`$bytes)
   `$pw = ConvertTo-SecureString ([Convert]::ToBase64String(`$bytes) + 'aA1!') -AsPlainText -Force
-  `$u = New-LocalUser -Name `$user -Password `$pw -PasswordNeverExpires -UserMayNotChangePassword -AccountNeverExpires -Description 'Thornswood deploy gate (#2841): its key runs C:\Thornswood-Gate\Gate.ps1 only'
+  # New-LocalUser refuses a description over 48 characters (29 Oct: the
+  # first install stopped here). tests\test-local-accounts.ps1 holds it.
+  `$u = New-LocalUser -Name `$user -Password `$pw -PasswordNeverExpires -UserMayNotChangePassword -AccountNeverExpires -Description 'Thornswood deploy gate (#2841), Gate.ps1 only'
   `$pw = `$null
   'CHANGED made the account ' + `$user + ', in no group'
 } else { 'ALREADY the account ' + `$user }

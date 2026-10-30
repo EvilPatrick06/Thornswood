@@ -95,7 +95,7 @@ yes('the key and the mold are both Thornswood content records',
     /var KEY = '15494:Thornswood-Content\.esp'/.test(code) &&
     /var MOLD = '15495:Thornswood-Content\.esp'/.test(code));
 yes('and a key is named for its building, so one key is not every key',
-    /function keyLabel\(building\) \{ return 'Key to ' \+ nameOf\(building\); \}/.test(code));
+    /function keyLabel\(building\) \{ return 'Key to ' \+ placeOf\(building\); \}/.test(code));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

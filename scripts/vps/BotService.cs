@@ -203,9 +203,17 @@ namespace Thornswood
             }
         }
 
-        // The hourly pass: rolled copies past copySeconds deleted, and the
-        // live file rolled once it is old. Each delete that fails is a line
-        // in bot.log, tried again on the next pass.
+        // The hourly pass: every copy of the log past copySeconds deleted,
+        // and the live file rolled once it is old. Each delete that fails is
+        // a line in bot.log, tried again on the next pass.
+        //
+        // Every copy, by its name: bot.log.1 to bot.log.<keep> that a roll
+        // made, and any other bot.log.<anything> in the folder, such as
+        // bot.log.20260916-1535.old that somebody renamed by hand to keep
+        // and the install moved into data (#3583). The privacy page promises
+        // no bot.log line past 90 days whatever the file is called; only the
+        // numbered ones used to be looked at, so a renamed copy was kept for
+        // ever.
         public void Age()
         {
             lock (sync)
@@ -213,9 +221,8 @@ namespace Thornswood
                 if (stream == null || copySeconds <= 0) return;
                 List<string> said = new List<string>();
                 int gone = 0;
-                for (int i = 1; i <= keep; i++)
+                foreach (string f in Copies())
                 {
-                    string f = path + "." + i;
                     try
                     {
                         if (!File.Exists(f)) continue;
@@ -225,7 +232,7 @@ namespace Thornswood
                     }
                     catch (Exception e) { said.Add("[run] could not delete " + System.IO.Path.GetFileName(f) + " by age: " + e.Message + ". Trying again within the hour."); }
                 }
-                if (gone > 0) said.Insert(0, "[run] by age: " + gone + " rolled bot.log cop" + (gone == 1 ? "y" : "ies") + " past " + (copySeconds / 86400).ToString("0.##", CultureInfo.InvariantCulture) + " days deleted");
+                if (gone > 0) said.Insert(0, "[run] by age: " + gone + " bot.log cop" + (gone == 1 ? "y" : "ies") + " past " + (copySeconds / 86400).ToString("0.##", CultureInfo.InvariantCulture) + " days deleted");
                 foreach (string l in said)
                 {
                     byte[] b = new UTF8Encoding(false).GetBytes(l + "\r\n");
@@ -234,6 +241,31 @@ namespace Thornswood
                 stream.Flush();
                 if (Old() && DateTime.UtcNow >= nextTry) Roll();
             }
+        }
+
+        // Every file in the log's folder named after it with more on the
+        // end: <log>.<anything>, never the live file. Named by a prefix
+        // test rather than the pattern alone, because Windows matches
+        // "bot.log.*" against bot.log itself.
+        List<string> Copies()
+        {
+            List<string> found = new List<string>();
+            string dir = System.IO.Path.GetDirectoryName(path);
+            string stem = System.IO.Path.GetFileName(path) + ".";
+            string[] names;
+            try { names = Directory.GetFiles(dir, stem + "*"); }
+            catch (Exception e)
+            {
+                byte[] b = new UTF8Encoding(false).GetBytes("[run] could not list " + dir + " for old bot.log copies: " + e.Message + ". Trying again within the hour.\r\n");
+                stream.Write(b, 0, b.Length);
+                return found;
+            }
+            foreach (string f in names)
+            {
+                string n = System.IO.Path.GetFileName(f);
+                if (n.Length > stem.Length && n.StartsWith(stem, StringComparison.OrdinalIgnoreCase)) found.Add(f);
+            }
+            return found;
         }
 
         public void Line(string text)
