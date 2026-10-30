@@ -47,6 +47,8 @@ function Done {
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) { Write-Host 'NOT RUN  the site task''s grants and their order happen only on Windows'; exit 0 }
 . (Join-Path $Repo 'scripts\deploy\ServiceAccount.ps1')
+# Deploy-Docs also puts BoxFirewall.ps1's function in the setup script (#3896).
+. (Join-Path $Repo 'scripts\vps\BoxFirewall.ps1')
 # The places no service may read, none here, so the fail-safe never reads
 # this machine's own C:\Thornswood-* folders.
 function Get-ThornswoodServiceNeverReach { param([string]$Own = '', [string]$Box = 'C:\') return @() }

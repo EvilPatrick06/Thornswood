@@ -80,6 +80,10 @@ link, and the old line goes.
 - **A shipment is lost only when people raid it**, never by chance. 22 Oct
   2026,
   [#3158](https://github.com/EvilPatrick06/Thornswood/issues/3158#issuecomment-6335273986).
+- **A cart whose driver leaves the road stays where they left**, and anybody
+  there can raid it until the driver comes back and takes it on (#3531).
+  26 Oct 2026,
+  [#3158](https://github.com/EvilPatrick06/Thornswood/issues/3158#issuecomment-6423068040).
 - **Each hold has 2 to 3 hold-only plants, ores or animals.** 22 Oct 2026,
   [#3150](https://github.com/EvilPatrick06/Thornswood/issues/3150#issuecomment-6335275040).
 - **Seasons are mild:** yields up or down a quarter, winter cold a quarter

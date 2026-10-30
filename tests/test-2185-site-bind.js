@@ -111,7 +111,8 @@ const OUT = outside();
     console.log('DEPLOY-DOCS');
     const fw = DEPLOY.slice(DEPLOY.indexOf("`$local = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','Machine')"));
     yes('4a: the firewall rule is torn down unless the box set EXPOSE=1',
-      /if \(`\$local -eq '1' -or `\$expose -ne '1'\) \{\s*Get-NetFirewallRule[^\n]*\n\s*Remove-NetFirewallRule/.test(fw));
+      /if \(`\$local -eq '1' -or `\$expose -ne '1'\) \{\s*if \(`\$fwHas\) \{ Remove-NetFirewallRule -PolicyStore localhost /.test(fw) &&
+      /`\$fwHas = \[bool\]\(Get-NetFirewallRule -PolicyStore localhost /.test(DEPLOY));
     yes('4b: and opened only in the branch after that', fw.indexOf('New-NetFirewallRule') > fw.indexOf("`$expose -ne '1'"));
     yes('4c: after the swap it says EXPOSED when the site listens anywhere but loopback without EXPOSE',
       /\$open = @\(\$l \| Where-Object \{ \$_\.LocalAddress -notmatch '\^\(127\\\.\|::1\$\)' \}/.test(DEPLOY) && /'EXPOSED: the site listens on '/.test(DEPLOY));

@@ -201,10 +201,10 @@ namespace Thornswood
         /// The five masters are skipped on the server's side, because the game
         /// loads them before any list and a list never carries them. A light
         /// plugin the server names holds its place: the game gives it no index
-        /// either way, and the flag is Checks.NotLight's to put right. A plugin
-        /// the server names that no line enables is not this function's to
-        /// switch on, so it returns null and leaves the list as it was; the
-        /// "is turned off" and "is not installed" issues own that.
+        /// either way, and a flag that is not the server's is Vortex's to put
+        /// right. A plugin the server names that no line enables is not this
+        /// function's to switch on, so it returns null and leaves the list as
+        /// it was; the "is turned off" and "is not installed" issues own that.
         /// </summary>
         public static List<string> Reorder(IList<string> lines, IList<string> manifest, Func<string, bool> isLight)
         {

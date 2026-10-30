@@ -4382,7 +4382,25 @@ const GIVEUP_MS = 300000;
 const FACE_SEEN_MS = 150000;
 const FACE_CAP_MS = 1800000;
 
-const firstSeen = new Map();
+/*
+  WHO IS IN THE WORLD, AND SINCE WHEN: actorId -> the time the chargen tick
+  first saw them online this session. Its first sight is the login, and the
+  per-session hook rides on it (chargenTick).
+
+  ON globalThis, SO A HOT RELOAD IS NOT A LOGIN (#3154). A reload runs this
+  file again in a fresh module (requireTemp in the fork's gamemodeLoad.ts),
+  and while this was a const of the module every reload emptied it. So every
+  gamemode deploy logged in again everybody on: the login hook ran for each
+  of them (their profession said again, the known spells and the K panel
+  sent again), and somebody in the hall read as a reconnect, which starts
+  the creation wait over. Measured by tests\test-3154-login-restore.js, which
+  runs the whole file and reloads it under a character in the world. The
+  needs block already keeps who has arrived on globalThis for the same
+  reason. A restart is a new process, so everybody is new again, which is
+  right: they all log in again.
+*/
+if (!(globalThis.__thornswoodFirstSeen instanceof Map)) { globalThis.__thornswoodFirstSeen = new Map(); }
+const firstSeen = globalThis.__thornswoodFirstSeen;
 
 /* Skyrim Unbound's own character generation room, which is where a new game
  * already puts everybody, and the marker it stands them on. Falling back to the
@@ -4788,6 +4806,21 @@ function arriveAt(actorId, townKey) {
     only, as before: arriveAt runs once, at the end of creation.
   */
   say(actorId, 'Welcome to ' + entry.hold + ', Safe Travels.');
+  /*
+    AND THE FIRST STEPS BEGIN HERE (#3166), and only here: the guide on the
+    K panel and the Cook's errand, in the first steps block. One line says
+    where they are, because the panel has just closed itself on the home.
+  */
+  const steps = globalThis.__thornswoodFirstSteps;
+  if (steps && steps.begin) {
+    try {
+      if (steps.begin(actorId, entry.key)) {
+        say(actorId, 'Your first steps in ' + entry.town + ' are on the panel behind K.');
+      }
+    } catch (e) {
+      log('chargen', actorId.toString(16), 'the first steps could not begin:', e);
+    }
+  }
   return true;
 }
 
@@ -5149,10 +5182,10 @@ function setChargen(actorId, state) {
   kept spamming the same message every like 5 seconds". The old creation line
   was said from the choosing reminder, which runs on a timer and runs again
   straight away every time the tick sees somebody afresh (a reconnect, a drop
-  out of onlinePlayers, a hot reload emptying firstSeen). A line that rides a
-  timer or a first sighting repeats; a line that rides a stage change should
-  not, but only while the stage write sticks, and chargenTick re-reads the
-  record every 500 ms.
+  out of onlinePlayers, and until #3154 a hot reload emptying firstSeen). A
+  line that rides a timer or a first sighting repeats; a line that rides a
+  stage change should not, but only while the stage write sticks, and
+  chargenTick re-reads the record every 500 ms.
 
   So the step is written on the record (told) BEFORE the line goes, and the
   line goes only when the record read back says so. A step already told is
@@ -7003,7 +7036,108 @@ const GAME_TUNING = {
  *  '__proto__' finds something on Object.prototype that a truth test cannot
  *  tell from a pheasant. */
 function isGame(baseDesc) {
-  return Object.prototype.hasOwnProperty.call(GAME_BY_BASE, baseDesc);
+  return Object.prototype.hasOwnProperty.call(GAME_BY_BASE, baseDesc) ||
+         Object.prototype.hasOwnProperty.call(RACKS_BY_HAND, baseDesc);
+}
+
+/*
+  A CARCASS OR A CATCH LYING IN THE WORLD THAT THE PASS LEFT UNRANKED (#3141).
+
+  Patrick, 22 October, on #3141: each gathering action goes to the class whose
+  work it is, resource by resource, "Neither just properly split it". The pass
+  files these four in its unranked list because their produce is a leveled list
+  (a LVLI) rather than one item, so it could not price or rank them, and until
+  now nothing answered them: the press fell out of onActivate and the engine
+  handed the list's roll to whoever pressed it.
+
+    38a83 Dragonborn  DLC2HorkerDead01, a dead horker the Skaal have hauled up
+                      in their village. A body, so the hunter's, at the rank the
+                      hunter's own horker body asks (lists/hunter.md: advanced).
+    17b9e1, 17ba31,   WHOarFish, WHOarFishHanging, WHOarFishHangingBig: fish
+    19648b Windhelm   laid out and hung up in Windhelm. A catch, so the fisher's,
+                      at novice, the rank of the fisher's commonest water. It
+                      is taken by hand like hanging game, so no pole is asked.
+
+  A row says who (owner), the rank, what the thing in the world is (from, for
+  the sentence) and the list the record hands over (list). The list is read out
+  of the load order when it is first pressed (listItems): one of its items is
+  handed over a press, as many as the owner's yield for their rank. Nothing
+  about what is in the list is written down here, so a plugin update that
+  changes the fish changes what is caught.
+*/
+var RACKS_BY_HAND = {
+  '38a83:Dragonborn.esm':   { owner: 'hunter', rank: 'advanced', from: 'Horker', list: '3c6a8:Dragonborn.esm' },
+  '17b9e1:WindhelmSSE.esp': { owner: 'fisher', rank: 'novice', from: 'catch', list: '19647b:WindhelmSSE.esp' },
+  '17ba31:WindhelmSSE.esp': { owner: 'fisher', rank: 'novice', from: 'hanging catch', list: '19647b:WindhelmSSE.esp' },
+  '19648b:WindhelmSSE.esp': { owner: 'fisher', rank: 'novice', from: 'hanging catch', list: '19647b:WindhelmSSE.esp' }
+};
+
+/*
+  The two owners a rack can have, and what each one's gate, ladder, waits and
+  yields are. The hunter's are the hanging game's (GAME_TUNING) and the fisher's
+  are the water's (FISH_TUNING), so a catch on a rack waits and pays what the
+  same rank of water does.
+*/
+var RACK_OWNERS = {
+  hunter: { verb: 'loot', ladder: 'hunter', word: 'Hunter', tuning: function () { return GAME_TUNING; } },
+  fisher: { verb: 'fish', ladder: 'fisher', word: 'Fisher', tuning: function () { return FISH_TUNING; } }
+};
+
+/** The row and its owner for a rack base, or null. The generated hanging game
+ *  is all the hunter's. */
+function rackOf(baseDesc) {
+  if (Object.prototype.hasOwnProperty.call(GAME_BY_BASE, baseDesc)) {
+    return { row: GAME_BY_BASE[baseDesc], owner: RACK_OWNERS.hunter };
+  }
+  if (Object.prototype.hasOwnProperty.call(RACKS_BY_HAND, baseDesc)) {
+    var row = RACKS_BY_HAND[baseDesc];
+    if (Object.prototype.hasOwnProperty.call(RACK_OWNERS, row.owner)) {
+      return { row: row, owner: RACK_OWNERS[row.owner] };
+    }
+  }
+  return null;
+}
+
+/*
+  THE ITEMS A LEVELED LIST CAN HAND OVER, read out of the load order the first
+  time it is asked and kept. Each LVLO entry names a form at bytes 4 to 7 (the
+  level is 0 to 1, the count 8 to 9); a list inside a list is walked to its
+  items, four deep at most. The engine's own pick does the same walk
+  (LeveledListUtils::EvaluateListRecurse in the fork). An entry twice in a list
+  is twice as likely, as it is in Skyrim. Empty when the plugin that owns the
+  list is not loaded, and the press then says nothing came away.
+*/
+var LIST_ITEMS = {};
+
+function listItems(desc) {
+  if (Object.prototype.hasOwnProperty.call(LIST_ITEMS, desc)) { return LIST_ITEMS[desc]; }
+  var out = [];
+  (function walk(id, depth) {
+    if (!id || depth > 4) { return; }
+    var found = null;
+    try { found = mp.lookupEspmRecordById(id); } catch (e) { found = null; }
+    var rec = found && found.record;
+    if (!rec) { return; }
+    if (String(rec.type) !== 'LVLI') {
+      var item = '';
+      try { item = String(mp.getDescFromId(id) || ''); } catch (e) { item = ''; }
+      if (item) { out.push(item); }
+      return;
+    }
+    var fields = rec.fields || [];
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (!f || String(f.type) !== 'LVLO' || !f.data || f.data.length < 8) { continue; }
+      var b = f.data;
+      var local = (b[4] | (b[5] << 8) | (b[6] << 16)) + b[7] * 0x1000000;
+      var global = 0;
+      try { global = Number(found.toGlobalRecordId(local)) || 0; } catch (e) { global = 0; }
+      walk(global, depth + 1);
+    }
+  })(idOf(desc), 0);
+  if (!out.length) { log('the list', desc, 'hands over no item in this load order'); }
+  LIST_ITEMS[desc] = out;
+  return out;
 }
 
 /*
@@ -7110,7 +7244,10 @@ const GATHER_UNRANKED = {
   "110ca:HearthFires.esm": { "produce": "1b3bd:Skyrim.esm", "name": "Snowberries", "rank": "advanced" },
   "10469:HearthFires.esm": { "produce": "2f44c:Skyrim.esm", "name": "Nightshade", "rank": "expert" },
   "110c3:HearthFires.esm": { "produce": "4da20:Skyrim.esm", "name": "Bleeding Crown", "rank": "expert" },
-  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" }
+  "110c7:HearthFires.esm": { "produce": "4da25:Skyrim.esm", "name": "Blisterwort", "rank": "expert" },
+  // The resource pack's aloe vera planter, the same kind of sack (#3141);
+  // its field plants are novice rows of the generated table.
+  "16b:_ResourcePack.esl": { "produce": "d0:_ResourcePack.esl", "name": "Aloe Vera Leaves", "rank": "novice" }
 };
 
 /** The row for a base, out of the generated table or the hand list beside it,
@@ -7165,6 +7302,87 @@ function plantAt(baseDesc) {
 /** True when somebody pressing this base should be answered by harvest(). */
 function isPlant(baseDesc) {
   return plantAt(baseDesc) !== null;
+}
+
+/*
+  EVERY PLANT AND TREE IN THE WORLD HAS AN OWNER, AND ONE NO LIST NAMES IS
+  NOBODY'S, NEVER EVERYBODY'S (#3141).
+
+  Patrick, 22 October, on #3141: each gathering action is split to the class
+  whose work it is, resource by resource, and not left open to everyone. The
+  chain in onActivate answers a FLOR or a TREE by table: a crop for the farmer,
+  water for the fisher, a rack for the hunter or the fisher, a nest, a churn or
+  a hive for the farmer, a reagent for the gatherer. Until this change a base no
+  table named fell out of the chain, and the engine's own pick
+  (MpObjectReference::ProcessActivate in the fork) handed its produce to
+  whoever pressed it. So the open door was the default: every record the pass
+  could not rank, and every plant a new plugin brings, was free to everybody.
+
+  Now the chain asks this last for a FLOR or a TREE, and it answers by name:
+
+    anybody  Patrick, 21 September: "make mammoth cheese bowls able to be picked
+             up by literally anybody." A giant's bowl of mammoth cheese. The
+             engine hands it over, as it always has.
+    nobody   records with nothing in them for anybody, each with its reason.
+             The HearthFires mead barrel's produce is a sack only a Papyrus
+             script opens, and no trade here draws or brews mead. Bashir's clam
+             (Oar's Rest) holds a quest prop, a fake Dwemer coin, not a catch.
+             A coin purse is not a harvest (gold.md), and every placed one is
+             switched off in Thornswood-Last.esp (#3077). The three Creation
+             Club roots are named on no list at all, because no table here may
+             name Creation Club content (#479, test-special-edition-only.js):
+             nothing places one, and the rule below would refuse it.
+
+  Any other FLOR or TREE is refused with the nobody sentence and named once in
+  the log, so a plant a plugin adds turns up there to be given its owner in
+  the right table, instead of being handed out.
+*/
+var WORLD_PRODUCE_ANYBODY = {
+  '7edf0:Skyrim.esm': 'Mammoth Cheese'
+};
+
+var NOBODYS_PRODUCE = 'This is nobody\'s work here, so nothing comes away.';
+var NOT_A_HARVEST = 'A coin purse is not a harvest. Nothing comes away.';
+
+var WORLD_PRODUCE_NOBODY = {
+  'f39b:HearthFires.esm': 'The mead barrel is sealed. Nobody draws from it here.',
+  '4d078:OarsRest.esp': 'There is nothing in this clam to take.',
+  'd790c:Skyrim.esm': NOT_A_HARVEST,
+  'd8e7f:Skyrim.esm': NOT_A_HARVEST,
+  'd8e80:Skyrim.esm': NOT_A_HARVEST,
+  'd8e8a:Skyrim.esm': NOT_A_HARVEST,
+  'd8e8b:Skyrim.esm': NOT_A_HARVEST,
+  'd8e8c:Skyrim.esm': NOT_A_HARVEST
+};
+
+var unownedProduceSeen = {};
+
+/** True when this base is a plant or a tree, or on one of the two lists. Asked
+ *  after every table in onActivate, so it only ever sees what none of them
+ *  named. A body's base is an NPC_ and is never one. */
+function isWorldProduce(baseDesc) {
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_ANYBODY, baseDesc)) { return true; }
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_NOBODY, baseDesc)) { return true; }
+  var spoils = globalThis.__thornswoodSpoils;
+  if (!spoils || !spoils.kindOf) { return false; }
+  var kind = '';
+  try { kind = spoils.kindOf(idOf(baseDesc)); } catch (e) { kind = ''; }
+  return kind === 'FLOR' || kind === 'TREE';
+}
+
+/** ALLOW for a record anybody may take, so the engine hands it over; the
+ *  record's reason for one nobody may; the nobody sentence for the rest. */
+function worldProduce(actorId, refrId, baseDesc) {
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_ANYBODY, baseDesc)) { return ALLOW; }
+  if (Object.prototype.hasOwnProperty.call(WORLD_PRODUCE_NOBODY, baseDesc)) {
+    return WORLD_PRODUCE_NOBODY[baseDesc];
+  }
+  if (!Object.prototype.hasOwnProperty.call(unownedProduceSeen, baseDesc)) {
+    unownedProduceSeen[baseDesc] = true;
+    log('#3141: a plant or tree no list names was pressed, so it is nobody\'s:', baseDesc,
+        'Give it its owner in a class table, WORLD_PRODUCE_ANYBODY or WORLD_PRODUCE_NOBODY.');
+  }
+  return NOBODYS_PRODUCE;
 }
 
 /* Shrine -> the ability it grants. These are the Altar*Spell records, which
@@ -7366,7 +7584,27 @@ var CROP_RULES = {
   '141081:JK\'s Whiterun\'s Outskirts.esp': { rank: 'expert', growMinutes: 40,
                             produce: '64b2e:Skyrim.esm', name: 'Red Apple' },
   '141088:JK\'s Whiterun\'s Outskirts.esp': { rank: 'expert', growMinutes: 40,
-                            produce: '64b2f:Skyrim.esm', name: 'Green Apple' }
+                            produce: '64b2f:Skyrim.esm', name: 'Green Apple' },
+  /*
+    THE HEARTHFIRES GARDEN PLANTERS (#3141). The pass files them unranked,
+    because each one's produce is a sack (Cabbage (2) and the like) that only a
+    Papyrus script opens, and nothing answered them: the engine handed the sack
+    to whoever pressed. The ingredient planters beside them went to the gatherer
+    in GATHER_UNRANKED. These six are field crops and the farmer's, so they are
+    plots like the field ones: the same produce, rank and time as that crop.
+  */
+  '1045e:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '64b3f:Skyrim.esm', name: 'Cabbage' },
+  '1045f:HearthFires.esm': { rank: 'novice', growMinutes: 25,
+                            produce: '10d666:Skyrim.esm', name: 'Gourd' },
+  '10460:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '669a5:Skyrim.esm', name: 'Leek' },
+  '110b9:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '64b40:Skyrim.esm', name: 'Carrot' },
+  '110ba:HearthFires.esm': { rank: 'novice', growMinutes: 20,
+                            produce: '64b41:Skyrim.esm', name: 'Potato' },
+  '110cd:HearthFires.esm': { rank: 'advanced', growMinutes: 45,
+                            produce: '4b0ba:Skyrim.esm', name: 'Wheat' }
 };
 
 /*
@@ -7880,10 +8118,17 @@ function fish(actorId, refrId, baseDesc) {
  * the class first and before the wait, then the rank refused by name with an
  * unknown rank treated as the strictest rather than the loosest, then the
  * record's own wait, then the count for the hunter's rank.
+ *
+ * Since #3141 it answers the racks in RACKS_BY_HAND as well: a horker for the
+ * hunter and the fish laid out in Windhelm for the fisher, each through its owner's gate,
+ * ladder, waits and yields (RACK_OWNERS).
  */
 function game(actorId, refrId, baseDesc) {
-  if (!isGame(baseDesc)) return null;
-  const hung = GAME_BY_BASE[baseDesc];
+  const rack = rackOf(baseDesc);
+  if (!rack) return null;
+  const hung = rack.row;
+  const who = rack.owner;
+  const tuning = who.tuning();
   if(!withinResourceReach(actorId,refrId)) return 'Come closer to this rack.';
   const stock=globalThis.__thornswoodResourceStock;
   if(!stock) return 'This rack is unavailable for now.';
@@ -7892,7 +8137,7 @@ function game(actorId, refrId, baseDesc) {
   // mineOre, harvest() and fish() settled on and for the same reason: somebody
   // who is not a hunter is never going to work this rack, and 'it is picked
   // clean' tells them the wrong thing about why nothing happened.
-  const refusal = classGate(actorId, 'loot');
+  const refusal = classGate(actorId, who.verb);
   if (refusal) return refusal;
 
   /*
@@ -7910,37 +8155,44 @@ function game(actorId, refrId, baseDesc) {
     failure to expect. That script fails its run on a rank that is not one of
     the four, so this is the second lock on that door rather than the only one.
   */
-  const step = rankStep(actorId, 'hunter');
+  const step = rankStep(actorId, who.ladder);
   const named = RANK_LADDER.indexOf(hung.rank);
   const want = named < 0 ? RANK_LADDER.length - 1 : named;
   if (want > 0 && step < want) {
     return 'This ' + hung.from + ' takes ' + rankWord(RANK_LADDER[want]) +
-           ' Hunter. Work what you can until you are one.';
+           ' ' + who.word + '. Work what you can until you are one.';
   }
 
   // The wait is the record's own. A rank the table does not name falls back to
   // the longest wait rather than the shortest, the same way the rivers, the
   // seams and the bodies do.
-  const span = Object.prototype.hasOwnProperty.call(GAME_TUNING.cooldownMs, hung.rank)
-    ? GAME_TUNING.cooldownMs[hung.rank] : GAME_TUNING.cooldownMs.master;
+  const span = Object.prototype.hasOwnProperty.call(tuning.cooldownMs, hung.rank)
+    ? tuning.cooldownMs[hung.rank] : tuning.cooldownMs.master;
   // milliseconds from the stock, seconds to waitWord, as in fish() (#1826)
   const waitMs = stock.left(refrId,span);
   if (waitMs > 0) {
     return 'This one is picked clean for now. ' + waitWord(waitMs / 1000) + ' to go.';
   }
 
-  const pair = GAME_TUNING.yieldByStep[step] || GAME_TUNING.yieldByStep[0];
+  const pair = tuning.yieldByStep[step] || tuning.yieldByStep[0];
   const got = randInt(pair[0], pair[1]);
+  // A hand row hands one item of its list (RACKS_BY_HAND); none in this load
+  // order is the same answer as a produce that is not loaded.
+  let produce = hung.produce;
+  if (hung.list) {
+    const items = listItems(hung.list);
+    produce = items.length ? items[randInt(0, items.length - 1)] : '';
+  }
   // addItem answers false in one case only, which is idOf returning 0 because
   // the plugin that owns the produce is not in the load order. The same
   // sentence the seams and the rivers say, because sending somebody off to
   // empty their pack over a broken build is the wrong answer twice.
-  const taken=stock.take(refrId,span,()=>addItemsAtomic(actorId,[{item:hung.produce,count:got}]));
+  const taken=stock.take(refrId,span,()=>!!produce && addItemsAtomic(actorId,[{item:produce,count:got}]));
   if (!taken.ok) {
-    return 'There is ' + hung.name + ' here and nothing in this load order to ' +
+    return 'There is ' + (hung.name || 'something') + ' here and nothing in this load order to ' +
            'put in your hands. Say so in the dev channel.';
   }
-  const rank = creditWork(actorId, 'loot');
+  const rank = creditWork(actorId, who.verb);
   /*
     The same doubling fish() has to handle: a row whose name in the world reads
     the same as what it gives would say 'You take 1 Cooked Skeever off the
@@ -7949,6 +8201,9 @@ function game(actorId, refrId, baseDesc) {
     CharredSkeever03 giving Cooked Skeever, but a mod renaming one is a sentence
     nobody would see until somebody read it in the world.
   */
+  if (!hung.name) {
+    return 'You take ' + got + ' from the ' + hung.from + '.' + (rank ? ' ' + rank : '');
+  }
   const doubled = String(hung.from).toLowerCase() === String(hung.name).toLowerCase();
   const where = doubled ? 'the rack' : 'the ' + hung.from;
   return 'You take ' + got + ' ' + hung.name + ' off ' + where + '.' +
@@ -7980,10 +8235,9 @@ function game(actorId, refrId, baseDesc) {
   wait it does not read, and ten minutes is the plants' number already. These
   are first numbers for the dev server.
 
-  THE MAMMOTH CHEESE BOWL IS NOT HERE AND MUST NOT BE. "Literally anybody" is a
-  base in none of the tables onActivate asks, which falls through to the engine
-  and is handed to whoever pressed it. That needs no code, and a line here would
-  be the thing that broke it.
+  THE MAMMOTH CHEESE BOWL IS NOT HERE AND MUST NOT BE. "Literally anybody" is
+  its row in WORLD_PRODUCE_ANYBODY (#3141), which lets the engine hand it to
+  whoever pressed it. A line here would make it the farmer's.
 
   MILK IS BESIDE loot(), FOR LIVING COWS ONLY.
   A farmer pressing E on a living cow is given one Jug of Milk
@@ -8958,7 +9212,13 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   */
   try {
     const propBoard = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodProperty;
-    if (propBoard && propBoard.boardActivated && propBoard.boardActivated(refrId, casterRefrId)) {
+    const boardWhich = (propBoard && propBoard.boardActivated) ? propBoard.boardActivated(refrId, casterRefrId) : '';
+    if (boardWhich) {
+      // Finding the board is a first step (#3166); the box beside it is not the board.
+      const steps = globalThis.__thornswoodFirstSteps;
+      if (boardWhich === 'board' && steps && steps.sawBoard) {
+        try { steps.sawBoard(casterRefrId); } catch (eSteps) { log('first steps threw at the board:', eSteps); }
+      }
       return false;
     }
   } catch (eBoard) {
@@ -8977,6 +9237,19 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     }
   } catch (eShip) {
     log('the dock crate at', Number(refrId).toString(16), 'threw:', eShip);
+  }
+
+  /*
+    A TRADE CART STOP'S CRATE (#3158): the stop panel, never the container,
+    the same way as a dock's, asked after it.
+  */
+  try {
+    const cartStop = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTradeCarts;
+    if (cartStop && cartStop.activated && cartStop.activated(refrId, casterRefrId, baseDesc)) {
+      return false;
+    }
+  } catch (eCart) {
+    log('the cart stop crate at', Number(refrId).toString(16), 'threw:', eCart);
   }
 
   /*
@@ -9261,6 +9534,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   else if (isHive(baseDesc)) message = hive(casterRefrId, refrId, baseDesc);
   else if (isPlant(baseDesc)) message = harvest(casterRefrId, refrId, baseDesc);
   else if (isVein(baseDesc)) message = mineOre(casterRefrId, refrId, baseDesc);
+  // A plant or a tree none of the tables above named: its owner by name, or
+  // nobody's (#3141). Never the engine's free pick for whoever pressed it.
+  else if (isWorldProduce(baseDesc)) message = worldProduce(casterRefrId, refrId, baseDesc);
   else {
     /*
       A BODY IS LAST, AND IT IS THE ONLY BRANCH THAT IS NOT A TABLE LOOKUP.
@@ -28901,6 +29177,24 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
   }
 
   /*
+    YOU MUST HAVE EATEN IT FIRST (#3134). Every ingredient in a brew is one
+    this character has eaten, or the brew is refused before anything is
+    taken. The inputs are mp.onCraft's, passed on as a fifth argument and
+    read through arguments so the signature every test cuts by stays as it
+    is. The alchemy block keeps what has been eaten and answers the line.
+  */
+  var alchemy = globalThis.__thornswoodAlchemy;
+  if (want === 'alchemist' && alchemy && alchemy.brewRefusal) {
+    var untasted = alchemy.brewRefusal(actorId, arguments[4]);
+    if (untasted) {
+      notify(actorId, untasted);
+      say(actorId, untasted);
+      log(actorId.toString(16), 'was refused a brew at bench', (workbenchId || 0).toString(16) + ':', untasted);
+      return false;
+    }
+  }
+
+  /*
     THE LISTS (#1389). With the effects in hand, each one is asked of the page
     that names it, at the rank that page gives it, and the work goes to the
     half that owns it. Without them, which is every craft on the engine at the
@@ -28968,6 +29262,15 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
       try { hurtBrew.brewed(actorId, Number(craftedItemBaseId), effects); }
       catch (e) { log('the injury block threw on a brew:', e); }
     }
+  }
+
+  /*
+    THE CHARACTER REMEMBERS THE MIX (#3134), at any lab: the alchemy block
+    keeps it, and every effect it taught, on the character.
+  */
+  if (want === 'alchemist' && Array.isArray(effects) && alchemy && alchemy.brewed) {
+    try { alchemy.brewed(actorId, arguments[4], effects); }
+    catch (e) { log('the alchemy block threw on a brew:', e); }
   }
   return;
 }
@@ -29282,7 +29585,11 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
         return false;
       }
     }
-    return recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects);
+    /*
+      The inputs go on to the brew as a fifth argument (#3134): what this
+      character has eaten is asked of every ingredient in it.
+    */
+    return recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects, inputs);
   }
 
   /*
@@ -35674,11 +35981,158 @@ log('gamemode loaded:',
     skyAdjust: skyAdjust,
     setEpoch: function (ms) { state.epoch = Number(ms) || Date.now(); saveState(); },
     epoch: function () { return state.epoch; },
-    resetRolls: function () { state.rolls = {}; saveState(); }
+    resetRolls: function () { state.rolls = {}; saveState(); },
+    // When the season at t gives way to the next one. Time before the first
+    // count is spring, and that spring runs a whole week from the count.
+    turnsAt: function (t) {
+      var idx = t < state.epoch ? 0 : seasonIndex(t);
+      return state.epoch + (idx + 1) * WEEK;
+    }
   };
   slog('season is', seasonName(Date.now()));
 })();
 // ==== end thornswood season ====
+
+// ==== thornswood map calendar ====
+/*
+  THE DATE, THE SEASON AND THE SERVER CLOCK ON THE MAP (#3156).
+
+  Patrick, 22 Oct 2026, on his page: C, they show on the map menu. The front
+  plugin draws them while the map is open (thornswood-front.js, THE MAP'S
+  CALENDAR). This block hands it the two things only the server knows:
+
+    - the season, from the season block above, the one after it, and when
+      it turns;
+    - the server's clock: the zone the box keeps (Mountain time,
+      scripts/vps/vps-harden.ps1's $BoxTimeZone, the clock staff give times
+      in), as its offset from UTC in minutes and its short name.
+
+  The date itself is the game's calendar, which the engine's TimeService
+  writes from today's date in UTC, the year 4E 252 in 2026. The front reads
+  it from the same globals the game's own map line reads, so the two never
+  disagree, and nothing here sends it.
+
+  One property, seen by its owner only. The pass below sets it on everybody
+  online whose value is not the one wanted now: once each time somebody
+  comes on, then only when a season turns or the clock goes on or off
+  summer time. What each character was last given is kept here, so the pass asks
+  the engine nothing. A property is kept on the character, so whoever joins
+  has the last value at once, and a value that went out of date while they
+  were away is put right within one pass.
+*/
+(function () {
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  var PROP = 'thornswoodCalendar';
+  var EVERY_MS = 5000;
+  var told = {};       // actorId -> the signature it was last given
+
+  function clog() {
+    var a = ['[thornswood calendar]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  /* The box's zone at now: minutes east of UTC, and its short name (MDT,
+     MST), or '' when this Node cannot name it. */
+  function zoneAt(now) {
+    var d = new Date(now);
+    var name = '';
+    try {
+      var parts = d.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ');
+      name = parts[parts.length - 1];
+    } catch (e) {
+      name = '';
+    }
+    if (!/^[A-Za-z][A-Za-z0-9+:-]{1,8}$/.test(name)) { name = ''; }
+    return { off: -d.getTimezoneOffset(), tz: name };
+  }
+
+  /* What everybody should hold at now. */
+  function calendarAt(now) {
+    var z = zoneAt(now);
+    var v = { season: '', next: '', turns: 0, off: z.off, tz: z.tz };
+    var S = g.__thornswoodSeason;
+    if (S && S.seasonAt && S.turnsAt) {
+      v.season = S.seasonAt(now);
+      v.turns = S.turnsAt(now);
+      v.next = S.seasonAt(v.turns);
+    }
+    return v;
+  }
+
+  function signature(v) {
+    return [v.season, v.next, v.turns, v.off, v.tz].join('|');
+  }
+
+  /*
+    ON THE CLIENT. Handed to the front through globalThis.thornswoodCalendar,
+    the one thing the two scopes share, as the needs HUD hands it drunk. Only
+    marked as handed over once the hook is there, so a front that loads after
+    this first runs is still told.
+  */
+  function calendarScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || typeof v !== "object") { return; }',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    var sig = [v.season, v.next, v.turns, v.off, v.tz].join("|");',
+      '    if (st.thornswoodCalendar === sig) { return; }',
+      '    if (typeof globalThis === "undefined" || typeof globalThis.thornswoodCalendar !== "function") { return; }',
+      '    globalThis.thornswoodCalendar({ season: String(v.season || ""), next: String(v.next || ""),',
+      '      turns: Number(v.turns) || 0, off: Number(v.off), tz: String(v.tz || "") });',
+      '    st.thornswoodCalendar = sig;',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  try {
+    mp.makeProperty(PROP, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: calendarScript(),
+      updateNeighbor: ''
+    });
+  } catch (e) {
+    clog('could not make the property, so the map shows the date alone:', e);
+  }
+
+  function pass(now) {
+    var want = calendarAt(now || Date.now());
+    var sig = signature(want);
+    var online = mp.get(0, 'onlinePlayers') || [];
+    var here = {};
+    for (var i = 0; i < online.length; i++) {
+      var id = online[i];
+      here[id] = true;
+      if (told[id] === sig) { continue; }
+      try {
+        mp.set(id, PROP, want);
+        told[id] = sig;
+      } catch (e) {
+        clog('could not set the calendar on ' + id + ':', e);
+      }
+    }
+    for (var gone in told) {
+      if (Object.prototype.hasOwnProperty.call(told, gone) && !here[gone]) { delete told[gone]; }
+    }
+  }
+
+  g.__thornswoodCalendar = { prop: PROP, at: calendarAt, pass: pass, script: calendarScript, told: told };
+
+  if (g.__thornswoodCalendarTimer) { clearInterval(g.__thornswoodCalendarTimer); }
+  g.__thornswoodCalendarTimer = setInterval(function () {
+    try { pass(Date.now()); } catch (e) { clog('the pass failed, nobody was told:', e); }
+  }, EVERY_MS);
+  var first = calendarAt(Date.now());
+  clog('the server clock is ' + (first.tz || 'unnamed') + ', ' + first.off + ' minutes from UTC; ' +
+       (first.season || 'no season') + ' turns to ' + (first.next || 'nothing') + ' at ' +
+       (first.turns ? new Date(first.turns).toISOString() : 'no time'));
+})();
+// ==== end thornswood map calendar ====
 
 // ==== thornswood world stage ====
 /*
@@ -36276,6 +36730,9 @@ log('gamemode loaded:',
     cargo     the character on every line and hand out of the trade ships'
               manifest, every piece kept where it was (the trade ships
               block, #511)
+    carts     the character on every line, hand out and journey of the
+              trade carts' manifest, every piece kept where it was (the
+              trade carts block, #3158)
     books     members, their book chat, books they own, when they last left
               (the books)
     merchants the guild traders' supply waits, commission promises and a
@@ -36301,7 +36758,7 @@ log('gamemode loaded:',
 (function () {
   'use strict';
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
-  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'books', 'merchants'];
+  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'carts', 'books', 'merchants'];
   var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
   // Into thornswood.log with the rest of the gamemode's own lines (log, at the top of the file).
   function rlog(line) {
@@ -46379,7 +46836,9 @@ module.exports = {
                  }),
                  steward: keeps.length > 0, staff: staff, door: null, boards: [],
                  // The trade ships' ports and routes (#2700), for staff while the ships are on.
-                 ships: staff && !!(g.__thornswoodTradeShips && g.__thornswoodTradeShips.command) };
+                 ships: staff && !!(g.__thornswoodTradeShips && g.__thornswoodTradeShips.command),
+                 // The trade carts' stops and roads (#3158), for staff while the carts are on.
+                 carts: staff && !!(g.__thornswoodTradeCarts && g.__thornswoodTradeCarts.command) };
     // Where the world is, for staff only (#513): the world stage block's staff card.
     var worldStageApi = g['__thornswoodWorldStage'];
     try { view.world = (staff && worldStageApi && worldStageApi.staffView) ? worldStageApi.staffView(pid) : null; }
@@ -49137,6 +49596,24 @@ const module = { exports: {} };
   Ownership of who may run a ship, contracts and freight belong to #512 (the
   Free Skyrim Trading Company). Prices, purses and trading belong to #1373.
   Nothing here calls either.
+
+  CARTS ARE THE SAME MANIFEST, DRIVEN (#3158). Patrick, 22 Oct 2026: people
+  drive the carts that move goods between holds, and a shipment is lost only
+  when people raid it, never by chance. createTradeCargo({ driven: true }) is
+  a manifest of carts: a "port" is a cart stop and a "route" a road. Every
+  rule above holds the same, and three differ:
+
+  - A cart leaves only with a driver, the character who drives it, kept on
+    the journey as sailing.driver. A ship never has one.
+  - A cart never arrives on a clock. pullIn() brings it in at its stop when
+    its driver is there and the road's least time has passed, or when staff
+    bring in one whose driver is gone. arrive() refuses a driven manifest.
+  - A driver deleted, reset, wiped or replaced comes off the journey the way
+    a loader does; the cart stays on the road for staff to bring in.
+
+  Taking from a cart on the road, the raid, is begin() with how 'taken',
+  which this file already allows at sea. Who may raid, and where, is the
+  caller's rule (game\trade-carts.js).
 */
 
 var GOLD_BASE = 15;
@@ -49205,6 +49682,8 @@ function createTradeCargo(opts) {
   }
   var maxLines = opts.maxLines === undefined ? MAX_LINES_DEFAULT : opts.maxLines;
   if (!Number.isInteger(maxLines) || maxLines < 1 || maxLines > 256) { throw new Error('The line limit cannot be verified.'); }
+  if (opts.driven !== undefined && typeof opts.driven !== 'boolean') { throw new Error('Whether it is driven cannot be verified.'); }
+  var driven = opts.driven === true;
 
   function empty() { return { v: 1, seq: 0, holds: {}, receipts: {} }; }
 
@@ -49244,7 +49723,8 @@ function createTradeCargo(opts) {
       holds++;
       if (h.sailing !== null) {
         var s = h.sailing;
-        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at) {
+        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at ||
+            (driven ? !has(s, 'driver') || !named(s.driver) : has(s, 'driver'))) {
           throw new Error('Hold ' + id + '\'s voyage cannot be verified.');
         }
         sailing++;
@@ -49326,9 +49806,13 @@ function createTradeCargo(opts) {
     });
   }
 
-  function depart(state, id, to, at, arriveAt) {
+  /* driver is the character driving a cart, and is never given for a ship. */
+  function depart(state, id, to, at, arriveAt, driver) {
     return change(state, function (s) {
       var h = holdOf(s, id);
+      var who = null;
+      if (driven) { who = partyOf(driver, 'Who drives it'); }
+      else if (driver !== undefined) { throw new Error('A ship has no driver.'); }
       if (h.sailing) { throw new Error('The hold is already at sea.'); }
       if (!ports[to] || to === h.port || (routes && !routes[h.port + '>' + to])) {
         throw new Error('No voyage from ' + h.port + ' to ' + to + '.');
@@ -49338,6 +49822,7 @@ function createTradeCargo(opts) {
       if (!carrying) { throw new Error('The hold is empty.'); }
       if (h.outs.some(function (o) { return o.receipt === null; })) { throw new Error('Something is still being handed out.'); }
       h.sailing = { from: h.port, to: to, at: at, arriveAt: arriveAt };
+      if (driven) { h.sailing.driver = who; }
       return h.sailing;
     });
   }
@@ -49365,6 +49850,7 @@ function createTradeCargo(opts) {
 
   /* Every hold whose voyage is over by now is docked at its destination. */
   function arrive(state, now) {
+    if (driven) { throw new Error('A cart comes in only with its driver.'); }
     if (!time(now)) { throw new Error('The time cannot be verified.'); }
     return change(state, function (s) {
       var landed = [];
@@ -49377,6 +49863,29 @@ function createTradeCargo(opts) {
         }
       });
       return landed;
+    });
+  }
+
+  /*
+    A cart comes in at the stop it was driven to. who is the character at the
+    stop: only the driver, and only once the road's least time has passed.
+    who null is staff bringing in a cart, at any time, whether or not its
+    driver is still named. Answers the stop.
+  */
+  function pullIn(state, id, now, who) {
+    if (!driven) { throw new Error('A ship docks on its own.'); }
+    if (!time(now)) { throw new Error('The time cannot be verified.'); }
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (!h.sailing) { throw new Error('The cart is not on the road.'); }
+      if (who !== null) {
+        var me = partyOf(who, 'Who brings it in');
+        if (!same(me, h.sailing.driver)) { throw new Error('Only its driver brings a cart in.'); }
+        if (now < h.sailing.arriveAt) { throw new Error('The road is not done yet.'); }
+      }
+      h.port = h.sailing.to;
+      h.sailing = null;
+      return h.port;
     });
   }
 
@@ -49456,6 +49965,7 @@ function createTradeCargo(opts) {
     function gone(p) { return !!p && (who.actor(p.actor) === true || (p.profile > 0 && who.profile(p.profile) === true)); }
     return change(state, function (s) {
       var c = { loaders: 0, recipients: 0, receivers: 0 };
+      if (driven) { c.drivers = 0; }
       Object.keys(s.holds).forEach(function (id) {
         var h = s.holds[id];
         Object.keys(h.lines).forEach(function (k) {
@@ -49464,6 +49974,7 @@ function createTradeCargo(opts) {
           if (gone(l.for)) { l.for = null; c.recipients++; }
         });
         h.outs.forEach(function (o) { if (gone(o.who)) { o.who = null; c.receivers++; } });
+        if (driven && h.sailing && gone(h.sailing.driver)) { h.sailing.driver = null; c.drivers++; }
       });
       return c;
     });
@@ -49499,9 +50010,9 @@ function createTradeCargo(opts) {
   }
 
   return {
-    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive,
+    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive, pullIn: pullIn,
     begin: begin, finish: finish, undo: undo, release: release, aboard: aboard, save: save, parse: load_,
-    PORTS: Object.keys(ports), MAX_LINES: maxLines
+    PORTS: Object.keys(ports), MAX_LINES: maxLines, DRIVEN: driven
   };
 }
 
@@ -49623,17 +50134,22 @@ function proposeRoutes(current, next, state) {
   openRegister(null) is the register of a server that never had one: no
   ports, no routes, no holds. A text that is there and does not verify is
   refused whole, never read as empty.
+
+  The carts' register is the same shape in its own file (#3158):
+  openRegister(text, { driven: true }), and the register remembers it is
+  driven through every adoptRoutes.
 */
-function registerOf(routes, state) {
-  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes });
+function registerOf(routes, state, driven) {
+  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes, driven: driven === true });
   ships.audit(state);
   return { routes: routes, ships: ships, state: state };
 }
 
-function openRegister(textIn) {
+function openRegister(textIn, opts) {
+  var driven = !!(opts && opts.driven === true);
   if (textIn === null || textIn === undefined) {
     var none = checkRoutes(NO_ROUTES);
-    return registerOf(none, createTradeCargo({ ports: [] }).empty());
+    return registerOf(none, createTradeCargo({ ports: [] }).empty(), driven);
   }
   if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES * 2) {
     throw new Error('The ship register cannot be verified.');
@@ -49643,7 +50159,7 @@ function openRegister(textIn) {
   if (!isObj(raw) || raw.v !== 1 || Object.keys(raw).length !== 3 || !has(raw, 'routes') || !has(raw, 'cargo')) {
     throw new Error('The ship register cannot be verified.');
   }
-  return registerOf(checkRoutes(raw.routes), raw.cargo);
+  return registerOf(checkRoutes(raw.routes), raw.cargo, driven);
 }
 
 function saveRegister(reg) {
@@ -49657,7 +50173,7 @@ function saveRegister(reg) {
 function adoptRoutes(reg, next) {
   var p = proposeRoutes(reg.routes, next, reg.state);
   if (p.strands.length) { throw new Error('The edit strands a hold: ' + p.strands.join(' ')); }
-  return registerOf(p.next, copy(reg.state));
+  return registerOf(p.next, copy(reg.state), reg.ships.DRIVEN);
 }
 
 /* The counts a load banner says. */
@@ -49871,8 +50387,13 @@ function parse(parts) {
     unroute <from> <to>              the route off the list
     crew <from> <to> <ref ...>       the route's crew references; none is no crew
     reset                            the draft back to the list in force
+
+  words names the places for what staff read, { place, crate, route }: a
+  port, a dock and a route when left out; a stop, a cart stop and a road for
+  the carts (#3158, game\trade-carts.js WORDS).
 */
-function editDraft(cargo, inForce, draft, edit, crate) {
+function editDraft(cargo, inForce, draft, edit, crate, words) {
+  var w = words || { place: 'port', crate: 'dock', route: 'route' };
   var d = copy(draft || inForce);
   var e = Array.isArray(edit) ? edit.map(String) : [];
   var op = (e[0] || '').toLowerCase();
@@ -49881,26 +50402,26 @@ function editDraft(cargo, inForce, draft, edit, crate) {
       throw new Error('Open the crate first, then press this within a minute.');
     }
     if (!/^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i.test(crate.desc)) {
-      throw new Error('That container is not one of the world\'s own, so it cannot be a dock.');
+      throw new Error('That container is not one of the world\'s own, so it cannot be a ' + w.crate + '.');
     }
     var taken = portOfCrate(d, crate.desc);
-    if (taken) { throw new Error('That crate is already the dock of ' + taken + '.'); }
+    if (taken) { throw new Error('That crate is already the ' + w.crate + ' of ' + taken + '.'); }
     return crate;
   }
   if (op === 'reset') { return cargo.checkRoutes(inForce); }
   if (op === 'port') {
     var c = needCrate();
-    if (!e[1] || portOf(d, e[1])) { throw new Error('A port needs a new plain name.'); }
-    if (HOLD_KEYS.indexOf(e[2]) < 0) { throw new Error('A port is in one of the holds.'); }
+    if (!e[1] || portOf(d, e[1])) { throw new Error('A ' + w.place + ' needs a new plain name.'); }
+    if (HOLD_KEYS.indexOf(e[2]) < 0) { throw new Error('A ' + w.place + ' is in one of the holds.'); }
     var name = e.slice(3).join(' ').trim();
     d.ports.push({ key: e[1], name: name, hold: e[2], world: c.world, pos: c.pos.slice(0, 3), crate: c.desc });
   } else if (op === 'crate') {
     var c2 = needCrate();
     var pc = portOf(d, e[1]);
-    if (!pc) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    if (!pc) { throw new Error('No ' + w.place + ' ' + e[1] + ' in the draft.'); }
     pc.crate = c2.desc; pc.world = c2.world; pc.pos = c2.pos.slice(0, 3);
   } else if (op === 'unport') {
-    if (!portOf(d, e[1])) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    if (!portOf(d, e[1])) { throw new Error('No ' + w.place + ' ' + e[1] + ' in the draft.'); }
     d.ports = d.ports.filter(function (p) { return p.key !== e[1]; });
     d.routes = d.routes.filter(function (r) { return r.from !== e[1] && r.to !== e[1]; });
   } else if (op === 'route') {
@@ -49908,11 +50429,11 @@ function editDraft(cargo, inForce, draft, edit, crate) {
     var r = routeOf(d, e[1], e[2]);
     if (r) { r.minutes = m; } else { d.routes.push({ from: e[1], to: e[2], minutes: m, crew: [] }); }
   } else if (op === 'unroute') {
-    if (!routeOf(d, e[1], e[2])) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    if (!routeOf(d, e[1], e[2])) { throw new Error('No ' + w.route + ' from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
     d.routes = d.routes.filter(function (x) { return !(x.from === e[1] && x.to === e[2]); });
   } else if (op === 'crew') {
     var rc = routeOf(d, e[1], e[2]);
-    if (!rc) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    if (!rc) { throw new Error('No ' + w.route + ' from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
     rc.crew = e.slice(3);
   } else {
     throw new Error('The staff panel does not know that edit.');
@@ -50105,6 +50626,90 @@ return module.exports;
     }
   }
 
+  /*
+    WHAT GOES BETWEEN A PACK AND A MANIFEST, kept here once for the ships and
+    for the carts block below (#3158), which hands goods the same way: who a
+    character is on a manifest, the names shown, what a pack offers, the
+    debit out of it, the credit into it, and who a load can be for. Published
+    as __thornswoodCargoHands whether or not the ships are on, because the
+    carts have their own switch.
+  */
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+  function partyOf(actorId) { return { actor: Number(actorId) >>> 0, profile: profileOf(actorId) }; }
+  function nameOf(p) {
+    try { var ap = mp.get(p.actor, 'appearance'); return ap && ap.name ? String(ap.name) : ''; } catch (e) { return ''; }
+  }
+  function itemName(entry) {
+    var prop = g.__thornswoodProperty;
+    try { if (prop && typeof prop.itemName === 'function') { return String(prop.itemName(entry)); } } catch (e) { }
+    return entry && typeof entry.name === 'string' && entry.name ? entry.name : 'Goods';
+  }
+
+  /* What they carry, coin left out: [{ baseId, nth, count, name }]. nth is which stack of that base. */
+  function packList(actorId) {
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return []; }
+    var nth = {}, out = [];
+    ((inv && inv.entries) || []).forEach(function (e) {
+      if (!e || !Number.isInteger(e.baseId) || !(e.count > 0)) { return; }
+      var k = nth[e.baseId] = (nth[e.baseId] === undefined ? 0 : nth[e.baseId] + 1);
+      if (TRADE_DOCK.isCoin(e.baseId) || questItemBlocked(e.baseId)) { return; }
+      out.push({ baseId: e.baseId, nth: k, count: e.count, name: itemName(e) });
+    });
+    return out.slice(0, 200);
+  }
+
+  /* The debit: n of that stack out of the pack, every other field kept. Coin is refused before the pack is read. */
+  function packTake(actorId, base, nthOf, n) {
+    if(questItemBlocked(base))throw new Error('Quest items stay with their assigned work.');
+    if (TRADE_DOCK.isCoin(base)) { throw new Error('Coin is not cargo.'); }
+    var inv = mp.get(actorId, 'inventory');
+    var entries = copy((inv && inv.entries) || []);
+    var seen = -1, at = -1;
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i].baseId === base && ++seen === nthOf) { at = i; break; }
+    }
+    if (at < 0 || !(entries[at].count >= n)) { throw new Error('You do not carry that many.'); }
+    var piece = copy(entries[at]);
+    piece.count = n;
+    entries[at].count -= n;
+    if (entries[at].count <= 0) { entries.splice(at, 1); }
+    mp.set(actorId, 'inventory', { entries: entries });
+    return piece;
+  }
+
+  /* The credit: a piece the manifest handed out, onto the stack it matches or as its own. */
+  function packGive(actorId, entry) {
+    if(questItemBlocked(entry.baseId))throw new Error('Quest items cannot be cargo.');
+    var inv = mp.get(actorId, 'inventory');
+    var entries = copy((inv && inv.entries) || []);
+    var shape = function (e) { var c = copy(e); delete c.count; return JSON.stringify(c); };
+    var want = shape(entry), done = false;
+    for (var i = 0; i < entries.length && !done; i++) {
+      if (entries[i] && shape(entries[i]) === want) { entries[i].count += entry.count; done = true; }
+    }
+    if (!done) { entries.push(copy(entry)); }
+    mp.set(actorId, 'inventory', { entries: entries });
+  }
+
+  function people(actorId) {
+    var me = partyOf(actorId), out = [me], online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    online.forEach(function (id) {
+      if ((Number(id) >>> 0) === me.actor || out.length >= 60) { return; }
+      var p = partyOf(id), nm = nameOf(p);
+      if (nm) { p.name = nm; out.push(p); }
+    });
+    return out;
+  }
+
+  g.__thornswoodCargoHands = {
+    profileOf: profileOf, partyOf: partyOf, nameOf: nameOf, itemName: itemName,
+    list: packList, take: packTake, give: packGive, people: people
+  };
+
   if (on && reg) {
     var act = function (name) {
       return function () {
@@ -50161,18 +50766,6 @@ return module.exports;
       var f = g[name];
       try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
     }
-    function profileOf(actorId) {
-      try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
-    }
-    function partyOf(actorId) { return { actor: Number(actorId) >>> 0, profile: profileOf(actorId) }; }
-    function nameOf(p) {
-      try { var ap = mp.get(p.actor, 'appearance'); return ap && ap.name ? String(ap.name) : ''; } catch (e) { return ''; }
-    }
-    function itemName(entry) {
-      var prop = g.__thornswoodProperty;
-      try { if (prop && typeof prop.itemName === 'function') { return String(prop.itemName(entry)); } } catch (e) { }
-      return entry && typeof entry.name === 'string' && entry.name ? entry.name : 'Goods';
-    }
 
     /*
       THE ONE CHARTER SPOT (#512, #2687). The Trading Company publishes
@@ -50196,63 +50789,6 @@ return module.exports;
       } catch (e) { return false; }
     }
 
-    /* What they carry, coin left out: [{ baseId, nth, count, name }]. nth is which stack of that base. */
-    function packList(actorId) {
-      var inv = null;
-      try { inv = mp.get(actorId, 'inventory'); } catch (e) { return []; }
-      var nth = {}, out = [];
-      ((inv && inv.entries) || []).forEach(function (e) {
-        if (!e || !Number.isInteger(e.baseId) || !(e.count > 0)) { return; }
-        var k = nth[e.baseId] = (nth[e.baseId] === undefined ? 0 : nth[e.baseId] + 1);
-        if (TRADE_DOCK.isCoin(e.baseId) || questItemBlocked(e.baseId)) { return; }
-        out.push({ baseId: e.baseId, nth: k, count: e.count, name: itemName(e) });
-      });
-      return out.slice(0, 200);
-    }
-
-    /* The debit: n of that stack out of the pack, every other field kept. Coin is refused before the pack is read. */
-    function packTake(actorId, base, nthOf, n) {
-      if(questItemBlocked(base))throw new Error('Quest items stay with their assigned work.');
-      if (TRADE_DOCK.isCoin(base)) { throw new Error('Coin is not cargo.'); }
-      var inv = mp.get(actorId, 'inventory');
-      var entries = copy((inv && inv.entries) || []);
-      var seen = -1, at = -1;
-      for (var i = 0; i < entries.length; i++) {
-        if (entries[i] && entries[i].baseId === base && ++seen === nthOf) { at = i; break; }
-      }
-      if (at < 0 || !(entries[at].count >= n)) { throw new Error('You do not carry that many.'); }
-      var piece = copy(entries[at]);
-      piece.count = n;
-      entries[at].count -= n;
-      if (entries[at].count <= 0) { entries.splice(at, 1); }
-      mp.set(actorId, 'inventory', { entries: entries });
-      return piece;
-    }
-
-    /* The credit: a piece the manifest handed out, onto the stack it matches or as its own. */
-    function packGive(actorId, entry) {
-      if(questItemBlocked(entry.baseId))throw new Error('Quest items cannot be cargo.');
-      var inv = mp.get(actorId, 'inventory');
-      var entries = copy((inv && inv.entries) || []);
-      var shape = function (e) { var c = copy(e); delete c.count; return JSON.stringify(c); };
-      var want = shape(entry), done = false;
-      for (var i = 0; i < entries.length && !done; i++) {
-        if (entries[i] && shape(entries[i]) === want) { entries[i].count += entry.count; done = true; }
-      }
-      if (!done) { entries.push(copy(entry)); }
-      mp.set(actorId, 'inventory', { entries: entries });
-    }
-
-    function people(actorId) {
-      var me = partyOf(actorId), out = [me], online = [];
-      try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
-      online.forEach(function (id) {
-        if ((Number(id) >>> 0) === me.actor || out.length >= 60) { return; }
-        var p = partyOf(id), nm = nameOf(p);
-        if (nm) { p.name = nm; out.push(p); }
-      });
-      return out;
-    }
 
     function push(actorId, view) {
       viewAt = Math.max(Date.now(), viewAt + 1);
@@ -50445,6 +50981,681 @@ return module.exports;
   }
 })();
 // ==== end thornswood trade ships ====
+
+// ==== thornswood trade carts ====
+/*
+  TRADE CARTS ON THE SERVER (#3158), ON UNLESS SWITCHED OFF.
+
+  Patrick, 22 Oct 2026 (docs/DECIDED.md): people drive the carts that move
+  goods between holds, and a shipment is lost only when people raid it, never
+  by chance. game\trade-carts.js is the stop, the road and the raid, and the
+  manifest is game\trade-cargo.js created driven; both are bundled into this
+  file by scripts\dev\Build-TradeCargoGamemode.js, and docs/systems/carts.md
+  is the page.
+
+  THE REGISTER is private\trade-carts.json, the ships' shape in its own file
+  (the stops and roads in force with the manifest of carts), for the same
+  reason as theirs: it names characters, and the data folder is served to
+  anybody (#541). No file is a world with no cart stops. A file that is there
+  and does not verify is refused whole and nothing is written over it.
+
+  THE SWITCH. "thornswoodTradeCarts": false in server-settings.json switches
+  the carts off. On is the default, unlike the ships, because a cart needs
+  nothing but a stop staff set (a ship's hold waits on the Trading Company's
+  charter, #512): with no stop on the list nobody meets a cart. Off, the
+  register is still read, let go of deleted characters and counted, as the
+  ships' is.
+
+  THE RELEASE (#2351, #2668). The part 'carts', asked for as this block loads:
+  a deleted, reset, wiped or replaced character comes off every line, hand
+  out and journey, and every piece stays where it was.
+
+  THE HANDS. What goes between a pack and a manifest is the ships block's
+  (__thornswoodCargoHands, above), so a cart takes, gives and names goods the
+  way a ship does and there is one copy of it.
+*/
+// TRADE CARTS BUNDLE BEGIN
+// Built by scripts\dev\Build-TradeCargoGamemode.js out of game\trade-carts.js. Do not hand edit.
+const TRADE_CARTS = (function () {
+const module = { exports: {} };
+'use strict';
+/*
+  TRADE CARTS: THE STOP, THE ROAD AND THE RAID (#3158).
+
+  Patrick, 22 Oct 2026, on his report page (docs/DECIDED.md):
+    - people drive the carts that move goods between holds;
+    - a shipment is lost only when people raid it, never by chance.
+
+  game\trade-cargo.js is the manifest, created driven: a "port" is a cart stop
+  and a "route" a road, and a cart leaves only with a driver and comes in only
+  with them (pullIn). This file is what a person meets, as views and as the
+  words the panel sends back. It never touches the world: the trade carts
+  block of gamemode.js hands it what the server knows and does what it says,
+  the way game\trade-ship-dock.js serves the ships.
+
+  THE STOP. A cart stop is a container already in the world that staff picked
+  (its reference, the stop's crate), with no new plugin, as a ship's dock is.
+  E on it opens the stop panel and never the container. Staff put carts at a
+  stop. Anyone loads a cart standing there, for anyone in the world.
+
+  THE ROAD. Whoever has loaded something on a cart may drive it to a stop a
+  road leads to; nothing about who drives it, where or when is decided here.
+  The cart then goes with its driver: it is on the road until the driver
+  presses the far stop's crate. The road's minutes, staff data, are the least
+  time a loaded cart takes, so a carriage ride or a teleport does not bring it
+  in sooner; walking or riding the road takes what it takes. One person drives
+  one cart at a time.
+
+  THE RAID. While a cart is on the road, anyone close to its driver, with both
+  in the world, may open it from Raid cart beside the driver under Near you on
+  P and take what is aboard. The manifest records who took what; whether it
+  was a robbery is roleplay, the rule ships have at a dock (#511). The driver
+  cannot raid their own cart. Nothing is ever lost any other way: no chance,
+  no clock, no weather.
+
+  WHAT IT NEVER DECIDES. Prices, pay and contracts: a haul on the notice
+  board (#1393) pays whoever carries goods, and a cart is how a lot of them
+  go. Coin is not cargo, here as on a ship.
+*/
+
+var GOLD_BASE = 15;
+var MINUTE = 60 * 1000;
+var KEY_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/;
+var WORD = '/cart';
+/* The words game\trade-ship-dock.js editDraft uses, for a cart stop and a road. */
+var WORDS = { place: 'stop', crate: 'cart stop', route: 'road' };
+
+function copy(v) { return JSON.parse(JSON.stringify(v)); }
+function whole(n) { return Number.isInteger(n) && n > 0; }
+function hex(n) { return (Number(n) >>> 0).toString(16); }
+function same(a, b) { return !!a && !!b && a.actor === b.actor && a.profile === b.profile; }
+function isCoin(baseId) { return (Number(baseId) >>> 0) === GOLD_BASE; }
+
+function routeOf(routes, from, to) {
+  var list = (routes && routes.routes) || [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].from === from && list[i].to === to) { return list[i]; }
+  }
+  return null;
+}
+function stopOf(routes, key) {
+  var list = (routes && routes.ports) || [];
+  for (var i = 0; i < list.length; i++) { if (list[i].key === key) { return list[i]; } }
+  return null;
+}
+function nameOfStop(routes, key) { var s = stopOf(routes, key); return s ? s.name : key; }
+
+/* When a cart leaves and the soonest it can come in: now, and now plus its road's minutes. */
+function road(routes, from, to, now) {
+  var r = routeOf(routes, from, to);
+  if (!r) { throw new Error('No road leads from here to there.'); }
+  if (!Number.isInteger(now) || now < 0) { throw new Error('The time cannot be verified.'); }
+  return { at: now, arriveAt: now + r.minutes * MINUTE };
+}
+
+/* The cart this character is driving, or ''. */
+function cartOfDriver(state, me) {
+  var holds = (state && state.holds) || {};
+  var ids = Object.keys(holds).sort();
+  for (var i = 0; i < ids.length; i++) {
+    var s = holds[ids[i]] && holds[ids[i]].sailing;
+    if (s && same(s.driver, me)) { return ids[i]; }
+  }
+  return '';
+}
+
+/* Whether this character has loaded something still aboard this cart, which is who may drive it. */
+function hasLoaded(state, id, me) {
+  var h = state && state.holds && state.holds[id];
+  if (!h) { return false; }
+  return Object.keys(h.lines).some(function (k) { return h.lines[k].aboard > 0 && same(h.lines[k].by, me); });
+}
+
+/*
+  THE PANEL'S WORDS. Sent by game\ui\thornswood-ship.js and the P panel, never
+  typed (Patrick, 4 Oct: no chat commands for what people do). Answers
+  { verb, ... } or { why } for anything it does not know.
+
+    /cart close
+    /cart load <cart> <base hex> <nth> <count> <for actor hex>
+    /cart drive <cart> <stop>
+    /cart pullin <cart>
+    /cart collect <cart> <line> <count>
+    /cart return <cart> <line> <count>
+    /cart raid <driver actor hex>          from Near you on P
+    /cart take <cart> <line> <count>       in the raid
+    /cart staff
+    /cart draft <edit ...>                 see trade-ship-dock.js editDraft
+    /cart confirm <base>
+    /cart add <stop>                       a new cart at a stop, staff only
+    /cart bring <cart>                     staff bring in a cart on the road
+*/
+function parse(parts) {
+  var p = Array.isArray(parts) ? parts.map(function (x) { return String(x); }) : [];
+  var verb = String(p[1] || '').toLowerCase();
+  var n = function (s) { return /^[0-9]{1,9}$/.test(String(s)) ? Number(s) : NaN; };
+  var h = function (s) { return /^[0-9a-f]{1,8}$/i.test(String(s)) ? parseInt(s, 16) >>> 0 : NaN; };
+  var key = function (s) { return typeof s === 'string' && KEY_RE.test(s) ? s : ''; };
+  if (verb === 'close' || verb === 'staff') { return { verb: verb }; }
+  if (verb === 'load') {
+    var l = { verb: 'load', cart: key(p[2]), base: h(p[3]), nth: n(p[4]), count: n(p[5]), forActor: h(p[6]) };
+    if (!l.cart || !whole(l.base) || !Number.isInteger(l.nth) || !whole(l.count) || !whole(l.forActor)) { return { why: 'That load cannot be read.' }; }
+    return l;
+  }
+  if (verb === 'drive') {
+    var d = { verb: 'drive', cart: key(p[2]), to: key(p[3]) };
+    return d.cart && d.to ? d : { why: 'That road cannot be read.' };
+  }
+  if (verb === 'pullin' || verb === 'bring') {
+    var b = { verb: verb, cart: key(p[2]) };
+    return b.cart ? b : { why: 'Say which cart.' };
+  }
+  if (verb === 'collect' || verb === 'return' || verb === 'take') {
+    var c = { verb: verb, cart: key(p[2]), line: n(p[3]), count: n(p[4]) };
+    return c.cart && whole(c.line) && whole(c.count) ? c : { why: 'That cannot be read.' };
+  }
+  if (verb === 'raid') {
+    var r = { verb: 'raid', driver: h(p[2]) };
+    return whole(r.driver) ? r : { why: 'Say whose cart.' };
+  }
+  if (verb === 'draft') { return { verb: 'draft', edit: p.slice(2) }; }
+  if (verb === 'confirm') { return p[2] ? { verb: 'confirm', base: String(p[2]) } : { why: 'That confirm cannot be read.' }; }
+  if (verb === 'add') {
+    var a = { verb: 'add', stop: key(p[2]) };
+    return a.stop ? a : { why: 'Say which stop.' };
+  }
+  return { why: 'The cart does not know that.' };
+}
+
+/*
+  WHAT A PERSON SEES AT A CART STOP. input:
+    reg       the carts' register (routes, ships, state)
+    stop      the stop key of the crate pressed
+    viewer    { actor, profile }, the character at the crate
+    staff     true for staff, who see every line
+    pack      [{ baseId, nth, count, name }], what they carry, coin left out by the caller
+    people    [{ actor, profile, name }], who a load can be for, the viewer first
+    nameOf    function (party) -> the name to show, or '' when it cannot be read
+    itemName  function (entry) -> the name of a piece
+    now       the time
+  Lines are shown only to whoever they concern: the one they are for, the one
+  who loaded them, and staff.
+*/
+function stopView(input) {
+  var reg = input.reg, stop = stopOf(reg.routes, input.stop);
+  if (!stop) { return { open: false }; }
+  var me = input.viewer, max = reg.ships.MAX_LINES, now = input.now;
+  var nameOf = input.nameOf || function () { return ''; };
+  var itemName = input.itemName || function () { return 'Goods'; };
+  var driving = cartOfDriver(reg.state, me);
+  var carts = [], incoming = [];
+  Object.keys(reg.state.holds).sort().forEach(function (id) {
+    var h = reg.state.holds[id];
+    if (h.sailing) {
+      if (h.sailing.to === stop.key) {
+        var mine = same(h.sailing.driver, me);
+        var left = Math.max(0, Math.ceil((h.sailing.arriveAt - now) / MINUTE));
+        incoming.push({ id: id, from: nameOfStop(reg.routes, h.sailing.from), dueIn: left,
+                        mine: mine, canPullIn: mine && left === 0 });
+      }
+      return;
+    }
+    if (h.port !== stop.key) { return; }
+    var lines = reg.ships.aboard(reg.state, id).map(function (l) {
+      var line = h.lines[String(l.line)];
+      var forMe = same(l.for, me), loaded = same(l.by, me);
+      return {
+        line: l.line, item: itemName(l.entry), count: l.entry.count,
+        shown: forMe || loaded || input.staff === true,
+        forName: l.for ? (forMe ? 'you' : (nameOf(l.for) || 'someone')) : 'nobody now',
+        canCollect: forMe && line.from !== h.port,
+        canReturn: loaded && line.from === h.port
+      };
+    });
+    var used = Object.keys(h.lines).length;
+    var others = lines.filter(function (l) { return !l.shown; }).length;
+    var mayDrive = !driving && hasLoaded(reg.state, id, me);
+    carts.push({
+      id: id, used: used, max: max,
+      lines: lines.filter(function (l) { return l.shown; }).map(function (l) { delete l.shown; return l; }),
+      others: others,
+      canLoad: used < max,
+      drive: mayDrive ? reg.routes.routes.filter(function (r) { return r.from === stop.key; }).map(function (r) {
+        return { to: r.to, name: nameOfStop(reg.routes, r.to), minutes: r.minutes };
+      }) : []
+    });
+  });
+  return {
+    open: true, mode: 'stop', kind: 'cart', word: WORD,
+    stop: { key: stop.key, name: stop.name },
+    carts: carts, incoming: incoming,
+    driving: driving ? { id: driving, to: nameOfStop(reg.routes, reg.state.holds[driving].sailing.to) } : null,
+    pack: (input.pack || []).filter(function (p) { return !isCoin(p.baseId); }).map(function (p) {
+      return { base: hex(p.baseId), nth: p.nth, count: p.count, name: p.name };
+    }),
+    people: (input.people || []).map(function (p) {
+      return { actor: hex(p.actor), name: same(p, me) ? 'Yourself' : p.name };
+    })
+  };
+}
+
+/*
+  WHAT A RAIDER SEES: every piece aboard the cart, with no name of whom it is
+  for or who loaded it. Each line can be taken.
+*/
+function raidView(input) {
+  var reg = input.reg, h = reg.state.holds[input.cart];
+  if (!h || !h.sailing) { return { open: false }; }
+  var itemName = input.itemName || function () { return 'Goods'; };
+  return {
+    open: true, mode: 'raid', kind: 'cart', word: WORD,
+    cart: input.cart, driver: input.driverName || 'somebody',
+    road: { from: nameOfStop(reg.routes, h.sailing.from), to: nameOfStop(reg.routes, h.sailing.to) },
+    lines: reg.ships.aboard(reg.state, input.cart).map(function (l) {
+      return { line: l.line, item: itemName(l.entry), count: l.entry.count };
+    })
+  };
+}
+
+/* The carts on the road, for the staff panel: where from and to, how long left, and whether a driver is still named. */
+function onRoad(reg, now) {
+  var out = [];
+  Object.keys(reg.state.holds).sort().forEach(function (id) {
+    var s = reg.state.holds[id].sailing;
+    if (!s) { return; }
+    out.push({ id: id, from: nameOfStop(reg.routes, s.from), to: nameOfStop(reg.routes, s.to),
+               dueIn: Math.max(0, Math.ceil((s.arriveAt - now) / MINUTE)), driver: !!s.driver });
+  });
+  return out;
+}
+
+module.exports = {
+  GOLD_BASE: GOLD_BASE, WORD: WORD, WORDS: copy(WORDS),
+  isCoin: isCoin, road: road, cartOfDriver: cartOfDriver, hasLoaded: hasLoaded,
+  parse: parse, stopView: stopView, raidView: raidView, onRoad: onRoad
+};
+return module.exports;
+})();
+// TRADE CARTS BUNDLE END
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined' ? globalThis : this);
+  var fs = require('fs'), path = require('path');
+  function clog() {
+    var a = Array.prototype.slice.call(arguments);
+    if (typeof log === 'function') { log.apply(null, ['[carts]'].concat(a)); } else { console.log('[thornswood] [carts] ' + a.join(' ')); }
+  }
+  function copy(v) { return JSON.parse(JSON.stringify(v)); }
+
+  var on = true;
+  try { var settings = mp.getServerSettings(); on = !(settings && settings.thornswoodTradeCarts === false); } catch (e) { on = true; }
+
+  // Where the register is: the privDir server-settings.json names, read the
+  // way the ships block reads it (#2871), so a settings file that will not
+  // read names no folder and nothing is guessed.
+  var privDir = 'private';
+  var settingsWhy = '';
+  try {
+    var cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^\uFEFF/, ''));
+    if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+  } catch (e) { settingsWhy = String((e && (e.code || e.message)) || e); }
+  var FILE = path.resolve(privDir, 'trade-carts.json');
+
+  var unreadable = settingsWhy ? 'server-settings.json could not be read' : '';
+  var reg = null;
+  (function read() {
+    if (unreadable) { return; }
+    var t = null;
+    try { t = fs.readFileSync(FILE, 'utf8'); }
+    catch (e) { if (!e || e.code !== 'ENOENT') { unreadable = String((e && e.code) || e); } }
+    if (unreadable) { return; }
+    try { reg = TRADE_CARGO.openRegister(t, { driven: true }); }
+    catch (e2) { unreadable = String((e2 && e2.message) || e2); reg = null; }
+  })();
+  if (settingsWhy) {
+    clog('server-settings.json could not be read (' + settingsWhy + '), so where the carts\' register is is not known: the carts hold nothing at this start and nothing is written until it is put right');
+  } else if (unreadable) {
+    clog(FILE, 'could not be read (' + unreadable + '), so the carts hold nothing at this start and nothing is written over it until it is put right');
+  }
+
+  function commit(next) {
+    if (unreadable || !reg) { return false; }
+    try {
+      var text = TRADE_CARGO.saveRegister(next);
+      fs.mkdirSync(path.dirname(FILE), { recursive: true });
+      fs.writeFileSync(FILE + '.tmp', text);
+      fs.renameSync(FILE + '.tmp', FILE);
+    } catch (e) {
+      clog('could not write', FILE + ':', (e && e.message) || e);
+      return false;
+    }
+    reg = next;
+    return true;
+  }
+
+  function release(who) {
+    var none = { loaders: 0, recipients: 0, receivers: 0, drivers: 0 };
+    if (unreadable || !reg) { return { counts: none, saved: false }; }
+    var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+    var c = reg.ships.release(next.state, who);
+    if (!c.loaders && !c.recipients && !c.receivers && !c.drivers) { return { counts: c, saved: true }; }
+    return { counts: c, saved: commit(next) };
+  }
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('carts', release); }
+
+  if (reg) {
+    var n = TRADE_CARGO.countsOf(reg);
+    clog('ready,', on ? 'on:' : 'off ("thornswoodTradeCarts": false in server-settings.json switches it off):',
+         n.ports, 'stop(s),', n.routes, 'road(s),', n.holds, 'cart(s),', n.sailing, 'on the road,',
+         n.aboard, 'piece(s) aboard,', n.pending, 'being handed out');
+    if (n.pending) {
+      clog(n.pending, 'piece(s) were being handed out when the server stopped; they stay counted on the manifest until each is finished or undone, and their cart cannot leave before');
+    }
+  }
+
+  var H = g.__thornswoodCargoHands;
+  if (on && reg && !H) {
+    clog('the trade ships block did not hand over what goes between a pack and a manifest, so nobody meets a cart at this start');
+  }
+  if (on && reg && H) {
+    var act = function (name) {
+      return function () {
+        var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+        var r = reg.ships[name].apply(null, [next.state].concat(Array.prototype.slice.call(arguments)));
+        if (!commit(next)) { throw new Error('The carts\' book could not be written, so nothing changed.'); }
+        return r;
+      };
+    };
+
+    /*
+      The panel is the ships' (game\ui\thornswood-ship.js), told it is a cart
+      by kind and word in the view; this property reaches it the way the
+      ships' does.
+    */
+    var CART_VIEW_PROPERTY = 'thornswoodCartView';
+    try {
+      mp.makeProperty(CART_VIEW_PROPERTY, {
+        isVisibleByOwner: true, isVisibleByNeighbors: false,
+        updateOwner: [
+          '(function(){',
+          '  try {',
+          '    var v = ctx.value;',
+          '    if (!v || typeof v !== "object") { return; }',
+          '    var st = ctx.state;',
+          '    if (!st || st.thornswoodCartAt === v.at) { return; }',
+          '    st.thornswoodCartAt = v.at;',
+          '    var body = JSON.stringify(v);',
+          '    ctx.sp.browser.executeJavaScript("(function(){try{var d=" + body + ";if(window.thornswoodShip&&window.thornswoodShip.setData){window.thornswoodShip.setData(d);}}catch(e){}})();");',
+          '  } catch (e) { }',
+          '})();'
+        ].join('\n'),
+        updateNeighbor: ''
+      });
+    } catch (eProp) { /* made by an earlier load, or no world here. harmless. */ }
+
+    var SESSION_MS = 10 * 60 * 1000;   // a stop panel left open this long asks for the crate again
+    var CRATE_MS = 60 * 1000;          // staff press a container, then the staff panel, within a minute
+    var NEAR = 400;                    // the reach of a stop's crate, the same as a dock's
+    var RAID_REACH = 700;              // how close a raider stands to the driver: a trade's 10 metres
+    var sessions = {}, drafts = {}, crateSeen = {}, viewAt = 0, receiptN = 0;
+    var RUN = (function () {
+      try { if (typeof serverRunId === 'function') { return String(serverRunId()); } } catch (eRun) { }
+      return Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e9).toString(36);
+    })();
+    function receipt(kind) { return 'cart-' + kind + ':' + RUN + ':' + (++receiptN); }
+
+    function hook(name, pid) {
+      var f = g[name];
+      try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+    }
+    function online(actorId) {
+      var list = [];
+      try { list = mp.get(0, 'onlinePlayers') || []; } catch (e) { list = []; }
+      return list.some(function (id) { return (Number(id) >>> 0) === (Number(actorId) >>> 0); });
+    }
+    function within(a, b, reach) {
+      try {
+        var cell = mp.get(a, 'worldOrCellDesc');
+        if (typeof cell !== 'string' || !cell || cell !== mp.get(b, 'worldOrCellDesc')) { return false; }
+        var p = mp.get(a, 'pos'), q = mp.get(b, 'pos');
+        var dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+        return dx * dx + dy * dy + dz * dz <= reach * reach;
+      } catch (e) { return false; }
+    }
+    function tell(actorId, text) {
+      var t = g.__thornswoodToProfile;
+      try { if (typeof t === 'function') { t(H.profileOf(actorId), text); } } catch (e) { }
+    }
+
+    function push(actorId, view) {
+      viewAt = Math.max(Date.now(), viewAt + 1);
+      view.at = viewAt;
+      try { mp.set(actorId, CART_VIEW_PROPERTY, view); } catch (e) { }
+      return view;
+    }
+    function shut(actorId) { sessions[actorId] = null; push(actorId, { open: false, kind: 'cart', word: TRADE_CARTS.WORD }); }
+    function crateOf(actorId) {
+      var c = crateSeen[actorId];
+      return c && Date.now() - c.at <= CRATE_MS ? c : null;
+    }
+    function pushStop(actorId, profileId, said) {
+      var v = TRADE_CARTS.stopView({
+        reg: reg, stop: sessions[actorId].stop, viewer: H.partyOf(actorId), staff: hook('__thornswoodIsStaff', profileId),
+        pack: H.list(actorId), people: H.people(actorId), nameOf: H.nameOf, itemName: H.itemName, now: Date.now()
+      });
+      v.note = said || '';
+      return push(actorId, v);
+    }
+    function pushRaid(actorId, said) {
+      var s = sessions[actorId];
+      var v = TRADE_CARTS.raidView({ reg: reg, cart: s.cart, driverName: H.nameOf(H.partyOf(s.driver)), itemName: H.itemName });
+      if (v.open) { v.note = said || ''; return push(actorId, v); }
+      sessions[actorId] = null;
+      if (said) { tell(actorId, said); }
+      return push(actorId, { open: false, kind: 'cart', word: TRADE_CARTS.WORD });
+    }
+    function pushStaff(actorId, profileId, said) {
+      var v = TRADE_DOCK.staffView(TRADE_CARGO, reg, drafts[profileId] || null, crateOf(actorId));
+      v.kind = 'cart';
+      v.word = TRADE_CARTS.WORD;
+      v.onRoad = TRADE_CARTS.onRoad(reg, Date.now());
+      v.note = said || '';
+      return push(actorId, v);
+    }
+
+    /* One piece of a line into one pack, through a receipt, the way a ship hands out. Answers the entry. */
+    function handOut(actorId, cart, line, count, how) {
+      var out = act('begin')(cart, line, count, how, H.partyOf(actorId), Date.now());
+      try { H.give(actorId, out.entry); } catch (eGive) {
+        act('undo')(cart, out.out);
+        throw new Error('It could not be put in your pack, so it stays on the cart.');
+      }
+      try { act('finish')(cart, out.out, receipt('credit')); } catch (eFinish) {
+        clog('handed', JSON.stringify(out.entry), 'from', cart, 'to', String((Number(actorId) >>> 0).toString(16)),
+             'but could not mark it finished:', (eFinish && eFinish.message) || eFinish);
+        throw new Error('It is in your pack, but the carts\' book could not be written. Say so in the dev channel.');
+      }
+      return out.entry;
+    }
+
+    function stopWord(w, actorId) {
+      var stop = sessions[actorId].stop;
+      var me = H.partyOf(actorId);
+      var h = reg.state.holds[w.cart];
+      if (!h) { throw new Error('There is no such cart.'); }
+      if (w.verb === 'pullin') {
+        if (!h.sailing || h.sailing.to !== stop) { throw new Error('That cart is not on its way here.'); }
+        var left = Math.ceil((h.sailing.arriveAt - Date.now()) / 60000);
+        if (left > 0 && TRADE_CARTS.cartOfDriver(reg.state, me) === w.cart) {
+          throw new Error('A loaded cart takes longer on this road than you have been on it: it comes in here in ' + left + ' more minute(s).');
+        }
+        act('pullIn')(w.cart, Date.now(), me);
+        clog('a cart came in at', stop);
+        return 'The cart is in.';
+      }
+      if (h.sailing || h.port !== stop) { throw new Error('That cart is not at this stop.'); }
+      if (w.verb === 'collect') { handOut(actorId, w.cart, w.line, w.count, 'delivered'); return 'Collected.'; }
+      if (w.verb === 'return') { handOut(actorId, w.cart, w.line, w.count, 'returned'); return 'Taken back.'; }
+      if (w.verb === 'drive') {
+        var driving = TRADE_CARTS.cartOfDriver(reg.state, me);
+        if (driving) { throw new Error('You are already driving a cart.'); }
+        if (!TRADE_CARTS.hasLoaded(reg.state, w.cart, me)) { throw new Error('Only somebody with goods of their own on it drives a cart.'); }
+        var t = TRADE_CARTS.road(reg.routes, stop, w.to, Date.now());
+        act('depart')(w.cart, w.to, t.at, t.arriveAt, me);
+        var to = reg.routes.ports.filter(function (p) { return p.key === w.to; })[0];
+        clog('a cart left', stop, 'for', w.to);
+        return 'You drive the cart off. Press the cart stop at ' + (to ? to.name : w.to) + ' when you get there; it comes in no sooner than ' +
+          Math.round((t.arriveAt - t.at) / 60000) + ' minutes from now.';
+      }
+      // load: coin, a full cart and the recipient are refused before the pack is touched.
+      if (TRADE_CARTS.isCoin(w.base)) { throw new Error('Coin is not cargo.'); }
+      if (Object.keys(h.lines).length >= reg.ships.MAX_LINES) { throw new Error('The cart is full.'); }
+      var forWho = null;
+      H.people(actorId).forEach(function (p) { if (p.actor === w.forActor) { forWho = { actor: p.actor, profile: p.profile }; } });
+      if (!forWho) { throw new Error('Who it is for has to be here, in the world.'); }
+      var piece = H.take(actorId, w.base, w.nth, w.count);
+      try {
+        act('load')(w.cart, { by: me, for: forWho, receipt: receipt('debit'), entry: piece });
+      } catch (eLoad) {
+        try { H.give(actorId, piece); } catch (eBack) {
+          clog('could not load', JSON.stringify(piece), 'for', String((Number(actorId) >>> 0).toString(16)),
+               'and could not put it back in their pack:', (eBack && eBack.message) || eBack);
+          throw new Error('It could not be loaded, and it could not be put back in your pack. Say so in the dev channel.');
+        }
+        throw eLoad;
+      }
+      return 'Loaded.';
+    }
+
+    /*
+      THE RAID. The cart is with its driver, so the raider stands near the
+      driver, both in the world, and the cart is still on the road with that
+      driver. Every take asks all of it again.
+    */
+    function raidable(actorId, driverId) {
+      var cart = TRADE_CARTS.cartOfDriver(reg.state, H.partyOf(driverId));
+      if (!cart) { throw new Error('They are not driving a cart.'); }
+      if ((Number(driverId) >>> 0) === (Number(actorId) >>> 0)) { throw new Error('You cannot raid your own cart.'); }
+      if (!online(driverId) || !within(actorId, driverId, RAID_REACH)) { throw new Error('Get closer to the cart first.'); }
+      return cart;
+    }
+    function raidWord(w, actorId) {
+      var s = sessions[actorId];
+      var cart = raidable(actorId, s.driver);
+      if (cart !== s.cart) { throw new Error('That is not the cart you were at.'); }
+      var entry = handOut(actorId, cart, w.line, w.count, 'taken');
+      tell(s.driver, 'Somebody takes ' + entry.count + ' ' + H.itemName(entry) + ' from your cart.');
+      clog('a cart on the road was raided');
+      return 'Taken.';
+    }
+
+    function staffWord(w, actorId, profileId) {
+      if (w.verb === 'draft') {
+        drafts[profileId] = TRADE_DOCK.editDraft(TRADE_CARGO, reg.routes, drafts[profileId] || null, w.edit, crateOf(actorId), TRADE_CARTS.WORDS);
+        return 'The draft changed. Nothing is in force until you confirm.';
+      }
+      if (w.verb === 'confirm') {
+        if (w.base !== TRADE_DOCK.baseOf(reg.routes)) { throw new Error('The list in force changed since. Look again before you confirm.'); }
+        if (!drafts[profileId]) { throw new Error('There is no draft to confirm.'); }
+        if (!commit(TRADE_CARGO.adoptRoutes(reg, drafts[profileId]))) { throw new Error('The carts\' book could not be written, so nothing changed.'); }
+        drafts[profileId] = null;
+        var c = TRADE_CARGO.countsOf(reg);
+        clog('staff confirmed the cart stops:', c.ports, 'stop(s),', c.routes, 'road(s)');
+        return 'Confirmed. The new list is in force.';
+      }
+      if (w.verb === 'add') {
+        if (!reg.routes.ports.some(function (p) { return p.key === w.stop; })) { throw new Error('No stop ' + w.stop + ' in force.'); }
+        var k = 1;
+        while (reg.state.holds['cart-' + k]) { k++; }
+        act('open')('cart-' + k, w.stop);
+        clog('staff put a cart at a stop:', Object.keys(reg.state.holds).length, 'cart(s) in all');
+        return 'A cart is at the stop.';
+      }
+      if (w.verb === 'bring') {
+        var h = reg.state.holds[w.cart];
+        if (!h || !h.sailing) { throw new Error('That cart is not on the road.'); }
+        act('pullIn')(w.cart, Date.now(), null);
+        clog('staff brought a cart in at', h.sailing.to);
+        return 'The cart is in at its stop.';
+      }
+      return '';
+    }
+
+    /* The panel's words (game\ui\thornswood-ship.js and Raid cart on P). Answers a line for the chat, or ''. */
+    function command(parts, actorId, profileId) {
+      var w = TRADE_CARTS.parse(parts);
+      if (w.why) { return w.why; }
+      var said = '';
+      if (w.verb === 'close') { shut(actorId); return ''; }
+      if (w.verb === 'staff' || w.verb === 'draft' || w.verb === 'confirm' || w.verb === 'add' || w.verb === 'bring') {
+        if (!hook('__thornswoodIsStaff', profileId)) { return 'Only staff keep the cart stops and roads.'; }
+        try { said = staffWord(w, actorId, profileId); } catch (eStaff) { said = String((eStaff && eStaff.message) || eStaff); }
+        sessions[actorId] = { mode: 'staff', at: Date.now() };
+        pushStaff(actorId, profileId, said);
+        return '';
+      }
+      if (w.verb === 'raid') {
+        var cart = '';
+        try { cart = raidable(actorId, w.driver); } catch (eRaid) { return String((eRaid && eRaid.message) || eRaid); }
+        sessions[actorId] = { mode: 'raid', cart: cart, driver: w.driver, at: Date.now() };
+        pushRaid(actorId, '');
+        return '';
+      }
+      var s = sessions[actorId];
+      if (w.verb === 'take') {
+        if (!s || s.mode !== 'raid' || Date.now() - s.at > SESSION_MS) { shut(actorId); return 'Open the cart from Raid cart beside its driver first.'; }
+        s.at = Date.now();
+        try { said = raidWord(w, actorId); } catch (eTake) { said = String((eTake && eTake.message) || eTake); }
+        pushRaid(actorId, said);
+        return '';
+      }
+      if (!s || s.mode !== 'stop' || Date.now() - s.at > SESSION_MS || !within(actorId, s.ref, NEAR)) {
+        shut(actorId);
+        return 'Stand at the cart stop and press its crate.';
+      }
+      s.at = Date.now();
+      try { said = stopWord(w, actorId); } catch (eStop) { said = String((eStop && eStop.message) || eStop); }
+      pushStop(actorId, profileId, said);
+      return '';
+    }
+
+    /*
+      E on anything (mp.onActivate), asked after the ships' dock. A stop's
+      crate opens the stop and answers true, so the container never opens. Any
+      other container a staff member opens is remembered for a minute, for the
+      staff panel's stop and crate edits, and the press goes on.
+    */
+    function activated(refrId, actorId, baseDesc) {
+      var desc = '';
+      try { desc = mp.getDescFromId(refrId); } catch (e) { desc = ''; }
+      var stop = TRADE_DOCK.portOfCrate(reg.routes, desc);
+      var pid = H.profileOf(actorId);
+      if (!stop) {
+        if (desc && hook('__thornswoodIsStaff', pid) && typeof kindIsContainer === 'function' && kindIsContainer(baseDesc)) {
+          try {
+            crateSeen[actorId] = { desc: desc, world: mp.get(refrId, 'worldOrCellDesc'), pos: mp.get(refrId, 'pos').slice(0, 3), at: Date.now() };
+          } catch (eSeen) { }
+        }
+        return false;
+      }
+      sessions[actorId] = { mode: 'stop', stop: stop, ref: refrId, at: Date.now() };
+      pushStop(actorId, pid, '');
+      return true;
+    }
+
+    g.__thornswoodTradeCarts = {
+      counts: function () { return TRADE_CARGO.countsOf(reg); },
+      routes: function () { return copy(reg.routes); },
+      aboard: function (id) { return reg.ships.aboard(reg.state, id); },
+      // Whether this character is driving a cart, for Raid cart under Near you on P.
+      driving: function (actorId) { return !!TRADE_CARTS.cartOfDriver(reg.state, H.partyOf(actorId)); },
+      open: act('open'), load: act('load'), depart: act('depart'), pullIn: act('pullIn'),
+      begin: act('begin'), finish: act('finish'), undo: act('undo'),
+      activated: activated, command: command
+    };
+  }
+})();
+// ==== end thornswood trade carts ====
 
 
 
@@ -51451,6 +52662,11 @@ return module.exports;
       var dyePage = null;
       try { dyePage = (HD && HD.view) ? HD.view(actorId) : null; } catch (eDye) { dyePage = null; }
       if (dyePage) { view.hairDye = dyePage; }
+      // First steps (#3166): a new character's guide, until the errand is done.
+      var FS = g.__thornswoodFirstSteps;
+      var firstSteps = null;
+      try { firstSteps = (FS && FS.view) ? FS.view(actorId, s) : null; } catch (eSteps) { firstSteps = null; }
+      if (firstSteps) { view.firstSteps = firstSteps; }
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
@@ -51706,6 +52922,12 @@ return module.exports;
     // sister half's count rises past the threshold it waits at (#1388).
     var r = P.creditWork(s, key, masterFor(actorId, s, P.classFor(key) || key));
     if (!r.ok) { return null; }
+    // The first piece of work is a first step (#3166), ticked before the write
+    // below so the panel it sends already shows it.
+    var FS = g.__thornswoodFirstSteps;
+    if (FS && FS.worked) {
+      try { FS.worked(actorId); } catch (eSteps) { clog('first steps threw at a piece of work:', eSteps); }
+    }
     writeState(actorId, r.state);
     return raiseLines(actorId, r);
   }
@@ -52405,6 +53627,19 @@ return module.exports;
         thirty seconds, because somebody who shut the panel and then forgot
         about it still has to be told how to get back to it.
       */
+      /*
+        Put this away, on the First steps page (#3166): the guide stops being
+        shown, and the panel is sent again without it. Nothing else changes.
+      */
+      if (what === 'firststeps') {
+        var FSH = g.__thornswoodFirstSteps;
+        var hid = false;
+        try { hid = !!(FSH && FSH.hide && String(parts[2] || '').toLowerCase() === 'hide' && FSH.hide(actorId)); }
+        catch (eHide) { hid = false; clog('first steps threw at put away:', eHide); }
+        writeState(actorId, s, true);
+        if (hid) { toProfile(profileId, 'Put away. The first steps are off your panel.'); }
+        return true;
+      }
       if (what === 'later') {
         var pushed = false;
         try { pushed = !!(chargen && chargen.remindLater && chargen.remindLater(actorId)); }
@@ -52711,8 +53946,11 @@ return module.exports;
 
   /*
     SOMEBODY HAS COME INTO THE WORLD (#1642): the K panel's view, worked out
-    now. Called from the chargen tick's first sight of them after a load or a
-    login, the hook the spells and the clothes ride on.
+    now. Called from the chargen tick's first sight of them after a server
+    start or a login, the hook the spells and the clothes ride on. A hot
+    reload is neither (#3154): the running effects' state is on globalThis
+    (__thornswoodPerkState, __thornswoodManeuverState), so the view they
+    were last sent still holds.
 
     The view is kept on the character, and the map the client applies is in
     it (effects): the tree, what the needs take off, and what a running
@@ -52741,6 +53979,11 @@ return module.exports;
     if (college && college.witheredAtLogin) {
       try { college.witheredAtLogin(actorId); } catch (e) { clog('withered at arrival threw for', actorId.toString(16) + ':', e); }
     }
+    // The game is taught what the character knows of alchemy (#3134).
+    var alchemy = g.__thornswoodAlchemy;
+    if (alchemy && alchemy.arrival) {
+      try { alchemy.arrival(actorId); } catch (e) { clog('alchemy at arrival threw for', actorId.toString(16) + ':', e); }
+    }
     return writeState(actorId, stateOf(actorId));
   }
 
@@ -52757,6 +54000,310 @@ return module.exports;
   clog('ready');
 })();
 // ==== end thornswood character ====
+
+// ==== thornswood first steps ====
+/*
+  THE FIRST HOUR OF A NEW CHARACTER (#3166).
+
+  Patrick, 22 October, on his report page: a new character is guided by both
+  a short guide on the K panel and a short NPC quest in the start town, and
+  gets the basic tool for the profession they pick. Creation already hands
+  the tool at the pick (giveTool, in the character block), so this block is
+  the other two, and they are one thing: the guide is the errand's steps,
+  each ticked when the server sees it done.
+
+  WHO GIVES THE ERRAND. The Cook of the start town's Merchant's Guild, out
+  of game\data\merchant-traders.json: the trader whose role is Cook and whose
+  book hold is the town (docs\systems\merchant-traders.md has the sixty).
+  Six of the nine stand in the inn the town's arrival used to be, and
+  Markarth's in Understone Keep, where a new character arrives. The others
+  are Riften's in Marise Aravel's House and Dawnstar's in Northern Star
+  Goods. They are server NPCs on main and on dev, and the guide names the
+  building each one stands in, so nobody has to know which one is Hulda.
+
+  THE ERRAND. Speak to the Cook (E, as at any guild trader). They ask for
+  three things: find the notice board, do one piece of your own work, and go
+  back to them. The board and the work count whenever they happen after the
+  arrival, before the Cook or after, so nobody is held up by the order. Back
+  at the Cook it is finished, and the Cook says where the guild's trader of
+  your own trade stands in the hold. Nothing is handed over: creation's 40
+  gold and the tool are the whole start (docs\systems\creation.md), and the
+  errand is for learning the way, not for a purse.
+
+  HOW THE SERVER SEES EACH STEP, with nothing new on the client:
+    the picks       the character state's class and profession
+    the Cook        the E press the front plugin already sends for every
+                    person under the crosshair (/merchant e <id>), measured
+                    here at the merchant's reach of 400 in the same cell
+    the board       the property block's board press (boardActivated)
+    the work        the character block's credit, which every trade's work
+                    goes through (creditWork)
+
+  WHERE IT IS KEPT. thornswoodFirstSteps on the character, which the engine
+  keeps with the rest of the change form, so a relog, a reload and a restart
+  all find it where it was. It is begun by the arrival (arriveAt), and only
+  there, so a character made before this has none and is shown nothing. It
+  goes off the panel once the errand is done, or when the person puts it
+  away with the button on the page (/pick firststeps hide).
+*/
+(function () {
+  var g = globalThis;
+  var PROPERTY = 'thornswoodFirstSteps';
+  // The merchant's reach: within 400 of the trader in the same place
+  // (docs\systems\merchants-guild.md), the distance E on a trader is answered at.
+  var REACH = 400;
+  // Each trade's guild trader, for the Cook's last line. A class, a warrior
+  // and a mage have none of their own, and the line leaves it out.
+  var TRADE_ROLE = { smith: 'Smith', woodworker: 'Woodworker', tailor: 'Tailor',
+                     enchanter: 'Enchanter', cook: 'Cook', alchemist: 'Alchemist' };
+
+  try {
+    mp.makeProperty(PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* already made by a previous load. harmless. */ }
+
+  function flog() { log.apply(null, ['firststeps'].concat([].slice.call(arguments))); }
+
+  /*
+    The guild's traders by book hold and role, read once at load. A missing
+    or unreadable file is said in the log, and the errand's Cook steps are
+    left off the guide for that load: the picks, the board and the work are
+    still there, and the guide is done when they are.
+  */
+  var TRADERS = {};
+  (function readTraders() {
+    var doc = null;
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var root = typeof __dirname === 'string' ? __dirname : path.dirname(__filename);
+      doc = JSON.parse(fs.readFileSync(path.join(root, 'data', 'merchant-traders.json'), 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      flog('could not read data\\merchant-traders.json, so no Cook gives the first errand:', e);
+      return;
+    }
+    var byRef = (doc && doc.byRef) || {};
+    Object.keys(byRef).forEach(function (ref) {
+      var t = byRef[ref];
+      if (!t || typeof t.bookHold !== 'string' || typeof t.role !== 'string') { return; }
+      var town = TRADERS[t.bookHold] || (TRADERS[t.bookHold] = {});
+      town[t.role] = { ref: ref, cell: String(t.cell || ''), locationName: String(t.locationName || '') };
+    });
+  })();
+
+  /* The town's name and hold, from the chargen block's own list. */
+  function townOf(key) {
+    var cg = g.__thornswoodChargen;
+    var towns = (cg && cg.towns) ? cg.towns() : [];
+    for (var i = 0; i < towns.length; i++) {
+      if (towns[i].key === key) { return towns[i]; }
+    }
+    return null;
+  }
+
+  /*
+    Where a trader stands, in words: the building their cell is, and the
+    place as well when it is not the town itself (Markarth Side for two of
+    Hjaalmarch's). A trader out of doors is the place alone.
+  */
+  function whereOf(t, townName) {
+    var building = (typeof BUILDING_NAME !== 'undefined' && BUILDING_NAME[t.cell]) || '';
+    var place = t.locationName;
+    if (!building) { return place || townName; }
+    if (place && place !== townName && place !== building) { return building + ', ' + place; }
+    return building;
+  }
+
+  function cookOf(rec) {
+    var town = rec && TRADERS[rec.town];
+    return (town && town.Cook) || null;
+  }
+
+  function read(actorId) {
+    var v = null;
+    try { v = mp.get(actorId, PROPERTY); } catch (e) { v = null; }
+    return (v && typeof v === 'object' && v.v === 1 && typeof v.town === 'string') ? v : null;
+  }
+
+  function write(actorId, rec) {
+    try {
+      mp.set(actorId, PROPERTY, rec);
+      return true;
+    } catch (e) {
+      flog('could not write the first steps of', actorId.toString(16) + ':', e);
+      return false;
+    }
+  }
+
+  /* The K panel again, now that a step moved. */
+  function redraw(actorId) {
+    var C = g.__thornswoodCharacter;
+    if (!C || !C.writeState || !C.stateOf) { return; }
+    try { C.writeState(actorId, C.stateOf(actorId)); } catch (e) { flog('the panel could not be written for', actorId.toString(16) + ':', e); }
+  }
+
+  /* Live means begun, not finished and not put away. */
+  function live(rec) { return !!rec && !rec.done && !rec.hidden; }
+
+  /*
+    Within the merchant's reach of the Cook, in the same cell. The same
+    measurement as inReach in the merchant block, on the server's own
+    positions, so a press relayed from anywhere else is not a visit.
+  */
+  function near(actorId, npcId) {
+    var a = null, b = null, ca = null, cb = null;
+    try {
+      a = mp.get(actorId, 'pos'); b = mp.get(npcId, 'pos');
+      ca = mp.get(actorId, 'worldOrCellDesc'); cb = mp.get(npcId, 'worldOrCellDesc');
+    } catch (e) { return false; }
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length < 3 || b.length < 3) { return false; }
+    if (!ca || String(ca) !== String(cb)) { return false; }
+    var d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    return d <= REACH;
+  }
+
+  function stillToDo(rec) {
+    var left = [];
+    if (!rec.board) { left.push('find the notice board'); }
+    if (!rec.work) { left.push('do a piece of your own work'); }
+    return left;
+  }
+
+  /*
+    The guide, for the K panel's First steps page, or null for nobody to
+    show it to. s is the character block's rules state, for the picks.
+  */
+  function view(actorId, s) {
+    var rec = read(actorId);
+    if (!live(rec)) { return null; }
+    var town = townOf(rec.town);
+    var townName = town ? town.name : rec.town;
+    var cook = cookOf(rec);
+    var at = cook ? whereOf(cook, townName) : '';
+    var steps = [];
+    steps.push({ key: 'pick', name: 'Your class and profession', done: !!(s && s.cls && s.prof),
+                 text: 'Choose your class and your profession, on this panel. One that needs a tool hands you the tool when you pick it.' });
+    if (cook) {
+      steps.push({ key: 'cook', name: 'The Cook', done: !!rec.took,
+                   text: 'Speak to the Cook at ' + at + '. Look at them and press E.' });
+    }
+    steps.push({ key: 'board', name: 'The notice board', done: !!rec.board,
+                 text: 'Find the notice board in ' + townName + ' and press E on it. Jobs, notices and letters go up there.' });
+    steps.push({ key: 'work', name: 'Your own work', done: !!rec.work,
+                 text: 'Do one piece of your own work: a seam, a log, a fish, a crop, a plant, a hunt, or something made at a bench.' });
+    if (cook) {
+      steps.push({ key: 'back', name: 'Back to the Cook', done: false, text: 'Go back to the Cook at ' + at + ' and tell them.' });
+    }
+    return { town: townName, steps: steps };
+  }
+
+  /* The arrival, once: the record begins here and nowhere else. */
+  function begin(actorId, townKey) {
+    if (read(actorId)) { return false; }
+    var ok = write(actorId, { v: 1, town: String(townKey || ''), since: Date.now() });
+    if (ok) { flog(actorId.toString(16), 'arrived in', townKey, '- first steps begun'); }
+    return ok;
+  }
+
+  /*
+    Finished without a Cook: the picks, the board and the work. Said once,
+    in the chat, the moment the last of them is seen.
+  */
+  function finishWithoutCook(actorId, rec) {
+    if (cookOf(rec) || !rec.board || !rec.work) { return; }
+    var C = g.__thornswoodCharacter;
+    var s = null;
+    try { s = (C && C.stateOf) ? C.stateOf(actorId) : null; } catch (e) { s = null; }
+    if (!s || !s.cls || !s.prof) { return; }
+    rec.done = Date.now();
+    if (write(actorId, rec)) {
+      flog(actorId.toString(16), 'finished the first steps (no Cook in', rec.town + ')');
+      say(actorId, 'You have found your feet. The first steps are done.');
+    }
+  }
+
+  /* A piece of work counted. Called from the character block's credit, before its own write. */
+  function worked(actorId) {
+    var rec = read(actorId);
+    if (!live(rec) || rec.work) { return; }
+    rec.work = Date.now();
+    if (write(actorId, rec)) { finishWithoutCook(actorId, rec); }
+  }
+
+  /* The notice board opened for them. Called from onActivate. */
+  function sawBoard(actorId) {
+    var rec = read(actorId);
+    if (!live(rec) || rec.board) { return; }
+    rec.board = Date.now();
+    if (write(actorId, rec)) { finishWithoutCook(actorId, rec); redraw(actorId); }
+  }
+
+  /*
+    E on somebody, from the front plugin's /merchant e <id>. Answers the
+    Cook's words when they were the Cook, in reach, and the errand is open,
+    and null for every other press in the world, which is nearly all of them.
+  */
+  function spoke(actorId, npcId) {
+    var rec = read(actorId);
+    if (!live(rec)) { return null; }
+    var cook = cookOf(rec);
+    if (!cook) { return null; }
+    var id = 0;
+    try { id = Number(mp.getIdFromDesc(cook.ref)) >>> 0; } catch (e) { id = 0; }
+    if (!id || id !== (Number(npcId) >>> 0) || !near(actorId, id)) { return null; }
+    // A Cook lying dead says nothing; the authored Cook comes back on the NPC clock.
+    var dead = false;
+    try { dead = !!mp.get(id, 'isDead'); } catch (e) { dead = false; }
+    if (dead) { return null; }
+    var town = townOf(rec.town);
+    var townName = town ? town.name : rec.town;
+    if (!rec.took) {
+      rec.took = Date.now();
+      if (!write(actorId, rec)) { return null; }
+      flog(actorId.toString(16), 'took the first errand from the Cook in', rec.town);
+      redraw(actorId);
+      return 'The Cook says: "New to ' + townName + '? Then do three things for me. Find the notice board, ' +
+             'where the jobs and the letters go up. Do a piece of your own work, whatever your trade is. ' +
+             'Then come back and tell me how it went."';
+    }
+    var left = stillToDo(rec);
+    if (left.length) {
+      return 'The Cook says: "Not yet. You still have to ' + left.join(' and ') + '."';
+    }
+    rec.done = Date.now();
+    if (!write(actorId, rec)) { return null; }
+    flog(actorId.toString(16), 'finished the first errand in', rec.town);
+    redraw(actorId);
+    var C = g.__thornswoodCharacter;
+    var s = null;
+    try { s = (C && C.stateOf) ? C.stateOf(actorId) : null; } catch (e) { s = null; }
+    var role = s && s.prof ? TRADE_ROLE[s.prof] : '';
+    var trader = role ? (TRADERS[rec.town] || {})[role] : null;
+    var trade = trader
+      ? ' The guild\'s ' + role + ' is at ' + whereOf(trader, townName) + ', and that is who buys and sells what your trade uses.'
+      : '';
+    return 'The Cook says: "Then you have found your feet.' + trade + ' Welcome to ' + townName + '."';
+  }
+
+  /* The page's Put this away. Nothing else changes; the steps stop being shown. */
+  function hide(actorId) {
+    var rec = read(actorId);
+    if (!live(rec)) { return false; }
+    rec.hidden = Date.now();
+    if (!write(actorId, rec)) { return false; }
+    flog(actorId.toString(16), 'put the first steps away');
+    return true;
+  }
+
+  g.__thornswoodFirstSteps = {
+    PROPERTY: PROPERTY, REACH: REACH,
+    begin: begin, view: view, spoke: spoke, sawBoard: sawBoard, worked: worked, hide: hide,
+    cookOf: function (townKey) { var t = TRADERS[townKey]; return (t && t.Cook) ? t.Cook.ref : ''; }
+  };
+})();
+// ==== end thornswood first steps ====
 
 // ==== thornswood skill perks ====
 /*
@@ -55769,6 +57316,372 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
 });
 // ==== end thornswood college ====
 
+// ==== thornswood alchemy ====
+/*
+  ALCHEMY LIKE OBLIVION (#3134). docs/systems/mixtures.md and
+  docs/systems/professions/alchemist.md.
+
+  Patrick, 22 Oct: mixing different ingredients makes different things; once
+  you have made something, your character remembers that recipe at any
+  alchemy table (docs/DECIDED.md); and to brew with a plant or a like
+  ingredient, you must have eaten it first.
+
+  MIXING IS THE ENGINE'S ALREADY. A brew is the effects two or more of its
+  ingredients share, worked out by the server from the inputs it takes
+  (CraftService::BrewEffects, fork #60), and the mixtures list in
+  recipelessCraft holds them to the page. Nothing here changes what a mix
+  makes.
+
+  WHAT THE CHARACTER FORGOT. Skyrim keeps which effects of an ingredient are
+  known on the save, and every spawn here starts from a throwaway save, so
+  the alchemy menu forgot every effect at every login: what you had tasted
+  and what you had brewed was gone, at every lab. That is the cause, and this
+  block keeps the record on the character, on the server, instead:
+
+    eaten    every ingredient (an INGR record) this character has eaten, by
+             desc, heard from mp.onEatItem, which the engine raises only once
+             it has checked the pack holds it and is taking it out. Never the
+             client's /ate line, which anybody could send.
+    known    each ingredient's effects this character knows, as a mask of the
+             record's effect slots, the way the game numbers them: eating
+             teaches the first, the game's own rule, and a brew teaches every
+             slot whose effect was in it.
+    recipes  every mix this character has brewed: its ingredients, what it
+             made, how many times and when.
+
+  At arrival, and whenever it grows, LEARN_PROPERTY hands the owner's game
+  every known slot by form id, and its script teaches them to the game with
+  Ingredient.LearnEffect, so the menu shows at any lab what the character
+  has learned. The form ids are worked out from the descs each time, so a
+  load order that moved a plugin is followed.
+
+  YOU MUST HAVE EATEN IT FIRST. brewRefusal names every ingredient in a brew
+  this character has never eaten, and recipelessCraft refuses the brew with
+  that line before anything is taken, so the ingredients stay in the pack.
+  Only a brew is asked: cooking with an ingredient is a recipe at a cooking
+  bench, not this.
+
+  The journal page (#3142) reads journal(actorId).
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  var ALCHEMY_PROPERTY = 'thornswoodAlchemy';
+  var LEARN_PROPERTY = 'thornswoodAlchemyLearn';
+  var SLOTS = 4;   // an ingredient carries four effects
+
+  function alog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[alchemy]');
+    console.log(a.join(' '));
+  }
+  function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function now() { return Date.now(); }
+  function personOf(id) {
+    try { return Number(mp.get(id, 'profileId')) > 0; } catch (e) { return false; }
+  }
+  function descOf(id) {
+    try { return String(mp.getDescFromId(Number(id) || 0) || ''); } catch (e) { return ''; }
+  }
+  function idOfDesc(desc) {
+    try { return Number(mp.getIdFromDesc(String(desc))) || 0; } catch (e) { return 0; }
+  }
+  function tell(actorId, line) {
+    try { if (typeof say === 'function') { say(actorId, line); } } catch (e) { }
+  }
+
+  // ------------------------------------------------------- the records --
+  /*
+    An ingredient's effects, in its slot order: the global form id of each
+    EFID, as the engine reads them for a brew. null for anything that is not
+    an INGR. Memoed by id, because a record never changes under a running
+    server.
+  */
+  var ingredients = {};
+  function effectsOf(baseId) {
+    var id = Number(baseId) || 0;
+    if (!id) { return null; }
+    if (own(ingredients, id)) { return ingredients[id]; }
+    var res = null;
+    try { res = mp.lookupEspmRecordById(id) || null; } catch (e) { res = null; }
+    var out = null;
+    if (res && res.record && String(res.record.type || '') === 'INGR') {
+      out = [];
+      var fields = res.record.fields || [];
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        if (!f || String(f.type) !== 'EFID') { continue; }
+        var b = f.data || [];
+        var local = b.length >= 4 ? ((b[0] | (b[1] << 8) | (b[2] << 16)) + b[3] * 0x1000000) : 0;
+        var global = local;
+        if (typeof res.toGlobalRecordId === 'function') {
+          try { global = Number(res.toGlobalRecordId(local)) || 0; } catch (e) { global = 0; }
+        }
+        out.push(global);
+      }
+    }
+    ingredients[id] = out;
+    return out;
+  }
+
+  /*
+    A name a person reads: the property block's, which the drop box and the
+    trade ships use too (Skyrim.esm's own names are in its strings files,
+    which the server does not load).
+  */
+  function nameOf(desc) {
+    var prop = g.__thornswoodProperty;
+    if (prop && typeof prop.itemName === 'function') {
+      try { return String(prop.itemName({ baseId: idOfDesc(desc) })); } catch (e) { }
+    }
+    return String(desc || 'something');
+  }
+  function effectName(desc) {
+    if (typeof MIXTURES !== 'undefined' && own(MIXTURES, desc)) { return MIXTURES[desc].name; }
+    return String(desc);
+  }
+  function listed(words, joiner) {
+    if (words.length < 2) { return words.join(''); }
+    return words.slice(0, -1).join(', ') + ' ' + (joiner || 'and') + ' ' + words[words.length - 1];
+  }
+
+  // -------------------------------------------------- the character's own --
+  function read(actorId) {
+    var rec = null;
+    try { rec = mp.get(actorId, ALCHEMY_PROPERTY); } catch (e) { rec = null; }
+    if (!rec || typeof rec !== 'object') { rec = {}; }
+    return {
+      eaten: (rec.eaten && typeof rec.eaten === 'object') ? rec.eaten : {},
+      known: (rec.known && typeof rec.known === 'object') ? rec.known : {},
+      recipes: Array.isArray(rec.recipes) ? rec.recipes : []
+    };
+  }
+  function write(actorId, rec) {
+    try { mp.set(actorId, ALCHEMY_PROPERTY, rec); }
+    catch (e) { alog('could not write the record of', hex(actorId) + ':', e); }
+  }
+
+  /*
+    What the owner's game is taught: [form id, mask] for every ingredient with
+    a known slot, under a new stamp, so the script runs once for it.
+  */
+  function push(actorId, rec) {
+    var learn = [];
+    for (var desc in rec.known) {
+      if (!own(rec.known, desc)) { continue; }
+      var id = idOfDesc(desc);
+      var mask = Number(rec.known[desc]) & ((1 << SLOTS) - 1);
+      if (id && mask) { learn.push([id, mask]); }
+    }
+    try { mp.set(actorId, LEARN_PROPERTY, { at: now(), learn: learn }); }
+    catch (e) { alog('could not teach', hex(actorId), 'what they know:', e); }
+  }
+
+  // ------------------------------------------------------------- the verbs --
+  /*
+    Something eaten, from the one onEatItem handler (the injury block's). Only
+    a person's, and only an ingredient. The first taste of one is said once.
+  */
+  function ate(actorId, baseId) {
+    var id = Number(actorId) || 0;
+    if (!id || !personOf(id)) { return false; }
+    if (!effectsOf(baseId)) { return false; }
+    var desc = descOf(baseId);
+    if (!desc) { return false; }
+    var rec = read(id);
+    var first = !own(rec.eaten, desc);
+    var mask = Number(rec.known[desc]) || 0;
+    if (!first && (mask & 1)) { return false; }
+    if (first) { rec.eaten[desc] = now(); }
+    rec.known[desc] = mask | 1;
+    write(id, rec);
+    push(id, rec);
+    if (first) {
+      alog(hex(id), 'ate', desc, 'for the first time');
+      tell(id, 'You know the taste of ' + nameOf(desc) + ' now. It can go in a brew.');
+    }
+    return first;
+  }
+
+  /*
+    The ingredients of a brew, by desc, each once, from the craft's inputs
+    ([{ baseId, count }], the engine's seventh argument to mp.onCraft).
+    Anything that is not an ingredient is left out.
+  */
+  function ingredientsIn(inputs) {
+    var out = [];
+    if (!Array.isArray(inputs)) { return out; }
+    for (var i = 0; i < inputs.length; i++) {
+      var base = Number(inputs[i] && inputs[i].baseId) || 0;
+      if (!base || !effectsOf(base)) { continue; }
+      var desc = descOf(base);
+      if (desc && out.indexOf(desc) === -1) { out.push(desc); }
+    }
+    return out;
+  }
+
+  /*
+    The line that refuses a brew with an ingredient this character has never
+    eaten, or ''. inputs that are not an array (an engine from before #1648)
+    are not asked, and the log says so.
+  */
+  function brewRefusal(actorId, inputs) {
+    if (!Array.isArray(inputs)) {
+      alog(hex(actorId), 'brewed and the engine named no inputs, so what they have eaten was not asked');
+      return '';
+    }
+    var rec = read(actorId);
+    var untasted = ingredientsIn(inputs).filter(function (d) { return !own(rec.eaten, d); });
+    if (!untasted.length) { return ''; }
+    var them = untasted.map(nameOf);
+    var one = them.length === 1;
+    return 'You have never eaten ' + listed(them, 'or') + ', so you do not know what ' +
+      (one ? 'it does' : 'they do') + '. Eat ' + (one ? 'one' : 'one of each') + ' first, and then ' +
+      (one ? 'it' : 'they') + ' can go in a brew. Your ingredients stay in your pack.';
+  }
+
+  /*
+    A brew that went through: the mix is remembered, and every slot of each
+    ingredient whose effect is in it is known. effects is the engine's sixth
+    argument, the MGEF ids the ingredients share.
+  */
+  function brewed(actorId, inputs, effects) {
+    var id = Number(actorId) || 0;
+    if (!id || !personOf(id) || !Array.isArray(effects)) { return null; }
+    var withDescs = ingredientsIn(inputs).sort();
+    if (withDescs.length < 2) { return null; }
+    var makes = [];
+    var shared = {};
+    for (var e = 0; e < effects.length; e++) {
+      var m = Number(effects[e]) || 0;
+      if (!m) { continue; }
+      shared[m] = true;
+      var md = descOf(m);
+      if (md && makes.indexOf(md) === -1) { makes.push(md); }
+    }
+    if (!makes.length) { return null; }
+
+    var rec = read(id);
+    for (var i = 0; i < withDescs.length; i++) {
+      var slots = effectsOf(idOfDesc(withDescs[i])) || [];
+      var mask = Number(rec.known[withDescs[i]]) || 0;
+      for (var s = 0; s < slots.length && s < SLOTS; s++) {
+        if (own(shared, slots[s])) { mask |= (1 << s); }
+      }
+      rec.known[withDescs[i]] = mask;
+    }
+
+    var key = withDescs.join('|');
+    var at = now();
+    var row = null;
+    for (var r = 0; r < rec.recipes.length; r++) {
+      if (rec.recipes[r] && Array.isArray(rec.recipes[r].with) && rec.recipes[r].with.join('|') === key) {
+        row = rec.recipes[r];
+        break;
+      }
+    }
+    var first = !row;
+    if (first) {
+      row = { with: withDescs, makes: makes, times: 0, first: at, last: at };
+      rec.recipes.push(row);
+    }
+    row.makes = makes;
+    row.times = (Number(row.times) || 0) + 1;
+    row.last = at;
+    write(id, rec);
+    push(id, rec);
+    if (first) {
+      alog(hex(id), 'brewed', key, 'for the first time, making', makes.join(', '));
+      tell(id, 'You will remember this mix at any alchemy lab: ' + listed(withDescs.map(nameOf)) +
+           ' make ' + listed(makes.map(effectName)) + '.');
+    }
+    return row;
+  }
+
+  /*
+    Somebody has come into the world (the character block's arrival): their
+    game was started from a throwaway save, so it is taught everything the
+    character knows, under a new stamp.
+  */
+  function arrival(actorId) {
+    var id = Number(actorId) || 0;
+    if (!id || !personOf(id)) { return; }
+    push(id, read(id));
+  }
+
+  /* What the journal page (#3142) shows: names a person reads, nothing else. */
+  function journal(actorId) {
+    var rec = read(actorId);
+    var eaten = Object.keys(rec.eaten).map(nameOf).sort();
+    var recipes = rec.recipes.filter(function (row) { return row && Array.isArray(row.with); }).map(function (row) {
+      return {
+        with: row.with.map(nameOf),
+        makes: (Array.isArray(row.makes) ? row.makes : []).map(effectName),
+        times: Number(row.times) || 0
+      };
+    });
+    return { eaten: eaten, recipes: recipes };
+  }
+
+  /*
+    Edge triggered on v.at through ctx.state, because updateOwner runs every
+    frame (see SWING_PROPERTY): the game is taught once for each stamp, and
+    the stamp is kept only once the character was there to teach.
+  */
+  function learnScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    if (!v || !v.at || !v.learn) { return; }',
+      '    var st = ctx.state;',
+      '    if (!st || st.thornswoodAlchemyAt === v.at) { return; }',
+      '    var sp = ctx.sp;',
+      '    if (!sp.Game.getPlayer()) { return; }',
+      '    st.thornswoodAlchemyAt = v.at;',
+      '    for (var i = 0; i < v.learn.length; i++) {',
+      '      var ing = sp.Ingredient.from(sp.Game.getFormEx(v.learn[i][0]));',
+      '      if (!ing) { continue; }',
+      '      for (var s = 0; s < ' + SLOTS + '; s++) {',
+      '        if (v.learn[i][1] & (1 << s)) { ing.learnEffect(s); }',
+      '      }',
+      '    }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  // ------------------------------------------------------------ register --
+  try {
+    // The server's own record: nobody's client reads it.
+    mp.makeProperty(ALCHEMY_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) {
+    // already made by a previous load
+  }
+  try {
+    mp.makeProperty(LEARN_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: learnScript(), updateNeighbor: ''
+    });
+  } catch (e) {
+    // already made by a previous load; a changed script needs a restart,
+    // which a deploy is.
+  }
+
+  g.__thornswoodAlchemy = {
+    ALCHEMY_PROPERTY: ALCHEMY_PROPERTY, LEARN_PROPERTY: LEARN_PROPERTY,
+    effectsOf: effectsOf, ate: ate, brewRefusal: brewRefusal, brewed: brewed,
+    arrival: arrival, journal: journal, read: read, learnScript: learnScript
+  };
+  alog('ready');
+})();
+// ==== end thornswood alchemy ====
+
 // ==== thornswood staff spells ====
 /*
   THE STAFF SPELLS: WHAT A STAFF BINDS, AND WHO HAS UNLOCKED IT.
@@ -57569,6 +59482,9 @@ const WORDS = ['/ooc', '/o',
                // The trade ships' panel, at a dock crate or on the Office page
                // for staff (#2700). Never typed, so not in PLAYER_WORDS.
                '/ship',
+               // The trade carts' panel, at a cart stop's crate, from Raid
+               // cart on P, or on the Office page for staff (#3158). Never typed.
+               '/cart',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
                // machine; see the branch for why that matters.
@@ -58766,6 +60682,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       Refuse send them, so they are in WORDS and not in PLAYER_WORDS.
     */
     if (word === '/merchant') {
+      /*
+        E on a person is also the first errand's Cook (#3166), whether or not
+        trading is running: the first steps block answers the Cook's words
+        for the one Cook of their errand, in reach, and nothing for anybody else.
+      */
+      var stepsApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodFirstSteps;
+      if (actorId && stepsApi && stepsApi.spoke && String(parts[1] || '').toLowerCase() === 'e') {
+        var cookLine = null;
+        try { cookLine = stepsApi.spoke(actorId, parseInt(String(parts[2] || ''), 16) || 0); }
+        catch (eSteps) { log('first steps threw at a press on', parts[2], ':', eSteps); }
+        if (cookLine) { toProfile(profileId, cookLine); }
+      }
       var merchants = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodMerchantTrade;
       if (!merchants) { toProfile(profileId, 'That is not running on this server.'); return true; }
       if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
@@ -58783,6 +60711,15 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
       var shipSaid = shipsApi.command(parts, actorId, profileId);
       if (shipSaid) { toProfile(profileId, shipSaid); }
+      return true;
+    }
+
+    if (word === '/cart') {
+      var cartsApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTradeCarts;
+      if (!cartsApi || !cartsApi.command) { toProfile(profileId, 'Trade carts are not running on this server.'); return true; }
+      if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
+      var cartSaid = cartsApi.command(parts, actorId, profileId);
+      if (cartSaid) { toProfile(profileId, cartSaid); }
       return true;
     }
 
@@ -64621,6 +66558,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // A drug's window and the crashes it owes (#1382), kept across reads.
       drugUntil: Number(v.drugUntil) || 0,
       drugCrash: Number(v.drugCrash) || 0,
+      // Whether that window is still open, for the HUD's high icon (#3143).
+      drugged: !!v.drugged,
       // And a tea's (#1382).
       teaUntil: Number(v.teaUntil) || 0,
       teaCrash: Number(v.teaCrash) || 0,
@@ -64854,13 +66793,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       standing in a fire moved the meter barely a point in ten seconds, which
       is the whole of "fire is still not changing temp".
     */
-    var target = warmthTarget(actorId, n);
-    var half = (target > n.temp)
-      ? (NEEDS.settleWarmMinutes || NEEDS.settleMinutes)
-      : NEEDS.settleMinutes;
-    var k = 1 - Math.pow(0.5, (hours * 60) / half);
-    if (k > 1) { k = 1; }
-    if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
+    /*
+      THE TIME AWAY MOVES NO TEMPERATURE (#3154). On an arrival the place in
+      n is still the one they logged out in, and they were not standing in it
+      while they were gone: the same reason the cold band above does not
+      speed the clocks for the time away, and the time away gains no rest
+      (#1764). Until this, the whole time away was settled toward that place,
+      so somebody who logged out at 45 in the snow at night came back six
+      hours later at 10, freezing, with the cold band on both clocks and the
+      chill's hour already counting (tests\test-3154-login-restore.js). They
+      come back at the temperature they left with, and it moves from there
+      toward wherever they stand now, from their game's first /place.
+    */
+    if (!arriving) {
+      var target = warmthTarget(actorId, n);
+      var half = (target > n.temp)
+        ? (NEEDS.settleWarmMinutes || NEEDS.settleMinutes)
+        : NEEDS.settleMinutes;
+      var k = 1 - Math.pow(0.5, (hours * 60) / half);
+      if (k > 1) { k = 1; }
+      if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
+    }
 
     // A night in a bed, on top of the time away settled above (#1606).
     // Three ales or more still counting when they left, and not in a bed
@@ -64878,6 +66831,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (slept) { n.hangover = false; n.ale = 0; }
     else if (leftDrunk) { n.hangover = true; n.ale = 0; }
     n.drunk = drunkNow(n, now);
+    // High while a drug's window is open (#3143); the crash above closes it.
+    n.drugged = n.drugUntil > now;
 
     n.at = now;
     write(actorId, n);
@@ -66471,6 +68426,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var now = Date.now();
     n.drugUntil = now + NEEDS.drug.holdMinutes * 60000;
     n.drugCrash = (Number(n.drugCrash) || 0) + 1;
+    n.drugged = true;
     write(actorId, n);
   }
 
@@ -66997,7 +68953,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    var temp = Math.round(Number(v.temp));',
       '    if (!isFinite(food) || !isFinite(drink) || !isFinite(rest)) { return; }',
       '    if (!isFinite(temp)) { temp = 50; }',
-      '    var sig = food + "|" + drink + "|" + rest + "|" + temp;',
+      /*
+        DRUNK AND HIGH ARE IN THE SIGNATURE (#3143), so the icon comes and
+        goes the moment either does, even when no meter moved.
+      */
+      '    var high = !!v.drugged;',
+      '    var sig = food + "|" + drink + "|" + rest + "|" + temp + "|" + (drunk ? "d" : "") + (high ? "h" : "");',
       '    if (st.thornswoodHud === sig) { return; }',
       '    st.thornswoodHud = sig;',
       '',
@@ -67105,6 +69066,46 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '               row("rest", "Rest", rest, tone(rest, "#8fb85e"), rest + "%") +',
       '               row("temp", "Temp", temp, tempTone(temp),',
       '                   tempWord(temp) + " " + temp);',
+      '',
+      /*
+        DRUNK AND HIGH, AN ICON EACH, ONLY WHILE IT APPLIES (#3143).
+
+        Patrick, 22 October, on his report page: "An icon that shows only
+        while drunk or high", not a fifth bar. Drunk is the server's own
+        answer (NEEDS.ale.drunkFrom, the third ale until a sleep or the 45
+        minutes), and high is a drug's window being open (NEEDS.drug, the
+        10 minutes skooma or any of the six drugs holds the rest drain at
+        zero). Both ride on the needs record, so nothing is worked out here.
+
+        A tankard for drunk and a four point star for high, in their own
+        small panel sitting on the strip's left end. It has to sit there:
+        the strip's 540 pixels are all used by the four rows (S3d), and the
+        corner above the strip's left end, x 10 to 49 and y 679 to 697 of
+        the HUD's pixels with both icons up, is left of TrueHUD's magicka
+        bar (from x 64.5) and below SkyHUD's (to y 640), so it covers none
+        of them. tests\test-hud.js works that out at every screen it knows.
+        It is a child of the strip, so taking the strip off in creation takes
+        it off too.
+      */
+      '    var MARK = {',
+      '      drunk: "M5 7h8v8.6a1.6 1.6 0 0 1-1.6 1.6H6.6A1.6 1.6 0 0 1 5 15.6z M13 9h1.8a1.8 1.8 0 0 1 1.8 1.8v1.6a1.8 1.8 0 0 1-1.8 1.8H13 M4.8 7c-.3-1.7 1.1-3 2.6-2.6.7-1.3 2.8-1.5 3.6-.3 1.4-.4 2.7.7 2.4 2.9",',
+      '      high: "M10 2.6l1.8 5.6 5.6 1.8-5.6 1.8L10 17.4l-1.8-5.6L2.6 10l5.6-1.8z"',
+      '    };',
+      '    var marks = [];',
+      '    if (drunk) { marks.push(["drunk", "#e3b04b"]); }',
+      '    if (high) { marks.push(["high", "#c58cf0"]); }',
+      '    if (marks.length) {',
+      '      var icons = "";',
+      '      for (var m = 0; m < marks.length; m++) {',
+      '        icons += \'<svg viewBox="0 0 20 20" fill="none" stroke="\' + marks[m][1] + \'" stroke-width="1.9" \' +',
+      '          \'stroke-linecap="round" stroke-linejoin="round" style="width:\' + u(14) + \';height:\' + u(14) + \';flex:none;margin-left:\' + u(m ? 3 : 0) + \'">\' +',
+      '          \'<path d="\' + MARK[marks[m][0]] + \'"/></svg>\';',
+      '      }',
+      '      html += \'<div id="ts-hud-marks" style="position:absolute;left:\' + u(-1) + \';bottom:calc(100% + 2 * var(--ts));\' +',
+      '        \'width:\' + u(8 + marks.length * 14 + (marks.length - 1) * 3) + \';height:\' + u(18) + \';box-sizing:border-box;\' +',
+      '        \'display:flex;align-items:center;padding:0 \' + u(3) + \';background:rgba(12,10,8,.62);\' +',
+      '        \'border:\' + u(1) + \' solid rgba(0,0,0,.65);border-radius:\' + u(4) + \'">\' + icons + \'</div>\';',
+      '    }',
       '',
       '    var src = "(function(){try{" +',
       '      "var d=document.getElementById(\'ts-hud\');" +',
@@ -69798,6 +71799,11 @@ module.exports = {
     if (college && college.drank) {
       try { college.drank(actorId, Number(baseId) || 0); } catch (e) { hlog('withered threw:', e); }
     }
+    // An ingredient tasted (#3134), in the alchemy block, on its own.
+    var alchemy = g.__thornswoodAlchemy;
+    if (alchemy && alchemy.ate) {
+      try { alchemy.ate(actorId, Number(baseId) || 0); } catch (e) { hlog('the taste threw:', e); }
+    }
   });
 
   /*
@@ -70890,6 +72896,8 @@ module.exports = {
     */
     var near = [];
     var nearNow = null;
+    // Who is driving a trade cart, for Raid cart beside them (#3158).
+    var cartsNear = g.__thornswoodTradeCarts;
     try { nearNow = mp.get(actorId, NEAR_PROPERTY); } catch (e) { nearNow = null; }
     var nearW = (nearNow && nearNow.w) || {};
     for (var hex in nearW) {
@@ -70903,7 +72911,10 @@ module.exports = {
         party: !!(p && p.members.indexOf(np) !== -1),
         muted: !!s.muted[np],
         textOff: !!(s.textOff && s.textOff[np]),
-        nameOff: !!(s.namesOff && s.namesOff[np])
+        nameOff: !!(s.namesOff && s.namesOff[np]),
+        cart: (function () {
+          try { return !!(cartsNear && cartsNear.driving && cartsNear.driving(parseInt(hex, 16))); } catch (eCart) { return false; }
+        })()
       });
     }
     near.sort(function (a, b) { return a.name < b.name ? -1 : 1; });

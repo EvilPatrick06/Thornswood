@@ -10,16 +10,29 @@
       pwsh scripts/deploy/Set-BuildRunners.ps1            make GitHub match main's records
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Check     change nothing; exit 1 when GitHub differs
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Run <id>  the answer of a run that had not ended
+      pwsh scripts/deploy/Set-BuildRunners.ps1 -RepoSettings [-Check | -Run <id>]
+                                                         the same for main's repository settings
       pwsh scripts/deploy/Set-BuildRunners.ps1 -AppRepos  which repositories the box's App is on
+
+  REPOSITORY SETTINGS (#3683, Patrick's answers of 26 Oct 2026). With
+  -RepoSettings it asks for records\github-repo-settings.json instead, which
+  names Thornswood and the engine fork, EvilPatrick06/skymp, and for each its
+  rulesets and, where it says, private vulnerability reporting: each ruleset
+  is made on GitHub, or put back, with exactly its target, enforcement,
+  conditions, rules and bypass list, and reporting is switched on or off as
+  the record says. A ruleset GitHub has that the record does not name stops
+  it and is left as it is. The same App, the same run, the same rule: what to
+  change comes from main, never from here.
 
   A record is { "label": ..., "runners": [1, 2] }: the runners it lists
   (thornswood-vps is 1, thornswood-vps-<n> is n) carry the label and no other
   runner does, an off-box runner (thornswood-pr-*) only when the record's
   offBox names it and it does not carry thornswood-vps (One's pull request
-  build runners, 26 Oct 2026, #4010). Changing one is a
-  pull request to the record; once it merges, .github\workflows\github-admin.yml
-  runs by itself and GitHub matches it a minute later. This script is for
-  asking again, or for -Check.
+  build runners, 26 Oct 2026, #4010). Changing one is a pull request to the
+  record; once it merges, the Desk runs this script and GitHub matches it a
+  minute later. -Check says only what differs. The workflow it starts is in
+  the private ops repository, where the runners are registered (#4013), so a
+  push here cannot start it by itself.
 
   WHY THE BUILD LABEL (#2994). The VPS has six cores and, from 20 October,
   eight runners (#2929; three since the evening of 21 October, #3108,
@@ -38,13 +51,16 @@
   HOW (#3107, Patrick's A of 22 Oct 2026). A runner's labels can be changed
   only by somebody who administers the repository, and a cloud thread's proxy
   refuses every actions/runners path, so this no longer calls GitHub's
-  runner API itself. It starts github-admin.yml on main, waits, and prints
+  runner API itself. It starts github-admin.yml on the main of
+  EvilPatrick06/Thornswood-Ops, which checks out this repository's main
+  (#4013), waits, and prints
   the runner's answer, the way Set-Ref.ps1 does. That run hands GitHub's OIDC
   token for it to the box's admin service (scripts\vps\admin\admin.js,
   Install-AdminService.ps1), which holds the key of a GitHub App made for
   Thornswood and nothing else does. The service checks the token is that
-  workflow on main, reads the records from main itself, and makes the labels
-  match. What to change never comes from here, so nobody can label a runner
+  workflow on the ops repository's main, reads the records from this
+  repository's main itself, and makes the labels of the runners registered
+  to the ops repository match. What to change never comes from here, so nobody can label a runner
   any way main does not say. A job already running is not touched.
 
   The service refuses to leave GitHub with no registered runner carrying a
@@ -86,11 +102,15 @@ param(
     [switch]$AppRepos,
     # The workflow's half: asks the box's admin service with this run's
     # OIDC token. -Check comes from ADMIN_CHECK there, and what it asks for
-    # from ADMIN_ASK (runner-labels when unset, as on a push).
+    # from ADMIN_ASK (runner-labels when unset; repo-settings is as
+    # -RepoSettings).
     [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
     [switch]$OnGitHub,
+    # main's repository settings (records\github-repo-settings.json) rather than its runner records.
+    [switch]$RepoSettings,
     [int]$WaitMinutes = 15,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood'
+    # Where github-admin.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops'
 )
 
 Set-StrictMode -Version Latest
@@ -98,7 +118,13 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\ops\WorkflowRun.ps1')
 
 $workflow = 'github-admin.yml'
-$title = 'Set-BuildRunners'
+if ($AppRepos -and $RepoSettings) { Write-Host 'STOP. -AppRepos and -RepoSettings are two different asks; give one. Nothing was changed.' -ForegroundColor Red; exit 1 }
+# The run's own half asks for the repository settings when the run was
+# started for them (ADMIN_ASK repo-settings), as -RepoSettings does here.
+if ($OnGitHub -and $env:ADMIN_ASK -eq 'repo-settings') { $RepoSettings = [switch]$true }
+$what = if ($RepoSettings) { 'repo-settings' } else { 'runner-labels' }
+$title = if ($RepoSettings) { 'Set-RepoSettings' } else { 'Set-BuildRunners' }
+$records = if ($RepoSettings) { 'main''s repository settings record' } else { 'main''s runner records' }
 # The audience admin.js takes, and nothing else does.
 $audience = 'thornswood-admin'
 
@@ -108,8 +134,10 @@ function Die($m) { Write-ThornswoodAnnotation 'error' $title $m; Write-Host "STO
 # ======================================================== the GitHub half ===
 if ($OnGitHub) {
     $askCheck = ($env:ADMIN_CHECK -eq 'true')
-    $askWhat = if ($env:ADMIN_ASK) { [string]$env:ADMIN_ASK } else { 'runner-labels' }
-    if ($askWhat -notin @('runner-labels', 'installation-repos')) { Die "the run asked for '$askWhat', which is neither runner-labels nor installation-repos. Nothing was changed." }
+    # The ask comes from ADMIN_ASK (or -RepoSettings): runner-labels,
+    # installation-repos or repo-settings.
+    $askWhat = if ($RepoSettings) { 'repo-settings' } elseif ($env:ADMIN_ASK) { [string]$env:ADMIN_ASK } else { 'runner-labels' }
+    if (-not $RepoSettings -and $askWhat -notin @('runner-labels', 'installation-repos')) { Die "the run asked for '$askWhat', which is neither runner-labels nor installation-repos. Nothing was changed." }
     if (-not $env:ACTIONS_ID_TOKEN_REQUEST_URL -or -not $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN) {
         Die 'this run has no OIDC token to ask for: github-admin.yml has to give the job id-token: write. Nothing was changed.'
     }
@@ -145,7 +173,7 @@ if ($OnGitHub) {
 
 # ======================================================= the session half ===
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Die "there is no gh here to start $workflow with. Install GitHub CLI from https://cli.github.com and run gh auth login. Nothing was changed." }
-$again = 'pwsh scripts/deploy/Set-BuildRunners.ps1 -Run '
+$again = 'pwsh scripts/deploy/Set-BuildRunners.ps1 ' + $(if ($RepoSettings) { '-RepoSettings ' } else { '' }) + '-Run '
 
 function Read-Answer([long]$id, [switch]$Started) {
     $a = Read-ThornswoodRunAnswer -Repo $GitHubRepo -Workflow $workflow -Run $id -Title $title -WaitMinutes $WaitMinutes -Started:$Started -Say { param($m) Say $m 'DarkGray' }
@@ -172,7 +200,7 @@ function Read-Answer([long]$id, [switch]$Started) {
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $answer = Read-Answer $Run
 } else {
-    $inputs = [ordered]@{ check = $(if ($Check) { 'true' } else { 'false' }); ask = $(if ($AppRepos) { 'installation-repos' } else { 'runner-labels' }) }
+    $inputs = [ordered]@{ check = $(if ($Check) { 'true' } else { 'false' }); ask = $(if ($AppRepos) { 'installation-repos' } else { $what }) }
     try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs $inputs }
     catch { Die ($_.Exception.Message + '. Nothing was changed.') }
     if (-not $started.Run) {
@@ -186,9 +214,9 @@ if ($PSCmdlet.ParameterSetName -eq 'Run') {
 $said = @("$answer" -split "`n")
 foreach ($l in @($said | Select-Object -Skip 1)) { Say "  $l" }
 switch -Regex ($said[0]) {
-    '^MATCHES$' { Say 'GitHub matches main''s runner records.' 'Green'; exit 0 }
-    '^CHANGED (\d+)$' { Say ('GitHub matches main''s runner records now; ' + $Matches[1] + ' label(s) changed.') 'Green'; exit 0 }
+    '^MATCHES$' { Say "GitHub matches $records." 'Green'; exit 0 }
+    '^CHANGED (\d+)$' { Say ("GitHub matches $records now; " + $Matches[1] + ' change(s) made.') 'Green'; exit 0 }
     '^REPOS (\d+)$' { Say ('The box''s App is installed on ' + $Matches[1] + ' repositor' + $(if ($Matches[1] -eq '1') { 'y' } else { 'ies' }) + ', above.') 'Green'; exit 0 }
-    '^DIFFERS (\d+)$' { Say ('GitHub differs from main''s runner records in ' + $Matches[1] + ' place(s), above. pwsh scripts/deploy/Set-BuildRunners.ps1 puts it right.') 'Yellow'; exit 1 }
+    '^DIFFERS (\d+)$' { Say ("GitHub differs from $records in " + $Matches[1] + ' place(s), above. pwsh scripts/deploy/Set-BuildRunners.ps1' + $(if ($RepoSettings) { ' -RepoSettings' } else { '' }) + ' puts it right.') 'Yellow'; exit 1 }
 }
 Die ("the run answered '" + $said[0] + "', which is none of the answers this knows.")

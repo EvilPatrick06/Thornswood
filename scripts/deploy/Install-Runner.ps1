@@ -392,6 +392,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+# Where the box keeps its firewall rules, and the refresh that makes the
+# firewall take a change to them (#3896).
+. (Join-Path $Here '..\vps\BoxFirewall.ps1')
 if (-not $OffBox) {
   if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
   if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
@@ -1020,29 +1023,35 @@ function Get-RunnerReachMisses([string[]]$ips, [string[]]$prefixes) {
   })
 }
 '@
-$guardLib = @'
+# The rules go where the runner is: on the box into its own policy store, the
+# only one its firewall takes rules from, with Group Policy refreshed after
+# (scripts\vps\BoxFirewall.ps1, #3896); off the box (-OffBox) into that
+# machine's local store, as before, since its firewall is not run that way.
+$guardLib = (Get-ThornswoodFirewallScript) + @'
 # Outbound block rules for the account alone, replacing any it had.
 function Set-RunnerFirewall([string]$acct, [string]$group, [string[]]$blocks, [int]$per = 500) {
   $sid = $(if ($acct.StartsWith('*')) { $acct.Substring(1) } else { (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value })
   if (-not @($blocks).Count) { throw 'there is no address list to block, so the firewall was left as it was' }
-  @(Get-NetFirewallRule -Group $group -EA SilentlyContinue) | ForEach-Object { Remove-NetFirewallRule -Name $_.Name }
+  @(Get-NetFirewallRule -PolicyStore $grdStore -Group $group -EA SilentlyContinue) | ForEach-Object { Remove-NetFirewallRule -PolicyStore $grdStore -Name $_.Name }
   $why = 'Install-Runner.ps1 (#1306, #2161): this account reaches GitHub, loopback, the -AllowHost names and, on the signing runner, the Microsoft tags records\sign-runners.json names (#3312), only. -NetworkOnly -Remove takes it off.'
   $n = 0
   for ($i = 0; $i -lt $blocks.Count; $i += $per) {
     $n++
     $chunk = @($blocks[$i..([Math]::Min($i + $per, $blocks.Count) - 1)])
-    New-NetFirewallRule -DisplayName ($group + ' ' + $n) -Group $group -Direction Outbound -Action Block -Profile Any -LocalUser ('D:(A;;CC;;;' + $sid + ')') -RemoteAddress $chunk -Description $why -EA Stop | Out-Null
+    New-NetFirewallRule -PolicyStore $grdStore -DisplayName ($group + ' ' + $n) -Group $group -Direction Outbound -Action Block -Profile Any -LocalUser ('D:(A;;CC;;;' + $sid + ')') -RemoteAddress $chunk -Description $why -EA Stop | Out-Null
   }
+  if ($grdStore -eq 'localhost') { Sync-ThornswoodFirewall }
   'firewall: ' + $acct + ' may reach GitHub, this machine and what it was given only, ' + $blocks.Count + ' blocked range(s) in ' + $n + ' outbound rule(s), group ' + $group
 }
 function Remove-RunnerFirewall([string]$group) {
-  $r = @(Get-NetFirewallRule -Group $group -EA SilentlyContinue)
+  $r = @(Get-NetFirewallRule -PolicyStore $grdStore -Group $group -EA SilentlyContinue)
   if (-not $r.Count) { 'firewall: no rule in ' + $group; return }
-  $r | ForEach-Object { Remove-NetFirewallRule -Name $_.Name }
+  $r | ForEach-Object { Remove-NetFirewallRule -PolicyStore $grdStore -Name $_.Name }
+  if ($grdStore -eq 'localhost') { Sync-ThornswoodFirewall }
   'firewall: took off ' + $r.Count + ' rule(s) in ' + $group
 }
 function Get-RunnerFirewall([string]$group) {
-  $r = @(Get-NetFirewallRule -Group $group -EA SilentlyContinue)
+  $r = @(Get-NetFirewallRule -PolicyStore $grdStore -Group $group -EA SilentlyContinue)
   if ($r.Count) { 'firewall  ' + $r.Count + ' outbound block rule(s), ' + @($r | Where-Object { "$($_.Enabled)" -eq 'True' }).Count + ' on (group ' + $group + ')' } else { 'firewall  NO RULES: a pull request job may reach anywhere. -OffBox -Lock puts them on' }
 }
 # The folders outside C:\Thornswood* it is shut out of. $users, $programData
@@ -1084,7 +1093,7 @@ function Open-RunnerReads([string]$acct, [string[]]$paths) {
 # Where the runner is: the guards, as source. $mode is apply, remove or status.
 function Get-GuardScript([string]$mode, [string[]]$blocks = @()) {
   $list = '@(' + ((@($blocks) | ForEach-Object { "'" + $_ + "'" }) -join ', ') + ')'
-  $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n`$grdOwn = '" + $(if ($onRunnerDrive) { $rootDrive } else { '' }) + "'`n"
+  $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n`$grdOwn = '" + $(if ($onRunnerDrive) { $rootDrive } else { '' }) + "'`n`$grdStore = '" + $(if ($OffBox) { 'PersistentStore' } else { 'localhost' }) + "'`n"
   if ($mode -eq 'status') { return $head + 'Get-RunnerFirewall $grdGroup' }
   if ($mode -eq 'network-remove') { return $head + "Remove-RunnerFirewall `$grdGroup`n" }
   if ($mode -eq 'network') { return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`n" }
@@ -1496,7 +1505,9 @@ function Get-RunnerMigrationState([string]$acct, [string]$svc, [string]$root) {
   $start = Join-Path $env:ProgramData 'Thornswood-RunnerDrive\start.ps1'
   if (-not $task -or $task.State -eq 'Disabled' -or $task.Principal.UserId -notin @('SYSTEM','S-1-5-18') -or @($task.Actions).Count -ne 1 -or $task.Actions[0].Execute -notin @('powershell.exe', 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe') -or $task.Actions[0].Arguments -ne ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $start + '"') -or -not (Test-Path -LiteralPath $start -PathType Leaf)) { throw 'Runner drive startup task does not match the managed SYSTEM attach/start task' }
   Assert-RunnerMigrationPath $start
-  $rules = @(Get-NetFirewallRule -Group ('Thornswood PR runner ' + $acct) -EA Stop)
+  # -Migrate is -OffBox only, and off the box the guards are in this machine's
+  # own store (Set-RunnerFirewall's $grdStore), so that is where they are read.
+  $rules = @(Get-NetFirewallRule -PolicyStore PersistentStore -Group ('Thornswood PR runner ' + $acct) -EA Stop)
   if (-not $rules.Count -or @($rules | Where-Object { [string]$_.Enabled -ne 'True' -or [string]$_.Direction -ne 'Outbound' -or [string]$_.Action -ne 'Block' }).Count) { throw 'Selected runner firewall guards are missing or disabled' }
   $plan
 }

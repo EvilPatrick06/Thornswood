@@ -138,6 +138,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The service account helpers (#2578), sent up as text in front of the setup
 # script (#2613), so the site's principal and fail-safe are the installers'.
 . (Join-Path $Here 'ServiceAccount.ps1')
+# Where the box keeps its firewall rules, and the refresh that makes the
+# firewall take a change to them (#3896).
+. (Join-Path $Here '..\vps\BoxFirewall.ps1')
 $siteAccountHelpers = (Get-ThornswoodServiceAccountScript) + "`n"
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
@@ -556,16 +559,21 @@ $siteAccountHelpers
 # and Caddy holds 80 and 443. Opening 3001 would put a plain HTTP way straight
 # past the certificate, so the rule is opened only for a box that asked for a
 # plain listener on purpose, and torn down otherwise if a previous run left one.
+# The rule lives in the box's own policy store, the only one the firewall
+# takes rules from, and Group Policy is refreshed after a change
+# (scripts\vps\BoxFirewall.ps1, #3896).
+$(Get-ThornswoodFirewallScript)
 `$local = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','Machine')
 `$expose = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_EXPOSE','Machine')
+`$fwHas = [bool](Get-NetFirewallRule -PolicyStore localhost -DisplayName '$Task' -EA SilentlyContinue)
 if (`$local -eq '1' -or `$expose -ne '1') {
-  Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue |
-    Remove-NetFirewallRule -EA SilentlyContinue
+  if (`$fwHas) { Remove-NetFirewallRule -PolicyStore localhost -DisplayName '$Task'; Sync-ThornswoodFirewall; 'firewall rule on $Port taken away' }
   'loopback only, $Port left shut'
 }
-elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
-  New-NetFirewallRule -DisplayName '$Task' -Direction Inbound -Protocol TCP ``
+elseif (-not `$fwHas) {
+  New-NetFirewallRule -PolicyStore localhost -DisplayName '$Task' -Direction Inbound -Protocol TCP ``
     -LocalPort $Port -Action Allow | Out-Null
+  Sync-ThornswoodFirewall
   'firewall opened on $Port'
 } else { 'firewall rule already there' }
 
