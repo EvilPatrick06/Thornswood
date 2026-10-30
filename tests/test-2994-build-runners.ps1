@@ -10,6 +10,9 @@
   six cores finish no more builds an hour. So the heavy jobs ask for the
   label thornswood-build, which only the runners records\build-runners.json
   lists carry, and scripts\deploy\Set-BuildRunners.ps1 makes GitHub match it.
+  The pull request build asks for records\pr-build-runners.json's label
+  instead, which on the box only build runners carry, and not all of them:
+  one is kept for main's build (#4010).
 
   This reads the record and the workflows. Since #3107 the labels are put
   right by the box's admin service (scripts\vps\admin\admin.js), which
@@ -49,6 +52,7 @@ $prNums = @($pr.runners | ForEach-Object { [int]$_ })
 Yes "the pull request record names its own label ($($pr.label))" ($pr.label -eq 'thornswood-pr-build' -and $pr.label -ne $rec.label)
 Yes "  its box runners ($($prNums -join ', ')) are build runners too, so the box's cap still holds" ($prNums.Count -ge 1 -and @($prNums | Where-Object { $nums -notcontains $_ }).Count -eq 0)
 Yes '  and at least one build runner is not among them, kept for main''s build' (@($nums | Where-Object { $prNums -notcontains $_ }).Count -ge 1)
+Yes '  the build record names no off-box runner: off the box only the pull request label is carried' (-not $rec.PSObject.Properties['offBox'])
 
 # ---- 2. which jobs ask for it -----------------------------------------------------
 # Every job on the VPS, by workflow, and whether it is heavy (a build or a
@@ -94,20 +98,23 @@ foreach ($f in Get-ChildItem -LiteralPath $wfDir -Filter *.yml) {
 }
 Yes "every heavy job named here is on the box ($seen found)" ($seen -ge 4)
 # The pull request build's fallback needs nothing of the box, so it asks for
-# the build label alone and the off-box build runners on One take it too (26
-# Oct 2026). Main's stays on the box, which traces the gate (#3114, #3874).
-# Every other job asking for it asks for the VPS label beside it.
-$buildOnly = @{ 'build-pr.yml' = @('launcher-vps') }
-foreach ($f in $buildOnly.Keys) {
+# records\pr-build-runners.json's label alone, which One's off-box build
+# runners carry too (26 Oct 2026). On the box only runner 2 carries it, so
+# runner 1 is kept for main's build, which stays on the box and traces the
+# gate (#3114, #3874; #4010, Patrick's A, 27 Oct 2026). Every job asking for
+# the build label asks for the VPS label beside it.
+$prOnly = @{ 'build-pr.yml' = @('launcher-vps') }
+foreach ($f in $prOnly.Keys) {
     $jobs = Get-Jobs ([IO.File]::ReadAllText((Join-Path $wfDir $f)))
-    foreach ($k in $buildOnly[$f]) {
+    foreach ($k in $prOnly[$f]) {
         $runsOn = [regex]::Match($jobs[$k], '(?m)^    runs-on:\s*(.+)$').Groups[1].Value.Trim()
-        Yes ("{0} {1} asks for the build label alone, for the box's build runners or One's ({2})" -f $f, $k, $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-build]')
+        Yes ("{0} {1} asks for the pull request build label alone ({2})" -f $f, $k, $runsOn) ($runsOn -eq ('[self-hosted, Windows, ' + $pr.label + ']'))
     }
 }
-Yes 'any other job asking for the build label asks for the VPS label too' (
-    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*thornswood-build.*$') } | Where-Object { $_.Value -notmatch 'self-hosted, Windows, thornswood-vps, thornswood-build\]' -and $_.Value -notmatch 'runs-on: \[self-hosted, Windows, thornswood-build\]' -and $_.Value -notmatch [regex]::Escape('"self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') }).Count -eq 0 -and
-    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on: \[self-hosted, Windows, thornswood-build\]') }).Count -eq 1)
+Yes 'no other job asks for the pull request build label' (
+    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*\bthornswood-pr-build\b.*$') }).Count -eq 1)
+Yes 'every job asking for the build label asks for the VPS label too, the private-only form included (#3685)' (
+    @(Get-ChildItem -LiteralPath $wfDir -Filter *.yml | ForEach-Object { [regex]::Matches([IO.File]::ReadAllText($_.FullName), '(?m)^\s*runs-on:.*\bthornswood-build\b.*$') } | Where-Object { $_.Value -notmatch 'self-hosted, Windows, thornswood-vps, thornswood-build\]' -and $_.Value -notmatch [regex]::Escape('"self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') }).Count -eq 0)
 
 # ---- 3. Install-Runner.ps1 registers a listed runner with it ----------------------
 $ir = [IO.File]::ReadAllText((Under @('scripts', 'deploy', 'Install-Runner.ps1')))

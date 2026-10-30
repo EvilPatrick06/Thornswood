@@ -117,11 +117,12 @@ try {
     # Once public, the same-repository condition is no guard: a fork's pull
     # request carries its own workflow files (#3685). The real build-pr.yml
     # falls back to the box's build runners (the build label, since 26 Oct
-    # 2026 without the VPS label), so a public repository shows it as a risk
-    # until that fallback is gone.
+    # 2026 without the VPS label, and since #4010 the pull request build label,
+    # which runner 2 on the box carries), so a public repository shows it as a
+    # risk until that fallback is gone.
     $x = Run $pub ''
     $bp = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build-pr.yml'))
-    if ($bp -match 'runs-on:[^\n]*\bthornswood-(vps|build)\b') {
+    if ($bp -match 'runs-on:[^\n]*\bthornswood-(vps|build|pr-build)\b') {
         T ($x.Out -match 'RISK  workflow build-pr\.yml runs on: expected not thornswood-vps for untrusted code, found [^\n]*the repository is public') 'a public repository with a runner and a pull request job on the production label is a risk, condition or not'
     } else {
         T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on') 'build-pr.yml has no job on the production label, so a public repository is safe from it'

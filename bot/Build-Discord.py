@@ -191,9 +191,15 @@ CHECK = os.environ.get('DISCORD_CHECK', '') == '1'
 # A category named here is made if missing, with every channel PLAN puts in
 # it; a channel named here is made or kept in its own category, which is not
 # made for it. No role is made or moved, nothing is listed for pruning or
-# pruned, no post is written, no webhook is made, and no server setting is
-# changed. A name PLAN does not have stops the run before Discord is asked
-# anything.
+# pruned, no webhook is made, and no server setting is changed. A name PLAN
+# does not have stops the run before Discord is asked anything.
+#
+# With POSTS as well, the read only posts of the channels named, and of no
+# other channel, are rewritten with their Changelog threads (#3656: the -Only
+# lore,factions -Posts run of 27 Oct wrote nothing, because ONLY returned
+# before the post step, and the one other way to rewrite two posts was a
+# whole run, which rewrites all seven and moves roles). Without POSTS no post
+# is written.
 ONLY = [n.strip() for n in os.environ.get('DISCORD_ONLY', '').split(',') if n.strip()]
 
 # THE AUDIT (#3317). Reads the live server and says where it differs from this
@@ -2130,6 +2136,59 @@ async def post(channel, text, found):
     say('wrote', '#' + channel.name)
 
 
+async def write_posts(posts, found):
+    """The read only posts of this run's channels, (channel, key) pairs: each
+       rewritten with its Changelog thread under -Posts, said under -Check,
+       and left alone without -Posts. A whole run and an ONLY run both come
+       through here, so they write a post the same way (#3656)."""
+    # A draft waits for its lead and Patrick (#3317) and is never written.
+    drafts = [(ch, k) for ch, k in posts if k in C.DRAFTS]
+    posts = [(ch, k) for ch, k in posts if k not in C.DRAFTS]
+    for ch, k in drafts:
+        say('left alone', '#%s: its words are a draft waiting on approval'
+            % getattr(ch, 'name', k.lower()))
+    if CHECK and POSTS:
+        for ch, key in posts:
+            if ch is not None:
+                say('would write', '#' + ch.name + ' and its changelog')
+    elif CHECK and posts:
+        # What the same run without -Check does: it leaves them alone.
+        # This said would write for all seven whether or not -Posts was
+        # given (#2519, 22 Oct).
+        say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
+    elif POSTS:
+        for ch, key in posts:
+            # The thread first, so the post can link it.
+            thread = await keep_changelog(ch, key)
+            await post(ch, doc_with_footer(key, thread), found)
+    elif posts:
+        say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
+
+
+def look_up(guild, found):
+    """Under ONLY, the channels of PLAN the run did not reach, found by name
+       in their own category and put in found, so a named channel's post
+       links the live channels it mentions instead of saying their names
+       as plain words. Asks Discord for nothing and changes nothing: a
+       channel that is not there stays out of found."""
+    def want(spec):
+        return spec['name'] if spec['kind'] == 'voice' else spec['name'].lower().replace(' ', '-')
+    for catname, specs in PLAN:
+        cat = None
+        if catname:
+            cat = discord.utils.get(guild.categories, name=catname)
+            if cat is None:
+                continue
+        for spec in specs:
+            key = spec.get('key')
+            if not key or found.get(key) is not None:
+                continue
+            for ch in guild.channels:
+                if ch.name == want(spec) and getattr(ch, 'category', None) == cat:
+                    found[key] = ch
+                    break
+
+
 def _flags_differ(guild, flags):
     """True when the server's system-channel flags are not the ones wanted.
 
@@ -3213,8 +3272,13 @@ async def on_ready():
                         await keep_bot(ch)
 
         if ONLY:
-            # Nothing past the parts named: no prune list, no post, no
-            # webhook, no server setting.
+            # Nothing past the parts named: no prune list, no webhook, no
+            # server setting, and no post but the named channels' own, and
+            # those only under -Posts (#3656).
+            if posts:
+                print('')
+                look_up(guild, found)
+                await write_posts(posts, found)
             say('only', ', '.join(ONLY) + '. Nothing else was touched')
             print('\n  made %d, already there %d' % (len(made), len(kept)))
             if failed:
@@ -3307,28 +3371,7 @@ async def on_ready():
                     failed.append('could not remove category %s (%s)' % (name, refused(e)))
 
         print('')
-        # A draft waits for its lead and Patrick (#3317) and is never written.
-        drafts = [(ch, k) for ch, k in posts if k in C.DRAFTS]
-        posts = [(ch, k) for ch, k in posts if k not in C.DRAFTS]
-        for ch, k in drafts:
-            say('left alone', '#%s: its words are a draft waiting on approval'
-                % getattr(ch, 'name', k.lower()))
-        if CHECK and POSTS:
-            for ch, key in posts:
-                if ch is not None:
-                    say('would write', '#' + ch.name + ' and its changelog')
-        elif CHECK and posts:
-            # What the same run without -Check does: it leaves them alone.
-            # This said would write for all seven whether or not -Posts was
-            # given (#2519, 22 Oct).
-            say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
-        elif POSTS:
-            for ch, key in posts:
-                # The thread first, so the post can link it.
-                thread = await keep_changelog(ch, key)
-                await post(ch, doc_with_footer(key, thread), found)
-        elif posts:
-            say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
+        await write_posts(posts, found)
 
         # A webhook in news, so a release can announce itself without the bot
         # having to be running.

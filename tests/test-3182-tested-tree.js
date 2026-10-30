@@ -234,10 +234,12 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   // Every harness and every script: GitHub's event and ref variables are read
   // only where named here, each with why it is not a check of a build.
   const ALLOWED = {
-    'scripts/release/Resolve-ReleaseTag.ps1': 'release.yml\'s tag step, which no check runs: tests/test-release-tag.ps1 gives it the values itself',
+    'tests/test-release-workflow.ps1': 'reads release.yml\'s text for the names its tag push hands to main\'s run (#3930); runs nothing',
     'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process',
     'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
     'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event',
+    'scripts/deploy/Install-Runner.ps1': 'writes the signing runner\'s job-started hook (#3889), which reads the ref on the box before a job\'s first step to refuse it; no check runs it',
+    'tests/test-runner-hook.ps1': 'sets those names for the hook in a scratch process, to hold which refs it takes and refuses',
     'scripts/dev/Gate-Map.ps1': 'the step after the gate that hands main\'s map on (#4009): it checks nothing, never fails a build, and prints only in main\'s push build',
     'tests/test-4009-gate-map.ps1': 'sets those names for Gate-Map.ps1 in scratch processes, to hold that only main\'s push build hands a map on'
   };
