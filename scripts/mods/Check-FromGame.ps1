@@ -16,8 +16,9 @@
 
   The same goes for the five files of the collection's mods made with no gold
   values since #3113 (SkyUI's config.txt and itemcard.swf, SkyHUD's
-  hudmenu.swf, moreHUD's AHZHudInfo.swf twice, from the recipes in
-  FromGameModMenus.cs that scripts\mods\Build-ModMenus.py writes): they are
+  hudmenu.swf, moreHUD's AHZHudInfo.swf twice), and SkyUI's quest_journal.swf
+  with no saving, loading, help or Creation Club since #3127, from the recipes
+  in FromGameModMenus.cs that scripts\mods\Build-ModMenus.py writes: they are
   their authors' files, made from the mods' own archives in -Data.
 
   Reads the archives and writes nothing, unless -Out names a folder to write

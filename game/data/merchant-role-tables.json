@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "9c65ffc072936307227c3f4af1e364500e05828bfa85ca5e411aa0017b8d7f09",
+    "game/data/recipes.json": "870ffb14af033c2a382990c05732a18d3d62201b0e6ac165711c987032ab7359",
     "game/data/harvests.json": "b977670daf535dede75a5eaa794365865953d85f554c3ca6f8cf0b6dbcb657a1",
     "game/data/hunts.json": "6618519178eb470173f7312c56527a3bc844ed53f0f93b23f7563c77202557a2",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
@@ -267,7 +267,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "485569f77da3a0f417e055f16f14d0c2e7217237079c37303dc204f5cbba7a3d",
+      "sha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535",
       "repository": true
     },
     {
@@ -522,7 +522,7 @@
     },
     {
       "name": "Thornswood-Last.esp",
-      "sha256": "ebb71d60663bd104522f0a2b6cc51d4e0b7e0c4dd2023a3641965a18683b2b9d",
+      "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
       "repository": true
     }
   ],
@@ -3101,27 +3101,6 @@
       "edid": "FalmerArrow",
       "winner": "Skyrim.esm"
     },
-    "39b4a:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "ResistFire25",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "39be1:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "ResistShock25",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "39be8:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreStamina02",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
     "3ad52:Skyrim.esm": {
       "type": "MISC",
       "flags": 0,
@@ -3312,55 +3291,6 @@
       "edid": "MAG_FoodAshHopperLeg",
       "winner": "Gourmet.esp",
       "food": true
-    },
-    "3eadd:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreHealth01",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "3eade:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreHealth02",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "3eadf:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreHealth03",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "3eae0:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreMagicka01",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "3eae1:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreMagicka02",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "3eae3:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreHealth04",
-      "winner": "Skyrim.esm",
-      "food": false
-    },
-    "3eae5:Skyrim.esm": {
-      "type": "ALCH",
-      "flags": 0,
-      "edid": "RestoreStamina01",
-      "winner": "Skyrim.esm",
-      "food": false
     },
     "3f7f8:Skyrim.esm": {
       "type": "INGR",
@@ -7944,9 +7874,6 @@
         "34d22:Skyrim.esm",
         "34d31:Skyrim.esm",
         "34d32:Skyrim.esm",
-        "39b4a:Skyrim.esm",
-        "39be1:Skyrim.esm",
-        "39be8:Skyrim.esm",
         "3ad56:Skyrim.esm",
         "3ad5e:Skyrim.esm",
         "3ad5f:Skyrim.esm",
@@ -7954,13 +7881,6 @@
         "3ad6f:Skyrim.esm",
         "3ad70:Skyrim.esm",
         "3ad72:Skyrim.esm",
-        "3eadd:Skyrim.esm",
-        "3eade:Skyrim.esm",
-        "3eadf:Skyrim.esm",
-        "3eae0:Skyrim.esm",
-        "3eae1:Skyrim.esm",
-        "3eae3:Skyrim.esm",
-        "3eae5:Skyrim.esm",
         "3f7f8:Skyrim.esm",
         "45c28:Skyrim.esm",
         "4b0ba:Skyrim.esm",
@@ -8027,9 +7947,6 @@
         "34d22:Skyrim.esm",
         "34d31:Skyrim.esm",
         "34d32:Skyrim.esm",
-        "39b4a:Skyrim.esm",
-        "39be1:Skyrim.esm",
-        "39be8:Skyrim.esm",
         "3ad56:Skyrim.esm",
         "3ad5e:Skyrim.esm",
         "3ad5f:Skyrim.esm",
@@ -8037,13 +7954,6 @@
         "3ad6f:Skyrim.esm",
         "3ad70:Skyrim.esm",
         "3ad72:Skyrim.esm",
-        "3eadd:Skyrim.esm",
-        "3eade:Skyrim.esm",
-        "3eadf:Skyrim.esm",
-        "3eae0:Skyrim.esm",
-        "3eae1:Skyrim.esm",
-        "3eae3:Skyrim.esm",
-        "3eae5:Skyrim.esm",
         "3f7f8:Skyrim.esm",
         "45c28:Skyrim.esm",
         "4b0ba:Skyrim.esm",
@@ -8939,8 +8849,6 @@
       "Alchemist:harvests:harvests:bcf33:Skyrim.esm",
       "Alchemist:harvests:harvests:bcf34:Skyrim.esm",
       "Alchemist:harvests:harvests:df015:Skyrim.esm",
-      "Alchemist:recipe:154f8:Thornswood-Content.esp:input:0",
-      "Alchemist:recipe:154f9:Thornswood-Content.esp:input:0",
       "Cook:recipe:117fd:HearthFires.esm:input:0",
       "Cook:recipe:11802:HearthFires.esm:input:0",
       "Cook:recipe:18013:Thornswood-Content.esp:input:0",
@@ -9939,15 +9847,6 @@
     "38341:Skyrim.esm": [
       "Woodworker:recipe:8f0:MoreCraftableEquipment.esp:out"
     ],
-    "39b4a:Skyrim.esm": [
-      "Alchemist:recipe:154f8:Thornswood-Content.esp:out"
-    ],
-    "39be1:Skyrim.esm": [
-      "Alchemist:recipe:154f9:Thornswood-Content.esp:out"
-    ],
-    "39be8:Skyrim.esm": [
-      "Alchemist:recipe:154f7:Thornswood-Content.esp:out"
-    ],
     "3ad52:Skyrim.esm": [
       "Smith:recipe:8d7:MoreCraftableEquipment.esp:input:2",
       "Smith:recipe:ab72:Hothtrooper44_ArmorCompilation.esp:input:0",
@@ -9978,7 +9877,6 @@
       "Woodworker:recipe:8f7:MoreCraftableEquipment.esp:input:1"
     ],
     "3ad5e:Skyrim.esm": [
-      "Alchemist:recipe:154f8:Thornswood-Content.esp:input:1",
       "Alchemist:station:fireSalts",
       "Cook:recipe:92d4:FishingInSkyrim.esp:input:1"
     ],
@@ -10130,27 +10028,6 @@
       "Cook:hunts:30f26:Dragonborn.esm:3",
       "Cook:recipe:81b:Gourmet.esp:input:3"
     ],
-    "3eadd:Skyrim.esm": [
-      "Alchemist:recipe:154f0:Thornswood-Content.esp:out"
-    ],
-    "3eade:Skyrim.esm": [
-      "Alchemist:recipe:154f1:Thornswood-Content.esp:out"
-    ],
-    "3eadf:Skyrim.esm": [
-      "Alchemist:recipe:154f2:Thornswood-Content.esp:out"
-    ],
-    "3eae0:Skyrim.esm": [
-      "Alchemist:recipe:154f4:Thornswood-Content.esp:out"
-    ],
-    "3eae1:Skyrim.esm": [
-      "Alchemist:recipe:154f5:Thornswood-Content.esp:out"
-    ],
-    "3eae3:Skyrim.esm": [
-      "Alchemist:recipe:154f3:Thornswood-Content.esp:out"
-    ],
-    "3eae5:Skyrim.esm": [
-      "Alchemist:recipe:154f6:Thornswood-Content.esp:out"
-    ],
     "3f7f8:Skyrim.esm": [
       "Alchemist:harvests:harvests:bb947:Skyrim.esm",
       "Alchemist:recipe:154c6:Thornswood-Content.esp:input:0",
@@ -10213,9 +10090,6 @@
     "4b0ba:Skyrim.esm": [
       "Alchemist:harvests:crops:bb953:Skyrim.esm",
       "Alchemist:harvests:harvests:bb953:Skyrim.esm",
-      "Alchemist:recipe:154f1:Thornswood-Content.esp:input:1",
-      "Alchemist:recipe:154f2:Thornswood-Content.esp:input:1",
-      "Alchemist:recipe:154f3:Thornswood-Content.esp:input:1",
       "Cook:recipe:17ec3:HearthFires.esm:input:0",
       "Cook:recipe:1a052:Thornswood-Content.esp:input:0"
     ],
@@ -10253,16 +10127,13 @@
       "Alchemist:harvests:harvests:db68b:Skyrim.esm",
       "Alchemist:harvests:harvests:dd683:Skyrim.esm",
       "Alchemist:harvests:harvests:eca59:Skyrim.esm",
-      "Alchemist:harvests:harvests:eca5a:Skyrim.esm",
-      "Alchemist:recipe:154f4:Thornswood-Content.esp:input:0",
-      "Alchemist:recipe:154f5:Thornswood-Content.esp:input:2"
+      "Alchemist:harvests:harvests:eca5a:Skyrim.esm"
     ],
     "4da23:Skyrim.esm": [
       "Alchemist:harvests:harvests:4da08:Skyrim.esm",
       "Alchemist:harvests:harvests:4da09:Skyrim.esm",
       "Alchemist:harvests:harvests:eca5b:Skyrim.esm",
-      "Alchemist:harvests:harvests:eca5c:Skyrim.esm",
-      "Alchemist:recipe:154f0:Thornswood-Content.esp:input:0"
+      "Alchemist:harvests:harvests:eca5c:Skyrim.esm"
     ],
     "4da24:Skyrim.esm": [
       "Alchemist:harvests:harvests:4da0a:Skyrim.esm",
@@ -10278,9 +10149,7 @@
       "Alchemist:harvests:harvests:4da1f:Skyrim.esm",
       "Alchemist:harvests:harvests:eca5f:Skyrim.esm",
       "Alchemist:harvests:harvests:eca60:Skyrim.esm",
-      "Alchemist:harvests:harvests:f675f:Skyrim.esm",
-      "Alchemist:recipe:154f2:Thornswood-Content.esp:input:3",
-      "Alchemist:recipe:154f3:Thornswood-Content.esp:input:3"
+      "Alchemist:harvests:harvests:f675f:Skyrim.esm"
     ],
     "4ded8:Skyrim.esm": [
       "Enchanter:recipe:1775e:Dragonborn.esm:out"
@@ -11078,9 +10947,7 @@
       "Alchemist:hunts:ea877:ZIA_Complete Pack.esp:1",
       "Alchemist:hunts:ea878:ZIA_Complete Pack.esp:1",
       "Alchemist:hunts:eb2:Skyrim.esm:1",
-      "Alchemist:recipe:154c7:Thornswood-Content.esp:input:0",
-      "Alchemist:recipe:154f6:Thornswood-Content.esp:input:0",
-      "Alchemist:recipe:154f7:Thornswood-Content.esp:input:1"
+      "Alchemist:recipe:154c7:Thornswood-Content.esp:input:0"
     ],
     "6bc02:Skyrim.esm": [
       "Alchemist:hunts:1e7a4:Skyrim.esm:1",
@@ -11115,7 +10982,6 @@
       "Alchemist:hunts:ea871:ZIA_Complete Pack.esp:1",
       "Alchemist:hunts:f798:Dawnguard.esm:1",
       "Alchemist:hunts:fe2d6:Skyrim.esm:1",
-      "Alchemist:recipe:154f6:Thornswood-Content.esp:input:1",
       "Smith:recipe:8ac:MoreCraftableEquipment.esp:input:0"
     ],
     "6bc07:Skyrim.esm": [
@@ -11132,10 +10998,7 @@
       "Alchemist:hunts:ea870:ZIA_Complete Pack.esp:2",
       "Alchemist:hunts:ea871:ZIA_Complete Pack.esp:2",
       "Alchemist:hunts:f798:Dawnguard.esm:2",
-      "Alchemist:hunts:fe2d6:Skyrim.esm:2",
-      "Alchemist:recipe:154f0:Thornswood-Content.esp:input:1",
-      "Alchemist:recipe:154f3:Thornswood-Content.esp:input:4",
-      "Alchemist:recipe:154f7:Thornswood-Content.esp:input:2"
+      "Alchemist:hunts:fe2d6:Skyrim.esm:2"
     ],
     "6bc0b:Skyrim.esm": [
       "Smith:recipe:8ad:MoreCraftableEquipment.esp:input:1"
@@ -11434,21 +11297,16 @@
       "Alchemist:harvests:harvests:bcf3d:Skyrim.esm",
       "Alchemist:harvests:harvests:bcf3f:Skyrim.esm",
       "Alchemist:recipe:154c7:Thornswood-Content.esp:input:1",
-      "Alchemist:recipe:154f1:Thornswood-Content.esp:input:0",
-      "Alchemist:recipe:154f2:Thornswood-Content.esp:input:0",
-      "Alchemist:recipe:154f3:Thornswood-Content.esp:input:0",
       "Tailor:recipe:84b:MoreCraftableEquipment.esp:input:0"
     ],
     "77e1d:Skyrim.esm": [
       "Alchemist:harvests:harvests:bcf3c:Skyrim.esm",
       "Alchemist:harvests:harvests:bcf3e:Skyrim.esm",
-      "Alchemist:recipe:154f5:Thornswood-Content.esp:input:0",
       "Tailor:recipe:84d:MoreCraftableEquipment.esp:input:0"
     ],
     "77e1e:Skyrim.esm": [
       "Alchemist:harvests:harvests:b91f8:Skyrim.esm",
       "Alchemist:harvests:harvests:bcf3a:Skyrim.esm",
-      "Alchemist:recipe:154f7:Thornswood-Content.esp:input:0",
       "Tailor:recipe:84c:MoreCraftableEquipment.esp:input:0"
     ],
     "7bc15:Skyrim.esm": [
@@ -11467,14 +11325,10 @@
       "Enchanter:recipe:1776b:Dragonborn.esm:input:1"
     ],
     "7e8b7:Skyrim.esm": [
-      "Alchemist:harvests:harvests:7e8b8:Skyrim.esm",
-      "Alchemist:recipe:154f1:Thornswood-Content.esp:input:2",
-      "Alchemist:recipe:154f2:Thornswood-Content.esp:input:2",
-      "Alchemist:recipe:154f3:Thornswood-Content.esp:input:2"
+      "Alchemist:harvests:harvests:7e8b8:Skyrim.esm"
     ],
     "7e8c1:Skyrim.esm": [
-      "Alchemist:harvests:harvests:7e8c2:Skyrim.esm",
-      "Alchemist:recipe:154f5:Thornswood-Content.esp:input:1"
+      "Alchemist:harvests:harvests:7e8c2:Skyrim.esm"
     ],
     "7e8c5:Skyrim.esm": [
       "Alchemist:harvests:fish:7e8c6:Skyrim.esm"
@@ -11488,7 +11342,6 @@
     "7ee01:Skyrim.esm": [
       "Alchemist:harvests:harvests:7ee00:Skyrim.esm",
       "Alchemist:harvests:harvests:9748b:Skyrim.esm",
-      "Alchemist:recipe:154f9:Thornswood-Content.esp:input:1",
       "Cook:recipe:8fa:Gourmet.esp:input:3",
       "Cook:recipe:906:Gourmet.esp:input:1"
     ],
@@ -12176,8 +12029,7 @@
     ],
     "b2183:Skyrim.esm": [
       "Alchemist:harvests:harvests:b03af:Skyrim.esm",
-      "Alchemist:harvests:harvests:b202c:Skyrim.esm",
-      "Alchemist:recipe:154f4:Thornswood-Content.esp:input:1"
+      "Alchemist:harvests:harvests:b202c:Skyrim.esm"
     ],
     "b647:Dawnguard.esm": [
       "Woodworker:recipe:f810:Dawnguard.esm:out"
@@ -12751,8 +12603,8 @@
       "supply": 54
     },
     "Alchemist": {
-      "buy": 81,
-      "sell": 81,
+      "buy": 71,
+      "sell": 71,
       "supply": 69
     }
   }
