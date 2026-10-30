@@ -137,6 +137,12 @@ async function start() {
   srv.stdout.on('data', (d) => { srvLog += d; });
   srv.stderr.on('data', (d) => { srvLog += d; });
   await listening(srv, PORT);
+  // Everybody below is in the world, since only somebody in the world holds
+  // a voice place and is on the roster (#3570): the gamemode's position
+  // feed, stood in for, everybody in one room.
+  const who = [601, 602, 603, 701, 702, 703, 801, 802, 803, 804].map((pid) => ({ profileId: pid, pos: [0, 0, 0], angleZ: 0, cell: 'a room' }));
+  const fed = await fetch(BASE + '/positions', { method: 'POST', body: JSON.stringify({ who: who }) });
+  if (fed.status !== 204) throw new Error('/positions answered ' + fed.status);
 }
 async function health() { return (await fetch(BASE + '/health')).json(); }
 

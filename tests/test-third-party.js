@@ -118,6 +118,93 @@ resources.forEach(function (name) {
   }
 });
 
+// ---------------------------------------------------------------- launcher source
+//
+// The launcher's code is compiled into it too, and one file of it,
+// FromGameDeflate.cs, is zlib 1.3 translated into C#. It went out from #2827
+// with no zlib notice and THIRD-PARTY.md calling everything compiled in
+// Thornswood's own (#3668). So the header of every .cs file under
+// launcher\app and installer\setup (its comments down to the first type it
+// declares) is read for outside projects: the libraries in
+// records\client-licences, the numeric and compression ones the launcher's
+// work touches, and any line saying code was translated, ported, adapted or
+// copied, or carrying a copyright line. Each file that names one needs a row
+// in THIRD-PARTY.md's "Launcher source that names outside work" naming what it
+// names, and a row that says a file carries a library's code needs that
+// library's notice in the file's header word for word, the file marked as
+// altered, and THIRD-PARTY.md pointing at the licence text.
+const SRC_DIRS = [path.join('launcher', 'app'), path.join('installer', 'setup')];
+const LIC_DIR = path.join(REPO, 'records', 'client-licences');
+const licNames = (fs.existsSync(LIC_DIR) ? fs.readdirSync(LIC_DIR) : [])
+  .filter(function (n) { return /\.txt$/i.test(n); })
+  .map(function (n) { return n.replace(/\.txt$/i, ''); });
+yes('records\\client-licences has licence texts to name (' + licNames.length + ')', licNames.length > 0);
+const OUTSIDE = licNames.concat(['deflate.c', 'trees.c', 'inflate.c', 'miniz', 'LZ4', 'LZMA', '7-Zip',
+  'OpenBLAS', 'LAPACK', 'BLAS', 'numpy', 'Eigen', 'Newtonsoft', 'Json.NET', 'SharpZipLib', 'DotNetZip',
+  'BouncyCastle', 'Mono', 'corefx', 'referencesource']);
+const SAYS_OUTSIDE = /\btranslat(ed|ion)\s+(of|from|into)\b|\bport(ed)?\s+(of|from)\b|\badapted\s+from\b|\bcopied\s+from\b|\bcopyright\s*(\(C\)|©)|\(C\)\s*\d{4}/i;
+function namesIn(text, name) {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^A-Za-z0-9_-])' + esc + '($|[^A-Za-z0-9_-])', 'i').test(text);
+}
+function header(src) {
+  const out = [];
+  const lines = src.replace(/\r/g, '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (/^(\[[^\]]*\]\s*)*((public|internal|static|sealed|partial|abstract)\s+)*(class|struct|enum|interface)\s/.test(t)) { break; }
+    if (t.indexOf('//') === 0) { out.push(t.replace(/^\/+ ?/, '').replace(/<\/?summary>/g, '')); }
+  }
+  return out.join('\n');
+}
+const srcSection = (/\n### Launcher source that names outside work\n([\s\S]*?)(\n## |\n### |$)/.exec(N) || [])[1] || '';
+yes('THIRD-PARTY.md has the section "Launcher source that names outside work"', srcSection.length > 0);
+const srcRows = {};
+srcSection.split('\n').forEach(function (l) {
+  const m = /^\| `([^`]+\.cs)` \| ([^|]*) \| ([^|]*) \|/.exec(l);
+  if (m) { srcRows[m[1]] = { names: m[2], carries: m[3].trim() }; }
+});
+const srcFiles = {};
+SRC_DIRS.forEach(function (d) {
+  const full = path.join(REPO, d);
+  (fs.existsSync(full) ? fs.readdirSync(full) : []).filter(function (n) { return /\.cs$/i.test(n); })
+    .forEach(function (n) { srcFiles[n] = path.join(full, n); });
+});
+yes('there is launcher source to read (' + Object.keys(srcFiles).length + ' files)', Object.keys(srcFiles).length >= 50);
+const flagged = {};
+Object.keys(srcFiles).sort().forEach(function (n) {
+  const h = header(read(srcFiles[n]) || '');
+  const names = OUTSIDE.filter(function (o) { return namesIn(h, o); });
+  if (names.length === 0 && !SAYS_OUTSIDE.test(h)) { return; }
+  flagged[n] = true;
+  const row = srcRows[n];
+  yes(n + '\'s header names outside work (' + (names.join(', ') || 'says it was taken from somewhere') +
+      ') and THIRD-PARTY.md has its row', !!row);
+  if (!row) { return; }
+  names.forEach(function (o) {
+    yes('  its row names ' + o, namesIn(row.names, o));
+  });
+  const carried = /^yes:\s*(.+)$/i.exec(row.carries);
+  yes('  its row says whether it carries outside code ("yes: <library>" or "no")', !!carried || /^no$/i.test(row.carries));
+  if (!carried) { return; }
+  carried[1].split(',').map(function (s) { return s.trim(); }).forEach(function (lib) {
+    const text = read(path.join(LIC_DIR, lib + '.txt'));
+    yes('  ' + lib + '\'s licence text is in records\\client-licences', text !== null);
+    if (text === null) { return; }
+    const body = text.replace(/\r/g, '').split('\n')
+      .filter(function (l) { return !/copyright|\(C\)/i.test(l); }).join('\n');
+    yes('  its header carries ' + lib + '\'s notice word for word', flat(h).indexOf(flat(body)) >= 0);
+    yes('  its header says it is altered and not the original software',
+        /\baltered from\b/i.test(h) && /not the original software/i.test(h));
+    yes('  THIRD-PARTY.md points at records\\client-licences\\' + lib + '.txt',
+        N.indexOf('`records\\client-licences\\' + lib + '.txt`') >= 0);
+  });
+});
+Object.keys(srcRows).forEach(function (n) {
+  yes(n + ', in "Launcher source that names outside work", is launcher source whose header names outside work',
+      !!srcFiles[n] && !!flagged[n]);
+});
+
 // ---------------------------------------------------------------- launcher\lib
 //
 // Every file, by name and by sha256, so a newer WebView2 dropped in without a
@@ -164,7 +251,7 @@ libFiles.forEach(function (p) {
   yes(name + ' (launcher\\lib) is named in THIRD-PARTY.md', N.indexOf(name) >= 0);
   yes(name + ' is in THIRD-PARTY.md by its sha256, ' + sha.slice(0, 16), N.toLowerCase().indexOf(sha) >= 0);
   const v = fileVersion(buf);
-  if (v) { versions[v] = (versions[v] || []).concat([name]); }
+  if (v && path.basename(path.dirname(p)) === 'webview2') { versions[v] = (versions[v] || []).concat([name]); }
 });
 wv2.forEach(function (n) {
   yes(n + ', which the launcher embeds, is in launcher\\lib\\webview2',
@@ -209,6 +296,41 @@ const WV2_LICENCE = [
 ].join('\n');
 yes('THIRD-PARTY.md carries the WebView2 licence word for word', flat(N).indexOf(flat(WV2_LICENCE)) >= 0);
 yes('the credits page carries the WebView2 licence word for word', flat(C).indexOf(flat(WV2_LICENCE)) >= 0);
+
+// NLayer, the menu theme's MP3 decoder (#3207): NLayer 3.0.0 from nuget.org,
+// its netstandard2.0 file, compared byte for byte on 26 October. The package
+// names MIT as its licence and commit 046c7ce4 of naudio/NLayer as its source;
+// the MIT licence wants its notice with every copy, so it is on the public
+// page too, as the repository's LICENSE at that commit has it.
+const NLAYER_DLL = path.join(REPO, 'launcher', 'lib', 'nlayer', 'NLayer.dll');
+yes('Thornswood.csproj embeds NLayer.dll, the menu theme\'s decoder', resources.indexOf('NLayer.dll') >= 0);
+yes('NLayer.dll, which the launcher embeds, is in launcher\\lib\\nlayer', fs.existsSync(NLAYER_DLL));
+if (fs.existsSync(NLAYER_DLL)) {
+  const nv = fileVersion(fs.readFileSync(NLAYER_DLL));
+  yes('NLayer.dll is file version 3.0.0.0 (' + nv + ')', nv === '3.0.0.0');
+}
+yes('THIRD-PARTY.md gives the NLayer version and its source commit', N.indexOf('Version 3.0.0') >= 0 && N.indexOf('046c7ce422970f8f0f0bc205d6c6341bcb7debf1') >= 0);
+yes('the credits page gives the NLayer version and links its source', C.indexOf('NLayer 3.0.0') >= 0 && C.indexOf('https://github.com/naudio/NLayer') >= 0);
+const NLAYER_LICENCE = [
+  'Copyright (c) 2018 Mark Heath, Andrew Ward & Contributors',
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.'
+].join('\n');
+yes('THIRD-PARTY.md carries the NLayer licence word for word', flat(N).indexOf(flat(NLAYER_LICENCE)) >= 0);
+yes('the credits page carries the NLayer licence word for word', flat(C).indexOf(flat(NLAYER_LICENCE)) >= 0);
 
 // ---------------------------------------------------------------- the site
 //
@@ -611,29 +733,124 @@ if (cl) {
   });
   yes('every port in it has its text in records\\client-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
 }
+// ------------------------------------- the other code inside them (#3751)
+//
+// Code that does not come through vcpkg had no record, so its notices went
+// nowhere: Tilted Phoques' libraries, the fork's MIT folders, and the npm
+// packages webpack bundles into skymp5-client.js and build.js. Every library
+// THIRD-PARTY.md names as built into a client file with a notice of its own
+// has a row in "The other code inside the client files"; each row is the
+// record's library, text and all, or, while the record has none (a client
+// measured before #3751), is named under "What is still missing". The front's
+// table is front-build.json's packages, row for row, each with its text.
+function tableRows(head) {
+  const lines = N.split('\n');
+  const at = lines.indexOf(head);
+  const rows = [];
+  for (let i = at + 2; at >= 0 && i < lines.length && lines[i].charAt(0) === '|'; i++) rows.push(lines[i]);
+  return { at: at, rows: rows };
+}
+const OTHER_HEAD = '| Library | Version | Licence, as its folder or package gives it | In |';
+const other = tableRows(OTHER_HEAD);
+const otherNames = other.rows.map(function (r) { return r.split('|')[1].trim(); });
+yes('THIRD-PARTY.md has the table of the other code inside the client files (' + other.rows.length + ' rows)', other.at >= 0 && other.rows.length > 0);
+// What the client section says is compiled into the client files, and which
+// of it carries a notice of its own: a folder named just before a licence
+// that is not the GPL's or AGPL's, and the Tilted folder.
+const compiled = (function () {
+  const a = N.indexOf('What is compiled into them:');
+  const b = N.indexOf('### The libraries inside the client files');
+  return a >= 0 && b > a ? N.slice(a, b) : '';
+})();
+const noticed = [];
+(compiled.match(/(?:`[^`]+`(?:,\s*|\s+and\s+))*`[^`]+`\s*\((?:MIT|BSD|Apache|ISC|Zlib|BSL)/g) || []).forEach(function (m) {
+  (m.match(/`([^`]+)`/g) || []).forEach(function (t) { const n = t.replace(/`/g, ''); if (noticed.indexOf(n) < 0) noticed.push(n); });
+});
+if (/skyrim-platform\\src\\tilted/.test(compiled)) noticed.push('tilted');
+const unrowed = noticed.filter(function (n) { return otherNames.indexOf(n) < 0; });
+yes('each library the client section names with a notice of its own has a row (' + noticed.join(', ') + ')' + (unrowed.length ? ', not: ' + unrowed.join(', ') : ''),
+    noticed.length >= 3 && unrowed.length === 0);
+if (cl && cl.libraries) {
+  const want = Object.keys(cl.libraries).sort().map(function (n) {
+    const p = cl.libraries[n];
+    const ver = p.kind === 'fork' ? 'the fork\'s' : String(p.version);
+    const lic = p.licence ? p.licence : 'not declared; its text is in `' + n + '.txt`';
+    const files = (p.in || []).map(function (f) { return String(f).split('\\').pop(); }).sort().map(function (f) { return '`' + f + '`'; }).join(', ');
+    return '| ' + n + ' | ' + ver + ' | ' + lic + ' | ' + files + ' |';
+  });
+  const wrong = want.filter(function (r) { return other.rows.indexOf(r) < 0; });
+  const extra = other.rows.filter(function (r) { return want.indexOf(r) < 0; });
+  wrong.forEach(function (r) { console.log('      not in THIRD-PARTY.md: ' + r); });
+  extra.forEach(function (r) { console.log('      not in the record: ' + r); });
+  yes('the table of the other code is the record\'s libraries, row for row (' + want.length + ')', want.length > 0 && wrong.length === 0 && extra.length === 0);
+  const noText = Object.keys(cl.libraries).filter(function (n) {
+    let b = null;
+    try { b = fs.readFileSync(path.join(REPO, 'records', 'client-licences', n + '.txt')); } catch (e) { return true; }
+    return crypto.createHash('sha256').update(b).digest('hex') !== String(cl.libraries[n].sha256) || b.length !== Number(cl.libraries[n].bytes);
+  });
+  yes('every library in the record has its text in records\\client-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
+} else {
+  const missing = flat(section('What is still missing'));
+  const unsaid = otherNames.filter(function (n) { return missing.indexOf(n) < 0; });
+  yes('the client record lists no libraries (measured before #3751), so "What is still missing" names every row' + (unsaid.length ? ', not: ' + unsaid.join(', ') : ''),
+      otherNames.length > 0 && unsaid.length === 0);
+}
+let fb = null;
+try { fb = JSON.parse(read(path.join(REPO, 'records', 'front-build.json')).replace(/^﻿/, '')); } catch (e) { fb = null; }
+yes('records\\front-build.json lists the npm packages in build.js', !!(fb && fb.packages && Object.keys(fb.packages).length > 0));
+if (fb && fb.packages) {
+  const front = tableRows('| Package | Version | Licence, as its package.json declares it | Text |');
+  const want = Object.keys(fb.packages).sort().map(function (n) {
+    const p = fb.packages[n];
+    return '| ' + p.package + ' | ' + p.version + ' | ' + (p.licence || 'not declared') + ' | `' + n + '.txt` |';
+  });
+  const wrong = want.filter(function (r) { return front.rows.indexOf(r) < 0; });
+  const extra = front.rows.filter(function (r) { return want.indexOf(r) < 0; });
+  wrong.forEach(function (r) { console.log('      not in THIRD-PARTY.md: ' + r); });
+  extra.forEach(function (r) { console.log('      not in the record: ' + r); });
+  yes('THIRD-PARTY.md\'s table of the npm packages in build.js is front-build.json, row for row (' + want.length + ')',
+      front.at >= 0 && wrong.length === 0 && extra.length === 0);
+  const noText = Object.keys(fb.packages).filter(function (n) {
+    let b = null;
+    try { b = fs.readFileSync(path.join(REPO, 'records', 'front-licences', n + '.txt')); } catch (e) { return true; }
+    return crypto.createHash('sha256').update(b).digest('hex') !== String(fb.packages[n].sha256) || b.length !== Number(fb.packages[n].bytes);
+  });
+  yes('every package in it has its text in records\\front-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
+}
 yes('THIRD-PARTY.md no longer says the vcpkg texts travel nowhere',
     !/None of those texts travels/.test(N) && !/vcpkg licence texts do not travel/.test(flat(section('What is still missing'))));
 yes('the frida-gum row says what else frida-gum.lib holds, under the LGPL',
     /glib, gobject, gnulib and libcharset \(LGPL-2\.1-or-later\)/.test(fridaRow));
-// The source of what is inside frida-gum.lib, by Thornswood's forks of
-// Frida's repositories (Patrick, A on #3287): the same six, at the same
-// commits, in Source-Notice.ps1's $SourceNoticeBundled and in "Where the
-// source is", and with the fork here, the commits its portfile fetches from.
+// The source of what is inside frida-gum.lib (#3287): records\frida-sources.json
+// names the six parts, each archive on Thornswood's own Release of them
+// (Patrick, C on #3287) and, while forksUp, Thornswood's fork of each of
+// Frida's repositories. "Where the source is" names the Release, each archive
+// and Frida's repository at the same commit, and the forks while they are up;
+// Source-Notice.ps1 reads the record rather than a list of its own; and with
+// the fork here, each commit is the one its portfile fetches from.
+let fs3287 = null;
+try { fs3287 = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'frida-sources.json'), 'utf8').replace(/^﻿/, '')); } catch (e) { fs3287 = null; }
+const bundled = fs3287 && Array.isArray(fs3287.parts) ? fs3287.parts : [];
+yes('records\\frida-sources.json names six parts of frida-gum.lib (' + bundled.length + ')', bundled.length === 6);
+yes('  of the Frida the client files carry (' + (fs3287 && fs3287.frida) + ', the row says ' + (fridaVer || 'none') + ')', !!fs3287 && fs3287.frida === fridaVer);
 const sn = read(path.join(REPO, 'scripts', 'release', 'Source-Notice.ps1')) || '';
-const bundled = [];
-(sn.match(/@\('[^']+',\s*'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'\)/g) || []).forEach(function (m) {
-  const r = /'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'/.exec(m);
-  bundled.push({ fork: r[1], commit: r[2] });
-});
-yes('Source-Notice.ps1 names the source of six libraries inside frida-gum.lib (' + bundled.length + ')', bundled.length === 6);
+yes('Source-Notice.ps1 reads where they are from records\\frida-sources.json and names no commit of its own',
+    /records\\frida-sources\.json/.test(sn) && !/'frida-[a-z0-9-]+',\s*'[0-9a-f]{40}'/.test(sn));
 const whereSec = section('Where the source is');
-const unnamed = bundled.filter(function (b) { return whereSec.indexOf('https://github.com/EvilPatrick06/' + b.fork + '/tree/' + b.commit) < 0; });
-yes('"Where the source is" names each of them by our fork and the same commit' + (unnamed.length ? ', not: ' + unnamed.map(function (b) { return b.fork; }).join(', ') : ''), bundled.length > 0 && unnamed.length === 0);
+const relUrl = fs3287 ? 'https://github.com/' + fs3287.release.repo + '/releases/tag/' + fs3287.release.tag : '';
+yes('"Where the source is" names the Release of their archives (' + relUrl + ')', !!relUrl && whereSec.indexOf(relUrl) >= 0);
+const unnamed = bundled.filter(function (b) {
+  return whereSec.indexOf('`' + b.archive + '`') < 0 || whereSec.indexOf(b.upstream + ' `' + b.commit + '`') < 0;
+});
+yes('  and each archive, with Frida\'s repository at the same commit' + (unnamed.length ? ', not: ' + unnamed.map(function (b) { return b.name; }).join(', ') : ''), bundled.length > 0 && unnamed.length === 0);
+const forkNamed = bundled.filter(function (b) { return whereSec.indexOf('https://github.com/EvilPatrick06/' + b.name + '/tree/' + b.commit) >= 0; });
+yes('  and the forks exactly while the record says they are up (' + forkNamed.length + ' named, forksUp ' + (fs3287 && fs3287.forksUp) + ')',
+    !!fs3287 && (fs3287.forksUp ? forkNamed.length === bundled.length : forkNamed.length === 0));
 if (haveFork) {
   let fp = '';
   try { fp = git(['show', commit + ':overlay_ports/frida-gum/portfile.cmake']); } catch (e) { fp = ''; }
   const off = bundled.filter(function (b) { return fp.indexOf('/' + b.commit + '/') < 0; });
-  yes('each is a commit overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches its licence from' + (off.length ? ', not: ' + off.map(function (b) { return b.fork; }).join(', ') : ''), !!fp && off.length === 0);
+  yes('each is a commit overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches its licence from' + (off.length ? ', not: ' + off.map(function (b) { return b.name; }).join(', ') : ''), !!fp && off.length === 0);
 } else {
   skip('no fork here, so the frida commits were not held to its portfile');
 }
@@ -888,6 +1105,41 @@ if (filesTxt === null) {
     yes('the section says ' + fromCollection.length + ' files, as files.txt does',
         runtimeFlat.indexOf(fromCollection.length + ' files') >= 0);
   }
+}
+
+// ------------------------------------------------- the collection's menus
+// QuickLoot IE's Nexus page says "Released under the GPL-3.0-or-later
+// license", and its 4.1.0 changelog "Changed the project license to
+// GPL-3.0-or-later"; all four records said "version 3" or "GPL 3" until
+// #3800. SkyUI's, SkyHUD's and moreHUD's pages each say something different
+// about their files, and the record had them as one ("nothing on those mods'
+// pages"), so each is held to its own page's words.
+{
+  const ql = read(path.join(REPO, 'game', 'ours', 'Data', 'SKSE', 'Plugins', 'QuickLootIE.json')) || '';
+  const prov = JSON.parse(read(path.join(REPO, 'records', 'asset-provenance.json')) || '{"assets":[]}');
+  const all = JSON.stringify(prov);
+  const qlEntry = (prov.assets || []).find(function (a) { return a.path === 'game/ours/Data/SKSE/Plugins/QuickLootIE.json'; });
+  const menuEntry = (prov.notInRepo || []).find(function (a) { return /skyui\\itemcard\.swf/.test(a.path); });
+  const qlSection = flat(N.slice(N.indexOf('`Data\\SKSE\\Plugins\\QuickLootIE.json` does ship'), N.indexOf('## Made for Thornswood by somebody else')));
+  const qlCredits = flat(C.slice(C.indexOf('**QuickLoot IE\'s settings**'), C.indexOf('**SkyUI\'s item lists')));
+  [['THIRD-PARTY.md', qlSection], ['the credits page', qlCredits], ['QuickLootIE.json', flat(ql.split('"logLevel"')[0])],
+   ['its provenance licence', qlEntry ? qlEntry.licence : ''], ['its provenance attribution', qlEntry ? qlEntry.attribution : '']]
+    .forEach(function (pair) {
+      yes(pair[0] + ' names QuickLoot IE\'s licence GPL-3.0-or-later', pair[1].indexOf('GPL-3.0-or-later') >= 0);
+      yes('  and never the GPL 3 or version 3 alone', !/GPL 3\b|General Public License version 3(?! unchanged)/.test(pair[1]));
+    });
+  const menus = flat(N.slice(N.indexOf('## The collection\'s menus, with no gold values'), N.indexOf('`Data\\SKSE\\Plugins\\QuickLootIE.json` does ship')));
+  yes('THIRD-PARTY.md no longer says nothing on the menu mods\' pages lets them be handed on',
+      menus.indexOf('nothing on those mods\' pages') < 0 && all.indexOf('none of them lets Thornswood hand these files on') < 0);
+  yes('  it quotes SkyUI\'s page on uploads and patches',
+      menus.indexOf('"Upload: not allowed to upload to other sites"') >= 0 && menus.indexOf('"You may release any patches that require the original file"') >= 0);
+  yes('  SkyHUD\'s on the rest of the mod', menus.indexOf('"The rest of the mod must not be included"') >= 0);
+  yes('  and says moreHUD\'s page has no permission list', /moreHUD: the page shows no permission list/.test(menus));
+  yes('  with the date the pages were read', /read on 26 October/.test(menus));
+  yes('the provenance menu entry quotes each page too', !!menuEntry &&
+      menuEntry.licence.indexOf('read 26 Oct 2026') >= 0 && menuEntry.licence.indexOf('Upload: not allowed to upload to other sites') >= 0 &&
+      menuEntry.licence.indexOf('The rest of the mod must not be included') >= 0 && /moreHUD \(12688\): the page shows no permission list/.test(menuEntry.licence));
+  yes('no record says only revision 4 installs the menu mods\' files', all.indexOf('revision 4 installs') < 0 && N.indexOf('revision 4 installs') < 0);
 }
 
 // ---------------------------------------------------------------- the words

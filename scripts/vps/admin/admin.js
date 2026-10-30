@@ -11,15 +11,33 @@
   right, its key lives here and nowhere else, and this is the only thing
   that uses it.
 
-  WHAT IT DOES. It makes GitHub's admin settings match what main records, and
-  nothing else:
+  WHAT IT DOES. It makes GitHub's admin settings match what main records, or
+  says where the App is installed, and nothing else:
     runner-labels   every records/<name>-runners.json on main, { label,
                     runners }: the runners it lists (thornswood-vps is 1,
                     thornswood-vps-<n> is n) carry the label and no other
                     runner does. records/build-runners.json is the build cap
-                    (#2994). It stops for a record whose runners GitHub does
+                    (#2994). A record may also list off-box runners by
+                    name (offBox, thornswood-pr-*), which carry its label
+                    too (build runners on One, 26 Oct 2026); they never
+                    carry thornswood-vps, so box-only jobs never reach
+                    them. It stops for a record whose runners GitHub does
                     not have, since every job asking for its label would
                     then wait for a runner that never comes.
+    repo-about      records/repo-about.json on main, { description,
+                    homepage, topics }: the About box a stranger sees on
+                    the repository's front page (#3682, Patrick's A of 26
+                    Oct 2026). A cloud thread's proxy refuses repository
+                    settings writes ("Repository settings writes are not
+                    permitted through this proxy", measured 26 Oct 2026,
+                    5:13 PM), and the App's administration write covers
+                    them. It stops for a record that is not a plain line,
+                    an https website, or GitHub's own topic shape.
+    installation-repos
+                    the repositories the App is installed on, read with a
+                    token that can read their metadata and nothing more, and
+                    nothing changed (#4013: the App has to be on
+                    Thornswood-Ops before the runners move there).
   What to do comes from main, read through the App, never from the caller,
   so whoever asks can only make GitHub match main. A change is a pull
   request to the record.
@@ -92,6 +110,9 @@ const RULES = {
 };
 // The labels every VPS runner carries, or GitHub gives itself; a record may
 // never name one, since taking it off would strand every job that asks.
+// What a run may ask for. None takes anything from the caller but the
+// check.
+const ASKS = ['runner-labels', 'installation-repos', 'repo-about'];
 const RESERVED = ['self-hosted', 'windows', 'linux', 'macos', 'x64', 'arm64', 'thornswood-vps', 'thornswood-pr'];
 
 // Server-Log.js --stamp puts the time on each line, as it does for the bridge.
@@ -166,6 +187,9 @@ function checkRecords(records) {
     if (!nums.length) throw new Error(r.file + ' lists no runners, so no job asking for ' + label + ' could ever run');
     if (nums.some(n => !Number.isInteger(n) || n < 1)) throw new Error(r.file + ' lists a runner that is not a number from 1');
     if (new Set(nums).size !== nums.length) throw new Error(r.file + ' lists a runner twice');
+    const off = Array.isArray(r.offBox) ? r.offBox : [];
+    if (off.some(n => !/^thornswood-pr-[a-z0-9-]{1,40}$/.test(String(n)))) throw new Error(r.file + ' lists an off-box runner whose name is not thornswood-pr-<machine>[-<n>]');
+    if (new Set(off).size !== off.length) throw new Error(r.file + ' lists an off-box runner twice');
   }
 }
 
@@ -175,13 +199,17 @@ function checkRecords(records) {
 function planLabels(record, runners) {
   const label = record.label;
   const want = record.runners;
+  const offBox = Array.isArray(record.offBox) ? record.offBox : [];
   const changes = [];
   const lines = [];
   let carry = 0;
   for (const r of runners) {
     const n = runnerNumber(r.name);
     const has = (r.labels || []).some(l => l.name === label);
-    const should = n > 0 && want.indexOf(n) >= 0;
+    // An off-box runner carries it only by its name in the record, and never
+    // one that carries thornswood-vps too, which would take box-only jobs.
+    const vps = (r.labels || []).some(l => l.name === 'thornswood-vps');
+    const should = (n > 0 && want.indexOf(n) >= 0) || (n === 0 && !vps && offBox.indexOf(r.name) >= 0);
     if (should) carry++;
     if (has && !should) changes.push({ id: r.id, name: r.name, do: 'take off' });
     else if (should && !has) changes.push({ id: r.id, name: r.name, do: 'put on' });
@@ -189,8 +217,43 @@ function planLabels(record, runners) {
   for (const n of want) {
     if (!runners.some(r => runnerNumber(r.name) === n)) lines.push('runner ' + n + ' is in ' + record.file + ' but not registered on GitHub');
   }
+  for (const name of offBox) {
+    if (!runners.some(r => r.name === name)) lines.push('off-box runner ' + name + ' is in ' + record.file + ' but not registered on GitHub');
+  }
   const refuse = carry ? '' : 'no runner ' + record.file + ' lists is registered on GitHub, so every job asking for ' + label + ' would wait for a runner that never comes';
   return { changes, lines, refuse };
+}
+
+// Checks the About record. Throws with why. GitHub takes a description of
+// 350 characters at most, and topics of lower case letters, digits and
+// hyphens, 50 characters each and 20 at most.
+function checkAbout(rec) {
+  const d = rec.description;
+  if (typeof d !== 'string' || !d.trim()) throw new Error(rec.file + ': the description is empty');
+  if (d.length > 350) throw new Error(rec.file + ': the description is ' + d.length + ' characters, and GitHub takes 350');
+  if (/[\r\n]/.test(d)) throw new Error(rec.file + ': the description is more than one line');
+  const h = rec.homepage;
+  if (typeof h !== 'string' || (h !== '' && !/^https:\/\/[^\s/?#]+\.[^\s]+$/.test(h))) throw new Error(rec.file + ': the website is not an https address');
+  const t = rec.topics;
+  if (!Array.isArray(t) || !t.length) throw new Error(rec.file + ' lists no topics');
+  if (t.length > 20) throw new Error(rec.file + ' lists ' + t.length + ' topics, and GitHub takes 20');
+  for (const x of t) if (typeof x !== 'string' || !/^[a-z0-9][a-z0-9-]{0,49}$/.test(x)) throw new Error(rec.file + ': the topic "' + x + '" is not lower case letters, digits and hyphens');
+  if (new Set(t).size !== t.length) throw new Error(rec.file + ' lists a topic twice');
+}
+
+// What has to change for the About box to match the record:
+// [{ what: 'description'|'website'|'topics', from, to }]. GitHub keeps
+// topics in no order of ours, so they compare as a set.
+function planAbout(rec, repo, topics) {
+  const out = [];
+  const has = (repo && repo.description) || '';
+  const site = (repo && repo.homepage) || '';
+  if (has !== rec.description) out.push({ what: 'description', from: has, to: rec.description });
+  if (site !== rec.homepage) out.push({ what: 'website', from: site, to: rec.homepage });
+  const now = (topics || []).slice().sort();
+  const want = rec.topics.slice().sort();
+  if (now.join(' ') !== want.join(' ')) out.push({ what: 'topics', from: now.join(', '), to: want.join(', ') });
+  return out;
 }
 
 // ------------------------------------------------------------------ GitHub --
@@ -229,16 +292,21 @@ function readApp() {
   return { pem: fs.readFileSync(keyPath, 'utf8'), app: JSON.parse(fs.readFileSync(appPath, 'utf8')) };
 }
 
-// A token for this repository only, with only what runner-labels needs, for
-// the hour GitHub gives it; nothing keeps it after the request.
-async function installationToken(held, now) {
+// A token for the hour GitHub gives it, with only what the ask needs, and
+// nothing keeps it after the request: for runner-labels and repo-about this
+// repository alone, administration write and contents read; for
+// installation-repos the metadata of the repositories the installation
+// holds, read only, which is all GitHub needs to list them.
+async function installationToken(held, now, what) {
   const jwt = appJwt(held.app.id, held.pem, now);
   const auth = { Authorization: 'Bearer ' + jwt };
   const inst = await call('GET', API + '/repos/' + REPO + '/installation', auth);
   if (inst.status === 404) throw new Error('the App is not installed on ' + REPO + ' yet: ' + WEB + '/apps/' + held.app.slug + '/installations/new');
   if (inst.status !== 200) throw new Error('GitHub would not say where the App is installed (' + said(inst) + ')');
-  const tok = await call('POST', API + '/app/installations/' + inst.body.id + '/access_tokens', auth,
-    { repositories: [REPO.split('/')[1]], permissions: { administration: 'write', contents: 'read' } });
+  const scope = what === 'installation-repos'
+    ? { permissions: { metadata: 'read' } }
+    : { repositories: [REPO.split('/')[1]], permissions: { administration: 'write', contents: 'read' } };
+  const tok = await call('POST', API + '/app/installations/' + inst.body.id + '/access_tokens', auth, scope);
   if (tok.status !== 201) throw new Error('GitHub gave the App no token (' + said(tok) + ')');
   return tok.body.token;
 }
@@ -255,9 +323,56 @@ async function mainRecords(token) {
     let j;
     try { j = JSON.parse(Buffer.from(got.body.content, 'base64').toString('utf8').replace(/^﻿/, '')); }
     catch (e) { throw new Error('records/' + f.name + ' on main is not JSON'); }
-    out.push({ file: 'records/' + f.name, label: String(j.label || '').trim(), runners: Array.isArray(j.runners) ? j.runners.map(Number) : [] });
+    out.push({ file: 'records/' + f.name, label: String(j.label || '').trim(), runners: Array.isArray(j.runners) ? j.runners.map(Number) : [], offBox: Array.isArray(j.offBox) ? j.offBox.map(String) : [] });
   }
   return out;
+}
+
+// records/repo-about.json on main, read through the App.
+async function aboutRecord(token) {
+  const got = await call('GET', API + '/repos/' + REPO + '/contents/records/repo-about.json?ref=main', { Authorization: 'Bearer ' + token });
+  if (got.status !== 200 || !got.body || !got.body.content) throw new Error('GitHub would not give records/repo-about.json on main (' + said(got) + ')');
+  let j;
+  try { j = JSON.parse(Buffer.from(got.body.content, 'base64').toString('utf8').replace(/^\uFEFF/, '')); }
+  catch (e) { throw new Error('records/repo-about.json on main is not JSON'); }
+  return { file: 'records/repo-about.json', description: j.description, homepage: j.homepage, topics: j.topics };
+}
+
+async function readAbout(token) {
+  const auth = { Authorization: 'Bearer ' + token };
+  const repo = await call('GET', API + '/repos/' + REPO, auth);
+  if (repo.status !== 200 || !repo.body) throw new Error('GitHub would not give the repository (' + said(repo) + ')');
+  const top = await call('GET', API + '/repos/' + REPO + '/topics', auth);
+  if (top.status !== 200 || !top.body || !Array.isArray(top.body.names)) throw new Error('GitHub would not give the topics (' + said(top) + ')');
+  return { repo: repo.body, topics: top.body.names };
+}
+
+// Makes the About box match main's record, or with check says only what
+// differs. { ok, lines, changed, differs }, as runnerLabels answers.
+async function repoAbout(token, check) {
+  const rec = await aboutRecord(token);
+  checkAbout(rec);
+  const before = await readAbout(token);
+  const plan = planAbout(rec, before.repo, before.topics);
+  const lines = [];
+  if (!plan.length) return { ok: true, lines: [rec.file + ': GitHub matches it'], changed: 0, differs: 0 };
+  for (const c of plan) lines.push(rec.file + ': the ' + c.what + (check ? ' would be ' : ' is now ') + JSON.stringify(c.to) + ', was ' + JSON.stringify(c.from));
+  if (check) return { ok: true, lines, changed: 0, differs: plan.length };
+  const auth = { Authorization: 'Bearer ' + token };
+  let ok = true;
+  if (plan.some(c => c.what !== 'topics')) {
+    const a = await call('PATCH', API + '/repos/' + REPO, auth, { description: rec.description, homepage: rec.homepage });
+    if (a.status !== 200) { lines.push('STOP GitHub did not change the description and website (' + said(a) + ')'); ok = false; }
+  }
+  if (plan.some(c => c.what === 'topics')) {
+    const a = await call('PUT', API + '/repos/' + REPO + '/topics', auth, { names: rec.topics });
+    if (a.status !== 200) { lines.push('STOP GitHub did not change the topics (' + said(a) + ')'); ok = false; }
+  }
+  // Read back rather than trust the calls.
+  const after = await readAbout(token);
+  const left = planAbout(rec, after.repo, after.topics);
+  if (left.length) { lines.push('STOP ' + rec.file + ': GitHub still differs in the ' + left.map(c => c.what).join(', ')); ok = false; }
+  return { ok, lines, changed: plan.length - left.length, differs: plan.length };
 }
 
 async function listRunners(token) {
@@ -305,6 +420,16 @@ async function runnerLabels(token, check) {
   return { ok, lines, changed, differs };
 }
 
+// The repositories the App's installation holds, and nothing changed.
+// { ok, lines, repos }.
+async function installationRepos(token) {
+  const a = await call('GET', API + '/installation/repositories?per_page=100', { Authorization: 'Bearer ' + token });
+  if (a.status !== 200 || !a.body || !Array.isArray(a.body.repositories)) throw new Error('GitHub would not list the App\'s repositories (' + said(a) + ')');
+  const repos = a.body.repositories.map(r => String(r.full_name)).sort();
+  const lines = repos.length ? repos.map(r => 'installed on ' + r) : ['installed on no repository'];
+  return { ok: true, lines, repos };
+}
+
 // ------------------------------------------------------------------- setup --
 function readSetup(now) {
   const p = path.join(STATE, 'setup.json');
@@ -343,7 +468,7 @@ async function setupStart(res, q, now) {
   if (!s || readApp() || !sameState(q.get('state'), s.state)) { plain(res); return; }
   const action = WEB + '/settings/apps/new?state=' + encodeURIComponent(s.state);
   page(res, 200, 'Make the Thornswood box admin App',
-    '<p>This makes a private GitHub App on your account that can change the runners\' labels and read the repository, and nothing else. Its key comes straight back to the box and is never shown.</p>' +
+    '<p>This makes a private GitHub App on your account that can change the runners\' labels and the About box and read the repository, and nothing else. Its key comes straight back to the box and is never shown.</p>' +
     '<form action="' + esc(action) + '" method="post"><input type="hidden" name="manifest" value="' + esc(JSON.stringify(manifest())) + '">' +
     '<p><button type="submit" style="font-size:1.2em;padding:.5em 1em">Make it on GitHub</button></p></form>');
 }
@@ -371,8 +496,8 @@ async function setupDone(res, q, now) {
   log('setup: App ' + a.body.slug + ' (' + a.body.id + ') made by ' + owner + '; its key is kept here and the setup is closed');
   const install = WEB + '/apps/' + encodeURIComponent(a.body.slug) + '/installations/new';
   page(res, 200, 'Made. Now install it',
-    '<p>The App is made and its key is on the box. Last step: install it on Thornswood only.</p>' +
-    '<p><a href="' + esc(install) + '" style="font-size:1.2em">Install it</a>, choose <b>Only select repositories</b>, pick <b>Thornswood</b>, then Install.</p>');
+    '<p>The App is made and its key is on the box. Last step: install it on Thornswood, Thornswood-Ops and skymp only.</p>' +
+    '<p><a href="' + esc(install) + '" style="font-size:1.2em">Install it</a>, choose <b>Only select repositories</b>, pick <b>Thornswood</b>, <b>Thornswood-Ops</b> and <b>skymp</b>, then Install.</p>');
 }
 
 // ------------------------------------------------------------------ server --
@@ -410,14 +535,21 @@ async function converge(req, res, now) {
   }
   let ask;
   try { ask = JSON.parse((await readBody(req, 4096)) || '{}'); } catch (e) { ask = null; }
-  if (!ask || ask.what !== 'runner-labels') { json(res, 400, { ok: false, lines: ['the only thing this does is runner-labels'] }); return; }
+  if (!ask || !ASKS.includes(ask.what)) { json(res, 400, { ok: false, lines: ['the only things this does are ' + ASKS.join(' and ')] }); return; }
   const run = claims.run_id + ' (' + claims.event_name + ' by ' + claims.actor + ')';
   const held = readApp();
   if (!held) { log('run ' + run + ': no App yet'); json(res, 503, { ok: false, lines: ['there is no App here yet: Install-AdminService.ps1 -Setup makes it'] }); return; }
   try {
-    const token = await installationToken(held, now);
-    const r = await runnerLabels(token, !!ask.check);
-    log('run ' + run + ': runner-labels' + (ask.check ? ' check' : '') + ', ' + r.changed + ' changed, ' + (r.ok ? 'ok' : 'stopped'));
+    const token = await installationToken(held, now, ask.what);
+    if (ask.what === 'installation-repos') {
+      const r = await installationRepos(token);
+      log('run ' + run + ': installation-repos, ' + r.repos.length + ' repositor' + (r.repos.length === 1 ? 'y' : 'ies'));
+      for (const l of r.lines) log('  ' + l);
+      json(res, 200, r);
+      return;
+    }
+    const r = await (ask.what === 'repo-about' ? repoAbout : runnerLabels)(token, !!ask.check);
+    log('run ' + run + ': ' + ask.what + (ask.check ? ' check' : '') + ', ' + r.changed + ' changed, ' + (r.ok ? 'ok' : 'stopped'));
     for (const l of r.lines) log('  ' + l);
     json(res, r.ok ? 200 : 409, r);
   } catch (e) {
@@ -447,5 +579,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planLabels, checkRecords, runnerNumber, manifest, RULES, serve };
+module.exports = { verifyOidc, appJwt, planLabels, checkRecords, checkAbout, planAbout, runnerNumber, manifest, RULES, ASKS, serve };
 if (require.main === module) serve();

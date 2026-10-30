@@ -160,24 +160,29 @@ nav.top a:hover{color:var(--page)}
   painting, and readable on desktop too. Measured at 412, 768, 1024, 1366,
   1920 and 3440 wide with the words hidden: 4.5:1 or better at the worst
   pixel behind every line.
+
+  THE WORDS ARE UNDER THE PAINTING AT EVERY WIDTH (Patrick, 26 Oct: "the text
+  be covering the logo some"). On a wide screen the words still sat over the
+  painting's foot, and at 1920 by 950 the era line and the pitch covered the
+  bottom of the painted title, its thorns and the purple crest: the words
+  are about 430 pixels tall, and no hero height under the 84vh cap left that
+  much room below the title once the picture was cropped. So the band below
+  900 pixels is the layout everywhere now. The painting is a band of its
+  own, the whole picture (16:9 of the width) when that fits, kept to the top
+  (the title is in its top 42%), no taller than 52vh so the Download button
+  is still on a 1366 by 768 screen, and never under 27vw so the whole title
+  fits in it even on an ultrawide and with the slow drift. Measured at 412,
+  768, 1024, 1366, 1920, 2560 and 3440 wide: the era line starts under the
+  painting every time, and the title's foot is inside it.
 */
-.hero{position:relative;min-height:min(84vh,56.25vw);display:grid;align-items:end;
-  padding:84px 0 64px;text-align:center;overflow:hidden;isolation:isolate}
-.hero > .paint{position:absolute;inset:0;z-index:-2;overflow:hidden}
+.hero{position:relative;padding:0 0 56px;text-align:center;overflow:hidden;isolation:isolate}
+.hero > .paint{position:relative;z-index:-2;overflow:hidden;height:min(56.25vw,max(52vh,27vw))}
 .hero .art{position:absolute;inset:0;width:100%;height:100%;
-  object-fit:cover;object-position:50% 25%}
-.hero .wrap::before{content:"";position:absolute;z-index:-1;pointer-events:none;
-  top:-96px;bottom:-64px;left:-50vw;right:-50vw;
-  background:linear-gradient(180deg,rgba(11,9,7,0) 0,rgba(11,9,7,.8) 96px,rgba(11,9,7,.9) 100%)}
-@media(max-width:900px){
-  .hero{display:block;min-height:0;padding:0 0 56px}
-  .hero > .paint{position:relative;inset:auto;aspect-ratio:16/9}
-  /* the foot of the painting fades into the page the words are on */
-  .hero > .paint::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28%;
-    background:linear-gradient(180deg,rgba(11,14,10,0),var(--night))}
-  .hero .wrap{padding-top:22px}
-  .hero .wrap::before{content:none}
-}
+  object-fit:cover;object-position:50% 0}
+/* the foot of the painting fades into the page the words are on */
+.hero > .paint::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28%;
+  background:linear-gradient(180deg,rgba(11,14,10,0),var(--night))}
+.hero .wrap{padding-top:22px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* Grain over the whole thing, because a flat gradient reads as a web page and
    a grained one reads as a place. */
