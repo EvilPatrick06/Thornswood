@@ -67,29 +67,20 @@ try {
     }
 
     $comp = [Environment]::MachineName.ToLower()
-    # Where -OffBox puts a runner when the command line names no folder: the
-    # runner drive (New-RunnerDrive.ps1's Dev Drive, found by its label, as
-    # Install-Runner.ps1 finds it) on a machine that has one, as One has since
-    # #3861, and C: anywhere else. The checks of that default expect what this
-    # machine has; the checks of the C: case name a folder on C:.
-    $defDrive = 'C:'
-    try { $vol = @(Get-Volume -FileSystemLabel 'Thornswood Runners' -ErrorAction Stop | Where-Object { $_.DriveLetter } | ForEach-Object { [string]$_.DriveLetter + ':' }); if ($vol.Count -gt 0) { $defDrive = $vol[0].ToUpper() } } catch { $defDrive = 'C:' }
-    $defRoot = $defDrive + '\Thornswood-RunnerPR'
     $r = Dry @('-OffBox')
     Yes "-OffBox dry run ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  it ran nothing: every step says DRY RUN' ($r.Said -match 'DRY RUN, nothing ran' -and $r.Said -match 'on this machine')
-    # The build label only when records\build-runners.json names this
-    # machine's runner (One's, 26 Oct 2026), so the answer depends on where
-    # the test runs.
-    $buildRec = Get-Content -LiteralPath (Join-Path $repo 'records\build-runners.json') -Raw | ConvertFrom-Json
-    $named = $buildRec.PSObject.Properties['offBox'] -and (@($buildRec.offBox) -contains ('thornswood-pr-' + $comp))
+    # The pull request build label only when records\pr-build-runners.json
+    # names this machine's runner (One's, 26 Oct 2026), so the answer depends
+    # on where the test runs. Never the build label: off the box it is not
+    # carried (#4010).
     $prRec = Get-Content -LiteralPath (Join-Path $repo 'records\pr-build-runners.json') -Raw | ConvertFrom-Json
     $prNamed = $prRec.PSObject.Properties['offBox'] -and (@($prRec.offBox) -contains ('thornswood-pr-' + $comp))
-    $wantLabels = 'thornswood-pr' + $(if ($named) { ',thornswood-build' } else { '' }) + $(if ($prNamed) { ',thornswood-pr-build' } else { '' })
+    $wantLabels = 'thornswood-pr' + $(if ($prNamed) { ',thornswood-pr-build' } else { '' })
     Yes "  registers thornswood-pr-$comp with the label(s) $wantLabels" ($r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "' --labels '" + [regex]::Escape($wantLabels) + "'"))
     Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps" -and $r.Text -notmatch "--labels '[^']*thornswood-vps")
-    Yes '  nor the build label unless the record names it (#2994)' ($named -or $r.Text -notmatch 'thornswood-build')
-    Yes "  in $defRoot, as the account thornswood-pr" ($r.Text -match [regex]::Escape("`$root = '$defRoot'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr'"))
+    Yes '  nor the build label, which is the box''s alone (#2994, #4010)' ($r.Text -notmatch '\bthornswood-build\b')
+    Yes '  in C:\Thornswood-RunnerPR, as the account thornswood-pr' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr'"))
     Yes '  its own folder is still locked before config.cmd writes into it' ($r.Text -match '(?m)^Lock-RunnerRoot \$root \$acct')
     Yes '  the install shuts it out of every C:\Thornswood* folder, hyphen or not, Dumps included (#2488)' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood*' @() @()"))
     Yes '  and the lock after leaves nothing out either' ($r.Text -match [regex]::Escape("`$leave = @()"))
@@ -104,7 +95,7 @@ try {
     Yes '-AlsoDeny is in the install''s deny list and the lock''s' (($r.Text -match [regex]::Escape("'Thornswood*' @('D:\Somewhere Else') @()")) -and ($r.Text -match [regex]::Escape("`$alsoDeny = @('D:\Somewhere Else')")))
 
     $r = Dry @('-OffBox', '-Number', '2')
-    Yes '-OffBox -Number 2 numbers its folder, account and name' ($r.Text -match [regex]::Escape("`$root = '$($defRoot)2'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr2'") -and $r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "-2'"))
+    Yes '-OffBox -Number 2 numbers its folder, account and name' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR2'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr2'") -and $r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "-2'"))
 
     # Its own install folder (#3860), never Patrick's game: the .env it writes
     # names one under its root.
@@ -113,10 +104,11 @@ try {
     $r = Dry @()
     Yes '  and a VPS runner does not' ($r.Code -eq 0 -and $r.Text -match "(?m)^Set-RunnerTemp \`$root '[^']+' \`$false\s*$")
 
-    # Build runners on One (Patrick, 26 Oct 2026): a name the build record's
-    # offBox lists takes the build label too, and never the VPS label.
+    # Build runners on One (Patrick, 26 Oct 2026): a name the pull request
+    # record's offBox lists takes its label too, and never the build or the
+    # VPS label (#4010).
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-one')
-    Yes 'an off-box runner records\build-runners.json and records\pr-build-runners.json name takes both labels (#4010)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one' --labels 'thornswood-pr,thornswood-build,thornswood-pr-build'(?!,)")
+    Yes 'an off-box runner records\pr-build-runners.json names takes its label, not the build label (#4010)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-one' --labels 'thornswood-pr,thornswood-pr-build'(?!,)")
     $r = Dry @('-OffBox', '-RunnerName', 'thornswood-pr-elsewhere')
     Yes '  and one it does not name keeps the pull request label alone' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-pr-elsewhere' --labels 'thornswood-pr'(?!,)")
 
@@ -124,9 +116,9 @@ try {
     Yes "-OffBox refuses the VPS label (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'never takes the VPS label' -and -not $r.Text)
 
     $r = Dry @('-OffBox', '-Status')
-    Yes '-OffBox -Status runs here, not over ssh' ($r.Code -eq 0 -and $r.Text -match ('runner    in ' + [regex]::Escape($defRoot)))
+    Yes '-OffBox -Status runs here, not over ssh' ($r.Code -eq 0 -and $r.Text -match 'runner    in C:\\Thornswood-RunnerPR')
     $r = Dry @('-OffBox', '-Remove')
-    Yes '-OffBox -Remove takes its denies off every C:\Thornswood* folder' ($r.Code -eq 0 -and $r.Text.Contains("Open-RunnerAccount 'thornswood-pr' '$defRoot' 'C:\' 'Thornswood*' @("))
+    Yes '-OffBox -Remove takes its denies off every C:\Thornswood* folder' ($r.Code -eq 0 -and $r.Text.Contains("Open-RunnerAccount 'thornswood-pr' 'C:\Thornswood-RunnerPR' 'C:\' 'Thornswood*' @("))
 
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
@@ -179,9 +171,7 @@ try {
     }
 
     # ---- the guards in the dry run (WHAT A PULL REQUEST JOB MAY REACH) -----
-    # A folder on C: named, so the C: case is read on a machine with a runner
-    # drive too.
-    $r = Dry @('-OffBox', '-Root', 'C:\Thornswood-RunnerPR')
+    $r = Dry @('-OffBox')
     $t = $r.Text
     Yes '-OffBox install puts outbound block rules on for the account alone' ($t -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $t -match '-Direction Outbound -Action Block' -and $t -match [regex]::Escape("-LocalUser ('D:(A;;CC;;;'"))
     Yes '  in a group named for the account' ($t -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-pr'"))
@@ -209,7 +199,8 @@ try {
     Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
     $r = Dry @('-OffBox', '-Remove')
     Yes '-OffBox -Remove takes the firewall rules and the read denies off' ($r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape('Open-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct -Own $grdOwn)'))
-    # ON THE RUNNER DRIVE (#3861): New-RunnerDrive.ps1's Dev Drive, R: here.
+    # ON THE RUNNER DRIVE (#3861): explicit R: is fixture metadata, not a
+    # lookup of One's attached labelled drive (#4048). Defaults above are C:.
     $r = Dry @('-OffBox', '-Number', '3', '-Root', 'R:\Thornswood-RunnerPR3')
     $t = $r.Text
     Yes "-OffBox on the runner drive installs there (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$root = 'R:\Thornswood-RunnerPR3'"))

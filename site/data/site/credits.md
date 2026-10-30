@@ -130,7 +130,10 @@ for them is at the bottom of this page. It also carries NLayer 3.0.0, by Mark
 Heath, Andrew Ward and contributors, the MP3 decoder it plays its menu theme
 with, under the MIT licence, which is at the bottom of this page too. Its
 source is [on GitHub](https://github.com/naudio/NLayer), at commit
-`046c7ce4`.
+`046c7ce4`. And it carries zlib's compressor, from zlib 1.3 by Jean-loup
+Gailly and Mark Adler, under the zlib licence. It is translated into C# so
+that the main menu the launcher makes from your game comes out the same on
+every machine.
 
 **The Thornswood Client Runtime** is Thornswood's own mod on
 [Nexus Mods](https://www.nexusmods.com/skyrimspecialedition/mods/192762), and

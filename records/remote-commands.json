@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  72,
-    "callCount":  290,
+    "scriptCount":  74,
+    "callCount":  293,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -761,6 +761,24 @@
                       "does":  "builds and installs the bot service",
                       "class":  "admin",
                       "reason":  "service install"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Gate.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-GateStatusScript)",
+                      "does":  "reads the gate account, the Thornswood Gate task, the installed commit and the end of the gate\u0027s log",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Gate.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-GateInstallScript $content $commit $ghHosts $pins $VpsHost)",
+                      "does":  "makes the thornswood-deploy account and its locked .ssh, writes the gate\u0027s files into C:\\Thornswood-Gate, makes the gate\u0027s GitHub and box keys, adds the thornswood-gate line to administrators_authorized_keys, points SYSTEM\u0027s ssh at 127.0.0.1, and registers and starts the SYSTEM task Thornswood Gate (#2841)",
+                      "class":  "admin",
+                      "reason":  "account, ACL, ssh key and task registration"
                   },
                   {
                       "script":  "scripts/deploy/Install-Bridge.ps1",
@@ -1783,8 +1801,8 @@
                       "script":  "scripts/vps/Backup-Server.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + \"`r`n\" + $gather)",
-                      "does":  "gathers a backup into the run\u0027s folder in C:\\Windows\\Temp, which its keeper removes (#3035)",
+                      "anchor":  "$lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + \"`r`n\" + $protect + \"`r`n\" + $gather)",
+                      "does":  "gathers a backup into the run\u0027s folder in C:\\Windows\\Temp and encrypts it there with the backup passphrase (#3582), which its keeper removes with the folder (#3035)",
                       "class":  "admin",
                       "reason":  "reads every secret and config"
                   },
@@ -1793,7 +1811,7 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
                       "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh \"${User}@${Vps}:$remoteZip\" \"$localZip\" } 2\u003e\u00261 | Out-Host",
-                      "does":  "downloads the backup",
+                      "does":  "downloads the encrypted backup (#3582)",
                       "class":  "admin",
                       "reason":  "carries every secret"
                   },
@@ -2203,6 +2221,15 @@
                       "reason":  "carries what its caller hands it; each caller is mapped instead"
                   },
                   {
+                      "script":  "scripts/vps/Set-InboundRules.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs vps-inbound-rules.ps1, sent on standard input (#3035), which turns off every inbound Allow rule not on the box's list (#3807)",
+                      "class":  "admin",
+                      "reason":  "firewall change"
+                  },
+                  {
                       "script":  "scripts/vps/Set-SshScope.ps1",
                       "scope":  "Test-KeyLogin",
                       "via":  "ssh",
@@ -2566,8 +2593,8 @@
                       "script":  "scripts/vps/Grant-BoxAccess.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Invoke-ThornswoodRemote",
-                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob $(if ($NoticesOnly) { $SayStaff } else { '' }))",
-                      "does":  "saves the key file and tokens, arms a put back task, then replaces or removes one name\u0027s key line and token digest",
+                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob $need ([bool]$Deploy))",
+                      "does":  "saves the key file (Administrator\u0027s, or for a deploy key the gate account\u0027s) and tokens, arms a put back task, then replaces or removes one name\u0027s key line and token digest",
                       "class":  "admin",
                       "reason":  "sends authorized_keys; task registration"
                   },
