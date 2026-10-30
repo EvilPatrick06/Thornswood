@@ -138,7 +138,7 @@ Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, a dev one mods only, with the
     $shipBox.Contains("`$ship = @{ Notes = `$notes; FromFeed = `$true; NoPause = `$true }") -and $shipBox.Contains("if (`$Channel -eq 'dev') { `$ship['Channel'] = 'dev'; `$ship['ModsOnly'] = `$true }") -and
     $shipBox.Contains('$env:GH_TOKEN = $token') -and $shipBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN'))
 Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
-$gt = Text 'scripts/vps/admin/gate-token.js'
+$gt = Text 'scripts/vps/admin/ship-access.js'
 Yes '  the token is the App''s, for the fork and Thornswood only, Actions write and Contents read and nothing more' (
     $gt.Contains("const REPOS = ['skymp', 'Thornswood'];") -and $gt.Contains("const PERMISSIONS = { actions: 'write', contents: 'read' };") -and $gt.Contains('{ repositories: REPOS, permissions: PERMISSIONS }'))
 $ig = Text 'scripts/deploy/Install-Gate.ps1'

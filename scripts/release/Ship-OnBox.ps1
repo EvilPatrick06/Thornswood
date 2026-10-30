@@ -25,7 +25,7 @@
     2. GitHub. A Ship from the feed signs its manifest in the engine fork
        (Sign-OnGitHub.ps1) and, with a new launcher, has release.yml build
        it, both through gh. The box admin App mints a token for this run
-       alone (scripts\vps\admin\gate-token.js, Patrick's pick of 30 Oct:
+       alone (scripts\vps\admin\ship-access.js, Patrick's pick of 30 Oct:
        Actions write on the fork and Thornswood, Contents read on
        Thornswood), which goes to gh through GH_TOKEN and nowhere else, and
        GitHub ends after an hour. gh is the one Install-Gate.ps1 pinned
@@ -72,7 +72,7 @@ $node = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $node) { Die 'there is no node on this machine to mint the App''s token with. Nothing was published.' }
 $env:THORNSWOOD_ADMIN_STATE = $AdminState
 $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$minted = @(& $node.Source (Join-Path $repo 'scripts\vps\admin\gate-token.js') 2>&1 | ForEach-Object { "$_" })
+$minted = @(& $node.Source (Join-Path $repo 'scripts\vps\admin\ship-access.js') 2>&1 | ForEach-Object { "$_" })
 $ErrorActionPreference = $was
 $token = @($minted | Where-Object { $_ -match '^gh[sp]_[A-Za-z0-9_]{20,}$' }) | Select-Object -First 1
 if ($LASTEXITCODE -ne 0 -or -not $token) { Die ('the box admin App gave no token for the Ship: ' + ((@($minted | Where-Object { $_ -notmatch '^gh[sp]_' })) -join ' ') + ' Nothing was published.') }

@@ -1,5 +1,5 @@
 /*
-  gate-token.js
+  ship-access.js
 
   An installation token of the "Thornswood box admin" App for one Ship
   through the deploy gate (#2841, Patrick's pick on 30 Oct 2026: the box
@@ -8,7 +8,7 @@
   the one account besides the admin service's own task and Administrators
   that may read the App's key.
 
-      node scripts/vps/admin/gate-token.js            the token, on its own line
+      node scripts/vps/admin/ship-access.js            the token, on its own line
 
   WHAT IT CAN DO. Only what a Ship from the feed asks GitHub for: Actions
   write on the engine fork (start thornswood-sign-manifest.yml, read its run,
@@ -80,6 +80,6 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch(e => { process.stderr.write('gate-token: ' + e.message + '\n'); process.exit(1); });
+  main().catch(e => { process.stderr.write('ship-access: ' + e.message + '\n'); process.exit(1); });
 }
 module.exports = { REPOS, PERMISSIONS };

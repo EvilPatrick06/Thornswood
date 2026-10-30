@@ -1,9 +1,9 @@
 /*
-  test-2841-gate-token.js
+  test-2841-ship-access.js
 
-      node tests/test-2841-gate-token.js
+      node tests/test-2841-ship-access.js
 
-  scripts/vps/admin/gate-token.js, the token a Ship through the deploy gate
+  scripts/vps/admin/ship-access.js, the token a Ship through the deploy gate
   signs with (#2841, Patrick's pick on 30 Oct 2026: the box admin App mints
   it). Against a stand-in GitHub on 127.0.0.1 and a key made here:
     1. it asks where the App is installed with the App's own short token,
@@ -24,14 +24,14 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 
 const Repo = path.join(__dirname, '..');
-const script = path.join(Repo, 'scripts', 'vps', 'admin', 'gate-token.js');
+const script = path.join(Repo, 'scripts', 'vps', 'admin', 'ship-access.js');
 let pass = 0, fail = 0;
 function yes(what, cond) { if (cond) { pass++; console.log('PASS  ' + what); } else { fail++; console.log('FAIL  ' + what); } }
 
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const pem = privateKey.export({ type: 'pkcs1', format: 'pem' });
-const state = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-token-'));
-const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-token-empty-'));
+const state = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-access-'));
+const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-access-empty-'));
 fs.writeFileSync(path.join(state, 'key.pem'), pem);
 fs.writeFileSync(path.join(state, 'app.json'), JSON.stringify({ id: 4242, slug: 'thornswood-box-admin' }));
 

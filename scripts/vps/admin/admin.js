@@ -102,7 +102,7 @@
   and contents read on the repositories it is installed on, and since #3534
   read of the names of its secrets, variables and environments, never their
   values, and since #2841's Ship verbs Actions write, which only
-  gate-token.js asks for); Patrick creates
+  ship-access.js asks for); Patrick creates
   it, GitHub sends him back to /setup/done with a one-time code, and this
   trades the code for the App's key straight from GitHub. The key goes into
   state\key.pem, the App's id and name into state\app.json, the setup is
