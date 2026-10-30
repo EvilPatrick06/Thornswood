@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 26 October 2026.
+Last changed: 27 October 2026.
 
 Thornswood is a free fan project run by a small team in their own time. It is
 not a company. This page is written plainly rather than legally, and it is
@@ -77,9 +77,13 @@ arrival you were against your Discord id, so the number on the welcome card
 is never handed to two people, and is yours again if you leave and come
 back.
 
-**The launcher's own log.** Sent to the site when a session ends. It is about
-the game: which mods are installed, what failed to start, which version you
-are on. It is how somebody who cannot play gets helped without a conversation.
+**The launcher's own log.** Sent to the site when a session ends. It is mostly
+about the game: which mods are installed, what failed to start, which version
+you are on, and how long the launcher took to open. It also names the voice
+server's address and port, the profile number voice used and your
+microphone's name as Windows gives it, and its file paths can hold your
+Windows user name. It is how somebody who cannot play gets helped without a
+conversation. A copy stays on your PC as well (below).
 
 **Gallery submissions.** The picture or recording, your signed-in account,
 the name for its caption and any note for staff are kept for review. A
@@ -177,9 +181,13 @@ until 24 September 2026, and both are served from here now.
   they change, this line changes with them.
 
 - **Your character** is kept until you ask for it to be deleted, or until a
-  wipe, which is announced first.
-- **Launcher logs** are kept for 365 days, like session records, unless staff
-  mark the session kept.
+  wipe, which is announced first. A wipe, a character reset or putting a
+  backup back leaves the characters it replaced set aside on the server for
+  30 days, so it can be undone, and then deleted. The server checks every
+  hour.
+- **Launcher logs** sent to the site are kept for 365 days, like session
+  records, unless staff mark the session kept. The copy on your PC keeps each
+  line for 30 days (below).
 - **A gallery submission that is removed** has its file deleted then. One
   taken down after somebody reported it is kept out of sight for 30 days, so
   staff can look into the report, then deleted. The site checks every hour.
@@ -224,11 +232,46 @@ until 24 September 2026, and both are served from here now.
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the
 operator's computer are kept for 30 days, with at least seven retained for
-recovery. These are private recovery copies, not public downloads. Removing
+recovery. A whole copy of the server taken by hand, before moving it to a
+new machine, is encrypted the same way and kept on the operator's computer
+for 30 days. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
 retention schedule. The game server's log is not in them. Staff must
 reapply completed deletion requests before putting an older backup back
-into service.
+into service. What putting a backup back replaces (the site's records and
+uploads, the bot's join numbers, characters) is set aside on the server for
+30 days, so it can be undone, and then deleted.
+
+## What the launcher keeps on your PC
+
+The launcher keeps these in the Profile folder of the folder it is installed
+in (C:\Thornswood\Profile, unless you installed it somewhere else). None of
+it leaves your PC except as this page says above.
+
+- **Its log**, launcher.log, the one described above. Each line is kept for
+  30 days, then removed: the launcher cuts the log every time it starts.
+- **Support reports**, the zips Build the report on Diagnostics makes for a
+  ticket in the Discord. Each holds a copy of the log and a short summary of
+  your machine. Nothing sends them; only you do, by posting one. Each is kept
+  for 30 days, then deleted the next time the launcher starts.
+- **Your Discord sign-in**, so you are not asked to sign in every time. The
+  sign-in itself is locked so only your Windows account can read it, and your
+  Discord name and picture are kept beside it in plain files, for the Discord
+  card at the top of the launcher. They are kept until you uninstall.
+- **The voice browser's data.** Voice runs in a small built-in browser,
+  Microsoft Edge WebView2, which keeps its cache and storage in a folder of
+  its own. It is kept until you uninstall. An older launcher ran the menu
+  music in one as well, and that folder goes the same way.
+- **Your characters, saves and settings**, and the launcher's record of what
+  it installed, kept until you uninstall.
+
+**Uninstalling** from the launcher's Settings page removes all of it. With
+"Keep this build's saves and settings" ticked, as it is unless you untick it,
+only your characters, saves and settings and the launcher's record of what it
+installed stay. The log, the Discord sign-in, name and picture, the support
+reports and the browser data go either way, and if one of them cannot be
+removed, the launcher's last message names it so you can delete it yourself.
+Deleting the install folder yourself removes everything as well.
 
 ## Deleting it
 
@@ -242,6 +285,9 @@ and the bot sometimes up to a week. You are told once every part has done it.
 You can also ask what is kept about your account, request a copy, or ask to
 correct it. Use a private ticket for account details rather than a public
 Discord message. Do not send a government identity document.
+
+A request covers what Thornswood keeps, not your PC: what the launcher keeps
+there is yours, and uninstalling removes it (above).
 
 What deletion means here: your Discord link, your session records, your chat,
 your character, your answer to the rules, the applications and calls for

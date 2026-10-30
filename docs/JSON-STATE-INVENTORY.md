@@ -17,7 +17,7 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 | `records/skyrim-pin.json` | by hand | Publish-Update (into version.json), launcher Downgrade/Config | High: the pinned game build | **held** (build, appId, exe sizes, three depots as digit strings; Publish-Update keeps the feed's pin on a problem); Check-Records holds it to skyrim-files' build; test-skyrim-pin.ps1 (agreement) |
 | `records/ui-gone.json` | by hand | Ship-Rules, Build-Launcher, launcher OwnGame | Medium: what every pack deletes | **held** (daedric name to sha256, unused names); Ship-Rules and Build-Launcher stop on a problem |
 | `records/skyrim-files.json` | New-SkyrimFilesRecord.ps1 | Build-Launcher (into the launcher), launcher OwnGameKinds | Medium | **held** (build, appId, files with bytes, sha1, depot); Build-Launcher stops on a problem |
-| `records/generated.json` | by hand | Build-Generated, Generated, Ship-Rules, Check-ShipReady | Medium | **held** (pandora.patches, bodyslide.sets and sliders); Generated.ps1 stops on a problem; test-build-generated |
+| `records/generated.json` | by hand | Build-Launcher (into the launcher), launcher GeneratedHere and GeneratedBuild, Build-Generated, Ship (its dry run) | Medium: every launcher builds from it before Play (#3715) | **held** (pandora.patches, bodyslide.sets, outfits and sliders); Build-Launcher and Generated.cs stop on a problem; test-build-generated |
 | `records/steam-build.json` | Check-Outside.ps1 | Check-Outside.ps1 | Low | none |
 | `records/update-creation-club.json` | Build-HarvestTable tooling | Build-HarvestTable, Build-HuntTable | Low (build time only) | none |
 | `records/upstream-not-taken.json` | by hand | people | Low | none |

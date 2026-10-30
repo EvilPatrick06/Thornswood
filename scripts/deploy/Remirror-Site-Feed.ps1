@@ -309,9 +309,10 @@ function Remote($script) {
 
 # Only the lines, and no throw when ssh has written a word to stderr.
 #
-# OpenSSH warns about post-quantum key exchange on every connection, 2>&1 above
-# folds that into the output as an error record, and a native command that
-# writes to stderr while $ErrorActionPreference is Stop is a terminating error.
+# Any line ssh writes on stderr (the post-quantum warning was one on every
+# connection until the box's OpenSSH 10.4, #1043), 2>&1 above folds into the
+# output as an error record, and a native command that writes to stderr
+# while $ErrorActionPreference is Stop is a terminating error.
 # Deploy-Docs.ps1 lost a whole deploy to that once. So every remote call comes
 # through here and the caller decides what the absence of an answer means.
 function RemoteLines($script) {

@@ -236,15 +236,6 @@
   for a security fix or for something that leaves the game untestable, and he
   says which.
 
-.PARAMETER AllowUncoveredBodies
-  Lets a main release go out while a body in the game folder is nude (issue
-  #405). A main release reads the collection revision this machine has
-  installed and tells every launcher to match it, so it refuses while
-  scripts\mods\Check-CoveredBodies.ps1 finds a nude body here; a dev release
-  only warns. Give it for a security fix that cannot wait for the covered
-  bodies' collection revision, and only on Patrick's word. A body mesh the
-  check cannot read refuses on both channels, with or without it (#1956).
-
 .PARAMETER AllowStaleCheckout
     Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
 
@@ -332,14 +323,13 @@ param(
     # from changed since the one on the feed (issue #921).
     ,[switch]$RebuildLauncher
     # A main release with a nude body in the game folder (issue #405).
-    ,[switch]$AllowUncoveredBodies
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     ,[switch]$AllowStaleCheckout
     # Build the release with no game folder of the collection's (#2754,
     # Patrick's A, 20 Oct): New-FeedRoot.ps1 stages the files the last release
     # carried, by their sha256 on the site, and this checkout builds over them.
-    # The collection's checks (the Vortex profile, the generated files, the
-    # covered bodies) belong to a Ship from One, run when the collection
+    # The collection's checks (the Vortex profile, whether the animation and
+    # body files can be built from it) belong to a Ship from One, run when the collection
     # changes; the plugin list is the last release's, held to the server's
     # order on the box. Runs off Windows. Keeps the feed's launcher.
     ,[switch]$FromFeed
@@ -602,8 +592,8 @@ function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
 # its own notes announced. And records\client-build.json is compiled into the
 # exe, so the stale launcher called the new client runtime in that same pack
 # "not the recorded build" and put the old skymp5-client.js back.
-# Returns the changed paths under launcher\ and records\client-build.json
-# between the tag and HEAD, or nothing when the tag is not here to compare
+# Returns the changed paths under launcher\ and the records compiled in
+# (client-build.json, ui-gone.json and, since #3715, generated.json) between the tag and HEAD, or nothing when the tag is not here to compare
 # with (Get-ReleaseLauncher stops that Ship anyway). Markdown is not built.
 function Get-LauncherDrift([string]$repoDir, [string]$tag) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -614,7 +604,7 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
             & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
             if ($LASTEXITCODE -ne 0) { return @() }
         }
-        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json records/ui-gone.json ':(exclude,glob)**/*.md' 2>$null |
+        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json records/ui-gone.json records/generated.json ':(exclude,glob)**/*.md' 2>$null |
                    Where-Object { $_ })
         if ($LASTEXITCODE -ne 0) { return @() }
         return $paths
@@ -642,9 +632,9 @@ function Get-RemoteTagCommit([string]$repoDir, [string]$tag) {
 # THE EXE CI BUILT MAY NOT BE SIGNED, issue #921. release.yml's VPS job
 # compiles on a runner that holds no signing certificate, so its v<version>
 # draft carries an unsigned Thornswood.exe, and until #2163's switch-over
-# every release is built there. release.yml's hosted job signs the exe on a
-# v tag, and such a draft passes through here untouched ("already signed by
-# us" below).
+# every release is built there. release.yml's hosted job signs the exe in a
+# run of main's own workflow (#3930), and such a draft passes through here
+# untouched ("already signed by us" below).
 # 20260927-1633 put exactly that on Main as 1.1.101 (sha256 38d4cd5d...), an
 # hour before the publish sign gate existed. Since then the gate refuses it,
 # which is safe but means no main Ship can go out at all.
@@ -680,7 +670,8 @@ function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$ex
 # WHAT THE LAUNCHER IS COMPILED FROM, as one sha256, issue #921. Every file
 # under launcher\ but the Markdown (the code, ui.xaml, the art, the video, the
 # WebView2 loader, the manifest), records\client-build.json and
-# records\ui-gone.json, which are compiled in, and Build-Launcher.ps1, which
+# records\ui-gone.json and records\generated.json (#3715), which are compiled
+# in, and Build-Launcher.ps1, which
 # writes the version resource and picks what goes in. Read off the working tree, not git, so a dev Ship of uncommitted
 # work counts it. Paths with / and sorted ordinally, so the same tree gives the
 # same answer on any machine; a line ending changed by git's autocrlf gives a
@@ -697,7 +688,7 @@ function Get-LauncherInputHash([string]$repoDir) {
             $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))
         }
     }
-    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'scripts/release/Build-Launcher.ps1') {
+    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'records/generated.json', 'scripts/release/Build-Launcher.ps1') {
         $p = Join-Path $repoDir $rel
         $h = 'missing'
         if (Test-Path -LiteralPath $p) { $h = Get-ThornswoodShippedSha256 $p }
@@ -1096,9 +1087,9 @@ if ($Dev) {
 
 # A folder Vortex deploys into is the collection's source, not a release
 # folder (#1692, docs\COLLECTION-REVISION-2.md step 8): Vortex writes its own
-# record, Data\vortex.deployment.json, into it, Build-Generated never builds
-# there, so a Ship from it could only stop at the generated files, and on
-# 4 October one did, after it had built and installed the launcher there.
+# record, Data\vortex.deployment.json, into it, and Build-Generated never
+# builds there, so on 4 October a Ship from one stopped at the generated
+# files, after it had built and installed the launcher there.
 # Refused here, before anything is built, whichever way the folder was named.
 if (Test-Path -LiteralPath (Join-Path $Root 'Game\Data\vortex.deployment.json')) {
     Die ("$Root is a folder Vortex deploys into (Game\Data\vortex.deployment.json is there), so a release is never built from it. Nothing was built. " +
@@ -1177,7 +1168,7 @@ if ($repeats.Count) {
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
 # The words in the files people read, not only the notes. Note-Rules above
-# reads the release notes. Check-Words reads the launcher help and window,
+# reads the release notes. Check-Words reads the launcher window,
 # and every other page a Ship sends out (issue #1081). A dev Ship may be run
 # from any branch, including one whose pull request build never ran or went
 # red, so this runs here, before anything is built, and on a dry run too.
@@ -1681,40 +1672,38 @@ if ($Package -and -not $Dev -and -not $DryRun) {
     Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
 }
 
-# ------------------------------------------------------------ generated files
-# Issue #1247, Patrick 29 Sep: the behavior files (Pandora) and BodySlide's bodies
-# are made in Thornswood's own folder on this machine, by
-# scripts\mods\Build-Generated.ps1, as a step before a Ship; the Steam copy is
-# the person's own. A release carries what is in the folder, so a folder whose
-# files were built for another mod list, from other files, or never, would
-# send everybody animations and bodies that do not match the collection.
-# Get-GeneratedState reads the record Build-Generated wrote against this
-# machine now (scripts\mods\Generated.ps1). Both channels stop: the files ship
-# on both. Before the launcher is built and installed (#1692): on 4 October a
-# dev Ship built and installed it, closing the running launcher, and only
-# then stopped here. And before the covered bodies, which read what it built.
+# ------------------------------------------------------------ animation and body files
+# The behavior files (Pandora) and the covered bodies (BodySlide) are built on
+# each computer by the launcher, before Play, from the collection installed
+# there, and no release carries them (#3715, Ship-Rules Test-ShipGenerated).
+# A release tells every launcher which collection revision to match, by the
+# one installed here, so this asks whether that collection can build them:
+# Pandora and every patch records\generated.json names are deployed, and every
+# slider set is there and keeps to the body rules (#1004, #405). A dry run of
+# the build, which writes nothing and starts no tool. Both channels stop:
+# every launcher would refuse Play on a collection that cannot build them.
+# Before the launcher is built and installed (#1692): on 4 October a dev Ship
+# built and installed it, closing the running launcher, and only then
+# stopped at the generated files.
 $GameDir = Join-Path $Root 'Game'
 if (-not $FromFeed -and -not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
-Head 'Generated files'
+Head 'Animation and body files'
 if ($FromFeed) {
-    # The last release's, each held to its sha256 by New-FeedRoot; a Ship from
-    # One builds and checks them when the collection changes (#2754).
-    Say '  the last release''s, by their sha256; a Ship from One makes them when the collection changes' 'DarkGray'
+    # The collection is the last release's, unchanged; a Ship from One asks
+    # this when the collection changes (#2754).
+    Say '  the collection is the last release''s; a Ship from One asks whether it builds them when the collection changes' 'DarkGray'
 } elseif ($GameDir) {
-    . (Join-Path $Here '..\mods\Generated.ps1')
-    $genState = $null
-    try { $genState = Get-GeneratedState $Root (Join-Path $RepoDir 'records\generated.json') }
-    catch {
-        Unbump 'the generated files could not be checked'
-        Die ($_.Exception.Message + ' Nothing was built or published.')
+    $global:LASTEXITCODE = 0
+    & (Join-Path $Here '..\mods\Build-Generated.ps1') -Root $Root -DryRun -NoPause
+    $genExit = $LASTEXITCODE
+    if ($genExit -ne 0) {
+        Unbump 'the collection cannot build the animation and body files'
+        Die ("The collection installed here cannot build Thornswood's animation and body files (Build-Generated.ps1 -DryRun exit $genExit, the STOP above says why), " +
+             'and every launcher on this release would refuse Play. Put it right in Vortex, bring the folder up to date, and Ship again. Nothing was built or published.')
     }
-    if (-not $genState.Current) {
-        Unbump 'the generated files are out of date'
-        Die (Get-GeneratedStaleSays $genState $Channel)
-    }
-    Say ("  {0} file(s) Build-Generated made for this mod list, as it made them" -f $genState.Record.Files.Count) 'Green'
+    Say '  the collection installed here builds them; every launcher builds them before Play' 'Green'
 } else {
-    Say '  no own game folder here, so there are none to check' 'DarkGray'
+    Say '  no own game folder here, so whether the collection builds them was not asked' 'DarkGray'
 }
 
 # ------------------------------------------------------------ node
@@ -1752,7 +1741,7 @@ if (-not $ModsOnly) {
         # A RELEASE FROM THE FEED TAKES ITS LAUNCHER FROM GITHUB (#3312): it
         # cannot compile or sign one where it runs. release-tag.yml tags this
         # commit (origin/main, held above) v<the number worked out above> and
-        # starts release.yml on it, which writes that number into Updater.cs,
+        # starts main's release.yml for it (#3930), which writes that number into Updater.cs,
         # builds the exe, signs it with ThornswoodRelease on GitHub's runner,
         # or on the box's runner 3 when GitHub has no minutes, and has a
         # build runner check the signed draft. The draft's exe comes down
@@ -1899,7 +1888,7 @@ if (-not $ModsOnly) {
 # launcherSha256 and its signature, put in place by Install-Launcher.ps1, and
 # left alone when the folder already holds it. Where the launcher a Ship
 # builds is installed, in its place (the two never both run): after the
-# generated files and node checks, so nothing is installed for a release that
+# animation and body files and node checks, so nothing is installed for a release that
 # stops there (#1692), and before anything is published, so a release with no
 # launcher to package stops now and not after it is out (Package-Thornswood
 # runs after, #2243).
@@ -1932,7 +1921,7 @@ if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {
 # So it happens here, before anything is scanned, into the same folder the
 # client patch and the publisher use. SkipServer because this is a build step
 # and has no business talking to the VPS. $GameDir is the game folder the
-# generated files were checked in, above, or '' when there is none.
+# animation and body files were asked of, above, or '' when there is none.
 
 # ------------------------------------------------------------ the front
 # The front Go.ps1 unpacks is built here from the pinned fork commit and held
@@ -2059,43 +2048,6 @@ if ($LASTEXITCODE -eq 2) {
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client build could not be checked'
     Die 'Sync-Client.ps1 refused, and says why above. The client that matches the record is CI''s build of the pin: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci, then Ship again (engine\README.md, A Ship machine takes CI''s build).'
-}
-
-# ------------------------------------------------------------ covered bodies
-# Issue #405, Patrick 28 Sep: "no nudity in players or NPCs for both males and
-# females". The bodies come from the Nexus collection, and a release tells every
-# launcher which collection revision to match by reading the one installed
-# here, so a main release out of a game folder whose body is nude points
-# everybody at a nude body. Check-CoveredBodies.ps1 reads the shapes in each
-# body mesh: 0 covered, 2 a nude body, 1 unreadable. Main refuses on 2 unless
-# -AllowUncoveredBodies; dev warns, so work can still be tried on the dev build
-# while the covered bodies' revision is on its way. 1 refuses on both channels
-# (#1956, Patrick 5 Oct), as the SkyUI menus step below does since #1913.
-Head 'Covered bodies'
-if ($FromFeed) {
-    # The bodies are the last release's bytes; a Ship from One reads them when
-    # the collection changes, as it builds them (#2754).
-    Say '  the last release''s bodies, by their sha256; a Ship from One reads them when the collection changes' 'DarkGray'
-} elseif ($GameDir) {
-    $global:LASTEXITCODE = 0
-    & (Join-Path $Here '..\mods\Check-CoveredBodies.ps1') -Game $GameDir -Quiet
-    $bodiesExit = $LASTEXITCODE
-    if ($bodiesExit -eq 2 -and -not $Dev -and -not $AllowUncoveredBodies) {
-        Unbump 'a body in the game folder is nude'
-        Die 'A body in the game folder is nude, and a main release would point everybody at this collection revision. Install the collection revision with the covered bodies (issue #405), bring the game folder up to date, and Ship again. -AllowUncoveredBodies ships anyway, on Patrick''s word only.'
-    }
-    if ($bodiesExit -eq 2) { Say '  a body in the game folder is nude (issue #405); shipping anyway' 'Yellow' }
-    elseif ($bodiesExit -ne 0) {
-        # Anything but 0 and 2, 1 for a mesh or a Data folder it could not read
-        # or the check itself failing, refuses on both channels, the way the
-        # SkyUI menus step does (#1956, Patrick 5 Oct). A check that cannot read
-        # is not a pass: the unread mesh may be the nude one.
-        Unbump 'the body meshes could not all be read'
-        Die ("The body meshes in the game folder could not all be read (Check-CoveredBodies.ps1 exit $bodiesExit), so whether a body is nude is not known. " +
-             'The red lines above say what could not be read. Fix or replace it in the game folder, and Ship again. -AllowUncoveredBodies does not let this through.')
-    }
-} else {
-    Say '  no game folder here, so the bodies were not read' 'DarkGray'
 }
 
 # ------------------------------------------------------------ SkyUI's menus
@@ -2588,7 +2540,7 @@ elseif ($Package) {
     # to Publish-Update (#2235), or the packager refuses what Ship let past.
     if ($AllowStaleCheckout) { $pkgArgs['AllowStaleCheckout'] = $true }
     # A THROW IS A FAILED BUILD TOO (#2243). On 11 October a stale generated
-    # files check inside the packager (Assert-ShipGeneratedBodies) threw, and
+    # files check inside the packager threw, and
     # the throw went straight out of Ship: the remirror, the dev feed's marks,
     # the news, the Discord post, the restart and the tag never ran, after the
     # pack was already on the feed. Caught here and given the same treatment

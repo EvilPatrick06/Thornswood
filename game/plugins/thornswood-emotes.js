@@ -58,12 +58,12 @@ const T = (globalThis.Thornswood = globalThis.Thornswood || {});
 /**
  * Keys come out of Data/SKSE/Plugins/Thornswood.ini rather than living here.
  *
- * Not for the sake of a config file: it is so the launcher's Controls page can
- * show and rebind them next to every other key in the build. That page reads
- * the real ini files at the moment you open it, which is why it cannot drift,
- * and a key hardcoded in here would be invisible to it. Values are DirectInput
- * scan codes, which is already what buttonEvent reports, so nothing has to be
- * translated.
+ * Not for the sake of a config file: it is so the Settings panel in the game
+ * (game/ui/thornswood-settings.js, #3126) can show and rebind them next to
+ * every other Thornswood key. It reads and writes this same file, which is
+ * why it cannot drift, and a key hardcoded in here would be invisible to it.
+ * Values are DirectInput scan codes, which is already what buttonEvent
+ * reports, so nothing has to be translated.
  */
 const INI = 'Data/SKSE/Plugins/Thornswood.ini';
 
@@ -85,7 +85,7 @@ function readIni(path) {
   return out;
 }
 
-const ini = readIni(INI);
+let ini = readIni(INI);
 
 function key(name, fallback) {
   const raw = ini[name.toLowerCase()];
@@ -93,11 +93,27 @@ function key(name, fallback) {
   return isNaN(n) ? fallback : n;
 }
 
-const OPEN_KEY  = key('WheelKey', 34);   // G, the template's since 13 Sep
-const PAGE_KEY  = key('PageKey', 15);    // Tab, while the wheel is open
-const CLOSE_KEY = key('CloseKey', 1);    // Escape
-const STOP_KEY  = key('StopKey', 49);    // N
-const CHAT_KEY  = key('ChatKey', 28);    // Enter, owned by the front
+let OPEN_KEY  = key('WheelKey', 34);   // G, the template's since 13 Sep
+let PAGE_KEY  = key('PageKey', 15);    // Tab, while the wheel is open
+let CLOSE_KEY = key('CloseKey', 1);    // Escape
+let STOP_KEY  = key('StopKey', 49);    // N
+let CHAT_KEY  = key('ChatKey', 28);    // Enter, owned by the front
+
+/*
+  A key moved on the Settings panel in the game (#3126): the front writes
+  Thornswood.ini and hands every plugin that reads it the new text, and the
+  wheel's keys are the file's from the next press. The page is told its
+  letters the next time the wheel opens (pushWheel).
+*/
+(T.settingsListeners = T.settingsListeners || []).push(function () {
+  ini = readIni(INI);
+  OPEN_KEY  = key('WheelKey', 34);
+  PAGE_KEY  = key('PageKey', 15);
+  CLOSE_KEY = key('CloseKey', 1);
+  STOP_KEY  = key('StopKey', 49);
+  CHAT_KEY  = key('ChatKey', 28);
+  log('keys read again: wheel on scan code', OPEN_KEY, 'stop on', STOP_KEY);
+});
 const STOP = 'IdleForceDefaultState';
 
 /*
