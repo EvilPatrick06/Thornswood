@@ -36,7 +36,6 @@ const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join('')
 const gm = read(SRC);
 const front = read(path.join(ROOT, 'game', 'plugins', 'thornswood-front.js'));
 const skills = read(path.join(ROOT, 'game', 'ui', 'thornswood-skills.js'));
-const helpCs = read(path.join(ROOT, 'launcher', 'app', 'Help.cs'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -101,14 +100,13 @@ yes('W4 every /rest goes to the beds, and the typed word never reaches the meter
     /beds\.rest\(actorId, Number\(profileId\) \|\| 0\)/.test(restBranch) &&
     !/needs\.resting\(actorId, where\)/.test(restBranch));
 {
-  // Every quoted string in the gamemode and the launcher's Help page: none
-  // tells anybody to type /bed or /rest.
+  // Every quoted string in the gamemode: none tells anybody to type /bed or
+  // /rest. The launcher's Help page was held to the same until it went (#3146).
   const strings = (gm.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(function (s) {
     return /\/bed\b|\/rest (sit|bed|campfire|inn|up)\b/.test(s);
   });
   yes('W5 no line the server says names /bed or a /rest word' + (strings.length ? ' (' + strings.slice(0, 3).join(' | ') + ')' : ''),
       strings.length === 0);
-  yes('W5 and neither does the launcher\'s Help page', !/\/rest\b|\/bed\b/.test(helpCs));
 }
 yes('W6 the look prompt\'s near list carries the sleep mark from the beds',
     /s: \(beds && beds\.mark\) \? beds\.mark\(me\.pid, them\.pid, me\.cell\) : 0/.test(socialBlock));
