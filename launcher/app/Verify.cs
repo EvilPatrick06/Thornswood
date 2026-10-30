@@ -265,15 +265,22 @@ namespace Thornswood
                     "Fix moves it aside into Thornswood's Isolated folder and nothing is deleted, so that server still works.",
                     "Close that server's launcher and Skyrim, then press Fix again: a file another program has open cannot be moved.", true));
 
-            // A plugin the server counts as light but this machine's copy does
-            // not, which gives it a load order index the server does not have and
-            // shifts everything after it by one. The set is derived from the
-            // server's manifest against the collection reference, so a new one is
-            // caught without editing Checks. See Verify.MustBeLight.
-            foreach (string p in Checks.NotLight(MustBeLight(cfg)))
+            // A plugin whose light flag is not the one the server's copy has. A
+            // copy that is full where the server's is light takes a load order
+            // index the server does not have, and one that is light where the
+            // server's is full takes none, so from there on every plugin is one
+            // place off. Read from the server's own two lists, never worked
+            // out. The flag is part of the file, so the collection installs it
+            // and Vortex puts it right; the launcher no longer writes it
+            // (#3022). Ours are left to Bytes, whose Fix fetches the server's
+            // copy. Before the order, so one problem reads as one problem.
+            foreach (KeyValuePair<string, bool> f in FlagNotServers(cfg))
                 issues.Add(Issue.Of(IssueKind.Plugins,
-                    p + " is not flagged light, so from there on your load order counts " +
-                    "one place differently from the server's.", "Fix flags it; nothing else changes.", Retry, true));
+                    f.Key + (f.Value
+                        ? " is light on the server and not flagged light in your copy, so from there on your load order counts one place more than the server's."
+                        : " is flagged light in your copy and is a full plugin on the server, so from there on your load order counts one place less than the server's.") +
+                    " The game shows that as LOAD ORDER ERROR.",
+                    null, FromVortex(cfg, f.Key), true));
             // The order, position by position. Only when nothing above was
             // found, as before: a plugin turned off or not flagged light
             // already explains the shift from there on, and one problem
@@ -600,6 +607,24 @@ namespace Thornswood
                 }
                 if (same) continue;
 
+                // Made here from the release's recipe (#2791, LastPlugin):
+                // never the server's copy. One that is not what the recipe
+                // makes is Scan's "made from your game" line, which Fix
+                // makes again; one that is, and still is not the server's,
+                // means the release and the server are of two builds.
+                if (LastPlugin.Makes(Paths.Game, m.filename))
+                {
+                    if (!LastPlugin.IsCurrent(Paths.Game)) continue;
+                    var made = Issue.Of(IssueKind.Plugins,
+                        m.filename + " is the one this release makes from your plugins, and it is not the server's" +
+                        (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
+                        ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server.",
+                        null, OtherBuild, true);
+                    made.Plugin = m.filename;
+                    issues.Add(made);
+                    continue;
+                }
+
                 var i = Issue.Of(IssueKind.Plugins,
                     m.filename + " is not the same file the server has" +
                     (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
@@ -648,6 +673,9 @@ namespace Thornswood
 
         /// <summary>A plugin of ours whose server copy the release does not have (#3386).</summary>
         const string NotInRelease = "Fix takes Thornswood's own plugins from the latest release, and that release does not have the copy the server runs yet, or could not be reached. The next update brings it: take it when it is waiting, then press Scan.";
+
+        /// <summary>Thornswood-Last.esp made from this release's recipe, and the server holding another (#2791).</summary>
+        const string OtherBuild = "The server and this release are of two builds: take the update when one is waiting; when none is, the server is behind, and staff deploy it again.";
 
         /// <summary>The order cannot be put right while the server names a plugin this build has no line for and that is not ours.</summary>
         const string OrderNeeds = "The server's order names a plugin this build's list does not have and that is not Thornswood's own, so only an update or Vortex can bring it: take the update when one is waiting, or deploy the Thornswood collection in Vortex, then press Scan.";
@@ -789,49 +817,30 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The plugins that have to carry the ESL flag on this machine, worked
-        /// out from the server rather than kept by hand.
-        ///
-        /// The server's manifest names every plugin it counts, in order; the
-        /// shipped reference list (Paths.Golden) enables the whole collection,
-        /// its light plugins and all. A plugin the reference enables that the
-        /// manifest leaves out is one the server treats as light: it drops light
-        /// plugins, and anything mastering to one, because Game.GetModCount gives
-        /// them no index. So this machine has to leave it out of the count too,
-        /// or from that plugin on its load order sits one place off the server's
-        /// and the game shows LOAD ORDER ERROR. That is Djinn's position 52 on
-        /// 2026-09-24 exactly: his Immersive Armors copy was not light, so it
-        /// took an index the server does not have.
-        ///
-        /// Derived, so the next plugin that ships light on the server but not on
-        /// a tester's disk is caught without a name being added to Checks. The
-        /// hand list in Checks.MustBeLight is always folded in: it is the answer
-        /// when the server cannot be asked (no manifest to derive from), and belt
-        /// and braces for the two names found by hand. Bethesda's masters and the
-        /// Creation Club files are left out the way Bytes leaves them out, and an
-        /// .esl takes no place in the order to begin with, so neither is flagged.
+        /// Each plugin in Data whose light flag is not the server's, with true
+        /// when the server's copy is light: in its light list (#1715) and not
+        /// flagged here, or in its full list and flagged here. Another author's
+        /// plugins only, and none when the server cannot be asked. An .esl is
+        /// light by its name, and a file that cannot be read is not reported.
         /// </summary>
-        public static List<string> MustBeLight(Config cfg)
+        static List<KeyValuePair<string, bool>> FlagNotServers(Config cfg)
         {
-            var names = new List<string>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string n in Checks.MustBeLight)
-                if (!string.IsNullOrEmpty(n) && seen.Add(n)) names.Add(n);
-
+            var l = new List<KeyValuePair<string, bool>>();
             ServerMod[] mods = null;
             try { mods = Manifest(cfg); }
-            catch (Exception ex) { Swallow.Note("Verify.MustBeLight, asking the server for its manifest", ex); }
-            if (mods != null)
+            catch (Exception ex) { Swallow.Note("Verify.FlagNotServers, asking the server for its manifest", ex); }
+            if (mods == null) return l;
+            foreach (bool light in new[] { false, true })
             {
-                var counted = new HashSet<string>(Names(mods), StringComparer.OrdinalIgnoreCase);
-                foreach (string p in Enabled(Path.Combine(Paths.Golden, "plugins.txt")))
+                foreach (ServerMod m in light ? (manifestLight ?? new ServerMod[0]) : mods)
                 {
-                    if (p.EndsWith(".esl", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (counted.Contains(p) || Storefront.Contains(p)) continue;
-                    if (seen.Add(p)) names.Add(p);
+                    if (m == null || string.IsNullOrEmpty(m.filename) || m.Served || Storefront.Contains(m.filename)) continue;
+                    if (m.filename.EndsWith(".esl", StringComparison.OrdinalIgnoreCase)) continue;
+                    bool? here = Checks.FlaggedLight(m.filename);
+                    if (here != null && here.Value != light) l.Add(new KeyValuePair<string, bool>(m.filename, light));
                 }
             }
-            return names;
+            return l;
         }
 
         // ------------------------------------------------------------ order
@@ -943,7 +952,8 @@ namespace Thornswood
                 var notHere = new List<string>();
                 foreach (string p in off)
                 {
-                    if (!ServedByServer(cfg, p)) notOurs.Add(p);
+                    // Ours: served, or made here from the release's recipe (#2791).
+                    if (!ServedByServer(cfg, p) && !LastPlugin.Makes(Paths.Game, p)) notOurs.Add(p);
                     else if (!InData(p)) notHere.Add(p);
                     else ours.Add(p);
                 }
@@ -961,6 +971,8 @@ namespace Thornswood
                 {
                     if (notOurs.Count > 0)
                         say("The server's order names " + string.Join(", ", notOurs.ToArray()) + ", which this build's plugin list does not enable and is not Thornswood's own, so the order was left alone. " + OrderNeeds);
+                    else if (notHere.Count == 1 && LastPlugin.Makes(Paths.Game, notHere[0]))
+                        say("The server's order names " + notHere[0] + ", which this release makes from your plugins and has not been made, so the order was left alone. Scan's line about the files made from your game says what stops it.");
                     else if (notHere.Count > 0)
                         say("The server's order names " + string.Join(", ", notHere.ToArray()) + ", which is ours and is not in Data, because the release did not have it, so the order was left alone. " + NotInRelease);
                     else
@@ -1301,7 +1313,6 @@ namespace Thornswood
             // from that anything gets. It is moved aside, never deleted,
             // because somebody who plays here may also play there.
             n += Checks.IsolateForeign(say);
-            n += Checks.FlagLight(MustBeLight(cfg), say);
 
             // Creation Club plugins the game would load because Skyrim.ccc
             // names them. Moved aside the same way, and said, because these are
@@ -1327,7 +1338,7 @@ namespace Thornswood
             if (cfg != null)
             {
                 foreach (Issue i in Bytes(cfg))
-                    if (i.Plugin != null && FetchPlugin(cfg, i, release, say)) n++;
+                    if (i.Plugin != null && !LastPlugin.Makes(Paths.Game, i.Plugin) && FetchPlugin(cfg, i, release, say)) n++;
             }
 
             // Still missing from Data and ours by the server's served list
@@ -1354,7 +1365,8 @@ namespace Thornswood
                         {
                             bool isLight = idx >= mods.Length;
                             ServerMod m = isLight ? light[idx - mods.Length] : mods[idx];
-                            if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename) || !m.Served) continue;
+                            // The one made from the release's recipe is MadeFromGame's (#2791).
+                            if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename) || !m.Served || LastPlugin.Makes(Paths.Game, m.filename)) continue;
                             string dest = Path.Combine(dataDir, m.filename);
                             bool goneFile = false;
                             try { goneFile = !File.Exists(dest); }
@@ -1459,16 +1471,6 @@ namespace Thornswood
                 catch (Exception ex) { Swallow.Note("Verify.DeployPersonal, " + rel, ex); }
             }
             return n;
-        }
-
-        public static string[] PersonalFiles()
-        {
-            try
-            {
-                if (!Directory.Exists(Paths.Personal)) return new string[0];
-                return Directory.GetFiles(Paths.Personal, "*.*", SearchOption.AllDirectories);
-            }
-            catch { return new string[0]; }
         }
     }
 }

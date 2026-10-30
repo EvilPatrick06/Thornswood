@@ -88,6 +88,7 @@ try {
     Yes '  Defender keeps scanning its folder' ($r.Text -match '(?m)^if \(\$false\) \{\s*$')
     Yes '  the stand-in registration token is in none of the scripts (it goes on standard input)' ($r.Text -notmatch 'DRY-RUN-TOKEN-NOT-REAL')
     Yes '  the install script is marked as taking a secret on standard input' ($r.Text -match 'with a secret on standard input')
+    Yes '  dry-run profile recovery names an approved restart of THIS PC, never a VPS script (#4048)' ($r.Text -match 'approved local PC restart' -and $r.Text -notmatch 'Set-TimeWait.ps1 -Restart')
     Yes '  GitHub was never asked (the gh on PATH was not called)' (-not (Test-Path -LiteralPath $ghCalled))
 
     $r = Dry @('-OffBox', '-DefenderSkip', '-AlsoDeny', 'D:\Somewhere Else')
@@ -133,6 +134,7 @@ try {
     Yes '  and a process list that cannot be read stops them, never reads as empty' ($r.Text -match [regex]::Escape('@(Get-CimInstance Win32_Process -EA Stop | Where-Object'))
     $rm = Dry @('-Number', '3', '-Remove')
     Yes '  -Remove refuses a runner running a job before GitHub is told, and stops it the same way' ($rm.Text -match "(?m)^Assert-RunnerIdle 'C:\\Thornswood-Runner3'" -and $rm.Text -match "(?m)^Stop-RunnerHere 'C:\\Thornswood-Runner3' " -and $rm.Text -notmatch 'Stop-Service[^\r\n]*-EA SilentlyContinue' -and $rm.Text.IndexOf('Assert-RunnerIdle ''C:\Thornswood-Runner3''') -lt $rm.Text.IndexOf('config.cmd remove'))
+    Yes '  remote VPS recovery retains VPS restart guidance (#4048)' ($r.Text -match 'Restart the VPS \(scripts\\vps\\Set-TimeWait.ps1 -Restart\)')
     Yes '  the VPS runner keeps its label, name and folder, runner 1 takes builds (#2994) and checks signed drafts (#3956), but no pull request builds (#4010)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build,thornswood-check'(?!,)" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
     $r2 = Dry @('-Number', '2')
     Yes '  runner 2 takes builds, pull request builds and checks (#4010)' ($r2.Code -eq 0 -and $r2.Text -match "--name 'thornswood-vps-2' --labels 'thornswood-vps,thornswood-build,thornswood-pr-build,thornswood-check'(?!,)")
@@ -314,14 +316,20 @@ try {
     Yes 'Get-RunnerReachMisses: an address outside every range is named, IPv4 or IPv6, and one inside is not' (($miss -join ',') -eq '48.192.88.101,2603:1006:2001::1')
 
     # ---- the guards themselves, on stand-ins and scratch folders -----------
-    $gl = [regex]::Match($src, "(?s)\`$guardLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+    $gl = [regex]::Match($src, "(?s)\`$guardLib = \(Get-ThornswoodFirewallScript\) \+ @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the guard library is where it was' ($gl -match 'function Set-RunnerFirewall')
     $script:fw = New-Object Collections.ArrayList
     $script:gone = New-Object Collections.ArrayList
     # Stand-ins: functions win over the cmdlets, so no real rule is read or made.
-    function New-NetFirewallRule { param($DisplayName, $Group, $Direction, $Action, $Profile, $LocalUser, $RemoteAddress, $Description, $ErrorAction) [void]$script:fw.Add(@{ Name = $DisplayName; Group = $Group; Direction = $Direction; Action = $Action; LocalUser = $LocalUser; Remote = @($RemoteAddress) }) }
-    function Get-NetFirewallRule { param($Group, $ErrorAction) @($script:fw | Where-Object { $_.Group -eq $Group } | ForEach-Object { New-Object PSObject -Property @{ Name = $_.Name; Enabled = 'True' } }) }
-    function Remove-NetFirewallRule { param($Name) [void]$script:gone.Add($Name); $keep = @($script:fw | Where-Object { $_.Name -ne $Name }); $script:fw.Clear(); foreach ($k in $keep) { [void]$script:fw.Add($k) } }
+    # Every store each one is asked for, and each refresh, are kept (#3896).
+    $script:stores = New-Object Collections.ArrayList
+    $script:syncs = 0
+    function New-NetFirewallRule { param($PolicyStore, $DisplayName, $Group, $Direction, $Action, $Profile, $LocalUser, $RemoteAddress, $Description, $ErrorAction) [void]$script:stores.Add($PolicyStore); [void]$script:fw.Add(@{ Name = $DisplayName; Group = $Group; Direction = $Direction; Action = $Action; LocalUser = $LocalUser; Remote = @($RemoteAddress) }) }
+    function Get-NetFirewallRule { param($PolicyStore, $Group, $ErrorAction) [void]$script:stores.Add($PolicyStore); @($script:fw | Where-Object { $_.Group -eq $Group } | ForEach-Object { New-Object PSObject -Property @{ Name = $_.Name; Enabled = 'True' } }) }
+    function Remove-NetFirewallRule { param($PolicyStore, $Name) [void]$script:stores.Add($PolicyStore); [void]$script:gone.Add($Name); $keep = @($script:fw | Where-Object { $_.Name -ne $Name }); $script:fw.Clear(); foreach ($k in $keep) { [void]$script:fw.Add($k) } }
+    function Sync-ThornswoodFirewall { $script:syncs++ }
+    # On the box the head sets the box's policy store, the only one its firewall takes rules from.
+    $grdStore = 'localhost'
     . ([scriptblock]::Create($gl))
     $many = @(1..1203 | ForEach-Object { '10.0.' + [int][Math]::Floor($_ / 256) + '.' + ($_ % 256) })
     $said = Set-RunnerFirewall '*S-1-5-7' 'TS test group' $many
@@ -334,6 +342,8 @@ try {
     Yes '  an empty list changes nothing and says so' ($threw -and $script:fw.Count -eq 1)
     $null = Remove-RunnerFirewall 'TS test group'
     Yes 'Remove-RunnerFirewall takes the group off' ($script:fw.Count -eq 0 -and (Get-RunnerFirewall 'TS test group') -match 'NO RULES')
+    Yes '  every rule read, made and taken away in the store the head names, and the policy refreshed after each change (#3896)' (
+        @($script:stores | Where-Object { $_ -ne 'localhost' }).Count -eq 0 -and $script:stores.Count -gt 0 -and $script:syncs -eq 3)
 
     $u = Join-Path $work 'Users'; $pd = Join-Path $work 'ProgramData'; $dv = Join-Path $work 'D-root'
     foreach ($n in 'alice', 'Public', 'Default', 'thornswood-pr', 'thornswood-pr.ONE') { New-Item -ItemType Directory -Path (Join-Path $u $n) | Out-Null }

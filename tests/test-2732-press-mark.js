@@ -166,6 +166,7 @@ const PANELS = {
   'thornswood-maneuvers.js': { say: 1 },
   'thornswood-merchant.js': { say: 1 },
   'thornswood-party.js': { say: 1 },
+  'thornswood-preserve.js': { say: 1 },
   'thornswood-repair.js': { say: 1 },
   'thornswood-ride.js': { say: 1 },
   'thornswood-ship.js': { say: 1 },

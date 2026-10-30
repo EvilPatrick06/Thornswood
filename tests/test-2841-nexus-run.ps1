@@ -23,7 +23,7 @@
        New-NexusRevision's download each run, print nothing of the script's
        output into the log, and seal it to the session's key; no key stops
        it before anything runs.
-    5. nexus-run.yml: main-only environment, the key in one step's
+    5. nexus-run.yml: on GitHub's Windows runner (#4013), main-only environment, the key in one step's
        environment, no input pasted into a script, actions pinned by SHA,
        the output sealed and kept a day.
     6. Set-NexusKey -ToEnvironment holds the environment to main alone and
@@ -241,7 +241,7 @@ else {
 # ---- 5. nexus-run.yml -------------------------------------------------------------
 $wf = (Text '.github/workflows/nexus-run.yml') -replace "`r`n", "`n"
 Yes 'nexus-run.yml is started by hand and by nothing else' ($wf -match '(?m)^  workflow_dispatch:\s*$' -and @([regex]::Matches(([regex]::Match($wf, '(?ms)^on:\n(.*?)^\S').Groups[1].Value), '(?m)^  [a-z_]+:')).Count -eq 1)
-Yes '  on a box runner, in the environment desk, reading the repository only' ($wf.Contains('runs-on: [self-hosted, Windows, thornswood-vps]') -and $wf -match '(?m)^    environment: desk$' -and $wf -match '(?m)^permissions:\n  contents: read$')
+Yes '  on GitHub''s Windows runner, never the box (#4013), in the environment desk, from main only, reading the repository only' ($wf -match '(?m)^    runs-on: windows-latest$' -and $wf -notmatch 'self-hosted|thornswood-' -and $wf -match "(?m)^    if: github\.ref == 'refs/heads/main'$" -and $wf -match '(?m)^    environment: desk$' -and $wf -match '(?m)^permissions:\n  contents: read$')
 Yes '  the key in one step''s environment, and nowhere else' (@([regex]::Matches($wf, 'secrets\.')).Count -eq 1 -and $wf.Contains('THORNSWOOD_NEXUS_API_KEY: ${{ secrets.NEXUS_API_KEY }}'))
 $runBlocks = @([regex]::Matches($wf, '(?ms)^\s+run: \|\s*\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
 Yes '  no input is pasted into a script; they reach it through the environment' (-not @($runBlocks | Where-Object { $_ -match '\$\{\{' }).Count)

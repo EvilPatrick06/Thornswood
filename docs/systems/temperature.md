@@ -40,6 +40,11 @@ half the gap in 90 seconds. A fire is obvious while you stand in it.
 Snow is not an emergency in the first few seconds. An unknown place is
 comfortable. A room nobody has classified is not a trap.
 
+It does not move while you are logged out. You come back at the reading
+you left with, and it moves from there toward wherever you are standing.
+The place you logged out in is not where you spent the time away, so
+logging out in the snow does not bring you back freezing (#3154).
+
 ## The place
 
 These are the targets before clothing, fire and weather.
@@ -162,6 +167,21 @@ Falling snow is still the snow line in the table above, 6 colder, on
 top of the season. A clear winter day does not take that 6. The snow
 place, target 16, is standing in snow on the ground. A clear sky over
 bare ground is not that place.
+
+## On the map
+
+The map menu shows a strip at the top while it is open (#3156, Patrick's
+C of 22 Oct 2026):
+
+- The date, the game's own: the day and the month are today's in UTC,
+  and the year is 4E 252 in 2026, turning with the real year. No day of
+  the week, because the game counts that on its own for each person.
+- The season, the next one, and how long until it turns.
+- The server clock: the box's own time, Mountain time, which is the
+  clock staff give times in. Your own clock beside it when your zone is
+  different.
+
+The season does not follow the date's month. Frostfall can be spring.
 
 ## Fire
 

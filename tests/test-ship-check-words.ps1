@@ -96,7 +96,7 @@ if (Test-Path -LiteralPath $readme) {
     $left = [IO.File]::ReadAllText($readme).Contains('HARNESS1081')
 }
 Yes 'the planted hit is not in the repository README' (-not $left)
-$porcelain = @(& git -C $Repo status --porcelain -- 'README.md' 'launcher/app/Help.cs' 'launcher/ui.xaml')
+$porcelain = @(& git -C $Repo status --porcelain -- 'README.md' 'launcher/ui.xaml')
 Yes 'the planted hit did not touch the files people read' ($porcelain.Count -eq 0)
 
 Done

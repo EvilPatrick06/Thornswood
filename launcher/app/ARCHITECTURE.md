@@ -108,9 +108,9 @@ it says a pool thread.
 | 6 | `Shell.cs:317 Bind` | Finds the controls, and sets `Discord.Folder` to Profile. |
 | 7 | `Shell.cs:318 Themes.Apply` | Colours from config.json's theme. |
 | 8 | `Shell.cs:319 Wire` | Attaches every handler, including the Play button, calls `WirePages` and `WireOwnGame`, and starts the two second timer (`Shell.cs:2544 DispatcherTimer`). |
-| 9 | `Shell.cs:320 BuildThemeRow` | Then `Shell.cs:322 BuildDisplay`, `Shell.cs:324 BuildStatRow`, `Shell.cs:325 BuildPathRows` and `Shell.cs:326 BuildHelp`: the theme buttons and display rows on Settings, the strip of figures from `Profile\stats.txt` (time played, sessions, last played, last update), the install and game folder rows, and the Help page. They draw controls and write nothing. |
+| 9 | `Shell.cs:320 BuildThemeRow` | Then `Shell.cs:322 BuildDisplay`, `Shell.cs:324 BuildStatRow`, `Shell.cs:325 BuildPathRows`: the theme buttons and display rows on Settings, the strip of figures from `Profile\stats.txt` (time played, sessions, last played, last update), and the install and game folder rows. They draw controls and write nothing. |
 | 10 | `Shell.cs:332 OpenForUninstall` | Only when Windows sent `-uninstall`, which is what Uninstall under Installed apps runs. `ShellUninstall.cs:49 OpenForUninstall()` stops the two second timer before it has ticked, stands down the game folder check, opens on Settings with the Uninstall button in view, and runs the message loop itself. Run returns from here, so no row below this one happens: no update check, no server scan, no client repair, no voice, and the Installed apps entry is not written again. |
-| 11 | `Shell.cs:334 BuildModList` | The Mods page's list, then `Shell.cs:335 RefreshDiscord` (the Discord card) and `Shell.cs:339 ShowPage`, which opens on Play. |
+| 11 | `Shell.cs:335 RefreshDiscord` | The Discord card, then `Shell.cs:339 ShowPage`, which opens on Play. |
 | 12 | `Shell.cs:344 Register.Ensure` | Writes this install's entry under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall` (`Register.cs:78 Ensure()`). |
 | 13 | `Shell.cs:357 Discord.SendPendingLogs` | Pool thread. A session that ended without sending its logs (`Profile\logs-pending.txt` still there) sends them now, before a new game start truncates them. |
 | 14 | `Shell.cs:363 AutoJoin.Ensure` | Makes `Game\Data\Platform\Plugins\skymp5-client-settings.txt` when there is none (`AutoJoin.cs:52 Ensure()`). |
@@ -456,6 +456,16 @@ them by hand, and Ship runs a dry run to ask whether the collection installed
 there can build them. `Ship-Rules.ps1 Test-ShipGenerated` keeps them out of
 every pack and off every list of removed files.
 
+**LastPlugin** (LastPlugin.cs, #2791). `Data\Thornswood-Last.esp` copies
+other authors' records out of the load order, so a release carries only its
+recipe, `Data\Thornswood-Last.recipe` (written by
+`scripts\mods\last_recipe.py`), and MadeFromGame makes the plugin from the
+plugins and string tables in `Paths.Game`'s Data, pinned by the sha256 of each
+and of the plugin, whenever a recipe is there and the plugin is missing or
+other bytes. Verify never fetches that plugin from the server, and counts it
+as ours when it puts the order right. A game folder with no recipe is left to
+the release. `tests\test-2791-last-plugin.ps1` holds it to `last_recipe.py`.
+
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile and the
 collection revision installed (#1582). The newest revision Vortex knows of
@@ -679,13 +689,12 @@ from its own Settings, under Maintenance.
 **Smaller pieces.** Stats.cs (`Profile\stats.txt`), Leaks.cs (the shipped sign
 in file, and what the 28 and 29 Sep dev records handed out), Icons.cs (the shortcut icon), BrowserArgs.cs (switches for the
 launcher's WebView2 browsers, such as no mDNS in the voice browser), Stall.cs and Waiting.cs
-(section 1), Diag.cs (`Profile\Reports`), Files.cs (saves and logs for the
-pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
+(section 1), Diag.cs (`Profile\Reports`), Files.cs (the logs and the newest crash
+for the support report), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 (making and reading junctions without cmd), Steam.cs (finding Steam and its
 Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
-Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Help.cs (the Help page's text), Links.cs (the Nexus page behind
-each mod name), Gallery.cs (the pictures the site shows from the world, read
+Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Gallery.cs (the pictures the site shows from the world, read
 from `/api/public` for Play's rotating spotlight and the Gallery page; the
 Gallery page uploads via `/api/gallery/submit` and then sends the picture's
 800 and 1600 pixel JPEG copies to `/api/gallery/copy` (#3218), reports via
@@ -777,7 +786,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 17 | `ShellPlay.cs:297 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:300 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
 | 18a | `ShellPlay.cs:315 GeneratedHere.Ensure` | Under Waiting. The behavior files and the covered bodies (#3715), built with the collection's own Pandora and BodySlide only when `generated.txt` is missing or stale: the mod list, the files the tools read, the build list compiled into the launcher, or a built file changed. A build that stops, or any body in the folder that is nude, stops Play with a message box saying why (#405). | when it builds: `Game\Data\meshes\actors\*\behaviors`, `characters`, `animationdatasinglefile.txt` and `animationsetdatasinglefile.txt`, the six bodies in `character assets`, BodySlide's own copies of its settings, presets and groups, and `Profile\OwnGame\generated.txt`; `Profile\OwnGame\build-generated` while it runs |
-| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf` |
+| 18b | `ShellPlay.cs:338 MadeFromGame.Ensure` | The main menu, the notice board's two meshes and the collection's menus with no gold values (#3113) made from this machine's game and mod archives, only those missing or changed. A game that cannot make them still plays, and the log line says which file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif`; `Game\Data\Interface\skyui\config.txt` and `itemcard.swf`, `Game\Data\Interface\hudmenu.swf`, `AHZHudInfo.swf` and `exported\AHZHudInfo.swf`; `Game\Data\Thornswood-Last.esp` from the release's recipe and the person's own plugins (#2791) |
 | 19 | `ShellPlay.cs:345 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
 | 20 | `ShellPlay.cs:352 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
 | 21 | `ShellPlay.cs:354 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |
