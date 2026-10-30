@@ -27,6 +27,8 @@ const CR = String.fromCharCode(13);
 const SRC = path.join(__dirname, '..', 'site', 'server.js');
 const src = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const CSP_HEADER = JSON.parse(src.match(/const CSP_HEADER = ("[^"\r\n]*");/)[1]);
+// send() names it beside the CSP (#2762).
+const PERMISSIONS_POLICY = src.match(/const PERMISSIONS_POLICY = '([^'\r\n]*)';/)[1];
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -85,6 +87,18 @@ eval(grab('function cspFor('));
 const rangeSrc = grab('function rangeReply(');
 yes('server.js has rangeReply()', !!rangeSrc);
 if (rangeSrc) eval(rangeSrc);
+
+// The release copies block (#3686): the asset route asks it for a GitHub
+// Release copy first. GitHub is never asked here; it answers 404, as it does
+// while the repository is private, unless a case puts a Release in place.
+eval(grab('function readJsonQuiet('));
+const relFrom = src.indexOf('/* ---- release copies (#3686) ----');
+const relTo = src.indexOf('/* ---- end release copies ---- */');
+yes('server.js has the release copies block', relFrom >= 0 && relTo > relFrom);
+const rel = eval('(function () {\nconst https = null;\n' + src.slice(relFrom, relTo) +
+  '\nreleaseGitHub = () => Promise.resolve({ status: 404, why: \'GitHub answered 404\' });' +
+  '\nreturn { releaseCopies: releaseCopies, releaseCopy: releaseCopy };\n})()');
+const releaseCopy = rel.releaseCopy;
 
 const verSrc = route('const feedVer = p.match(', "if (feedVer && req.method === 'GET')");
 const assetSrc = route('const feedAsset = p.match(', "if (feedAsset && req.method === 'GET')");
@@ -193,6 +207,22 @@ async function main() {
 
   const da = await ask('GET', '/feed-dev/assets/' + SHA);
   yes('GET /feed-dev/assets/<sha256> is 200', da.code === 200);
+
+  // Once the feed's release has a public GitHub Release holding the asset at
+  // this size, the route answers 302 to it, and sends no bytes (#3686).
+  const TAG = 'release/main/20261026-170000';
+  const COPY = 'https://github.com/EvilPatrick06/Thornswood/releases/download/' + TAG + '/' + SHA;
+  fs.writeFileSync(path.join(ROOT, 'feed', 'version', '00000003.json'),
+    JSON.stringify({ launcherUrl: 'https://thornswood.net/feed/assets/' + SHA, release: { id: '20261026-170000', tag: TAG } }));
+  const before = await ask('GET', '/feed/assets/' + SHA);
+  yes('a release with no Release copy yet: the site still sends the bytes', before.code === 200 && before.body.equals(BODY));
+  rel.releaseCopies[TAG] = { files: { [SHA]: { url: COPY, size: BODY.length } }, installer: null, seen: Date.now() };
+  const moved = await ask('GET', '/feed/assets/' + SHA);
+  yes('with one, GET /feed/assets/<sha256> is 302 to the Release copy', moved.code === 302 && moved.h['location'] === COPY && moved.body.length === 0);
+  yes('  and the redirect is not cached as if it were the bytes', moved.h['cache-control'] === 'no-cache');
+  rel.releaseCopies[TAG].files[SHA].size = BODY.length + 1;
+  const sized = await ask('GET', '/feed/assets/' + SHA);
+  yes('a Release copy of another size is never used', sized.code === 200 && sized.body.equals(BODY));
 
   // Who the ETag above is for, so it is not taken out again as unused: the
   // launcher asks with the tag of the copy it holds and reads a 304 as the

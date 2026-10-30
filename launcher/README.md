@@ -8,10 +8,14 @@ built with MSBuild from `launcher\app\Thornswood.csproj` (#498), and
 class owns and how Play runs. The window's layout is `ui.xaml`, parsed at
 startup, so a control renamed there and not in the C# is found by
 `scripts\dev\Check-Controls.ps1` rather than by somebody pressing it. Beside them are
-the icon (`app.ico`), the emblem (`logo.png`, `logo-192.png`), the strip of art
-behind the title (`launcher-header.jpg` and `.mp4`), the key template the
-launcher writes when a machine has none (`Thornswood.ini`), and the WebView2
-libraries in `lib\webview2`.
+the icon (`app.ico`), the emblem (`logo.png`, `logo-192.png`), the dev build's
+icon and emblem (`app-dev.ico`, `logo-dev.png`, picked in `Icons.cs` and
+`Art.cs`), the strip of art behind the title (`launcher-header.jpg` and
+`.mp4`), the key template the launcher writes when a machine has none
+(`Thornswood.ini`), and the WebView2 libraries in `lib\webview2`. `art` holds the
+source pictures for the main menu backdrop and its spec (`BACKDROP-SPEC.md`,
+`ART-PROMPT.md`), which `scripts\dev\Build-Backdrop.py` reads; the launcher
+does not ship them (#3680).
 
 `voice-host.html` is proximity voice as the launcher runs it. The launcher
 (`launcher\app\Voice.cs`) opens it in a hidden WebView2 window, where a real
@@ -57,4 +61,4 @@ the release, and each launcher replaces itself when its feed has a newer one;
 the dev build, on the dev feed, gets it first. The voice page is written out
 beside the exe on start, when the copy there is missing or a different size,
 and loaded from there. Moved here from `tools\` on 25 September (issue #440,
-phase 7); the comments in the C# still say `tools\` in places.
+phase 7).

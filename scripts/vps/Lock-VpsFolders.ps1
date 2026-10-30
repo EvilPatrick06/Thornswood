@@ -26,8 +26,7 @@
   every backup, and so every secret on the box: that one is SYSTEM's and
   Administrators' only, like private, and nothing else reads it. And the
   service folders (issues #1183 and #1691): C:\Thornswood-Watch,
-  C:\Thornswood-Deploys, C:\Thornswood-Caddy and C:\Thornswood-Maint lose
-  Users the same way, keeping their rules by name (the bot's on Watch, the
+  C:\Thornswood-Deploys and C:\Thornswood-Caddy lose Users the same way, keeping their rules by name (the bot's on Watch, the
   site's on Deploys\current), and C:\Thornswood-Dumps is SYSTEM's and
   Administrators' to read, with LOCAL SERVICE and every local thornswood-runner*
   account allowed to make and write files in it and read nothing: Windows Error
@@ -49,7 +48,10 @@
   The service folders are locked as they are made, by the same rules, through
   Lock-Folder.ps1: Watch-Services.ps1 and Watch-Load.ps1 for Watch,
   Setup-Domain.ps1 for Caddy, Artifact.ps1 and Swap.ps1 for Deploys. Nothing in
-  the repository makes Maint or Dumps, so those two are this script's alone.
+  the repository makes Dumps, so it is this script's alone. C:\Thornswood-Maint
+  is not one of them any more: it held update.ps1, which the hand made task
+  Maint Update ran as SYSTEM, and Remove-HandMadeTasks.ps1 takes both off the
+  box (#3288).
 
   WHAT IT REFUSES.
     - anywhere that is not the box: a Windows workstation, which a gaming PC
@@ -108,7 +110,7 @@ if (-not $AllowGamingPc) {
 $broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
 $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
 $keepers = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
-$nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|failed)-\d{8}-\d{6})?|Thornswood-Backup|Thornswood-(Watch|Deploys|Caddy|Maint|Dumps))$'
+$nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|failed)-\d{8}-\d{6})?|Thornswood-Backup|Thornswood-(Watch|Deploys|Caddy|Dumps))$'
 # The service folders (#1183, #1691). Each keeps its rules by name, and Users goes:
 #   Watch    watch.ps1 and load.ps1 run as SYSTEM; the bot reads alerts and
 #            writes alerts-sent-bot.txt by the rules Install-Bot.ps1 gives it
@@ -119,13 +121,10 @@ $nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|fai
 #   Caddy    caddy.exe runs as LOCAL SERVICE with the SID of 'Thornswood
 #            Web' (Setup-Domain.ps1, #2578), by the rules it gives that SID;
 #            nothing else reads it.
-#   Maint    update.ps1 and dev-instance.ps1 run as SYSTEM, by design
-#            (docs\DEPLOY-IDENTITIES.md section 8); nothing here makes
-#            the Maint Update task or update.ps1 (#3288). Nothing else.
 #   Dumps    WER LocalDumps writes node.exe's crash dumps there as the crashing
 #            account: SYSTEM's and Administrators' like the backups, plus write
 #            (no read) for LOCAL SERVICE and the thornswood-runner* accounts.
-$svcRule = '^Thornswood-(Watch|Deploys|Caddy|Maint|Dumps)$'
+$svcRule = '^Thornswood-(Watch|Deploys|Caddy|Dumps)$'
 
 # The site's account, from its task, when it is one of its own.
 if (-not $SiteSid) {
