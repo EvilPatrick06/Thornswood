@@ -15,7 +15,7 @@
   "everyoneElse": 3378,
   "failedToInflate": 0,
   "guards": 393,
-  "noHold": 603,
+  "noHold": 639,
   "notPeople": 7723,
   "offAtStart": 2549,
   "people": 6935,
@@ -27,12 +27,12 @@
   "uniqueTransport": 27
  },
  "holdFrom": {
-  "its own location": 3182,
-  "nothing placed it": 603,
-  "the cell it stands in": 2124,
-  "the ground it stands on": 108,
+  "its own location": 3149,
+  "nothing placed it": 639,
+  "the cell it stands in": 2108,
+  "the ground it stands on": 107,
   "the nearest named place": 570,
-  "whose law it answers to": 348
+  "whose law it answers to": 362
  },
  "holds": {
   "Eastmarch": {
@@ -1701,18 +1701,18 @@
   },
   "Haafingar": {
    "counts": {
-    "everyoneElse": 375,
+    "everyoneElse": 354,
     "guards": 56,
-    "notPeople": 541,
-    "offAtStart": 253,
-    "people": 986,
-    "traders": 298,
+    "notPeople": 462,
+    "offAtStart": 250,
+    "people": 959,
+    "traders": 295,
     "transport": 4
    },
    "everyoneElse": {
     "Ahtar": 1,
     "Aia Arria": 1,
-    "Alchemist": 2,
+    "Alchemist": 1,
     "Apprentice Conjurer": 1,
     "Arena Vendor": 1,
     "Argonian": 2,
@@ -1749,7 +1749,7 @@
     "Erikur": 1,
     "Eris": 1,
     "Falk Firebeard": 1,
-    "Feral Vampire": 2,
+    "Feral Vampire": 1,
     "Fight Organisator": 1,
     "First Mate": 1,
     "Forsworn": 2,
@@ -1758,8 +1758,6 @@
     "Freir": 1,
     "Freyja Trodirson": 1,
     "Fridrika": 1,
-    "Fura Bloodmouth": 1,
-    "Garan Marethi": 1,
     "General Tullius": 1,
     "Giraud Gemane": 1,
     "Gisli": 1,
@@ -1800,7 +1798,6 @@
     "Leper": 1,
     "Lisette": 1,
     "Lodvar": 1,
-    "Lord Harkon": 1,
     "Lowlife": 1,
     "Lumberjack": 1,
     "Ma'zaka": 1,
@@ -1829,7 +1826,6 @@
     "Olda": 1,
     "Orc": 1,
     "Orellia Quintus": 1,
-    "Orthjolf": 1,
     "Pantea Ateia": 1,
     "Pelagius the Mad": 1,
     "Penitus Oculatus Agent": 11,
@@ -1837,7 +1833,6 @@
     "Priest": 3,
     "Prisoner": 1,
     "Raggedy Rolf": 1,
-    "Rargal Thrallmaster": 1,
     "Razelan": 1,
     "Redguard": 1,
     "Roggvir": 1,
@@ -1846,7 +1841,6 @@
     "Sabine Nytte": 1,
     "Safia": 1,
     "Sailor": 6,
-    "Salonia Caelia": 1,
     "Servant": 3,
     "Sheogorath": 1,
     "Silana Petreia": 1,
@@ -1855,7 +1849,6 @@
     "Snorreid": 1,
     "Sorex Vinius": 1,
     "Stabbed guard": 1,
-    "Stalf": 1,
     "Stormcloak Leader": 1,
     "Stormcloak Soldier": 19,
     "Styrr": 1,
@@ -1873,13 +1866,10 @@
     "Tsavani": 1,
     "Una": 1,
     "Vagrant": 1,
-    "Vampire Cattle": 10,
     "Vampire Fledgling": 7,
     "Varnius Junius": 1,
     "Veteran": 1,
     "Viarmo": 1,
-    "Vingalmo": 1,
-    "Watchman": 1,
     "Witch": 1,
     "Wood Elf": 1,
     "Xander": 1
@@ -1891,17 +1881,6 @@
     "Stormcloak Guard": 2
    },
    "offAtStart": [
-    {
-     "base": "1f0e6a:CFTO.esp",
-     "because": [
-      "KmodFastTravelDialogueFaction",
-      "KmodFerryRoute1Faction"
-     ],
-     "column": "transport",
-     "name": "Enthralled Ferryman",
-     "offBy": "its enable parent",
-     "ref": "1f0e6b:CFTO.esp"
-    },
     {
      "base": "1684d:Dawnguard.esm",
      "because": [
@@ -1924,10 +1903,10 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 195,
+    "everyoneElse": 193,
     "guards": 55,
     "traders": 0,
-    "transport": 3
+    "transport": 2
    },
    "traders": [
     {
@@ -2759,18 +2738,6 @@
      "where": "alsd"
     },
     {
-     "base": "3366:Dawnguard.esm",
-     "because": [
-      "DLC1ServicesFeran"
-     ],
-     "edid": "DLC1FeranSadri",
-     "holdFrom": "its own location",
-     "name": "Feran Sadri",
-     "ref": "33aa:Dawnguard.esm",
-     "unique": true,
-     "where": "Volkihar Keep"
-    },
-    {
      "base": "13275:Skyrim.esm",
      "because": [
       "ServicesSolitudeFletcher"
@@ -2793,18 +2760,6 @@
      "ref": "198d5:Skyrim.esm",
      "unique": true,
      "where": "Solitude Stables"
-    },
-    {
-     "base": "3365:Dawnguard.esm",
-     "because": [
-      "DLC1ServicesHestla"
-     ],
-     "edid": "DLC1Hestla",
-     "holdFrom": "its own location",
-     "name": "Hestla",
-     "ref": "33ac:Dawnguard.esm",
-     "unique": true,
-     "where": "Volkihar Keep"
     },
     {
      "base": "f4fb8:Skyrim.esm",
@@ -4606,18 +4561,6 @@
      "ref": "5cbf8:SkyrimSewers.esp",
      "unique": true,
      "where": "Solitude Sewers, Western Tunnel"
-    },
-    {
-     "base": "3367:Dawnguard.esm",
-     "because": [
-      "DLC1ServicesRonthil"
-     ],
-     "edid": "DLC1Ronthil",
-     "holdFrom": "its own location",
-     "name": "Ronthil",
-     "ref": "33af:Dawnguard.esm",
-     "unique": true,
-     "where": "Volkihar Keep"
     },
     {
      "base": "25905:FishingInSkyrim.esp",
@@ -6961,7 +6904,7 @@
    "counts": {
     "everyoneElse": 207,
     "guards": 4,
-    "notPeople": 729,
+    "notPeople": 709,
     "offAtStart": 148,
     "people": 376,
     "traders": 15,
@@ -7263,15 +7206,16 @@
   },
   "no hold": {
    "counts": {
-    "everyoneElse": 331,
+    "everyoneElse": 353,
     "guards": 50,
-    "notPeople": 580,
-    "offAtStart": 200,
-    "people": 603,
-    "traders": 22,
+    "notPeople": 702,
+    "offAtStart": 211,
+    "people": 639,
+    "traders": 25,
     "transport": 0
    },
    "everyoneElse": {
+    "Alchemist": 1,
     "Anger": 1,
     "Araniel the Wise": 1,
     "Arrowsong": 1,
@@ -7279,12 +7223,16 @@
     "Bandit": 17,
     "Blood Horker": 5,
     "Bodyguard": 2,
+    "Breton": 1,
     "Commoner": 8,
     "Confidence": 1,
     "Dremora Churl": 5,
     "Erlendr": 1,
     "Felldir the Old": 1,
+    "Feral Vampire": 1,
     "Fish Hatchery": 1,
+    "Fura Bloodmouth": 1,
+    "Garan Marethi": 1,
     "Gladiator": 6,
     "Gormlaith Golden-Hilt": 1,
     "Hakon One-Eye": 1,
@@ -7297,6 +7245,7 @@
     "Klog the Ogre": 1,
     "Klug the Dwarf": 1,
     "Legate Adventus Caesennius": 1,
+    "Lord Harkon": 1,
     "M'aiq the Liar": 1,
     "Malyn Varen": 1,
     "Miraak": 1,
@@ -7304,6 +7253,7 @@
     "Morven Stroud": 1,
     "Nikulas": 1,
     "Olaf One-Eye": 1,
+    "Orthjolf": 1,
     "Pelagius the Suspicious": 1,
     "Pelagius the Tormented": 1,
     "Planter": 121,
@@ -7312,8 +7262,11 @@
     "Prelate Edhelbor": 1,
     "Prelate Nirilor": 1,
     "Prelate Sidanyis": 1,
+    "Rargal Thrallmaster": 1,
+    "Salonia Caelia": 1,
     "Soul": 39,
     "Spectator": 60,
+    "Stalf": 1,
     "Stormcloak Soldier": 6,
     "TestCarryBasket": 1,
     "TestCarryFirewood": 1,
@@ -7321,20 +7274,79 @@
     "Tsun": 1,
     "Ulfgar the Unending": 1,
     "Valerica": 1,
+    "Vampire Cattle": 10,
+    "Vingalmo": 1,
+    "Watchman": 1,
     "White": 1,
     "Ysgramor": 1
    },
    "guards": {
     "Imperial Soldier": 50
    },
-   "offAtStart": [],
+   "offAtStart": [
+    {
+     "base": "1f0e6a:CFTO.esp",
+     "because": [
+      "KmodFastTravelDialogueFaction",
+      "KmodFerryRoute1Faction"
+     ],
+     "column": "transport",
+     "name": "Enthralled Ferryman",
+     "offBy": "its enable parent",
+     "ref": "1f0e6b:CFTO.esp"
+    },
+    {
+     "base": "336d:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesFlorentius"
+     ],
+     "column": "traders",
+     "name": "Florentius Baenius",
+     "offBy": "its own flag",
+     "ref": "3476:Dawnguard.esm"
+    },
+    {
+     "base": "336b:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesSorineJurard"
+     ],
+     "column": "traders",
+     "name": "Sorine Jurard",
+     "offBy": "its own flag",
+     "ref": "3475:Dawnguard.esm"
+    }
+   ],
    "offAtStartBy": {
-    "everyoneElse": 150,
+    "everyoneElse": 158,
     "guards": 50,
-    "traders": 0,
-    "transport": 0
+    "traders": 2,
+    "transport": 1
    },
    "traders": [
+    {
+     "base": "3366:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesFeran"
+     ],
+     "edid": "DLC1FeranSadri",
+     "holdFrom": "nothing placed it",
+     "name": "Feran Sadri",
+     "ref": "33aa:Dawnguard.esm",
+     "unique": true,
+     "where": "Volkihar Keep"
+    },
+    {
+     "base": "3365:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesHestla"
+     ],
+     "edid": "DLC1Hestla",
+     "holdFrom": "nothing placed it",
+     "name": "Hestla",
+     "ref": "33ac:Dawnguard.esm",
+     "unique": true,
+     "where": "Volkihar Keep"
+    },
     {
      "base": "4e50a:Skyrim.esm",
      "because": [
@@ -7576,6 +7588,18 @@
      "where": "lsdl"
     },
     {
+     "base": "3367:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesRonthil"
+     ],
+     "edid": "DLC1Ronthil",
+     "holdFrom": "nothing placed it",
+     "name": "Ronthil",
+     "ref": "33af:Dawnguard.esm",
+     "unique": true,
+     "where": "Volkihar Keep"
+    },
+    {
      "base": "23b6d:JKs Skyrim.esp",
      "because": [
       "XJKCiliaVendorFaction"
@@ -7606,7 +7630,7 @@
    "counts": {
     "everyoneElse": 222,
     "guards": 11,
-    "notPeople": 627,
+    "notPeople": 629,
     "offAtStart": 285,
     "people": 532,
     "traders": 12,
@@ -7908,11 +7932,11 @@
   },
   "the Reach": {
    "counts": {
-    "everyoneElse": 401,
+    "everyoneElse": 400,
     "guards": 45,
-    "notPeople": 714,
-    "offAtStart": 219,
-    "people": 696,
+    "notPeople": 701,
+    "offAtStart": 218,
+    "people": 694,
     "traders": 30,
     "transport": 1
    },
@@ -7939,7 +7963,7 @@
     "Borgakh the Steel Heart": 1,
     "Borkul the Beast": 1,
     "Braig": 1,
-    "Breton": 5,
+    "Breton": 4,
     "Brother Verulus": 1,
     "Cairine": 1,
     "Captain Aquilius": 1,
@@ -8086,7 +8110,7 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 174,
+    "everyoneElse": 173,
     "guards": 43,
     "traders": 1,
     "transport": 1
@@ -8474,9 +8498,9 @@
    "counts": {
     "everyoneElse": 407,
     "guards": 60,
-    "notPeople": 900,
-    "offAtStart": 282,
-    "people": 797,
+    "notPeople": 888,
+    "offAtStart": 275,
+    "people": 790,
     "traders": 44,
     "transport": 4
    },
@@ -8671,16 +8695,6 @@
      "ref": "ac9e9:Skyrim.esm"
     },
     {
-     "base": "336d:Dawnguard.esm",
-     "because": [
-      "DLC1ServicesFlorentius"
-     ],
-     "column": "traders",
-     "name": "Florentius Baenius",
-     "offBy": "its own flag",
-     "ref": "3476:Dawnguard.esm"
-    },
-    {
      "base": "336c:Dawnguard.esm",
      "because": [
       "DLC1ServicesGunmar"
@@ -8721,16 +8735,6 @@
      "ref": "9b7b4:Skyrim.esm"
     },
     {
-     "base": "336b:Dawnguard.esm",
-     "because": [
-      "DLC1ServicesSorineJurard"
-     ],
-     "column": "traders",
-     "name": "Sorine Jurard",
-     "offBy": "its own flag",
-     "ref": "3475:Dawnguard.esm"
-    },
-    {
      "base": "29daa:Skyrim.esm",
      "because": [
       "ServicesThievesGuildSyndus"
@@ -8752,9 +8756,9 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 216,
+    "everyoneElse": 211,
     "guards": 57,
-    "traders": 7,
+    "traders": 5,
     "transport": 2
    },
    "traders": [
@@ -9343,7 +9347,7 @@
    ]
   }
  },
- "readFrom": "102 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "readFrom": "101 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
  "sellers": {
   "0GQShopFaction": 1,
   "0WHBakeryFaction": 1,

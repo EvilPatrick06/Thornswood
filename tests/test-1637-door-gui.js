@@ -273,7 +273,7 @@ open(ALICE, DOOR_OUT);
   const held = W.holderOf(HOME);
   yes('D2 the claim the key sends is answered by the property block', r.handled === true);
   yes('D2 and Honeyside is Alice\'s, with the deed in her pack',
-      !!held && held.by === ALICE.pid && holds(ALICE, DEED_DESC, 'Deed to Honeyside'));
+      !!held && held.by === ALICE.pid && holds(ALICE, DEED_DESC, W.deedLabel(HOME)));
   yes('D2 and the line at the door says Lock now, as a new write',
       lineOf(ALICE).x === 'lock' && lineOf(ALICE).at > was);
 }
@@ -326,7 +326,7 @@ yes('D4 Bob at his own shop is offered Lock', lineOf(BOB).x === 'lock' && lineOf
 // D7: the deed carried to the door moves the place, and the line follows.
 {
   const entries = pack(ALICE);
-  const at = entries.findIndex(function (e) { return e.name === 'Deed to Honeyside'; });
+  const at = entries.findIndex(function (e) { return e.name === W.deedLabel(HOME); });
   pack(CAROL).push(entries.splice(at, 1)[0]);
   open(CAROL, DOOR_OUT);
   yes('D7 Carol carries the deed through the door and holds Honeyside', W.holderOf(HOME).by === CAROL.pid);
@@ -340,15 +340,15 @@ function give(p, baseDesc, n, name) {
   if (name) { e.name = name; }
   pack(p).push(e);
 }
-give(ALICE, MOLD_DESC, 1, 'Key mold for Honeyside');
+give(ALICE, MOLD_DESC, 1, W.moldLabel(HOME));
 give(ALICE, INGOT, 2);
 smithAt(ALICE, 1100);
 {
   const r = word(ALICE, '/key', [FORGE_REF.toString(16)]);
   yes('K1 a smith at the forge with the mold cuts a key named for the building: "' + r.told + '"',
-      holds(ALICE, KEY_DESC, 'Key to Honeyside'));
+      holds(ALICE, KEY_DESC, W.keyLabel(HOME)));
   yes('K1 for one iron ingot, the Key\'s price at a forge', count(ALICE, INGOT) === 1);
-  yes('K1 and the mold is kept', holds(ALICE, MOLD_DESC, 'Key mold for Honeyside'));
+  yes('K1 and the mold is kept', holds(ALICE, MOLD_DESC, W.moldLabel(HOME)));
 }
 function keys(p) { return pack(p).filter(function (e) { return e.baseId === idOf(KEY_DESC); }).length; }
 {
@@ -363,7 +363,7 @@ function keys(p) { return pack(p).filter(function (e) { return e.baseId === idOf
   const z = word(ALICE, '/key', ['zz']);
   yes('K4 an id that is not one cuts nothing', keys(ALICE) === had && count(ALICE, INGOT) === 1);
   refs[CAROL.a].pos = [1100, 1000, 0];
-  give(CAROL, MOLD_DESC, 1, 'Key mold for Honeyside');
+  give(CAROL, MOLD_DESC, 1, W.moldLabel(HOME));
   give(CAROL, INGOT, 1);
   const c = word(CAROL, '/key', [FORGE_REF.toString(16)]);
   yes('K5 somebody who is not a smith is told it is a smith\'s work', /smith/.test(c.told) && keys(CAROL) === 0 && count(CAROL, INGOT) === 1);
@@ -417,7 +417,7 @@ function keys(p) { return pack(p).filter(function (e) { return e.baseId === idOf
                         pv + '\nreturn propertyView(' + CAROL.a + ', ' + CAROL.pid + ');')(
       g, mp, idOf, BUILDING_NAME, function () { }, 24);
   });
-  const home = (rows || []).filter(function (r) { return r.name === 'Honeyside'; })[0];
+  const home = (rows || []).filter(function (r) { return r.name === W.placeOf(HOME); })[0];
   const farm = (rows || []).filter(function (r) { return r.farm; })[0];
   yes('P1 a building you hold carries the rent on it, owed up to now',
       !!home && !!home.rent && home.rent.amount === 50 && home.rent.every === 7 && home.rent.owed === 50);
@@ -429,7 +429,7 @@ function keys(p) { return pack(p).filter(function (e) { return e.baseId === idOf
                         pv + '\nreturn propertyView(' + CAROL.a + ', ' + CAROL.pid + ');')(
       g, mp, idOf, BUILDING_NAME, function () { }, 24);
   });
-  const bare = (rows || []).filter(function (r) { return r.name === 'Honeyside'; })[0];
+  const bare = (rows || []).filter(function (r) { return r.name === W.placeOf(HOME); })[0];
   yes('P3 a place with no rent says none', !!bare && bare.rent === null);
 
   // The farming block's own answer.

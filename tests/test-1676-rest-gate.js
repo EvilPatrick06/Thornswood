@@ -158,7 +158,7 @@ function keyAt(rest) {
   const gave = [];
   const G = { __thornswoodNeeds: needsAt(rest) };
   const run = new Function('g', 'isSmith', 'forgeHere', 'moldInHand', 'heldBy', 'here', 'takeItem',
-    'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'plog', 'unfitToMake',
+    'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'placeOf', 'plog', 'unfitToMake',
     'toolGate', 'wearTool',
     cutKeySrc + '\nreturn cutKey;')(
     G,
@@ -167,6 +167,7 @@ function keyAt(rest) {
     function (id, item, n) { took.push(n); return true; },
     function () { gave.push(1); return true; }, function () { },
     'ingot', 'key', function () { return 'Key to Honeyside'; }, function () { return 'Honeyside'; },
+    function () { return 'Honeyside'; },
     function () { }, gateFor(G),
     // The smith holds a hammer (#3162); tests/test-3162-bench-tools.js asks the refusal.
     function () { return null; }, function () { return null; });

@@ -123,7 +123,7 @@ function Invoke-Box([string]$mode, [hashtable]$vars = @{}) {
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     $out = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Bypass -Script ($pre + [IO.File]::ReadAllText($BoxScript)) |
-        ForEach-Object { [string]$_ } | Where-Object { $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+        ForEach-Object { [string]$_ })
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     return [pscustomobject]@{ Code = $rc; Lines = $out }

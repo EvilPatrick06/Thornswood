@@ -37,6 +37,22 @@ that makes two items from one craft is still one piece of work.
 
 Each rank hands one skill-tree point. See [Skill tree](skill-tree.md).
 
+A rank in a half you make things in also says what it just opened,
+counted the way the recipe book on K counts it: how many recipes sit at
+that rank, their kinds, and how many of them Skyrim lists at the bench
+(Patrick, 26 October 2026, #3149). The rest each carry a condition of
+their own, a perk or a spell or something to hold first:
+
+> You are now an Advanced Platewright. 1 skill point to spend, on K.
+> Advanced Platewright work opens 57 more recipes to you: armoured
+> boots, gauntlets, helmets, body armour, shields and other armour and
+> clothing. Skyrim lists 2 of them at the bench. The other 55 each
+> carry a condition of their own, a perk or a spell or something you
+> have to be holding.
+
+The count leaves out what your race may not make, as the book does. A
+half with nothing at the rank reached gets the rank line alone.
+
 The same ladder is used by every class. A miner and a tailor are not
 on different clocks.
 
@@ -94,6 +110,39 @@ fittings are refused: [lists/refused.md](lists/refused.md).
 A recipe can also demand a race. [Races](races.md). The locked rows
 are marked in the lists and collected in
 [lists/race-locks.md](lists/race-locks.md).
+
+## Crude, fine and masterwork
+
+Patrick, 22 October 2026 (#3151): a weapon or an armour piece made at
+a bench comes out crude, fine or masterwork. Crude is a tenth worse
+than the piece as its record has it, and masterwork a tenth better: a
+weapon's damage, an armour piece's rating. Fine is the piece as its
+record has it, the same as anything that was not made at a bench.
+
+What decides it is your skill over the materials. A recipe's rank is
+the rank of the dearest thing it asks for, so the question is how many
+ranks you stand above that rank in the half the recipe is, before this
+piece counts toward your next one.
+
+| Ranks above the recipe | Crude | Masterwork |
+| --- | --- | --- |
+| 0, at the edge of what you can | 25% | 5% |
+| 1 | 10% | 15% |
+| 2 | 5% | 25% |
+| 3, a master on novice stock | never | 35% |
+
+The rest is fine. A batch is one roll. The tier is on the piece's
+name, `Iron Sword (Crude)` or `Steel Armor (Masterwork)`, and a
+condition goes after it: `Steel Armor (Masterwork) (85%)`. A repair
+never changes the tier. A Master Weaver's mark goes in front:
+`Master-Lined Leather Armor (Masterwork)`.
+
+Only what strikes or holds is rolled: swords, daggers, greatswords, war
+axes, battleaxes, maces, warhammers, bows, and light and heavy armour
+with shields. Clothing, jewellery, staves, instruments, arrows and
+tools are not, because none of them has a damage or a rating to move.
+A cook's dish has its own three, on the [Cook](professions/cook.md)
+page.
 
 ## Apprentices
 
@@ -184,12 +233,60 @@ lists linked from each sub-profession.
 
 A mage sees the spell book there instead.
 
+## The guides on K
+
+Press K, Profession guides. Every profession has a page, one tab
+each, and it opens on your own (Patrick, 22 Oct, A on #3165). It is
+there while you create a character too, before Home, so a profession
+can be read before it is picked. A page says three things:
+
+- What it makes: each half, the benches it works at and the rank each
+  opens at, its families with how many rows sit at each rank, and the
+  first things a new novice can make. A warrior's page lists the
+  maneuvers instead, and a mage's the spells of each school.
+- Where the materials come from: the inputs its recipes ask for most,
+  the class each one rests on and at what rank, the bench that makes
+  it out of what, and where it is found (the mines with the most veins
+  of the ore, or the kinds of animal that give the part).
+- How to rank up: what counts as a piece of work for it, the ladder,
+  the rest a piece costs, the sister half and the party bonus.
+
+The facts are read out of `game\data\recipes.json`,
+`game\data\mine-buildings.json`, `game\data\hunts.json` and the
+gamemode's bench table, maneuvers and tuning by
+`scripts\dev\Build-ProfessionGuides.js`, which writes them into
+`game\ui\thornswood-skills.js`. Run it after any of those change;
+`tests\test-3165-profession-guides.js` fails while the page is behind.
+
 ## Names that are not a profession
 
 Bard, merchant, priest, scholar and thief are not picked on K. They
 grant no recipe, no verb and no rank. Bardic rest is on
 [People beside you](people.md). The merchant NPCs belong to the
 [Merchant's Guild](merchants-guild.md).
+
+## Staff
+
+Staff have a crafting card on the Office page of K. They pick somebody
+in the world and see every class, half and school that person holds, its
+rank, and the work counted toward the next. Raise moves one rank, the
+way the work would: the same ceilings hold, so a taught trade stays at
+novice and a sister half past novice still needs its Master, and the
+rank gives its skill point, and a spell point for a mage's school or an
+Enchanter's staff spells. The count toward the next rank starts again at
+0.
+
+The card also asks the server about a recipe by what it makes: whether
+that person may make it, and if not, the reason the bench would give.
+When they may make it and the bench still leaves it out, the card says
+whether their game was handed an older list than the server gives now,
+which a button hands it again, or whether the game's own recipe asks for
+a perk, an item or a spell first.
+
+And staff give back an item somebody lost, with a count and a reason.
+Nothing records what was lost, so the reason is the record. Nobody does
+any of it to themselves, and every change is in the staff log with the
+name of the staff member who made it.
 
 ## Where this is
 
@@ -209,7 +306,14 @@ those recipes off every bench until the answer changes, so a rank, a
 Master taking you on or a roll changes the list straight away. A recipe
 nobody owns is listed for everybody.
 
-Not in the world yet: the parts of a warrior's maneuvers the game
+A weapon or an armour piece comes out crude, fine or masterwork, and
+the tier is on its name, in the server. The line at a rank up naming
+what it opened is in the server too.
+
+Not in the world yet: the tenth less or more for a crude or masterwork
+piece, which the engine's damage formula reads off the name (the fork
+has it since 26 October, and it waits on the next engine pin), the
+parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), the check of which effect a
 brew or an enchantment carries (the engine does not pass it yet),

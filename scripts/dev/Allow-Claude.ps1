@@ -8,7 +8,7 @@
 
   A Claude here can read the repo and run the read only scripts, and everything
   else it is asked to do it shows you instead. That is the arrangement in
-  CLAUDE.md and it is not what this changes. What this changes is the two ways
+  the ops repo's CLAUDE.md and it is not what this changes. What this changes is the two ways
   that arrangement breaks down into "I could not, ask Patrick" over things
   nobody meant to withhold:
 
@@ -27,11 +27,17 @@
 
   Nothing that leaves this machine on its own: no Ship, no push, no
   Publish-Server, no Deploy to the live server, no Rotate-ServerPassword. Those
-  stay yours to run, which is the point of that section of CLAUDE.md. The one
+  stay yours to run, which is the point of that section of the ops repo's CLAUDE.md. The one
   exception already in your settings before this ran is Deploy-DevGamemode,
   which you put there yourself.
 
   Everything it adds is either read only or builds something on this machine.
+  Two scripts do more than look unless they are given one switch, so their
+  rules name that switch and nothing else: Sync-Client.ps1 only with -Check
+  (without it, it copies the client into the game folder and can fetch the
+  engine build from GitHub) and Setup-SshKey.ps1 only with -Test (without it,
+  it makes keys, edits the ssh config, and -NewBox logs in to the box to add
+  one). Issue #3985: their rules used to allow any arguments.
 
   WHERE IT WRITES
 
@@ -41,10 +47,14 @@
   decision about somebody else's machine, so it is a switch and not the
   default.
 
-  It never removes anything, it never reorders anything it did not add, and it
-  keeps every other key in the file exactly as it was. It writes UTF-8 with no
-  byte order mark, because a mark in a JSON file is how the dev server was
-  taken down on 18 September and the same tools read this one.
+  It removes only a rule it wrote itself that allows more than it now allows:
+  the any-arguments rule for Sync-Client.ps1 or Setup-SshKey.ps1 that it wrote
+  before #3985, which would otherwise keep allowing everything the narrow
+  rules leave out. It says each one it removes. It never reorders anything it
+  did not add, and it keeps every other key in the file exactly as it was. It
+  writes UTF-8 with no byte order mark, because a mark in a JSON file is how
+  the dev server was taken down on 18 September and the same tools read this
+  one.
 
   Usage:
     .\scripts\dev\Allow-Claude.ps1              add what is missing
@@ -61,7 +71,7 @@ param(
     # Also allow the scripts that reach the VPS and GitHub. OFF BY DEFAULT.
     # Asked for by Patrick on 21 September, in his own words: run it yourself so
     # you can, I want it all done when I wake up. It is a switch rather than the
-    # default because CLAUDE.md says these are his to run, and a rule that grants
+    # default because the ops repo's CLAUDE.md says these are his to run, and a rule that grants
     # them should be something somebody typed on purpose.
     [switch]$Live,
     # Somewhere else entirely.
@@ -78,6 +88,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Add($m)  { Write-Host ('  +     ' + $m) -ForegroundColor Green }
 function Have($m) { Write-Host ('  have  ' + $m) -ForegroundColor DarkGray }
+function Drop($m) { Write-Host ('  -     ' + $m) -ForegroundColor Magenta }
 function Skip($m) { Write-Host ('  skip  ' + $m) -ForegroundColor Yellow }
 function Die($m)  { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
@@ -93,7 +104,7 @@ function Die($m)  { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; i
 #                 plant, ore and spell tables are read out of these records
 #                 rather than typed from memory, and that only works if the
 #                 records can be read.
-#   the profile   launcher.log and plugins.txt. CLAUDE.md says to read
+#   the profile   launcher.log and plugins.txt. The ops repo's CLAUDE.md says to read
 #                 launcher.log before claiming a cause, which needs this.
 #
 $WantDirs = @(
@@ -107,6 +118,12 @@ $WantDirs = @(
 # pwsh, no profile, -File, a repo relative path. A Claude will call them that
 # way and no other, because a rule that does not match how it is called is a
 # rule that does nothing.
+#
+# A script with Forms is allowed only with exactly those arguments, one rule
+# for each, with no :* on the end: Claude Code matches a rule without it
+# against the whole command, so nothing else may follow the switch. A script
+# without Forms is allowed with any arguments, because every way of running
+# it is read only or builds here.
 #
 # Two groups, and the difference matters:
 #
@@ -125,8 +142,8 @@ $WantAllow = @(
     @{ Script = 'Build-HarvestTable.ps1'; Why = 'reads every plant out of the game records' },
     @{ Script = 'Build-OreTable.ps1';     Why = 'reads every ore vein out of the game records' },
     @{ Script = 'Build-SpellTable.ps1';   Why = 'reads every spell out of the masters' },
-    @{ Script = 'Sync-Client.ps1';        Why = 'the client runtime; -Check only looks' },
-    @{ Script = 'Setup-SshKey.ps1';       Why = '-Test only looks' },
+    @{ Script = 'Sync-Client.ps1';        Why = 'the client runtime: -Check only, which only looks'; Forms = @('-Check', '-Check -NoPause') },
+    @{ Script = 'Setup-SshKey.ps1';       Why = 'ssh to the box: -Test only, which only looks';      Forms = @('-Test', '-Test -NoPause') },
     @{ Script = 'Check-Backdrop.ps1';     Why = 'read only' },
     @{ Script = 'Check-Build.ps1';        Why = 'read only' },
     @{ Script = 'Check-Chargen.ps1';      Why = 'read only' },
@@ -215,6 +232,7 @@ $allow = @($perm.allow)
 $dirs  = @($perm.additionalDirectories)
 
 $added = 0
+$removed = 0
 
 Head 'Folders outside the repo'
 
@@ -255,26 +273,46 @@ foreach ($a in $allowList) {
         continue
     }
     $rel = 'scripts/' + (Split-Path -Leaf (Split-Path -Parent $full)) + '/' + $s
-    $rule = 'Bash(pwsh -NoProfile -File ./' + $rel + ':*)'
-    $has = @($allow | Where-Object { [string]$_ -ieq $rule })
-    if ($has.Count) { Have ($s + '  ' + $a.Why); continue }
-    Add ($s + '  ' + $a.Why)
-    $allow += $rule
-    $added++
+    $call = 'pwsh -NoProfile -File ./' + $rel
+    $wide = 'Bash(' + $call + ':*)'
+    $forms = @($a.Forms | Where-Object { $_ })
+    if (-not $forms.Count) {
+        $has = @($allow | Where-Object { [string]$_ -ieq $wide })
+        if ($has.Count) { Have ($s + '  ' + $a.Why); continue }
+        Add ($s + '  ' + $a.Why)
+        $allow += $wide
+        $added++
+        continue
+    }
+    # Only these forms: the any-arguments rule this script wrote before #3985
+    # comes out, or it would still allow what the forms leave out.
+    if (@($allow | Where-Object { [string]$_ -ieq $wide }).Count) {
+        Drop ($wide + '  allowed any arguments')
+        $allow = @($allow | Where-Object { [string]$_ -ine $wide })
+        $removed++
+    }
+    foreach ($f in $forms) {
+        $rule = 'Bash(' + $call + ' ' + $f + ')'
+        $has = @($allow | Where-Object { [string]$_ -ieq $rule })
+        if ($has.Count) { Have ($s + ' ' + $f + '  ' + $a.Why); continue }
+        Add ($s + ' ' + $f + '  ' + $a.Why)
+        $allow += $rule
+        $added++
+    }
 }
 
 Head 'What happens now'
 
-if ($added -eq 0) {
-    Say '  Nothing to add. Everything above is already allowed.' 'Green'
+if ($added -eq 0 -and $removed -eq 0) {
+    Say '  Nothing to change. Everything above is already allowed, and nothing wider.' 'Green'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
 
 if ($Check) {
-    Say ("  -Check, so nothing was written. {0} entr(ies) would be added." -f $added) 'Yellow'
-    Say '  Run it again without -Check to add them.'
+    Say ("  -Check, so nothing was written. {0} entr(ies) would be added and {1} removed." -f $added, $removed) 'Yellow'
+    Say '  Run it again without -Check to make the change.'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
@@ -295,7 +333,7 @@ if ($raw) {
 # how the dev server was taken down on 18 September.
 $json = $doc | ConvertTo-Json -Depth 30
 [IO.File]::WriteAllText($SettingsPath, $json, (New-Object Text.UTF8Encoding($false)))
-Say ("  wrote {0} new entr(ies)" -f $added) 'Green'
+Say ("  wrote {0} new entr(ies) and removed {1}" -f $added, $removed) 'Green'
 
 # Proved rather than assumed: read it back, parse it, and check the first byte.
 try {
@@ -317,8 +355,9 @@ if ($Live) {
     Say '  Wipe-Saves, Rotate-ServerPassword and Clean-Everything are deliberately not, and should stay that way.'
     Say '  Take any of it back by deleting the line from the allow list, or with /permissions.'
 } else {
-    Say '  Nothing here lets anything leave this machine on its own. Ship, push, Publish-Server'
-    Say '  and the live Deploy scripts are all still yours to run.'
+    Say '  Nothing here changes anything off this machine. Check-LiveGamemode and Setup-SshKey -Test'
+    Say '  ask the box and change nothing; Ship, push, Publish-Server and the live Deploy scripts'
+    Say '  are all still yours to run.'
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

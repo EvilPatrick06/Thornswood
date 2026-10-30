@@ -75,6 +75,9 @@ const pieces = {
   handle: lineOf(/^const HANDLE_DESC = .*$/m),
   key: lineOf(/^const KEY_RECIPE = .*$/m),
   noProf: lineOf(/^const NO_PROFESSION_AT_A_BENCH = .*$/m),
+  // #3151: the quality a weapon or an armour piece comes out at, which onCraft asks.
+  quality: [slice(gm, 'const CRAFT_QUALITY = {', '\n};'), lineOf(/^const QUALITY_WEAPON_FAMILIES = .*$/m),
+            lineOf(/^const QUALITY_RANKS = .*$/m)].join('\n'),
   toolNumbers: [lineOf(/^const TOOL_USES = .*$/m), lineOf(/^const TOOL_WARN_AT = .*$/m),
                 lineOf(/^const POLE_USES = .*$/m), lineOf(/^const TOOL_PROPERTY = .*$/m)].join('\n'),
   fns: ['function idOf(descriptor)', 'function mintedEntry(entry)', 'function takeItem(actorId, itemDesc, count)',
@@ -82,6 +85,8 @@ const pieces = {
         'function packCount(actorId, itemDesc)', 'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)',
         'function wantsAHandle(row)', 'function holdsPerk(actorId, key)', 'function wovenMark(actorId)',
         'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
+        'function qualityTier(margin, roll)', 'function qualityRolled(row, baseId)',
+        'function qualityMargin(actorId, row)', 'function qualityOutput(actorId, row, margin)',
         'function unfitToMake(actorId, workbenchId)', 'function rankWord(rank)', 'function aWord(name)',
         'function professionName(prof)', 'function craftAnswer(actorId, row)',
         'function toolFor(key)', 'function holdsTool(actorId, tool)', 'function toolStamps(actorId)',
@@ -185,7 +190,7 @@ function rig(state, missing) {
     __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } },
     __thornswoodManeuvers: { WOVEN: { mark: 'Master-Lined ', less: 0.1 } }
   };
-  const body = [pieces.grades, pieces.fuel, pieces.hafted, pieces.handle, toolsSrc, pieces.toolNumbers, pieces.key, pieces.noProf]
+  const body = [pieces.grades, pieces.fuel, pieces.hafted, pieces.handle, toolsSrc, pieces.toolNumbers, pieces.key, pieces.noProf, pieces.quality]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft +
     '\nreturn { onCraft: mp.onCraft, benchGate: benchGate, giveTool: giveTool, benchToolKey: benchToolKey, toolGate: toolGate };';
   const api = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'BENCH_ACCESS', 'BENCH_BY_BASE',

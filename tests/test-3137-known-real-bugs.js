@@ -2,9 +2,12 @@
 //
 //     node tests/test-3137-known-real-bugs.js
 //
-// The Known Issues page lists only what is actually broken, every row of it is
-// an issue on the board, and what works the way it does on purpose is on the
-// Help page instead.
+// The Known Issues page lists only what is actually broken, and every row of
+// it is an issue on the board. What works the way it does on purpose is not
+// listed anywhere: Patrick, 26 Oct, 11:42 AM, on Help's Things that are normal
+// here: "we can just remove that whole section from help, this ism just
+// clutter people arent fucking that stupid". So that section is gone too, and
+// nothing points at it.
 //
 // Issue #3137, Patrick: "we need to add any of the known issues ion the discor
 // or the website to the issues boards and get them fixed aswell as remove
@@ -24,8 +27,8 @@
 //   - no longer true: fishing "no rod needed" (the server asks for a pole);
 //   - on purpose: the mods the collection took out, what the server owns, the
 //     bare creation hall, leaving with no class, an old launcher, the load
-//     order rule. Those went to help.md's Things that are normal here, or were
-//     already there.
+//     order rule. Those went to help.md's Things that are normal here, which
+//     Patrick then removed whole (26 Oct).
 // The old harnesses for the sections that came off (test-known-npcs.js for the
 // NPC section, test-known-page.js for the table of removed mods) went with
 // them, since what they checked is no longer on the page by decision.
@@ -66,17 +69,16 @@ yes('the page does not show issue numbers to testers', !/#\d{2,}/.test(page));
   ['the creation hall rows', /creation hall|leave the hall/i],
   ['the old launcher row', /before 26 September/i]
 ].forEach(function (c) { yes('the page no longer has ' + c[0], !c[1].test(page)); });
-yes('the opening sends what is on purpose to Help', /\[Help\]\(\/help\)/.test(page.split('\n## ')[0]) &&
-    /on purpose/i.test(page.split('\n## ')[0]));
+yes('the opening no longer sends anybody to Help for what is on purpose',
+    !/on purpose|normal here/i.test(page.split('\n## ')[0]));
 
-// 3. Help has what moved there.
-const normal = (help.split('## Things that are normal here')[1] || '').split('\n## ')[0];
-yes('Help has its Things that are normal here list', normal.length > 0);
-yes('it says what the server owns', /server owns where you are/i.test(normal) && /put back/i.test(normal));
-yes('it says fishing is the Fisher\'s trade, with a pole', /Fishing is the Fisher's trade/.test(normal) && /pole/.test(normal));
-yes('it says mods come in batches because of the load order', /batches/.test(normal) && /load order/.test(normal));
-yes('it no longer calls the menus that still reset deliberate', !/QuickLoot/.test(normal));
-yes('and it ends by pointing at Known Issues for what is broken', /\[Known Issues\]\(\/known\)\s+lists what is broken right now/.test(normal));
+// 3. Help has no list of what is normal, and nothing points at one.
+yes('Help has no Things that are normal here section', !/normal here/i.test(help));
+yes('nor does any public page, the Known Issues intro or the Discord docs point at one',
+    ['site/data/site/join.md', 'site/server.js'].every(function (f) { return !/normal here|on purpose\.?$/im.test(read(f) || ''); }) &&
+    !/lists what works this way on purpose/.test(content));
+yes('Help still says where to look first, and Known Issues lists what is broken',
+    /\[Known Issues\]\(\/known\) first/.test(help));
 yes('Help tells somebody with a launcher from before 26 September to take the installer again',
     /launcher last opened before 26 September/.test(help) && /\[Downloads\]\(\/downloads\)/.test(help));
 
@@ -84,8 +86,8 @@ yes('Help tells somebody with a launcher from before 26 September to take the in
 yes('Discord no longer calls the known issues page broken on purpose', !/broken on purpose/i.test(content));
 yes('the Discord questions no longer explain NPCs by who is nearest or hosting swaps',
     !/Whoever is nearest is the one running them/.test(content) && !/Hosting swaps/.test(content));
-yes('and fast travel points at the help page, not Known Issues',
-    /\*\*Fast travel\?\*\*[^*]*\*\*https:\/\/thornswood\.net\/help\*\*/.test(content));
+yes('the menus that forget their settings are called a bug, not a lack of a save file',
+    /forget their settings every session\. That is a\s+bug/.test(content) && !/no save\s+file for them/.test(content));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

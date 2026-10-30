@@ -314,6 +314,27 @@ try {
     yes 'the stage''s own config.json is not failed by name' (-not $r.Out.Contains('config.json'))
     yes 'without any value' (-not (Test-Leaks $r.Out))
 
+    # ------------------------------------------- a stage of an older release (#3099)
+    # The installer of a release whose client is not the checkout's holds the
+    # six files to the record of the launcher it packs.
+    $older = Join-Path $work 'stage-older'
+    $bundle = Join-Path $older 'payload\Data\Platform\Plugins\skymp5-client.js'
+    Write-Utf8 $bundle "// an older client`n"
+    $sha = (Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash.ToLowerInvariant()
+    $olderRec = Join-Path $work 'older-client-build.json'
+    Write-Utf8 $olderRec ('{"forkCommit":"0lder000","files":{"Data\\Platform\\Plugins\\skymp5-client.js":{"sha256":"' + $sha + '","bytes":1}}}')
+    $r = Invoke-Scan @{ Dir = $older; Allow = $noAllow }
+    yes 'held to the checkout''s record, an older client fails' ($r.Code -eq 1 -and $r.Out.Contains('skymp5-client.js:0  client-not-recorded-build'))
+    $r = Invoke-Scan @{ Dir = $older; Allow = $noAllow; ClientRecord = $olderRec }
+    yes 'held to the record it was built with, it passes' ($r.Code -eq 0)
+    Write-Utf8 $bundle "// one byte changed`n"
+    $r = Invoke-Scan @{ Dir = $older; Allow = $noAllow; ClientRecord = $olderRec }
+    yes 'and a changed byte still fails against that record' ($r.Code -eq 1 -and $r.Out.Contains('skymp5-client.js:0  client-not-recorded-build'))
+    $badRec = Join-Path $work 'bad-client-build.json'
+    Write-Utf8 $badRec '{"forkCommit":"x"}'
+    $r = Invoke-Scan @{ Dir = $older; Allow = $noAllow; ClientRecord = $badRec }
+    yes 'a record that names no files stops the scan' ($r.Code -eq 2)
+
     # ---------------------------------------------------------------- the repo
     $repo = $here
     $r = Invoke-Scan @{}
@@ -330,6 +351,7 @@ try {
     $pkg = [IO.File]::ReadAllText((Join-Path $here 'scripts\release\Package-Thornswood.ps1'))
     $a = $pkg.IndexOf("Check-Secrets.ps1')")
     yes 'Package-Thornswood scans the stage' ($a -ge 0 -and $pkg.Contains('-Dir $stage'))
+    yes 'held to the record of the launcher it packs (#3099)' ($pkg.Contains('-Dir $stage -ClientRecord $clientRecordPath') -and $pkg.IndexOf('Remove-Item -LiteralPath $clientRecordDir') -gt $a)
     yes 'before -NoArchive hands it over and before it is compressed' ($a -ge 0 -and $a -lt $pkg.IndexOf('if ($NoArchive)') -and $a -lt $pkg.IndexOf("Head 'Compressing'"))
 
     # And the two hooks themselves, run: the block out of each script, with Die
@@ -369,12 +391,20 @@ try {
 
     $pkgFrom = '# ---- nothing that must never ship ----'
     $pkgTo = '# ---- archive ----'
+    # The record the packager saved for the launcher it packs (#3099), which
+    # the hook hands the scan and then removes.
+    $clientRecordDir = Join-Path $work 'package-client'
+    $clientRecordPath = Join-Path $clientRecordDir 'client-build.json'
+    $null = New-Item -ItemType Directory -Force -Path $clientRecordDir
+    Copy-Item -LiteralPath (Join-Path $repo 'records\client-build.json') -Destination $clientRecordPath
     $d = Invoke-Hook $pkg $pkgFrom $pkgTo
     yes 'Package-Thornswood stops on a stage carrying a token' ($d -ne 'no hook' -and $d -match 'staged installer')
     $stageGood = Join-Path $work 'stage-good'
     Write-Utf8 (Join-Path $stageGood 'payload\Data\Platform\Plugins\thornswood-front.js') "var a = 1;`n"
     Write-Utf8 (Join-Path $stageGood 'config.json') "{}`n"
     $stage = $stageGood
+    $null = New-Item -ItemType Directory -Force -Path $clientRecordDir
+    Copy-Item -LiteralPath (Join-Path $repo 'records\client-build.json') -Destination $clientRecordPath
     $d = Invoke-Hook $pkg $pkgFrom $pkgTo
     yes 'and lets a clean stage through' ($d -eq '')
     $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))

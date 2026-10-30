@@ -5,6 +5,7 @@
     "Dawnguard.esm",
     "HearthFires.esm",
     "Dragonborn.esm",
+    "_ResourcePack.esl",
     "Water for ENB.esm",
     "Embers XD.esm",
     "Expressive Facegen Morphs.esl",
@@ -103,7 +104,7 @@
     "Playable Rieklings.esp",
     "Thornswood-Last.esp"
   ],
-  "builtAt": "2026-10-26T17:54:47.201Z",
+  "builtAt": "2026-10-26T22:43:21.795Z",
   "reach": {
     "flame": 300,
     "craft": 260

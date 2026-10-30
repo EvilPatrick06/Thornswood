@@ -8,7 +8,7 @@
   -Collect sends scripts\vps\Get-ProdFacts.ps1 to the VPS through
   Remote.ps1 and saves what it prints to -Facts. Get-ProdFacts only reads:
   no write, no start, no stop, no setting changed. Collecting is a live
-  step, so it is Claude's to run (claude-queue\2165-prod-parity.md).
+  step, so it is Claude's to run (the ops repo's ops\claude-queue\2165-prod-parity.md).
 
   Without -Collect it reads a saved -Facts file and compares it with
   records\prod-parity.json and the repository's own files. That part is
@@ -143,6 +143,25 @@ foreach ($e in $r.files) {
     $ok = (Get-RepoHashes $e.repo) -contains $live
     Row 'file' $e.live "same as $($e.repo) at this checkout" $(if ($ok) { 'same' } else { 'differs (or deployed from another commit)' }) $ok
 }
+
+# ---- inbound firewall rules (#3807) ----------------------------------------
+# Every enabled inbound Allow rule is on the record's list, by Name or
+# DisplayName, and every required one is on. Set-InboundRules.ps1 turns off
+# whatever is not listed; one that shows up afterwards is a door nobody wrote
+# down. The row names a rule by its DisplayName: a Name can be a long run of
+# letters and dashes that the secret scan below refuses.
+if ($f.PSObject.Properties.Name -contains 'inboundRules') {
+    $listed = @($r.inboundRules | ForEach-Object { [string]$_.rule })
+    foreach ($e in @($r.inboundRules | Where-Object { $_.required })) {
+        $on = @($f.inboundRules | Where-Object { $_.name -eq $e.rule -or $_.displayName -eq $e.rule })
+        Row 'firewall' $e.rule 'on (required)' $(if ($on) { 'on' } else { 'off, or not on the box' }) ([bool]$on)
+    }
+    foreach ($x in @($f.inboundRules)) {
+        if ($listed -contains [string]$x.name -or $listed -contains [string]$x.displayName) { continue }
+        $ports = if (@($x.ports).Count) { @($x.ports) -join ',' } else { 'Any' }
+        Row 'firewall' $x.displayName 'not listed in the record' ('on, ' + $x.protocol + ' ' + $ports + ' from ' + (@($x.remote) -join ',')) $false
+    }
+} else { Row 'firewall' 'inbound rules' 'collected' 'facts from before #3807 carry none' $false }
 
 # ---- TLS -------------------------------------------------------------------
 $site = @($f.certs | Where-Object { $_.subject -match 'thornswood\.net' })

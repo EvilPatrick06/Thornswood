@@ -24,7 +24,7 @@ and hardlinks it into the game folder. Updating a mod is editing a line.
 Read off the machine on 15 September:
 
     deploymentMethod   hardlink_activator
-    stagingPath        C:\Users\you\AppData\Roaming\Vortex\skyrimse\mods
+    stagingPath        C:\Users\<you>\AppData\Roaming\Vortex\skyrimse\mods
     targetPath         C:\Program Files (x86)\Steam\steamapps\common\
                        Skyrim Special Edition\Data
 
