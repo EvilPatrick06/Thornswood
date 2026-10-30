@@ -29,8 +29,10 @@ the MIT licence. Its own lore, art, music and game content are under
 [Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/):
 share and adapt them, not for money, crediting Thornswood and keeping the same
 licence. The Thornswood name and logo are under neither, and stay
-Thornswood's with all rights reserved. What other people made keeps its own
-licence, as the rest of this page says.
+Thornswood's with all rights reserved. The theme music is its composer's,
+with all rights reserved: it is licensed to Thornswood alone and is not under
+that licence. What other people made keeps its own licence, as the rest of
+this page says.
 
 <a id='source'></a>
 

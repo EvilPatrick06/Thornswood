@@ -959,10 +959,13 @@ October).
 ## Made for Thornswood by somebody else
 
 - `Data\Platform\UI\thornswood-theme.mp3` (in the repo as
-  `game\ui\thornswood-theme.mp3`) is the theme. It was made for Thornswood
-  by an artist this repository does not name, and it went to everybody on
-  Patrick's word of 22 September (commit ec8d113). The terms are between
-  Patrick and the artist and are not written down here.
+  `game\ui\thornswood-theme.mp3`) is the theme. Copyright its composer,
+  who is not named here. All rights reserved. Its composer gave Thornswood,
+  in writing on 28 October 2026, the right to use it, change it and earn
+  from it, with no fee and no credit asked (the grant is on #1333). That
+  right is Thornswood's only: the theme is not under the licence that
+  covers Thornswood's art, and nobody else may copy, change, share or use it,
+  even for free, from this repository, from a pack or from the installer.
 
 ## On the site
 

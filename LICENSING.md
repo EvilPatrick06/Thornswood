@@ -102,12 +102,13 @@ It does not cover:
   launcher, and two unused pictures were deleted). Thornswood cannot license
   what it cannot show it owns; such a file goes under CC BY-NC-SA 4.0 once
   its maker and terms are recorded.
-- the theme, `game/ui/thornswood-theme.mp3`. An artist made it for
-  Thornswood, and the terms between Patrick and the artist are not written
-  down yet (`THIRD-PARTY.md`, "Made for Thornswood by somebody else"), so
-  Thornswood does not own it to license. It stays the artist's until written
-  terms say otherwise; Patrick is asking the artist for them (27 October
-  2026). Thornswood owns no other music today.
+- the theme, `game/ui/thornswood-theme.mp3`. Its composer made it for
+  Thornswood and keeps all rights in it. In writing on 28 October 2026 the
+  composer gave Thornswood alone the right to use it, change it and earn
+  from it (#1333), and Patrick decided on 29 October 2026 that it stays all
+  rights reserved (`THIRD-PARTY.md`, "Made for Thornswood by somebody
+  else"). Nobody else may copy, change, share or use it, even for free.
+  Thornswood owns no music today.
 
 `records/asset-provenance.json` records, for each picture, sound, mesh and
 plugin in the repository, who made it, under what terms, and what is still

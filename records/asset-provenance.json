@@ -403,14 +403,13 @@
       "sha256": "fcdc3c7a715c158dfced39431ad55d41aa751d56c5e412eae7cc110c380e6a64",
       "what": "The Thornswood theme, 1 min 56 s. Plays in the launcher, the game's main menu and loading screen. No title, artist or copyright tag in the file.",
       "published": "Every pack and the installer (Data\\Platform\\UI\\thornswood-theme.mp3)",
-      "source": "Made for Thornswood by an artist this repository does not name",
-      "creator": "Not named here (the artist's name goes in only if they agree)",
-      "licence": "A verbal agreement between Patrick and the artist; terms not written down",
-      "attribution": "As the artist wants, not yet recorded",
-      "approved": "Patrick, 22 Sep 2026, for main (commit ec8d113); held to dev before that because the artist had not signed it off",
-      "evidence": "THIRD-PARTY.md, Made for Thornswood by somebody else; #1333. The written licence, once there is one, is kept privately by Patrick, never in this repository or an issue; this entry then says where.",
-      "status": "agreed-not-written",
-      "ask": "Djinn (assigned by Patrick, 12 Oct, option A on #1333): a short written licence by email from the artist covering the launcher, the game's menus and loading screen, the installer and the update downloads, its duration and fee, and how they want to be credited."
+      "source": "Made for Thornswood by a composer this repository does not name",
+      "creator": "Not named here (the composer's name goes in only if they agree)",
+      "licence": "All rights reserved by its composer. Licensed to Thornswood only, in writing on 28 Oct 2026: Thornswood may use, change and earn from it, with no fee. Not under Thornswood's art licence; nobody else may copy, change, share or use it",
+      "attribution": "None asked: the composer asks for nothing in return",
+      "approved": "Patrick, 22 Sep 2026, for main (commit ec8d113); the label, Patrick on 29 Oct 2026 (#1333): all rights reserved, kept in the repository",
+      "evidence": "The composer's written grant, 28 Oct 2026, relayed by Djinn in Discord, quoted word for word on #1333 without their name; THIRD-PARTY.md, Made for Thornswood by somebody else.",
+      "status": "cleared"
     },
     {
       "path": "game/ui/thornswood-scroll.webp",
