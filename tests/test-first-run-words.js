@@ -10,8 +10,9 @@
 // to the menu." Both were the old multiplayer mod's advice, carried over. The name is
 // what everybody sees above your head, so somebody who followed the card walked
 // into Whiterun under their own name. And there is no saving here: the site's
-// help page says "No saving. The server holds your character. Quitting is
-// safe."
+// hints say "There is no saving. The server holds your character, so quitting
+// is safe." (site\data\site\lines.md, the one copy of the hints, #3147; Help's
+// list of what is normal here, which said it too, was removed on 26 Oct).
 //
 // The same name advice was in the Help page's first Joining item, two pages
 // away, and its third item still explained saving by what the old
@@ -28,7 +29,7 @@ function read(rel) {
 }
 const xaml = read('launcher/ui.xaml');
 const help = read(path.join('launcher', 'app', 'Help.cs'));
-const site = read(path.join('site', 'data', 'help.md'));
+const site = read(path.join('site', 'data', 'site', 'lines.md'));
 const shell = read(path.join('launcher', 'app', 'Shell.cs'));
 
 let pass = 0, fail = 0;
@@ -103,8 +104,8 @@ yes('the character pick item gives the same rule as the card: ' + RULE_NOT_OWN,
 // that still has one has to agree with the site.
 const saving = joining.filter(function (j) { return /\bsav(e|ed|ing)\b/i.test(j.title); });
 yes('at most one Joining item is about saving', saving.length <= 1);
-yes('the site still says there is no saving, so there is something to agree with',
-    /No saving\. The server holds your character\./.test(site));
+yes('the site\'s hints still say there is no saving, so there is something to agree with',
+    /There is no saving\. The server holds your character\b/.test(site));
 yes('any Joining item about saving says there is no saving, as the site does',
     saving.every(function (j) { return /no saving/i.test(j.title + ' ' + j.body); }));
 yes('any Joining item about saving says the server holds the character',

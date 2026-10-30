@@ -310,13 +310,16 @@ function frontRig(opts) {
     (F.closeKey || '') + '\n' + (F.closeGame || '') + '\n' + (F.creatingFrom || '') + '\n' +
     F.race + '\n' + F.messages + '\n';
   new Function('sp', 'T', 'Date', 'ini', 'log', 'say', 'guard', 'tellServer', 'treeFromView', 'treeFromMap',
-               'maneuversFromView', 'perksFromView', body)(
+               'maneuversFromView', 'perksFromView', 'overheadMessage', body)(
     sp, T, clock.Date, opts.ini === undefined ? '' : opts.ini,
     function () { w.logs.push(Array.prototype.slice.call(arguments).join(' ')); },
     function (t) { w.logs.push(String(t)); },
     guard,
     function (line) { w.server.push(line); },
-    function () { }, function () { }, function () { }, function () { });
+    function () { }, function () { }, function () { }, function () { },
+    // The words above heads, asked first by the handler (#3941); none of
+    // these messages is one, and test-3941-chat-not-logged.js runs it.
+    function () { return false; });
   w.update = function () { (w.handlers.update || []).forEach(function (f) { f(); }); };
   w.frames = function (ms) {
     // Updates every 50ms of pretend time, the way a slow frame rate would.

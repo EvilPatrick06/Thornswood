@@ -21,6 +21,9 @@
 #>
 
 $ThornswoodFrontRecordPath = Join-Path $PSScriptRoot '..\..\records\front-build.json'
+# The licence text of each npm package webpack put in build.js, one file per
+# package, named as the record's packages name them (#3751).
+$ThornswoodFrontLicencesDir = Join-Path $PSScriptRoot '..\..\records\front-licences'
 
 function Add-ThornswoodZipTypes {
     Add-Type -AssemblyName System.IO.Compression
@@ -120,5 +123,101 @@ function Get-ThornswoodFrontProblems($Files, $Record) {
         if ($Files[$k].sha256 -ne ([string]$want[$k].sha256).ToLowerInvariant()) { $out += "$k is not the recorded bytes" }
     }
     foreach ($k in @($want.Keys | Sort-Object)) { if (-not $Files.Contains($k)) { $out += "$k, which the build makes, is missing" } }
+    return $out
+}
+
+# THE PACKAGES INSIDE build.js (#3751). webpack bundles npm packages into
+# build.js under their own licences, MIT and BSD among them, which ask for
+# their notice to go with every copy, and until 27 October nothing recorded
+# which: the @license comments some of them leave in it were the only notice,
+# and a minifier setting drops those. The front is webpack's development
+# build, which names every module it holds on a line of its own,
+# /***/ "<loaders>!<path>":, so the packages are read from build.js itself,
+# and each one's licence from the folder webpack took it from.
+
+# The folders, under the folder the front was built in, of the npm packages
+# in a development build. A bundle that names no module (a production build)
+# stops this, rather than reading as one with no packages.
+function Get-ThornswoodBundlePackages([string]$Bundle) {
+    $dirs = New-Object 'System.Collections.Generic.SortedSet[string]' ([StringComparer]::Ordinal)
+    $modules = 0
+    foreach ($line in [IO.File]::ReadLines($Bundle)) {
+        if ($line -notmatch '^/\*\*\*/ "(.+)":\s*$') { continue }
+        $modules++
+        $id = $Matches[1]
+        $res = $id.Substring($id.LastIndexOf('!') + 1)
+        if ($res -match '^\./(.*node_modules/(?:@[^/]+/)?[^/]+)/') { [void]$dirs.Add($Matches[1]) }
+    }
+    if (-not $modules) { throw "$Bundle names no module, so it is not webpack's development build and the packages inside it cannot be read from it" }
+    return ,@($dirs)
+}
+
+# A package's name, version, declared licence and licence text, read from
+# its folder. Several licence files are given together, each under a line
+# naming it; a package with none stops this, since its notice is owed.
+function Get-ThornswoodPackageNotice([string]$Dir) {
+    $pj = Join-Path $Dir 'package.json'
+    if (-not (Test-Path -LiteralPath $pj -PathType Leaf)) { throw "$Dir has no package.json" }
+    $j = [IO.File]::ReadAllText($pj) | ConvertFrom-Json
+    $lic = $null
+    if ($j.license -is [string]) { $lic = $j.license }
+    elseif ($j.license -and $j.license.type) { $lic = [string]$j.license.type }
+    elseif ($j.licenses) { $lic = (@($j.licenses | ForEach-Object { if ($_ -is [string]) { $_ } else { [string]$_.type } }) -join ' OR ') }
+    $files = @(Get-ChildItem -LiteralPath $Dir -File | Where-Object { $_.Name -match '(?i)^(licen[cs]e|copying)([.-].*)?$' } | Sort-Object Name)
+    if (-not $files.Count) { throw "$($j.name) $($j.version) is in build.js and carries no licence file in $Dir. Its notice is owed and there is nothing to give." }
+    if ($files.Count -eq 1) { $bytes = [IO.File]::ReadAllBytes($files[0].FullName) }
+    else {
+        $utf8 = New-Object Text.UTF8Encoding($false)
+        $ms = New-Object IO.MemoryStream
+        foreach ($f in $files) {
+            $h = $utf8.GetBytes("==> $($f.Name) <==`n")
+            $ms.Write($h, 0, $h.Length)
+            $b = [IO.File]::ReadAllBytes($f.FullName)
+            $ms.Write($b, 0, $b.Length)
+            $ms.WriteByte(10)
+        }
+        $bytes = $ms.ToArray()
+    }
+    return [pscustomobject]@{ Name = [string]$j.name; Version = [string]$j.version; Licence = $lic; Bytes = $bytes }
+}
+
+# The text's name for a package: npm-<name>-<version>, with a scope's @
+# dropped and its / a -.
+function Get-ThornswoodPackageTextName([string]$Name, [string]$Version) {
+    $n = 'npm-' + $Name.TrimStart('@').Replace('/', '-') + '-' + $Version
+    if ($n -notmatch '^[a-z0-9][a-z0-9._-]*$') { throw "$Name $Version makes the text name $n, which is not one a file can safely have" }
+    return $n
+}
+
+# The packages in the build.js of $Dist, built in $Front, by text name, each
+# @{ package; version; licence; from; sha256; bytes; Text (its bytes) }, in
+# name order. One package at one version in two folders is one entry.
+function Get-ThornswoodFrontPackages([string]$Dist, [string]$Front) {
+    $out = [ordered]@{}
+    $found = @{}
+    foreach ($d in (Get-ThornswoodBundlePackages (Join-Path $Dist 'build.js'))) {
+        $p = Get-ThornswoodPackageNotice (Join-Path $Front ($d -replace '/', [IO.Path]::DirectorySeparatorChar))
+        $n = Get-ThornswoodPackageTextName $p.Name $p.Version
+        if ($found.ContainsKey($n)) { continue }
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $h = ([BitConverter]::ToString($sha.ComputeHash($p.Bytes)) -replace '-', '').ToLowerInvariant() } finally { $sha.Dispose() }
+        $found[$n] = [ordered]@{ package = $p.Name; version = $p.Version; licence = $p.Licence; from = $d; sha256 = $h; bytes = [long]$p.Bytes.Length; Text = $p.Bytes }
+    }
+    foreach ($n in @($found.Keys | Sort-Object -Culture '' -CaseSensitive)) { $out[$n] = $found[$n] }
+    return $out
+}
+
+# What is wrong with measured packages against the record: one it does not
+# list, one with another text, one it lists that the build has not got.
+function Get-ThornswoodFrontPackageProblems($Packages, $Record) {
+    $want = @{}
+    $rp = $Record.PSObject.Properties['packages']
+    if ($rp -and $rp.Value) { foreach ($p in $rp.Value.PSObject.Properties) { $want[$p.Name] = $p.Value } }
+    $out = @()
+    foreach ($k in @($Packages.Keys)) {
+        if (-not $want.ContainsKey($k)) { $out += "build.js holds $k, which the record does not list"; continue }
+        if ($Packages[$k].sha256 -ne ([string]$want[$k].sha256).ToLowerInvariant()) { $out += "$k's licence text is not the recorded one" }
+    }
+    foreach ($k in @($want.Keys | Sort-Object)) { if (-not $Packages.Contains($k)) { $out += "the record lists $k, which build.js does not hold" } }
     return $out
 }

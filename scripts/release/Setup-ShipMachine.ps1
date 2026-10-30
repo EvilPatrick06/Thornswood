@@ -37,7 +37,7 @@
        cannot reach the profile says so here instead of at the end of a Ship.
     5. The client runtime records\client-build.json names. On a machine
        that takes CI's engine build (below), Get-EngineArtifact.ps1 fetches
-       engine.yml's artifact of the pin and holds every file to the records.
+       the fork's own build of the pin and holds every file to the records.
        Otherwise, when neither the game folder nor the build folder holds
        it, the zip of that exact commit is fetched from the site's feed (the
        clientRuntime entry in /feed-dev/version.json or /feed/version.json),
@@ -79,7 +79,7 @@
   worktree of the fork). A folder with no build\dist in it is not recorded.
 
   CI'S ENGINE BUILD (#3047). -EngineBuild ci records {"ci": true} instead:
-  the engine build is then CI's build of the pin, engine.yml's artifact,
+  the engine build is then CI's build of the pin, the fork's own build,
   which Get-EngineArtifact.ps1 puts in a folder named for the commit
   (Where.ps1 EngineArtifact) after holding every file to the records. It is
   the only build that matches a record CI made, and a pin move needs a fetch,
@@ -642,7 +642,7 @@ Say ('  record ' + $commit + '; the game folder ' + $game + ' holds ' + $inGame 
 if ($inGame -eq $total -or $inDist -eq $total) {
   Row 'the recorded client is here' $true $(if ($inGame -eq $total) { 'in the game folder' } else { 'in ' + $dist + ', and Ship copies it in' }) ''
 } elseif (($EngineBuild -eq 'ci') -or (Test-EngineBuildIsCi $engineFile)) {
-  # CI's build of the pin (#3047): engine.yml's artifact, held to the records.
+  # CI's build of the pin (#3047): the fork's own build (#3399), held to the records.
   $getArgs = @{ NoPause = $true }
   if ($Check) { $getArgs['Check'] = $true }
   $global:LASTEXITCODE = 0
