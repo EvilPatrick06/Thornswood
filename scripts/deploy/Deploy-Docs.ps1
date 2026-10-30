@@ -724,7 +724,7 @@ if (`$principal) {
       foreach (`$r in @(`$acl.GetAccessRules(`$true, `$false, [Security.Principal.SecurityIdentifier]) | Where-Object { `$_.IdentityReference.Value -eq 'S-1-5-19' })) { [void]`$acl.RemoveAccessRuleSpecific(`$r) }
       Set-Acl -LiteralPath `$f -AclObject `$acl -ErrorAction Stop
       'denied NT TASK\$Task writing and deleting in ' + `$f
-    } catch { 'COULD NOT DENY ' + `$runAs + ' writing in ' + `$f + ': ' + `$_.Exception.Message }
+    } catch { 'COULD NOT DENY NT TASK\$Task writing in ' + `$f + ': ' + `$_.Exception.Message }
   }
 
   # BUILTIN\Users inherits read and create on C:\ and so on the whole site

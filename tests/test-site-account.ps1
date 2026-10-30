@@ -581,7 +581,7 @@ try {
     Yes 'and BUILTIN\Users is still off, with nothing refused' (
         (RulesFor $docs $u).Count -eq 0 -and ($r.said -join "`n") -notmatch 'COULD NOT (DENY|TAKE)')
     Yes 'and the second run still says what it granted, with nothing refused' (
-        ($r.said -join "`n") -match [regex]::Escape("granted LOCAL SERVICE (OI)(CI)M on $docs") -and
+        ($r.said -join "`n") -match [regex]::Escape("granted NT TASK\Thornswood Docs (OI)(CI)M on $docs") -and
         ($r.said -join "`n") -notmatch 'COULD NOT GRANT')
 
     # -- icacls refusing: said, and the rest still tried ------------------------
