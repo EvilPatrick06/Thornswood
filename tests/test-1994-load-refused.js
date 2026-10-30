@@ -106,6 +106,6 @@ const asks = tick < 0 ? -1 : front.indexOf('if (loadRefused()) { return; }', tic
 yes('the menu tick asks loadRefused, and stops there when it took one', tick >= 0 && asks > tick);
 yes('before the choice is said again, so a refused pick is not repeated to the client', asks > 0 && say > asks);
 yes('and the page is given the sentence, and no place in line (the path #1157 uses)',
-    /if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \} else \{ list\.away = menuAgain; \}/.test(front));
+    /if \(menuAgain\.ended\) \{ list\.ended = String\(menuAgain\.ended\); \}\s*else if \(menuAgain\.switched\) \{[^]*?\}\);\s*\}\s*else \{ list\.away = menuAgain; \}/.test(front));
 
 done();
