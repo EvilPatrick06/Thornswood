@@ -197,11 +197,11 @@ Pass if a message says what is happening and how long, then more as it counts do
 
 ## TEST 13. Field of view
 
-1. In the launcher open Display. The Field of view box should read 65.
-2. Press Apply without changing it. Start the game. Nothing should look different.
-3. Quit. Set it to 90. Press Apply. Start the game.
+1. In the game press F7, then Settings at the foot of the help. On Screen and chat, Field of view should read 65.
+2. Move it to 90.
+3. Open your inventory and close it, then go through a door.
 
-Pass if at 90 the view is noticeably wider.
+Pass if the view is noticeably wider the moment you move it, and is still 90 after the inventory and the door.
 
 ## TEST 14. Chains and cage doors
 
@@ -251,4 +251,4 @@ without end is for people who are still being shown the scroll.
 
 ## Do not report these
 
-Typing in another window still moves your character. A flute, lute or drum looks wrong when you equip it and plays nothing. They come from PlayFluteLuteDrum.esp, which handles equipping one and playing it with scripts that never fire here. Use the Lute, Flute and Drum emotes instead: open the emote wheel with G, or whatever key the launcher's Controls page gives it if you have moved it, then search for Lute, Flute or Drum. Mod settings menus reset every session only in QuickLoot, the instrument menu, MCM Recorder and SkyUI's favourite group and unequip options; Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and chfshVariousActions now keep theirs, so report one of those if it forgets. NPCs keep moving when nobody is near them now, and what comes next for them is on the roadmap, so report an NPC only if it stands still or does something the Known Issues page does not already describe. You cannot save.
+Typing in another window still moves your character. A flute, lute or drum looks wrong when you equip it and plays nothing. They come from PlayFluteLuteDrum.esp, which handles equipping one and playing it with scripts that never fire here. Use the Lute, Flute and Drum emotes instead: open the emote wheel with G, or whatever key you gave it on Settings in the game if you have moved it, then search for Lute, Flute or Drum. Mod settings menus reset every session only in QuickLoot, the instrument menu, MCM Recorder and SkyUI's favourite group and unequip options; Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and chfshVariousActions now keep theirs, so report one of those if it forgets. NPCs keep moving when nobody is near them now, and what comes next for them is on the roadmap, so report an NPC only if it stands still or does something the Known Issues page does not already describe. You cannot save.

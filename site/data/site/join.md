@@ -77,10 +77,12 @@ script extender and Thornswood's own content, and nothing else.
 Not optional. Without it you have a launcher and no mods, and the server turns
 you away when you press Play.
 
-The link is on the [Downloads](/downloads) page and on the launcher's
-Diagnostics page. Open it and Vortex takes it from there: it makes a profile
-for Thornswood, downloads every mod from its own author, and deploys them.
-Give it time.
+The link is on the [Downloads](/downloads) page, on the card above Play and on
+the launcher's Diagnostics page. Each opens the revision of the collection the
+server was built against and names its number. Install that revision, not a
+newer one Nexus may show first: a newer one keeps Play shut until the server
+catches up. Vortex takes it from there: it makes a profile for Thornswood,
+downloads every mod from its own author, and deploys them. Give it time.
 
 If the wrong profile is active in Vortex, the launcher says so before you press
 Play.

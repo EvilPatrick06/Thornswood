@@ -258,6 +258,9 @@ else {
         }
         'read ' + `$src + ' (' + `$dirs.Count + ' folder(s) given the rule' + `$(if (`$locked.Count) { ', and ' + (@(`$locked | ForEach-Object { `$_.Name }) -join ', ') }) + ')'
       }
+      # What it makes is its own, not every service's (#4077): a backup
+      # LOCAL SERVICE owned was one any service could give itself a rule on.
+      Set-ThornswoodTaskOwner -TaskName '$TaskName' -Sid `$sid -Action `$a -Roots '$Root'
       'on LOCAL SERVICE, Limited, as ' + `$sid
     } catch {
       Register-ScheduledTask -TaskName '$TaskName' -Action `$a -Trigger `$t -Principal (New-ThornswoodServicePrincipal -AsSystem) -Settings `$s -Force | Out-Null

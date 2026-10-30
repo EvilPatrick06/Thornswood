@@ -312,7 +312,7 @@ yes('  it reads the paths every pack deletes as gone', /--gone \(@\(Get-ShipDele
 yes('  it refuses on exit 2, dev and main alike, and puts the version back',
   /if \(\$skyuiExit -eq 2\) \{\s*Unbump '[^\n]*'\s*Die /.test(step) && !/\$Dev/.test(step));
 yes('  and it reads the exit code off the global one', /\$global:LASTEXITCODE = 0/.test(step));
-const bodies = ship.indexOf("Head 'Covered bodies'");
+const bodies = ship.indexOf("Head 'Animation and body files'");
 const pub = ship.indexOf('Publish-Update.ps1', at + 1);
 yes('  it comes after the load order copies and before anything is published',
   at > ship.indexOf("Head 'The load order copies'") && at > bodies && (pub < 0 || pub > at));

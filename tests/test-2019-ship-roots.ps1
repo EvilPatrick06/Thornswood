@@ -420,7 +420,8 @@ if ($OnWindows) {
     $refs = @(); $missing = @()
     foreach ($n in $LauncherNeeded) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
     Yes ('every framework reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
-    $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'DevBuild.cs') |
+    # OwnGameKinds and Verify name LastPlugin (#2791), which reads the game's archives through FromGameArchive.cs.
+    $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'DevBuild.cs', 'LastPlugin.cs', 'FromGameArchive.cs') |
         ForEach-Object { Join-Path $App $_ }
     $real += @((Join-Path $Tool 'ShipRoot.cs'), (Join-Path $Tool 'OwnGameShipRoot.cs'))
     foreach ($f in $real) { Yes ("$([IO.Path]::GetFileName($f)) is there") (Test-Path -LiteralPath $f) }
@@ -578,10 +579,10 @@ Yes '4. Ship.ps1 runs Update-ShipRoot.ps1 for the channel''s root' ($callAt -ge 
 $rootAt = $shipText.IndexOf("Where.ps1') `$(if (`$Dev) { 'ShipRootDev' } else { 'ShipRoot' })")
 $vortexAt = $shipText.IndexOf("is a folder Vortex deploys into (Game\Data\vortex.deployment.json is there), so a release is never built from it")
 $versionAt = $shipText.IndexOf('# ------------------------------------------------------------ version')
-$genAt = $shipText.IndexOf("Head 'Generated files'")
+$genAt = $shipText.IndexOf("Head 'Animation and body files'")
 $buildAt = $shipText.IndexOf("Head 'Building the launcher'")
 Yes '4.   after it knows the root and has refused a folder Vortex deploys into' ($rootAt -ge 0 -and $vortexAt -ge 0 -and $callAt -gt $rootAt -and $callAt -gt $vortexAt)
-Yes '4.   and before the version moves, the generated files are read or the launcher is built' ($callAt -lt $versionAt -and $callAt -lt $genAt -and $callAt -lt $buildAt)
+Yes '4.   and before the version moves, the collection is asked whether it builds the animation and body files, or the launcher is built' ($callAt -lt $versionAt -and $callAt -lt $genAt -and $callAt -lt $buildAt)
 $setupText = [IO.File]::ReadAllText($setup)
 Yes '4. Setup-ShipMachine.ps1 takes -SkyrimFrom and hands it to Update-ShipRoot.ps1, not with -Check (#2603)' (
     $setupText -match '\[string\]\$SkyrimFrom' -and $setupText -match "(?s)if \(\`$Check\) \{ \`$upArgs\['Check'\] = \`$true \}\s*elseif \(\`$SkyrimFrom\) \{ \`$upArgs\['SkyrimFrom'\] = \`$SkyrimFrom \}")

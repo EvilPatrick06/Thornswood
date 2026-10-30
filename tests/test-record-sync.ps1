@@ -252,10 +252,6 @@ New-Item -ItemType Directory -Force -Path $rel | Out-Null
 # ours.esp is under Data\Platform\UI, so naming it stopped every release (#1878).
 Put (Join-Path $pub 'Profile\OwnGame\plugins.txt') "*collection.esp`r`n"
 Put (Join-Path $pub 'Profile\OwnGame\loadorder.txt') "collection.esp`r`n"
-# The covered bodies a publish needs since d2519bb, as a build leaves them.
-# They are ours, so every release and the installer carry them too.
-. (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-New-GeneratedBodies $pub $fake
 . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
 Install-UiFrontFixture (Join-Path $pub 'Game')
 Put (Join-Path $pub 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($gamePort - 1) + '}')

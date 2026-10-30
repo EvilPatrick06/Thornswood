@@ -14,7 +14,7 @@
        stand-in launcher with no certificate table reads unsigned, the same
        file with one reads signed, and something that is not a PE reads
        unsigned.
-    2. -FromFeed refuses without -NoPublish (nothing signs it yet) and
+    2. -FromFeed refuses without -NoPublish (it never publishes itself) and
        without -Stub (CI's setup program), before anything is fetched.
     3. A whole build: the installer carries the files main's newest release
        recorded and nothing a folder had before (a stray file, a plugin the
@@ -194,7 +194,7 @@ try {
     $r = Package $outDir @('-NoPublish', '-Stub', $stub)
     Yes ("it builds (exit {0})" -f $r.Code) ($r.Code -eq 0)
     if ($r.Code -ne 0) { Write-Host $r.Out -ForegroundColor DarkGray; Done }
-    Yes '  and says it is not signed' ($r.Out -match 'not signed: built from the feed')
+    Yes '  and, with no signing setup here, says it is not signing' ($r.Out -match 'not signing: no records.signing.signing\.json')
     $zipPath = Join-Path $outDir 'Thornswood-Setup.zip'
     Yes '  into Thornswood-Setup.exe and its zip' ((Test-Path -LiteralPath (Join-Path $outDir 'Thornswood-Setup.exe')) -and (Test-Path -LiteralPath $zipPath))
     Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem

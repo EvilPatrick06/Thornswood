@@ -1,7 +1,9 @@
 'use strict';
 /*
   The trade ships' panel (#2700, split from #511): the dock, and the staff
-  side that keeps the ports and routes.
+  side that keeps the ports and routes. The trade carts (#3158) use it too:
+  a cart stop, a raid on a cart on the road, and the staff side that keeps
+  the stops and roads.
 
   E on a port's crate opens the dock side; Ports and routes on the Office page
   of K opens the staff side. The server answers on thornswoodShipView, and
@@ -15,6 +17,10 @@
                     '/ship draft|confirm|add|staff ...' for staff, through
                     window.thornswoodNet.say; nobody is told to type them
                     (Patrick, 4 Oct: no chat commands for what people do).
+                    A cart's view says kind 'cart' and word '/cart', and every
+                    line goes out under that word instead: '/cart load|drive|
+                    pullin|collect|return|take|close ...' and the staff's
+                    '/cart draft|confirm|add|bring|staff ...'.
 
   WHAT IT SHOWS IS WHAT THE SERVER SENT. The server decides who may load or
   sail (the Trading Company's charter), which lines a person sees, and what a
@@ -28,6 +34,10 @@
   var data = null;
   var shown = false;
   var root = null;
+
+  /* The word every line goes out under: the view's, or the ships' when it names none. */
+  function word() { return data && data.word === '/cart' ? '/cart' : '/ship'; }
+  function isCart() { return !!data && data.kind === 'cart'; }
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'ship:' + what); }
@@ -80,7 +90,7 @@
       '<h2 id="' + ID + '-title">Ship</h2><div class="body" id="' + ID + '-body"></div>' +
       '<div class="foot"><button id="' + ID + '-close">Step back</button></div></div>';
     document.body.appendChild(root);
-    root.querySelector('#' + ID + '-close').onclick = function () { net('/ship close'); close(); };
+    root.querySelector('#' + ID + '-close').onclick = function () { net(word() + ' close'); close(); };
     root.addEventListener('click', onClick);
     return root;
   }
@@ -105,30 +115,31 @@
     var a = el.getAttribute('data-act'), h = el.getAttribute('data-hold') || '', k = el.getAttribute('data-key') || '';
     var n;
     if (a === 'say') { net(el.getAttribute('data-line')); return; }
-    if (a === 'collect' || a === 'return') {
+    var w = word() + ' ';
+    if (a === 'collect' || a === 'return' || a === 'take') {
       n = count(el.getAttribute('data-count'));
-      if (n) { net('/ship ' + a + ' ' + h + ' ' + el.getAttribute('data-line') + ' ' + n); }
+      if (n) { net(w + a + ' ' + h + ' ' + el.getAttribute('data-line') + ' ' + n); }
       return;
     }
     if (a === 'load') {
       var piece = val(ID + '-piece-' + h).split(':'), to = val(ID + '-for-' + h);
       n = count(ID + '-count-' + h);
-      if (piece.length === 2 && to && n) { net('/ship load ' + h + ' ' + piece[0] + ' ' + piece[1] + ' ' + n + ' ' + to); }
+      if (piece.length === 2 && to && n) { net(w + 'load ' + h + ' ' + piece[0] + ' ' + piece[1] + ' ' + n + ' ' + to); }
       return;
     }
     if (a === 'port') {
       var key = val(ID + '-pkey').toLowerCase(), hold = val(ID + '-phold'), name = val(ID + '-pname');
-      if (key && hold && name) { net('/ship draft port ' + key + ' ' + hold + ' ' + name); }
+      if (key && hold && name) { net(w + 'draft port ' + key + ' ' + hold + ' ' + name); }
       return;
     }
     if (a === 'route') {
       var m = count(ID + '-rmin');
-      if (m) { net('/ship draft route ' + val(ID + '-rfrom') + ' ' + val(ID + '-rto') + ' ' + m); }
+      if (m) { net(w + 'draft route ' + val(ID + '-rfrom') + ' ' + val(ID + '-rto') + ' ' + m); }
       return;
     }
     if (a === 'minutes') {
       var mm = count(el.getAttribute('data-count'));
-      if (mm) { net('/ship draft route ' + k + ' ' + mm); }
+      if (mm) { net(w + 'draft route ' + k + ' ' + mm); }
     }
   }
 
@@ -180,57 +191,143 @@
     return b;
   }
 
+  /* The words staff read for a ship's places, or a cart's. */
+  function places() {
+    return isCart()
+      ? { place: 'stop', places: 'stops', crate: 'cart stop', at: 'at a cart stop', route: 'road', none: 'No cart stops. A world with no carts.',
+          vehicle: 'cart', put: 'Put a cart here', minutes: 'least minutes on the road' }
+      : { place: 'port', places: 'ports', crate: 'dock', at: 'at a dock', route: 'route', none: 'No ports. A world with no ships.',
+          vehicle: 'ship', put: 'Put a ship here', minutes: 'minutes' };
+  }
+
   function drawStaff() {
-    var b = '';
+    var b = '', P = places(), w = word() + ' ';
     if (data.note) { b += '<p class="note" role="status">' + esc(data.note) + '</p>'; }
     var inForce = data.inForce || { ports: [], routes: [] }, draft = data.draft || { ports: [], routes: [] };
     b += '<h3>In force</h3>';
-    if (!inForce.ports.length) { b += '<p class="note">No ports. A world with no ships.</p>'; }
+    if (!inForce.ports.length) { b += '<p class="note">' + esc(P.none) + '</p>'; }
     inForce.ports.forEach(function (p) {
       b += line('<span class="nm">' + esc(p.name) + ' (' + esc(p.key) + ', ' + esc(p.hold) + ')' + (p.crate ? '' : ', no crate yet') +
-        ', ' + (p.ships || []).length + ' ship(s)</span>' + say('Put a ship here', '/ship add ' + p.key));
+        ', ' + (p.ships || []).length + ' ' + P.vehicle + '(s)</span>' + say(P.put, w + 'add ' + p.key));
     });
     inForce.routes.forEach(function (r) {
-      b += line('<span class="nm">' + esc(r.from) + ' to ' + esc(r.to) + ', ' + esc(r.minutes) + ' minutes, crew of ' + esc(r.crew) + '</span>');
+      b += line('<span class="nm">' + esc(r.from) + ' to ' + esc(r.to) + ', ' + esc(r.minutes) + ' ' + P.minutes +
+        (isCart() ? '' : ', crew of ' + esc(r.crew)) + '</span>');
     });
+    if (isCart()) {
+      var road = data.onRoad || [];
+      b += '<h3>On the road</h3>';
+      if (!road.length) { b += '<p class="note">No cart is on the road.</p>'; }
+      road.forEach(function (c) {
+        b += line('<span class="nm">' + esc(c.id) + ', ' + esc(c.from) + ' to ' + esc(c.to) +
+          (c.dueIn ? ', ' + esc(c.dueIn) + ' minutes left' : ', the road is done') + (c.driver ? '' : ', its driver is gone') + '</span>' +
+          say('Bring it in', w + 'bring ' + c.id));
+      });
+    }
     b += '<h3>Your draft</h3>';
     if (data.crate && data.crate.here) {
       b += data.crate.dockOf
-        ? '<p class="note">The container you just opened is the dock of ' + esc(data.crate.dockOf) + '.</p>'
-        : line('<span class="nm">The container you just opened, as a new port:</span>' +
-          '<input id="' + ID + '-pkey" type="text" maxlength="64" placeholder="key" aria-label="Port key">' +
+        ? '<p class="note">The container you just opened is the ' + esc(P.crate) + ' of ' + esc(data.crate.dockOf) + '.</p>'
+        : line('<span class="nm">The container you just opened, as a new ' + esc(P.place) + ':</span>' +
+          '<input id="' + ID + '-pkey" type="text" maxlength="64" placeholder="key" aria-label="Key">' +
           '<select id="' + ID + '-phold" aria-label="Hold">' + options(data.holdKeys || [], function (x) { return x; }, function (x) { return x; }) + '</select>' +
-          '<input id="' + ID + '-pname" type="text" maxlength="64" placeholder="name people read" aria-label="Port name">' +
-          btn('Add port', 'data-act="port"'));
+          '<input id="' + ID + '-pname" type="text" maxlength="64" placeholder="name people read" aria-label="Name">' +
+          btn('Add ' + P.place, 'data-act="port"'));
     } else {
-      b += '<p class="note">Open a crate at a dock, then this page within a minute, to make it a port or move a port\'s crate.</p>';
+      b += '<p class="note">Open a crate ' + esc(P.at) + ', then this page within a minute, to make it a ' + esc(P.place) +
+        ' or move a ' + esc(P.place) + '\'s crate.</p>';
     }
     draft.ports.forEach(function (p) {
       b += line('<span class="nm">' + esc(p.name) + ' (' + esc(p.key) + ')</span>' +
-        (data.crate && data.crate.here && !data.crate.dockOf ? say('Its crate is the one I opened', '/ship draft crate ' + p.key) : '') +
-        say('Remove', '/ship draft unport ' + p.key));
+        (data.crate && data.crate.here && !data.crate.dockOf ? say('Its crate is the one I opened', w + 'draft crate ' + p.key) : '') +
+        say('Remove', w + 'draft unport ' + p.key));
     });
     draft.routes.forEach(function (r, i) {
       var cid = ID + '-m-' + i;
       b += line('<span class="nm">' + esc(r.from) + ' to ' + esc(r.to) + '</span>' +
         '<input id="' + cid + '" type="number" min="1" max="10080" step="1" value="' + esc(r.minutes) + '" aria-label="Minutes">' +
         btn('Set minutes', 'data-act="minutes" data-key="' + esc(r.from + ' ' + r.to) + '" data-count="' + cid + '"') +
-        say('Remove', '/ship draft unroute ' + r.from + ' ' + r.to));
+        say('Remove', w + 'draft unroute ' + r.from + ' ' + r.to));
     });
     if (draft.ports.length > 1) {
       var keys = draft.ports.map(function (p) { return p.key; });
-      b += line('<span class="nm">A new route</span>' +
+      b += line('<span class="nm">A new ' + esc(P.route) + '</span>' +
         '<select id="' + ID + '-rfrom" aria-label="From">' + options(keys, function (x) { return x; }, function (x) { return x; }) + '</select>' +
         '<select id="' + ID + '-rto" aria-label="To">' + options(keys, function (x) { return x; }, function (x) { return x; }) + '</select>' +
         '<input id="' + ID + '-rmin" type="number" min="1" max="10080" step="1" value="60" aria-label="Minutes">' +
-        btn('Add route', 'data-act="route"'));
+        btn('Add ' + P.route, 'data-act="route"'));
     }
     b += '<h3>If you confirm</h3>';
     var ch = data.changes || [], st = data.strands || [];
     if (!ch.length) { b += '<p class="note">The draft is the list in force.</p>'; }
     ch.forEach(function (c) { b += line('<span class="nm">' + esc(c) + '</span>'); });
     st.forEach(function (s) { b += line('<span class="nm">Refused: ' + esc(s) + '</span>'); });
-    b += line((data.canConfirm ? say('Confirm', '/ship confirm ' + data.base) : '') + say('Back to the list in force', '/ship draft reset'));
+    b += line((data.canConfirm ? say('Confirm', w + 'confirm ' + data.base) : '') + say('Back to the list in force', w + 'draft reset'));
+    return b;
+  }
+
+  /* A line aboard with a count box and one button that sends it, for collect, return and take. */
+  function countLine(text, act, holdId, l) {
+    var cid = ID + '-c-' + holdId + '-' + l.line;
+    return '<span class="nm">' + text + '</span>' +
+      '<input id="' + cid + '" type="number" min="1" max="' + esc(l.count) + '" step="1" value="' + esc(l.count) + '" aria-label="Count">' +
+      btn(act === 'collect' ? 'Collect' : (act === 'return' ? 'Take back' : 'Take'),
+        'data-act="' + act + '" data-hold="' + esc(holdId) + '" data-line="' + esc(l.line) + '" data-count="' + cid + '"');
+  }
+
+  /* A cart stop (#3158): the carts standing here, a load, the roads out, and the carts on their way in. */
+  function drawStop() {
+    var b = '';
+    if (data.note) { b += '<p class="note" role="status">' + esc(data.note) + '</p>'; }
+    if (data.driving) {
+      b += '<p class="note">You are driving ' + esc(data.driving.id) + ' to ' + esc(data.driving.to) + '. It comes in at that stop\'s crate.</p>';
+    }
+    var carts = data.carts || [];
+    if (!carts.length) { b += '<p class="note">No cart is at this stop.</p>'; }
+    carts.forEach(function (c) {
+      var cid = esc(c.id);
+      b += '<h3>' + cid + ', ' + esc(c.used) + ' of ' + esc(c.max) + ' lines</h3>';
+      (c.lines || []).forEach(function (l) {
+        var text = esc(l.count) + ' ' + esc(l.item) + ', for ' + esc(l.forName);
+        if (l.canCollect) { b += line(countLine(text, 'collect', c.id, l)); }
+        else if (l.canReturn) { b += line(countLine(text, 'return', c.id, l)); }
+        else { b += line('<span class="nm">' + text + '</span>'); }
+      });
+      if (c.others) { b += '<p class="note">' + esc(c.others) + ' more line(s) on it for other people.</p>'; }
+      if (c.canLoad && (data.pack || []).length && (data.people || []).length) {
+        b += line('<select id="' + ID + '-piece-' + cid + '" aria-label="What to load">' +
+          options(data.pack, function (p) { return p.base + ':' + p.nth; }, function (p) { return p.name + ' (' + p.count + ')'; }) + '</select>' +
+          '<input id="' + ID + '-count-' + cid + '" type="number" min="1" step="1" value="1" aria-label="Count">' +
+          '<label>for</label><select id="' + ID + '-for-' + cid + '" aria-label="Who it is for">' +
+          options(data.people, function (p) { return p.actor; }, function (p) { return p.name; }) + '</select>' +
+          btn('Load', 'data-act="load" data-hold="' + cid + '"'));
+      }
+      (c.drive || []).forEach(function (d) {
+        b += line('<span class="nm">To ' + esc(d.name) + ', at least ' + esc(d.minutes) + ' minutes on the road</span>' +
+          say('Drive', '/cart drive ' + c.id + ' ' + d.to));
+      });
+    });
+    var inc = data.incoming || [];
+    if (inc.length) {
+      b += '<h3>On the way here</h3>';
+      inc.forEach(function (c) {
+        b += line('<span class="nm">' + esc(c.id) + ' from ' + esc(c.from) +
+          (c.dueIn ? ', in ' + esc(c.dueIn) + ' minutes at the soonest' : '') + (c.mine ? ', which you drive' : '') + '</span>' +
+          (c.canPullIn ? say('Pull in', '/cart pullin ' + c.id) : ''));
+      });
+    }
+    return b;
+  }
+
+  /* A raid on a cart on the road (#3158): every piece aboard, and Take. */
+  function drawRaid() {
+    var b = '';
+    if (data.note) { b += '<p class="note" role="status">' + esc(data.note) + '</p>'; }
+    b += '<p class="note">' + esc(data.driver) + '\'s cart, on the road from ' + esc(data.road && data.road.from) +
+      ' to ' + esc(data.road && data.road.to) + '. Whatever you take is written down as taken by you.</p>';
+    var lines = data.lines || [];
+    if (!lines.length) { b += '<p class="note">Nothing is left on it.</p>'; }
+    lines.forEach(function (l) { b += line(countLine(esc(l.count) + ' ' + esc(l.item), 'take', data.cart, l)); });
     return b;
   }
 
@@ -240,9 +337,12 @@
     root.className = 'on';
     var was = shown;
     shown = true;
-    root.querySelector('#' + ID + '-title').textContent = data.mode === 'staff' ? 'Ports and routes' :
+    root.querySelector('#' + ID + '-title').textContent = data.mode === 'staff' ? (isCart() ? 'Cart stops and roads' : 'Ports and routes') :
+      data.mode === 'raid' ? 'A cart on the road' :
+      data.mode === 'stop' ? ((data.stop && data.stop.name) || 'The cart stop') :
       ((data.port && data.port.name) || 'The dock');
-    root.querySelector('#' + ID + '-body').innerHTML = data.mode === 'staff' ? drawStaff() : drawDock();
+    root.querySelector('#' + ID + '-body').innerHTML = data.mode === 'staff' ? drawStaff() :
+      data.mode === 'stop' ? drawStop() : data.mode === 'raid' ? drawRaid() : drawDock();
     if (!was) { tell('opened'); }
   }
 
@@ -259,7 +359,7 @@
 
   document.addEventListener('keydown', function (ev) {
     if (!shown) { return; }
-    if (ev.key === 'Escape') { ev.preventDefault(); net('/ship close'); close(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); net(word() + ' close'); close(); }
   });
 
   window.thornswoodShip = {

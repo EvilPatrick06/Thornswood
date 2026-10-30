@@ -10,6 +10,9 @@
 // in settings to hide the needs menu on the screen so it doesnt show and they
 // can do /needs to find it all".
 //
+// Both are set on Settings in the game since #3126, and take effect at once:
+// the front writes window.THORNSWOOD and calls thornswoodChat.settings().
+//
 // This runs the REAL thornswood-bridge.js in a sandbox with a small page and a
 // clock it controls, and reads the REAL settings lines out of
 // thornswood-front.js. Every line reaches the chat through thornswoodChat.add,
@@ -234,11 +237,33 @@ for (const s of [5, 15, 20]) {
   yes('no word from the launcher: shown, as before', !p.needsHidden());
 }
 
+// ---- changed on Settings in the game, at once (#3126) ---------------------------
+{
+  const p = page({ chatFade: 10, needsBars: true });
+  yes('the chat page has settings() for a change made in the game', typeof p.chat.settings === 'function');
+  p.chat.show();
+  p.win.THORNSWOOD.needsBars = false;
+  p.chat.settings();
+  yes('needs bars hidden on Settings: gone at once', p.needsHidden());
+  p.win.THORNSWOOD.needsBars = true;
+  p.chat.settings();
+  yes('and shown again: back at once', !p.needsHidden());
+  p.win.THORNSWOOD.chatFade = 5;
+  p.chat.settings();
+  p.advance(5100);
+  yes('chat fade set to 5 on Settings: the chat hides 5 seconds on, not 10', p.faded());
+  p.chat.show();
+  p.win.THORNSWOOD.chatFade = 0;
+  p.chat.settings();
+  p.advance(60000);
+  yes('and set to Never: it stays', !p.faded());
+}
+
 // ---- the plugin reads Thornswood.ini ------------------------------------------
 {
   const front = fs.readFileSync(FRONT, 'utf8').split(String.fromCharCode(13)).join('');
-  const a = front.indexOf('  const CHAT_FADE = (function () {');
-  const b = front.indexOf('const NEEDS_BARS = ');
+  const a = front.indexOf('  function chatFadeOf(text) {');
+  const b = front.indexOf('let NEEDS_BARS = ');
   const end = b < 0 ? -1 : front.indexOf('\n', b);
   yes('thornswood-front.js reads ChatFade and NeedsBars', a >= 0 && b > a && end > b);
   if (a >= 0 && b > a && end > b) {
@@ -257,6 +282,10 @@ for (const s of [5, 15, 20]) {
   }
   yes('and hands both to the page in window.THORNSWOOD',
       /window\.THORNSWOOD='[\s\S]{0,400}chatFade: CHAT_FADE, needsBars: NEEDS_BARS/.test(front));
+  yes('and after a change on Settings, again, with thornswoodChat.settings()',
+      /c\.chatFade=' \+ CHAT_FADE \+[\s\S]{0,200}c\.needsBars=' \+ NEEDS_BARS[\s\S]{0,200}window\.thornswoodChat\.settings\(\)/.test(front));
+  yes('and Settings is where they are changed: setSetting takes ChatFade and NeedsBars',
+      /name === 'ChatFade'/.test(front) && /name === 'NeedsBars'/.test(front));
 }
 
 console.log('');
