@@ -193,14 +193,15 @@ namespace Thornswood
             // Scan and Fix are on the Diagnostics page since #607. Fix is
             // Verify.Fix for the plugins: the server's order, other servers'
             // files and Creation Club plugins moved aside, missing plugins
-            // back from Vortex, the server's copy of Thornswood's own plugins
-            // when their bytes differ or they are missing, and the mod to put
-            // right in Vortex when another author's differs (#1180: the server
-            // hands out only its own). Since #2627 Scan looks at the whole
+            // back from Vortex, the release's copy of Thornswood's own plugins
+            // when their bytes differ from the server's or they are missing
+            // (#3386: from the signed release, never the server's plain http
+            // port), and the mod to put right in Vortex when another author's
+            // differs (#1180: only our own is ours to give). Since #2627 Scan looks at the whole
             // install (Upkeep.cs) and Fix puts right everything it can, then
             // says what is left (ShellScanFix.cs).
             new HelpItem("If it breaks", "What Scan and Fix do",
-                "Both are on the Diagnostics page. Scan looks for everything wrong with this install. It compares your plugins with the server's: the same names, in the same order, with the same bytes. It also looks for an update waiting, Thornswood's own game folder behind what Vortex has deployed or missing files, this build's own files changed, Windows' Skyrim folders left pointed at Thornswood after a crash, an out of date shortcut icon, the multiplayer client, Steam not running and the wrong Skyrim build. Fix puts right everything it can. It puts your plugin list in the server's order, puts back plugins Vortex has that the game folder lost, downloads the server's copy of Thornswood's own plugin when its bytes differ, names the mod to update or reinstall in Vortex when another author's plugin differs, and moves another server's files and stray Creation Club plugins aside, never deleting them. It brings the game folder up to date from Vortex first and takes a waiting update last. Then it scans again and says what is still wrong, why, and what will put it right. Close Skyrim first. Fix cannot install a mod Vortex never installed: if Scan says a plugin is not installed, the collection is not fully installed or the wrong Vortex profile is on."),
+                "Both are on the Diagnostics page. Scan looks for everything wrong with this install. It compares your plugins with the server's: the same names, in the same order, with the same bytes. It also looks for an update waiting, Thornswood's own game folder behind what Vortex has deployed or missing files, this build's own files changed, Windows' Skyrim folders left pointed at Thornswood after a crash, an out of date shortcut icon, the multiplayer client, Steam not running and the wrong Skyrim build. Fix puts right everything it can. It puts your plugin list in the server's order, puts back plugins Vortex has that the game folder lost, downloads Thornswood's own plugin from the latest release when its bytes differ from the server's, names the mod to update or reinstall in Vortex when another author's plugin differs, and moves another server's files and stray Creation Club plugins aside, never deleting them. It brings the game folder up to date from Vortex first and takes a waiting update last. Then it scans again and says what is still wrong, why, and what will put it right. Close Skyrim first. Fix cannot install a mod Vortex never installed: if Scan says a plugin is not installed, the collection is not fully installed or the wrong Vortex profile is on."),
 
             new HelpItem("If it breaks", "\"LOAD ORDER ERROR\", or Play is refused",
                 "A plugin differs from the server's, and joining like that would desync everyone. Close the game, open Diagnostics, press Scan and then Fix, and press Play again. When the plugin that differs is another author's mod, Scan names the mod to update or reinstall in Vortex, because the server hands out only Thornswood's own."),
@@ -212,7 +213,7 @@ namespace Thornswood
                 "A long wait, a black screen, and then you are standing in Skyrim on your own. That is not a crash: nothing was answering at the server's address. The launcher checks before it starts the game and says so when the server is not answering. Watch the Discord and try again later."),
 
             new HelpItem("If it breaks", "Sending your logs",
-                "Diagnostics, then Build the report, makes one zip with the newest crash log, the script extender log, your plugin list, the launcher log and a short summary of your machine, and opens the folder it is in. Drag that zip into your ticket in the Discord, and say what you were doing. The files themselves: the launcher log is C:\\Thornswood\\Profile\\launcher.log (Settings, Open log), and crash logs are in C:\\Thornswood\\Profile\\MyGames\\SKSE."),
+                "Diagnostics, then Build the report, makes one zip with the newest crash log, the script extender log, your plugin list, the launcher log and a short summary, and opens the folder it is in. The Diagnostics page says everything that is in it, and what of it names you. Drag that zip into your ticket in the Discord, and say what you were doing. The files themselves: the launcher log is C:\\Thornswood\\Profile\\launcher.log (Settings, Open log), and crash logs are in C:\\Thornswood\\Profile\\MyGames\\SKSE."),
 
             new HelpItem("If it breaks", "Something says Skyrim is open and it is not on screen",
                 "Skyrim does not always exit when the window goes away, and the game's own browser often leaves helper processes behind. The launcher clears those when it starts and again when you press Play. If something still says it after the launcher restarts, restart the PC."),

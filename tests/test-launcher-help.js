@@ -650,7 +650,7 @@ function between(src, from, to) {
       /x:Name="BtnScan"/.test(diagPage) && /x:Name="BtnFix"/.test(diagPage) &&
       /on the Diagnostics page/.test(fixItem) &&
       /open Diagnostics, press Scan and then Fix/.test(item('If it breaks', '"LOAD ORDER ERROR", or Play is refused')));
-  const fix = between(verify, 'public static int Fix(Config cfg, Action<string> say)', '\n        }\n');
+  const fix = between(verify, 'public static int Fix(Config cfg, Action<string> say, Func<string, byte[]> release)', '\n        }\n');
   yes('Fix puts the list in the server\'s order, and the page says so',
       /PutInServerOrder\(/.test(fix) && /in the server's order/.test(fixItem));
   yes('Fix moves another server\'s files and Creation Club plugins aside, and the page says so',
@@ -658,11 +658,11 @@ function between(src, from, to) {
       /another server's files and stray Creation Club plugins aside, never deleting them/.test(fixItem));
   yes('Fix puts missing plugins back from Vortex, and the page says so',
       /restoring missing plugins from Vortex/.test(fix) && /puts back plugins Vortex has/.test(fixItem));
-  // #1180: the server hands out Thornswood's own plugin and nobody else's.
-  yes('Fix fetches the server\'s copy of our own plugin, names the Vortex mod for another author\'s, and the page says so',
-      /The server's copy of our own plugin when its bytes are not the/.test(fix) &&
+  // #1180: Fix has Thornswood's own plugin and nobody else's, from the release since #3386.
+  yes('Fix puts in the release\'s copy of our own plugin, names the Vortex mod for another author\'s, and the page says so',
+      /The release's copy of our own plugin when its bytes are not the/.test(fix) &&
       /if \(!i\.Served\)[\s\S]{0,200}FromVortex\(cfg, i\.Plugin\)/.test(verify) &&
-      /downloads the server's copy of Thornswood's own plugin when its bytes differ/.test(fixItem) &&
+      /downloads Thornswood's own plugin from the latest release when its bytes differ from the server's/.test(fixItem) &&
       /names the mod to update or reinstall in Vortex when another author's plugin differs/.test(fixItem));
 
   const logs = item('If it breaks', 'Sending your logs');
@@ -712,8 +712,8 @@ function between(src, from, to) {
   yes('help.md sends people to Diagnostics for Scan and Fix', /open Diagnostics in the launcher and press Scan/.test(md));
   yes('help.md says what Fix does, in the same words as the page',
       /puts your plugin list in the server's order/.test(md) &&
-      /downloads the server's copy of\s+Thornswood's own plugin when its bytes differ/.test(md) &&
-      /names the mod to update or\s+reinstall in Vortex when another author's plugin differs/.test(md));
+      /downloads Thornswood's own\s+plugin from the latest release when its bytes differ from the server's/.test(md) &&
+      /names\s+the mod to update or\s+reinstall in Vortex when another author's plugin differs/.test(md));
   yes('help.md says to send the logs with Build the report', /Diagnostics and press\s+Build the report/.test(md));
   const logsPage = /\bLogs page\b|\bServer page\b/.exec(md);
   yes('help.md sends nobody to a page the rail no longer shows' + (logsPage ? ' (says "' + logsPage[0] + '")' : ''), !logsPage);

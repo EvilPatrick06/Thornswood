@@ -18,7 +18,7 @@
   is not built: Manage on the site still opens the site page, and this harness
   holds the launcher to that until the launcher lane changes it on purpose.
 
-  The launcher cannot be started from here (CLAUDE.md), so this reads the
+  The launcher cannot be started from here (the ops repo's CLAUDE.md), so this reads the
   source, the window and site\server.js and checks the shape:
 
     - Gallery.Report / Submit / Approve / Reject / TakeDown / Queue talk to

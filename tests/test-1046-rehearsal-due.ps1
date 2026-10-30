@@ -7,7 +7,8 @@
   2026 that the hands-on restore rehearsal runs monthly. Nothing read when
   the last one ran, so nothing could say one was due.
   scripts\vps\Check-RehearsalDue.ps1 reads the Last rehearsed line in
-  docs\RESTORING.md and the nightly checks run it.
+  RESTORING.md, which is in the private ops repo since #3693, and that
+  repo's nightly runs it.
 
   It proves:
     1. On made-up pages, with -Today: 35 days after the line is ok and 36
@@ -15,11 +16,8 @@
        -Days moves that line; no line, two lines, a date that does not read,
        a date after today, a missing page and a bad -Today are each unread
        (exit 3), never ok.
-    2. The real docs\RESTORING.md has exactly one line it reads (exit 0 or 1,
-       never 3, whatever day this runs), says the rehearsal is monthly and
-       names the check.
-    3. The nightly checks run it and fail on overdue, and
-       docs\SERVICE-OBJECTIVES.md no longer calls the cadence a proposal.
+    2. scripts\README.md lists it.
+  The real page's checks are the ops repo's tests\test-ops-runbooks.ps1.
 
   Writes nothing but a scratch folder under the temp folder.
 #>
@@ -104,27 +102,14 @@ try {
 
     $r = Run @('-Doc', $one, '-Today', '2026-10-18', '-Days', '0')
     Yes ('-Days 0: unread (exit {0})' -f $r.Code) ($r.Code -eq 3)
-
-    $r = Run @()
-    Yes ('the real docs\RESTORING.md reads (exit {0}, never 3)' -f $r.Code) ($r.Code -eq 0 -or $r.Code -eq 1)
-    Write-Host ('      ' + $r.Out.Trim())
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -EA SilentlyContinue
 }
 
-$restoring = [IO.File]::ReadAllText((Join-Path $Repo 'docs\RESTORING.md'))
-Yes 'RESTORING.md keeps one Last rehearsed line' ([regex]::Matches($restoring, '(?m)^\*\*Last rehearsed: ').Count -eq 1)
-Yes 'RESTORING.md says the hands-on rehearsal is due monthly, by Patrick''s ruling' ($restoring -match 'monthly' -and $restoring -match '18 October 2026')
-Yes '  and names the check' ($restoring -match 'Check-RehearsalDue\.ps1')
-
-$nightly = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\nightly.yml'))
-Yes 'the nightly checks run it' ($nightly -match 'scripts\\vps\\Check-RehearsalDue\.ps1')
-Yes '  and an overdue rehearsal fails the step' ($nightly -match '(?s)Check-RehearsalDue\.ps1.{0,600}exit \$code')
-
-$so = [IO.File]::ReadAllText((Join-Path $Repo 'docs\SERVICE-OBJECTIVES.md'))
-Yes 'SERVICE-OBJECTIVES.md names the monthly cadence and the check' ($so -match 'monthly' -and $so -match 'Check-RehearsalDue\.ps1:\$Days = 35')
-Yes '  and no longer calls the rehearsal cadence a proposal' (-not ($so -match 'at a cadence (he|Patrick) sets'))
+# The real RESTORING.md and SERVICE-OBJECTIVES.md are in the private ops repo
+# since #3693. Its tests\test-ops-runbooks.ps1 runs this script against the
+# real page and holds the two pages to the cadence, and its nightly runs it.
 
 $readme = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\README.md'))
 Yes 'scripts\README.md lists it' ($readme -match '\[vps/Check-RehearsalDue\.ps1\]')

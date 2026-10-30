@@ -150,7 +150,8 @@ if ($OnBox) {
   # first -OnBox run after that stopped with FileNotFoundError for it; the
   # same test imports Build-Discord.py there too, where a python with
   # discord.py is. content.py reads #factions out of lore\factions.md (#3317).
-  $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt',
+  # Build-Discord.py logs in through trust.py, the bot's roots (#3604).
+  $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/trust.py', 'bot/staff-channel.txt',
     'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md',
     'lore/factions.md')
   # The commit, never the working tree, so what ran is a commit anyone can name.
@@ -250,8 +251,12 @@ if (-not $py) { throw 'No Python 3.10 or newer found. Install Python 3.12 (py -3
 
 if (-not $SkipInstall) {
   Write-Host 'Making sure discord.py is here...'
-  & $py @pyArgs -m pip install -q -U discord.py
-  if ($LASTEXITCODE -ne 0) { throw 'pip could not install discord.py' }
+  # Build-Discord.py logs in through bot\trust.py, which reads its roots out
+  # of the certifi the bot pins, so that one comes too (#3604).
+  $certifi = [regex]::Match((Get-Content -LiteralPath (Join-Path $Here '..\..\bot\requirements.in') -Raw), '(?m)^certifi==(\S+)').Groups[1].Value
+  if (-not $certifi) { throw 'bot\requirements.in names no certifi version, so the roots Build-Discord.py trusts cannot be installed.' }
+  & $py @pyArgs -m pip install -q -U discord.py ('certifi==' + $certifi)
+  if ($LASTEXITCODE -ne 0) { throw 'pip could not install discord.py and certifi' }
   Write-Host '  ready'
 }
 

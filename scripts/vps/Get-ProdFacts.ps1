@@ -12,6 +12,9 @@
                site server.js, voice-server.js)
     certs      subject and NotAfter of each certificate Caddy keeps
     versions   file versions of node, caddy, python and sshd
+    inboundRules  every enabled inbound Allow firewall rule: Name,
+               DisplayName, protocol, local ports and remote addresses
+               (#3807)
     settings   for each config file named, its top level key NAMES and the
                JSON type of each value; machine environment variable NAMES
                that start THORNSWOOD_; never a value
@@ -97,11 +100,18 @@ function Get-ProdFacts {
     foreach ($f in 'C:\Thornswood-Docs\config.json', 'C:\Thornswood-Server\server-settings.json', 'C:\Thornswood-Server-Dev\server-settings.json') {
         $settings[$f] = if (Test-Path -LiteralPath $f) { try { ConvertTo-SettingShape (Get-Content -LiteralPath $f -Raw | ConvertFrom-Json) } catch { 'unreadable' } } else { 'missing' }
     }
+    $inbound = @()
+    foreach ($fw in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow)) {
+        $pf = $fw | Get-NetFirewallPortFilter
+        $af = $fw | Get-NetFirewallAddressFilter
+        $inbound += [ordered]@{ name = [string]$fw.Name; displayName = [string]$fw.DisplayName; protocol = [string]$pf.Protocol
+                                ports = @(@($pf.LocalPort) | ForEach-Object { [string]$_ }); remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ }) }
+    }
     $envNames = @([Environment]::GetEnvironmentVariables('Machine').Keys | Where-Object { $_ -like 'THORNSWOOD_*' } | Sort-Object)
     [ordered]@{
         takenUtc = (Get-Date).ToUniversalTime().ToString('o'); host = $env:COMPUTERNAME
         listeners = $listen; tasks = $tasks; services = $svcs; files = $files; fileBodies = $fileBodies
-        certs = $certs; versions = $versions; settings = $settings; machineEnvNames = $envNames
+        certs = $certs; versions = $versions; settings = $settings; machineEnvNames = $envNames; inboundRules = $inbound
     }
 }
 

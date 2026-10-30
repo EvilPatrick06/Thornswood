@@ -218,10 +218,8 @@ function typed(N, word, actorId) {
   const guide = read('Developer-Guide.md');
   const rule = slice(guide, '#### Buttons, not chat commands', '\n#### ') || '';
   yes('D5 the Developer Guide\'s rule names it beside the other exceptions', /`\/needs`/.test(rule) && /#2267/.test(rule));
-  const claude = read('CLAUDE.md');
-  const claudeRule = slice(claude, '### Buttons, not chat commands', '\n### ') || '';
-  yes('D5b CLAUDE.md\'s list of the commands that stay names /needs and /need in the guide\'s words',
-      /`\/needs` \(and `\/need`\), the needs bars as a line of text for somebody who hid them/.test(claudeRule) && /#2267/.test(claudeRule));
+  // D5b, CLAUDE.md's list, left with CLAUDE.md for the private ops repo
+  // (#3693), whose tests/test-ops-docs.js holds it.
   const commands = read('docs', 'systems', 'commands.md');
   yes('D6 docs/systems/commands.md has its row: anybody, on the list, stays a command',
       /^\| `\/needs`, `\/need` \| Anybody \|[^\n]*\| The list;[^\n]*\| Stays a command[^\n]*\| #2267 \|$/m.test(commands));

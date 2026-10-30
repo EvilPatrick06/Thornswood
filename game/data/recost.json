@@ -24,7 +24,7 @@
  },
  "counts": {
   "measured": 1112,
-  "inGroups": 882,
+  "inGroups": 883,
   "groups": 105,
   "recosted": 43,
   "coinsTakenOut": 11,
@@ -218,7 +218,7 @@
    "name": "Dragonguard Katana",
    "plugin": "Immersive Weapons.esp",
    "kind": "Swords",
-   "rank": "expert",
+   "rank": "advanced",
    "costWas": 8,
    "inputs": [
     {
@@ -419,7 +419,7 @@
    "name": "Colovian Composite Bow",
    "plugin": "Immersive Weapons.esp",
    "kind": "Bows",
-   "rank": "advanced",
+   "rank": "novice",
    "costWas": 5,
    "inputs": [
     {

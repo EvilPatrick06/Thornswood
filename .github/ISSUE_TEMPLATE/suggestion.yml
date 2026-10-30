@@ -1,0 +1,40 @@
+name: An idea
+description: Something new, or a change to something that works but could be better.
+labels: ["triage", "Suggestion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the idea. Everybody can read an issue, so leave out anything private. The [roadmap](https://thornswood.net/roadmap) shows what is being built already.
+  - type: dropdown
+    id: where
+    attributes:
+      label: What is it for?
+      options:
+        - The world and roleplay
+        - The launcher or the installer
+        - The website
+        - The Discord bot
+        - Voice
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What you would like, in your own words.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What it would make better, or what is hard without it.
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Pictures, examples from other servers or mods, or how it could work.

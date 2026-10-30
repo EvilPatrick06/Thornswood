@@ -1561,8 +1561,8 @@ yes('Build-Discord.py names #dev-test-tasks in Dev, moved from Staff, never make
 
 # ------- 12. #known-issues holds the findings whose fix has not landed ------
 # Patrick, 22 Oct, and #3140: a known issue is a finding people still meet.
-# A "Test task:" comment, or the board's Done label (done-on-merge.yml puts
-# it on a merged fix), takes it off. A merged pull request alone does not:
+# A "Test task:" comment, done-on-merge.yml's comment on a merged fix, or the
+# board's Done label for the minute it is on, takes it off. A merged pull request alone does not:
 # #503 (scripts never fire) was kept off by a measuring step, and #1626 by a
 # Refs written by mistake, while people still met both.
 ISSUES.clear()
@@ -1597,6 +1597,28 @@ yes('a "Test task:" comment takes its post down, and so does the board\'s '
 out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
 yes('  nothing comes back on the next pass', out == ([], [], [])
     and sorted(names(kf)) == ['Chairs stand you up', 'Scripts never fire'])
+# 26 Oct: board-status.yml takes board: Done off within a minute, so #613 and
+# #1626 were in Done and still posted. done-on-merge.yml's comment stays, its
+# test task inside a code block where "Test task:" is not the first line.
+issue(124, 'Forge list messy', ['Main Findings'])
+issue(125, 'Ladders creak', ['Main Findings'])
+run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
+DOM = ('Pull request #3302 merged (1d39df361ea3), so this is in Done and stays '
+       'open: the merge puts the fix on the main branch.\n\n```\nTest task: '
+       'Forge recipes\n1. Open the forge.\n```')
+COMMENTS[124] = [{'body': DOM, 'user': {'login': 'github-actions[bot]'},
+                  'created_at': tick()}]
+COMMENTS[125] = [{'body': DOM, 'user': {'login': 'someone'},
+                  'created_at': tick()}]
+bump(124)
+bump(125)
+removed = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))[2]
+yes('  done-on-merge\'s comment takes its post down, the board: Done label '
+    'long gone; the same words from a person do not',
+    removed == [124] and 'Ladders creak' in names(kf)
+    and 'Forge list messy' not in names(kf))
+bump(125, state='closed', state_reason='completed', closed_at=tick())
+run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
 ks['known_changed'] = {'123': 2, '120': True}
 del ks['issues']['123']
 out = run(bot.known_issues_once(kf, ks, gh, me_id=me.id))
