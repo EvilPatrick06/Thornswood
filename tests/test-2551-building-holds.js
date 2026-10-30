@@ -54,8 +54,8 @@ const COLLECTION = path.join(ROOT, 'records', 'collection-plugins.json');
 const LAST = path.join(ROOT, 'game', 'data', 'last-plugin.json');
 const TOOL = path.join(ROOT, 'scripts', 'dev', 'Build-BuildingHolds.py');
 const gm = read(path.join(ROOT, 'game', 'gamemode.js'));
-const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
-const AFTER = ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'];
+const OURS = ['Thornswood-Content.esp', 'Thornswood-Last.esp'];
+const AFTER = ['Thornswood-Last.esp'];
 const HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
                'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
 const TOWN_OF_HOLD = {

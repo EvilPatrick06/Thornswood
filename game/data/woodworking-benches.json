@@ -869,19 +869,14 @@
   },
   {
    "name": "Thornswood-Last.esp",
-   "sha256": "ebb71d60663bd104522f0a2b6cc51d4e0b7e0c4dd2023a3641965a18683b2b9d",
-   "size": 12899542
-  },
-  {
-   "name": "Thornswood-WoodworkerTrail.esp",
-   "sha256": "d12bcd2e54d874c5005303082b5ac40ad01af3d5d8bfb5c75a4795b39d988482",
-   "size": 9628
+   "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
+   "size": 12901082
   }
  ],
  "builtBy": "scripts/dev/Build-WoodworkingBenches.py",
  "issue": 516,
  "keyword": "154e1:Thornswood-Content.esp",
- "readFrom": "game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp; Thornswood-Content.esp, Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp from game/content",
+ "readFrom": "game/data/last-plugin.json loadOrder, then Thornswood-Last.esp; Thornswood-Content.esp, Thornswood-Last.esp from game/content",
  "rule": "Each bench stands beside a forge, at offset (x to the smith's right, y the way the smith faces) and turn from the forge's winning record. Its outline (x -75 to 85, y 8 to 88) and its user's place (x -35 to 35, y -55 to 8) lie on the navmesh, on ground flat to 16 units and within 60 of the forge's height, and touch no furniture, container, door, item or static under 250 by 250 (larger statics, and anything over 600 units on a side, are the navmesh's), nor where anybody stands at another bench or the way through a door, from 6 to 140 units above the floor, with 30 units round the table. It stands on the lowest of those samples.",
  "skipped": {
   "dragonbridge": "its forge (531b:JKs Skyrim.esp) stands on sloping ground; the nearest clear flat spot is 725 units away out in the field, which is not beside a forge. The second forge, aa57 in Thornswood-Content.esp, was the other server's and left with its placements (#2553).",

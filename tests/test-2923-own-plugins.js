@@ -65,8 +65,8 @@ fs.mkdirSync(DATA);
 const OWN = fs.readdirSync(OWN_DIR).filter((n) => fs.statSync(path.join(OWN_DIR, n)).isFile());
 
 // ---------------------------------------------------------------- H
-yes('H0 game/content holds Thornswood-Content.esp, Thornswood-Last.esp and Thornswood-WoodworkerTrail.esp',
-    ['Thornswood-Content.esp', 'Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'].every((n) => OWN.indexOf(n) >= 0));
+yes('H0 game/content holds Thornswood-Content.esp and Thornswood-Last.esp',
+    ['Thornswood-Content.esp', 'Thornswood-Last.esp'].every((n) => OWN.indexOf(n) >= 0));
 const js = require(path.join(DEV, 'OwnPlugins.js'));
 yes('H1 OwnPlugins.js reads every file in game/content from there (' + OWN.length + ')',
     OWN.every((n) => path.resolve(js.pluginPath(DATA, n)) === path.resolve(OWN_DIR, n)));
@@ -262,7 +262,9 @@ const SENT = ['game/content', 'game/data', 'records'];
 const under = (f, list) => list.some((d) => f === d || f.indexOf(d + '/') === 0);
 // Any step's: Write-SystemLists.js reads the spell ids Build-SpellTable.ps1
 // writes into game/gamemode.js, which later steps write other tables into.
-const listed = [].concat.apply([], steps.map((s) => (s.reads || []).concat(s.readsBack || [], s.uses || [], s.writes || [])));
+// And what a builder writes only by hand, with an option the chain does not
+// give it (writesOffChain, #3120).
+const listed = [].concat.apply([], steps.map((s) => (s.reads || []).concat(s.readsBack || [], s.uses || [], s.writes || [], s.writesOffChain || [])));
 const notListed = [];
 let named = 0;
 for (const s of steps) {
