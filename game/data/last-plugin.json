@@ -369,8 +369,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "size": 276305,
-   "sha256": "c7ee316ff6b90c5a86d16ccc070a632c8b280ea9e1d2015e087453c67360da81"
+   "size": 276186,
+   "sha256": "bea10873c87b2c8bc0dc759ae286effc980723b17c5d8b84b6b671b8fdde57a0"
   },
   {
    "name": "Populated Cities Towns Villages Legendary.esp",
@@ -25269,6 +25269,20 @@
    "WindhelmSSE.esp": 15,
    "ZIA_Complete Pack.esp": 1,
    "atlas map markers.esp": 3
+  }
+ },
+ "recipe": {
+  "name": "last-plugin.recipe",
+  "size": 4122960,
+  "sha256": "a0e2f603342580bcd2b36c7245c02e3ab465d5deecc282dfbaf22aa04abac97f",
+  "sources": 68,
+  "records": 102772,
+  "ownBytes": 2724893,
+  "ownBytesInRecords": 136041,
+  "addedSubrecords": {
+   "CTDA": 2242,
+   "PNAM": 1,
+   "XLCN": 3
   }
  },
  "notCopiedFrom": {

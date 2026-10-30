@@ -151,17 +151,13 @@
   The same, and records that a dev release on this machine is built from
   local\release-devbuild in the repository, One's dev release folder since
   5 October. Give the whole path: it is recorded for every clone and
-  worktree. After moving a release folder, run
-  .\scripts\mods\Build-Generated.ps1 -Channel dev once, because the
-  generated files record the game folder they were built for.
+  worktree.
 
 .EXAMPLE
   .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Thornswood-Repo\local\release-main -EngineBuild ci
   Gives main a release folder of its own, made by Update-ShipRoot.ps1 from
   Vortex's deployment and the main feed's release, and records CI's build of
-  the pin as this machine's engine build (#3047), fetched now. Then
-  .\scripts\mods\Build-Generated.ps1 -Channel main builds its generated
-  files.
+  the pin as this machine's engine build (#3047), fetched now.
 
 .EXAMPLE
   .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Thornswood-Repo\local\release-main -SkyrimFrom C:\Thornswood-Repo\local\release-devbuild\Game
@@ -705,7 +701,7 @@ if (Test-Path -LiteralPath (Join-Path $shipRoot 'Game\Data\vortex.deployment.jso
   & (Join-Path $Here 'Update-ShipRoot.ps1') @upArgs
   $upCode = $LASTEXITCODE
   Row ('the release folder is current with Vortex''s deployment, with the recorded client in it') ($upCode -eq 0) $shipRoot `
-    $('.\scripts\release\Update-ShipRoot.ps1 -Channel ' + $Channel + ' says why above; then .\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel)
+    $('.\scripts\release\Update-ShipRoot.ps1 -Channel ' + $Channel + ' says why above')
 }
 
 # ---------------------------------------------------------- what is left --

@@ -110,7 +110,8 @@ $refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', '
           'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework.dll', 'System.Xaml.dll') |
     ForEach-Object { Join-Path $LauncherRefDir $_ }
 
-$real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs') |
+# OwnGameKinds and Verify name LastPlugin (#2791), which reads the game's archives through FromGameArchive.cs.
+$real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'LastPlugin.cs', 'FromGameArchive.cs') |
     ForEach-Object { Join-Path $AppPath $_ }
 foreach ($f in $real) { if (-not (Test-Path -LiteralPath $f)) { Yes "launcher\app\$([IO.Path]::GetFileName($f)) is there" $false; Done } }
 

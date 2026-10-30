@@ -77,6 +77,14 @@
         "ThenRestart": "switch",
         "RestartFollows": "switch"
       }
+    },
+    "Read-LauncherStarts": {
+      "script": "scripts/vps/Read-LauncherStarts.ps1",
+      "timeoutMinutes": 10,
+      "fixed": [],
+      "params": {
+        "Days": "^[0-9]{1,3}$"
+      }
     }
   }
 }

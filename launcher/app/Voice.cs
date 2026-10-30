@@ -43,6 +43,13 @@ namespace Thornswood
     /// </summary>
     static class Voice
     {
+        /// <summary>
+        /// The voice browser's own WebView2 folder: its cache and storage, kept
+        /// while the launcher is installed and removed by every uninstall
+        /// (LocalKeep.NotSaves, #3679).
+        /// </summary>
+        public static string BrowserDir { get { return Path.Combine(Paths.ProfileDir, "VoiceBrowser"); } }
+
         const string CoreDll   = "Microsoft.Web.WebView2.Core.dll";
         const string WpfDll    = "Microsoft.Web.WebView2.Wpf.dll";
         const string LoaderDll = "WebView2Loader.dll";
@@ -366,7 +373,7 @@ namespace Thornswood
                 }
             };
 
-            string profile = Path.Combine(Paths.ProfileDir, "VoiceBrowser");
+            string profile = BrowserDir;
             try { Directory.CreateDirectory(profile); } catch (Exception ex) { Swallow.Note("Voice.Begin, create profile", ex); }
 
             // No mDNS responder in the voice browser, so nothing in it listens

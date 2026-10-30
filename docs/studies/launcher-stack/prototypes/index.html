@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Thornswood prototype</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #14110e; color: #eadfc8; font-family: "Segoe UI", sans-serif; overflow: hidden; }
+  #art { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #panel { position: fixed; left: 48px; bottom: 48px; display: flex; flex-direction: column; gap: 12px; }
+  h1 { margin: 0; font-size: 40px; letter-spacing: 2px; text-shadow: 0 2px 8px #000; }
+  button { width: 220px; height: 56px; font-size: 20px; color: #14110e; background: #c9a45c; border: 0; border-radius: 4px; cursor: pointer; }
+  button:hover { background: #dcb873; }
+  #state { font-size: 14px; text-shadow: 0 1px 4px #000; }
+</style>
+</head>
+<body>
+<img id="art" src="art.png" alt="">
+<div id="panel">
+  <h1>THORNSWOOD</h1>
+  <button id="play">Play</button>
+  <div id="state">Ready to launch</div>
+</div>
+<audio id="music" src="loop.wav" loop></audio>
+<script>
+  // One page for every stack that draws its window in a web view (Tauri,
+  // Electron, Wails, and WPF with WebView2). Each host is told "ready" once
+  // the first frame with the art is on screen, and "play" four seconds later,
+  // when the page also starts the music: README.md has the contract.
+  function host(msg) {
+    if (window.__TAURI__) return window.__TAURI__.core.invoke(msg);
+    if (window.proto) return window.proto[msg]();
+    if (window.go && window.go.main) return window.go.main.App[msg === 'ready' ? 'Ready' : 'Play']();
+    if (window.chrome && window.chrome.webview) return window.chrome.webview.postMessage(msg);
+  }
+  function play() {
+    document.getElementById('music').play().catch(e => { document.getElementById('state').textContent = 'Music: ' + e.name; });
+    host('play');
+    document.getElementById('state').textContent = 'Started';
+  }
+  document.getElementById('play').onclick = play;
+  const art = document.getElementById('art');
+  const shown = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+    host('ready');
+    setTimeout(play, 4000);
+  }));
+  if (art.complete) shown(); else { art.onload = shown; art.onerror = shown; }
+</script>
+</body>
+</html>

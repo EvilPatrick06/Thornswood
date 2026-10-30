@@ -7,7 +7,7 @@
     - every Markdown file in the repository, apart from lore\ (in-world
       writing, not operational text), docs\archive\ (dated snapshots, kept as
       they were) and the engine submodule;
-    - the launcher's help (launcher/app/Help.cs) and window (launcher/ui.xaml),
+    - the launcher's window (launcher/ui.xaml; its Help page went with #3146),
       the bot's channel posts (bot/content.py), the site's public pages
       (site/public/*.html) and the read me every installer carries
       (installer/READ ME FIRST.txt). The voice service serves no page since
@@ -81,7 +81,7 @@ $Root = (Resolve-Path -LiteralPath $Root).Path
 # written from the issue board, and the bot checks their words (bot.py
 # post_problems).
 $Named = @(
-    'README.md', 'SECURITY.md', 'Developer-Guide.md', 'launcher/app/Help.cs', 'launcher/ui.xaml',
+    'README.md', 'SECURITY.md', 'Developer-Guide.md', 'launcher/ui.xaml',
     'bot/content.py', 'site/public/home.html', 'installer/READ ME FIRST.txt', 'site/data/board.json'
 )
 # README.md and the component READMEs that tests\test-component-readmes.js reads.

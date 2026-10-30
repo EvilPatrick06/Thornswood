@@ -334,17 +334,28 @@ KIT_RECIPES.forEach(function (k) {
       }));
 }
 
-const EDGE = { prof: 'smith', half: 'edgewright', ranks: { edgewright: 'novice', platewright: 'novice' } };
+// A Master Edgewright: the smiths' 120% waits for Master (Patrick, 26 Oct, #3442).
+const EDGE = { prof: 'smith', half: 'edgewright', ranks: { edgewright: 'master', platewright: 'novice' } };
+const EDGE_NOVICE = { prof: 'smith', half: 'edgewright', ranks: { edgewright: 'novice', platewright: 'novice' } };
+const PLATE_EXPERT = { prof: 'smith', half: 'platewright', ranks: { platewright: 'expert', edgewright: 'novice' } };
 const PLATE = { prof: 'smith', half: 'platewright', ranks: { platewright: 'master', edgewright: 'novice' } };
 const HABER = { prof: 'tailor', half: 'haberdasher', ranks: { haberdasher: 'novice' } };
 const LIVERY = { prof: 'tailor', half: 'liverywright', ranks: { liverywright: 'master', haberdasher: 'novice' } };
 const COOK = { prof: 'cook', half: 'hearthcook', ranks: { hearthcook: 'expert' } };
 
-yes('the Edgewright mends with a Weapon Kit to 120%', D.repairTo(EDGE, 'weapon') === 120);
+yes('the Edgewright mends with a Weapon Kit to 120% at Master', D.repairTo(EDGE, 'weapon') === 120);
+yes('below Master, the Edgewright mends with it to 100%, like anybody else (#3442)',
+    D.repairTo(EDGE_NOVICE, 'weapon') === 100);
+yes('an expert Platewright mends with an Armor Kit to 100%, not 120%',
+    D.repairTo(PLATE_EXPERT, 'armour') === 100);
+yes('a smith with no ranks written down mends to 100%',
+    D.repairTo({ prof: 'smith', half: 'edgewright' }, 'weapon') === 100);
+yes('the two smith kits are the ones that wait for Master, and the Sewing Kit is not',
+    KITS.weapon.atMaster === true && KITS.armour.atMaster === true && !KITS.clothing.atMaster);
 yes('the Platewright, the other half of the same profession, to 100%, even at master',
     D.repairTo(PLATE, 'weapon') === 100);
 yes('the Platewright mends with an Armor Kit to 120%', D.repairTo(PLATE, 'armour') === 120);
-yes('the Haberdasher mends with a Sewing Kit to 120%, the Liverywright to 100%',
+yes('a novice Haberdasher mends with a Sewing Kit to 120%, the Liverywright to 100%',
     D.repairTo(HABER, 'clothing') === 120 && D.repairTo(LIVERY, 'clothing') === 100);
 yes('a Liverywright with the sister half at master under a master still mends to 100% (Patrick, 4 October)',
     D.repairTo({ prof: 'tailor', half: 'liverywright', ranks: { liverywright: 'novice', haberdasher: 'master' },

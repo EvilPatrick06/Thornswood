@@ -85,7 +85,8 @@ const OURS = {
   'Thornswood.ini': 'the key template, launcher',
   'client-build.json': 'the record of the client runtime',
   'skyrim-files.json': 'the list of the pinned Skyrim build\'s own files, read from Steam\'s depot manifests',
-  'ui-gone.json': 'the Daedric menu set and unused fork assets a refresh must not copy back'
+  'ui-gone.json': 'the Daedric menu set and unused fork assets a refresh must not copy back',
+  'generated.json': 'the build list of the animation and body files the launcher makes on each computer (#3715)'
 };
 
 // What goes into the launcher is written in its project file since #498's
@@ -1107,6 +1108,97 @@ if (filesTxt === null) {
   }
 }
 
+// ------------------------------------- built here from other people's work
+//
+// Issue #3715. The launcher builds behavior files with Pandora and bodies
+// with BodySlide on each computer (launcher\app\GeneratedBuild.cs, which
+// Build-Generated.ps1 runs too), and Ship-Rules.ps1 names what it builds
+// ($ShipGeneratedBodyFiles, $ShipGeneratedOutfitFiles and the patterns
+// $ShipGeneratedPatterns adds) so that no pack and no installer carries them.
+// Until 27 October every release carried them, 45 files with nothing saying
+// whose they were. They are still other people's work on every computer, and
+// the credits name it: every path and pattern Ship-Rules.ps1 names as built is
+// named by an entry of records\asset-provenance.json, and every file of a
+// generated record matches one: tests\fixtures\3715-generated.txt, the 45 the
+// installer carried on 27 October, and the launcher's own
+// Profile\OwnGame\generated.txt where it is on this machine.
+const shipRulesText = read(path.join(REPO, 'scripts', 'release', 'Ship-Rules.ps1')) || '';
+function shipPaths(text, name) {
+  // @() on one line is an empty list, not the start of one that ends further down.
+  const m = new RegExp('^\\$' + name + ' = (?:[$\\w]+ \\+ )*@\\((?:\\)|([\\s\\S]*?)^\\))', 'm').exec(text);
+  // A comment line inside the list is not a path, though it may hold a quote.
+  const body = (m && m[1] || '').replace(/^\s*#.*$/mg, '');
+  return m ? (body.match(/'[^']+'/g) || []).map(function (q) { return q.slice(1, -1); }) : [];
+}
+// PowerShell's -like, as Test-ShipGenerated uses it: * and ?, any case.
+function like(rel, pattern) {
+  const rx = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp('^' + rx + '$', 'i').test(rel);
+}
+function generatedRows(text) {
+  return String(text || '').split('\n').map(function (l) { return /^file [0-9a-f]{64} (.+)$/.exec(l.trim()); })
+    .filter(Boolean).map(function (m) { return m[1].replace(/\//g, '\\'); });
+}
+// Each finding is one line saying what has no entry.
+function generatedAudit(reg, rules, rows) {
+  const bad = [];
+  const entries = ((reg && reg.notInRepo) || []).filter(function (e) { return Array.isArray(e.paths); });
+  const named = function (p) {
+    return entries.filter(function (e) { return e.paths.some(function (q) { return q.toLowerCase() === p.toLowerCase(); }); });
+  };
+  const lets = shipPaths(rules, 'ShipGeneratedBodyFiles').concat(shipPaths(rules, 'ShipGeneratedOutfitFiles'), shipPaths(rules, 'ShipGeneratedPatterns'));
+  lets.forEach(function (p) {
+    const by = named(p);
+    if (by.length === 0) bad.push(p + ': Ship-Rules.ps1 names it as built on each computer, and no records\\asset-provenance.json entry names it');
+    by.forEach(function (e) {
+      if (!e.licence || !e.status) bad.push(p + ': its entry has no licence or status');
+      if (e.status === 'no-licence-found' && !(Number.isInteger(e.issue) && e.issue > 0)) bad.push(p + ': no licence found, and no issue carries the decision');
+    });
+  });
+  rows.forEach(function (rel) {
+    const by = entries.filter(function (e) { return e.paths.some(function (q) { return like(rel, q); }); });
+    if (by.length === 0) bad.push(rel + ': in a generated record, and no records\\asset-provenance.json entry covers it');
+  });
+  return { bad: bad, lets: lets };
+}
+let provenance = null;
+try { provenance = JSON.parse(read(path.join(REPO, 'records', 'asset-provenance.json'))); } catch (e) { }
+yes('records\\asset-provenance.json reads, for the generated files', provenance !== null);
+const standIn = generatedRows(read(path.join(REPO, 'tests', 'fixtures', '3715-generated.txt')));
+yes('the stand-in generated record lists the 45 files the installer carried (' + standIn.length + ')', standIn.length === 45);
+const gen = generatedAudit(provenance, shipRulesText, standIn);
+gen.bad.forEach(function (b) { console.log('      ' + b); });
+yes('Ship-Rules.ps1 names what the launcher builds (' + gen.lets.length + ' paths and patterns, each once)', gen.lets.length === new Set(gen.lets.map(function (p) { return p.toLowerCase(); })).size && gen.lets.length >= 12);
+yes('every generated path and pattern, and every file in the stand-in record, has a provenance entry (' + gen.bad.length + ' finding(s))', gen.bad.length === 0);
+const ownGenerated = read(path.join(PROFILE, 'OwnGame', 'generated.txt'));
+if (ownGenerated === null) {
+  skip('no ' + path.join(PROFILE, 'OwnGame', 'generated.txt') + ' here, so this machine\'s generated files were not held to the register');
+} else {
+  const own = generatedAudit(provenance, shipRulesText, generatedRows(ownGenerated));
+  own.bad.forEach(function (b) { console.log('      ' + b); });
+  yes('every file this machine\'s generated.txt lists has a provenance entry (' + own.bad.length + ' finding(s))', own.bad.length === 0);
+}
+const builtSec = (/\n## Built here from other people's work: behaviors and bodies\n([\s\S]*?)\n## /.exec(N) || [])[1] || '';
+yes('THIRD-PARTY.md has the section on what the launcher builds', builtSec.length > 0);
+['Pandora Behaviour Engine+', 'Precision', 'True Directional Movement', 'CBBE 3BA', 'HIMBO', 'Nexus SE 198'].forEach(function (w) {
+  yes('  it names ' + w, builtSec.indexOf(w) >= 0);
+});
+yes('  and "What is still missing" says the installer already published carries them until a release after #3715 replaces it', /behavior files[\s\S]*#3715[\s\S]*replaces it/.test((/\n## What is still missing\n([\s\S]*?)\n## /.exec(N) || [])[1] || ''));
+// HIMBO's body goes out under CC BY-SA 4.0, which asks for the credit and the
+// licence wherever it is handed on.
+yes('the public credits page credits HIMBO and gives its licence', /HIMBO/.test(C) && /Kreiste and Novelyst/.test(C) && /creativecommons\.org\/licenses\/by-sa\/4\.0/.test(C));
+if (provenance) {
+  const without = function (test) {
+    const c = JSON.parse(JSON.stringify(provenance));
+    c.notInRepo = c.notInRepo.filter(function (e) { return !test(e); });
+    return generatedAudit(c, shipRulesText, standIn).bad;
+  };
+  let r = without(function (e) { return (e.paths || []).indexOf('Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif') >= 0; });
+  yes('a body whose provenance entry is taken out is caught', r.some(function (b) { return /^Data\\meshes\\actors\\character\\character assets\\femalebody_0\.nif: Ship-Rules\.ps1 names it as built/.test(b); }));
+  r = without(function (e) { return (e.paths || []).indexOf('Data\\meshes\\actors\\*\\behaviors\\*.hkx') >= 0; });
+  yes('a behavior file whose provenance entry is taken out is caught', r.some(function (b) { return /^Data\\meshes\\actors\\character\\behaviors\\0_master\.hkx: in a generated record/.test(b); }));
+}
+
 // ------------------------------------------------- the collection's menus
 // QuickLoot IE's Nexus page says "Released under the GPL-3.0-or-later
 // license", and its 4.1.0 changelog "Changed the project license to
@@ -1147,14 +1239,115 @@ if (filesTxt === null) {
   yes(pair[0] + ' has no em dash', pair[1].indexOf('\u2014') < 0);
   yes(pair[0] + ' never says player', !/\bplayers?\b/i.test(pair[1]));
 });
-// Thornswood's own work is all rights reserved, in LICENSE at the root, with
-// the terms every contributor agrees to once (Patrick, 12 Oct, #1331). This
-// file points there and licenses nothing of ours itself.
+// Thornswood's own code is under MIT (Patrick, 26 Oct, #3688). LICENSE holds
+// the MIT text and nothing else: one added sentence and GitHub's licence
+// reader (licensee) stops naming it MIT, measured 26 Oct. What MIT does not
+// cover, and the terms every contributor agrees to once (#1331), are in
+// LICENSING.md. This file points there and licenses nothing of ours itself.
 const licence = read(path.join(ROOT, 'LICENSE'));
 yes('LICENSE is at the repo root', licence !== null);
-yes('  it keeps every right to Thornswood\'s own work', /All rights reserved\./.test(licence || ''));
-yes('  and carries the contributor terms', /CONTRIBUTOR TERMS/.test(licence || '') && /agrees to these\s+terms once/.test(licence || ''));
-yes('THIRD-PARTY.md sends the project\'s own licence to LICENSE', /does not license Thornswood's own work\. That is `LICENSE` at the\s+root/.test(N));
+const MIT_BODY = [
+  'Permission is hereby granted, free of charge, to any person obtaining a copy',
+  'of this software and associated documentation files (the "Software"), to deal',
+  'in the Software without restriction, including without limitation the rights',
+  'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell',
+  'copies of the Software, and to permit persons to whom the Software is',
+  'furnished to do so, subject to the following conditions:',
+  '',
+  'The above copyright notice and this permission notice shall be included in all',
+  'copies or substantial portions of the Software.',
+  '',
+  'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR',
+  'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,',
+  'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE',
+  'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER',
+  'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,',
+  'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE',
+  'SOFTWARE.',
+].join('\n');
+const MIT_FILE = 'MIT License\n\nCopyright (c) 2026 Patrick (EvilPatrick06) and Thornswood contributors\n\n' +
+  MIT_BODY + '\n';
+yes('  it is the MIT text and nothing else, so GitHub reads it as MIT', licence === MIT_FILE);
+const licensing = read(path.join(ROOT, 'LICENSING.md'));
+const LG = licensing || '';
+yes('LICENSING.md is at the repo root', licensing !== null);
+yes('  it says what MIT does not cover', /## What MIT does not cover/.test(LG));
+yes('  the SkyMP fork keeps its own licences', /engine\/skymp/.test(LG) && /Affero/.test(LG));
+yes('  every file THIRD-PARTY.md lists keeps its own', /Every file `THIRD-PARTY\.md` lists/.test(LG));
+yes('  lore, art and music Thornswood owns are under CC BY-NC-SA 4.0 (Patrick, 26 Oct, #3688)',
+    /## Lore, art and music: CC BY-NC-SA 4\.0/.test(LG) && /creativecommons\.org\/licenses\/by-nc-sa\/4\.0/.test(LG));
+yes('  the content plugin\'s own records are under it, Last.esp and WoodworkerTrail once #2791 rebuilds them (q-3688-esp-licence, 4)',
+    /`game\/content\/Thornswood-Content\.esp` now/.test(flat(LG)) && /once #2791 has rebuilt them/.test(flat(LG)));
+yes('  the name and logo stay all rights reserved', /\*\*The Thornswood name and logo\.\*\* They stay all rights reserved/.test(LG));
+// Every logo file LICENSING.md keeps out of CC BY-NC-SA 4.0 is a real file.
+const logoAt = LG.indexOf('**The Thornswood name and logo.**');
+const logoPara = logoAt >= 0 ? LG.slice(logoAt, LG.indexOf('\n7. ', logoAt)) : '';
+const logoFiles = [];
+let dirNow = '';
+(logoPara.match(/`[^`]+`/g) || []).forEach(function (q) {
+  const f = q.slice(1, -1);
+  if (f.indexOf('/') >= 0) { dirNow = f.slice(0, f.lastIndexOf('/') + 1); logoFiles.push(f); }
+  else if (dirNow) { logoFiles.push(dirNow + f); }
+});
+const logoMissing = logoFiles.filter(function (f) { return !fs.existsSync(path.join(ROOT, f)); });
+logoMissing.forEach(function (f) { console.log('      named as a logo file, not in the repository: ' + f); });
+yes('  every logo file it names is in the repository (' + logoFiles.length + ')', logoFiles.length >= 10 && logoMissing.length === 0);
+yes('  and it carries the contributor terms', /## Contributor terms/.test(LG) && /agrees to these\s+terms once/.test(LG));
+yes('THIRD-PARTY.md sends the project\'s own licence to LICENSE and LICENSING.md',
+    /does not license Thornswood's own work\./.test(N) && /`LICENSE` at the root/.test(N) && /`LICENSING\.md` says what that licence does not cover/.test(N));
+yes('THIRD-PARTY.md says it covers files kept in the repository too, as LICENSING.md does',
+    /the files kept in this repository that somebody else wrote/.test(N));
+// Contributor term 3 asks the pull request to say whose the work is, so the
+// template has a line for it (#3651).
+const template = read(path.join(ROOT, '.github', 'pull_request_template.md')) || '';
+if (/the pull request says whose it is/.test(flat(LG))) {
+  yes('the pull request template has a "Whose work" line for contributor term 3', /^Whose work:/m.test(template));
+} else {
+  yes('LICENSING.md no longer asks the pull request to say whose the work is', true);
+}
+[['LICENSING.md', LG]].forEach(function (pair) {
+  yes(pair[0] + ' has no em dash', pair[1].indexOf('—') < 0);
+  yes(pair[0] + ' never says player', !/\bplayers?\b/i.test(pair[1]));
+});
+
+// --------------------------------------------- kept in the repository, #3761
+//
+// LICENSING.md says MIT does not cover anything THIRD-PARTY.md lists, and
+// THIRD-PARTY.md lists what sits in the repository as well as what ships.
+// A fixture that is large or carries somebody else's notice has a row in
+// "Kept in the repository, not shipped". The 2.4 MB skymp5-front build and
+// certifi's roots sat in tests\fixtures with none until #3761.
+const keptAt = N.indexOf('## Kept in the repository, not shipped');
+yes('THIRD-PARTY.md has a section for files kept in the repository, not shipped', keptAt >= 0);
+const keptSec = keptAt >= 0 ? N.slice(keptAt, N.indexOf('\n## ', keptAt + 5) > 0 ? N.indexOf('\n## ', keptAt + 5) : N.length) : '';
+const NOTICE_RE = /@license|\bCopyright\b|\bcertifi\b|-----BEGIN CERTIFICATE-----/;
+function walkFixtures(dir, rel, out) {
+  fs.readdirSync(dir, { withFileTypes: true }).forEach(function (e) {
+    const r = rel ? rel + '\\' + e.name : e.name;
+    if (e.isDirectory()) { walkFixtures(path.join(dir, e.name), r, out); }
+    else if (e.isFile()) { out.push({ rel: r, full: path.join(dir, e.name) }); }
+  });
+  return out;
+}
+const fixtures = walkFixtures(path.join(ROOT, 'tests', 'fixtures'), '', []);
+const fixturesFlagged = fixtures.filter(function (f) {
+  const size = fs.statSync(f.full).size;
+  if (size > 100 * 1024) { return true; }
+  return NOTICE_RE.test(fs.readFileSync(f.full, 'latin1'));
+});
+yes('  the check found the fixtures it was written for (' + fixturesFlagged.length + ')',
+    fixturesFlagged.some(function (f) { return f.rel === '3111-roots.pem'; }));
+fixturesFlagged.forEach(function (f) {
+  yes('  tests\\fixtures\\' + f.rel + ' has a row there', keptSec.indexOf('`tests\\fixtures\\' + f.rel + '`') >= 0);
+});
+const uiFront = fixtures.filter(function (f) { return f.rel === 'ui-front-build.js'; })[0];
+if (uiFront) {
+  const ui = fs.readFileSync(uiFront.full, 'utf8');
+  yes('  tests\\fixtures\\ui-front-build.js is only the build\'s asset modules: no bundled npm notice in it',
+      !/@license|\bCopyright\b|react-dom|\bLicensed under\b/i.test(ui));
+  yes('  and it has a row there all the same, since it was cut from skymp5-front\'s GPL build',
+      keptSec.indexOf('`tests\\fixtures\\ui-front-build.js`') >= 0 && /General Public License version 3/.test(keptSec));
+}
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
