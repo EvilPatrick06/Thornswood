@@ -291,7 +291,7 @@ namespace Thornswood
             if (pendingPacks.Count == 0 && !newLauncher)
             {
                 updateBar.Visibility = Visibility.Collapsed;
-                btnInstallNow.Visibility = Visibility.Collapsed;
+                InstallShown(Visibility.Collapsed);
                 updatePending = false;
                 updateAnswered = true;
                 DrawStatus();
@@ -312,7 +312,7 @@ namespace Thornswood
                 note += "  ·  " + pendingPacks[0].notes;
             txtUpdateNote.Text = note;
             updateBar.Visibility = Visibility.Visible;
-            btnInstallNow.Visibility = Visibility.Visible;
+            InstallShown(Visibility.Visible);
             Log(cfg.AutoUpdate
                 ? "Update available."
                 : "Update available. Install it from the card above the Play button, or in Settings.");
@@ -519,6 +519,13 @@ namespace Thornswood
             UpdateNow();
         }
 
+        /// <summary>Whether both of those buttons show, so the card's is hidden where Settings' is, as for a collection ahead of the server (#4115).</summary>
+        static void InstallShown(Visibility shown)
+        {
+            if (btnInstallNow != null) btnInstallNow.Visibility = shown;
+            if (btnUpdate != null) btnUpdate.Visibility = shown;
+        }
+
         /// <summary>What both of those buttons say, so the card's never says Install now over a card about the mods.</summary>
         static void InstallLabel(string text)
         {
@@ -614,7 +621,7 @@ namespace Thornswood
                     win.Dispatcher.BeginInvoke(new Action(delegate
                     {
                         updateBar.Visibility = Visibility.Collapsed;
-                        btnInstallNow.Visibility = Visibility.Collapsed;
+                        InstallShown(Visibility.Collapsed);
                         Stats.LastUpdate = DateTime.Now.ToString("d MMM HH:mm");
                         Stats.Save();
                         BuildStatRow();

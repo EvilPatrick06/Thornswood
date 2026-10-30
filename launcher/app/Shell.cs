@@ -2787,7 +2787,7 @@ namespace Thornswood
                 collectionBarUp = false;
                 InstallLabel("Install now");
                 updateBar.Visibility = Visibility.Collapsed;
-                btnInstallNow.Visibility = Visibility.Collapsed;
+                InstallShown(Visibility.Collapsed);
             }
 
             // Mods that could not be confirmed (Djinn, 2 Oct). CollectionProblem
@@ -2809,7 +2809,7 @@ namespace Thornswood
                     InstallLabel(CollectionButtonText());
                     btnInstallNow.IsEnabled = true;
                     updateBar.Visibility = Visibility.Visible;
-                    btnInstallNow.Visibility = Visibility.Visible;
+                    InstallShown(Visibility.Visible);
                     collectionNoteUp = true;
                 }
                 else if (!unsure && collectionNoteUp)
@@ -2817,7 +2817,7 @@ namespace Thornswood
                     collectionNoteUp = false;
                     InstallLabel("Install now");
                     updateBar.Visibility = Visibility.Collapsed;
-                    btnInstallNow.Visibility = Visibility.Collapsed;
+                    InstallShown(Visibility.Collapsed);
                 }
             }
             else if (collectionNoteUp)
@@ -2829,7 +2829,7 @@ namespace Thornswood
                 {
                     InstallLabel("Install now");
                     updateBar.Visibility = Visibility.Collapsed;
-                    btnInstallNow.Visibility = Visibility.Collapsed;
+                    InstallShown(Visibility.Collapsed);
                 }
             }
 
@@ -4556,7 +4556,7 @@ namespace Thornswood
             updateBar.Visibility = Visibility.Visible;
             // Ahead has no button (#4115): there is nothing to install, and
             // every collection page leads to the same revision or a newer one.
-            btnInstallNow.Visibility = problem == "ahead" ? Visibility.Collapsed : Visibility.Visible;
+            InstallShown(problem == "ahead" ? Visibility.Collapsed : Visibility.Visible);
             collectionBarUp = true;
 
             // Open to everybody (#428). Patrick, 28 Sep: "we are in alpha so the
