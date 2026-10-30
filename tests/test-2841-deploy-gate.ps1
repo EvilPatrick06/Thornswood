@@ -83,6 +83,10 @@ Yes 'a switch and a quoted text value become their words, in order' ((Words 'Dep
 Yes 'a verb''s fixed words come first' ((Words 'Install-Bot -PutBack') -eq '-CodeOnly|-NoPause|-PutBack')
 Yes 'Get-Logs takes -Dev and -Lines, and names its out parameter' ((Words 'Get-Logs -Dev -Lines 2000') -eq '-NoPause|-Dev|-Lines|2000' -and (Test-ThornswoodGateRequest -Line 'Get-Logs' -Verbs $verbs).Out -eq '-Out')
 Yes 'an enum value outside its list is refused' ((Words 'Deploy-DevGamemode -Npcs maybe') -eq 'REFUSED')
+# The weekly review's launcher start read (#3534): a number of days and
+# nothing else, never the folder it reads.
+Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-LauncherStarts -Days 7') -eq '-Days|7' -and (Words 'Read-LauncherStarts') -eq '' -and
+    (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
 $refused = @(
     @('', 'an empty line'),
     @('Remove-Item C:\', 'a verb that is not on the list'),
