@@ -149,7 +149,7 @@ $others = @($jobIds | Where-Object { $_ -ne $boardId })
 $boardJob = [regex]::Match($y, '(?s)(?m)^  ' + [regex]::Escape($boardId) + ':\s*$(.*)\z').Groups[1].Value
 $needs = [regex]::Match($boardJob, '(?m)^    needs:\s*\[([^\]]*)\]').Groups[1].Value -split '\s*,\s*' | Where-Object { $_ }
 Yes ("nightly.yml: its last job ($boardId) waits for every other job ($($others -join ', '))") ($others.Count -ge 1 -and (@($others | Where-Object { $needs -notcontains $_ }).Count -eq 0))
-Yes '  and runs whether they passed or failed, but not after somebody cancels the run' ($boardJob -match '(?m)^    if: \$\{\{ !cancelled\(\) \}\}\s*$')
+Yes '  and runs whether they passed or failed, but not after somebody cancels the run' ($boardJob -match '(?m)^    if: \$\{\{ !cancelled\(\)( && github\.ref == ''refs/heads/main'')? \}\}\s*$')
 $failCond = '(?m)^\s+if: \$\{\{ ' + (($others | ForEach-Object { "needs\.$_\.result != 'success'" }) -join ' \|\| ') + ' \}\}\s*$'
 $okCond = '(?m)^\s+if: \$\{\{ ' + (($others | ForEach-Object { "needs\.$_\.result == 'success'" }) -join ' && ') + ' \}\}\s*$'
 $failStep = [regex]::Match($boardJob, '(?s)- name: Put a failure on the board\s+(if: [^\r\n]*)(.*?)(?=\r?\n      - name: |\z)')
