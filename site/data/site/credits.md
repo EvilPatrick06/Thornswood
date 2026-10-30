@@ -187,9 +187,12 @@ the GPL-3.0-or-later, and so is this file.
 
 **SkyUI's item lists and item card, SkyHUD's line under an item and moreHUD's
 value to weight** show no gold value on Thornswood, because an item here has
-no gold price. They are the work of the SkyUI Team, the SkyHUD Team and
-Ahzaab, moreHUD's author. Thornswood ships none of those files: the launcher
-makes them on your computer from your own copy of each mod.
+no gold price. **SkyUI's journal** has no saving, loading, Skyrim help or
+Creation Club on its System page, because Thornswood keeps your character on
+the server and has its own help. They are the work of the SkyUI Team, the
+SkyHUD Team and Ahzaab, moreHUD's author. Thornswood ships none of those
+files: the launcher makes them on your computer from your own copy of each
+mod.
 
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
