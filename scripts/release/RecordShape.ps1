@@ -164,10 +164,36 @@ function Get-ThornswoodRecordProblems {
                     }
                 }
             }
+            # The fork's own noticed folders and the npm packages in
+            # skymp5-client.js (#3751). A client measured before that has none.
+            $libs = Get-ThornswoodRecordProp $Doc 'libraries'
+            if ($null -ne $libs) {
+                if ($libs -isnot [psobject] -or $libs -is [array] -or $libs -is [string]) { $out += 'libraries is there and not a map of library to its text' }
+                else {
+                    foreach ($p in $libs.PSObject.Properties) {
+                        if ($p.Name -notmatch '^[a-z0-9][a-z0-9._-]*$') { $out += "libraries.$($p.Name) is not a name a text can safely have" }
+                        if (@('fork', 'npm') -notcontains [string](Get-ThornswoodRecordProp $p.Value 'kind')) { $out += "libraries.$($p.Name) is not of kind fork or npm" }
+                        if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "libraries.$($p.Name) has no sha256" }
+                        if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "libraries.$($p.Name) has no whole bytes" }
+                        if (-not @(Get-ThornswoodRecordProp $p.Value 'in').Count) { $out += "libraries.$($p.Name) is in no file" }
+                    }
+                }
+            }
         }
         'front-build' {
             if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 40 40)) { $out += 'forkCommit is missing or not a full commit SHA' }
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
+            # The npm packages in build.js, each with its text (#3751).
+            $pk = Get-ThornswoodRecordProp $Doc 'packages'
+            if ($null -eq $pk -or $pk -isnot [psobject] -or $pk -is [array] -or $pk -is [string]) { $out += 'packages is missing or not a map of package to its text' }
+            else {
+                foreach ($p in $pk.PSObject.Properties) {
+                    if ($p.Name -notmatch '^npm-[a-z0-9][a-z0-9._-]*$') { $out += "packages.$($p.Name) is not an npm-<name>-<version> text name" }
+                    if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "packages.$($p.Name) has no sha256" }
+                    if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "packages.$($p.Name) has no whole bytes" }
+                    if (-not ((Get-ThornswoodRecordProp $p.Value 'version') -is [string])) { $out += "packages.$($p.Name) has no version" }
+                }
+            }
         }
         'most-online' {
             # Main's numbers are the record's own, and dev's, when it has its

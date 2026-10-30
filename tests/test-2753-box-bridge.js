@@ -26,6 +26,14 @@
 //      deadline says the stage, and an answer that is not the WebSocket
 //      carries its cf-ray.
 //      The bridge's open line says how long sshd took.
+//   5. one WebSocket is not the session (#3214): through a front that cuts
+//      every connection at once, as Cloudflare's restarts do, 4 MB there and
+//      back arrives byte for byte across three cuts with nothing said on
+//      standard error; a front that goes deaf both ways is taken for gone and
+//      the bridge hands the session to the new WebSocket; somebody else's
+//      token, a name never given, a bad count and a session let go after its
+//      hold are refused; and a bridge from before then still ends a session
+//      with its WebSocket.
 //
 // Read only. Nothing outside the temp folder is touched, and nothing leaves
 // loopback.
@@ -100,6 +108,19 @@ throws('a frame that says it is over a megabyte is refused before it is held', (
 });
 throws('a control frame over 125 bytes is refused', () => new ws.Reader({ masked: true }).push(ws.encode(ws.OP.PING, Buffer.alloc(126), true)));
 throws('a continuation with nothing to continue is refused', () => new ws.Reader({ masked: true }).push(ws.encode(ws.OP.CONT, Buffer.from('x'), true)));
+{
+  // Carry (#3214): what was sent is kept until acked, and a new WebSocket
+  // gets again exactly what is past what the far end says it has.
+  const c = new ws.Carry();
+  c.out(Buffer.from('abcde')); c.out(Buffer.from('fgh')); c.out(Buffer.from('ijkl'));
+  c.ack(2);
+  yes('Carry keeps what is not acked', c.keptBytes === 10 && c.acked === 2 && c.sent === 12);
+  yes('  and sends again exactly what is past the far end\'s count', Buffer.concat(c.since(6)).toString() === 'ghijkl' && c.keptBytes === 6);
+  throws('  an ack below one already given is refused', () => c.ack(5));
+  throws('  an ack past what was sent is refused', () => c.ack(13));
+  c.took(7);
+  yes('  what came in is owed an ack until told', c.owed === 7 && ((c.told = c.got), c.owed === 0));
+}
 yes('the handshake answer is the one RFC 6455 gives for its own example key', ws.accept('dGhlIHNhbXBsZSBub25jZQ==') === 's3pPLMBiTxaQ9kYGzzhZRbK+xOo=');
 
 // ---- helpers -----------------------------------------------------------------
@@ -157,6 +178,7 @@ function runClient(env, input, waitMs) {
       THORNSWOOD_BRIDGE_PORT: String(port),
       THORNSWOOD_BRIDGE_TOKENS: tokens,
       THORNSWOOD_BRIDGE_TARGET: '127.0.0.1:' + echoPort,
+      THORNSWOOD_BRIDGE_RESUME_MS: '2000',
     }),
   });
   bridge.stdout.on('data', (d) => { log += d; });
@@ -363,6 +385,125 @@ function runClient(env, input, waitMs) {
       silent.close();
       cf502.close();
     }
+
+    // ---- 5. one WebSocket is not the session (#3214) ---------------------------
+    // A front between connect.js and the bridge that Cloudflare's restarts
+    // stand in for: cut() ends every connection through it at once, both
+    // ways, and deaf() stops carrying bytes but leaves both ends open, as when
+    // Cloudflare's side lingers toward the box.
+    const pairs = [];
+    const front = net.createServer((c) => {
+      c.on('error', () => {});
+      const b = net.connect(port, '127.0.0.1');
+      b.on('error', () => {});
+      const pair = { c, b, deaf: false };
+      c.on('data', (d) => { if (!pair.deaf) b.write(d); });
+      b.on('data', (d) => { if (!pair.deaf) c.write(d); });
+      c.on('close', () => { if (!pair.deaf) b.destroy(); });
+      b.on('close', () => { if (!pair.deaf) c.destroy(); });
+      pairs.push(pair);
+    });
+    await new Promise((r) => front.listen(0, '127.0.0.1', r));
+    const frontUrl = 'ws://localhost:' + front.address().port + '/box/';
+    const cut = () => { for (const p of pairs.splice(0)) { p.c.destroy(); p.b.destroy(); } };
+    const deaf = () => { for (const p of pairs.splice(0)) p.deaf = true; };
+    // connect.js the way ssh drives it, through the front: input written in
+    // pieces, and what comes back counted, with hit() run as the output
+    // passes each mark in marks.
+    function carried(env, input, marks, hit) {
+      return new Promise((resolve) => {
+        const e = Object.assign({}, process.env, env);
+        delete e.HTTPS_PROXY; delete e.https_proxy;
+        const c = spawn(process.execPath, [path.join(DIR, 'connect.js')], { env: e });
+        const out = []; let n = 0; let err = '';
+        let next = 0;
+        c.stderr.on('data', (d) => { err += d; });
+        c.stdout.on('data', (d) => {
+          out.push(d); n += d.length;
+          while (next < marks.length && n >= marks[next]) hit(next++);
+          if (n >= input.length) c.stdin.end();
+        });
+        c.on('close', (code) => resolve({ code, out: Buffer.concat(out), err }));
+        c.stdin.on('error', () => {});
+        let at = 0;
+        // Input waits a piece past the next mark until the output has
+        // passed it, so whatever hit() does lands with input still to send.
+        (function feed() {
+          if (at >= input.length) return;
+          if (next < marks.length && at > marks[next] + 65536) return setTimeout(feed, 5);
+          c.stdin.write(input.subarray(at, at + 65536));
+          at += 65536;
+          setTimeout(feed, 5);
+        })();
+        setTimeout(() => c.kill(), 30000);
+      });
+    }
+    const carriedBefore = (log.match(/carried over to a new WebSocket/g) || []).length;
+    const lots = crypto.randomBytes(4 * 1024 * 1024);
+    r = await carried({ THORNSWOOD_BOX_URL: frontUrl, THORNSWOOD_BOX_TOKEN: TOKEN }, lots, [512 * 1024, 2 * 1024 * 1024, 3 * 1024 * 1024], () => cut());
+    yes('4 MB there and back with its WebSocket cut three times arrives byte for byte (exit ' + r.code + ', ' + r.out.length + ' bytes)' + (r.err ? ': ' + r.err.trim() : ''), r.code === 0 && r.out.equals(lots));
+    yes('  saying nothing on standard error, where Windows PowerShell reads the far side\'s CLIXML', r.err === '');
+    yes('  and the bridge logs each carry-over', await waitFor(() => (log.match(/carried over to a new WebSocket/g) || []).length >= carriedBefore + 3, 3000));
+    yes('  and the session\'s lost WebSocket, held for connect.js to come back', /session \d+ lost its WebSocket: the WebSocket closed, after \d+ s; held 2 s for connect\.js to come back/.test(log));
+    yes('  and its end names how many WebSockets it rode', /ended: the far end closed it, \d+ s, \d+ bytes in, \d+ bytes out, carried over to 3 new WebSockets/.test(log));
+
+    // Deaf: nothing moves and nothing says it has gone, at either end.
+    // connect.js takes it for gone after HEAR_MS, and the bridge, which has
+    // not seen it go, hands the session to the new WebSocket.
+    const some = crypto.randomBytes(300000);
+    r = await carried({ THORNSWOOD_BOX_URL: frontUrl, THORNSWOOD_BOX_TOKEN: TOKEN, THORNSWOOD_BOX_HEAR_MS: '1500' }, some, [100000], () => deaf());
+    yes('a WebSocket that goes deaf both ways is taken for gone and the session goes on (exit ' + r.code + ', ' + r.out.length + ' bytes)' + (r.err ? ': ' + r.err.trim() : ''), r.code === 0 && r.out.equals(some));
+    yes('  the bridge handing it over before it saw the old one go', await waitFor(() => /carried over to a new WebSocket before the old one was seen to go/.test(log), 3000));
+
+    // A resume by somebody else, of nothing, or of a session gone is refused.
+    const nameOf = () => new Promise((resolve) => {
+      const s2 = net.connect(port, '127.0.0.1');
+      let got = '';
+      s2.on('error', () => resolve({ s: s2, name: '' }));
+      s2.on('data', (d) => {
+        got += d.toString('latin1');
+        if (got.indexOf('\r\n\r\n') >= 0) resolve({ s: s2, name: (/X-Thornswood-Session: ([0-9a-f]{32})/i.exec(got) || [])[1] || '' });
+      });
+      s2.write(['GET / HTTP/1.1', 'Host: x'].concat(WS_HEADERS, ['Authorization: Bearer ' + TOKEN, 'X-Thornswood-Resume: new']).join('\r\n') + '\r\n\r\n');
+    });
+    const held1 = await nameOf();
+    yes('a session asked for with "X-Thornswood-Resume: new" is given a name', /^[0-9a-f]{32}$/.test(held1.name));
+    yes('  and one asked for without it is given none', !/X-Thornswood-Session/i.test(await new Promise((resolve) => {
+      const s3 = net.connect(port, '127.0.0.1'); let got = '';
+      s3.on('data', (d) => { got += d.toString('latin1'); if (got.indexOf('\r\n\r\n') >= 0) { s3.destroy(); resolve(got); } });
+      s3.on('error', () => resolve('error'));
+      s3.write(['GET / HTTP/1.1', 'Host: x'].concat(WS_HEADERS, ['Authorization: Bearer ' + TOKEN]).join('\r\n') + '\r\n\r\n');
+    })));
+    held1.s.destroy();
+    await waitFor(() => new RegExp('lost its WebSocket').test(log), 2000);
+    yes('another holder\'s token cannot take the session on (410)', /^HTTP\/1\.1 410/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + OTHER, 'X-Thornswood-Resume: ' + held1.name + ' 0']))));
+    yes('a name the bridge never gave is a 410', /^HTTP\/1\.1 410/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN, 'X-Thornswood-Resume: ' + crypto.randomBytes(16).toString('hex') + ' 0']))));
+    yes('a resume that is not a name and a count is a 400', /^HTTP\/1\.1 400/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN, 'X-Thornswood-Resume: yes please']))));
+    yes('a resume from a byte past what was sent is a 409 and ends the session', /^HTTP\/1\.1 409/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN, 'X-Thornswood-Resume: ' + held1.name + ' 99999']))));
+    yes('  saying why', await waitFor(() => /ended: connect\.js asked to go on from an ack for byte 99999/.test(log), 2000));
+    const notBack = () => (log.match(/ended: the WebSocket closed, and connect\.js did not come back within 2 s/g) || []).length;
+    const notBackBefore = notBack();
+    const held2 = await nameOf();
+    held2.s.destroy();
+    yes('a session whose WebSocket does not come back is let go once it has been held', await waitFor(() => notBack() > notBackBefore, 5000));
+    yes('  and after that its name is a 410', /^HTTP\/1\.1 410/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN, 'X-Thornswood-Resume: ' + held2.name + ' 0']))));
+
+    // Against a bridge from before #3214, which names no session, a cut
+    // ends it as it always did.
+    const oldBridge = net.createServer((c) => {
+      c.on('error', () => {});
+      c.once('data', (d) => {
+        const key = (/Sec-WebSocket-Key: (\S+)/i.exec(d.toString('latin1')) || [])[1];
+        c.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + ws.accept(key) + '\r\n\r\n');
+        setTimeout(() => c.destroy(), 200);
+      });
+    });
+    await new Promise((r2) => oldBridge.listen(0, '127.0.0.1', r2));
+    r = await runClient({ THORNSWOOD_BOX_URL: 'ws://localhost:' + oldBridge.address().port + '/', THORNSWOOD_BOX_TOKEN: TOKEN }, Buffer.from('x'), 5000);
+    yes('against a bridge that names no session, a dropped WebSocket ends it as before (exit ' + r.code + ')', r.code === 0 || r.code === 1);
+    yes('  without trying a new one', !/carry the session on/.test(r.err));
+    oldBridge.close();
+    front.close();
 
     // Taking one holder off refuses them at once and leaves the other in.
     fs.unlinkSync(path.join(tokens, 'djinn'));

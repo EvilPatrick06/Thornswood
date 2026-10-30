@@ -208,7 +208,13 @@ if (Test-Path -LiteralPath $OldDist) {
     # A count for the person, never a reason to stop: what could not be read
     # is said as an "at least" rather than left out of the number unsaid.
     $oldUnread = @()
-    $oldMb = ([double](@(Get-ChildItem -LiteralPath $OldDist -Recurse -File -ErrorAction SilentlyContinue -ErrorVariable oldUnread) | Measure-Object Length -Sum).Sum) / 1MB
+    # Measure-Object hands back nothing at all when no file comes in, and under
+    # Set-StrictMode -Version Latest (top of this file) reading .Sum off that
+    # nothing throws "The property 'Sum' cannot be found on this object". An
+    # old folder that is there but empty did exactly that, before anything was
+    # published. Empty is 0 MB.
+    $oldMeasure = @(Get-ChildItem -LiteralPath $OldDist -Recurse -File -ErrorAction SilentlyContinue -ErrorVariable oldUnread) | Measure-Object Length -Sum
+    $oldMb = if ($oldMeasure) { [double]$oldMeasure.Sum / 1MB } else { 0 }
     Write-Host ("  releases stage in $DistDir now, not in $OldDist") -ForegroundColor DarkGray
     Write-Host ("  the old one still holds {0}{1:N1} MB. Check it with .\scripts\dev\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $(if ($oldUnread.Count) { 'at least ' } else { '' }), $oldMb) -ForegroundColor Yellow
     if ($oldUnread.Count) { Write-Host ("  {0} part(s) of it could not be read to count: {1}" -f $oldUnread.Count, $oldUnread[0].Exception.Message) -ForegroundColor DarkGray }

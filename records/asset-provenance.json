@@ -56,8 +56,8 @@
     },
     {
       "path": "site/public/favicon.ico",
-      "sha256": "b8f2124f2f9fe8ef019b15fa62ff804003358e64207ca7ebf56ff7ae6b85aa97",
-      "what": "The site's tab icon, the crest.",
+      "sha256": "498279f4546985c9cf3ff907916493873b62ea4884c867dcb9cd19250854df3f",
+      "what": "The site's tab icon: the 16, 32 and 48 frames of launcher/app.ico, the badge with TW (Djinn, 27 Oct, #3319).",
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
@@ -361,8 +361,8 @@
     },
     {
       "path": "launcher/app.ico",
-      "sha256": "9fb8dd6ade2a6e669e972597dc6b4ae1bb69621b6ad26f027757c6b33c190df4",
-      "what": "The launcher's icon, the full badge at every size (Djinn, 11 Oct; tests\\test-launcher-icons.js).",
+      "sha256": "be99a5cd8ef3c1d025702ac3fb9a73824928f3320b8b0d75bd2e428d50526e60",
+      "what": "The launcher's icon, the badge at every size: Thornswood at 128 and 256, TW at 32 to 64, the crest and scene alone at 16 and 24 (Djinn, 27 Oct, #3319; tests\\test-launcher-icons.js).",
       "published": "The launcher and its shortcuts",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
@@ -397,32 +397,6 @@
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
       "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: launcher\\art\\BACKDROP-SPEC.md; launcher\\art\\ART-PROMPT.md.",
       "status": "ours"
-    },
-    {
-      "path": "launcher/art/thornswood-art-1536.png",
-      "sha256": "995d2e3968510b21653883d4f78af8b869c64069992d5c962699ee772671127a",
-      "what": "The 16 Sep source of the backdrop (BACKDROP-SPEC.md). No build has used it since 20 Sep.",
-      "published": "nowhere",
-      "source": "not recorded",
-      "creator": "not recorded",
-      "licence": "not recorded",
-      "attribution": "not recorded",
-      "approved": "not recorded",
-      "evidence": "launcher\\art\\BACKDROP-SPEC.md.",
-      "status": "not-published"
-    },
-    {
-      "path": "launcher/art/thornswood-banner-1672.png",
-      "sha256": "7e6878a4102b8d53a1c3510ae3d4676280c5762d4ebab157bf9b3275b4d6f24c",
-      "what": "A banner picture. No script, page or document names it.",
-      "published": "nowhere",
-      "source": "not recorded",
-      "creator": "not recorded",
-      "licence": "not recorded",
-      "attribution": "not recorded",
-      "approved": "not recorded",
-      "evidence": "No file in the repository names it (searched 12 Oct).",
-      "status": "not-published"
     },
     {
       "path": "game/ui/thornswood-theme.mp3",

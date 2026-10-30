@@ -370,10 +370,12 @@ the shipped reference `Profile\Default\plugins.txt`, the live list
 `Profile\LocalAppData\plugins.txt`, the server's manifest over HTTP on its
 resources port (3000 for the main server, 7788 for dev), and the size and
 CRC of each plugin. Only the Fix button writes: the reference list into the
-live one, Thornswood's own plugins fetched from the server when their bytes
-differ or they are missing, full ones at `/plugins/<index>.bin` and light
-ones at `/plugins/light-<index>.bin` (#2627; the old one kept in
-`Profile\Replaced`; the server hands out no other author's plugin, #1180),
+live one, Thornswood's own plugins put in from the release the update feed
+names when their bytes differ from the server's or they are missing, over
+https and by the sha256 the release record gives them, and only when that
+copy is the one the server's manifest describes (`Updater.ReleaseCopy`,
+#3386; the old one kept in `Profile\Replaced`; no other author's plugin,
+#1180),
 one of ours the server's order names switched on in its place
 (`PutInServerOrder`), and other servers' files moved into
 `Profile\Isolated`. With no folder of its own yet (`Paths.Collection`) Run
@@ -681,7 +683,10 @@ Gallery page uploads via `/api/gallery/submit` and then sends the picture's
 `/api/gallery/report`, and for staff Approves (naming the copies the card
 showed beside the picture), Rejects and takes an approved shot down over the
 same Discord ticket, with a clear message when an older
-site still answers those doors 403 without why), Swallow.cs
+site still answers those doors 403 without why), MediaStrip.cs (what a
+picture or recording says about where and when it was made, Exif and GPS
+among it, taken out before the Gallery page sends it, by the site's rules,
+#3648), Swallow.cs
 (a caught exception written to `launcher.log` instead of dropped, section 1).
 
 A new class gets a line on this page in the pull request that adds it.
