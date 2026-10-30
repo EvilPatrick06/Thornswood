@@ -236,6 +236,7 @@ async function ask(o, tree) { const g = github(o); return T.find({ tree: tree ||
   const ALLOWED = {
     'tests/test-release-workflow.ps1': 'reads release.yml\'s text for the names its tag push hands to main\'s run (#3930); runs nothing',
     'tests/test-release-tag.ps1': 'reads release.yml\'s text for those names; sets them for Resolve-ReleaseTag.ps1 in a scratch process',
+    'tests/test-3412-installer-on-github.ps1': 'reads installer.yml\'s text for those names; installer.yml is started by hand on a tag and is no check of a build (#3412)',
     'scripts/dev/Run-Gate.ps1': 'the gate step: the event chooses only how much of the gate runs (#3114), and a build that ran less than all of it keeps no note, held above',
     'tests/test-3114-run-gate.ps1': 'sets those names for Run-Gate.ps1 in scratch processes, to hold what it does on each event',
     'scripts/deploy/Install-Runner.ps1': 'writes the signing runner\'s job-started hook (#3889), which reads the ref on the box before a job\'s first step to refuse it; no check runs it',
