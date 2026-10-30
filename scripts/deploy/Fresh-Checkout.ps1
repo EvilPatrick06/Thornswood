@@ -104,12 +104,17 @@ function Get-FreshCheckoutState {
     $r = [ordered]@{ Ok = $false; Problem = ''; Message = ''; Fix = ''; Branch = ''; Target = ''; Ahead = 0; Behind = 0; Dirty = 0; Submodules = @(); Head = '' }
     $update = '.\scripts\release\Update-Checkout.ps1'
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) { $r.Problem = 'nogit'; $r.Message = 'git is not on this machine, so the checkout cannot be checked'; $r.Fix = 'winget install --id Git.Git -e'; return [pscustomobject]$r }
-    $top = Invoke-FreshGit $RepoDir @('rev-parse', '--show-toplevel')
-    if ($top.Code -ne 0) { $r.Problem = 'notrepo'; $r.Message = "$RepoDir is not a git checkout, so nothing says what it was built from"; $r.Fix = 'git clone https://github.com/EvilPatrick06/Thornswood.git'; return [pscustomobject]$r }
-    $head = Invoke-FreshGit $RepoDir @('rev-parse', 'HEAD')
-    $r.Head = if ($head.Code -eq 0 -and $head.Out.Count) { $head.Out[0].Trim() } else { '' }
-    $br = Invoke-FreshGit $RepoDir @('rev-parse', '--abbrev-ref', 'HEAD')
-    $r.Branch = if ($br.Code -eq 0 -and $br.Out.Count) { $br.Out[0].Trim() } else { '' }
+    # The top, the commit and the branch in one git (#3835: every git started
+    # on the box is a process and a Defender scan). It fails as a whole in a
+    # clone with no commit yet, so only then is the top asked alone.
+    $at = Invoke-FreshGit $RepoDir @('rev-parse', '--show-toplevel', 'HEAD', '--abbrev-ref', 'HEAD')
+    if ($at.Code -eq 0 -and $at.Out.Count -eq 3) {
+        $r.Head = $at.Out[1].Trim()
+        $r.Branch = $at.Out[2].Trim()
+    } else {
+        $top = Invoke-FreshGit $RepoDir @('rev-parse', '--show-toplevel')
+        if ($top.Code -ne 0) { $r.Problem = 'notrepo'; $r.Message = "$RepoDir is not a git checkout, so nothing says what it was built from"; $r.Fix = 'git clone https://github.com/EvilPatrick06/Thornswood.git'; return [pscustomobject]$r }
+    }
     $want = 'main'
     if ($AnyBranch -and $r.Branch -and $r.Branch -ne 'HEAD') { $want = $r.Branch }
     $r.Target = "origin/$want"

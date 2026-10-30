@@ -91,7 +91,7 @@ function Get-ThornswoodTaskSid {
 function Get-ThornswoodServiceNeverReach {
     param([string]$Own = '', [string]$Box = 'C:\')
     $own = $Own.TrimEnd('\')
-    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch', 'Thornswood-Maint') { Join-Path $Box $n })
+    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch') { Join-Path $Box $n })
     foreach ($r in 'Thornswood-Server', 'Thornswood-Server-Dev') {
         $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'private') }
