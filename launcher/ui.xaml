@@ -966,8 +966,8 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
                       <TextBlock Style="{StaticResource H2}" Text="One zip for Discord"/>
-                      <TextBlock Style="{StaticResource Small}" Margin="0,4,0,0"
-                                 Text="Newest crash log, script extender log, plugin list, launcher log and a short machine summary. Nothing personal beyond your Windows user name in file paths."/>
+                      <!-- Diag.WhatTheReportHolds() fills this in (#3565), from the same lists the zip is made from. -->
+                      <TextBlock x:Name="TxtDiagHolds" Style="{StaticResource Small}" Margin="0,4,0,0"/>
                       <TextBlock x:Name="TxtDiagNote" Style="{StaticResource Small}" Margin="0,8,0,0"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="18,0,0,0">

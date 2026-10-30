@@ -19,7 +19,7 @@ namespace Thornswood
     // page went into the game as Settings (#3126).
     static partial class Shell
     {
-        static TextBlock txtDiagNote, txtThemeNote;
+        static TextBlock txtDiagNote, txtDiagHolds, txtThemeNote;
         static StackPanel diagReadings, diagCollection, diagAddons;
         static Button btnDiagBundle, btnDiagOpen;
 
@@ -32,7 +32,7 @@ namespace Thornswood
 
         static void BindPages()
         {
-            txtDiagNote = F<TextBlock>("TxtDiagNote"); txtThemeNote = F<TextBlock>("TxtThemeNote");
+            txtDiagNote = F<TextBlock>("TxtDiagNote"); txtDiagHolds = F<TextBlock>("TxtDiagHolds"); txtThemeNote = F<TextBlock>("TxtThemeNote");
             diagReadings = F<StackPanel>("DiagReadings");
             diagCollection = F<StackPanel>("DiagCollection");
             diagAddons = F<StackPanel>("DiagAddons");
@@ -41,6 +41,7 @@ namespace Thornswood
 
         static void WirePages()
         {
+            txtDiagHolds.Text = Diag.WhatTheReportHolds();
             btnDiagOpen.Click += delegate
             {
                 Directory.CreateDirectory(Diag.ReportDir);

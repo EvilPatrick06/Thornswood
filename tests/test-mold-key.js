@@ -551,6 +551,8 @@ const PIECES_GM = {
   giveNamed: liftFrom(gm, 'function giveNamed(actorId, baseDesc, label) {', '  '),
   holderOf: liftFrom(gm, 'function holderOf(building) {', '  '),
   nameOf: liftFrom(gm, 'function nameOf(building) {', '  '),
+  placeOf: liftFrom(gm, 'function placeOf(building) {', '  '),
+  holdOfBuilding: liftFrom(gm, 'function holdOfBuilding(building) {', '  '),
   buildingOf: liftFrom(gm, 'function buildingOf(doorDesc) {', '  '),
   blankMoldsExist: liftFrom(gm, 'function blankMoldsExist() {', '  '),
   takeBlankMold: liftFrom(gm, 'function takeBlankMold(actorId) {', '  '),
@@ -701,6 +703,8 @@ function boot(E, claims, smiths) {
     'var BUILDING_BY_DOOR = {}; BUILDING_BY_DOOR[' + JSON.stringify(DOOR_DESC) + '] = ' + JSON.stringify(HOUSE) + ';',
     'BUILDING_BY_DOOR[' + JSON.stringify(INSIDE_DESC) + '] = ' + JSON.stringify(HOUSE) + ';',
     'var BUILDING_NAME = {}; BUILDING_NAME[' + JSON.stringify(HOUSE) + '] = "Breezehome";',
+    // A house the hold table does not name, so its labels are its name alone (#3899).
+    'var BUILDING_HOLD = {}; var HOLD_TOWN = {}; var LABEL_NO = {};',
     'function lapseDays() { return 14; }',
     'function save() {}',
     'function pushAll() {}',

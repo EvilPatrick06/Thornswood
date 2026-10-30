@@ -1,13 +1,13 @@
 # Hearthcook
 
-Dinners. 112 recipes, all of them reach the server.
+Dinners. 123 recipes, all of them reach the server.
 
 The full table, every row: [lists/cook-hearthcook.md](../../lists/cook-hearthcook.md).
 
 | Rank | Recipes |
 | --- | --- |
-| Novice | 51 |
-| Advanced | 42 |
+| Novice | 55 |
+| Advanced | 49 |
 | Expert | 14 |
 | Master | 5 |
 
@@ -15,9 +15,9 @@ The full table, every row: [lists/cook-hearthcook.md](../../lists/cook-hearthcoo
 | --- | --- |
 | Stews | 24 |
 | Meat dishes | 22 |
+| Other food and drink | 20 |
 | Soups | 18 |
 | Cheese | 14 |
-| Other food and drink | 9 |
 | Bread | 8 |
 | Vegetable dishes | 8 |
 | Fish dishes | 4 |
@@ -25,27 +25,36 @@ The full table, every row: [lists/cook-hearthcook.md](../../lists/cook-hearthcoo
 | Chowders | 2 |
 | Ingredients | 1 |
 
-98 are the cookpot. 13 are the oven. 1 is the grain mill, the sack
+106 are the cookpot. 16 are the oven. 1 is the grain mill, the sack
 of flour, and it is novice. A recipe has no gold price. No row is
 race locked.
 
 ## Novice, the day-one kitchen
 
 Baked Potatoes, Beef Stew, Cabbage Soup, Carrot Soup, Clam Chowder,
-Cooked Beef, Cooked Dog, Cooked Skeever, Goat Roast, Goat Stew, Gourd
-Soup, Grilled Chicken Breast, Grilled Leeks, Pheasant Roast, Pheasant
-Stew, Potato Soup, Rabbit Haunch, Rabbit Stew, Roasted Carrots,
-Roasted Mushrooms, Sack of Flour, Salmon Steak, Slaughterfish Steak,
-Steamed Mudcrab Legs, Venison Chop, Venison Stew.
+Cooked Beef, Cooked Dog, Cooked Skeever, First Planting Mead, Goat
+Roast, Goat Stew, Gourd Soup, Grilled Chicken Breast, Grilled Leeks,
+Juniper Tea, Lavender Tea, Midyear Jazbay Wine, Pheasant Roast,
+Pheasant Stew, Potato Soup, Rabbit Haunch, Rabbit Stew, Roasted
+Carrots, Roasted Mushrooms, Sack of Flour, Salmon Steak, Slaughterfish
+Steak, Steamed Mudcrab Legs, Venison Chop, Venison Stew.
 
 Several of those exist twice in the table, a one-portion row and a
-two-portion row, which is why 26 names are 51 recipes. A Confectioner
+two-portion row, which is why 30 names are 55 recipes. A Confectioner
 using the sister half can make this novice list and nothing above it.
 
 ## Master
 
 Mammoth Steak, twice in the table, 6 gold, meat. Mammoth Stew, twice,
 16 gold, stew. Dwemer Fire Paste, 50 gold, the ingredient row.
+
+## Festival dishes and brews
+
+Four festival dishes and four festival brews, one of each for each
+season, made from that season's two herbs (#3152, [Food](../../food.md),
+"Seasonal food"). The loaf, the tart and the cake are the oven, the roast
+and the brews the cookpot. A festival dish is a feast and comes out
+burnt, plain or fine like any dish; a brew is an ale.
 
 ## Benches and the mill
 
@@ -83,15 +92,15 @@ Grand Chef's second serving is in the server.
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 56 recipes. 56 reach the server. None of them are tempering. The same rows, with ids, are in [cook-hearthcook](../../lists/cook-hearthcook.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 64 recipes. 64 reach the server. None of them are tempering. The same rows, with ids, are in [cook-hearthcook](../../lists/cook-hearthcook.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
-**Novice** (28 names). Baked Potatoes. Beef Stew. Cabbage Soup. Carrot Soup. Clam Chowder. Cooked Beef. Cooked Dog. Cooked Skeever. Goat Roast. Goat Stew. Gourd Soup. Grilled Chicken Breast. Grilled Leeks. Juniper Tea. Lavender Tea. Pheasant Roast. Pheasant Stew. Potato Soup. Rabbit Haunch. Rabbit Stew. Roasted Carrots. Roasted Mushrooms. Sack of Flour. Salmon Steak. Slaughterfish Steak. Steamed Mudcrab Legs. Venison Chop. Venison Stew.
+**Novice** (30 names). Baked Potatoes. Beef Stew. Cabbage Soup. Carrot Soup. Clam Chowder. Cooked Beef. Cooked Dog. Cooked Skeever. First Planting Mead. Goat Roast. Goat Stew. Gourd Soup. Grilled Chicken Breast. Grilled Leeks. Juniper Tea. Lavender Tea. Midyear Jazbay Wine. Pheasant Roast. Pheasant Stew. Potato Soup. Rabbit Haunch. Rabbit Stew. Roasted Carrots. Roasted Mushrooms. Sack of Flour. Salmon Steak. Slaughterfish Steak. Steamed Mudcrab Legs. Venison Chop. Venison Stew.
 
-**Advanced** (18 names). Ash Hopper Stew. Ash Yam Soup. Braided Bread. Bread Loaf. Cooked Boar Meat. Eidar Cheese Fondue. Garlic Bread. Goat Cheese Fondue. Horker Loaf. Horker Stew. Horse Haunch. Mammoth Cheese Fondue. Potato Bread. Roasted Glowing Mushroom. Roasted Wild Mushrooms. Roasted Yams. Snowberry Tea. Tomato Soup.
+**Advanced** (24 names). Ash Hopper Stew. Ash Yam Soup. Braided Bread. Bread Loaf. Cooked Boar Meat. Eidar Cheese Fondue. First Planting Loaf. Garlic Bread. Goat Cheese Fondue. Harvest's End Ale. Harvest's End Roast. Horker Loaf. Horker Stew. Horse Haunch. Mammoth Cheese Fondue. Midyear Jazbay Tart. Potato Bread. Roasted Glowing Mushroom. Roasted Wild Mushrooms. Roasted Yams. Saturalia Mulled Mead. Saturalia Spice Cake. Snowberry Tea. Tomato Soup.
 
 **Expert** (7 names). Boar Stew. Cabbage Potato Soup. Cabbage and Tomato Soup. Glowing Mushroom Stew. Mushroom Stew. Vegetable Soup. Wild Mushroom Stew.
 
@@ -111,8 +120,10 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Rabbit Haunch | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Raw Rabbit Leg |  | yes | `f430f:Skyrim.esm` |
 | Venison Chop | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Venison |  | yes | `f4311:Skyrim.esm` |
 | Cooked Dog | 1 | novice | Other food and drink | Cookpot | 1 Salt Pile, 1 Dog Meat |  | yes | `8ab:Gourmet.esp` |
+| First Planting Mead | 1 | novice | Other food and drink | Cookpot | 1 Honeycomb, 1 Lavender, 1 Juniper Berries |  | yes | `1a050:Thornswood-Content.esp` |
 | Juniper Tea | 1 | novice | Other food and drink | Cookpot | 2 Juniper Berries |  | yes | `18012:Thornswood-Content.esp` |
 | Lavender Tea | 1 | novice | Other food and drink | Cookpot | 2 Lavender |  | yes | `18011:Thornswood-Content.esp` |
+| Midyear Jazbay Wine | 1 | novice | Other food and drink | Cookpot | 2 Jazbay Grapes, 1 Lavender |  | yes | `1a051:Thornswood-Content.esp` |
 | Roasted Mushrooms | 1 | novice | Other food and drink | Cookpot | 1 Garlic, 1 Namira's Rot, 1 Butter |  | yes | `904:Gourmet.esp` |
 | Sack of Flour | 1 | novice | Other food and drink | isGrainMill | 1 Wheat |  | yes | `17ec3:HearthFires.esm` |
 | Cabbage Soup | 1 | novice | Soups | Cookpot | 1 Salt Pile, 1 Cabbage, 1 Leek |  | yes | `3cd5c:Dragonborn.esm` |
@@ -137,8 +148,14 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Cooked Boar Meat | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Boar Meat |  | yes | `81e:Gourmet.esp` |
 | Horker Loaf | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Horker Meat |  | yes | `f430b:Skyrim.esm` |
 | Horse Haunch | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Horse Meat |  | yes | `f430c:Skyrim.esm` |
+| First Planting Loaf | 1 | advanced | Other food and drink | BYOHCraftingOven | 1 Sack of Flour, 1 Chicken's Egg, 1 Lavender, 1 Juniper Berries |  | yes | `1a020:Thornswood-Content.esp` |
+| Harvest's End Ale | 1 | advanced | Other food and drink | Cookpot | 1 Wheat, 1 Jazbay Grapes, 1 Snowberries |  | yes | `1a052:Thornswood-Content.esp` |
+| Harvest's End Roast | 1 | advanced | Other food and drink | Cookpot | 1 Venison, 1 Salt Pile, 1 Jazbay Grapes, 1 Snowberries |  | yes | `1a022:Thornswood-Content.esp` |
+| Midyear Jazbay Tart | 1 | advanced | Other food and drink | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 2 Jazbay Grapes, 1 Lavender |  | yes | `1a021:Thornswood-Content.esp` |
 | Roasted Glowing Mushroom | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Glowing Mushroom, 1 Butter |  | yes | `906:Gourmet.esp` |
 | Roasted Wild Mushrooms | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Scaly Pholiota, 1 Butter |  | yes | `905:Gourmet.esp` |
+| Saturalia Mulled Mead | 1 | advanced | Other food and drink | Cookpot | 1 Honeycomb, 1 Snowberries, 1 Juniper Berries |  | yes | `1a053:Thornswood-Content.esp` |
+| Saturalia Spice Cake | 1 | advanced | Other food and drink | BYOHCraftingOven | 1 Sack of Flour, 1 Butter, 1 Snowberries, 1 Juniper Berries |  | yes | `1a023:Thornswood-Content.esp` |
 | Snowberry Tea | 1 | advanced | Other food and drink | Cookpot | 2 Snowberries |  | yes | `18013:Thornswood-Content.esp` |
 | Ash Yam Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Garlic, 1 Horker Meat, 1 Ash Yam |  | yes | `3cd5d:Dragonborn.esm` |
 | Tomato Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Tomato, 1 Leek |  | yes | `f4318:Skyrim.esm` |
@@ -160,7 +177,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 
 ## Where this is
 
-The 112 rows, the oven, the mill, and the flour recipe are in the
+The 123 rows, the oven, the mill, and the flour recipe are in the
 server. The hunger numbers a finished meal grants are partly in the
 server (unlisted food is 15, and the food table has its own values)
 and the plan's raw, burnt, cooked, and feast steps are on

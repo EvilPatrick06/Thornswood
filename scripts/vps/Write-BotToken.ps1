@@ -40,7 +40,7 @@
 #>
 
 # The first part of a bot token is the application's id in base64. The id is
-# public (docs\OWNERSHIP.md names it); the token is not.
+# public (the ops repo's OWNERSHIP.md names it); the token is not.
 function Get-ThornswoodTokenApp([string]$Token) {
   $parts = "$Token" -split '\.'
   if (@($parts).Count -ne 3) { return '' }

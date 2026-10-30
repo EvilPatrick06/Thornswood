@@ -4,8 +4,8 @@
   Puts a nightly backup back onto a new VPS, run from this machine.
 
   All of it in one command: both game servers' worlds, the site, the bot and
-  Caddy's file (issue #454). docs\MOVING-THE-SERVER.md says when in a move to
-  run it, and docs\RESTORING.md "The box is gone" when there is nothing left
+  Caddy's file (issue #454). MOVING-THE-SERVER.md in the ops repo says when in a move to
+  run it, and RESTORING.md in the ops repo "The box is gone" when there is nothing left
   to move from.
 
       .\scripts\vps\Restore-Box.ps1 -Backup <file>.zip.enc -Check    ready? sends nothing
@@ -42,7 +42,7 @@
        bot token and the site keys.
 
   Starts nothing. Deploy-Docs.ps1, Install-Bot.ps1 -NoToken and starting the
-  game servers come after it, in the order MOVING-THE-SERVER.md gives.
+  game servers come after it, in the order MOVING-THE-SERVER.md in the ops repo gives.
 
   Prints RESTORE BOX OK and exits 0 only when all three restores and the
   reapply said OK.
@@ -108,9 +108,8 @@ Say "  box     $target" 'DarkGray'
 if (-not (Test-Path -LiteralPath $Backup)) { Die "There is no file at $Backup" }
 $Backup = (Resolve-Path -LiteralPath $Backup).Path
 $name = Split-Path -Leaf $Backup
-# The nightly shape only. Backup-Server.ps1's thornswood-backup-<stamp>.zip
-# names the dev server game-2 and is not encrypted; Restore-Server.ps1 reads
-# game and game-dev.
+# The nightly shape only. Backup-Server.ps1's thornswood-backup-<stamp>.zip.enc
+# names the dev server game-2; Restore-Server.ps1 reads game and game-dev.
 if ($name -notmatch '^thornswood-\d{8}-\d{6}\.zip\.enc$') {
   Die ("$name is not a nightly backup (thornswood-<date>-<time>.zip.enc). Take one with " +
        'Install-Backup.ps1 -RunNow and bring it down with Fetch-Backups.ps1.')
@@ -262,6 +261,6 @@ if ($bad) {
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 1
 }
-Say 'RESTORE BOX OK. Nothing is started yet: docs\MOVING-THE-SERVER.md has the next steps.' 'Green'
+Say 'RESTORE BOX OK. Nothing is started yet: MOVING-THE-SERVER.md in the ops repo has the next steps.' 'Green'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0

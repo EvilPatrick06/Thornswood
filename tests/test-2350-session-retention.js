@@ -146,13 +146,16 @@ function grab(name) {
   srv.stderr.on('data', (d) => { out += d; });
   try {
     let up = false;
-    for (let i = 0; i < 100 && !up; i++) {
-      if (out.indexOf('listening on ') >= 0) { up = true; break; }
+    /* Up once the site says ready or NOT READY: it says that right after its
+       first retention sweep, in the same callback, so the sweep's files are
+       all written by then however busy the machine is (#4082). The minute
+       only bounds a site that never comes up. */
+    for (let i = 0; i < 1200 && !up; i++) {
+      if (/\[thornswood-docs\] (ready|NOT READY): /.test(out)) { up = true; break; }
       if (srv.exitCode !== null) break;
       await wait(50);
     }
     if (!up) throw new Error('the scratch site never came up:\n' + out);
-    await wait(300);
 
     const k = keys();
     yes('with no session ending, a row 400 days old is gone from sessions.json', k.indexOf('old0000000000001') < 0);

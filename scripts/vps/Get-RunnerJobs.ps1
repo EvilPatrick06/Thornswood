@@ -5,7 +5,7 @@
 .DESCRIPTION
   The outbound limits of #2161 go on one VPS runner account at a time, and
   each is proven by a job that runner then runs green before the next one
-  goes on (docs\RUNNER-ISOLATION.md section 6). All the runners carry the
+  goes on (the ops repo's RUNNER-ISOLATION.md section 6). All the runners carry the
   same labels, so a job cannot be sent to one of them: this reads what each
   did instead, by the runner_name GitHub records on every job.
 

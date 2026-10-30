@@ -123,7 +123,7 @@ it says a pool thread.
 | 21 | `Shell.cs:490 HealClientBackground` | Pool thread, only when the six client runtime files are not the recorded build: `ClientRuntime.cs:206 Heal()` fetches them. Then `Shell.cs:491 AutoDisplayOnce` marks `config.json` so it never runs again and, on an install that has never played, matches the game's resolution to the screen; `Shell.cs:492 StartPing` asks whether the server is up. |
 | 22 | `Shell.cs:496 CheckUpdatesBackground` | Pool thread: the update check (see Updater in section 2). Always: config.json cannot switch it off, and Play stays shut until it answers (#937). |
 | 23 | `Shell.cs:512 Voice.Prepare` | Installs the resolver that loads WebView2 out of the exe. `Shell.cs:520 Voice.Start` is queued until the window is idle on screen. |
-| 24 | `Shell.cs:529 win.ContentRendered` | Once the window has drawn, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. |
+| 24 | `Shell.cs:557 win.ContentRendered` | Once the window has drawn, LogStartTime (declared above Run) writes one line to `Profile\launcher.log`, `Launcher start: the window was on screen <s> s after the launcher started, <s> s of it the mod check, on launcher <version>.`, timed from the process's own start and the Stopwatch around RunScan (#3534); the weekly review totals them with `scripts\vps\Read-LauncherStarts.ps1`. Then, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. |
 | 25 | `Shell.cs:571 Application` | A new WPF Application with `ShutdownMode.OnMainWindowClose`, because the hidden voice window would otherwise keep the process alive. `Shell.cs:573 app.Exit` stops voice and presence and releases Hold. `Shell.cs:580 DispatcherUnhandledException` logs a fault and keeps the launcher up. `Shell.cs:618 StartStallWatch` logs when the window stops answering. |
 | 26 | `Shell.cs:643 app.Run` | The message loop. Run does not return until the window closes. |
 | 27 | `ShellOwnGame.cs:46 ContentRendered` | Once the window is on screen: `ShellOwnGame.cs:65 OwnGameAtStart()` refreshes the game folder by itself when Vortex has deployed since it was made (`OwnGame.cs:662 NeedsRefresh()`), or offers to make it in the shared shape. When Vortex deploys into a Thornswood game folder it logs why nothing is refreshed and what to do (`OwnGame.RefusedSource`). Play also asks that same test now, through `OwnGameRefreshIfDue`. |
@@ -370,10 +370,12 @@ the shipped reference `Profile\Default\plugins.txt`, the live list
 `Profile\LocalAppData\plugins.txt`, the server's manifest over HTTP on its
 resources port (3000 for the main server, 7788 for dev), and the size and
 CRC of each plugin. Only the Fix button writes: the reference list into the
-live one, Thornswood's own plugins fetched from the server when their bytes
-differ or they are missing, full ones at `/plugins/<index>.bin` and light
-ones at `/plugins/light-<index>.bin` (#2627; the old one kept in
-`Profile\Replaced`; the server hands out no other author's plugin, #1180),
+live one, Thornswood's own plugins put in from the release the update feed
+names when their bytes differ from the server's or they are missing, over
+https and by the sha256 the release record gives them, and only when that
+copy is the one the server's manifest describes (`Updater.ReleaseCopy`,
+#3386; the old one kept in `Profile\Replaced`; no other author's plugin,
+#1180),
 one of ours the server's order names switched on in its place
 (`PutInServerOrder`), and other servers' files moved into
 `Profile\Isolated`. With no folder of its own yet (`Paths.Collection`) Run
@@ -571,13 +573,15 @@ checked against the list and then copied (`OwnGameKinds.cs SkyrimFrom()`,
 **SteamUpdates** (SteamUpdates.cs, with ShellSteamUpdates.cs for its
 question). Steam's Updates setting for Skyrim, `AutoUpdateBehavior` in
 `steamapps\appmanifest_489830.acf` in the library that holds it.
-At every start `ShellSteamUpdates.cs:26 HoldSteamUpdatesOnStart()` logs it
-(`SteamUpdates.cs:262 Report()`) and, when it is not "Wait until I launch the
-game" or the file is marked read only, sets it (#493): `SteamUpdates.cs:328
+At every start `ShellSteamUpdates.cs:28 HoldSteamUpdatesOnStart()` logs it
+(`SteamUpdates.cs:270 Report()`) and, when it is not "Wait until I launch the
+game" or the file is marked read only, sets it (#493): `SteamUpdates.cs:344
 OnStart()` says write it at once when Steam is closed, or put
-`ShellSteamUpdates.cs:61 AskToHoldSteamUpdates()`, whose Yes closes Steam,
-waits for it to go, writes and starts Steam again. A No is remembered in
-config.json (`SteamUpdatesDeclined`). `SteamUpdates.cs:426 Hold()` changes that one value,
+`ShellSteamUpdates.cs:64 AskToHoldSteamUpdates()`, whose Yes closes Steam,
+waits for it to go, writes and starts Steam again, and starts Steam again
+whatever happens once it was asked to exit. No means not now (#3600): nothing
+is remembered, so a later start with Steam closed writes it and one with Steam
+open asks again, and the question says so. `SteamUpdates.cs:465 Hold()` changes that one value,
 takes off a read-only mark and never writes while Steam runs. The mark is not
 what holds the version: Thornswood runs its own folder, whose exe is its own
 copy, and Steam puts an update in by moving new files into its own copy. Since
@@ -654,16 +658,21 @@ Gallery page uploads via `/api/gallery/submit` and then sends the picture's
 `/api/gallery/report`, and for staff Approves (naming the copies the card
 showed beside the picture), Rejects and takes an approved shot down over the
 same Discord ticket, with a clear message when an older
-site still answers those doors 403 without why), Swallow.cs
+site still answers those doors 403 without why), MediaStrip.cs (what a
+picture or recording says about where and when it was made, Exif and GPS
+among it, taken out before the Gallery page sends it, by the site's rules,
+#3648), Swallow.cs
 (a caught exception written to `launcher.log` instead of dropped, section 1).
 
 A new class gets a line on this page in the pull request that adds it.
 
 **ChannelWait** (ChannelWait.cs). Waits for the game to write one of the named voice files, instead of opening those files ten times a second for the whole life of the launcher. When no watcher can be made it sleeps the old 100 ms, so push to talk is never slower than the poll it replaced.
 
-**MenuMusic** (MenuMusic.cs). Plays the launcher menu theme in a hidden WebView2, because the usual WPF playback needs the Media Feature Pack and that pack is missing on the ship PC. The browser is made the first time the music is wanted and closed while the game runs.
+**MenuMusic** (MenuMusic.cs). Plays the launcher menu theme from the launcher's own process: NLayer (embedded, THIRD-PARTY.md) decodes the MP3 and waveOut plays it on a thread of its own, so the Windows Volume Mixer lists the sound as this build, by the name and icon MenuMusic gives its audio session ("Thornswood" or "Thornswood Dev", #3207). It used to play in a hidden WebView2, whose sound Windows put under Microsoft Edge WebView2; the WPF MediaPlayer before that needed a Windows Media component the ship PC does not have. The sound output is opened the first time the music is wanted and closed while the game runs.
 
 **Watched** (Watched.cs). Remembers the processes the last full look found and asks only those, by the handle each already has, whether they are still running. A full look happens again only when all of them have gone, and that look is the same one Checks.GameRunning makes.
+
+**PathFence** (PathFence.cs). The one rule for whether a resolved path is inside a folder: it compares against the folder plus its separator, so `C:\Thornswood2` is not inside `C:\Thornswood`. Every pack write and delete in Updater and Sync is fenced with it, and Setup.csproj compiles this file into the setup program as well, for its unpack into the scratch folder (#3561).
 
 **WindowFit** (WindowFit.cs). Keeps a window inside the work area of the monitor it is on, at any display scale. The size and the minimum are clamped to that work area at startup and again when the window lands on a monitor with another scale. Build-Launcher.ps1 compiles this file into the setup program as well.
 ## 3. The Play sequence

@@ -10,8 +10,9 @@
 // to the menu." Both were the old multiplayer mod's advice, carried over. The name is
 // what everybody sees above your head, so somebody who followed the card walked
 // into Whiterun under their own name. And there is no saving here: the site's
-// help page says "No saving. The server holds your character. Quitting is
-// safe."
+// hints say "There is no saving. The server holds your character, so quitting
+// is safe." (site\data\site\lines.md, the one copy of the hints, #3147; Help's
+// list of what is normal here, which said it too, was removed on 26 Oct).
 //
 // The same name advice was in the Help page's first Joining item, two pages
 // away, and its third item still explained saving by what the old
@@ -30,6 +31,7 @@ function read(rel) {
 }
 const xaml = read('launcher/ui.xaml');
 const site = read(path.join('site', 'data', 'help.md'));
+const lines = read(path.join('site', 'data', 'site', 'lines.md'));
 const shell = read(path.join('launcher', 'app', 'Shell.cs'));
 
 let pass = 0, fail = 0;
@@ -90,8 +92,9 @@ yes('it gives the same rule as the card: ' + RULE_SKYRIM, first.indexOf(RULE_SKY
 yes('it gives the same rule as the card: ' + RULE_SHAPE, first.indexOf(RULE_SHAPE) >= 0);
 yes('it gives the same rule as the card: ' + RULE_NOT_OWN, first.indexOf(RULE_NOT_OWN) >= 0);
 yes('nothing in the site\'s help says to name the character after yourself', !/after yourself/i.test(site));
-yes('the site still says there is no saving',
-    /No saving\. The server holds your character\./.test(site));
+// Help lost its on-purpose list in #3544; the hints say it now.
+yes('the site\'s hints still say there is no saving',
+    /There is no saving\. The server holds your character\b/.test(lines));
 yes('the section explains nothing by the old multiplayer mod',
     !/Skyrim\s*Together|\bTogether\b/.test(first));
 

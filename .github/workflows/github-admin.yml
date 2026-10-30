@@ -9,20 +9,32 @@
 # by scripts\vps\admin\admin.js and nowhere else, and this run is the only
 # thing that service listens to.
 #
-# HOW. scripts/deploy/Set-BuildRunners.ps1 starts it by hand from anywhere,
-# One or a cloud thread, and reads its answer; a push to main that changes a
-# records/*-runners.json starts it by itself, so a merged record is on GitHub
+# HOW. scripts/deploy/Set-BuildRunners.ps1 (the runner labels) and
+# Set-RepoAbout.ps1 (the About box, #3682) start it by hand from anywhere,
+# One or a cloud thread, and read their answers; a push to main that changes
+# a records/*-runners.json or records/repo-about.json starts it by itself, so
+# a merged record is on GitHub
 # a minute later. Here Set-BuildRunners.ps1 -OnGitHub asks GitHub for this
 # run's OIDC token for the audience thornswood-admin and hands it to the
 # service on 127.0.0.1:7791. The service checks the token against GitHub's
 # published keys and that it is this workflow on main, reads the records from
 # main itself, and makes the runners' labels match them. Nothing the run
 # sends says what to change, so the most anybody who can start it can do is
-# make GitHub match main.
+# make GitHub match main. Set-BuildRunners.ps1 -AppRepos asks instead which
+# repositories the App is installed on, which changes nothing (#4013).
 #
 # NO SECRET. The run holds none and the service needs none from it: the OIDC
 # token is GitHub's own word for which run is asking, good for minutes, and
 # for this audience only.
+#
+# SETTINGS, READ ONLY (#3534). Started by hand with ask = settings, it
+# changes nothing: scripts/deploy/Check-GitHubSettings.ps1 -OnGitHub reads
+# the environments and where each may deploy from with the run's own token
+# (actions read, the only reason the job has it), asks the service for the
+# Actions settings, the runners and the secret and variable names, which it
+# reads with a read-only installation token, and compares them with
+# records/github-settings.json. A cloud thread is refused all of those paths
+# (HTTP 403), which is why the weekly reviews read them this way.
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
@@ -35,13 +47,25 @@ on:
         description: 'Change nothing; say only what differs from main'
         type: boolean
         default: false
+      ask:
+        description: 'What to ask the box: make the runner labels match main, list the repositories the App is on, or read the settings and compare them with main (the last two change nothing)'
+        type: choice
+        options:
+          - runner-labels
+          - installation-repos
+          - settings
+        default: runner-labels
   push:
     branches: [main]
     paths:
       - 'records/*-runners.json'
+      - 'records/repo-about.json'
 permissions:
   contents: read
   id-token: write
+  # Only to list the environments and their deployment policies for the
+  # settings read (#3534); GitHub puts those under Actions.
+  actions: read
 # One at a time, and never one cancelled half way.
 concurrency:
   group: github-admin
@@ -49,6 +73,12 @@ concurrency:
 jobs:
   admin:
     name: Match GitHub to main
+    # Main only (#3550): runner 3 signs release launchers and takes any job
+    # that asks for thornswood-vps alone, so a job on that label never runs a
+    # branch's code. A dispatch on a branch skips it. scripts\vps\
+    # Check-RunnerIsolation.ps1 holds every job to that, on the gate through
+    # tests\test-runner-isolation.ps1.
+    if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, thornswood-vps]
     # A handful of calls to GitHub through the box. Past this it is stuck.
     timeout-minutes: 5
@@ -72,9 +102,35 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Ask the box
+        if: ${{ inputs.ask != 'settings' }}
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
+          # A push has no inputs, so it asks for the labels.
+          ADMIN_ASK: ${{ inputs.ask || 'runner-labels' }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-BuildRunners.ps1') -OnGitHub
+          exit $LASTEXITCODE
+
+      # The About box, records/repo-about.json, the same way (#3682). It
+      # runs whatever the runner labels answered, since neither waits on
+      # the other, and writes its own answer, titled Set-RepoAbout. Asking
+      # only which repositories the App is on, or reading the settings,
+      # changes nothing, so it does not run then.
+      - name: Match the About box
+        if: ${{ !cancelled() && inputs.ask != 'installation-repos' && inputs.ask != 'settings' }}
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
         env:
           ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
         run: |
-          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-BuildRunners.ps1') -OnGitHub
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-RepoAbout.ps1') -OnGitHub
+          exit $LASTEXITCODE
+
+      - name: Read the settings
+        if: ${{ inputs.ask == 'settings' }}
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Check-GitHubSettings.ps1') -OnGitHub
           exit $LASTEXITCODE
