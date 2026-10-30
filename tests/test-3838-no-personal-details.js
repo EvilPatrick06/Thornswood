@@ -28,8 +28,9 @@
 // address instead.
 //
 // WHAT IS LEFT ALONE, AND WHY.
-//   - records/client-licences/: third-party licence texts keep their
-//     authors' notices word for word, as the licences require.
+//   - records/client-licences/ and records/front-licences/: third-party
+//     licence texts keep their authors' notices word for word, as the
+//     licences require.
 //   - the same notice lines copied into our own source: a line that is,
 //     past its comment marks, word for word a line of one of those texts
 //     that holds an address. zlib's licence says its notice "may not be
@@ -54,15 +55,18 @@ const { execFileSync } = require('child_process');
 const REPO_DIR = path.join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 
 const WAITING = [];
-const LEFT_ALONE = [/^records\/client-licences\//, /^tests\/fixtures\/ui-front-build\.js$/];
+const LEFT_ALONE = [/^records\/client-licences\//, /^records\/front-licences\//, /^tests\/fixtures\/ui-front-build\.js$/];
 
-// Every line of a recorded licence text that holds an address, with its
+// Every line of a recorded licence text (the client's and the site's
+// front build's) that holds an address, with its
 // spacing collapsed, so a notice copied into a source comment is known.
-const LIC_DIR = path.join(REPO_DIR, 'records', 'client-licences');
+const LIC_DIRS = ['client-licences', 'front-licences'].map((d) => path.join(REPO_DIR, 'records', d));
 const flatLine = (l) => l.replace(/^\s*(?:\/\/+|#+|\*+|;+|--)?/, '').replace(/\s+/g, ' ').trim();
 const NOTICE_LINES = new Set();
-for (const n of (fs.existsSync(LIC_DIR) ? fs.readdirSync(LIC_DIR) : [])) {
-  for (const l of fs.readFileSync(path.join(LIC_DIR, n), 'utf8').split(/\r?\n/)) if (/@/.test(l)) NOTICE_LINES.add(flatLine(l));
+for (const dir of LIC_DIRS) {
+  for (const n of (fs.existsSync(dir) ? fs.readdirSync(dir) : [])) {
+    for (const l of fs.readFileSync(path.join(dir, n), 'utf8').split(/\r?\n/)) if (/@/.test(l)) NOTICE_LINES.add(flatLine(l));
+  }
 }
 
 const MAIL_DOMAIN = /^(?:gmail\.com|googlemail\.com|outlook\.[a-z.]+|hotmail\.[a-z.]+|live\.[a-z.]+|msn\.com|yahoo\.[a-z.]+|ymail\.com|icloud\.com|me\.com|mac\.com|proton\.me|protonmail\.[a-z.]+|aol\.com|(?:[a-z0-9-]+\.)+edu)$/i;
