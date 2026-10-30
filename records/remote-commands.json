@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  74,
-    "callCount":  293,
+    "callCount":  295,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -829,10 +829,28 @@
                       "script":  "scripts/deploy/Install-Bridge.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "\u0027BRIDGE OK\u0027; exit 0",
-                      "does":  "checks the stage, swaps it in and registers and starts the bridge task, or puts the old one back",
+                      "anchor":  "if (`$off) { \u0027NOT RECORDED\u0027 } else { \u0027MATCHES\u0027 }",
+                      "does":  "reads the hashes of the three bridge files and asks its port, so -Record records what runs and changes nothing (#3214)",
+                      "class":  "read-status",
+                      "reason":  "reads file hashes and the port only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$started = @(Remote $run.Start)",
+                      "does":  "starts the check of the stage, the swap and the registering and starting of the bridge task, or the put-back, on the box on its own, through WMI (#3214)",
                       "class":  "admin",
-                      "reason":  "sends Register-ScheduledTask"
+                      "reason":  "the run it starts sends Register-ScheduledTask"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$read = @(Remote $run.Read",
+                      "does":  "reads the report of that run, and deletes it once it holds END (#3214)",
+                      "class":  "read-status",
+                      "reason":  "reads a report file"
                   },
                   {
                       "script":  "scripts/deploy/Install-AdminService.ps1",
