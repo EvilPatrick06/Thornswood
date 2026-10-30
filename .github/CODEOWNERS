@@ -1,41 +1,10 @@
-# The files every machine touches.
-#
-# Developer-Guide.md says these six need a word in
-# #staff-updates before they are edited, because a change in any of them lands on
-# everybody else's work without warning. Until now that rule was prose with nothing
-# behind it: nothing asked, nothing checked, and it was forgotten as often as
-# it was kept.
-#
-# A leading slash pins the pattern to the repository root, the same way a
-# gitignore pattern works. Without it, launcher/app/Shell.cs would also match any
-# Shell.cs in any folder added later.
-#
-# WHAT THIS DOES AND DOES NOT DO. GitHub requests a review from the owner named
-# here when a pull request touches the file, and never asks a pull request's
-# own author. So a pull request one of the team opens on Shell.cs asks the
-# others, which is exactly the intent. The owners are the handles on the six
-# shared files below. The guide does not keep a separate list of people.
-# tests\test-branch-rules.js checks every other line stays inside that set.
-#
-# It is a request and nothing more. Branch protection on main, since 25
-# September: enforce_admins is off; there is no required check; required
-# approving reviews is 0; and Require review from Code Owners is off. The
-# team's rule is to merge once the build check on the VPS is green and it
-# has been said in #staff-updates, whether or not anybody named here has
-# read it.
-#
-# Switching the code owner review on is Patrick's decision, and it is not
-# free. With enforce_admins back on, a pull request of his that touches /.github/
-# could never merge, because he is its only owner and GitHub does not let an
-# author approve their own. Every one of his that touches the shared files
-# below would wait for somebody else. The settings change without a commit, so read
-# them rather than this comment:
+# A pull request that touches one of these files asks the people named here for
+# a review. Developer-Guide.md, "Signing, the build check, and the six shared
+# files", says why these. It is a request only: on main, enforce_admins is off,
+# there is no required check, required approving reviews is 0 and the code owner
+# review is off. Read the live settings, and check this file after an edit:
 #
 #     gh api repos/EvilPatrick06/Thornswood/branches/main/protection
-#
-# A mistyped path or a handle without push access is ignored in silence, which
-# is why the check is worth running after any edit here:
-#
 #     gh api repos/EvilPatrick06/Thornswood/codeowners/errors
 
 /launcher/app/Shell.cs        @EvilPatrick06 @WiccanDjinn @Jhinswife
@@ -45,8 +14,7 @@
 /launcher/app/Updater.cs      @EvilPatrick06 @WiccanDjinn @Jhinswife
 /scripts/release/Publish-Update.ps1  @EvilPatrick06 @WiccanDjinn @Jhinswife
 
-# Not one of the six shared files, and here because getting them wrong is the same
-# shape of accident: they decide what leaves a machine and what a release is.
+# These decide what leaves a machine and what a release is.
 /scripts/release/Ship.ps1            @EvilPatrick06 @WiccanDjinn @Jhinswife
 /scripts/release/Ship-Rules.ps1      @EvilPatrick06 @WiccanDjinn @Jhinswife
 /.github/                  @EvilPatrick06
