@@ -60,6 +60,9 @@ $heavy = @{
     'nightly.yml'  = @('harnesses')
     # The gate, run as build.yml runs it, under a trace (#3114).
     'trace-gate.yml' = @('trace')
+    # Named harnesses or the gate, on a branch as well as main, so never on
+    # the runner that signs (#3550).
+    'harnesses.yml' = @('harnesses')
 }
 # release.yml's verify is light. It asked for a build runner until #3956,
 # since those are never the runner that signs; it asks for the check label

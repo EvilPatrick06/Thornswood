@@ -263,7 +263,7 @@ Moot put the crown on Ulfric. He wore it twenty-six years and died in his
 bed.
 
 The Moot sat eleven days and didn't pick his kin. It picked **Eirik
-Ravensgard** of the Rift, who's had it twenty-two years and is neither loved
+Ravensgard** of the Rift, who's had it twenty-three years and is neither loved
 nor hated.
 
 There's a High King of Skyrim and nothing above him. Every hold keeps its own
@@ -595,6 +595,7 @@ CHANGES = {
         ('2026-10-26', 'If it goes wrong: the known issues page lists what is broken right now, and the help page has what works that way on purpose.', 'ca32544d805a'),
         ('2026-10-26', 'Your first character has its own section: the stone hall, the nine towns you can start in and where you arrive, what waits on a class or a profession, and the tool a Miner, a Farmer, a Fisher or a Woodworker is handed. Connect Discord is on the Play page, and voice names its keys: hold V to talk, O keeps the microphone open, B steps between whisper, normal and yell.', 'e4e76eaea6bf'),
         ('2026-10-26', 'If it goes wrong: the help page has the usual fixes. Its list of what works that way on purpose is gone.', '3c1f3de182b5'),
+        ('2026-10-27', "For Thornswood's own plugin, Fix downloads the latest release's copy, no longer the server's.", '1592da4dfb29'),
     ],
     'NEWS': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '90be4dab837f'),
@@ -614,9 +615,11 @@ CHANGES = {
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),
         ('2026-10-22', 'Rewritten without the narrator asides, so it reads as plain lore. No event in it has changed.', 'fb95f2f38532'),
+        ('2026-10-27', 'Eirik has held the crown twenty-three years, not twenty-two: Ulfric died in 4E 229 and this is 4E 252. Patrick confirmed it (#3656).', 'e33f97399598'),
     ],
     'FACTIONS': [
         ('2026-10-22', 'The sixteen factions of 4E 252, each with who they are, where they keep and who leads them, as Patrick approved them.', '8ba2250523f8'),
+        ('2026-10-27', 'No Legion soldier has been in Skyrim under arms in fifty years, not thirty: the Legion left in the thaw of 203. Patrick confirmed it (#3656).', '16480e79786c'),
     ],
 }
 
