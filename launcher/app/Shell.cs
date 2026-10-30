@@ -326,6 +326,10 @@ namespace Thornswood
                 if (args[i].Equals("-uninstall", StringComparison.OrdinalIgnoreCase)) askedToUninstall = true;
 
             Paths.Init(root);
+            // The log and the support zips are kept for LocalKeep.Days days on
+            // this PC, and the privacy page says so (#3679). Here, inside this
+            // install's mutex and before anything else in it writes the log.
+            LocalKeep.Tidy(DateTime.Now);
             // Profile\accepted.json is the setup program's record of the terms,
             // the privacy policy and the rules (issue #1009). An install made
             // before that has no file, and silence is not a yes. Ask before
@@ -4840,6 +4844,10 @@ namespace Thornswood
             {
                 stays.AppendLine("    " + Paths.ProfileDir + "   (your characters and settings)");
                 stays.AppendLine("    " + Paths.CfgFile);
+                // Kept saves and settings are only that (#3679): the log, the
+                // Discord sign-in, name and picture, the support reports and
+                // the browser folders inside Profile go either way.
+                goes.AppendLine("    From " + Paths.ProfileDir + ": " + LocalKeep.NotSavesInWords);
             }
 
             // Named rather than removed quietly, because it is not where
