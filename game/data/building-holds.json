@@ -13088,13 +13088,8 @@
   },
   {
    "name": "Thornswood-Last.esp",
-   "sha256": "ebb71d60663bd104522f0a2b6cc51d4e0b7e0c4dd2023a3641965a18683b2b9d",
-   "size": 12899542
-  },
-  {
-   "name": "Thornswood-WoodworkerTrail.esp",
-   "sha256": "d12bcd2e54d874c5005303082b5ac40ad01af3d5d8bfb5c75a4795b39d988482",
-   "size": 9628
+   "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
+   "size": 12901082
   }
  ],
  "builtBy": "scripts/dev/Build-BuildingHolds.py",
@@ -13156,7 +13151,7 @@
   }
  },
  "issue": 2551,
- "readFrom": "game/data/doors.json for the buildings and their doors; game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp, last plugin wins; Thornswood-Content.esp, Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp from game/content",
+ "readFrom": "game/data/doors.json for the buildings and their doors; game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, last plugin wins; Thornswood-Content.esp, Thornswood-Last.esp from game/content",
  "refused": {
   "10a8b:Dawnguard.esm": {
    "name": "Forgotten Vale Cave",
