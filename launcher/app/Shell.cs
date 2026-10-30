@@ -5328,6 +5328,14 @@ namespace Thornswood
             return new[] { "The collection is not installed yet.", "for it to be installed" };
         }
 
+        /// <summary>What Play says when a press reaches it with the collection card up (#4115).</summary>
+        static string CollectionHeldLine()
+        {
+            return CollectionWait()[0] + (CollectionProblem() == "ahead"
+                ? " Nothing needs installing; Play opens once the server is rebuilt."
+                : " Open the collection from the card above Play, then come back.");
+        }
+
 
     }
 }

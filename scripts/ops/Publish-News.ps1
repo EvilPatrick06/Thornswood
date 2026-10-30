@@ -233,7 +233,7 @@ try { if ($v.PSObject.Properties['collectionUrl']) { $collection = [string]$v.co
 # past the server landed ahead of it with Play shut. The launcher's buttons
 # open the same page (Checks.CollectionRevisionUrl).
 $collectionRevision = 0
-try { if ($v.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$v.collectionRevision, [ref]$collectionRevision) } } catch { }
+if ($v.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$v.collectionRevision, [ref]$collectionRevision) }
 if ($collectionRevision -gt 0 -and $collection -match '^(.*?/collections/[A-Za-z0-9]+)([/?#].*)?$') {
   $collection = $Matches[1] + '/revisions/' + $collectionRevision
 } else {

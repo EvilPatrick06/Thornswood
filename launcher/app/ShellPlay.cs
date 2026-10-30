@@ -161,14 +161,7 @@ namespace Thornswood
                 // update, the pack is being fetched, and a press in that gap
                 // starts Skyrim on a half extracted build.
                 if (updatePending) { Log("An update is going in. Play comes back when it is done."); return; }
-                if (collectionBarUp)
-                {
-                    string[] wait = CollectionWait();
-                    Log(wait[0] + (CollectionProblem() == "ahead"
-                        ? " Nothing needs installing; Play opens once the server is rebuilt."
-                        : " Open the collection from the card above Play, then come back."));
-                    return;
-                }
+                if (collectionBarUp) { Log(CollectionHeldLine()); return; }
                 if (ownGameBusy) { Log("Thornswood's own Skyrim folder is being prepared. Play comes back when it is done."); return; }
                 if (OwnGameRefreshIfDue()) return;
                 if (feedNotice.Hold != null) { Log(feedNotice.Hold); return; }

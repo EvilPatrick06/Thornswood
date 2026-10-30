@@ -99,7 +99,7 @@ $wait = Method $shell 'static string[] CollectionWait()'
 Yes 'CollectionWait names behind, ahead and not installed' ($wait.Contains('problem == "stale"') -and $wait.Contains('problem == "ahead"') -and $wait.Contains('"The collection is not installed yet."'))
 Yes 'the update log no longer says not installed for every case' (-not $update.Contains('Log("The collection is not installed yet'))
 Yes 'all three update log lines ask CollectionWait' (([regex]::Matches($update, '= CollectionWait\(\);')).Count -eq 3)
-Yes 'Play''s own refusal asks it too' ($play.Contains('string[] wait = CollectionWait();') -and -not $play.Contains('Log("The collection is not installed yet. Open it'))
+Yes 'Play''s own refusal asks it too' ($play.Contains('if (collectionBarUp) { Log(CollectionHeldLine()); return; }') -and (Method $shell 'static string CollectionHeldLine()').Contains('CollectionWait()[0]') -and -not $play.Contains('Log("The collection is not installed yet. Open it'))
 
 # ---- what the installer tells people ---------------------------------------
 $rmf = [IO.File]::ReadAllText((Join-Path $repo 'installer\READ ME FIRST.txt')) -replace '\s+', ' '
