@@ -28,8 +28,9 @@
 // address instead.
 //
 // WHAT IS LEFT ALONE, AND WHY.
-//   - records/client-licences/: third-party licence texts keep their
-//     authors' notices word for word, as the licences require.
+//   - records/client-licences/ and records/front-licences/: third-party
+//     licence texts keep their authors' notices word for word, as the
+//     licences require.
 //   - tests/fixtures/ui-front-build.js: a third-party webpack build, kept
 //     as its authors built it (#3761); the profile path in it is one of
 //     theirs, from their own machine.
@@ -47,7 +48,7 @@ const { execFileSync } = require('child_process');
 const REPO_DIR = path.join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 
 const WAITING = [];
-const LEFT_ALONE = [/^records\/client-licences\//, /^tests\/fixtures\/ui-front-build\.js$/];
+const LEFT_ALONE = [/^records\/client-licences\//, /^records\/front-licences\//, /^tests\/fixtures\/ui-front-build\.js$/];
 
 const MAIL_DOMAIN = /^(?:gmail\.com|googlemail\.com|outlook\.[a-z.]+|hotmail\.[a-z.]+|live\.[a-z.]+|msn\.com|yahoo\.[a-z.]+|ymail\.com|icloud\.com|me\.com|mac\.com|proton\.me|protonmail\.[a-z.]+|aol\.com|(?:[a-z0-9-]+\.)+edu)$/i;
 const MAIL = /[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})/g;
