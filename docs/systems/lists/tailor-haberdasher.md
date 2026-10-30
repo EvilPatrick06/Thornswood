@@ -1,8 +1,8 @@
 # Tailor/Haberdasher
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 170 recipes, 170 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 174 recipes, 172 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 117, advanced 26, expert 10, master 17.
+By rank: novice 119, advanced 26, expert 10, master 19.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -50,6 +50,8 @@ By rank: novice 117, advanced 26, expert 10, master 17.
 | Girl's Yellow Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fe:MoreCraftableEquipment.esp` |
 | Sewing Kit | 1 | novice | Other goods | TanningRack | 1 Tundra Cotton, 1 Leather Strips |  | yes | `154b5:Thornswood-Content.esp` |
 | Thread | 1 | novice | Other goods | MCE_CraftingLoom | 2 Tundra Cotton |  | yes | `84a:MoreCraftableEquipment.esp` |
+| Alik'r Warrior Garb | 1 | novice | Robes and body wear | SmithingForge | 4 Leather, 3 Leather Strips | redguard | yes | `53:cheddars_mashups.esl` |
+| Alik'r Warrior Garb | 1 | novice | Robes and body wear | SmithingArmorTable | 1 Leather | redguard | no | `54:cheddars_mashups.esl` |
 | Belted Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `96f:MoreCraftableEquipment.esp` |
 | Blacksmith's Apron | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 3 Thread |  | yes | `925:MoreCraftableEquipment.esp` |
 | Blacksmith's Apron | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 3 Thread |  | yes | `927:MoreCraftableEquipment.esp` |
@@ -170,6 +172,8 @@ By rank: novice 117, advanced 26, expert 10, master 17.
 | Bosmer Engraved Shoulder Cape | 1 | master | Robes and body wear | SmithingForge | 3 Hanging Moss, 1 Gold Ingot, 2 Leather Strips, 3 Spider Egg, 3 Fur Plate | woodelf | yes | `23907:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Full Cape | 1 | master | Robes and body wear | SmithingForge | 4 Hanging Moss, 1 Silver Ingot, 2 Leather Strips, 4 Spider Egg, 4 Fur Plate | woodelf | yes | `238fe:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Shoulder Cape | 1 | master | Robes and body wear | SmithingForge | 3 Hanging Moss, 1 Silver Ingot, 2 Leather Strips, 3 Spider Egg, 3 Fur Plate | woodelf | yes | `23919:Hothtrooper44_ArmorCompilation.esp` |
+| Thalmor Plate | 1 | master | Robes and body wear | SmithingForge | 3 Leather Strips, 5 Ebony Ingot |  | yes | `bd:cheddars_mashups.esl` |
+| Thalmor Plate | 1 | master | Robes and body wear | SmithingArmorTable | 1 Ebony Ingot |  | no | `bc:cheddars_mashups.esl` |
 | Ebony Mage Unarmored Boots | 1 | master | Shoes and light boots | SmithingForge | 2 Troll Fat, 1 Ebony Ingot, 2 Leather Strips, 2 Leather |  | yes | `372fe:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Boots Black | 1 | master | Shoes and light boots | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c6:Hothtrooper44_ArmorCompilation.esp` |
 | Tribunal Unarmored Boots Blue | 1 | master | Shoes and light boots | SmithingForge | 1 Linen Wrap, 3 Troll Fat, 3 Leather Strips, 3 Leather, 1 Fur Plate |  | yes | `231c7:Hothtrooper44_ArmorCompilation.esp` |

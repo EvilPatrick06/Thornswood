@@ -14,7 +14,7 @@ An item in this file is not found in the world and not made at a public bench. T
 | embassy | Not found in Skyrim. The embassy roll may craft it. |
 | thalmor | Not found. Someone on the Thalmor remnant roll may craft it. |
 
-Counts in this file: cut 3319, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 595.
+Counts in this file: cut 3321, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 595.
 
 The rules below sorted the recipe table once, before anything was cut. The recipe build (`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.
 
@@ -114,7 +114,7 @@ Not found. A person on the remnant roll may make them. Wearing them is still the
 
 Not found and not made. Held here so the reference can come back.
 
-3319 references.
+3321 references.
 
 | Item | Id | Half | Why |
 | --- | --- | --- | --- |
@@ -269,6 +269,7 @@ Not found and not made. Held here so the reference can come back.
 | Staff of the Major Daedra | `2a816b:Odin - Skyrim Magic Overhaul.esp` | Bladebinder | Dragon, Daedric, or Aetherium. Not found and not made. The reference stays here so it can come back for an event. |
 | Staff of the Minor Daedra | `2a8168:Odin - Skyrim Magic Overhaul.esp` | Bladebinder | Dragon, Daedric, or Aetherium. Not found and not made. The reference stays here so it can come back for an event. |
 | Vaermina Robes | `9dc:MoreCraftableEquipment.esp` | Liverywright | Dragon, Daedric, or Aetherium. Not found and not made. The reference stays here so it can come back for an event. |
+| Wamsu Bone Armor | `8a:cheddars_mashups.esl` | Platewright | Dragon, Daedric, or Aetherium. Not found and not made. The reference stays here so it can come back for an event. |
 | Apple Dumpling | `80e:Gourmet.esp` | Confectioner | Duplicate of the same dish. The other row stays. This reference is here if the second portion is wanted back. |
 | Apple Dumpling | `994:Gourmet.esp` | Confectioner | Duplicate of the same dish. The other row stays. This reference is here if the second portion is wanted back. |
 | Apple Dumpling | `995:Gourmet.esp` | Confectioner | Duplicate of the same dish. The other row stays. This reference is here if the second portion is wanted back. |
@@ -3374,6 +3375,7 @@ Not found and not made. Held here so the reference can come back.
 | Vvardenfell Glass Shield | `23347:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Wabba Jackhammer | `3951:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Wabba Jaxe | `3952:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Wamsu Bone Armor | `8b:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief Heavy Battlecrown | `df4:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief Heavy Bulwark | `df6:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief Heavy Grips | `dfa:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |

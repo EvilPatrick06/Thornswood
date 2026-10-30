@@ -1,11 +1,11 @@
 # Where every item comes from
 
-Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1058 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
+Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1143 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
-| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 719 | 662 |
-| race | a recipe only the named race may make | 38 | 25 |
+| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 799 | 742 |
+| race | a recipe only the named race may make | 42 | 29 |
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
 | faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
 | quest | drawn only while a merchant's scarce work is open, a rare seam its quest opens, or a retrieval token | 21 | 11 |
@@ -17,7 +17,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 ## Nothing hands these out
 
-17 items a live recipe asks for, or a hair dye or a bottle of water needs, that no recipe, class, quest, dungeon or starting kit hands out. Every recipe that asks for one of them cannot be made.
+18 items a live recipe asks for, or a hair dye or a bottle of water needs, that no recipe, class, quest, dungeon or starting kit hands out. Every recipe that asks for one of them cannot be made.
 
 | Item | Asked for by | Id |
 | --- | --- | --- |
@@ -37,6 +37,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Unenchanted Conjuration Staff | Staff of Soul Trapping | `7e647:Skyrim.esm` |
 | Unenchanted Destruction Staff | Staff of Firebolts, Staff of Flames, Staff of Frostbite, Staff of Ice Spikes, Staff of Ice Storms, Staff of Icy Spear and 4 more | `be11f:Skyrim.esm` |
 | Unenchanted Restoration Staff | Grand Staff of Turning, Staff of Turning | `51b0c:Skyrim.esm` |
+| Werewolf Pelt | Werewolf's Bane | `fe6a9:Skyrim.esm` |
 | White Wine | Eidar Cheese Fondue, Goat Cheese Fondue, Mammoth Cheese Fondue | `3133c:Skyrim.esm` |
 
 ## Only from a quest
@@ -209,11 +210,14 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 ## Race work
 
-38 items. Only the named race may make these. An item also made by another source shows it.
+42 items. Only the named race may make these. An item also made by another source shows it.
 
 | Item | Sources | Id |
 | --- | --- | --- |
 | Alik'r Hood | race Tailor/Haberdasher redguard novice | `7bc1a:Skyrim.esm` |
+| Alik'r Knight | race Smith/Platewright redguard advanced | `9b:cheddars_mashups.esl` |
+| Alik'r Warrior Garb | race Tailor/Haberdasher redguard novice | `52:cheddars_mashups.esl` |
+| Armored Telvanni Robes | race Smith/Platewright darkelf advanced | `199:cheddars_mashups.esl` |
 | Bosmer Boots | race Smith/Platewright woodelf expert | `238e0:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Bracers | race Smith/Platewright woodelf expert | `238eb:Hothtrooper44_ArmorCompilation.esp` |
 | Bosmer Cuirass | race Smith/Platewright woodelf expert | `238e2:Hothtrooper44_ArmorCompilation.esp` |
@@ -225,6 +229,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Dark Alik'r Hood | race Tailor/Haberdasher redguard novice | `e0dd2:Skyrim.esm` |
 | Dark Hammerfell Garb | race Tailor/Haberdasher redguard novice | `e0dd0:Skyrim.esm` |
 | Dark Redguard Boots | race Tailor/Haberdasher redguard novice | `e0dd4:Skyrim.esm` |
+| Dawnguard Alik'r Armor | race Smith/Platewright redguard advanced | `43:cheddars_mashups.esl` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `82c:MoreCraftableEquipment.esp` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `82d:MoreCraftableEquipment.esp` |
 | Dunmer Hooded Outfit | race Tailor/Haberdasher darkelf novice | `831:MoreCraftableEquipment.esp` |

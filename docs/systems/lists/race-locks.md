@@ -1,10 +1,12 @@
 # Race locked recipes
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 38 recipes carry a race. Only the named race can make them. A material named for a people, such as Elven or Orcish or Nordic Carved, is not in this list.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 46 recipes carry a race. Only the named race can make them. A material named for a people, such as Elven or Orcish or Nordic Carved, is not in this list.
 
 
 ## darkelf
 
+- Armored Telvanni Robes (advanced, Smith/Platewright, `19b:cheddars_mashups.esl`)
+- Armored Telvanni Robes (advanced, Smith/Platewright, `19a:cheddars_mashups.esl`)
 - Dunmer Hooded Outfit (novice, Tailor/Haberdasher, `957:MoreCraftableEquipment.esp`)
 - Dunmer Hooded Outfit (novice, Tailor/Haberdasher, `958:MoreCraftableEquipment.esp`)
 - Dunmer Hooded Outfit (novice, Tailor/Haberdasher, `95b:MoreCraftableEquipment.esp`)
@@ -19,9 +21,15 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 3
 ## redguard
 
 - Alik'r Hood (novice, Tailor/Haberdasher, `9c0:MoreCraftableEquipment.esp`)
+- Alik'r Knight (advanced, Smith/Platewright, `bf:cheddars_mashups.esl`)
+- Alik'r Knight (advanced, Smith/Platewright, `c0:cheddars_mashups.esl`)
+- Alik'r Warrior Garb (novice, Tailor/Haberdasher, `53:cheddars_mashups.esl`)
+- Alik'r Warrior Garb (novice, Tailor/Haberdasher, `54:cheddars_mashups.esl`)
 - Dark Alik'r Hood (novice, Tailor/Haberdasher, `948:MoreCraftableEquipment.esp`)
 - Dark Hammerfell Garb (novice, Tailor/Haberdasher, `947:MoreCraftableEquipment.esp`)
 - Dark Redguard Boots (novice, Tailor/Haberdasher, `946:MoreCraftableEquipment.esp`)
+- Dawnguard Alik'r Armor (advanced, Smith/Platewright, `44:cheddars_mashups.esl`)
+- Dawnguard Alik'r Armor (advanced, Smith/Platewright, `45:cheddars_mashups.esl`)
 - Hammerfell Garb (novice, Tailor/Haberdasher, `9be:MoreCraftableEquipment.esp`)
 - Redguard Boots (novice, Tailor/Haberdasher, `9bd:MoreCraftableEquipment.esp`)
 - Redguard Knight Cape (advanced, Tailor/Haberdasher, `f74d:Hothtrooper44_ArmorCompilation.esp`)
