@@ -216,7 +216,6 @@ namespace Probe
         static IntPtr GetForegroundWindow() { return Foreground; }
         const uint GA_ROOT = 2;
         static IntPtr GetAncestor(IntPtr h, uint flags) { Win w = Find(h); return (w != null && w.Root != IntPtr.Zero) ? w.Root : h; }
-        static int GetWindowText(IntPtr h, StringBuilder text, int max) { Win w = Find(h); if (w == null || w.Title == null) return 0; text.Append(w.Title); return w.Title.Length; }
         // The real one tries a few times and reads the text back, because
         // Clipboard.SetText fails while another program has the clipboard
         // open. Here it is a switch: ClipboardTakes false is a clipboard that
@@ -378,8 +377,11 @@ try {
         Call 'SayWindow' @([IntPtr]0x21, $log) | Out-Null
         Yes 'the window found is named in the log once, however many times it is found' ($lines.Count -eq 1)
         $l = if ($lines.Count) { $lines[0] } else { '' }
-        Yes ('the line names the process, its number, the title and the size: ' + $l) (
-            $l -like '*steamwebhelper, process 200*' -and $l -like '*titled "Steam"*' -and $l -like '*2308 x 927*')
+        Yes ('the line names the process, its number and the size: ' + $l) (
+            $l -like '*steamwebhelper, process 200*' -and $l -like '*2308 x 927*')
+        # Never the title (#3627): a Steam chat window is titled with a friend's
+        # name, and launcher.log goes up with the session's logs.
+        Yes 'the line never carries the window''s title' ($l -notlike '*Steam"*' -and $l -notlike '*titled*')
         Call 'SayWindow' @([IntPtr]0x11, $log) | Out-Null
         Yes 'a different window found later is named too' ($lines.Count -eq 2 -and $lines[1] -like '*steam, process 100*')
         Call 'AddWindow' @([long]0xA1, 999, $true, 800, 600, 'Steam') | Out-Null
