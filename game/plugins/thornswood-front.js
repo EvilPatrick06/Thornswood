@@ -904,6 +904,15 @@
       what is missing: an index.html from before this change gets the list
       and the script injected; a browser on some other address (none known)
       gets a loadUrl as a last resort and the wait that comes with it.
+
+      Shown from the start (#3129). The page was drawn and hidden for those
+      fifteen seconds, with the game's own menu picture the only thing on
+      screen, because SkyrimPlatform makes its browser hidden and nothing
+      showed it before this tick. The fork's SkyrimPlatform now shows and
+      focuses it as it is made ([Browser] ShowAtStart, on unless the ini
+      says false), and skymp5-client no longer hides it as it loads when the
+      choice is made here. The setVisible and setFocused below are what
+      shows it when ShowAtStart is off.
     */
     if (menuPhase === 0) {
       // 100 ms, was 600 (Djinn, 25 September: the still before the loop was up too long).
