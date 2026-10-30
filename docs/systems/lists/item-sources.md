@@ -1,10 +1,10 @@
 # Where every item comes from
 
-Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1068 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
+Generated from `game/data/item-sources.json` by `scripts/dev/Write-SystemLists.js`. 1058 items: everything somebody can come to hold, and every input a live recipe asks for. Each is marked with every way it comes into the world. `scripts/dev/Build-ItemSources.js` builds the table; run it, then this script, after a recipe, work, quest or dungeon table changes. Balance is what a thing takes to make or get plus its stats, never gold.
 
 | Kind | What it means | Items | Only this |
 | --- | --- | --- | --- |
-| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 741 | 683 |
+| crafted | made at a bench by a profession, by anybody where no profession owns the recipe, or made by the server in place of a recipe's output (fine and burnt dishes, hair dye) | 731 | 673 |
 | race | a recipe only the named race may make | 38 | 25 |
 | company | a Free Skyrim Trading Company ware (cut-items.json rieklingKept) | 13 | 0 |
 | faction | a recipe only the embassy roll or the remnant roll may make | 24 | 24 |
@@ -25,7 +25,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 | Drum | Drum | `daba9:Skyrim.esm` |
 | Dwarven Oil | Dwemer Fire Paste | `f11c0:Skyrim.esm` |
 | Eidar Cheese Wheel | Eidar Cheese Fondue | `64b34:Skyrim.esm` |
-| Empty Wine Bottle | a hair dye or a bottle of water | `f2012:Skyrim.esm` |
+| Empty Wine Bottle | a bottle of water | `f2012:Skyrim.esm` |
 | Flute | Flute | `daba7:Skyrim.esm` |
 | Honey | Honey Nut Treat | `10394d:Skyrim.esm` |
 | Linen Wrap | Apotheus Scarf, Bandana, Bandana, Tied, College of Winterhold Cloak, Dark Brotherhood Cloak, Dawngaurd Cloak and 40 more | `34cd6:Skyrim.esm` |
@@ -45,7 +45,7 @@ Not a source: a cut recipe, a tempering row (grindstone, armour table), a Hearth
 
 | Item | Sources | Id |
 | --- | --- | --- |
-| Crimson Nirnroot | quest crimson (game/data/merchant-scarce-harvest.json) | `b701a:Skyrim.esm` |
+| Crimson Nirnroot | quest gatherer crimson novice (game/data/merchant-scarce-harvest.json) | `b701a:Skyrim.esm` |
 | Guild Ledger | quest ledger (game/data/merchant-retrievals.json) | `17001:Thornswood-Content.esp` |
 | Guild Locket | quest locket (game/data/merchant-retrievals.json) | `17003:Thornswood-Content.esp` |
 | Guild Satchel | quest satchel (game/data/merchant-retrievals.json) | `17000:Thornswood-Content.esp` |

@@ -52,8 +52,17 @@
   -Check the exit code is 2 when any rule is OUTSIDE or a required one is
   missing, so the check fails on a rule nobody listed.
 
+  WHICH STORE (#3896). The rules are read as the firewall takes them (the
+  active store), each with where it came from. A rule from the box's own
+  policy is turned off there and Group Policy refreshed
+  (scripts\vps\BoxFirewall.ps1); a local one, before
+  Set-InboundRules.ps1 -Own has the firewall ignore local rules, in the local
+  store.
+
   THE WAY BACK. A rule this turned off is still on the box, disabled:
-      Enable-NetFirewallRule -Name '<its Name, from the CHANGED line>'
+      Enable-NetFirewallRule -PolicyStore localhost -Name '<its Name, from the CHANGED line>'; gpupdate /target:computer /force
+  or, for one the CHANGED line says was local,
+      Enable-NetFirewallRule -Name '<its Name>'
 
 .PARAMETER Check
   Read all of it and change nothing.
@@ -108,12 +117,26 @@ function Get-ThornswoodBoxRefusal {
 }
 # ---- end BoxGuard.ps1 ----
 
-# Every inbound Allow rule, enabled or not, as Name, DisplayName, Enabled,
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
+
+# Every inbound Allow rule the firewall takes, enabled or not, as Name, DisplayName, Enabled,
 # Group, Protocol, Ports, Remote ('Any' when open to all), Program, Package
-# (the Store app's container, '' when none), Service, Store (where the rule is kept: PersistentStore for the box's own) and
-# Description.
+# (the Store app's container, '' when none), Service, Store (where the
+# firewall took it from: GroupPolicy for the box's own policy, Local for the
+# local store) and Description.
 function Get-InboundRules {
-    foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Action Allow -ErrorAction SilentlyContinue)) {
+    foreach ($r in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Action Allow -ErrorAction SilentlyContinue)) {
         $pf = $r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
         $af = $r | Get-NetFirewallAddressFilter -ErrorAction SilentlyContinue
         $ap = $r | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue
@@ -133,8 +156,11 @@ function Get-InboundRules {
         }
     }
 }
-function Disable-Rule([string]$Name) { Disable-NetFirewallRule -Name $Name }
-function Test-RuleEnabled([string]$Name) { return ([string](Get-NetFirewallRule -Name $Name).Enabled -eq 'True') }
+function Disable-Rule([string]$Name, [string]$Store) {
+    if ($Store -eq 'GroupPolicy') { Disable-NetFirewallRule -PolicyStore localhost -Name $Name; Sync-ThornswoodFirewall }
+    else { Disable-NetFirewallRule -PolicyStore PersistentStore -Name $Name }
+}
+function Test-RuleEnabled([string]$Name) { return (@(Get-NetFirewallRule -PolicyStore ActiveStore -Name $Name -ErrorAction SilentlyContinue | Where-Object { [string]$_.Enabled -eq 'True' }).Count -gt 0) }
 # The firewall log's "rule added" (2004, 2097) and "rule changed" (2005,
 # 2099) events, as Time, Id, RuleId, RuleName, User and Program, oldest
 # first, and the time of the oldest event the log still holds.
@@ -293,9 +319,9 @@ function Invoke-InboundRules {
         if (Test-TakesSsh $r) { Say 'LEFT' ("'" + $r.DisplayName + "' lets TCP 22 in, and ssh's rules are Set-SshScope.ps1's. Put it on the list or scope it there."); continue }
         $script:changes++
         if ($DryRun) { Say 'WOULD' ("turn off '" + $r.DisplayName + "' (" + $r.Name + ')'); continue }
-        Disable-Rule $r.Name
+        Disable-Rule $r.Name $r.Store
         if (Test-RuleEnabled $r.Name) { $script:stopped = $true; Say 'STOP' ("'" + $r.DisplayName + "' reads back as still on after it was turned off."); return }
-        Say 'CHANGED' ("turned off '" + $r.DisplayName + "' (" + $r.Name + ')')
+        Say 'CHANGED' ("turned off '" + $r.DisplayName + "' (" + $r.Name + '), ' + $(if ($r.Store -eq 'GroupPolicy') { 'in the box''s policy' } else { 'a local rule' }))
     }
 }
 

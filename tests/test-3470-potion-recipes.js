@@ -13,7 +13,8 @@
 // rank in docs/systems/mixtures.md). A recipe whose ingredient does not carry
 // the effect would brew nothing in the game's own menu, so each input is held
 // to game/data/ingredients.json, which reads the effects off the INGR
-// records, and to scripts/dev/Check-Makers.js's makers.
+// records, and to game/data/item-sources.json, which says who gathers each
+// one and at what rank.
 //
 // Read only. It reads the committed plugin and tables.
 const fs = require('fs');
@@ -21,7 +22,6 @@ const path = require('path');
 const zlib = require('zlib');
 
 const ROOT = path.join(__dirname, '..');
-const check = require(path.join(ROOT, 'scripts', 'dev', 'Check-Makers.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -91,7 +91,12 @@ walk(24 + buf.readUInt32LE(4), buf.length);
 // --------------------------------------------------------------- the rows --
 
 const table = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'ingredients.json'), 'utf8'));
-const m = check.makers(ROOT, fs.readFileSync(path.join(ROOT, 'game', 'gamemode.js'), 'utf8'));
+// The ranks each ingredient is gathered at, out of the item source table.
+const gatheredAt = new Map();
+for (const [desc, item] of Object.entries(JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'item-sources.json'), 'utf8')).items)) {
+  const ranks = item.via.filter((v) => v.kind === 'gathered' && v.rank).map((v) => v.rank);
+  if (ranks.length) { gatheredAt.set(desc.toLowerCase(), ranks); }
+}
 const recipeRank = {};
 for (const line of fs.readFileSync(path.join(ROOT, 'scripts', 'dev', 'Build-RecipeTable.ps1'), 'utf8').split(/\r?\n/)) {
   const r = /^\s*'(ThornswoodRecipePotion\w+)'\s*=\s*@\{\s*Rank = '(\w+)'/.exec(line);
@@ -112,9 +117,8 @@ for (const edid of Object.keys(WANT)) {
   const bad = r.inputs.filter((x) => ((table.ingredients[x[0]] || {}).effects || []).indexOf(effects[0]) < 0);
   yes('...every one carrying ' + effects[0] + (bad.length ? ' (not: ' + bad.map((x) => x[0]).join(', ') + ')' : ''), bad.length === 0);
   const above = r.inputs.filter((x) => {
-    const who = m.who.get(x[0].toLowerCase());
-    if (!who) { return true; }
-    return !Array.from(who).some((w) => RANKS.some((k) => RANKS.indexOf(k) <= RANKS.indexOf(rank) && w.indexOf(k) >= 0));
+    const at = gatheredAt.get(x[0].toLowerCase()) || [];
+    return !at.some((k) => RANKS.indexOf(k) >= 0 && RANKS.indexOf(k) <= RANKS.indexOf(rank));
   });
   yes('...and every one gathered at ' + rank + ' or below' + (above.length ? ' (not: ' + above.map((x) => x[0]).join(', ') + ')' : ''),
     above.length === 0);
