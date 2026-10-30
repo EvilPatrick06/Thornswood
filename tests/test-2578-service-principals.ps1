@@ -123,8 +123,8 @@ Yes 'and carry all six' (([regex]::Matches($sent, '(?m)^function ')).Count -eq 6
 # ---- never reach ---------------------------------------------------------------
 if ($OnWindows) {
     $nr = @(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Server')
-    Yes 'never reach: the backups, the deploys, the watch and maint folders' (
-        $nr -contains 'C:\Thornswood-Backup' -and $nr -contains 'C:\Thornswood-Deploys' -and $nr -contains 'C:\Thornswood-Watch' -and $nr -contains 'C:\Thornswood-Maint')
+    Yes 'never reach: the backups, the deploys and the watch folders' (
+        $nr -contains 'C:\Thornswood-Backup' -and $nr -contains 'C:\Thornswood-Deploys' -and $nr -contains 'C:\Thornswood-Watch')
     Yes "never reach: another server's private folder, and voice keys, but not its own" (
         $nr -contains 'C:\Thornswood-Server-Dev\private' -and $nr -notcontains 'C:\Thornswood-Server\private' -and
         $nr -contains 'C:\Thornswood-Voice\token-key.txt')
