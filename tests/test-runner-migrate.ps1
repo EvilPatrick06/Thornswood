@@ -350,6 +350,13 @@ Check 'generated migration executes against OS/native mocks and fails closed at 
   function Assert-RunnerMigrationAccess { }
   function Assert-RunnerMigrationService { $script:events+='verify' }
   function Get-Process { param($Name,$ErrorAction) @() }
+  # The generated script names its folder on the runner drive. A machine
+  # without that drive (the box) gets a stand-in for this check alone, so the
+  # fixture does not depend on which drives the machine running it has.
+  $standIn = $null; $letter = 'R:\Thornswood-RunnerPR'.Substring(0, 1)
+  if (-not (Get-PSDrive -Name $letter -PSProvider FileSystem -ErrorAction SilentlyContinue)) {
+    $standIn = New-PSDrive -Name $letter -PSProvider FileSystem -Root ([IO.Path]::GetTempPath()) -Scope Global
+  }
   try {
     foreach ($script:stage in @('success','stop','guard','acl','download','config','sc')) {
       $script:events=@(); $script:removed=@(); $ThornswoodSecret='fixture-token'; $why=''
@@ -364,6 +371,7 @@ Check 'generated migration executes against OS/native mocks and fails closed at 
       Assert (-not @($script:removed | Where-Object { $_ -like 'C:\Thornswood-RunnerPR*' }).Count) 'source data was deleted'
     }
   } finally {
+    if ($standIn) { Remove-PSDrive -Name $letter -Scope Global -Force }
     [Environment]::SetEnvironmentVariable('ACTIONS_RUNNER_INPUT_TOKEN',$null,'Process')
     [Environment]::SetEnvironmentVariable('ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD',$null,'Process')
   }
