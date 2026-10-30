@@ -166,7 +166,12 @@ function Invoke-Msi([string[]]$Arguments) {
     $global:Fake.rules = @($global:Fake.rules | Where-Object { $_.Name -ne '{msi-rule}' })
     return 0
 }
-function Get-Port22Rules { foreach ($r in $global:Fake.rules) { [pscustomobject]@{ Name = $r.Name; DisplayName = $r.DisplayName; Remote = @($r.Remote) } } }
+function Get-Port22Rules {
+    # On the box the first Get-NetFirewallRule loads NetSecurity, whose commands
+    # are functions of a CDXML module, after the script listed the built in ones.
+    if (-not (Get-Module ThornswoodFakeCdxml)) { New-Module -Name ThornswoodFakeCdxml -ScriptBlock ([scriptblock]::Create('function Get-FakeCdxmlRule { }')) | Import-Module -Global }
+    foreach ($r in $global:Fake.rules) { [pscustomobject]@{ Name = $r.Name; DisplayName = $r.DisplayName; Remote = @($r.Remote) } }
+}
 function Test-Rule([string]$Name) { return (@($global:Fake.rules | Where-Object { $_.Name -eq $Name }).Count -gt 0) }
 function Set-RuleRemote([string]$Name, [string[]]$Remote) {
     foreach ($r in $global:Fake.rules) { if ($r.Name -eq $Name) { $r.Remote = @($Remote) } }
@@ -286,6 +291,7 @@ try {
     Yes 'an sshd that already offers a post-quantum key exchange: ALREADY, 0 changes, nothing downloaded' ($r.Code -eq 0 -and (Has $r.Lines '^ALREADY sshd offers a post-quantum key exchange: sntrup761x25519-sha512@openssh\.com') -and (Has $r.Lines '^DONE 0 change\(s\) made') -and $global:Fake.log.Count -eq 0)
 
     New-Fake
+    Remove-Module ThornswoodFakeCdxml -ErrorAction SilentlyContinue
     $r = Invoke-BoxHere @{ Pins = $PinArg }
     Yes 'real plan: exit 0, two CHANGED lines' ($r.Code -eq 0 -and @($r.Lines | Where-Object { $_ -match '^CHANGED ' }).Count -eq 2)
     Yes '  the MSI kept in the work folder, which was made SYSTEM and Administrators only' ($global:Fake.workMade -and $global:Fake.files.ContainsKey('C:\ProgramData\Thornswood-OpenSSH\OpenSSH-Win64-v10.4.0.0.msi'))
@@ -307,6 +313,7 @@ try {
     $own = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $false) | ForEach-Object { $_.Name })
     Yes '  the program the tasks run parses and carries every function of the script and the BoxGuard copy' ((-not $perrs -or $perrs.Count -eq 0) -and @($own | Where-Object { $pNames -notcontains $_ }).Count -eq 0 -and $pNames -contains 'Get-ThornswoodBoxRefusal')
     Yes '  and none of the harness''s own' (@($pNames | Where-Object { @('Yes', 'Has', 'New-Fake', 'Invoke-BoxHere', 'Rule') -contains $_ }).Count -eq 0)
+    Yes '  and none of a module loaded while it ran, as NetSecurity and ScheduledTasks are on the box (their copies cannot run outside the module, #1043)' ((Get-Module ThornswoodFakeCdxml) -and $pNames -notcontains 'Get-FakeCdxmlRule')
 
     $r2 = Invoke-BoxHere @{ Pins = $PinArg }
     Yes 'a second plan while armed: STOP, nothing new armed or downloaded' ($r2.Code -eq 1 -and (Has $r2.Lines '^STOP an upgrade is already armed or was left') -and @($global:Fake.log | Where-Object { $_ -like 'download*' }).Count -eq 1)

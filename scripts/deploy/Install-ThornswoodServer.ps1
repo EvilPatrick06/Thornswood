@@ -305,7 +305,7 @@ function Get-ThornswoodTaskSid {
 function Get-ThornswoodServiceNeverReach {
     param([string]$Own = '', [string]$Box = 'C:\')
     $own = $Own.TrimEnd('\')
-    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch', 'Thornswood-Maint') { Join-Path $Box $n })
+    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch') { Join-Path $Box $n })
     foreach ($r in 'Thornswood-Server', 'Thornswood-Server-Dev') {
         $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'private') }
@@ -982,7 +982,7 @@ function MoveDir([string]$from, [string]$to) {
 # (whose own line is relative), and any node with the root on its line. The
 # game port alone is not proof: a scratch root holding a copy of the live
 # settings names 7777, and the process there is the live server
-# (docs\RESTORING.md installs into one). Each as its Win32_Process.
+# (RESTORING.md in the ops repo installs into one). Each as its Win32_Process.
 function ServerProcesses([string]$dir) {
     $mark = $dir + '\'
     $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine })
