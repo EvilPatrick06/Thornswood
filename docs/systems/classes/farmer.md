@@ -54,6 +54,22 @@ What you bring in is more than the one you sowed:
 | Expert | 4 |
 | Master | 5 |
 
+## Compost
+
+Spoiled food is compost ([Spoilage](../spoilage.md)). Press a plot you
+sowed while it is still growing, with spoiled food in your pack, and
+one piece goes into the ground. The line names that press:
+E, Work in spoiled food.
+The wait from sowing to ripe is a quarter shorter, and the plot gives
+one more when you bring it in. A plot takes compost once a sowing, and
+the line says "composted" after.
+
+Patrick decided this on his report page on 26 October 2026 ("A+B",
+[#3526](https://github.com/EvilPatrick06/Thornswood/issues/3526)).
+
+Only your own sowing, and not the orchard trees of the orchard work,
+which counts what it hands over against the work's own hold.
+
 ## The claim
 
 At a plot on ground nobody holds, the line names the lock key, X
