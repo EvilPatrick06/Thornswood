@@ -46,6 +46,11 @@
 #
 # Weekly rather than daily: this is a small team, and a pull request a day
 # from a robot is a pull request nobody reads.
+#
+# LABELS: each update names the area: label its part already has, so its pull
+# requests sort like everything else. Without a labels list Dependabot puts on
+# its own dependencies and github_actions, and makes them again when they are
+# deleted (#3733, Patrick's A of 26 Oct 2026: both were deleted).
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -54,6 +59,8 @@ updates:
       interval: weekly
     commit-message:
       prefix: "ci"
+    labels:
+      - "area: GitHub & CI"
 
   - package-ecosystem: pip
     directory: /bot
@@ -61,3 +68,5 @@ updates:
       interval: weekly
     commit-message:
       prefix: "bot"
+    labels:
+      - "area: Discord"

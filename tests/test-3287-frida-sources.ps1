@@ -15,7 +15,9 @@
   It holds:
     - the record: six parts, each archive named <name>-<commit>.tar, of the
       Frida the client files carry;
-    - make: a draft made, every archive checked against the record before
+    - make: nothing while the repository is private (Patrick, B on
+      q-3287-release-when); once public, a draft made, every archive
+      checked against the record before
       anything goes up, uploaded, published, never as the latest; run again,
       nothing changes;
     - make refuses a fork tag at another commit, an archive that is not the
@@ -50,7 +52,7 @@ Yes '  of the Frida client-licences.json says the client files carry' ([string]$
 Yes '  on a Release tag of its own, frida-sources-<version>' ([string]$real.release.tag -eq ('frida-sources-' + $real.frida))
 $wf = [IO.File]::ReadAllText((Join-Path $repo '.github/workflows/frida-sources.yml'))
 $nightly = [IO.File]::ReadAllText((Join-Path $repo '.github/workflows/nightly.yml'))
-Yes 'frida-sources.yml runs the script on GitHub''s hosted runner with the run''s own token, by hand only' ($wf -match 'runs-on: ubuntu-latest' -and $wf -match 'Publish-FridaSources\.ps1' -and $wf -match 'GH_TOKEN: \$\{\{ github\.token \}\}' -and $wf -notmatch '(?m)^\s+(push|schedule|pull_request)' -and $wf -notmatch 'self-hosted')
+Yes 'frida-sources.yml runs the script on GitHub''s hosted runner with the run''s own token, by hand only, and only once the repository is public' ($wf -match 'if: \$\{\{ github\.event\.repository\.private == false \}\}' -and $wf -match 'runs-on: ubuntu-latest' -and $wf -match 'Publish-FridaSources\.ps1' -and $wf -match 'GH_TOKEN: \$\{\{ github\.token \}\}' -and $wf -notmatch '(?m)^\s+(push|schedule|pull_request)' -and $wf -notmatch 'self-hosted')
 Yes 'the nightly run checks it' ($nightly -match 'Publish-FridaSources\.ps1 -Check')
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-frida-sources-' + [Guid]::NewGuid().ToString('N'))
@@ -192,9 +194,12 @@ function Get-SiteText([string]$Uri) {
     # ---- make --------------------------------------------------------------------
     New-Fake $true
     $r = Run @()
+    Yes 'make: while the repository is private it makes nothing and says why (Patrick, B: on the day it goes public)' ($r.Code -eq 0 -and $r.Out -match 'PRIVATE' -and @((Fake).releases).Count -eq 0 -and -not @((Fake).calls | Where-Object { $_ -match '^(POST|PATCH|DELETE) ' }).Count)
+    New-Fake $false
+    $r = Run @()
     $f = Fake
     $rel = @($f.releases)[0]
-    Yes 'make: a new Release is published with both archives, in a private repository too' ($r.Code -eq 0 -and $r.Out -match 'PUBLISHED' -and @($f.releases).Count -eq 1 -and -not $rel.draft -and @($rel.assets).Count -eq 2)
+    Yes '  once public, a new Release is published with both archives' ($r.Code -eq 0 -and $r.Out -match 'PUBLISHED' -and @($f.releases).Count -eq 1 -and -not $rel.draft -and @($rel.assets).Count -eq 2)
     if ($r.Code -ne 0) { Write-Host $r.Out }
     $held = @($parts | Where-Object { $p = $_; @($rel.assets | Where-Object { $_.name -eq $p.archive -and $_.digest -eq ('sha256:' + $p.sha256) -and $_.size -eq $p.bytes }).Count -eq 1 })
     Yes '  each archive under its name, the recorded bytes' ($held.Count -eq 2)
@@ -210,9 +215,10 @@ function Get-SiteText([string]$Uri) {
     & git -C $w -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m two
     & git -C $w tag -f thornswood-frida-1.2.3 2>&1 | Out-Null
     & git -C $w push -q -f (Join-Path $forks 'frida-two.git') refs/tags/thornswood-frida-1.2.3 2>&1 | Out-Null
-    New-Fake $true
+    New-Fake $false
     $r = Run @()
     Yes 'make refuses a fork tag at another commit, with nothing made' ($r.Code -eq 1 -and $r.Out -match 'frida-two' -and $r.Out -match 'nothing was uploaded' -and @((Fake).releases).Count -eq 0)
+    New-Fake $true
     $r = Run @('-Check')
     Yes '-Check fails on that moved tag, naming the fork' ($r.Code -eq 1 -and $r.Out -match "the fork frida-two's tag")
     Write-Record { param($x) $x.forksUp = $false }
@@ -224,13 +230,13 @@ function Get-SiteText([string]$Uri) {
 
     # An archive that is not the recorded bytes.
     Write-Record { param($x) $x.parts[0].sha256 = ('0' * 64) }
-    New-Fake $true
+    New-Fake $false
     $r = Run @()
     Yes 'make refuses an archive that is not the recorded bytes, with nothing made' ($r.Code -eq 1 -and $r.Out -match 'not the recorded' -and @((Fake).releases).Count -eq 0)
     Write-Record $null
 
     # A published Release that lacks an archive.
-    New-Fake $true
+    New-Fake $false
     Set-Fake { param($x) $x.releases = @([pscustomobject]@{ id = 7; tag_name = 'frida-sources-1.2.3'; draft = $false; target = 'main'; make_latest = 'false'; assets = @() }) }
     $r = Run @()
     Yes 'make refuses a published Release that lacks an archive, and uploads nothing' ($r.Code -eq 1 -and $r.Out -match 'never changed' -and -not @((Fake).calls | Where-Object { $_ -match '^POST ' }).Count)
@@ -271,11 +277,12 @@ function Get-SiteText([string]$Uri) {
     }
     $old = 'a' * 40; $new = 'b' * 40; $newer = 'c' * 40
     Write-Feeds 2 $old $new
-    New-Fake $true
+    New-Fake $false
     Set-Fake { param($x) $x.notice = [pscustomobject]@{ $old = 2; $new = 3; $newer = 3 } }
     $r = Run @()
     Yes '  (the Release is made for these)' ($r.Code -eq 0)
     if ($r.Code -ne 0) { Write-Host $r.Out }
+    Set-Fake { param($x) $x.private = $true }
     $r = Run @('-ForksMayGo')
     Yes '-ForksMayGo: not while the repository is private' ($r.Code -eq 2 -and $r.Out -match 'repository is private')
     if ($r.Code -ne 2) { Write-Host $r.Out }
