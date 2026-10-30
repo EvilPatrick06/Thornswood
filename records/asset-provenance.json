@@ -1074,7 +1074,7 @@
     },
     {
       "what": "The Nexus collection's mods",
-      "how": "Thornswood does not hand them on: each person installs them from Nexus Mods through Vortex under each author's own terms, and the launcher and the public credits page link every one (THIRD-PARTY.md, Not shipped by Thornswood). What packs used to carry of them is THIRD-PARTY.md's entry 168 paragraph."
+      "how": "Thornswood does not hand them on: each person installs them from Nexus Mods through Vortex under each author's own terms, and the launcher and the public credits page link every one (THIRD-PARTY.md, Not shipped by Thornswood). What each mod's page says about being put in a collection is records\\collection-permissions.json (#3649). What packs used to carry of them is THIRD-PARTY.md's entry 168 paragraph."
     },
     {
       "what": "Program code, libraries and engine files",
