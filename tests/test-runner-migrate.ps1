@@ -302,7 +302,8 @@ Check 'real preflight collector validates mocked Windows metadata and supports a
   function Get-LocalGroup { param($ErrorAction) [pscustomobject]@{SID='S-1-5-32-545'; Name='Users'} }
   function Get-LocalGroupMember { throw 'should not inspect Users membership as a privileged group' }
   function Get-ScheduledTask { param($TaskName,$ErrorAction) [pscustomobject]@{ State='Ready'; Principal=@{UserId='SYSTEM'}; Actions=@(@{Execute='powershell.exe'; Arguments=('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+(Join-Path $env:ProgramData 'Thornswood-RunnerDrive\start.ps1')+'"')}) } }
-  function Get-NetFirewallRule { param($Group,$ErrorAction) [pscustomobject]@{ Enabled='True'; Direction='Outbound'; Action='Block' } }
+  # The guards are read from the store an -OffBox install writes them to.
+  function Get-NetFirewallRule { param($PolicyStore,$Group,$ErrorAction) if ($PolicyStore -ne 'PersistentStore') { return @() }; [pscustomobject]@{ Enabled='True'; Direction='Outbound'; Action='Block' } }
   $p=Get-RunnerMigrationState 'thornswood-pr' 'actions.runner.test' 'R:\Thornswood-RunnerPR'
   Assert ($p.SID -eq $script:f.Account.SID -and -not $p.AlreadyThere) 'collector rejected healthy source'
   $script:f.Service.PathName='"R:\Thornswood-RunnerPR\bin\RunnerService.exe"'; $script:f.DestinationExists=$true
