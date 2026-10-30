@@ -31,6 +31,11 @@ It does not grow back. Sow another. Nothing is typed.
 
 One sow or one bring-in is one piece of work. 100, then 250, then 600.
 
+The garden planters of a HearthFires homestead are plots too. The
+cabbage, gourd, leek, carrot, potato and wheat planters take the same
+crop, rank and time as that crop in a field. Their own produce is a
+sack only a game script opens, so nobody is ever handed the sack.
+
 ## How long, and how many
 
 The base wait is on the crop, for a novice multiplier of 1. Cabbage,
@@ -53,6 +58,22 @@ What you bring in is more than the one you sowed:
 | Advanced | 3 |
 | Expert | 4 |
 | Master | 5 |
+
+## Compost
+
+Spoiled food is compost ([Spoilage](../spoilage.md)). Press a plot you
+sowed while it is still growing, with spoiled food in your pack, and
+one piece goes into the ground. The line names that press:
+E, Work in spoiled food.
+The wait from sowing to ripe is a quarter shorter, and the plot gives
+one more when you bring it in. A plot takes compost once a sowing, and
+the line says "composted" after.
+
+Patrick decided this on his report page on 26 October 2026 ("A+B",
+[#3526](https://github.com/EvilPatrick06/Thornswood/issues/3526)).
+
+Only your own sowing, and not the orchard trees of the orchard work,
+which counts what it hands over against the work's own hold.
 
 ## The claim
 
@@ -113,7 +134,7 @@ you and that object. A restart clears it.
 | Beehive | The placed hive `dbf8b3:Thornswood-Content.esp`, and a world beehive on the harvest list | 1 Honeycomb | Told it is farm work |
 
 Goats are not milked. A beehive is. A mammoth cheese bowl is not a farmer verb.
-Whoever presses it gets the bowl, because no class answers it.
+It is anybody's: whoever presses it gets the bowl.
 
 Wild eggs are not this nest. Pine thrush, rock warbler, and hawk
 eggs are reagents on the gatherer list. A chicken nest that the

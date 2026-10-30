@@ -56,7 +56,8 @@ Yes 'the live feed is Updater.cs''s MainFeed' ((@($S.Feeds | Where-Object { $_.N
 Yes 'the dev feed is Updater.cs''s DevFeed' ((@($S.Feeds | Where-Object { $_.Name -eq 'feed-dev' })[0].Url) -eq 'https://thornswood.net/feed-dev/version.json')
 Yes 'the site is the feed''s host' ($S.Site -eq 'https://thornswood.net/' -and $S.SiteHost -eq 'thornswood.net')
 Yes 'the collection comes from Config.cs' ($S.NexusSlug -and $S.NexusGame)
-Yes 'the VPS address comes from scripts\vps\vps.json' ($S.VpsAddress -match '^\d+\.\d+\.\d+\.\d+$')
+$ipLike = $null
+Yes 'the game''s name comes from scripts\vps\vps.json, a name and not the box''s address (#3690)' ($S.GameHost -and -not [Net.IPAddress]::TryParse($S.GameHost, [ref]$ipLike))
 Yes 'the certificate line is 14 days' ($S.CertDays -eq 14)
 Yes 'the webhook''s channel is #staff-updates, bot\staff-channel.txt''s id (#2501)' ($S.StaffChannel -eq '1549254991082946570')
 Yes 'the runners are the repository''s, from thornswood-vps' ($S.Repo -eq 'EvilPatrick06/Thornswood' -and $S.RunnerName -eq 'thornswood-vps')
@@ -84,7 +85,7 @@ try {
   Yes ('watch-outside.json holds only the public settings: ' + ($keys -join ', ')) ($keys.Count -gt 0 -and @($keys | Where-Object { $PublicSettings -notcontains $_ }).Count -eq 0)
   $S2 = Read-Settings (Join-Path $dir 'no-repository-here') $json
   Yes 'read back there, it asks what the repository says' (
-    $S2.Site -eq $S.Site -and $S2.VpsAddress -eq $S.VpsAddress -and $S2.NexusSlug -eq $S.NexusSlug -and $S2.Repo -eq $S.Repo -and
+    $S2.Site -eq $S.Site -and $S2.GameHost -eq $S.GameHost -and $S2.NexusSlug -eq $S.NexusSlug -and $S2.Repo -eq $S.Repo -and
     @($S2.Feeds).Count -eq 2 -and @($S2.Feeds)[1].Url -eq @($S.Feeds)[1].Url -and $S2.StaffChannel -eq $S.StaffChannel)
   Yes 'Cloudflare''s ranges go there from cloudflare-ranges.txt and read back whole (#2995)' (
     @($S.FrontRanges).Count -ge 10 -and (@($S2.FrontRanges) -join ',') -eq (@($S.FrontRanges) -join ',') -and @($S.FrontRanges)[0] -eq '173.245.48.0/20')
@@ -101,8 +102,20 @@ try {
   if (Test-Path -LiteralPath (Join-Path $pub '.github/workflows/keep-alive.yml')) { $ka = Get-Content -LiteralPath (Join-Path $pub '.github/workflows/keep-alive.yml') -Raw }
   Yes 'keep-alive commits once a month, inside the 60 days GitHub allows' ($ka -match "cron: '17 6 1 \* \*'" -and $ka -match 'git push' -and $ka -match 'alive\.txt')
 
+  # ---- the same watch, folded into this repository (#3690) -------------------
+  $here = ''
+  $herePath = Join-Path $Root '.github/workflows/watch-outside.yml'
+  if (Test-Path -LiteralPath $herePath) { $here = Get-Content -LiteralPath $herePath -Raw }
+  Yes 'this repository has the watch as its own workflow' ($here -match "cron: '\*/5 \* \* \* \*'")
+  Yes '  it runs this script from where it is, with the two secrets by name' (
+    $here -match '\./scripts/vps/Watch-Outside\.ps1 -Run -Folder state' -and $here -match 'WATCH_WEBHOOK: \$\{\{ secrets\.STAFF_WEBHOOK \}\}' -and $here -match 'WATCH_RUNNER_TOKEN: \$\{\{ secrets\.RUNNER_TOKEN \}\}')
+  Yes '  on GitHub''s runners, off the box' ($here -match 'runs-on: ubuntu-latest' -and $here -notmatch 'self-hosted')
+  Yes '  only once the variable WATCH_OUTSIDE says here, so a private repository is never billed for it' ($here -match "if: \$\{\{ vars\.WATCH_OUTSIDE == 'here' \}\}")
+  Yes '  it keeps its memory the way the public one does' ($here -match 'restore-keys: watch-outside-' -and $here -match 'key: watch-outside-\$\{\{ github\.run_id \}\}-')
+  Yes '  it reads the repository and writes nothing to it' ($here -match "permissions:\s+contents: read" -and $here -notmatch 'contents: write')
+
   # Fixed values from here on, so nothing below depends on what the repository says.
-  $S.VpsAddress = '192.0.2.10'
+  $S.GameHost = 'play.example.invalid'
   $S.FrontRanges = @('104.16.0.0/13', '172.64.0.0/13', '2606:4700::/32')
 
   # ---- the fakes ------------------------------------------------------------
@@ -122,6 +135,7 @@ try {
     $script:certProblems = 'None'
     $script:certError = ''
     $script:dns = @('104.21.5.10', '172.67.130.5')
+    $script:gameDns = @('192.0.2.10')
     $script:cfCode = 200
     $script:cfBody = '{"result":{"ipv4_cidrs":["104.16.0.0/13","172.64.0.0/13"],"ipv6_cidrs":["2606:4700::/32"]},"success":true}'
     $script:rdap = 200
@@ -155,7 +169,10 @@ try {
     return @{ Code = 0; Body = ''; Error = 'not in the table' }
   }
   function Get-Cert([string]$hostName) { return @{ NotAfter = $script:certEnd; Problems = $script:certProblems; Error = $script:certError } }
-  function Get-Dns([string]$name) { return @{ Addresses = @($script:dns); Error = $(if (@($script:dns).Count) { '' } else { 'does not resolve' }) } }
+  function Get-Dns([string]$name) {
+    $a = $(if ($name -eq 'play.example.invalid') { @($script:gameDns) } else { @($script:dns) })
+    return @{ Addresses = $a; Error = $(if ($a.Count) { '' } else { 'does not resolve' }) }
+  }
   # The real one, kept to drive against the fake Get-Http below.
   $realGetRunners = ${function:Get-Runners}
   function Get-Runners([string]$repo) {
@@ -191,7 +208,7 @@ try {
   # ---- everything fine ----------------------------------------------------
   Reset-World
   $r = Pass-Once
-  Yes 'a healthy world: every check ran, nine of them' ($r.Count -eq 9)
+  Yes 'a healthy world: every check ran, ten of them' ($r.Count -eq 10)
   Yes 'a healthy world: nothing is wrong and nothing could not be checked' (@($r.Values | Where-Object { $_.Bad -or $_.Unknown }).Count -eq 0)
   Yes 'a healthy world: nothing is posted' ($script:posted.Count -eq 0)
   Yes 'Nexus was asked for the collection from Config.cs' ($script:nexusQuery -match $S.NexusSlug)
@@ -380,6 +397,15 @@ try {
   $keep = $S.FrontRanges; $S.FrontRanges = @(); $script:dns = @('104.21.5.10')
   Yes 'no list of ranges to compare with is could not check' ((Check-Dns $S).Unknown)
   $S.FrontRanges = $keep
+  Reset-World
+  Yes 'the game''s name resolving, DNS only, is right, and the line names no address (#3690)' (-not (Check-Game $S).Bad -and -not (Check-Game $S).Unknown -and (Check-Game $S).Line -notmatch '\d+\.\d+\.\d+\.\d+')
+  $script:gameDns = @()
+  Yes 'the game''s name not resolving is wrong, and says nobody can reach the game' ((Check-Game $S).Bad -and (Check-Game $S).Why -match 'no launcher can reach the game')
+  $script:gameDns = @('104.21.5.10')
+  Yes 'the game''s name behind Cloudflare''s proxy is wrong: the game port is UDP' ((Check-Game $S).Bad -and (Check-Game $S).Why -match 'proxy is on')
+  $script:gameDns = @('192.0.2.10'); $keepHost = $S.GameHost; $S.GameHost = ''
+  Yes 'no game name to ask about is could not check' ((Check-Game $S).Unknown)
+  $S.GameHost = $keepHost
   Reset-World
   Yes 'Cloudflare''s ranges matching ours is right' (-not (Check-Ranges $S).Bad -and (Check-Ranges $S).Line -match 'the 3 ranges match')
   $script:cfBody = '{"result":{"ipv4_cidrs":["104.16.0.0/13","172.64.0.0/13","198.51.100.0/22"],"ipv6_cidrs":[]},"success":true}'

@@ -384,7 +384,22 @@ if ($IncludeSigningRuntime) {
 
 # --- firewall ---------------------------------------------------------------
 # SLikeNet is UDP. A TCP-only rule looks exactly like a dead server: the client
-# sits there and times out with nothing in the log to explain it.
+# sits there and times out with nothing in the log to explain it. The rules go
+# in the box's own policy store, which is the only place the firewall takes a
+# rule from once Set-InboundRules.ps1 -Own has run (scripts\vps\BoxFirewall.ps1,
+# #3896), and Group Policy is refreshed after the last one is made.
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
 if (-not $SkipFirewall) {
     Write-Host ''
     Write-Host 'firewall' -ForegroundColor Cyan
@@ -393,15 +408,18 @@ if (-not $SkipFirewall) {
         @{ Name = 'Thornswood game (TCP)';      Port = $GamePort;     Protocol = 'TCP' }
         @{ Name = 'Thornswood resources (TCP)'; Port = $ResourcePort; Protocol = 'TCP' }
     )
+    $made = 0
     foreach ($r in $rules) {
-        if (Get-NetFirewallRule -DisplayName $r.Name -ErrorAction SilentlyContinue) {
+        if (Get-NetFirewallRule -PolicyStore localhost -DisplayName $r.Name -ErrorAction SilentlyContinue) {
             Write-Host "  already there   $($r.Name)" -ForegroundColor DarkGray
         } else {
-            New-NetFirewallRule -DisplayName $r.Name -Direction Inbound -Action Allow `
+            New-NetFirewallRule -PolicyStore localhost -DisplayName $r.Name -Direction Inbound -Action Allow `
                                 -Protocol $r.Protocol -LocalPort $r.Port | Out-Null
+            $made++
             Write-Host "  opened          $($r.Protocol)/$($r.Port)  $($r.Name)" -ForegroundColor DarkGray
         }
     }
+    if ($made) { Sync-ThornswoodFirewall; Write-Host '  the firewall has taken them (Group Policy refreshed)' -ForegroundColor DarkGray }
 }
 
 # --- report -----------------------------------------------------------------

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807).
+  Turns off every enabled inbound Allow firewall rule on the box that records\prod-parity.json does not list ("inboundRules"), WinRM from any address among them, and says which (#3807); with -Own, moves the rules the box keeps into its own firewall policy and has the firewall ignore local rules (#3896).
 
 .DESCRIPTION
   Issue #3807, measured on 26 Oct 2026. The scripts that make firewall rules
@@ -41,13 +41,31 @@
 
   THE WAY BACK, for one rule, on the box (Remote.ps1, or the VNC console in
   the provider's panel):
-      Enable-NetFirewallRule -Name '<the Name in its CHANGED line>'
+      Enable-NetFirewallRule -PolicyStore localhost -Name '<the Name in its CHANGED line>'; gpupdate /target:computer /force
+  (a rule the line says was local: Enable-NetFirewallRule -Name '<Name>').
   A rule that should stay on goes on the list in records\prod-parity.json,
   with why, in the same pull request as whatever needs it.
+
+  -OWN (#3896). Edge's setup adds an inbound mDNS rule with every version,
+  WebView2's one per version, and any installer can add others, because the
+  firewall took every local rule. Patrick, 27 Oct 2026: the box's own policy
+  holds every rule and local rules are ignored (scripts\vps\BoxFirewall.ps1
+  is the rule every script follows). -Own sends
+  scripts\vps\vps-firewall-policy.ps1 with the same list: it checks the
+  policy store takes a rule (a probe rule, turned off, made and taken away),
+  copies every listed inbound Allow rule and every Block rule into the policy
+  store, refreshes Group Policy and reads each back as taken from there, and
+  only then turns local rules off for every profile and reads the required
+  rules back. -Own -Check only reads, and exits 2 until that is done. -Own
+  -WhatIf says what it would do. Its way back is in that script's header.
 
 .PARAMETER Check
   Only say how the rules stand. Nothing is changed. Exit 2 when any rule is
   outside the list or a required one is missing.
+
+.PARAMETER Own
+  Move the rules into the box's own firewall policy and have the firewall
+  ignore local rules (#3896), instead of turning rules off.
 
 .PARAMETER Vps
   The box's address. vps.json's by default.
@@ -75,10 +93,16 @@
 .EXAMPLE
   .\scripts\vps\Set-InboundRules.ps1 -NoPause
   Turns off every enabled inbound Allow rule outside the list.
+
+.EXAMPLE
+  .\scripts\vps\Set-InboundRules.ps1 -Own -WhatIf
+  Says which rules it would move into the box's policy, and that it would
+  then have the firewall ignore local rules.
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(
     [switch]$Check,
+    [switch]$Own,
     [string]$Vps = '',
     [string]$User = '',
     [string]$KnownHosts = '',
@@ -95,7 +119,7 @@ if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath }
 if (-not $Record) { $Record = [IO.Path]::Combine((Split-Path -Parent (Split-Path -Parent $Here)), 'records', 'prod-parity.json') }
 
-$BoxScript = Join-Path $Here 'vps-inbound-rules.ps1'
+$BoxScript = Join-Path $Here $(if ($Own) { 'vps-firewall-policy.ps1' } else { 'vps-inbound-rules.ps1' })
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=10')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -136,10 +160,10 @@ function Invoke-Box([string]$mode) {
     $ErrorActionPreference = $old
     foreach ($l in $out) {
         $c = 'Gray'
-        if ($l -match '^CHANGED ' -or $l -match '^RULE KEPT ') { $c = 'Green' }
-        elseif ($l -match '^(WOULD|LEFT|REQUIRED) ' -or $l -match '^RULE OUTSIDE ') { $c = 'Yellow' }
+        if ($l -match '^(CHANGED|COPIED|ACTIVE|PROBE) ' -or $l -match '^RULE KEPT ') { $c = 'Green' }
+        elseif ($l -match '^(WOULD|LEFT|REQUIRED|MOVE) ' -or $l -match '^RULE OUTSIDE ') { $c = 'Yellow' }
         elseif ($l -match '^STOP ') { $c = 'Red' }
-        elseif ($l -match '^(ALREADY|LIST|ORIGIN|EVENT|WINRM|ADDRESS|LISTEN|DONE) ') { $c = 'DarkGray' }
+        elseif ($l -match '^(ALREADY|LIST|ORIGIN|EVENT|WINRM|ADDRESS|LISTEN|PROFILE|HELD|IGNORED|DONE) ') { $c = 'DarkGray' }
         Say "  $l" $c
     }
     return [pscustomobject]@{ Code = $rc; Lines = $out }
@@ -147,7 +171,7 @@ function Invoke-Box([string]$mode) {
 function Has($lines, [string]$rx) { return (@($lines | Where-Object { $_ -match $rx }).Count -gt 0) }
 
 Write-Host ''
-Write-Host '  THORNSWOOD  -  the inbound rules the box keeps' -ForegroundColor White
+Write-Host $(if ($Own) { '  THORNSWOOD  -  the box''s own firewall policy holds its rules' } else { '  THORNSWOOD  -  the inbound rules the box keeps' }) -ForegroundColor White
 Say "  $User@$Vps" 'DarkGray'
 
 if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) { Die 'ssh is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client.' }
@@ -164,6 +188,18 @@ if ($hk.Status -ne 'trusted') {
 }
 Say '  known_hosts holds the pinned key' 'Green'
 
+if ($Check -and $Own) {
+    Head '3. On the box, read only'
+    $box = Invoke-Box ('-Check ' + $listArg)
+    if (Has $box.Lines '^STOP ') { Die ('The box stopped (exit ' + $box.Code + '). The lines above say why.') }
+    $done = @($box.Lines | Where-Object { $_ -match '^DONE read only, (\d+) thing\(s\) left' }) | Select-Object -Last 1
+    if (-not $done) { Die ('The box did not say how its policy stands (exit ' + $box.Code + '). Run .\scripts\vps\Setup-SshKey.ps1 -Test if it did not answer at all.') }
+    [void]($done -match '^DONE read only, (\d+) thing')
+    if ([int]$Matches[1]) { Write-Host ''; Say ('  ' + $Matches[1] + ' thing(s) left before the box''s policy holds every rule (the MOVE, REQUIRED and PROFILE lines above).') 'Yellow'; Done 2 }
+    Write-Host ''; Say '  The box''s policy holds every rule it keeps, and the firewall ignores local rules.' 'Green'
+    Done 0
+}
+
 if ($Check) {
     Head '3. On the box, read only'
     $box = Invoke-Box ('-Check ' + $listArg)
@@ -176,7 +212,7 @@ if ($Check) {
     Done 0
 }
 
-$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", 'turn off every enabled inbound Allow firewall rule that records\prod-parity.json does not list')
+$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", $(if ($Own) { 'move the rules the box keeps into its own firewall policy and have the firewall ignore local rules' } else { 'turn off every enabled inbound Allow firewall rule that records\prod-parity.json does not list' }))
 Head $(if ($doIt) { '3. On the box' } else { '3. On the box, read only' })
 $mode = @('-Apply', $listArg)
 if (-not $doIt) { $mode += '-DryRun' }
@@ -185,5 +221,5 @@ if (Has $box.Lines '^STOP ') { Die ('The box stopped (exit ' + $box.Code + '). T
 if ($box.Code -ne 0 -or -not (Has $box.Lines '^DONE ')) { Die ('The box did not finish (exit ' + $box.Code + '). Run this with -Check to read where it stands.') }
 if (-not $doIt) { Write-Host ''; Say 'Nothing was changed. Run it again without -WhatIf to make the changes above.' 'Yellow'; Done 0 }
 Write-Host ''
-Say '  Done. Set-InboundRules.ps1 -Check says how they stand now, and Check-Site.ps1 whether the site still answers.' 'Green'
+Say $(if ($Own) { '  Done. Set-InboundRules.ps1 -Own -Check and -Check say how they stand now, and Check-Site.ps1 whether the site still answers.' } else { '  Done. Set-InboundRules.ps1 -Check says how they stand now, and Check-Site.ps1 whether the site still answers.' }) 'Green'
 Done 0

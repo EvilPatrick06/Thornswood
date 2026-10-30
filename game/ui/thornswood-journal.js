@@ -18,7 +18,7 @@
   would look for it rather than left to be discovered.
 
   THE CONTRACT with thornswood-front.js:
-    window.thornswoodJournal = { open, close, toggle, isOpen, setData, setFacing }
+    window.thornswoodJournal = { open, close, toggle, isOpen, setData, setFacing, setKey }
     page -> plugin  'journal:ready' | 'journal:opened' | 'journal:closed'
     plugin -> page  setFacing({ id, name }) or setFacing(null) as it opens:
                     who the look prompt was drawn for when J opened
@@ -39,6 +39,9 @@
   var data = null;
   var shown = false;
   var root = null;
+  // JournalKey's name as bound, from the front (setKey); J on a fresh
+  // install. The Settings panel moves it with the game running (#3126).
+  var keyName = 'J';
   var openBook = '';     // which journal is being read
   var openPage = '';     // which page inside it
   var editing = false;
@@ -230,6 +233,7 @@
       '</div>' +
       '<div class="foot"><span id="' + ID + '-foot"></span><span style="flex:1"></span>' +
       '<button id="' + ID + '-help">Help</button>' +
+      '<button id="' + ID + '-settings">Settings</button>' +
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
@@ -239,6 +243,11 @@
     // first, so the keyboard is never let go between the two.
     root.querySelector('#' + ID + '-help').onclick = function () {
       try { if (window.thornswoodHelp) { window.thornswoodHelp.open('people'); } } catch (e) { }
+      close();
+    };
+    // Settings beside it (#3126): the Settings panel, the same way.
+    root.querySelector('#' + ID + '-settings').onclick = function () {
+      try { if (window.thornswoodSettings) { window.thornswoodSettings.open(); } } catch (e) { }
       close();
     };
     fit();
@@ -252,7 +261,8 @@
     document.addEventListener('keydown', function (ev) {
       if (!shown) { return; }
       if (ev.key === 'Escape') { ev.preventDefault(); close(); return; }
-      if ((ev.key === 'j' || ev.key === 'J') && !ev.ctrlKey && !ev.altKey && !ev.metaKey && !typing(ev.target)) {
+      if (keyName && String(ev.key || '').toUpperCase() === keyName.toUpperCase() &&
+          !ev.ctrlKey && !ev.altKey && !ev.metaKey && !typing(ev.target)) {
         ev.preventDefault(); close();
       }
     });
@@ -880,7 +890,7 @@
     drawSide();
     drawMain();
     var foot = root.querySelector('#' + ID + '-foot');
-    foot.textContent = 'Escape or J closes this. Sharing needs them to be a friend.';
+    foot.textContent = 'Escape' + (keyName ? ' or ' + keyName : '') + ' closes this. Sharing needs them to be a friend.';
   }
 
   function open() {
@@ -908,6 +918,17 @@
     toggle: toggle,
     isOpen: function () { return shown; },
     scaleFor: scaleFor,
+    /*
+      JournalKey's name, as the front has it bound, so the key that opened
+      this closes it wherever it is. A key the front has no name for (#57,
+      say) is not one this page can hear, so only Escape closes it then; the
+      same as the P panel's setKey (#1919).
+    */
+    setKey: function (name) {
+      var n = String(name == null ? '' : name);
+      keyName = n.charAt(0) === '#' ? '' : n;
+      if (shown) { draw(); }
+    },
     /*
       Who was in front of you as J opened, from the look prompt
       (thornswood-front.js, the journal facing handler), or null for nobody.

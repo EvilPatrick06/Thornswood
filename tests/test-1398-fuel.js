@@ -160,6 +160,8 @@ const pieces = {
         'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
         'function qualityTier(margin, roll)', 'function qualityRolled(row, baseId)',
         'function qualityMargin(actorId, row)', 'function qualityOutput(actorId, row, margin)',
+        // A dish named with its days left (#3163), after the other outputs.
+        'function spoilingOutput(actorId)',
         'function unfitToMake(actorId, workbenchId)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };

@@ -84,12 +84,26 @@ function Get-ThornswoodBoxRefusal {
 }
 # ---- end BoxGuard.ps1 ----
 
-# Enabled inbound Allow rules as Name, DisplayName, Protocol, Ports, Program,
-# Package (the app container the rule is for, '' when none), Service ('Any'
-# when not bound to one) and Remote (the remote addresses, 'Any' when open to
-# all).
+# ---- BoxFirewall.ps1 (copy) ----
+function Sync-ThornswoodFirewall {
+    # scripts\vps\BoxFirewall.ps1 (#3896): the firewall takes the box's policy
+    # store when Group Policy is refreshed, so every change to the store ends here.
+    $was = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $said = @(& gpupdate.exe /target:computer /force 2>&1 | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
+    $rc = $LASTEXITCODE
+    $ErrorActionPreference = $was
+    if ($rc -ne 0) { throw ('gpupdate did not refresh the box''s policy, so the firewall has not taken the change (exit ' + $rc + '): ' + ($said -join ' ')) }
+}
+# ---- end BoxFirewall.ps1 ----
+
+# Enabled inbound Allow rules the firewall takes, as Name, DisplayName,
+# Protocol, Ports, Program, Package (the app container the rule is for, ''
+# when none), Service ('Any' when not bound to one), Remote (the remote
+# addresses, 'Any' when open to all) and Store (GroupPolicy for the box's own
+# policy, Local for the local store; #3896).
 function Get-AllowRules {
-    foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
+    foreach ($r in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
         $pf = $r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
         $af = $r | Get-NetFirewallAddressFilter -ErrorAction SilentlyContinue
         $ap = $r | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue
@@ -102,10 +116,18 @@ function Get-AllowRules {
             Package = [string]$ap.Package
             Service = [string]$sf.Service
             Remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ })
+            Store = [string]$r.PolicyStoreSourceType
         }
     }
 }
-function Set-RuleRemote([string]$Name, [string[]]$Remote) { Set-NetFirewallRule -Name $Name -RemoteAddress $Remote }
+# A rule's remote addresses, changed in the store the firewall took it from:
+# the box's own policy (then Group Policy refreshed, scripts\vps\BoxFirewall.ps1,
+# #3896), or the local store for a rule from before Set-InboundRules.ps1 -Own.
+function Set-RuleRemote([string]$Name, [string[]]$Remote, [string]$Store = 'GroupPolicy') {
+    if ($Store -eq 'Local') { Set-NetFirewallRule -PolicyStore PersistentStore -Name $Name -RemoteAddress $Remote; return }
+    Set-NetFirewallRule -PolicyStore localhost -Name $Name -RemoteAddress $Remote
+    Sync-ThornswoodFirewall
+}
 
 # Makes $Path an empty file only SYSTEM and Administrators may open, taking
 # nothing from its folder (#3034). C:\ProgramData\ssh gives every signed in
@@ -144,7 +166,7 @@ function Test-TakesSshd($Rule) {
 # Puts every saved rule's remote addresses back in ten minutes, then removes
 # itself, unless Set-SshScope.ps1 cancels it first.
 function Register-Rollback([string]$Saved) {
-    $cmd = "`$s = Get-Content -Raw -LiteralPath '" + $Saved + "' | ConvertFrom-Json; foreach (`$r in `$s.rules) { Set-NetFirewallRule -Name `$r.name -RemoteAddress @(`$r.remote) }; Unregister-ScheduledTask -TaskName '" + $RollbackTask + "' -Confirm:`$false"
+    $cmd = "`$s = Get-Content -Raw -LiteralPath '" + $Saved + "' | ConvertFrom-Json; foreach (`$r in `$s.rules) { if (`$r.store -eq 'Local') { Set-NetFirewallRule -PolicyStore PersistentStore -Name `$r.name -RemoteAddress @(`$r.remote) } else { Set-NetFirewallRule -PolicyStore localhost -Name `$r.name -RemoteAddress @(`$r.remote) } }; gpupdate.exe /target:computer /force | Out-Null; Unregister-ScheduledTask -TaskName '" + $RollbackTask + "' -Confirm:`$false"
     $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -Command "' + $cmd + '"')
     $t = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(10))
     $p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
@@ -261,7 +283,7 @@ function Invoke-Scope {
     # -------------------------------------------------------- the change ---
     $saved = Join-Path (Get-SaveFolder) ('ssh-scope-before-' + (Get-Date).ToString('yyyyMMdd-HHmmss') + '.json')
     if (-not $DryRun) {
-        $doc = [ordered]@{ taken = (Get-Date).ToString('o'); rules = @($todo | ForEach-Object { [ordered]@{ name = $_.Name; remote = @($_.Remote) } }) }
+        $doc = [ordered]@{ taken = (Get-Date).ToString('o'); rules = @($todo | ForEach-Object { [ordered]@{ name = $_.Name; remote = @($_.Remote); store = $_.Store } }) }
         New-PrivateFile $saved
         [IO.File]::WriteAllText($saved, ($doc | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
         Register-Rollback $saved
@@ -269,7 +291,7 @@ function Invoke-Scope {
     Change ('saved the rules as they are to ' + $saved)
     Change ("a task named '" + $RollbackTask + "' puts them back in ten minutes unless Set-SshScope.ps1 cancels it once key login is proven again")
     foreach ($r in $todo) {
-        if (-not $DryRun) { Set-RuleRemote $r.Name $want }
+        if (-not $DryRun) { Set-RuleRemote $r.Name $want $r.Store }
         Change ("rule '" + $r.DisplayName + "' takes port 22 from " + ($want -join ', ') + ' (was ' + ($r.Remote -join ', ') + ')')
     }
 }
