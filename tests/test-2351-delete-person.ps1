@@ -128,6 +128,12 @@ $Live = Join-Path $Box 'Thornswood-Server'
 $Dev  = Join-Path $Box 'Thornswood-Server-Dev'
 $Vl   = Join-Path $Box 'Thornswood-Voice'
 $Vd   = Join-Path $Box 'Thornswood-Voice-Dev'
+# The copies a wipe and a character reset set aside inside a game server's
+# folder, stamped from this run's own clock (#4635): Server-Log.js deletes one
+# 30 days after the stamp in its name (#3880), so the fixed 20260930 stamps
+# were deleted at the server's start from 30 Oct on and the harness stopped.
+$Wipe  = (Get-Date).AddDays(-2).ToString('yyyyMMdd-HHmmss')
+$Reset = (Get-Date).AddDays(-1).ToString('yyyyMMdd-HHmmss')
 $Bot  = Join-Path $Box 'Thornswood-Bot'
 # The nightly backup's task, where this runs on the box that has it (#2833):
 # the record's folder gives its SID read. Elsewhere no task, no rule.
@@ -184,8 +190,8 @@ function Build {
         Put (Join-Path $CF 'ff000a03.json') ('{"formDesc":"ff000a03","profileId":' + $P2 + '}')
         Put (Join-Path $CF 'ff000a04.json') ('{"formDesc":"ff000a04","profileId":' + $PT + '}')
         Put (Join-Path $CF '1a2b3.json') '{"formDesc":"1a2b3:Skyrim.esm","profileId":-1}'
-        Put (Join-Path $CF '_discarded-20261002-000000\ff000a05.json') ('{"profileId":' + $P1 + '}')
-        Put (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json') ('{"profileId":' + $P1 + '}')
+        Put (Join-Path $CF ('_discarded-' + $Reset + '\ff000a05.json')) ('{"profileId":' + $P1 + '}')
+        Put (Join-Path $R ('world-before-' + $Wipe + '\changeForms\ff000a06.json')) ('{"profileId":' + $P1 + '}')
         # Reset-Appearance.ps1's whole copy of a character, beside the live one (#3620).
         Put (Join-Path $CF 'ff000a01.json.bak-20261003-000000') ('{"formDesc":"ff000a01","profileId":' + $P1 + '}')
         Put (Join-Path $CF 'ff000a02.json.bak-20261003-000000') ('{"formDesc":"ff000a02","profileId":' + $PY + '}')
@@ -196,7 +202,7 @@ function Build {
         Put (Join-Path $RA 'private\characters.json') ('{"who":{"' + $P1 + '":{"name":"Mine"},"' + $PY + '":{"name":"Yours"}}}')
         $PV = Join-Path $R 'private'
         Put (Join-Path $PV 'characters.json') ('{"who":{"' + $P1 + '":{"name":"Mine"},"' + $PY + '":{"name":"Yours"},"' + $PT + '":{"name":"Theirs"}}}')
-        Put (Join-Path $PV 'characters-before-20260930-000000.json') ('{"who":{"' + $P1 + '":{"name":"Mine"}}}')
+        Put (Join-Path $PV ('characters-before-' + $Wipe + '.json')) ('{"who":{"' + $P1 + '":{"name":"Mine"}}}')
         Put (Join-Path $PV 'mod-settings.json') ('{"who":{"' + $P1 + '":{"a":1},"' + $PY + '":{"a":2}}}')
         Put (Join-Path $PV 'take-limit.json') ('{"counts":{"' + $P1 + '|1a2b3":{"n":1},"' + $PY + '|1a2b3":{"n":2}}}')
         # The game's registers, in the shapes the gamemode writes, each naming
@@ -278,7 +284,7 @@ try {
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'a list of deleted characters that is not one refuses the run' ($c -eq 1 -and (Said 'deleted-characters\.json is not a list of deleted characters, so nothing was changed'))
     Remove-Item -LiteralPath $lst -Force
-    $pend = Join-Path $Dev 'world-before-20260930-000000\changeForms\.pending-batch'
+    $pend = Join-Path $Dev ('world-before-' + $Wipe + '\changeForms\.pending-batch')
     Put $pend '{}'
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'an unfinished save in a copy nothing runs from refuses the run' ($c -eq 1 -and (Said '\.pending-batch is an unfinished save in a copy nothing runs from'))
@@ -349,8 +355,8 @@ try {
     foreach ($R in $Live, $Dev) {
         $CF = Join-Path $R 'world\changeForms'
         Yes ((Split-Path -Leaf $R) + ': the copies a reset and a wipe set aside lose them at once, and the wipe''s card and the old last-left too') (
-            -not (Test-Path (Join-Path $CF '_discarded-20261002-000000\ff000a05.json')) -and -not (Test-Path (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json')) -and
-            $null -eq (J (Join-Path $R 'private\characters-before-20260930-000000.json')).who."$P1" -and $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1")
+            -not (Test-Path (Join-Path $CF ('_discarded-' + $Reset + '\ff000a05.json'))) -and -not (Test-Path (Join-Path $R ('world-before-' + $Wipe + '\changeForms\ff000a06.json'))) -and
+            $null -eq (J (Join-Path $R ('private\characters-before-' + $Wipe + '.json'))).who."$P1" -and $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1")
     }
     foreach ($R in $Live, $Dev) {
         $CF = Join-Path $R 'world\changeForms'
@@ -474,10 +480,10 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
         $CF = Join-Path $R 'world\changeForms'
         Yes "$tag`: their character's change form is gone, whatever its name" (-not (Test-Path (Join-Path $CF 'ff000a01.json')))
         Yes "$tag`:   and the shared one, the other people's and the world's stay" ((Test-Path (Join-Path $CF 'ff000a03.json')) -and (Test-Path (Join-Path $CF 'ff000a02.json')) -and (Test-Path (Join-Path $CF 'ff000a04.json')) -and (Test-Path (Join-Path $CF '1a2b3.json')))
-        Yes "$tag`:   and the copies a reset and a wipe set aside are gone" (-not (Test-Path (Join-Path $CF '_discarded-20261002-000000\ff000a05.json')) -and -not (Test-Path (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json')))
+        Yes "$tag`:   and the copies a reset and a wipe set aside are gone" (-not (Test-Path (Join-Path $CF ('_discarded-' + $Reset + '\ff000a05.json'))) -and -not (Test-Path (Join-Path $R ('world-before-' + $Wipe + '\changeForms\ff000a06.json'))))
         $PV = Join-Path $R 'private'
         $ch = J (Join-Path $PV 'characters.json')
-        Yes "$tag`: their card is gone, in characters.json and its wipe copy" ($null -eq $ch.who."$P1" -and $null -ne $ch.who."$PY" -and $null -eq (J (Join-Path $PV 'characters-before-20260930-000000.json')).who."$P1")
+        Yes "$tag`: their card is gone, in characters.json and its wipe copy" ($null -eq $ch.who."$P1" -and $null -ne $ch.who."$PY" -and $null -eq (J (Join-Path $PV ('characters-before-' + $Wipe + '.json'))).who."$P1")
         Yes "$tag`: their mod menu choices, take counts and last-left time are gone" (
             $null -eq (J (Join-Path $PV 'mod-settings.json')).who."$P1" -and $null -ne (J (Join-Path $PV 'mod-settings.json')).who."$PY" -and
             $null -eq (J (Join-Path $PV 'take-limit.json')).counts."$P1|1a2b3" -and $null -ne (J (Join-Path $PV 'take-limit.json')).counts."$PY|1a2b3" -and
