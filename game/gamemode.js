@@ -60449,13 +60449,13 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   undefined and true let it through, false refuses it (except in the Papyrus
   family, where it refuses nothing), and a throw is logged and lets it
   through. So a handler with no opinion returns nothing at all.
-  Thirteen events have a fixed name, and they come first. Two families build
+  Fifteen events have a fixed name, and they come first. Two families build
   their name when they fire: the Papyrus family, onPapyrusEvent:<Name>, which
   is the one that hears hits and spells and has its own heading below, and
   custom events, whose name is whatever the client sent (CUSTOM EVENTS AND
   PACKETS).
 
-  THE THIRTEEN WITH A FIXED NAME.
+  THE FIFTEEN WITH A FIXED NAME.
 
     onActivate    Pressing E on anything. mp.onActivate refuses on named paths
                   only: a bench that is not theirs, a locked door whose client
@@ -60473,6 +60473,13 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   race, profession and rank question; and a temper at the
                   sharpening wheel or the armour table (#1384). A refusal
                   keeps their materials.
+    onCraftWork   Asked before anything else about a craft, with onCraft's own
+                  arguments (CraftService::OnCraftItem, fork #115). A false
+                  refuses the craft with nothing taken. mp.onCraftWork names
+                  the time the craft is held at the bench by its size, small
+                  1 s, medium 5 s, large 15 s (HOW LONG A CRAFT TAKES AT THE
+                  BENCH, #3161), and onCraft is asked only when the time is
+                  up.
     onPutItem     Putting into a container. Bound quest items and unverified
                   item identities are refused before diagnostics, alongside
                   the join-pass guard. No container-specific ledger remains.
@@ -60537,10 +60544,19 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   for the college block (#1387), which takes back a spell the
                   book does not list from somebody's hands, and it returns
                   nothing.
+    onEquipItemAttempt
+                  Each item an equipment update puts on that the server's
+                  record does not already have on, asked once, before the
+                  update is stored (ActionListener::OnUpdateEquipment, #2262).
+                  A false refuses that item alone: the engine keeps the rest
+                  of the update, records the item as in the pack and not
+                  worn, and tells the owner's game to take it off. Raised only
+                  while equipItemAttemptEnabled is on in server-settings.json.
+                  Nothing here answers it yet, so every item goes on.
 
   THE PAPYRUS FAMILY, mp['onPapyrusEvent:<Name>']. Every Papyrus event the
   engine sends goes through MpForm::SendPapyrusEvent, which wraps it in a
-  PapyrusEventEvent and fires it the way the thirteen above are fired, under
+  PapyrusEventEvent and fires it the way the fifteen above are fired, under
   the name "onPapyrusEvent:" followed by the Papyrus name. A handler is called
   with the id of the form the event is sent on, then the Papyrus arguments
   (PapyrusUtils::GetJsValueFromPapyrusValue): a form as { type: 'form', desc },
