@@ -709,7 +709,9 @@ is showing on the button (`playBar.Active`, see PlayProgress in section 2), and 
 feed does not hold Play (`feedNotice.Hold`, see FeedNotice in section 2). The
 button's words say which one is holding it: while work shows, what it is doing
 and how far it has got (UPDATING 41%, 310 OF 740 MB), otherwise PREPARING THE GAME FOLDER,
-INSTALL THE MODS FIRST, CHECKING..., UPDATE FIRST, NO ANSWER FROM THE UPDATE
+INSTALL THE MODS FIRST, UPDATE THE MODS FIRST, WAITING FOR THE SERVER (this
+copy's collection revision is ahead of the server's, so nothing needs
+installing, #4115), CHECKING..., UPDATE FIRST, NO ANSWER FROM THE UPDATE
 SOURCE, CLOSED FOR MAINTENANCE or UPDATE THE LAUNCHER (the feed's hold, with
 the bar above Play saying why), DOWNGRADE FIRST, or in the shared shape MAKE
 THORNSWOOD'S OWN FOLDER. `updatePending` starts true and only an answer from
