@@ -139,13 +139,14 @@
 
   BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The pull request build's
   fallback (build-pr.yml, launcher-vps) needs nothing of the box, so it asks
-  for thornswood-build alone; main's (build.yml) stays on the box, which
-  traces the gate (#3114, #3874). An -OffBox runner whose name the
-  record's offBox lists (thornswood-pr-one, thornswood-pr-one-2, ... on
-  One) is registered with thornswood-build too and takes them, on One's own
-  cores. It never carries thornswood-vps, so staff notices, the admin
-  service, the release jobs and every other job that needs the box never
-  reach it. Pass -AllowHost pypi.org,files.pythonhosted.org, or the build's
+  for thornswood-pr-build alone; main's (build.yml) stays on the box, which
+  traces the gate (#3114, #3874). An -OffBox runner whose name
+  records\pr-build-runners.json's offBox lists (thornswood-pr-one,
+  thornswood-pr-one-2, ... on One) is registered with thornswood-pr-build
+  too and takes them, on One's own cores. It never carries thornswood-build,
+  which only ever means one of the box's build slots (#4010), nor
+  thornswood-vps, so staff notices, the admin service, the release jobs and
+  every other job that needs the box never reach it. Pass -AllowHost pypi.org,files.pythonhosted.org, or the build's
   ruff install fails closed (WHAT A PULL REQUEST JOB MAY REACH, above).
   -OffBox -Number n -Remove takes one off again.
 
@@ -378,17 +379,12 @@ if ($OffBox) {
 }
 # HOW MANY BUILD AT ONCE (#2994). A VPS runner that records\build-runners.json
 # lists is registered with its build label as well, so a reinstall keeps the
-# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner carries it only
-# when the record's offBox names it (build runners on One, Patrick, 26 Oct
-# 2026), and then takes the pull request build's fallback, which asks for it alone; it
-# still never carries thornswood-vps, so no box-only job reaches it.
+# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner never carries it:
+# One's take the pull request build's fallback by the label below (#4010).
 $registerLabels = $Label
 $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
 if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
-}
-if ($OffBox -and -not $PSBoundParameters.ContainsKey('Label') -and $buildRecord.PSObject.Properties['offBox'] -and @($buildRecord.offBox) -contains $RunnerName) {
-  $registerLabels = $Label + ',' + $buildRecord.label
 }
 # PULL REQUEST BUILDS (#4010). records\pr-build-runners.json's label is the
 # one the pull request build's fallback asks for: a VPS runner its runners
