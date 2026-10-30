@@ -64,15 +64,19 @@
     domain    the registration has more than 30 days left, once a day.
               Registered 15 September 2026 through Cloudflare, runs out 15
               September 2027 (RDAP, rdap.org).
-    runner    GitHub lists every build runner as online: thornswood-vps and
+    runner    GitHub lists every box runner as online: thornswood-vps and
               the numbered ones beside it, thornswood-vps-2 and up
-              (Install-Runner.ps1 -Number, 4 October). Asked over REST with
-              WATCH_RUNNER_TOKEN, a fine-grained token that can only read the
-              repository's runners (Administration: read on that one
-              repository). With none online, no pull request gets Launcher
-              builds and nothing may merge; with some, the checks wait
-              longer. Three runs in a row, because a runner restarts itself
-              when it updates.
+              (Install-Runner.ps1 -Number, 4 October). Since the flip
+              (#4013, 30 Oct 2026) they are registered to the private
+              EvilPatrick06/Thornswood-Ops, where the box's own jobs run,
+              and the public repository has none on purpose (#3792), so
+              that is the repository asked. Asked over REST with
+              WATCH_RUNNER_TOKEN, a fine-grained token that can only read
+              that repository's runners (Administration: read on it alone).
+              With none online, the box's jobs (deploys through the gate,
+              staff notices from cloud threads, the admin App's asks) wait;
+              with some, they wait longer. Three runs in a row, because a
+              runner restarts itself when it updates.
     nexus     the Nexus collection still exists, once an hour. Nexus refuses
               a plain page request (403), but its public GraphQL answers a
               stranger: collection "Thornswood", revision 1, that day.
@@ -176,7 +180,8 @@ function Read-Settings([string]$repo, [string]$saved) {
   $s = @{
     Site = 'https://thornswood.net/'; SiteHost = 'thornswood.net'
     Feeds = @(); GameHost = ''; FrontRanges = @(); StaffChannel = ''
-    Repo = 'EvilPatrick06/Thornswood'; RunnerName = 'thornswood-vps'
+    # The repository the box's runners are registered to (#4013).
+    Repo = 'EvilPatrick06/Thornswood-Ops'; RunnerName = 'thornswood-vps'
     NexusGame = ''; NexusSlug = ''
     CertDays = 14; DomainDays = 30; Minutes = $(if ($Minutes) { $Minutes } else { 5 })
   }
@@ -564,8 +569,8 @@ function Get-Checks($S) {
     @{ Name = 'domain'; Say = ('The registration of ' + $S.SiteHost); What = ('the registration of ' + $S.SiteHost); Fails = 'runs out soon'; Recovers = 'was renewed'; Misses = 1; Back = 1; Every = 1440
        Fix = 'It is registered through Cloudflare: renew it there, under Domain Registration.' },
     @{ Name = 'runner'; Say = ('The build runners, ' + $S.RunnerName + ' and the numbered ones,'); What = 'the build runners'; Fails = 'are not all online on GitHub'; Recovers = 'are all online again'; Misses = 3; Back = 2; Every = 0; Private = $true
-       Fix = 'With none of them online no pull request gets its Launcher builds check, so nothing can be merged; with some, the checks wait longer. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees of the first, and -Number <n> -Status of the others.'
-       Blind = 'It asks with RUNNER_TOKEN, a secret of the outside watcher''s repository: a fine-grained token that reads only the runners. A new one goes there.' },
+       Fix = 'They are registered to EvilPatrick06/Thornswood-Ops (#4013). With none of them online the box''s jobs wait: deploys through the gate, staff notices from cloud threads and the admin App''s asks; with some, they wait longer. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees of the first, and -Number <n> -Status of the others.'
+       Blind = 'It asks with RUNNER_TOKEN, a secret of the outside watcher''s repository: a fine-grained token that reads only the runners of EvilPatrick06/Thornswood-Ops. A new one goes there.' },
     @{ Name = 'nexus'; Say = 'The Nexus collection'; What = 'the Nexus collection'; Fails = 'cannot be reached'; Recovers = 'is reachable again'; Misses = 2; Back = 2; Every = 60
        Fix = 'A new install gets its mods through this collection.' }
   )
