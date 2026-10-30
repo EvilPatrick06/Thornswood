@@ -543,18 +543,20 @@ if (-not $SkipServer) {
   }
   $voiceUrl = 'https://thornswood.net/voice/health'
   $vh = VoiceUp $voiceUrl
-  # voice-server.js answers /health with JSON that counts its peers. Anything
-  # else answering 200 there is not the voice service (Caddy handing the path
-  # to the site, say), so it is said as such rather than counted as up.
+  # voice-server.js answers /health through the site with {"ok":true} and
+  # nothing more (#3806); the counts go only to a caller on the box, and the
+  # restart below prints that answer. Anything else answering 200 there is
+  # not the voice service (Caddy handing the path to the site, say), so it is
+  # said as such rather than counted as up.
   $vhDoc = $null; $vhWhy = ''
   if ($vh) {
     try { $vhDoc = $vh | ConvertFrom-Json } catch { $vhWhy = $_.Exception.Message }
-    if (-not $vhWhy -and -not ($vhDoc -and $vhDoc.PSObject.Properties['peers'])) { $vhWhy = 'it names no peers' }
+    if (-not $vhWhy -and -not ($vhDoc -and $vhDoc.PSObject.Properties['ok'] -and $vhDoc.ok -eq $true)) { $vhWhy = 'it does not say ok' }
   }
   if ($vh -and $vhWhy) {
     Bad "voice service: something answered at $voiceUrl, but not voice's health ($vhWhy)"
   } elseif ($vh) {
-    Note ('voice service: answering at /voice/  ' + [string]$vhDoc.peers + ' peer(s)')
+    Note 'voice service: answering at /voice/'
   } else {
     Bad "voice service: NOTHING at $voiceUrl"
     Bad '  that is Caddy or the service itself; the raw port is shut on purpose and proves nothing'

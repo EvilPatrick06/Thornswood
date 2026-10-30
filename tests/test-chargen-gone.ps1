@@ -70,7 +70,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot '..\scripts\release\Where.ps1') Install),
     [string]$Steam = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition'
 )
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).

@@ -9,7 +9,7 @@
   gate verb (stage, swap, putback, feed-send, task-start-stop, read-status),
   admin, or transport (a helper that only carries what its caller hands it,
   where the caller is the row that counts). Issue #2182, section 5 step 1 of
-  docs\DEPLOY-IDENTITIES.md.
+  the ops repo's DEPLOY-IDENTITIES.md.
 
   WHY THIS EXISTS. Section 2 of that doc was first read off script names, not
   off the commands each script sends. A deploy identity built from a list like

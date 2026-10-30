@@ -17,9 +17,10 @@
   Python tool could run here, and the threads did not know the box held
   Skyrim's archives, so #2906's records and #3077's plugin ran on One on
   21 Oct 2026 though the box held what they read. The last line above runs
-  the whole chain of scripts\mods\content-tables.json; its tables are not
-  yet the ones a game PC writes (#3105), so Developer-Guide.md still sends
-  the whole rebuild to a PC with the game.
+  the whole chain of scripts\mods\content-tables.json. Since #3105 its
+  tables are the ones a game PC writes: every builder reads the load order
+  game\data\npc-population.json records, on the box and on a PC alike, and
+  the crime table reads the script pack a PC made (records\papyrus-scripts.json).
 
   WHY. Patrick, 20 Oct 2026: "let's make the content plugin available in the
   cloud". The content plugin's tools read the game's Data folder, which was

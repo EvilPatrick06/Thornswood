@@ -14,9 +14,10 @@
 // hands out, with real join tokens from a stand-in site that says yes, and
 // measures on the wire:
 //
-//   PEOPLE sockets that are already open send their joins together; every one
-//   is welcomed, then sent one roster naming all of them, not one per
-//   arrival (the first in used to get PEOPLE);
+//   PEOPLE people in the world (a stand-in position feed, since only they
+//   hold a voice place, #3570), their sockets already open, send their joins
+//   together; every one is welcomed, then sent one roster naming all of
+//   them, not one per arrival (the first in used to get PEOPLE);
 //   the welcome still comes before the first roster on every socket;
 //   half of them close together, and the rest are sent one roster without
 //   them, again not one per departure;
@@ -180,6 +181,24 @@ async function openPage(port, pid) {
     ws.onerror = () => { clearTimeout(late); bad(new Error('socket for ' + pid + ' was refused')); };
   });
 }
+/*
+  The gamemode's position feed, stood in for: only somebody in the world holds
+  a voice place and is on the roster (#3570), so everybody this joins is put
+  in the world first, each in a cell of their own.
+*/
+function inWorld(port, pids) {
+  return new Promise((ok, bad) => {
+    const body = JSON.stringify({ who: pids.map((pid) => ({ profileId: pid, pos: [0, 0, 0], angleZ: 0,
+                                                            cell: 'cell ' + pid, name: 'Person ' + pid })) });
+    const req = http.request({ host: '127.0.0.1', port: port, path: '/positions', method: 'POST', agent: false,
+                               headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, (res) => {
+      res.resume();
+      res.on('end', () => { if (res.statusCode === 204) ok(); else bad(new Error('/positions answered ' + res.statusCode)); });
+    });
+    req.on('error', bad);
+    req.end(body);
+  });
+}
 const rosters = (me) => me.got.filter((m) => m.t === 'peers');
 const lastRoster = (me) => { const r = rosters(me); return r.length ? r[r.length - 1].peers : null; };
 const names = (list, peers) => !!list && peers.every((id) => list.some((row) => row.peer === id));
@@ -187,6 +206,7 @@ const names = (list, peers) => !!list && peers.every((id) => list.some((row) => 
 (async () => {
   const site = await siteThatSaysYes();
   const s = await service(site);
+  await inWorld(s.port, Array.from({ length: PEOPLE }, (_, k) => 5000 + k).concat([9000]));
 
   // ------------------------------------------------------- all in at once
   const pages = [];
