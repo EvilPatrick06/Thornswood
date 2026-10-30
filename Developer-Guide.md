@@ -576,7 +576,7 @@ in, above). When both say READY:
 - one line for each thing a person will notice"
 ```
 
-Any developer may run a main Ship from a machine that can sign (How work moves). The same script with
+A main Ship runs only on Patrick's word, by whoever he names, from a machine that can sign (How work moves). The same script with
 `-Channel main` checks a machine for it.
 
 Ship builds a channel's release from one folder on each machine: the main
@@ -815,31 +815,32 @@ is added as a collaborator on the repository, and on CODEOWNERS beside the
 shared files, and agrees once to the contributor terms in `LICENSE`.
 Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
 
-Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
-Vortex) also work here, on the shipping machine, under his GitHub account.
-Every rule in this file binds them the same as a person. They share notes
-through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine;
-what is true now is `ops\status.md` in the private ops repo (since 22 Oct). The
-vault is for coordinating, and the board is still the one record of work. They mark what they are on with a
-`claimed: <lane>` label and the board card moved to In Progress. When the
-issue closes, `.github\workflows\drop-claims.yml` takes every `claimed:`
-label off it (#1863), so a lane's finish step need not. Their
-branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
-On the shipping machine `C:\Thornswood-Repo` is shared
-by all of them and sits detached at `origin/main`, because lanes build from
-it: branch work goes in a worktree in its ignored `worktrees` folder, removed
-with its branch once the pull request merges.
+Patrick's Grok Bot lanes (Anvil, Herald, Waystone, Wyrd, Smeagle and Codex)
+only audit now (Patrick, 30 Oct): they look over the work and file what
+they find as plain issues, unclaimed, in Todo. They claim no issue, open no
+pull request and run nothing. Every rule in this
+file binds them the same as a person. Their own notes are in an Obsidian
+vault on the shipping machine; nothing there is a rule, and what is true now
+is `ops\status.md` in the private ops repo.
 
-One rule binds the lanes and not a person (Patrick, 11 Oct): a lane only
-commits, pushes and merges. It never runs a Ship, a Deploy-*, Publish-* or
-Install-* script, a step on the live or dev server, or a Vortex step. For each
-change that needs a run, the lane writes one note in the private ops repo's
-`ops\claude-queue\` folder, naming the pull request of the change, with the exact
-command, its risks, draft release notes, and a news post when people would
-notice; `ops\README.md` there has the template. A Claude on the shipping machine runs those notes once that pull request is merged. A lane
-does not ask anybody to approve a deploy; the note is the hand-off.
+Six Hermes Bots take over the work from the Claude threads (Patrick, 30 Oct):
+Bramble picks, claims, merges and runs every release step, and Rift, Sprocket,
+Echo, Magpie and Wisp each own a part of the project. A Bot marks what it is
+on with its `claimed: <Bot>` label and the board card in In Progress, the
+way everybody claims. When the issue closes, `.github\workflows\drop-claims.yml`
+takes every `claimed:` label off it (#1863). A change that needs a run (a
+Ship, a Deploy-*, Publish-* or Install-* script, a step on the live or dev
+server, a Vortex step) is run by Bramble, from the note the change's pull
+request leaves in the private ops repo's `ops\claude-queue\` folder
+(`ops\README.md` there has the template), once that pull request is merged;
+a main or live run still waits for Patrick's word. Until the switch, the
+Claude Desk runs those notes. Bot branches carry the Bot's name
+(`wisp/3150-what-it-is`). On the shipping machine `C:\Thornswood-Repo` is
+shared and sits detached at `origin/main`: branch work goes in a worktree in
+its ignored `worktrees` folder, removed with its branch once the pull request
+merges.
 
-A lane writes test tasks the way "Test tasks and known issues" says, in
+A Bot writes test tasks the way "Test tasks and known issues" says, in
 its pull request and on the issue: Main for what any playtester can check,
 Dev only for what needs a dev, one per issue and kind, never posted by hand
 in Discord.
@@ -1021,7 +1022,7 @@ How to use it:
   `Suggestion` an idea somebody asked for, and `bug` something broken;
   nothing reads these three, they are for people sorting the board.
   `claimed: <name>` marks who is on an issue ("What this is" says how the
-  lanes use it). Assign yourself when you start one. The stage is Order and
+  Bots use it). Assign yourself when you start one. The stage is Order and
   Status: the `wave:` labels and `needs: the live server` were retired on
   22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
@@ -1346,7 +1347,13 @@ The short form of the rules. The same decisions, with the dates they were made, 
 
 ##### Main, hotfixes, and merging
 
-- main is what ships. Any developer may ship main from a machine that can sign, and Ship.ps1 refuses
+- main is what ships, and it ships only on Patrick's word for that exact
+  build (Patrick, 30 Oct). Nobody else decides that a main release, a
+  hotfix or a live server or gamemode deploy goes out: not a developer, a
+  lane, a Claude or a Bot, and nobody asks him whether main is ready.
+  Whoever he names runs it from a machine that can sign; once the Hermes
+  Bots take over, that is Bramble. Until 30 Oct any developer could ship
+  main. Ship.ps1 refuses
   a main release that is not on main, is behind or ahead of origin, has
   anything uncommitted, has a file under `scripts` or another folder a release is built from that git does not know, or
   asks for a new number with `-Version`. A main Ship writes nothing to the
@@ -1364,8 +1371,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   above still applies, and Ship refuses a hotfix branch that is not on
   GitHub. A hotfix leaves the dev feed alone. The fix also goes to main
   through its own pull request, or the next main release loses it. 1.1.93 was
-  the first, built from 55ac6ef. Any developer may ship a hotfix when they are confident in the fix and
-  Launcher builds is green, the same as any live release. Once it is live, its commit is kept as a tag, `live-<version>`,
+  the first, built from 55ac6ef. A hotfix goes out on Patrick's word, the same as any live release, once
+  the fix's Launcher builds is green. Once it is live, its commit is kept as a tag, `live-<version>`,
   and the branch is deleted, so no hotfix branch sits on GitHub: the next
   hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
   tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
@@ -1380,8 +1387,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   approving reviews is **0**, and the code owner review is **off**.
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
   anybody on the team merges their own pull request once `Launcher builds`
-  (the build check, on the VPS) is green and they have said what it is in
-  #staff-updates. Nobody waits for Patrick. What GitHub does hold write
+  (the build check, on the VPS) is green and they are confident in the
+  change. A merge gets no line in #staff-updates (Patrick, 22 Oct: that
+  channel is only for what staff must act on). Nobody waits for Patrick. What GitHub does hold write
   access to on main: a change comes through a pull request (with no approval
   needed), and a force push or deleting main is refused. None of that applies
   to the admin account while `enforce_admins` is off.
@@ -1558,8 +1566,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   to main whose tree a green pull request build already passed stops green at
   "Already tested in its pull request" instead of building again (#3182).
   Red means the branch would stop Ship at the build step; fix that, and merge
-  once one of the two is green, you are confident in the change, and you have
-  said so in #staff-updates. Nothing in GitHub's settings is required. Run the
+  once one of the two is green and you are confident in the change; a merge
+  gets no line in #staff-updates. Nothing in GitHub's settings is required. Run the
   test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
@@ -1582,7 +1590,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
 Several people, several machines, one repo. The short rules are above;
 this is the long form.
 
-- **main is what ships.** Any developer may ship main from a machine that can sign. `Ship.ps1`
+- **main is what ships, on Patrick's word.** It goes out only when Patrick
+  says so for that exact build, run by whoever he names from a machine that
+  can sign (Patrick, 30 Oct; until then any developer could). `Ship.ps1`
   refuses a main release that is not on the `main` branch, is behind or
   ahead of `origin/main`, has anything uncommitted, or has a file under
   `scripts` or another folder a release is built from that git does not know. It commits and pushes nothing, so what
@@ -1724,7 +1734,7 @@ Ship already posts the note. These commands send nothing. They show what a secon
 
 ### What any developer may do
 
-Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+Decided for the whole team: any developer may do every one of these, except the ones that change what is live. A main release, a hotfix and a live server or gamemode deploy go out only on Patrick's word, by whoever he names (Patrick, 30 Oct; How work moves). Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A dev release, a dev deploy, and a news post are the same people. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
 The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, in First Time Setup, says which Azure sign-in can sign.
 
@@ -1758,7 +1768,7 @@ To post the current feed again:
 
 ## 4. How to release to main
 
-A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign. A release gets no #staff-updates line; the update channel, the app and site News tabs and GitHub say it. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
+A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. It goes out only on Patrick's word for that exact build, and whoever he names runs it from a machine that can sign (Patrick, 30 Oct). Nobody asks him whether main is ready. A release gets no #staff-updates line; the update channel, the app and site News tabs and GitHub say it. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
 
 ### Move the version first
 
@@ -1942,7 +1952,8 @@ script closes the launcher and Skyrim itself when it needs to.
 ### After a pull request is merged
 
 Merging on GitHub changes nothing anybody sees. You run the rest from the
-repository folder. Any developer may.
+repository folder. Any developer may, except a main release, a hotfix and a
+live deploy, which wait for Patrick's word.
 
 1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
    that is behind origin, so the pull comes first.
