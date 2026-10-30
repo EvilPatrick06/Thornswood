@@ -102,7 +102,7 @@ $expect = @($parts | Where-Object { $_ -ne 'merchants' -and $_ -ne 'saves' })
 Yes ('S5 the wipe marks done every part but the merchants'' and the saves (' + ($WipeDone -join ', ') + ')') (
     $WipeDone.Count -eq $expect.Count -and @($expect | Where-Object { $WipeDone -notcontains $_ }).Count -eq 0)
 $registers = @{ farms = @('farm-claims.json'); property = @('property.json', 'law.json', 'beds.json'); embassy = @('embassy.json')
-                dungeon = @('dungeon-rewards-ledger.json'); cargo = @('trade-cargo.json'); carts = @('trade-carts.json')
+                dungeon = @('dungeon-rewards-ledger.json'); cargo = @('trade-cargo.json'); stalls = @('market-stalls.json'); carts = @('trade-carts.json')
                 books = @('books.json', 'last-left.json') }
 $all = $true
 foreach ($p in $WipeDone) {
