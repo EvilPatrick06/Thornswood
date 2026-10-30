@@ -51,6 +51,7 @@ $carriers = [ordered]@{
     'scripts/vps/Clear-OldWorldCopies.ps1'       = @{ Args = "-WhatIf -TempDirs '<scratch>'";          Word = 'REFUSED: ' }
     'scripts/vps/Delete-Person.ps1'              = @{ Args = "-SiteRoot '<scratch>'";                  Word = 'REFUSED: ' }
     'scripts/vps/Lock-VpsFolders.ps1'            = @{ Args = "-WhatIf -Parent '<scratch>' -SiteSid none -BotSid none -DumpWriterSids none"; Word = 'REFUSED: ' }
+    'scripts/vps/Remove-HandMadeTasks.ps1'       = @{ Args = "-WhatIf -Parent '<scratch>'";            Word = 'REFUSED: ' }
     'scripts/deploy/Install-ThornswoodServer.ps1' = @{ Args = "-Zip '<scratch>\none.zip' -Root '<scratch>'"; Word = '' }
     'scripts/vps/vps-harden.ps1'                 = @{ Args = "-DryRun -SshdConfig '<scratch>\sshd_config' -Sshd '<scratch>\sshd.exe'"; Word = 'STOP ' }
     'scripts/vps/vps-openssh.ps1'                = @{ Args = "-DryRun -Pins 'SHA256:x'";               Word = 'STOP ' }
