@@ -4,9 +4,9 @@
        then it carried csc's default one: asInvoker, but named MyApplication.app
        at 1.0.0.0, with no DPI awareness, so Windows stretched its window blurry
        at any scale above 100 percent.
-       The version here is a placeholder. Build-Launcher.ps1 writes the
-       launcher's version (Updater.cs Version, four parts) into a copy of this
-       file and embeds that copy, the same number as the file's version
+       The version here is a placeholder. Setup.csproj's ThornswoodManifest
+       target writes the launcher's version (Updater.cs Version, four parts)
+       into a copy of this file and embeds that copy, the same number as the file's version
        details. tests\test-app-manifest.ps1 reads it back out of the built exe. -->
   <assemblyIdentity
     type="win32"
