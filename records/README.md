@@ -63,6 +63,15 @@ read it (issue #440, phase 8):
   on this list, so a mod put into the Steam copy by hand never gets in. Run
   the script again in the same pull request as a pin move;
   `tests\test-skyrim-pin.ps1` fails while the two disagree.
+- `recipe-owners.json`: the recipes whose owner or rank is a decision rather
+  than a reading, each with the measured reason it cannot be derived:
+  `"owner"` is RECIPE_OWNER and `"rank"` is RECIPE_RANK in
+  `scripts\dev\Build-RecipeTable.ps1`, which reads them from here. No script
+  writes this one: it is changed by hand, in the pull request that adds the
+  recipe it names. It is data so that a recipe change is this file and
+  `game\content\Thornswood-Content.esp` and nothing else, the two files the
+  box's Rebuild-ContentTables takes from a pull request to rebuild its tables
+  with main's own builders (Patrick, 30 Oct 2026, B on the report page, #3470).
 - `game-strings.json`: the loose string tables of the localized masters the
   content tools read whose names are in no Skyrim archive, by size and
   sha256 (#2899): RaceCompatibility.esm's three, measured 20 Oct 2026.
