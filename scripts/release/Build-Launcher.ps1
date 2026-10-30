@@ -94,13 +94,14 @@ foreach ($p in @($proj, $stubProj)) {
 }
 
 # ------------------------------------------- the records compiled into it
-# RecordShape.ps1 (#2180): the two records compiled into the launcher must be
+# RecordShape.ps1 (#2180): the records compiled into the launcher must be
 # a version this checkout knows with every field OwnGame reads, or the build
 # stops here; a launcher with a half-read list in it is worse than none. The
 # project file embeds them; it cannot read their shape, so this does.
 . (Join-Path $Here 'RecordShape.ps1')
 foreach ($embedded in @(@{ Path = (Join-Path $Here '..\..\records\skyrim-files.json'); Kind = 'skyrim-files' },
-                        @{ Path = (Join-Path $Here '..\..\records\ui-gone.json'); Kind = 'ui-gone' })) {
+                        @{ Path = (Join-Path $Here '..\..\records\ui-gone.json'); Kind = 'ui-gone' },
+                        @{ Path = (Join-Path $Here '..\..\records\generated.json'); Kind = 'generated' })) {
     if (Test-Path -LiteralPath $embedded.Path) {
         try { $null = Read-ThornswoodRecord -Path $embedded.Path -Kind $embedded.Kind } catch { Die ($_.Exception.Message + ' Nothing was built.') }
     }

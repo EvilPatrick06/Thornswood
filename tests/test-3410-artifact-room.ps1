@@ -76,7 +76,7 @@ Yes 'its token may delete artifacts and read this repository and its pull reques
     (@($perms -split "`n" | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim() } | Sort-Object) -join '|') -eq 'actions: write|contents: read|pull-requests: read' -and @([regex]::Matches($text, '(?m)^\s+permissions:')).Count -eq 0)
 Yes '  and no secret' ($text -notmatch 'secrets\.')
 $runsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
-Yes ("it runs on the VPS runners ({0})" -f $runsOn) ($runsOn -eq '[self-hosted, Windows, thornswood-vps]')
+Yes ("it runs on the VPS runners only while the repository is private, and on GitHub's once public (#3685) ({0})" -f $runsOn) ($runsOn -eq "`${{ github.event.repository.private && fromJSON('[`"self-hosted`", `"Windows`", `"thornswood-vps`"]') || 'windows-latest' }}")
 Yes '  with a timeout' ($text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
 Yes '  and runs no action: it checks out nothing and builds nothing' ($text -notmatch '(?m)^\s+(-\s+)?uses:')
 Yes 'one prune at a time, none cancelled' ($text -match '(?m)^\s+group:\s*engine-prune\s*$' -and $text -match '(?m)^\s+cancel-in-progress:\s*false\s*$')

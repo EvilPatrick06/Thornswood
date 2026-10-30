@@ -100,18 +100,27 @@ function Get-ProdFacts {
     foreach ($f in 'C:\Thornswood-Docs\config.json', 'C:\Thornswood-Server\server-settings.json', 'C:\Thornswood-Server-Dev\server-settings.json') {
         $settings[$f] = if (Test-Path -LiteralPath $f) { try { ConvertTo-SettingShape (Get-Content -LiteralPath $f -Raw | ConvertFrom-Json) } catch { 'unreadable' } } else { 'missing' }
     }
+    # As the firewall takes them (#3896): from the box's own policy once
+    # Set-InboundRules.ps1 -Own has it ignore local rules.
     $inbound = @()
-    foreach ($fw in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow)) {
+    foreach ($fw in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -Action Allow)) {
         $pf = $fw | Get-NetFirewallPortFilter
         $af = $fw | Get-NetFirewallAddressFilter
         $inbound += [ordered]@{ name = [string]$fw.Name; displayName = [string]$fw.DisplayName; protocol = [string]$pf.Protocol
                                 ports = @(@($pf.LocalPort) | ForEach-Object { [string]$_ }); remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ }) }
     }
+    $fwProfiles = @(Get-NetFirewallProfile -PolicyStore ActiveStore | ForEach-Object { [ordered]@{ name = [string]$_.Name; allowLocalRules = [string]$_.AllowLocalFirewallRules } })
+    $edgeKey = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Microsoft Edge' -ErrorAction SilentlyContinue
+    $edge = if ($edgeKey) { [string]$edgeKey.DisplayVersion } else { '' }
+    # Whether the Edge updater is told never to install Edge (vps-harden.ps1, #3896).
+    $edgePol = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\EdgeUpdate' -Name 'Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}' -ErrorAction SilentlyContinue
+    $edgeBlocked = ($null -ne $edgePol -and [string]$edgePol.'Install{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062}' -eq '0')
     $envNames = @([Environment]::GetEnvironmentVariables('Machine').Keys | Where-Object { $_ -like 'THORNSWOOD_*' } | Sort-Object)
     [ordered]@{
         takenUtc = (Get-Date).ToUniversalTime().ToString('o'); host = $env:COMPUTERNAME
         listeners = $listen; tasks = $tasks; services = $svcs; files = $files; fileBodies = $fileBodies
         certs = $certs; versions = $versions; settings = $settings; machineEnvNames = $envNames; inboundRules = $inbound
+        firewallProfiles = $fwProfiles; edgeVersion = $edge; edgeInstallBlocked = $edgeBlocked
     }
 }
 

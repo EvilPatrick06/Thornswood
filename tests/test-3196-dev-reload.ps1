@@ -219,10 +219,13 @@ try {
 
   # ---- the same gamemode, a new stamp -----------------------------------------
   $srv = New-Server @{ 'gamemode.js' = $oldGm; 'thornswood-build.json' = '{"commit":"newer"}' }
-  $t0 = Get-Date
-  $out = Invoke-Reload $srv
+  # Whether it waited is read from what it printed: a reload that waits says
+  # "waiting up to N seconds" first (Reload.ps1). A clock round the call also
+  # timed starting Windows PowerShell, which a busy runner can take longer
+  # than any wait to do (#4766).
+  $out = Invoke-Reload $srv 30
   Yes 'the gamemode it already runs, with a new stamp: RELOAD OK, the stamp moved' ($out -contains 'RELOAD OK' -and (Read-At $srv 'thornswood-build.json') -eq '{"commit":"newer"}')
-  Yes '  without waiting for a load that cannot come' (@($out | Where-Object { $_ -like '*already runs git blob*' }).Count -eq 1 -and ((Get-Date) - $t0).TotalSeconds -lt 6)
+  Yes '  without waiting for a load that cannot come' (@($out | Where-Object { $_ -like '*already runs git blob*' }).Count -eq 1 -and @($out | Where-Object { $_ -like '*waiting up to*' }).Count -eq 0)
   Stop-Server $srv
 
   # ---- a roll of server.log in the middle of the load ---------------------------

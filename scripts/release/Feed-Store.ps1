@@ -163,7 +163,8 @@ function Get-FeedStoreVps([hashtable]$To) {
 # Windows 10 1709 or Windows Server 2019 or later: the VPS is Windows Server
 # 2022, and the working folder is under LOCALAPPDATA on the system drive.
 # Windows PowerShell 5.1, which runs this on the VPS, has no such call in
-# .NET, so it is declared. Its own type, not Generated.ps1's RecordSwap, so
+# .NET, so it is declared. Its own type, not the generated record's GeneratedOs
+# (launcher\app\GeneratedBuild.cs, which Generated.ps1 compiles), so
 # neither can load the other's rename first in one session.
 $script:FeedStoreSwap = @'
 function Move-FeedStoreInto([string]$from, [string]$to) {
