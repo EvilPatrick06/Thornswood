@@ -57,8 +57,7 @@ which answer is right and why, or the build stops.
 WHAT IT READS. game\\data\\doors.json for the buildings and their doors (the
 same table BUILDING_BY_DOOR and BUILDING_NAME are built from, and the build
 stops if the gamemode's buildings are not doors.json's), and the load order of
-game\\data\\last-plugin.json then Thornswood-Last.esp and
-Thornswood-WoodworkerTrail.esp, last plugin wins, with the repository's own
+game\\data\\last-plugin.json then Thornswood-Last.esp, last plugin wins, with the repository's own
 plugins from game\\content, the way Build-WoodworkingBenches.py reads it. The
 game folder has to hold the collection's own bytes
 (records\\collection-plugins.json).
