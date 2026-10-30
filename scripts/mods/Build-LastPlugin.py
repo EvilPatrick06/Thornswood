@@ -2380,14 +2380,16 @@ def main():
     with io.open(GAMEMODE, 'w', encoding='utf-8', newline='') as f:
         f.write(gm)
     print('Wrote game/content/%s, game/data/%s, game/data/last-plugin.json and the HELD_BY_SERVER block (%d)'
-          % (PLUGIN, os.path.basename(RECIPE), len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer'])))
+          % (PLUGIN, os.path.basename(RECIPE), len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer']) +
+             len((manifest.get('holdOnly') or {}).get('heldByServer', []))))
     return 0
 
 
 def held_block(manifest, gamemode):
-    """game/gamemode.js with its HELD_BY_SERVER block: the floor items and cut
-    actors Thornswood-Last.esp cannot switch off without copying a plugin it
-    never copies from, which the server holds off instead (#3077, #2454)."""
+    """game/gamemode.js with its HELD_BY_SERVER block: the floor items, cut
+    actors and hold-only plants and ores Thornswood-Last.esp cannot switch
+    off without copying a plugin it never copies from, which the server holds
+    off instead (#3077, #2454, #3150)."""
     a, b = gamemode.find(HELD_BLOCK[0]), gamemode.find(HELD_BLOCK[1])
     if a < 0 or b < a:
         raise SystemExit('STOP. no HELD_BY_SERVER markers in game/gamemode.js. Nothing was written.')
