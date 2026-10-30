@@ -188,12 +188,60 @@ lists linked from each sub-profession.
 
 A mage sees the spell book there instead.
 
+## The guides on K
+
+Press K, Profession guides. Every profession has a page, one tab
+each, and it opens on your own (Patrick, 22 Oct, A on #3165). It is
+there while you create a character too, before Home, so a profession
+can be read before it is picked. A page says three things:
+
+- What it makes: each half, the benches it works at and the rank each
+  opens at, its families with how many rows sit at each rank, and the
+  first things a new novice can make. A warrior's page lists the
+  maneuvers instead, and a mage's the spells of each school.
+- Where the materials come from: the inputs its recipes ask for most,
+  the class each one rests on and at what rank, the bench that makes
+  it out of what, and where it is found (the mines with the most veins
+  of the ore, or the kinds of animal that give the part).
+- How to rank up: what counts as a piece of work for it, the ladder,
+  the rest a piece costs, the sister half and the party bonus.
+
+The facts are read out of `game\data\recipes.json`,
+`game\data\mine-buildings.json`, `game\data\hunts.json` and the
+gamemode's bench table, maneuvers and tuning by
+`scripts\dev\Build-ProfessionGuides.js`, which writes them into
+`game\ui\thornswood-skills.js`. Run it after any of those change;
+`tests\test-3165-profession-guides.js` fails while the page is behind.
+
 ## Names that are not a profession
 
 Bard, merchant, priest, scholar and thief are not picked on K. They
 grant no recipe, no verb and no rank. Bardic rest is on
 [People beside you](people.md). The merchant NPCs belong to the
 [Merchant's Guild](merchants-guild.md).
+
+## Staff
+
+Staff have a crafting card on the Office page of K. They pick somebody
+in the world and see every class, half and school that person holds, its
+rank, and the work counted toward the next. Raise moves one rank, the
+way the work would: the same ceilings hold, so a taught trade stays at
+novice and a sister half past novice still needs its Master, and the
+rank gives its skill point, and a spell point for a mage's school or an
+Enchanter's staff spells. The count toward the next rank starts again at
+0.
+
+The card also asks the server about a recipe by what it makes: whether
+that person may make it, and if not, the reason the bench would give.
+When they may make it and the bench still leaves it out, the card says
+whether their game was handed an older list than the server gives now,
+which a button hands it again, or whether the game's own recipe asks for
+a perk, an item or a spell first.
+
+And staff give back an item somebody lost, with a count and a reason.
+Nothing records what was lost, so the reason is the record. Nobody does
+any of it to themselves, and every change is in the staff log with the
+name of the staff member who made it.
 
 ## Where this is
 

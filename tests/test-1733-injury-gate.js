@@ -55,6 +55,9 @@ const NEEDS_SRC = slice('// ==== thornswood needs: hunger, thirst and exhaustion
 const HURT_SRC = slice('// ==== thornswood injury and disease ====', '// ==== end thornswood injury and disease ====');
 const GATE_SRC = slice('function unfitToMake(actorId, workbenchId) {', '\n}\n');
 const CRAFT_SRC = slice("mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n');
+// The order taken at a bench before its time runs (#3161) asks it too, so a
+// person too tired to work is told before they wait.
+const WORK_SRC = slice("mp.onCraftWork = guard('onCraftWork', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n');
 const KEY_SRC = slice('  function cutKey(actorId, profileId, toProfile, parts) {', '\n  }\n');
 // A master key cut again at a forge (#2254) is a third road, and asks too.
 const MASTER_SRC = slice('  function cutMasterKey(actorId, profileId, toProfile, parts) {', '\n  }\n');
@@ -292,9 +295,10 @@ Object.keys(ROADS).forEach(function (name) {
   yes('W2 no other code asks either block\'s craftRefusal by another name (only the two definitions and the gate)',
       other === 4);
   const calls = code.match(/\bunfitToMake\(actorId, [a-zA-Z]+\);/g) || [];
-  yes('W3 the three roads ask the gate: a bench\'s menu with its bench, the kiln\'s included, a key with the forge, and a master key with the forge (#2254)',
-      calls.length === 3 && !/function burnCharcoal\b/.test(code) &&
+  yes('W3 the roads ask the gate: a bench\'s menu with its bench, the kiln\'s included, when the order is taken (#3161) and when it is made, a key with the forge, and a master key with the forge (#2254)',
+      calls.length === 4 && !/function burnCharcoal\b/.test(code) &&
       /unfitToMake\(actorId, workbenchId\)/.test(CRAFT_SRC) &&
+      !!WORK_SRC && /unfitToMake\(actorId, workbenchId\)/.test(WORK_SRC) &&
       /unfitToMake\(actorId, forge\)/.test(KEY_SRC) &&
       !!MASTER_SRC && /unfitToMake\(actorId, forge\)/.test(MASTER_SRC));
   yes('W4 each asks before anything is taken',

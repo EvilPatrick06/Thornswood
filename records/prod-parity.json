@@ -188,6 +188,14 @@
         "Boot"
       ],
       "why": "scripts/deploy/Install-Bridge.ps1, the box's end of ssh, LOCAL SERVICE, Limited, with a SID of its own (#2891, #2578)"
+    },
+    {
+      "name": "Thornswood Gate",
+      "user": "SYSTEM",
+      "triggers": [
+        "Boot"
+      ],
+      "why": "scripts/deploy/Install-Gate.ps1, from boot as SYSTEM (#2841): the deploy gate's broker, which runs only the verbs of scripts/vps/gate/verbs.json, each a script of main, and those reach the box as Administrator over loopback because the deploys' box halves need administrator (the ops repo's DEPLOY-IDENTITIES.md sections 2a and 9)"
     }
   ],
   "services": [
@@ -229,5 +237,153 @@
     "THORNSWOOD_VOICE_AUTH"
   ],
   "certMinDays": 14,
+  "inboundRulesAbout": "Every enabled inbound Allow firewall rule the box keeps, by its Name or DisplayName (#3807). scripts/vps/Set-InboundRules.ps1 turns off every other one, and Check-ProdParity.ps1 marks one outside this list for review. required: the rule must be there and on, or Set-InboundRules refuses to turn anything off. Not on the list, so off: WinRM, the old SkyMP copies of the game rules, Teredo, IP-HTTPS and IPv6-in-IPv4 tunnels, Delivery Optimization, DIAL, Cast to Device, AllJoyn, mDNS, Media Foundation and the Store apps' rules.",
+  "inboundRules": [
+    {
+      "rule": "Thornswood game (UDP)",
+      "required": true,
+      "why": "live game, UDP 7777 from anybody: the game connects straight to the box (Bootstrap-VPS.ps1)"
+    },
+    {
+      "rule": "Thornswood game (TCP)",
+      "required": true,
+      "why": "live game, TCP 7777 (Bootstrap-VPS.ps1)"
+    },
+    {
+      "rule": "Thornswood resources (TCP)",
+      "required": true,
+      "why": "live resources, TCP 3000 (Bootstrap-VPS.ps1)"
+    },
+    {
+      "rule": "Thornswood Dev game (UDP)",
+      "required": true,
+      "why": "dev game, UDP 7787 (vps-dev-instance.ps1)"
+    },
+    {
+      "rule": "Thornswood Dev game (TCP)",
+      "required": true,
+      "why": "dev game, TCP 7787 (vps-dev-instance.ps1)"
+    },
+    {
+      "rule": "Thornswood Dev resources (TCP)",
+      "required": true,
+      "why": "dev resources, TCP 7788 (vps-dev-instance.ps1)"
+    },
+    {
+      "rule": "Thornswood Web 80",
+      "required": true,
+      "why": "Caddy, only from Cloudflare's ranges (Setup-Domain.ps1, Set-WebFirewall.ps1, #2995)"
+    },
+    {
+      "rule": "Thornswood Web 443",
+      "required": true,
+      "why": "Caddy, only from Cloudflare's ranges (Setup-Domain.ps1, Set-WebFirewall.ps1, #2995)"
+    },
+    {
+      "rule": "Thornswood Voice",
+      "required": false,
+      "why": "made by Install-Voice.ps1 only when live voice answers every interface; on loopback (the default since #1304) it takes the rule away"
+    },
+    {
+      "rule": "Thornswood Dev Voice",
+      "required": false,
+      "why": "made by Install-Voice.ps1 only when dev voice answers every interface, as above"
+    },
+    {
+      "rule": "Thornswood Docs",
+      "required": false,
+      "why": "made by Deploy-Docs.ps1 only with THORNSWOOD_DOCS_EXPOSE=1; otherwise it takes the rule away (#2185)"
+    },
+    {
+      "rule": "OpenSSH-Server-In-TCP",
+      "required": false,
+      "why": "sshd on 22, only from 127.0.0.1 so only the bridge (Set-SshScope.ps1 owns every port 22 rule)"
+    },
+    {
+      "rule": "OpenSSH TCP 22",
+      "required": false,
+      "why": "an older ssh rule made by hand, scoped with the one above to 127.0.0.1 by Set-SshScope.ps1, the only script that changes port 22 rules"
+    },
+    {
+      "rule": "CoreNet-DHCP-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: DHCP answers"
+    },
+    {
+      "rule": "CoreNet-DHCPV6-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: DHCPv6 answers"
+    },
+    {
+      "rule": "CoreNet-ICMP4-DUFRAG-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: fragmentation needed, for path MTU"
+    },
+    {
+      "rule": "CoreNet-ICMP6-DU-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: destination unreachable"
+    },
+    {
+      "rule": "CoreNet-ICMP6-PTB-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: packet too big, for path MTU"
+    },
+    {
+      "rule": "CoreNet-ICMP6-TE-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: time exceeded"
+    },
+    {
+      "rule": "CoreNet-ICMP6-PP-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: parameter problem"
+    },
+    {
+      "rule": "CoreNet-ICMP6-NDS-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: neighbor discovery"
+    },
+    {
+      "rule": "CoreNet-ICMP6-NDA-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: neighbor discovery"
+    },
+    {
+      "rule": "CoreNet-ICMP6-RA-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: router advertisement, from link-local only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-RS-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: router solicitation"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LQ-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener query, local subnet only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LR-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener report, local subnet only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LR2-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener report v2, local subnet only"
+    },
+    {
+      "rule": "CoreNet-ICMP6-LD-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast listener done, local subnet only"
+    },
+    {
+      "rule": "CoreNet-IGMP-In",
+      "required": false,
+      "why": "Windows Core Networking, which the box's own network needs: multicast group membership"
+    }
+  ],
   "intentional": []
 }
