@@ -4612,10 +4612,15 @@ const SLOG_DAYS = 365;
    crash log from that session, if it crashed, and it goes second because it
    is the one that settles a crash with no message (entry 105).
    skyrim-platform.log is the tail of Skyrim Platform's own log, and it goes
-   last because it is the biggest and the noisiest. */
+   last because it is the biggest and the noisiest.
+
+   Every name here is named on the privacy page, with what it can hold, and
+   tests\test-session-logs.js fails when one is not (#3627). The retired
+   dresser's log is not taken: nothing writes it, so a copy left on a PC was
+   an old session's sent as this one's. */
 const SLOG_NAMES = [
   'launcher.log', 'crash.log', 'thornswood-front.log', 'thornswood-voice.log',
-  'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
+  'thornswood-emotes.log', 'thornswood-input.log',
   'thornswood-loadorder.txt', 'thornswood-plugins-light.txt',
   'skyrim-platform.log'
 ];
