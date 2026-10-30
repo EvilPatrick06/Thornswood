@@ -101,7 +101,8 @@
   App's manifest to GitHub (name, no webhook, private, administration write
   and contents read on the repositories it is installed on, and since #3534
   read of the names of its secrets, variables and environments, never their
-  values); Patrick creates
+  values, and since #2841's Ship verbs Actions write, which only
+  gate-token.js asks for); Patrick creates
   it, GitHub sends him back to /setup/done with a one-time code, and this
   trades the code for the App's key straight from GitHub. The key goes into
   state\key.pem, the App's id and name into state\app.json, the setup is
@@ -804,7 +805,7 @@ function manifest() {
     hook_attributes: { url: 'https://thornswood.net/github-app/hook', active: false },
     redirect_url: 'https://thornswood.net/github-app/setup/done',
     public: false,
-    default_permissions: { administration: 'write', contents: 'read', secrets: 'read', actions_variables: 'read', environments: 'read' },
+    default_permissions: { administration: 'write', contents: 'read', secrets: 'read', actions_variables: 'read', environments: 'read', actions: 'write' },
     default_events: [],
   };
 }

@@ -127,6 +127,23 @@ Yes '  it takes only the listed data files from the pull request, held to its he
 Yes '  and no file of the list is a script' (@([regex]::Match($rebuild, '\$DataFromPull = @\(([^)]*)\)').Groups[1].Value -split ',' | Where-Object { $_ -match '\.(ps1|psm1|py|js|cmd|bat|exe|dll)''' }).Count -eq 0)
 Yes '  it runs the chain by Run-OnBox.ps1, its words quoted so none is read as a parameter' ($rebuild.Contains("'scripts/mods/Rebuild-ContentTables.ps1' '-Data' '{data}' '-PluginsTxt' '{plugins}' -Server `$Server -Out `$Out"))
 Yes '  and Run-OnBox.ps1 copies what came back into -Out as well as the checkout' ((Text 'scripts/mods/Run-OnBox.ps1').Contains('foreach ($into in @($repo, $Out | Where-Object { $_ }))'))
+# The Ship verbs (Patrick's A, 30 Oct 2026: the box admin App mints the
+# token a Ship from the feed signs with, and the whole Ship runs on the box).
+Yes 'Ship-Dev is a dev Ship from the feed, its note as a title and detail lines' ((Words 'Ship-Dev -Title "Market stalls take your prices" -Detail "Claim a stall"') -eq '-Channel|dev|-Title|Market stalls take your prices|-Detail|Claim a stall' -and
+    (Words 'Ship-Dev -Channel main -Title x -Detail y') -eq 'REFUSED' -and (Words 'Ship-Dev -Title x -Detail y -Root C:/x') -eq 'REFUSED' -and (Words 'Ship-Dev -Title x -Detail y -Package') -eq 'REFUSED')
+Yes 'Ship-Main is held to a build and to -Channel main' ($verbs.verbs.'Ship-Main'.build -eq $true -and (Words 'Ship-Main -Title x -Detail y') -eq 'REFUSED' -and
+    (Words "Ship-Main -Build $sha -Title x -Detail y -ModsOnly") -eq '-Channel|main|-Title|x|-Detail|y|-ModsOnly' -and (Words "Ship-Main -Build $sha -Title x -Detail y -MoveServer") -eq 'REFUSED')
+$shipBox = Text 'scripts/release/Ship-OnBox.ps1'
+Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, a dev one mods only, with the token in GH_TOKEN alone and gone after' (
+    $shipBox.Contains("`$ship = @{ Notes = `$notes; FromFeed = `$true; NoPause = `$true }") -and $shipBox.Contains("if (`$Channel -eq 'dev') { `$ship['Channel'] = 'dev'; `$ship['ModsOnly'] = `$true }") -and
+    $shipBox.Contains('$env:GH_TOKEN = $token') -and $shipBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN'))
+Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
+$gt = Text 'scripts/vps/admin/gate-token.js'
+Yes '  the token is the App''s, for the fork and Thornswood only, Actions write and Contents read and nothing more' (
+    $gt.Contains("const REPOS = ['skymp', 'Thornswood'];") -and $gt.Contains("const PERMISSIONS = { actions: 'write', contents: 'read' };") -and $gt.Contains('{ repositories: REPOS, permissions: PERMISSIONS }'))
+$ig = Text 'scripts/deploy/Install-Gate.ps1'
+Yes 'Install-Gate pins the GitHub CLI by version and SHA-256 and refuses one that does not match' ($ig -match "\`$GhVersion = '\d+\.\d+\.\d+'" -and $ig -match "\`$GhSha = '[0-9A-F]{64}'" -and
+    $ig.Contains('if (`$got -ne ''$GhSha'')') -and $ig.Contains('gh = `$gh;'))
 $refused = @(
     @('', 'an empty line'),
     @('Remove-Item C:\', 'a verb that is not on the list'),
@@ -286,9 +303,18 @@ try {
         if (($said -join ';') -ne ($want -join ';')) { $said | Write-Host }
     } finally { Remove-Item -LiteralPath $pipeProbe -Force -ErrorAction SilentlyContinue }
 }
+Yes 'the broker puts the pinned GitHub CLI first on the verbs'' PATH' ($brokerCode.Contains("`$env:PATH = (Split-Path -Parent ([string]`$Cfg.gh)) + ';' + `$env:PATH"))
+# Patrick's A, 30 Oct 2026: the verbs are main's own verbs.json, read from
+# the checkout the broker has just fetched, so a merged verb needs no install.
+# The line's shape is still checked before git is asked anything.
+$shaped = $brokerCode.IndexOf('Split-ThornswoodGateLine $line')
 $tested = $brokerCode.IndexOf('Test-ThornswoodGateRequest -Line $line')
-Yes 'every line goes through the rules before anything runs' ($tested -gt 0 -and $tested -lt $brokerCode.IndexOf('$commit = Update-Checkout') -and $tested -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
-Yes '  and the rules are the installed verbs.json, not anything sent' ($brokerCode.Contains("Read-ThornswoodGateVerbs (Join-Path `$Root 'verbs.json')"))
+Yes 'a line''s shape is checked before git is asked anything' ($shaped -gt 0 -and $shaped -lt $brokerCode.IndexOf('$commit = Update-Checkout'))
+Yes 'every line goes through the rules after the fetch and before anything runs' ($tested -gt $brokerCode.IndexOf('$commit = Update-Checkout') -and $tested -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
+Yes '  and the rules are main''s verbs.json in the fetched checkout, never anything sent or installed' ($brokerCode.Contains("`$verbsAt = Join-Path `$Repo 'scripts\vps\gate\verbs.json'") -and
+    $brokerCode.Contains('Read-ThornswoodGateVerbs $verbsAt') -and -not $brokerCode.Contains("Read-ThornswoodGateVerbs (Join-Path `$Root 'verbs.json')"))
+Yes '  and the installer no longer puts a verbs.json beside the broker, and takes an old one away' (
+    (Text 'scripts/deploy/Install-Gate.ps1') -notmatch "\$Files = @\([^)]*verbs\.json" -and (Text 'scripts/deploy/Install-Gate.ps1').Contains('Remove-Item -LiteralPath (Join-Path `$root ''verbs.json'') -Force'))
 Yes 'what runs is the tip of main: fetched into origin/main and checked out from it' (
     $brokerCode.Contains("'+refs/heads/main:refs/remotes/origin/main'") -and $brokerCode.Contains("'--detach', 'refs/remotes/origin/main'") -and $brokerCode.Contains("'clean', '-ffdxq'"))
 Yes 'a live verb runs only when main is at the build it named, checked after the fetch' ($brokerCode.Contains('if ($req.Build -and $req.Build -cne $commit)') -and
