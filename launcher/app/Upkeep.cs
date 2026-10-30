@@ -359,7 +359,7 @@ namespace Thornswood
                 }
                 if (kinds.Contains(IssueKind.Plugins) || kinds.Contains(IssueKind.Personal) || kinds.Contains(IssueKind.OwnFolder))
                 {
-                    try { Verify.Fix(cfg, say); }
+                    try { Verify.Fix(cfg, say, Updater.ReleaseCopy(cfg, v)); }
                     catch (Exception ex) { Swallow.Note("Upkeep.FixOnDisk, the plugin list", ex); say("The plugin list could not be put right (" + ex.Message.TrimEnd('.') + ")."); }
                 }
                 // Thornswood's own files, from the release this install is
