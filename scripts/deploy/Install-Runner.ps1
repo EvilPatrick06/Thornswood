@@ -805,7 +805,8 @@ function Remove-LeftProfiles([string[]]$like, [string]$users = 'C:\Users') {
 # with its files open, and runner 3 was left with no service). The install and
 # -Remove both ask this first, and stop with what is wrong.
 function Get-RunnerProcesses([string]$root) {
-  @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { ('' + $_.ExecutablePath) -like ($root.TrimEnd('\') + '\*') })
+  # -EA Stop: a process list that cannot be read is a stop, never an empty list.
+  @(Get-CimInstance Win32_Process -EA Stop | Where-Object { ('' + $_.ExecutablePath) -like ($root.TrimEnd('\') + '\*') })
 }
 function Assert-RunnerIdle([string]$root) {
   $worker = @(Get-RunnerProcesses $root | Where-Object { $_.Name -eq 'Runner.Worker.exe' })
@@ -1455,6 +1456,13 @@ if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no 
 `$root = '$Root'
 `$acct = '$Account'
 
+# A runner already here is taken off first, so a second run replaces it:
+# never one in the middle of a job, and never by halves (Assert-RunnerIdle and
+# Stop-RunnerHere, #3889). Before the account's password changes, so a refusal
+# leaves the old service and the password it was registered with as they were.
+Assert-RunnerIdle `$root
+Stop-RunnerHere `$root '$service'
+
 # The account. In Users and nothing else. A password nobody ever sees: made
 # here, set, handed to config.cmd for the service, and dropped. Letters and
 # digits only: config.cmd is a batch file, and cmd.exe reads & | % ^ < > in
@@ -1496,11 +1504,6 @@ $(if ($onRunnerDrive) { "# ON THE RUNNER DRIVE: the other runners' folders there
 # The guard above, before the runner can take a job.
 $guard
 
-# A runner already here is taken off first, so a second run replaces it:
-# never one in the middle of a job, and never by halves (Assert-RunnerIdle and
-# Stop-RunnerHere, #3889).
-Assert-RunnerIdle `$root
-Stop-RunnerHere `$root '$service'
 # Everything config.cmd reads as "already configured": actions/runner keeps a
 # runner moved to the broker as .runner_migrated and .credentials_migrated, and
 # a reinstall that left those got "Cannot configure the runner because it is
