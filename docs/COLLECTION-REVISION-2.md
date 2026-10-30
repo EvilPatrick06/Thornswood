@@ -183,10 +183,7 @@ and server still use Dev's channel and ports. Record it once with
 scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Repo\local\release-devbuild,
 so Ship, Check-ShipReady and Build-Generated take it without -Root; Ship
 refuses any folder Vortex deploys into before anything is built
-(issue #1692). After the folder moves, run
-scripts\mods\Build-Generated.ps1 -Channel dev once: generated.txt records
-the game folder the generated files were built for, and they count as not
-built in any other.
+(issue #1692).
 
 Check: each release folder has Profile\OwnGame\files.txt, records the
 actual Vortex source in made.txt, and has no Vortex deployment manifest.
@@ -194,7 +191,11 @@ actual Vortex source in made.txt, and has no Vortex deployment manifest.
 ## 9. Build behaviors and bodies in each channel's own folder
 
 <!-- 1247:start -->
-Run scripts\mods\Build-Generated.ps1 -Root <own-install> -NoPause.
+Since #3715 (27 October 2026) the launcher builds these on each computer
+before Play and no release carries them; Ship asks a dry run whether the
+collection installed on the shipping machine can build them. To see a
+collection change build by hand, run
+scripts\mods\Build-Generated.ps1 -Root <own-install> -NoPause.
 Pandora 5.0.0-beta runs from a scratch copy with explicit game and output
 paths. The recorded recipe enables Precision and the three True Directional
 Movement patches. BodySlide builds CBBE 3BBB Amazing NeverNude, HIMBO Body -

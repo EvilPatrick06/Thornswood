@@ -35,8 +35,9 @@
   // ours: this file does nothing at all. Unreadable: carry on, as before.
   //
   // Ours is the address in Thornswood.ini's ServerAddress line when there is
-  // one, so a server move is an ini edit, and the fixed address below when
-  // there is not.
+  // one, and the game's own name below when there is not: the launcher writes
+  // that name into server-ip, never the box's address (#3690), so a server
+  // move is a DNS record and nothing here.
   //
   // This is the one copy (issue #485). The other plugins in game/plugins hold
   // no check of their own: this file publishes it below as
@@ -45,7 +46,7 @@
   // tests/test-whose-game-gate.js holds that together.
   if (!thornswoodGame()) { return; }
   function thornswoodGame() {
-    const ours = ['192.135.112.23'];
+    const ours = ['play.thornswood.net'];
     let ip = '';
     try {
       const fs = require('fs');
@@ -96,7 +97,8 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
+                    'thornswood-help.js', 'thornswood-settings.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js',
+                    'thornswood-preserve.js', 'thornswood-furniture.js', 'thornswood-stall.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -476,6 +478,15 @@
   */
   let TREAT_SELF_KEY = TRADE_KEY;
   /*
+    "Salt or smoke your food" in the inventory (#3163). THE FRIEND KEY, Y,
+    and not a new one: every letter is already Skyrim's or ours. In the
+    inventory the social keys refuse to act and Skyrim binds nothing to Y,
+    and U, H and X, the other three keys with a line there, are other keys,
+    so all four lines can be up at once. Rebinding FriendKey moves both. See
+    preservePress.
+  */
+  let PRESERVE_KEY = FRIEND_KEY;
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the game's own favourites hotkeys (and the emote slots while
     the wheel is open), and every letter is already one of ours or the game's.
@@ -537,6 +548,7 @@
   let HELP_NAME = keyName(HELP_KEY);
   let TREAT_NAME = keyName(TREAT_KEY);
   let TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+  let PRESERVE_NAME = keyName(PRESERVE_KEY);
 
   /*
     A KEY CHANGED IN THE GAME (#3126). The Settings panel writes
@@ -565,6 +577,7 @@
     HAIR_DYE_KEY = SKILLS_KEY;
     TREAT_KEY = LOCK_KEY;
     TREAT_SELF_KEY = TRADE_KEY;
+    PRESERVE_KEY = FRIEND_KEY;
     MANEUVER_KEY = iniNumber(ini, 'ManeuverKey', SETTINGS_KEYS.ManeuverKey);
     HELP_KEY = iniNumber(ini, 'HelpKey', SETTINGS_KEYS.HelpKey);
     TALK_KEY = iniNumber(ini, 'PushToTalk', SETTINGS_KEYS.PushToTalk);
@@ -583,6 +596,7 @@
     HELP_NAME = keyName(HELP_KEY);
     TREAT_NAME = keyName(TREAT_KEY);
     TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+    PRESERVE_NAME = keyName(PRESERVE_KEY);
     CLOSE_GAME_KEY = iniNumber(ini, 'CloseGameKey', SETTINGS_KEYS.CloseGameKey);
     CLOSE_GAME_NAME = keyName(CLOSE_GAME_KEY);
   }
@@ -2252,10 +2266,10 @@
   */
   const CAP_CLOSES = {
     skills: 'thornswoodSkills', party: 'thornswoodParty', journal: 'thornswoodJournal',
-    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
+    board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat', preserve: 'thornswoodPreserve',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip'
+    help: 'thornswoodHelp', settings: 'thornswoodSettings', box: 'thornswoodBox', ship: 'thornswoodShip', stall: 'thornswoodStall'
   };
 
   T.claimFocus = function (who, on) {
@@ -5797,8 +5811,77 @@
     ['JKs Skyrim.esp', 0x2493e], ['JKs Skyrim.esp', 0x2493d], ['JKs Skyrim.esp', 0x2c91],
     ['JKs Skyrim.esp', 0x3274], ["JK's Whiterun's Outskirts.esp", 0x1503ff],
     ["JK's Whiterun's Outskirts.esp", 0x18d5d7], ["JK's Whiterun's Outskirts.esp", 0x141081],
-    ["JK's Whiterun's Outskirts.esp", 0x141088]
+    ["JK's Whiterun's Outskirts.esp", 0x141088],
+    // The HearthFires garden planters, plots since #3141.
+    ['HearthFires.esm', 0x1045e], ['HearthFires.esm', 0x1045f], ['HearthFires.esm', 0x10460],
+    ['HearthFires.esm', 0x110b9], ['HearthFires.esm', 0x110ba], ['HearthFires.esm', 0x110cd]
   ];
+  /*
+    A MARKET STALL (#3160). Stalls are fixed market stalls (Patrick, 22 Oct
+    2026), and a stall's counter is a static, which the crosshair never
+    names. So the line goes up by where somebody stands: within a stall's
+    reach of the point in front of its counter, in its world or cell, with
+    nothing else of the lock key's under the crosshair, the line says Market
+    stall, and the lock key sends /stall open and the stall's id. The server
+    checks again that they stand there, and its panel does the rest
+    (game/ui/thornswood-stall.js).
+  */
+  // MARKET STALL SPOTS BEGIN
+  // Built by scripts\dev\Build-MarketStallsGamemode.js out of game\data\market-stalls.json. Do not hand edit.
+  const STALL_SPOTS = [
+    ["falkreath-e0b1", 0x3c, "Skyrim.esm", -54113, -34305, -3633, 335],
+    ["falkreath-e0b2", 0x3c, "Skyrim.esm", -54413, -34602, -3620, 335],
+    ["markarth-473a0", 0x16d71, "Skyrim.esm", -174050, 5729, -3363, 183],
+    ["markarth-473a1", 0x16d71, "Skyrim.esm", -174136, 6065, -3328, 183],
+    ["markarth-7de", 0x3c, "Skyrim.esm", -168656, 6632, -4331, 183],
+    ["morthal-bc995", 0x3c, "Skyrim.esm", -85314, 57199, -11567, 254],
+    ["morthal-bc996", 0x3c, "Skyrim.esm", -85377, 57518, -11568, 254],
+    ["riften-1b1f7a", 0x16bb4, "Skyrim.esm", 176485, -98728, 11211, 260],
+    ["riften-1b1f7c", 0x16bb4, "Skyrim.esm", 176213, -99094, 11207, 202],
+    ["riften-1dd1", 0x16bb4, "Skyrim.esm", 172370, -96376, 11128, 202],
+    ["riften-1dd2", 0x16bb4, "Skyrim.esm", 172370, -96231, 11128, 202],
+    ["riften-cc524", 0x16bb4, "Skyrim.esm", 173755, -96726, 11104, 252],
+    ["riften-cc52d", 0x16bb4, "Skyrim.esm", 173079, -97352, 11104, 309],
+    ["riften-cc52e", 0x16bb4, "Skyrim.esm", 173779, -97306, 11104, 257],
+    ["solitude-1aa3b", 0x3c, "Skyrim.esm", -59552, 100648, -13958, 224],
+    ["solitude-2a11", 0x37edf, "Skyrim.esm", -61093, 105827, -8410, 224],
+    ["solitude-2a1b", 0x37edf, "Skyrim.esm", -61315, 105933, -8418, 209],
+    ["solitude-2a49", 0x37edf, "Skyrim.esm", -60786, 105792, -8410, 224],
+    ["solitude-357d", 0x37edf, "Skyrim.esm", -59225, 107632, -8021, 224],
+    ["solitude-46f5", 0x37edf, "Skyrim.esm", -60730, 104169, -8307, 224],
+    ["solitude-4725", 0x37edf, "Skyrim.esm", -61764, 104094, -8307, 224],
+    ["solitude-50c6a", 0x37edf, "Skyrim.esm", -61161, 104924, -8335, 224],
+    ["solitude-5133", 0x3c, "Skyrim.esm", -58740, 101161, -13959, 224],
+    ["solitude-64b8c", 0x37edf, "Skyrim.esm", -61200, 104536, -8334, 224],
+    ["solitude-64b8d", 0x37edf, "Skyrim.esm", -61605, 104462, -8333, 224],
+    ["whiterun-1908f", 0x1a26f, "Skyrim.esm", 21453, -7327, -3587, 254],
+    ["whiterun-5b2e4", 0x1a26f, "Skyrim.esm", 25242, -7425, -3393, 254],
+    ["whiterun-5bee6", 0x1a26f, "Skyrim.esm", 25156, -7089, -3400, 314],
+    ["whiterun-6b0b6", 0x1a26f, "Skyrim.esm", 24382, -7187, -3399, 335],
+    ["whiterun-b7f00", 0x3c, "Skyrim.esm", 12937, -10803, -4726, 238],
+    ["whiterun-fe7f", 0x1a26f, "Skyrim.esm", 24312, -6755, -3422, 270],
+    ["windhelm-383a6", 0x1691d, "Skyrim.esm", 130794, 36455, -12272, 236],
+    ["windhelm-38403", 0x1691d, "Skyrim.esm", 130808, 35750, -12276, 236],
+    ["windhelm-38404", 0x1691d, "Skyrim.esm", 130560, 36224, -12272, 236],
+    ["windhelm-80c33", 0x3c, "Skyrim.esm", 135265, 30774, -12565, 202],
+    ["windhelm-8b01e", 0x1691d, "Skyrim.esm", 134225, 39412, -12049, 236],
+    ["windhelm-8b0a", 0x1691d, "Skyrim.esm", 129842, 36459, -12272, 236],
+    ["windhelm-8b0fb", 0x3c, "Skyrim.esm", 135301, 30408, -12581, 177],
+    ["windhelm-8b6c", 0x1691d, "Skyrim.esm", 130415, 35648, -12272, 236],
+    ["windhelm-a48fc", 0x1691d, "Skyrim.esm", 137951, 38182, -12643, 208],
+    ["windhelm-b4bb", 0x1691d, "Skyrim.esm", 137721, 38748, -12660, 219],
+    ["windhelm-f3c74", 0x1691d, "Skyrim.esm", 131041, 35666, -12272, 219],
+    ["windhelm-f3c75", 0x1691d, "Skyrim.esm", 130560, 36016, -12272, 219],
+    ["winterhold-76d1", 0x3c, "Skyrim.esm", 114289, 104184, -9405, 202],
+    ["winterhold-76d3", 0x3c, "Skyrim.esm", 114562, 104038, -9392, 183],
+    ["winterhold-76e1", 0x3c, "Skyrim.esm", 114011, 103748, -9225, 202],
+    ["winterhold-76e2", 0x3c, "Skyrim.esm", 113403, 100147, -8954, 183],
+    ["winterhold-76e4", 0x3c, "Skyrim.esm", 113628, 100266, -9020, 202],
+    ["winterhold-76e5", 0x3c, "Skyrim.esm", 112678, 100814, -8953, 202],
+    ["winterhold-76e6", 0x3c, "Skyrim.esm", 112650, 100647, -8944, 202]
+  ];
+  // MARKET STALL SPOTS END
+  let stallWorlds = null;  // null not resolved yet, else { stall id: runtime world or cell id }
   const PLOT_ASK_MS = 10000;     // asked again this often while one crop is looked at
   const PLOT_LINE_MS = 30000;    // an answer older than this is not drawn
   let lockAt = 0;
@@ -5894,9 +5977,61 @@
 
   const LOCK_WORDS = { claim: 'Claim ', lock: 'Lock ', unlock: 'Unlock ' };
 
+  /** The lock key's line at a stall: what stallAt finds, with no menu over it. */
+  function stallNow() {
+    const s = stallAt();
+    if (!s || busyMenuOpenNow()) { return null; }
+    return { hex: s, verb: 'stall open', words: 'Market stall' };
+  }
+
+  /** The id of the stall somebody is standing at, by STALL_SPOTS, or ''. */
+  function stallAt() {
+    if (!STALL_SPOTS.length) { return ''; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return ''; }
+    if (!stallWorlds) {
+      const got = {};
+      let found = 0;
+      for (let i = 0; i < STALL_SPOTS.length; i++) {
+        try {
+          const f = sp.Game.getFormFromFile(STALL_SPOTS[i][1], STALL_SPOTS[i][2]);
+          const id = f ? (f.getFormID() >>> 0) : 0;
+          if (id) { got[STALL_SPOTS[i][0]] = id; found++; }
+        } catch (e) { }
+      }
+      if (!found) { return ''; }
+      stallWorlds = got;
+      say('market stalls for the lock key: ' + found + ' of ' + STALL_SPOTS.length + ' found');
+    }
+    let where = 0, x = 0, y = 0, z = 0;
+    try {
+      const w = pc.getWorldSpace();
+      const c = pc.getParentCell();
+      where = w ? (w.getFormID() >>> 0) : (c ? (c.getFormID() >>> 0) : 0);
+      x = pc.getPositionX(); y = pc.getPositionY(); z = pc.getPositionZ();
+    } catch (e) { return ''; }
+    if (!where) { return ''; }
+    // Two stalls side by side reach over each other: the nearer one is the one at hand.
+    let best = '', bestD = Infinity;
+    for (let i = 0; i < STALL_SPOTS.length; i++) {
+      const s = STALL_SPOTS[i];
+      if (stallWorlds[s[0]] !== where) { continue; }
+      const dx = x - s[3], dy = y - s[4], dz = z - s[5];
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d <= s[6] * s[6] && d < bestD) { best = s[0]; bestD = d; }
+    }
+    return best;
+  }
+
   /** What the lock key would do right now: { hex, verb, words }, or null. */
   function lockKeyNow() {
     if (anyClaim()) { return null; }
+    return lockKeyRef() || stallNow();
+  }
+
+  /** What the lock key would do at what is under the crosshair: a door, a crop or a forge. */
+  function lockKeyRef() {
     let ref = null;
     try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
     if (!ref) { return null; }
@@ -6253,6 +6388,84 @@
     catch (err) { say('treat: closeMenu threw on the inventory: ' + err); }
     tellServer('/treat');
     say('pressed ' + TREAT_SELF_NAME + ' in the inventory with a wound to tend, asked the server for the treatment panel');
+    return true;
+  }
+
+  /*
+    ------------------------------------- salting and smoking food, from the inventory
+
+    #3163. Food spoils (docs/systems/spoilage.md), and a cook keeps raw meat
+    and fish by salting or smoking it. There is no item to use for that, so
+    it is the repair kit's pattern: while the inventory is open and the
+    server says you may preserve something you carry, one line at the bottom
+    names a key, and that key shuts the inventory and asks the server for
+    the preserving panel (game/ui/thornswood-preserve.js), whose buttons
+    send the rest. /preserve is that ask; nobody is told to type it.
+
+    Whether there is anything to preserve is the server's: you have to be a
+    cook and carry raw food that spoils, and its spoilage block writes that
+    on the thornswoodPreserveLine property, whose owner's script sets
+    globalThis.thornswoodPreserveLine. Above the furniture line, so all four
+    can be up.
+  */
+  let preserveShown = false;
+  const PRESERVE_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:27%');
+
+  function preserveCan() {
+    try { return !!globalThis.thornswoodPreserveLine; } catch (e) { return false; }
+  }
+
+  /** The line up or down. Only remembered once the page has taken it. */
+  function drawPreserveLine(on) {
+    if (on === preserveShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-preserve-line");if(d){d.style.display="none";}}catch(e){}')) {
+        preserveShown = false;
+      }
+      return;
+    }
+    const html =
+      '<span style="display:inline-block;min-width:26px;text-align:center;margin-right:12px;' +
+      'padding:1px 7px;border:1px solid rgba(233,209,155,.55);border-bottom-width:2px;' +
+      'border-radius:3px;background:rgba(0,0,0,.35);color:#e9d19b">' + PRESERVE_NAME + '</span>' +
+      'Salt or smoke your food';
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-preserve-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-preserve-line";' +
+             'd.style.cssText=' + JSON.stringify(PRESERVE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      preserveShown = true;
+    }
+  }
+
+  sp.on('menuOpen', guard('preserve line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(!!T.ready && preserveCan());
+  }));
+  sp.on('menuClose', guard('preserve line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawPreserveLine(false);
+  }));
+
+  /*
+    The key, in the inventory. Asked again at the press: the inventory open,
+    nothing typing, something to preserve. Answers whether it was used, so
+    the key falls through when it was not.
+  */
+  function preservePress() {
+    if (!T.ready || claims.chat) { return false; }
+    let open = false;
+    try { open = !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { open = false; }
+    if (!open) { return false; }
+    if (!preserveCan()) { drawPreserveLine(false); return false; }
+    drawPreserveLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('preserve: closeMenu threw on the inventory: ' + err); }
+    tellServer('/preserve');
+    say('pressed ' + PRESERVE_NAME + ' in the inventory with food to preserve, asked the server for the preserving panel');
     return true;
   }
 
@@ -7791,7 +8004,7 @@
 
     And the game's journal cannot be switched off as a whole, because the
     Journal Menu is also what Escape opens, at its System page, which is where
-    people save, change settings and quit. The journal flag on
+    people change settings and quit (#3127 took saving off it). The journal flag on
     DisablePlayerControls is documented as leaving only the System page of
     the book, which takes the quest log mods still write to away from Escape
     as well, and the controls watchdog above turns every control back on
@@ -8623,6 +8836,18 @@
     }
   }));
 
+  // A market stall's panel closes when you walk away from the stall (#3160).
+  let stallWatchAt = 0;
+  sp.on('update', guard('stall distance', () => {
+    if (!T.hasFocus('stall')) { return; }
+    const now = Date.now();
+    if (now - stallWatchAt < 250) { return; }
+    stallWatchAt = now;
+    if (!stallAt()) {
+      T.js('try{window.thornswoodStall&&window.thornswoodStall.close();}catch(e){}');
+    }
+  }));
+
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
     // Before the isDown guard, not after it.
@@ -8702,6 +8927,8 @@
     if (e.code === TREAT_KEY && treatPress()) { return; }
     // The trade key in the inventory, with a wound to tend (#1383). See TREAT_SELF_KEY.
     if (e.code === TREAT_SELF_KEY && treatSelfPress()) { return; }
+    // The friend key in the inventory, for a cook with raw food (#3163). See PRESERVE_KEY.
+    if (e.code === PRESERVE_KEY && preservePress()) { return; }
     /*
       The five social keys work in the open world, and P and J can always
       close their own panel. Djinn on dev, 24 September: "The party menu
@@ -9610,6 +9837,11 @@
       if (what.indexOf('select:alive') !== 0) { log('choice page:', what.slice(7)); }
       return;
     }
+    // The loading screen (#3130) says when it went up and down by the page's
+    // own clock, and how far the loop played. Sent during a load, so they
+    // reach this log after it: the times in them are the record, not this
+    // log's.
+    if (what.indexOf('load:') === 0) { log('loading screen:', what.slice(5)); return; }
 
     /*
       The skills panel says when it opens and closes rather than being
@@ -9643,6 +9875,10 @@
     if (what === 'ship:opened') { T.claimFocus('ship', true); return; }
     if (what === 'ship:closed') { T.claimFocus('ship', false); return; }
     if (what === 'ship:ready') { log('the trade ships panel is in'); return; }
+    // A market stall's panel (#3160): the lock key at a stall.
+    if (what === 'stall:opened') { T.claimFocus('stall', true); return; }
+    if (what === 'stall:closed') { T.claimFocus('stall', false); return; }
+    if (what === 'stall:ready') { log('the market stall panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
@@ -9679,6 +9915,9 @@
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'preserve:opened') { T.claimFocus('preserve', true); return; }
+    if (what === 'preserve:closed') { T.claimFocus('preserve', false); return; }
+    if (what === 'preserve:ready') { log('the preserving panel is in'); return; }
     if (what === 'furniture:opened') { T.claimFocus('furniture', true); return; }
     if (what === 'furniture:closed') { T.claimFocus('furniture', false); return; }
     if (what === 'furniture:ready') { log('the furniture panel is in'); return; }
@@ -9859,6 +10098,182 @@
 
     log(what);
   }));
+
+  // ------------------------------------------------- the map's calendar --
+  /*
+    THE MAP'S CALENDAR: THE DATE, THE SEASON AND THE SERVER CLOCK (#3156).
+
+    Patrick, 22 Oct 2026, on his page: C, on the map menu. A strip at the top
+    of the screen while MapMenu is up, gone the moment it closes:
+
+      26th of Frostfall, 4E 252
+      Autumn, winter in 3 days
+      Server clock 9:46 AM MDT, yours 4:46 PM
+
+    THE DATE is the game's own calendar, the globals the game's map line
+    reads (GameDay 0x37, GameMonth 0x36, GameYear 0x35), which the engine's
+    TimeService writes from today's date in UTC. It is read here rather than
+    worked out again, so this line and the game's never disagree. There is
+    no day of the week: the game counts that from GameDaysPassed, which
+    TimeService never writes (#841), so it is not the same for two people.
+
+    THE SEASON AND THE SERVER CLOCK are the server's, handed over by the
+    calendar property (gamemode.js, THE DATE, THE SEASON AND THE SERVER CLOCK
+    ON THE MAP) through globalThis.thornswoodCalendar, as the drunk screen's
+    is. The server clock is the box's zone put on this machine's own clock,
+    the clock the sky already runs on. Yours shows only when your zone is not
+    the server's. Before the server has said anything, the date shows alone.
+
+    Read once a second while the map is up, and written to the page only when
+    a line changed, which is once a minute.
+  */
+  const MAP_MENU = 'MapMenu';
+  const MAP_CAL_ID = 'ts-map-calendar';
+  const MAP_CAL_EVERY_MS = 1000;
+  // GameMonth counts from 0, Morning Star.
+  const MONTHS = ['Morning Star', 'Sun\'s Dawn', 'First Seed', 'Rain\'s Hand', 'Second Seed', 'Midyear',
+                  'Sun\'s Height', 'Last Seed', 'Hearthfire', 'Frostfall', 'Sun\'s Dusk', 'Evening Star'];
+  const GAME_DAY = 0x37;
+  const GAME_MONTH = 0x36;
+  const GAME_YEAR = 0x35;
+  let mapCalendar = null;   // what the server last handed over
+  let mapUp = false;
+  let mapCalAt = 0;
+  let mapCalShown = '';
+  let mapCalUnread = false; // the calendar could not be read, said once a map
+
+  globalThis.thornswoodCalendar = function (v) { mapCalendar = v; mapCalShown = ''; };
+
+  function ordinal(n) {
+    const t = n % 100;
+    if (t >= 11 && t <= 13) { return n + 'th'; }
+    if (n % 10 === 1) { return n + 'st'; }
+    if (n % 10 === 2) { return n + 'nd'; }
+    if (n % 10 === 3) { return n + 'rd'; }
+    return n + 'th';
+  }
+
+  function clock12(h, m) {
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return hh + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
+  }
+
+  function gameGlobal(id) {
+    const gv = sp.GlobalVariable.from(sp.Game.getFormEx(id));
+    return gv ? Math.floor(gv.getValue()) : NaN;
+  }
+
+  function mapDateLine() {
+    let day = NaN, month = NaN, year = NaN;
+    try {
+      day = gameGlobal(GAME_DAY);
+      month = gameGlobal(GAME_MONTH);
+      year = gameGlobal(GAME_YEAR);
+    } catch (e) {
+      if (!mapCalUnread) { mapCalUnread = true; log('map calendar: the game\'s calendar could not be read: ' + e); }
+      return '';
+    }
+    if (!(day >= 1 && day <= 31) || !(month >= 0 && month <= 11) || !(year >= 1)) {
+      if (!mapCalUnread) {
+        mapCalUnread = true;
+        log('map calendar: the game\'s calendar reads day ' + day + ', month ' + month + ', year ' + year + ', so no date');
+      }
+      return '';
+    }
+    return ordinal(day) + ' of ' + MONTHS[month] + ', 4E ' + year;
+  }
+
+  function untilWords(ms) {
+    const H = 3600000;
+    if (ms >= 36 * H) { return 'in ' + Math.round(ms / (24 * H)) + ' days'; }
+    if (ms >= 90 * 60000) { return 'in ' + Math.round(ms / H) + ' hours'; }
+    return 'within the hour';
+  }
+
+  function capital(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+
+  function mapSeasonLine(cal, now) {
+    if (!cal || !cal.season) { return ''; }
+    const line = capital(cal.season);
+    if (!cal.next || !(cal.turns > now)) { return line; }
+    return line + ', ' + cal.next + ' ' + untilWords(cal.turns - now);
+  }
+
+  function mapClockLine(cal, now) {
+    if (!cal || typeof cal.off !== 'number' || !isFinite(cal.off)) { return ''; }
+    const s = new Date(now + cal.off * 60000);
+    let line = 'Server clock ' + clock12(s.getUTCHours(), s.getUTCMinutes()) + (cal.tz ? ' ' + cal.tz : '');
+    const here = new Date(now);
+    if (-here.getTimezoneOffset() !== cal.off) {
+      line += ', yours ' + clock12(here.getHours(), here.getMinutes());
+    }
+    return line;
+  }
+
+  function mapCalendarLines(now) {
+    return [mapDateLine(), mapSeasonLine(mapCalendar, now), mapClockLine(mapCalendar, now)]
+      .filter(function (l) { return !!l; });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /*
+    The strip, in the needs HUD's own pixels (--ts, gamemode.js hudScript):
+    the screen's height over 720 or its width over 1280, whichever is smaller,
+    so it sits in the same place at every screen size. Centred at the top,
+    where the map has nothing of its own.
+  */
+  const MAP_CAL_CSS = '--ts:min(0.078125vw,0.1388889vh);' +
+    'position:fixed;left:50vw;top:calc(50vh - 350 * var(--ts));transform:translateX(-50%);' +
+    'z-index:2147483500;pointer-events:none;text-align:center;white-space:nowrap;' +
+    'font-family:Georgia,serif;font-size:calc(11 * var(--ts));line-height:1.35;color:#efe4cc;' +
+    'background:rgba(12,10,8,.62);border:calc(1 * var(--ts)) solid rgba(0,0,0,.65);' +
+    'border-radius:calc(4 * var(--ts));padding:calc(4 * var(--ts)) calc(10 * var(--ts));' +
+    'text-shadow:0 1px 3px rgba(0,0,0,.95)';
+
+  function drawMapCalendar(now) {
+    const lines = mapCalendarLines(now);
+    const text = lines.join('\n');
+    if (text === mapCalShown) { return; }
+    mapCalShown = text;
+    if (!lines.length) { hideMapCalendar(); return; }
+    const html = lines.map(function (l) { return '<div>' + escapeHtml(l) + '</div>'; }).join('');
+    T.js('(function(){try{' +
+         'var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(!d){d=document.createElement("div");d.id=' + JSON.stringify(MAP_CAL_ID) + ';' +
+         'd.style.cssText=' + JSON.stringify(MAP_CAL_CSS) + ';document.body.appendChild(d);}' +
+         'd.innerHTML=' + JSON.stringify(html) + ';' +
+         '}catch(e){}})();');
+  }
+
+  function hideMapCalendar() {
+    T.js('(function(){try{var d=document.getElementById(' + JSON.stringify(MAP_CAL_ID) + ');' +
+         'if(d&&d.parentNode){d.parentNode.removeChild(d);}}catch(e){}})();');
+  }
+
+  sp.on('menuOpen', guard('map calendar open', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = true;
+    mapCalAt = 0;
+    mapCalShown = '';
+    mapCalUnread = false;
+  }));
+  sp.on('menuClose', guard('map calendar close', (e) => {
+    if (!e || e.name !== MAP_MENU) { return; }
+    mapUp = false;
+    mapCalShown = '';
+    hideMapCalendar();
+  }));
+  sp.on('update', guard('map calendar', () => {
+    if (!mapUp) { return; }
+    const now = Date.now();
+    if (now - mapCalAt < MAP_CAL_EVERY_MS) { return; }
+    mapCalAt = now;
+    drawMapCalendar(now);
+  }));
+  // ------------------------------------------------ end the map's calendar --
 
   // ------------------------------------------------------ the drunk screen --
   /*

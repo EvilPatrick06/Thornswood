@@ -61,7 +61,7 @@ jobs:
     # Check-RunnerIsolation.ps1 holds every job to that, on the gate through
     # tests\test-runner-isolation.ps1.
     if: github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     # Six calls at most. Past this it is stuck, not slow.
     timeout-minutes: 5
     steps:

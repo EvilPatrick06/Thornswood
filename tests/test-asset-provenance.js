@@ -27,7 +27,8 @@
 //      path the entry names (the five files nothing uses, #2177); a file the
 //      launcher makes from the person's own game, or from their own copy of
 //      the collection's mods, names the Ship-Rules.ps1 list that keeps it out
-//      of every pack the same way (#2827, #3113);
+//      of every pack the same way (#2827, #3113), and so does one the
+//      launcher builds on each computer with the collection's tools (#3715);
 //   5. no permission is copied in: no email address anywhere in it;
 //   6. it stays operator only: nothing that builds a pack, the installer, the
 //      launcher or the site names it, and it is not under site\public;
@@ -92,8 +93,11 @@ function tracked() {
 
 // The quoted paths of one list in Ship-Rules.ps1, $<name> = @( ... ).
 function shipList(text, name) {
-  const m = new RegExp('^\\$' + name + ' = @\\(([\\s\\S]*?)^\\)', 'm').exec(text || '');
-  return m ? (m[1].match(/'[^']+'/g) || []).map((q) => q.slice(1, -1)) : [];
+  // A list may start with others added on ($A + $B + @(...)), and @() on one
+  // line is an empty list; a comment line inside it is not a path.
+  const m = new RegExp('^\\$' + name + ' = (?:[$\\w]+ \\+ )*@\\((?:\\)|([\\s\\S]*?)^\\))', 'm').exec(text || '');
+  const body = (m && m[1] || '').replace(/^\s*#.*$/mg, '');
+  return m ? (body.match(/'[^']+'/g) || []).map((q) => q.slice(1, -1)) : [];
 }
 
 // Each finding is one line saying what is wrong and what to do.
@@ -115,7 +119,7 @@ function audit(reg, files, hash, uiGone, shipRules) {
     if (NEEDS_ASK.indexOf(a.status) >= 0 && !(typeof a.ask === 'string' && /^[^:]{2,}: \S/.test(a.ask))) bad.push(name + ': ' + a.status + ' with no ask naming who can answer ("Who: what")');
     if (a.status === 'no-licence-found' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': no licence found, and no issue that carries it');
     if (a.status === 'leaving' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': leaving, and no issue that carries the upload it leaves in');
-    if (a.status === 'withheld' || a.status === 'made-from-game' || a.status === 'made-from-mods') {
+    if (a.status === 'withheld' || a.status === 'made-from-game' || a.status === 'made-from-mods' || a.status === 'built-on-each-computer') {
       const m = /^records\/ui-gone\.json#(\w+)$/.exec(a.record || '');
       const r = /^scripts\/release\/Ship-Rules\.ps1#(\w+)$/.exec(a.record || '');
       if (r) {
@@ -126,6 +130,8 @@ function audit(reg, files, hash, uiGone, shipRules) {
         else if (out.length) bad.push(name + ': ' + a.status + ' by Ship-Rules.ps1 $' + r[1] + ', which does not hold ' + out.join(', '));
       } else if (a.status === 'made-from-game' || a.status === 'made-from-mods') {
         bad.push(name + ': made from the ' + (a.status === 'made-from-game' ? 'game' : 'mods') + ', but names no Ship-Rules.ps1 list that keeps it out of packs');
+      } else if (a.status === 'built-on-each-computer') {
+        bad.push(name + ': built on each computer, but names no Ship-Rules.ps1 list that keeps it out of packs');
       } else {
         const held = m && uiGone ? uiGone[m[1]] : null;
         const n = held ? (Array.isArray(held) ? held.length : Object.keys(held).length) : 0;
@@ -185,10 +191,15 @@ if (reg) {
     (reg.notInRepo || []).filter((a) => a.status === 'made-from-game' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromGame')
       .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 3 &&
     shipList(shipRules, 'ShipMadeFromGame').length === 3);
-  yes('the five menus the launcher makes from the collection\'s mods are registered, held out by the Ship-Rules.ps1 list (#3113)',
+  yes('the six menus the launcher makes from the collection\'s mods are registered, held out by the Ship-Rules.ps1 list (#3113, #3127)',
     (reg.notInRepo || []).filter((a) => a.status === 'made-from-mods' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromMods')
-      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 5 &&
-    shipList(shipRules, 'ShipMadeFromMods').length === 5);
+      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 6 &&
+    shipList(shipRules, 'ShipMadeFromMods').length === 6);
+  yes('the animation and body files the launcher builds on each computer are registered, named by the Ship-Rules.ps1 lists that keep them out (#3715)',
+    (reg.notInRepo || []).filter((a) => a.status === 'built-on-each-computer' && /^scripts\/release\/Ship-Rules\.ps1#ShipGenerated(BodyFiles|Patterns)$/.test(a.record || ''))
+      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) ===
+      ['ShipGeneratedBodyFiles', 'ShipGeneratedOutfitFiles', 'ShipGeneratedPatterns'].reduce((n, l) => n + shipList(shipRules, l).length, 0) &&
+    shipList(shipRules, 'ShipGeneratedBodyFiles').length === 6);
   yes('community uploads and the collection\'s mods are dispositioned', (reg.dispositions || []).length >= 2 && (reg.dispositions || []).some((d) => /gallery/i.test(d.what)) && (reg.dispositions || []).some((d) => /collection/i.test(d.what)));
 }
 

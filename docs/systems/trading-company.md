@@ -11,7 +11,8 @@ company is how a crate gets from one hold to another for pay. The
 lore of that agreement is on the site. This page is the coin.
 
 Carriages and ferries move people. They are not the company. See
-[Carriages and ferries](carriages.md).
+[Carriages and ferries](carriages.md). A lot of goods at once go on a cart that
+somebody drives; see [Trade carts](carts.md).
 
 ## Posting a haul
 

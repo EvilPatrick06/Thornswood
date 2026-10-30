@@ -266,9 +266,9 @@ for (const list of Object.values(os.networkInterfaces())) {
   console.log('\n5. Install-Voice.ps1:');
   const iv = read('scripts/deploy/Install-Voice.ps1');
   yes('binds loopback unless told otherwise', /\[string\]\$Bind\s+= '127\.0\.0\.1',/.test(iv));
-  yes('opens the firewall only for every interface, and takes the rule away on loopback',
-      /if \('\$Bind' -eq '127\.0\.0\.1'\) \{\s*Remove-NetFirewallRule -DisplayName '\$TaskName'/.test(iv) &&
-      /\} elseif \(-not \(Get-NetFirewallRule -DisplayName '\$TaskName'[^\n]*\)\) \{\s*New-NetFirewallRule/.test(iv));
+  yes('opens the firewall only for every interface, and takes the rule away on loopback, in the box\'s policy store (#3896)',
+      /`\$fwHas = \[bool\]\(Get-NetFirewallRule -PolicyStore localhost -DisplayName '\$TaskName'[^\n]*\)\s*if \('\$Bind' -eq '127\.0\.0\.1'\) \{\s*if \(`\$fwHas\) \{ Remove-NetFirewallRule -PolicyStore localhost -DisplayName '\$TaskName'; Sync-ThornswoodFirewall \}/.test(iv) &&
+      /\} elseif \(-not `\$fwHas\) \{\s*New-NetFirewallRule -PolicyStore localhost /.test(iv));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exitCode = fail ? 1 : 0;
