@@ -279,7 +279,7 @@ namespace TsTest264
   # Proves the naming rule against a real install rather than against itself:
   # when the Address Library is installed here at all, the name read off the
   # real exe must be one of its files.
-  $real = 'C:\Thornswood\Game'
+  $real = Join-Path ([string](& (Join-Path $Here 'scripts\release\Where.ps1') Install)) 'Game'
   $realPlugins = Join-Path $real 'Data\SKSE\Plugins'
   if ((Test-Path (Join-Path $real 'SkyrimSE.exe')) -and (Test-Path $realPlugins) -and
       @(Get-ChildItem $realPlugins -Filter 'version*.bin' -File -ErrorAction SilentlyContinue).Count -gt 0) {
@@ -290,7 +290,7 @@ namespace TsTest264
     Yes 'on this machine the name read off the real exe is a file the Address Library installed' `
         ($rf.Length -gt 0 -and (Test-Path $rf))
   } else {
-    Write-Host 'SKIP  no Address Library install at C:\Thornswood\Game to measure against'
+    Write-Host "SKIP  no Address Library install at $real to measure against"
   }
 }
 finally {

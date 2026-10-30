@@ -7,7 +7,8 @@
 # records\server-build.json (New-ServerBuildRecord.ps1, which ties each file
 # to the fork's source), records\client-build.json (New-ClientBuildRecord.ps1,
 # the six client files), and records\client-licences.json with
-# records\client-licences\, the vcpkg libraries in the client files and each
+# records\client-licences\, the libraries in the client files (vcpkg ports, the
+# fork's own noticed folders and npm packages, #3751) and each
 # one's licence text (#3099, New-ClientLicenceRecord.ps1), which the fork's
 # build measures from each file's program database and keeps in
 # build\licences. It also makes the server build the box's store keeps
@@ -93,7 +94,8 @@
 # with no commit, the one this branch pins. A manual run only: a pull
 # request's code reaches the box through build-pr.yml alone (#1306,
 # tests\test-1306-pr-workflow.js), so a change to this file is first run by
-# hand once it is on main.
+# hand once it is on main. A manual run on a branch runs on the build
+# runners, which never sign (#3550).
 #
 # WHY THE ACTIONS ARE PINNED. Each is a full commit SHA with its tag in a
 # comment, as in build.yml and release.yml: these steps run on the VPS.

@@ -37,12 +37,22 @@
        when Nexus keeps something else the run stops with the way back, and
        -From puts the page back;
     5. a collection revision: the collection_data is Vortex's own mapping; an
-       entry with patches, hashes or a mod rule is refused; -WhatIf builds the
+       entry with hashes is refused; a moved entry's patch stays when the new
+       archive holds the same file, goes when it is dropped and is refused
+       otherwise, and a mod rule that names it is given the new archive's md5,
+       file name and version (#2793); -WhatIf builds the
        archive and writes nothing; the real run uploads an archive with the
        same files as the published one and only the swapped entry changed,
        as a draft; a second draft, a base that is not the latest and a
        publish of something that is not a draft are refused; -Publish
-       publishes it.
+       publishes it;
+    6. taking a mod out (#3649): its entry and its plugins go and nothing
+       else changes; one with patches, no hashes or a rule naming it is
+       refused;
+    7. what each mod's page allows (#3649): a revision with a mod the
+       permission record has not read, or does not have, is refused before
+       anything is written, and so is publishing a draft with a mod whose
+       page does not allow it in a collection; a -WhatIf says so and goes on.
 
   Needs node. The collection part needs 7-Zip and says SKIP without it; the
   5.1 runs say SKIP where there is no Windows PowerShell. Everything it writes
@@ -131,6 +141,9 @@ function Run([string]$name, [string[]]$arguments, [switch]$Win51) {
     if ($Win51) { $exe = $winps }
     $psi = New-Object Diagnostics.ProcessStartInfo
     $psi.FileName = $exe
+    # New-NexusRevision holds every mod to a permission record (#3649): the
+    # stand-in's mods are in one of the test's own, never the real one.
+    if ($name -eq 'New-NexusRevision.ps1') { $arguments = @($arguments) + @('-Permissions', $script:perm) }
     $psi.Arguments = ((@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Q (Join-Path $rel $name))) + @($arguments | ForEach-Object { Q $_ }) + @('-NoPause')) -join ' ')
     $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
     $p = [Diagnostics.Process]::Start($psi)
@@ -141,6 +154,21 @@ function Run([string]$name, [string[]]$arguments, [switch]$Win51) {
     $script:outs.Add($text)
     return [pscustomobject]@{ Code = $p.ExitCode; Out = $text }
 }
+# The permission record for the stand-in's mods (#3649), with what each
+# page says set per run: ours, a reading's collections value, or null.
+$script:perm = Join-Path $T 'collection-permissions.json'
+function Perm([hashtable]$say) {
+    $rows = foreach ($id in @(1111, 1932, 47618, 192001, 192762)) {
+        if (-not $say.ContainsKey($id)) { continue }
+        $v = $say[$id]
+        $head = '{"modId":' + $id + ',"name":"Mod ' + $id + '","author":"Someone","files":[{"fileId":1,"name":"f","version":"1"}],"plugins":[],"page":"https://www.nexusmods.com/skyrimspecialedition/mods/' + $id + '?tab=description"'
+        if ($v -eq 'ours') { $head + ',"ours":true,"reading":null}' }
+        elseif ($null -eq $v) { $head + ',"reading":null}' }
+        else { $head + ',"reading":{"read":"2026-10-27","by":"the test","collections":"' + $v + '","terms":{"Author''s instructions":"x"}}}' }
+    }
+    Put $script:perm ('{"version":1,"collection":"7essxf","revision":2,"mods":[' + (@($rows) -join ',') + ']}')
+}
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
 function Show($r) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 14) -join "`n") -ForegroundColor DarkGray }
 function YesR([string]$what, [bool]$cond, $r) { Yes $what $cond; if (-not $cond) { Show $r } }
 function Writes($reqs) { return @($reqs | Where-Object { $_.method -ne 'GET' -and -not ($_.path -eq '/v2/graphql' -and -not ([string]$_.json.query).StartsWith('mutation')) }) }
@@ -177,7 +205,8 @@ $env:THORNSWOOD_NEXUS_STANDIN = $null; $env:LOCALAPPDATA = (Join-Path $T 'appdat
 $n0 = Count
 $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.1')
 $env:THORNSWOOD_NEXUS_STANDIN = $base; $env:LOCALAPPDATA = $realAppData
-YesR 'with no key on the machine a file upload stops, naming the variable and the file' ($r.Code -eq 1 -and $r.Out -match 'THORNSWOOD_NEXUS_API_KEY' -and $r.Out.Contains([IO.Path]::Combine('Thornswood', 'Nexus', 'api-key.txt')) -and $r.Out -match 'Nothing was changed on Nexus') $r
+# A cloud session holds no key since #2841: the stop names Nexus-Run.ps1, which runs it with the key, and One's file.
+YesR 'with no key on the machine a file upload stops, naming Nexus-Run.ps1 and the file' ($r.Code -eq 1 -and $r.Out -match 'Nexus-Run\.ps1' -and $r.Out.Contains([IO.Path]::Combine('Thornswood', 'Nexus', 'api-key.txt')) -and $r.Out -match 'Nothing was changed on Nexus') $r
 Yes 'and asks nothing first' ((Count) -eq $n0)
 
 $r = Run 'Set-NexusKey.ps1' @('-Check')
@@ -320,7 +349,7 @@ $fixture = [ordered]@{
             source = [ordered]@{ type = 'nexus'; modId = 1111; fileId = 2222; md5 = '00000000000000000000000000000001'; fileSize = 10; logicalFilename = 'Hashed'; updatePolicy = 'exact'; tag = 'zzz' }
             hashes = @([ordered]@{ path = 'a.esp'; md5 = '00000000000000000000000000000002' }); author = 'Someone'; details = [ordered]@{ category = 'Gameplay'; type = '' }; phase = 1 }
     )
-    modRules = @([ordered]@{ type = 'before'; reference = [ordered]@{ fileMD5 = 'ee881bf2a869d0810113a82ca1405445'; logicalFileName = 'Thornswood Content'; versionMatch = '1.2.0' }
+    modRules = @([ordered]@{ type = 'before'; reference = [ordered]@{ fileExpression = 'Thornswood Content 192001 1.2 2026-09-26T22-15Z EwgfAezil'; fileMD5 = 'ee881bf2a869d0810113a82ca1405445'; logicalFileName = 'Thornswood Content'; versionMatch = '1.2.0' }
                            source = [ordered]@{ fileMD5 = 'fa1fe7613d21ab5826d4a3a3b258f14a'; logicalFileName = 'Fishing In Skyrim'; versionMatch = '1.0.0' } })
     tools = @(); plugins = @(); pluginRules = [ordered]@{ plugins = @(); groups = @() }; collectionConfig = [ordered]@{ recommendNewProfile = $true; referenceTagScheme = 'v1' }
 }
@@ -346,14 +375,53 @@ $wantPayload = '{"adult_content":false,"collection_manifest":{"info":{"author":"
 Yes 'the collection_data is Vortex''s mapping: empty strings to null, ids as strings, file_size dropped by filterInfo, schema 1' ((Test-Path -LiteralPath $o2) -and ([IO.File]::ReadAllText($o2, [Text.Encoding]::UTF8)) -ceq $wantPayload)
 & $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),t=fs.readFileSync(process.argv[2],'utf8'),b=JSON.parse(t);const layout=t===JSON.stringify(b,undefined,2);const r=b.mods[1];r.version='1.0.0';r.source.fileId=809366;r.source.md5='c515679068f6563750b1ca1f9260031f';r.source.fileSize=148896610;process.exit(layout&&JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1
 Yes 'and the rest of collection.json is as it was, in the layout Vortex writes' ($LASTEXITCODE -eq 0)
-foreach ($case in @(
-        @('192001', 'patches', 'Thornswood Content carries patches'),
-        @('1111', 'hashes', 'A Hashed Mod carries hashes'),
-        @('47618', 'a mod rule', 'mod rules name A Fishing Mod'))) {
-    Put $sw ('[{"modId":"' + $case[0] + '","fileId":"999","version":"9","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"x"}]')
-    $null = & $node.Source $js $cj $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
-    Yes ('an entry with ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+Put $sw ('[{"modId":"1111","fileId":"999","version":"9","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"x"}]')
+$null = & $node.Source $js $cj $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+Yes 'an entry with hashes is refused, and nothing is written' ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+
+# Issue #2793: Thornswood Content moved to a file whose plugin is not the one
+# its patch was made for. The patch stays only where the new archive holds the
+# same file, and the mod rule that names 1.2 by its archive is moved with it.
+$tcExpr = 'Thornswood Content 192001 1.3 2026-10-27T15-00Z Tok812399'
+function TcSwap([string]$crcs, [string]$drop, [string]$expr = $tcExpr) {
+    $x = if ($expr) { ',"fileExpression":"' + $expr + '"' } else { '' }
+    $c = if ($crcs) { ',"patchCrcs":' + $crcs } else { '' }
+    $d = if ($drop) { ',"dropPatches":' + $drop } else { '' }
+    return '[{"modId":"192001","fileId":"812399","version":"1.3","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"Thornswood Content"' + $x + $c + $d + '}]'
 }
+$o1 = Join-Path $T 'tc-collection.json'; $o2 = Join-Path $T 'tc-payload.json'
+Put $sw (TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' '["thornswood-content.esp"]')
+$said = & $node.Source $js $cj $sw $o1 $o2
+$want = @("patches.Thornswood-Content.esp`t023593E0`tdropped", "modRules[0].reference.fileMD5`tee881bf2a869d0810113a82ca1405445`t$md5",
+    "modRules[0].reference.fileExpression`tThornswood Content 192001 1.2 2026-09-26T22-15Z EwgfAezil`t$tcExpr", "modRules[0].reference.versionMatch`t1.2.0`t1.3.0",
+    "version`t1.2`t1.3", "source.fileId`t811029`t812399", "source.md5`tee881bf2a869d0810113a82ca1405445`t$md5", "source.fileSize`t660022`t1") | ForEach-Object { "Thornswood Content`t" + $_ }
+Yes 'a dropped patch goes, and the rule that names Thornswood Content gets the new md5, file name and version, each said' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ($want -join '|'))
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));const c=b.mods[0],r=b.modRules[0];if('patches' in c)process.exit(2);if(JSON.stringify(r.source)!==JSON.stringify(a.modRules[0].source))process.exit(3);c.patches=a.mods[0].patches;c.version='1.2';Object.assign(c.source,{fileId:811029,md5:'ee881bf2a869d0810113a82ca1405445',fileSize:660022});const k=Object.keys(c);k.splice(k.indexOf('patches'),1);k.splice(k.indexOf('source')+1,0,'patches');const o={};for(const x of k)o[x]=c[x];b.mods[0]=o;Object.assign(r.reference,{fileExpression:'Thornswood Content 192001 1.2 2026-09-26T22-15Z EwgfAezil',fileMD5:'ee881bf2a869d0810113a82ca1405445',versionMatch:'1.2.0'});process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1
+Yes 'and nothing else in collection.json changes' ($LASTEXITCODE -eq 0)
+Put $sw (TcSwap '{"Thornswood-Content.esp":"023593e0"}' '')
+$said = & $node.Source $js $cj $sw $o1 $o2
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));process.exit(b.mods[0].patches['Thornswood-Content.esp']==='023593E0'&&b.modRules[0].reference.versionMatch==='1.3.0'?0:1)" $o1
+Yes 'a patch whose file the new archive holds unchanged stays, with no line for it' ($LASTEXITCODE -eq 0 -and -not (@($said) -match '^Thornswood Content	patches'))
+foreach ($case in @(
+        @((TcSwap '' ''), 'a patched entry whose new archive the swap does not describe', 'does not say what the new archive holds there'),
+        @((TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' ''), 'a patch made for another file than the new archive holds', 'with CRC-32 0A1B2C3D, so the patch would not apply\. Drop it .*-DropPatch 192001:Thornswood-Content\.esp'),
+        @((TcSwap '{"Thornswood-Content.esp":null}' ''), 'a patch for a file the new archive does not have', 'the new archive has no Thornswood-Content\.esp'),
+        @((TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' '["Other.esp"]'), 'dropping a patch the entry does not have', 'has no patch for Other\.esp to drop'),
+        @((TcSwap '{"Thornswood-Content.esp":"0A1B2C3D"}' '["Thornswood-Content.esp"]' ''), 'a rule that names the entry by its file name, with no new file name', 'by its file name on Nexus, and the swap gives no fileExpression'))) {
+    Put $sw $case[0]
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $err = (& $node.Source $js $cj $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>&1) -join ' '
+    Yes ('a swap of ' + $case[1] + ' is refused, saying so, and nothing is written') ($LASTEXITCODE -eq 1 -and $err -match $case[2] -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+# A rule that matches a version range, which cannot be worked out for the new one.
+$cjRange = Join-Path $T 'range-collection.json'
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));b.modRules[0].source.versionMatch='>=1.0.0';fs.writeFileSync(process.argv[2],JSON.stringify(b,undefined,2))" $cj $cjRange
+Put $sw ('[{"modId":"47618","fileId":"999","version":"9","md5":"' + $md5 + '","fileSize":1,"logicalFilename":"Fishing In Skyrim"}]')
+Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+$err = (& $node.Source $js $cjRange $sw (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>&1) -join ' '
+Yes 'a rule that matches the moved entry by a version range is refused, and nothing is written' ($LASTEXITCODE -eq 1 -and $err -match 'by the version ">=1\.0\.0"' -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+$said = & $node.Source $js $cj $sw $o1 $o2
+Yes 'and one that matches it by its own version moves to the new one' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -match ('modRules\[0\]\.source\.fileMD5\tfa1fe7613d21ab5826d4a3a3b258f14a\t' + $md5) -and (@($said) -join '|') -match 'modRules\[0\]\.source\.versionMatch\t1\.0\.0\t9\.0\.0')
 
 # Issue #2969: a mod the revision does not carry yet, added the way Vortex
 # writes one it put in with its basic installer.
@@ -400,6 +468,34 @@ foreach ($case in @(
     Yes ('a patch for ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
 }
 
+# Issue #3649: a mod taken out, with the plugins its hashes put in Data.
+$rmJson = Join-Path $T 'remove.json'
+Put $rmJson '[{"remove":true,"modId":"1111"}]'
+$o1 = Join-Path $T 'remove-collection.json'; $o2 = Join-Path $T 'remove-payload.json'
+$said = & $node.Source $js $cj $rmJson $o1 $o2
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));if(b.mods.some(m=>m.source.modId===1111))process.exit(2);a.mods=a.mods.filter(m=>m.source.modId!==1111);process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1
+Yes 'nexus-collection.js takes the hashed mod out, says so, and changes nothing else' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("A Hashed Mod`tremoved`t`tfile 2222"))
+$cjp = Join-Path $T 'remove-plugins.json'
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.plugins=[{name:'A.esp',enabled:true},{name:'b.esp',enabled:true}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+$said = & $node.Source $js $cjp $rmJson $o1 $o2
+& $node.Source -e "const b=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.exit(JSON.stringify(b.plugins)===JSON.stringify([{name:'b.esp',enabled:true}])?0:1)" $o1
+Yes 'its plugin comes off the plugin list whatever its case, and the rest stay' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ("A Hashed Mod`tremoved`t`tfile 2222|A.esp`tplugin`t`tremoved"))
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.plugins=[{name:'a.esp',enabled:true},{name:'b.esp',enabled:true}];c.pluginRules.plugins=[{name:'b.esp',after:['a.esp']}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+$null = & $node.Source $js $cjp $rmJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+Yes 'taking out a mod whose plugin a plugin rule names is refused, and nothing is written' ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+& $node.Source -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));c.mods[2].hashes=[{path:'Fishing.esp',md5:'x'}];fs.writeFileSync(process.argv[2],JSON.stringify(c,undefined,2))" $cj $cjp
+foreach ($case in @(
+        @($cj, '192001', 'patches'),
+        @($cj, '192762', 'no file hashes'),
+        @($cjp, '47618', 'a mod rule naming it'),
+        @($cj, '5555', 'no entry'))) {
+    Put $rmJson ('[{"remove":true,"modId":"' + $case[1] + '"}]')
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $null = & $node.Source $js $case[0] $rmJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+    Yes ('taking out a mod with ' + $case[2] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+
 if (-not $sz) { Skip 'the collection revision runs: 7-Zip is not on this machine'; Done }
 $baseArchive = Join-Path $T 'vortex\collection_7essxf_2_2026-10-03T17-33-45Z.7z'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $baseArchive) | Out-Null
@@ -407,11 +503,33 @@ Push-Location (Join-Path $T 'fixture'); & $sz a -t7z -y $baseArchive 'bundled' '
 Yes 'a published revision''s archive stands in for the one in Vortex''s downloads' (Test-Path -LiteralPath $baseArchive)
 $newFileArchive = $archive
 
+# Issue #2793: Thornswood Content moves to a file that carries the plugin as
+# it should be, so the patch revision 2 made for 1.2's plugin is dropped.
+$tcDir = Join-Path $T 'tc'
+New-Item -ItemType Directory -Force -Path $tcDir | Out-Null
+Put (Join-Path $tcDir 'Thornswood-Content.esp') 'TES4 remade'
+$tcArc = Join-Path $T 'Thornswood Content-next.7z'
+Push-Location $tcDir; & $sz a -t7z -y $tcArc 'Thornswood-Content.esp' | Out-Null; Pop-Location
+# 1.3 is taken when the 5.1 run above made it.
+$tcVer = if ($winps) { '1.4' } else { '1.3' }
+$r = Run 'Send-NexusFile.ps1' @('-Mod', '192001', '-Archive', $tcArc, '-Version', $tcVer, '-Category', 'main')
+$tcId = [regex]::Match($r.Out, 'File id\s+(\d+)').Groups[1].Value
+YesR ('Thornswood Content ' + $tcVer + ', an archive with the plugin in it, is uploaded') ($r.Code -eq 0 -and $tcId) $r
+$tcMd5 = (Get-FileHash -LiteralPath $tcArc -Algorithm MD5).Hash.ToLowerInvariant()
 $n0 = Count
-# Content's live file is 1.3 when the 5.1 run above made it, and 1.2 otherwise.
-$contentLive = if ($winps) { '812347' } else { '811029' }
-$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $contentLive, '-Archive', $newFileArchive, '-WhatIf')
-YesR 'a revision that moves Thornswood Content is refused, because of its patch' ($r.Code -eq 1 -and $r.Out -match 'Thornswood Content carries patches' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $tcId, '-Archive', $tcArc, '-WhatIf')
+YesR 'moving Thornswood Content with no -DropPatch is refused, naming it, because its patch was made for another plugin' ($r.Code -eq 1 -and $r.Out -match 'patches Thornswood-Content\.esp \(CRC-32 023593E0\); the new archive holds it with CRC-32 [0-9A-F]{8}' -and $r.Out -match 'so the patch would not apply' -and $r.Out -match '-DropPatch 192001:Thornswood-Content\.esp' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $tcId, '-Archive', $tcArc, '-DropPatch', '192762:Thornswood-Content.esp', '-WhatIf')
+YesR 'a -DropPatch for a mod the run does not move is refused' ($r.Code -eq 1 -and $r.Out -match 'names mod 192762, which -Mod does not move') $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192001', '-FileId', $tcId, '-Archive', $tcArc, '-DropPatch', '192001:Thornswood-Content.esp', '-WhatIf')
+$built = Join-Path $T 'scratch\nexus-revision-7essxf\out\collection_3.7z'
+YesR 'with -DropPatch, -WhatIf builds collection_3.7z less the patch, says what moved and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'patches\.Thornswood-Content\.esp: 023593E0 -> dropped' -and $r.Out -match 'modRules\[0\]\.reference\.fileMD5: ee881bf2a869d0810113a82ca1405445 -> ' -and $r.Out -match 'less the dropped patches\\Thornswood Content, patches\\Thornswood Content\\Thornswood-Content\.esp\.diff' -and (Test-Path -LiteralPath $built) -and @(Writes @(Since $n0)).Count -eq 0) $r
+$x = Join-Path $T 'unpacked-tc'
+& $sz x -y ('-o' + $x) $built | Out-Null
+Yes 'its archive has no patch for Thornswood Content' ((Test-Path -LiteralPath (Join-Path $x 'collection.json')) -and -not (Test-Path -LiteralPath (Join-Path $x 'patches\Thornswood Content')))
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));const c=b.mods[0],r=b.modRules[0].reference;const x=new RegExp('^Thornswood Content 192001 '+process.argv[3].replace('.','\\.')+' \\d{4}-\\d\\d-\\d\\dT\\d\\d-\\d\\dZ Tok'+process.argv[2]+'$');process.exit(!('patches' in c)&&c.source.fileId===Number(process.argv[2])&&c.source.md5===process.argv[4]&&r.fileMD5===process.argv[4]&&x.test(r.fileExpression)&&r.versionMatch===process.argv[3]+'.0'&&r.logicalFileName==='Thornswood Content'?0:1)" (Join-Path $x 'collection.json') $tcId $tcVer $tcMd5
+Yes 'and its rule names the new archive by md5, its file name on Nexus and version, so Vortex finds it' ($LASTEXITCODE -eq 0)
+$n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812345', '-Archive', $newFileArchive, '-WhatIf')
 YesR 'a file id that has been archived is refused' ($r.Code -eq 1 -and $r.Out -match 'is archived, not a file people can download now') $r
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '811029', '-Archive', $newFileArchive, '-WhatIf')
@@ -421,6 +539,13 @@ $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
 $built = Join-Path $T 'scratch\nexus-revision-7essxf\out\collection_3.7z'
 YesR '-WhatIf builds collection_3.7z with the same files as revision 2 and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'source\.fileId: 809366 -> 812346' -and $r.Out -match 'the same 5 files and folders as revision 2' -and (Test-Path -LiteralPath $built) -and @(Writes @(Since $n0)).Count -eq 0) $r
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', '1111', '-WhatIf')
+YesR '-Remove -WhatIf builds the revision without the mod, with the same files, and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'A Hashed Mod, removed: file 2222' -and $r.Out -match 'the same 5 files and folders as revision 2' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', '192001', '-WhatIf')
+YesR '-Remove of a mod with patches is refused, saying so' ($r.Code -eq 1 -and $r.Out -match 'Thornswood Content carries patches') $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Remove', 'x', '-WhatIf')
+YesR '-Remove of something that is not a mod number is refused' ($r.Code -eq 1 -and $r.Out -match '-Remove x is not a mod number') $r
 # Issue #2969: with no -From the published revision comes from Nexus, as it
 # does in a cloud session, where there is no Vortex.
 Control @{ addRevision = @{ n = 2; id = 801014; status = 'published'; archive = $baseArchive } }
@@ -428,6 +553,22 @@ $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
 $got = @(Since $n0)
 YesR 'with no -From it downloads the published revision from Nexus, the CDN getting no key' ($r.Code -eq 0 -and $r.Out -match 'revision 2, the latest published' -and $r.Out -match 'the same 5 files and folders as revision 2' -and @($got | Where-Object { $_.path -eq '/v2/collections/515846/revisions/801014/download_link' }).Count -eq 1 -and @($got | Where-Object { $_.path -like '/cdn/collection/801014*' -and $_.key -eq 'none' }).Count -eq 1 -and @(Writes $got).Count -eq 0) $r
+
+# Issue #3649: every mod in the revision is held to what its page allows.
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = $null; 192001 = 'ours'; 192762 = 'ours' }
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
+YesR 'a revision with a mod whose page nobody has read is refused before anything is written, naming its page' ($r.Code -eq 1 -and $r.Out -match 'mod 47618 \(Mod 47618\): its page has not been read: https://www\.nexusmods\.com/skyrimspecialedition/mods/47618\?tab=description' -and @(Writes @(Since $n0)).Count -eq 0) $r
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
+YesR 'a -WhatIf says the same, that a run that writes stops there, and still builds the revision' ($r.Code -eq 0 -and $r.Out -match 'its page has not been read' -and $r.Out -match 'A run that writes stops here' -and $r.Out -match 'the same 5 files and folders as revision 2') $r
+Perm @{ 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
+YesR 'a revision with a mod the record does not have is refused before anything is written' ($r.Code -eq 1 -and $r.Out -match 'mod 1111: not in the record' -and @(Writes @(Since $n0)).Count -eq 0) $r
+Perm @{ 1111 = 'not allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
+YesR 'a revision with a mod whose page does not allow it in a collection is refused' ($r.Code -eq 1 -and $r.Out -match 'mod 1111 \(Mod 1111\): its page, read 2026-10-27, does not allow it in a collection') $r
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
 
 $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
@@ -491,6 +632,15 @@ YesR 'an archive whose plugins are not the ones named is refused' ($r.Code -eq 1
 AddFile (Join-Path $T 'fomod.7z') $hair
 $r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
 YesR 'an archive with a FOMOD installer is refused' ($r.Code -eq 1 -and $r.Out -match 'has a FOMOD installer') $r
+AddFile $hairArc $hair
+Perm @{ 1111 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'a mod -Add puts in that the record does not have is named, and a run that writes would stop' ($r.Code -eq 0 -and $r.Out -match 'mod 1932: not in the record' -and $r.Out -match 'A run that writes stops here') $r
+Perm @{ 1111 = 'not allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-Publish', '3')
+YesR 'publishing a draft with a mod whose page does not allow it in a collection is refused, and no mutation goes' ($r.Code -eq 1 -and $r.Out -match 'mod 1111 \(Mod 1111\): its page, read 2026-10-27, does not allow it in a collection' -and @(Writes @(Since $n0)).Count -eq 0 -and (State).collection.latest -eq 2) $r
+Perm @{ 1111 = 'allowed'; 1932 = 'allowed'; 47618 = 'not stated'; 192001 = 'ours'; 192762 = 'ours' }
 $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-Publish', '3', '-WhatIf')
 YesR '-Publish -WhatIf names the revision and sends no mutation' ($r.Code -eq 0 -and $r.Out -match 'publishRevision\(revisionId: "900003"\)' -and @(Writes @(Since $n0)).Count -eq 0) $r

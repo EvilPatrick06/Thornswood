@@ -11,7 +11,7 @@
   it". The music (MusicDecide) has always stopped while the game runs. Playing,
   the video measured 3 to 14% of one core.
 
-  The launcher cannot be started from here (CLAUDE.md), so this does two things:
+  The launcher cannot be started from here (the ops repo's CLAUDE.md), so this does two things:
 
     - It lifts the video's own decide delegate out of Shell.cs as it is written
       and runs it against a stand-in clock, window and page: a game start and a

@@ -36,7 +36,8 @@
       asks for it all again, the same way, and adds no line; -Merge adds a
       request from another copy of the record and asks for that one too, once
     - the nightly backup takes the record, Restore-Box.ps1 reapplies it from
-      the backup before anything starts, and docs\RESTORING.md says so
+      the backup before anything starts (RESTORING.md in the private ops
+      repo says so, and that repo's tests\test-ops-runbooks.ps1 checks it)
 
   Nothing leaves this machine and nothing runs from the stand-ins.
 #>
@@ -78,17 +79,8 @@ $rmAt = $boxText.IndexOf("Head 'Taking the copy off the box'")
 Yes '  and reapplies the record, merged with the backup''s, after the restores and before the copy is taken off' (
     $reAt -gt $svAt -and $svAt -gt 0 -and $rmAt -gt $reAt -and
     $boxText -match "OnBox 'Delete-Person\.ps1' ""-Reapply -Delete -Merge \`$far\\unpacked\\deletions\\requests\.jsonl""")
-$restoring = [IO.File]::ReadAllText((Join-Path $Repo 'docs\RESTORING.md'))
-Yes 'docs\RESTORING.md names the reapply step' ($restoring -match 'Delete-Person\.ps1 -Reapply')
-$ops = [IO.File]::ReadAllText((Join-Path $Repo 'docs\WEBSITE-OPERATIONS.md'))
-$at = $ops.IndexOf("`n## Deletion requests")
-Yes 'docs\WEBSITE-OPERATIONS.md has the procedure, "Deletion requests"' ($at -ge 0)
-if ($at -ge 0) {
-    $end = $ops.IndexOf("`n## ", $at + 5)
-    $pt = if ($end -gt 0) { $ops.Substring($at, $end - $at) } else { $ops.Substring($at) }
-    Yes '  and names the dry run, the real run, the record and the reapply' (
-        $pt -match '-DiscordId' -and $pt -match '-Delete -By' -and $pt -match 'C:\\Thornswood-Deletions\\requests\.jsonl' -and $pt -match '-Reapply')
-}
+# The procedure around it, "Deletion requests" in WEBSITE-OPERATIONS.md, is in
+# the private ops repo since #3693, and its tests/test-ops-docs.js checks it.
 
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) {
@@ -136,6 +128,12 @@ $Live = Join-Path $Box 'Thornswood-Server'
 $Dev  = Join-Path $Box 'Thornswood-Server-Dev'
 $Vl   = Join-Path $Box 'Thornswood-Voice'
 $Vd   = Join-Path $Box 'Thornswood-Voice-Dev'
+# The copies a wipe and a character reset set aside inside a game server's
+# folder, stamped from this run's own clock (#4635): Server-Log.js deletes one
+# 30 days after the stamp in its name (#3880), so the fixed 20260930 stamps
+# were deleted at the server's start from 30 Oct on and the harness stopped.
+$Wipe  = (Get-Date).AddDays(-2).ToString('yyyyMMdd-HHmmss')
+$Reset = (Get-Date).AddDays(-1).ToString('yyyyMMdd-HHmmss')
 $Bot  = Join-Path $Box 'Thornswood-Bot'
 # The nightly backup's task, where this runs on the box that has it (#2833):
 # the record's folder gives its SID read. Elsewhere no task, no rule.
@@ -192,11 +190,19 @@ function Build {
         Put (Join-Path $CF 'ff000a03.json') ('{"formDesc":"ff000a03","profileId":' + $P2 + '}')
         Put (Join-Path $CF 'ff000a04.json') ('{"formDesc":"ff000a04","profileId":' + $PT + '}')
         Put (Join-Path $CF '1a2b3.json') '{"formDesc":"1a2b3:Skyrim.esm","profileId":-1}'
-        Put (Join-Path $CF '_discarded-20261002-000000\ff000a05.json') ('{"profileId":' + $P1 + '}')
-        Put (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json') ('{"profileId":' + $P1 + '}')
+        Put (Join-Path $CF ('_discarded-' + $Reset + '\ff000a05.json')) ('{"profileId":' + $P1 + '}')
+        Put (Join-Path $R ('world-before-' + $Wipe + '\changeForms\ff000a06.json')) ('{"profileId":' + $P1 + '}')
+        # Reset-Appearance.ps1's whole copy of a character, beside the live one (#3620).
+        Put (Join-Path $CF 'ff000a01.json.bak-20261003-000000') ('{"formDesc":"ff000a01","profileId":' + $P1 + '}')
+        Put (Join-Path $CF 'ff000a02.json.bak-20261003-000000') ('{"formDesc":"ff000a02","profileId":' + $PY + '}')
+        # Restore-Server.ps1's set-aside world and private, inside the server's folder (#3620).
+        $RA = Join-Path $R 'world-before-restore-20261004-000000'
+        Put (Join-Path $RA 'world\changeForms\ff000a09.json') ('{"formDesc":"ff000a09","profileId":' + $P1 + '}')
+        Put (Join-Path $RA 'world\changeForms\ff000a0a.json') ('{"formDesc":"ff000a0a","profileId":' + $PY + '}')
+        Put (Join-Path $RA 'private\characters.json') ('{"who":{"' + $P1 + '":{"name":"Mine"},"' + $PY + '":{"name":"Yours"}}}')
         $PV = Join-Path $R 'private'
         Put (Join-Path $PV 'characters.json') ('{"who":{"' + $P1 + '":{"name":"Mine"},"' + $PY + '":{"name":"Yours"},"' + $PT + '":{"name":"Theirs"}}}')
-        Put (Join-Path $PV 'characters-before-20260930-000000.json') ('{"who":{"' + $P1 + '":{"name":"Mine"}}}')
+        Put (Join-Path $PV ('characters-before-' + $Wipe + '.json')) ('{"who":{"' + $P1 + '":{"name":"Mine"}}}')
         Put (Join-Path $PV 'mod-settings.json') ('{"who":{"' + $P1 + '":{"a":1},"' + $PY + '":{"a":2}}}')
         Put (Join-Path $PV 'take-limit.json') ('{"counts":{"' + $P1 + '|1a2b3":{"n":1},"' + $PY + '|1a2b3":{"n":2}}}')
         # The game's registers, in the shapes the gamemode writes, each naming
@@ -243,6 +249,8 @@ function Build {
     Put (Join-Path $Vl 'chat\2026-10-02.jsonl') ($yours + "`n")
     Put (Join-Path $Vd 'chat\2026-10-01.jsonl') ($mine + "`n" + $inKept + "`n")
     Put (Join-Path $Bot 'data\joins.json') ('{"900":{"last":40,"members":{"' + $ME + '":39,"' + $YOU + '":40}}}')
+    # The joins.json a restore set aside beside it (#3620), written by nobody.
+    Put (Join-Path $Bot 'data\joins.json-before-restore-20261020-101500') ('{"900":{"last":38,"members":{"' + $ME + '":37,"' + $YOU + '":38}}}')
     Put (Join-Path $Bot 'data\open-tickets.json') ('{"900:' + $ME + '":123,"900:' + $YOU + '":456}')
 }
 
@@ -276,7 +284,7 @@ try {
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'a list of deleted characters that is not one refuses the run' ($c -eq 1 -and (Said 'deleted-characters\.json is not a list of deleted characters, so nothing was changed'))
     Remove-Item -LiteralPath $lst -Force
-    $pend = Join-Path $Dev 'world-before-20260930-000000\changeForms\.pending-batch'
+    $pend = Join-Path $Dev ('world-before-' + $Wipe + '\changeForms\.pending-batch')
     Put $pend '{}'
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'an unfinished save in a copy nothing runs from refuses the run' ($c -eq 1 -and (Said '\.pending-batch is an unfinished save in a copy nothing runs from'))
@@ -335,8 +343,10 @@ try {
     Yes '  and the run says each chat day it asks to edit, with its line count before and after' (Said 'chat\s+live 2026-10-01\.jsonl: 5 lines before, 3 after')
 
     # ---- right after the run: no live file changed, the copies set aside did
+    # A copy a restore set aside in the bot's data folder is written by no service,
+    # so it is edited at once like the site's (#3620).
     $now = Hashes $Box
-    $liveFile = '^\\Thornswood-Docs\\(data|uploads)\\|^\\Thornswood-Server(-Dev)?\\world\\changeForms\\[^\\]+$|^\\Thornswood-Server(-Dev)?\\private\\(characters|mod-settings|take-limit|last-left)\.json$|^\\Thornswood-Voice(-Dev)?\\chat\\|^\\Thornswood-Bot\\data\\'
+    $liveFile = '^\\Thornswood-Docs\\(data|uploads)\\|^\\Thornswood-Server(-Dev)?\\world\\changeForms\\[^\\]+\.json$|^\\Thornswood-Server(-Dev)?\\private\\(characters|mod-settings|take-limit|last-left)\.json$|^\\Thornswood-Voice(-Dev)?\\chat\\|^\\Thornswood-Bot\\data\\(?![^\\]*-before-restore-)'
     $changed = @($before.Keys | Where-Object { $_ -match $liveFile -and $now[$_] -ne $before[$_] })
     foreach ($k in $changed) { Write-Host "        changed: $k" }
     Yes 'no file a service writes while it runs was changed' ($changed.Count -eq 0)
@@ -345,8 +355,17 @@ try {
     foreach ($R in $Live, $Dev) {
         $CF = Join-Path $R 'world\changeForms'
         Yes ((Split-Path -Leaf $R) + ': the copies a reset and a wipe set aside lose them at once, and the wipe''s card and the old last-left too') (
-            -not (Test-Path (Join-Path $CF '_discarded-20261002-000000\ff000a05.json')) -and -not (Test-Path (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json')) -and
-            $null -eq (J (Join-Path $R 'private\characters-before-20260930-000000.json')).who."$P1" -and $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1")
+            -not (Test-Path (Join-Path $CF ('_discarded-' + $Reset + '\ff000a05.json'))) -and -not (Test-Path (Join-Path $R ('world-before-' + $Wipe + '\changeForms\ff000a06.json'))) -and
+            $null -eq (J (Join-Path $R ('private\characters-before-' + $Wipe + '.json'))).who."$P1" -and $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1")
+    }
+    foreach ($R in $Live, $Dev) {
+        $CF = Join-Path $R 'world\changeForms'
+        $RA = Join-Path $R 'world-before-restore-20261004-000000'
+        Yes ((Split-Path -Leaf $R) + ': an appearance reset''s copy of their character goes at once, somebody else''s stays (#3620)') (
+            -not (Test-Path (Join-Path $CF 'ff000a01.json.bak-20261003-000000')) -and (Test-Path (Join-Path $CF 'ff000a02.json.bak-20261003-000000')))
+        Yes ((Split-Path -Leaf $R) + ': the world and private a restore set aside lose them at once, somebody else''s stay (#3620)') (
+            -not (Test-Path (Join-Path $RA 'world\changeForms\ff000a09.json')) -and (Test-Path (Join-Path $RA 'world\changeForms\ff000a0a.json')) -and
+            $null -eq (J (Join-Path $RA 'private\characters.json')).who."$P1" -and $null -ne (J (Join-Path $RA 'private\characters.json')).who."$PY")
     }
     Yes 'the live server''s folder an install set aside loses their change form at once' (-not (Test-Path (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json')))
     $prevList = J (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\deleted-characters.json')
@@ -461,10 +480,10 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
         $CF = Join-Path $R 'world\changeForms'
         Yes "$tag`: their character's change form is gone, whatever its name" (-not (Test-Path (Join-Path $CF 'ff000a01.json')))
         Yes "$tag`:   and the shared one, the other people's and the world's stay" ((Test-Path (Join-Path $CF 'ff000a03.json')) -and (Test-Path (Join-Path $CF 'ff000a02.json')) -and (Test-Path (Join-Path $CF 'ff000a04.json')) -and (Test-Path (Join-Path $CF '1a2b3.json')))
-        Yes "$tag`:   and the copies a reset and a wipe set aside are gone" (-not (Test-Path (Join-Path $CF '_discarded-20261002-000000\ff000a05.json')) -and -not (Test-Path (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json')))
+        Yes "$tag`:   and the copies a reset and a wipe set aside are gone" (-not (Test-Path (Join-Path $CF ('_discarded-' + $Reset + '\ff000a05.json'))) -and -not (Test-Path (Join-Path $R ('world-before-' + $Wipe + '\changeForms\ff000a06.json'))))
         $PV = Join-Path $R 'private'
         $ch = J (Join-Path $PV 'characters.json')
-        Yes "$tag`: their card is gone, in characters.json and its wipe copy" ($null -eq $ch.who."$P1" -and $null -ne $ch.who."$PY" -and $null -eq (J (Join-Path $PV 'characters-before-20260930-000000.json')).who."$P1")
+        Yes "$tag`: their card is gone, in characters.json and its wipe copy" ($null -eq $ch.who."$P1" -and $null -ne $ch.who."$PY" -and $null -eq (J (Join-Path $PV ('characters-before-' + $Wipe + '.json'))).who."$P1")
         Yes "$tag`: their mod menu choices, take counts and last-left time are gone" (
             $null -eq (J (Join-Path $PV 'mod-settings.json')).who."$P1" -and $null -ne (J (Join-Path $PV 'mod-settings.json')).who."$PY" -and
             $null -eq (J (Join-Path $PV 'take-limit.json')).counts."$P1|1a2b3" -and $null -ne (J (Join-Path $PV 'take-limit.json')).counts."$PY|1a2b3" -and
@@ -488,6 +507,8 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
         $day -eq ('{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}' + "`n" + '{"at":150000,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"kept"}' + "`n" + '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}' + "`n"))
     Yes '  a day with none of theirs is not touched' ($before['\Thornswood-Voice\chat\2026-10-02.jsonl'] -eq (Get-FileHash (Join-Path $Vl 'chat\2026-10-02.jsonl')).Hash)
     Yes '  and a dev day of only theirs is left empty, not deleted' ((Get (Join-Path $Vd 'chat\2026-10-01.jsonl')) -eq '')
+    $ja = J (Join-Path $Bot 'data\joins.json-before-restore-20261020-101500')
+    Yes 'their join number is gone from the joins.json a restore set aside, at once, and the others stay' ($null -eq $ja.'900'.members.$ME -and $ja.'900'.members.$YOU -eq 38 -and $ja.'900'.last -eq 38)
     if ($botRan) {
         $jn = J (Join-Path $Bot 'data\joins.json')
         Yes 'their join number is gone and the last number given out stays' ($null -eq $jn.'900'.members.$ME -and $jn.'900'.members.$YOU -eq 40 -and $jn.'900'.last -eq 40)

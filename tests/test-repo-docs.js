@@ -78,7 +78,12 @@ if (readme !== null) {
   yes('README.md points people who want to join at thornswood.net/join',
       /https:\/\/thornswood\.net\/join/.test(readme));
   yes('README.md points developers at Developer-Guide.md', /\]\(Developer-Guide\.md\)/.test(readme));
-  yes('README.md points developers at CLAUDE.md', /\]\(CLAUDE\.md\)/.test(readme));
+  // CLAUDE.md is for the agents, which read it by themselves; the README is
+  // for a stranger and no longer sends anybody there (#3682).
+  yes('README.md points at the community files a stranger looks for',
+      ['SUPPORT.md', 'SECURITY.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'LICENSE'].every(function (f) {
+        return readme.indexOf('](' + f + ')') >= 0 && fs.existsSync(path.join(ROOT, f));
+      }));
   yes('README.md does not send anybody to SETUP.md, which describes the old product' + where(readme, /SETUP\.md/),
       !/SETUP\.md/.test(readme));
   yes('README.md describes no F2 party menu, which nothing binds' + where(readme, /\bF2\b/),
@@ -170,7 +175,9 @@ if (tracked) {
       tracked.indexOf('site/config.sample.json') < 0);
   yes('site/config.example.json is tracked (same suffix as root config.example.json)',
       tracked.indexOf('site/config.example.json') >= 0);
-  ['CLAUDE.md', 'Developer-Guide.md'].forEach(function (rel) {
+  // The long CLAUDE.md is in the private ops repo since #3693; its
+  // tests/test-ops-docs.js holds the same check of it there.
+  ['Developer-Guide.md'].forEach(function (rel) {
     const t = read(rel);
     yes(rel + ' is there', t !== null);
     if (t !== null) {

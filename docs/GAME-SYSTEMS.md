@@ -116,7 +116,9 @@ by a fire 35, that bed by a fire 45, a bed you are allowed in 50, and
 your own bed 80. Crafting stops under 15.
 
 [Food](systems/food.md). Raw, burnt, cooked, and a feast. Eating takes
-time. A full stomach refuses another meal's help.
+time. A full stomach refuses another meal's help. Four herbs are picked
+only in their seasons, and each season has a festival dish and brew
+made from its pair.
 
 [Drink and ale](systems/drink.md). Clean water, fouled water, and ale that
 gets worse with each one inside 45 minutes.

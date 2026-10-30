@@ -56,6 +56,12 @@
   month ago does not quietly lose its last good ones here too. Only files
   named the way the box names them are ever considered.
 
+  And the whole-server copies Backup-Server.ps1 takes by hand into the same
+  folder (thornswood-backup-<yyyyMMdd-HHmm>.zip.enc, and the plain .zip it
+  made until #3582), each deleted -KeepDays days after the day in its name.
+  They are no part of the nightly series, so the newest seven are not
+  counted among them and none is kept past its days for that.
+
   Every run adds to fetch.log in the -To folder, because a task that runs
   unattended says nothing to anybody otherwise.
 
@@ -116,7 +122,8 @@ function Set-Aside($path) {
 }
 
 # Everything from the last $KeepDays days, and the newest seven whatever
-# their age. Matched by name, so nothing put here by hand is ever touched.
+# their age. Matched by name, so nothing put here by hand is ever touched,
+# except Backup-Server.ps1's own copies, aged below by the day in theirs.
 function Prune {
   if ($KeepDays -le 0) { return }
   $mine = @(Get-ChildItem -LiteralPath $To -File -EA SilentlyContinue |
@@ -146,6 +153,28 @@ function Prune {
     }
   }
   Say ("  kept {0} backup(s) here" -f ($mine.Count - $dropped)) 'DarkGray'
+
+  # Backup-Server.ps1's copies taken by hand (#3582), by the day in the name.
+  $byHand = @(Get-ChildItem -LiteralPath $To -File -EA SilentlyContinue |
+              Where-Object { $_.Name -match '^thornswood-backup-(\d{8})-(\d{4})\.zip(\.enc)?$' } |
+              Sort-Object Name)
+  $kept = 0
+  foreach ($f in $byHand) {
+    $d = [datetime]::ParseExact($f.Name.Substring(18, 8), 'yyyyMMdd', $null)
+    if ($d -ge $cut) { $kept++; continue }
+    try {
+      Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
+      if (Test-Path -LiteralPath $f.FullName) { throw [IO.IOException]::new('still there after the delete') }
+      Say ("  dropped {0}, a copy taken by hand, older than {1} days" -f $f.Name, $KeepDays) 'DarkGray'
+    } catch {
+      $ex = $_.Exception
+      $kind = $ex.GetType().Name
+      if ($ex.HResult) { $kind += (' 0x{0:X8}' -f $ex.HResult) }
+      Say ("  NOT DROPPED {0}: {1}. It is a copy taken by hand, older than {2} days, and is still here." -f $f.Name, $kind, $KeepDays) 'Red'
+      $script:pruneFailed++
+    }
+  }
+  if ($byHand.Count) { Say ("  kept {0} copy(ies) taken by hand here" -f $kept) 'DarkGray' }
 }
 $script:pruneFailed = 0
 
@@ -185,7 +214,7 @@ if (-not $To -and -not $Unschedule) {
 # backslash (C:\...) or \\server\share. Each is used as given, and the task
 # -Schedule registers is handed both word for word, so anything else means a
 # different folder depending on where it runs. Measured 12 Oct (#2199): -To
-# given through Git Bash unquoted arrived as C:UsersevilpDownloadsThornswood-
+# given through Git Bash unquoted arrived as C:Users<you>DownloadsThornswood-
 # Repolocalbackups, a path relative to the current folder on C:. This script
 # made that folder inside the worktree it ran from and registered the task
 # with it, so the next 4:15 AM run would have fetched into a new folder under
@@ -361,7 +390,7 @@ Prune
 if ($checked) { Send-OffBoxMark } else { Say '  the box was not told of these, because none of them was opened' 'Yellow' }
 Write-Host ''
 Say "  They are in $To" 'DarkGray'
-Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
+Say '  Restoring one for real is RESTORING.md in the ops repo.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 if ($failed -or $script:pruneFailed -or $script:markFailed) { exit 1 }
 exit 0

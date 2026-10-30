@@ -11,8 +11,16 @@ on:
   pull_request:
 permissions:
   contents: read
-# One run per branch at a time. A newer push cancels the run it replaces, so
-# no runner is left building a commit nobody wants.
+# One run per branch at a time. On main a newer push waits for the run in
+# progress and does not cancel it (#3874): every main build traces the gate
+# (#3114), and pull requests choose their harnesses from the newest trace.
+# When each merge cancelled the build before it, no main build finished in a
+# busy hour, the trace fell behind, and from 4:59 PM on 26 Oct every pull
+# request ran all 608 harnesses, 8.5 minutes of a build runner for a one line
+# change to ops/status.md (run 40418651976). A third push still drops the one
+# waiting, so at most one main build runs and the newest is next. A pull
+# request's newer push cancels its older run (build-pr.yml): nothing reads a
+# pull request's trace.
 concurrency:
   group: build-pr-${{ github.ref }}
   cancel-in-progress: true
@@ -40,7 +48,19 @@ jobs:
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
     # the harness step alone and the limit below cancelled passing builds.
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    # Main's build stays on the box: only the box's runners have the trace
+    # task, and a main build is what leaves the gate map the next pull
+    # requests measure from (#3114, #3874). Build-PrWorkflow.js gives
+    # build-pr.yml's fallback the pull request build label alone instead
+    # (records/pr-build-runners.json): box runner 2 and One's off-box runners
+    # carry it and runner 1 does not, so main's build never waits behind pull
+    # requests for runner 1 (#3860; #4010, Patrick's A, 27 Oct 2026).
+    runs-on: [self-hosted, Windows, thornswood-pr-build]
+    # actions: read for the gate step off the box, which reads the map main's
+    # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
+    permissions:
+      actions: read
+      contents: read
     # Often past twenty minutes on the VPS (#2557): it is shared with the live
     # server and other jobs, and the harness list keeps growing (#2544 added
     # test-release-workflow.ps1, #2525 the feed-watch test, #2546 the remote
@@ -129,29 +149,8 @@ jobs:
           }
           if ($failed.Count) { exit 1 }
 
-      - name: Check the ownership page
-        shell: pwsh
-        run: |
-          # Issue #752. docs\OWNERSHIP.md says where every credential file
-          # lives, who holds it and who the second holder is, and
-          # tests\test-ownership.js greps scripts\<area>\*.ps1 and
-          # launcher\app\*.cs for the file names rather than trusting the page.
-          # #697 added discord-avatar.txt with neither a row on that page nor a
-          # line saying it is not a secret, and nothing said so until #750 and
-          # #751 found it by hand. A tenth of a second, so it runs here on every
-          # pull request and not only in the nightly checks.
-          #
-          # Fail closed: no node on the runner is a check that did not happen,
-          # which is the failure this step exists to stop, so it is red.
-          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-            Write-Host '::error file=tests/test-ownership.js::no node on this runner, so the ownership page was not checked'
-            exit 1
-          }
-          node tests\test-ownership.js
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=docs/OWNERSHIP.md::the ownership page does not match what the scripts and the launcher name; the FAIL lines above say which rows'
-            exit 1
-          }
+      # The ownership page check (#752) went with docs/OWNERSHIP.md to the
+      # private ops repository (#3693), which runs it against main every night.
 
       - name: Check the old mod's name stays out
         shell: pwsh
@@ -262,6 +261,11 @@ jobs:
       - name: Run the gate harnesses
         id: gate
         shell: pwsh
+        # Off the box a pull request's gate reads the map main's build handed
+        # on with it (#4009). Run-Gate.ps1 takes it out of the environment
+        # before any harness starts.
+        env:
+          GATE_MAP_TOKEN: ${{ github.token }}
         run: |
           # Issue #3009. The gate is every tests\test-*.js and tests\test-*.ps1
           # that tests\gate-excluded.txt does not name, read from the files by
@@ -315,6 +319,18 @@ jobs:
           .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800
           exit $LASTEXITCODE
 
+      # THE MAP FOR RUNNERS OFF THE BOX (#4009). The trace task leaves the map
+      # only in the box's build runners' folders, so a pull request built on
+      # One's runners or GitHub's ran the whole gate. Main's build prints the
+      # box's newest map into this job's log, which costs no storage
+      # (artifacts do, #3399), and a gate off the box reads it from there.
+      # scripts\dev\Gate-Map.ps1 says how; it hands on only in main's push
+      # build, and never fails a build.
+      - name: Hand the traced map to runners off the box
+        if: ${{ !cancelled() && runner.environment == 'self-hosted' }}
+        shell: pwsh
+        run: .\scripts\dev\Gate-Map.ps1 -Hand
+
       - name: Run the voice service's /health harness
         shell: pwsh
         run: |
@@ -353,14 +369,17 @@ jobs:
           }
 
       - name: Check the launcher window
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -Command ". '{0}'"
         run: |
           # The launcher builds its window from ui.xaml at startup and finds
           # every control by name, so a renamed control or a window that does
           # not parse compiles clean and is found by the person using it. This
           # fails on either. Windows PowerShell on purpose: it parses with the
           # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
-          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          # -ExecutionPolicy Bypass on both, as every harness starts 5.1:
+          # Windows 11 keeps 5.1 at Restricted, so on One's runners the plain
+          # shell: powershell could not run this step's own script (#3861).
+          & powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dev\Check-Controls.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
 
       - name: Check the launcher UI thread
@@ -418,9 +437,16 @@ jobs:
           # which this already covers, is gone (#3114). The nightly keeps it.
           # ruff comes into a venv of this run's own, never the machine's
           # Python, pinned by version and hash in .github\ruff-requirements.txt.
-          # By hand, from the repository folder, in any venv:
-          #   python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
-          #   python -m ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
+          # By hand, from the repository folder, into .venv (git ignores it).
+          # With uv, which needs no python on the PATH (uv's own Python
+          # refuses pip as "externally-managed", and a uv venv has no pip):
+          #   uv venv .venv
+          #   uv pip install --python .venv --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # or with Python's own pip:
+          #   python -m venv .venv
+          #   .venv\Scripts\python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          # then:
+          #   .venv\Scripts\ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
           $venv = Join-Path $env:RUNNER_TEMP 'ruff-venv'
           python -m venv $venv
           $py = Join-Path $venv 'Scripts\python.exe'
@@ -521,15 +547,23 @@ jobs:
       # line of this job's log. Last, so it is written only when they all
       # did, and only when the gate step ran every gate harness (#3114): a
       # pull request that ran only what its change can reach leaves main to
-      # build in full. A pull request's checkout is GitHub's merge of it into
-      # main, so this is the tree a squash merge gives main while main has
-      # not moved. In the log and not an artifact since #3399: this
+      # build in full. Only on GitHub's hosted runner (#3874), which has no
+      # traced map and runs every harness anyway: a main build skipped by
+      # this note is not traced either, so on the VPS, where a pull request
+      # ran the whole gate only because the map could not serve it, the note
+      # kept the map stale and every pull request after it ran the whole gate
+      # too. Without it main builds in full and is traced (Patrick's option A
+      # on q-3114-map-refresh, every main build traced), and the next pull
+      # request runs only what it can reach. A pull request's checkout is
+      # GitHub's merge of it into main, so this is the tree a squash merge
+      # gives main while main has not moved. In the log and not an artifact
+      # since #3399: this
       # repository's artifact storage is counted by the hour, it used
       # October's whole allowance by 23 Oct 2026, and from then the note's
       # upload failed and took every pull request's build red. A log costs no
       # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
       - name: Write down the tree these checks passed on
-        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
+        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true' && runner.environment == 'github-hosted'
         shell: pwsh
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -554,6 +588,10 @@ jobs:
     name: Launcher builds
     if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
     runs-on: windows-latest
+    # As the fallback's: the gate step reads the map main's build handed on.
+    permissions:
+      actions: read
+      contents: read
     # The hosted runner has two cores: the harness step alone took over
     # eighteen minutes on it, so it gets an hour.
     timeout-minutes: 60
