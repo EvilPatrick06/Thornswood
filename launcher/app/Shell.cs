@@ -92,7 +92,6 @@ namespace Thornswood
         // has moved past, which is what happened to everybody on 1.1.40.
         static DateTime updateSeenAt = DateTime.MinValue;
         static bool closedForUpdate = false;
-        static bool installWhenSeen = false;
         static int inPlayTicks = 0;
         static DispatcherTimer timer;
 
@@ -560,6 +559,14 @@ namespace Thornswood
                         try { moved = Icons.Ensure(true); } catch (Exception ex) { Swallow.Note("Shell.Run, refreshing shortcut icons after self update", ex); }
                         if (moved > 0)
                             try { win.Dispatcher.BeginInvoke((Action)delegate { Log("Shortcut icon brought up to date after the update."); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying shortcut icons were refreshed", ex); }
+                        // The rest of the update that restarted the launcher
+                        // (#3201): the same Fix Install now runs after an
+                        // update that needs no restart, after the icon pass so
+                        // the two never race. Not without a folder of our own,
+                        // where the offer to make one (OwnGameAtStart) is the
+                        // thing to answer first.
+                        if (!Paths.Collection)
+                            try { win.Dispatcher.BeginInvoke((Action)delegate { RunFix(true); }); } catch (Exception ex) { Swallow.Note("Shell.Run, the scan after the launcher update", ex); }
                     }
                     if (string.IsNullOrEmpty(said)) return;
                     try { win.Dispatcher.BeginInvoke((Action)delegate { Log(said); }); } catch (Exception ex) { Swallow.Note("Shell.Run, saying what the self update left", ex); }
@@ -2275,22 +2282,13 @@ namespace Thornswood
             };
             if (buttonDiscord != null) buttonDiscord.Click += delegate { ConnectDiscord(); };
 
-            btnUpdate.Click += delegate { RunUpdate(); };
+            // The card above Play and Settings' button are one button in two
+            // places (#3201). The card's used to run the update whatever the
+            // card said, so under "Your mods are not installed yet" it ran an
+            // update with nothing in it instead of opening the collection.
+            btnUpdate.Click += delegate { InstallNowPressed(); };
             if (btnDowngrade != null) btnDowngrade.Click += delegate { RunDowngrade(); };
-            btnInstallNow.Click += delegate
-            {
-                if (collectionBarUp || (collectionNoteUp && !updatePending))
-                {
-                    // Ahead has nothing to open (#4115): the button is hidden
-                    // for it, and a press that slips in before the redraw
-                    // must not send this copy to another revision.
-                    if (collectionBarUp && CollectionProblem() == "ahead") return;
-                    try { Process.Start(new ProcessStartInfo(CollectionLink()) { UseShellExecute = true }); }
-                    catch (Exception ex) { Log("Could not open the collection: " + ex.Message); }
-                    return;
-                }
-                RunUpdate();
-            };
+            btnInstallNow.Click += delegate { InstallNowPressed(); };
 
             if (chkMusic != null) chkMusic.Click += delegate
             {
@@ -2636,7 +2634,8 @@ namespace Thornswood
                 if (closedForUpdate)
                 {
                     closedForUpdate = false;
-                    installWhenSeen = true;
+                    // With automatic updates on, the check's answer takes it
+                    // (UpdateBySelf, #3202), as it takes any update it finds.
                     Log("Fetching the update the game was closed for...");
                     ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(true); });
                 }
@@ -2786,7 +2785,7 @@ namespace Thornswood
             else if (collectionBarUp && updateBar != null && btnInstallNow != null)
             {
                 collectionBarUp = false;
-                btnInstallNow.Content = "Install now";
+                InstallLabel("Install now");
                 updateBar.Visibility = Visibility.Collapsed;
                 btnInstallNow.Visibility = Visibility.Collapsed;
             }
@@ -2807,7 +2806,7 @@ namespace Thornswood
                         "The launcher could not read which revision of the Thornswood collection " +
                         "Vortex has installed. If you have not installed it, or are not sure, open " +
                         "the collection and let Vortex install or update it. Play is not held for this.";
-                    btnInstallNow.Content = CollectionButtonText();
+                    InstallLabel(CollectionButtonText());
                     btnInstallNow.IsEnabled = true;
                     updateBar.Visibility = Visibility.Visible;
                     btnInstallNow.Visibility = Visibility.Visible;
@@ -2816,7 +2815,7 @@ namespace Thornswood
                 else if (!unsure && collectionNoteUp)
                 {
                     collectionNoteUp = false;
-                    btnInstallNow.Content = "Install now";
+                    InstallLabel("Install now");
                     updateBar.Visibility = Visibility.Collapsed;
                     btnInstallNow.Visibility = Visibility.Collapsed;
                 }
@@ -2828,7 +2827,7 @@ namespace Thornswood
                 collectionNoteUp = false;
                 if (!collectionBarUp && !updatePending && updateBar != null && btnInstallNow != null)
                 {
-                    btnInstallNow.Content = "Install now";
+                    InstallLabel("Install now");
                     updateBar.Visibility = Visibility.Collapsed;
                     btnInstallNow.Visibility = Visibility.Collapsed;
                 }
@@ -4567,7 +4566,7 @@ namespace Thornswood
             // left somebody still waiting on their application with a button
             // that only said Connect Discord, which the site refuses until they
             // are accepted. The application is what unlocks Play, not the mods.
-            btnInstallNow.Content = CollectionButtonText();
+            InstallLabel(CollectionButtonText());
             btnInstallNow.IsEnabled = true;
         }
 
