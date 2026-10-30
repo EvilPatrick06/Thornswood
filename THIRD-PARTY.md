@@ -649,21 +649,51 @@ collection and Vortex's staging folder on the shipping machine:
   section gave the 1.1 file as read on 24 September, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod
-  27859) with one line changed, `bTweenMenu = false`. The rest is as that
-  mod's author wrote it. Revision 2 removed Skyrim Souls RE itself
+  27859) with one line changed, `bTweenMenu = false`. Read on 27 October
+  against the mod's own files: it is the 7,009-byte ini Skyrim Souls RE 3.1.2
+  ships (Nexus file 754726), with its byte order mark taken off and a blank
+  line added under the first line. Revision 2 removed Skyrim Souls RE itself
   (docs\COLLECTION-REVISION-2.md), so nothing in the collection reads this
   file now.
 - `SKSE\Plugins\OpenAnimationReplacer.ini`: the settings file Open Animation
   Replacer (mod 92109, in the collection) writes, holding the values Thornswood
-  wants.
+  wants. It is not one of that mod's files: its archives (3.1.6, and 3.2.1,
+  Nexus file 798222, in revision 5) hold only `OpenAnimationReplacer.dll` and
+  its `.pdb`. The two values Thornswood needs the launcher writes into it on
+  every Play (`launcher\app\Enforce.cs`).
 - The four face files: the face meshes and face tints the Creation Kit exports
   for two people Fishing In Skyrim Special Edition (mod 47618, in the
   collection) adds, Rybek Kupiecski (`FishingVendorPolish`, 00025905) and
   Lillani (`FISLillani`, 0002A07C). The four are dated 26 September and
-  are made from that mod's records.
+  are made from that mod's records. The mod's own archive (Nexus file
+  194634, 1.0) carries its own four for the same two people, dated 27 March
+  2021, and Vortex deploys these over them.
 
-The settings files and the faces belong with mods that are, or were, in the
-collection. This file did not read those mods' permissions.
+What those mods' pages say, read on 26 October (#2793), and what becomes of
+each file:
+
+- Skyrim Souls RE: 3.2.0 and later under GPL-3.0 with the modding exception,
+  and "Version 3.1.2 and earlier is released under the MIT License". The MIT
+  licence asks for its notice to go with the file, and Thornswood Content 1.2
+  carries none. The next Thornswood Content file leaves the ini out.
+- Open Animation Replacer: modifying its files needs its author's permission,
+  its assets may be used with credit, and it may not be uploaded elsewhere.
+  No part of its archive is in the ini. The next Thornswood Content file
+  leaves the ini out all the same, so the launcher is the one place those two
+  values come from.
+- Fishing In Skyrim Special Edition: "You must get permission from me before
+  you are allowed to use any of the assets in this file", the same for
+  modifying its files, and no upload to other sites. No permission is
+  recorded, and faces made from its records cannot be rebuilt as Thornswood's
+  own, so the next Thornswood Content file leaves the four out for good
+  (Patrick, 26 October, #2793).
+- The plugin: the next Thornswood Content file carries the repository's
+  `game\content\Thornswood-Content.esp` in place of the copy from before
+  #2553, and the collection revision that pins it drops the patch.
+
+`records\asset-provenance.json` registers each of these files by its sha256,
+and `tests\test-asset-provenance.js` fails while a file in the table above has
+no entry there.
 
 ### The plugin each channel carries
 
@@ -926,7 +956,11 @@ the copy the project's own Google Fonts folder keeps with its copyright line:
   with a link to its page (`launcher\app\Links.cs`), and the public credits page
   says so. The two mods in it that Thornswood uploads itself are not in this
   group: they have their own sections above. The mod files the installer
-  carries anyway are entry 168, above.
+  carries anyway are entry 168, above. What each mod's own page says about
+  being put in a collection is read and kept, with the page's words, in
+  `records\collection-permissions.json`, and `New-NexusRevision.ps1` makes
+  and publishes no revision that carries a mod whose page nobody has read or
+  whose page says no (#3649).
 - SKSE, which is in the collection, and Skyrim Special Edition, which each
   person owns.
 - The WebView2 Runtime, which comes from Microsoft.
