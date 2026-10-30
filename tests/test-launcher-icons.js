@@ -2,24 +2,28 @@
 //
 //     node tests/test-launcher-icons.js
 //
-// Three icon files, three jobs. launcher/app.ico is the Main launcher,
-// the full Thornswood badge at every size. launcher/app-dev.ico is the
-// Dev launcher, the TF monogram. site/public/favicon.ico is the website
-// tab only, the crest. They must not share a frame.
+// Three icon files. launcher/app.ico is the Main launcher: the badge at
+// every size, with Thornswood written out at 128 and 256, TW at 32, 48
+// and 64, and no lettering at 16 and 24, where none can be read.
+// launcher/app-dev.ico is the Dev launcher, the TF monogram.
+// site/public/favicon.ico is the website tab, and it is the same picture
+// as the launcher: its 16, 32 and 48 frames are app.ico's frames.
 //
-// WHY THIS EXISTS. #1581 (5 Oct) put the favicon's crest into the 16, 24,
-// 32, 48 and 64 frames of launcher/app.ico. Windows draws shortcuts and
-// the taskbar from those small frames, so Main looked like the website
-// tab. That shipped in 1.1.106 and 1.2.0. Djinn, 11 Oct 2026: Main is
-// the badge at every size; the crest stays on the favicon; Dev stays
-// the monogram.
+// WHY THIS EXISTS. #1581 (5 Oct) put a crest into the small frames of
+// app.ico, and Main looked like the website tab; Djinn put the badge back
+// on 11 Oct (#2122) and the favicon kept the crest. Patrick asked in #3319
+// for the website tab to match the launcher. Djinn, 27 Oct 2026: the tab
+// and the launcher are the same badge, and the small sizes carry TW, or no
+// lettering, because the whole name cannot be read there. Dev stays the
+// monogram.
 //
 // What it checks:
-//   1. the three files are ICO files and app.ico has the seven sizes;
-//   2. no frame payload in app.ico matches a frame in the favicon;
+//   1. the three files are ICO files, app.ico has the seven sizes and the
+//      favicon has 16, 32 and 48;
+//   2. each favicon frame is app.ico's frame of the same size, byte for byte;
 //   3. no frame payload in app.ico matches a frame in app-dev.ico;
-//   4. a planted collision is found, so a comparison that always
-//      returns nothing cannot pass.
+//   4. a planted difference is found, so a comparison that always
+//      passes cannot pass.
 //
 // Read only.
 'use strict';
@@ -132,13 +136,21 @@ const sizes = app.frames.map(function (f) { return f.w; }).join(',');
 yes('launcher/app.ico has seven frames', app.frames.length === 7);
 yes('those sizes are 16 24 32 48 64 128 256', sizes === '16,24,32,48,64,128,256');
 
-const vsFav = shared(app.frames, fav.frames);
-yes(sayHits('app.ico shares no frame with the favicon', vsFav), vsFav.length === 0);
-if (vsFav.length) {
-  vsFav.forEach(function (h) {
-    console.log('  shared ' + h.a + ' with favicon ' + h.b);
+const favSizes = fav.frames.map(function (f) { return f.w; }).join(',');
+yes('the favicon\'s sizes are 16 32 48', favSizes === '16,32,48');
+
+function unlike(favFrames, appFrames) {
+  const bad = [];
+  favFrames.forEach(function (f) {
+    const twin = appFrames.filter(function (a) { return a.w === f.w && a.h === f.h; })[0];
+    if (!twin || !twin.payload.equals(f.payload)) bad.push(f.w + 'x' + f.h);
   });
+  return bad;
 }
+
+const vsFav = unlike(fav.frames, app.frames);
+yes('every favicon frame is app.ico\'s frame of the same size' +
+    (vsFav.length ? ' (differs: ' + vsFav.join(', ') + ')' : ''), vsFav.length === 0);
 
 const vsDev = shared(app.frames, dev.frames);
 yes(sayHits('app.ico shares no frame with app-dev.ico', vsDev), vsDev.length === 0);
@@ -152,12 +164,11 @@ const vsSelf = shared(app.frames, app.frames);
 yes('comparing app.ico to itself finds every frame (the reader is not a no-op)',
     vsSelf.length === app.frames.length);
 
-const planted = app.frames.map(function (f) {
+const planted = fav.frames.map(function (f) {
   return { w: f.w, h: f.h, size: f.size, payload: Buffer.from(f.payload) };
 });
-planted[0].payload = Buffer.from(fav.frames[0].payload);
-const vsPlanted = shared(planted, fav.frames);
-yes('a planted favicon frame inside a copy of app.ico is found', vsPlanted.length >= 1);
+planted[0].payload = Buffer.from(dev.frames[0].payload);
+yes('a planted Dev frame inside a copy of the favicon is found', unlike(planted, app.frames).length >= 1);
 
 const self = fs.readFileSync(__filename, 'utf8');
 yes('no em dash in this harness', self.indexOf('\u2014') < 0);

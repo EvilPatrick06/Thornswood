@@ -611,8 +611,8 @@ async function setupDone(res, q, now) {
   log('setup: App ' + a.body.slug + ' (' + a.body.id + ') made by ' + owner + '; its key is kept here and the setup is closed');
   const install = WEB + '/apps/' + encodeURIComponent(a.body.slug) + '/installations/new';
   page(res, 200, 'Made. Now install it',
-    '<p>The App is made and its key is on the box. Last step: install it on Thornswood and skymp only.</p>' +
-    '<p><a href="' + esc(install) + '" style="font-size:1.2em">Install it</a>, choose <b>Only select repositories</b>, pick <b>Thornswood</b> and <b>skymp</b>, then Install.</p>');
+    '<p>The App is made and its key is on the box. Last step: install it on Thornswood, Thornswood-Ops and skymp only.</p>' +
+    '<p><a href="' + esc(install) + '" style="font-size:1.2em">Install it</a>, choose <b>Only select repositories</b>, pick <b>Thornswood</b>, <b>Thornswood-Ops</b> and <b>skymp</b>, then Install.</p>');
 }
 
 // ------------------------------------------------------------------ server --

@@ -628,7 +628,7 @@ function start(stateDir, ghPort) {
     yes('  traded with GitHub by the code alone', gh.calls.length === 1 && gh.calls[0].path === '/app-manifests/abcdef123456/conversions' && gh.calls[0].auth === '');
     yes('  the setup is disarmed', !fs.existsSync(path.join(state, 'setup.json')));
     yes('  the page links the App\'s install page and never shows the key', /\/apps\/thornswood-box-admin\/installations\/new/.test(r.text) && !r.text.includes(keyLine));
-    yes('  and says to pick Thornswood and skymp, the engine fork (#3683)', /pick <b>Thornswood<\/b> and <b>skymp<\/b>/.test(r.text));
+    yes('  and says to pick Thornswood, Thornswood-Ops and skymp, the engine fork (#3683)', /pick <b>Thornswood<\/b>, <b>Thornswood-Ops<\/b> and <b>skymp<\/b>/.test(r.text));
     yes('  and the log never holds the key', !svc.log().includes(keyLine));
     fs.writeFileSync(path.join(state, 'setup.json'), JSON.stringify({ state: st, expires: now() + 3600 }));
     r = await ask(P, 'GET', '/setup?state=' + st, fwd);
