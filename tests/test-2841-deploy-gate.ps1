@@ -95,6 +95,30 @@ Yes 'Publish-Server is held to -Channel dev -FromStore' ((Words 'Publish-Server'
     (Words 'Publish-Server -RequirePass on -Wait 300') -eq '-Channel|dev|-FromStore|-NoPause|-RequirePass|on|-Wait|300')
 Yes '  and a caller cannot name main, a build, a zip or a fresh world' ((Words 'Publish-Server -Channel main') -eq 'REFUSED' -and
     (Words 'Publish-Server -ServerBuild x') -eq 'REFUSED' -and (Words 'Publish-Server -Zip x') -eq 'REFUSED' -and (Words 'Publish-Server -FreshWorld') -eq 'REFUSED')
+# The live verbs (Patrick, 30 Oct 2026: Ships and deploys run from the
+# cloud, never One): each names the exact build of main it is for with
+# -Build, which the broker holds to main's tip and never hands the script.
+$sha = 'a' * 40
+foreach ($live in 'Deploy-Server', 'Publish-Server-Main') { Yes "$live is a live verb, held to a build" ($verbs.verbs.$live.build -eq $true) }
+Yes 'a live verb without -Build is refused, and says why' ((Words 'Deploy-Server -GamemodeOnly') -eq 'REFUSED' -and
+    (Test-ThornswoodGateRequest -Line 'Deploy-Server -GamemodeOnly' -Verbs $verbs).Why -match 'exact build')
+$req = Test-ThornswoodGateRequest -Line ("Deploy-Server -GamemodeOnly -Build $sha -Mode restart") -Verbs $verbs
+Yes '  and with it, the build is the gate''s and never the script''s' ($req.Ok -and $req.Build -eq $sha -and ($req.Args -join '|') -eq '-GamemodeOnly|-Mode|restart')
+Yes '  -Build is a full lower case commit, given once' ((Words "Deploy-Server -FromStore -Build abc123") -eq 'REFUSED' -and (Words ("Deploy-Server -FromStore -Build " + ('A' * 40))) -eq 'REFUSED' -and
+    (Words "Deploy-Server -FromStore -Build $sha -Build $sha") -eq 'REFUSED' -and (Words 'Deploy-Server -FromStore -Build') -eq 'REFUSED')
+Yes '  a verb that is not live takes no -Build' ((Words "Deploy-DevGamemode -Build $sha") -eq 'REFUSED' -and (Test-ThornswoodGateRequest -Line 'Deploy-DevGamemode' -Verbs $verbs).Build -eq '')
+Yes 'Publish-Server-Main is held to -Channel main -FromStore' ((Words "Publish-Server-Main -Build $sha -RequirePass on") -eq '-Channel|main|-FromStore|-NoPause|-RequirePass|on' -and
+    (Words "Publish-Server-Main -Build $sha -Channel dev") -eq 'REFUSED' -and (Words "Publish-Server-Main -Build $sha -ServerBuild x") -eq 'REFUSED')
+Yes 'Deploy-Server takes no host, folder, build folder or role list' ((Words "Deploy-Server -Build $sha -Vps x") -eq 'REFUSED' -and (Words "Deploy-Server -Build $sha -Root C:/x") -eq 'REFUSED' -and
+    (Words "Deploy-Server -Build $sha -Dist x") -eq 'REFUSED' -and (Words "Deploy-Server -Build $sha -Devs 1") -eq 'REFUSED')
+# Content rebuilds through the gate (Patrick's card, 30 Oct 2026): main's
+# whole chain against a server's plugins, its files back through -Out.
+Yes 'Rebuild-ContentTables takes -Server dev or main, and names its out parameter' ((Words 'Rebuild-ContentTables') -eq '' -and (Words 'Rebuild-ContentTables -Server main') -eq '-Server|main' -and
+    (Words 'Rebuild-ContentTables -Server live') -eq 'REFUSED' -and (Test-ThornswoodGateRequest -Line 'Rebuild-ContentTables' -Verbs $verbs).Out -eq '-Out')
+Yes '  and cannot name a commit, a branch or a tool' ((Words "Rebuild-ContentTables -Build $sha") -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Script x') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Branch x') -eq 'REFUSED')
+$rebuild = Text 'scripts/mods/Rebuild-OnBox.ps1'
+Yes '  it runs the chain by Run-OnBox.ps1, its words quoted so none is read as a parameter' ($rebuild.Contains("'scripts/mods/Rebuild-ContentTables.ps1' '-Data' '{data}' '-PluginsTxt' '{plugins}' -Server `$Server -Out `$Out"))
+Yes '  and Run-OnBox.ps1 copies what came back into -Out as well as the checkout' ((Text 'scripts/mods/Run-OnBox.ps1').Contains('foreach ($into in @($repo, $Out | Where-Object { $_ }))'))
 $refused = @(
     @('', 'an empty line'),
     @('Remove-Item C:\', 'a verb that is not on the list'),
@@ -259,6 +283,9 @@ Yes 'every line goes through the rules before anything runs' ($tested -gt 0 -and
 Yes '  and the rules are the installed verbs.json, not anything sent' ($brokerCode.Contains("Read-ThornswoodGateVerbs (Join-Path `$Root 'verbs.json')"))
 Yes 'what runs is the tip of main: fetched into origin/main and checked out from it' (
     $brokerCode.Contains("'+refs/heads/main:refs/remotes/origin/main'") -and $brokerCode.Contains("'--detach', 'refs/remotes/origin/main'") -and $brokerCode.Contains("'clean', '-ffdxq'"))
+Yes 'a live verb runs only when main is at the build it named, checked after the fetch' ($brokerCode.Contains('if ($req.Build -and $req.Build -cne $commit)') -and
+    $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -gt $brokerCode.IndexOf('$commit = Update-Checkout') -and
+    $brokerCode.IndexOf('if ($req.Build -and $req.Build -cne $commit)') -lt $brokerCode.IndexOf('Invoke-Child ([string]$Cfg.pwsh)'))
 Yes 'the script is the verb''s from verbs.json, under the checkout' ($brokerCode.Contains('Join-Path $Repo ($req.Script.Replace(''/'', ''\'')'))
 Yes 'the program starts with no shell, and nothing on its input' ($brokerCode.Contains('$si.UseShellExecute = $false') -and $brokerCode.Contains('$p.StandardInput.Close()') -and $brokerCode -notmatch 'Invoke-Expression|\biex\b|cmd(\.exe)? /c')
 Yes 'a run past its time is ended with everything it started' ($brokerCode.Contains('taskkill.exe" @(''/T'', ''/F'', ''/PID'''))
