@@ -140,11 +140,20 @@ if ($r.conclusion -ne 'success') { Die ("the run ended $($r.conclusion), so ther
 # is kept and prints it as it is.
 $jobs = @((Get-GitHub "$runPath/jobs").jobs)
 if ($jobs.Count -ne 1) { Die ("run $id has $($jobs.Count) jobs, not the one board-read.yml runs: " + $r.html_url) }
+# A runner's log carries terminal escape sequences (its colours). gh 2.92 and
+# newer refuse to hand over an answer that holds any (CVE-2026-45803) unless
+# told --allow-escape-sequences, so a main Ship's board read on such a gh
+# stopped here on 27 Oct 2026 and closed no issue. The log goes into $log and
+# only its BOARD-JSON lines are read; nothing of it reaches the terminal as it
+# is (the refusal below strips ESC first). An older gh has no such flag and
+# refuses no log, so it is passed only when gh's own help names it.
+$escFlag = @()
+if ((& gh api --help 2>&1 | Out-String) -match '--allow-escape-sequences') { $escFlag = @('--allow-escape-sequences') }
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs" 2>&1 | ForEach-Object { "$_" })
+$log = @(& gh api "repos/$GitHubRepo/actions/jobs/$($jobs[0].id)/logs" @escFlag 2>&1 | ForEach-Object { "$_" })
 $c = $LASTEXITCODE
 $ErrorActionPreference = $old
-if ($c -ne 0) { Die ("GitHub did not hand over run $id's log: " + (($log | Select-Object -Last 2) -join ' ')) }
+if ($c -ne 0) { Die ("GitHub did not hand over run $id's log: " + ((($log | Select-Object -Last 2) -join ' ') -replace "`e", '')) }
 try { $bytes = Read-BoardFromLog $log } catch { Die ("run $id's log does not hold board.json whole: " + $_.Exception.Message + ' ' + $r.html_url) }
 $board = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
 $dir = Split-Path -Parent $OutFile
