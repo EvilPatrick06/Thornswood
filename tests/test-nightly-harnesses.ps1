@@ -37,6 +37,12 @@
     8. -StartLog (#3114) adds a line of JSON as each harness starts, with
        its process id and start time, and as it ends, with its exit code and
        whether it said SKIP, for scripts\dev\Trace-Gate.ps1 to read.
+    9. a heavy harness the script names (#4981, test-2914-nexus-scripts.ps1)
+       gets a 600 s clock on an off-box runner (thornswood-pr-*, as
+       scripts\dev\Run-Gate.ps1 tells One's runners from the box's), and the
+       line it ends with and the summary say so and why; on the box, on
+       GitHub's runner and off a runner it keeps 300 s, and so does every
+       harness the list does not name.
 
   Writes only into a scratch folder under TEMP, which it removes.
 #>
@@ -238,6 +244,40 @@ try {
     $byName = @{}; foreach ($e in $ends) { $byName[$e.name] = $e }
     Yes '  and an end line for each, with its exit code and whether it said SKIP' ($ends.Count -eq 3 -and $byName['test-1-ok.js'].code -eq 0 -and -not $byName['test-1-ok.js'].skipped -and
         $byName['test-2-skip.js'].code -eq 0 -and $byName['test-2-skip.js'].skipped -and $byName['test-3-red.ps1'].code -eq 3 -and -not $byName['test-3-red.ps1'].skipped)
+
+    # ---- 9. a longer clock for heavy harnesses off the box (#4981) ----------
+    # The budget proves the clock: with 400 s, a 600 s clock does not fit
+    # and the harness is not started, where a 300 s one does and runs.
+    $hv = Join-Path $work 'heavy'
+    Put (Join-Path $hv 'tests\test-2914-nexus-scripts.ps1') "Write-Host 'PASS  stand-in'`nexit 0`n"
+    Put (Join-Path $hv 'tests\test-other.ps1') "Write-Host 'PASS  stand-in'`nexit 0`n"
+    $runnerWas = $env:RUNNER_NAME
+    try {
+        $env:RUNNER_NAME = 'thornswood-pr-one'
+        $r = Run $hv @('-Only', 'test-2914-nexus-scripts.ps1')
+        Yes "off the box (thornswood-pr-one) the heavy harness runs and passes (exit $($r.Code))" ($r.Code -eq 0 -and (@(Ran $r.Said) -join ',') -eq 'test-2914-nexus-scripts.ps1')
+        Yes '  its line says it had the 600 s clock, off the box' ($r.Said -match '(?m)^--- test-2914-nexus-scripts\.ps1  \([0-9.]+s, on a 600 s clock off the box[,)]')
+        Yes '  and the summary names it, its clock, the runner and why' ($r.Said -match '(?m)^longer clock off the box: test-2914-nexus-scripts\.ps1 600 s; thornswood-pr-one is an off-box runner, where these heavy harnesses run slower than on the box \(#4981\)\s*$')
+        $r = Run $hv @('-Only', 'test-2914-nexus-scripts.ps1', '-BudgetSeconds', '400')
+        Yes "  with 400 s to run in, its 600 s clock does not fit and it is not started (exit $($r.Code))" ($r.Code -eq 1 -and -not (Ran $r.Said).Count -and $r.Said -match '::error file=.*?test-2914-nexus-scripts\.ps1::not run, out of time: \d+s used of 400s and its clock is 600s')
+        $r = Run $hv @('-Only', 'test-other.ps1', '-BudgetSeconds', '400')
+        Yes "  a harness the list does not name keeps 300 s off the box (exit $($r.Code))" ($r.Code -eq 0 -and (@(Ran $r.Said) -join ',') -eq 'test-other.ps1' -and $r.Said -notmatch 'longer clock' -and $r.Said -notmatch '600 s')
+        foreach ($name in 'thornswood-vps-2', 'GitHub Actions 7', '') {
+            $env:RUNNER_NAME = $name
+            $where = $(if ($name) { $name } else { 'no runner' })
+            $r = Run $hv @('-Only', 'test-2914-nexus-scripts.ps1', '-BudgetSeconds', '400')
+            Yes "  on $where it keeps 300 s: it fits in 400 s, runs and passes, and nothing says longer (exit $($r.Code))" ($r.Code -eq 0 -and (@(Ran $r.Said) -join ',') -eq 'test-2914-nexus-scripts.ps1' -and $r.Said -notmatch 'longer clock' -and $r.Said -notmatch 'off the box')
+        }
+    } finally {
+        if ($null -eq $runnerWas) { Remove-Item Env:\RUNNER_NAME -ErrorAction SilentlyContinue } else { $env:RUNNER_NAME = $runnerWas }
+    }
+    # The list is one place in the script, and names real harnesses only.
+    $src = [IO.File]::ReadAllText($script)
+    $list = [regex]::Match($src, '(?ms)^\$OFF_BOX_CLOCK = @\{(.*?)^\}')
+    $named = @([regex]::Matches($list.Groups[1].Value, "(?m)^\s*'([^']+)'\s*=\s*(\d+)") | ForEach-Object { [pscustomobject]@{ Name = $_.Groups[1].Value; Secs = [int]$_.Groups[2].Value } })
+    Yes ('the heavy harnesses are one list in Nightly-Harnesses.ps1 ($OFF_BOX_CLOCK), naming test-2914-nexus-scripts.ps1 at 600 s (' + (@($named | ForEach-Object { $_.Name + ' ' + $_.Secs }) -join ', ') + ')') ($list.Success -and @($named | Where-Object { $_.Name -eq 'test-2914-nexus-scripts.ps1' -and $_.Secs -eq 600 }).Count -eq 1)
+    Yes '  every name on it is a harness here, and no clock on it is past 600 s' ($named.Count -and -not @($named | Where-Object { -not (Test-Path -LiteralPath (Join-Path $repo ('tests\' + $_.Name))) -or $_.Secs -gt 600 -or $_.Secs -le 300 }).Count)
+    Yes '  and the box is told from One by the runner name, as Run-Gate.ps1 does' ($src -match "\[string\]\`$env:RUNNER_NAME -like 'thornswood-pr-\*'" -and [IO.File]::ReadAllText((Join-Path $repo 'scripts\dev\Run-Gate.ps1')) -match "\[string\]\`$env:RUNNER_NAME -like 'thornswood-pr-\*'")
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
