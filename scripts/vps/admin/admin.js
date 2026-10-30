@@ -27,7 +27,12 @@
                     carry thornswood-vps, so box-only jobs never reach
                     them. It stops for a record whose runners GitHub does
                     not have, since every job asking for its label would
-                    then wait for a runner that never comes.
+                    then wait for a runner that never comes. A label of
+                    our own that no record names any more comes off every
+                    runner, so a record taken off main takes its label with
+                    it (#4033: thornswood-sign stayed on runner 3 after
+                    the box stopped signing, since only a record's own
+                    label was ever looked at).
     repo-about      records/repo-about.json on main, { description,
                     homepage, topics }: the About box a stranger sees on
                     the repository's front page (#3682, Patrick's A of 26
@@ -274,6 +279,22 @@ function planLabels(record, runners) {
   }
   const refuse = carry ? '' : 'no runner ' + record.file + ' lists is registered on GitHub, so every job asking for ' + label + ' would wait for a runner that never comes';
   return { changes, lines, refuse };
+}
+
+// The labels on GitHub's runners that no record names: every label of our
+// own (not one GitHub gives, type read-only, and not one RESERVED lists)
+// that main has no record for any more. [{ id, name, label }] to take off.
+function planLeftovers(records, runners) {
+  const named = records.map(r => String(r.label || '').trim().toLowerCase());
+  const out = [];
+  for (const r of runners) {
+    for (const l of r.labels || []) {
+      const n = String(l.name || '').toLowerCase();
+      if (l.type === 'read-only' || RESERVED.indexOf(n) >= 0 || named.indexOf(n) >= 0) continue;
+      out.push({ id: r.id, name: r.name, label: l.name });
+    }
+  }
+  return out;
 }
 
 // Checks one repository's rulesets in main's settings record. An empty list
@@ -656,6 +677,15 @@ async function runnerLabels(read, token, check) {
       lines.push(rec.file + ': ' + c.name + ', ' + rec.label + ' ' + (c.do === 'put on' ? 'put on' : 'taken off'));
     }
   }
+  // A label no record names comes off (#4033).
+  for (const c of planLeftovers(records, runners)) {
+    differs++;
+    if (check) { lines.push('no record names ' + c.label + ': ' + c.name + ' would have it taken off'); continue; }
+    const a = await call('DELETE', API + '/repos/' + RUNNERS_REPO + '/actions/runners/' + c.id + '/labels/' + encodeURIComponent(c.label), { Authorization: 'Bearer ' + token });
+    if (a.status !== 200) { lines.push('STOP ' + c.name + ': GitHub did not take off ' + c.label + ' (' + said(a) + ')'); ok = false; continue; }
+    changed++;
+    lines.push('no record names ' + c.label + ': ' + c.name + ', taken off');
+  }
   if (!check && changed) {
     // Read back rather than trust the calls.
     const after = await listRunners(token);
@@ -663,6 +693,8 @@ async function runnerLabels(read, token, check) {
       const p = planLabels(rec, after);
       if (!p.refuse && p.changes.length) { lines.push('STOP ' + rec.file + ': GitHub still differs for ' + p.changes.map(c => c.name).join(', ')); ok = false; }
     }
+    const left = planLeftovers(records, after);
+    if (left.length) { lines.push('STOP labels no record names are still on ' + left.map(c => c.name + ' (' + c.label + ')').join(', ')); ok = false; }
   }
   return { ok, lines, changed, differs };
 }
@@ -930,5 +962,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planLabels, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { verifyOidc, appJwt, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
