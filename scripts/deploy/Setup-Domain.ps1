@@ -234,12 +234,9 @@ Remote @"
 Get-NetFirewallRule -DisplayName 'Thornswood Docs' -EA SilentlyContinue |
   Remove-NetFirewallRule -EA SilentlyContinue
 
-`$t = Get-ScheduledTask -TaskName 'Thornswood Docs' -EA SilentlyContinue
-if (`$t) {
-  `$node = (Get-Command node -EA SilentlyContinue).Source
-  `$a = New-ScheduledTaskAction -Execute `$node -Argument '$rootWin\server.js' -WorkingDirectory '$rootWin'
-  Set-ScheduledTask -TaskName 'Thornswood Docs' -Action `$a | Out-Null
-}
+# The docs task's action is Deploy-Docs.ps1's, which starts it through the
+# launcher that makes what the site writes its own (#4077); a plain action
+# set here took that off at every run.
 [Environment]::SetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','1','Machine')
 
 Get-CimInstance Win32_Process |
@@ -365,12 +362,15 @@ if (-not `$asSystem) {
   `$sid = Get-ThornswoodTaskSid 'Thornswood Web'
   if (-not `$sid) { `$why = 'the task SID NT TASK\Thornswood Web could not be looked up' }
   else {
-    try { Grant-ThornswoodServiceFolder -Root `$dir -Sid `$sid -Writable 'data' }
-    catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+    try {
+      Grant-ThornswoodServiceFolder -Root `$dir -Sid `$sid -Writable 'data'
+      # What it makes is its own, not every service's (#4077).
+      Set-ThornswoodTaskOwner -TaskName 'Thornswood Web' -Sid `$sid -Action `$a -Roots `$dir
+    } catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
   }
   if (`$why) {
     `$why + ', so the task goes back on SYSTEM'
-    Set-ScheduledTask -TaskName 'Thornswood Web' -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
+    Set-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
   } else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\Thornswood Web' }
 }
 
