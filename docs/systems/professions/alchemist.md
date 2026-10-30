@@ -54,6 +54,13 @@ keeps that on your character, so a relog or a restart forgets
 nothing, and every time you come into the world your game is taught
 it again, so the alchemy menu shows it. A known effect is not a rank.
 
+The Alchemy journal page of the K panel
+([#3142](https://github.com/EvilPatrick06/Thornswood/issues/3142)) shows
+the same record anywhere, away from a lab: every mix you have brewed,
+what it made and how many times, and every ingredient you have eaten,
+with how many of its effects you know and the names of the ones a brew
+here makes. The page appears once you have eaten an ingredient.
+
 ## Master Chemist
 
 At master, either half. Every batch yields two instead of one. One
