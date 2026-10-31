@@ -140,7 +140,7 @@ season('summer');
 yes('summer outdoors cools at the written speed', !!outdoorCooling && outdoorCooling({ place: 'outdoors' }) === 1);
 
 // ---- a plant picked, run -------------------------------------------------------
-const given = [], work = [], stamped = [];
+const given = [], work = [], stamped = [], counted = [];
 const plantCtx = {
   Date: { now: () => 5000000000 }, globalThis: null, RANK_LADDER: ['novice', 'advanced', 'expert', 'master'],
   HARVEST_COOLDOWN_MS: 600000, lastUse: new Map(),
@@ -150,6 +150,8 @@ const plantCtx = {
   addItem: (id, desc, n) => { given.push(n); return true; },
   stampCooldown: (who, ref) => { stamped.push(ref); plantCtx.lastUse.set(who + ':' + ref, 5000000000); },
   creditWork: (id, verb) => { work.push(verb); return null; },
+  // The hold economy's count (#3164) is what the season let the pick give.
+  economyGathered: (id, desc, n) => { counted.push(n); },
   harvestCrimson: () => 'crimson',
   // No seasonal herb here (#3152): every plant is in season, so only the
   // quarter decides what a pick gives.
@@ -158,14 +160,14 @@ const plantCtx = {
 plantCtx.globalThis = { __thornswoodSeason: S };
 vm.createContext(plantCtx);
 vm.runInContext(topFn('harvest') + '\n' + topFn('outOfSeason'), plantCtx);
-function pick(ref) { given.length = 0; work.length = 0; stamped.length = 0; return plantCtx.harvest(1, ref, 'x'); }
+function pick(ref) { given.length = 0; work.length = 0; stamped.length = 0; counted.length = 0; return plantCtx.harvest(1, ref, 'x'); }
 
 season('winter');
 units([0.8]);
 let line = pick(11);
 yes('a bare winter plant gives nothing and says why: "' + line + '"',
   line === 'The Blue Mountain Flower has nothing to pick this time. Winter gives less.' &&
-  given.length === 0 && work.length === 0);
+  given.length === 0 && work.length === 0 && counted.length === 0);
 yes('and it still waits its ten minutes, so a second press cannot take the quarter back',
   stamped[0] === 11 && pick(11) === 'This one has already been picked.' && given.length === 0);
 units([0.1]);
@@ -177,6 +179,7 @@ units([0.1]);
 line = pick(13);
 yes('a summer plant gives a second a quarter of the time: "' + line + '"',
   line === 'You pick 2 Blue Mountain Flower. Summer gives more.' && given[0] === 2 && work.length === 1);
+yes('  and the hold economy counts the two it gave', counted.length === 1 && counted[0] === 2);
 season('spring');
 line = pick(14);
 yes('a spring plant gives its one', line === 'You pick the Blue Mountain Flower.' && given[0] === 1);
@@ -205,7 +208,7 @@ for (const ref of [81, 82, 83, 84]) {
 }
 let credited = 0;
 const fishCtx = { mp: fishMp, Math, Date: { now: () => time }, Number, Map, Set, JSON, log() {},
-  toolGate() { return null; }, wearTool() { return null; }, randInt: (a) => a };
+  toolGate() { return null; }, wearTool() { return null; }, randInt: (a) => a, economyGathered() {} };
 vm.createContext(fishCtx);
 vm.runInContext(fishCode, fishCtx);
 fishCtx.__thornswoodCharacter = {
