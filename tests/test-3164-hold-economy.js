@@ -494,8 +494,10 @@ const asJson = { 'content-type': 'application/json' };
     yes('and /economy is the hub page, like the other hub addresses (' + r.status + ')',
         r.status === 200 && /<script src="\/hub\.js"><\/script>/.test(r.body));
   } finally {
-    srv.kill();
-    await wait(100);
+    // Until the site has ended, Windows holds its folder open and the
+    // removal is refused (EPERM, a hosted build on 31 Oct), so it waits for
+    // the exit itself, not for a time.
+    if (srv.exitCode === null && srv.signalCode === null) { await new Promise((ok) => { srv.once('exit', ok); srv.kill(); }); }
     fs.rmSync(sdir, { recursive: true, force: true });
   }
   console.log('');
