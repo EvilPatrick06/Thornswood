@@ -6,7 +6,8 @@
 // WHY. A classic SkyUI menu keeps its choices in the save, and there is no save
 // here, so Apocalypse, AHZmoreHUD, atlas map markers, Skyrim Unbound and
 // chfshVariousActions started from their defaults every session. The front
-// plugin now reads the 176 GLOB records wired to those menus and sends what
+// plugin now reads the GLOB records wired to those menus (78 since Atlas Map
+// Markers' were dropped for revision 6, #3649) and sends what
 // moved as /modset lines; the gamemode keeps them in private\mod-settings.json
 // and puts them back through an owner-visible property when the character
 // comes in.
@@ -114,11 +115,10 @@ const files = Object.keys(TABLE);
 const counts = {};
 let total = 0;
 files.forEach(function (f) { counts[f] = Object.keys(TABLE[f]).length; total += counts[f]; });
-yes('176 settings are kept (got ' + total + ')', total === 176);
-yes('across the five menus Patrick named, with the audit\'s counts (got ' + JSON.stringify(counts) + ')',
+yes('78 settings are kept (got ' + total + ')', total === 78);
+yes('across the four menus left of the five Patrick named, with the audit\'s counts (got ' + JSON.stringify(counts) + ')',
     counts['Apocalypse - Magic of Skyrim.esp'] === 31 && counts['AHZmoreHUD.esp'] === 40 &&
-    counts['atlas map markers.esp'] === 98 && counts['Skyrim Unbound.esp'] === 6 &&
-    counts['chfshVariousActions.esp'] === 1 && files.length === 5);
+    counts['Skyrim Unbound.esp'] === 6 && counts['chfshVariousActions.esp'] === 1 && files.length === 4);
 let idsOk = true;
 files.forEach(function (f) {
   Object.keys(TABLE[f]).forEach(function (n) {
@@ -127,9 +127,12 @@ files.forEach(function (f) {
   });
 });
 yes('every id is the id inside its plugin, never a load order index', idsOk);
-yes('the atlas ids fit a light plugin', Object.keys(TABLE['atlas map markers.esp']).every(function (n) {
-  return TABLE['atlas map markers.esp'][n] <= 0xfff;
-}));
+// A menu whose mod left the collection leaves this table in the same change
+// (#3649: Atlas Map Markers and its 98 globals, with revision 6).
+const shipped = JSON.parse(fs.readFileSync(path.join(ROOT, 'records', 'collection-plugins.json'), 'utf8')).plugins
+  .map(function (p) { return p.name.toLowerCase(); });
+const gone = files.filter(function (f) { return shipped.indexOf(f.toLowerCase()) < 0; });
+yes('every menu kept is a plugin of the collection (not: ' + gone.join(', ') + ')', gone.length === 0);
 
 // ---- the property
 const prop = one.made[M.MOD_SETTINGS_PROPERTY];
@@ -139,13 +142,13 @@ yes('it carries the put back script', prop && prop.updateOwner === M.putBackScri
 
 // ---- a line is taken
 const P = 1964204031;
-let r = M.command(P, 0, line('/modset AHZShowBookSkill=0 ATLASGroupInnGV=1 WB_General_Global_XP=1.5 chfshVAMenuHotkey=62'));
+let r = M.command(P, 0, line('/modset AHZShowBookSkill=0 DelayDragonMin=1 WB_General_Global_XP=1.5 chfshVAMenuHotkey=62'));
 yes('four known names with numbers are all taken (took ' + r.took + ', refused ' + r.refused.join('; ') + ')',
     r.took === 4 && r.refused.length === 0);
 let disk = onDisk();
 yes('they are in private\\mod-settings.json at once',
     !!disk && disk.who && disk.who[String(P)] &&
-    disk.who[String(P)].AHZShowBookSkill === 0 && disk.who[String(P)].ATLASGroupInnGV === 1 &&
+    disk.who[String(P)].AHZShowBookSkill === 0 && disk.who[String(P)].DelayDragonMin === 1 &&
     disk.who[String(P)].WB_General_Global_XP === 1.5 && disk.who[String(P)].chfshVAMenuHotkey === 62);
 yes('and nothing lands in the served data folder', fs.readdirSync(dataDir).length === 0);
 yes('no temp copy is left beside it', !fs.existsSync(FILE + '.tmp'));
@@ -167,7 +170,11 @@ yes('none of that reached the file',
 yes('the refusals are logged', one.logged.some(function (l) { return /refused from profile 1964204031/.test(l); }));
 
 // Too many pairs on one line: the first MOD.pairs are taken, the rest refused.
-const names = Object.keys(TABLE['atlas map markers.esp']);
+// Names the checks below do not read back, so filling a line with them moves
+// nothing those checks look at.
+const READ_BACK = ['AHZShowBookSkill', 'WB_General_Global_XP', 'chfshVAMenuHotkey', 'DelayDragonMin', 'AHZHotKey', 'AHZIconSize'];
+const names = [].concat.apply([], files.map(function (f) { return Object.keys(TABLE[f]); }))
+  .filter(function (n) { return READ_BACK.indexOf(n) < 0; });
 const many = ['/modset'].concat(names.slice(0, M.MOD.pairs + 5).map(function (n) { return n + '=0'; }));
 r = M.command(P, 0, many);
 yes('at most ' + M.MOD.pairs + ' pairs are taken from one line (took ' + r.took + ')',
@@ -242,7 +249,8 @@ yes('somebody with nothing kept is sent nothing', two.sets.filter(function (s) {
 
 // A hand edit with junk in it does not reach anybody.
 const junk = onDisk();
-junk.who['77'] = { AHZHotKey: 5, Bogus: 1, AHZIconSize: 'big', ATLASGroupInnGV: 1e300 };
+// ATLASGroupInnGV is what a character kept for Atlas before revision 6 took it out.
+junk.who['77'] = { AHZHotKey: 5, Bogus: 1, AHZIconSize: 'big', DelayDragonMin: 1e300, ATLASGroupInnGV: 1 };
 junk.who['not a profile'] = { AHZHotKey: 1 };
 fs.writeFileSync(FILE, JSON.stringify(junk));
 const three = boot({});
@@ -349,34 +357,35 @@ if (fa >= 0 && fb > fa) {
   fire('menuClose', { name: 'Journal Menu' });
   yes('nothing moved, nothing sent', told.length === 1);
 
-  // Every atlas marker switched off at once: more than one line, each short.
-  Object.keys(F.MOD_GLOBALS['atlas map markers.esp']).forEach(function (n) { setG('atlas map markers.esp', n, 1); });
+  // Every AHZmoreHUD setting changed at once: more than one line, each short.
+  Object.keys(F.MOD_GLOBALS['AHZmoreHUD.esp']).forEach(function (n) { setG('AHZmoreHUD.esp', n, 7); });
   told.length = 0;
   fire('menuClose', { name: 'Journal Menu' });
   function pairsIn(list) {
     return list.join(' ').split(' ').filter(function (w) { return w.indexOf('=') > 0; });
   }
-  yes('98 changes go out in ' + told.length + ' lines, every one under the 400 the voice service keeps',
+  yes('40 changes go out in ' + told.length + ' lines, every one under the 400 the voice service keeps',
       told.length > 1 && told.length <= F.MOD_LINES_AT_ONCE &&
       told.every(function (l) { return l.length <= 380 && l.indexOf('/modset ') === 0; }));
-  yes('and every changed name is in them once', pairsIn(told).length === 98);
+  yes('and every changed name is in them once', pairsIn(told).length === 40);
 
   // Each line the plugin sends is one the gamemode takes whole.
   let allTaken = true;
   told.forEach(function (l) { const rr = three.api.take(55, line(l)); if (rr.refused.length) { allTaken = false; } });
-  yes('the gamemode takes every pair the plugin sends', allTaken && Object.keys(three.api.book['55']).length === 98);
+  yes('the gamemode takes every pair the plugin sends', allTaken && Object.keys(three.api.book['55']).length === 40);
 
-  // All 176 at once is more than one go: the rest follows a few seconds later
-  // rather than pushing the chat's own lines out of tellServer's queue.
+  // All 78 at once, each to a number written out long, is more than one go
+  // (11 lines): the rest follows a few seconds later rather than pushing the
+  // chat's own lines out of tellServer's queue.
   Object.keys(F.MOD_GLOBALS).forEach(function (file) {
-    Object.keys(F.MOD_GLOBALS[file]).forEach(function (n) { setG(file, n, 2); });
+    Object.keys(F.MOD_GLOBALS[file]).forEach(function (n) { setG(file, n, -0.1234567890123456); });
   });
   told.length = 0;
   fire('menuClose', { name: 'Journal Menu' });
   const first = told.length;
   const firstPairs = pairsIn(told).length;
-  yes('176 changes send at most ' + F.MOD_LINES_AT_ONCE + ' lines at once (sent ' + first + ', ' + firstPairs + ' pairs)',
-      first === F.MOD_LINES_AT_ONCE && firstPairs < 176);
+  yes('78 changes send at most ' + F.MOD_LINES_AT_ONCE + ' lines at once (sent ' + first + ', ' + firstPairs + ' pairs)',
+      first === F.MOD_LINES_AT_ONCE && firstPairs < 78);
   clock.t += 1000;
   fire('update');
   yes('nothing more in the next second', told.length === first);
@@ -386,10 +395,10 @@ if (fa >= 0 && fb > fa) {
   const uniq = {};
   all.forEach(function (p) { uniq[p.split('=')[0]] = true; });
   yes('and the rest five seconds later, each name once (' + all.length + ' pairs in ' + told.length + ' lines)',
-      all.length === 176 && Object.keys(uniq).length === 176);
+      all.length === 78 && Object.keys(uniq).length === 78);
   clock.t += 5000;
   fire('update');
-  yes('then the beat is quiet until a minute has gone', pairsIn(told).length === 176);
+  yes('then the beat is quiet until a minute has gone', pairsIn(told).length === 78);
 }
 
 try { fs.rmSync(box, { recursive: true, force: true }); } catch (e) { }
