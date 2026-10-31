@@ -97,7 +97,8 @@ function Test-ThornswoodGateRequest {
     $i = 1
     while ($i -lt $words.Count) {
         $w = $words[$i]
-        if ($w -notmatch '^-([A-Za-z]{1,40})$') { $r.Why = ($w + ' is not a parameter name: ' + $name + ' takes only -Name or -Name value. Nothing was run.'); return $r }
+        # A name may end in digits, as Ship's -Detail2 and -Detail3 do (#5144).
+        if ($w -notmatch '^-([A-Za-z][A-Za-z0-9]{0,39})$') { $r.Why = ($w + ' is not a parameter name: ' + $name + ' takes only -Name or -Name value. Nothing was run.'); return $r }
         $p = $Matches[1]
         # The build a live verb is held to: the gate's own, never the script's.
         if ($held -and $p -ceq 'Build') {
