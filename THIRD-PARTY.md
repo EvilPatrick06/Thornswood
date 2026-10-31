@@ -189,7 +189,7 @@ file carries outside code and the file does not carry that project's notice.
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `c5e01b53` (in full, `c5e01b532463ed3cd3add7e52a021196029e3133`). That
+commit `a9970b43` (in full, `a9970b435ef87a3f4a97452c09ada905275a93d0`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -454,7 +454,7 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`c5e01b53`, the commit the client record names (the same 68 files, byte for
+`a9970b43`, the commit the client record names (the same 68 files, byte for
 byte, as at `891f5d47`: what changed in `skymp5-front` since, the unused
 login page taken out (#3927), was never in what webpack builds). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
@@ -1216,7 +1216,7 @@ rewrite takes it out (#3684).
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `c5e01b532463ed3cd3add7e52a021196029e3133` on the public fork. The
+  name `a9970b435ef87a3f4a97452c09ada905275a93d0` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -1288,10 +1288,14 @@ rewrite takes it out (#3684).
   deleted across a restart (#3498), the client logs only the kind of a
   message from the in-game page, never what it says (#3941), and the
   server's resources port refuses masters, archives and scripts and its save
-  reader reads a list's size in 64 bits (#3927).
+  reader reads a list's size in 64 bits (#3927), and since `a9970b43` every
+  listener that serves /rpc refuses another machine (#1294), a person no
+  longer starts with the game's own Flames and Healing (#1688), each step of
+  an NPC's spawn is logged (#1287), and trees and flora show harvested by
+  their flag alone (#2382).
   The server module's SHA256
-  is `f8509c15c712d475fa30177b11cfbd9a31ae75466b8ef5e9b8bf83c8ab559961`, built
-  2026-10-27T05:32:52Z. This is the recorded next release, not a deployment
+  is `f2bad8a90b43d7c0e9583ee8073ed572e5358db3d848d8e1eb332bdcdcbb6f97`, built
+  2026-10-30T23:27:54Z. This is the recorded next release, not a deployment
   claim. Main remains on `0714e444047a994b1013dfe4cac187aef29ad65a` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -1326,7 +1330,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/c5e01b532463ed3cd3add7e52a021196029e3133
+https://github.com/EvilPatrick06/skymp/tree/a9970b435ef87a3f4a97452c09ada905275a93d0
 
 For the engine Main runs until then:
 
