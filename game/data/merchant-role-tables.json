@@ -3,11 +3,11 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "870ffb14af033c2a382990c05732a18d3d62201b0e6ac165711c987032ab7359",
-    "game/data/harvests.json": "b977670daf535dede75a5eaa794365865953d85f554c3ca6f8cf0b6dbcb657a1",
-    "game/data/hunts.json": "6618519178eb470173f7312c56527a3bc844ed53f0f93b23f7563c77202557a2",
+    "game/data/recipes.json": "c6ace948ac3080f1a6696dea192ef0413515d68c3753bbfc5a2cb19402cdfaca",
+    "game/data/harvests.json": "bf392d0c999644f35b82a0436a834bd5978e070a908dae435d3db668a1043208",
+    "game/data/hunts.json": "a14a63951d87341652bc0749b98bc9433b08a78c990a2d24a59219779c904920",
     "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
-    "docs/systems/cut-items.json": "fd3122104482fe441cba2e54cac3374dab42f13d6737de29ce93c8ef15b856c3"
+    "docs/systems/cut-items.json": "56d1f5ba2372c46eaf1b5e49f7a027a4a548c314cb05dc0f73b8a1a66fd2364d"
   },
   "loadOrder": [
     {
@@ -41,6 +41,11 @@
       "repository": false
     },
     {
+      "name": "cheddars_mashups.esl",
+      "sha256": "c802d3d5548430778fd3e25720b664c206e5f7b9e2f177fb00fcd51f2f27f5c1",
+      "repository": false
+    },
+    {
       "name": "Water for ENB.esm",
       "sha256": "e043a0ab6136b861fa0117aef69a78a1ffbaf183c4862e196575977439601830",
       "repository": false
@@ -56,6 +61,11 @@
       "repository": false
     },
     {
+      "name": "RaceCompatibility.esm",
+      "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2",
+      "repository": false
+    },
+    {
       "name": "AHZmoreHUDInventory.esl",
       "sha256": "ea9ce96cf1a8d174f8f2cfe22d938703dfdfcb3c3c572ee87e61427f51ec9aeb",
       "repository": false
@@ -66,18 +76,13 @@
       "repository": false
     },
     {
-      "name": "RaceCompatibility.esm",
-      "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2",
+      "name": "LSFX-SSE-Audiosettings.esp",
+      "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7",
       "repository": false
     },
     {
       "name": "SkyUI_SE.esp",
       "sha256": "61eb77164ed3632344ac2ccac4c8a4e69c62397999e7d8d558c162fd205616cf",
-      "repository": false
-    },
-    {
-      "name": "LSFX-SSE-Audiosettings.esp",
-      "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7",
       "repository": false
     },
     {
@@ -88,11 +93,6 @@
     {
       "name": "Immersive Sounds - Compendium.esp",
       "sha256": "5a1b36a7961d767c0937957767055dcf1bcb53b79b574003a40a66d382d3350e",
-      "repository": false
-    },
-    {
-      "name": "FNIS.esp",
-      "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03",
       "repository": false
     },
     {
@@ -181,11 +181,6 @@
       "repository": false
     },
     {
-      "name": "HIMBO.esp",
-      "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a",
-      "repository": false
-    },
-    {
       "name": "AnotherOakwood.esp",
       "sha256": "e29668024dc76c1dfb8e3724448522ae1b8853815cc221c5f0024e433d2b2264",
       "repository": false
@@ -221,8 +216,18 @@
       "repository": false
     },
     {
+      "name": "CBBE.esp",
+      "sha256": "4243b94779ebbd46a15b003d677f8d7fc12a5b9ddd55943a4d429b94c31f3f7c",
+      "repository": false
+    },
+    {
       "name": "RaceMenuPlugin.esp",
       "sha256": "d36cd31e2472c1278d4ae9b7f2de89a305a4704b0838a0c89328431e739457de",
+      "repository": false
+    },
+    {
+      "name": "RaceMenuMorphsCBBE.esp",
+      "sha256": "c7d062bd13f08271ad052ce307077ac090daea8c4e116c54a6bc4d57c6dd099b",
       "repository": false
     },
     {
@@ -269,6 +274,41 @@
       "name": "Thornswood-Content.esp",
       "sha256": "2d47578f3f303e4995e866aed4de677fbd348bc603f1195f3f0a6b0283ca4fad",
       "repository": true
+    },
+    {
+      "name": "FNIS.esp",
+      "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03",
+      "repository": false
+    },
+    {
+      "name": "3BBB.esp",
+      "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549",
+      "repository": false
+    },
+    {
+      "name": "AwBaldandShavedHair.esp",
+      "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a",
+      "repository": false
+    },
+    {
+      "name": "HIMBO.esp",
+      "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a",
+      "repository": false
+    },
+    {
+      "name": "RaceMenuMorphsHIMBO.esp",
+      "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b",
+      "repository": false
+    },
+    {
+      "name": "BeardMaskFix.esp",
+      "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db",
+      "repository": false
+    },
+    {
+      "name": "BetterThirdPersonSelection.esp",
+      "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e",
+      "repository": false
     },
     {
       "name": "Populated Cities Towns Villages Legendary.esp",
@@ -326,66 +366,6 @@
       "repository": false
     },
     {
-      "name": "AHZmoreHUD.esp",
-      "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd",
-      "repository": false
-    },
-    {
-      "name": "HappyLittleTrees.esp",
-      "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f",
-      "repository": false
-    },
-    {
-      "name": "BetterContainerControls.esp",
-      "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3",
-      "repository": false
-    },
-    {
-      "name": "GourmetTables.esp",
-      "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f",
-      "repository": false
-    },
-    {
-      "name": "Embers XD - Fire Magick Add-On.esp",
-      "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092",
-      "repository": false
-    },
-    {
-      "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
-      "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6",
-      "repository": false
-    },
-    {
-      "name": "Embers XD - Patch - Gourmet Tables.esp",
-      "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a",
-      "repository": false
-    },
-    {
-      "name": "MoreCraftableEquipment_CloaksandCapes.esp",
-      "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363",
-      "repository": false
-    },
-    {
-      "name": "MCMHelper.esp",
-      "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc",
-      "repository": false
-    },
-    {
-      "name": "SkyHUD.esp",
-      "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca",
-      "repository": false
-    },
-    {
-      "name": "PlayFluteLuteDrum.esp",
-      "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00",
-      "repository": false
-    },
-    {
-      "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
-      "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0",
-      "repository": false
-    },
-    {
       "name": "CFTO-JK-Patch.esp",
       "sha256": "b3e710c0e575bd0e406157ed3d9ff8e6afe08ba29221e16623efd08cb22c7031",
       "repository": false
@@ -406,18 +386,38 @@
       "repository": false
     },
     {
-      "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
-      "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c",
+      "name": "AHZmoreHUD.esp",
+      "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd",
       "repository": false
     },
     {
-      "name": "AwBaldandShavedHair.esp",
-      "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a",
+      "name": "HappyLittleTrees.esp",
+      "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f",
       "repository": false
     },
     {
-      "name": "BetterThirdPersonSelection.esp",
-      "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e",
+      "name": "BetterContainerControls.esp",
+      "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3",
+      "repository": false
+    },
+    {
+      "name": "Embers XD - Fire Magick Add-On.esp",
+      "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092",
+      "repository": false
+    },
+    {
+      "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
+      "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6",
+      "repository": false
+    },
+    {
+      "name": "GourmetTables.esp",
+      "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f",
+      "repository": false
+    },
+    {
+      "name": "Embers XD - Patch - Gourmet Tables.esp",
+      "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a",
       "repository": false
     },
     {
@@ -426,28 +426,8 @@
       "repository": false
     },
     {
-      "name": "McmRecorder.esp",
-      "sha256": "c6f0249c6dfb9e550901529786dcdde4f03b856bedea03ec8b17df0cb3089cf9",
-      "repository": false
-    },
-    {
-      "name": "RaceMenuMorphsHIMBO.esp",
-      "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b",
-      "repository": false
-    },
-    {
-      "name": "QuickLootIE.esp",
-      "sha256": "2675d895dbe0a76b0da9c4c2748fb83972410eec50c73a75c1dc1faeaa8a89e4",
-      "repository": false
-    },
-    {
-      "name": "KhisartinBeards.esp",
-      "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9",
-      "repository": false
-    },
-    {
-      "name": "IA CBBE Patch.esp",
-      "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919",
+      "name": "AZ_IADistribution.esp",
+      "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c",
       "repository": false
     },
     {
@@ -456,13 +436,28 @@
       "repository": false
     },
     {
-      "name": "TrueDirectionalMovement.esp",
-      "sha256": "deb6707f859ef41f37ab2c4e124143ffe9cb0416a175d604be683f99386acccf",
+      "name": "IA CBBE Patch.esp",
+      "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919",
       "repository": false
     },
     {
-      "name": "AZ_IADistribution.esp",
-      "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c",
+      "name": "KhisartinBeards.esp",
+      "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9",
+      "repository": false
+    },
+    {
+      "name": "McmRecorder.esp",
+      "sha256": "c6f0249c6dfb9e550901529786dcdde4f03b856bedea03ec8b17df0cb3089cf9",
+      "repository": false
+    },
+    {
+      "name": "MCMHelper.esp",
+      "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc",
+      "repository": false
+    },
+    {
+      "name": "MoreCraftableEquipment_CloaksandCapes.esp",
+      "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363",
       "repository": false
     },
     {
@@ -471,13 +466,33 @@
       "repository": false
     },
     {
-      "name": "BeardMaskFix.esp",
-      "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db",
+      "name": "QuickLootIE.esp",
+      "sha256": "2675d895dbe0a76b0da9c4c2748fb83972410eec50c73a75c1dc1faeaa8a89e4",
       "repository": false
     },
     {
-      "name": "3BBB.esp",
-      "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549",
+      "name": "SkyHUD.esp",
+      "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca",
+      "repository": false
+    },
+    {
+      "name": "PlayFluteLuteDrum.esp",
+      "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00",
+      "repository": false
+    },
+    {
+      "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
+      "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0",
+      "repository": false
+    },
+    {
+      "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
+      "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c",
+      "repository": false
+    },
+    {
+      "name": "TrueDirectionalMovement.esp",
+      "sha256": "deb6707f859ef41f37ab2c4e124143ffe9cb0416a175d604be683f99386acccf",
       "repository": false
     },
     {
@@ -501,18 +516,8 @@
       "repository": false
     },
     {
-      "name": "atlas map markers.esp",
-      "sha256": "e93c675baa5ed7d0825afc697209616d769d480d324d24e6e2d362ee8c6d4361",
-      "repository": false
-    },
-    {
       "name": "Water for ENB (Shades of Skyrim).esp",
       "sha256": "63e0893556515f8ebbf36b4199ebee1a441c9b8ed092a06551e315e6cc284204",
-      "repository": false
-    },
-    {
-      "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
-      "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e",
       "repository": false
     },
     {
@@ -521,8 +526,18 @@
       "repository": false
     },
     {
+      "name": "KS_Hairdo's_Lite_NoNPCs.esp",
+      "sha256": "3dc7ac33b2e1dbbb150e0ae080177ba4858609c0677a779fe65b9e0fe0580787",
+      "repository": false
+    },
+    {
+      "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
+      "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e",
+      "repository": false
+    },
+    {
       "name": "Thornswood-Last.esp",
-      "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
+      "sha256": "95d85507c11962b592dacf1ace067677f5309b75d0cd7d9caadf1e502909cca0",
       "repository": false
     }
   ],
@@ -752,6 +767,12 @@
       "flags": 0,
       "edid": "DLC1SabreCatHide",
       "winner": "Dawnguard.esm"
+    },
+    "12a:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSteelHoodedHelmetBlack",
+      "winner": "cheddars_mashups.esl"
     },
     "12c7:Cloaks&Capes.esp": {
       "type": "ARMO",
@@ -1425,6 +1446,24 @@
       "edid": "EbonyArrow",
       "winner": "Dawnguard.esm"
     },
+    "144:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSteelFurGauntlets",
+      "winner": "cheddars_mashups.esl"
+    },
+    "145:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorVampirePlateGloves",
+      "winner": "cheddars_mashups.esl"
+    },
+    "146:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSteelFurGloves",
+      "winner": "cheddars_mashups.esl"
+    },
     "14757:Dawnguard.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -1436,6 +1475,12 @@
       "flags": 0,
       "edid": "DLC1ArmorDawnguardGauntletsHeavy",
       "winner": "Dawnguard.esm"
+    },
+    "148:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorGlovedHideGauntlets",
+      "winner": "cheddars_mashups.esl"
     },
     "14dc4:Dawnguard.esm": {
       "type": "ALCH",
@@ -1564,6 +1609,12 @@
       "edid": "ClothesEmperor",
       "winner": "Update.esm"
     },
+    "15b:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorVampireBattlelord",
+      "winner": "cheddars_mashups.esl"
+    },
     "16000:Thornswood-Content.esp": {
       "type": "MISC",
       "flags": 0,
@@ -1629,6 +1680,12 @@
       "flags": 0,
       "edid": "ThornswoodFurnitureLargeChest",
       "winner": "Thornswood-Content.esp"
+    },
+    "161:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardPriestHood",
+      "winner": "cheddars_mashups.esl"
     },
     "16e26:Dragonborn.esm": {
       "type": "INGR",
@@ -1723,11 +1780,35 @@
       "edid": "ClothesChefShoes",
       "winner": "Skyrim.esm"
     },
+    "190:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorNordHeroCuirass",
+      "winner": "cheddars_mashups.esl"
+    },
+    "191:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorNordHeroHelmet",
+      "winner": "cheddars_mashups.esl"
+    },
     "1932b:Dawnguard.esm": {
       "type": "MISC",
       "flags": 0,
       "edid": "DLC1CanticleBarkFake",
       "winner": "Dawnguard.esm"
+    },
+    "196:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardCasual",
+      "winner": "cheddars_mashups.esl"
+    },
+    "199:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorTelvanniRobes",
+      "winner": "cheddars_mashups.esl"
     },
     "19ade:Dawnguard.esm": {
       "type": "ARMO",
@@ -1752,6 +1833,12 @@
       "flags": 0,
       "edid": "DLC01ClothesVampireGloves",
       "winner": "Dawnguard.esm"
+    },
+    "19e:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardHunterCuriass",
+      "winner": "cheddars_mashups.esl"
     },
     "19f5f:Playable Rieklings.esp": {
       "type": "ARMO",
@@ -1788,6 +1875,18 @@
       "flags": 0,
       "edid": "1ArmorRieklingCuirassChiefAlt",
       "winner": "Playable Rieklings.esp"
+    },
+    "19f:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardHunterHelmet",
+      "winner": "cheddars_mashups.esl"
+    },
+    "1:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorScholarofStendarr",
+      "winner": "cheddars_mashups.esl"
     },
     "1a010:Thornswood-Content.esp": {
       "type": "ALCH",
@@ -1844,6 +1943,18 @@
       "edid": "ThornswoodFoodBrewSaturalia",
       "winner": "Thornswood-Content.esp",
       "food": true
+    },
+    "1a4:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardHornedHelmet",
+      "winner": "cheddars_mashups.esl"
+    },
+    "1a8:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorFallenDawnguard",
+      "winner": "cheddars_mashups.esl"
     },
     "1b39f:Skyrim.esm": {
       "type": "ARMO",
@@ -2212,6 +2323,12 @@
       "edid": "IAShieldWolf",
       "winner": "Hothtrooper44_ArmorCompilation.esp"
     },
+    "22:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "DBStalkerArmor",
+      "winner": "cheddars_mashups.esl"
+    },
     "22fc:Hothtrooper44_ArmorCompilation.esp": {
       "type": "ARMO",
       "flags": 0,
@@ -2458,6 +2575,12 @@
       "edid": "IABosmerShoulderCape",
       "winner": "Hothtrooper44_ArmorCompilation.esp"
     },
+    "23:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorVampireBattlemasterBoots",
+      "winner": "cheddars_mashups.esl"
+    },
     "23a09:Playable Rieklings.esp": {
       "type": "ARMO",
       "flags": 0,
@@ -2638,6 +2761,12 @@
       "edid": "StaffTurnGreaterUndead",
       "winner": "Skyrim.esm"
     },
+    "2:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorAdventurer",
+      "winner": "cheddars_mashups.esl"
+    },
     "2a78:Dawnguard.esm": {
       "type": "INGR",
       "flags": 0,
@@ -2661,6 +2790,12 @@
       "flags": 0,
       "edid": "BearCavePeltWH",
       "winner": "WindhelmSSE.esp"
+    },
+    "2d:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorScholarGauntlets",
+      "winner": "cheddars_mashups.esl"
     },
     "2dd5:Hothtrooper44_ArmorCompilation.esp": {
       "type": "ARMO",
@@ -2860,6 +2995,18 @@
       "edid": "MAG_DrinkWineWhite",
       "winner": "Gourmet.esp",
       "food": true
+    },
+    "31:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorWerwolfBaneGloves",
+      "winner": "cheddars_mashups.esl"
+    },
+    "32:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorWerewolfBane",
+      "winner": "cheddars_mashups.esl"
     },
     "330b3:Skyrim.esm": {
       "type": "ARMO",
@@ -3101,6 +3248,18 @@
       "edid": "FalmerArrow",
       "winner": "Skyrim.esm"
     },
+    "3:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorVampireBattlemaster",
+      "winner": "cheddars_mashups.esl"
+    },
+    "3a:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorVampireStalker",
+      "winner": "cheddars_mashups.esl"
+    },
     "3ad52:Skyrim.esm": {
       "type": "MISC",
       "flags": 0,
@@ -3292,6 +3451,12 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "3d:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "CultistMaskSkull",
+      "winner": "cheddars_mashups.esl"
+    },
     "3f7f8:Skyrim.esm": {
       "type": "INGR",
       "flags": 0,
@@ -3315,6 +3480,12 @@
       "flags": 0,
       "edid": "ClothesMerchantBoots",
       "winner": "Skyrim.esm"
+    },
+    "43:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardAlikr",
+      "winner": "cheddars_mashups.esl"
     },
     "441003:Immersive Weapons.esp": {
       "type": "WEAP",
@@ -3358,11 +3529,35 @@
       "edid": "IAFurHoodWhite",
       "winner": "Hothtrooper44_ArmorCompilation.esp"
     },
+    "49:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorFallenCompanion",
+      "winner": "cheddars_mashups.esl"
+    },
+    "4:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorBladesRemnant",
+      "winner": "cheddars_mashups.esl"
+    },
+    "4a:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorFallenCompanionBoots",
+      "winner": "cheddars_mashups.esl"
+    },
     "4b0ba:Skyrim.esm": {
       "type": "INGR",
       "flags": 0,
       "edid": "Wheat",
       "winner": "Skyrim.esm"
+    },
+    "4b:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorFallenCompanionGauntlets",
+      "winner": "cheddars_mashups.esl"
     },
     "4c3cb:Skyrim.esm": {
       "type": "ARMO",
@@ -3472,6 +3667,18 @@
       "edid": "StaffTemplateRestoration",
       "winner": "Dragonborn.esm"
     },
+    "52:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRedguardWarrior",
+      "winner": "cheddars_mashups.esl"
+    },
+    "56:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorBladesPriest",
+      "winner": "cheddars_mashups.esl"
+    },
     "56a9d:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -3496,11 +3703,29 @@
       "edid": "HangingMoss",
       "winner": "Skyrim.esm"
     },
+    "59:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSonofSkyrimboots",
+      "winner": "cheddars_mashups.esl"
+    },
     "59b86:Skyrim.esm": {
       "type": "INGR",
       "flags": 0,
       "edid": "Nirnroot",
       "winner": "Skyrim.esm"
+    },
+    "5:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ForswornModestCuirass",
+      "winner": "cheddars_mashups.esl"
+    },
+    "5a:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSonofSkyrimgauntlets",
+      "winner": "cheddars_mashups.esl"
     },
     "5acdb:Skyrim.esm": {
       "type": "MISC",
@@ -3640,6 +3865,18 @@
       "edid": "ArmorFalmerShield",
       "winner": "Update.esm"
     },
+    "5c:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSteelVigilantA",
+      "winner": "cheddars_mashups.esl"
+    },
+    "5d:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSonofSkyrim",
+      "winner": "cheddars_mashups.esl"
+    },
     "5db7b:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -3651,6 +3888,18 @@
       "flags": 0,
       "edid": "ClothesJarlShoes",
       "winner": "Update.esm"
+    },
+    "5e:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSteeledVigilantHood",
+      "winner": "cheddars_mashups.esl"
+    },
+    "5f:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorBonemoldCuirassForsworn",
+      "winner": "cheddars_mashups.esl"
     },
     "62303:Skyrim.esm": {
       "type": "ARMO",
@@ -4126,6 +4375,12 @@
       "edid": "MountainFlower01Purple",
       "winner": "Skyrim.esm"
     },
+    "7:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardScholar",
+      "winner": "cheddars_mashups.esl"
+    },
     "7bc15:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -4305,6 +4560,12 @@
       "edid": "MAG_FoodMammothStew",
       "winner": "Gourmet.esp",
       "food": true
+    },
+    "81:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardPriestRobe",
+      "winner": "cheddars_mashups.esl"
     },
     "81c:Gourmet.esp": {
       "type": "ALCH",
@@ -4517,6 +4778,12 @@
       "edid": "PearlSmall",
       "winner": "Skyrim.esm"
     },
+    "85:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorIronFurGauntlets",
+      "winner": "cheddars_mashups.esl"
+    },
     "8697e:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -4601,6 +4868,12 @@
       "edid": "ArmorElvenCuirass",
       "winner": "Skyrim.esm"
     },
+    "8:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorNoble",
+      "winner": "cheddars_mashups.esl"
+    },
     "8aa:Gourmet.esp": {
       "type": "ALCH",
       "flags": 0,
@@ -4636,6 +4909,18 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "8c:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmoredJarl",
+      "winner": "cheddars_mashups.esl"
+    },
+    "8d:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorScaledIronCuirass",
+      "winner": "cheddars_mashups.esl"
+    },
     "8e2:Gourmet.esp": {
       "type": "ALCH",
       "flags": 0,
@@ -4649,6 +4934,12 @@
       "edid": "MAG_FoodAshYamCooked",
       "winner": "Gourmet.esp",
       "food": true
+    },
+    "8e:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteel",
+      "winner": "cheddars_mashups.esl"
     },
     "8ea:Gourmet.esp": {
       "type": "ALCH",
@@ -4691,6 +4982,12 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "8f:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorNobleAlt",
+      "winner": "cheddars_mashups.esl"
+    },
     "901:Gourmet.esp": {
       "type": "ALCH",
       "flags": 0,
@@ -4712,17 +5009,65 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "90:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelB",
+      "winner": "cheddars_mashups.esl"
+    },
     "9151b:Skyrim.esm": {
       "type": "INGR",
       "flags": 0,
       "edid": "SpiderEgg",
       "winner": "Skyrim.esm"
     },
+    "91:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelY",
+      "winner": "cheddars_mashups.esl"
+    },
+    "92:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelD",
+      "winner": "cheddars_mashups.esl"
+    },
     "92d3:FishingInSkyrim.esp": {
       "type": "INGR",
       "flags": 0,
       "edid": "FishingFirePaste",
       "winner": "FishingInSkyrim.esp"
+    },
+    "93:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelC",
+      "winner": "cheddars_mashups.esl"
+    },
+    "94:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelP",
+      "winner": "cheddars_mashups.esl"
+    },
+    "95:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelR",
+      "winner": "cheddars_mashups.esl"
+    },
+    "96:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardHelmetHooded",
+      "winner": "cheddars_mashups.esl"
+    },
+    "97:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardHelmetHoodedW",
+      "winner": "cheddars_mashups.esl"
     },
     "981:Gourmet.esp": {
       "type": "ALCH",
@@ -4731,11 +5076,53 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "98:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardHelmetHoodedB",
+      "winner": "cheddars_mashups.esl"
+    },
+    "99:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardHelmetHoodedG",
+      "winner": "cheddars_mashups.esl"
+    },
+    "9:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDawnguardExecutioner",
+      "winner": "cheddars_mashups.esl"
+    },
+    "9a:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorDraugrGloves",
+      "winner": "cheddars_mashups.esl"
+    },
     "9b8a4:Playable Rieklings.esp": {
       "type": "WEAP",
       "flags": 0,
       "edid": "1RieklingBone",
       "winner": "Playable Rieklings.esp"
+    },
+    "9b:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorAlikrKnight",
+      "winner": "cheddars_mashups.esl"
+    },
+    "9c:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelG",
+      "winner": "cheddars_mashups.esl"
+    },
+    "9d:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronB",
+      "winner": "cheddars_mashups.esl"
     },
     "9db:HearthFires.esm": {
       "type": "ALCH",
@@ -4751,6 +5138,12 @@
       "winner": "Gourmet.esp",
       "food": true
     },
+    "9e:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronY",
+      "winner": "cheddars_mashups.esl"
+    },
     "9f0:MoreCraftableEquipment.esp": {
       "type": "ARMO",
       "flags": 0,
@@ -4763,11 +5156,59 @@
       "edid": "MCEIldariRobes",
       "winner": "MoreCraftableEquipment.esp"
     },
+    "9f:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronD",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a0:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronG",
+      "winner": "cheddars_mashups.esl"
+    },
     "a199b:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
       "edid": "ClothesRobesBlue",
       "winner": "Skyrim.esm"
+    },
+    "a1:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronR",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a2:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronC",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a3:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedSteelO",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a4:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronO",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a5:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIron",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a6:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorRobedIronP",
+      "winner": "cheddars_mashups.esl"
     },
     "a6d79:Skyrim.esm": {
       "type": "ARMO",
@@ -4786,6 +5227,30 @@
       "flags": 0,
       "edid": "ArmorStormcloakBoots",
       "winner": "Update.esm"
+    },
+    "a7:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorAncientFalmerRobes",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a8:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorOrcishHuntCuirass",
+      "winner": "cheddars_mashups.esl"
+    },
+    "a9:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorOrcishExecCuirass",
+      "winner": "cheddars_mashups.esl"
+    },
+    "aa:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorOrcishExecBoots",
+      "winner": "cheddars_mashups.esl"
     },
     "ab64:Hothtrooper44_ArmorCompilation.esp": {
       "type": "ARMO",
@@ -4811,11 +5276,35 @@
       "edid": "IAHeroicStormcloakBoots",
       "winner": "Hothtrooper44_ArmorCompilation.esp"
     },
+    "ab:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorOrcishExecGauntlets",
+      "winner": "cheddars_mashups.esl"
+    },
+    "ac:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorOrcishExecHelmet",
+      "winner": "cheddars_mashups.esl"
+    },
+    "ae:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorSteelHoodedHelmet",
+      "winner": "cheddars_mashups.esl"
+    },
     "af5fd:Skyrim.esm": {
       "type": "MISC",
       "flags": 0,
       "edid": "BoneHumanSkullFull",
       "winner": "Skyrim.esm"
+    },
+    "af:cheddars_mashups.esl": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ArmorNordicRobes",
+      "winner": "cheddars_mashups.esl"
     },
     "b08c5:Skyrim.esm": {
       "type": "INGR",
@@ -5389,6 +5878,12 @@
       "flags": 0,
       "edid": "Gold001",
       "winner": "Skyrim.esm"
+    },
+    "fe6a9:Skyrim.esm": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "WerewolfPelt",
+      "winner": "Skyrim.esm"
     }
   },
   "tables": {
@@ -5396,6 +5891,7 @@
       "buy": [
         "10aa19:Skyrim.esm",
         "10c6fb:Skyrim.esm",
+        "12a:cheddars_mashups.esl",
         "12e46:Skyrim.esm",
         "12e49:Skyrim.esm",
         "12e4b:Skyrim.esm",
@@ -5491,23 +5987,38 @@
         "139b0:Skyrim.esm",
         "139b1:Skyrim.esm",
         "139b2:Skyrim.esm",
+        "144:cheddars_mashups.esl",
+        "145:cheddars_mashups.esl",
+        "146:cheddars_mashups.esl",
         "14757:Dawnguard.esm",
         "14758:Dawnguard.esm",
+        "148:cheddars_mashups.esl",
         "150b8:Dawnguard.esm",
         "15490:Thornswood-Content.esp",
         "15494:Thornswood-Content.esp",
         "15495:Thornswood-Content.esp",
         "154b0:Thornswood-Content.esp",
         "154b1:Thornswood-Content.esp",
+        "15b:cheddars_mashups.esl",
+        "161:cheddars_mashups.esl",
         "16e26:Dragonborn.esm",
         "17e97:Dragonborn.esm",
         "18388:Skyrim.esm",
+        "190:cheddars_mashups.esl",
+        "191:cheddars_mashups.esl",
+        "196:cheddars_mashups.esl",
+        "199:cheddars_mashups.esl",
+        "19e:cheddars_mashups.esl",
         "19f5f:Playable Rieklings.esp",
         "19f60:Playable Rieklings.esp",
         "19f61:Playable Rieklings.esp",
         "19f62:Playable Rieklings.esp",
         "19f6a:Playable Rieklings.esp",
         "19f71:Playable Rieklings.esp",
+        "19f:cheddars_mashups.esl",
+        "1:cheddars_mashups.esl",
+        "1a4:cheddars_mashups.esl",
+        "1a8:cheddars_mashups.esl",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
         "1b3a1:Skyrim.esm",
@@ -5552,6 +6063,7 @@
         "1cdb9:Dragonborn.esm",
         "1cdba:Dragonborn.esm",
         "214a1:Hothtrooper44_ArmorCompilation.esp",
+        "22:cheddars_mashups.esl",
         "23146:Hothtrooper44_ArmorCompilation.esp",
         "2314b:Hothtrooper44_ArmorCompilation.esp",
         "23150:Hothtrooper44_ArmorCompilation.esp",
@@ -5564,6 +6076,7 @@
         "238e2:Hothtrooper44_ArmorCompilation.esp",
         "238eb:Hothtrooper44_ArmorCompilation.esp",
         "238f1:Hothtrooper44_ArmorCompilation.esp",
+        "23:cheddars_mashups.esl",
         "23e9:Dawnguard.esm",
         "23eb:Dawnguard.esm",
         "23ed:Dawnguard.esm",
@@ -5572,27 +6085,43 @@
         "26235:Dragonborn.esm",
         "26236:Dragonborn.esm",
         "26237:Dragonborn.esm",
+        "2:cheddars_mashups.esl",
         "2b04e:Dragonborn.esm",
         "2b06b:Dragonborn.esm",
+        "2d:cheddars_mashups.esl",
         "2e4e6:Skyrim.esm",
         "2e6d1:Skyrim.esm",
         "2f2f4:Skyrim.esm",
         "302cd:Skyrim.esm",
+        "31:cheddars_mashups.esl",
+        "32:cheddars_mashups.esl",
         "34cd6:Skyrim.esm",
         "34cdd:Skyrim.esm",
         "3619e:Skyrim.esm",
+        "3:cheddars_mashups.esl",
+        "3a:cheddars_mashups.esl",
         "3ad52:Skyrim.esm",
         "3ad57:Skyrim.esm",
         "3ad5f:Skyrim.esm",
         "3ad6d:Skyrim.esm",
+        "3ad74:Skyrim.esm",
         "3ad90:Skyrim.esm",
+        "43:cheddars_mashups.esl",
         "441003:Immersive Weapons.esp",
+        "49:cheddars_mashups.esl",
+        "4:cheddars_mashups.esl",
+        "4a:cheddars_mashups.esl",
+        "4b:cheddars_mashups.esl",
         "4c3cb:Skyrim.esm",
         "4c3d0:Skyrim.esm",
         "50d0:Dawnguard.esm",
+        "56:cheddars_mashups.esl",
         "56a9d:Skyrim.esm",
         "56a9e:Skyrim.esm",
         "56b17:Skyrim.esm",
+        "59:cheddars_mashups.esl",
+        "5:cheddars_mashups.esl",
+        "5a:cheddars_mashups.esl",
         "5acdb:Skyrim.esm",
         "5acdc:Skyrim.esm",
         "5acdd:Skyrim.esm",
@@ -5612,6 +6141,10 @@
         "5ada0:Skyrim.esm",
         "5ada1:Skyrim.esm",
         "5c06c:Skyrim.esm",
+        "5c:cheddars_mashups.esl",
+        "5d:cheddars_mashups.esl",
+        "5e:cheddars_mashups.esl",
+        "5f:cheddars_mashups.esl",
         "6bc02:Skyrim.esm",
         "6bc04:Skyrim.esm",
         "6bc0b:Skyrim.esm",
@@ -5621,20 +6154,60 @@
         "71cf3:Skyrim.esm",
         "747df:Immersive Weapons.esp",
         "747e0:Immersive Weapons.esp",
+        "7:cheddars_mashups.esl",
         "800e4:Skyrim.esm",
+        "81:cheddars_mashups.esl",
+        "85:cheddars_mashups.esl",
         "8697e:Skyrim.esm",
         "86981:Skyrim.esm",
         "86983:Skyrim.esm",
         "86985:Skyrim.esm",
         "896a3:Skyrim.esm",
+        "8:cheddars_mashups.esl",
+        "8c:cheddars_mashups.esl",
+        "8d:cheddars_mashups.esl",
+        "8e:cheddars_mashups.esl",
+        "8f:cheddars_mashups.esl",
+        "90:cheddars_mashups.esl",
+        "91:cheddars_mashups.esl",
+        "92:cheddars_mashups.esl",
+        "93:cheddars_mashups.esl",
+        "94:cheddars_mashups.esl",
+        "95:cheddars_mashups.esl",
+        "96:cheddars_mashups.esl",
+        "97:cheddars_mashups.esl",
+        "98:cheddars_mashups.esl",
+        "99:cheddars_mashups.esl",
+        "9:cheddars_mashups.esl",
+        "9a:cheddars_mashups.esl",
         "9b8a4:Playable Rieklings.esp",
+        "9b:cheddars_mashups.esl",
+        "9c:cheddars_mashups.esl",
+        "9d:cheddars_mashups.esl",
+        "9e:cheddars_mashups.esl",
+        "9f:cheddars_mashups.esl",
+        "a0:cheddars_mashups.esl",
+        "a1:cheddars_mashups.esl",
+        "a2:cheddars_mashups.esl",
+        "a3:cheddars_mashups.esl",
+        "a4:cheddars_mashups.esl",
+        "a5:cheddars_mashups.esl",
+        "a6:cheddars_mashups.esl",
         "a6d79:Skyrim.esm",
         "a6d7b:Skyrim.esm",
         "a6d7f:Skyrim.esm",
+        "a7:cheddars_mashups.esl",
+        "a8:cheddars_mashups.esl",
+        "a9:cheddars_mashups.esl",
+        "aa:cheddars_mashups.esl",
         "ab64:Hothtrooper44_ArmorCompilation.esp",
         "ab65:Hothtrooper44_ArmorCompilation.esp",
         "ab66:Hothtrooper44_ArmorCompilation.esp",
         "ab67:Hothtrooper44_ArmorCompilation.esp",
+        "ab:cheddars_mashups.esl",
+        "ac:cheddars_mashups.esl",
+        "ae:cheddars_mashups.esl",
+        "af:cheddars_mashups.esl",
         "b83cb:Skyrim.esm",
         "b83cd:Skyrim.esm",
         "b83cf:Skyrim.esm",
@@ -5658,11 +6231,13 @@
         "f3fe:Dawnguard.esm",
         "f400:Dawnguard.esm",
         "f5d05:Skyrim.esm",
-        "f6f21:Skyrim.esm"
+        "f6f21:Skyrim.esm",
+        "fe6a9:Skyrim.esm"
       ],
       "sell": [
         "10aa19:Skyrim.esm",
         "10c6fb:Skyrim.esm",
+        "12a:cheddars_mashups.esl",
         "12e46:Skyrim.esm",
         "12e49:Skyrim.esm",
         "12e4b:Skyrim.esm",
@@ -5758,23 +6333,38 @@
         "139b0:Skyrim.esm",
         "139b1:Skyrim.esm",
         "139b2:Skyrim.esm",
+        "144:cheddars_mashups.esl",
+        "145:cheddars_mashups.esl",
+        "146:cheddars_mashups.esl",
         "14757:Dawnguard.esm",
         "14758:Dawnguard.esm",
+        "148:cheddars_mashups.esl",
         "150b8:Dawnguard.esm",
         "15490:Thornswood-Content.esp",
         "15494:Thornswood-Content.esp",
         "15495:Thornswood-Content.esp",
         "154b0:Thornswood-Content.esp",
         "154b1:Thornswood-Content.esp",
+        "15b:cheddars_mashups.esl",
+        "161:cheddars_mashups.esl",
         "16e26:Dragonborn.esm",
         "17e97:Dragonborn.esm",
         "18388:Skyrim.esm",
+        "190:cheddars_mashups.esl",
+        "191:cheddars_mashups.esl",
+        "196:cheddars_mashups.esl",
+        "199:cheddars_mashups.esl",
+        "19e:cheddars_mashups.esl",
         "19f5f:Playable Rieklings.esp",
         "19f60:Playable Rieklings.esp",
         "19f61:Playable Rieklings.esp",
         "19f62:Playable Rieklings.esp",
         "19f6a:Playable Rieklings.esp",
         "19f71:Playable Rieklings.esp",
+        "19f:cheddars_mashups.esl",
+        "1:cheddars_mashups.esl",
+        "1a4:cheddars_mashups.esl",
+        "1a8:cheddars_mashups.esl",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
         "1b3a1:Skyrim.esm",
@@ -5819,6 +6409,7 @@
         "1cdb9:Dragonborn.esm",
         "1cdba:Dragonborn.esm",
         "214a1:Hothtrooper44_ArmorCompilation.esp",
+        "22:cheddars_mashups.esl",
         "23146:Hothtrooper44_ArmorCompilation.esp",
         "2314b:Hothtrooper44_ArmorCompilation.esp",
         "23150:Hothtrooper44_ArmorCompilation.esp",
@@ -5831,6 +6422,7 @@
         "238e2:Hothtrooper44_ArmorCompilation.esp",
         "238eb:Hothtrooper44_ArmorCompilation.esp",
         "238f1:Hothtrooper44_ArmorCompilation.esp",
+        "23:cheddars_mashups.esl",
         "23e9:Dawnguard.esm",
         "23eb:Dawnguard.esm",
         "23ed:Dawnguard.esm",
@@ -5839,27 +6431,43 @@
         "26235:Dragonborn.esm",
         "26236:Dragonborn.esm",
         "26237:Dragonborn.esm",
+        "2:cheddars_mashups.esl",
         "2b04e:Dragonborn.esm",
         "2b06b:Dragonborn.esm",
+        "2d:cheddars_mashups.esl",
         "2e4e6:Skyrim.esm",
         "2e6d1:Skyrim.esm",
         "2f2f4:Skyrim.esm",
         "302cd:Skyrim.esm",
+        "31:cheddars_mashups.esl",
+        "32:cheddars_mashups.esl",
         "34cd6:Skyrim.esm",
         "34cdd:Skyrim.esm",
         "3619e:Skyrim.esm",
+        "3:cheddars_mashups.esl",
+        "3a:cheddars_mashups.esl",
         "3ad52:Skyrim.esm",
         "3ad57:Skyrim.esm",
         "3ad5f:Skyrim.esm",
         "3ad6d:Skyrim.esm",
+        "3ad74:Skyrim.esm",
         "3ad90:Skyrim.esm",
+        "43:cheddars_mashups.esl",
         "441003:Immersive Weapons.esp",
+        "49:cheddars_mashups.esl",
+        "4:cheddars_mashups.esl",
+        "4a:cheddars_mashups.esl",
+        "4b:cheddars_mashups.esl",
         "4c3cb:Skyrim.esm",
         "4c3d0:Skyrim.esm",
         "50d0:Dawnguard.esm",
+        "56:cheddars_mashups.esl",
         "56a9d:Skyrim.esm",
         "56a9e:Skyrim.esm",
         "56b17:Skyrim.esm",
+        "59:cheddars_mashups.esl",
+        "5:cheddars_mashups.esl",
+        "5a:cheddars_mashups.esl",
         "5acdb:Skyrim.esm",
         "5acdc:Skyrim.esm",
         "5acdd:Skyrim.esm",
@@ -5879,6 +6487,10 @@
         "5ada0:Skyrim.esm",
         "5ada1:Skyrim.esm",
         "5c06c:Skyrim.esm",
+        "5c:cheddars_mashups.esl",
+        "5d:cheddars_mashups.esl",
+        "5e:cheddars_mashups.esl",
+        "5f:cheddars_mashups.esl",
         "6bc02:Skyrim.esm",
         "6bc04:Skyrim.esm",
         "6bc0b:Skyrim.esm",
@@ -5888,20 +6500,60 @@
         "71cf3:Skyrim.esm",
         "747df:Immersive Weapons.esp",
         "747e0:Immersive Weapons.esp",
+        "7:cheddars_mashups.esl",
         "800e4:Skyrim.esm",
+        "81:cheddars_mashups.esl",
+        "85:cheddars_mashups.esl",
         "8697e:Skyrim.esm",
         "86981:Skyrim.esm",
         "86983:Skyrim.esm",
         "86985:Skyrim.esm",
         "896a3:Skyrim.esm",
+        "8:cheddars_mashups.esl",
+        "8c:cheddars_mashups.esl",
+        "8d:cheddars_mashups.esl",
+        "8e:cheddars_mashups.esl",
+        "8f:cheddars_mashups.esl",
+        "90:cheddars_mashups.esl",
+        "91:cheddars_mashups.esl",
+        "92:cheddars_mashups.esl",
+        "93:cheddars_mashups.esl",
+        "94:cheddars_mashups.esl",
+        "95:cheddars_mashups.esl",
+        "96:cheddars_mashups.esl",
+        "97:cheddars_mashups.esl",
+        "98:cheddars_mashups.esl",
+        "99:cheddars_mashups.esl",
+        "9:cheddars_mashups.esl",
+        "9a:cheddars_mashups.esl",
         "9b8a4:Playable Rieklings.esp",
+        "9b:cheddars_mashups.esl",
+        "9c:cheddars_mashups.esl",
+        "9d:cheddars_mashups.esl",
+        "9e:cheddars_mashups.esl",
+        "9f:cheddars_mashups.esl",
+        "a0:cheddars_mashups.esl",
+        "a1:cheddars_mashups.esl",
+        "a2:cheddars_mashups.esl",
+        "a3:cheddars_mashups.esl",
+        "a4:cheddars_mashups.esl",
+        "a5:cheddars_mashups.esl",
+        "a6:cheddars_mashups.esl",
         "a6d79:Skyrim.esm",
         "a6d7b:Skyrim.esm",
         "a6d7f:Skyrim.esm",
+        "a7:cheddars_mashups.esl",
+        "a8:cheddars_mashups.esl",
+        "a9:cheddars_mashups.esl",
+        "aa:cheddars_mashups.esl",
         "ab64:Hothtrooper44_ArmorCompilation.esp",
         "ab65:Hothtrooper44_ArmorCompilation.esp",
         "ab66:Hothtrooper44_ArmorCompilation.esp",
         "ab67:Hothtrooper44_ArmorCompilation.esp",
+        "ab:cheddars_mashups.esl",
+        "ac:cheddars_mashups.esl",
+        "ae:cheddars_mashups.esl",
+        "af:cheddars_mashups.esl",
         "b83cb:Skyrim.esm",
         "b83cd:Skyrim.esm",
         "b83cf:Skyrim.esm",
@@ -5925,7 +6577,8 @@
         "f3fe:Dawnguard.esm",
         "f400:Dawnguard.esm",
         "f5d05:Skyrim.esm",
-        "f6f21:Skyrim.esm"
+        "f6f21:Skyrim.esm",
+        "fe6a9:Skyrim.esm"
       ],
       "supply": [
         "15490:Thornswood-Content.esp",
@@ -5941,6 +6594,7 @@
         "3ad57:Skyrim.esm",
         "3ad5f:Skyrim.esm",
         "3ad6d:Skyrim.esm",
+        "3ad74:Skyrim.esm",
         "3ad90:Skyrim.esm",
         "5acdb:Skyrim.esm",
         "5acdc:Skyrim.esm",
@@ -5967,7 +6621,8 @@
         "d284d:Skyrim.esm",
         "da0bf1:Update.esm",
         "db5d2:Skyrim.esm",
-        "db8a2:Skyrim.esm"
+        "db8a2:Skyrim.esm",
+        "fe6a9:Skyrim.esm"
       ]
     },
     "Woodworker": {
@@ -6257,6 +6912,7 @@
         "3b04e:Dragonborn.esm",
         "3c9fe:Skyrim.esm",
         "3ca00:Skyrim.esm",
+        "3d:cheddars_mashups.esl",
         "3f7f8:Skyrim.esm",
         "4223b:Skyrim.esm",
         "4223c:Skyrim.esm",
@@ -6266,6 +6922,7 @@
         "48d8:Hothtrooper44_ArmorCompilation.esp",
         "48d9:Hothtrooper44_ArmorCompilation.esp",
         "48e0:Hothtrooper44_ArmorCompilation.esp",
+        "52:cheddars_mashups.esl",
         "57f91:Skyrim.esm",
         "5ace3:Skyrim.esm",
         "5ad9d:Skyrim.esm",
@@ -6357,6 +7014,7 @@
         "9f0:MoreCraftableEquipment.esp",
         "9f3:MoreCraftableEquipment.esp",
         "a199b:Skyrim.esm",
+        "af5fd:Skyrim.esm",
         "b145b:Skyrim.esm",
         "b1460:Skyrim.esm",
         "ba99a:Hothtrooper44_ArmorCompilation.esp",
@@ -6528,6 +7186,7 @@
         "3b04e:Dragonborn.esm",
         "3c9fe:Skyrim.esm",
         "3ca00:Skyrim.esm",
+        "3d:cheddars_mashups.esl",
         "3f7f8:Skyrim.esm",
         "4223b:Skyrim.esm",
         "4223c:Skyrim.esm",
@@ -6537,6 +7196,7 @@
         "48d8:Hothtrooper44_ArmorCompilation.esp",
         "48d9:Hothtrooper44_ArmorCompilation.esp",
         "48e0:Hothtrooper44_ArmorCompilation.esp",
+        "52:cheddars_mashups.esl",
         "57f91:Skyrim.esm",
         "5ace3:Skyrim.esm",
         "5ad9d:Skyrim.esm",
@@ -6628,6 +7288,7 @@
         "9f0:MoreCraftableEquipment.esp",
         "9f3:MoreCraftableEquipment.esp",
         "a199b:Skyrim.esm",
+        "af5fd:Skyrim.esm",
         "b145b:Skyrim.esm",
         "b1460:Skyrim.esm",
         "ba99a:Hothtrooper44_ArmorCompilation.esp",
@@ -6688,6 +7349,7 @@
         "77e1e:Skyrim.esm",
         "800e4:Skyrim.esm",
         "9151b:Skyrim.esm",
+        "af5fd:Skyrim.esm",
         "da0bf1:Update.esm",
         "db5d2:Skyrim.esm",
         "db8a2:Skyrim.esm"
@@ -6719,6 +7381,7 @@
         "10fcf2:Skyrim.esm",
         "10fcf4:Skyrim.esm",
         "10fcf7:Skyrim.esm",
+        "12a:cheddars_mashups.esl",
         "12c7:Cloaks&Capes.esp",
         "12e46:Skyrim.esm",
         "12e49:Skyrim.esm",
@@ -6769,25 +7432,40 @@
         "13962:Skyrim.esm",
         "13963:Skyrim.esm",
         "13964:Skyrim.esm",
+        "144:cheddars_mashups.esl",
+        "145:cheddars_mashups.esl",
+        "146:cheddars_mashups.esl",
         "14757:Dawnguard.esm",
         "14758:Dawnguard.esm",
+        "148:cheddars_mashups.esl",
         "150b8:Dawnguard.esm",
         "15516:Skyrim.esm",
+        "15b:cheddars_mashups.esl",
+        "161:cheddars_mashups.esl",
         "17695:Skyrim.esm",
         "17696:Skyrim.esm",
         "17749:Dragonborn.esm",
         "18388:Skyrim.esm",
         "18801:Skyrim.esm",
+        "190:cheddars_mashups.esl",
+        "191:cheddars_mashups.esl",
+        "196:cheddars_mashups.esl",
+        "199:cheddars_mashups.esl",
         "19ade:Dawnguard.esm",
         "19adf:Dawnguard.esm",
         "19ae1:Dawnguard.esm",
         "19ae3:Dawnguard.esm",
+        "19e:cheddars_mashups.esl",
         "19f5f:Playable Rieklings.esp",
         "19f60:Playable Rieklings.esp",
         "19f61:Playable Rieklings.esp",
         "19f62:Playable Rieklings.esp",
         "19f6a:Playable Rieklings.esp",
         "19f71:Playable Rieklings.esp",
+        "19f:cheddars_mashups.esl",
+        "1:cheddars_mashups.esl",
+        "1a4:cheddars_mashups.esl",
+        "1a8:cheddars_mashups.esl",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
         "1b3a1:Skyrim.esm",
@@ -6826,6 +7504,7 @@
         "209a6:Skyrim.esm",
         "209aa:Skyrim.esm",
         "214a1:Hothtrooper44_ArmorCompilation.esp",
+        "22:cheddars_mashups.esl",
         "22fc:Hothtrooper44_ArmorCompilation.esp",
         "23060:Hothtrooper44_ArmorCompilation.esp",
         "23061:Hothtrooper44_ArmorCompilation.esp",
@@ -6867,6 +7546,7 @@
         "238f1:Hothtrooper44_ArmorCompilation.esp",
         "238fb:Hothtrooper44_ArmorCompilation.esp",
         "238fc:Hothtrooper44_ArmorCompilation.esp",
+        "23:cheddars_mashups.esl",
         "23a09:Playable Rieklings.esp",
         "23e9:Dawnguard.esm",
         "23eb:Dawnguard.esm",
@@ -6890,6 +7570,8 @@
         "29b83:Skyrim.esm",
         "29b95:Skyrim.esm",
         "29b97:Skyrim.esm",
+        "2:cheddars_mashups.esl",
+        "2d:cheddars_mashups.esl",
         "2dd5:Hothtrooper44_ArmorCompilation.esp",
         "2dec:Cloaks&Capes.esp",
         "2ded:Cloaks&Capes.esp",
@@ -6918,6 +7600,8 @@
         "2e4ff:Skyrim.esm",
         "2e500:Skyrim.esm",
         "2e504:Skyrim.esm",
+        "31:cheddars_mashups.esl",
+        "32:cheddars_mashups.esl",
         "330b3:Skyrim.esm",
         "330bc:Skyrim.esm",
         "3329:Hothtrooper44_ArmorCompilation.esp",
@@ -6936,18 +7620,26 @@
         "37b8a:Dragonborn.esm",
         "37b8c:Dragonborn.esm",
         "37b8e:Dragonborn.esm",
+        "3:cheddars_mashups.esl",
+        "3a:cheddars_mashups.esl",
         "3b04b:Dragonborn.esm",
         "3b04e:Dragonborn.esm",
         "3c9fe:Skyrim.esm",
         "3ca00:Skyrim.esm",
+        "3d:cheddars_mashups.esl",
         "4223b:Skyrim.esm",
         "4223c:Skyrim.esm",
         "4223d:Skyrim.esm",
+        "43:cheddars_mashups.esl",
         "47d7:Dawnguard.esm",
         "47d9:Dawnguard.esm",
         "48d8:Hothtrooper44_ArmorCompilation.esp",
         "48d9:Hothtrooper44_ArmorCompilation.esp",
         "48e0:Hothtrooper44_ArmorCompilation.esp",
+        "49:cheddars_mashups.esl",
+        "4:cheddars_mashups.esl",
+        "4a:cheddars_mashups.esl",
+        "4b:cheddars_mashups.esl",
         "4c3cb:Skyrim.esm",
         "4c3d0:Skyrim.esm",
         "4c6ca:Skyrim.esm",
@@ -6958,16 +7650,25 @@
         "4dee3:Skyrim.esm",
         "50d0:Dawnguard.esm",
         "51b0c:Skyrim.esm",
+        "52:cheddars_mashups.esl",
+        "56:cheddars_mashups.esl",
         "56a9d:Skyrim.esm",
         "56a9e:Skyrim.esm",
         "56b17:Skyrim.esm",
+        "59:cheddars_mashups.esl",
+        "5:cheddars_mashups.esl",
+        "5a:cheddars_mashups.esl",
         "5b69e:Skyrim.esm",
         "5b69f:Skyrim.esm",
         "5b6a0:Skyrim.esm",
         "5b6a1:Skyrim.esm",
         "5c06c:Skyrim.esm",
+        "5c:cheddars_mashups.esl",
+        "5d:cheddars_mashups.esl",
         "5db7b:Skyrim.esm",
         "5db7e:Skyrim.esm",
+        "5e:cheddars_mashups.esl",
+        "5f:cheddars_mashups.esl",
         "62303:Skyrim.esm",
         "6230b:Skyrim.esm",
         "62311:Skyrim.esm",
@@ -6989,6 +7690,7 @@
         "6ff38:Skyrim.esm",
         "6ff43:Skyrim.esm",
         "6ff45:Skyrim.esm",
+        "7:cheddars_mashups.esl",
         "7bc15:Skyrim.esm",
         "7bc19:Skyrim.esm",
         "7bc1a:Skyrim.esm",
@@ -7004,6 +7706,7 @@
         "80c:MoreCraftableEquipment.esp",
         "80d:MoreCraftableEquipment.esp",
         "812:MoreCraftableEquipment.esp",
+        "81:cheddars_mashups.esl",
         "822:MoreCraftableEquipment.esp",
         "823:MoreCraftableEquipment.esp",
         "824:MoreCraftableEquipment.esp",
@@ -7035,6 +7738,7 @@
         "840:MoreCraftableEquipment.esp",
         "841:MoreCraftableEquipment.esp",
         "842:MoreCraftableEquipment.esp",
+        "85:cheddars_mashups.esl",
         "8697e:Skyrim.esm",
         "86981:Skyrim.esm",
         "86983:Skyrim.esm",
@@ -7048,17 +7752,54 @@
         "88958:Skyrim.esm",
         "8895a:Skyrim.esm",
         "896a3:Skyrim.esm",
+        "8:cheddars_mashups.esl",
+        "8c:cheddars_mashups.esl",
+        "8d:cheddars_mashups.esl",
+        "8e:cheddars_mashups.esl",
         "8f19a:Skyrim.esm",
+        "8f:cheddars_mashups.esl",
+        "90:cheddars_mashups.esl",
+        "91:cheddars_mashups.esl",
+        "92:cheddars_mashups.esl",
+        "93:cheddars_mashups.esl",
+        "94:cheddars_mashups.esl",
+        "95:cheddars_mashups.esl",
+        "96:cheddars_mashups.esl",
+        "97:cheddars_mashups.esl",
+        "98:cheddars_mashups.esl",
+        "99:cheddars_mashups.esl",
+        "9:cheddars_mashups.esl",
+        "9a:cheddars_mashups.esl",
+        "9b:cheddars_mashups.esl",
+        "9c:cheddars_mashups.esl",
+        "9d:cheddars_mashups.esl",
+        "9e:cheddars_mashups.esl",
         "9f0:MoreCraftableEquipment.esp",
         "9f3:MoreCraftableEquipment.esp",
+        "9f:cheddars_mashups.esl",
+        "a0:cheddars_mashups.esl",
         "a199b:Skyrim.esm",
+        "a1:cheddars_mashups.esl",
+        "a2:cheddars_mashups.esl",
+        "a3:cheddars_mashups.esl",
+        "a4:cheddars_mashups.esl",
+        "a5:cheddars_mashups.esl",
+        "a6:cheddars_mashups.esl",
         "a6d79:Skyrim.esm",
         "a6d7b:Skyrim.esm",
         "a6d7f:Skyrim.esm",
+        "a7:cheddars_mashups.esl",
+        "a8:cheddars_mashups.esl",
+        "a9:cheddars_mashups.esl",
+        "aa:cheddars_mashups.esl",
         "ab64:Hothtrooper44_ArmorCompilation.esp",
         "ab65:Hothtrooper44_ArmorCompilation.esp",
         "ab66:Hothtrooper44_ArmorCompilation.esp",
         "ab67:Hothtrooper44_ArmorCompilation.esp",
+        "ab:cheddars_mashups.esl",
+        "ac:cheddars_mashups.esl",
+        "ae:cheddars_mashups.esl",
+        "af:cheddars_mashups.esl",
         "b145b:Skyrim.esm",
         "b1460:Skyrim.esm",
         "b83cb:Skyrim.esm",
@@ -7127,6 +7868,7 @@
         "10fcf2:Skyrim.esm",
         "10fcf4:Skyrim.esm",
         "10fcf7:Skyrim.esm",
+        "12a:cheddars_mashups.esl",
         "12c7:Cloaks&Capes.esp",
         "12e46:Skyrim.esm",
         "12e49:Skyrim.esm",
@@ -7177,25 +7919,40 @@
         "13962:Skyrim.esm",
         "13963:Skyrim.esm",
         "13964:Skyrim.esm",
+        "144:cheddars_mashups.esl",
+        "145:cheddars_mashups.esl",
+        "146:cheddars_mashups.esl",
         "14757:Dawnguard.esm",
         "14758:Dawnguard.esm",
+        "148:cheddars_mashups.esl",
         "150b8:Dawnguard.esm",
         "15516:Skyrim.esm",
+        "15b:cheddars_mashups.esl",
+        "161:cheddars_mashups.esl",
         "17695:Skyrim.esm",
         "17696:Skyrim.esm",
         "17749:Dragonborn.esm",
         "18388:Skyrim.esm",
         "18801:Skyrim.esm",
+        "190:cheddars_mashups.esl",
+        "191:cheddars_mashups.esl",
+        "196:cheddars_mashups.esl",
+        "199:cheddars_mashups.esl",
         "19ade:Dawnguard.esm",
         "19adf:Dawnguard.esm",
         "19ae1:Dawnguard.esm",
         "19ae3:Dawnguard.esm",
+        "19e:cheddars_mashups.esl",
         "19f5f:Playable Rieklings.esp",
         "19f60:Playable Rieklings.esp",
         "19f61:Playable Rieklings.esp",
         "19f62:Playable Rieklings.esp",
         "19f6a:Playable Rieklings.esp",
         "19f71:Playable Rieklings.esp",
+        "19f:cheddars_mashups.esl",
+        "1:cheddars_mashups.esl",
+        "1a4:cheddars_mashups.esl",
+        "1a8:cheddars_mashups.esl",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
         "1b3a1:Skyrim.esm",
@@ -7234,6 +7991,7 @@
         "209a6:Skyrim.esm",
         "209aa:Skyrim.esm",
         "214a1:Hothtrooper44_ArmorCompilation.esp",
+        "22:cheddars_mashups.esl",
         "22fc:Hothtrooper44_ArmorCompilation.esp",
         "23060:Hothtrooper44_ArmorCompilation.esp",
         "23061:Hothtrooper44_ArmorCompilation.esp",
@@ -7275,6 +8033,7 @@
         "238f1:Hothtrooper44_ArmorCompilation.esp",
         "238fb:Hothtrooper44_ArmorCompilation.esp",
         "238fc:Hothtrooper44_ArmorCompilation.esp",
+        "23:cheddars_mashups.esl",
         "23a09:Playable Rieklings.esp",
         "23e9:Dawnguard.esm",
         "23eb:Dawnguard.esm",
@@ -7298,6 +8057,8 @@
         "29b83:Skyrim.esm",
         "29b95:Skyrim.esm",
         "29b97:Skyrim.esm",
+        "2:cheddars_mashups.esl",
+        "2d:cheddars_mashups.esl",
         "2dd5:Hothtrooper44_ArmorCompilation.esp",
         "2dec:Cloaks&Capes.esp",
         "2ded:Cloaks&Capes.esp",
@@ -7326,6 +8087,8 @@
         "2e4ff:Skyrim.esm",
         "2e500:Skyrim.esm",
         "2e504:Skyrim.esm",
+        "31:cheddars_mashups.esl",
+        "32:cheddars_mashups.esl",
         "330b3:Skyrim.esm",
         "330bc:Skyrim.esm",
         "3329:Hothtrooper44_ArmorCompilation.esp",
@@ -7344,18 +8107,26 @@
         "37b8a:Dragonborn.esm",
         "37b8c:Dragonborn.esm",
         "37b8e:Dragonborn.esm",
+        "3:cheddars_mashups.esl",
+        "3a:cheddars_mashups.esl",
         "3b04b:Dragonborn.esm",
         "3b04e:Dragonborn.esm",
         "3c9fe:Skyrim.esm",
         "3ca00:Skyrim.esm",
+        "3d:cheddars_mashups.esl",
         "4223b:Skyrim.esm",
         "4223c:Skyrim.esm",
         "4223d:Skyrim.esm",
+        "43:cheddars_mashups.esl",
         "47d7:Dawnguard.esm",
         "47d9:Dawnguard.esm",
         "48d8:Hothtrooper44_ArmorCompilation.esp",
         "48d9:Hothtrooper44_ArmorCompilation.esp",
         "48e0:Hothtrooper44_ArmorCompilation.esp",
+        "49:cheddars_mashups.esl",
+        "4:cheddars_mashups.esl",
+        "4a:cheddars_mashups.esl",
+        "4b:cheddars_mashups.esl",
         "4c3cb:Skyrim.esm",
         "4c3d0:Skyrim.esm",
         "4c6ca:Skyrim.esm",
@@ -7366,16 +8137,25 @@
         "4dee3:Skyrim.esm",
         "50d0:Dawnguard.esm",
         "51b0c:Skyrim.esm",
+        "52:cheddars_mashups.esl",
+        "56:cheddars_mashups.esl",
         "56a9d:Skyrim.esm",
         "56a9e:Skyrim.esm",
         "56b17:Skyrim.esm",
+        "59:cheddars_mashups.esl",
+        "5:cheddars_mashups.esl",
+        "5a:cheddars_mashups.esl",
         "5b69e:Skyrim.esm",
         "5b69f:Skyrim.esm",
         "5b6a0:Skyrim.esm",
         "5b6a1:Skyrim.esm",
         "5c06c:Skyrim.esm",
+        "5c:cheddars_mashups.esl",
+        "5d:cheddars_mashups.esl",
         "5db7b:Skyrim.esm",
         "5db7e:Skyrim.esm",
+        "5e:cheddars_mashups.esl",
+        "5f:cheddars_mashups.esl",
         "62303:Skyrim.esm",
         "6230b:Skyrim.esm",
         "62311:Skyrim.esm",
@@ -7397,6 +8177,7 @@
         "6ff38:Skyrim.esm",
         "6ff43:Skyrim.esm",
         "6ff45:Skyrim.esm",
+        "7:cheddars_mashups.esl",
         "7bc15:Skyrim.esm",
         "7bc19:Skyrim.esm",
         "7bc1a:Skyrim.esm",
@@ -7412,6 +8193,7 @@
         "80c:MoreCraftableEquipment.esp",
         "80d:MoreCraftableEquipment.esp",
         "812:MoreCraftableEquipment.esp",
+        "81:cheddars_mashups.esl",
         "822:MoreCraftableEquipment.esp",
         "823:MoreCraftableEquipment.esp",
         "824:MoreCraftableEquipment.esp",
@@ -7443,6 +8225,7 @@
         "840:MoreCraftableEquipment.esp",
         "841:MoreCraftableEquipment.esp",
         "842:MoreCraftableEquipment.esp",
+        "85:cheddars_mashups.esl",
         "8697e:Skyrim.esm",
         "86981:Skyrim.esm",
         "86983:Skyrim.esm",
@@ -7456,17 +8239,54 @@
         "88958:Skyrim.esm",
         "8895a:Skyrim.esm",
         "896a3:Skyrim.esm",
+        "8:cheddars_mashups.esl",
+        "8c:cheddars_mashups.esl",
+        "8d:cheddars_mashups.esl",
+        "8e:cheddars_mashups.esl",
         "8f19a:Skyrim.esm",
+        "8f:cheddars_mashups.esl",
+        "90:cheddars_mashups.esl",
+        "91:cheddars_mashups.esl",
+        "92:cheddars_mashups.esl",
+        "93:cheddars_mashups.esl",
+        "94:cheddars_mashups.esl",
+        "95:cheddars_mashups.esl",
+        "96:cheddars_mashups.esl",
+        "97:cheddars_mashups.esl",
+        "98:cheddars_mashups.esl",
+        "99:cheddars_mashups.esl",
+        "9:cheddars_mashups.esl",
+        "9a:cheddars_mashups.esl",
+        "9b:cheddars_mashups.esl",
+        "9c:cheddars_mashups.esl",
+        "9d:cheddars_mashups.esl",
+        "9e:cheddars_mashups.esl",
         "9f0:MoreCraftableEquipment.esp",
         "9f3:MoreCraftableEquipment.esp",
+        "9f:cheddars_mashups.esl",
+        "a0:cheddars_mashups.esl",
         "a199b:Skyrim.esm",
+        "a1:cheddars_mashups.esl",
+        "a2:cheddars_mashups.esl",
+        "a3:cheddars_mashups.esl",
+        "a4:cheddars_mashups.esl",
+        "a5:cheddars_mashups.esl",
+        "a6:cheddars_mashups.esl",
         "a6d79:Skyrim.esm",
         "a6d7b:Skyrim.esm",
         "a6d7f:Skyrim.esm",
+        "a7:cheddars_mashups.esl",
+        "a8:cheddars_mashups.esl",
+        "a9:cheddars_mashups.esl",
+        "aa:cheddars_mashups.esl",
         "ab64:Hothtrooper44_ArmorCompilation.esp",
         "ab65:Hothtrooper44_ArmorCompilation.esp",
         "ab66:Hothtrooper44_ArmorCompilation.esp",
         "ab67:Hothtrooper44_ArmorCompilation.esp",
+        "ab:cheddars_mashups.esl",
+        "ac:cheddars_mashups.esl",
+        "ae:cheddars_mashups.esl",
+        "af:cheddars_mashups.esl",
         "b145b:Skyrim.esm",
         "b1460:Skyrim.esm",
         "b83cb:Skyrim.esm",
@@ -8199,6 +9019,10 @@
     "1199a:Dawnguard.esm": [
       "Tailor:recipe:2e07:Cloaks&Capes.esp:input:1"
     ],
+    "12a:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:12c:cheddars_mashups.esl:out"
+    ],
     "12c7:Cloaks&Capes.esp": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:2dfc:Cloaks&Capes.esp:out"
@@ -8585,6 +9409,18 @@
     "139bf:Skyrim.esm": [
       "Woodworker:recipe:b651:Dawnguard.esm:out"
     ],
+    "144:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:153:cheddars_mashups.esl:out"
+    ],
+    "145:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:156:cheddars_mashups.esl:out"
+    ],
+    "146:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:152:cheddars_mashups.esl:out"
+    ],
     "14757:Dawnguard.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:85f:MoreCraftableEquipment.esp:out"
@@ -8592,6 +9428,10 @@
     "14758:Dawnguard.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:866:MoreCraftableEquipment.esp:out"
+    ],
+    "148:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:15e:cheddars_mashups.esl:out"
     ],
     "14dc4:Dawnguard.esm": [
       "Cook:harvests:harvests:12db9:Dawnguard.esm",
@@ -8662,6 +9502,10 @@
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:967:MoreCraftableEquipment.esp:out"
     ],
+    "15b:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:15c:cheddars_mashups.esl:out"
+    ],
     "16000:Thornswood-Content.esp": [
       "Woodworker:recipe:16080:Thornswood-Content.esp:out"
     ],
@@ -8694,6 +9538,10 @@
     ],
     "1600a:Thornswood-Content.esp": [
       "Woodworker:recipe:1608a:Thornswood-Content.esp:out"
+    ],
+    "161:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:163:cheddars_mashups.esl:out"
     ],
     "16e26:Dragonborn.esm": [
       "Alchemist:harvests:harvests:16e24:Dragonborn.esm",
@@ -8765,6 +9613,22 @@
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:92b:MoreCraftableEquipment.esp:out"
     ],
+    "190:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:194:cheddars_mashups.esl:out"
+    ],
+    "191:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:195:cheddars_mashups.esl:out"
+    ],
+    "196:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:197:cheddars_mashups.esl:out"
+    ],
+    "199:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:19a:cheddars_mashups.esl:out"
+    ],
     "19ade:Dawnguard.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:94e:MoreCraftableEquipment.esp:out"
@@ -8780,6 +9644,10 @@
     "19ae3:Dawnguard.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:94d:MoreCraftableEquipment.esp:out"
+    ],
+    "19e:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:1a0:cheddars_mashups.esl:out"
     ],
     "19f5f:Playable Rieklings.esp": [
       "Enchanter:wardweaver:public-wearable",
@@ -8805,6 +9673,14 @@
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:19f97:Playable Rieklings.esp:out"
     ],
+    "19f:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:1a1:cheddars_mashups.esl:out"
+    ],
+    "1:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:10:cheddars_mashups.esl:out"
+    ],
     "1a010:Thornswood-Content.esp": [
       "Cook:recipe:1a020:Thornswood-Content.esp:out"
     ],
@@ -8828,6 +9704,14 @@
     ],
     "1a043:Thornswood-Content.esp": [
       "Cook:recipe:1a053:Thornswood-Content.esp:out"
+    ],
+    "1a4:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:1a5:cheddars_mashups.esl:out"
+    ],
+    "1a8:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:1a9:cheddars_mashups.esl:out"
     ],
     "1b39f:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -8893,6 +9777,7 @@
       "Alchemist:harvests:harvests:195dd:Dragonborn.esm"
     ],
     "1cd7c:Dragonborn.esm": [
+      "Smith:recipe:19a:cheddars_mashups.esl:input:0",
       "Smith:recipe:2b04f:Dragonborn.esm:input:1",
       "Smith:recipe:2b050:Dragonborn.esm:input:1",
       "Smith:recipe:2b051:Dragonborn.esm:input:1",
@@ -8906,7 +9791,8 @@
       "Smith:recipe:2b05a:Dragonborn.esm:input:2",
       "Smith:recipe:2b05b:Dragonborn.esm:input:2",
       "Smith:recipe:2b05c:Dragonborn.esm:input:2",
-      "Smith:recipe:3d2dd:Dragonborn.esm:input:2"
+      "Smith:recipe:3d2dd:Dragonborn.esm:input:2",
+      "Smith:recipe:6d:cheddars_mashups.esl:input:2"
     ],
     "1cd7e:Dragonborn.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -9083,6 +9969,10 @@
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:214aa:Hothtrooper44_ArmorCompilation.esp:out"
     ],
+    "22:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:24:cheddars_mashups.esl:out"
+    ],
     "22fc:Hothtrooper44_ArmorCompilation.esp": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:53b5:Hothtrooper44_ArmorCompilation.esp:out"
@@ -9247,6 +10137,10 @@
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:23919:Hothtrooper44_ArmorCompilation.esp:out"
     ],
+    "23:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:27:cheddars_mashups.esl:out"
+    ],
     "23a09:Playable Rieklings.esp": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:23a0a:Playable Rieklings.esp:out"
@@ -9364,6 +10258,10 @@
     "29b97:Skyrim.esm": [
       "Enchanter:recipe:1776d:Dragonborn.esm:out"
     ],
+    "2:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:11:cheddars_mashups.esl:out"
+    ],
     "2a78:Dawnguard.esm": [
       "Alchemist:harvests:harvests:2a76:Dawnguard.esm",
       "Alchemist:harvests:harvests:2a77:Dawnguard.esm",
@@ -9371,6 +10269,7 @@
       "Tailor:recipe:9d1:MoreCraftableEquipment.esp:input:1"
     ],
     "2b04e:Dragonborn.esm": [
+      "Smith:recipe:19a:cheddars_mashups.esl:input:1",
       "Smith:recipe:2b04f:Dragonborn.esm:input:2",
       "Smith:recipe:2b050:Dragonborn.esm:input:2",
       "Smith:recipe:2b051:Dragonborn.esm:input:2",
@@ -9400,6 +10299,10 @@
       "Smith:recipe:2b07d:Dragonborn.esm:input:0",
       "Woodworker:recipe:2b077:Dragonborn.esm:input:0",
       "Woodworker:recipe:3cf54:Dragonborn.esm:input:1"
+    ],
+    "2d:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:2e:cheddars_mashups.esl:out"
     ],
     "2dd5:Hothtrooper44_ArmorCompilation.esp": [
       "Enchanter:wardweaver:public-wearable",
@@ -9526,6 +10429,14 @@
       "Cook:recipe:812:Gourmet.esp:input:0",
       "Cook:recipe:813:Gourmet.esp:input:0"
     ],
+    "31:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:33:cheddars_mashups.esl:out"
+    ],
+    "32:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:35:cheddars_mashups.esl:out"
+    ],
     "330b3:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:979:MoreCraftableEquipment.esp:out"
@@ -9599,6 +10510,7 @@
       "Smith:recipe:2b05b:Dragonborn.esm:input:0",
       "Smith:recipe:2b05c:Dragonborn.esm:input:0",
       "Smith:recipe:3d2dd:Dragonborn.esm:input:0",
+      "Smith:recipe:6d:cheddars_mashups.esl:input:1",
       "Smith:recipe:9e775:Playable Rieklings.esp:input:0"
     ],
     "34cdf:Skyrim.esm": [
@@ -9847,6 +10759,14 @@
     "38341:Skyrim.esm": [
       "Woodworker:recipe:8f0:MoreCraftableEquipment.esp:out"
     ],
+    "3:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:2b:cheddars_mashups.esl:out"
+    ],
+    "3a:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:3b:cheddars_mashups.esl:out"
+    ],
     "3ad52:Skyrim.esm": [
       "Smith:recipe:8d7:MoreCraftableEquipment.esp:input:2",
       "Smith:recipe:ab72:Hothtrooper44_ArmorCompilation.esp:input:0",
@@ -9981,6 +10901,9 @@
       "Tailor:recipe:82ec1:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Tailor:recipe:82ec2:Hothtrooper44_ArmorCompilation.esp:input:1"
     ],
+    "3ad74:Skyrim.esm": [
+      "Smith:recipe:2a:cheddars_mashups.esl:input:2"
+    ],
     "3ad90:Skyrim.esm": [
       "Smith:recipe:8aa:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:8ad:MoreCraftableEquipment.esp:input:0"
@@ -10028,6 +10951,10 @@
       "Cook:hunts:30f26:Dragonborn.esm:3",
       "Cook:recipe:81b:Gourmet.esp:input:3"
     ],
+    "3d:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Tailor:recipe:3e:cheddars_mashups.esl:out"
+    ],
     "3f7f8:Skyrim.esm": [
       "Alchemist:harvests:harvests:bb947:Skyrim.esm",
       "Alchemist:recipe:154c6:Thornswood-Content.esp:input:0",
@@ -10052,6 +10979,10 @@
     "4223d:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:98f:MoreCraftableEquipment.esp:out"
+    ],
+    "43:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:44:cheddars_mashups.esl:out"
     ],
     "441003:Immersive Weapons.esp": [
       "Smith:recipe:77100a:Immersive Weapons.esp:out"
@@ -10087,11 +11018,27 @@
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:1d90:Hothtrooper44_ArmorCompilation.esp:out"
     ],
+    "49:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:4f:cheddars_mashups.esl:out"
+    ],
+    "4:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:30:cheddars_mashups.esl:out"
+    ],
+    "4a:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:50:cheddars_mashups.esl:out"
+    ],
     "4b0ba:Skyrim.esm": [
       "Alchemist:harvests:crops:bb953:Skyrim.esm",
       "Alchemist:harvests:harvests:bb953:Skyrim.esm",
       "Cook:recipe:17ec3:HearthFires.esm:input:0",
       "Cook:recipe:1a052:Thornswood-Content.esp:input:0"
+    ],
+    "4b:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:1a7:cheddars_mashups.esl:out"
     ],
     "4c3cb:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -10188,6 +11135,14 @@
       "Enchanter:recipe:1776d:Dragonborn.esm:input:1",
       "Enchanter:recipe:1776e:Dragonborn.esm:input:1"
     ],
+    "52:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Tailor:recipe:53:cheddars_mashups.esl:out"
+    ],
+    "56:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:57:cheddars_mashups.esl:out"
+    ],
     "56a9d:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:f46cd:Skyrim.esm:out"
@@ -10209,8 +11164,20 @@
       "Tailor:recipe:23918:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Tailor:recipe:23919:Hothtrooper44_ArmorCompilation.esp:input:0"
     ],
+    "59:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:67:cheddars_mashups.esl:out"
+    ],
     "59b86:Skyrim.esm": [
       "Alchemist:harvests:harvests:110c8:HearthFires.esm"
+    ],
+    "5:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:2a:cheddars_mashups.esl:out"
+    ],
+    "5a:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:66:cheddars_mashups.esl:out"
     ],
     "5acdb:Skyrim.esm": [
       "Smith:recipe:a30cb:Skyrim.esm:input:0",
@@ -10238,6 +11205,10 @@
       "Smith:recipe:a30dc:Skyrim.esm:input:0"
     ],
     "5ace3:Skyrim.esm": [
+      "Smith:recipe:164:cheddars_mashups.esl:input:3",
+      "Smith:recipe:165:cheddars_mashups.esl:input:3",
+      "Smith:recipe:166:cheddars_mashups.esl:input:3",
+      "Smith:recipe:167:cheddars_mashups.esl:input:3",
       "Smith:recipe:900:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:901:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:a30dd:Skyrim.esm:out",
@@ -10247,6 +11218,13 @@
       "Tailor:recipe:23919:Hothtrooper44_ArmorCompilation.esp:input:1"
     ],
     "5ace4:Skyrim.esm": [
+      "Smith:recipe:10:cheddars_mashups.esl:input:0",
+      "Smith:recipe:12c:cheddars_mashups.esl:input:2",
+      "Smith:recipe:12e:cheddars_mashups.esl:input:2",
+      "Smith:recipe:137:cheddars_mashups.esl:input:1",
+      "Smith:recipe:13:cheddars_mashups.esl:input:0",
+      "Smith:recipe:152:cheddars_mashups.esl:input:2",
+      "Smith:recipe:153:cheddars_mashups.esl:input:2",
       "Smith:recipe:1548d:Thornswood-Content.esp:input:0",
       "Smith:recipe:1548e:Thornswood-Content.esp:input:0",
       "Smith:recipe:15492:Thornswood-Content.esp:input:0",
@@ -10254,9 +11232,29 @@
       "Smith:recipe:15497:Thornswood-Content.esp:input:0",
       "Smith:recipe:154b3:Thornswood-Content.esp:input:0",
       "Smith:recipe:154b4:Thornswood-Content.esp:input:0",
+      "Smith:recipe:156:cheddars_mashups.esl:input:3",
+      "Smith:recipe:15c:cheddars_mashups.esl:input:0",
+      "Smith:recipe:17e:cheddars_mashups.esl:input:0",
+      "Smith:recipe:17f:cheddars_mashups.esl:input:0",
+      "Smith:recipe:180:cheddars_mashups.esl:input:0",
+      "Smith:recipe:181:cheddars_mashups.esl:input:0",
+      "Smith:recipe:182:cheddars_mashups.esl:input:0",
+      "Smith:recipe:183:cheddars_mashups.esl:input:0",
+      "Smith:recipe:184:cheddars_mashups.esl:input:0",
+      "Smith:recipe:185:cheddars_mashups.esl:input:0",
+      "Smith:recipe:186:cheddars_mashups.esl:input:0",
+      "Smith:recipe:194:cheddars_mashups.esl:input:1",
+      "Smith:recipe:195:cheddars_mashups.esl:input:1",
+      "Smith:recipe:19a:cheddars_mashups.esl:input:2",
       "Smith:recipe:19f8f:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f97:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f9d:Playable Rieklings.esp:input:0",
+      "Smith:recipe:1a7:cheddars_mashups.esl:input:2",
+      "Smith:recipe:1a9:cheddars_mashups.esl:input:2",
+      "Smith:recipe:1aa:cheddars_mashups.esl:input:2",
+      "Smith:recipe:1ab:cheddars_mashups.esl:input:1",
+      "Smith:recipe:24:cheddars_mashups.esl:input:1",
+      "Smith:recipe:27:cheddars_mashups.esl:input:3",
       "Smith:recipe:2b04f:Dragonborn.esm:input:0",
       "Smith:recipe:2b050:Dragonborn.esm:input:0",
       "Smith:recipe:2b051:Dragonborn.esm:input:0",
@@ -10266,13 +11264,27 @@
       "Smith:recipe:2b05a:Dragonborn.esm:input:1",
       "Smith:recipe:2b05b:Dragonborn.esm:input:1",
       "Smith:recipe:2b05c:Dragonborn.esm:input:1",
+      "Smith:recipe:2b:cheddars_mashups.esl:input:0",
+      "Smith:recipe:2e:cheddars_mashups.esl:input:3",
+      "Smith:recipe:30:cheddars_mashups.esl:input:0",
+      "Smith:recipe:35:cheddars_mashups.esl:input:1",
+      "Smith:recipe:3b:cheddars_mashups.esl:input:0",
       "Smith:recipe:3d2dd:Dragonborn.esm:input:1",
+      "Smith:recipe:4f:cheddars_mashups.esl:input:2",
+      "Smith:recipe:50:cheddars_mashups.esl:input:1",
+      "Smith:recipe:57:cheddars_mashups.esl:input:0",
+      "Smith:recipe:63:cheddars_mashups.esl:input:2",
+      "Smith:recipe:66:cheddars_mashups.esl:input:1",
+      "Smith:recipe:68:cheddars_mashups.esl:input:1",
+      "Smith:recipe:6a:cheddars_mashups.esl:input:2",
+      "Smith:recipe:6d:cheddars_mashups.esl:input:0",
       "Smith:recipe:855:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:856:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:857:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:858:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:868:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:869:MoreCraftableEquipment.esp:input:0",
+      "Smith:recipe:87:cheddars_mashups.esl:input:1",
       "Smith:recipe:8d4:MoreCraftableEquipment.esp:input:2",
       "Smith:recipe:8d5:MoreCraftableEquipment.esp:input:2",
       "Smith:recipe:8d6:MoreCraftableEquipment.esp:input:2",
@@ -10281,8 +11293,18 @@
       "Smith:recipe:8fc:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:a30c3:Skyrim.esm:out",
       "Smith:recipe:a5cd6:Skyrim.esm:input:0",
+      "Smith:recipe:b1:cheddars_mashups.esl:input:2",
+      "Smith:recipe:b3:cheddars_mashups.esl:input:2",
+      "Smith:recipe:b6:cheddars_mashups.esl:input:0",
+      "Smith:recipe:b7:cheddars_mashups.esl:input:0",
+      "Smith:recipe:c2:cheddars_mashups.esl:input:2",
+      "Smith:recipe:c3:cheddars_mashups.esl:input:2",
+      "Smith:recipe:c4:cheddars_mashups.esl:input:2",
+      "Smith:recipe:c5:cheddars_mashups.esl:input:3",
       "Smith:recipe:c74736:Immersive Weapons.esp:input:2",
       "Smith:recipe:c74737:Immersive Weapons.esp:input:2",
+      "Smith:recipe:c8:cheddars_mashups.esl:input:1",
+      "Smith:recipe:d9:cheddars_mashups.esl:input:1",
       "Smith:recipe:da769:Skyrim.esm:input:0",
       "Smith:recipe:da76a:Skyrim.esm:input:0",
       "Smith:recipe:da76b:Skyrim.esm:input:0",
@@ -10290,6 +11312,7 @@
       "Smith:recipe:da76d:Skyrim.esm:input:0",
       "Smith:recipe:da76e:Skyrim.esm:input:0",
       "Smith:recipe:da76f:Skyrim.esm:input:0",
+      "Smith:recipe:da:cheddars_mashups.esl:input:1",
       "Smith:recipe:db28f:Skyrim.esm:input:1",
       "Smith:recipe:db290:Skyrim.esm:input:1",
       "Smith:recipe:db291:Skyrim.esm:input:1",
@@ -10322,12 +11345,14 @@
       "Smith:recipe:db8ae:Skyrim.esm:input:0",
       "Smith:recipe:db8af:Skyrim.esm:input:0",
       "Smith:recipe:db8b0:Skyrim.esm:input:0",
+      "Smith:recipe:db:cheddars_mashups.esl:input:1",
       "Smith:recipe:dc9fa:Skyrim.esm:input:3",
       "Smith:recipe:dc9fb:Skyrim.esm:input:3",
       "Smith:recipe:dc9fc:Skyrim.esm:input:3",
       "Smith:recipe:dc9fd:Skyrim.esm:input:3",
       "Smith:recipe:dc9fe:Skyrim.esm:input:2",
       "Smith:recipe:dc9ff:Skyrim.esm:input:1",
+      "Smith:recipe:dc:cheddars_mashups.esl:input:1",
       "Smith:recipe:dca00:Skyrim.esm:input:1",
       "Smith:recipe:dd975:Skyrim.esm:input:2",
       "Smith:recipe:dd977:Skyrim.esm:input:2",
@@ -10346,6 +11371,19 @@
       "Smith:recipe:dd985:Skyrim.esm:input:2",
       "Smith:recipe:dd986:Skyrim.esm:input:2",
       "Smith:recipe:dd987:Skyrim.esm:input:2",
+      "Smith:recipe:dd:cheddars_mashups.esl:input:1",
+      "Smith:recipe:de:cheddars_mashups.esl:input:1",
+      "Smith:recipe:df:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e0:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e1:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e2:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e3:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e4:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e5:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e6:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e7:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e8:cheddars_mashups.esl:input:2",
+      "Smith:recipe:e9:cheddars_mashups.esl:input:2",
       "Smith:recipe:f46cc:Skyrim.esm:input:3",
       "Smith:recipe:f46cd:Skyrim.esm:input:1",
       "Smith:recipe:f46cf:Skyrim.esm:input:2",
@@ -10363,9 +11401,39 @@
       "Woodworker:recipe:b64f:Dawnguard.esm:input:1"
     ],
     "5ace5:Skyrim.esm": [
+      "Smith:recipe:10:cheddars_mashups.esl:input:1",
+      "Smith:recipe:12c:cheddars_mashups.esl:input:1",
+      "Smith:recipe:12e:cheddars_mashups.esl:input:1",
+      "Smith:recipe:13:cheddars_mashups.esl:input:1",
+      "Smith:recipe:152:cheddars_mashups.esl:input:1",
+      "Smith:recipe:153:cheddars_mashups.esl:input:1",
+      "Smith:recipe:156:cheddars_mashups.esl:input:1",
+      "Smith:recipe:15c:cheddars_mashups.esl:input:1",
+      "Smith:recipe:163:cheddars_mashups.esl:input:2",
+      "Smith:recipe:164:cheddars_mashups.esl:input:2",
+      "Smith:recipe:165:cheddars_mashups.esl:input:2",
+      "Smith:recipe:166:cheddars_mashups.esl:input:2",
+      "Smith:recipe:167:cheddars_mashups.esl:input:2",
+      "Smith:recipe:16:cheddars_mashups.esl:input:2",
+      "Smith:recipe:17e:cheddars_mashups.esl:input:1",
+      "Smith:recipe:17f:cheddars_mashups.esl:input:1",
+      "Smith:recipe:180:cheddars_mashups.esl:input:1",
+      "Smith:recipe:181:cheddars_mashups.esl:input:1",
+      "Smith:recipe:182:cheddars_mashups.esl:input:1",
+      "Smith:recipe:183:cheddars_mashups.esl:input:1",
+      "Smith:recipe:184:cheddars_mashups.esl:input:1",
+      "Smith:recipe:185:cheddars_mashups.esl:input:1",
+      "Smith:recipe:186:cheddars_mashups.esl:input:1",
+      "Smith:recipe:197:cheddars_mashups.esl:input:2",
+      "Smith:recipe:1a0:cheddars_mashups.esl:input:2",
+      "Smith:recipe:1a1:cheddars_mashups.esl:input:2",
+      "Smith:recipe:1a5:cheddars_mashups.esl:input:2",
+      "Smith:recipe:1a7:cheddars_mashups.esl:input:1",
+      "Smith:recipe:1a9:cheddars_mashups.esl:input:1",
       "Smith:recipe:214aa:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Smith:recipe:23900:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Smith:recipe:2390e:Hothtrooper44_ArmorCompilation.esp:input:0",
+      "Smith:recipe:27:cheddars_mashups.esl:input:0",
       "Smith:recipe:2b065:Dragonborn.esm:input:1",
       "Smith:recipe:2b066:Dragonborn.esm:input:2",
       "Smith:recipe:2b067:Dragonborn.esm:input:1",
@@ -10383,7 +11451,18 @@
       "Smith:recipe:2b083:Dragonborn.esm:input:0",
       "Smith:recipe:2b084:Dragonborn.esm:input:0",
       "Smith:recipe:2b085:Dragonborn.esm:input:0",
+      "Smith:recipe:2b:cheddars_mashups.esl:input:1",
+      "Smith:recipe:2e:cheddars_mashups.esl:input:1",
+      "Smith:recipe:30:cheddars_mashups.esl:input:1",
+      "Smith:recipe:3b:cheddars_mashups.esl:input:1",
+      "Smith:recipe:44:cheddars_mashups.esl:input:2",
+      "Smith:recipe:4f:cheddars_mashups.esl:input:1",
+      "Smith:recipe:50:cheddars_mashups.esl:input:2",
+      "Smith:recipe:57:cheddars_mashups.esl:input:1",
+      "Smith:recipe:63:cheddars_mashups.esl:input:1",
+      "Smith:recipe:6a:cheddars_mashups.esl:input:1",
       "Smith:recipe:77100a:Immersive Weapons.esp:input:1",
+      "Smith:recipe:83:cheddars_mashups.esl:input:2",
       "Smith:recipe:855:MoreCraftableEquipment.esp:input:1",
       "Smith:recipe:856:MoreCraftableEquipment.esp:input:1",
       "Smith:recipe:857:MoreCraftableEquipment.esp:input:1",
@@ -10406,6 +11485,10 @@
       "Smith:recipe:ab73:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Smith:recipe:ab74:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Smith:recipe:ab75:Hothtrooper44_ArmorCompilation.esp:input:0",
+      "Smith:recipe:b1:cheddars_mashups.esl:input:1",
+      "Smith:recipe:b6:cheddars_mashups.esl:input:1",
+      "Smith:recipe:b7:cheddars_mashups.esl:input:1",
+      "Smith:recipe:c0:cheddars_mashups.esl:input:2",
       "Smith:recipe:c74736:Immersive Weapons.esp:input:1",
       "Smith:recipe:c74737:Immersive Weapons.esp:input:1",
       "Smith:recipe:db5d7:Skyrim.esm:input:2",
@@ -10437,11 +11520,22 @@
       "Smith:recipe:dd97f:Skyrim.esm:input:1",
       "Smith:recipe:dd980:Skyrim.esm:input:1",
       "Smith:recipe:dd981:Skyrim.esm:input:1",
+      "Smith:recipe:e1:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e2:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e3:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e4:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e5:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e6:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e7:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e8:cheddars_mashups.esl:input:1",
+      "Smith:recipe:e9:cheddars_mashups.esl:input:1",
+      "Smith:recipe:ea:cheddars_mashups.esl:input:1",
       "Smith:recipe:f46cc:Skyrim.esm:input:0",
       "Smith:recipe:f46cd:Skyrim.esm:input:2",
       "Smith:recipe:f46cf:Skyrim.esm:input:1",
       "Smith:recipe:f46d0:Skyrim.esm:input:1",
       "Smith:recipe:f6f2a:Skyrim.esm:input:2",
+      "Smith:recipe:f:cheddars_mashups.esl:input:2",
       "Woodworker:recipe:1549d:Thornswood-Content.esp:input:2",
       "Woodworker:recipe:1549e:Thornswood-Content.esp:input:2",
       "Woodworker:recipe:19fb4:Playable Rieklings.esp:input:0",
@@ -10454,17 +11548,38 @@
       "Woodworker:recipe:f813:Dawnguard.esm:input:1"
     ],
     "5ad93:Skyrim.esm": [
+      "Smith:recipe:10:cheddars_mashups.esl:input:3",
+      "Smith:recipe:13:cheddars_mashups.esl:input:3",
+      "Smith:recipe:156:cheddars_mashups.esl:input:0",
+      "Smith:recipe:15c:cheddars_mashups.esl:input:3",
+      "Smith:recipe:17e:cheddars_mashups.esl:input:3",
+      "Smith:recipe:17f:cheddars_mashups.esl:input:3",
+      "Smith:recipe:180:cheddars_mashups.esl:input:3",
+      "Smith:recipe:181:cheddars_mashups.esl:input:3",
+      "Smith:recipe:182:cheddars_mashups.esl:input:3",
+      "Smith:recipe:183:cheddars_mashups.esl:input:3",
+      "Smith:recipe:184:cheddars_mashups.esl:input:3",
+      "Smith:recipe:185:cheddars_mashups.esl:input:3",
+      "Smith:recipe:186:cheddars_mashups.esl:input:3",
       "Smith:recipe:214aa:Hothtrooper44_ArmorCompilation.esp:input:1",
+      "Smith:recipe:27:cheddars_mashups.esl:input:1",
       "Smith:recipe:2b052:Dragonborn.esm:input:0",
       "Smith:recipe:2b055:Dragonborn.esm:input:0",
       "Smith:recipe:2b056:Dragonborn.esm:input:0",
       "Smith:recipe:2b057:Dragonborn.esm:input:0",
+      "Smith:recipe:2b:cheddars_mashups.esl:input:3",
+      "Smith:recipe:2e:cheddars_mashups.esl:input:0",
+      "Smith:recipe:30:cheddars_mashups.esl:input:3",
+      "Smith:recipe:3b:cheddars_mashups.esl:input:3",
+      "Smith:recipe:57:cheddars_mashups.esl:input:3",
       "Smith:recipe:77100a:Immersive Weapons.esp:input:0",
       "Smith:recipe:a30cb:Skyrim.esm:out",
       "Smith:recipe:ab72:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:ab73:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Smith:recipe:ab74:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Smith:recipe:ab75:Hothtrooper44_ArmorCompilation.esp:input:1",
+      "Smith:recipe:b6:cheddars_mashups.esl:input:3",
+      "Smith:recipe:b7:cheddars_mashups.esl:input:3",
       "Smith:recipe:dc9ff:Skyrim.esm:input:2",
       "Smith:recipe:dca00:Skyrim.esm:input:2",
       "Smith:recipe:dca05:Skyrim.esm:input:0",
@@ -10477,7 +11592,12 @@
       "Smith:recipe:dd981:Skyrim.esm:input:3"
     ],
     "5ad99:Skyrim.esm": [
+      "Smith:recipe:1aa:cheddars_mashups.esl:input:1",
+      "Smith:recipe:1ab:cheddars_mashups.esl:input:2",
       "Smith:recipe:a30db:Skyrim.esm:out",
+      "Smith:recipe:c2:cheddars_mashups.esl:input:1",
+      "Smith:recipe:c3:cheddars_mashups.esl:input:1",
+      "Smith:recipe:c4:cheddars_mashups.esl:input:1",
       "Smith:recipe:db899:Skyrim.esm:input:2",
       "Smith:recipe:db89a:Skyrim.esm:input:0",
       "Smith:recipe:db89c:Skyrim.esm:input:0",
@@ -10515,6 +11635,7 @@
       "Smith:recipe:dd98a:Skyrim.esm:input:1",
       "Smith:recipe:dd98b:Skyrim.esm:input:1",
       "Smith:recipe:dd98c:Skyrim.esm:input:1",
+      "Smith:recipe:ea:cheddars_mashups.esl:input:2",
       "Tailor:recipe:372fe:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Tailor:recipe:372ff:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Tailor:recipe:37300:Hothtrooper44_ArmorCompilation.esp:input:1",
@@ -10538,6 +11659,7 @@
       "Smith:recipe:23908:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Smith:recipe:2390e:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Smith:recipe:a30d9:Skyrim.esm:out",
+      "Smith:recipe:c5:cheddars_mashups.esl:input:2",
       "Smith:recipe:da0c03:Update.esm:input:1",
       "Smith:recipe:db8aa:Skyrim.esm:input:3",
       "Smith:recipe:db8ab:Skyrim.esm:input:0",
@@ -10594,6 +11716,7 @@
       "Smith:recipe:db8ae:Skyrim.esm:input:3",
       "Smith:recipe:db8af:Skyrim.esm:input:3",
       "Smith:recipe:db8b0:Skyrim.esm:input:1",
+      "Smith:recipe:ea:cheddars_mashups.esl:input:3",
       "Woodworker:recipe:108cfa:Skyrim.esm:input:0",
       "Woodworker:recipe:2b07f:Dragonborn.esm:input:1",
       "Woodworker:recipe:3cf53:Dragonborn.esm:input:1"
@@ -10639,6 +11762,14 @@
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:8a9:MoreCraftableEquipment.esp:out"
     ],
+    "5c:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:63:cheddars_mashups.esl:out"
+    ],
+    "5d:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:68:cheddars_mashups.esl:out"
+    ],
     "5db7b:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:984:MoreCraftableEquipment.esp:out"
@@ -10646,6 +11777,14 @@
     "5db7e:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:98a:MoreCraftableEquipment.esp:out"
+    ],
+    "5e:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:6a:cheddars_mashups.esl:out"
+    ],
+    "5f:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:6d:cheddars_mashups.esl:out"
     ],
     "62303:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -11309,6 +12448,10 @@
       "Alchemist:harvests:harvests:bcf3a:Skyrim.esm",
       "Tailor:recipe:84c:MoreCraftableEquipment.esp:input:0"
     ],
+    "7:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:f:cheddars_mashups.esl:out"
+    ],
     "7bc15:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:9bd:MoreCraftableEquipment.esp:out"
@@ -11346,11 +12489,47 @@
       "Cook:recipe:906:Gourmet.esp:input:1"
     ],
     "800e4:Skyrim.esm": [
+      "Smith:recipe:10:cheddars_mashups.esl:input:2",
+      "Smith:recipe:11:cheddars_mashups.esl:input:1",
+      "Smith:recipe:12c:cheddars_mashups.esl:input:0",
+      "Smith:recipe:12e:cheddars_mashups.esl:input:0",
+      "Smith:recipe:137:cheddars_mashups.esl:input:0",
+      "Smith:recipe:13:cheddars_mashups.esl:input:2",
+      "Smith:recipe:152:cheddars_mashups.esl:input:0",
+      "Smith:recipe:153:cheddars_mashups.esl:input:0",
       "Smith:recipe:154b3:Thornswood-Content.esp:input:1",
+      "Smith:recipe:156:cheddars_mashups.esl:input:2",
+      "Smith:recipe:15c:cheddars_mashups.esl:input:2",
+      "Smith:recipe:15e:cheddars_mashups.esl:input:0",
+      "Smith:recipe:163:cheddars_mashups.esl:input:0",
+      "Smith:recipe:164:cheddars_mashups.esl:input:0",
+      "Smith:recipe:165:cheddars_mashups.esl:input:0",
+      "Smith:recipe:166:cheddars_mashups.esl:input:0",
+      "Smith:recipe:167:cheddars_mashups.esl:input:0",
+      "Smith:recipe:16:cheddars_mashups.esl:input:0",
+      "Smith:recipe:17e:cheddars_mashups.esl:input:2",
+      "Smith:recipe:17f:cheddars_mashups.esl:input:2",
+      "Smith:recipe:180:cheddars_mashups.esl:input:2",
+      "Smith:recipe:181:cheddars_mashups.esl:input:2",
+      "Smith:recipe:182:cheddars_mashups.esl:input:2",
+      "Smith:recipe:183:cheddars_mashups.esl:input:2",
+      "Smith:recipe:184:cheddars_mashups.esl:input:2",
+      "Smith:recipe:185:cheddars_mashups.esl:input:2",
+      "Smith:recipe:186:cheddars_mashups.esl:input:2",
+      "Smith:recipe:194:cheddars_mashups.esl:input:0",
+      "Smith:recipe:195:cheddars_mashups.esl:input:0",
+      "Smith:recipe:197:cheddars_mashups.esl:input:0",
       "Smith:recipe:19f8c:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f8d:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f8e:Playable Rieklings.esp:input:0",
       "Smith:recipe:19f8f:Playable Rieklings.esp:input:1",
+      "Smith:recipe:1a0:cheddars_mashups.esl:input:0",
+      "Smith:recipe:1a1:cheddars_mashups.esl:input:0",
+      "Smith:recipe:1a5:cheddars_mashups.esl:input:0",
+      "Smith:recipe:1a7:cheddars_mashups.esl:input:0",
+      "Smith:recipe:1a9:cheddars_mashups.esl:input:0",
+      "Smith:recipe:1aa:cheddars_mashups.esl:input:0",
+      "Smith:recipe:1ab:cheddars_mashups.esl:input:0",
       "Smith:recipe:23190:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:23195:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:2319a:Hothtrooper44_ArmorCompilation.esp:input:1",
@@ -11363,6 +12542,9 @@
       "Smith:recipe:23900:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:23908:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Smith:recipe:2390e:Hothtrooper44_ArmorCompilation.esp:input:2",
+      "Smith:recipe:24:cheddars_mashups.esl:input:0",
+      "Smith:recipe:27:cheddars_mashups.esl:input:2",
+      "Smith:recipe:2a:cheddars_mashups.esl:input:1",
       "Smith:recipe:2b065:Dragonborn.esm:input:0",
       "Smith:recipe:2b066:Dragonborn.esm:input:0",
       "Smith:recipe:2b067:Dragonborn.esm:input:0",
@@ -11391,7 +12573,23 @@
       "Smith:recipe:2b083:Dragonborn.esm:input:1",
       "Smith:recipe:2b084:Dragonborn.esm:input:1",
       "Smith:recipe:2b085:Dragonborn.esm:input:1",
+      "Smith:recipe:2b:cheddars_mashups.esl:input:2",
+      "Smith:recipe:2e:cheddars_mashups.esl:input:2",
+      "Smith:recipe:30:cheddars_mashups.esl:input:2",
+      "Smith:recipe:33:cheddars_mashups.esl:input:1",
+      "Smith:recipe:35:cheddars_mashups.esl:input:0",
+      "Smith:recipe:3b:cheddars_mashups.esl:input:2",
+      "Smith:recipe:44:cheddars_mashups.esl:input:0",
+      "Smith:recipe:4f:cheddars_mashups.esl:input:0",
+      "Smith:recipe:50:cheddars_mashups.esl:input:0",
+      "Smith:recipe:57:cheddars_mashups.esl:input:2",
+      "Smith:recipe:63:cheddars_mashups.esl:input:0",
+      "Smith:recipe:66:cheddars_mashups.esl:input:0",
+      "Smith:recipe:67:cheddars_mashups.esl:input:0",
+      "Smith:recipe:68:cheddars_mashups.esl:input:0",
+      "Smith:recipe:6a:cheddars_mashups.esl:input:0",
       "Smith:recipe:77100a:Immersive Weapons.esp:input:2",
+      "Smith:recipe:83:cheddars_mashups.esl:input:0",
       "Smith:recipe:844:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:848:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:849:MoreCraftableEquipment.esp:input:1",
@@ -11408,6 +12606,7 @@
       "Smith:recipe:868:MoreCraftableEquipment.esp:input:2",
       "Smith:recipe:869:MoreCraftableEquipment.esp:input:2",
       "Smith:recipe:874:MoreCraftableEquipment.esp:input:1",
+      "Smith:recipe:87:cheddars_mashups.esl:input:0",
       "Smith:recipe:87b:MoreCraftableEquipment.esp:input:1",
       "Smith:recipe:87c:MoreCraftableEquipment.esp:input:1",
       "Smith:recipe:88c:MoreCraftableEquipment.esp:input:1",
@@ -11437,8 +12636,19 @@
       "Smith:recipe:ab73:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:ab74:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Smith:recipe:ab75:Hothtrooper44_ArmorCompilation.esp:input:2",
+      "Smith:recipe:b1:cheddars_mashups.esl:input:0",
+      "Smith:recipe:b3:cheddars_mashups.esl:input:0",
+      "Smith:recipe:b6:cheddars_mashups.esl:input:2",
+      "Smith:recipe:b7:cheddars_mashups.esl:input:2",
+      "Smith:recipe:c0:cheddars_mashups.esl:input:0",
+      "Smith:recipe:c2:cheddars_mashups.esl:input:0",
+      "Smith:recipe:c3:cheddars_mashups.esl:input:0",
+      "Smith:recipe:c4:cheddars_mashups.esl:input:0",
+      "Smith:recipe:c5:cheddars_mashups.esl:input:0",
       "Smith:recipe:c74736:Immersive Weapons.esp:input:3",
       "Smith:recipe:c74737:Immersive Weapons.esp:input:3",
+      "Smith:recipe:c8:cheddars_mashups.esl:input:0",
+      "Smith:recipe:d9:cheddars_mashups.esl:input:0",
       "Smith:recipe:da769:Skyrim.esm:input:1",
       "Smith:recipe:da76a:Skyrim.esm:input:1",
       "Smith:recipe:da76b:Skyrim.esm:input:1",
@@ -11446,6 +12656,7 @@
       "Smith:recipe:da76d:Skyrim.esm:input:1",
       "Smith:recipe:da76e:Skyrim.esm:input:1",
       "Smith:recipe:da76f:Skyrim.esm:input:1",
+      "Smith:recipe:da:cheddars_mashups.esl:input:0",
       "Smith:recipe:db28e:Skyrim.esm:input:0",
       "Smith:recipe:db28f:Skyrim.esm:input:0",
       "Smith:recipe:db290:Skyrim.esm:input:0",
@@ -11497,12 +12708,14 @@
       "Smith:recipe:db8bc:Skyrim.esm:input:1",
       "Smith:recipe:db8bd:Skyrim.esm:input:1",
       "Smith:recipe:db8be:Skyrim.esm:input:1",
+      "Smith:recipe:db:cheddars_mashups.esl:input:0",
       "Smith:recipe:dc9fa:Skyrim.esm:input:0",
       "Smith:recipe:dc9fb:Skyrim.esm:input:0",
       "Smith:recipe:dc9fc:Skyrim.esm:input:0",
       "Smith:recipe:dc9fd:Skyrim.esm:input:0",
       "Smith:recipe:dc9fe:Skyrim.esm:input:0",
       "Smith:recipe:dc9ff:Skyrim.esm:input:0",
+      "Smith:recipe:dc:cheddars_mashups.esl:input:0",
       "Smith:recipe:dca00:Skyrim.esm:input:0",
       "Smith:recipe:dca01:Skyrim.esm:input:1",
       "Smith:recipe:dca02:Skyrim.esm:input:1",
@@ -11539,12 +12752,27 @@
       "Smith:recipe:dd98a:Skyrim.esm:input:0",
       "Smith:recipe:dd98b:Skyrim.esm:input:0",
       "Smith:recipe:dd98c:Skyrim.esm:input:0",
+      "Smith:recipe:dd:cheddars_mashups.esl:input:0",
+      "Smith:recipe:de:cheddars_mashups.esl:input:0",
+      "Smith:recipe:df:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e0:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e1:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e2:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e3:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e4:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e5:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e6:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e7:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e8:cheddars_mashups.esl:input:0",
+      "Smith:recipe:e9:cheddars_mashups.esl:input:0",
+      "Smith:recipe:ea:cheddars_mashups.esl:input:0",
       "Smith:recipe:f46cc:Skyrim.esm:input:1",
       "Smith:recipe:f46cd:Skyrim.esm:input:0",
       "Smith:recipe:f46cf:Skyrim.esm:input:0",
       "Smith:recipe:f46d0:Skyrim.esm:input:0",
       "Smith:recipe:f6f2a:Skyrim.esm:input:0",
       "Smith:recipe:f7f43:Skyrim.esm:out",
+      "Smith:recipe:f:cheddars_mashups.esl:input:0",
       "Tailor:recipe:154b5:Thornswood-Content.esp:input:1",
       "Tailor:recipe:1d90:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Tailor:recipe:22fe:Hothtrooper44_ArmorCompilation.esp:input:0",
@@ -11585,6 +12813,8 @@
       "Tailor:recipe:37307:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Tailor:recipe:37308:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Tailor:recipe:37309:Hothtrooper44_ArmorCompilation.esp:input:1",
+      "Tailor:recipe:3e:cheddars_mashups.esl:input:1",
+      "Tailor:recipe:53:cheddars_mashups.esl:input:1",
       "Tailor:recipe:53b3:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Tailor:recipe:53b5:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Tailor:recipe:53b7:Hothtrooper44_ArmorCompilation.esp:input:0",
@@ -11681,6 +12911,10 @@
     ],
     "818:Gourmet.esp": [
       "Cook:recipe:819:Gourmet.esp:out"
+    ],
+    "81:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:83:cheddars_mashups.esl:out"
     ],
     "81c:Gourmet.esp": [
       "Cook:recipe:81d:Gourmet.esp:out"
@@ -11819,6 +13053,10 @@
     "85500:Skyrim.esm": [
       "Alchemist:harvests:fish:3828d:Dragonborn.esm"
     ],
+    "85:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:87:cheddars_mashups.esl:out"
+    ],
     "8697e:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:8d5:MoreCraftableEquipment.esp:out"
@@ -11875,6 +13113,10 @@
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:dc9fb:Skyrim.esm:out"
     ],
+    "8:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:13:cheddars_mashups.esl:out"
+    ],
     "8aa:Gourmet.esp": [
       "Cook:recipe:8ab:Gourmet.esp:out"
     ],
@@ -11915,11 +13157,25 @@
     "8b3:Gourmet.esp": [
       "Cook:recipe:8ba:Gourmet.esp:out"
     ],
+    "8c:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:b6:cheddars_mashups.esl:out"
+    ],
+    "8d:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:b3:cheddars_mashups.esl:out"
+    ],
     "8e2:Gourmet.esp": [
       "Cook:recipe:8e3:Gourmet.esp:out"
     ],
     "8e4:Gourmet.esp": [
       "Cook:recipe:8e5:Gourmet.esp:out"
+    ],
+    "8e:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:17e:cheddars_mashups.esl:out",
+      "Smith:recipe:b1:cheddars_mashups.esl:out",
+      "Smith:recipe:e9:cheddars_mashups.esl:out"
     ],
     "8ea:Gourmet.esp": [
       "Cook:recipe:8ec:Gourmet.esp:out"
@@ -11940,6 +13196,10 @@
     "8f7:Gourmet.esp": [
       "Cook:recipe:8fa:Gourmet.esp:out"
     ],
+    "8f:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:b7:cheddars_mashups.esl:out"
+    ],
     "901:Gourmet.esp": [
       "Cook:recipe:904:Gourmet.esp:out"
     ],
@@ -11949,26 +13209,97 @@
     "903:Gourmet.esp": [
       "Cook:recipe:906:Gourmet.esp:out"
     ],
+    "90:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:17f:cheddars_mashups.esl:out",
+      "Smith:recipe:e8:cheddars_mashups.esl:out"
+    ],
     "9151b:Skyrim.esm": [
       "Tailor:recipe:238fe:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Tailor:recipe:23907:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Tailor:recipe:23918:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Tailor:recipe:23919:Hothtrooper44_ArmorCompilation.esp:input:3"
     ],
+    "91:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:186:cheddars_mashups.esl:out",
+      "Smith:recipe:e1:cheddars_mashups.esl:out"
+    ],
+    "92:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:181:cheddars_mashups.esl:out",
+      "Smith:recipe:e6:cheddars_mashups.esl:out"
+    ],
     "92d3:FishingInSkyrim.esp": [
       "Cook:recipe:92d4:FishingInSkyrim.esp:out"
+    ],
+    "93:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:180:cheddars_mashups.esl:out",
+      "Smith:recipe:e7:cheddars_mashups.esl:out"
+    ],
+    "94:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:184:cheddars_mashups.esl:out",
+      "Smith:recipe:e3:cheddars_mashups.esl:out"
+    ],
+    "95:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:185:cheddars_mashups.esl:out",
+      "Smith:recipe:e2:cheddars_mashups.esl:out"
+    ],
+    "96:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:164:cheddars_mashups.esl:out"
+    ],
+    "97:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:167:cheddars_mashups.esl:out"
     ],
     "981:Gourmet.esp": [
       "Cook:recipe:98b:Gourmet.esp:out"
     ],
+    "98:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:165:cheddars_mashups.esl:out"
+    ],
+    "99:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:166:cheddars_mashups.esl:out"
+    ],
+    "9:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:16:cheddars_mashups.esl:out"
+    ],
+    "9a:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:137:cheddars_mashups.esl:out"
+    ],
     "9b8a4:Playable Rieklings.esp": [
       "Smith:recipe:9e775:Playable Rieklings.esp:out"
+    ],
+    "9b:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:c0:cheddars_mashups.esl:out"
+    ],
+    "9c:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:182:cheddars_mashups.esl:out",
+      "Smith:recipe:e5:cheddars_mashups.esl:out"
+    ],
+    "9d:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:df:cheddars_mashups.esl:out"
     ],
     "9db:HearthFires.esm": [
       "Cook:recipe:a11:HearthFires.esm:out"
     ],
     "9dc:HearthFires.esm": [
       "Cook:recipe:9ad:Gourmet.esp:out"
+    ],
+    "9e:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:d9:cheddars_mashups.esl:out"
     ],
     "9f0:MoreCraftableEquipment.esp": [
       "Enchanter:wardweaver:public-wearable",
@@ -11978,9 +13309,42 @@
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:9f4:MoreCraftableEquipment.esp:out"
     ],
+    "9f:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:dd:cheddars_mashups.esl:out"
+    ],
+    "a0:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:dc:cheddars_mashups.esl:out"
+    ],
     "a199b:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:9c4:MoreCraftableEquipment.esp:out"
+    ],
+    "a1:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:da:cheddars_mashups.esl:out"
+    ],
+    "a2:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:de:cheddars_mashups.esl:out"
+    ],
+    "a3:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:183:cheddars_mashups.esl:out",
+      "Smith:recipe:e4:cheddars_mashups.esl:out"
+    ],
+    "a4:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:db:cheddars_mashups.esl:out"
+    ],
+    "a5:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:e0:cheddars_mashups.esl:out"
+    ],
+    "a6:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:c8:cheddars_mashups.esl:out"
     ],
     "a6d79:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -11993,6 +13357,22 @@
     "a6d7f:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:8d8:MoreCraftableEquipment.esp:out"
+    ],
+    "a7:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:c5:cheddars_mashups.esl:out"
+    ],
+    "a8:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:c3:cheddars_mashups.esl:out"
+    ],
+    "a9:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:c4:cheddars_mashups.esl:out"
+    ],
+    "aa:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:1ab:cheddars_mashups.esl:out"
     ],
     "ab64:Hothtrooper44_ArmorCompilation.esp": [
       "Enchanter:wardweaver:public-wearable",
@@ -12009,6 +13389,25 @@
     "ab67:Hothtrooper44_ArmorCompilation.esp": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:ab75:Hothtrooper44_ArmorCompilation.esp:out"
+    ],
+    "ab:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:1aa:cheddars_mashups.esl:out"
+    ],
+    "ac:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:c2:cheddars_mashups.esl:out"
+    ],
+    "ae:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:12e:cheddars_mashups.esl:out"
+    ],
+    "af5fd:Skyrim.esm": [
+      "Tailor:recipe:3e:cheddars_mashups.esl:input:2"
+    ],
+    "af:cheddars_mashups.esl": [
+      "Enchanter:wardweaver:public-wearable",
+      "Smith:recipe:ea:cheddars_mashups.esl:out"
     ],
     "b08c5:Skyrim.esm": [
       "Alchemist:station:honeycomb",
@@ -12233,12 +13632,24 @@
     ],
     "db5d2:Skyrim.esm": [
       "Smith:recipe:1033de:Skyrim.esm:out",
+      "Smith:recipe:11:cheddars_mashups.esl:input:0",
       "Smith:recipe:154b4:Thornswood-Content.esp:input:1",
+      "Smith:recipe:15e:cheddars_mashups.esl:input:1",
+      "Smith:recipe:163:cheddars_mashups.esl:input:1",
+      "Smith:recipe:164:cheddars_mashups.esl:input:1",
+      "Smith:recipe:165:cheddars_mashups.esl:input:1",
+      "Smith:recipe:166:cheddars_mashups.esl:input:1",
+      "Smith:recipe:167:cheddars_mashups.esl:input:1",
+      "Smith:recipe:16:cheddars_mashups.esl:input:1",
+      "Smith:recipe:197:cheddars_mashups.esl:input:1",
       "Smith:recipe:19f8c:Playable Rieklings.esp:input:1",
       "Smith:recipe:19f8d:Playable Rieklings.esp:input:1",
       "Smith:recipe:19f8e:Playable Rieklings.esp:input:1",
       "Smith:recipe:19f97:Playable Rieklings.esp:input:1",
       "Smith:recipe:19f9d:Playable Rieklings.esp:input:1",
+      "Smith:recipe:1a0:cheddars_mashups.esl:input:1",
+      "Smith:recipe:1a1:cheddars_mashups.esl:input:1",
+      "Smith:recipe:1a5:cheddars_mashups.esl:input:1",
       "Smith:recipe:214aa:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:23195:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Smith:recipe:2319a:Hothtrooper44_ArmorCompilation.esp:input:2",
@@ -12250,6 +13661,12 @@
       "Smith:recipe:23900:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Smith:recipe:23908:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Smith:recipe:2390e:Hothtrooper44_ArmorCompilation.esp:input:3",
+      "Smith:recipe:24:cheddars_mashups.esl:input:2",
+      "Smith:recipe:2a:cheddars_mashups.esl:input:0",
+      "Smith:recipe:33:cheddars_mashups.esl:input:0",
+      "Smith:recipe:44:cheddars_mashups.esl:input:1",
+      "Smith:recipe:67:cheddars_mashups.esl:input:1",
+      "Smith:recipe:83:cheddars_mashups.esl:input:1",
       "Smith:recipe:844:MoreCraftableEquipment.esp:input:1",
       "Smith:recipe:848:MoreCraftableEquipment.esp:input:1",
       "Smith:recipe:849:MoreCraftableEquipment.esp:input:0",
@@ -12265,6 +13682,9 @@
       "Smith:recipe:8d7:MoreCraftableEquipment.esp:input:0",
       "Smith:recipe:8d8:MoreCraftableEquipment.esp:input:1",
       "Smith:recipe:8d9:MoreCraftableEquipment.esp:input:1",
+      "Smith:recipe:b3:cheddars_mashups.esl:input:1",
+      "Smith:recipe:c0:cheddars_mashups.esl:input:1",
+      "Smith:recipe:c5:cheddars_mashups.esl:input:1",
       "Smith:recipe:db28e:Skyrim.esm:input:1",
       "Smith:recipe:db5d3:Skyrim.esm:input:1",
       "Smith:recipe:db5d4:Skyrim.esm:input:1",
@@ -12291,6 +13711,7 @@
       "Smith:recipe:f46cf:Skyrim.esm:input:3",
       "Smith:recipe:f46d0:Skyrim.esm:input:3",
       "Smith:recipe:f7f43:Skyrim.esm:input:0",
+      "Smith:recipe:f:cheddars_mashups.esl:input:1",
       "Tailor:recipe:231c6:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Tailor:recipe:231c7:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Tailor:recipe:231c8:Hothtrooper44_ArmorCompilation.esp:input:3",
@@ -12321,6 +13742,9 @@
       "Tailor:recipe:37307:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Tailor:recipe:37308:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Tailor:recipe:37309:Hothtrooper44_ArmorCompilation.esp:input:2",
+      "Tailor:recipe:3e:cheddars_mashups.esl:input:0",
+      "Tailor:recipe:3e:cheddars_mashups.esl:input:3",
+      "Tailor:recipe:53:cheddars_mashups.esl:input:0",
       "Tailor:recipe:55bd:Cloaks&Capes.esp:input:0",
       "Tailor:recipe:82ebf:Hothtrooper44_ArmorCompilation.esp:input:2",
       "Tailor:recipe:82ec0:Hothtrooper44_ArmorCompilation.esp:input:2",
@@ -12574,13 +13998,16 @@
     "f8715:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:981:MoreCraftableEquipment.esp:out"
+    ],
+    "fe6a9:Skyrim.esm": [
+      "Smith:recipe:35:cheddars_mashups.esl:input:2"
     ]
   },
   "counts": {
     "Smith": {
-      "buy": 265,
-      "sell": 265,
-      "supply": 40
+      "buy": 344,
+      "sell": 344,
+      "supply": 42
     },
     "Woodworker": {
       "buy": 65,
@@ -12588,13 +14015,13 @@
       "supply": 16
     },
     "Tailor": {
-      "buy": 269,
-      "sell": 269,
-      "supply": 23
+      "buy": 272,
+      "sell": 272,
+      "supply": 24
     },
     "Enchanter": {
-      "buy": 406,
-      "sell": 406,
+      "buy": 485,
+      "sell": 485,
       "supply": 16
     },
     "Cook": {
