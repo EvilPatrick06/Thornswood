@@ -26,7 +26,10 @@
        from main's feed; the setup program held to SHA256SUMS; the installer
        put on a draft, replacing what an earlier run put there, and never on
        a published release or with a note that describes another exe; the
-       second machine's check, which reads the note before the signature.
+       second machine's check, which reads the note before the signature;
+       the installer and its note taken from the run's own installer-files
+       (#5109), 'none' when the run holds none, and a zip that lacks one or
+       does not open refused.
 
   It never reaches GitHub or the site. Read only apart from files under its
   own temp folder.
@@ -102,6 +105,9 @@ Yes 'the run has to be main''s own, started by hand' ($build.Contains("if (`$env
 Yes '  and main is what is built' ($build.Contains('git checkout --force --detach origin/main'))
 Yes 'Package is run from the feed, one file, and never publishes' ($build -match 'Package-Thornswood\.ps1 -FromFeed -OneFile -NoPublish -NoPause ')
 Yes 'the signed installer is read back Valid with a timestamp' ($build.Contains("`$sig.Status -ne 'Valid'") -and $build.Contains('TimeStamperCertificate'))
+Yes 'the build job keeps the installer and its note as the run''s installer-files, after putting them on the draft (#5109)' (
+    $build -match '(?s)- name: Put the installer on the launcher''s draft.*- name: Keep the installer and its note as the run''s files\s+uses: actions/upload-artifact@[0-9a-f]{40}' -and
+    $build -match 'name: installer-files' -and $build.Contains('/installer/Thornswood-Setup.exe') -and $build.Contains('/installer/Thornswood-Setup.release.json') -and $build -match 'if-no-files-found: error')
 Yes 'every action is pinned to a full SHA' (@([regex]::Matches($wf, '(?m)uses:\s*(\S+)') | Where-Object { $_.Groups[1].Value -notmatch '@[0-9a-f]{40}$' }).Count -eq 0)
 # What GitHub writes into a script before it runs is the injection; inputs
 # reach the scripts through env.
@@ -175,7 +181,7 @@ try {
     Yes '  and never a dev number' ($why -match "not a main version")
 
     # GitHub: releases by id, files by asset id, and what was asked.
-    $gh = @{ Releases = @(); Files = @{}; Calls = New-Object System.Collections.ArrayList; NextAsset = 100 }
+    $gh = @{ Releases = @(); Files = @{}; Calls = New-Object System.Collections.ArrayList; NextAsset = 100; Artifacts = @{}; Zips = @{} }
     function New-Rel([int]$id, [string]$tag, [bool]$draft, [hashtable]$files) {
         $assets = @()
         foreach ($n in $files.Keys) {
@@ -196,6 +202,12 @@ try {
         }
         if ($Method -eq 'Get' -and $Uri -match '/releases/(\d+)$') {
             $rid = [int]$Matches[1]; return (@($gh.Releases | Where-Object { $_.id -eq $rid })[0])
+        }
+        if ($Method -eq 'Get' -and $Uri -match '/actions/runs/(\d+)/artifacts\?per_page=100$') {
+            return [pscustomobject]@{ artifacts = @($(if ($gh.Artifacts.ContainsKey($Matches[1])) { $gh.Artifacts[$Matches[1]] } else { @() })) }
+        }
+        if ($Method -eq 'Get' -and $Uri -match '/actions/artifacts/(\d+)/zip$') {
+            [IO.File]::WriteAllBytes($OutFile, [byte[]]$gh.Zips[$Matches[1]]); return $null
         }
         if ($Method -eq 'Delete' -and $Uri -match '/releases/assets/(\d+)$') { return $null }
         if ($Method -eq 'Post' -and $Uri -match '^https://uploads\.github\.com/') { return [pscustomobject]@{ id = 1 } }
@@ -265,6 +277,39 @@ try {
     $gh.Releases = @((New-Rel 7 'v1.2.8' $true @{ 'Thornswood-Setup.exe' = $exeBytes }))
     $why = Get-InstallerDraftRefusal $api $repoName '7' $chk $Repo
     Yes 'a draft with no note is refused' ($why -match 'has 0 files named Thornswood-Setup\.release\.json')
+
+    # The run's own files (#5109): what the deploy gate's token can read.
+    function New-Zip([hashtable]$files) {
+        $d = Join-Path $Scratch ('zip-' + [Guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Force -Path $d
+        foreach ($n in $files.Keys) { [IO.File]::WriteAllBytes((Join-Path $d $n), [byte[]]$files[$n]) }
+        $z = $d + '.zip'
+        Compress-Archive -Path (Join-Path $d '*') -DestinationPath $z -Force
+        $b = [IO.File]::ReadAllBytes($z); Remove-Item -LiteralPath $d, $z -Recurse -Force
+        return ,$b
+    }
+    $noteBytes = [Text.Encoding]::UTF8.GetBytes('{"release":"20261031-061439"}')
+    $gh.Artifacts['41205403716'] = @(
+        [pscustomobject]@{ id = 50; name = 'installer-files'; expired = $true },
+        [pscustomobject]@{ id = 51; name = 'installer-files'; expired = $false },
+        [pscustomobject]@{ id = 52; name = 'something-else'; expired = $false })
+    $gh.Zips['51'] = (New-Zip @{ 'Thornswood-Setup.exe' = $exeBytes; 'Thornswood-Setup.release.json' = $noteBytes })
+    $runInto = Join-Path $Scratch 'run-files'
+    $gh.Calls.Clear()
+    $why = Save-InstallerRunFiles $api $repoName '41205403716' $runInto
+    Yes ('the run''s installer-files: both files taken, from the one that has not expired (' + $why + ')') ($why -eq '' -and
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $runInto 'Thornswood-Setup.exe'))) -eq [Convert]::ToBase64String($exeBytes) -and
+        [IO.File]::ReadAllText((Join-Path $runInto 'Thornswood-Setup.release.json')) -eq '{"release":"20261031-061439"}' -and
+        @($gh.Calls | Where-Object { $_ -match '/actions/artifacts/51/zip$' }).Count -eq 1 -and @($gh.Calls | Where-Object { $_ -match '/releases' }).Count -eq 0)
+    Yes '  and the zip and its folder are gone again' (@(Get-ChildItem -LiteralPath $runInto -Name | Sort-Object) -join ',' -eq 'Thornswood-Setup.exe,Thornswood-Setup.release.json')
+    Yes 'a run that kept no files: none, so the draft''s are taken' ((Save-InstallerRunFiles $api $repoName '41205403717' (Join-Path $Scratch 'run-none')) -eq 'none')
+    Yes 'no run id: none' ((Save-InstallerRunFiles $api $repoName '' (Join-Path $Scratch 'run-none')) -eq 'none')
+    $gh.Zips['51'] = (New-Zip @{ 'Thornswood-Setup.exe' = $exeBytes })
+    $why = Save-InstallerRunFiles $api $repoName '41205403716' (Join-Path $Scratch 'run-short')
+    Yes ('a run''s files without the note: refused, saying so (' + $why + ')') ($why -match 'hold no Thornswood-Setup\.release\.json')
+    $gh.Zips['51'] = [byte[]](1, 2, 3)
+    $why = Save-InstallerRunFiles $api $repoName '41205403716' (Join-Path $Scratch 'run-bad')
+    Yes 'a run''s files that are not a zip: refused' ($why -match 'did not open as a zip')
 }
 finally {
     foreach ($k in $keep.Keys) { [Environment]::SetEnvironmentVariable($k, $keep[$k]) }

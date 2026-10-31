@@ -155,6 +155,18 @@ Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, keeping the launcher only whe
     $shipBox.Contains("if (`$ModsOnly) { `$ship['ModsOnly'] = `$true }") -and -not $shipBox.Contains("elseif (`$ModsOnly)") -and
     $shipBox.Contains('$env:GH_TOKEN = $token') -and $shipBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN'))
 Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
+# The installer for the site (#5109): no parameter at all, the token the
+# Ship's, and the publish from the branch main.
+Yes 'Publish-Installer takes nothing, and is not a live verb' ((Words 'Publish-Installer') -eq '' -and (Words 'Publish-Installer -OutDir C:/x') -eq 'REFUSED' -and
+    (Words 'Publish-Installer -AllowStaleCheckout') -eq 'REFUSED' -and (Words 'Publish-Installer -WaitSeconds 10') -eq 'REFUSED' -and -not $verbs.verbs.'Publish-Installer'.build -and
+    $verbs.verbs.'Publish-Installer'.script -eq 'scripts/release/Publish-InstallerOnBox.ps1')
+$instBox = Text 'scripts/release/Publish-InstallerOnBox.ps1'
+Yes '  Publish-InstallerOnBox.ps1 runs Publish-InstallerFromGitHub.ps1 with the App''s token in GH_TOKEN alone and gone after, from the branch main' (
+    $instBox.Contains('Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState') -and $instBox.Contains("& (Join-Path `$Here 'Publish-InstallerFromGitHub.ps1') -WaitSeconds `$WaitSeconds") -and
+    $instBox.Contains('$env:GH_TOKEN = $token') -and $instBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN') -and
+    $instBox.Contains('checkout --quiet -B main refs/remotes/origin/main') -and
+    $instBox.IndexOf('checkout --quiet -B main') -lt $instBox.IndexOf('Get-ThornswoodShipAccess -Repo') -and -not $instBox.Contains('AllowStaleCheckout'))
+Yes '  and its wait for installer.yml fits inside the verb''s timeout' ([int]([regex]::Match($instBox, '\[int\]\$WaitSeconds = (\d+)').Groups[1].Value) -lt 60 * [int]$verbs.verbs.'Publish-Installer'.timeoutMinutes)
 $gt = Text 'scripts/vps/admin/ship-access.js'
 Yes '  the token is the App''s, for the fork and Thornswood only, Actions write and Contents read and nothing more' (
     $gt.Contains("const REPOS = ['skymp', 'Thornswood'];") -and $gt.Contains("const PERMISSIONS = { actions: 'write', contents: 'read' };") -and $gt.Contains('{ repositories: REPOS, permissions: PERMISSIONS }'))
