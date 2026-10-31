@@ -91,6 +91,15 @@ Yes 'an enum value outside its list is refused' ((Words 'Deploy-DevGamemode -Npc
 # nothing else, never the folder it reads.
 Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-LauncherStarts -Days 7') -eq '-Days|7' -and (Words 'Read-LauncherStarts') -eq '' -and
     (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
+# The box's read only checks, which only One could run before (the cloud
+# reaches neither game port nor the box's shell): each takes nothing a caller
+# could steer, and Check-ProdParity sends its facts and report back.
+foreach ($check in 'Read-Online', 'Check-LiveGamemode', 'Check-ServiceOwners', 'Check-ProdParity') {
+    Yes "$check takes no parameter of the caller's" ((Words "$check -Vps x") -eq 'REFUSED' -and (Words "$check -User x") -eq 'REFUSED' -and (Words $check) -ne 'REFUSED')
+}
+Yes '  Check-LiveGamemode never waits for Enter, and Check-ProdParity collects into the run''s folder' ((Words 'Check-LiveGamemode') -eq '-NoPause' -and
+    (Words 'Check-ProdParity') -eq '-Collect' -and (Test-ThornswoodGateRequest -Line 'Check-ProdParity' -Verbs $verbs).Out -eq '-Out' -and
+    (Words 'Check-ProdParity -Facts x') -eq 'REFUSED' -and (Words 'Check-ProdParity -Record x') -eq 'REFUSED')
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
 Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and
@@ -136,10 +145,24 @@ $rebuild = Text 'scripts/mods/Rebuild-OnBox.ps1'
 Yes '  a pull request by number and its full head commit' ((Words "Rebuild-ContentTables -Pull 4835 -Head $sha") -eq "-Pull|4835|-Head|$sha" -and
     (Words 'Rebuild-ContentTables -Pull 0') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Head abc') -eq 'REFUSED' -and (Words 'Rebuild-ContentTables -Pull x') -eq 'REFUSED')
 Yes '  it takes only the listed data files from the pull request, held to its head, and commits them for Run-OnBox.ps1' (
-    $rebuild.Contains("`$DataFromPull = @('game/content/Thornswood-Content.esp', 'records/recipe-owners.json')") -and
+    $rebuild.Contains("`$DataFromPull = @('game/content/Thornswood-Content.esp', 'records/recipe-owners.json', 'game/data/last-plugin-policy.json', 'scripts/mods/content-salvaged.json')") -and
     $rebuild.Contains("'checkout', `$Head, '--', `$p") -and $rebuild.Contains('if ($at -cne $Head)') -and $rebuild.Contains("'commit', '--quiet', '--allow-empty'") -and
     $rebuild.IndexOf("'commit', '--quiet'") -lt $rebuild.IndexOf("Run-OnBox.ps1')"))
 Yes '  and no file of the list is a script' (@([regex]::Match($rebuild, '\$DataFromPull = @\(([^)]*)\)').Groups[1].Value -split ',' | Where-Object { $_ -match '\.(ps1|psm1|py|js|cmd|bat|exe|dll)''' }).Count -eq 0)
+# The stations first (#1387): main's Build-StationSites.py measures them over
+# the server's plugins, main's Add-ContentRecords.py writes the plugin from
+# that table, each committed in the checkout, and then the chain.
+Yes '  -Stations is a switch, with a pull request or without' ((Words "Rebuild-ContentTables -Stations -Pull 1387 -Head $sha") -eq "-Stations|-Pull|1387|-Head|$sha" -and
+    (Words 'Rebuild-ContentTables -Stations') -eq '-Stations' -and (Words 'Rebuild-ContentTables -Stations yes') -eq 'REFUSED')
+$sites = $rebuild.IndexOf("'scripts/dev/Build-StationSites.py' '--data' '{data}' -Server `$Server -Out `$Out")
+$records = $rebuild.IndexOf("'scripts/mods/Add-ContentRecords.py' '--masters' '{data}' -Server `$Server -Out `$Out")
+$chain = $rebuild.IndexOf("'scripts/mods/Rebuild-ContentTables.ps1' '-Data'")
+Yes '  with it the stations are measured, then the plugin written, then the chain runs' ($rebuild.Contains('if ($Stations) {') -and $sites -gt 0 -and $records -gt $sites -and $chain -gt $records)
+Yes '  each step is committed, new files and all, before the next is sent' (
+    $rebuild.IndexOf("Save-Step 'Build-StationSites.py'") -gt $sites -and $rebuild.IndexOf("Save-Step 'Build-StationSites.py'") -lt $records -and
+    $rebuild.IndexOf("Save-Step 'Add-ContentRecords.py'") -gt $records -and $rebuild.IndexOf("Save-Step 'Add-ContentRecords.py'") -lt $chain -and
+    $rebuild.Contains("Invoke-PullGit @('add', '--all')"))
+Yes '  and a step that fails stops the run before the chain' (([regex]::Matches($rebuild, 'if \(\$LASTEXITCODE -ne 0\) \{ Write-Host "STOP\. (Build-StationSites|Add-ContentRecords)\.py ended')).Count -eq 2)
 Yes '  it runs the chain by Run-OnBox.ps1, its words quoted so none is read as a parameter' ($rebuild.Contains("'scripts/mods/Rebuild-ContentTables.ps1' '-Data' '{data}' '-PluginsTxt' '{plugins}' -Server `$Server -Out `$Out"))
 Yes '  and Run-OnBox.ps1 copies what came back into -Out as well as the checkout' ((Text 'scripts/mods/Run-OnBox.ps1').Contains('foreach ($into in @($repo, $Out | Where-Object { $_ }))'))
 # The Ship verbs (Patrick's A, 30 Oct 2026: the box admin App mints the

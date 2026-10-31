@@ -100,8 +100,9 @@ WHAT HOLDS A SPOT CLEAR, the same measure as the woodworking benches:
 WHAT IT READS. The collection's plugins in game\\data\\last-plugin.json's load
 order, from --data, and from the repository's Thornswood-Content.esp only the
 four station records: their bounds are the stations' outlines. It does not
-read Thornswood-Last.esp, and it checks that it places nothing new: only the town gates it unlocks and
-the floor items it switches off, where they stand. It reads the benches' spots out of
+read Thornswood-Last.esp, and it checks that it places nothing new: only the town gates it unlocks,
+the floor items it switches off and the hold-only plants and ores it switches off outside their
+hold (#3150), where they stand. It reads the benches' spots out of
 game\\data\\woodworking-benches.json and the boards' out of game\\gamemode.js.
 
 WHAT IT WRITES. game\\data\\station-sites.json: every site's anchor, the spot,
@@ -837,11 +838,13 @@ def main():
     # reference left where it stands without its lock or script, which
     # last-plugin.json names; and since #3077 the floor items it switches off,
     # each a master's or a mod's own reference left where it stands, initially
-    # disabled, as many as last-plugin.json's floorItems.off. A switched-off
-    # item still counts here as something in the way, as it did before, so no
-    # spot changes. Anything else it placed would stop this.
+    # disabled, as many as last-plugin.json's floorItems.off, and since #3150
+    # the hold-only plants and ores it switches off outside their hold the
+    # same way, the ones its holdOnly.off lists. A switched-off item still
+    # counts here as something in the way, as it did before, so no spot
+    # changes. Anything else it placed would stop this.
     gates = set(lo_doc.get('gatesUnlocked') or [])
-    floor_off = int((lo_doc.get('floorItems') or {}).get('off') or 0)
+    floor_off = int((lo_doc.get('floorItems') or {}).get('off') or 0) + len((lo_doc.get('holdOnly') or {}).get('off') or [])
     for n in OURS_AFTER:
         # Made in the Data folder from its recipe since #2791 (own_plugins.py).
         pl = wb.Plugin(own_plugins.plugin_path(args.data, n), n)
@@ -863,7 +866,8 @@ def main():
                   'switches off (%s); this table would have to read it.' % (n, len(named), ', '.join(named[:6])))
             return 1
         if n == 'Thornswood-Last.esp' and off != floor_off:
-            print('STOP. %s switches off %d floor item(s) and last-plugin.json says %d; rebuild it first.'
+            print('STOP. %s switches off %d floor item(s) or hold-only plant(s) and ore(s), and last-plugin.json '
+                  'says %d; rebuild it first.'
                   % (n, off, floor_off))
             return 1
     print('The load order: %d plugins, game\\data\\last-plugin.json\'s; %s read from game\\content for its '
