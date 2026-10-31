@@ -14,25 +14,25 @@
   "deleted": 10,
   "everyoneElse": 1063,
   "failedToInflate": 0,
-  "guards": 8,
-  "noHold": 629,
+  "guards": 393,
+  "noHold": 603,
   "notPeople": 7723,
   "offAtStart": 5757,
   "people": 6935,
   "placed": 14668,
   "stringTables": 7,
-  "traders": 80,
+  "traders": 588,
   "transport": 27,
   "uniqueTraders": 59,
   "uniqueTransport": 27
  },
  "holdFrom": {
-  "its own location": 945,
-  "nothing placed it": 629,
-  "the cell it stands in": 3993,
-  "the ground it stands on": 200,
-  "the nearest named place": 777,
-  "whose law it answers to": 391
+  "its own location": 3182,
+  "nothing placed it": 603,
+  "the cell it stands in": 2124,
+  "the ground it stands on": 108,
+  "the nearest named place": 570,
+  "whose law it answers to": 348
  },
  "holds": {
   "Eastmarch": {
@@ -1300,15 +1300,17 @@
   },
   "Haafingar": {
    "counts": {
-    "everyoneElse": 78,
-    "guards": 0,
-    "notPeople": 533,
-    "offAtStart": 894,
-    "people": 983,
-    "traders": 7,
+    "everyoneElse": 375,
+    "guards": 56,
+    "notPeople": 541,
+    "offAtStart": 253,
+    "people": 986,
+    "traders": 298,
     "transport": 4
    },
    "everyoneElse": {
+    "Ahtar": 1,
+    "Aia Arria": 1,
     "Alchemist": 2,
     "Apprentice Conjurer": 1,
     "Argonian": 2,
@@ -1316,550 +1318,142 @@
     "Bandit Chief": 1,
     "Blackblood Marauder": 7,
     "Corpse": 1,
-    "Corsair": 2,
-    "Feral Vampire": 1,
+    "Corsair": 6,
+    "Corsair Mercenary": 3,
+    "Deeja": 1,
+    "Dervenin": 1,
+    "Digitus Quintus": 1,
+    "Dorian": 1,
+    "East Empire Warden": 4,
+    "Elenwen": 1,
+    "Elisif the Fair": 1,
+    "Erdi": 1,
+    "Erikur": 1,
+    "Eris": 1,
+    "Falk Firebeard": 1,
+    "Feral Vampire": 2,
+    "Fight Organisator": 1,
+    "First Mate": 1,
     "Forsworn": 2,
     "Forsworn Briarheart": 1,
+    "Frederik": 1,
+    "Freir": 1,
+    "Freyja Trodirson": 1,
+    "Fridrika": 1,
+    "Fura Bloodmouth": 1,
+    "Garan Marethi": 1,
+    "General Tullius": 1,
+    "Giraud Gemane": 1,
+    "Gisli": 1,
+    "Gissur": 1,
+    "Gladiator": 2,
+    "Greta": 1,
+    "Gulum-Ei": 1,
+    "Hajum-ja": 1,
+    "Heimvar": 1,
+    "Hired Thug": 1,
+    "Hjoldan": 1,
+    "Hjorunn": 1,
     "Hodlismod": 1,
     "Imperial": 1,
+    "Imperial Captain": 2,
+    "Imperial Soldier": 15,
+    "Inge Six Fingers": 1,
+    "Irnskar Ironhand": 1,
+    "Istar Cairn-Breaker": 1,
+    "J'Datak": 1,
+    "Jakob": 1,
+    "Janus": 1,
+    "Jaree-Ra": 1,
+    "Jawanan": 1,
+    "Jon Mikl": 1,
+    "Jorn": 1,
+    "Julienne Lylvieve": 1,
+    "Katla": 1,
+    "Kayd": 1,
+    "Kharag gro-Shurkul": 1,
+    "Knud": 1,
+    "Labourer": 5,
+    "Legate Rikke": 1,
+    "Leper": 1,
+    "Lisette": 1,
+    "Lodvar": 1,
+    "Lord Harkon": 1,
+    "Lowlife": 1,
+    "Lumberjack": 1,
+    "Ma'zaka": 1,
+    "Malborn": 2,
+    "Malkoran": 1,
     "Master Vampire": 1,
     "Nord": 5,
     "Novice Conjurer": 1,
     "Novice Fire Mage": 1,
     "Novice Necromancer": 3,
     "Orc": 1,
-    "Penitus Oculatus Agent": 1,
+    "Orellia Quintus": 1,
+    "Orthjolf": 1,
+    "Pantea Ateia": 1,
+    "Pelagius the Mad": 1,
+    "Penitus Oculatus Agent": 11,
+    "Pilgrim": 1,
+    "Priest": 3,
     "Prisoner": 1,
+    "Raggedy Rolf": 1,
+    "Rargal Thrallmaster": 1,
+    "Razelan": 1,
     "Redguard": 1,
-    "Sailor": 1,
+    "Roggvir": 1,
+    "Rorlund": 1,
+    "Rulindil": 1,
+    "Sabine Nytte": 1,
+    "Safia": 1,
+    "Sailor": 6,
+    "Salonia Caelia": 1,
+    "Servant": 3,
+    "Sheogorath": 1,
+    "Silana Petreia": 1,
+    "Smuggler": 2,
+    "Snilling": 1,
+    "Snorreid": 1,
+    "Sorex Vinius": 1,
     "Stabbed guard": 1,
+    "Stalf": 1,
+    "Stormcloak Leader": 1,
+    "Stormcloak Soldier": 19,
+    "Styrr": 1,
+    "Svari": 1,
+    "Tahlen-Ra": 1,
+    "Thalmor Justiciar": 4,
+    "Thalmor Soldier": 8,
+    "Thalmor Wizard": 4,
     "Thorek": 1,
-    "Vampire Cattle": 1,
-    "Vampire Fledgling": 6,
-    "Witch": 1
+    "Torbec": 1,
+    "Toril": 1,
+    "Trainer Ykeim": 1,
+    "Traveler": 2,
+    "Troubadour": 1,
+    "Tsavani": 1,
+    "Una": 1,
+    "Vagrant": 1,
+    "Vampire Cattle": 10,
+    "Vampire Fledgling": 7,
+    "Varnius Junius": 1,
+    "Veteran": 1,
+    "Viarmo": 1,
+    "Vingalmo": 1,
+    "Watchman": 1,
+    "Witch": 1,
+    "Wood Elf": 1,
+    "Xander": 1
+   },
+   "guards": {
+    "Haafingar Guard": 2,
+    "Imperial Soldier": 6,
+    "Solitude Guard": 46,
+    "Stormcloak Guard": 2
    },
    "guards": {},
    "offAtStart": [
-    {
-     "base": "13255:Skyrim.esm",
-     "because": [
-      "ServicesSolitudeFishAddvar"
-     ],
-     "column": "traders",
-     "name": "Addvar",
-     "offBy": "its own flag",
-     "ref": "198d4:Skyrim.esm"
-    },
-    {
-     "base": "8c55:The Great City of Solitude.esp",
-     "because": [
-      "ServicesSolitudeBlacksmithDocks"
-     ],
-     "column": "traders",
-     "name": "Aksel Trodirson",
-     "offBy": "its own flag",
-     "ref": "8c5a:The Great City of Solitude.esp"
-    },
-    {
-     "base": "d6ad8:Skyrim.esm",
-     "because": [
-      "ServicesSolitudeEastEmpireCompany"
-     ],
-     "column": "traders",
-     "name": "Aquillius Aeresius",
-     "offBy": "its own flag",
-     "ref": "d6ad9:Skyrim.esm"
-    },
-    {
-     "base": "93a5:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9388:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9389:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "938a:Solitude Arena.esp"
-    },
-    {
-     "base": "93a5:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "938b:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "938c:Solitude Arena.esp"
-    },
-    {
-     "base": "93a5:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "938d:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "938e:Solitude Arena.esp"
-    },
-    {
-     "base": "93a5:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "938f:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9390:Solitude Arena.esp"
-    },
-    {
-     "base": "93a5:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9391:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9392:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9393:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9394:Solitude Arena.esp"
-    },
-    {
-     "base": "93a5:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9395:Solitude Arena.esp"
-    },
-    {
-     "base": "93a5:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9396:Solitude Arena.esp"
-    },
-    {
-     "base": "9384:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Argonian Spectator",
-     "offBy": "its own flag",
-     "ref": "9397:Solitude Arena.esp"
-    },
-    {
-     "base": "93f4:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93f6:Solitude Arena.esp"
-    },
-    {
-     "base": "93f4:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93f7:Solitude Arena.esp"
-    },
-    {
-     "base": "93f4:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93f8:Solitude Arena.esp"
-    },
-    {
-     "base": "93f4:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93f9:Solitude Arena.esp"
-    },
-    {
-     "base": "93f4:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93fa:Solitude Arena.esp"
-    },
-    {
-     "base": "93f4:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93fb:Solitude Arena.esp"
-    },
-    {
-     "base": "93f4:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93fc:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93fd:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93fe:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "93ff:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "9400:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "9401:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "9402:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "9403:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "9404:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "9405:Solitude Arena.esp"
-    },
-    {
-     "base": "93f3:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Breton Spectator",
-     "offBy": "its own flag",
-     "ref": "9406:Solitude Arena.esp"
-    },
-    {
-     "base": "1039:Solitude Arena.esp",
-     "because": [
-      "LSDfactionrestaurant"
-     ],
-     "column": "traders",
-     "name": "Chef of the Restaurant",
-     "offBy": "its own flag",
-     "ref": "1021:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fa0:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fab:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fac:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fad:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fae:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7faf:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fb0:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fb1:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fb2:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fb3:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "7fb4:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "a15a:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9f:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Dark Elf Spectator",
-     "offBy": "its own flag",
-     "ref": "a15c:Solitude Arena.esp"
-    },
-    {
-     "base": "d586:The Great City of Solitude.esp",
-     "because": [
-      "ServicesSolitudeSwampsideApothecaryTGCoS"
-     ],
-     "column": "traders",
-     "name": "Dra'kaleeja",
-     "offBy": "its own flag",
-     "ref": "d587:The Great City of Solitude.esp"
-    },
-    {
-     "base": "1326f:Skyrim.esm",
-     "because": [
-      "ServicesSolitudeRadiantRaiments"
-     ],
-     "column": "traders",
-     "name": "Endarie",
-     "offBy": "its own flag",
-     "ref": "198ad:Skyrim.esm"
-    },
     {
      "base": "1f0e6a:CFTO.esp",
      "because": [
@@ -1868,188 +1462,8 @@
      ],
      "column": "transport",
      "name": "Enthralled Ferryman",
-     "offBy": "its own flag",
+     "offBy": "its enable parent",
      "ref": "1f0e6b:CFTO.esp"
-    },
-    {
-     "base": "13273:Skyrim.esm",
-     "because": [
-      "ServicesSolitudeFruitEvette"
-     ],
-     "column": "traders",
-     "name": "Evette San",
-     "offBy": "its own flag",
-     "ref": "198b3:Skyrim.esm"
-    },
-    {
-     "base": "19a28:Skyrim.esm",
-     "because": [
-      "ServicesDragonBrideFourShieldsInn"
-     ],
-     "column": "traders",
-     "name": "Faida",
-     "offBy": "its own flag",
-     "ref": "19a29:Skyrim.esm"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa1:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa2:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa3:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa4:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa5:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa6:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa7:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa8:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7fa9:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "7faa:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "a159:Solitude Arena.esp"
-    },
-    {
-     "base": "7f9e:Solitude Arena.esp",
-     "because": [
-      "LSDspectateurs"
-     ],
-     "column": "traders",
-     "name": "Farmer",
-     "offBy": "its own flag",
-     "ref": "a15b:Solitude Arena.esp"
-    },
-    {
-     "base": "3366:Dawnguard.esm",
-     "because": [
-      "DLC1ServicesFeran"
-     ],
-     "column": "traders",
-     "name": "Feran Sadri",
-     "offBy": "its own flag",
-     "ref": "33aa:Dawnguard.esm"
-    },
-    {
-     "base": "1327d:Skyrim.esm",
-     "because": [
-      "ServicesSolitudeStables"
-     ],
-     "column": "traders",
-     "name": "Geimund",
-     "offBy": "its own flag",
-     "ref": "198d5:Skyrim.esm"
-    },
-    {
-     "base": "3365:Dawnguard.esm",
-     "because": [
-      "DLC1ServicesHestla"
-     ],
-     "column": "traders",
-     "name": "Hestla",
-     "offBy": "its own flag",
-     "ref": "33ac:Dawnguard.esm"
-    },
-    {
-     "base": "1328c:Skyrim.esm",
-     "because": [
-      "ServicesSolitudeFruitJala"
-     ],
-     "column": "traders",
-     "name": "Jala",
-     "offBy": "its own flag",
-     "ref": "198af:Skyrim.esm"
     },
     {
      "base": "1684d:Dawnguard.esm",
@@ -4285,9 +3699,9 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 489,
-    "guards": 111,
-    "traders": 291,
+    "everyoneElse": 195,
+    "guards": 55,
+    "traders": 0,
     "transport": 3
    },
    "traders": [
@@ -4328,6 +3742,366 @@
      "where": "The Winking Skeever"
     },
     {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fa0:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fab:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fac:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fad:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fae:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7faf:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fb0:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fb1:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fb2:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fb3:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "7fb4:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "a15a:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9f:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur6",
+     "holdFrom": "whose law it answers to",
+     "name": "Dark Elf Spectator",
+     "ref": "a15c:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "d586:The Great City of Solitude.esp",
+     "because": [
+      "ServicesSolitudeSwampsideApothecaryTGCoS"
+     ],
+     "edid": "DraKaleejaTGCoS",
+     "holdFrom": "the cell it stands in",
+     "name": "Dra'kaleeja",
+     "ref": "d587:The Great City of Solitude.esp",
+     "unique": true,
+     "where": "Riverside Apothecary"
+    },
+    {
+     "base": "1326f:Skyrim.esm",
+     "because": [
+      "ServicesSolitudeRadiantRaiments"
+     ],
+     "edid": "Endarie",
+     "holdFrom": "its own location",
+     "name": "Endarie",
+     "ref": "198ad:Skyrim.esm",
+     "unique": true,
+     "where": "Radiant Raiment"
+    },
+    {
+     "base": "13273:Skyrim.esm",
+     "because": [
+      "ServicesSolitudeFruitEvette"
+     ],
+     "edid": "EvetteSan",
+     "holdFrom": "its own location",
+     "name": "Evette San",
+     "ref": "198b3:Skyrim.esm",
+     "unique": true,
+     "where": "Evette San's House"
+    },
+    {
+     "base": "19a28:Skyrim.esm",
+     "because": [
+      "ServicesDragonBrideFourShieldsInn"
+     ],
+     "edid": "Faida",
+     "holdFrom": "its own location",
+     "name": "Faida",
+     "ref": "19a29:Skyrim.esm",
+     "unique": true,
+     "where": "Four Shields Tavern"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa1:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa2:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa3:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa4:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa5:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa6:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa7:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa8:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7fa9:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "7faa:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "a159:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "7f9e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur5",
+     "holdFrom": "whose law it answers to",
+     "name": "Farmer",
+     "ref": "a15b:Solitude Arena.esp",
+     "unique": false,
+     "where": "alsd"
+    },
+    {
+     "base": "3366:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesFeran"
+     ],
+     "edid": "DLC1FeranSadri",
+     "holdFrom": "its own location",
+     "name": "Feran Sadri",
+     "ref": "33aa:Dawnguard.esm",
+     "unique": true,
+     "where": "Volkihar Keep"
+    },
+    {
      "base": "13275:Skyrim.esm",
      "because": [
       "ServicesSolitudeFletcher"
@@ -4340,6 +4114,30 @@
      "where": "Fletcher"
     },
     {
+     "base": "1327d:Skyrim.esm",
+     "because": [
+      "ServicesSolitudeStables"
+     ],
+     "edid": "Geimund",
+     "holdFrom": "its own location",
+     "name": "Geimund",
+     "ref": "198d5:Skyrim.esm",
+     "unique": true,
+     "where": "Solitude Stables"
+    },
+    {
+     "base": "3365:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesHestla"
+     ],
+     "edid": "DLC1Hestla",
+     "holdFrom": "its own location",
+     "name": "Hestla",
+     "ref": "33ac:Dawnguard.esm",
+     "unique": true,
+     "where": "Volkihar Keep"
+    },
+    {
      "base": "f4fb8:Skyrim.esm",
      "because": [
       "WEServicesHunterFaction"
@@ -4350,6 +4148,2637 @@
      "ref": "f4fb7:Skyrim.esm",
      "unique": false,
      "where": "Steepfall Burrow"
+    },
+    {
+     "base": "1328c:Skyrim.esm",
+     "because": [
+      "ServicesSolitudeFruitJala"
+     ],
+     "edid": "Jala",
+     "holdFrom": "its own location",
+     "name": "Jala",
+     "ref": "198af:Skyrim.esm",
+     "unique": true,
+     "where": "Jala's House"
+    },
+    {
+     "base": "23b3d:JKs Skyrim.esp",
+     "because": [
+      "XJKCiliaVendorFaction",
+      "XJKJurgenVendorFaction"
+     ],
+     "edid": "XJKblacksmithvendorDragonbridge",
+     "holdFrom": "the cell it stands in",
+     "name": "Jurgen Krohnsson",
+     "ref": "5e56:JKs Skyrim.esp",
+     "unique": true,
+     "where": "DragonBridgeExterior02"
+    },
+    {
+     "base": "1aa31:The Great City of Solitude.esp",
+     "because": [
+      "ServicesSolitudeFruitJytteTGCoS"
+     ],
+     "edid": "JytteTGCoS",
+     "holdFrom": "the cell it stands in",
+     "name": "Jytte",
+     "ref": "1aa35:The Great City of Solitude.esp",
+     "unique": true,
+     "where": "Torbec's House"
+    },
+    {
+     "base": "6d2c:Populated Cities Towns Villages Legendary.esp",
+     "because": [
+      "ooooSolitudeMerchantHumanFaction"
+     ],
+     "edid": "ssssSolitudeMerchantHuman",
+     "holdFrom": "whose law it answers to",
+     "name": "Merchant",
+     "ref": "e2d7:Populated Cities Towns Villages Legendary.esp",
+     "unique": false,
+     "where": "SolitudeRow"
+    },
+    {
+     "base": "6d2d:Populated Cities Towns Villages Legendary.esp",
+     "because": [
+      "ooooSolitudeMerchantOldFaction"
+     ],
+     "edid": "ssssSolitudeMerchantOld",
+     "holdFrom": "whose law it answers to",
+     "name": "Merchant",
+     "ref": "e2d9:Populated Cities Towns Villages Legendary.esp",
+     "unique": false,
+     "where": "SolitudeRow"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c0:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c1:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c2:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c3:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in AAALSDarencombSOLI"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c4:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c5:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c6:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144c7:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144cd:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144ce:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144cf:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144d0:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144d1:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144f3:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144f4:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144f5:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144f6:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144f7:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144fe:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "144ff:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14500:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14501:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14502:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1451d:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1451e:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1451f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14520:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14522:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14527:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14528:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "14529:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1452a:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "184f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1852:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1854:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1855:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1856:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1857:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1858:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1859:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "185a:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "185b:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in AAALSDarencombSOLI"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "185c:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in AAALSDarencombSOLI"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "185d:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in AAALSDarencombSOLI"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "185e:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "185f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1860:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1861:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1862:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1863:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1864:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1865:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1866:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1867:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1868:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1869:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "186a:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "186b:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "186c:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "186d:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "186e:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "186f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1870:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1871:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1872:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in AAALSDarencombSOLI"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1873:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1874:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1875:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "1876:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "356c:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "356e:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "356f:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3570:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3571:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3572:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3573:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3574:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3575:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3576:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3577:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3578:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3579:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "357a:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "357b:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "357c:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "357d:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "357e:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "357f:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3580:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3581:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3582:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3583:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3584:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3585:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3586:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3587:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3588:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3589:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3594:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3596:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3598:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "3599:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "36c5:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "36c6:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "36c7:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "36c8:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6756:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6758:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6759:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "675a:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "675b:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "675c:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "675d:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "675e:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "675f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6760:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6761:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6762:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6763:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6764:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6765:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6766:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6767:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6768:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6769:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "676a:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "676b:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "676c:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "676d:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "676e:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "676f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6770:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6771:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6772:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6773:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "677e:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6780:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6782:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "6783:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "68ac:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "68ad:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184d:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur3",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "68ae:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "184e:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeuse2",
+     "holdFrom": "whose law it answers to",
+     "name": "Noble Spectator",
+     "ref": "68af:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "5cbf7:SkyrimSewers.esp",
+     "because": [
+      "SSewersPeddlerSolitude"
+     ],
+     "edid": "SSewersPeddlerSolitude01",
+     "holdFrom": "the cell it stands in",
+     "name": "Peddler",
+     "ref": "5cbf8:SkyrimSewers.esp",
+     "unique": true,
+     "where": "Solitude Sewers, Western Tunnel"
+    },
+    {
+     "base": "3367:Dawnguard.esm",
+     "because": [
+      "DLC1ServicesRonthil"
+     ],
+     "edid": "DLC1Ronthil",
+     "holdFrom": "its own location",
+     "name": "Ronthil",
+     "ref": "33af:Dawnguard.esm",
+     "unique": true,
+     "where": "Volkihar Keep"
+    },
+    {
+     "base": "25905:FishingInSkyrim.esp",
+     "because": [
+      "FishingServicesSolitudeFishPolish",
+      "ServicesSolitudeFishAddvar"
+     ],
+     "edid": "FishingVendorPolish",
+     "holdFrom": "the nearest named place",
+     "name": "Rybek Kupiecski",
+     "ref": "25906:FishingInSkyrim.esp",
+     "unique": true,
+     "where": "open ground in Tamriel"
+    },
+    {
+     "base": "1329a:Skyrim.esm",
+     "because": [
+      "ServicesSolitudeBitsAndPieces"
+     ],
+     "edid": "Sayma",
+     "holdFrom": "its own location",
+     "name": "Sayma",
+     "ref": "198c9:Skyrim.esm",
+     "unique": true,
+     "where": "Bits and Pieces"
+    },
+    {
+     "base": "dec3:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDgardearne",
+     "holdFrom": "whose law it answers to",
+     "name": "Solitude Guard",
+     "ref": "dec5:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "dec3:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDgardearne",
+     "holdFrom": "whose law it answers to",
+     "name": "Solitude Guard",
+     "ref": "dec6:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144c8:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144c9:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144ca:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144cb:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in AAALSDarencombSOLI"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144cc:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144f8:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144f9:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144fa:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144fb:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144fc:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "144fd:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "14521:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "14523:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "14524:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "14525:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "14526:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1850:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1877:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1878:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1879:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "187a:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "187b:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "187c:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "187d:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "187e:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "187f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1880:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1881:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1882:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1883:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1884:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "1885:Solitude Arena.esp",
+     "unique": false,
+     "where": "aaalsdarene"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "356d:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "358a:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "358b:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "358c:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "358d:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "358e:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "358f:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "3590:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "3591:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "3592:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "3593:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "3595:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "3597:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "359a:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "35d1:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "36c9:Solitude Arena.esp",
+     "unique": false,
+     "where": "open ground in aaalsdarenedeso"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6757:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6774:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6775:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6776:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6777:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6778:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6779:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "677a:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "677b:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "677c:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "677d:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "677f:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6781:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "6784:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "67bb:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "1851:Solitude Arena.esp",
+     "because": [
+      "LSDspectateurs"
+     ],
+     "edid": "LSDmangeur4",
+     "holdFrom": "whose law it answers to",
+     "name": "Spectator Farmer",
+     "ref": "68b0:Solitude Arena.esp",
+     "unique": false,
+     "where": "aalearen"
+    },
+    {
+     "base": "16ace:Skyrim.esm",
+     "because": [
+      "CWServicesQuartermasterSons"
+     ],
+     "edid": "CWQuartermasterSons",
+     "enableParent": "95777:Skyrim.esm",
+     "holdFrom": "its own location",
+     "name": "Stormcloak Quartermaster",
+     "ref": "16acf:Skyrim.esm",
+     "unique": false,
+     "where": "MilitaryCampHaafingarSons"
     },
     {
      "base": "132aa:Skyrim.esm",
@@ -5503,12 +7932,12 @@
   },
   "Winterhold": {
    "counts": {
-    "everyoneElse": 56,
-    "guards": 0,
-    "notPeople": 703,
-    "offAtStart": 301,
-    "people": 367,
-    "traders": 8,
+    "everyoneElse": 207,
+    "guards": 4,
+    "notPeople": 729,
+    "offAtStart": 148,
+    "people": 376,
+    "traders": 15,
     "transport": 2
    },
    "everyoneElse": {
@@ -5744,40 +8173,78 @@
   },
   "no hold": {
    "counts": {
-    "everyoneElse": 11,
-    "guards": 0,
-    "notPeople": 671,
-    "offAtStart": 618,
-    "people": 629,
-    "traders": 0,
+    "everyoneElse": 331,
+    "guards": 50,
+    "notPeople": 580,
+    "offAtStart": 200,
+    "people": 603,
+    "traders": 22,
     "transport": 0
    },
    "everyoneElse": {
+    "Anger": 1,
+    "Araniel the Wise": 1,
+    "Arrowsong": 1,
+    "Azura": 1,
+    "Bandit": 17,
     "Blood Horker": 5,
-    "Gladiator": 6
+    "Bodyguard": 2,
+    "Commoner": 8,
+    "Confidence": 1,
+    "Dremora Churl": 5,
+    "Erlendr": 1,
+    "Felldir the Old": 1,
+    "Fish Hatchery": 1,
+    "Gladiator": 6,
+    "Gormlaith Golden-Hilt": 1,
+    "Hakon One-Eye": 1,
+    "Hero of Sovngarde": 15,
+    "High King Torygg": 1,
+    "Hunroor": 1,
+    "Imperial Soldier": 7,
+    "Jiub": 1,
+    "Jurgen Windcaller": 1,
+    "Klog the Ogre": 1,
+    "Klug the Dwarf": 1,
+    "Legate Adventus Caesennius": 1,
+    "M'aiq the Liar": 1,
+    "Malyn Varen": 1,
+    "Miraak": 1,
+    "Molag Bal": 1,
+    "Morven Stroud": 1,
+    "Nikulas": 1,
+    "Olaf One-Eye": 1,
+    "Pelagius the Suspicious": 1,
+    "Pelagius the Tormented": 1,
+    "Planter": 121,
+    "Prelate Athring": 1,
+    "Prelate Celegriath": 1,
+    "Prelate Edhelbor": 1,
+    "Prelate Nirilor": 1,
+    "Prelate Sidanyis": 1,
+    "Soul": 39,
+    "Spectator": 60,
+    "Stormcloak Soldier": 6,
+    "TestCarryBasket": 1,
+    "TestCarryFirewood": 1,
+    "TestFurnitureUseIdleLinkedRefNPC": 2,
+    "Tsun": 1,
+    "Ulfgar the Unending": 1,
+    "Valerica": 1,
+    "White": 1,
+    "Ysgramor": 1
    },
-   "guards": {},
-   "offAtStart": [
-    {
-     "base": "4e50a:Skyrim.esm",
-     "because": [
-      "WEServicesHunterFaction"
-     ],
-     "column": "traders",
-     "name": "Hunter",
-     "offBy": "its own flag",
-     "ref": "e0a0:Dawnguard.esm"
-    },
-    {
-     "base": "4e50a:Skyrim.esm",
-     "because": [
-      "WEServicesHunterFaction"
-     ],
-     "column": "traders",
-     "name": "Hunter",
-     "offBy": "its own flag",
-     "ref": "e0a4:Dawnguard.esm"
-    },
+   "guards": {
+    "Imperial Soldier": 50
+   },
+   "offAtStart": [],
+   "offAtStartBy": {
+    "everyoneElse": 150,
+    "guards": 50,
+    "traders": 0,
+    "transport": 0
+   },
+   "traders": [
     {
      "base": "4e50a:Skyrim.esm",
      "because": [
@@ -5955,8 +8422,9 @@
      ],
      "column": "traders",
      "name": "Redguard Spectator",
-     "offBy": "its own flag",
-     "ref": "9a86:Solitude Arena.esp"
+     "ref": "9a86:Solitude Arena.esp",
+     "unique": true,
+     "where": "lsdl"
     },
     {
      "base": "23b6d:JKs Skyrim.esp",
@@ -5990,10 +8458,10 @@
   },
   "the Pale": {
    "counts": {
-    "everyoneElse": 62,
-    "guards": 0,
+    "everyoneElse": 222,
+    "guards": 11,
     "notPeople": 627,
-    "offAtStart": 462,
+    "offAtStart": 285,
     "people": 532,
     "traders": 6,
     "transport": 2
@@ -6217,12 +8685,12 @@
   },
   "the Reach": {
    "counts": {
-    "everyoneElse": 155,
-    "guards": 3,
+    "everyoneElse": 401,
+    "guards": 45,
     "notPeople": 714,
-    "offAtStart": 524,
-    "people": 690,
-    "traders": 7,
+    "offAtStart": 219,
+    "people": 696,
+    "traders": 30,
     "transport": 1
    },
    "everyoneElse": {
@@ -6230,7 +8698,18 @@
     "Alethius": 1,
     "Bandit": 22,
     "Bandit Outlaw": 1,
+    "Banning": 1,
+    "Beggar": 2,
+    "Belchimac": 1,
+    "Betrid Silver-Blood": 1,
+    "Blue Spirit": 1,
+    "Borgakh the Steel Heart": 1,
+    "Borkul the Beast": 1,
+    "Braig": 1,
     "Breton": 5,
+    "Brother Verulus": 1,
+    "Cairine": 1,
+    "Captain Aquilius": 1,
     "Captive": 1,
     "Corpse": 3,
     "Dark Brotherhood Assassin": 1,
@@ -6495,9 +8974,9 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 415,
-    "guards": 85,
-    "traders": 23,
+    "everyoneElse": 174,
+    "guards": 43,
+    "traders": 1,
     "transport": 1
    },
    "traders": [
@@ -6604,12 +9083,12 @@
   },
   "the Rift": {
    "counts": {
-    "everyoneElse": 115,
-    "guards": 4,
-    "notPeople": 887,
-    "offAtStart": 657,
-    "people": 792,
-    "traders": 12,
+    "everyoneElse": 407,
+    "guards": 60,
+    "notPeople": 900,
+    "offAtStart": 282,
+    "people": 797,
+    "traders": 44,
     "transport": 4
    },
    "everyoneElse": {
@@ -6657,76 +9136,6 @@
      "ref": "ac9e9:Skyrim.esm"
     },
     {
-     "base": "19df2:Skyrim.esm",
-     "because": [
-      "ServicesRiftenTheScorchedHammer"
-     ],
-     "column": "traders",
-     "name": "Asbjorn Fire-Tamer",
-     "offBy": "its own flag",
-     "ref": "19df3:Skyrim.esm"
-    },
-    {
-     "base": "19e18:Skyrim.esm",
-     "because": [
-      "ServicesLargashburAtub"
-     ],
-     "column": "traders",
-     "name": "Atub",
-     "offBy": "its own flag",
-     "ref": "19e19:Skyrim.esm"
-    },
-    {
-     "base": "15b609:Riften Expansion.esp",
-     "because": [
-      "ServicesRiftenBakery"
-     ],
-     "column": "traders",
-     "name": "Bjoruld",
-     "offBy": "its own flag",
-     "ref": "160715:Riften Expansion.esp"
-    },
-    {
-     "base": "1334f:Skyrim.esm",
-     "because": [
-      "ServicesRiftenPlazaBrandish"
-     ],
-     "column": "traders",
-     "name": "Brand-Shei",
-     "offBy": "its own flag",
-     "ref": "19ddc:Skyrim.esm"
-    },
-    {
-     "base": "1336d:Skyrim.esm",
-     "because": [
-      "ServicesRiftenRaggedFlagon"
-     ],
-     "column": "traders",
-     "name": "Dirge",
-     "offBy": "its own flag",
-     "ref": "19dfa:Skyrim.esm"
-    },
-    {
-     "base": "13354:Skyrim.esm",
-     "because": [
-      "ServicesRiftenPawnedPrawn"
-     ],
-     "column": "traders",
-     "name": "Drifa",
-     "offBy": "its own flag",
-     "ref": "19dcf:Skyrim.esm"
-    },
-    {
-     "base": "136c3:Skyrim.esm",
-     "because": [
-      "ServicesShorsStoneFilnjar"
-     ],
-     "column": "traders",
-     "name": "Filnjar",
-     "offBy": "its own flag",
-     "ref": "19e09:Skyrim.esm"
-    },
-    {
      "base": "336d:Dawnguard.esm",
      "because": [
       "DLC1ServicesFlorentius"
@@ -6735,16 +9144,6 @@
      "name": "Florentius Baenius",
      "offBy": "its own flag",
      "ref": "3476:Dawnguard.esm"
-    },
-    {
-     "base": "136c5:Skyrim.esm",
-     "because": [
-      "ServicesRiftenPlazaGrelka"
-     ],
-     "column": "traders",
-     "name": "Grelka",
-     "offBy": "its own flag",
-     "ref": "4e0b3:Skyrim.esm"
     },
     {
      "base": "336c:Dawnguard.esm",
@@ -7058,9 +9457,9 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 503,
-    "guards": 113,
-    "traders": 39,
+    "everyoneElse": 216,
+    "guards": 57,
+    "traders": 7,
     "transport": 2
    },
    "traders": [
@@ -7264,7 +9663,7 @@
    ]
   }
  },
- "readFrom": "106 plugins in load order (names sha256 16098210dbc1)",
+ "readFrom": "103 plugins in load order (names sha256 015fd63125cf)",
  "sellers": {
   "DLC2RRServicesRavenRockFethis": 1,
   "DLC2RRServicesRavenRockGeldis": 1,
