@@ -17,10 +17,10 @@
   REPOSITORY SETTINGS (#3683, Patrick's answers of 26 Oct 2026). With
   -RepoSettings it asks for records\github-repo-settings.json instead, which
   names Thornswood and the engine fork, EvilPatrick06/skymp, and for each its
-  rulesets and, where it says, private vulnerability reporting: each ruleset
-  is made on GitHub, or put back, with exactly its target, enforcement,
-  conditions, rules and bypass list, and reporting is switched on or off as
-  the record says. A ruleset GitHub has that the record does not name stops
+  rulesets and, where it says, private vulnerability reporting, secret
+  scanning and push protection: each ruleset is made on GitHub, or put back,
+  with exactly its target, enforcement, conditions, rules and bypass list,
+  and the rest are switched on or off as the record says. A ruleset GitHub has that the record does not name stops
   it and is left as it is. The same App, the same run, the same rule: what to
   change comes from main, never from here.
 

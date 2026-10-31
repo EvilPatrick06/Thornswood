@@ -59,7 +59,10 @@
 //      each repository with a token for that repository alone, puts a
 //      changed one back by name, sending only the ruleset's own keys,
 //      switches the fork's private reporting as the record says and leaves
-//      it alone where the record says nothing, reads everything back, and a
+//      it alone where the record says nothing, switches secret scanning and
+//      push protection in one PATCH of only the keys that differ (push
+//      protection only with scanning, each true or false), reads everything
+//      back, and a
 //      second run changes nothing; a ruleset the record does not name stops
 //      it and is never deleted; a repository the App is not installed on
 //      stops for it with the link to the installation's settings while the
@@ -282,6 +285,9 @@ yes('a record with no repositories stops', /names no repositories/.test(sstops({
 yes('another repository stops, named', /names EvilPatrick06\/other, and the only ones/.test(sstops({ repositories: [{ repository: 'EvilPatrick06/other', rulesets: [] }] })));
 yes('a repository named twice stops', /twice/.test(sstops({ repositories: [settings().repositories[1], settings().repositories[1]] })));
 yes('reporting that is not true or false stops', /true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'private_vulnerability_reporting', 'yes')] })));
+yes('secret scanning that is not true or false stops, named', /secret_scanning is true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning', 'on')] })));
+yes('push protection without secret scanning stops', /secret_scanning_push_protection is on only with secret_scanning on too/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning_push_protection', true)] })) &&
+  sstops({ repositories: [Object.assign({}, settings().repositories[1], { secret_scanning: true, secret_scanning_push_protection: true })] }) === '');
 yes('a bad ruleset stops, naming its repository', /EvilPatrick06\/skymp: main targets push/.test(sstops({ repositories: [with_(settings().repositories[1], 'rulesets', [with_(forkMain, 'target', 'push')])] })));
 yes('the real records/github-repo-settings.json, when there is one, passes', (() => {
   const f = path.join(REPO, 'records', 'github-repo-settings.json');
@@ -319,7 +325,7 @@ const gh = {
     runner(13, 'thornswood-vps-3', base.concat('thornswood-build', 'thornswood-sign')),
     runner(14, 'thornswood-vps-4', base),
   ],
-  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null },
+  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null, security_and_analysis: { secret_scanning: { status: 'disabled' }, secret_scanning_push_protection: { status: 'disabled' } } },
   topics: [],
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   readToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
@@ -343,6 +349,7 @@ const gh = {
   forkInstalled: true,
   sets: { Thornswood: [], skymp: [] },
   pvr: { Thornswood: false, skymp: false },
+  forkRepo: { full_name: 'EvilPatrick06/skymp', security_and_analysis: { secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' } } },
   nextRuleset: 100,
 };
 gh.records['github-settings.json'] = { environments: { board: {}, notices: {}, 'bad name/../x': {} } };
@@ -433,7 +440,17 @@ function standIn(req, res) {
       if (req.method === 'DELETE') { gh.pvr[m[1]] = false; return send(204); }
     }
     if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'GET') return send(200, gh.repo);
-    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'PATCH') { Object.assign(gh.repo, body); return send(200, gh.repo); }
+    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'PATCH') {
+      // GitHub switches only the security_and_analysis keys a PATCH names.
+      const sa = Object.assign({}, gh.repo.security_and_analysis, body.security_and_analysis || {});
+      Object.assign(gh.repo, body, { security_and_analysis: sa });
+      return send(200, gh.repo);
+    }
+    if (P === '/repos/EvilPatrick06/skymp') {
+      if (req.headers.authorization !== 'Bearer ' + gh.forkToken) return send(401, { message: 'Bad credentials' });
+      if (req.method === 'GET') return send(200, gh.forkRepo);
+      if (req.method === 'PATCH') { Object.assign(gh.forkRepo.security_and_analysis, body.security_and_analysis || {}); return send(200, gh.forkRepo); }
+    }
     if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'GET') return send(200, { names: gh.topics });
     if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'PUT') { gh.topics = body.names.slice(); return send(200, { names: gh.topics }); }
     if (P === '/repos/EvilPatrick06/Thornswood-Ops/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
@@ -710,6 +727,35 @@ function start(stateDir, ghPort) {
     gh.settingsRecord = settings();
     r = await ask4(bearer(sign(good())), { what: 'repo-settings', repositories: [{ repository: S, private_vulnerability_reporting: false, rulesets: [] }] });
     yes('settings sent by the caller are not used', r.status === 200 && r.json.changed === 0 && gh.pvr.skymp === true && gh.sets.skymp.length === 1);
+    yes('  and a record that names no scanning never reads or touches it', !gh.calls.some(c => c.path === '/repos/' + T || c.path === '/repos/' + S));
+
+    // Secret scanning and push protection (#3683, at the flip).
+    const scan = (o) => (o.security_and_analysis.secret_scanning.status + '/' + o.security_and_analysis.secret_scanning_push_protection.status);
+    const patches = () => gh.calls.filter(c => c.method === 'PATCH' && (c.path === '/repos/' + T || c.path === '/repos/' + S));
+    gh.settingsRecord = settings();
+    Object.assign(gh.settingsRecord.repositories[0], { secret_scanning: true, secret_scanning_push_protection: true });
+    Object.assign(gh.settingsRecord.repositories[1], { secret_scanning: true, secret_scanning_push_protection: true });
+    gh.calls = [];
+    r = await askRs(true);
+    yes('a check says Thornswood\'s scanning and push protection would be switched on, and changes nothing', r.status === 200 && r.json.differs === 2 && r.json.changed === 0 && patches().length === 0 &&
+      has(/^EvilPatrick06\/Thornswood: secret scanning would be switched on$/) && has(/^EvilPatrick06\/Thornswood: push protection would be switched on$/) && scan(gh.repo) === 'disabled/disabled');
+    yes('  and says the fork\'s are on already', has(/^EvilPatrick06\/skymp: secret scanning is on, as the record says$/) && has(/^EvilPatrick06\/skymp: push protection is on, as the record says$/));
+    gh.calls = [];
+    r = await askRs();
+    yes('a run switches both on in one PATCH with Thornswood\'s token, and reads it back (2 changed)', r.status === 200 && r.json.ok && r.json.changed === 2 && scan(gh.repo) === 'enabled/enabled' &&
+      patches().length === 1 && patches()[0].auth === 'Bearer ' + gh.aboutToken &&
+      JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}}' &&
+      gh.calls.filter(c => c.method === 'GET' && c.path === '/repos/' + T).length === 2);
+    yes('  sending nothing to the fork, whose are on', !patches().some(c => c.path === '/repos/' + S));
+    gh.calls = [];
+    r = await askRs();
+    yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && patches().length === 0);
+    gh.repo.security_and_analysis.secret_scanning_push_protection = { status: 'disabled' };
+    gh.calls = [];
+    r = await askRs();
+    yes('push protection switched off on GitHub is switched on again, sending only that key', r.status === 200 && r.json.changed === 1 && scan(gh.repo) === 'enabled/enabled' &&
+      JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning_push_protection":{"status":"enabled"}}}' && has(/^EvilPatrick06\/Thornswood: push protection switched on$/));
+    gh.settingsRecord = settings();
 
     const tokenSeen = sign(good());
     await ask4(bearer(tokenSeen));
