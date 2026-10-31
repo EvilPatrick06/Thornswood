@@ -454,7 +454,57 @@ if ($why.Count) {
   'CARRY REFUSED'
 } else {
   Copy-Item -LiteralPath (Join-Path $Root 'server-settings.json') -Destination $sp -Force
-  'the server keeps its own settings as they are: a server build out of the store changes none of them'
-  'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
+  $orderWhy = ''
+  if ((Test-Path -LiteralPath variable:OrderWire) -and $OrderWire) {
+    # -FromRecord (#4069): the recorded order over the server's, and the
+    # start point to Skyrim Unbound.esp's place in it. Nothing else moves,
+    # and the swap reads every other key back as the server had it.
+    $names = @([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($OrderWire)) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $far = ($Root -replace '\\', '/') + '/plugins/'
+    $newOrder = @($names | ForEach-Object { $far + $_ })
+    'the load order moves from ' + @($run.loadOrder).Count + ' plugins to ' + $newOrder.Count
+    $isLight = $null
+    if ($LoadsLight) {
+      $lightOf = @{}
+      foreach ($leaf in $names) {
+        $f = Join-Path (Join-Path $stageDir 'plugins') $leaf
+        if (-not (Test-Path -LiteralPath $f)) { $f = Join-Path (Join-Path $Root 'plugins') $leaf }
+        if ($leaf -ieq 'Thornswood-Last.esp' -and -not (Test-Path -LiteralPath $f)) { $lightOf[$leaf.ToLowerInvariant()] = $false; continue }
+        try { $lightOf[$leaf.ToLowerInvariant()] = Test-ThornswoodPluginLight $f } catch { $orderWhy = ('whether ' + $leaf + ' is light cannot be read (' + $_.Exception.Message + '), so where new characters start in the new order is not known') }
+      }
+      $isLight = { param($n) [bool]$lightOf[$n.ToLowerInvariant()] }.GetNewClosure()
+    }
+    $s = $run
+    $pt = @($s.startPoints)[0]
+    $unb = Get-ThornswoodFullIndex ([string[]]$newOrder) $isLight 'Skyrim Unbound.esp'
+    if (-not $orderWhy -and $pt -and $unb -ge 0) {
+      $raw = ([string]$pt.worldOrCell).Trim()
+      $startWas = -1
+      if ($raw -match '^0[xX][0-9a-fA-F]+$') { $startWas = [Convert]::ToInt64($raw.Substring(2), 16) } elseif ($raw -match '^[0-9]+$') { $startWas = [int64]$raw }
+      if ($startWas -lt 0) { $orderWhy = ('the start point ' + $raw + ' does not read as a form id') }
+      else {
+        $startWant = ($unb * 0x01000000) + ($startWas -band 0x00FFFFFF)
+        if ($startWant -ne $startWas) {
+          $pt.worldOrCell = ('0x{0:X8}' -f $startWant)
+          $s | Add-Member -NotePropertyName startPoints -NotePropertyValue @(@($pt) + @(@($s.startPoints) | Select-Object -Skip 1)) -Force
+          'the start point moves from 0x{0:X8} to 0x{1:X8}: Skyrim Unbound.esp is full plugin {2} in the new order' -f $startWas, $startWant, $unb
+        } else { 'the start point stays 0x{0:X8}: Skyrim Unbound.esp keeps its place' -f $startWas }
+      }
+    } elseif (-not $orderWhy -and $unb -lt 0) { 'Skyrim Unbound.esp is not a full plugin of the new order, so the start point stays as it is' }
+    if (-not $orderWhy) {
+      $s | Add-Member -NotePropertyName loadOrder -NotePropertyValue $newOrder -Force
+      [IO.File]::WriteAllText($sp, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false)))
+    }
+  } else {
+    'the server keeps its own settings as they are: a server build out of the store changes none of them'
+  }
+  if ($orderWhy) {
+    $orderWhy
+    Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+    'the stage is cleared and the server was not touched'
+    'CARRY REFUSED'
+  } else {
+    'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
 }
 '@

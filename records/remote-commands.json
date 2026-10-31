@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  76,
-    "callCount":  306,
+    "callCount":  307,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -462,6 +462,15 @@
                       "via":  "Remote",
                       "anchor":  "$thereRaw = @(Remote (\"Get-ChildItem -LiteralPath \u0027\" + $remotePlugins.Replace(\u0027/\u0027,\u0027\\\u0027) +",
                       "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Server.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$thereRaw = @(Remote (\"Get-ChildItem -LiteralPath \u0027\" + $livePlugins.Replace(\u0027/\u0027, \u0027\\\u0027) +",
+                      "does":  "reads the names and sizes of the live server\u0027s plugins, for a move to the recorded revision (#4069)",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   },

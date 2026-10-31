@@ -97,6 +97,24 @@
       -Devs, -Playtesters and -DropPlugins.
   The notice, the swap and -PutBack are the same as every other run.
 
+  FROM THE RECORD (#4069). -FromStore -FromRecord moves the live server to
+  the collection revision the repository records, with nothing of One's:
+    - the load order becomes game\data\last-plugin.json's, with
+      Thornswood-Last.esp on the end, the order every table and the Last
+      plugin of this commit were built against;
+    - the collection's plugins that order names and the box does not hold at
+      the store's size go up from the box's store of that revision
+      (scripts\deploy\CollectionStore.ps1, fetched from Nexus through
+      Nexus-Run when it is not whole), each held to
+      records\collection-plugins.json, and Thornswood-Last.esp is made on
+      the box from them;
+    - an order that leaves out a plugin the live server loads is refused
+      unless records\collection-dropped.json names it for that revision;
+    - the live server keeps every other setting: only loadOrder and the start
+      point move (Skyrim Unbound.esp's place in the new order), and the swap
+      reads every other key back as the server had it.
+      .\Deploy-Server.ps1 -FromStore -FromRecord
+
   THE LIVE SERVER KEEPS ITS OWN SETTINGS (#1221, #1222). A build whose
   server-settings.json is not the live server's (port 7777, not the dev voice
   port or name, not thornswoodServer dev, no npcSettings "default" key) is
@@ -202,6 +220,9 @@ param(
   # The server build records\server-build.json names, out of the store on the
   # box, with no server build on this machine (#459). See FROM THE STORE.
   [switch]$FromStore,
+  # With -FromStore: the live server moves to the load order and collection
+  # plugins the repository records (#4069). See FROM THE RECORD.
+  [switch]$FromRecord,
   # A server build zip (server-<...>.zip, its .json beside it, as
   # Get-EngineArtifact.ps1 makes it from the fork's build of the pin) to
   # send to the store first, for -FromStore.
@@ -544,6 +565,9 @@ if (@($DropPlugins).Count -and ($PutBack -or $GamemodeOnly -or $FromStore)) {
 if ($ServerBuild -and -not $FromStore) {
   throw '-ServerBuild sends a server build to the store for -FromStore to deploy. Give -FromStore with it. Nothing was sent and the server was not touched.'
 }
+if ($FromRecord -and -not $FromStore) {
+  throw '-FromRecord moves the live server to the recorded collection revision with the server build out of the store, so it goes with -FromStore. Nothing was sent and the server was not touched.'
+}
 if ($FromStore -and ($GamemodeOnly -or $PutBack)) {
   throw '-FromStore deploys the recorded server build and the gamemode; -GamemodeOnly sends no build, and -PutBack puts back what the last deploy replaced. Use one. Nothing was sent and the server was not touched.'
 }
@@ -880,7 +904,59 @@ if (Test-Path -LiteralPath $rp) {
   # recipe, never sent (#2791), when the box does not hold the bytes
   # game\data\last-plugin.json names.
   $lastWant = Get-ThornswoodLastPluginWant (Join-Path $Here '..\..')
-  if ($lastWant) {
+  $orderWire = ''
+  if ($FromRecord) {
+    # FROM THE RECORD (#4069): the order last-plugin.json was built against,
+    # and the collection's plugins from the box's store of the record's
+    # revision. Worked out before anything is sent.
+    . (Join-Path $Here 'CollectionStore.ps1')
+    $repoRoot = (Resolve-Path -LiteralPath (Join-Path $Here '..\..')).ProviderPath
+    $store = Get-ThornswoodCollectionStore -RecordPath (Join-Path $repoRoot 'records\collection-plugins.json') -Fetch { param($w, $h) Invoke-ThornswoodCollectionFetch -Work $w -Head $h -Repo $repoRoot } -Say { param($m) Write-Host $m -ForegroundColor DarkGray }
+    $lastDoc = Join-Path $repoRoot 'game\data\last-plugin.json'
+    $lastBuilt = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($lastDoc)) $lastDoc
+    $recordOrder = @(@(@($lastBuilt.loadOrder) | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -ine $ThornswoodLastPlugin }) + $ThornswoodLastPlugin)
+    if ($recordOrder.Count -lt 2) { throw "$lastDoc has no loadOrder, so there is no order to move to. Nothing was sent and the server was not touched." }
+    if (-not $boxContent.OrderRead) { throw 'the live server did not say which load order it runs, so what the move drops cannot be held. Nothing was sent and the server was not touched.' }
+    # What the move may drop is the repository's word: records\collection-dropped.json,
+    # for the revision the record names, never the caller's.
+    $mayDrop = @()
+    $dropDoc = Join-Path $repoRoot 'records\collection-dropped.json'
+    if (Test-Path -LiteralPath $dropDoc -PathType Leaf) {
+      $dd = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($dropDoc)) $dropDoc
+      if ([string]$dd.collection -eq $store.Slug -and [string]$dd.revision -eq [string]$store.Revision) { $mayDrop = @(@($dd.dropped) | ForEach-Object { [string]$_.name } | Where-Object { $_ }) }
+    }
+    $drop = Test-ThornswoodLoadOrderDrop ([pscustomobject]@{ loadOrder = @($boxContent.Order) }) ([pscustomobject]@{ loadOrder = $recordOrder }) $mayDrop
+    foreach ($l in $drop.Said) { Write-Host ('  ' + $l) -ForegroundColor Yellow }
+    if ($drop.Problem) { throw ($drop.Problem + ' A plugin a new revision takes out goes in records\collection-dropped.json, with why its forms can go. Nothing was sent and the server was not touched.') }
+    # The collection's plugins the box does not hold at the store's size.
+    $livePlugins = ($Root -replace '\\', '/') + '/plugins'
+    $thereRaw = @(Remote ("Get-ChildItem -LiteralPath '" + $livePlugins.Replace('/', '\') + "' -File | ForEach-Object { `$_.Name + '|' + `$_.Length }"))
+    $thereSize = @{}
+    foreach ($row in $thereRaw) {
+      $bits = "$row".Trim() -split '\|'
+      if ($bits.Count -eq 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0].ToLowerInvariant()] = [int64]$bits[1] }
+    }
+    if (-not $thereSize.Count) { throw ('nothing readable at ' + $livePlugins + ' on the box, so there is no telling which plugins it holds. Nothing was sent and the server was not touched.') }
+    foreach ($n in $recordOrder) {
+      if ($n -ieq $ThornswoodLastPlugin -or (Test-ThornswoodRepoPlugin $n)) { continue }
+      $inStore = Join-Path $store.Dir $n
+      $has = $thereSize.ContainsKey($n.ToLowerInvariant())
+      if (Test-Path -LiteralPath $inStore -PathType Leaf) {
+        $len = (Get-Item -LiteralPath $inStore).Length
+        if (-not $has -or $thereSize[$n.ToLowerInvariant()] -ne $len) {
+          $sendPlugins += $inStore
+          $changed += ('{0}  {1} -> {2:N0} bytes, revision {3}' -f $n, $(if ($has) { '{0:N0} bytes' -f $thereSize[$n.ToLowerInvariant()] } else { 'not on the box' }), $len, $store.Revision)
+        }
+      } elseif (-not $has) {
+        throw ("the recorded order names $n, which the box does not hold and the store of revision " + $store.Revision + ' does not either. Nothing was sent and the server was not touched.')
+      }
+    }
+    . (Join-Path $Here 'CollectionPlugins.ps1')
+    Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $repoRoot 'records\collection-plugins.json') -Files $sendPlugins -Exempt $ThornswoodRepoPlugins -What 'this deploy'
+    $orderWire = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($recordOrder -join "`n"))
+    Write-Host ('{0,-22} game\data\last-plugin.json''s, {1} plugins, collection revision {2}, over the live server''s {3}' -f 'load order', $recordOrder.Count, $store.Revision, @($boxContent.Order).Count) -ForegroundColor Yellow
+  }
+  if ($lastWant -and -not $FromRecord) {
     $liveOrder = @($boxContent.Order)
     if (-not $boxContent.OrderRead -or $liveOrder.Count -eq 0 -or $liveOrder[-1] -ine 'Thornswood-Last.esp') {
       throw ('the live load order does not end with Thornswood-Last.esp, and -GamemodeOnly changes no setting. ' +
@@ -1177,10 +1253,20 @@ Write-Host 'Keeping the live server''s own settings...'
 if ($FromStore) {
   # The running server's own file, copied into the stage unchanged, after the
   # box's record is read again: still what this run read before it sent
-  # anything (#459, ServerSettings.ps1's $settingsStoreBlock). No key moves.
+  # anything (#459, ServerSettings.ps1's $settingsStoreBlock). No key moves,
+  # but with -FromRecord the load order and the start point (#4069).
   $liveKeys = @()
+  $orderLines = ''
+  if ($orderWire) {
+    . (Join-Path $Here 'ServerOrder.ps1')
+    $liveKeys = @('loadOrder', 'startPoints')
+    $ourLight = ($rec.PSObject.Properties.Name -contains 'lightPlugins' -and $rec.lightPlugins -eq $true)
+    $orderLines = ('$OrderWire = ''' + $orderWire + '''' + "`r`n") + ('$LoadsLight = $' + $ourLight + "`r`n") +
+                  'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}`r`n" +
+                  'function Test-ThornswoodPluginLight {' + "`n" + (Get-Command Test-ThornswoodPluginLight).Definition + "`n}`r`n"
+  }
   $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" + $ThornswoodRecordSumText + "`r`n" +
-                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + ('$WasRecord = ''' + $boxRecord + '''' + "`r`n") + $settingsStoreBlock
+                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + ('$WasRecord = ''' + $boxRecord + '''' + "`r`n") + $orderLines + $settingsStoreBlock
 } elseif ($GamemodeOnly) {
   # The running server's own file, copied into the stage unchanged, after the
   # box's record and join pass switch are read again; no key may move at the
