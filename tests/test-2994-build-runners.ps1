@@ -70,9 +70,6 @@ $heavy = @{
     # the runner that signs (#3550).
     'harnesses.yml' = @('harnesses')
 }
-# release.yml's verify is light. It asked for a build runner until #3956,
-# since those are never the runner that signs; it asks for the check label
-# (records\check-runners.json) now, so it never waits behind a build.
 function Get-Jobs([string]$text) {
     $text = $text -replace "`r`n", "`n"
     $body = $text.Substring($text.IndexOf("`njobs:`n") + 7)

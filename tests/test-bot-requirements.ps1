@@ -63,11 +63,8 @@ Yes 'nightly.yml installs it for the bot harnesses the same way' ($nyLines.Count
 # The job that installs it, by the job header above the install line.
 $nyJobs = @([regex]::Matches(($ny -split '(?m)^jobs:\s*$', 2)[1], '(?ms)^  ([A-Za-z0-9_-]+):\s*$(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\z)'))
 $installJobs = @($nyJobs | Where-Object { $_.Groups[2].Value -match 'pip install[^\n]*requirements\.txt' })
-$check = [IO.File]::ReadAllText((Join-Path $repo 'records\check-runners.json')) | ConvertFrom-Json
-$sign = [IO.File]::ReadAllText((Join-Path $repo 'records\sign-runners.json')) | ConvertFrom-Json
-Yes ('  in one job, which asks for the check label (' + $check.label + ') and so never runs on the signing runner (#4914)') (
-    $installJobs.Count -eq 1 -and $installJobs[0].Groups[2].Value -match ('(?m)^    runs-on: .*"thornswood-vps", "' + [regex]::Escape([string]$check.label) + '"') -and
-    -not @($check.runners | Where-Object { @($sign.runners) -contains $_ }).Count)
+Yes '  in one job, on GitHub''s runner, which reaches the package feeds (#4914, #4033)' (
+    $installJobs.Count -eq 1 -and $installJobs[0].Groups[2].Value -match '(?m)^    runs-on: windows-latest\s*$')
 $others = @()
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $repo 'scripts') -Recurse -File -Include *.ps1) + @(Get-ChildItem -LiteralPath (Join-Path $repo '.github\workflows') -File -Filter *.yml)) {
     foreach ($l in [IO.File]::ReadAllLines($f.FullName)) {

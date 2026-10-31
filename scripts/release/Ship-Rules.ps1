@@ -310,6 +310,10 @@ $ShipOldSkyUIScripts = @(
 # files" row in THIRD-PARTY.md) are dead weight too: build.js names none of
 # them. They stop shipping and every pack deletes them from installs as well.
 #
+# So do the four Futura PT and DIN Pro faces main's older front build named
+# by hash (#1317): the front built from the fork names none of them since 20
+# Oct, and without a gone entry the installs that took them would keep them.
+#
 # WHAT IS OURS UNDER UI. Only index.html, build.js, thornswood-* files, and
 # the hashed assets build.js actually names. That last list is parsed from
 # build.js at ship time, never kept by hand. OwnGame.Foreign reads the list
@@ -317,7 +321,8 @@ $ShipOldSkyUIScripts = @(
 $ShipUiAssetsRel = 'Data\Platform\UI\thornswood-ui-assets.txt'
 $ShipUiHashedPattern = '^[0-9a-f]{8,32}\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$'
 # One record, records\ui-gone.json: the 37 Daedric names and sha256 values,
-# and the 42 unused fork names. OwnGame.Foreign reads the same file (Build-Launcher
+# and the 46 unused fork names (41 svgs and bg.png, and the four commercial
+# faces of #1317). OwnGame.Foreign reads the same file (Build-Launcher
 # embeds it). A second hand-copied list here would drift.
 $ShipUiGoneRecord = Join-Path $PSScriptRoot '..\..\records\ui-gone.json'
 if (-not (Test-Path -LiteralPath $ShipUiGoneRecord -PathType Leaf)) {
@@ -506,13 +511,13 @@ function Save-ShipUiHashedAssets([string]$GameFolder) {
 # repository, the game folder's skymp5-client.js, build.js or Modules, or the
 # fork names any of them. Skyrim Platform loads every sprite font in Fonts by
 # its name (DX11RenderHandler.cpp), and a font is drawn only when a script
-# names it: ours names DIN-Pro-bold, and Tavern is the default. Nothing
+# names it: ours names Barlow-SemiBold (#1317), and Tavern is the default. Nothing
 # reads Images. Nobody recorded who made them or on what terms.
 #
 # Test-ShipOtherServer calls them not ours, so no pack or installer carries
 # them, and they are on $ShipDeleteAlways below, so every pack deletes them
-# from the installs that have them. The other sprite fonts (Tavern,
-# DIN-Pro-bold, Futura) still ship. OwnGame.Foreign carries the same five so
+# from the installs that have them. Tavern and Barlow-SemiBold still ship;
+# DIN-Pro-bold and Futura are $ShipCommercialFonts below. OwnGame.Foreign carries the same five so
 # a refresh cannot copy them back from a Steam copy; change the two together.
 # tests\test-2177-platform-unused.ps1 holds both.
 $ShipPlatformUnused = @(
@@ -521,6 +526,24 @@ $ShipPlatformUnused = @(
     'Data\Platform\Fonts\ChainLink.spritefont',
     'Data\Platform\Fonts\NoticeIcon.spritefont',
     'Data\Platform\Fonts\VoiceIcon.spritefont'
+)
+
+# TWO SPRITE FONTS OF COMMERCIAL FACES, issue #1317. DIN-Pro-bold.spritefont
+# is FSI FontShop's DIN Pro Bold drawn into a sprite font, from upstream
+# SkyMP's client-deps; Futura.spritefont, dated 14 Sep, is by its name
+# ParaType's Futura PT and is in neither the fork nor upstream. Nothing gives
+# SkyMP or Thornswood the right to hand either face on. The one thing that drew
+# with either was the overhead voice mark, which draws its dot in
+# Barlow-SemiBold.spritefont since #1317 (game\ours, made by
+# scripts\mods\Build-SpriteFont.py from the OFL Barlow SemiBold the fork's
+# interface uses). They are not ours, so no pack or installer carries them,
+# and they are on $ShipDeleteAlways below, so every install loses them on the
+# next release. OwnGame.Foreign carries the same two so a refresh cannot copy
+# them back from a Steam copy; change the two together.
+# tests\test-1317-fonts.ps1 holds both.
+$ShipCommercialFonts = @(
+    'Data\Platform\Fonts\DIN-Pro-bold.spritefont',
+    'Data\Platform\Fonts\Futura.spritefont'
 )
 
 function Test-ShipOtherServer([string]$rel) {
@@ -577,6 +600,8 @@ function Test-ShipOtherServer([string]$rel) {
     if ($rel -ieq 'Data\Platform\Plugins\thornswood-chargen.js') { return $true }
     # The five files nothing uses (#2177, $ShipPlatformUnused above).
     foreach ($u in $ShipPlatformUnused) { if ($rel -ieq $u) { return $true } }
+    # The two commercial sprite fonts (#1317, $ShipCommercialFonts above).
+    foreach ($u in $ShipCommercialFonts) { if ($rel -ieq $u) { return $true } }
     # In Plugins only our overlays belong. The bundle was decided by its hash above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
@@ -822,8 +847,10 @@ function Test-ShipMadeFromGame([string]$rel) {
 #
 # An item on Thornswood has no gold price, and three of the collection's mods
 # draw one: SkyUI's item lists and item card, SkyHUD's line under an item
-# somebody looks at, and moreHUD's value to weight. The launcher makes these
-# five from each machine's own copy of those mods, out of their archives
+# somebody looks at, and moreHUD's value to weight. And SkyUI's journal puts
+# Quick Save, Save, Load, Help and the Creation Club on its System page, which
+# Thornswood does not use (#3127). The launcher makes these six from each
+# machine's own copy of those mods, out of their archives
 # (launcher\app\FromGameModMenus.cs, written by scripts\mods\Build-ModMenus.py),
 # the same way and at the same times as the three above. They are their
 # authors' files edited, so none of them may leave the machine either, and none
@@ -836,11 +863,38 @@ $ShipMadeFromMods = @(
     'Data\Interface\skyui\itemcard.swf',
     'Data\Interface\hudmenu.swf',
     'Data\Interface\AHZHudInfo.swf',
-    'Data\Interface\exported\AHZHudInfo.swf'
+    'Data\Interface\exported\AHZHudInfo.swf',
+    'Data\Interface\quest_journal.swf'
 )
 
 function Test-ShipMadeFromMods([string]$rel) {
     foreach ($f in $ShipMadeFromMods) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
+# MADE FROM THE RECIPE ON EACH MACHINE, NEVER SHIPPED (#2791).
+#
+# Thornswood-Last.esp copies the winning record of each cell, world, quest and
+# placed actor it changes out of about 31 other authors' plugins, so Patrick
+# chose on 26 Oct 2026 (A on #3721) that Thornswood hands on only its recipe:
+# a release carries Data\Thornswood-Last.recipe ($ShipOursFiles), and the
+# launcher makes the plugin from it and the person's own plugins before every
+# Play (launcher\app\LastPlugin.cs), as the box does for the servers
+# (scripts\deploy\LastPluginOnBox.ps1). So no pack, installer or record
+# carries the plugin, and none lists it as removed (Test-ShipMachine): an
+# install that took it from an earlier pack has the very bytes the launcher
+# makes, and a delete.txt line, or a gone entry by its sha256, would only take
+# it away until the next Play made it again. Scrub-Feed.ps1 takes it out of
+# the packs and records already on the site, as another author's
+# (Test-ShipNotOurs), once both channels carry the recipe.
+$ShipMadeFromRecipe = @(
+    'Data\Thornswood-Last.esp'
+)
+
+function Test-ShipMadeFromRecipe([string]$rel) {
+    foreach ($f in $ShipMadeFromRecipe) {
         if ($rel -ieq $f) { return $true }
     }
     return $false
@@ -1145,6 +1199,8 @@ function Test-ShipMachine([string]$rel) {
     # collection's mods (#3113).
     if (Test-ShipMadeFromGame $rel) { return $true }
     if (Test-ShipMadeFromMods $rel) { return $true }
+    # Made on each machine from the recipe the release carries (#2791).
+    if (Test-ShipMadeFromRecipe $rel) { return $true }
     # Built on each computer from the collection's Pandora and BodySlide (#3715).
     if (Test-ShipGenerated $rel) { return $true }
     # One machine's own by kind (#1239), the named files and Vortex's records
@@ -1297,10 +1353,12 @@ function Get-ShipLooseArt($files) {
 . (Join-Path $PSScriptRoot 'RepoPlugins.ps1')
 $ShipOursFiles = @(
     # Our completed plugins ship on both channels beyond the collection base:
-    # the content plugin and the late-loading one (#2468). These two lines are
-    # $ThornswoodRepoPlugins (RepoPlugins.ps1) as Data\ paths.
+    # the content plugin, and the late-loading one (#2468) as its recipe
+    # (#2791), which the launcher makes the plugin from ($ShipMadeFromRecipe).
+    # These two lines are $ThornswoodRepoPlugins (RepoPlugins.ps1) as Data\
+    # paths, the second as the recipe in the plugin's place.
     'Data\Thornswood-Content.esp',
-    'Data\Thornswood-Last.esp',
+    'Data\Thornswood-Last.recipe',
     # The SkyMP client's compiled script, from the engine fork.
     'Data\Scripts\MpClientPlugin.pex',
     # An empty loading spinner (Checks.cs, since 16 September) and the menu
@@ -1328,7 +1386,14 @@ $ShipOursFiles = @(
     # material groups inside. The English names of those groups beside it.
     # Both are Thornswood's own; Go.ps1 writes them too ($oursMenuFiles).
     'Data\SKSE\Plugins\CraftingCategories\Thornswood-Content.json',
-    'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt'
+    'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt',
+    # The sprite font the overhead voice mark draws its dot in, made from the
+    # OFL Barlow SemiBold by scripts\mods\Build-SpriteFont.py, and the OFL
+    # beside it, which a copy has to carry (#1317). Under Data\Platform these
+    # are ours anyway; they are named here because Go.ps1 writes them from
+    # game\ours with the others.
+    'Data\Platform\Fonts\Barlow-SemiBold.spritefont',
+    'Data\Platform\Fonts\Barlow-SemiBold-OFL.txt'
 )
 
 # BUILT ON EACH COMPUTER, NEVER SHIPPED (#3715).
@@ -1684,6 +1749,40 @@ function Test-ShipNotOurs([string]$rel, [int]$Revision = $ShipCollectionRevision
     return (-not (Test-ShipHeld $rel $Revision))
 }
 
+# OTHER AUTHORS' FILES OUR OLD PACKS SHIPPED, BY THEIR BYTES (#1178). The packs
+# carried them as ours until the scrub of 29 September, which took them out of
+# the packs and the records. #1261 (2 October) makes a release list such a file
+# as gone at the sha256 we shipped, but only when the release before it named
+# the file, and after the scrub none did. So every install the old packs reached
+# kept them: 166 files, 67.6 MB, on the main install on 12 October, among them
+# old MCM Helper scripts over the collection's newer ones and the other server's
+# haybale. records\shipped-not-ours.json names 165 of them with those bytes,
+# and Publish-Update puts every one in the record as gone. The haybale's path
+# would name the other server, which no tracked file may (#400), so the
+# launcher's Leaks.cs takes that one out by its shape and bytes. The launcher
+# deletes one only while it still has those bytes and Vortex does not deploy
+# the path, so a copy somebody installed themselves is never touched.
+#
+# Returns path -> lowercase sha256. Stops, naming them, on a record that does
+# not read, or on a path Ship-Rules does not call another author's: a delete
+# must never reach Bethesda's files, one machine's own, or a backup.
+$ShipShippedNotOursRecord = Join-Path $PSScriptRoot '..\..\records\shipped-not-ours.json'
+function Get-ShipShippedNotOurs {
+    $doc = Read-ThornswoodRecord -Path $ShipShippedNotOursRecord -Kind shipped-not-ours
+    $map = [ordered]@{}
+    $wrong = @()
+    foreach ($p in @($doc.files.PSObject.Properties)) {
+        $rel = $p.Name
+        if (-not (Test-ShipNotOurs $rel) -or (Test-ShipBethesda $rel) -or (Test-ShipOneMachine $rel) -or (Test-ShipBackup $rel)) { $wrong += $rel; continue }
+        $map[$rel] = ([string]$p.Value.sha256).ToLowerInvariant()
+    }
+    if ($wrong.Count) {
+        throw ("records\shipped-not-ours.json names {0} file(s) Ship-Rules does not call another author's loose file, so no release may delete them by it: {1}" -f
+               $wrong.Count, (($wrong | Select-Object -First 5) -join ', '))
+    }
+    return $map
+}
+
 # Where this build's reference plugins.txt and loadorder.txt are read from.
 #   no Root\Game         the Steam copy: Vortex writes them into AppData
 #   an own folder        Profile\OwnGame: the Vortex profile's lists as of the
@@ -1818,6 +1917,9 @@ $ShipDeleteAlways += $ShipUiGonePaths
 # The five files under Data\Platform nothing uses, issue #2177: every pack
 # deletes them, so the next release takes them off every install.
 $ShipDeleteAlways += $ShipPlatformUnused
+# The two commercial sprite fonts, issue #1317: every pack deletes them, so
+# the next release takes them off every install.
+$ShipDeleteAlways += $ShipCommercialFonts
 
 function Get-ShipDeleteAlways {
     $list = New-Object 'System.Collections.Generic.List[string]'
@@ -1912,16 +2014,21 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
     $placed = New-Object System.Collections.Generic.List[string]
     $sources = @(Get-ChildItem -LiteralPath $srcRoot -File -EA Stop)
     # Our own plugins (RepoPlugins.ps1): the content plugin and, since #2486,
-    # the late-loading one. A completed release can update them beyond the
-    # published collection base without changing anybody's staging copy.
-    # Packs and the installer place exactly this committed source.
+    # the late-loading one, as its recipe since #2791 (the launcher makes the
+    # plugin from it, $ShipMadeFromRecipe). A completed release can update
+    # them beyond the published collection base without changing anybody's
+    # staging copy. Packs and the installer place exactly this committed
+    # source.
+    $names = @{}
     foreach ($ownName in $ThornswoodRepoPlugins) {
         $own = Get-ThornswoodRepoPluginPath $RepoDir $ownName
         if (Test-Path -LiteralPath $own) { $sources += Get-Item -LiteralPath $own }
     }
+    $recipe = Join-Path $RepoDir $ShipLastRecipe
+    if (Test-Path -LiteralPath $recipe) { $r = Get-Item -LiteralPath $recipe; $sources += $r; $names[$r.FullName] = 'Thornswood-Last.recipe' }
     foreach ($f in $sources) {
         if ($f.Name -eq 'README.md') { continue }
-        $rel = 'Data\' + $f.Name
+        $rel = 'Data\' + $(if ($names.ContainsKey($f.FullName)) { $names[$f.FullName] } else { $f.Name })
         $dst = Join-Path $GameDir $rel
         $dir = Split-Path -Parent $dst
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -1986,9 +2093,9 @@ function Save-ShipSymbols([string]$FromDir, [string]$Version) {
 }
 
 # ---------------------------------------------------------------------------
-# THE PLUGIN THAT LOADS LAST (#2468, #2486).
+# THE PLUGIN THAT LOADS LAST (#2468, #2486, #2791).
 #
-# game\content\Thornswood-Last.esp switches off every placed actor the NPC
+# Thornswood-Last.esp switches off every placed actor the NPC
 # catalogue cuts and stops the vanilla quests, by copying the WINNING record
 # of each actor's cell and world and of each quest, from the exact bytes of
 # every plugin in the load order (scripts\mods\Build-LastPlugin.py,
@@ -1998,21 +2105,23 @@ function Save-ShipSymbols([string]$FromDir, [string]$Version) {
 # one. Patrick, 12 Oct, #2486: the release refuses a plugin built against
 # other bytes than its own, rather than ship a broken one.
 #
-# It ships from the repository the way the content plugin does (RepoPlugins.ps1,
-# #2486): placed into the release's Data and carried by the pack. What is here
-# makes it LOAD: the plugin list the pack carries enables it last
+# It ships from the repository as its recipe (#2791), game\data\last-plugin.recipe,
+# placed into the release's Data as Thornswood-Last.recipe and carried by the
+# pack, and every machine makes the plugin from it ($ShipMadeFromRecipe). What
+# is here makes it LOAD: the plugin list the pack carries enables it last
 # (Add-ShipLastPluginLine), which the server's own order then confirms, because
 # the deploys put it last there too (Deploy-DevGamemode.ps1 -LoadOrder,
 # Deploy-Gamemode.ps1). Every check here applies only when the checkout holds
-# the plugin.
+# the recipe.
 
 $ShipLastPlugin = 'Thornswood-Last.esp'
 $ShipLastManifest = 'game\data\last-plugin.json'
+$ShipLastRecipe = 'game\data\last-plugin.recipe'
 # The five the game loads before it reads any list (LoadOrder.ps1 skips them).
 $ShipBaseMasters = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm')
 
 function Test-ShipLastPluginHeld([string]$RepoDir) {
-    return (Test-Path -LiteralPath (Join-Path $RepoDir ('game\content\' + $ShipLastPlugin)) -PathType Leaf)
+    return (Test-Path -LiteralPath (Join-Path $RepoDir $ShipLastRecipe) -PathType Leaf)
 }
 
 # A copy of a plugins.txt with *Thornswood-Last.esp as its last enabled line:
@@ -2034,7 +2143,8 @@ function Add-ShipLastPluginLine([string]$Src, [string]$Out, [switch]$Plain) {
 #   $RepoDir  the checkout
 #   $Enabled  the enabled plugin names of the list the pack carries, in order
 #   $Ccc      Skyrim.ccc's names that are in the release's Data folder
-# Refused: no manifest, a plugin that is not the manifest's bytes, a load
+# Refused: no manifest, a recipe that does not make the plugin the manifest
+# names or is not the recipe the manifest names, a load
 # order (the five masters, the Skyrim.ccc plugins, then the enabled names,
 # without this plugin) that is not the one it was built against, the plugin
 # not enabled last, and any
@@ -2121,10 +2231,10 @@ function Get-ShipSkyUIFeedChange([string]$GameDir, [hashtable]$Record, [string[]
 }
 
 function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled, [string[]]$Ccc = @()) {
-    $rebuild = 'Build it again for this load order: python scripts\mods\Build-LastPlugin.py --data <a Data folder holding the collection''s bytes>, then commit the plugin and game\data\last-plugin.json.'
-    $plugin = Join-Path $RepoDir ('game\content\' + $ShipLastPlugin)
+    $rebuild = 'Build it again for this load order: python scripts\mods\Build-LastPlugin.py --data <a Data folder holding the collection''s bytes>, then commit game\data\last-plugin.recipe and game\data\last-plugin.json.'
+    $recipe = Join-Path $RepoDir $ShipLastRecipe
     $mpath = Join-Path $RepoDir $ShipLastManifest
-    if (-not (Test-Path -LiteralPath $mpath)) { return "the checkout has $ShipLastPlugin and no $ShipLastManifest saying what it was built against." }
+    if (-not (Test-Path -LiteralPath $mpath)) { return "the checkout has the recipe for $ShipLastPlugin and no $ShipLastManifest saying what it was built against." }
     try { $m = ([IO.File]::ReadAllText($mpath) -replace '^\uFEFF', '') | ConvertFrom-Json } catch { return "$ShipLastManifest does not read as JSON: " + $_.Exception.Message }
     $rpath = Join-Path $RepoDir 'records\collection-plugins.json'
     if (-not (Test-Path -LiteralPath $rpath)) { return "there is no records\collection-plugins.json, so nothing says which bytes the collection gives people." }
@@ -2134,9 +2244,18 @@ function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled, [string
     $sha = [Security.Cryptography.SHA256]::Create()
     try {
         $hashOf = { param($f) $fs = [IO.File]::OpenRead($f); try { -join ($sha.ComputeHash($fs) | ForEach-Object { $_.ToString('x2') }) } finally { $fs.Dispose() } }
-        $own = & $hashOf $plugin
-        if ($own -ne ([string]$m.plugin.sha256).ToLowerInvariant()) {
-            return "game\content\$ShipLastPlugin is not the plugin $ShipLastManifest describes (sha256 $($own.Substring(0, 12)), the manifest says $(([string]$m.plugin.sha256).Substring(0, 12))). $rebuild"
+        # The recipe names the size and sha256 of the plugin it makes, in its
+        # first 41 bytes (scripts\mods\last_recipe.py), and the manifest names
+        # both the plugin and the recipe.
+        $rb = [IO.File]::ReadAllBytes($recipe)
+        if ($rb.Length -lt 41 -or [Text.Encoding]::ASCII.GetString($rb, 0, 5) -ne ('TSLR' + [char]1)) { return "$ShipLastRecipe is not a version 1 recipe for $ShipLastPlugin. $rebuild" }
+        $makes = -join ($rb[9..40] | ForEach-Object { $_.ToString('x2') })
+        if ([BitConverter]::ToUInt32($rb, 5) -ne [int64]$m.plugin.size -or $makes -ne ([string]$m.plugin.sha256).ToLowerInvariant()) {
+            return "$ShipLastRecipe makes another $ShipLastPlugin (sha256 $($makes.Substring(0, 12))) than the one $ShipLastManifest describes (sha256 $(([string]$m.plugin.sha256).Substring(0, 12))). $rebuild"
+        }
+        $own = & $hashOf $recipe
+        if (-not $m.recipe -or $own -ne ([string]$m.recipe.sha256).ToLowerInvariant() -or [int64]$rb.Length -ne [int64]$m.recipe.size) {
+            return "$ShipLastRecipe is not the recipe $ShipLastManifest describes (sha256 $($own.Substring(0, 12))). $rebuild"
         }
         $names = @($Enabled | Where-Object { $_ })
         if (-not $names.Count -or $names[-1] -ine $ShipLastPlugin) {

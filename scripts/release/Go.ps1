@@ -383,8 +383,10 @@ foreach ($pair in $menuPairs) {
 # ------------------------------------------------ our own menu files --
 # The empty loading spinner, the silent stand-in for the game's theme,
 # SkyHUD's settings as Thornswood set them, QuickLoot IE's with no gold
-# value column (#3113), and the crafting menu's groups, item type first with
-# material groups inside, and their English names (#3133). From game\ours, beside
+# value column (#3113), the crafting menu's groups, item type first with
+# material groups inside, and their English names (#3133), and the Barlow
+# SemiBold sprite font the voice mark draws its dot in, with its licence
+# (#1317). From game\ours, beside
 # game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
@@ -399,7 +401,9 @@ $oursMenuFiles = @(
   'Data\Interface\skyhud\skyhud.txt',
   'Data\SKSE\Plugins\QuickLootIE.json',
   'Data\SKSE\Plugins\CraftingCategories\Thornswood-Content.json',
-  'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt'
+  'Data\Interface\Translations\Thornswood-Content_ENGLISH.txt',
+  'Data\Platform\Fonts\Barlow-SemiBold.spritefont',
+  'Data\Platform\Fonts\Barlow-SemiBold-OFL.txt'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel
@@ -424,7 +428,8 @@ foreach ($rel in $oursMenuFiles) {
 # The collection's item menus and HUD with no gold values are made the same
 # way from the mods' own archives in this game (#3113, Ship-Rules
 # $ShipMadeFromMods): SkyUI's config.txt and itemcard.swf, SkyHUD's
-# hudmenu.swf and moreHUD's AHZHudInfo.swf, two copies.
+# hudmenu.swf and moreHUD's AHZHudInfo.swf, two copies. And SkyUI's
+# quest_journal.swf with no saving, loading, help or Creation Club (#3127).
 Head 'Made from the game'
 if (-not ('Thornswood.FromGame' -as [type])) {
   $fromGameCs = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\..\launcher\app') -Filter 'FromGame*.cs' -File |

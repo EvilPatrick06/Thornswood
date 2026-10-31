@@ -23,7 +23,9 @@
 //      loses it, a right one is left alone, a listed runner GitHub does not
 //      have is named, and a record whose runners GitHub has none of, one
 //      that names a label every runner carries, lists no runners, or names a
-//      label another record names, stops;
+//      label another record names, stops; and a label of our own that no
+//      record names comes off every runner (#4033), while the labels GitHub
+//      gives (read-only) and the reserved ones stay;
 //   3b. the About record (#3682): the real records/repo-about.json passes, and
 //      an empty, too long or two-line description, a website that is not
 //      https, and a topic in capitals, twice, or past GitHub's 20 each stop;
@@ -34,7 +36,8 @@
 //      asked of GitHub; with no App it says how to make one; with one, a
 //      check says what differs and changes nothing, a run puts the labels
 //      right on the ops repository with an installation token for it alone,
-//      reads them back, and a second run changes nothing; the records come
+//      reads them back, and a second run changes nothing; runner 3's
+//      thornswood-sign, whose record is gone (#4033), comes off; the records come
 //      from this repository's main through the App, with a read-only token
 //      for this repository alone, never from the caller; installation-repos
 //      (#4013) lists the repositories the App is on with a token that reads
@@ -56,7 +59,10 @@
 //      each repository with a token for that repository alone, puts a
 //      changed one back by name, sending only the ruleset's own keys,
 //      switches the fork's private reporting as the record says and leaves
-//      it alone where the record says nothing, reads everything back, and a
+//      it alone where the record says nothing, switches secret scanning and
+//      push protection in one PATCH of only the keys that differ (push
+//      protection only with scanning, each true or false), reads everything
+//      back, and a
 //      second run changes nothing; a ruleset the record does not name stops
 //      it and is never deleted; a repository the App is not installed on
 //      stops for it with the link to the installation's settings while the
@@ -159,7 +165,9 @@ yes('issued by the App\'s id, ten minutes at most', jbody.iss === '123456' && jb
 // ---- 3. the records and the plan ----------------------------------------------------
 console.log('the records and the plan');
 const base = ['self-hosted', 'Windows', 'X64', 'thornswood-vps'];
-const runner = (id, name, labels, status) => ({ id, name, status: status || 'online', busy: false, labels: labels.map(n => ({ name: n })) });
+// GitHub marks the labels it gives a runner itself read-only, and ours custom.
+const given = ['self-hosted', 'Windows', 'Linux', 'X64', 'ARM', 'ARM64'];
+const runner = (id, name, labels, status) => ({ id, name, status: status || 'online', busy: false, labels: labels.map(n => ({ name: n, type: given.indexOf(n) >= 0 ? 'read-only' : 'custom' })) });
 const mixed = [
   runner(1, 'thornswood-vps', base.concat('thornswood-build')),
   runner(2, 'thornswood-vps-2', base),
@@ -189,16 +197,26 @@ yes('a record whose runners GitHub has none of is refused', /never comes/.test(a
 yes('runner numbers: thornswood-vps is 1, thornswood-vps-<n> is n, anything else none',
   admin.runnerNumber('thornswood-vps') === 1 && admin.runnerNumber('thornswood-vps-7') === 7 && admin.runnerNumber('thornswood-pr-one') === 0 && admin.runnerNumber('thornswood-vps-x') === 0);
 function stops(records) { try { admin.checkRecords(records); return ''; } catch (e) { return e.message; } }
-const sign3 = { file: 'records/sign-runners.json', label: 'thornswood-sign', runners: [3] };
-yes('the build and sign records pass together', stops([rec4, sign3]) === '');
+const light3 = { file: 'records/light-runners.json', label: 'thornswood-light', runners: [3] };
+yes('two records with labels of their own pass together', stops([rec4, light3]) === '');
 yes('a record naming thornswood-vps stops', /every runner carries/.test(stops([{ file: 'r', label: 'thornswood-vps', runners: [1] }])));
 yes('  and one naming self-hosted', /every runner carries/.test(stops([{ file: 'r', label: 'self-hosted', runners: [1] }])));
 yes('a record listing no runners stops', /lists no runners/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [] }])));
-yes('two records naming one label stop', /both name/.test(stops([rec4, Object.assign({}, sign3, { label: 'thornswood-build' })])));
+yes('two records naming one label stop', /both name/.test(stops([rec4, Object.assign({}, light3, { label: 'thornswood-build' })])));
 yes('a label that is not one lower case word stops', /one lower case word/.test(stops([{ file: 'r', label: 'a b', runners: [1] }])));
 yes('an off-box name that is not thornswood-pr-* stops', /not thornswood-pr-/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-vps-9'] })])));
 yes('an off-box name listed twice stops', /off-box runner twice/.test(stops([Object.assign({}, rec4, { offBox: ['thornswood-pr-one', 'thornswood-pr-one'] })])));
 yes('a runner number below 1 stops', /number from 1/.test(stops([{ file: 'r', label: 'thornswood-x', runners: [0] }])));
+// #4033: a label no record names comes off, whoever carries it.
+const left = admin.planLeftovers([rec4], [
+  runner(1, 'thornswood-vps', base.concat('thornswood-build', 'ARM')),
+  runner(3, 'thornswood-vps-3', base.concat('thornswood-sign')),
+  runner(40, 'thornswood-pr-one', ['self-hosted', 'Windows', 'thornswood-pr', 'Thornswood-Sign']),
+]);
+yes('a label of our own that no record names comes off every runner carrying it, in any case',
+  left.length === 2 && left.some(c => c.name === 'thornswood-vps-3' && c.label === 'thornswood-sign' && c.id === 3) && left.some(c => c.name === 'thornswood-pr-one' && c.label === 'Thornswood-Sign'));
+yes('  a record\'s label, a reserved one and one GitHub gives (read-only) stay', !left.some(c => /^(thornswood-build|thornswood-vps|thornswood-pr|ARM|self-hosted|Windows|X64)$/.test(c.label)));
+yes('  and a label a record names stays, whatever its case', admin.planLeftovers([rec4, light3], [runner(3, 'thornswood-vps-3', base.concat('Thornswood-Light'))]).length === 0);
 yes('the real records on this checkout pass', (() => {
   const dir = path.join(REPO, 'records');
   const recs = fs.readdirSync(dir).filter(f => /^[a-z0-9-]+-runners\.json$/.test(f)).map(f => {
@@ -267,6 +285,9 @@ yes('a record with no repositories stops', /names no repositories/.test(sstops({
 yes('another repository stops, named', /names EvilPatrick06\/other, and the only ones/.test(sstops({ repositories: [{ repository: 'EvilPatrick06/other', rulesets: [] }] })));
 yes('a repository named twice stops', /twice/.test(sstops({ repositories: [settings().repositories[1], settings().repositories[1]] })));
 yes('reporting that is not true or false stops', /true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'private_vulnerability_reporting', 'yes')] })));
+yes('secret scanning that is not true or false stops, named', /secret_scanning is true or false/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning', 'on')] })));
+yes('push protection without secret scanning stops', /secret_scanning_push_protection is on only with secret_scanning on too/.test(sstops({ repositories: [with_(settings().repositories[1], 'secret_scanning_push_protection', true)] })) &&
+  sstops({ repositories: [Object.assign({}, settings().repositories[1], { secret_scanning: true, secret_scanning_push_protection: true })] }) === '');
 yes('a bad ruleset stops, naming its repository', /EvilPatrick06\/skymp: main targets push/.test(sstops({ repositories: [with_(settings().repositories[1], 'rulesets', [with_(forkMain, 'target', 'push')])] })));
 yes('the real records/github-repo-settings.json, when there is one, passes', (() => {
   const f = path.join(REPO, 'records', 'github-repo-settings.json');
@@ -296,15 +317,15 @@ const gh = {
   calls: [],
   records: {
     'build-runners.json': { label: 'thornswood-build', runners: [1, 2] },
-    'sign-runners.json': { label: 'thornswood-sign', runners: [3] },
   },
   runners: [
     runner(11, 'thornswood-vps', base.concat('thornswood-build')),
     runner(12, 'thornswood-vps-2', base),
-    runner(13, 'thornswood-vps-3', base.concat('thornswood-build')),
+    // Runner 3 as #4033 found it: the signing record is gone, its label is not.
+    runner(13, 'thornswood-vps-3', base.concat('thornswood-build', 'thornswood-sign')),
     runner(14, 'thornswood-vps-4', base),
   ],
-  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null },
+  repo: { full_name: 'EvilPatrick06/Thornswood', description: null, homepage: null, security_and_analysis: { secret_scanning: { status: 'disabled' }, secret_scanning_push_protection: { status: 'disabled' } } },
   topics: [],
   instToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
   readToken: 'ghs_' + crypto.randomBytes(16).toString('hex'),
@@ -328,6 +349,7 @@ const gh = {
   forkInstalled: true,
   sets: { Thornswood: [], skymp: [] },
   pvr: { Thornswood: false, skymp: false },
+  forkRepo: { full_name: 'EvilPatrick06/skymp', security_and_analysis: { secret_scanning: { status: 'enabled' }, secret_scanning_push_protection: { status: 'enabled' } } },
   nextRuleset: 100,
 };
 gh.records['github-settings.json'] = { environments: { board: {}, notices: {}, 'bad name/../x': {} } };
@@ -418,7 +440,17 @@ function standIn(req, res) {
       if (req.method === 'DELETE') { gh.pvr[m[1]] = false; return send(204); }
     }
     if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'GET') return send(200, gh.repo);
-    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'PATCH') { Object.assign(gh.repo, body); return send(200, gh.repo); }
+    if (P === '/repos/EvilPatrick06/Thornswood' && req.method === 'PATCH') {
+      // GitHub switches only the security_and_analysis keys a PATCH names.
+      const sa = Object.assign({}, gh.repo.security_and_analysis, body.security_and_analysis || {});
+      Object.assign(gh.repo, body, { security_and_analysis: sa });
+      return send(200, gh.repo);
+    }
+    if (P === '/repos/EvilPatrick06/skymp') {
+      if (req.headers.authorization !== 'Bearer ' + gh.forkToken) return send(401, { message: 'Bad credentials' });
+      if (req.method === 'GET') return send(200, gh.forkRepo);
+      if (req.method === 'PATCH') { Object.assign(gh.forkRepo.security_and_analysis, body.security_and_analysis || {}); return send(200, gh.forkRepo); }
+    }
     if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'GET') return send(200, { names: gh.topics });
     if (P === '/repos/EvilPatrick06/Thornswood/topics' && req.method === 'PUT') { gh.topics = body.names.slice(); return send(200, { names: gh.topics }); }
     if (P === '/repos/EvilPatrick06/Thornswood-Ops/actions/runners') return send(200, { total_count: gh.runners.length, runners: gh.runners });
@@ -436,7 +468,7 @@ function standIn(req, res) {
     if (m) {
       const r = gh.runners.find(x => x.id === Number(m[1]));
       if (!r) return send(404, { message: 'Not Found' });
-      if (req.method === 'POST') { for (const l of body.labels) if (!r.labels.some(x => x.name === l)) r.labels.push({ name: l }); return send(200, { labels: r.labels }); }
+      if (req.method === 'POST') { for (const l of body.labels) if (!r.labels.some(x => x.name === l)) r.labels.push({ name: l, type: 'custom' }); return send(200, { labels: r.labels }); }
       if (req.method === 'DELETE') { r.labels = r.labels.filter(x => x.name !== decodeURIComponent(m[2])); return send(200, { labels: r.labels }); }
     }
     m = /^\/app-manifests\/([^/]+)\/conversions$/.exec(P);
@@ -518,7 +550,7 @@ function start(stateDir, ghPort) {
     r = await ask4(bearer(sign(good())));
     yes('with no App yet it says how to make one (503)', r.status === 503 && /Install-AdminService\.ps1 -Setup/.test(r.text));
     r = await ask4(bearer(sign(good())), { what: 'secrets' });
-    yes('anything but runner-labels, installation-repos, repo-about, settings and repo-settings is refused (400)', r.status === 400 && /runner-labels, installation-repos, repo-about, settings and repo-settings/.test(r.text));
+    yes('anything but runner-labels, installation-repos, repo-about, settings, repo-settings and go-public is refused (400)', r.status === 400 && /runner-labels, installation-repos, repo-about, settings, repo-settings and go-public/.test(r.text));
 
     // The App, as the setup would leave it.
     fs.writeFileSync(path.join(state, 'key.pem'), appKeyPem);
@@ -533,7 +565,7 @@ function start(stateDir, ghPort) {
     const writes = () => gh.calls.filter(c => c.method === 'POST' && /labels/.test(c.path) || c.method === 'DELETE');
     yes('a check answers 200 with what differs, and changes nothing', r.status === 200 && r.json.ok && r.json.differs === 3 && r.json.changed === 0 && writes().length === 0);
     yes('  runner 2 would get the build label, runner 3 lose it', r.json.lines.some(l => /thornswood-vps-2 would have thornswood-build put on/.test(l)) && r.json.lines.some(l => /thornswood-vps-3 would have thornswood-build taken off/.test(l)));
-    yes('  and runner 3 the sign label', r.json.lines.some(l => /sign-runners\.json: thornswood-vps-3 would have thornswood-sign put on/.test(l)));
+    yes('  and runner 3 thornswood-sign, which no record names', r.json.lines.some(l => /no record names thornswood-sign: thornswood-vps-3 would have it taken off/.test(l)));
     const toks = gh.calls.filter(c => /access_tokens$/.test(c.path)).map(c => JSON.stringify(c.body));
     yes('two installation tokens: contents read on this repository alone, administration write on the ops repository alone (' + toks.join(' ') + ')',
       toks.length === 2 && toks.includes(JSON.stringify({ repositories: ['Thornswood'], permissions: { contents: 'read' } })) && toks.includes(JSON.stringify({ repositories: ['Thornswood-Ops'], permissions: { administration: 'write' } })));
@@ -542,14 +574,14 @@ function start(stateDir, ghPort) {
     const lists = gh.calls.filter(c => /actions\/runners/.test(c.path));
     yes('  and the runners are the ops repository\'s, asked with its token', lists.length > 0 && lists.every(c => c.path.startsWith('/repos/EvilPatrick06/Thornswood-Ops/actions/runners') && c.auth === 'Bearer ' + gh.instToken));
 
-    // The sign label belongs on runner 3 and is not there yet: #3312's case.
+    // The sign label is on runner 3 and no record names it: #4033's case.
     gh.calls = [];
     r = await ask4(bearer(sign(good())));
     yes('a run puts every label right (200, 3 changed)', r.status === 200 && r.json.ok && r.json.changed === 3);
     const labels = n => gh.runners.find(x => x.name === n).labels.map(l => l.name);
     yes('  runner 1 and 2 carry the build label, 3 and 4 do not',
       labels('thornswood-vps').includes('thornswood-build') && labels('thornswood-vps-2').includes('thornswood-build') && !labels('thornswood-vps-3').includes('thornswood-build') && !labels('thornswood-vps-4').includes('thornswood-build'));
-    yes('  runner 3 carries the sign label and no other does', labels('thornswood-vps-3').includes('thornswood-sign') && gh.runners.filter(x => labels(x.name).includes('thornswood-sign')).length === 1);
+    yes('  no runner carries thornswood-sign any more', gh.runners.every(x => !labels(x.name).includes('thornswood-sign')) && r.json.lines.some(l => /no record names thornswood-sign: thornswood-vps-3, taken off/.test(l)));
     yes('  the labels every runner carries are untouched', gh.runners.every(x => base.every(b => labels(x.name).includes(b))));
     yes('  each change is one call with the installation token', writes().length === 3 && writes().every(c => c.auth === 'Bearer ' + gh.instToken));
     yes('  and it reads them back after', gh.calls.filter(c => /actions\/runners\?/.test(c.path)).length === 2);
@@ -602,11 +634,15 @@ function start(stateDir, ghPort) {
     r = await ask4(bearer(sign(good())));
     yes('a bad record on main stops it, nothing changed (502)', r.status === 502 && /every runner carries/.test(r.text) && writes().length === 0);
     delete gh.records['bad-runners.json'];
-    gh.records['sign-runners.json'] = { label: 'thornswood-sign', runners: [9] };
+    gh.records['light-runners.json'] = { label: 'thornswood-light', runners: [9] };
+    gh.runners.find(x => x.name === 'thornswood-vps-3').labels.push({ name: 'thornswood-light', type: 'custom' });
     gh.calls = [];
     r = await ask4(bearer(sign(good())));
-    yes('a record whose runners GitHub has none of stops for it (409) and leaves its label where it is', r.status === 409 && /never comes/.test(r.text) && labels('thornswood-vps-3').includes('thornswood-sign') && writes().length === 0);
-    gh.records['sign-runners.json'] = { label: 'thornswood-sign', runners: [3] };
+    yes('a record whose runners GitHub has none of stops for it (409) and leaves its label where it is', r.status === 409 && /never comes/.test(r.text) && labels('thornswood-vps-3').includes('thornswood-light') && writes().length === 0);
+    delete gh.records['light-runners.json'];
+    gh.calls = [];
+    r = await ask4(bearer(sign(good())));
+    yes('  and once its record is off main, the label comes off with it (#4033)', r.status === 200 && r.json.changed === 1 && !labels('thornswood-vps-3').includes('thornswood-light'));
 
     // ---- 4a. repository settings ----
     console.log('repository settings');
@@ -691,6 +727,35 @@ function start(stateDir, ghPort) {
     gh.settingsRecord = settings();
     r = await ask4(bearer(sign(good())), { what: 'repo-settings', repositories: [{ repository: S, private_vulnerability_reporting: false, rulesets: [] }] });
     yes('settings sent by the caller are not used', r.status === 200 && r.json.changed === 0 && gh.pvr.skymp === true && gh.sets.skymp.length === 1);
+    yes('  and a record that names no scanning never reads or touches it', !gh.calls.some(c => c.path === '/repos/' + T || c.path === '/repos/' + S));
+
+    // Secret scanning and push protection (#3683, at the flip).
+    const scan = (o) => (o.security_and_analysis.secret_scanning.status + '/' + o.security_and_analysis.secret_scanning_push_protection.status);
+    const patches = () => gh.calls.filter(c => c.method === 'PATCH' && (c.path === '/repos/' + T || c.path === '/repos/' + S));
+    gh.settingsRecord = settings();
+    Object.assign(gh.settingsRecord.repositories[0], { secret_scanning: true, secret_scanning_push_protection: true });
+    Object.assign(gh.settingsRecord.repositories[1], { secret_scanning: true, secret_scanning_push_protection: true });
+    gh.calls = [];
+    r = await askRs(true);
+    yes('a check says Thornswood\'s scanning and push protection would be switched on, and changes nothing', r.status === 200 && r.json.differs === 2 && r.json.changed === 0 && patches().length === 0 &&
+      has(/^EvilPatrick06\/Thornswood: secret scanning would be switched on$/) && has(/^EvilPatrick06\/Thornswood: push protection would be switched on$/) && scan(gh.repo) === 'disabled/disabled');
+    yes('  and says the fork\'s are on already', has(/^EvilPatrick06\/skymp: secret scanning is on, as the record says$/) && has(/^EvilPatrick06\/skymp: push protection is on, as the record says$/));
+    gh.calls = [];
+    r = await askRs();
+    yes('a run switches both on in one PATCH with Thornswood\'s token, and reads it back (2 changed)', r.status === 200 && r.json.ok && r.json.changed === 2 && scan(gh.repo) === 'enabled/enabled' &&
+      patches().length === 1 && patches()[0].auth === 'Bearer ' + gh.aboutToken &&
+      JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}}' &&
+      gh.calls.filter(c => c.method === 'GET' && c.path === '/repos/' + T).length === 2);
+    yes('  sending nothing to the fork, whose are on', !patches().some(c => c.path === '/repos/' + S));
+    gh.calls = [];
+    r = await askRs();
+    yes('a second run changes nothing', r.status === 200 && r.json.changed === 0 && patches().length === 0);
+    gh.repo.security_and_analysis.secret_scanning_push_protection = { status: 'disabled' };
+    gh.calls = [];
+    r = await askRs();
+    yes('push protection switched off on GitHub is switched on again, sending only that key', r.status === 200 && r.json.changed === 1 && scan(gh.repo) === 'enabled/enabled' &&
+      JSON.stringify(patches()[0].body) === '{"security_and_analysis":{"secret_scanning_push_protection":{"status":"enabled"}}}' && has(/^EvilPatrick06\/Thornswood: push protection switched on$/));
+    gh.settingsRecord = settings();
 
     const tokenSeen = sign(good());
     await ask4(bearer(tokenSeen));
@@ -748,8 +813,8 @@ function start(stateDir, ghPort) {
     const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, '\'').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
     yes('the armed page, through Caddy, posts the manifest to GitHub with the state', r.status === 200 && form && unesc(form[1]) === 'http://127.0.0.1:' + ghPort + '/web/settings/apps/new?state=' + st);
     const mf = form ? JSON.parse(unesc(form[2])) : {};
-    yes('  the manifest: private, administration write, contents read and secrets, variables and environments read only, no webhook, back to /github-app/setup/done',
-      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"read","actions_variables":"read","environments":"read"}' && mf.hook_attributes.active === false &&
+    yes('  the manifest: private, administration write, contents read, secrets and environments write for go-public (#4013), variables read, Actions write for the Ship verbs (#2841), no webhook, back to /github-app/setup/done',
+      mf.public === false && JSON.stringify(mf.default_permissions) === '{"administration":"write","contents":"read","secrets":"write","actions_variables":"read","environments":"write","actions":"write"}' && mf.hook_attributes.active === false &&
       mf.redirect_url === 'https://thornswood.net/github-app/setup/done' && (mf.default_events || []).length === 0);
     yes('  and the page is neither kept nor passed on', /no-store/.test(r.headers['cache-control'] || '') && r.headers['referrer-policy'] === 'no-referrer');
 

@@ -29,6 +29,9 @@
   that fails stops the chain; what the ones before it changed is still
   listed. -Data is handed to every builder that takes it; left out, each
   builder uses its own default, which on One is the game at C:\Thornswood.
+  A step that changes a file an earlier step reads back (readsBack) runs the
+  chain again from that earlier step, once (#4087): Write-CutItems.js sorts a
+  new plugin's recipes into the cut file, and the recipe build applies it.
 
   THE LOAD ORDER IS THE ONE THE COMMIT RECORDS (#3105). Every builder that
   takes a plugin list is given the load order game\data\npc-population.json
@@ -168,6 +171,24 @@ New-Item -ItemType Directory -Force -Path $orderFolder | Out-Null
 [IO.File]::WriteAllLines($orderList, [string[]]@($recorded | Select-Object -Skip 5 | ForEach-Object { '*' + $_ }), (New-Object Text.UTF8Encoding($false)))
 Say ('the load order: ' + (Get-LoadOrderName $recorded) + ', from game\data\npc-population.json') 'Cyan'
 
+# A file a step reads back (readsBack in content-tables.json) is written by a
+# later step. When that step changes it, the reader built from the old one, so
+# the chain runs again from the reader, once (#4087): Build-RecipeTable.ps1
+# reads docs\systems\cut-items.json, and Write-CutItems.js sorts a row a new
+# plugin added into it, which the recipe build has to apply. A second change
+# is a builder that never settles, and stops the chain.
+function Get-FileSha([string]$rel) {
+    $f = Join-Path $repo $rel
+    if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { return '' }
+    return (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+$readBackBy = @{}
+for ($j = 0; $j -lt $steps.Count; $j++) {
+    foreach ($r in @($steps[$j].readsBack | Where-Object { $_ })) { $readBackBy[[string]$r] = $j }
+}
+$readBackAt = @{}
+$againFrom = @{}
+
 $before = Get-TreePrint
 $stopped = $null
 $unregistered = @()
@@ -175,10 +196,24 @@ try {
     for ($i = 0; $i -lt $steps.Count; $i++) {
         Say ''
         Say ('[{0}/{1}] {2}' -f ($i + 1), $steps.Count, $steps[$i].tool) 'Cyan'
+        foreach ($r in @($steps[$i].readsBack | Where-Object { $_ })) { $readBackAt[[string]$r] = Get-FileSha ([string]$r) }
         $exe = $runs[$i][0]
         $line = $runs[$i][1]
         & $exe @line
         if ($LASTEXITCODE -ne 0) { $stopped = '{0} ended with exit {1}' -f $steps[$i].tool, $LASTEXITCODE; break }
+        $from = -1
+        foreach ($w in @($steps[$i].writes | Where-Object { $_ })) {
+            $w = [string]$w
+            if (-not $readBackBy.ContainsKey($w) -or $readBackBy[$w] -ge $i) { continue }
+            if ((Get-FileSha $w) -eq $readBackAt[$w]) { continue }
+            $j = $readBackBy[$w]
+            if ($againFrom.ContainsKey($j)) { $stopped = '{0} changed {1} again after {2} ran on it a second time' -f $steps[$i].tool, $w, $steps[$j].tool; break }
+            $againFrom[$j] = $true
+            Say ('{0} changed {1}, which {2} read, so the chain runs again from step {3}' -f $steps[$i].tool, $w, $steps[$j].tool, ($j + 1)) 'Yellow'
+            if ($from -lt 0 -or $j -lt $from) { $from = $j }
+        }
+        if ($stopped) { break }
+        if ($from -ge 0) { $i = $from - 1 }
     }
 } finally {
     try { Remove-Item -LiteralPath $orderFolder -Recurse -Force } catch { Say ('could not remove ' + $orderFolder + ': ' + $_.Exception.Message) 'Yellow' }

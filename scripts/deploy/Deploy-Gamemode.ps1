@@ -297,6 +297,12 @@ function Read-PluginHeader([string]$path) {
     $b = New-Object byte[] $len
     [void]$fs.Read($b, 0, $len)
     $fs.Close()
+    return (Read-PluginHeaderBytes $b $path)
+}
+
+# The same, of a plugin's first bytes, named $path for its extension.
+function Read-PluginHeaderBytes([byte[]]$b, [string]$path) {
+    $len = $b.Length
 
     # Two bits in the same dword at offset 8, and until 22 September only one
     # of them was read. 0x200 is light, which gets no index. 0x1 is master,
@@ -487,17 +493,20 @@ $keep  = @($wanted | Where-Object { $info[$_] -and -not $drop.Contains($_) })
 
 # THE PLUGIN THAT LOADS LAST (#2468, #2486) is ours, built in this repository
 # and never in the collection, so no plugin list Vortex writes names it. When
-# the checkout holds it, it is the server's last plugin, read from the
-# repository (its path below), whatever the list says. It is light, so it
-# needs an engine that loads light plugins (#1715).
-$lastName = 'Thornswood-Last.esp'
-$lastRepo = [IO.Path]::GetFullPath((Join-Path $Here ('..\..\game\content\' + $lastName)))
-$lastHeld = Test-Path -LiteralPath $lastRepo -PathType Leaf
+# the checkout holds its recipe, it is the server's last plugin whatever the
+# list says, and the deploy makes it on the box from the recipe (#2791,
+# LastPluginOnBox.ps1); its header is read out of the recipe, which holds it
+# as Thornswood wrote it. It is light, so it needs an engine that loads light
+# plugins (#1715).
+. (Join-Path $Here 'LastPluginRecipe.ps1')
+$lastName = $ThornswoodLastPlugin
+$lastHead = Get-ThornswoodLastRecipeHead (Join-Path $Here '..\..')
+$lastHeld = $null -ne $lastHead
 if ($lastHeld) {
     if (-not $loadsLight) {
         throw "$lastName is a light plugin and the server build records\server-build.json names does not load light plugins, so it cannot be in this load order."
     }
-    $info[$lastName] = Read-PluginHeader $lastRepo
+    $info[$lastName] = Read-PluginHeaderBytes $lastHead $lastName
     $keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastName
 }
 
@@ -551,7 +560,7 @@ if ($loadsLight) {
     # against, so it is not held to the one the plugin was built against.
     if ($lastHeld -and -not $OrderOnly) {
         $lastRecord = [IO.Path]::GetFullPath((Join-Path $Here '..\..\game\data\last-plugin.json'))
-        if (-not (Test-Path -LiteralPath $lastRecord)) { throw "the checkout holds $lastName and no game\data\last-plugin.json saying which load order it was built against" }
+        if (-not (Test-Path -LiteralPath $lastRecord)) { throw "the checkout holds the recipe for $lastName and no game\data\last-plugin.json saying which load order it was built against" }
         $lastOrder = @((ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($lastRecord)) $lastRecord).loadOrder | ForEach-Object { [string]$_ })
         $rs = Get-ThornswoodRecordedSequence ([string[]]$wanted) ([string[]]$lastOrder)
         $sequence = $rs.Wanted
@@ -657,7 +666,7 @@ if ($loadsLight) {
 # And last after the server's own order was followed, whatever it held.
 if ($lastHeld) { $keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastName }
 $paths = @($keep | ForEach-Object {
-    if ($lastHeld -and $_ -ieq $lastName) { $lastRepo -replace '\\', '/' } else { (Join-Path $Data $_) -replace '\\', '/' }
+    (Join-Path $Data $_) -replace '\\', '/'
 })
 
 # ---- THE ORDER ALONE (-OrderOnly, #4068) -----------------------------------

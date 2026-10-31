@@ -3,23 +3,24 @@
 # fixed (scripts/vps/Watch-Outside.ps1, whose header says what each check
 # asks and why).
 #
-# FOLDED IN FROM THE PUBLIC REPOSITORY (#3690). Until now this ran from
+# FOLDED IN FROM THE PUBLIC REPOSITORY (#3690). It ran from
 # EvilPatrick06/thornswood-watch-outside, a public repository of its own,
 # because a public repository's Actions minutes are not billed and this one
-# was private. Once this repository is public it runs here for free, and the
-# other one is deleted (Patrick, 26 Oct, B on the page). While this
-# repository is private every run would be billed, every five minutes, so
-# the job runs only when the repository variable WATCH_OUTSIDE is "here".
-# Set it at the flip, just before deleting the old repository, so exactly
-# one watcher posts:
+# was private. Since the flip this one is public too, so it runs here for
+# free (Patrick, 31 Oct), and the old repository's workflow is turned off
+# once this one has run green. The job runs only while the repository
+# variable WATCH_OUTSIDE is "here", which is set in the same sitting as that
+# switch-off, so exactly one watcher posts.
 #
-#     gh variable set WATCH_OUTSIDE --body here --repo EvilPatrick06/Thornswood
-#
-# It needs two repository secrets, the same two the old repository holds:
-# STAFF_WEBHOOK, the Discord webhook in #staff-updates that the VPS watchdog
-# also posts through, and RUNNER_TOKEN, a fine-grained token whose only
-# permission is Administration: Read-only on this repository, so it can read
-# the build runners and nothing else.
+# ITS TWO SECRETS are in the "watch" environment, which only main may deploy
+# from (records/github-settings.json): STAFF_WEBHOOK, the Discord webhook in
+# #staff-updates that the VPS watchdog also posts through, and RUNNER_TOKEN,
+# a fine-grained token whose only permission is Administration: Read-only on
+# Thornswood-Ops, where the box's runners are registered since the flip, so
+# it can read the runners and nothing else. Nothing a fork can start reaches
+# them: this workflow has no pull_request trigger, a dispatch needs write
+# access, the repository sends no secrets to fork pull requests, and no
+# workflow here runs on pull_request_target.
 #
 # What it remembers between runs (what is down, the outbox) is in the Actions
 # cache: restored from the newest one, saved under a new key at the end. Not
@@ -51,6 +52,7 @@ concurrency:
 jobs:
   watch:
     if: ${{ vars.WATCH_OUTSIDE == 'here' }}
+    environment: watch
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:

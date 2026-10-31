@@ -66,7 +66,8 @@
     window.thornswoodSkills = { open, close, toggle, isOpen, setData, takeOn, setKey }
     setKey(name)    SkillsKey's name, K unless it is bound elsewhere (#1919)
     page -> plugin  'skills:ready' | 'skills:opened' | 'skills:closed' |
-                    'skills:refresh' | 'skills:pick <words>'
+                    'skills:refresh' | 'skills:pick <words>' |
+                    'skills:switch' (Change character, #3128)
     the plugin turns 'skills:pick X' into the chat line '/pick X'
 
   THE CONTRACT with the server, agreed 20 September, written down here
@@ -124,6 +125,15 @@
       { id, name }, and Offer to dye sends '/hairdye offer <id> <dye>': they
       answer on their own prompt. The server answers in the chat and by
       rewriting this.
+
+    alchemy: { eaten: [ { name, effects: [ '<effect>' ] | null, other, known, of } ],
+               recipes: [ { with: [ '<ingredient>' ], makes: [ '<effect>' ], times } ] }
+      The Alchemy journal (#3142), sent only once the character has eaten an
+      ingredient or brewed a mix. eaten is every ingredient tasted, with the
+      effects of it the character knows: known of of are known, effects
+      names the ones a brew here can make and other counts the rest. effects
+      is null when the server cannot find the ingredient's record. recipes
+      is every mix brewed, and how many times. Nothing on it is sent.
 
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
@@ -295,7 +305,8 @@
         { key: 'health', name: 'Health', subs: [
             { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day, the blow that would kill you leaves you at 1 health.' },
             { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: during a fight, health returns at 2 a second.' },
-            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.' },
+            { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.',
+              gate: [{ weight: 45, might: 5 }, { weight: 30, might: 3 }] },
             { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: nothing staggers you while you block.' },
             { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: disease does not take, and poison deals 25%.' }] },
         { key: 'magicka', name: 'Magicka', subs: [
@@ -421,6 +432,15 @@
     hairdye: {
       title: 'Hair dye',
       lead: 'A dye you carry colours your own hair, or the hair of somebody in front of you once they say yes. Each one is used up.',
+      rows: []
+    },
+    /*
+      The Alchemy journal (#3142). What was eaten and brewed is the server's,
+      under mine.alchemy; this is the title and the sentence over the page.
+    */
+    alchemy: {
+      title: 'Alchemy journal',
+      lead: 'Every ingredient you have eaten and what you know of it, and every mix you have brewed. Your character remembers all of it at any alchemy lab. An ingredient goes in a brew only once you have eaten it, and eating teaches its first effect; a brew teaches the effects its ingredients share.',
       rows: []
     },
     /*
@@ -837,6 +857,7 @@
       '<div class="nav"></div>' +
       '<div class="body"></div>' +
       '<div class="foot"><div class="status"></div><div class="btns">' +
+        '<div class="tsbtn ghost" data-act="switch">Change character</div>' +
         '<div class="tsbtn ghost" data-act="help">Help</div>' +
         '<div class="tsbtn ghost" data-act="settings">Settings</div>' +
         '<div class="tsbtn ghost" data-act="close"><span>Close</span><span class="key">K</span></div>' +
@@ -855,6 +876,11 @@
   // Help (#1633), beside Close: the help panel, and this one put down. Never
   // while creating, where this panel is the whole of what there is to do.
   var elHelp = root.querySelector('[data-act="help"]');
+  // Change character (#3128), beside Help and never while creating: the
+  // front waits ten seconds with the character out of combat and standing
+  // still, then takes the game to the character choice. Pressed again, it
+  // stops the wait.
+  var elSwitch = root.querySelector('[data-act="switch"]');
   // Settings beside it (#3126), and never while creating either.
   var elSettings = root.querySelector('[data-act="settings"]');
   // The word inside the Close button, so drawFoot can say Close Skyrim while
@@ -1220,6 +1246,16 @@
     if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
     return got;
   }
+  /* The Alchemy journal (#3142): the server's, under mine.alchemy, or null with nothing on it. */
+  function alchemyView() {
+    var got = mine && mine.alchemy;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  function alchemyList(field) {
+    var v = alchemyView();
+    return (v && Array.isArray(v[field])) ? v[field].filter(function (r) { return r && typeof r === 'object'; }) : [];
+  }
   /* The Body page (#1631): the server's, under mine.body, or null while creating. */
   function bodyView() {
     var got = mine && mine.body;
@@ -1322,6 +1358,18 @@
     if (!book || book.points === undefined || book.points === null) return null;
     return Number(book.points) || 0;
   }
+  /* The weapon line on the Might row: what each weight needs, and what you hold. */
+  function gateLine(gate, have) {
+    var bits = [];
+    for (var i = gate.length - 1; i >= 0; i--) {
+      bits.push('weapons weighing ' + gate[i].weight + (i > 0 ? ' to ' + (gate[i - 1].weight - 1) : ' or more') + ' need Might ' + gate[i].might);
+    }
+    var ok = 0;
+    for (var j = 0; j < gate.length; j++) { if (have >= gate[j].might) { ok = gate[j].might; break; } }
+    var holds = !ok ? 'You can wield neither yet.' : (ok >= gate[0].might ? 'You can wield any of them.' : 'You can wield the first, not the second.');
+    return 'Strength: ' + bits.join(', and ') + '. ' + holds;
+  }
+
   /* The marked staff spells, in the order the page draws them, which is the order they are sent in. */
   function markedStaffDescs() {
     var out = [];
@@ -1544,6 +1592,8 @@
     if (section === 'office') return 0;
     // The Body page is what is true, and one button to read it again.
     if (section === 'body') return 0;
+    // The Alchemy journal is what is true, and nothing on it is sent.
+    if (section === 'alchemy') return 0;
     return rows().length + (laterOffered(section) ? 1 : 0);
   }
   /* Another section: the top row, and the status line back to the hint. */
@@ -1613,6 +1663,8 @@
     if (creating()) sections.splice(sections.indexOf('home') < 0 ? sections.length : sections.indexOf('home'), 0, 'guides');
     else sections.push('guides');
     if (!creating() && bodyView()) sections.push('body');
+    // The Alchemy journal (#3142), after Body: only once something was eaten or brewed.
+    if (!creating() && alchemyView()) sections.push('alchemy');
     if (!creating() && officePage()) sections.push('office');
     /*
       Property, last, and only once there is something on it. Patrick,
@@ -1741,6 +1793,11 @@
       if (hdV && hdV.steeping && !hdN) return { t: 'steeping', c: '' };
       return { t: hdN + (hdN === 1 ? ' dye' : ' dyes'), c: 'set' };
     }
+    if (sec === 'alchemy') {
+      var alE = alchemyList('eaten').length, alR = alchemyList('recipes').length;
+      if (alR) return { t: alR + (alR === 1 ? ' mix' : ' mixes') + ', ' + alE + ' eaten', c: 'set' };
+      return { t: alE + ' eaten', c: alE ? 'set' : '' };
+    }
     if (sec === 'body') {
       var bv = bodyView();
       var bw = bodyWorries(bv);
@@ -1848,6 +1905,7 @@
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
     else if (section === 'body') drawNeeds();
+    else if (section === 'alchemy') drawAlchemy();
     else if (section === 'review') drawReview();
     else drawTree();
   }
@@ -2099,6 +2157,61 @@
     again.appendChild(line);
     wrap.appendChild(again);
     elBody.appendChild(wrap);
+  }
+
+  /*
+    THE ALCHEMY JOURNAL (#3142). Two lists of what is already true, both the
+    server's: the mixes brewed, first, because they are what somebody comes
+    here to brew again, and every ingredient eaten with what is known of it.
+    Nothing on it is picked or sent, so Confirm stays hidden and the keyboard
+    has no rows to walk.
+  */
+  function drawAlchemy() {
+    var recipes = alchemyList('recipes');
+    var eaten = alchemyList('eaten');
+    var bar = el('div', 'spellbar');
+    bar.appendChild(el('div', 'spellpts',
+      (recipes.length ? recipes.length + (recipes.length === 1 ? ' mix brewed' : ' mixes brewed') : 'No mix brewed yet') +
+      ', ' + eaten.length + (eaten.length === 1 ? ' ingredient eaten' : ' ingredients eaten')));
+    bar.appendChild(el('div', 'spellnote',
+      'Two ingredients that share an effect make it at a lab. The alchemy menu shows the effects you know too.'));
+    elBody.appendChild(bar);
+
+    var wrap = el('div', 'cards');
+    recipes.forEach(function (r) {
+      var card = el('div', 'card mine');
+      var makes = Array.isArray(r.makes) ? r.makes.map(String) : [];
+      var nm = el('div', 'name', makes.length ? listWords(makes) : 'A mix');
+      var times = Number(r.times) || 0;
+      nm.appendChild(el('span', 'tag', times === 1 ? 'brewed once' : 'brewed ' + times + ' times'));
+      card.appendChild(nm);
+      card.appendChild(el('div', 'desc', listWords((Array.isArray(r.with) ? r.with : []).map(String)) + '.'));
+      wrap.appendChild(card);
+    });
+    eaten.forEach(function (r) {
+      var card = el('div', 'card');
+      var nm = el('div', 'name', String(r.name || 'something'));
+      var of = Number(r.of) || 0, known = Number(r.known) || 0;
+      if (Array.isArray(r.effects) && of) nm.appendChild(el('span', 'tag', known + ' of ' + of + ' known'));
+      card.appendChild(nm);
+      if (!Array.isArray(r.effects)) {
+        card.appendChild(el('div', 'desc', 'Eaten. The server cannot find this ingredient in the game now, so what it does is not known.'));
+      } else {
+        var named = r.effects.map(String);
+        var other = Number(r.other) || 0;
+        var line = named.length ? 'Known: ' + listWords(named) + '.' : 'Eaten.';
+        if (other) line += ' ' + (other === 1 ? 'One more known effect is' : other + ' more known effects are') + ' not one a brew here makes.';
+        if (of && known < of) line += ' Brewing it with another ingredient that shares an effect teaches that effect.';
+        card.appendChild(el('div', 'desc', line));
+      }
+      wrap.appendChild(card);
+    });
+    elBody.appendChild(wrap);
+  }
+  /* Words joined the way a sentence lists them: a, b and c. */
+  function listWords(words) {
+    if (words.length < 2) return words.join('');
+    return words.slice(0, -1).join(', ') + ' and ' + words[words.length - 1];
   }
 
   /*
@@ -3370,6 +3483,14 @@
           use.onclick = function (ev) { ev.stopPropagation(); usePerk('fontofmagic'); };
           row.appendChild(use);
         }
+        /*
+          Strength (#2262): Might is what a heavy weapon needs. The server
+          refuses the equip (the strength weapons block in game/gamemode.js);
+          this line says so first, so nobody finds out by trying. The two
+          rows are the server's STRENGTH.tiers, kept equal by
+          tests/test-2262-strength-weapons.js.
+        */
+        if (s.gate) row.appendChild(el('div', 'sd gate', gateLine(s.gate, have)));
         row.onclick = function () { rowAt = idx; draw(); };
         col.appendChild(row);
       });
@@ -3410,7 +3531,7 @@
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'start' && section !== 'tree' && section !== 'recipes' && section !== 'guides' && section !== 'property' && section !== 'office' &&
-         section !== 'apprentice' && section !== 'hairdye' && section !== 'body');
+         section !== 'apprentice' && section !== 'hairdye' && section !== 'body' && section !== 'alchemy');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
     if (key === footKey) return;
@@ -3429,6 +3550,7 @@
     elCloseKey.textContent = keyName;
     elCloseKey.style.display = (cr || !keyName) ? 'none' : '';
     elHelp.style.display = cr ? 'none' : '';
+    elSwitch.style.display = cr ? 'none' : '';
     elSettings.style.display = cr ? 'none' : '';
   }
 
@@ -3470,6 +3592,7 @@
     }
     if (section === 'office') return 'Each button is checked again by the server, and it answers in the chat.';
     if (section === 'body') return 'As the server counted it when K opened. Read again asks it now.';
+    if (section === 'alchemy') return 'What your character knows, as K opened. Nothing here is picked or sent.';
     if (section === 'staff') {
       if (staffWaiting()) return 'Sent. The server is checking.';
       if (markedStaffDescs().length) return 'Unlock sends the staff spells you marked, one staff spell point each.';
@@ -4155,6 +4278,12 @@
   elHelp.onclick = function () {
     if (creating()) return;
     try { if (window.thornswoodHelp) { window.thornswoodHelp.open('work'); } } catch (e) { }
+    api.close();
+  };
+  // The panel goes down so the wait's lines are seen; nothing is decided here.
+  elSwitch.onclick = function () {
+    if (creating()) return;
+    tell('switch');
     api.close();
   };
   elSettings.onclick = function () {

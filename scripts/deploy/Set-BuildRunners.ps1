@@ -3,9 +3,9 @@
 
   Makes the labels on GitHub's VPS runners match the runner records on main
   (records\<name>-runners.json): records\build-runners.json caps how many
-  builds run on the box at once, records\sign-runners.json says which runner
-  may sign a release launcher, records\check-runners.json which runners may
-  check a signed draft (#3956). From One, a developer's PC or a cloud thread.
+  builds run on the box at once. A label of our own that no record names
+  comes off every runner, so taking a record off main takes its label off
+  too (#4033). From One, a developer's PC or a cloud thread.
 
       pwsh scripts/deploy/Set-BuildRunners.ps1            make GitHub match main's records
       pwsh scripts/deploy/Set-BuildRunners.ps1 -Check     change nothing; exit 1 when GitHub differs
@@ -17,10 +17,10 @@
   REPOSITORY SETTINGS (#3683, Patrick's answers of 26 Oct 2026). With
   -RepoSettings it asks for records\github-repo-settings.json instead, which
   names Thornswood and the engine fork, EvilPatrick06/skymp, and for each its
-  rulesets and, where it says, private vulnerability reporting: each ruleset
-  is made on GitHub, or put back, with exactly its target, enforcement,
-  conditions, rules and bypass list, and reporting is switched on or off as
-  the record says. A ruleset GitHub has that the record does not name stops
+  rulesets and, where it says, private vulnerability reporting, secret
+  scanning and push protection: each ruleset is made on GitHub, or put back,
+  with exactly its target, enforcement, conditions, rules and bypass list,
+  and the rest are switched on or off as the record says. A ruleset GitHub has that the record does not name stops
   it and is left as it is. The same App, the same run, the same rule: what to
   change comes from main, never from here.
 

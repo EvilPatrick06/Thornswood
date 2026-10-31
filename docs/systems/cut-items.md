@@ -18,6 +18,8 @@ Counts in this file: cut 3319, embassy 15, thalmor 9. Rows this pass left in the
 
 The rules below sorted the recipe table once, before anything was cut. The recipe build (`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.
 
+A row a plugin adds later, which is in neither this list nor [cut-kept.json](cut-kept.json), is sorted once, by the rules about what cannot be had here and by no others: a temper, a recipe that asks for something this file cuts, a dragon, Daedric or Aetherium piece, Thalmor and Empire gear, a Riekling piece outside the kept set, and a staff whose spell is not in the college book. A plugin is added for what it adds, so its other rows stay in the open book, and the recipe build gives them owners.
+
 ## Rules that built the lists
 
 One suit per material. Where a material has a heavy set and a light set, both stay. A suit is body, head, hands, and feet. Shields are fewer than suits: one shield named Shield, not the buckler and not the painted variants.

@@ -163,16 +163,21 @@ try {
     Write-Host "$Tag names $count file(s)"
 
     # ---- the Release: found (a draft included), or made as a draft ---------
+    # GitHub's answer comes back as one object holding the JSON array, so every page
+    # is spread through ForEach-Object: wrapped in @() as it comes, a page of
+    # 100 counts as 1, and the paging stopped after the first (#3686: the dev
+    # release's 253 files read as 100, and 153 "still lacked" after upload).
+    function Get-Page([string]$Uri) { return @(Invoke-GitHub GET $Uri | ForEach-Object { $_ }) }
     $rel = $null
     for ($page = 1; $page -le 10 -and -not $rel; $page++) {
-        $list = @(Invoke-GitHub GET ($script:Api + '/releases?per_page=100&page=' + $page))
+        $list = Get-Page ($script:Api + '/releases?per_page=100&page=' + $page)
         $rel = $list | Where-Object { $_.tag_name -eq $Tag } | Select-Object -First 1
         if ($list.Count -lt 100) { break }
     }
     function Get-Assets($Rel) {
         $all = @()
         for ($page = 1; $page -le 20; $page++) {
-            $got = @(Invoke-GitHub GET ($script:Api + '/releases/' + $Rel.id + '/assets?per_page=100&page=' + $page))
+            $got = Get-Page ($script:Api + '/releases/' + $Rel.id + '/assets?per_page=100&page=' + $page)
             $all += $got
             if ($got.Count -lt 100) { break }
         }

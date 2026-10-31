@@ -100,8 +100,7 @@ WHAT HOLDS A SPOT CLEAR, the same measure as the woodworking benches:
 WHAT IT READS. The collection's plugins in game\\data\\last-plugin.json's load
 order, from --data, and from the repository's Thornswood-Content.esp only the
 four station records: their bounds are the stations' outlines. It does not
-read Thornswood-Last.esp or Thornswood-WoodworkerTrail.esp, and it checks
-that neither places anything. It reads the benches' spots out of
+read Thornswood-Last.esp, and it checks that it places nothing. It reads the benches' spots out of
 game\\data\\woodworking-benches.json and the boards' out of game\\gamemode.js.
 
 WHAT IT WRITES. game\\data\\station-sites.json: every site's anchor, the spot,
@@ -149,7 +148,7 @@ last = _module('build_last_plugin', os.path.join(ROOT, 'scripts', 'mods', 'Build
 
 CONTENT = 'Thornswood-Content.esp'
 OWN = 'thornswood-content.esp'
-OURS_AFTER = ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp']
+OURS_AFTER = ['Thornswood-Last.esp']
 MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
 DELETED, DISABLED = 0x20, 0x800
 
@@ -838,7 +837,8 @@ def main():
     # a station and stands where it always stood, so no spot changes.
     gates = set(lo_doc.get('gatesUnlocked') or [])
     for n in OURS_AFTER:
-        pl = wb.Plugin(os.path.join(ROOT, 'game', 'content', n), n)
+        # Made in the Data folder from its recipe since #2791 (own_plugins.py).
+        pl = wb.Plugin(own_plugins.plugin_path(args.data, n), n)
         placed = []
         pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append(fid) if tag == b'REFR' else None,
                 tops={b'WRLD', b'CELL'})

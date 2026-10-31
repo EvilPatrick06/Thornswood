@@ -103,6 +103,8 @@ const MADE = [
     words: '| Physicker\'s Remedy | 1 Mudcrab Chitin, 1 Blue Mountain Flower | Alchemy lab | Alchemist, Physicker, advanced |' }
 ];
 const recipeTable = read('scripts', 'dev', 'Build-RecipeTable.ps1');
+// RECIPE_OWNER's entries, which Build-RecipeTable.ps1 reads from records/recipe-owners.json.
+const named = JSON.parse(read('records', 'recipe-owners.json')).owner;
 const adder = read('scripts', 'mods', 'Add-ContentRecords.py');
 MADE.forEach(function (m) {
   const misc = plugin.recs[m.item];
@@ -116,8 +118,8 @@ MADE.forEach(function (m) {
       sub(cobj, 'BNAM')[0].data.readUInt32LE(0) === m.bench &&
       sub(cobj, 'COCT')[0].data.readUInt32LE(0) === m.inputs.length &&
       JSON.stringify(ins) === JSON.stringify(m.inputs) && injury.indexOf(m.words) !== -1);
-  yes('and $RECIPE_OWNER names it to ' + m.owner.join('/') + ', so the rebuilt table gates it',
-      new RegExp("'" + m.edid + "'\\s*=\\s*@\\{ Owner = '" + m.owner[0] + "'; Half = '" + m.owner[1] + "'").test(recipeTable));
+  yes('and records/recipe-owners.json names it to ' + m.owner.join('/') + ', so the rebuilt table gates it',
+      !!named[m.edid] && named[m.edid].Owner === m.owner[0] && named[m.edid].Half === m.owner[1]);
   // Written by the tool from its own numbers (#2553): a writer call with the
   // record's constant and its editor id.
   yes('and Add-ContentRecords.py is what adds both records',

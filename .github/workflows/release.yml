@@ -465,11 +465,10 @@ jobs:
   # a signed launcher. A job of its own gets a fresh GitHub runner, so the
   # machine that checks holds no signing client, no signing.json and no
   # Azure token and is not the one that signed: what it accepts it accepts
-  # on the files alone, the way an installed launcher does. No runner of the
-  # box checks it any more, so records\check-runners.json (#3956) names a
-  # label no job asks for, and #4033 takes it off with the sign record.
-  # contents: write only because a draft release is visible to nobody
-  # without push access.
+  # on the files alone, the way an installed launcher does. No VPS runner
+  # checks it any more (#4013), and #4033 took the signing and check
+  # runners' labels off. contents: write only because a draft release is
+  # visible to nobody without push access.
   verify:
     name: Check the signed draft on a second machine
     needs: launcher

@@ -156,6 +156,8 @@ if ($Dev -and -not $PSBoundParameters.ContainsKey('Root') -and -not (Test-Path (
 . (Join-Path $Here 'Dev-News.ps1')
 # Which content plugin the channel's server holds (#2308, ServerContent.ps1).
 . (Join-Path $Here '..\deploy\ServerContent.ps1')
+# Which Thornswood-Last.esp this commit's recipe makes (#2791).
+. (Join-Path $Here '..\deploy\LastPluginRecipe.ps1')
 # Where the notes are kept, in the feed or as a file of their own (#1050).
 . (Join-Path $Here 'Feed-News.ps1')
 # The signed release manifest (#2163, phase B): what it lists, and signing it.
@@ -1144,8 +1146,11 @@ if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -
 # than through the server's manifest. A dry run (-NoUpload -NoPush) asks the
 # same and stops the same, so it says what the real Ship would do.
 # Every plugin of ours (RepoPlugins.ps1), not the content plugin alone: since
-# #2486 Thornswood-Last.esp ships from the repo too, under the same rule.
-$contentChanged = @($changed | Where-Object { Test-ThornswoodRepoPlugin $_ })
+# #2486 Thornswood-Last.esp reaches clients from the repo too, under the same
+# rule, and since #2791 as its recipe, from which the launcher makes the
+# plugin game\data\last-plugin.json names. So a release whose recipe changed
+# asks the server for that plugin, which the deploy made on the box.
+$contentChanged = @($changed | Where-Object { (Test-ThornswoodRepoPlugin $_) -or $_ -ieq 'Data\Thornswood-Last.recipe' })
 if ($contentChanged.Count) {
     Head 'Our plugins on the server'
     $contentBox = $null
@@ -1154,6 +1159,11 @@ if ($contentChanged.Count) {
     foreach ($contentRel in $contentChanged) {
         $contentName = Split-Path -Leaf $contentRel
         $contentEntry = [string]$now[$contentRel]
+        if ($contentRel -ieq 'Data\Thornswood-Last.recipe') {
+            $contentName = $ThornswoodLastPlugin
+            $lastShipWant = Get-ThornswoodLastPluginWant $RepoDir
+            $contentEntry = if ($lastShipWant) { '{0}:{1}' -f $lastShipWant.Bytes, $lastShipWant.Sha } else { '' }
+        }
         $pluginBox = Get-ThornswoodServerPlugin $contentBox $contentName
         $contentProblem = Get-ThornswoodContentShipProblem $Channel $contentEntry $pluginBox $contentName
         if ($contentProblem) {
@@ -1644,10 +1654,28 @@ foreach ($k in @($prev.Keys)) {
     # launcher builds on each computer (#3715): an install whose build made
     # the very bytes a release once carried would lose them at every update
     # and build them again at the next Play.
-    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k) -or (Test-ShipGenerated $k)) { continue }
+    # Nor Thornswood-Last.esp, which the launcher makes from the recipe on
+    # each computer before every Play (#2791, Test-ShipMadeFromRecipe).
+    if ((Test-ShipBethesda $k) -or (Test-ShipOneMachine $k) -or (Test-ShipBackup $k) -or (Test-ShipGenerated $k) -or (Test-ShipMadeFromRecipe $k)) { continue }
     $m = [regex]::Match([string]$prev[$k], '^\d+:([0-9a-fA-F]{64})$')
     if ($m.Success) { $gone[$k] = $m.Groups[1].Value.ToLowerInvariant() }
 }
+# ==== thornswood shipped not ours ====
+# tests\test-shipped-not-ours.ps1 runs this block on its own.
+#
+# And the ones no record named any more when #1261 came (#1178): the scrub of
+# 29 September had already taken them out of the records, so the loop above
+# never saw them, and every install the old packs reached kept them.
+# Ship-Rules' Get-ShipShippedNotOurs reads them, with the bytes we shipped, from
+# records\shipped-not-ours.json, and stops the release on a path that is not
+# another author's. A path this release ships is its own file again and is not
+# gone; one Ship-Rules deletes everywhere stays 'always'.
+$shippedNotOurs = Get-ShipShippedNotOurs
+foreach ($k in @($shippedNotOurs.Keys)) {
+    if ($now.ContainsKey($k) -or [string]$gone[$k] -eq 'always') { continue }
+    $gone[$k] = $shippedNotOurs[$k]
+}
+# ==== end thornswood shipped not ours ====
 foreach ($k in @($gone.Keys)) {
     if ($now.ContainsKey($k)) { $gone.Remove($k); continue }
     if ($gone[$k] -eq 'always') { continue }

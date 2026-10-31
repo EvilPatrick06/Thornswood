@@ -28,7 +28,8 @@
 //      launcher makes from the person's own game, or from their own copy of
 //      the collection's mods, names the Ship-Rules.ps1 list that keeps it out
 //      of every pack the same way (#2827, #3113), and so does one the
-//      launcher builds on each computer with the collection's tools (#3715);
+//      launcher builds on each computer with the collection's tools (#3715),
+//      and the plugin each machine makes from its recipe (#2791);
 //   5. no permission is copied in: no email address anywhere in it;
 //   6. it stays operator only: nothing that builds a pack, the installer, the
 //      launcher or the site names it, and it is not under site\public;
@@ -119,7 +120,7 @@ function audit(reg, files, hash, uiGone, shipRules) {
     if (NEEDS_ASK.indexOf(a.status) >= 0 && !(typeof a.ask === 'string' && /^[^:]{2,}: \S/.test(a.ask))) bad.push(name + ': ' + a.status + ' with no ask naming who can answer ("Who: what")');
     if (a.status === 'no-licence-found' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': no licence found, and no issue that carries it');
     if (a.status === 'leaving' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': leaving, and no issue that carries the upload it leaves in');
-    if (a.status === 'withheld' || a.status === 'made-from-game' || a.status === 'made-from-mods' || a.status === 'built-on-each-computer') {
+    if (a.status === 'withheld' || a.status === 'made-from-game' || a.status === 'made-from-mods' || a.status === 'built-on-each-computer' || a.status === 'made-from-recipe') {
       const m = /^records\/ui-gone\.json#(\w+)$/.exec(a.record || '');
       const r = /^scripts\/release\/Ship-Rules\.ps1#(\w+)$/.exec(a.record || '');
       if (r) {
@@ -132,6 +133,8 @@ function audit(reg, files, hash, uiGone, shipRules) {
         bad.push(name + ': made from the ' + (a.status === 'made-from-game' ? 'game' : 'mods') + ', but names no Ship-Rules.ps1 list that keeps it out of packs');
       } else if (a.status === 'built-on-each-computer') {
         bad.push(name + ': built on each computer, but names no Ship-Rules.ps1 list that keeps it out of packs');
+      } else if (a.status === 'made-from-recipe') {
+        bad.push(name + ': made from its recipe, but names no Ship-Rules.ps1 list that keeps it out of packs');
       } else {
         const held = m && uiGone ? uiGone[m[1]] : null;
         const n = held ? (Array.isArray(held) ? held.length : Object.keys(held).length) : 0;
@@ -191,15 +194,19 @@ if (reg) {
     (reg.notInRepo || []).filter((a) => a.status === 'made-from-game' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromGame')
       .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 3 &&
     shipList(shipRules, 'ShipMadeFromGame').length === 3);
-  yes('the five menus the launcher makes from the collection\'s mods are registered, held out by the Ship-Rules.ps1 list (#3113)',
+  yes('the six menus the launcher makes from the collection\'s mods are registered, held out by the Ship-Rules.ps1 list (#3113, #3127)',
     (reg.notInRepo || []).filter((a) => a.status === 'made-from-mods' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromMods')
-      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 5 &&
-    shipList(shipRules, 'ShipMadeFromMods').length === 5);
+      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 6 &&
+    shipList(shipRules, 'ShipMadeFromMods').length === 6);
   yes('the animation and body files the launcher builds on each computer are registered, named by the Ship-Rules.ps1 lists that keep them out (#3715)',
     (reg.notInRepo || []).filter((a) => a.status === 'built-on-each-computer' && /^scripts\/release\/Ship-Rules\.ps1#ShipGenerated(BodyFiles|Patterns)$/.test(a.record || ''))
       .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) ===
       ['ShipGeneratedBodyFiles', 'ShipGeneratedOutfitFiles', 'ShipGeneratedPatterns'].reduce((n, l) => n + shipList(shipRules, l).length, 0) &&
     shipList(shipRules, 'ShipGeneratedBodyFiles').length === 6);
+  yes('Thornswood-Last.esp is registered as made from its recipe, held out by the Ship-Rules.ps1 list, and no repository holds it (#2791)',
+    (reg.notInRepo || []).some((a) => a.status === 'made-from-recipe' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromRecipe' &&
+      Array.isArray(a.paths) && a.paths.length === 1 && a.paths[0] === 'Data\\Thornswood-Last.esp') &&
+    shipList(shipRules, 'ShipMadeFromRecipe').length === 1 && files.indexOf('game/content/Thornswood-Last.esp') < 0);
   yes('community uploads and the collection\'s mods are dispositioned', (reg.dispositions || []).length >= 2 && (reg.dispositions || []).some((d) => /gallery/i.test(d.what)) && (reg.dispositions || []).some((d) => /collection/i.test(d.what)));
 }
 
@@ -223,12 +230,14 @@ yes('every sprite font THIRD-PARTY.md names is registered (' + sprites.length + 
 // ---- 8: the checks catch what they are for, on planted copies -----------------------
 if (reg) {
   const copy = () => JSON.parse(JSON.stringify(reg));
-  const some = (reg.assets || []).find((a) => a.status === 'unconfirmed');
+  // Any registered file; since #2791 no asset is unconfirmed, so the check
+  // for an ask is run on one made so in the copy.
+  const some = (reg.assets || [])[0];
   let r = audit(copy(), files.concat(['site/public/new-picture.png']), hashOf, uiGone, shipRules);
   yes('a new picture nobody registered is caught', r.some((b) => /^site\/public\/new-picture\.png: not in records/.test(b)));
   r = audit(copy(), files, (p) => (p === some.path ? '0'.repeat(64) : hashOf(p)), uiGone, shipRules);
   yes('a registered picture that changed is caught', r.some((b) => b.indexOf(some.path + ': changed since it was registered') === 0));
-  const c = copy(); delete c.assets.find((a) => a.path === some.path).ask;
+  const c = copy(); const planted = c.assets.find((a) => a.path === some.path); planted.status = 'unconfirmed'; delete planted.ask;
   r = audit(c, files, hashOf, uiGone, shipRules);
   yes('an unconfirmed entry with no ask is caught', r.some((b) => b.indexOf(some.path + ': unconfirmed with no ask') === 0));
   const d = copy(); d.assets[0].evidence = 'licence by email from someone@example.com';
