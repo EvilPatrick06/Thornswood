@@ -446,7 +446,10 @@ set by its own settings file instead, which ships from `game\ours`. SkyUI's
 journal (`Data\Interface\quest_journal.swf`, from `SkyUI_SE.bsa`) is made the
 same way with Quick Save, Save, Load, Help and the Creation Club entries taken
 off its System page (#3127), since a character lives on the server and the
-help panel replaced Skyrim's help.
+help panel replaced Skyrim's help. The game still writes "disabled" into each
+of those entries every time the journal opens (SetSaveDisabled), so the edit
+hands it an empty object of its own in each one's place; handing it the
+missing entry crashed the game on Escape (31 Oct 2026).
 
 **GeneratedHere and GeneratedBuild** (GeneratedHere.cs, GeneratedBuild.cs,
 Generated.cs, CoveredBodies.cs, #1247, #3715). The behavior files Pandora
