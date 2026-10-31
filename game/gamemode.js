@@ -5353,6 +5353,13 @@ function chargenTick() {
   for (const id of Array.from(firstSeen.keys())) {
     if (!here.has(id)) {
       firstSeen.delete(id);
+      // The cuffs keep nothing on somebody gone (#2573, left()).
+      try {
+        const cuffsGone = globalThis.__thornswoodCuffs;
+        if (cuffsGone && cuffsGone.left) { cuffsGone.left(id); }
+      } catch (e) {
+        log('logout', id.toString(16), 'could not clear what the cuffs knew of them:', e);
+      }
     }
   }
 
@@ -5480,6 +5487,15 @@ function chargenTick() {
         }
       } catch (e) {
         log('login', actorId.toString(16), 'could not say the profession:', e);
+      }
+
+      // A guard is issued their Prisoner's Cuffs as they arrive, and a new
+      // session looks at their pair afresh (#2573, arrived()).
+      try {
+        const cuffsHere = globalThis.__thornswoodCuffs;
+        if (cuffsHere && cuffsHere.arrived) { cuffsHere.arrived(actorId); }
+      } catch (e) {
+        log('login', actorId.toString(16), 'could not issue the cuffs:', e);
       }
 
       /*
@@ -47609,6 +47625,11 @@ module.exports = {
     var had = holdHere(office, hold, profileId, name);
     pushAll();
     officeRedraw(actorId, had ? had.pid : 0);
+    // A guard now: their Prisoner's Cuffs, if they have none (#2573).
+    var cuffsOffice = g.__thornswoodCuffs;
+    if (office === 'guard' && cuffsOffice && cuffsOffice.guardOffice) {
+      try { cuffsOffice.guardOffice(actorId); } catch (e) { plog('law: the cuffs issue for', name, 'failed:', e); }
+    }
     plog('law:', name, '(profile ' + profileId + ') holds', role, 'for their account' +
          (had ? ', in place of ' + had.name + ' (profile ' + had.pid + ')' : ''));
     toProfile(profileId, 'This character holds ' + role + ' now' + (had ? ', in place of ' + had.name : '') + '. ' +
@@ -62074,7 +62095,14 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     if (word === '/joinpass') {
       var jp = g.__thornswoodJoinPass;
       if (jp && profileId) {
+        var heldBefore = !!(jp.held && jp.held(profileId, Date.now()));
         try { jp.take(profileId, parts[1], Date.now()); } catch (eJp) { log('/joinpass failed:', eJp); }
+        // Shown just now, not again: a guard who arrived waiting on the pass
+        // is issued their cuffs here (#2573, passShown()).
+        var cuffsPass = g.__thornswoodCuffs;
+        if (heldBefore && cuffsPass && cuffsPass.passShown && !(jp.held && jp.held(profileId, Date.now()))) {
+          try { cuffsPass.passShown(profileId); } catch (eCuffs) { log('/joinpass: the cuffs issue failed:', eCuffs); }
+        }
       }
       return;
     }
@@ -64902,15 +64930,39 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   prisoner's pair goes into that guard's pack. WHICH guard: any guard of any
   hold (Patrick, 17 Oct 2026 on #2573). Freeing is not tied to a hold, the
   hold that cuffed them or the one they stand in; being a guard is the whole
-  of it. Anybody else is told only a guard can take the cuffs off.
+  of it. Anybody else is told that any guard of any hold can take them off,
+  and the prisoner is told the same as the cuffs go on.
 
-  WHERE A GUARD'S CUFFS COME FROM. A guard of any hold who is in the world,
-  carries no cuffs and is not cuffed is issued one pair, at most once a real
-  day per character. Cuffing moves the pair to the prisoner and freeing gives
-  it back, so the issue only covers a pair that went away.
+  WHERE A GUARD'S CUFFS COME FROM. A guard of any hold who carries no cuffs
+  and is not cuffed is issued one pair, at most once a real day per
+  character, at the three moments that can make somebody such a guard in the
+  world, and at no other time: they arrive (the per-session hook in the
+  chargen tick, arrived()), their join pass is shown (passShown(), for
+  somebody who arrived still waiting on it), and they take a guard office on
+  the Office page of K (officeHoldHere). Not a timer looking at everybody:
+  nothing changes in between. Cuffing moves the pair to the prisoner and
+  freeing gives it back, so the issue only covers a pair that went away, and
+  a guard whose pair went away is issued the next one when they next arrive
+  a day or more later.
 
-  updateOwner runs every frame (see SWING_PROPERTY), so the owner script is
-  edge triggered on v.at and does only cheap reads between changes.
+  THE CLIENT SCRIPTS ACT ONCE, ON A CHANGE. updateOwner and updateNeighbor
+  run every frame (see SWING_PROPERTY). What the prisoner's game is told to
+  do, it does once, when the record changes (v.at) or in a game that has not
+  seen this record yet (a new session, so a fresh ctx.state): fighting off
+  and named held, a drawn weapon put away, the pair locked on, the idle
+  played. Nothing is put right again every frame or every few seconds,
+  because nothing undoes it: the pair is locked on (preventRemoval), with
+  fighting off nothing can be drawn, and the two front plugin rescues leave
+  a held control alone (#2620). The one thing the game itself throws away
+  is the idle, with the body it was played on: a load screen rebuilds the
+  prisoner's own body, so their game plays it once more when the cell they
+  stand in changes, and everybody else's game plays it once each time the
+  prisoner's body is loaded near them. Nothing in them fails quietly: a step
+  that throws is written to the game's console, once per record.
+
+  NOTHING ABOUT THE GUARD GOES TO THE NEIGHBOURS. The record everybody near
+  sees is bound, hold, at and item. Who put the cuffs on, by profile, is in
+  the server log only.
 */
 (function () {
   'use strict';
@@ -64919,13 +64971,14 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   var CUFF_PROPERTY = 'thornswoodCuffed';
   var ISSUED_PROPERTY = 'thornswoodCuffsIssued';
   var ISSUE_EVERY_MS = 24 * 3600 * 1000;
-  var ISSUE_TICK_MS = 30000;
   var USE_PROPERTY = 'thornswoodCuffsUsed';
   // Arm's reach, in game units (about 2.8 m), and in front: within 60 degrees
   // either side of the way the guard faces.
   var REACH = 200;
   var FRONT_COS = 0.5;
   var stamp = 0;
+  // actorId -> whether their pair was worn at the last look this session.
+  var wornWas = {};
 
   function clog() {
     var a = Array.prototype.slice.call(arguments);
@@ -64980,14 +65033,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     try { return holdAt({ desc: l.cellOrWorldDesc, pos: l.pos }) || null; } catch (e) { return null; }
   }
   function tell(id, line) {
-    try { notify(id, line); } catch (e) { }
-    try { say(id, line); } catch (e2) { }
+    try { notify(id, line); } catch (e) { clog('could not show', hex(id), 'the line "' + line + '":', e); }
+    try { say(id, line); } catch (e2) { clog('could not say to', hex(id), 'the line "' + line + '":', e2); }
   }
-  function write(id, v) {
+  /*
+    The record everybody near sees: bound, hold, at, item, and nothing about
+    the guard. Their pair's worn state is looked at afresh from here on
+    (wornWas), so going into or out of the cuffs is never read as a use.
+  */
+  function write(id, bound, hold) {
     stamp = Math.max(stamp + 1, Date.now());
-    v.at = stamp;
-    v.item = cuffsId();
-    mp.set(id, CUFF_PROPERTY, v);
+    delete wornWas[id];
+    mp.set(id, CUFF_PROPERTY, { bound: !!bound, hold: hold, at: stamp, item: cuffsId() });
   }
 
   /*
@@ -65050,23 +65107,22 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     }
     if (!takeItemById(casterId, cuffsId(), 1)) { return true; }
     addItem(targetId, CUFFS_DESC, 1);
-    write(targetId, { bound: true, hold: hold, by: cp });
+    write(targetId, true, hold);
     tell(casterId, 'You put the cuffs on them in the name of ' + town(hold) +
                    '. Facing them, put on a pair again to take the cuffs off.');
-    tell(targetId, 'A guard of ' + town(hold) + ' puts you in cuffs. Only a guard of ' + town(hold) +
-                   ' can take them off.');
+    tell(targetId, 'A guard of ' + town(hold) + ' puts you in cuffs. Any guard of any hold can take them off.');
     clog(hex(casterId), '(profile ' + cp + ') cuffed', hex(targetId), '(profile ' + tp + ') for', hold);
     return true;
   }
 
   function free(casterId, cp, targetId, tp, on) {
     if (!mayFree(cp)) {
-      tell(casterId, 'They are in the cuffs of ' + town(on.hold) + ', and only a guard can take them off.');
+      tell(casterId, 'They are in the cuffs of ' + town(on.hold) + '. Any guard of any hold can take them off, and you are not a guard.');
       return true;
     }
     var back = takeItemById(targetId, cuffsId(), 1);
     if (back) { addItem(casterId, CUFFS_DESC, 1); }
-    write(targetId, { bound: false, hold: on.hold, by: cp });
+    write(targetId, false, on.hold);
     tell(casterId, 'You take the cuffs off. ' + (back ? 'Their pair is in your pack.' : ''));
     tell(targetId, 'A guard takes the cuffs off. Your hands are free.');
     clog(hex(casterId), '(profile ' + cp + ') freed', hex(targetId), '(profile ' + tp + ') from the cuffs of', on.hold);
@@ -65127,8 +65183,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     the engine before onEquipItemAttempt. A pair newly worn acts as above,
     and the wearer's own game takes it back off. The first look at somebody
     after they arrive only remembers, so a pair worn at logout does nothing.
+    wornWas is declared at the top of the block; arrived() and left() clear
+    a person's entry, so it is per session and holds nobody offline.
   */
-  var wornWas = {};
   function equipped(actorId, eq) {
     // Not even remembered while waiting: the first look after the pass is
     // the baseline, so a pair put on before it does nothing afterwards.
@@ -65172,98 +65229,142 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     clog('issued a pair of cuffs to', hex(actorId), '(profile ' + pid + ')');
     return true;
   }
-  function tick() {
+
+  /*
+    THE PER-SESSION HOOK (the chargen tick's first sight of somebody, #1642).
+    A new session starts with no look at their pair yet, and a guard who is
+    not still waiting on their pass is issued theirs now; one who is waiting
+    is issued it when the pass is shown (passShown).
+  */
+  function arrived(actorId) {
+    delete wornWas[actorId];
+    if (waiting(actorId)) { return false; }
+    return issue(actorId);
+  }
+  /* Gone from the world (the same tick's offline pass): nothing kept on them. */
+  function left(actorId) {
+    delete wornWas[actorId];
+  }
+  /*
+    Their join pass was shown (the dispatcher's /joinpass, on the change from
+    held to shown only, so the launcher's later passes do nothing here).
+  */
+  function passShown(pid) {
+    pid = Number(pid) || 0;
+    if (!pid) { return false; }
     var on = [];
-    try { on = mp.getOnlinePlayers() || []; } catch (e) { on = []; }
-    for (var i = 0; i < on.length; i++) { issue(on[i]); }
+    try { on = mp.getOnlinePlayers() || []; } catch (e) { clog('could not list who is online for the pass of profile', pid + ':', e); return false; }
+    for (var i = 0; i < on.length; i++) {
+      if (pidOf(on[i]) === pid) { return issue(on[i]); }
+    }
+    return false;
+  }
+  /* They took a guard office on the Office page of K (officeHoldHere). */
+  function guardOffice(actorId) {
+    return issue(actorId);
   }
 
-  /* The prisoner's own game. Edge triggered on v.at; between changes, held. */
+  /*
+    The lines every client script starts with: step(what, f) runs one thing
+    the game is asked to do, and one that throws is written to the game's
+    console with what it was, once per record (v.at), not every frame.
+  */
+  var SCRIPT_HEAD = [
+    '  var sp = ctx.sp, st = ctx.state, v = ctx.value;',
+    '  if (!v || !v.at || !st) { return; }',
+    '  function report(what, e) {',
+    '    var seen = st.thornswoodCuffReported || (st.thornswoodCuffReported = {});',
+    '    var key = what + " " + v.at;',
+    '    if (seen[key]) { return; }',
+    '    seen[key] = true;',
+    '    sp.printConsole("[thornswood] cuffs: could not " + what + ": " + e);',
+    '  }',
+    '  function step(what, f) { try { f(); } catch (e) { report(what, e); } }'
+  ];
+
+  /*
+    The prisoner's own game. Everything once, on a change of record or in a
+    game new to it; after that only which cell they stand in is read, so the
+    idle a load screen throws away is played once more.
+  */
   function ownerScript() {
-    return [
-      '(function(){',
-      '  try {',
-      '    var v = ctx.value;',
-      '    if (!v || !v.at) { return; }',
-      '    var st = ctx.state;',
-      '    if (!st) { return; }',
-      '    var sp = ctx.sp;',
+    return ['(function(){'].concat(SCRIPT_HEAD, [
+      '  step("look at the cuffed record", function () {',
       '    var pc = sp.Game.getPlayer();',
       '    if (!pc) { return; }',
       '    var cuffs = v.item ? sp.Game.getFormEx(v.item) : null;',
-      '    var now = Date.now();',
+      '    var cell = pc.getParentCell();',
+      '    var where = cell ? cell.getFormID() : 0;',
       '    if (st.thornswoodCuffAt !== v.at) {',
       '      st.thornswoodCuffAt = v.at;',
       '      if (!v.bound) {',
-      '        if (st.thornswoodCuffBound) {',
-      '          st.thornswoodCuffBound = false;',
-      '          try { if (cuffs) { pc.unequipItem(cuffs, false, true); } } catch (e) { }',
-      '          try { sp.Debug.sendAnimationEvent(pc, "OffsetStop"); } catch (e) { }',
-      '          try { if (sp.storage.thornswoodControlsHeld) { delete sp.storage.thornswoodControlsHeld.fighting; } } catch (e) { }',
-      '          try { sp.Game.enablePlayerControls(false, true, false, false, false, false, false, false, 0); } catch (e) { }',
-      '        }',
+      '        if (!st.thornswoodCuffBound) { return; }',
+      '        st.thornswoodCuffBound = false;',
+      '        st.thornswoodCuffWhere = 0;',
+      '        step("take the cuffs off", function () { if (cuffs) { pc.unequipItem(cuffs, false, true); } });',
+      '        step("end the bound idle", function () { sp.Debug.sendAnimationEvent(pc, "OffsetStop"); });',
+      '        step("stop naming fighting held", function () { if (sp.storage.thornswoodControlsHeld) { delete sp.storage.thornswoodControlsHeld.fighting; } });',
+      '        step("give fighting back", function () { sp.Game.enablePlayerControls(false, true, false, false, false, false, false, false, 0); });',
       '        return;',
       '      }',
       '      st.thornswoodCuffBound = true;',
-      '      st.thornswoodCuffIdleAt = 0;',
-      '      try { sp.Game.disablePlayerControls(false, true, false, false, false, false, false, false, 0); } catch (e) { }',
+      '      st.thornswoodCuffWhere = where;',
+      '      step("name fighting held", function () { var held = sp.storage.thornswoodControlsHeld || {}; held.fighting = "cuffed"; sp.storage.thornswoodControlsHeld = held; });',
+      '      step("turn fighting off", function () { sp.Game.disablePlayerControls(false, true, false, false, false, false, false, false, 0); });',
+      '      step("put the weapon away", function () { if (pc.isWeaponDrawn()) { pc.sheatheWeapon(); } });',
+      '      step("lock the cuffs on", function () { if (cuffs && pc.getItemCount(cuffs) > 0) { pc.equipItem(cuffs, true, true); } });',
+      '      step("play the bound idle", function () { sp.Debug.sendAnimationEvent(pc, "OffsetBoundStandingStart"); });',
+      '      return;',
       '    }',
-      '    if (!v.bound) { return; }',
-      '    try { var held = sp.storage.thornswoodControlsHeld || {}; if (held.fighting !== "cuffed") { held.fighting = "cuffed"; sp.storage.thornswoodControlsHeld = held; } } catch (e) { }',
-      '    try { if (sp.Game.isFightingControlsEnabled()) { sp.Game.disablePlayerControls(false, true, false, false, false, false, false, false, 0); } } catch (e) { }',
-      '    try { if (pc.isWeaponDrawn()) { pc.sheatheWeapon(); } } catch (e) { }',
-      '    try { if (cuffs && pc.getItemCount(cuffs) > 0 && !pc.isEquipped(cuffs)) { pc.equipItem(cuffs, true, true); } } catch (e) { }',
-      '    if (now - (st.thornswoodCuffIdleAt || 0) > 5000) {',
-      '      st.thornswoodCuffIdleAt = now;',
-      '      try { sp.Debug.sendAnimationEvent(pc, "OffsetBoundStandingStart"); } catch (e) { }',
-      '    }',
-      '  } catch (e) { }',
+      '    if (!v.bound || !where || st.thornswoodCuffWhere === where) { return; }',
+      '    st.thornswoodCuffWhere = where;',
+      '    step("play the bound idle after a load", function () { sp.Debug.sendAnimationEvent(pc, "OffsetBoundStandingStart"); });',
+      '  });',
       '})();'
-    ].join('\n');
+    ]).join('\n');
   }
 
   /* The wearer's own game, once per use: the pair they put on comes back off. */
   function useScript() {
-    return [
-      '(function(){',
-      '  try {',
-      '    var v = ctx.value;',
-      '    if (!v || !v.at || !ctx.state || ctx.state.thornswoodCuffUseAt === v.at) { return; }',
-      '    ctx.state.thornswoodCuffUseAt = v.at;',
-      '    var pc = ctx.sp.Game.getPlayer();',
-      '    var cuffs = v.item ? ctx.sp.Game.getFormEx(v.item) : null;',
+    return ['(function(){'].concat(SCRIPT_HEAD, [
+      '  if (st.thornswoodCuffUseAt === v.at) { return; }',
+      '  st.thornswoodCuffUseAt = v.at;',
+      '  step("take back off the pair that was used", function () {',
+      '    var pc = sp.Game.getPlayer();',
+      '    var cuffs = v.item ? sp.Game.getFormEx(v.item) : null;',
       '    if (pc && cuffs && pc.isEquipped(cuffs)) { pc.unequipItem(cuffs, false, true); }',
-      '  } catch (e) { }',
+      '  });',
       '})();'
-    ].join('\n');
+    ]).join('\n');
   }
 
-  /* Everybody else's game: the idle on the prisoner's body, on each change and now and then. */
+  /*
+    Everybody else's game: the idle on the prisoner's body, once on each
+    change, and once each time that body is loaded near them (it comes with
+    a fresh body, which does not keep an idle played on the last one).
+  */
   function neighborScript() {
-    return [
-      '(function(){',
-      '  try {',
-      '    var v = ctx.value;',
-      '    if (!v || !v.at) { return; }',
-      '    var st = ctx.state;',
-      '    if (!st) { return; }',
-      '    var a = ctx.sp.Actor.from(ctx.refr);',
+    return ['(function(){'].concat(SCRIPT_HEAD, [
+      '  step("look at the cuffed record nearby", function () {',
+      '    var a = sp.Actor.from(ctx.refr);',
       '    if (!a) { return; }',
-      '    var now = Date.now();',
       '    var changed = st.thornswoodCuffAt !== v.at;',
       '    st.thornswoodCuffAt = v.at;',
       '    if (!v.bound) {',
-      '      if (changed && st.thornswoodCuffBound) { st.thornswoodCuffBound = false; ctx.sp.Debug.sendAnimationEvent(a, "OffsetStop"); }',
+      '      if (changed && st.thornswoodCuffBound) {',
+      '        st.thornswoodCuffBound = false;',
+      '        step("end the bound idle nearby", function () { sp.Debug.sendAnimationEvent(a, "OffsetStop"); });',
+      '      }',
       '      return;',
       '    }',
       '    st.thornswoodCuffBound = true;',
-      '    if (changed || now - (st.thornswoodCuffIdleAt || 0) > 5000) {',
-      '      st.thornswoodCuffIdleAt = now;',
-      '      ctx.sp.Debug.sendAnimationEvent(a, "OffsetBoundStandingStart");',
-      '    }',
-      '  } catch (e) { }',
+      '    if (!a.is3DLoaded()) { st.thornswoodCuffShown = false; return; }',
+      '    if (!changed && st.thornswoodCuffShown) { return; }',
+      '    st.thornswoodCuffShown = true;',
+      '    step("play the bound idle nearby", function () { sp.Debug.sendAnimationEvent(a, "OffsetBoundStandingStart"); });',
+      '  });',
       '})();'
-    ].join('\n');
+    ]).join('\n');
   }
 
   try {
@@ -65274,7 +65375,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       updateNeighbor: neighborScript()
     });
   } catch (e) {
-    // already made by a previous load; a changed script needs a restart, which a deploy is.
+    // Made by a previous load: a changed script needs a restart, which a deploy is.
+    clog('the', CUFF_PROPERTY, 'property was made already, so its scripts are the last load\'s until a restart:', e);
   }
   try {
     mp.makeProperty(USE_PROPERTY, {
@@ -65282,7 +65384,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       updateOwner: useScript(), updateNeighbor: ''
     });
   } catch (e) {
-    // already made by a previous load.
+    clog('the', USE_PROPERTY, 'property was made already, so its script is the last load\'s until a restart:', e);
   }
   try {
     mp.makeProperty(ISSUED_PROPERTY, {
@@ -65290,10 +65392,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       updateOwner: '', updateNeighbor: ''
     });
   } catch (e) {
-    // already made by a previous load.
+    clog('the', ISSUED_PROPERTY, 'property was made already (a reload):', e);
   }
-  if (g.__thornswoodCuffsTimer) { try { clearInterval(g.__thornswoodCuffsTimer); } catch (e) { } }
-  g.__thornswoodCuffsTimer = setInterval(guard('cuffsIssue', tick), ISSUE_TICK_MS);
 
   /*
     ONE ENGINE EVENT, MORE THAN ONE GATE. A cuffed person's weapon, and a
@@ -65338,7 +65438,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   g.__thornswoodCuffs = {
     used: used, facing: facing, mayEquip: mayEquip, equipped: equipped, mayFree: mayFree,
     useScript: useScript, USE_PROPERTY: USE_PROPERTY, equipBefore: equipBefore, REACH: REACH,
-    mayLetGo: mayLetGo, issue: issue, tick: tick, cuffedBy: cuffedBy,
+    mayLetGo: mayLetGo, issue: issue, arrived: arrived, left: left, passShown: passShown,
+    guardOffice: guardOffice, cuffedBy: cuffedBy,
     bindingHold: bindingHold, ownerScript: ownerScript, neighborScript: neighborScript,
     CUFFS_DESC: CUFFS_DESC, CUFF_PROPERTY: CUFF_PROPERTY, ISSUE_EVERY_MS: ISSUE_EVERY_MS
   };
