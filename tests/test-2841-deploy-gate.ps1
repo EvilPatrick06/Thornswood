@@ -91,6 +91,15 @@ Yes 'an enum value outside its list is refused' ((Words 'Deploy-DevGamemode -Npc
 # nothing else, never the folder it reads.
 Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-LauncherStarts -Days 7') -eq '-Days|7' -and (Words 'Read-LauncherStarts') -eq '' -and
     (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
+# The box's read only checks, which only One could run before (the cloud
+# reaches neither game port nor the box's shell): each takes nothing a caller
+# could steer, and Check-ProdParity sends its facts and report back.
+foreach ($check in 'Read-Online', 'Check-LiveGamemode', 'Check-ServiceOwners', 'Check-ProdParity') {
+    Yes "$check takes no parameter of the caller's" ((Words "$check -Vps x") -eq 'REFUSED' -and (Words "$check -User x") -eq 'REFUSED' -and (Words $check) -ne 'REFUSED')
+}
+Yes '  Check-LiveGamemode never waits for Enter, and Check-ProdParity collects into the run''s folder' ((Words 'Check-LiveGamemode') -eq '-NoPause' -and
+    (Words 'Check-ProdParity') -eq '-Collect' -and (Test-ThornswoodGateRequest -Line 'Check-ProdParity' -Verbs $verbs).Out -eq '-Out' -and
+    (Words 'Check-ProdParity -Facts x') -eq 'REFUSED' -and (Words 'Check-ProdParity -Record x') -eq 'REFUSED')
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
 Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and

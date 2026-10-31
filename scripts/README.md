@@ -305,6 +305,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Read-Availability.ps1](vps/Read-Availability.ps1) | Says how many minutes each service was down over a window, and what share of the window it was up, from the down and back lines the watchdog writes into alerts.jsonl. |
 | [vps/Read-LauncherStarts.ps1](vps/Read-LauncherStarts.ps1) | Says how long the launcher took to start on the machines of the people who played, per launcher version: how many starts, the middle one, the one slower than nine in ten, the slowest, and how much of the middle start the mod check took. |
 | [vps/Read-Load.ps1](vps/Read-Load.ps1) | Says which service is using the box, from the record vps-load.ps1 keeps on it. |
+| [vps/Read-Online.ps1](vps/Read-Online.ps1) | Says how many people are on each game server, live and dev, from the online.json each server announces on its resources port (3000 live, 7788 dev), the same file Restart-Server.ps1 and the launcher read. |
 | [vps/Remote.ps1](vps/Remote.ps1) | Runs a bit of PowerShell on the VPS, properly. |
 | [vps/Remove-HandMadeTasks.ps1](vps/Remove-HandMadeTasks.ps1) | Takes the two SYSTEM tasks somebody made by hand on the box, and the folders they run from, off the box (issue #3288). |
 | [vps/Request-Restart.ps1](vps/Request-Restart.ps1) | Tells the live server to warn everybody and then clear them out, without needing to be standing in the world to type /restart. |
