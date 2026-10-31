@@ -47,3 +47,15 @@ answer q-3649-content-14, A), each step through Nexus-Run.ps1 from main
    collection.json> --revision 6`.
 6. `New-NexusRevision -Publish 6`. Main takes revision 6 with no wipe
    (#3649).
+
+Then the servers and the feeds, from the box, with nothing of One's (#4069):
+
+7. `Deploy-DevGamemode -LoadOrder -FromRecord -ShipFollows` through the
+   deploy gate writes last-plugin.json's order over the dev server's, with
+   the plugins from the box's store of revision 6, fetched from Nexus
+   through Nexus-Run (scripts/deploy/CollectionStore.ps1).
+8. `Ship-Dev` moves the dev feed from revision 2 to 6: its plugin list is
+   last-plugin.json's order, held to the dev server's, and SkyUI's menu
+   check reads revision 6's own files from the same store.
+9. Main once dev carries revision 6: a Ship from the feed moves main only
+   then. The main server's own move to the order is the last part of #4069.

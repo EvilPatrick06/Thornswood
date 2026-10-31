@@ -189,7 +189,7 @@ try {
     $cccRead = $pu.LastIndexOf("Join-Path `$GameDir 'Skyrim.ccc'", $bytes)
     Yes '  and is handed the Skyrim.ccc plugins in the release''s Data' ($pu.Contains('Get-ShipLastPluginProblem $RepoDir $lastEnabled $lastCcc') -and $cccRead -gt 0 -and $bytes - $cccRead -lt 600)
     $dd = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-DevGamemode.ps1'))
-    Yes 'Deploy-DevGamemode -LoadOrder puts it last, and sends that order even without -Dist' ($dd.Contains('@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName') -and $dd.Contains('if ($Dist -or $orderMoved)'))
+    Yes 'Deploy-DevGamemode -LoadOrder puts it last, and sends that order even without -Dist' ($dd.Contains('@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName') -and $dd.Contains('if ($Dist -or $FromRecord -or $orderMoved)'))
     $ds = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-Server.ps1'))
     Yes 'Deploy-Server -GamemodeOnly refuses a live order that does not end with it' ($ds -match 'live load order does not end with Thornswood-Last\.esp')
     $dg = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-Gamemode.ps1'))

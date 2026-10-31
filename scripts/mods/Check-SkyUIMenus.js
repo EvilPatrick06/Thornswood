@@ -3,6 +3,7 @@
 //     node scripts\mods\Check-SkyUIMenus.js
 //     node scripts\mods\Check-SkyUIMenus.js --data <a Data folder> --plugins <its plugins.txt>
 //     node scripts\mods\Check-SkyUIMenus.js ... --gone "Data\Scripts\a.pex;Data\Interface\b.swf" --quiet
+//     node scripts\mods\Check-SkyUIMenus.js --holding <archive.bsa> ...
 //
 // Says whether SkyUI's menu files carry the version SkyUI's own script expects,
 // and exits 2 when one does not. Ship.ps1 runs it before a release.
@@ -315,12 +316,35 @@ function report(r, quiet) {
   return out;
 }
 
+/*
+  Whether an archive holds anything this check can read: SkyUI's script
+  (scripts\ski_main.pex) or any menu under interface. Install-NexusRevision
+  -KeepPlugins keeps those archives of a revision, and no other, so the box
+  can run this check on a revision that is not on any machine (#4069). An
+  archive that will not read is kept too: the check says what it could not
+  read, which is a refusal, never a pass.
+*/
+function holdsInput(file) {
+  let got;
+  try { got = archiveIndex(file); } catch (e) { return true; }
+  return Object.keys(got).some(function (k) {
+    return k === 'scripts\\ski_main.pex' || (k.indexOf('interface\\') === 0 && /\.swf$/.test(k));
+  });
+}
+
 module.exports = {
   archiveIndex: archiveIndex, fileFinder: fileFinder, readSkyUIScript: readSkyUIScript,
-  swfBody: swfBody, readMenu: readMenu, check: check, report: report
+  swfBody: swfBody, readMenu: readMenu, check: check, report: report, holdsInput: holdsInput
 };
 
 function main(args) {
+  // --holding <archive> ...: prints each archive that holds anything the
+  // check reads (holdsInput), one per line, and exits 0.
+  const holding = args.indexOf('--holding');
+  if (holding >= 0) {
+    args.slice(holding + 1).forEach(function (f) { if (holdsInput(f)) { console.log(f); } });
+    return 0;
+  }
   const opt = function (name, def) {
     const at = args.indexOf('--' + name);
     return at >= 0 && args[at + 1] !== undefined ? args[at + 1] : def;
