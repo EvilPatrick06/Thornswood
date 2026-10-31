@@ -96,6 +96,35 @@
         "Days": "^[0-9]{1,3}$"
       }
     },
+    "Read-Online": {
+      "script": "scripts/vps/Read-Online.ps1",
+      "timeoutMinutes": 5,
+      "fixed": [],
+      "params": {}
+    },
+    "Check-LiveGamemode": {
+      "script": "scripts/vps/Check-LiveGamemode.ps1",
+      "timeoutMinutes": 10,
+      "fixed": [
+        "-NoPause"
+      ],
+      "params": {}
+    },
+    "Check-ProdParity": {
+      "script": "scripts/vps/Check-ProdParity.ps1",
+      "timeoutMinutes": 15,
+      "fixed": [
+        "-Collect"
+      ],
+      "out": "-Out",
+      "params": {}
+    },
+    "Check-ServiceOwners": {
+      "script": "scripts/vps/Check-ServiceOwners.ps1",
+      "timeoutMinutes": 20,
+      "fixed": [],
+      "params": {}
+    },
     "Publish-Server": {
       "script": "scripts/release/Publish-ServerOnBox.ps1",
       "timeoutMinutes": 45,
