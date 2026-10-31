@@ -93,7 +93,10 @@ working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
 `thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`), `thornswoodTradeShips`
 (`gamemode.js:settings.thornswoodTradeShips === true`, off unless it is true: the trade ships of
 issue #511, whose register is still read and counted while off; on, a port's crate opens the dock and staff
-keep the ports and routes from the Office page of K, issue #2700) and `loadOrder`
+keep the ports and routes from the Office page of K, issue #2700; at a docked hold anybody may take what is aboard,
+written on the manifest as taken by their character and shown to staff, a hold at sea opens for nobody, and what nobody
+collects goes into that port's hold drop box under the recipient's name once the staff list's `uncollectedDays` have
+passed since it landed, 7 unless staff set it (`gamemode.js:function uncollectedNow`), freeing its line, issue #511) and `loadOrder`
 (`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
 (`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 
@@ -202,7 +205,8 @@ door reads from the site (`__thornswoodOffices`, read through `officeOf`,
 #2551): a Jarl gives their hold's Court, Steward and Guard on the Office
 page (`officeCmd`, which asks the site to set the role), and only a
 steward can `evict`. A hold's box is the drop box on its board
-(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid; board fees
+(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid and trade ship
+cargo nobody collected waits for a steward to hand out (`boxShipped`, #511); board fees
 (`takeGold`) are counted on the hold's ledger (`funds`). Notice boards come after them. Coin enters the world in one
 place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
 moves by trade (`gold`). No container holds gold the world put there,

@@ -43,14 +43,26 @@
   back your own where you loaded it, is not a charter. With no company rule
   running, nobody charters, and the panel says why.
 
+  TAKING (Patrick, 22 Oct 2026, 12:28 AM, #511: A). Anyone who opens a docked
+  hold sees what is aboard and can take from it. The manifest writes it as
+  taken, with their character, and staff see it in their panel (takenOf).
+  Whether it was a robbery or a seizure is roleplay; this file never says.
+  A hold at sea is not at any dock, so nobody can open it.
+
+  WHAT NOBODY COLLECTS (the same answer, B). Cargo still aboard the staff
+  list's uncollectedDays after landing goes into that port's hold drop box
+  under the recipient's name, and the hold's lines are free again.
+  trade-cargo's uncollected() says what is due; the block moves it.
+
   WHAT IT NEVER DECIDES. Who sails, where, when or for how long: those are the
-  players' RP (Patrick, 17 Oct 2026, 10:13 PM MT). Ports, routes, minutes and
-  crews are staff data. Taking cargo that is not yours, and leaving goods in a
-  drop box for somebody who never comes, wait on their own answer (#2700).
+  players' RP (Patrick, 17 Oct 2026, 10:13 PM MT). Ports, routes, minutes,
+  crews and the days cargo waits are staff data.
 */
 
 var GOLD_BASE = 15;
 var MINUTE = 60 * 1000;
+var DAY = 24 * 60 * MINUTE;
+var TAKEN_SHOWN = 20;
 var KEY_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/;
 var HOLD_KEYS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath',
   'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
@@ -116,6 +128,12 @@ function nextArrival(state) {
   return next;
 }
 
+/* How long cargo waits aboard after landing, from the list in force. */
+function waitOf(routes) {
+  var d = routes && Number.isInteger(routes.uncollectedDays) ? routes.uncollectedDays : 7;
+  return d * DAY;
+}
+
 /*
   THE CHARTER, ASKED IN ONE PLACE. tc is what the Trading Company publishes:
   { mayCharter(who, terms), terms() } (#2687). Answers { may, why }.
@@ -143,6 +161,7 @@ function charterOf(tc, who) {
     /ship sail <hold> <port>
     /ship collect <hold> <line> <count>
     /ship return <hold> <line> <count>
+    /ship take <hold> <line> <count>  anyone at a docked hold, written as taken
     /ship staff
     /ship draft <edit ...>           see editDraft
     /ship confirm <base>
@@ -164,7 +183,7 @@ function parse(parts) {
     var s = { verb: 'sail', hold: key(p[2]), to: key(p[3]) };
     return s.hold && s.to ? s : { why: 'That voyage cannot be read.' };
   }
-  if (verb === 'collect' || verb === 'return') {
+  if (verb === 'collect' || verb === 'return' || verb === 'take') {
     var c = { verb: verb, hold: key(p[2]), line: n(p[3]), count: n(p[4]) };
     return c.hold && whole(c.line) && whole(c.count) ? c : { why: 'That cannot be read.' };
   }
@@ -188,6 +207,7 @@ function parse(parts) {
     route <from> <to> <minutes>      a one way route, or its new minutes
     unroute <from> <to>              the route off the list
     crew <from> <to> <ref ...>       the route's crew references; none is no crew
+    days <n>                         real days cargo waits aboard before the drop box
     reset                            the draft back to the list in force
 */
 function editDraft(cargo, inForce, draft, edit, crate) {
@@ -232,6 +252,8 @@ function editDraft(cargo, inForce, draft, edit, crate) {
     var rc = routeOf(d, e[1], e[2]);
     if (!rc) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
     rc.crew = e.slice(3);
+  } else if (op === 'days') {
+    d.uncollectedDays = /^[0-9]{1,3}$/.test(e[1] || '') ? Number(e[1]) : NaN;
   } else {
     throw new Error('The staff panel does not know that edit.');
   }
@@ -239,10 +261,32 @@ function editDraft(cargo, inForce, draft, edit, crate) {
 }
 
 /*
-  WHAT STAFF SEE: the list in force, the draft, and the server's proposal of
-  what confirming the draft would do. Never a person's name or id.
+  WHAT WAS TAKEN, newest first, for staff: the hold, the piece, how many, the
+  character who took it and when. names is { nameOf(party), itemName(entry) }.
 */
-function staffView(cargo, reg, draft, crate) {
+function takenOf(reg, names) {
+  var nameOf = (names && names.nameOf) || function () { return ''; };
+  var itemName = (names && names.itemName) || function () { return 'Goods'; };
+  var all = [];
+  Object.keys(reg.state.holds).forEach(function (id) {
+    var h = reg.state.holds[id];
+    h.outs.forEach(function (o) {
+      if (o.how !== 'taken' || o.receipt === null) { return; }
+      var l = h.lines[String(o.line)];
+      all.push({ hold: id, item: l ? itemName(l.entry) : 'Goods', count: o.count,
+                 by: o.who ? (nameOf(o.who) || 'someone') : 'nobody now', at: o.at, seq: o.seq });
+    });
+  });
+  all.sort(function (a, b) { return b.seq - a.seq; });
+  return all.slice(0, TAKEN_SHOWN).map(function (t) { delete t.seq; return t; });
+}
+
+/*
+  WHAT STAFF SEE: the list in force, the draft, the server's proposal of
+  what confirming the draft would do, and what was taken lately, by
+  character name (Patrick's A: staff see it).
+*/
+function staffView(cargo, reg, draft, crate, names) {
   var d = draft || reg.routes;
   var p = cargo.proposeRoutes(reg.routes, d, reg.state);
   var c = cargo.countsOf(reg);
@@ -257,9 +301,12 @@ function staffView(cargo, reg, draft, crate) {
     counts: c,
     holdKeys: HOLD_KEYS.slice(),
     inForce: { ports: reg.routes.ports.map(function (x) { return { key: x.key, name: x.name, hold: x.hold, crate: !!x.crate, ships: holdsAt[x.key] || [] }; }),
-               routes: reg.routes.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }) },
+               routes: reg.routes.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }),
+               days: reg.routes.uncollectedDays },
     draft: { ports: d.ports.map(function (x) { return { key: x.key, name: x.name, hold: x.hold, crate: !!x.crate }; }),
-             routes: d.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }) },
+             routes: d.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }),
+             days: d.uncollectedDays },
+    taken: takenOf(reg, names),
     changes: p.changes.slice(), strands: p.strands.slice(),
     canConfirm: p.changes.length > 0 && p.strands.length === 0,
     crate: crate ? { here: true, dockOf: portOfCrate(d, crate.desc) || null } : null
@@ -277,8 +324,10 @@ function staffView(cargo, reg, draft, crate) {
     nameOf    function (party) -> the name to show, or '' when it cannot be read
     itemName  function (entry) -> the name of a piece
     now       the time
-  Lines are shown only to whoever they concern: the one they are for, the one
-  who loaded them, and staff (input.staff).
+  Everything aboard a docked hold is shown to whoever opened it, because
+  anyone there can take it (Patrick's A). Who a line is for is shown only to
+  whoever it concerns: the one it is for, the one who loaded it, and staff
+  (input.staff). Anybody else reads someone else.
 */
 function dockView(input) {
   var reg = input.reg, port = portOf(reg.routes, input.port);
@@ -301,20 +350,20 @@ function dockView(input) {
     var lines = reg.ships.aboard(reg.state, id).map(function (l) {
       var line = reg.state.holds[id].lines[String(l.line)];
       var mine = same(l.for, me), loaded = same(l.by, me);
+      var concerns = mine || loaded || input.staff === true;
+      var canCollect = mine && line.from !== h.port, canReturn = loaded && line.from === h.port;
       return {
         line: l.line, item: itemName(l.entry), count: l.entry.count,
-        shown: mine || loaded || input.staff === true,
-        forName: l.for ? (same(l.for, me) ? 'you' : (nameOf(l.for) || 'someone')) : 'nobody now',
-        canCollect: mine && line.from !== h.port,
-        canReturn: loaded && line.from === h.port
+        forName: !l.for ? 'nobody now' : (mine ? 'you' : (concerns ? (nameOf(l.for) || 'someone') : 'someone else')),
+        canCollect: canCollect,
+        canReturn: canReturn,
+        canTake: !canCollect && !canReturn
       };
     });
-    var used = Object.keys(h.lines).length;
-    var others = lines.filter(function (l) { return !l.shown; }).length;
+    var used = reg.ships.used(reg.state, id);
     holds.push({
       id: id, used: used, max: max,
-      lines: lines.filter(function (l) { return l.shown; }).map(function (l) { delete l.shown; return l; }),
-      others: others,
+      lines: lines,
       canLoad: input.charter.may && used < max,
       sail: input.charter.may ? reg.routes.routes.filter(function (r) { return r.from === port.key; }).map(function (r) {
         var to = portOf(reg.routes, r.to);
@@ -339,5 +388,6 @@ function dockView(input) {
 module.exports = {
   GOLD_BASE: GOLD_BASE, HOLD_KEYS: HOLD_KEYS,
   isCoin: isCoin, baseOf: baseOf, portOfCrate: portOfCrate, voyage: voyage, nextArrival: nextArrival,
+  waitOf: waitOf, takenOf: takenOf,
   charterOf: charterOf, parse: parse, editDraft: editDraft, staffView: staffView, dockView: dockView
 };

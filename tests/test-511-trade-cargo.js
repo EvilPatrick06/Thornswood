@@ -11,6 +11,11 @@
        hand out, a tampered save refused
     S  staff data: ports, routes and crews checked whole, an edit proposed
        with the holds it would strand, a voyage amended for narration
+    L  Patrick's answers of 22 Oct 2026: nothing is handed out of a hold at
+       sea, taken included; a hold keeps when it landed; what nobody collects
+       comes due after the staff list's days, never at the port it was loaded
+       in nor for a released recipient; a hold whose lines went out is free
+       again; the days are staff data, whole days from 1 to 60
     D  the release of deleted characters: by form id, by profile, never a
        profile's other characters, every piece where it was
     G  the register: none is a world with no ships, a bad one is refused
@@ -110,7 +115,7 @@ try {
   throws('N21 a refused change changes nothing', function () { ships.begin(s, 'ship-1', l2, 99, 'delivered', KARI, 400); });
   yes('N22 the manifest is as it was', ships.save(s) === before);
   const b3 = ships.begin(s, 'ship-1', l2, 1, 'taken', ONUND, 401);
-  yes('N23 this file lets a piece be taken; when that is allowed is the world\'s rule', b3.entry.count === 1);
+  yes('N23 at a dock anybody may take a piece, written as taken by who took it', b3.entry.count === 1 && s.holds['ship-1'].outs[s.holds['ship-1'].outs.length - 1].who.actor === ONUND.actor);
   ships.finish(s, 'ship-1', b3.out, 'credit:3');
 
   // ================================================================== S
@@ -136,6 +141,71 @@ try {
   ships.amend(s2, 'ship-2', { to: 'windhelm', arriveAt: 99 });
   yes('S6 staff can turn a voyage under way, nothing aboard changes', s2.holds['ship-2'].sailing.to === 'windhelm' && ships.audit(s2).aboard === 2);
   throws('S7 not back to where it left', function () { ships.amend(s2, 'ship-2', { to: 'solitude' }); });
+
+  // ================================================================== L
+  const DAY = 24 * 60 * 60 * 1000;
+  const L = ships.empty();
+  ships.open(L, 'ship-5', 'solitude');
+  yes('L1 a new hold has not landed', L.holds['ship-5'].landed === null);
+  const la = ships.load(L, 'ship-5', { by: BRYNJA, for: ONUND, receipt: 'l1', entry: { baseId: IRON, count: 4 } });
+  const lb = ships.load(L, 'ship-5', { by: BRYNJA, for: KARI, receipt: 'l2', entry: { baseId: SALT, count: 2 } });
+  yes('L2 at the port it was loaded in, nothing is ever due', ships.uncollected(L, 100 * DAY, 7 * DAY).length === 0 && ships.nextUncollected(L, 7 * DAY) === null);
+  ships.depart(L, 'ship-5', 'windhelm', 10, 20);
+  yes('L3 a hold that sails has no landing', L.holds['ship-5'].landed === null);
+  throws('L4 nothing is taken from a hold at sea', function () { ships.begin(L, 'ship-5', la, 1, 'taken', KARI, 15); }, /at sea/);
+  throws('L5 nor handed out any other way', function () { ships.begin(L, 'ship-5', la, 1, 'returned', BRYNJA, 15); }, /at sea/);
+  yes('L6 nor is anything due while it sails', ships.uncollected(L, 100 * DAY, 7 * DAY).length === 0);
+  ships.arrive(L, 20);
+  yes('L7 it landed when it docked', L.holds['ship-5'].landed === 20 && ships.nextUncollected(L, 7 * DAY) === 20 + 7 * DAY);
+  yes('L8 nothing is due a moment before the days are up', ships.uncollected(L, 20 + 7 * DAY - 1, 7 * DAY).length === 0);
+  const due = ships.uncollected(L, 20 + 7 * DAY, 7 * DAY);
+  yes('L9 at the days, every line aboard is due, at the port it is at, for its recipient', due.length === 2 && due[0].line === la && due[0].count === 4 &&
+      due[0].port === 'windhelm' && due[0].for.actor === ONUND.actor && due[1].line === lb);
+  ships.release(L, { actor: function (n) { return n === KARI.actor; }, profile: function () { return false; } });
+  yes('L10 a line whose recipient was released stays aboard, for the world to settle', ships.uncollected(L, 20 + 7 * DAY, 7 * DAY).length === 1);
+  const lt = ships.begin(L, 'ship-5', lb, 2, 'taken', ONUND, 30);
+  ships.finish(L, 'ship-5', lt.out, 'lc1');
+  const lo = ships.begin(L, 'ship-5', la, 4, 'left', ONUND, 20 + 7 * DAY);
+  yes('L11 a line being moved is still in use', ships.used(L, 'ship-5') === 1);
+  ships.finish(L, 'ship-5', lo.out, 'box:1');
+  yes('L12 once every line went out, the hold is free again', ships.used(L, 'ship-5') === 0 && ships.uncollected(L, 30 * DAY, 7 * DAY).length === 0 &&
+      ships.nextUncollected(L, 7 * DAY) === null);
+  const Lsave = ships.save(L);
+  yes('L13 the landing saves and reads back', ships.save(ships.parse(Lsave)) === Lsave && JSON.parse(Lsave).holds['ship-5'].landed === 20);
+  const l14 = JSON.parse(Lsave); l14.holds['ship-5'].landed = 'soon';
+  throws('L14 a landing that is not a time is refused', function () { ships.parse(JSON.stringify(l14)); }, /landing/);
+  const l15 = JSON.parse(Lsave); l15.holds['ship-5'].sailing = { from: 'windhelm', to: 'solitude', at: 30, arriveAt: 40 };
+  throws('L15 a hold at sea that says it landed is refused', function () { ships.parse(JSON.stringify(l15)); }, /landing/);
+  const l16 = JSON.parse(Lsave); delete l16.holds['ship-5'].landed;
+  const old = ships.parse(JSON.stringify(l16));
+  yes('L16 a save from before landings were kept still reads', !!old.holds['ship-5']);
+  yes('L17 and its docked holds get a landing at a start, once', JSON.stringify(ships.clockDocked(old, 500)) === '["ship-5"]' && old.holds['ship-5'].landed === 500 &&
+      ships.clockDocked(old, 600).length === 0 && old.holds['ship-5'].landed === 500);
+
+  const F = ships.empty();
+  ships.open(F, 'ship-6', 'solitude');
+  for (let i = 0; i < 24; i++) {
+    const n = ships.load(F, 'ship-6', { by: BRYNJA, for: BRYNJA, receipt: 'f' + i, entry: { baseId: IRON, count: 1 } });
+    const r = ships.begin(F, 'ship-6', n, 1, 'returned', BRYNJA, 1);
+    ships.finish(F, 'ship-6', r.out, 'fc' + i);
+  }
+  yes('L18 24 lines that all went out leave the hold free: a 25th loads', ships.used(F, 'ship-6') === 0 &&
+      ships.load(F, 'ship-6', { by: BRYNJA, for: ONUND, receipt: 'f24', entry: { baseId: IRON, count: 1 } }) > 0);
+  for (let i = 25; i < 48; i++) { ships.load(F, 'ship-6', { by: BRYNJA, for: ONUND, receipt: 'f' + i, entry: { baseId: IRON, count: 1 } }); }
+  throws('L19 but 24 open at once is full', function () { ships.load(F, 'ship-6', { by: BRYNJA, for: ONUND, receipt: 'f48', entry: { baseId: IRON, count: 1 } }); }, /full/);
+  const l20 = JSON.parse(ships.save(F));
+  const open1 = Object.keys(l20.holds['ship-6'].lines).filter(function (k) { return l20.holds['ship-6'].lines[k].aboard === 1; })[0];
+  l20.holds['ship-6'].lines['999'] = Object.assign({}, l20.holds['ship-6'].lines[open1], { seq: 999, receipt: 'f999' });
+  l20.receipts.f999 = true; l20.seq = 999;
+  throws('L20 a save carrying more open lines than a hold may is refused', function () { ships.parse(JSON.stringify(l20)); }, /more lines/);
+
+  yes('L21 the staff list waits 7 days unless it says', T.checkRoutes(ROUTES).uncollectedDays === 7 && T.UNCOLLECTED_DAYS === 7);
+  yes('L22 it keeps the days it says', T.checkRoutes(Object.assign({}, ROUTES, { uncollectedDays: 3 })).uncollectedDays === 3);
+  [0, 61, 2.5, '7', -1].forEach(function (n) {
+    throws('L23 days of ' + JSON.stringify(n) + ' are refused', function () { T.checkRoutes(Object.assign({}, ROUTES, { uncollectedDays: n })); }, /whole number from 1 to 60/);
+  });
+  yes('L24 a change of days is said in the proposal', T.proposeRoutes(ROUTES, Object.assign({}, ROUTES, { uncollectedDays: 10 }), ships.empty()).changes
+      .some(function (c) { return c === 'Cargo nobody collects goes to the drop box after 10 days, not 7.'; }));
 
   // ================================================================== D
   function who(actors, profiles) {

@@ -89,6 +89,29 @@ Nobody agrees who founded the Company or whose silver paid for its charter.
 The signs over the old doors still say East Empire in places, and the Company
 has not painted them over.
 
+## The ships
+
+The Company owns no ship, so every crate it carries rides in somebody else's
+hold. Most of those holds belong to three houses, and none of them is old.
+
+**The Salt-Sage line** sails out of Windhelm. It grew from the Northern Maiden
+and her run to Raven Rock, and it still writes her name at the top of its
+oldest ledger. It is a Nord house, and proud of it, and it hires more hulls
+than it can crew.
+
+**The Brine Hall** is the Grey Quarter's. Dunmer and Argonian crews who could
+not get a berth on a Nord ship put what they had into two hulls and a counting
+room on the Windhelm docks. They sail the Sea of Ghosts to Raven Rock and back
+in weather the Nord houses wait out.
+
+**The Karth Mouth pilots** are Solitude's, lightermen and pilots who know the
+river mouth under the Blue Palace better than any chart does. They carry the
+western coast, and take crates out to the deep water where the big hulls ride.
+
+Each house is kept by its captains, and each has a seat at the head of its
+table that nobody has filled for long. Whoever can win a house's captains over
+can have it. The Company hires from whoever holds it.
+
 ## Now
 
 Ulfric died in his bed in 4E 229.
