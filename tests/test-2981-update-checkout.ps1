@@ -34,6 +34,9 @@
     6. It refuses, moving nothing, whenever a move would leave something
        behind or carry it along: a tracked change, a submodule change of its
        own, a submodule commit no branch holds, a HEAD no branch holds.
+       After a history rewrite (#3684) a -RewriteMap that gives such a commit
+       a new id a branch holds lets it move on, with no archive branch; a map
+       whose new id nothing holds, or one that is not there, still stops it.
     7. On a branch it does not move the branch, but brings the submodule to
        the branch's pin; a checkout that never fetched the submodule is left
        alone.
@@ -282,6 +285,14 @@ try {
     $r = Run $one
     Yes "6c. engine/skymp at a commit no branch holds: refused (exit $($r.Code))" ($r.Code -eq 1 -and $r.Out -match ('engine/skymp is at ' + (Short $lone) + ', which no branch of the fork') -and $r.Out -match 'branch archive/')
     Yes '6c. and nothing moved, the commit still checked out' ((Rev $one) -eq $h -and (Rev $subDir) -eq $lone)
+    # 6f. #3684: after a history rewrite the fork's commit has a new id a
+    # branch holds, and the rewrite's map says so: it moves, with no archive.
+    $smap = Join-Path $tmp 'fork-commit-map.txt'
+    Set-Content -LiteralPath $smap -Value @('old                                      new', "$lone $sh")
+    $r = Run $one @('-RewriteMap', $smap)
+    Yes "6f. engine/skymp at a commit a rewrite map gives a held new id: moves on (exit $($r.Code))" (
+        $r.Code -eq 0 -and $r.Out -match ('engine/skymp at ' + (Short $lone) + ' is ' + (Short $sh) + ' since the history rewrite') -and (Rev $one) -eq $t5 -and (Rev $subDir) -eq $s2)
+    Yes '6f. and makes no archive branch in the fork' (@(G $subDir branch --list 'archive/*').Count -eq 0)
     $null = G $subDir checkout -q $sh
 
     $null = G $one -c submodule.recurse=false commit -q --allow-empty -m 'only here'
@@ -289,6 +300,20 @@ try {
     $r = Run $one
     Yes "6d. HEAD at a commit no branch holds: refused (exit $($r.Code))" ($r.Code -eq 1 -and $r.Out -match ('HEAD is at ' + (Short $mine) + ', which no branch'))
     Yes '6d. and nothing moved' ((Rev $one) -eq $mine)
+    # 6e. #3684: the same HEAD after a history rewrite. A map whose new id no
+    # branch holds is still refused; one whose new id main holds moves on.
+    $map = Join-Path $tmp 'commit-map.txt'
+    Set-Content -LiteralPath $map -Value @('old                                      new', "$mine $('1' * 40)")
+    $r = Run $one @('-RewriteMap', $map)
+    Yes "6e. a rewrite map whose new id nothing holds: still refused (exit $($r.Code))" ($r.Code -eq 1 -and $r.Out -match ('HEAD is at ' + (Short $mine)) -and (Rev $one) -eq $mine)
+    Set-Content -LiteralPath $map -Value @('old                                      new', "$mine $h")
+    # Both maps in one argument, the way pwsh -File hands "a,b" over.
+    $r = Run $one @('-RewriteMap', "$map,$smap")
+    Yes "6e. a rewrite map giving it a new id main holds: moves to main, both maps named in one argument (exit $($r.Code))" (
+        $r.Code -eq 0 -and $r.Out -match ('HEAD at ' + (Short $mine) + ' is ' + (Short $h) + ' since the history rewrite') -and (Rev $one) -eq $t5)
+    Yes '6e. and makes no archive branch' (@(G $one branch --list 'archive/*').Count -eq 0)
+    $r = Run $one @('-RewriteMap', (Join-Path $tmp 'no-such-map.txt'))
+    Yes "6e. a -RewriteMap that is not there stops the run (exit $($r.Code))" ($r.Code -eq 1 -and $r.Out -match 'no-such-map\.txt is not there')
     $null = G $one -c submodule.recurse=false checkout -q --detach $h
 
     $r = Run $one
