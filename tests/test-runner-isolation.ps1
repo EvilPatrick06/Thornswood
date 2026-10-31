@@ -86,13 +86,13 @@ try {
     $x = Run (Facts) ''
     T ($x.Out -notmatch 'RISK  workflow \S+ runs on') 'no real workflow runs a pull request on the production runners without the same-repository condition'
     T ($x.Report -notmatch 'signing runner') 'no row is about a signing runner, since no runner of the box signs (#4033)'
-    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*same-repository pull requests only[^\n]*\| ok \|') 'the real build-pr.yml falls back to the VPS for same-repository pull requests only, and the check says ok (Patrick, 12 Oct 2026)'
-
-    # Anything anyone can start on a public repository (#3685): opening or
-    # closing their own issue. The real area-label.yml and drop-claims.yml
-    # take the VPS only while the repository is private.
+    # Since #4983 no real workflow asks for a runner of the box at all: the
+    # pull request build has no VPS fallback, and anything anyone can start
+    # on a public repository (#3685), opening or closing their own issue, is
+    # on GitHub's runner.
+    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*triggers pull_request \|' -and $x.Report -notmatch '\| workflow \| build-pr\.yml runs on \|[^\n]*; on thornswood') 'the real build-pr.yml is not on the production label at all, and the check says ok (#4983)'
     foreach ($n in 'area-label.yml', 'drop-claims.yml') {
-        T ($x.Out -notmatch ('RISK  workflow ' + [regex]::Escape($n) + ' started by anyone') -and $x.Report -match ('\| workflow \| ' + [regex]::Escape($n) + ' started by anyone \|[^\n]*only while private[^\n]*\| ok \|')) "the real $n is on the VPS only while the repository is private, and the check says ok"
+        T ($x.Out -notmatch ('RISK  workflow ' + [regex]::Escape($n) + ' started by anyone') -and $x.Report -match ('\| workflow \| ' + [regex]::Escape($n) + ' started by anyone \|[^\n]*; not on thornswood-vps[^\n]*\| ok \|')) "the real $n is not on the production label, and the check says ok"
     }
     $wfIs = Join-Path $scratch 'wfis'; New-Item -ItemType Directory -Path $wfIs | Out-Null
     Set-Content (Join-Path $wfIs 'label.yml') "on:`n  issues:`n    types: [opened]`npermissions:`n  issues: write`njobs:`n  a:`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"

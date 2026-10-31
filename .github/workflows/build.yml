@@ -15,8 +15,10 @@
 # The harnesses were all written to be run by hand and none of them had ever
 # run here: 236 checks across twelve files, sitting in the repo going stale.
 #
-# WHERE IT RUNS NOW (#1306, 11 October): GitHub's hosted Windows runner by
-# default, the VPS only as a fallback; see the jobs below. The history:
+# WHERE IT RUNS NOW (#4983): GitHub's hosted Windows runner, and nothing
+# else. The repository went public on 30 Oct 2026, so hosted minutes are
+# free here, and no runner of the box is registered to it any more (#4013),
+# so the VPS fallback below in the history went. The history:
 #
 # WHERE IT RAN. On the VPS, from 25 September: GitHub's own runners were
 # blocked on billing and every run failed in seconds, and Patrick chose a
@@ -33,10 +35,9 @@
 # the Actions budget is not being raised. Every build tries GitHub's hosted
 # Windows runner first; when the month's included minutes are used up the
 # hosted job is refused before any step runs and the VPS fallback builds it.
-# A pull request runs these same steps in build-pr.yml, which
-# scripts\dev\Build-PrWorkflow.js generates from this file; it has the same
-# fallback, for this repository's own branches only (Patrick, 12 Oct).
-# Change a step here, then run  node scripts/dev/Build-PrWorkflow.js;
+# That held until the flip. A pull request runs these same steps in
+# build-pr.yml, which scripts\dev\Build-PrWorkflow.js generates from this
+# file. Change a step here, then run  node scripts/dev/Build-PrWorkflow.js;
 # tests\test-1306-pr-workflow.js fails while the two differ.
 #
 # WHY THE ACTIONS ARE PINNED. Every action is named by a full length commit
@@ -74,12 +75,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      runner:
-        description: 'hosted (GitHub, the default) or vps (the box, the fallback)'
-        type: choice
-        options: [hosted, vps]
-        default: hosted
 permissions:
   contents: read
 # One run per branch at a time. On main a newer push waits for the run in
@@ -106,20 +101,13 @@ jobs:
   # last step of the checks below), and when one did it names that run and
   # the build stops green. Any other tree, a fork's run or a GitHub answer it
   # cannot read builds main in full, as before. A manual run always builds.
-  # Only a pull request built on GitHub's hosted runner leaves that note
-  # (#3874): on the VPS main builds in full so the gate is traced.
-  # HOSTED FIRST, LIKE THE BUILD (#3551, 27 Oct 2026). Both build jobs wait
-  # for this answer, so while this job asked only for a VPS runner the hosted
-  # build could start no sooner than a box runner was free, and not at all
-  # with the box down: on every push the box came first, not last. Nothing
-  # here needs the box. It starts node and asks GitHub a few questions, which
-  # pull request a commit came from among them (pull-requests: read), so it
-  # asks on GitHub's hosted Linux runner, and the box answers only when that
-  # did not, in "tested-vps" below. tests\test-3182-tested-tree.js holds what
+  # It starts node and asks GitHub a few questions, which pull request a
+  # commit came from among them (pull-requests: read), so it asks on GitHub's
+  # hosted Linux runner (#3551). tests\test-3182-tested-tree.js holds what
   # it accepts, and why a tree is enough is in the script's header.
   tested:
     name: Already tested in its pull request
-    if: ${{ github.event_name == 'push' && (!github.event.repository.private || vars.BUILD_RUNNER != 'vps') }}
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -128,17 +116,8 @@ jobs:
       pull-requests: read
     outputs:
       run: ${{ steps.look.outputs.run }}
-    steps: &look
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      # Every self-hosted checkout is written again (#3029), as below.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Look for a green pull request build of this tree
         id: look
         shell: pwsh
@@ -149,94 +128,30 @@ jobs:
           node scripts/dev/Tested-Tree.js --tree $tree --commit $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
           exit 0
 
-  # The same question on the box, as launcher-vps is the build's fallback.
-  # It asks only when the hosted job did not succeed: the repository variable
-  # BUILD_RUNNER is vps, which skips the hosted job outright, or a billing or
-  # quota stop refused it before any step ran. Only a push of main gets here,
-  # never a branch or a pull request, so it takes any VPS runner and needs
-  # no build runner. The steps are the hosted job's own, by the anchor look.
-  tested-vps:
-    name: Already tested in its pull request (VPS fallback)
+  # The launcher build and every check, on GitHub's hosted windows-latest
+  # (#1306; the only runner since #4983).
+  launcher:
+    name: Launcher builds
     needs: tested
-    if: ${{ !cancelled() && github.event.repository.private && github.event_name == 'push' && needs.tested.result != 'success' }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
-    timeout-minutes: 5
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' }}
+    runs-on: windows-latest
+    # actions: read for the gate step, which reads the map main's build
+    # handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
     permissions:
       actions: read
       contents: read
-      pull-requests: read
-    outputs:
-      run: ${{ steps.look.outputs.run }}
-    steps: *look
-
-  # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
-  # GitHub's hosted windows-latest is the default, in the job "launcher"
-  # at the end of this file. This job is the VPS FALLBACK. It runs only
-  # when the hosted job did not succeed (for a pull request, only on a
-  # branch of this repository, never a fork), that is when
-  #   - the repository variable BUILD_RUNNER is vps, which skips the hosted
-  #     job outright (Settings, Variables). Optional: a refused hosted job
-  #     already falls through to the box, the variable only saves the red, or
-  #   - a manual run asked for runner: vps, or
-  #   - the hosted job failed. A quota or billing stop fails it before any
-  #     step runs, and this picks the build up on the box. A real red fails
-  #     here too, so a broken main shows red twice; that is the price of not
-  #     telling a quota stop from a test failure.
-  # The steps are the hosted job's own, by the YAML anchor checks, so the two
-  # can never test different things.
-  launcher-vps:
-    name: Launcher builds (VPS fallback)
-    needs: [tested, tested-vps, launcher]
-    if: ${{ !cancelled() && github.event.repository.private && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
-    # thornswood-build (#2994): only the runners records/build-runners.json
-    # lists carry it, so no more builds run on the box at once than its six
-    # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
-    # the harness step alone and the limit below cancelled passing builds.
-    # Main's build stays on the box: only the box's runners have the trace
-    # task, and a main build is what leaves the gate map the next pull
-    # requests measure from (#3114, #3874). Build-PrWorkflow.js gives
-    # build-pr.yml's fallback the pull request build label alone instead
-    # (records/pr-build-runners.json): box runner 2 and One's off-box runners
-    # carry it and runner 1 does not, so main's build never waits behind pull
-    # requests for runner 1 (#3860; #4010, Patrick's A, 27 Oct 2026).
-    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
-    # actions: read for the gate step off the box, which reads the map main's
-    # build handed on in its log (#4009, scripts\dev\Gate-Map.ps1).
-    permissions:
-      actions: read
-      contents: read
-    # Often past twenty minutes on the VPS (#2557): it is shared with the live
-    # server and other jobs, and the harness list keeps growing (#2544 added
-    # test-release-workflow.ps1, #2525 the feed-watch test, #2546 the remote
-    # command map under both pwsh and PowerShell 5.1). Forty leaves room for
-    # that; past it the job is stuck, not slow.
-    timeout-minutes: 40
-    steps: &checks
+    # The hosted runner has two cores: the harness step alone took over
+    # eighteen minutes on it, so it gets an hour.
+    timeout-minutes: 60
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-
       # The hosted image ships whatever node and python it has this month;
-      # these are pinned so a check means the same thing as on the VPS, which
-      # has its own and skips them.
+      # these are pinned so a check means the same thing every month.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: runner.environment == 'github-hosted'
         with:
           node-version: '24'
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        if: runner.environment == 'github-hosted'
         with:
           python-version: '3.12'
 
@@ -405,8 +320,8 @@ jobs:
       - name: Run the gate harnesses
         id: gate
         shell: pwsh
-        # Off the box a pull request's gate reads the map main's build handed
-        # on with it (#4009). Run-Gate.ps1 takes it out of the environment
+        # A pull request's gate reads the map main's build handed on with it
+        # (#4009). Run-Gate.ps1 takes it out of the environment
         # before any harness starts.
         env:
           GATE_MAP_TOKEN: ${{ github.token }}
@@ -455,25 +370,15 @@ jobs:
           # which harnesses its change can reach, and only those run, each
           # with why. It writes whole=true only when every one ran, and the
           # note below is kept only then, so main builds in full, and is
-          # traced, after any pull request that ran less.
+          # traced, after any pull request that ran less. Only a main build on
+          # the box handed a map on (scripts\dev\Gate-Map.ps1), and none runs
+          # there since #4983.
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
             exit 1
           }
           .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800
           exit $LASTEXITCODE
-
-      # THE MAP FOR RUNNERS OFF THE BOX (#4009). The trace task leaves the map
-      # only in the box's build runners' folders, so a pull request built on
-      # One's runners or GitHub's ran the whole gate. Main's build prints the
-      # box's newest map into this job's log, which costs no storage
-      # (artifacts do, #3399), and a gate off the box reads it from there.
-      # scripts\dev\Gate-Map.ps1 says how; it hands on only in main's push
-      # build, and never fails a build.
-      - name: Hand the traced map to runners off the box
-        if: ${{ !cancelled() && runner.environment == 'self-hosted' }}
-        shell: pwsh
-        run: .\scripts\dev\Gate-Map.ps1 -Hand
 
       - name: Run the voice service's /health harness
         shell: pwsh
@@ -651,8 +556,7 @@ jobs:
           # comparison with the old csc build proved: every resource byte for
           # byte its file, the references, the PE kind, the version in the
           # file details and the manifest, the icon, nothing beside the exe.
-          # GitHub's image has Visual Studio; the VPS runners have the Build
-          # Tools from Bootstrap-VPS.ps1 -IncludeBuildTools (option A, 12 Oct).
+          # GitHub's image has Visual Studio.
           # It builds both exes with Build-Launcher.ps1, then runs
           # tests\test-app-manifest.ps1 (#463) and Check-Secrets.ps1 -Binary on
           # the pair, so this build has no build, manifest or secrets step of
@@ -691,14 +595,9 @@ jobs:
       # line of this job's log. Last, so it is written only when they all
       # did, and only when the gate step ran every gate harness (#3114): a
       # pull request that ran only what its change can reach leaves main to
-      # build in full. Only on GitHub's hosted runner (#3874), which has no
-      # traced map and runs every harness anyway: a main build skipped by
-      # this note is not traced either, so on the VPS, where a pull request
-      # ran the whole gate only because the map could not serve it, the note
-      # kept the map stale and every pull request after it ran the whole gate
-      # too. Without it main builds in full and is traced (Patrick's option A
-      # on q-3114-map-refresh, every main build traced), and the next pull
-      # request runs only what it can reach. A pull request's checkout is
+      # build in full. While the box built, this was written only on GitHub's
+      # hosted runner (#3874), so a VPS build left main to be built and
+      # traced; every build is hosted now (#4983). A pull request's checkout is
       # GitHub's merge of it into main, so this is the tree a squash merge
       # gives main while main has not moved. In the log and not an artifact
       # since #3399: this
@@ -707,7 +606,7 @@ jobs:
       # upload failed and took every pull request's build red. A log costs no
       # storage and is kept 90 days; scripts\dev\Tested-Tree.js reads it.
       - name: Write down the tree these checks passed on
-        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true' && runner.environment == 'github-hosted'
+        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
         shell: pwsh
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -724,20 +623,3 @@ jobs:
       # of Actions storage, which Patrick's billing page read at 1.8 GB. The
       # pdb was never kept either (#1356 / #462): it carries absolute
       # build-machine source paths.
-
-  # The default: GitHub's hosted Windows runner (#1306). Skipped when
-  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
-  # fallback above runs instead.
-  launcher:
-    name: Launcher builds
-    needs: [tested, tested-vps]
-    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.tested-vps.outputs.run == '' && (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}
-    runs-on: windows-latest
-    # As the fallback's: the gate step reads the map main's build handed on.
-    permissions:
-      actions: read
-      contents: read
-    # The hosted runner has two cores: the harness step alone took over
-    # eighteen minutes on it, so it gets an hour.
-    timeout-minutes: 60
-    steps: *checks

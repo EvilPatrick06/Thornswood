@@ -30,6 +30,12 @@
   into <dir>, the shape of the box's gate-map, with the built map in place
   of the traces. Exit 0 with a map in <dir>, 1 without, saying why.
 
+  SINCE #4983 no build of this repository runs on the box, so nothing runs
+  -Hand and main's builds hold no map: -Fetch reads them, says so and exits
+  1, and a pull request runs the whole gate. The box still takes the traces,
+  through the private repository's trace-gate.yml, but no main build hands
+  them on; #4983 has that written down.
+
   WHY THE LOG. It was to be an artifact, but this private repository's
   artifact storage is used up (#3399: the tested-tree note's upload failed
   and took every pull request's build red), and a log costs no storage and

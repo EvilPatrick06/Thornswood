@@ -84,13 +84,11 @@ yml.forEach(function (l) {
 });
 // No check is required since 25 September (the build check on GitHub is off),
 // but the job keeps its name, so turning the requirement back on is one setting.
-// #1306: the hosted job is the build; launcher-vps is only its fallback, run
-// when the hosted one is skipped or fails, and never on a pull request.
-// #3182: "tested" builds nothing either; it only asks whether a pull request
-// build already passed main's tree, and both build jobs wait for its answer.
-// #3551: so does its VPS fallback, tested-vps.
-const main = jobs.filter(function (j) { return j.id !== 'launcher-vps' && j.id !== 'tested' && j.id !== 'tested-vps'; });
-yes('build.yml has exactly one build job besides the VPS fallback, so one required check covers it (found ' + main.length + ')', main.length === 1);
+// #1306: the hosted job is the build, the only one since #4983.
+// #3182: "tested" builds nothing; it only asks whether a pull request build
+// already passed main's tree, and the build job waits for its answer.
+const main = jobs.filter(function (j) { return j.id !== 'tested'; });
+yes('build.yml has exactly one build job, so one required check covers it (found ' + main.length + ')', main.length === 1);
 const CHECK = main.length ? main[0].name : null;
 yes('that job is named "Launcher builds" (found "' + CHECK + '")', CHECK === 'Launcher builds');
 

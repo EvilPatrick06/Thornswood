@@ -236,7 +236,7 @@ $held = $pu.IndexOf('loose files held for the collection until then still ship')
 Yes 'Publish-Update.ps1 asks, and stops on the answer, before anything is packed' ($at -gt 0 -and $held -gt $at -and $pu.Contains('if ($newestWhy) { Die $newestWhy }'))
 $wf = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\collection-revision.yml')).Replace("`r`n", "`n")
 Yes 'collection-revision.yml runs every hour and by hand' ($wf -match "(?m)^\s+- cron: '\d{1,2} \* \* \* \*'" -and $wf -match '(?m)^\s+workflow_dispatch:')
-Yes '  on the VPS runners' ($wf -match 'runs-on: \[self-hosted, Windows, thornswood-vps\]')
+Yes '  on GitHub''s Windows runner, main only (#4983)' ($wf -match '(?m)^    runs-on: windows-latest$' -and $wf -match "(?m)^    if: github\.ref == 'refs/heads/main'$" -and $wf -notmatch 'self-hosted')
 Yes '  with -Issue, the run''s own token and the repository' ($wf -match 'Check-CollectionRevisions\.ps1 -Issue' -and $wf -match 'GH_TOKEN: \$\{\{ github\.token \}\}' -and $wf -match 'REPO: \$\{\{ github\.repository \}\}')
 Yes '  and a token that can read the code and edit issues, nothing more' ($wf -match "(?ms)^permissions:\n  contents: read\n  issues: write\n(?!  )")
 Done
