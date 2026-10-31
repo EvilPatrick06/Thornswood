@@ -85,7 +85,7 @@
   those plugins and nothing else of the collection, and until 31 Oct 2026
   One's Vortex game was the only place they came from, so no server could
   move to a new revision without One. The box takes them this way, sealed
-  to itself, through Nexus-Run (scripts\deploy\Get-CollectionPluginsOnBox.ps1).
+  to itself, through Nexus-Run (scripts\deploy\CollectionStore.ps1).
 
   Needs PowerShell 7 (NexusLayout.cs reads JSON with System.Text.Json), 7-Zip
   (off Windows, 7-Zip's own build, which Get-SevenZip.ps1 fetches, because
