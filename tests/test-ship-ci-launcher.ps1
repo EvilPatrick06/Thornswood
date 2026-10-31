@@ -444,6 +444,13 @@ Yes 'a main Ship from the feed takes the launcher dev tried, under this number a
     $src -match [regex]::Escape("`$devPub = Get-PublishedLauncher (Get-FeedStoreDir 'dev') 'dev'") -and
     $src -match [regex]::Escape("if (`$devPub -and [string]`$devPub.Version -eq `$current -and (Test-LauncherUnchanged `$devPub `$LauncherInputs)) { `$DevTriedLauncher = `$devPub }") -and
     $src -match ('(?s)\} elseif \(\$DevTriedLauncher\) \{\s+Head ''The launcher dev tried, from the dev feed''\s+\$why = Get-FeedLauncher \$DevTriedLauncher \$buildOut \$ciSigner \$hold.*?\} else \{\s+Head ''The launcher, built and signed on GitHub'''))
+# 31 Oct: main 20261031-144725's exe came out of release.yml's run artifact
+# dated six hours ahead (the zip's UTC clock read as Mountain), and the next
+# Ship-Main stopped on "not in place" after putting its launcher there (#5156).
+Yes 'Ship reads back the launcher in place by its sha256 against the one it meant, never by its write time (#5156)' (
+    $src -match [regex]::Escape("`$meant = Join-Path `$buildOut 'Thornswood.exe'") -and
+    $src -match [regex]::Escape("`$inPlace = ((Get-FileHash -LiteralPath `$exe -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath `$meant -Algorithm SHA256).Hash)") -and
+    $src -notmatch 'LastWriteTimeUtc -gt \$before')
 Yes 'Ship fetches it for a main -Package, before the build and the publish' ($src -match '(?s)if \(\$Package -and -not \$Dev -and -not \$DryRun\) \{.*?Get-ReleaseStub.*?# -+ build')
 Yes '  and hands it to Package-Thornswood as -Stub' ($src -match [regex]::Escape("if (`$ciStub) { `$pkgArgs['Stub'] = `$ciStub }") -and $src -match [regex]::Escape("& (Join-Path `$Here 'Package-Thornswood.ps1') @pkgArgs"))
 # Issue #1213: the site carries the one file build, so -Package asks for it,
