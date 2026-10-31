@@ -2371,8 +2371,9 @@ $newsSource = Get-ReleaseSource $RepoDir
 $entry = [pscustomobject]@{
     # Month first, with the time on it, the same shape the site shows under
     # its download button. Entries written before this carry a bare date and
-    # the launcher converts those as it reads them.
-    date    = (Get-Date).ToString('M-d-yyyy h:mm tt')
+    # the launcher converts those as it reads them. On the team's clock, the
+    # one the release id is minted on (Get-TeamNow in Release-Name.ps1).
+    date    = (Get-TeamNow).ToString('M-d-yyyy h:mm tt', [Globalization.CultureInfo]::InvariantCulture)
     title   = $title
     body    = $body
     details = @($details)
