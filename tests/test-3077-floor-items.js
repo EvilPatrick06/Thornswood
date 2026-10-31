@@ -26,10 +26,11 @@
        coin-giving flora in game/data/harvests.json, no more
     M  the manifest counts the floor items it switched off, and its counts
        agree with each other
-    P  every placed reference in the plugin but the three town gates is a
-       floor item switched off: initially disabled, keeping only its base and
-       place, with nothing that could switch it on; they are the manifest's
-       number, and their ids hash to the manifest's refsSha256
+    P  every placed reference in the plugin but the three town gates and the
+       hold-only plants and ores (#3150) is a floor item switched off:
+       initially disabled, keeping only its base and place, with nothing that
+       could switch it on; they are the manifest's number, and their ids hash
+       to the manifest's refsSha256
     C  Thornswood-Content.esp places no item of its own on the floor (a
        Thornswood plugin's floor item is Patrick's to decide; the builder stops
        on one with the game's records too)
@@ -146,12 +147,16 @@ yes('M4 the cells copied only for them are counted by the plugin that wins each'
 const last = made.buf ? readPlugin(made.path, 'Thornswood-Last.esp') : { recs: [], masters: [], desc: () => '' };
 if (!made.buf) { console.log('SKIP  P, N2, N3, N5: ' + made.why); }
 const gates = new Set(manifest.gatesUnlocked || []);
-const refs = last.recs.filter((r) => r.tag === 'REFR' && !gates.has(r.desc));
+// The hold-only plants and ores switched off outside their hold (#3150) are
+// tests/test-3150-hold-builder.js's and the builder's --verify.
+const holdOff = new Set((manifest.holdOnly && manifest.holdOnly.off) || []);
+const refs = last.recs.filter((r) => r.tag === 'REFR' && !gates.has(r.desc) && !holdOff.has(r.desc));
 const bad = refs.filter((r) => {
   const tags = r.subs.map((s) => s.t).join(',');
   return !(r.flags & DISABLED) || (r.flags & DELETED) || (tags !== 'NAME,DATA' && tags !== 'EDID,NAME,DATA');
 });
-yesR('P1 every placed reference but the ' + gates.size + ' town gates is switched off: initially disabled, ' +
+yesR('P1 every placed reference but the ' + gates.size + ' town gates and the hold-only plants and ores is ' +
+    'switched off: initially disabled, ' +
     'keeping only its base and place, with no enable parent, script or link' +
     (bad.length ? ' (not: ' + bad.slice(0, 5).map((r) => r.desc).join(', ') + ')' : ''),
     () => gates.size === 3 && bad.length === 0);

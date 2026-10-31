@@ -182,9 +182,11 @@ const lastMade = require('./last-plugin-made.js').made();
 const lastCounts = JSON.parse(fs.readFileSync(LAST, 'utf8')).counts || {};
 const lastGates = lastCounts.gatesUnlocked;
 if (lastMade.buf) {
-  yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + ') and the floor items it switches off (' +
-      lastCounts.floorItemsOff + '), so the table need not read it',
-      lastGates === 3 && placements(lastMade.buf) === lastGates + (lastCounts.floorItemsOff || 0));
+  // And the hold-only plants and ores it switches off outside their hold (#3150).
+  const holdOff = ((JSON.parse(fs.readFileSync(LAST, 'utf8')).holdOnly || {}).off || []).length;
+  yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + '), the floor items it switches off (' +
+      lastCounts.floorItemsOff + ') and the hold-only plants and ores it switches off (' + holdOff + '), so the table need not read it',
+      lastGates === 3 && placements(lastMade.buf) === lastGates + (lastCounts.floorItemsOff || 0) + holdOff);
 } else {
   console.log('SKIP  B3: ' + lastMade.why);
 }
