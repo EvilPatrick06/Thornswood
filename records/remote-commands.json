@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  76,
-    "callCount":  307,
+    "scriptCount":  77,
+    "callCount":  309,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1472,6 +1472,24 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends Stop-Process"
+                  },
+                  {
+                      "script":  "scripts/ops/Reset-Npcs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$surveyLines = Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $boxScript",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/ops/Reset-Npcs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$resetLines = Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $boxScript",
+                      "does":  "install-time or outside-the-gate work",
+                      "class":  "admin",
+                      "reason":  "stops the server task and moves NPC change forms aside: the Reset-Npcs-Dev and Reset-Npcs-Main gate verbs"
                   },
                   {
                       "script":  "scripts/ops/Say-Staff.ps1",

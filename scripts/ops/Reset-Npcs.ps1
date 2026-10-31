@@ -211,9 +211,9 @@ function Show-Lines($lines) {
 
 if ($Survey) {
   Head 'What a reset would take (nothing moves)'
-  $lines = Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $boxScript
+  $surveyLines = Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $boxScript
   $code = $LASTEXITCODE
-  $failed = Show-Lines $lines
+  $failed = Show-Lines $surveyLines
   if ($failed -or $code -ne 0) { Die "the survey on the box did not finish (exit $code)." }
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -232,9 +232,9 @@ else {
 }
 
 Head 'Resetting'
-$lines = Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $boxScript
+$resetLines = Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $boxScript
 $code = $LASTEXITCODE
-$failed = Show-Lines $lines
+$failed = Show-Lines $resetLines
 if ($failed -or $code -ne 0) { Die "the reset on the box did not finish (exit $code). What it said is above." }
 Write-Host ''
 Say '  Done. The NPCs moved aside are in changeForms\_discarded-<stamp> beside' 'Green'
