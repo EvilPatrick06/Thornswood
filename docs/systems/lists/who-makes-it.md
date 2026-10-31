@@ -253,7 +253,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Amethyst | Dungeon and body loot | Miner, master, only while the gem work is open | `63b46:Skyrim.esm` |
 | Baked Potatoes | Dungeon and body loot | Cook/Hearthcook, novice | `64b3a:Skyrim.esm` |
 | Blue Mountain Flower | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `77e1c:Skyrim.esm` |
-| Boiled Creme Treat | Dungeon and body loot | Cook/Confectioner, novice | `64b30:Skyrim.esm` |
+| Boiled Creme Treat | Dungeon and body loot | Cook/Confectioner, advanced | `64b30:Skyrim.esm` |
 | Cabbage | Dungeon and body loot, A farmer's first seeds, Asked for by a recipe | Farmer, novice | `64b3f:Skyrim.esm` |
 | Corundum Ingot | Dungeon and body loot, Asked for by a recipe | Smith/Platewright, novice | `5ad93:Skyrim.esm` |
 | Corundum Ore | Dungeon and body loot, Asked for by a recipe | Miner, advanced | `5acdb:Skyrim.esm` |
@@ -277,7 +277,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Grilled Leeks | Dungeon and body loot | Cook/Hearthcook, novice | `64b3e:Skyrim.esm` |
 | Hide Armor | Dungeon and body loot | Smith/Platewright, novice | `13911:Skyrim.esm` |
 | Hide Helmet | Dungeon and body loot | Smith/Platewright, novice | `13913:Skyrim.esm` |
-| Honey Nut Treat | Dungeon and body loot | Cook/Confectioner, novice | `64b38:Skyrim.esm` |
+| Honey Nut Treat | Dungeon and body loot | Cook/Confectioner, advanced | `64b38:Skyrim.esm` |
 | Imp Stool | Dungeon and body loot, Asked for by a recipe | Gatherer, novice | `4da23:Skyrim.esm` |
 | Iron Armor | Dungeon and body loot | Smith/Platewright, novice | `12e49:Skyrim.esm` |
 | Iron Arrow | Dungeon and body loot | Woodworker/Woodwright, novice | `1397d:Skyrim.esm` |
@@ -319,7 +319,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Steel Sword | Dungeon and body loot | Smith/Edgewright, advanced | `13989:Skyrim.esm` |
 | Steel War Axe | Dungeon and body loot | Smith/Edgewright, advanced | `13983:Skyrim.esm` |
 | Swamp Fungal Pod | Dungeon and body loot, Asked for by a recipe | Gatherer, advanced | `7e8b7:Skyrim.esm` |
-| Sweet Roll | Dungeon and body loot | Cook/Confectioner, novice | `64b3d:Skyrim.esm` |
+| Sweet Roll | Dungeon and body loot | Cook/Confectioner, advanced | `64b3d:Skyrim.esm` |
 | Venison | Dungeon and body loot, Asked for by a recipe | Hunter, novice | `669a2:Skyrim.esm` |
 | Void Salts | Dungeon and body loot | Miner, expert | `3ad60:Skyrim.esm` |
 | Wheat | Dungeon and body loot, Asked for by a recipe | Farmer, advanced; Gatherer, advanced | `4b0ba:Skyrim.esm` |
