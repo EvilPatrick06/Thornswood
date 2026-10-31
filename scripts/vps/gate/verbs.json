@@ -163,15 +163,6 @@
       ],
       "params": {}
     },
-    "Install-Watch": {
-      "script": "scripts/vps/Watch-Services.ps1",
-      "timeoutMinutes": 15,
-      "fixed": [
-        "-Install",
-        "-NoPause"
-      ],
-      "params": {}
-    },
     "Install-Bridge": {
       "script": "scripts/deploy/Install-Bridge.ps1",
       "timeoutMinutes": 15,

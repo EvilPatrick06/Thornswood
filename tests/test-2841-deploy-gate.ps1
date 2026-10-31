@@ -103,8 +103,6 @@ Yes '  Check-LiveGamemode never waits for Enter, and Check-ProdParity collects i
 # The box installs and reads that only One could run before (#2862): each
 # runs main's script with fixed words, and takes no host, user, folder,
 # address or webhook from the caller.
-Yes 'Install-Watch only installs the watchdog, and never sets its webhook' ((Words 'Install-Watch') -eq '-Install|-NoPause' -and
-    (Words 'Install-Watch -SetWebhook') -eq 'REFUSED' -and (Words 'Install-Watch -Remove') -eq 'REFUSED' -and (Words 'Install-Watch -Root x') -eq 'REFUSED')
 Yes 'Install-Bridge takes -Status, -Record and -Wait, never -Remove or a site' ((Words 'Install-Bridge -Record') -eq '-NoPause|-Record' -and (Words 'Install-Bridge -Status') -eq '-NoPause|-Status' -and
     (Words 'Install-Bridge -Remove') -eq 'REFUSED' -and (Words 'Install-Bridge -Site x') -eq 'REFUSED' -and (Words 'Install-Bridge -AsSystem') -eq 'REFUSED')
 Yes 'Setup-Domain takes -TaskOnly and -SkipDnsCheck, never a domain, an address or another Caddy' ((Words 'Setup-Domain -TaskOnly') -eq '-TaskOnly' -and
