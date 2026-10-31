@@ -11,6 +11,11 @@
 //
 // Root cause and design: issue #2573, issuecomment-6226678131.
 //
+// #4573: a guard's pair is issued at the three moments that make somebody a
+// guard in the world (they arrive, their join pass is shown, they take a
+// guard office), not by a timer looking at everybody; the client scripts act
+// once on a change and say on the console when a step throws.
+//
 // Runs the REAL cuffs block over a stand-in mp, packs, offices and places;
 // its client scripts over a stand-in Skyrim Platform; the REAL front plugin
 // watchdog helpers over a stand-in game (#2620); and reads the REAL wiring.
@@ -103,7 +108,9 @@ if (C && typeof C.used === 'function') {
     !!r.made[PROP] && r.made[PROP].isVisibleByOwner && r.made[PROP].isVisibleByNeighbors &&
     !!r.made[PROP].updateOwner && !!r.made[PROP].updateNeighbor);
   yes('the issue record is the server\'s alone', !!r.made.thornswoodCuffsIssued && !r.made.thornswoodCuffsIssued.isVisibleByOwner);
-  yes('guards are looked at for an issue on a timer', r.timers.length === 1 && r.timers[0] > 0);
+  yes('no timer looks at everybody for an issue (#4573): the block starts none', r.timers.length === 0 && !/setInterval|setTimeout/.test(block));
+  yes('...and the issue hooks are there: cameIn, wentOut, passShown, guardOffice',
+    typeof C.cameIn === 'function' && typeof C.wentOut === 'function' && typeof C.passShown === 'function' && typeof C.guardOffice === 'function' && C.tick === undefined);
 
   const G = r.person(0xff000001, 11, 'whiterunCell:T.esm');   // guard of Whiterun
   const P = r.person(0xff000002, 12, 'whiterunCell:T.esm');   // somebody
@@ -117,8 +124,9 @@ if (C && typeof C.used === 'function') {
   yes('a guard with no cuffs is issued one pair', C.issue(G) === true && r.count(G, CUFFS) === 1 && /issued a pair/.test(r.last(G)));
   yes('...and not a second while they carry one', C.issue(G) === false && r.count(G, CUFFS) === 1);
   yes('somebody who is not a guard is issued nothing', C.issue(X) === false && r.count(X, CUFFS) === 0);
-  C.tick();
-  yes('the timer issues the Riften guard theirs too', r.count(R, CUFFS) === 1);
+  yes('a guard of another hold arriving is issued theirs', C.cameIn(R) === true && r.count(R, CUFFS) === 1);
+  yes('...and somebody who is not a guard arriving is issued nothing', C.cameIn(X) === false && r.count(X, CUFFS) === 0);
+  yes('...and the guard arriving again, still carrying it, is issued no second', C.cameIn(R) === false && r.count(R, CUFFS) === 1);
 
   const C_ = '10e039:Skyrim.esm';
   // Putting a pair on with nobody in front.
@@ -147,10 +155,13 @@ if (C && typeof C.used === 'function') {
   r.face(G, P);
   yes('a guard of the hold, facing somebody, puts a pair on and cuffs them', C.used(G) === true && !!C.cuffedBy(P));
   const rec = r.props[P][PROP];
-  yes('...in that hold\'s name, by that guard, with the cuffs\' id for their game',
-    rec.bound === true && rec.hold === 'whiterun' && rec.by === 11 && rec.item === CUFFS && rec.at > 0);
+  yes('...in that hold\'s name, with the cuffs\' id for their game',
+    rec.bound === true && rec.hold === 'whiterun' && rec.item === CUFFS && rec.at > 0);
+  yes('...and nothing about the guard in the record everybody near sees: bound, hold, at, item only',
+    Object.keys(rec).sort().join() === 'at,bound,hold,item');
   yes('...and the pair moves from the guard\'s pack to theirs', r.count(G, CUFFS) === 0 && r.count(P, CUFFS) === 1);
   yes('...and both are told', /in the name of Whiterun/.test(r.last(G)) && /puts you in cuffs/.test(r.last(P)));
+  yes('...and the prisoner is told any guard of any hold can take them off', /Any guard of any hold can take them off/.test(r.last(P)));
   yes('...and nobody is told to press E or type anything', !/press E|\//i.test(r.last(G) + r.last(P)));
 
   // Bound: the pair stays on, no weapon.
@@ -172,7 +183,8 @@ if (C && typeof C.used === 'function') {
   yes('one freeing rule, no switch and no hold: being a guard', !/FREE_BY|binder|freeingHold/.test(block) && typeof C.mayFree === 'function');
   r.addItem(X, C_, 1);
   r.face(X, P);
-  yes('somebody who is not a guard cannot free them', C.used(X) === true && !!C.cuffedBy(P) && /only a guard can take them off/.test(r.last(X)));
+  yes('somebody who is not a guard cannot free them, and is told any guard of any hold can',
+    C.used(X) === true && !!C.cuffedBy(P) && /Any guard of any hold can take them off, and you are not a guard/.test(r.last(X)));
   r.face(R, P);
   yes('a guard of another hold frees them, here in Whiterun, from Whiterun\'s cuffs', C.used(R) === true && !C.cuffedBy(P));
   yes('...and the prisoner\'s pair goes into that guard\'s pack', r.count(P, CUFFS) === 0 && r.count(R, CUFFS) === 2);
@@ -387,7 +399,9 @@ if (C && typeof C.used === 'function') {
     q.face(wg, wp);
     yes('used() itself acts for nobody waiting', Q.used(wg) === false && !Q.cuffedBy(wp));
     q.people[wg].inv = {};
-    yes('a guard waiting is issued nothing, directly or by the timer', Q.issue(wg) === false && (Q.tick(), q.count(wg, CUFFS) === 0));
+    yes('a guard waiting is issued nothing, directly, on arriving or by taking the office',
+      Q.issue(wg) === false && Q.cameIn(wg) === false && Q.guardOffice(wg) === false && q.count(wg, CUFFS) === 0);
+    yes('...nor by passShown while the pass is still held', Q.passShown(81) === false && q.count(wg, CUFFS) === 0);
     // The stored-equipment path, waiting then passed: nothing acts, and the first look after the pass is only a baseline.
     q.addItem(wg, C_, 1); q.face(wg, wp);
     const worn = function (on) { return { inv: { entries: [{ baseId: CUFFS, count: 1, worn: on }] } }; };
@@ -425,6 +439,52 @@ if (C && typeof C.used === 'function') {
     yes(order + ', waiting: only the strength gate\'s own refusal stands, once', q.mp.onEquipItemAttempt(wg, WEAK) === false && told.length === 1 && q.said.length === 0);
   }
 
+  // The three issue moments (#4573).
+  {
+    const q = rig(), Q = q.C;
+    const held = {};
+    q.g.__thornswoodPassHeld = function (pid) { return !!held[pid]; };
+    const a = q.person(0xff0000a1, 111, 'whiterunCell:T.esm');   // guard, arrives with the pass in
+    const b = q.person(0xff0000a2, 112, 'whiterunCell:T.esm');   // guard, arrives waiting on the pass
+    const c = q.person(0xff0000a3, 113, 'whiterunCell:T.esm');   // takes the guard office later
+    const d = q.person(0xff0000a4, 114, 'whiterunCell:T.esm');   // somebody else online, not a guard
+    q.guards[111] = ['whiterun']; q.guards[112] = ['riften'];
+    held[112] = true;
+    yes('arriving: a guard whose pass is in is issued a pair', Q.cameIn(a) === true && q.count(a, CUFFS) === 1 && /issued a pair/.test(q.last(a)));
+    yes('arriving waiting on the pass: nothing yet', Q.cameIn(b) === false && q.count(b, CUFFS) === 0);
+    delete held[112];
+    yes('their pass shown: issued then, found by profile among those online', Q.passShown(112) === true && q.count(b, CUFFS) === 1 && /Riften/.test(q.last(b)));
+    yes('...and a pass for a profile nobody online has issues nothing', Q.passShown(999) === false && Q.passShown(0) === false);
+    yes('...and a pass for somebody who is not a guard issues nothing', Q.passShown(114) === false && q.count(d, CUFFS) === 0);
+    yes('no guard office yet: arriving issues nothing', Q.cameIn(c) === false && q.count(c, CUFFS) === 0);
+    q.guards[113] = ['whiterun'];
+    yes('taking the guard office: issued a pair', Q.guardOffice(c) === true && q.count(c, CUFFS) === 1);
+    yes('...and the same day, a pair gone, arriving again issues no other', (q.people[c].inv = {}, Q.cameIn(c) === false && q.count(c, CUFFS) === 0));
+    q.clock.now += Q.ISSUE_EVERY_MS + 1000;
+    yes('...and a day later, arriving issues the next one', Q.cameIn(c) === true && q.count(c, CUFFS) === 1);
+    const gone = q.mp.getOnlinePlayers;
+    q.mp.getOnlinePlayers = function () { throw new Error('no list'); };
+    yes('a pass shown when who is online cannot be read issues nothing, and does not throw', Q.passShown(111) === false);
+    q.mp.getOnlinePlayers = gone;
+  }
+  // wentOut() and cameIn() start a person's stored-equipment look afresh.
+  {
+    const q = rig(), Q = q.C;
+    const g = q.person(0xff0000b1, 121, 'whiterunCell:T.esm'), p = q.person(0xff0000b2, 122, 'whiterunCell:T.esm');
+    q.guards[121] = ['whiterun']; q.addItem(g, '10e039:Skyrim.esm', 1); q.face(g, p);
+    const worn = function (on) { return { inv: { entries: [{ baseId: CUFFS, count: 1, worn: on }] } }; };
+    Q.equipped(g, worn(false));
+    Q.wentOut(g);
+    Q.equipped(g, worn(true));
+    yes('after wentOut(), the first look is only a baseline again, so a pair worn at logout cuffs nobody', !Q.cuffedBy(p));
+    Q.equipped(g, worn(false));
+    Q.cameIn(g);
+    Q.equipped(g, worn(true));
+    yes('...and after cameIn() too', !Q.cuffedBy(p));
+    Q.equipped(g, worn(false)); Q.equipped(g, worn(true));
+    yes('...and a pair newly worn after that baseline cuffs as usual', !!Q.cuffedBy(p));
+  }
+
   // Issue once a day.
   const G3 = r.person(0xff000006, 16, 'whiterunCell:T.esm'); r.guards[16] = ['whiterun'];
   C.issue(G3); r.people[G3].inv = {};
@@ -436,7 +496,8 @@ if (C && typeof C.used === 'function') {
   // The client scripts.
   function sp(log) {
     const pc = {
-      drawn: true, equipped: false, count: 1,
+      drawn: true, equipped: false, count: 1, cell: 0x1a,
+      getParentCell: function () { const c = this.cell; return c ? { getFormID: function () { return c; } } : null; },
       isWeaponDrawn: function () { return this.drawn; }, sheatheWeapon: function () { this.drawn = false; log.push('sheathe'); },
       getItemCount: function () { return this.count; }, isEquipped: function () { return this.equipped; },
       equipItem: function (f, prevent) { this.equipped = true; log.push('equip ' + (prevent ? 'locked' : 'loose')); },
@@ -446,6 +507,7 @@ if (C && typeof C.used === 'function') {
       pc: pc,
       sp: {
         storage: {},
+        printConsole: function (line) { log.push('console ' + line); },
         Game: {
           fighting: true,
           isFightingControlsEnabled: function () { return this.fighting; },
@@ -474,13 +536,38 @@ if (C && typeof C.used === 'function') {
     log.length = 0;
     own({ value: bound, state: st, sp: s.sp });
     yes('the next frame with nothing new does nothing', log.length === 0);
-    s.pc.equipped = false; s.pc.drawn = true;
+    s.pc.drawn = true;
+    for (let i = 0; i < 20; i++) { own({ value: bound, state: st, sp: s.sp }); }
+    yes('nothing is put right again frame after frame: once per record (#4573)', log.length === 0);
+    yes('no timer in the prisoner\'s script: it acts on the record, not on Date.now', !/Date\.now/.test(C.ownerScript()) && !/Date\.now/.test(C.neighborScript()));
+    s.pc.cell = 0x2b;
     own({ value: bound, state: st, sp: s.sp });
-    yes('cuffs that came off, or a weapon drawn, are put right while bound', log.indexOf('equip locked') !== -1 && log.indexOf('sheathe') !== -1);
-    log.length = 0; s.sp.Game.fighting = true; delete s.sp.storage.thornswoodControlsHeld;
+    yes('a load into another cell plays the bound idle once more, and only that', log.join() === 'anim OffsetBoundStandingStart');
+    log.length = 0;
     own({ value: bound, state: st, sp: s.sp });
-    yes('fighting switched back on by anything else is switched off again, and named held again',
-      log.indexOf('controls off move=false fight=true') !== -1 && s.sp.storage.thornswoodControlsHeld.fighting === 'cuffed');
+    yes('...and once: the same cell again does nothing', log.length === 0);
+    s.pc.cell = 0;
+    own({ value: bound, state: st, sp: s.sp });
+    yes('...and no cell (a load screen) does nothing', log.length === 0);
+    s.pc.cell = 0x2b;
+    {
+      const logN = [], sN = sp(logN);
+      own({ value: bound, state: {}, sp: sN.sp });
+      yes('a new session (a fresh state) with the same bound record does it all once',
+        logN.indexOf('controls off move=false fight=true') !== -1 && logN.indexOf('equip locked') !== -1 && logN.indexOf('anim OffsetBoundStandingStart') !== -1);
+    }
+    {
+      const logT = [], sT = sp(logT), stT = {};
+      sT.pc.sheatheWeapon = function () { throw new Error('no sheathe'); };
+      own({ value: { bound: true, hold: 'whiterun', at: 40, item: CUFFS }, state: stT, sp: sT.sp });
+      const said = logT.filter(function (x) { return /^console /.test(x); });
+      yes('a step that throws is written to the game\'s console with what it was, and the others still run',
+        said.length === 1 && /could not put the weapon away: Error: no sheathe/.test(said[0]) && logT.indexOf('equip locked') !== -1 && logT.indexOf('anim OffsetBoundStandingStart') !== -1);
+      stT.thornswoodCuffAt = 0;
+      logT.length = 0;
+      own({ value: { bound: true, hold: 'whiterun', at: 40, item: CUFFS }, state: stT, sp: sT.sp });
+      yes('...once per record, not each time it is tried', logT.filter(function (x) { return /^console /.test(x); }).length === 0);
+    }
     log.length = 0;
     own({ value: { bound: false, hold: 'whiterun', at: 6, item: CUFFS }, state: st, sp: s.sp });
     yes('freed: cuffs off, idle ended, fighting back', log.indexOf('unequip') !== -1 && log.indexOf('anim OffsetStop') !== -1 &&
@@ -499,10 +586,19 @@ if (C && typeof C.used === 'function') {
     own({ value: { bound: false, at: 9, item: CUFFS }, state: {}, sp: s2.sp });
     yes('a free record in a new session touches nothing', log2.length === 0);
     const log3 = [], s3 = sp(log3), nst = {};
-    near({ value: bound, state: nst, sp: s3.sp, refr: {} });
-    yes('everybody else\'s game plays the bound idle on the prisoner', log3.indexOf('anim OffsetBoundStandingStart') !== -1);
+    const body = { loaded: true, is3DLoaded: function () { return this.loaded; } };
+    near({ value: bound, state: nst, sp: s3.sp, refr: body });
+    yes('everybody else\'s game plays the bound idle on the prisoner', log3.join() === 'anim OffsetBoundStandingStart');
     log3.length = 0;
-    near({ value: { bound: false, at: 6 }, state: nst, sp: s3.sp, refr: {} });
+    for (let i = 0; i < 20; i++) { near({ value: bound, state: nst, sp: s3.sp, refr: body }); }
+    yes('...once, not again frame after frame', log3.length === 0);
+    body.loaded = false;
+    near({ value: bound, state: nst, sp: s3.sp, refr: body });
+    body.loaded = true;
+    near({ value: bound, state: nst, sp: s3.sp, refr: body });
+    yes('...and once more when the prisoner\'s body is loaded near them again', log3.join() === 'anim OffsetBoundStandingStart');
+    log3.length = 0;
+    near({ value: { bound: false, at: 6 }, state: nst, sp: s3.sp, refr: body });
     yes('...and ends it when they are freed', log3.indexOf('anim OffsetStop') !== -1);
   }
 }
@@ -524,6 +620,31 @@ yes('the cuffs answer onEquipItemAttempt and ask any handler already there, neve
   /mp\.onEquipItemAttempt = cuffsGate;/.test(block));
 yes('mp.onDropItem refuses the pair on a prisoner\'s wrists', /cuffsDrop && !cuffsDrop\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/.test(handler('onDropItem')));
 yes('mp.onPutItem does too', /cuffsPut && !cuffsPut\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/.test(handler('onPutItem')));
+
+// Where a guard's pair is issued (#4573): the three moments, wired.
+{
+  const tickAt = gm.indexOf('function chargenTick() {');
+  const tick = tickAt < 0 ? '' : gm.slice(tickAt, gm.indexOf('\n}\n', tickAt));
+  const firstSight = tick.indexOf('if (!firstSeen.has(actorId)) {');
+  const gone = tick.indexOf('firstSeen.delete(id);');
+  yes('the chargen tick\'s first sight of somebody (the per-session hook) asks the cuffs, cameIn(actorId)',
+    firstSight !== -1 && tick.indexOf('cuffsHere.cameIn(actorId)') > firstSight);
+  yes('...and its offline pass tells the cuffs somebody left, wentOut(id)',
+    gone !== -1 && tick.indexOf('cuffsGone.wentOut(id)') > gone && tick.indexOf('cuffsGone.wentOut(id)') < firstSight);
+  const officeAt = gm.indexOf('function officeHoldHere(');
+  const office = officeAt < 0 ? '' : gm.slice(officeAt, gm.indexOf('\n  }\n', officeAt));
+  yes('taking a guard office on the Office page of K issues the pair, for the guard office only',
+    /if \(office === 'guard' && cuffsOffice && cuffsOffice\.guardOffice\) \{/.test(office) && office.indexOf('cuffsOffice.guardOffice(actorId)') > office.indexOf('holdHere(office, hold, profileId, name)'));
+  const takeAt = gm.indexOf('  function take(profileId, raw, now) {');
+  const take = takeAt < 0 ? '' : gm.slice(takeAt, gm.indexOf('\n  }\n', takeAt));
+  const letAt = gm.indexOf('  function letIn(profileId) {');
+  const letIn = letAt < 0 ? '' : gm.slice(letAt, gm.indexOf('\n  }\n', letAt));
+  yes('the join pass block issues it only on the change from held to shown, once the pass is on record',
+    /var heldBefore = held\(profileId, now\);/.test(take) &&
+    /seen\.passes\[profileId\] = \{[^\n]*\};\s*if \(heldBefore && !held\(profileId, now\)\) \{ letIn\(profileId\); \}\s*return r;/.test(take));
+  yes('...and letIn hands the profile to the cuffs, and says on the console when that throws',
+    /cuffs\.passShown\(profileId\)/.test(letIn) && /catch \(e\) \{ console\.log\(/.test(letIn));
+}
 
 // The front plugin's two rescues and what the server holds off (#2620).
 const front = fs.readFileSync(path.join(ROOT, 'game', 'plugins', 'thornswood-front.js'), 'utf8').split(String.fromCharCode(13)).join('');

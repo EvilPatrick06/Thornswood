@@ -5353,10 +5353,10 @@ function chargenTick() {
   for (const id of Array.from(firstSeen.keys())) {
     if (!here.has(id)) {
       firstSeen.delete(id);
-      // The cuffs keep nothing on somebody gone (#2573, left()).
+      // The cuffs keep nothing on somebody gone (#2573, wentOut()).
       try {
         const cuffsGone = globalThis.__thornswoodCuffs;
-        if (cuffsGone && cuffsGone.left) { cuffsGone.left(id); }
+        if (cuffsGone && cuffsGone.wentOut) { cuffsGone.wentOut(id); }
       } catch (e) {
         log('logout', id.toString(16), 'could not clear what the cuffs knew of them:', e);
       }
@@ -5490,10 +5490,10 @@ function chargenTick() {
       }
 
       // A guard is issued their Prisoner's Cuffs as they arrive, and a new
-      // session looks at their pair afresh (#2573, arrived()).
+      // session looks at their pair afresh (#2573, cameIn()).
       try {
         const cuffsHere = globalThis.__thornswoodCuffs;
-        if (cuffsHere && cuffsHere.arrived) { cuffsHere.arrived(actorId); }
+        if (cuffsHere && cuffsHere.cameIn) { cuffsHere.cameIn(actorId); }
       } catch (e) {
         log('login', actorId.toString(16), 'could not issue the cuffs:', e);
       }
@@ -33383,8 +33383,23 @@ log('gamemode loaded:',
     return 0;
   }
 
+  /*
+    A session this pass let in just now, that was held before it: the blocks
+    that wait for that moment are told here, once, and the launcher's later
+    passes for the same session tell nobody. Only the cuffs wait on it, so a
+    guard who arrived still waiting on their pass is issued their pair now
+    (#2573, passShown()).
+  */
+  function letIn(profileId) {
+    var cuffs = g.__thornswoodCuffs;
+    if (!cuffs || !cuffs.passShown) { return; }
+    try { cuffs.passShown(profileId); }
+    catch (e) { console.log('[thornswood] join pass: the cuffs issue for profile ' + profileId + ' failed: ' + e); }
+  }
+
   /* One "/joinpass <pass>" from the relay, sent under profileId. */
   function take(profileId, raw, now) {
+    var heldBefore = held(profileId, now);
     var r = readPass(raw, passKey(now), now, serverName());
     if (r.ok && r.p !== profileId) { r = { why: 'a pass for profile ' + r.p, p: r.p }; }
     // The character may be on a new connection the sweep has not seen yet
@@ -33417,6 +33432,7 @@ log('gamemode loaded:',
       console.log('[thornswood] join pass for profile ' + profileId + ', launcher ' + r.v);
     }
     seen.passes[profileId] = { at: now, x: r.x, v: r.v, d: r.d, i: r.i, id: r.id, s: r.s };
+    if (heldBefore && !held(profileId, now)) { letIn(profileId); }
     return r;
   }
 
@@ -62095,14 +62111,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     if (word === '/joinpass') {
       var jp = g.__thornswoodJoinPass;
       if (jp && profileId) {
-        var heldBefore = !!(jp.held && jp.held(profileId, Date.now()));
         try { jp.take(profileId, parts[1], Date.now()); } catch (eJp) { log('/joinpass failed:', eJp); }
-        // Shown just now, not again: a guard who arrived waiting on the pass
-        // is issued their cuffs here (#2573, passShown()).
-        var cuffsPass = g.__thornswoodCuffs;
-        if (heldBefore && cuffsPass && cuffsPass.passShown && !(jp.held && jp.held(profileId, Date.now()))) {
-          try { cuffsPass.passShown(profileId); } catch (eCuffs) { log('/joinpass: the cuffs issue failed:', eCuffs); }
-        }
       }
       return;
     }
@@ -64937,9 +64946,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   and is not cuffed is issued one pair, at most once a real day per
   character, at the three moments that can make somebody such a guard in the
   world, and at no other time: they arrive (the per-session hook in the
-  chargen tick, arrived()), their join pass is shown (passShown(), for
+  chargen tick, cameIn()), their join pass is shown (passShown(), for
   somebody who arrived still waiting on it), and they take a guard office on
-  the Office page of K (officeHoldHere). Not a timer looking at everybody:
+  the Office page of K (guardOffice()). Not a timer looking at everybody:
   nothing changes in between. Cuffing moves the pair to the prisoner and
   freeing gives it back, so the issue only covers a pair that went away, and
   a guard whose pair went away is issued the next one when they next arrive
@@ -65183,7 +65192,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     the engine before onEquipItemAttempt. A pair newly worn acts as above,
     and the wearer's own game takes it back off. The first look at somebody
     after they arrive only remembers, so a pair worn at logout does nothing.
-    wornWas is declared at the top of the block; arrived() and left() clear
+    wornWas is declared at the top of the block; cameIn() and wentOut() clear
     a person's entry, so it is per session and holds nobody offline.
   */
   function equipped(actorId, eq) {
@@ -65236,13 +65245,13 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     not still waiting on their pass is issued theirs now; one who is waiting
     is issued it when the pass is shown (passShown).
   */
-  function arrived(actorId) {
+  function cameIn(actorId) {
     delete wornWas[actorId];
     if (waiting(actorId)) { return false; }
     return issue(actorId);
   }
   /* Gone from the world (the same tick's offline pass): nothing kept on them. */
-  function left(actorId) {
+  function wentOut(actorId) {
     delete wornWas[actorId];
   }
   /*
@@ -65259,7 +65268,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     }
     return false;
   }
-  /* They took a guard office on the Office page of K (officeHoldHere). */
+  /* They took a guard office on the Office page of K (the property block's office hold). */
   function guardOffice(actorId) {
     return issue(actorId);
   }
@@ -65438,7 +65447,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   g.__thornswoodCuffs = {
     used: used, facing: facing, mayEquip: mayEquip, equipped: equipped, mayFree: mayFree,
     useScript: useScript, USE_PROPERTY: USE_PROPERTY, equipBefore: equipBefore, REACH: REACH,
-    mayLetGo: mayLetGo, issue: issue, arrived: arrived, left: left, passShown: passShown,
+    mayLetGo: mayLetGo, issue: issue, cameIn: cameIn, wentOut: wentOut, passShown: passShown,
     guardOffice: guardOffice, cuffedBy: cuffedBy,
     bindingHold: bindingHold, ownerScript: ownerScript, neighborScript: neighborScript,
     CUFFS_DESC: CUFFS_DESC, CUFF_PROPERTY: CUFF_PROPERTY, ISSUE_EVERY_MS: ISSUE_EVERY_MS
