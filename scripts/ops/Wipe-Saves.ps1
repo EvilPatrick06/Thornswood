@@ -135,6 +135,12 @@
 
     .\Wipe-Saves.ps1 -Server dev
 
+  The deploy gate runs that one as its Wipe-Dev verb (#3649), with -Yes and
+  -NoPause and nothing a caller can add, so a cloud session starts dev over
+  for a load order change without a key to the box:
+
+    pwsh scripts/vps/Box-Run.ps1 -Line 'Wipe-Dev'
+
   Read-Host reads the console rather than standard input, so a wipe run from a
   script or from an agent cannot answer the question however it is fed: it comes
   back empty and the script stops with "Left alone.". That is the whole reason

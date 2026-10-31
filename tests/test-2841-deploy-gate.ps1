@@ -155,6 +155,12 @@ Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, keeping the launcher only whe
     $shipBox.Contains("if (`$ModsOnly) { `$ship['ModsOnly'] = `$true }") -and -not $shipBox.Contains("elseif (`$ModsOnly)") -and
     $shipBox.Contains('$env:GH_TOKEN = $token') -and $shipBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN'))
 Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
+# The dev world started over for a load order change (#3649: a light plugin
+# going out renumbers the ones after it): dev only, with nothing a caller
+# can add, and the wipe's own -Yes because the gate has no console.
+Yes 'Wipe-Dev wipes the dev server alone and takes nothing' ((Words 'Wipe-Dev') -eq '-Server|dev|-Yes|-NoPause' -and (Words 'Wipe-Dev -Server main') -eq 'REFUSED' -and
+    (Words 'Wipe-Dev -Vps 1.2.3.4') -eq 'REFUSED' -and -not $verbs.verbs.'Wipe-Dev'.build -and $verbs.verbs.'Wipe-Dev'.script -eq 'scripts/ops/Wipe-Saves.ps1')
+Yes '  and no verb wipes main or every server' (@($verbs.verbs.PSObject.Properties | Where-Object { $_.Value.script -eq 'scripts/ops/Wipe-Saves.ps1' -and (@($_.Value.fixed) -join ' ') -ne '-Server dev -Yes -NoPause' }).Count -eq 0)
 # The installer for the site (#5109): no parameter at all, the token the
 # Ship's, and the publish from the branch main.
 Yes 'Publish-Installer takes nothing, and is not a live verb' ((Words 'Publish-Installer') -eq '' -and (Words 'Publish-Installer -OutDir C:/x') -eq 'REFUSED' -and
