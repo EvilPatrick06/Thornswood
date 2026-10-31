@@ -32,6 +32,9 @@ namespace Thornswood
         static string feedSaid = "";
         static bool inPlayFailSaid;
         static bool notChangedSaid;
+        // Said once while the config points at a server on this machine, so
+        // the line is in launcher.log without one every thirty seconds.
+        static bool localSaid;
 
         /// <summary>
         /// Keeps one long-poll open against the site's /feed/watch (#2440).
@@ -176,10 +179,25 @@ namespace Thornswood
                 LogOnly("Update checks read " + feedSaid + ".");
             }
 
+            // A config pointing at a server on this machine was pointed there
+            // by hand: a restore rehearsal (docs RESTORING.md, #5020) or a
+            // developer's own server. The feed's address and ports are the
+            // public server's, and taking them here put the public address
+            // back over 127.0.0.1 on the first check, so Play loaded the live
+            // character instead of the restored one. They are left as they
+            // are until the config names a server elsewhere again.
+            bool local = SkyMp.IsLocal(cfg);
+            if (local && !localSaid)
+            {
+                localSaid = true;
+                LogOnly("This launcher points at a server on this machine (" + cfg.ServerAddress + ":" + cfg.ServerPort + "), so the update feed's server address and ports are not taken.");
+            }
+            if (!local) localSaid = false;
+
             bool moved = false;
-            if (!string.IsNullOrEmpty(v.serverAddress) && v.serverAddress != cfg.ServerAddress) { cfg.ServerAddress = v.serverAddress; moved = true; }
+            if (!local && !string.IsNullOrEmpty(v.serverAddress) && v.serverAddress != cfg.ServerAddress) { cfg.ServerAddress = v.serverAddress; moved = true; }
             if (!string.IsNullOrEmpty(v.collectionUrl) && v.collectionUrl != cfg.CollectionUrl) { cfg.CollectionUrl = v.collectionUrl; moved = true; }
-            if (!string.IsNullOrEmpty(v.serverPort) && v.serverPort != cfg.ServerPort) { cfg.ServerPort = v.serverPort; moved = true; }
+            if (!local && !string.IsNullOrEmpty(v.serverPort) && v.serverPort != cfg.ServerPort) { cfg.ServerPort = v.serverPort; moved = true; }
             if (v.maxOnline > 0 && v.maxOnline != cfg.MaxOnline) { cfg.MaxOnline = v.maxOnline; moved = true; }
             if (moved)
             {
@@ -197,7 +215,7 @@ namespace Thornswood
             // Quietly, and without a line in the log. Nobody set these and
             // nobody needs telling they changed.
             bool quiet = false;
-            if (!string.IsNullOrEmpty(v.voicePort) && v.voicePort != cfg.VoicePort)
+            if (!local && !string.IsNullOrEmpty(v.voicePort) && v.voicePort != cfg.VoicePort)
             {
                 cfg.VoicePort = v.voicePort; quiet = true;
             }
