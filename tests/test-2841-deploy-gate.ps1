@@ -155,6 +155,14 @@ Yes '  Ship-OnBox.ps1 runs Ship.ps1 from the feed, keeping the launcher only whe
     $shipBox.Contains("if (`$ModsOnly) { `$ship['ModsOnly'] = `$true }") -and -not $shipBox.Contains("elseif (`$ModsOnly)") -and
     $shipBox.Contains('$env:GH_TOKEN = $token') -and $shipBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN'))
 Yes '  a main Ship goes from the branch main at the fetched origin/main' ($shipBox.Contains("checkout --quiet -B main refs/remotes/origin/main"))
+# The DEV marks and the shipped issues read main's history and the release
+# tags, which the gate's one-commit checkout has not got (#5133).
+Yes '  a Ship deepens the gate''s checkout to main''s history and tags before it runs, and keeps origin/main at the commit the gate read' (
+    $shipBox.Contains("'fetch', '--quiet', '--unshallow', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'") -and
+    $shipBox.Contains("'fetch', '--quiet', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'") -and
+    $shipBox.Contains('update-ref refs/remotes/origin/main $head') -and
+    $shipBox.IndexOf('--unshallow') -gt $shipBox.IndexOf('checkout --quiet -B main') -and
+    $shipBox.IndexOf('--unshallow') -lt $shipBox.IndexOf("& (Join-Path `$Here 'Ship.ps1') @ship"))
 # The dev world started over for a load order change (#3649: a light plugin
 # going out renumbers the ones after it): dev only, with nothing a caller
 # can add, and the wipe's own -Yes because the gate has no console.
