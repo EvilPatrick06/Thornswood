@@ -32,6 +32,13 @@
   nor is ours (Thornswood-Content.esp), which every deploy sends from the
   repository.
 
+  AND WHAT SKYUI'S MENU CHECK READS. A release that moves the revision runs
+  Check-SkyUIMenus.js against the revision's own files, which are on no
+  machine, so the store keeps those too, in menus\ at each file's path in the
+  game folder: SkyUI's script, the loose menus and the archives that hold
+  either (Install-NexusRevision -KeepPlugins says which). Each is held to the
+  sha256 the layout's files.txt names for its path before it goes in.
+
   WHERE IT GOES. C:\Thornswood-Deploys\collection\<slug>-<revision>, beside
   the store of server builds, written into a folder of its own first and
   moved into place whole, with store.json saying what is there. A store that
@@ -64,6 +71,56 @@ function Get-ThornswoodCollectionStoreFiles([string]$Dir) {
 
 function Get-ThornswoodCollectionStoreDir([string]$Root, [string]$Slug, [int]$Revision) {
     return (Join-Path $Root ($Slug + '-' + $Revision))
+}
+
+# files.txt of a layout as a path -> { Size; Sha256 } table, paths compared
+# without case. Rows are sha256, size, file id and path, tab apart.
+function Read-ThornswoodLayoutFiles([string]$Path) {
+    $table = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($l in [IO.File]::ReadAllLines($Path)) {
+        if (-not $l -or $l.StartsWith('#')) { continue }
+        $c = $l.Split("`t")
+        if ($c.Count -lt 4 -or $c[0] -notmatch '^[0-9a-fA-F]{64}$') { throw "$Path has a row that is not sha256, size, file id and path: $l" }
+        $table[$c[3]] = [pscustomobject]@{ Size = [int64]$c[1]; Sha256 = $c[0].ToLowerInvariant() }
+    }
+    return $table
+}
+
+# The files under $Dir, each with its path below $Dir the Windows way
+# (Data\SkyUI_SE.bsa), its size and its sha256.
+function Get-ThornswoodCollectionMenuFiles([string]$Dir) {
+    if (-not (Test-Path -LiteralPath $Dir -PathType Container)) { return @() }
+    $full = (Get-Item -LiteralPath $Dir).FullName.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    return @(Get-ChildItem -LiteralPath $Dir -File -Recurse | Sort-Object FullName | ForEach-Object {
+        [pscustomobject]@{ Path = $_.FullName.Substring($full.Length).Replace([string][IO.Path]::DirectorySeparatorChar, '\'); Full = $_.FullName; Size = $_.Length; Sha256 = (Get-ThornswoodPluginSha256 $_.FullName) }
+    })
+}
+
+# Why the menus in $Dir are not the ones $Rows names ({ Size; Sha256 } by
+# path: the layout's files.txt, or the store's own list), one line each.
+# With $Whole every row has to be there too.
+function Get-ThornswoodCollectionMenuProblems([string]$Dir, $Rows, [switch]$Whole) {
+    $out = @()
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($f in @(Get-ThornswoodCollectionMenuFiles $Dir)) {
+        [void]$seen.Add($f.Path)
+        if (-not $Rows.ContainsKey($f.Path)) { $out += ($f.Path + '  (not a file of the layout)'); continue }
+        $want = $Rows[$f.Path]
+        if ($f.Size -ne $want.Size -or $f.Sha256 -ne $want.Sha256) { $out += ($f.Path + '  (sha256 ' + $f.Sha256.Substring(0, 12) + ', the layout''s is ' + $want.Sha256.Substring(0, 12) + ')') }
+    }
+    if ($Whole) { foreach ($k in $Rows.Keys) { if (-not $seen.Contains($k)) { $out += ($k + '  (not in ' + $Dir + ')') } } }
+    return $out
+}
+
+# Why the store at $Dir does not hold what SkyUI's menu check reads as its
+# store.json lists it; none when it does.
+function Get-ThornswoodCollectionStoreMenuProblems([string]$Dir) {
+    $doc = $null
+    try { $doc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText((Join-Path $Dir 'store.json'))) (Join-Path $Dir 'store.json') } catch { return @('its store.json does not read: ' + $_.Exception.Message) }
+    if ([int]$doc.version -lt 2 -or -not $doc.PSObject.Properties['menus']) { return @('it was made before the store held what SkyUI''s menu check reads') }
+    $rows = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($m in @($doc.menus)) { $rows[[string]$m.path] = [pscustomobject]@{ Size = [int64]$m.size; Sha256 = ([string]$m.sha256).ToLowerInvariant() } }
+    return @(Get-ThornswoodCollectionMenuProblems (Join-Path $Dir 'menus') $rows -Whole)
 }
 
 # Why the plugins in $Dir are not the store for the record ($Head), one line
@@ -102,10 +159,11 @@ function Get-ThornswoodCollectionStore {
     $dir = Get-ThornswoodCollectionStoreDir $Root $head.Slug $head.Revision
     if (Test-Path -LiteralPath (Join-Path $dir 'store.json') -PathType Leaf) {
         $bad = @(Get-ThornswoodCollectionStoreProblems $head $dir)
+        if (-not $bad.Count) { $bad = @(Get-ThornswoodCollectionStoreMenuProblems $dir) }
         if (-not $bad.Count) {
             $n = @(Get-ThornswoodCollectionStoreFiles $dir).Count
-            & $Say ('  the box holds collection ' + $head.Slug + ' revision ' + $head.Revision + '''s ' + $n + ' plugins, each the record''s bytes (' + $dir + ')')
-            return [pscustomobject]@{ Dir = $dir; Slug = $head.Slug; Revision = $head.Revision; Count = $n }
+            & $Say ('  the box holds collection ' + $head.Slug + ' revision ' + $head.Revision + '''s ' + $n + ' plugins, each the record''s bytes, and what SkyUI''s menu check reads (' + $dir + ')')
+            return [pscustomobject]@{ Dir = $dir; Slug = $head.Slug; Revision = $head.Revision; Count = $n; Menus = (Join-Path $dir 'menus') }
         }
         & $Say ('  the store for revision ' + $head.Revision + ' is not the record''s, so it is fetched again: ' + ($bad -join '; '))
     }
@@ -121,27 +179,40 @@ function Get-ThornswoodCollectionStore {
         $layout = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($layoutPath)) $layoutPath
         $bad = @(Get-ThornswoodCollectionStoreProblems $head $plugins $layout)
         if ($bad.Count) { throw ("the plugins fetched are not the ones records\collection-plugins.json names, so nothing went into the store:`n    " + ($bad -join "`n    ")) }
+        $menus = Join-Path $record 'menus'
+        $filesTxt = Join-Path $record 'files.txt'
+        if (-not (Test-Path -LiteralPath $menus -PathType Container) -or -not (Test-Path -LiteralPath $filesTxt -PathType Leaf)) { throw "the fetch brought back no menus folder or no files.txt, so what SkyUI's menu check reads is not here. Nothing went into the store." }
+        $bad = @(Get-ThornswoodCollectionMenuProblems $menus (Read-ThornswoodLayoutFiles $filesTxt))
+        if ($bad.Count) { throw ("what SkyUI's menu check reads, as fetched, is not the layout's, so nothing went into the store:`n    " + ($bad -join "`n    ")) }
+        $menuFiles = @(Get-ThornswoodCollectionMenuFiles $menus)
         $files = @(Get-ThornswoodCollectionStoreFiles $plugins)
         $stage = $dir + '.new'
         if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
         New-Item -ItemType Directory -Path $stage -Force | Out-Null
         foreach ($f in $files) { [IO.File]::Copy($f.FullName, (Join-Path $stage $f.Name), $true) }
+        foreach ($m in $menuFiles) {
+            $to = Join-Path (Join-Path $stage 'menus') ($m.Path.Replace('\', [string][IO.Path]::DirectorySeparatorChar))
+            New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+            [IO.File]::Copy($m.Full, $to, $true)
+        }
+        New-Item -ItemType Directory -Path (Join-Path $stage 'menus') -Force | Out-Null
         $doc = [ordered]@{
-            version    = 1
+            version    = 2
             builtBy    = 'scripts/deploy/CollectionStore.ps1'
             issue      = 4069
             collection = $head.Slug
             revision   = $head.Revision
             layoutMade = [string]$layout.made
             plugins    = @($files | Sort-Object Name | ForEach-Object { [ordered]@{ name = $_.Name; size = $_.Length; sha256 = (Get-ThornswoodPluginSha256 $_.FullName) } })
+            menus      = @($menuFiles | ForEach-Object { [ordered]@{ path = $_.Path; size = $_.Size; sha256 = $_.Sha256 } })
         }
         [IO.File]::WriteAllText((Join-Path $stage 'store.json'), ($doc | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
-        $bad = @(Get-ThornswoodCollectionStoreProblems $head $stage)
-        if ($bad.Count) { throw ("the plugins copied into $stage are not the record's: " + ($bad -join '; ')) }
+        $bad = @(Get-ThornswoodCollectionStoreProblems $head $stage) + @(Get-ThornswoodCollectionStoreMenuProblems $stage)
+        if ($bad.Count) { throw ("what was copied into $stage is not what was fetched: " + ($bad -join '; ')) }
         if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
         Move-Item -LiteralPath $stage -Destination $dir
-        & $Say ('  ' + $files.Count + ' plugins of revision ' + $head.Revision + ' are in the store, each the record''s bytes (' + $dir + ')')
-        return [pscustomobject]@{ Dir = $dir; Slug = $head.Slug; Revision = $head.Revision; Count = $files.Count }
+        & $Say ('  ' + $files.Count + ' plugins of revision ' + $head.Revision + ' are in the store, each the record''s bytes, and ' + $menuFiles.Count + ' files SkyUI''s menu check reads (' + $dir + ')')
+        return [pscustomobject]@{ Dir = $dir; Slug = $head.Slug; Revision = $head.Revision; Count = $files.Count; Menus = (Join-Path $dir 'menus') }
     }
     finally {
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

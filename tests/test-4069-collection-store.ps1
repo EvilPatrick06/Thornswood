@@ -9,13 +9,18 @@
        only from plugins that are records\collection-plugins.json's bytes,
        of the revision and collection it names; one that is not stops it and
        nothing goes in; a whole store is used again with no fetch; a store
-       that is no longer the record's is fetched again.
+       that is no longer the record's is fetched again. What SkyUI's menu
+       check reads goes in with them, each at the bytes the layout's
+       files.txt names for its path, and a store without it, or made before
+       it held it, is fetched again.
     2. Invoke-ThornswoodCollectionFetch runs Nexus-Run's
        Install-NexusRevision -KeepPlugins for the record's revision with the
        box admin App's token in GH_TOKEN for that run alone, and takes the
        one record the run left; a run that does not end 0 stops it.
     3. Install-NexusRevision -KeepPlugins goes with -Record alone, and keeps
-       the copy each plugin's place is won by, held to files.txt's sha256.
+       the copy each plugin's place is won by, held to files.txt's sha256,
+       and the same of what SkyUI's menu check reads, with node saying which
+       archives hold any of it (Check-SkyUIMenus.js --holding).
     4. The verbs: Nexus-Run lets Install-NexusRevision take -KeepPlugins, and
        the deploy gate lets Deploy-DevGamemode take -LoadOrder -FromRecord.
     5. Deploy-DevGamemode -FromRecord: the order is last-plugin.json's, the
@@ -37,6 +42,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 function Text([string]$rel) { return [IO.File]::ReadAllText((Join-Path $Repo $rel)) }
+function Sha-Bytes([byte[]]$b) { return ([BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($b))).Replace('-', '').ToLowerInvariant() }
 function Sha([string]$p) { return ([BitConverter]::ToString([Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($p)))).Replace('-', '').ToLowerInvariant() }
 $utf8 = New-Object Text.UTF8Encoding($false)
 
@@ -65,8 +71,15 @@ try {
     Write-Record $record 6 $rows
     $root = Join-Path $tmp 'store'
     $count = @{ n = 0 }
-    # A fetch as the box's brings it back: a layout record with its plugins.
-    function New-Fetch([int]$rev, [string]$slug, [hashtable]$swap) {
+    # What SkyUI's menu check reads, as the layout places it.
+    $menuBytes = [ordered]@{
+        'Data\SkyUI_SE.bsa'                  = [byte[]](1..64 | ForEach-Object { ($_ * 3) % 256 })
+        'Data\Interface\skyui\itemcard.swf' = [byte[]](1..32 | ForEach-Object { ($_ * 5) % 256 })
+    }
+    # A fetch as the box's brings it back: a layout record with its plugins,
+    # its menus and its files.txt. $swapMenu writes other bytes at a path
+    # after files.txt is written; $noMenus leaves the menus folder out.
+    function New-Fetch([int]$rev, [string]$slug, [hashtable]$swap, [hashtable]$swapMenu = @{}, [bool]$noMenus = $false) {
         return {
             param($w, $h)
             $count.n++
@@ -76,6 +89,16 @@ try {
             foreach ($f in Get-ChildItem -LiteralPath $src -File) { [IO.File]::Copy($f.FullName, (Join-Path $pd $f.Name), $true) }
             [IO.File]::WriteAllBytes((Join-Path $pd 'Thornswood-Content.esp'), [byte[]](7, 7, 7))
             foreach ($k in $swap.Keys) { [IO.File]::WriteAllBytes((Join-Path $pd $k), [byte[]]$swap[$k]) }
+            $ft = @('# Install-NexusRevision.ps1: collection ' + $slug + ' revision ' + $rev + '. sha256, size, Nexus file id, path in the game folder.')
+            foreach ($k in $menuBytes.Keys) {
+                $b = [byte[]]$menuBytes[$k]
+                $ft += ((Sha-Bytes $b) + "`t" + $b.Length + "`t" + '1000' + "`t" + $k)
+                if ($noMenus) { continue }
+                $to = Join-Path (Join-Path $rec 'menus') ($k.Replace('\', [string][IO.Path]::DirectorySeparatorChar))
+                New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+                [IO.File]::WriteAllBytes($to, $(if ($swapMenu.ContainsKey($k)) { [byte[]]$swapMenu[$k] } else { $b }))
+            }
+            [IO.File]::WriteAllLines((Join-Path $rec 'files.txt'), [string[]]$ft)
             $lay = [ordered]@{ schema = 1; made = '2026-10-31T18:00:00Z'; collection = [ordered]@{ slug = $slug; revision = $rev } }
             [IO.File]::WriteAllText((Join-Path $rec 'layout.json'), ($lay | ConvertTo-Json -Depth 4), $utf8)
             return $rec
@@ -101,6 +124,14 @@ try {
     try { $null = Get-ThornswoodCollectionStore -RecordPath $record -Root $root -Fetch (New-Fetch 6 'other' @{}) -Say $quiet } catch { $threw = $_.Exception.Message }
     Yes 'a layout of another collection stops the store' ($threw -match 'collection other')
 
+    $threw = ''
+    try { $null = Get-ThornswoodCollectionStore -RecordPath $record -Root $root -Fetch (New-Fetch 6 '7essxf' @{} @{ 'Data\SkyUI_SE.bsa' = [byte[]](9, 9) }) -Say $quiet } catch { $threw = $_.Exception.Message }
+    Yes 'a fetched menu file at other bytes than the layout''s stops the store, naming it' ($threw -match 'SkyUI_SE\.bsa' -and $threw -match 'nothing went into the store' -and -not (Test-Path -LiteralPath (Join-Path $root '7essxf-6')))
+
+    $threw = ''
+    try { $null = Get-ThornswoodCollectionStore -RecordPath $record -Root $root -Fetch (New-Fetch 6 '7essxf' @{} @{} $true) -Say $quiet } catch { $threw = $_.Exception.Message }
+    Yes 'a fetch with no menus folder stops the store (one made before -KeepPlugins kept them)' ($threw -match 'no menus folder' -and -not (Test-Path -LiteralPath (Join-Path $root '7essxf-6')))
+
     $count.n = 0
     $s = Get-ThornswoodCollectionStore -RecordPath $record -Root $root -Fetch (New-Fetch 6 '7essxf' @{}) -Say $quiet
     $dir = Join-Path $root '7essxf-6'
@@ -108,6 +139,8 @@ try {
     Yes 'each one at the record''s bytes' ((Sha (Join-Path $dir 'Alpha.esp')) -eq $rows[0].sha256 -and (Sha (Join-Path $dir 'beta.esl')) -eq $rows[1].sha256)
     $sj = [IO.File]::ReadAllText((Join-Path $dir 'store.json')) | ConvertFrom-Json
     Yes 'store.json says the collection, the revision and each plugin''s sha256' ($sj.collection -eq '7essxf' -and $sj.revision -eq 6 -and @($sj.plugins).Count -eq 2 -and $sj.issue -eq 4069)
+    Yes 'what SkyUI''s menu check reads is in the store''s menus folder, at its path in the game folder' ((Test-Path -LiteralPath (Join-Path $dir 'menus/Data/SkyUI_SE.bsa')) -and (Test-Path -LiteralPath (Join-Path $dir 'menus/Data/Interface/skyui/itemcard.swf')) -and $s.Menus -eq (Join-Path $dir 'menus'))
+    Yes '  and store.json, version 2, lists each with its sha256' ([int]$sj.version -eq 2 -and @($sj.menus).Count -eq 2 -and @($sj.menus | Where-Object { $_.path -eq 'Data\SkyUI_SE.bsa' -and $_.sha256 -eq (Sha-Bytes $menuBytes['Data\SkyUI_SE.bsa']) }).Count -eq 1)
     Yes 'nor is ours, which every deploy sends from the repository' (-not (Test-Path -LiteralPath (Join-Path $dir 'Thornswood-Content.esp')))
     Yes 'the game''s own masters the record names are not the store''s to hold' (-not (Test-Path -LiteralPath (Join-Path $dir 'Skyrim.esm')))
     Yes 'nothing of the fetch is left beside the store' (@(Get-ChildItem -LiteralPath $root -Force | Where-Object { $_.Name -ne '7essxf-6' }).Count -eq 0)
@@ -118,6 +151,20 @@ try {
     [IO.File]::WriteAllBytes((Join-Path $dir 'beta.esl'), [byte[]](9, 9, 9))
     $s3 = Get-ThornswoodCollectionStore -RecordPath $record -Root $root -Fetch (New-Fetch 6 '7essxf' @{}) -Say $quiet
     Yes 'a store that is no longer the record''s bytes is fetched again' ($count.n -eq 2 -and (Sha (Join-Path $dir 'beta.esl')) -eq $rows[1].sha256)
+
+    Remove-Item -LiteralPath (Join-Path $dir 'menus/Data/Interface/skyui/itemcard.swf') -Force
+    $null = Get-ThornswoodCollectionStore -RecordPath $record -Root $root -Fetch (New-Fetch 6 '7essxf' @{}) -Say $quiet
+    Yes 'a store missing a menu file it lists is fetched again' ($count.n -eq 3 -and (Test-Path -LiteralPath (Join-Path $dir 'menus/Data/Interface/skyui/itemcard.swf')))
+
+    $sjp = Join-Path $dir 'store.json'
+    $old = [IO.File]::ReadAllText($sjp) | ConvertFrom-Json
+    $old.version = 1
+    $old.PSObject.Properties.Remove('menus')
+    [IO.File]::WriteAllText($sjp, ($old | ConvertTo-Json -Depth 5), $utf8)
+    $said = New-Object System.Collections.Generic.List[string]
+    $null = Get-ThornswoodCollectionStore -RecordPath $record -Root $root -Fetch (New-Fetch 6 '7essxf' @{}) -Say { param($m) $said.Add($m) }.GetNewClosure()
+    Yes 'a store made before it held the menus (version 1) is fetched again, saying so' ($count.n -eq 4 -and (($said -join ' ') -match 'made before the store held'))
+    $count.n = 2
 
     $record7 = Join-Path $tmp 'collection-plugins-7.json'
     Write-Record $record7 7 $rows
@@ -164,9 +211,44 @@ exit 0
     Yes 'Install-NexusRevision -KeepPlugins without -Record is refused before anything is read' ($LASTEXITCODE -eq 1 -and (($out -join ' ') -match '-KeepPlugins keeps the plugins beside a record'))
     $ki = $inr.IndexOf('$script:Kept[$s.Full] = $kf')
     $ri = if ($ki -ge 0) { $inr.IndexOf('Remove-Unpacked $e $u', $ki) } else { -1 }
-    Yes 'it keeps a copy of each plugin before the unpacked mod goes' ($ki -gt 0 -and $ri -gt $ki -and ($ri - $ki) -lt 400)
+    Yes 'it keeps a copy of each plugin before the unpacked mod goes' ($ki -gt 0 -and $ri -gt $ki -and ($ri - $ki) -lt 2000)
     Yes 'the copy kept is the one that wins the plugin''s place, held to files.txt''s sha256' ($inr -match '\$src = \$script:Kept\[\$x\.Full\]' -and $inr -match 'if \(\$got -ne \$x\.Sha256\)')
-    Yes 'a -Record folder may hold its plugins folder and nothing else besides' ($inr -match "'loadorder\.txt', 'plugins'\) -notcontains")
+    Yes 'a -Record folder may hold its plugins and menus folders and nothing else besides' ($inr -match "'loadorder\.txt', 'plugins', 'menus'\) -notcontains")
+    $km = $inr.IndexOf('$script:KeptMenus[$s.Full] = $kf')
+    $rm = if ($km -ge 0) { $inr.IndexOf('Remove-Unpacked $e $u', $km) } else { -1 }
+    Yes 'it keeps what SkyUI''s menu check reads before the unpacked mod goes' ($km -gt 0 -and $rm -gt $km -and ($rm - $km) -lt 400)
+    Yes '  an archive only when node says it holds SkyUI''s script or a menu' ($inr.Contains('& node $script:MenuCheck --holding @bsas') -and $inr.Contains('$holding -notcontains $s.Full'))
+    Yes '  the copy the layout places, held to files.txt''s sha256, at its path under menus' ($inr -match '\$src = \$script:KeptMenus\[\$x\.Full\]' -and $inr -match "Join-Path \`$Record 'menus'" -and $inr.Contains('$to = Join-Path $md $x.Rel'))
+    Yes '  and without node -KeepPlugins is refused up front' ($inr -match 'if \(\$KeepPlugins -and -not \(Get-Command node')
+    # Check-SkyUIMenus.js --holding, on two stand-in archives: one with a
+    # menu under interface, one with only a texture.
+    $bsaDir = Join-Path $tmp 'bsa'
+    New-Item -ItemType Directory -Path $bsaDir -Force | Out-Null
+    function New-Bsa([string]$path, [string]$folder, [string]$leaf) {
+        # A version 105 archive with one folder of one file, as archiveIndex reads it.
+        $fn = [Text.Encoding]::ASCII.GetBytes($folder + [char]0)
+        $ln = [Text.Encoding]::ASCII.GetBytes($leaf + [char]0)
+        $ms = New-Object IO.MemoryStream
+        $bw = New-Object IO.BinaryWriter($ms)
+        $bw.Write([Text.Encoding]::ASCII.GetBytes("BSA`0")); $bw.Write([uint32]105); $bw.Write([uint32]36); $bw.Write([uint32]3)
+        $bw.Write([uint32]1); $bw.Write([uint32]1); $bw.Write([uint32]$fn.Length); $bw.Write([uint32]$ln.Length); $bw.Write([uint32]0)
+        $blockAt = 36 + 24
+        # folder record: hash, count, pad, offset (to the folder's name, plus the file names' length)
+        $bw.Write([uint64]0); $bw.Write([uint32]1); $bw.Write([uint32]0); $bw.Write([uint64]($blockAt + $ln.Length))
+        $bw.Write([byte]$fn.Length); $bw.Write($fn)
+        $bw.Write([uint64]0); $bw.Write([uint32]4); $bw.Write([uint32]0)
+        $bw.Write($ln)
+        $bw.Flush()
+        [IO.File]::WriteAllBytes($path, $ms.ToArray())
+    }
+    $withMenu = Join-Path $bsaDir 'Menus.bsa'
+    $without = Join-Path $bsaDir 'Textures.bsa'
+    New-Bsa $withMenu 'interface\skyui' 'itemcard.swf'
+    New-Bsa $without 'textures\armor' 'plate.dds'
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+        $held = @(& node (Join-Path $Repo 'scripts/mods/Check-SkyUIMenus.js') --holding $withMenu $without)
+        Yes 'Check-SkyUIMenus.js --holding names the archive with a menu and not the one without' ($LASTEXITCODE -eq 0 -and $held.Count -eq 1 -and $held[0] -eq $withMenu)
+    } else { Write-Host 'SKIP  node is not on this machine, so --holding is not run' }
 
     # ---- 4. the verbs ------------------------------------------------------
     $nv = (Text 'scripts\release\nexus-verbs.json') | ConvertFrom-Json

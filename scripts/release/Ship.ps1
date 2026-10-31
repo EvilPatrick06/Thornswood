@@ -1407,12 +1407,24 @@ if ($FromFeed) {
 # release, whose plugin list goes forward. Publish-Update asks again before it
 # writes the number; asking here stops the Ship before the version moves.
 Head 'Collection revision'
+$revMoveFrom = 0
 if ($FromFeed) {
     $revFeed = $null
     try { $revFeed = Read-SiteFeed $Channel } catch { Die ('The ' + $Channel + ' feed could not be read, so which collection revision its last release carries is not known. Nothing was built or published: ' + $_.Exception.Message) }
     $revBuilt = 0
     if ($null -ne $revFeed -and $revFeed.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$revFeed.collectionRevision, [ref]$revBuilt) }
-    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Source "the $Channel feed's last release" -Remedy 'A release from the feed carries that release''s plugin list, so it cannot move the revision: Ship from One, with Vortex on the recorded revision. Nothing was built or published.'
+    # A RELEASE FROM THE FEED MOVES THE REVISION UP TO THE RECORDED ONE
+    # (#4069), with the servers' order, game\data\last-plugin.json's, as its
+    # plugin list (Get-ShipFeedMoveRevision, CollectionRevision.ps1). The
+    # publish holds that list to the order the channel's server loads, and
+    # SkyUI's check below reads the revision's own files from the box's store.
+    $revMove = Get-ShipFeedMoveRevision -RepoDir $RepoDir -Built $revBuilt
+    if ($revMove) {
+        $revMoveFrom = $revBuilt
+        $revBuilt = $revMove
+        Say ("  the {0} feed's last release is on revision {1}; this release moves it to {2}, with game\data\last-plugin.json's order as its plugin list" -f $Channel, $revMoveFrom, $revMove) 'Yellow'
+    }
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Source "the $Channel feed's last release" -Remedy 'A release from the feed moves the revision only up to the recorded one, and only from a checkout with game\data\last-plugin.recipe and last-plugin.json. Nothing was built or published.'
 } else {
     try { $revRead = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); [pscustomobject]@{ Built = (Get-ShipCollectionRevision $Root); Slug = (Get-CollectionSlug (Get-ShipCollectionUrl $Root)) } } }
     catch { Die ($_.Exception.Message + ' Nothing was built or published.') }
@@ -1804,7 +1816,24 @@ if ($Package -and -not $Dev -and -not $DryRun) {
 $GameDir = Join-Path $Root 'Game'
 if (-not $FromFeed -and -not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
 Head 'Animation and body files'
-if ($FromFeed) {
+if ($FromFeed -and $revMoveFrom) {
+    # The collection moves, and its animation and body tools need the game
+    # itself, which is on no machine a release runs from (#4069). Every
+    # launcher builds them before Play and refuses Play when it cannot, and
+    # main moves only once dev has carried the revision.
+    if ($Channel -eq 'main') {
+        $devRev = 0
+        try { $devFeed = Read-SiteFeed 'dev'; if ($null -ne $devFeed -and $devFeed.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$devFeed.collectionRevision, [ref]$devRev) } }
+        catch { Unbump 'the dev feed could not be read'; Die ('The dev feed could not be read, so whether dev has carried revision ' + $revBuilt + ' is not known. Nothing was built or published: ' + $_.Exception.Message) }
+        if ($devRev -ne $revBuilt) {
+            Unbump 'dev has not carried the revision'
+            Die ('This release moves main to collection revision ' + $revBuilt + ', and the dev feed is on revision ' + $devRev + '. Whether the revision builds the animation and body files is asked on dev first, by every launcher before Play: Ship dev on it, then main. Nothing was built or published.')
+        }
+        Say ('  the dev feed already carries revision ' + $revBuilt + ', so dev''s launchers have built them on it') 'Green'
+    } else {
+        Say ('  revision ' + $revBuilt + ' is new here: every launcher builds them before Play and refuses Play when it cannot, which dev asks before main') 'Yellow'
+    }
+} elseif ($FromFeed) {
     # The collection is the last release's, unchanged; a Ship from One asks
     # this when the collection changes (#2754).
     Say '  the collection is the last release''s; a Ship from One asks whether it builds them when the collection changes' 'DarkGray'
@@ -2107,8 +2136,10 @@ Head 'The load order copies'
 $profileDir = Join-Path $Root 'Profile'
 if ($FromFeed) {
     # No Vortex here: the plugin list is the last release's, which the publish
-    # holds to the server's order on the box (#2754).
-    Say '  the last release''s plugin list, held to the server''s order when it is published' 'DarkGray'
+    # holds to the server's order on the box (#2754), or when the release
+    # moves the revision, the servers' order (#4069).
+    if ($revMoveFrom) { Say ("  revision {0}'s plugin list, game\data\last-plugin.json's order, held to the server's order when it is published" -f $revBuilt) 'DarkGray' }
+    else { Say '  the last release''s plugin list, held to the server''s order when it is published' 'DarkGray' }
 } else {
     try {
         $twProfile = Assert-VortexProfile 'Thornswood'
@@ -2179,7 +2210,57 @@ if ($LASTEXITCODE -ne 0) {
 # node is on the machine by now: Ship stopped before the build without it
 # (#1913).
 Head 'SkyUI menus'
-if ($FromFeed) {
+if ($FromFeed -and $revMoveFrom) {
+    # A RELEASE THAT MOVES THE REVISION FROM THE FEED (#4069) changes the
+    # archives the check reads, so the last release's answer does not carry
+    # over: the check runs here, on the revision's own files. The box's store
+    # of the recorded revision (scripts\deploy\CollectionStore.ps1, fetched
+    # from Nexus when it is not whole) holds SkyUI's script, the loose menus
+    # and the archives that hold either, each the layout's bytes. Ours go over
+    # them, as every launcher puts them over the collection, and the order is
+    # the plugin list this release carries.
+    $skyuiStore = $null
+    try {
+        $skyuiStore = & {
+            . (Join-Path $RepoDir 'scripts\deploy\CollectionStore.ps1')
+            $repoFull = (Get-Item -LiteralPath $RepoDir).FullName
+            Get-ThornswoodCollectionStore -RecordPath (Join-Path $repoFull 'records\collection-plugins.json') -Fetch { param($w, $h) Invoke-ThornswoodCollectionFetch -Work $w -Head $h -Repo $repoFull }.GetNewClosure() -Say { param($m) Write-Host $m -ForegroundColor DarkGray }
+        }
+    } catch {
+        Unbump 'the revision''s files for SkyUI''s check are not on the box'
+        Die ("SkyUI's menu check reads revision $revBuilt's own files, and the box could not hold them: " + $_.Exception.Message + ' Nothing was published.')
+    }
+    $skyuiWork = & (Join-Path $Here 'Get-ScratchDir.ps1') 'Thornswood-skyui-move'
+    if (Test-Path -LiteralPath $skyuiWork) { Remove-Item -LiteralPath $skyuiWork -Recurse -Force }
+    $skyuiData = Join-Path $skyuiWork 'Data'
+    New-Item -ItemType Directory -Force -Path $skyuiData | Out-Null
+    $storeData = Join-Path $skyuiStore.Menus 'Data'
+    if (Test-Path -LiteralPath $storeData) { Copy-Item -Path (Join-Path $storeData '*') -Destination $skyuiData -Recurse -Force }
+    $oursData = Join-Path $GameDir 'Data'
+    $oursFull = (Get-Item -LiteralPath $GameDir).FullName.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    foreach ($f in @(Get-ChildItem -LiteralPath $oursData -Recurse -File -Force -ErrorAction SilentlyContinue)) {
+        $rel = $f.FullName.Substring($oursFull.Length).Replace([string][IO.Path]::DirectorySeparatorChar, '\')
+        if (-not (Test-ShipSkyUIInput $rel)) { continue }
+        $to = Join-Path $skyuiWork ($rel.Replace('\', [string][IO.Path]::DirectorySeparatorChar))
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
+        Copy-Item -LiteralPath $f.FullName -Destination $to -Force
+    }
+    $skyuiPlugins = Join-Path $skyuiWork 'plugins.txt'
+    $skyuiOrder = @((Get-Content -LiteralPath (Join-Path $RepoDir 'game\data\last-plugin.json') -Raw | ConvertFrom-Json).loadOrder | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -ine $ShipLastPlugin })
+    [IO.File]::WriteAllLines($skyuiPlugins, [string[]](@($skyuiOrder + $ShipLastPlugin) | ForEach-Object { '*' + $_ }))
+    $global:LASTEXITCODE = 0
+    & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data $skyuiData --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
+    $skyuiExit = $LASTEXITCODE
+    if ($skyuiExit -eq 2) {
+        Unbump 'SkyUI''s menus are not the version its script wants'
+        Die ("In revision $revBuilt, with our files over it, SkyUI's menus are not the version its script wants, so everybody would get the SkyUI error box on the way in. The lines above say which file wins and where it comes from. Nothing was published.")
+    }
+    if ($skyuiExit -ne 0) {
+        Unbump 'SkyUI''s menus could not all be read'
+        Die ("SkyUI's menus in revision $revBuilt could not all be read (Check-SkyUIMenus.js exit $skyuiExit), so whether everybody gets the SkyUI error box on the way in is not known. The UNREAD and FAIL lines above say which file. Nothing was published.")
+    }
+    Say ("  revision {0}'s SkyUI, with our files over it, passes: its check read the box's store of the revision" -f $revBuilt) 'Green'
+} elseif ($FromFeed) {
     # The collection's archives are not here, so the menus cannot be read
     # against them. What can be said is whether this release changes anything
     # the check reads (Ship-Rules.ps1, Get-ShipSkyUIFeedChange): when it does

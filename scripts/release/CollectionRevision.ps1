@@ -82,6 +82,31 @@ function Get-ShipCollectionRevisionProblem([string]$RepoDir, [int]$Built, [strin
     return ''
 }
 
+# A RELEASE FROM THE FEED THAT MOVES THE REVISION (#4069). A Ship from the
+# feed carries the last release's plugin list, so until 31 Oct 2026 only a
+# Ship from One could move the revision, and with One retired from releases a
+# new revision stopped every Ship. The plugin list a revision ships is the
+# servers' order, which is game\data\last-plugin.json's: every table and the
+# Last plugin of the checkout were built against it, and
+# Get-ShipLastPluginProblem holds that order to the bytes
+# records\collection-plugins.json gives people for the recorded revision. So a
+# release from the feed may move from the feed's revision to the recorded one
+# when the checkout holds the Last plugin's recipe and manifest, and then its
+# list is that order (New-ShipFeedMoveLists, Ship-Rules.ps1), held to the
+# order the channel's server loads before anything is built.
+# Returns the revision it moves to, or 0 when it does not move: the feed is
+# already on the record, says no revision, is ahead of it, or the checkout
+# has no order to move with.
+function Get-ShipFeedMoveRevision([string]$RepoDir, [int]$Built, [string]$Path) {
+    if ($Built -le 0) { return 0 }
+    try { $rec = Get-ShipRecordedCollectionRevision $RepoDir $Path } catch { return 0 }
+    if ($Built -ge $rec.Revision) { return 0 }
+    foreach ($f in 'game\data\last-plugin.recipe', 'game\data\last-plugin.json') {
+        if (-not (Test-Path -LiteralPath (Join-Path $RepoDir $f) -PathType Leaf)) { return 0 }
+    }
+    return $rec.Revision
+}
+
 # '' when the recorded revision is the newest one published on Nexus;
 # otherwise the reason no release may go out (#4068). Patrick, 27 Oct, when
 # revision 5 had been out six days and both feeds still said 2: "1. The
