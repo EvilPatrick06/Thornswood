@@ -26,12 +26,21 @@ function Get-ThornswoodShipAccess {
     $had = $env:THORNSWOOD_ADMIN_STATE
     $env:THORNSWOOD_ADMIN_STATE = $AdminState
     $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try { $minted = @(& $node.Source (Join-Path $Repo 'scripts\vps\admin\ship-access.js') 2>&1 | ForEach-Object { "$_" }) }
+    try {
+        $global:LASTEXITCODE = 0
+        $minted = @(& $node.Source ([IO.Path]::Combine($Repo, 'scripts', 'vps', 'admin', 'ship-access.js')) 2>&1)
+        $code = $LASTEXITCODE
+    }
     finally {
         $ErrorActionPreference = $was
         if ($null -eq $had) { Remove-Item -LiteralPath Env:\THORNSWOOD_ADMIN_STATE -ErrorAction SilentlyContinue } else { $env:THORNSWOOD_ADMIN_STATE = $had }
     }
-    $token = @($minted | Where-Object { $_ -match '^gh[sp]_[A-Za-z0-9_]{20,}$' }) | Select-Object -First 1
-    if ($LASTEXITCODE -ne 0 -or -not $token) { throw ((@($minted | Where-Object { $_ -notmatch '^gh[sp]_' })) -join ' ') }
-    return $token
+    # ship-access.js prints the token alone on its standard output and
+    # everything else on its standard error, so the two are told apart by the
+    # stream, never by the token's shape, which is GitHub's to change.
+    $said = @($minted | Where-Object { $_ -is [Management.Automation.ErrorRecord] } | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    $out = @($minted | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] } | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    if ($code -ne 0) { throw ('ship-access.js ended ' + $code + $(if ($said.Count) { ': ' + ($said -join ' ') } else { ' and said nothing' })) }
+    if ($out.Count -ne 1 -or $out[0] -match '\s') { throw ('ship-access.js ended 0 but printed ' + $out.Count + ' line(s) where one token belongs' + $(if ($said.Count) { '; it said: ' + ($said -join ' ') } else { '' })) }
+    return $out[0]
 }
