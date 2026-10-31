@@ -8,10 +8,15 @@
       pwsh scripts/vps/Box-Run.ps1 -Line 'Ship-Dev -Title "Market stalls take your own prices" -Detail "Claim a stall in a town market and sell at your prices"'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Ship-Main -Build <main''s full commit> -Title "..." -Detail "..."'
 
-  Ship-Dev is Ship.ps1 -Channel dev -FromFeed -ModsOnly. Ship-Main is
-  Ship.ps1 -FromFeed, the main release, and the gate runs it only when main
-  is at the commit -Build names (the build Patrick gave his word for); its
-  -ModsOnly keeps the feed's launcher.
+  Ship-Dev is Ship.ps1 -Channel dev -FromFeed. Ship-Main is Ship.ps1
+  -FromFeed, the main release, and the gate runs it only when main is at the
+  commit -Build names (the build Patrick gave his word for). On either,
+  -ModsOnly keeps the feed's launcher. Without it, a launcher that changed is
+  built and signed on GitHub from main's commit, the way Ship.ps1 does it
+  from the feed, so a new launcher goes to dev before main like everything
+  else. Until 31 Oct a dev Ship from the gate always kept dev's launcher, so
+  a launcher change could only reach dev from One, and launcher 1.2.12 would
+  have gone to main untried.
 
   WHAT IS DIFFERENT FROM ONE. Nothing in Ship.ps1. Its box steps
   (Publish-Update, Sync-Client, Publish-Installer, the feed store,
@@ -44,7 +49,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Detail,
     [string]$Detail2 = '',
     [string]$Detail3 = '',
-    # Main only: keep the feed's launcher. A dev Ship from the gate always does.
+    # Keep the feed's launcher.
     [switch]$ModsOnly,
     # Where the App's key and id are, for a harness.
     [string]$AdminState = 'C:\Thornswood-Admin\state'
@@ -73,8 +78,8 @@ try { $token = Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState }
 catch { Die ('the box admin App gave no token for the Ship: ' + $_.Exception.Message + ' Nothing was published.') }
 
 $ship = @{ Notes = $notes; FromFeed = $true; NoPause = $true }
-if ($Channel -eq 'dev') { $ship['Channel'] = 'dev'; $ship['ModsOnly'] = $true }
-elseif ($ModsOnly) { $ship['ModsOnly'] = $true }
+if ($Channel -eq 'dev') { $ship['Channel'] = 'dev' }
+if ($ModsOnly) { $ship['ModsOnly'] = $true }
 $env:GH_TOKEN = $token
 $token = $null
 try {
