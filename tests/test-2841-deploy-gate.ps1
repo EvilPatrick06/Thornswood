@@ -91,8 +91,9 @@ Yes 'Read-LauncherStarts takes -Days, a number, and nothing else' ((Words 'Read-
     (Words 'Read-LauncherStarts -Days week') -eq 'REFUSED' -and (Words 'Read-LauncherStarts -Folder x') -eq 'REFUSED')
 # Publish-Server through the gate is the dev server's, from the box's store,
 # and nothing else (#4987): main stays with a Main run Patrick approves.
-Yes 'Publish-Server is held to -Channel dev -FromStore' ((Words 'Publish-Server') -eq '-Channel|dev|-FromStore|-NoPause' -and
-    (Words 'Publish-Server -RequirePass on -Wait 300') -eq '-Channel|dev|-FromStore|-NoPause|-RequirePass|on|-Wait|300')
+Yes 'Publish-Server is held to -Channel dev' ((Words 'Publish-Server') -eq '-Channel|dev' -and
+    (Words 'Publish-Server -RequirePass on -Wait 300') -eq '-Channel|dev|-RequirePass|on|-Wait|300' -and
+    $verbs.verbs.'Publish-Server'.script -eq 'scripts/release/Publish-ServerOnBox.ps1')
 Yes '  and a caller cannot name main, a build, a zip or a fresh world' ((Words 'Publish-Server -Channel main') -eq 'REFUSED' -and
     (Words 'Publish-Server -ServerBuild x') -eq 'REFUSED' -and (Words 'Publish-Server -Zip x') -eq 'REFUSED' -and (Words 'Publish-Server -FreshWorld') -eq 'REFUSED')
 # The live verbs (Patrick, 30 Oct 2026: Ships and deploys run from the
@@ -107,8 +108,20 @@ Yes '  and with it, the build is the gate''s and never the script''s' ($req.Ok -
 Yes '  -Build is a full lower case commit, given once' ((Words "Deploy-Server -FromStore -Build abc123") -eq 'REFUSED' -and (Words ("Deploy-Server -FromStore -Build " + ('A' * 40))) -eq 'REFUSED' -and
     (Words "Deploy-Server -FromStore -Build $sha -Build $sha") -eq 'REFUSED' -and (Words 'Deploy-Server -FromStore -Build') -eq 'REFUSED')
 Yes '  a verb that is not live takes no -Build' ((Words "Deploy-DevGamemode -Build $sha") -eq 'REFUSED' -and (Test-ThornswoodGateRequest -Line 'Deploy-DevGamemode' -Verbs $verbs).Build -eq '')
-Yes 'Publish-Server-Main is held to -Channel main -FromStore' ((Words "Publish-Server-Main -Build $sha -RequirePass on") -eq '-Channel|main|-FromStore|-NoPause|-RequirePass|on' -and
+Yes 'Publish-Server-Main is held to -Channel main' ((Words "Publish-Server-Main -Build $sha -RequirePass on") -eq '-Channel|main|-RequirePass|on' -and
+    $verbs.verbs.'Publish-Server-Main'.script -eq 'scripts/release/Publish-ServerOnBox.ps1' -and
     (Words "Publish-Server-Main -Build $sha -Channel dev") -eq 'REFUSED' -and (Words "Publish-Server-Main -Build $sha -ServerBuild x") -eq 'REFUSED')
+$pubBox = Text 'scripts/release/Publish-ServerOnBox.ps1'
+# A pin move's first publish (31 Oct 2026, bea31db8): the store lacked the
+# new build, and only One's plain publish sent it there.
+Yes '  Publish-ServerOnBox.ps1 fetches CI''s engine build with the App''s token and sends its zip to the store before publishing from it' (
+    $pubBox.Contains("& (Join-Path `$Here 'Get-EngineArtifact.ps1') -NoPause") -and $pubBox.Contains("`$pub['FromStore'] = `$true") -and $pubBox.Contains("`$pub['ServerBuild'] = `$ciZip") -and
+    $pubBox.Contains('$env:GH_TOKEN = $token') -and $pubBox.Contains('finally { Remove-Item -LiteralPath Env:\GH_TOKEN') -and
+    $pubBox.IndexOf('Get-EngineArtifact.ps1') -lt $pubBox.IndexOf("& (Join-Path `$Here 'Publish-Server.ps1') @pub"))
+Yes '  and -PutBack and -TaskOnly go without a fetch or -FromStore, which Publish-Server.ps1 refuses with them' ($pubBox.Contains('if (-not $PutBack -and -not $TaskOnly) {') -and
+    (Text 'scripts/release/Publish-Server.ps1').Contains('if ($FromStore -and ($PutBack -or $TaskOnly))'))
+Yes '  both box scripts mint the token through ShipAccess.ps1' ($pubBox.Contains('Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState') -and
+    (Text 'scripts/release/Ship-OnBox.ps1').Contains('Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState'))
 Yes 'Deploy-Server takes no host, folder, build folder or role list' ((Words "Deploy-Server -Build $sha -Vps x") -eq 'REFUSED' -and (Words "Deploy-Server -Build $sha -Root C:/x") -eq 'REFUSED' -and
     (Words "Deploy-Server -Build $sha -Dist x") -eq 'REFUSED' -and (Words "Deploy-Server -Build $sha -Devs 1") -eq 'REFUSED')
 # Content rebuilds through the gate (Patrick's card, 30 Oct 2026): main's
