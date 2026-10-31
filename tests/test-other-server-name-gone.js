@@ -42,6 +42,11 @@
 //     their compressed data, and none as a word).
 //   - Every other binary file (meshes, interface files, programs): all of
 //     them, as single bytes and as UTF-16, in any case.
+//   - Thornswood-Last.esp, which no repository holds since #2791 step 3: it
+//     is made from game/data/last-plugin.recipe (tests/last-plugin-made.js)
+//     and searched as a plugin. The recipe itself is searched as a binary
+//     file. Without a game Data folder to make it from, that one check
+//     prints SKIP and the rest still run.
 //
 // Read only.
 'use strict';
@@ -139,6 +144,13 @@ const MEDIA = /\.(png|jpe?g|gif|webp|ico|bmp|tga|dds|mp3|mp4|webm|ogg|wav|flac|x
 const hits = [];
 let text = 0, binary = 0, plugins = 0;
 const pluginNames = [];
+function searchPlugin(rel, buf) {
+  const s = pluginText(buf);
+  if (s === null) { hits.push(rel + ' (a plugin that does not read as records, so it could not be searched)'); return; }
+  let m;
+  ALL.lastIndex = 0;
+  while ((m = ALL.exec(s)) !== null) hits.push(rel + ' (plugin, at byte ' + m.index + ' of its inflated records)  ' + JSON.stringify(m[0]));
+}
 tracked.forEach(function (rel) {
   ALL.lastIndex = 0;
   if (ALL.test(rel)) hits.push(rel + ' (its path)');
@@ -153,10 +165,7 @@ tracked.forEach(function (rel) {
   if (/\.es[pml]$/i.test(rel)) {
     plugins++;
     pluginNames.push(path.basename(rel));
-    const s = pluginText(buf);
-    if (s === null) { hits.push(rel + ' (a plugin that does not read as records, so it could not be searched)'); return; }
-    ALL.lastIndex = 0;
-    while ((m = ALL.exec(s)) !== null) hits.push(rel + ' (plugin, at byte ' + m.index + ' of its inflated records)  ' + JSON.stringify(m[0]));
+    searchPlugin(rel, buf);
     return;
   }
   if (buf.indexOf(0) < 0) {
@@ -180,8 +189,10 @@ tracked.forEach(function (rel) {
 });
 
 yes('read the tracked text files (' + text + '), plugins (' + plugins + ') and other binary files (' + binary + ')',
-    text > 100 && ['Thornswood-Content.esp', 'Thornswood-Last.esp'].every(function (n) { return pluginNames.indexOf(n) >= 0; }) &&
-    binary > 0);
+    text > 100 && pluginNames.indexOf('Thornswood-Content.esp') >= 0 && tracked.indexOf('game/data/last-plugin.recipe') >= 0 && binary > 0);
+const last = require('./last-plugin-made.js').made();
+if (last.buf) { searchPlugin('Thornswood-Last.esp (made from game/data/last-plugin.recipe)', last.buf); yes('read Thornswood-Last.esp, made from its recipe', true); }
+else { console.log('SKIP  Thornswood-Last.esp: ' + last.why); }
 hits.forEach(function (h) { console.log('      ' + h); });
 yes('no tracked file names the server the content plugin was salvaged from, or its short forms (' + hits.length + ' found)', hits.length === 0);
 
