@@ -257,8 +257,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "sha256": "8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66",
-   "size": 271624
+   "sha256": "f4bd6cbce6d08d38be1df6416772aeb6a69ece669bf801c1c76a7a893913d724",
+   "size": 282765
   },
   {
    "name": "Populated Cities Towns Villages Legendary.esp",
@@ -512,13 +512,8 @@
   },
   {
    "name": "Thornswood-Last.esp",
-   "sha256": "ebb71d60663bd104522f0a2b6cc51d4e0b7e0c4dd2023a3641965a18683b2b9d",
-   "size": 12899542
-  },
-  {
-   "name": "Thornswood-WoodworkerTrail.esp",
-   "sha256": "d12bcd2e54d874c5005303082b5ac40ad01af3d5d8bfb5c75a4795b39d988482",
-   "size": 9628
+   "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
+   "size": 12901082
   }
  ],
  "issue": 3160,
