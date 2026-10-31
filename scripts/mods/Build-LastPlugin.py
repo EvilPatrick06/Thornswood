@@ -150,6 +150,30 @@ WHAT IT PUTS IN THE PLUGIN
      writes into game/gamemode.js, and each person's game moves its own copy
      of the record, the way RECIPES_SET_IN_GAME sets the re-costed counts.
 
+  9. Skyrim's own perks gate no recipe (#4826; Patrick, 22 Oct 2026, B: the
+     whole vanilla perk system goes, not only the recipe perk conditions).
+     Nobody here holds a vanilla perk: no perk menu opens and vanilla
+     progression is off (classes.md). So a recipe whose record tests one
+     (HasPerk, condition function 448) was hidden by the crafting menu from
+     everybody, whatever the server's craft gate allowed: 252 of the 276
+     rows hidden from somebody allowed to make them, measured 26 Oct 2026 on
+     four halves. Every winning recipe that tests a perk is the winning
+     record with only those conditions taken out (and the strings that
+     follow one, CIS1 and CIS2), so the server alone decides who makes what
+     (the craft gate, and the recipes it hides from each person). A recipe
+     of a plugin the policy never copies from is copied only when its row
+     says perkRecipesCopied (Immersive Armors: Patrick, 31 Oct 2026, A on
+     q-4826-ia-perk-recipes), and then the same way, with only its perk
+     tests taken out; its counts and bench stay its own here and are set in
+     each person's game as before (6, 8). The copy is made on each machine
+     from that machine's own copy of the plugin (#2791), so none of its
+     bytes are handed on. One of a plugin whose row does not say it keeps
+     its perks and is counted (perks.notCopied). A perk test joined to another condition by OR stops
+     the build, because taking it out would change what the other one
+     means; each such recipe is decided rather than guessed. A recipe
+     re-costed (6), moved (8) and freed of its perks is one record carrying
+     all three.
+
   A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
   them, form ids moved into this plugin's numbering. A quest and a location
@@ -311,6 +335,11 @@ NEVER_TRUE = struct.pack('<B3sfHHIIIIi', 4 << 5, b'\x00\x00\x00', 0.0, 47, 0,
                          0x0000000F, 0, 0, 0, -1)
 
 # The order Skyrim writes its top groups in.
+# Skyrim's HasPerk condition function (#4826), and the subrecords that
+# follow a condition and belong to it: its string parameters.
+HAS_PERK = 448
+CTDA_TRAILERS = (b'CIS1', b'CIS2')
+CTDA_OR = 0x01
 GROUP_ORDER = [b'COBJ', b'CELL', b'WRLD', b'QUST', b'LCTN']
 
 # The subrecords of a cell that come before its location (XLCN), in the
@@ -1274,8 +1303,12 @@ def build(data_dir):
     # Patrick allowed. Immersive Armors carries none (Patrick, 22 Oct 2026,
     # q-613-ia-recipes: the 6 floor items it places and their 5 cell and
     # world headers were never his to carry); those floor items are held off
-    # by the server (heldByServer below).
+    # by the server (heldByServer below). The one other thing copied out of
+    # such a plugin is its recipes that test a perk, with only those tests
+    # taken out, when its row says perkRecipesCopied (9; Patrick, 31 Oct
+    # 2026, A on q-4826-ia-perk-recipes).
     blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    perks_off = perk_recipes_copied(policy)
     carried = {r.lower(): r for row in policy.get('notCopiedFrom', []) for r in row.get('carried', [])}
     used = set()
     below = {}
@@ -1428,6 +1461,9 @@ def build(data_dir):
     moves, moved_in_game = move_entries(json.load(open(RECIPES, encoding='utf-8')), plugins, win, canon,
                                         blocked, carries)
 
+    # 9. The recipes freed of Skyrim's perks (#4826).
+    perk_recipes, perk_stats = perk_entries(plugins, win, canon, blocked, perks_off)
+
     # 6. Nothing is copied out of a plugin the policy never copies from
     # (notCopiedFrom, above) but what it carries; anything else it would
     # contribute stops the build, and so does a carried record not needed.
@@ -1544,13 +1580,16 @@ def build(data_dir):
             pairs = set_properties(copy_record(src, e, rn, strings, what), row, what)
             out['qust'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
-        # A recipe re-costed and moved is one record carrying both.
+        # A recipe re-costed, moved and freed of its perks is one record
+        # carrying all three.
         cobjs = collections.OrderedDict()
         for e, row in recipes:
-            cobjs.setdefault((e.pi, e.fid), [e, None, None])[1] = row
+            cobjs.setdefault((e.pi, e.fid), [e, None, None, False])[1] = row
         for e, kw, row in moves:
-            cobjs.setdefault((e.pi, e.fid), [e, None, None])[2] = kw
-        for e, cost, kw in cobjs.values():
+            cobjs.setdefault((e.pi, e.fid), [e, None, None, False])[2] = kw
+        for e in perk_recipes:
+            cobjs.setdefault((e.pi, e.fid), [e, None, None, False])[3] = True
+        for e, cost, kw, perks in cobjs.values():
             src = plugins[e.pi]
             what = '%s COBJ 0x%08X' % (src.name, e.fid)
             pairs = copy_record(src, e, rn, strings, what)
@@ -1558,6 +1597,8 @@ def build(data_dir):
                 pairs = recount(pairs, cost)
             if kw is not None:
                 pairs = rebench(pairs, struct.pack('<I', rn.gid(kw)), what)
+            if perks:
+                pairs = without_perks(pairs, what)
             out['cobj'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
         return out
@@ -1616,7 +1657,8 @@ def build(data_dir):
                    'questsKept': len(quests_kept), 'gatesUnlocked': len(gates),
                    'placeLocations': len(made['lctn']), 'placeRooms': len(hold_cells),
                    'recipesRecosted': len(recipes), 'recipesMoved': len(moves),
-                   'recipesMovedInGame': len(moved_in_game), 'questScriptProperties': len(qprops)},
+                   'recipesMovedInGame': len(moved_in_game), 'questScriptProperties': len(qprops),
+                   'recipesPerksOff': len(perk_recipes)},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
         'gatesUnlocked': [desc_of(g, canon) for g in GATES],
         'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
@@ -1639,6 +1681,11 @@ def build(data_dir):
         'benchMoves': [{'recipe': row['recipe'], 'editorId': row['editorId'], 'from': row['movedFrom'],
                         'to': row['bench']} for _, _, row in moves],
         'benchMovesInGame': moved_in_game,
+        # The recipes freed of Skyrim's perks (#4826), counted rather than
+        # listed (there are thousands): how many recipes and conditions, by
+        # the plugin whose record each copy is, which perks were tested and
+        # how often, and the recipes a never-copied plugin keeps behind them.
+        'perks': perk_stats,
         # The floor items switched off (#3077), counted rather than listed
         # (there are tens of thousands); refsSha256 is the sha256 of every one,
         # 'object id:plugin' sorted and joined by newlines, which
@@ -1707,6 +1754,100 @@ def make_recipe(plugin, made, plugins):
     if again != plugin:
         raise SystemExit('STOP. the recipe does not make %s back byte for byte. Nothing was written.' % PLUGIN)
     return recipe, stats
+
+
+def perk_tests(pairs):
+    """The indexes of the HasPerk conditions (#4826) among a record's
+    subrecords, and whether any of them is joined to another condition by
+    OR: its own OR flag, or the one of the condition before it."""
+    at, joined, prev_or = [], False, False
+    for i, (t, b) in enumerate(pairs):
+        if t != b'CTDA':
+            continue
+        is_or = len(b) > 0 and bool(b[0] & CTDA_OR)
+        if len(b) >= 10 and struct.unpack_from('<H', b, 8)[0] == HAS_PERK:
+            at.append(i)
+            if is_or or prev_or:
+                joined = True
+        prev_or = is_or
+    return at, joined
+
+
+def without_perks(pairs, what):
+    """The recipe with every HasPerk condition taken out, and the CIS1 and
+    CIS2 that follow one, and nothing else."""
+    at, joined = perk_tests(pairs)
+    if not at or joined:
+        raise SystemExit('STOP. %s %s. Nothing was written.'
+                         % (what, 'joins a perk test to another condition by OR' if joined else 'tests no perk'))
+    out, drop = [], False
+    for i, (t, b) in enumerate(pairs):
+        if i in at:
+            drop = True
+            continue
+        if drop and t in CTDA_TRAILERS:
+            continue
+        drop = False
+        out.append((t, b))
+    return out
+
+
+def perk_recipes_copied(policy):
+    """The never-copied plugins whose recipes that test a perk are copied all
+    the same, to take the tests out (perkRecipesCopied on the plugin's
+    notCopiedFrom row, #4826), lower case."""
+    return frozenset(row['plugin'].lower() for row in policy.get('notCopiedFrom', [])
+                     if row.get('perkRecipesCopied') is True)
+
+
+def perks_kept(src_name, gid, blocked, perks_off):
+    """Whether a winning recipe keeps its perk tests: it does when the plugin
+    that wins it, or the one that made it, is never copied from and its row
+    does not copy its perk recipes."""
+    return any(n in blocked and n not in perks_off for n in (src_name.lower(), gid[0]))
+
+
+def perk_entries(plugins, win, canon, blocked, perks_off=frozenset()):
+    """Every winning recipe that tests one of Skyrim's perks (#4826): the
+    entries copied here to take the tests out, and what the manifest says of
+    them. One a never-copied plugin has or wins keeps its tests and is only
+    counted, unless that plugin's row copies its perk recipes (perks_off);
+    one whose test is joined by OR stops the build."""
+    here, joined = [], []
+    by_plugin, perks, not_copied = collections.Counter(), collections.Counter(), collections.Counter()
+    copied_anyway = collections.Counter()
+    conditions = 0
+    for (tag, gid), e in sorted(win.items()):
+        if tag != b'COBJ' or e.flags & DELETED:
+            continue
+        src = plugins[e.pi]
+        pairs = subrecords(src.data(e))
+        at, is_joined = perk_tests(pairs)
+        if not at:
+            continue
+        if perks_kept(src.name, gid, blocked, perks_off):
+            not_copied[src.name] += 1
+            continue
+        if is_joined:
+            joined.append('%s %s (won by %s)' % (desc_of(gid, canon), edid_of(plugins, e), src.name))
+            continue
+        here.append(e)
+        by_plugin[src.name] += 1
+        for n in sorted({src.name.lower(), gid[0]} & blocked):
+            copied_anyway[canon.get(n, n)] += 1
+        conditions += len(at)
+        for i in at:
+            perks[desc_of(src.gid(struct.unpack_from('<I', pairs[i][1], 12)[0]), canon)] += 1
+    if joined:
+        raise SystemExit('STOP. %d recipe(s) join a perk test to another condition by OR, so taking the perk '
+                         'out would change what the other condition means. Decide each on #4826:\n  %s\n'
+                         'Nothing was written.' % (len(joined), '\n  '.join(joined[:60])))
+    stats = {'recipes': len(here), 'conditions': conditions,
+             'byWinner': dict(sorted(by_plugin.items())),
+             'tested': dict(sorted(perks.items(), key=lambda kv: (-kv[1], kv[0]))),
+             'notCopied': dict(sorted(not_copied.items())),
+             'copiedFromNeverCopied': dict(sorted(copied_anyway.items()))}
+    return here, stats
 
 
 def move_entries(table, plugins, win, canon, blocked, carries):
@@ -2018,7 +2159,9 @@ def verify(data_dir, plugin_bytes, manifest):
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
     win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL', b'FLOR', b'COBJ'} | set(FLOOR_TYPES))
-    blocked = {row['plugin'].lower() for row in json.load(open(POLICY, encoding='utf-8')).get('notCopiedFrom', [])}
+    policy = json.load(open(POLICY, encoding='utf-8'))
+    blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    perks_off = perk_recipes_copied(policy)
     fails = []
     # Every re-costed recipe (#613) wins here, asking the counts the manifest says.
     for row in manifest.get('recost', []):
@@ -2035,6 +2178,22 @@ def verify(data_dir, plugin_bytes, manifest):
         if e is None or e.pi != last.index or not bnam or \
                 plugins[e.pi].gid(struct.unpack_from('<I', bnam, 0)[0]) != ref_key(row['to']):
             fails.append('recipe %s %s is not at %s' % (row['recipe'], row['editorId'], row['to']))
+    # No winning recipe tests a perk (#4826), but one a never-copied plugin
+    # has or wins whose perk recipes are not copied, which the manifest counts.
+    kept = 0
+    for (tag, gid), e in win.items():
+        if tag != b'COBJ' or e.flags & DELETED:
+            continue
+        at, _ = perk_tests(subrecords(plugins[e.pi].data(e)))
+        if not at:
+            continue
+        if perks_kept(plugins[e.pi].name, gid, blocked, perks_off):
+            kept += 1
+        else:
+            fails.append('recipe %s still tests a perk' % desc_of(gid, canon))
+    if 'perks' in manifest and kept != sum(manifest['perks']['notCopied'].values()):
+        fails.append('%d recipes of never-copied plugins test a perk, and the manifest says %d'
+                     % (kept, sum(manifest['perks']['notCopied'].values())))
     # Every script property the policy sets (#3101) is on the winning quest,
     # with the policy's value.
     for row in (json.load(open(POLICY, encoding='utf-8')).get('questScriptProperties') or {}).get('quests', []):
