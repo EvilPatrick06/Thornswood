@@ -66,7 +66,10 @@
         be on it: deleting a published release's tag breaks the release,
         and a draft's goes first with -DeleteDraft. A tag already gone is
         GONE. Nothing brings a deleted tag back but the commit it named, so
-        the caller records that first (#4177 has the list it deleted).
+        the caller records that first (#4177 has the list it deleted). The
+        "release tags" ruleset holds every v* tag against deletion, and only
+        an administrator passes it, so the run's token is refused one: that
+        is a failure that names GitHub's answer, never GONE.
     -DeleteDraft: only a draft, by its id; a published release is refused.
         One already gone is DRAFT-GONE.
     -PublishLauncher: only a v<version> tag with exactly one release, a
@@ -291,9 +294,10 @@ if ($OnGitHub) {
         }
         $gone = Api DELETE ('git/refs/heads/' + (Get-RefPath $DeleteBranch))
         if ($gone.Code -eq 204) { Note 'notice' "DELETED $DeleteBranch $Commit"; Say "DELETED $DeleteBranch $Commit" 'Green'; exit 0 }
-        # 422 is GitHub saying the ref is not there any more: it went between
-        # the read and the delete, which is the state this run is for.
-        if ($gone.Code -eq 422) { Note 'notice' "GONE $DeleteBranch"; Say "GONE $DeleteBranch" 'Green'; exit 0 }
+        # 422 is either the ref gone between the read and the delete, or a
+        # rule refusing the delete (#4177: the release tags ruleset answered
+        # 422 and the tag was still there). Only a second read tells them apart.
+        if ($gone.Code -eq 422 -and (Api GET $refPath).Code -eq 404) { Note 'notice' "GONE $DeleteBranch"; Say "GONE $DeleteBranch" 'Green'; exit 0 }
         Die ("GitHub did not delete $DeleteBranch (" + (Said $gone) + ').')
     }
     if ($DeleteTag) {
@@ -310,8 +314,10 @@ if ($OnGitHub) {
         }
         $gone = Api DELETE ('git/refs/tags/' + (Get-RefPath $DeleteTag))
         if ($gone.Code -eq 204) { Note 'notice' "DELETED $DeleteTag $Commit"; Say "DELETED $DeleteTag $Commit" 'Green'; exit 0 }
-        # 422: the ref went between the read and the delete.
-        if ($gone.Code -eq 422) { Note 'notice' "GONE $DeleteTag"; Say "GONE $DeleteTag" 'Green'; exit 0 }
+        # 422, as for a branch: gone only when a second read says so. A tag the
+        # release tags ruleset holds (refs/tags/v*) is refused this way, and
+        # only an administrator may delete it.
+        if ($gone.Code -eq 422 -and (Api GET $refPath).Code -eq 404) { Note 'notice' "GONE $DeleteTag"; Say "GONE $DeleteTag" 'Green'; exit 0 }
         Die ("GitHub did not delete $DeleteTag (" + (Said $gone) + ').')
     }
 
