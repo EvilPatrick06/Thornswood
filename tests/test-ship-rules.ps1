@@ -277,13 +277,15 @@ Yes '  and the parsed names are exactly the emitted hashed set from that file' (
 $uiFonts = @(Get-UiFrontFixtureFontNames)
 $uiFontA = [string]$uiFonts[0]
 $uiFontB = [string]$uiFonts[1]
-Yes '  and that set names the Bankir-Retro font the fixture emits' ($uiExpected.Contains($uiFontA))
-Yes '  and names the icomoon font' ($uiExpected.Contains($uiFontB))
-# The four Futura PT and DIN Pro faces that older build.js names are on
-# records\ui-gone.json (#1317): named by build.js or not, they never ship.
-foreach ($face in '6f802bf60c545304b09e.ttf', '00e4a2200c3e5ae71d67.ttf', '268a0df3f0e2c23d1ea6.ttf', 'fdf086661e1600f95a34.ttf') {
-    Yes "  it names the commercial face $face too" ($uiExpected.Contains($face))
-    Yes "  which is not ours all the same (#1317)" (Test-ShipOtherServer ('Data\Platform\UI\' + $face))
+Yes '  and that set names the Big Shoulders font the fixture emits' ($uiExpected.Contains($uiFontA))
+Yes '  and names the Barlow SemiBold font' ($uiExpected.Contains($uiFontB))
+# The four Futura PT and DIN Pro faces of main's older build.js (#1317) and
+# the Bankir-Retro and icomoon faces fork #41 took out are on
+# records\ui-gone.json: the fork's build names none of them, and a copy left
+# in an install is never ours.
+foreach ($face in '6f802bf60c545304b09e.ttf', '00e4a2200c3e5ae71d67.ttf', '268a0df3f0e2c23d1ea6.ttf', 'fdf086661e1600f95a34.ttf', '855bfaf67c57745958d3.ttf', 'd213051bb6f28a25fb26.ttf') {
+    Yes "  the fork's build does not name the retired face $face" (-not $uiExpected.Contains($face))
+    Yes "  and it is not ours all the same" (Test-ShipOtherServer ('Data\Platform\UI\' + $face))
 }
 
 $uiWork = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ui-front-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))

@@ -189,7 +189,7 @@ file carries outside code and the file does not carry that project's notice.
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `d258e53e` (in full, `d258e53e71faa7470b01b1399fd0f0f4087761dd`). That
+commit `50736fe6` (in full, `50736fe6183409b640218ac131742d16d738d550`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -428,8 +428,10 @@ build has none of the four (below), so they leave with main's next release,
 and `records\ui-gone.json` lists all four, so every pack deletes them from
 the installs that took them and no release carries them again (#1317).
 
-Bankir-Retro and icomoon keep shipping, credited to SkyMP and to their makers
-(Patrick, 15 Oct 2026, #2177): they came to Thornswood with SkyMP's
+Bankir-Retro and icomoon shipped, credited to SkyMP and to their makers
+(Patrick, 15 Oct 2026, #2177), until the fork's build took them out for Big
+Shoulders (fork pull request 41, below); main's older build.js carries them
+until main's next release. They came to Thornswood with SkyMP's
 `skymp5-front`, where both have been in `src\fonts` since 13 October 2021
 (upstream commit 34d8ca12, #329), and the public credits page names both.
 build.js draws SkyMP's buttons and text boxes in Bankir-Retro, and the dots of
@@ -453,14 +455,17 @@ a hidden password in icomoon. What each one carries, read on 16 October:
 Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.js`
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
-`records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`d258e53e`, the commit the client record names (the same 68 files, byte for
-byte, as at `445ded38`: what changed in `skymp5-front` since, the unused
-login page taken out (#3927), was never in what webpack builds). Read on 21 October (#421):
-the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
+`records\front-build.json`: 67 files, 8,676,260 bytes, from commit
+`50736fe6`, the commit the client record names. Its build.js is 2,444,820
 bytes, sha256
-`d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae`, and every
-font in it is one the record names. Main's release `20261017-205912` still
+`a67a1a146f104891d879d360c06d40e7c9051aac859bd6fd4d207f432be4416f`, and every
+font in it is one the record names. From `d258e53e` to `50736fe6` the one
+change in what webpack builds is fork pull request 41: Big Shoulders in
+place of Bankir-Retro and icomoon, and the interface's Russian button text
+and perk descriptions in English. Before it, the dev feed's release
+`20261021-104809-dev` (read on 21 October, #421) carried the 68-file build
+from `d258e53e`'s source, build.js 2,448,900 bytes, sha256
+`d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae`. Main's release `20261017-205912` still
 carries the 13 September build in the table above until main's next release.
 
 The licence is skymp5-front's, `GPL-3.0` by its `package.json`, and its source
@@ -504,8 +509,7 @@ The fonts in it, from their own name tables:
 
 | File | Font | What the file says |
 |---|---|---|
-| `855bfaf67c57745958d3.ttf` | Bankir-Retro, by Gophmann A.L., 2006 | The same file as in the older build, above. |
-| `d213051bb6f28a25fb26.ttf` | icomoon, made with the IcoMoon app | The same file as in the older build, above. |
+| `4b2950a2781132b82147.ttf` | Big Shoulders, version 2.002, by Patric King (XO Type Co), a variable font from Thin to Black | "Copyright 2019 The Big Shoulders Project Authors (https://github.com/xotypeco/big_shoulders)", and in its licence field "This Font Software is licensed under the SIL Open Font License, Version 1.1." with https://openfontlicense.org. 320,800 bytes, sha256 `4b4b24aa6f799aa73cdcd5b6fa840cbcbbb38b81fa9fa82c25126a4530c1ba44`, the fork's `skymp5-front\src\fonts\BigShoulders-Variable.ttf`. |
 | `dc3cbd21104d40477da6.ttf` | Barlow SemiBold, version 1.408, by Jeremy Tribby (Tribby Type) | "Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)", and in its licence field "This Font Software is licensed under the SIL Open Font License, Version 1.1." with http://scripts.sil.org/OFL. 108,348 bytes, sha256 `86577cb32f8abe3673db53ca0f4221e6856751a4f6730c867e00f720f8bb1fc5`, the fork's `skymp5-front\src\fonts\Barlow-SemiBold.ttf`. |
 
 Barlow came into the fork on 9 October (fork #40, for #1317) in place of DIN
@@ -513,6 +517,16 @@ Pro, from Google Fonts' `google/fonts` at `2eb0b48d`, and the same change
 took out the Futura PT and DIN Pro faces. The OFL lets a font travel with its
 copyright notice and licence in its own metadata, which this one carries;
 the fork keeps the full text beside it as `skymp5-front\src\fonts\OFL.txt`.
+
+Big Shoulders came into the fork on 31 October (fork pull request 41) in
+place of Bankir-Retro, which reserved all rights and named no licence, and
+icomoon, which named none, from `google/fonts` at `c1339027`
+(`ofl/bigshoulders`). The interface draws its buttons and text boxes in it,
+and a hidden password shows the browser's own dots. The fork keeps its full
+licence text as `skymp5-front\src\fonts\OFL-BigShoulders.txt`. The two
+older faces, `855bfaf67c57745958d3.ttf` and `d213051bb6f28a25fb26.ttf`, are
+in `records\ui-gone.json`, so every pack deletes them from the installs that
+took them.
 
 ## Thornswood's own sprite font
 
@@ -1205,7 +1219,7 @@ certificate, and has no row here (#3761).
 
 | File | What it is | Where it came from | Licence | Read by |
 |---|---|---|---|---|
-| `tests\fixtures\ui-front-build.js` | The 68 asset modules of the shipped `Data\Platform\UI\build.js`, verbatim: the stub webpack writes for each picture, sound and font, with the hashed name it was given and the source path it came from. 47,757 bytes. | Cut on 26 October 2026 (#3761) from the whole development build of `skymp5-front` that was the fixture until then (2,451,499 bytes, sha256 `5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2`), the build "SkyMP's interface, built from the fork" describes. The cut leaves out the front's own code and the npm code bundled with it (React, Redux and the rest, under MIT and BSD notices); `tests\fixtures\ui-front-build.assets.txt` names its sha256. | GNU General Public License version 3, `skymp5-front`'s, as the build it was cut from | `tests\fixtures\ui-front.ps1`, `tests\test-ship-rules.ps1` (#1318) |
+| `tests\fixtures\ui-front-build.js` | The 64 asset modules of the shipped `Data\Platform\UI\build.js`, verbatim: the stub webpack writes for each picture, sound and font, with the hashed name it was given and the source path it came from. 53,999 bytes. | First cut on 26 October 2026 (#3761) from the whole development build of `skymp5-front` that was the fixture until then (2,451,499 bytes, sha256 `5e70e4d7de167fac71522416c59ee4e1f7d5274ecfe30161cbedc46d8a4e9ea2`), and cut again the same way on 31 October from the fork's build at `50736fe6` (2,444,820 bytes, sha256 `a67a1a146f104891d879d360c06d40e7c9051aac859bd6fd4d207f432be4416f`), the build "SkyMP's interface, built from the fork" describes. The cut leaves out the front's own code and the npm code bundled with it (React, Redux and the rest, under MIT and BSD notices); `tests\fixtures\ui-front-build.assets.txt` names its sha256. | GNU General Public License version 3, `skymp5-front`'s, as the build it was cut from | `tests\fixtures\ui-front.ps1`, `tests\test-ship-rules.ps1` (#1318) |
 | `tests\fixtures\3111-roots.pem` | Eight public root certificates and their comment lines, no key. 223 lines. | Copied from certifi 2026.7.22's `cacert.pem` (#3111): four of eMudhra's emSign roots and the four the bot needs. | Mozilla Public License 2.0, certifi's, as "The Discord bot, on the VPS" gives it | `tests\test-3111-emudhra-trust.js` |
 | `tests\fixtures\webview2-setup-chain.txt` | Three public certificates, no key: the signing certificate and issuer of Microsoft's WebView2 setup program, and the root. | Read out of the Authenticode signature of `MicrosoftEdgeWebview2Setup.exe` as Microsoft handed it out on 5 October 2026, and the root from the address the issuer names (#1330). | None given: they are Microsoft's public certificates, which every copy of that program carries | `tests\test-1330-webview2-signature.js` |
 
@@ -1216,7 +1230,7 @@ rewrite takes it out (#3684).
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `d258e53e71faa7470b01b1399fd0f0f4087761dd` on the public fork. The
+  name `50736fe6183409b640218ac131742d16d738d550` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -1293,11 +1307,15 @@ rewrite takes it out (#3684).
   longer starts with the game's own Flames and Healing (#1688), each step of
   an NPC's spawn is logged (#1287), and trees and flora show harvested by
   their flag alone (#2382). `d258e53e` adds only the fork's own build
-  workflow keeping each push's engine build as a package (fork #131), so
-  nothing in what is built changed.
+  workflow keeping each push's engine build as a package (fork #131), and
+  `50736fe6` adds that inherited NPC equipment stays owned for combat and out
+  of loot (#3079), a brewed potion is kept as what is in it and built again
+  on arrival (#1649), the interface's font is Big Shoulders in
+  place of Bankir-Retro and icomoon, and Skyrim's own loading screen is
+  cleared under the page while the Loading Menu is open (#3130).
   The server module's SHA256
-  is `09d2eabd05d7dbe4c940834fee4a4a93cecd7921b644cb7ec548245e24879ffc`, built
-  2026-10-31T04:42:41Z. This is the recorded next release, not a deployment
+  is `5c9ccedf791296cf4cbd7ea9d9789421eaa7fe657b8c83ebdcefdea9d87ae804`, built
+  2026-10-31T22:15:09Z. This is the recorded next release, not a deployment
   claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -1332,7 +1350,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/d258e53e71faa7470b01b1399fd0f0f4087761dd
+https://github.com/EvilPatrick06/skymp/tree/50736fe6183409b640218ac131742d16d738d550
 
 For the engine Main runs until then:
 
@@ -1458,8 +1476,10 @@ beside its `___systemPolyfill.js`.
   installer from now on that carries the recorded build, do.
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).
-- The Bankir-Retro and icomoon fonts in both front builds ship with no
-  licence found (fork pull request 41 swaps them). The 37 Daedric Online menu
+- The Bankir-Retro and icomoon fonts in main's older front build ship with
+  no licence found until main's next release; the fork's build has neither
+  since fork pull request 41, and every pack deletes both from installs. The
+  37 Daedric Online menu
   files do not: they are removed and deleted from installs (#1318), and so
   are the two pictures in `Images` and the ChainLink, NoticeIcon and
   VoiceIcon sprite fonts (#2177), and the Futura PT and DIN Pro faces, as the
