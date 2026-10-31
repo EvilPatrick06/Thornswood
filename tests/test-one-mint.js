@@ -794,21 +794,26 @@ function goldDescriptors(text) {
     */
     const names = bodyOf('property/itemName') || '';
     /*
-      And a market stall's Find (#3160): the names a goods price can ask
-      for, so the buyer pays with something out of their own pack. It hands
-      back names and records, coin left out, never a thing, and writes
-      nothing.
+      And the hold economy's names (#3164): recordNames reads the two tables
+      to name a counted record on staff's page, the same one way round as the
+      drop box, and hands nothing out. And a market stall's Find (#3160): the
+      names a goods price can ask for, so the buyer pays with something out of
+      their own pack. It hands back names and records, coin left out, never a
+      thing, and writes nothing.
     */
+    const counted = bodyOf('hold economy/recordNames') || '';
     const stallFind = bodyOf('market stalls/find') || '';
     const inNames = function (name) {
-      return (names.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length +
-        (stallFind.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length;
+      const re = new RegExp('\\b' + name + '\\b', 'g');
+      return (names.match(re) || []).length + (counted.match(re) || []).length +
+        (stallFind.match(re) || []).length;
     };
-    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box and a stall\'s Find only for a name',
+    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box, the hold economy and a stall\'s Find only for a name',
         refs('ITEM_NAMES') === (build.match(/\bITEM_NAMES\b/g) || []).length + inNames('ITEM_NAMES') &&
         refs('ADMIN_ITEMS') === (build.match(/\bADMIN_ITEMS\b/g) || []).length + inNames('ADMIN_ITEMS') &&
-        refs('ADMIN_ITEMS') > 0 && !!names && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names) &&
-        !!stallFind && !/\bmp\.set\(|\baddItem\(|\bpayOut\(|\bpackGive\(|\bwritePack\(/.test(stallFind) && /BOOK\.isCoin\(base\)/.test(stallFind));
+        refs('ADMIN_ITEMS') > 0 && !!names && !!counted && !!stallFind &&
+        !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names) && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(counted) &&
+        !/\bmp\.set\(|\baddItem\(|\bpayOut\(|\bpackGive\(|\bwritePack\(/.test(stallFind) && /BOOK\.isCoin\(base\)/.test(stallFind));
     yes('ADMIN_ACTORS is read by the /spawn index and nothing else',
         refs('ADMIN_ACTORS') > 0 && refs('ADMIN_ACTORS') === (beasts.match(/\bADMIN_ACTORS\b/g) || []).length);
     yes('and /give and /spawn still refuse anybody who is not a playtester',

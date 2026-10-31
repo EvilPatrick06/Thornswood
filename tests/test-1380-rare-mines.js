@@ -137,6 +137,7 @@ function world(opts) {
       inv[item] = (inv[item] || 0) + n; return true;
     },
     creditWork: function () { works++; return ''; },
+    economyGathered: function () { },
     wearTool: function () { return ''; },
     setTimeout: function (fn) { timers.push(fn); },
     guard: function (n, fn) { return fn; },
@@ -365,6 +366,7 @@ if (lifted && ORES) {
       notify: function () {},
       say: function () {},
       creditWork: function () { return null; },
+      economyGathered: function () { },
       wearTool: function () { return null; },
       cellOf: function (id) { return ({ 0x600: 'mine-a', 0x601: 'mine-b' })[id] || ''; }
     });
@@ -493,6 +495,7 @@ if (ORES && qBlock2) {
     notify: function () {},
     say: function () {},
     creditWork: function () { return null; },
+    economyGathered: function () { },
     wearTool: function () { return null; }
   };
   ctx.globalThis = ctx;
