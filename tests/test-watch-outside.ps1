@@ -110,7 +110,8 @@ try {
   Yes '  it runs this script from where it is, with the two secrets by name' (
     $here -match '\./scripts/vps/Watch-Outside\.ps1 -Run -Folder state' -and $here -match 'WATCH_WEBHOOK: \$\{\{ secrets\.STAFF_WEBHOOK \}\}' -and $here -match 'WATCH_RUNNER_TOKEN: \$\{\{ secrets\.RUNNER_TOKEN \}\}')
   Yes '  on GitHub''s runners, off the box' ($here -match 'runs-on: ubuntu-latest' -and $here -notmatch 'self-hosted')
-  Yes '  only once the variable WATCH_OUTSIDE says here, so a private repository is never billed for it' ($here -match "if: \$\{\{ vars\.WATCH_OUTSIDE == 'here' \}\}")
+  Yes '  only once the variable WATCH_OUTSIDE says here, so it and the old repository''s watcher never both post' ($here -match "if: \$\{\{ vars\.WATCH_OUTSIDE == 'here' \}\}")
+  Yes '  its two secrets come from the watch environment, which only main may use' ($here -match '(?m)^\s+environment: watch\s*$')
   Yes '  it keeps its memory the way the public one does' ($here -match 'restore-keys: watch-outside-' -and $here -match 'key: watch-outside-\$\{\{ github\.run_id \}\}-')
   Yes '  it reads the repository and writes nothing to it' ($here -match "permissions:\s+contents: read" -and $here -notmatch 'contents: write')
 
