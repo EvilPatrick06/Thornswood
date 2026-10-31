@@ -5,9 +5,8 @@
   2026): scripts\vps\admin\admin.js, as the task "Thornswood Admin",
   listening on 127.0.0.1:7791. It holds the key of a GitHub App made for
   Thornswood, and makes the runners' labels, and the rulesets, private
-  vulnerability reporting and secret scanning of Thornswood and the engine
-  fork, on GitHub
-  match main's records (records\*-runners.json, and since #3683
+  vulnerability reporting, immutable releases and secret scanning of
+  Thornswood and the engine fork, on GitHub match main's records (records\*-runners.json, and since #3683
   records\github-repo-settings.json) when a run of the ops repository's
   github-admin.yml on main asks
   with its OIDC token (admin.js says how it checks that, and why nothing else
