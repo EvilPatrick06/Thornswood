@@ -6,7 +6,8 @@
 // it there. Measured on dev, 19 Oct: thalmor-patrols.json, property-word.json
 // and furniture.json all "would not read ... ENOENT ... Temp\skymp5-server...".
 // scripts/dev/Build-StaffData.js now carries the three inside gamemode.js as
-// STAFF_DATA, and each reader takes its file from there.
+// STAFF_DATA, and each reader takes its file from there. merchant-traders.json
+// joined them for first steps' Cook (#5137).
 //
 // This harness runs the readers the way the server does: from a folder with
 // no data beside them. It fails when STAFF_DATA is stale, when a reader opens
@@ -60,9 +61,11 @@ yes('S4 the line is set before any code runs (it sits with the other inlined dat
 // ------------------------------------- every run-time game/data read is carried
 // Each file the gamemode opens out of its own data folder, and what carries it
 // on the server. A new one fails here until it is carried.
+// merchant-traders.json was listed here as env.catalog until #5137: that is
+// only the merchant install's own copy, and first steps read the file from
+// beside the gamemode, so on a server it found no Cook. It is in STAFF_DATA now.
 const CARRIED_ELSEWHERE = {
-  'guild-sites.json': 'MERCHANT_GUILD_SITES, written by Build-MerchantGamemode.js',
-  'merchant-traders.json': 'env.catalog, written by Build-MerchantGamemode.js'
+  'guild-sites.json': 'MERCHANT_GUILD_SITES, written by Build-MerchantGamemode.js'
 };
 const reads = new Set();
 gm.replace(/'data',\s*'([^']+\.json)'/g, function (m, name) { reads.add(name); return m; });
@@ -114,6 +117,28 @@ BUILD.FILES.forEach(function (name) {
       on.logs.join(' | ') + ' perHolderPerDay=' + (on.out && on.out.perHolderPerDay));
   yes('R2 without STAFF_DATA and no data folder it falls back to the defaults and says so',
       off.logs.some(l => /would not read, so the limits are the defaults/.test(l)));
+}
+// merchant-traders.json: first steps' traders by town and role, read at load
+// to find the start town's Cook for the first errand (#3459, #5137).
+{
+  const fn = between('  var TRADERS = {};\n  (function readTraders() {', '\n  })();');
+  function run(withData) {
+    const logs = [];
+    const ctx = { require: n => (n === 'fs' ? noDisk : n === 'path' ? path.posix : null), __dirname: 'temp', JSON: JSON, Object: Object, String: String,
+      flog: function () { logs.push(Array.prototype.join.call(arguments, ' ')); } };
+    vm.createContext(ctx);
+    vm.runInContext((withData ? 'var STAFF_DATA = ' + JSON.stringify(SD) + ';\n' : '') + (fn || '') + '\nglobalThis.out = TRADERS;', ctx);
+    return { out: ctx.out, logs: logs };
+  }
+  const want = file('merchant-traders.json').byRef;
+  const cooks = Object.keys(want).filter(r => want[r].role === 'Cook');
+  let on = null, off = null, err = '';
+  try { on = run(true); off = run(false); } catch (e) { err = String(e && e.message); }
+  yes('R4 with no data folder first steps finds every town\'s Cook in STAFF_DATA (' + cooks.length + ' Cooks)', !!fn && !!on &&
+      on.logs.length === 0 && cooks.every(r => on.out[want[r].bookHold] && on.out[want[r].bookHold].Cook && on.out[want[r].bookHold].Cook.ref === r),
+      err || (on && on.logs.join(' | ')));
+  yes('R4 without STAFF_DATA and no data folder it says it could not read the traders, as the server did',
+      !!off && off.logs.some(l => /could not read data\\merchant-traders\.json/.test(l)), off && off.logs.join(' | '));
 }
 // thalmor-patrols.json is run in tests/test-1390-thalmor-patrols.js (K2b, K2c),
 // which drives the whole keeper with no data folder.
