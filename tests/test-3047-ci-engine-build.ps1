@@ -470,7 +470,7 @@ exit $LASTEXITCODE
     $offered = @()
     $tokens = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($setup, [ref]$tokens, [ref]$null)
-    foreach ($t in $tokens) { if ($t.Kind -in 'StringLiteral', 'StringExpandable' -and $t.Text -match 'Setup-ShipMachine\.ps1 -Rebuild') { $offered += $t.Extent.StartLineNumber } }
+    foreach ($tok in $tokens) { if ($tok.Kind -in 'StringLiteral', 'StringExpandable' -and $tok.Text -match 'Setup-ShipMachine\.ps1 -Rebuild') { $offered += $tok.Extent.StartLineNumber } }
     Yes ('6. no fix in Setup-ShipMachine.ps1 offers -Rebuild' + $(if ($offered.Count) { ': line ' + ($offered -join ', ') } else { '' })) ($offered.Count -eq 0)
     $setupAst = [System.Management.Automation.Language.Parser]::ParseFile($setup, [ref]$null, [ref]$null)
     Yes '6. Setup-ShipMachine.ps1 has no -Rebuild switch (#3056)' (-not ($setupAst.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Rebuild' }))
@@ -496,8 +496,8 @@ exit $LASTEXITCODE
     foreach ($n in 'Check-ShipReady.ps1', 'Sync-Client.ps1', 'Setup-ShipMachine.ps1', 'Update-ShipRoot.ps1', 'Ship.ps1', 'Where.ps1') {
         $tokens = $null
         [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $Here ('scripts\release\' + $n)), [ref]$tokens, [ref]$null)
-        foreach ($t in $tokens) {
-            if ($t.Kind -in 'StringLiteral', 'StringExpandable' -and ($t.Text -match '(?i)build the fork with|build it there|Rebuild, then|Rebuild the client|Build-Engine\.ps1 -Fork built')) { $sent += ('{0}:{1}' -f $n, $t.Extent.StartLineNumber) }
+        foreach ($tok in $tokens) {
+            if ($tok.Kind -in 'StringLiteral', 'StringExpandable' -and ($tok.Text -match '(?i)build the fork with|build it there|Rebuild, then|Rebuild the client|Build-Engine\.ps1 -Fork built')) { $sent += ('{0}:{1}' -f $n, $tok.Extent.StartLineNumber) }
         }
     }
     Yes ('6. no fix in the scripts a Ship machine reads sends it to build the engine' + $(if ($sent.Count) { ': ' + ($sent -join ', ') } else { '' })) ($sent.Count -eq 0)
