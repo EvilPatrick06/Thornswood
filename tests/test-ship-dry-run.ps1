@@ -372,12 +372,18 @@ return [int]$env:TS_DRY_COLLECTION_REVISION
         (Get-Item -LiteralPath $exe).LastWriteTimeUtc = [DateTime]::UtcNow.AddHours(-1)
     }
 
-    Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause' ''
+    # The build writes its exe into -OutDir and the install copies that one
+    # into the root, as the real ones do: Ship reads back that the exe in the
+    # root is the one in -OutDir by its sha256 (#5156).
+    Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause' @'
+[void](New-Item -ItemType Directory -Force -Path $OutDir)
+[IO.File]::WriteAllText((Join-Path $OutDir 'Thornswood.exe'), 'the launcher this run built')
+'@
     # Makes the Launcher folder when there is none, as the real one does: a
     # ship root Update-ShipRoot.ps1 made has none (G2, #2662).
     Stub 'Install-Launcher' '[string]$Root, [string]$From, [switch]$NoPause' @'
 [void](New-Item -ItemType Directory -Force -Path (Join-Path $Root 'Launcher'))
-[IO.File]::WriteAllText((Join-Path $Root 'Launcher\Thornswood.exe'), 'the launcher this run built')
+Copy-Item -LiteralPath (Join-Path $From 'Thornswood.exe') -Destination (Join-Path $Root 'Launcher\Thornswood.exe') -Force
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
     Stub 'Build-Front' '[string]$Fork, [string]$Commit, [string]$Out, [switch]$Record' ''
