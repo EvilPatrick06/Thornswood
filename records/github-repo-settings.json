@@ -9,7 +9,7 @@
       "secret_scanning": true,
       "secret_scanning_push_protection": true,
       "collaborators": ["WiccanDjinn"],
-      "collaborators_why": "Everybody besides Patrick, the owner, who may push here. Four (Jhinswife) stepped down on 31 Oct 2026 and Patrick asked for her access to go, so she is not named and the next run takes her off. A person who joins or leaves the team is a pull request to this list.",
+      "collaborators_why": "Everybody besides the owner who may push here, as the team is on 31 Oct 2026. A person who joins or leaves the team is a pull request to this list, and the next run makes GitHub match it.",
       "rulesets": [
         {
           "name": "release tags",

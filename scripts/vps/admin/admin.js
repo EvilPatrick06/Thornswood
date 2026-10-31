@@ -81,8 +81,8 @@
                     there (a personal repository has no other role): one
                     GitHub has that the list does not name is taken off,
                     and an invitation to one is withdrawn, so a person who
-                    leaves the team is a pull request to the record (Four,
-                    31 Oct 2026); one the list names who is not there yet
+                    leaves the team is a pull request to the record (31 Oct
+                    2026); one the list names who is not there yet
                     is invited. An entry that gives no list leaves its
                     people as they are.
     go-public       the flip (#4013, #3721; Patrick's word of 30 Oct 2026,
