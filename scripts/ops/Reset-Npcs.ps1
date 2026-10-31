@@ -115,7 +115,7 @@ if ($Survey) {
   exit 0
 }
 $port = 0
-try { $port = [int]$cfg.port } catch { }
+[void][int]::TryParse([string]$cfg.port, [ref]$port)
 if ($port -le 0) { 'STOP|' + $settings + ' names no port, so the server is not known. Nothing was stopped or moved.'; exit 1 }
 # skymp5-server/ts/ui.ts: 3000 when the game port is 7777, the game port plus one otherwise.
 $resPort = if ($port -eq 7777) { 3000 } else { $port + 1 }
