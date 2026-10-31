@@ -21,7 +21,8 @@
   through them steadily. Updater.Tip now puts the watch in a connection group
   of its own (Updater.WatchGroup), which counts its connections apart.
 
-  What it proves, against a server of its own on 127.0.0.1:
+  What it proves, against a server of its own on 127.0.0.1, given the limit a
+  host that is not loopback gets:
     - on this machine two held requests in the shared group leave a third to
       time out, so the limit this guards against is really there
     - with the feed watch held open through Updater.Tip and one picture
@@ -239,8 +240,16 @@ function Run {
     $srv.Start()
     try {
         $base = "http://127.0.0.1:$($srv.Port)"
-        Yes ('the shared group allows {0} connections to a host here' -f [Net.ServicePointManager]::DefaultConnectionLimit) (
-            [Net.ServicePointManager]::DefaultConnectionLimit -eq 2)
+        # A loopback address is given no limit at all unless one is set on its
+        # ServicePoint (ServicePoint.LoopbackConnectionLimit, measured on
+        # GitHub's Windows runner: three held requests went through at once).
+        # thornswood.net is not loopback and gets DefaultConnectionLimit, so
+        # this one is set to that, before any request, which every connection
+        # group made under it then takes.
+        $sp = [Net.ServicePointManager]::FindServicePoint([Uri]$base)
+        $sp.ConnectionLimit = [Net.ServicePointManager]::DefaultConnectionLimit
+        Yes ('the shared group allows {0} connections to a host here, as to thornswood.net' -f $sp.ConnectionLimit) (
+            [Net.ServicePointManager]::DefaultConnectionLimit -eq 2 -and $sp.ConnectionLimit -eq 2)
 
         function Quick([string]$path) {
             $sw = [Diagnostics.Stopwatch]::StartNew()
