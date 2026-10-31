@@ -6,7 +6,7 @@ Everything in the world has a recipe except named uniques and quest items (Patri
 
 What the world hands out and who makes it both come from [Where every item comes from](item-sources.md) (`game/data/item-sources.json`). A maker is a recipe in the open book (not cut and not tempering), a class that gathers the item, or the scarce work or rare seam a class works. A bottle the alchemy lab brews is a new form, not a record, so the lab is the maker of no record. The build fails when the world hands out something with no maker that `scripts/dev/Check-Makers.waiting.json` does not name with the issue that will give it one.
 
-276 items handed out. 158 have a maker. 118 have none yet.
+279 items handed out. 160 have a maker. 119 have none yet.
 
 ## Nobody makes these yet
 
@@ -128,7 +128,8 @@ What the world hands out and who makes it both come from [Where every item comes
 | Flawless Garnet | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
 | Garnet | Dungeon and body loot | 0 | #3521 | Patrick, 26 Oct, A: from the master Miner's gem geodes; no garnet or diamond vein exists yet. |
 | Dwarven Oil | Asked for by a recipe | 1 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
-| Bone Meal | Dungeon and body loot, Asked for by a recipe | 7 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
+| Bone Meal | Dungeon and body loot, Asked for by a recipe | 8 | #3523 | Patrick, 26 Oct, A: bone meal ground by a Hunter at the grain mill, dwarven oil drawn by a Smith at the smelter. |
+| Werewolf Pelt | Asked for by a recipe | 1 | #4649 | an animal part no hunt gives yet; Werewolf's Bane, from Cheddar's Mashups in collection revision 5, asks for it |
 | Empty Wine Bottle | Filled into a bottle of water | 0 | #4652 | water is carried in it (NEEDS.waterItems), and nothing hands one out. |
 
 ## What each trade makes or gathers
@@ -144,12 +145,12 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Alchemist/Physicker | 2 | also brews medicine in the alchemy lab's menu, which has no recipe rows |
 | Cook/Hearthcook | 64 |  |
 | Cook/Confectioner | 12 |  |
-| Smith/Platewright | 171 |  |
+| Smith/Platewright | 252 |  |
 | Smith/Edgewright | 82 |  |
 | Enchanter/Bladebinder | 13 | also enchants in the arcane enchanter's menu |
 | Enchanter/Wardweaver | 0 | enchants armour and clothing in the arcane enchanter's menu, which has no recipe rows |
-| Tailor/Liverywright | 84 |  |
-| Tailor/Haberdasher | 169 |  |
+| Tailor/Liverywright | 85 |  |
+| Tailor/Haberdasher | 171 |  |
 | Woodworker/Charburner | 5 |  |
 | Woodworker/Woodwright | 45 |  |
 | Farmer | 14 |  |
@@ -232,6 +233,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Scaly Pholiota | Asked for by a recipe | Gatherer, advanced | `6f950:Skyrim.esm` |
 | Scathecraw | Asked for by a recipe | Gatherer, novice | `17e97:Dragonborn.esm` |
 | Skeever Meat | Asked for by a recipe | Hunter, novice | `8ac:Gourmet.esp` |
+| Skull | Asked for by a recipe | Hunter, master | `af5fd:Skyrim.esm` |
 | Slaughterfish Meat | Asked for by a recipe | Hunter, novice | `8ae:Gourmet.esp` |
 | Snow Bear Pelt | Asked for by a recipe | Hunter, expert | `3ad54:Skyrim.esm` |
 | Stalhrim | Asked for by a recipe | Miner, master, only while the stalhrim work is open | `2b06b:Dragonborn.esm` |
@@ -242,6 +244,7 @@ Distinct items, open book only. A profession half that makes nothing from a reci
 | Troll Fat | Asked for by a recipe | Hunter, advanced | `3ad72:Skyrim.esm` |
 | Tundra Cotton | Asked for by a recipe | Gatherer, novice | `3f7f8:Skyrim.esm` |
 | Vale Sabre Cat Hide | Asked for by a recipe | Hunter, novice | `1199a:Dawnguard.esm` |
+| Wolf Pelt | Asked for by a recipe | Hunter, novice | `3ad74:Skyrim.esm` |
 | Yellow Mountain Flower | Asked for by a recipe | Gatherer, advanced | `2a78:Dawnguard.esm` |
 | Amethyst | Dungeon and body loot | Miner, master, only while the gem work is open | `63b46:Skyrim.esm` |
 | Baked Potatoes | Dungeon and body loot | Cook/Hearthcook, novice | `64b3a:Skyrim.esm` |
