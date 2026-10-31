@@ -60,7 +60,8 @@
                     Patrick's answers of 26 Oct 2026), { repositories: [{
                     repository, rulesets: [...],
                     private_vulnerability_reporting, immutable_releases,
-                    secret_scanning, secret_scanning_push_protection }] },
+                    secret_scanning, secret_scanning_push_protection,
+                    collaborators: [login] }] },
                     for Thornswood and
                     the engine fork, EvilPatrick06/skymp, and no other
                     repository: each ruleset an entry names is on GitHub
@@ -75,7 +76,18 @@
                     record or a deliberate removal, never a silent loss. A repository
                     the App is not installed on stops the run for it, with
                     the link to the installation's settings, and the others
-                    go on.
+                    go on. An entry's collaborators, when it gives them, is
+                    the whole list of people besides the owner who may push
+                    there (a personal repository has no other role): one
+                    GitHub has that the list does not name is taken off,
+                    and an invitation to one is withdrawn, so a person who
+                    leaves the team is a pull request to the record (31 Oct
+                    2026). It only ever takes people off. One the list names
+                    who is not there yet is reported and nothing is sent
+                    for them: giving somebody push is Patrick's by hand on
+                    GitHub, never a merged pull request through this App.
+                    An entry that gives no list leaves its people as they
+                    are.
     go-public       the flip (#4013, #3721; Patrick's word of 30 Oct 2026,
                     and his of the same evening that it is not done on
                     One). A cloud thread's proxy refuses the visibility
@@ -200,6 +212,8 @@ const SWITCHES = {
   private_vulnerability_reporting: { path: 'private-vulnerability-reporting', name: 'private vulnerability reporting' },
   immutable_releases: { path: 'immutable-releases', name: 'immutable releases' },
 };
+// A GitHub login: letters, digits and single hyphens, 39 at most.
+const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/;
 // security_and_analysis keys the record may switch, each true or false.
 const SCANNING_KEYS = ['secret_scanning', 'secret_scanning_push_protection'];
 // What repo-settings' token for each repository may do: Thornswood's reads
@@ -388,7 +402,43 @@ function checkSettings(doc) {
     // GitHub has no push protection without the scanning it protects.
     if (e.secret_scanning_push_protection === true && e.secret_scanning !== true) throw new Error(SETTINGS_FILE + ', ' + repo + ': secret_scanning_push_protection is on only with secret_scanning on too');
     checkRulesets(repo, e.rulesets);
+    if (e.collaborators !== undefined) checkCollaborators(repo, e.collaborators);
   }
+}
+
+// Checks an entry's collaborators: a list of GitHub logins, each once, never
+// the owner (who is not a collaborator and can never be taken off). An empty
+// list says nobody but the owner. Throws.
+function checkCollaborators(repo, list) {
+  const at = SETTINGS_FILE + ', ' + repo;
+  if (!Array.isArray(list)) throw new Error(at + ': collaborators is a list of GitHub logins, not ' + JSON.stringify(list));
+  const seen = {};
+  for (const x of list) {
+    if (typeof x !== 'string' || !LOGIN.test(x)) throw new Error(at + ': ' + JSON.stringify(x) + ' is not a GitHub login');
+    const k = x.toLowerCase();
+    if (k === OWNER.toLowerCase()) throw new Error(at + ': the owner, ' + OWNER + ', is not a collaborator and is never listed');
+    if (seen[k]) throw new Error(at + ' names the collaborator ' + x + ' twice');
+    seen[k] = true;
+  }
+}
+
+// What has to change for a repository's people to match its list:
+// { missing: [login], drop: [login], withdraw: [{ id, login }], right: [login] }.
+// missing is only ever reported: this App takes people off and never adds
+// anybody (a named login with an open invitation is neither right nor
+// missing).
+// have is GitHub's direct collaborators ({ login }), invites its open
+// invitations ({ id, invitee: { login } }). Logins compare in any case, as
+// GitHub's do. The owner is never dropped.
+function planCollaborators(list, have, invites) {
+  const named = k => list.some(x => x.toLowerCase() === k.toLowerCase());
+  const logins = have.map(c => String(c.login)).filter(l => l.toLowerCase() !== OWNER.toLowerCase());
+  const asked = invites.map(i => ({ id: i.id, login: String((i.invitee && i.invitee.login) || '') }));
+  const right = list.filter(x => logins.some(l => l.toLowerCase() === x.toLowerCase()));
+  const missing = list.filter(x => !right.includes(x) && !asked.some(i => i.login.toLowerCase() === x.toLowerCase()));
+  const drop = logins.filter(l => !named(l));
+  const withdraw = asked.filter(i => !named(i.login));
+  return { missing, drop, withdraw, right };
 }
 
 // The body GitHub is sent for one record entry: its API keys and nothing else.
@@ -606,6 +656,62 @@ async function rulesets(token, repo, list, check) {
   return { ok, lines, changed, differs };
 }
 
+// A repository's direct collaborators and its open invitations, read in
+// full: { have, invites }.
+async function listPeople(token, repo) {
+  const auth = { Authorization: 'Bearer ' + token };
+  const all = async (what, part) => {
+    const out = [];
+    for (let page = 1; ; page++) {
+      const a = await call('GET', API + '/repos/' + repo + '/' + part + (part.includes('?') ? '&' : '?') + 'per_page=100&page=' + page, auth);
+      if (a.status !== 200 || !Array.isArray(a.body)) throw new Error('GitHub would not list the ' + what + ' of ' + repo + ' (' + said(a) + ')');
+      out.push(...a.body);
+      if (a.body.length < 100) return out;
+    }
+  };
+  return { have: await all('collaborators', 'collaborators?affiliation=direct'), invites: await all('invitations', 'invitations') };
+}
+
+// Takes off whoever of a repository's collaborators and invitations its list
+// does not name, or with check says only who that is. One the list names who
+// is not there is reported and never invited (remove only, 31 Oct 2026).
+// { ok, lines, changed, differs }.
+async function collaborators(token, repo, list, check) {
+  const p0 = await listPeople(token, repo);
+  const p = planCollaborators(list, p0.have, p0.invites);
+  const lines = p.right.map(l => repo + ': ' + l + ' is a collaborator, as the record says');
+  const notHere = l => repo + ': ' + l + ' is named but not a collaborator; Patrick invites them by hand on GitHub';
+  const differs = p.drop.length + p.withdraw.length;
+  if (!differs) return { ok: true, lines: lines.concat(p.missing.map(notHere)), changed: 0, differs: 0 };
+  if (check) {
+    for (const l of p.drop) lines.push(repo + ': ' + l + ' would be taken off, as the record does not name them');
+    for (const i of p.withdraw) lines.push(repo + ': the invitation to ' + i.login + ' would be withdrawn, as the record does not name them');
+    for (const l of p.missing) lines.push(notHere(l));
+    return { ok: true, lines, changed: 0, differs };
+  }
+  const auth = { Authorization: 'Bearer ' + token };
+  let ok = true, changed = 0;
+  for (const l of p.drop) {
+    const a = await call('DELETE', API + '/repos/' + repo + '/collaborators/' + encodeURIComponent(l), auth);
+    if (a.status !== 204) { lines.push('STOP ' + repo + ': GitHub did not take ' + l + ' off (' + said(a) + ')'); ok = false; continue; }
+    changed++;
+    lines.push(repo + ': ' + l + ' taken off');
+  }
+  for (const i of p.withdraw) {
+    const a = await call('DELETE', API + '/repos/' + repo + '/invitations/' + Number(i.id), auth);
+    if (a.status !== 204) { lines.push('STOP ' + repo + ': GitHub did not withdraw the invitation to ' + i.login + ' (' + said(a) + ')'); ok = false; continue; }
+    changed++;
+    lines.push(repo + ': the invitation to ' + i.login + ' withdrawn');
+  }
+  for (const l of p.missing) lines.push(notHere(l));
+  // Read back rather than trust the calls.
+  const p1 = await listPeople(token, repo);
+  const again = planCollaborators(list, p1.have, p1.invites);
+  for (const l of again.drop) { lines.push('STOP ' + repo + ': GitHub still has ' + l + ' as a collaborator'); ok = false; }
+  for (const i of again.withdraw) { lines.push('STOP ' + repo + ': GitHub still has an invitation to ' + i.login); ok = false; }
+  return { ok, lines, changed, differs };
+}
+
 // Makes one of a repository's on-or-off switches (SWITCHES: private
 // vulnerability reporting, immutable releases) on or off as its entry says,
 // or with check says only whether it differs. GitHub answers each the same
@@ -678,6 +784,7 @@ async function repoSettings(held, now, check) {
       add(await rulesets(token, e.repository, e.rulesets, check));
       for (const k of Object.keys(SWITCHES)) if (typeof e[k] === 'boolean') add(await setSwitch(token, e.repository, k, e[k], check));
       if (SCANNING_KEYS.some(k => typeof e[k] === 'boolean')) add(await scanning(token, e.repository, e, check));
+      if (Array.isArray(e.collaborators)) add(await collaborators(token, e.repository, e.collaborators, check));
     } catch (err) {
       add({ ok: false, lines: ['STOP ' + e.repository + ': ' + err.message + '; nothing more was changed there'], changed: 0, differs: 0 });
     }
@@ -1146,5 +1253,5 @@ function serve() {
   return server;
 }
 
-module.exports = { verifyOidc, appJwt, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
+module.exports = { verifyOidc, appJwt, planCollaborators, planPublic, publicStops, PUBLIC_DROPS, OPS_COPIES, PUBLIC_KEEPS, planLabels, planLeftovers, checkRecords, checkAbout, planAbout, runnerNumber, checkRulesets, checkSettings, planRulesets, rulesetBody, says, manifest, RULES, ASKS, REPO, RUNNERS_REPO, SETTINGS_REPOS, SCANNING_KEYS, SETTINGS_PERMISSIONS, SETTINGS_EXTRA, serve };
 if (require.main === module) serve();
