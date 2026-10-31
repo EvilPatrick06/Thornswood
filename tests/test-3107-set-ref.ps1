@@ -45,13 +45,19 @@
          releases on the tag, a draft built from another commit than the
          tag names, a draft not named for the launcher and a tag that is not
          v<version> each leave it a draft.
+       - a launcher draft GitHub took off its tag (untagged-<hex>) is one
+         PATCH naming tag_name and target_commitish together, then read
+         back, RETAGGED; a tag that already has its release is
+         ALREADY-ON-TAG; a draft holding another commit, two such drafts,
+         a tag not on GitHub and an edit that does not take each stop.
     3. Set-Ref.ps1 in a session, against a stand-in for gh: it starts
        git-ref.yml on main with the inputs on gh's standard input, reads the
        runner's annotation and says what it did, exit 0; a stopped runner is
        1; a run not ended in time is 2 with the -Run line; and a name it would
        refuse is refused before anything is started. -Fork starts the fork's
        thornswood-git-ref.yml instead, for a branch only. -DeleteTag,
-       -DeleteDraft and -PublishLauncher send their one input each.
+       -DeleteDraft, -PublishLauncher and -RetagLauncher send their one
+       input each.
     4. Add-ReleaseTag in a cloud session (CLAUDE_CODE_REMOTE true): it hands
        the tag, the commit and the release's own message to the checkout's
        Set-Ref.ps1 and tags nothing in the checkout; a refusal says what to
@@ -115,7 +121,7 @@ $next = [regex]::Match($code, '(?ms)- name: Start release-files\.yml for the rel
 $nextRun = [regex]::Match($next, '(?ms)run: \|\n(.*)$').Groups[1].Value
 Yes 'then it starts release-files.yml, for a tag only' ($next -match "(?m)^\s+if: \$\{\{ inputs\.tag != '' \}\}$" -and $nextRun -match 'actions/workflows/release-files\.yml/dispatches')
 Yes '  only for a release tag, read from the environment, nothing pasted into its script' ($nextRun -match '\$env:REF_TAG -notmatch' -and $nextRun -notmatch '\$\{\{')
-foreach ($k in 'REF_TAG: ${{ inputs.tag }}', 'REF_DELETE_BRANCH: ${{ inputs.delete_branch }}', 'REF_DELETE_TAG: ${{ inputs.delete_tag }}', 'REF_DELETE_DRAFT: ${{ inputs.delete_draft }}', 'REF_PUBLISH_LAUNCHER: ${{ inputs.publish_launcher }}', 'REF_COMMIT: ${{ inputs.commit }}', 'REF_MESSAGE: ${{ inputs.message }}', 'GH_TOKEN: ${{ github.token }}') {
+foreach ($k in 'REF_TAG: ${{ inputs.tag }}', 'REF_DELETE_BRANCH: ${{ inputs.delete_branch }}', 'REF_DELETE_TAG: ${{ inputs.delete_tag }}', 'REF_DELETE_DRAFT: ${{ inputs.delete_draft }}', 'REF_PUBLISH_LAUNCHER: ${{ inputs.publish_launcher }}', 'REF_RETAG_LAUNCHER: ${{ inputs.retag_launcher }}', 'REF_COMMIT: ${{ inputs.commit }}', 'REF_MESSAGE: ${{ inputs.message }}', 'GH_TOKEN: ${{ github.token }}') {
     Yes "  $($k.Split(':')[0]) reaches it through the environment" ($step.Contains($k))
 }
 
@@ -164,7 +170,16 @@ function Invoke-WebRequest {
         return (A 404 @{ message = 'Not Found' })
     }
     if ($Method -eq 'DELETE' -and $p -match '^releases/\d+$') { return (A $s.delete $null) }
-    if ($Method -eq 'PATCH' -and $p -match '^releases/\d+$') { return (A 200 @{ id = 1 }) }
+    if ($Method -eq 'PATCH' -and $p -match '^releases/(\d+)$') {
+        # GitHub keeps what the edit names, unless the case says it does not.
+        if (-not $s['patchIgnored']) {
+            $id = $Matches[1]; $b = $Body | ConvertFrom-Json
+            foreach ($rel in @(@($s.releases) | Where-Object { [string]$_.id -eq $id })) {
+                foreach ($q in $b.PSObject.Properties) { $rel | Add-Member -NotePropertyName $q.Name -NotePropertyValue $q.Value -Force }
+            }
+        }
+        return (A 200 @{ id = 1 })
+    }
     return (A 500 @{ message = "the stand-in has no answer for $Method $p" })
 }
 function OnGitHub([hashtable]$envs, [hashtable]$state) {
@@ -173,7 +188,7 @@ function OnGitHub([hashtable]$envs, [hashtable]$state) {
     $global:TSgh = $base
     $global:TScalls = @()
     $all = @{ GITHUB_ACTIONS = 'true'; GH_TOKEN = 'run-token'; GITHUB_REPOSITORY = 'owner/repo'; GITHUB_API_URL = 'https://api.test'
-              REF_TAG = ''; REF_DELETE_BRANCH = ''; REF_DELETE_TAG = ''; REF_DELETE_DRAFT = ''; REF_PUBLISH_LAUNCHER = ''
+              REF_TAG = ''; REF_DELETE_BRANCH = ''; REF_DELETE_TAG = ''; REF_DELETE_DRAFT = ''; REF_PUBLISH_LAUNCHER = ''; REF_RETAG_LAUNCHER = ''
               REF_COMMIT = $main; REF_MESSAGE = ''; REF_DEFAULT_BRANCH = 'main' }
     foreach ($k in $envs.Keys) { $all[$k] = $envs[$k] }
     $was = @{}
@@ -343,6 +358,50 @@ try {
         $r = OnGitHub @{ REF_PUBLISH_LAUNCHER = $bad; REF_COMMIT = '' } @{}
         Yes "  $bad is not a launcher tag: refused, nothing asked" ($r.Code -eq 1 -and $r.Calls.Count -eq 0)
     }
+
+    # A launcher draft GitHub took off its tag (31 Oct 2026: an edit that did
+    # not name tag_name left v1.2.13's draft untagged-<hex>).
+    function Lost($more = @{}) {
+        $l = Launcher 'v1.2.13' (@{ id = 429911727; tag_name = 'untagged-2683386397d5fe053ff3' } + $more)
+        $l.refs = @{ 'tags/v1.2.13' = @{ type = 'commit'; sha = $main } }
+        $l.releases = @($l.releases) + @([pscustomobject]@{ id = 429888873; tag_name = 'v1.2.12'; name = 'Launcher v1.2.12'; draft = $true; target_commitish = $other; assets = @() })
+        return $l
+    }
+    $l = Lost
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } $l
+    $w = @(Writes $r)
+    Yes ("a launcher draft GitHub took off its tag: exit 0, RETAGGED ($($r.Code))") ($r.Code -eq 0 -and $r.Out -match "Set-Ref::RETAGGED v1\.2\.13 $main")
+    Yes '  one PATCH of that draft, naming the tag and the commit together, and nothing else' (
+        $w.Count -eq 1 -and $w[0].Method -eq 'PATCH' -and $w[0].Path -eq 'releases/429911727' -and $w[0].Body.tag_name -eq 'v1.2.13' -and $w[0].Body.target_commitish -eq $main -and
+        @($w[0].Body.PSObject.Properties).Count -eq 2)
+    Yes '  then the draft is read back' (@($r.Calls | Where-Object { $_.Method -eq 'GET' -and $_.Path -eq 'releases/429911727' }).Count -eq 1)
+    Yes '  and its files are not fetched' (@($r.Calls | Where-Object { $_.Path -like 'releases/assets/*' }).Count -eq 0)
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } $l
+    Yes 'run again, the tag has its release: ALREADY-ON-TAG, exit 0, nothing changed' ($r.Code -eq 0 -and $r.Out -match 'Set-Ref::ALREADY-ON-TAG v1\.2\.13' -and @(Writes $r).Count -eq 0)
+    $l = Lost; $l.patchIgnored = $true
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } $l
+    Yes 'an edit GitHub did not keep: exit 1, it says what the draft reads back as' ($r.Code -eq 1 -and $r.Out -match 'reads back as untagged-')
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } (Lost @{ target_commitish = $other })
+    Yes 'a draft holding another commit than the tag names: it stays as it is' ($r.Code -eq 1 -and $r.Out -match 'not that tag''s build' -and @(Writes $r).Count -eq 0)
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } (Lost @{ draft = $false })
+    Yes 'a published release is not one this puts back' ($r.Code -eq 1 -and $r.Out -match '0 drafts' -and @(Writes $r).Count -eq 0)
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } (Lost @{ name = 'Thornswood main release' })
+    Yes 'a draft not named for the launcher: it stays as it is' ($r.Code -eq 1 -and @(Writes $r).Count -eq 0)
+    $l = Lost; $l.releases = @($l.releases) + @([pscustomobject]@{ id = 5; tag_name = 'untagged-ffff'; name = 'Launcher v1.2.13'; draft = $true; target_commitish = $main; assets = @() })
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } $l
+    Yes 'two such drafts: neither is chosen, it says which' ($r.Code -eq 1 -and $r.Out -match '429911727, 5' -and @(Writes $r).Count -eq 0)
+    $l = Lost; $l.releases = @($l.releases) + @([pscustomobject]@{ id = 6; tag_name = 'v1.2.13'; name = 'Launcher v1.2.13'; draft = $true; target_commitish = $main; assets = @() }, [pscustomobject]@{ id = 7; tag_name = 'v1.2.13'; name = 'x'; draft = $true; target_commitish = $main; assets = @() })
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } $l
+    Yes 'a tag that already has two releases: nothing changed, exit 1' ($r.Code -eq 1 -and $r.Out -match '2 releases' -and @(Writes $r).Count -eq 0)
+    $l = Lost; $l.refs = @{}
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } $l
+    Yes 'a tag not on GitHub: nothing changed, exit 1' ($r.Code -eq 1 -and $r.Out -match 'not on GitHub' -and @(Writes $r).Count -eq 0)
+    foreach ($bad in 'release/main/20261030-133616', 'v1.2', 'untagged-2683386397d5fe053ff3') {
+        $r = OnGitHub @{ REF_RETAG_LAUNCHER = $bad; REF_COMMIT = '' } @{}
+        Yes "  $bad is not a launcher tag: refused, nothing asked" ($r.Code -eq 1 -and $r.Calls.Count -eq 0)
+    }
+    $r = OnGitHub @{ REF_RETAG_LAUNCHER = 'v1.2.13'; REF_PUBLISH_LAUNCHER = 'v1.2.13'; REF_COMMIT = '' } (Lost)
+    Yes 'asked to put back and publish at once: refused, nothing asked' ($r.Code -eq 1 -and $r.Calls.Count -eq 0)
 } finally {
     $global:TSscript = $setRef
     Remove-Item Env:TS_TRF, Env:TS_TRF_RC -ErrorAction SilentlyContinue
@@ -415,6 +474,12 @@ $s = Session @{ PublishLauncher = 'v1.2.11' } $done @((Note 'notice' "PUBLISHED 
 Yes '-PublishLauncher: publish_launcher alone in the inputs, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.publish_launcher -eq 'v1.2.11' -and @($s.Body.inputs.PSObject.Properties).Count -eq 1 -and $s.Out -match 'checked as signed')
 $s = Session @{ PublishLauncher = 'release/main/20261030-133616' } $done @()
 Yes '  a tag that is not v<version> is refused before anything is started' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
+$s = Session @{ RetagLauncher = 'v1.2.13' } $done @((Note 'notice' "RETAGGED v1.2.13 $main"))
+Yes '-RetagLauncher: retag_launcher alone in the inputs, exit 0' ($s.Code -eq 0 -and $s.Body.inputs.retag_launcher -eq 'v1.2.13' -and @($s.Body.inputs.PSObject.Properties).Count -eq 1 -and $s.Out -match 'back on its tag')
+$s = Session @{ RetagLauncher = 'v1.2.13' } $done @((Note 'notice' "ALREADY-ON-TAG v1.2.13 $main"))
+Yes '  and says when the tag already had its release' ($s.Code -eq 0 -and $s.Out -match 'already had its release')
+$s = Session @{ RetagLauncher = 'untagged-2683386397d5fe053ff3' } $done @()
+Yes '  a name that is not v<version> is refused before anything is started' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
 $s = Session @{ DeleteTag = 'a b'; Commit = $main } $done @()
 Yes '  and so is a tag name it would not delete' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
 Remove-Item Function:\gh
