@@ -543,7 +543,7 @@ function Save-ReleaseFiles([string]$repo, [string]$tag, [string[]]$names, [strin
             finally { $fs.Dispose() }
             try {
                 if ($why) { return @{ LookWhy = ''; None = $false; Why = "could not download the files of release.yml run $($run.id) ($why)" } }
-                try { Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force -ErrorAction Stop }
+                try { $null = Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force -ErrorAction Stop }
                 catch { return @{ LookWhy = ''; None = $false; Why = "the files of release.yml run $($run.id) did not open as a zip ($($_.Exception.Message))" } }
                 if (@($names | Where-Object { -not (Test-Path -LiteralPath (Join-Path $dir $_) -PathType Leaf) }).Count -eq 0) {
                     foreach ($n in $names) { Copy-Item -LiteralPath (Join-Path $dir $n) -Destination (Join-Path $into $n) -Force }

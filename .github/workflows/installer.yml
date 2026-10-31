@@ -166,6 +166,22 @@ jobs:
           } catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('release_id=' + $id)
 
+      # The same two files kept as the run's own, which
+      # Publish-InstallerFromGitHub.ps1 takes from the run it waited on
+      # (Actions read). GitHub lists a draft only to an account that can push,
+      # and the deploy gate's Publish-Installer verb reads GitHub with the box
+      # admin App's token, which reads contents only (#5109; release.yml keeps
+      # its release-files the same way, #5102).
+      - name: Keep the installer and its note as the run's files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: installer-files
+          path: |
+            ${{ runner.temp }}/installer/Thornswood-Setup.exe
+            ${{ runner.temp }}/installer/Thornswood-Setup.release.json
+          if-no-files-found: error
+          retention-days: 30
+
   # A SECOND MACHINE CHECKS THE DRAFT'S INSTALLER, as release.yml's verify:
   # another hosted machine, holding no signing client, no signing.json and no
   # Azure token, accepts it on its files alone.

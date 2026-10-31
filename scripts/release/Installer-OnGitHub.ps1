@@ -39,6 +39,8 @@
 . (Join-Path $PSScriptRoot 'Assert-PublishSigned.ps1')
 
 $InstallerAssetNames = @('Thornswood-Setup.exe', 'Thornswood-Setup.release.json')
+# The run's own copy of them, which installer.yml keeps beside the draft's.
+$InstallerRunArtifact = 'installer-files'
 
 # GitHub's REST API with the job's token, as one scriptblock a harness can
 # replace: & $api <Method> <Uri> [-Body <json>] [-InFile <path>] [-OutFile <path>].
@@ -192,7 +194,10 @@ function Invoke-InstallerOnGitHub {
         [Parameter(Mandatory = $true)][string]$Repo,
         [scriptblock]$Gh = { Invoke-SignOnGitHubGh $args },
         [int]$WaitSeconds = 3600,
-        [int]$Poll = 20
+        [int]$Poll = 20,
+        # Given, it gets the id of the run that built the installer, for
+        # Save-InstallerRunFiles.
+        [ref]$RunId
     )
     $asked = (Get-Date).ToUniversalTime().AddSeconds(-30)
     $ask = @('workflow', 'run', 'installer.yml', '-R', $Repo, '--ref', 'main')
@@ -215,5 +220,42 @@ function Invoke-InstallerOnGitHub {
         return ("the installer.yml run on main ended " + [string]$run.conclusion + ', so there is no checked, signed installer: ' + [string]$run.url)
     }
     Write-Host ('  built, signed and checked on GitHub: ' + [string]$run.url) -ForegroundColor DarkGray
+    if ($null -ne $RunId) { $RunId.Value = [string]$run.databaseId }
+    return ''
+}
+
+# The installer and its note from the installer.yml run that built them
+# (installer.yml keeps them as the run's installer-files), into $Into. Read
+# with Actions read alone, which the deploy gate's token has: a draft is
+# listed only to an account that can push (#5109). '' when both are there;
+# 'none' when the run holds no such files (a run from before they were kept,
+# or one whose files expired), so the caller takes the draft's; else why not.
+function Save-InstallerRunFiles($Api, [string]$Repo, [string]$RunId, [string]$Into) {
+    if ($RunId -notmatch '^[1-9][0-9]*$') { return 'none' }
+    $base = Get-InstallerApiBase $Repo
+    try { $doc = & $Api 'Get' ($base + '/actions/runs/' + $RunId + '/artifacts?per_page=100') }
+    catch { return ("the files of installer.yml run $RunId could not be listed: " + $_.Exception.Message) }
+    $art = $null
+    foreach ($a in @(@($doc.artifacts) | Where-Object { $_ })) {
+        if ([string]$a.name -ceq $InstallerRunArtifact -and -not $a.expired -and ($null -eq $art -or [long]$a.id -gt [long]$art.id)) { $art = $a }
+    }
+    if ($null -eq $art) { return 'none' }
+    $null = New-Item -ItemType Directory -Force -Path $Into
+    $zip = Join-Path $Into ($InstallerRunArtifact + '.zip')
+    $dir = Join-Path $Into $InstallerRunArtifact
+    foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force } }
+    try {
+        try { $null = & $Api 'Get' ($base + '/actions/artifacts/' + $art.id + '/zip') -OutFile $zip }
+        catch { return ("the files of installer.yml run $RunId could not be downloaded: " + $_.Exception.Message) }
+        try { $null = Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force -ErrorAction Stop }
+        catch { return ("the files of installer.yml run $RunId did not open as a zip: " + $_.Exception.Message) }
+        foreach ($n in $InstallerAssetNames) {
+            if (-not (Test-Path -LiteralPath (Join-Path $dir $n) -PathType Leaf)) { return "the files of installer.yml run $RunId hold no $n" }
+        }
+        foreach ($n in $InstallerAssetNames) { Copy-Item -LiteralPath (Join-Path $dir $n) -Destination (Join-Path $Into $n) -Force }
+    } finally {
+        foreach ($p in $zip, $dir) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue } }
+    }
+    Write-Host ('  the installer and its note from installer.yml run ' + $RunId) -ForegroundColor DarkGray
     return ''
 }
