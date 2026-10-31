@@ -82,9 +82,12 @@
                     GitHub has that the list does not name is taken off,
                     and an invitation to one is withdrawn, so a person who
                     leaves the team is a pull request to the record (31 Oct
-                    2026); one the list names who is not there yet
-                    is invited. An entry that gives no list leaves its
-                    people as they are.
+                    2026). It only ever takes people off. One the list names
+                    who is not there yet is reported and nothing is sent
+                    for them: giving somebody push is Patrick's by hand on
+                    GitHub, never a merged pull request through this App.
+                    An entry that gives no list leaves its people as they
+                    are.
     go-public       the flip (#4013, #3721; Patrick's word of 30 Oct 2026,
                     and his of the same evening that it is not done on
                     One). A cloud thread's proxy refuses the visibility
@@ -420,7 +423,10 @@ function checkCollaborators(repo, list) {
 }
 
 // What has to change for a repository's people to match its list:
-// { invite: [login], drop: [login], withdraw: [{ id, login }], right: [login] }.
+// { missing: [login], drop: [login], withdraw: [{ id, login }], right: [login] }.
+// missing is only ever reported: this App takes people off and never adds
+// anybody (a named login with an open invitation is neither right nor
+// missing).
 // have is GitHub's direct collaborators ({ login }), invites its open
 // invitations ({ id, invitee: { login } }). Logins compare in any case, as
 // GitHub's do. The owner is never dropped.
@@ -429,10 +435,10 @@ function planCollaborators(list, have, invites) {
   const logins = have.map(c => String(c.login)).filter(l => l.toLowerCase() !== OWNER.toLowerCase());
   const asked = invites.map(i => ({ id: i.id, login: String((i.invitee && i.invitee.login) || '') }));
   const right = list.filter(x => logins.some(l => l.toLowerCase() === x.toLowerCase()));
-  const invite = list.filter(x => !right.includes(x) && !asked.some(i => i.login.toLowerCase() === x.toLowerCase()));
+  const missing = list.filter(x => !right.includes(x) && !asked.some(i => i.login.toLowerCase() === x.toLowerCase()));
   const drop = logins.filter(l => !named(l));
   const withdraw = asked.filter(i => !named(i.login));
-  return { invite, drop, withdraw, right };
+  return { missing, drop, withdraw, right };
 }
 
 // The body GitHub is sent for one record entry: its API keys and nothing else.
@@ -666,18 +672,21 @@ async function listPeople(token, repo) {
   return { have: await all('collaborators', 'collaborators?affiliation=direct'), invites: await all('invitations', 'invitations') };
 }
 
-// Makes one repository's collaborators match its list, or with check says
-// only what differs. { ok, lines, changed, differs }.
+// Takes off whoever of a repository's collaborators and invitations its list
+// does not name, or with check says only who that is. One the list names who
+// is not there is reported and never invited (remove only, 31 Oct 2026).
+// { ok, lines, changed, differs }.
 async function collaborators(token, repo, list, check) {
   const p0 = await listPeople(token, repo);
   const p = planCollaborators(list, p0.have, p0.invites);
   const lines = p.right.map(l => repo + ': ' + l + ' is a collaborator, as the record says');
-  const differs = p.invite.length + p.drop.length + p.withdraw.length;
-  if (!differs) return { ok: true, lines, changed: 0, differs: 0 };
+  const notHere = l => repo + ': ' + l + ' is named but not a collaborator; Patrick invites them by hand on GitHub';
+  const differs = p.drop.length + p.withdraw.length;
+  if (!differs) return { ok: true, lines: lines.concat(p.missing.map(notHere)), changed: 0, differs: 0 };
   if (check) {
     for (const l of p.drop) lines.push(repo + ': ' + l + ' would be taken off, as the record does not name them');
     for (const i of p.withdraw) lines.push(repo + ': the invitation to ' + i.login + ' would be withdrawn, as the record does not name them');
-    for (const l of p.invite) lines.push(repo + ': ' + l + ' would be invited');
+    for (const l of p.missing) lines.push(notHere(l));
     return { ok: true, lines, changed: 0, differs };
   }
   const auth = { Authorization: 'Bearer ' + token };
@@ -694,18 +703,12 @@ async function collaborators(token, repo, list, check) {
     changed++;
     lines.push(repo + ': the invitation to ' + i.login + ' withdrawn');
   }
-  for (const l of p.invite) {
-    const a = await call('PUT', API + '/repos/' + repo + '/collaborators/' + encodeURIComponent(l), auth);
-    if (a.status !== 201 && a.status !== 204) { lines.push('STOP ' + repo + ': GitHub did not invite ' + l + ' (' + said(a) + ')'); ok = false; continue; }
-    changed++;
-    lines.push(repo + ': ' + l + ' invited');
-  }
+  for (const l of p.missing) lines.push(notHere(l));
   // Read back rather than trust the calls.
   const p1 = await listPeople(token, repo);
   const again = planCollaborators(list, p1.have, p1.invites);
   for (const l of again.drop) { lines.push('STOP ' + repo + ': GitHub still has ' + l + ' as a collaborator'); ok = false; }
   for (const i of again.withdraw) { lines.push('STOP ' + repo + ': GitHub still has an invitation to ' + i.login); ok = false; }
-  for (const l of again.invite) { lines.push('STOP ' + repo + ': GitHub has neither ' + l + ' nor an invitation to them'); ok = false; }
   return { ok, lines, changed, differs };
 }
 

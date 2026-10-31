@@ -69,8 +69,9 @@
 //      stops for it with the link to the installation's settings while the
 //      other is still matched; an entry's collaborators list takes off
 //      whoever it does not name (never the owner), withdraws an unnamed
-//      invitation, invites who is missing, reads back, and changes nothing
-//      a second time, and an entry with no list never touches its people;
+//      invitation, only reports who it names that is missing and never
+//      invites anybody (no PUT), reads back, and changes nothing a second
+//      time, and an entry with no list never touches its people;
 //      and the real records/github-repo-settings.json, when there is one,
 //      passes;
 //   5. the App's setup: no armed setup, a wrong or expired state, and an App
@@ -304,8 +305,9 @@ yes('a collaborator named twice, in any case, stops', /names the collaborator wi
 const pc = admin.planCollaborators(['WiccanDjinn', 'NewPerson', 'Asked'],
   [{ login: 'EvilPatrick06' }, { login: 'wiccandjinn' }, { login: 'Jhinswife' }],
   [{ id: 5, invitee: { login: 'Asked' } }, { id: 6, invitee: { login: 'Stale' } }]);
-yes('the people plan takes off whoever the list does not name and never the owner, withdraws an unnamed invitation, invites who is missing, and compares logins in any case',
-  JSON.stringify(pc.drop) === '["Jhinswife"]' && JSON.stringify(pc.withdraw) === '[{"id":6,"login":"Stale"}]' && JSON.stringify(pc.invite) === '["NewPerson"]' && JSON.stringify(pc.right) === '["WiccanDjinn"]');
+yes('the people plan takes off whoever the list does not name and never the owner, withdraws an unnamed invitation, names who is missing, and compares logins in any case',
+  JSON.stringify(pc.drop) === '["Jhinswife"]' && JSON.stringify(pc.withdraw) === '[{"id":6,"login":"Stale"}]' && JSON.stringify(pc.missing) === '["NewPerson"]' && JSON.stringify(pc.right) === '["WiccanDjinn"]' &&
+  !('invite' in pc));
 yes('the real records/github-repo-settings.json, when there is one, passes', (() => {
   const f = path.join(REPO, 'records', 'github-repo-settings.json');
   if (!fs.existsSync(f)) return true;
@@ -371,7 +373,6 @@ const gh = {
   nextRuleset: 100,
   people: { Thornswood: ['Jhinswife', 'WiccanDjinn'], skymp: ['Ture-Neko', 'WiccanDjinn'] },
   invites: { Thornswood: [], skymp: [{ id: 40, invitee: { login: 'Stale' }, permissions: 'write' }] },
-  nextInvite: 50,
 };
 gh.records['github-settings.json'] = { environments: { board: {}, notices: {}, 'bad name/../x': {} } };
 const appKey = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -441,10 +442,8 @@ function standIn(req, res) {
     m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/collaborators\/([^/]+)$/.exec(P);
     if (m && req.method === 'DELETE') { const i = gh.people[m[1]].indexOf(m[2]); if (i < 0) return send(404, { message: 'Not Found' }); gh.people[m[1]].splice(i, 1); return send(204); }
     if (m && req.method === 'PUT') {
-      if (gh.people[m[1]].includes(m[2])) return send(204);
-      const inv = { id: gh.nextInvite++, invitee: { login: m[2] }, permissions: 'write' };
-      gh.invites[m[1]].push(inv);
-      return send(201, inv);
+      gh.people[m[1]].push(m[2]);
+      return send(204);
     }
     m = /^\/repos\/EvilPatrick06\/(Thornswood|skymp)\/invitations$/.exec(P);
     if (m && req.method === 'GET') return send(200, gh.invites[m[1]]);
@@ -832,21 +831,24 @@ function start(stateDir, ghPort) {
     gh.settingsRecord.repositories[1].collaborators = ['Ture-Neko', 'WiccanDjinn', 'NewPerson'];
     gh.calls = [];
     r = await askRs(true);
-    yes('a check says who would be taken off, withdrawn and invited, and changes nothing', r.status === 200 && r.json.differs === 3 && r.json.changed === 0 && peopleWrites().length === 0 &&
+    yes('a check says who would be taken off and withdrawn, names who is missing, and changes nothing', r.status === 200 && r.json.differs === 2 && r.json.changed === 0 && peopleWrites().length === 0 &&
       has(/^EvilPatrick06\/Thornswood: Jhinswife would be taken off, as the record does not name them$/) && has(/^EvilPatrick06\/skymp: the invitation to Stale would be withdrawn/) &&
-      has(/^EvilPatrick06\/skymp: NewPerson would be invited$/) && has(/^EvilPatrick06\/Thornswood: WiccanDjinn is a collaborator, as the record says$/));
+      has(/^EvilPatrick06\/skymp: NewPerson is named but not a collaborator; Patrick invites them by hand on GitHub$/) && has(/^EvilPatrick06\/Thornswood: WiccanDjinn is a collaborator, as the record says$/));
     gh.calls = [];
     r = await askRs();
-    yes('a run takes Jhinswife off Thornswood, withdraws the stale invitation and invites the new person, each with its own repository\'s token, and reads back (3 changed)',
-      r.status === 200 && r.json.ok && r.json.changed === 3 &&
-      JSON.stringify(gh.people.Thornswood) === '["WiccanDjinn"]' && gh.invites.skymp.length === 1 && gh.invites.skymp[0].invitee.login === 'NewPerson' &&
+    yes('a run takes Jhinswife off Thornswood and withdraws the stale invitation, each with its own repository\'s token, and reads back (2 changed)',
+      r.status === 200 && r.json.ok && r.json.changed === 2 &&
+      JSON.stringify(gh.people.Thornswood) === '["WiccanDjinn"]' && gh.invites.skymp.length === 0 && !gh.people.skymp.includes('NewPerson') &&
       peopleWrites().some(c => c.method === 'DELETE' && c.path === '/repos/' + T + '/collaborators/Jhinswife' && c.auth === 'Bearer ' + gh.aboutToken) &&
       peopleWrites().some(c => c.method === 'DELETE' && c.path === '/repos/' + S + '/invitations/40' && c.auth === 'Bearer ' + gh.forkToken) &&
       gh.calls.filter(c => c.method === 'GET' && c.path.startsWith('/repos/' + T + '/collaborators?')).length === 2);
     yes('  and never the owner or a named collaborator', !peopleWrites().some(c => /EvilPatrick06$|WiccanDjinn$|Ture-Neko$/.test(c.path)));
+    yes('  and never adds anybody: no PUT, the missing one only reported', !peopleWrites().some(c => c.method === 'PUT') &&
+      has(/^EvilPatrick06\/skymp: NewPerson is named but not a collaborator; Patrick invites them by hand on GitHub$/));
     gh.calls = [];
     r = await askRs();
-    yes('a second run changes nothing, with the invitation still open', r.status === 200 && r.json.changed === 0 && peopleWrites().length === 0);
+    yes('a second run changes nothing and still names the missing one', r.status === 200 && r.json.changed === 0 && peopleWrites().length === 0 &&
+      has(/^EvilPatrick06\/skymp: NewPerson is named but not a collaborator/));
     gh.people.Thornswood.push('ByHand');
     gh.calls = [];
     r = await askRs();
