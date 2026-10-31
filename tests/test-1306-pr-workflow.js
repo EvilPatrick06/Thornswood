@@ -24,7 +24,9 @@ yes('main builds on GitHub\'s hosted runner, unless its pull request already pas
 yes('  with no fallback job and nothing on a self-hosted runner (#4983)', !/\n  launcher-vps:\n|\n  tested-vps:\n/.test(build) && code(build).indexOf('self-hosted') < 0);
 yes('  and no runner to pick on a manual run', !/\n    inputs:\n/.test(build) && !/inputs\.runner|vars\.BUILD_RUNNER/.test(code(build)));
 yes('build-pr.yml exists', !!pr);
-yes('build-pr.yml runs on a pull request and nothing else', JSON.stringify(triggers(pr)) === '["pull_request"]');
+// #5148: and a manual run, which engine-pin.yml starts on the pin branch it
+// pushes, since a push with the run's own token starts no pull_request run.
+yes('build-pr.yml runs on a pull request and a manual run, nothing else', JSON.stringify(triggers(pr)) === '["pull_request","workflow_dispatch"]');
 yes('on GitHub\'s hosted windows-latest', /\n    runs-on: windows-latest\n/.test(pr));
 yes('no pull request job is on a self-hosted runner (#4983)', !!pr && code(pr).indexOf('self-hosted') < 0 && !/\n  launcher-vps:\n/.test(pr));
 yes('it takes no secrets', !!pr && !/\$\{\{\s*secrets\./.test(pr));

@@ -36,7 +36,15 @@ function build(src) {
   body = swap(body, 'name: Build check\n', 'name: Build check (pull requests)\n', 'its name');
   const on = /\non:\n(?:  .*\n|    .*\n)+?(?=permissions:)/.exec(body);
   if (!on || on[0].indexOf('  push:') < 0) { fail('build.yml no longer has its push and manual triggers'); }
-  body = body.replace(on[0], '\non:\n  pull_request:\n');
+  /*
+    A PIN PULL REQUEST'S OWN RUN (#5148). engine-pin.yml pushes the rolling
+    engine pin branch with the run's own token, and GitHub starts no
+    pull_request run for a push made with that token. A manual run is the one
+    event that token may start, so engine-pin.yml starts this workflow on the
+    branch after each push, and its checks land on the pull request's head.
+    A manual run needs write access, which a push already needs.
+  */
+  body = body.replace(on[0], '\non:\n  pull_request:\n  workflow_dispatch:\n');
   body = swap(body, 'group: build-${{ github.ref }}', 'group: build-pr-${{ github.ref }}', 'its concurrency group');
   /*
     A PULL REQUEST'S NEWER PUSH CANCELS ITS OLDER RUN (#3874). Main's builds

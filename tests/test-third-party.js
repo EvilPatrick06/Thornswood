@@ -970,7 +970,14 @@ yes('the credits page names ___systemPolyfill.js and its licence',
 const POLY = 'skyrim-platform/tools/system_polyfill';
 let polyUpstream = null;
 let spLicence = null;
+// A clone fetched at the pin alone (--depth 1, as Build-Front.ps1 and
+// engine-pin.yml fetch it, #5148) does not hold the polyfill's older commit,
+// so there is nothing here to read it in.
+let polyHere = false;
 if (haveFork && polySrc) {
+  try { git(['cat-file', '-e', polySrc[1] + '^{commit}']); polyHere = true; } catch (e) { polyHere = false; }
+}
+if (polyHere) {
   try { polyUpstream = git(['show', polySrc[1] + ':' + POLY + '/dist/___systemPolyfill.js']); } catch (e) { polyUpstream = null; }
   try { spLicence = git(['show', polySrc[1] + ':skyrim-platform/LICENSE']); } catch (e) { spLicence = null; }
   yes('the fork at ' + polySrc[1].slice(0, 8) + ' has ' + POLY + '/src/___systemPolyfill.ts', (function () {
@@ -980,7 +987,8 @@ if (haveFork && polySrc) {
     try { git(['cat-file', '-e', commit + ':' + POLY]); return false; } catch (e) { return true; }
   })());
 } else {
-  skip('no fork here to read ___systemPolyfill.js\'s source commit in');
+  skip(haveFork && polySrc ? 'the fork clone at ' + FORK + ' does not hold ' + polySrc[1].slice(0, 8) + ', so ___systemPolyfill.js\'s source was not read there'
+    : 'no fork here to read ___systemPolyfill.js\'s source commit in');
 }
 
 // Vortex's copy of the mod. The newest one Vortex holds is the one read; an
