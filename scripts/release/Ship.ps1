@@ -379,7 +379,11 @@ function Get-SourceRepo([string]$repoDir) {
     } else {
         Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
     }
-    if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
+    # A URL's port is not part of owner/name: the deploy gate's checkout reads
+    # ssh://git@ssh.github.com:443/<owner>/<name>.git (Install-Gate.ps1), and
+    # on 31 Oct its main Ship asked gh for 443/EvilPatrick06/Thornswood, a
+    # repository on a host named 443 ("error connecting to 443").
+    if ($remote -and $remote -match 'github\.com(?::\d+(?=/))?[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
     return 'EvilPatrick06/Thornswood'
 }
 
