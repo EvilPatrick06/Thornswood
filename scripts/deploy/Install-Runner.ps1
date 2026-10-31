@@ -118,9 +118,10 @@
   carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
 
-  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026). The pull request build's
-  fallback (build-pr.yml, launcher-vps) needs nothing of the box, so it asks
-  for thornswood-pr-build alone; main's (build.yml) stays on the box, which
+  BUILD RUNNERS ON ONE (Patrick, 26 Oct 2026; history since #4983, when the
+  public repository's builds left every runner of ours). The pull request
+  build's fallback (build-pr.yml, launcher-vps) needed nothing of the box, so it asked
+  for thornswood-pr-build alone; main's (build.yml) stayed on the box, which
   traces the gate (#3114, #3874). An -OffBox runner whose name
   records\pr-build-runners.json's offBox lists (thornswood-pr-one,
   thornswood-pr-one-2, ... on One) is registered with thornswood-pr-build

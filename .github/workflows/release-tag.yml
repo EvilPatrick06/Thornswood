@@ -22,7 +22,8 @@
 #     Ship asking again starts release.yml again on it, and a tag on another
 #     commit stops the run. A tag is never moved or deleted here.
 # Nothing is checked out and no repository code runs: it is REST calls with
-# the repository token, on any VPS runner (a light job, like the board's).
+# the repository token, on GitHub's Windows runner (a light job, like the
+# board's).
 #
 # WHO CAN RUN IT. workflow_dispatch from main only, so only people who can
 # write to the repository, who can push a v tag already.
@@ -47,7 +48,7 @@ jobs:
   tag:
     name: Tag the commit and start release.yml on it
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    runs-on: windows-latest
     timeout-minutes: 5
     steps:
       # The inputs reach the script through env, never pasted into its text.

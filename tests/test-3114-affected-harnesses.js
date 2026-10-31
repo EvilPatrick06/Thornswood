@@ -219,12 +219,11 @@ try {
     'name: Build check', 'on:', '  push:', '    branches: [main]', 'permissions:', '  contents: read',
     'concurrency:', '  group: build-${{ github.ref }}', '  cancel-in-progress: false', 'jobs:',
     '  tested:', '    runs-on: ubuntu-latest', '    steps:', '      - run: echo look',
-    '  launcher-vps:', '    name: Launcher builds (VPS fallback)', '    needs: [tested, launcher]', "    if: ${{ !cancelled() }}",
-    '    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]', '    timeout-minutes: 40', '    steps: &checks',
+    '  launcher:', '    name: Launcher builds', '    needs: tested', "    if: ${{ !cancelled() }}",
+    '    runs-on: windows-latest', '    timeout-minutes: 60', '    steps:',
     '      - uses: actions/checkout@x # v7', '      # why the checks run', '      - name: Scan', '        run: |', '          .\\scripts\\dev\\Check-Secrets.ps1',
     '      - name: Run the gate harnesses', '        id: gate', '        run: |', '          .\\scripts\\dev\\Run-Gate.ps1 -Throttle 6',
-    '      - name: Lint', '        run: echo lint', '      - name: Write down the tree', '        run: echo note',
-    '  launcher:', '    name: Launcher builds', '    needs: tested', '    runs-on: windows-latest', '    timeout-minutes: 60', '    steps: *checks', ''].join('\n');
+    '      - name: Lint', '        run: echo lint', '      - name: Write down the tree', '        run: echo note', ''].join('\n');
   const PR = WF.replace('name: Build check', 'name: Build check (pull requests)');
   const sh = (a, b) => A.gateShape([a, b === undefined ? PR : b]);
   const base = sh(WF);
@@ -235,16 +234,15 @@ try {
     ['the triggers', WF.replace('    branches: [main]', '    branches: [main, dev]')],
     ['the concurrency', WF.replace('cancel-in-progress: false', 'cancel-in-progress: true')],
     ['the tested job', WF.replace('      - run: echo look', '      - run: echo look again')],
-    ['a build job\'s condition and needs', WF.replace("    if: ${{ !cancelled() }}", "    if: ${{ !cancelled() && 1 }}").replace('needs: [tested, launcher]', 'needs: [tested, tested-vps, launcher]')],
+    ['the build job\'s condition and needs', WF.replace("    if: ${{ !cancelled() }}", "    if: ${{ !cancelled() && 1 }}").replace('    needs: tested\n', '    needs: [tested, other]\n')],
     ['a step after the gate', WF.replace('        run: echo note', '        if: runner.environment == \'github-hosted\'\n        run: echo note')],
-    ['a new job beside the build jobs', WF.replace('  launcher:\n', '  other:\n    runs-on: ubuntu-latest\n  launcher:\n')],
+    ['a new job beside the build job', WF.replace('  launcher:\n', '  other:\n    runs-on: ubuntu-latest\n  launcher:\n')],
   ]) { yes('  a change to ' + what + ' keeps it', sh(text) === base); }
   for (const [what, text] of [
     ['the gate step', WF.replace('-Throttle 6', '-Throttle 4')],
     ['a step before the gate', WF.replace('Check-Secrets.ps1', 'Check-Secrets.ps1 -Binary')],
     ['a new step before the gate', WF.replace('      - name: Run the gate harnesses', '      - name: Plant\n        run: echo x > game/x.js\n      - name: Run the gate harnesses')],
-    ['the fallback\'s runner', WF.replace('thornswood-vps, thornswood-build]', 'thornswood-build]')],
-    ['the hosted job\'s runner', WF.replace('runs-on: windows-latest', 'runs-on: windows-2025')],
+    ['the build job\'s runner', WF.replace('runs-on: windows-latest', 'runs-on: windows-2025')],
     ['the permissions', WF.replace('  contents: read', '  contents: read\n  actions: read')],
     ['an env for every job', WF.replace('concurrency:', 'env:\n  X: 1\nconcurrency:')],
   ]) { yes('  a change to ' + what + ' changes it', sh(text) !== base); }

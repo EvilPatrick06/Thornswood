@@ -1556,33 +1556,27 @@ The short form of the rules. The same decisions, with the dates they were made, 
   issue #1343) and the count of silent catches, and builds the launcher with
   MSBuild from its project files, held to its sources
   (`tests\test-498-msbuild.ps1`, issue #498).
-- The check has two names, and either one passing is the merge bar.
-  **Launcher builds** is the job on GitHub's hosted Windows runner, tried
-  first. **Launcher builds (VPS fallback)** runs the same steps on a build
-  runner on the VPS, when the hosted job did not succeed, when the repository
-  variable `BUILD_RUNNER` is `vps` (then Launcher builds shows skipped), or
-  when a manual run of build.yml asks for `runner: vps`. A pull request from a
-  fork never gets the fallback. While the month's hosted minutes are used up,
-  `BUILD_RUNNER` is `vps` and the fallback is the one that goes green. A push
+- The check is **Launcher builds**, on GitHub's hosted Windows runner, and on
+  a pull request **Build check result** passes only when it did (#3683).
+  The repository is public since 30 Oct 2026, so hosted minutes are free, and
+  nothing builds on the VPS any more: no fallback job and no `BUILD_RUNNER`
+  switch (#4983). A push
   to main whose tree a green pull request build already passed stops green at
   "Already tested in its pull request" instead of building again (#3182).
   Red means the branch would stop Ship at the build step; fix that, and merge
-  once one of the two is green and you are confident in the change; a merge
+  once it is green and you are confident in the change; a merge
   gets no line in #staff-updates. Nothing in GitHub's settings is required. Run the
   test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
-  and branches run every night on the VPS (.github/workflows/nightly.yml,
+  and branches run every night on GitHub's runner (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
   checks failed", and whoever broke it fixes it next. The harnesses run in
   shares, a job each on a runner of its own with 45 minutes of its own
   (`scripts\dev\Nightly-Harnesses.ps1`, #2357); a share that runs out of
-  time names the harnesses it did not get to, and the cure is another share. It runs on the VPS, on the runners
-  `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
-  GitHub's own runners were blocked on billing from 25 Sep. Several since
-  4 Oct, so checks run side by side: `-Number 2` and up puts each one after
-  the first beside it. `.\scripts\deploy\Install-Runner.ps1 -Status` (with
-  `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
-  every runner's folder again without stopping a job.
+  time names the harnesses it did not get to, and the cure is another share. It
+  ran on the VPS from 25 Sep, when GitHub's own runners were blocked on
+  billing (issue #437), and runs on GitHub's runner since the repository went
+  public (#4013, #4983).
 - An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
   Publish-Update.ps1 that blocks others' work gets a line in #dev-coordination first, from a Dev; every machine touches those.
 

@@ -34,6 +34,8 @@
      (measured 21 Oct: the job log says "Cleaning the repository", and a
      checkout made that way kept all 5,182 CRLF lines of hunts.json). Every
      self-hosted job writes every tracked file again right after its checkout.
+     Since #4983 no job here runs on a self-hosted runner, so there are none
+     to check; a job put back on one must write again.
 
   Nothing is written.
 */
@@ -155,6 +157,7 @@ const WF = path.join(ROOT, '.github', 'workflows');
 const AGAIN = /\n\s*- name: Check every tracked file out again\n\s*if: runner\.environment == 'self-hosted'\n\s*shell: pwsh\n\s*run: \|\n\s*git rm -r -q --cached \.\n\s*if \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}\n\s*git reset -q --hard HEAD\n\s*if \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}(\n|$)/;
 const missing = [];
 let checkouts = 0;
+let jobs = 0;
 for (const f of fs.readdirSync(WF).filter(function (n) { return /\.ya?ml$/.test(n); }).sort()) {
   const t = fs.readFileSync(path.join(WF, f), 'utf8').split('\r\n').join('\n');
   const starts = [];
@@ -164,6 +167,7 @@ for (const f of fs.readdirSync(WF).filter(function (n) { return /\.ya?ml$/.test(
   starts.forEach(function (s, k) {
     const job = t.slice(s.at, k + 1 < starts.length ? starts[k + 1].at : t.length);
     const runs = /^\s*runs-on:(.*)$/m.exec(job);
+    if (runs) { jobs++; }
     if (!runs || runs[1].indexOf('self-hosted') < 0) { return; }
     const parts = job.split(/(?=\n\s*- (?:uses|name): )/);
     parts.forEach(function (p, i) {
@@ -173,8 +177,8 @@ for (const f of fs.readdirSync(WF).filter(function (n) { return /\.ya?ml$/.test(
     });
   });
 }
-yes('G  each of the ' + checkouts + ' checkouts on a self-hosted runner is followed by writing every file again' + some(missing),
-  checkouts > 0 && missing.length === 0);
+yes('G  each of the ' + checkouts + ' checkouts on a self-hosted runner (of ' + jobs + ' jobs read) is followed by writing every file again' + some(missing),
+  jobs > 0 && missing.length === 0);
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

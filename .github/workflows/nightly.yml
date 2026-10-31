@@ -1,6 +1,7 @@
-# Every night on the VPS: everything the pull request check does, and the
-# slow half it leaves out. Patrick, 25 September: "let's do #1 and setup a
-# nightly schedule to do a bunch of security, file, github, code checks".
+# Every night on GitHub's Windows runner (#4983): everything the pull request
+# check does, and the slow half it leaves out. Patrick, 25 September: "let's
+# do #1 and setup a nightly schedule to do a bunch of security, file,
+# github, code checks".
 #
 #   security  the secret scan of the tree and of the built launcher
 #   files     every PowerShell, game and bot file parses; the writing rules
@@ -11,8 +12,7 @@
 #             and comments of the last day not written plain (#3692)
 #
 # Every action here is named by a full length commit SHA with its tag in the
-# comment, for the reason build.yml gives: a tag is a moving pointer, and this
-# runs on the VPS beside the live server.
+# comment, for the reason build.yml gives: a tag is a moving pointer.
 #
 # Any failure opens an issue on the board, or adds to the one already open,
 # and the first night everything passes closes it (Nightly-Issue.ps1),
@@ -43,31 +43,15 @@ concurrency:
 jobs:
   nightly:
     name: Nightly checks
-    # Main only (#3550): runner 3 signs release launchers and takes any job
-    # that asks for thornswood-vps alone, so this job and "board" never run a
-    # branch's code. A dispatch on a branch runs the harness shares and the
-    # bot harnesses alone, on the build runners and GitHub's, and tells the board
-    # nothing: a branch's night is not main's, and the first night that passes
-    # closes the board's issue.
+    # Main only (#3550): this job and "board" never run a branch's code. A
+    # dispatch on a branch runs the harness shares and the bot harnesses
+    # alone, and tells the board nothing: a branch's night is not main's, and
+    # the first night that passes closes the board's issue.
     if: github.ref == 'refs/heads/main'
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    runs-on: windows-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Scan the tree for secrets
         if: ${{ !cancelled() }}
@@ -325,10 +309,8 @@ jobs:
     # how many there are. fail-fast off: one share failing must not cancel
     # the other, whose list of what failed is half the night's answer.
     name: Test harnesses (${{ matrix.shard }} of 2)
-    # Each share is a build check's worth of harnesses, so it takes one of
-    # the box's build slots (thornswood-build, records/build-runners.json,
-    # #2994); the short jobs around it run on any VPS runner.
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps", "thornswood-build"]') || 'windows-latest' }}
+    # Each share is a build check's worth of harnesses, on a runner of its own.
+    runs-on: windows-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -336,20 +318,6 @@ jobs:
         shard: [1, 2]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Install the eslint the lint harness copies
         if: ${{ !cancelled() }}
@@ -469,24 +437,10 @@ jobs:
     needs: [nightly, harnesses, bot]
     # Main only, as "nightly" above says (#3550).
     if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
-    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
+    runs-on: windows-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      # A runner keeps its folder from one job to the next, and a checkout
-      # there rewrites only the files that differ from the last job's commit,
-      # so every other file keeps the line endings the last job's
-      # .gitattributes gave it (#3029). Every tracked file is written again,
-      # the way this commit checks it out.
-      - name: Check every tracked file out again
-        if: runner.environment == 'self-hosted'
-        shell: pwsh
-        run: |
-          git rm -r -q --cached .
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          git reset -q --hard HEAD
-          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Put a failure on the board
         if: ${{ needs.nightly.result != 'success' || needs.harnesses.result != 'success' || needs.bot.result != 'success' }}
