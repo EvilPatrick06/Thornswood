@@ -26549,7 +26549,7 @@
  "recipe": {
   "name": "last-plugin.recipe",
   "size": 4123579,
-  "sha256": "43822461a4ee8fc957cfa5cad46e9701226a8c2f65e0b7946e1bd6cd90cca3fa",
+  "sha256": "fd8d68fd74569e2880fd6a23a9c03e9d3a1ff61a0b7ad609a5cd01651a28d22f",
   "sources": 68,
   "records": 102784,
   "ownBytes": 2725282,
