@@ -1399,6 +1399,33 @@ if ($FromFeed) {
     }
 }
 
+# ------------------------------------------------------------ collection revision
+# The feed names records\collection-plugins.json's revision (#3597), and the
+# launcher holds Play for any install that is not on it. So what this release
+# is built from has to be on it too: this machine's Vortex, which the plugin
+# list, its order and the bodies are read from, or from the feed the last
+# release, whose plugin list goes forward. Publish-Update asks again before it
+# writes the number; asking here stops the Ship before the version moves.
+Head 'Collection revision'
+if ($FromFeed) {
+    $revFeed = $null
+    try { $revFeed = Read-SiteFeed $Channel } catch { Die ('The ' + $Channel + ' feed could not be read, so which collection revision its last release carries is not known. Nothing was built or published: ' + $_.Exception.Message) }
+    $revBuilt = 0
+    if ($null -ne $revFeed -and $revFeed.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$revFeed.collectionRevision, [ref]$revBuilt) }
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Source "the $Channel feed's last release" -Remedy 'A release from the feed carries that release''s plugin list, so it cannot move the revision: Ship from One, with Vortex on the recorded revision. Nothing was built or published.'
+} else {
+    try { $revRead = & { . (Join-Path $Here '..\mods\LoadOrder.ps1'); [pscustomobject]@{ Built = (Get-ShipCollectionRevision $Root); Slug = (Get-CollectionSlug (Get-ShipCollectionUrl $Root)) } } }
+    catch { Die ($_.Exception.Message + ' Nothing was built or published.') }
+    $revBuilt = [int]$revRead.Built
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $revBuilt -Slug $revRead.Slug -Source "this machine's Vortex" -Remedy 'Update the collection in Vortex''s Thornswood profile to the recorded revision, let it deploy, close Vortex, then Ship again. Nothing was built or published.'
+}
+if ($revWhy) { Die $revWhy }
+# And the record has to be the newest revision published on Nexus, so no
+# release is built on an old one (#4068).
+$newestWhy = Get-ShipNewestRevisionProblem -RepoDir $RepoDir
+if ($newestWhy) { Die $newestWhy }
+Say ("  collection revision {0}, the one records\collection-plugins.json names and the newest on Nexus" -f $revBuilt) 'Green'
+
 # ------------------------------------------------------------ version
 $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }

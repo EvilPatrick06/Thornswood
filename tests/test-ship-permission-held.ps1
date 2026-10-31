@@ -85,7 +85,7 @@ try {
     # files test-client-by-hash copies), loads with no holds.
     $lone = Join-Path $tmp 'lone'; $loneTools = Join-Path $lone 'scripts\release'; $loneRec = Join-Path $lone 'records'
     New-Item -ItemType Directory $loneTools, $loneRec | Out-Null
-    foreach ($f in 'Ship-Rules.ps1', 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $f)) -Destination $loneTools }
+    foreach ($f in 'Ship-Rules.ps1', 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1', 'CollectionRevision.ps1') { Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $f)) -Destination $loneTools }
     Copy-Item -LiteralPath (Join-Path $Repo 'records\ui-gone.json') -Destination $loneRec
     $n = @(& $winPs -NoProfile -ExecutionPolicy Bypass -Command "& { `$ErrorActionPreference = 'Stop'; . '$loneTools\Ship-Rules.ps1'; 'held=' + `$ShipPermissionHeld.Count }" 2>$null)
     Yes ('a copy of Ship-Rules with no list beside it loads with no holds ({0})' -f ($n -join ' ')) (@($n | Where-Object { $_ -eq 'held=0' }).Count -eq 1)

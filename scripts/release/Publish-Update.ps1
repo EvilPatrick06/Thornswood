@@ -551,9 +551,22 @@ if ($FromFeed) {
     try { $revDoc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile } catch { Die $_.Exception.Message }
     if ($revDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$revDoc.collectionRevision, [ref]$ShipCollectionRevision) }
     if ($ShipCollectionRevision -le 0) { Die "The $Channel feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+    # The last release's plugin list goes forward, so this release is on the
+    # last release's revision, and the feed may only say the recorded one
+    # (#3597): when the collection has moved, the release that carries it is a
+    # Ship from One.
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $ShipCollectionRevision -Source "the $Channel feed's last release" -Remedy 'A release from the feed carries that release''s plugin list, so it cannot move the revision: Ship from One, with Vortex on the recorded revision. Nothing was built.'
+    if ($revWhy) { Die $revWhy }
 } else {
     $ShipCollectionRevision = Get-ShipCollectionRevision $Root
+    # This machine's Vortex is what the plugin list, its order and the bodies
+    # are read from, so it has to be on the revision the feed will name (#3597).
+    $revWhy = Get-ShipCollectionRevisionProblem -RepoDir $RepoDir -Built $ShipCollectionRevision -Slug (Get-CollectionSlug (Get-ShipCollectionUrl $Root)) -Source "this machine's Vortex" -Remedy 'Update the collection in Vortex''s Thornswood profile to the recorded revision, let it deploy, close Vortex, then Ship again. Nothing was built.'
+    if ($revWhy) { Die $revWhy }
 }
+# And the record has to be the newest revision published on Nexus (#4068).
+$newestWhy = Get-ShipNewestRevisionProblem -RepoDir $RepoDir
+if ($newestWhy) { Die $newestWhy }
 Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 function Test-Machine([string]$rel) { return ((Test-ShipMachine $rel) -or (Test-ShipNotOurs $rel)) }
 
@@ -2119,12 +2132,11 @@ if (Test-Path $cfgPath) {
 
         # Which collection revision this release agrees with.
         #
-        # Read off THIS machine's Vortex install, because this machine's
-        # deployment is what the server's load order and the reference plugin
-        # list were both derived from. It is not a claim about what is newest
-        # on Nexus; it is a statement of what this release matches, and the
-        # launcher compares its own installed revision against it and says
-        # behind or ahead.
+        # The recorded one (records\collection-plugins.json, #3597), which the
+        # check at the top of this run held this release's source to: One's
+        # Vortex for a Ship from One, the last release for one from the feed.
+        # The launcher compares its own installed revision against it and says
+        # behind or ahead, and holds Play for either.
         #
         # There was no number at all before 22 September. The launcher guessed
         # from whether po3_StartOnSave.dll existed, a file Add-Characters.ps1
@@ -2133,20 +2145,12 @@ if (Test-Path $cfgPath) {
         # and skipped that script read as behind, and this machine sat on
         # revision 2 while Nexus was on 4 and nothing said a word.
         #
-        # Silence when it cannot be read, never a guess: a wrong number here
-        # tells everybody to reinstall a collection that is already right.
-        # From the feed there is no Vortex here, and the revision is the one
-        # the last release named, which only a collection Ship moves (#2754).
-        $slug = Get-CollectionSlug ([string]$cfg.CollectionUrl)
-        $rev = if ($FromFeed) { 0 } else { Get-CollectionRevision $slug }
-        if ($FromFeed) {
-            Say "  collection revision $ShipCollectionRevision, as the last release named it" 'DarkGray'
-        } elseif ($rev -gt 0) {
-            Set-Prop $doc 'collectionRevision' $rev
-            Say "  collection revision $rev (what this release was built against)" 'Green'
-        } else {
-            Say '  could not read the collection revision from Vortex, so the feed keeps what it had' 'Yellow'
-        }
+        # From then until #3597 the number written here was the one this
+        # machine's Vortex had installed, or from the feed the last release's.
+        # One stayed on revision 2 while 3, 4 and 5 were published without
+        # Vortex, so both feeds said 2 and a launcher on 2 was let in.
+        Set-Prop $doc 'collectionRevision' $ShipCollectionRevision
+        Say "  collection revision $ShipCollectionRevision (records\collection-plugins.json, what this release was built against)" 'Green'
 
         # The server password does NOT ride along, and it used to.
         #
