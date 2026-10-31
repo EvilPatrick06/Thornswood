@@ -227,9 +227,7 @@ yes('C4 the Alchemist tab says what a Blightbrewer makes with no recipes, and wh
     /Poisons, mixed at the alchemy lab/.test(text) && /Works at the Alchemy lab from Novice\./.test(text) && /a Gatherer's plants, a Hunter's parts/.test(text));
 tab('Cook').onclick();
 text = seen();
-// Since #4826 took the vanilla perks off, the Confectioner's cheapest row is
-// open on the day they pick it (Build-RecipeTable.ps1 fills the novice rung).
-yes('C4 the Cook tab names what a new Confectioner can start with, the way the recipe book does',
+yes('C4 the Cook tab names what a new Confectioner can start with, the way the recipe book does (the perks came off in #4826)',
     /Confectioner: Desserts, breads, sweets/.test(text) && /A new Novice can start with Apple Dumpling/.test(text));
 ['Enchanter', 'Tailor', 'Woodworker'].forEach(function (p) { tab(p).onclick(); seen(); });
 yes('C5 nothing on any tab was sent to the server or said in the chat', sentPage.filter(function (x) { return /pick/.test(x); }).length === 0 && saidLines.length === 0);

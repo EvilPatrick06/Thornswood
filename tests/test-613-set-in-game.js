@@ -236,12 +236,14 @@ yes('F1 the policy carries no record of a plugin it never copies from (Patrick, 
 const heldByServer = ((manifest.floorItems || {}).heldByServer || []).concat((manifest.refs || {}).heldByServer || []).sort();
 yes('F2 HELD_BY_SERVER is the manifest\'s floor items and cut actors held by the server (' + heldByServer.length + ')',
     Array.isArray(box.F) && JSON.stringify(box.F) === JSON.stringify(heldByServer));
-// A never-copied plugin is a master only when its row copies its perk recipes
-// (perkRecipesCopied: Patrick, 31 Oct 2026, A on q-4826-ia-perk-recipes, #4826),
-// because those copies are its records with only the perk tests taken out.
-yes('F3 Thornswood-Last.esp has no never-copied plugin as a master, but one whose perk recipes it copies',
+// A never-copied plugin is a master only when its row copies its perk
+// recipes (perkRecipesCopied, Patrick's A on q-4826-ia-perk-recipes) and the
+// manifest counts those copies.
+yes('F3 Thornswood-Last.esp has a never-copied plugin as a master only for the perk recipes its row lets it copy',
     (manifest.masters || []).every(function (m) {
-      return !never.some(function (r) { return r.plugin.toLowerCase() === m.toLowerCase() && r.perkRecipesCopied !== true; });
+      const row = never.filter(function (r) { return r.plugin.toLowerCase() === m.toLowerCase(); })[0];
+      return !row || (row.perkRecipesCopied === true &&
+        (((manifest.perks || {}).copiedFromNeverCopied || {})[row.plugin] || 0) > 0);
     }));
 {
   const fs2 = server();

@@ -162,12 +162,17 @@ One paragraph per class, naming the files it writes. Profile is
 `<Root>\Profile`; Game is `<Root>\Game`.
 
 **Shell** (Shell.cs, Pages.cs, ShellOwnGame.cs, ShellSteamUpdates.cs,
-ShellUninstall.cs, ShellProgress.cs, ShellNews.cs, ShellPacks.cs, ShellScanFix.cs, Waiting.cs, Stall.cs). The window and every flag that
+ShellUninstall.cs, ShellProgress.cs, ShellNews.cs, ShellPacks.cs, ShellScanFix.cs, ShellVortexWatch.cs, Waiting.cs, Stall.cs). The window and every flag that
 decides the Play button: `playing`, `updatePending`, `updateAnswered`, `checkFailed`,
 `collectionBarUp`, `ownGameBusy`, `doorCheckOut`, `feedNotice` (the last
 answer FeedNotice gave), and `chosenId`, the character picked at the game's
 menu this session. Writes `Profile\launcher.log` through Log and
 `Profile\played.flag` at each Play.
+While the collection card or the not-confirmed note is up, the two second
+tick lists Vortex's state.v2 files and the plugin list (ShellVortexWatch.cs,
+#5136); when they change it reads the revision again off the UI thread,
+draws the card again, and asks the feed again once the card comes down, so
+an update finished in Vortex is picked up with nothing pressed.
 
 **Paths** (Paths.cs). Every path the launcher uses, worked out once in
 `Paths.cs:71 Init()` from where the exe is. `Collection` says which shape the

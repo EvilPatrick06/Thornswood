@@ -288,11 +288,31 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     # No proof is not proof of the opposite. A note whose release this clone
     # has no tag for, or whose release was built with uncommitted files and
     # is not settled yet, keeps the mark it was last given.
+    #
+    # A sourceCommit this clone does not hold proves nothing either, and is
+    # judged the same way, by its release's tag. The #3684 history rewrite of
+    # 31 Oct 2026 gave every commit on main a new id and moved the release
+    # tags with them, but the notes already in the dev feed kept the old ids.
+    # Each read as a commit main lacked, so after main 20261031-144725, which
+    # carried all of them, 12 of the 17 notes stayed DEV (#5133). Asked of
+    # git once for every note: which of the ids are commits here.
     $devTags = $null
     $marked = 0
+    $named = @(@($news) | ForEach-Object { Get-DevNewsVal $_ 'sourceCommit' } | Where-Object { $_ -match '^[0-9a-f]{40}$' } | Select-Object -Unique)
+    $held = New-Object 'System.Collections.Generic.HashSet[string]'
+    if ($named.Count) {
+        $hadCode = Test-Path -LiteralPath 'variable:global:LASTEXITCODE'
+        $was = if ($hadCode) { $global:LASTEXITCODE } else { 0 }
+        try { $g = Invoke-ReleaseGit $sourceRepo (@('log', '--no-walk=unsorted', '--ignore-missing', '--format=%H') + $named) }
+        finally {
+            if ($hadCode) { $global:LASTEXITCODE = $was }
+            else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+        }
+        if ($g.Code -eq 0) { foreach ($l in @($g.Lines)) { [void]$held.Add(([string]$l).Trim()) } }
+    }
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
-        if ($commit) { $published = Is-Published $commit }
+        if ($commit -and $held.Contains($commit)) { $published = Is-Published $commit }
         else {
             if ($null -eq $devTags) { $devTags = @(Get-DevReleaseTags $sourceRepo) }
             $rel = Find-DevNoteRelease $devTags (Get-DevNewsVal $n 'date')
