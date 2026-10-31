@@ -20,6 +20,7 @@
       as the latest; run again, nothing changes;
     - a site file that is not its sha256: exit 1, the Release left a draft;
     - a published Release missing a file: exit 1, nothing uploaded;
+    - a Release of more than 100 files: every page of its files is read;
     - a tag from before #3686, which names no files: the live split feed is
       read when it still names that release, and refused when it does not.
 
@@ -64,9 +65,11 @@ function Invoke-GitHub([string]$Method, [string]$Uri, $Body = $null, [string]$In
             $t = @($F.tags | Where-Object { $_.obj -eq $Matches[1] })[0]
             return [pscustomobject]@{ message = $t.message }
         }
+        # Pages of 100, each handed back as one object, the way
+        # Invoke-RestMethod hands back a JSON array.
         if ($Method -eq 'GET' -and $path -match '^/releases\?per_page=100&page=(\d+)$') {
-            if ([int]$Matches[1] -gt 1) { return ,@() }
-            return ,@($F.releases | ForEach-Object { [pscustomobject]@{ id = $_.id; tag_name = $_.tag_name; draft = $_.draft } })
+            $skip = 100 * ([int]$Matches[1] - 1)
+            return ,@($F.releases | Select-Object -Skip $skip -First 100 | ForEach-Object { [pscustomobject]@{ id = $_.id; tag_name = $_.tag_name; draft = $_.draft } })
         }
         if ($Method -eq 'POST' -and $path -eq '/releases') {
             $r = [pscustomobject]@{ id = 100 + @($F.releases).Count; tag_name = $Body.tag_name; draft = $Body.draft; prerelease = $Body.prerelease; make_latest = ''; assets = @() }
@@ -74,10 +77,10 @@ function Invoke-GitHub([string]$Method, [string]$Uri, $Body = $null, [string]$In
             return [pscustomobject]@{ id = $r.id; tag_name = $r.tag_name; draft = $r.draft }
         }
         if ($Method -eq 'GET' -and $path -match '^/releases/(\d+)/assets\?per_page=100&page=(\d+)$') {
-            if ([int]$Matches[2] -gt 1) { return ,@() }
+            $skip = 100 * ([int]$Matches[2] - 1)
             $id = [int]$Matches[1]
             $r = @($F.releases | Where-Object { $_.id -eq $id })[0]
-            return ,@($r.assets)
+            return ,@(@($r.assets) | Select-Object -Skip $skip -First 100)
         }
         if ($Method -eq 'POST' -and $path -match '^/releases/(\d+)/assets\?name=(.+)$') {
             $id = [int]$Matches[1]; $name = [uri]::UnescapeDataString($Matches[2])
@@ -201,6 +204,19 @@ function Get-SiteJson([string]$Uri) { return Get-Content -Raw -LiteralPath (Join
     $r = Run $tagNew
     $g = Get-Fake
     Yes 'run again once the site is right: the same draft is filled and published' ($r.Code -eq 0 -and @($g.releases).Count -eq 1 -and $g.releases[0].draft -eq $false -and @($g.releases[0].assets).Count -eq 6)
+
+    # ---- more than 100 files: every page of them is read ----------------------
+    # A draft already holding 150 other files puts this release's own past
+    # the first page, as the dev release's 253 were (#3686).
+    $many = [ordered]@{} + $base
+    $many.releases = @([ordered]@{ id = 100; tag_name = $tagNew; draft = $true; prerelease = $false; make_latest = ''; assets = @(
+        1..150 | ForEach-Object { [ordered]@{ id = 9000 + $_; name = ('other-{0:d3}' -f $_); state = 'uploaded'; size = 1; digest = 'sha256:' + ('0' * 64) } }) })
+    Set-Fake $many
+    $r = Run $tagNew
+    $g = Get-Fake
+    Yes 'a draft of more than 100 files is read page by page, filled and published' ($r.Code -eq 0 -and $r.Out -match 'PUBLISHED' -and $g.releases[0].draft -eq $false -and @($g.releases[0].assets).Count -eq 156)
+    $r = Run $tagNew
+    Yes '  and run again, the published Release is read to its last page and holds all' ($r.Code -eq 0 -and $r.Out -match 'ALREADY')
 
     # ---- a tag from before #3686 ----------------------------------------------
     $tagOld = 'release/dev/20261025-230853-dev'

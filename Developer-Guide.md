@@ -1375,7 +1375,8 @@ The short form of the rules. The same decisions, with the dates they were made, 
   the fix's Launcher builds is green. Once it is live, its commit is kept as a tag, `live-<version>`,
   and the branch is deleted, so no hotfix branch sits on GitHub: the next
   hotfix starts with `git checkout -b hotfix/<name> live-<version>` from the
-  tag of the release that is live. 1.1.94 is `live-1.1.94` (25 Sep).
+  tag of the release that is live. None is kept today: `live-1.1.94` (25 Sep)
+  shared no history with main and was deleted on 31 Oct (#4177).
 - Nobody pushes to main any more, Patrick included. Everything goes through a
   pull request. This replaces the 18 Sep decision that his own work went
   straight to main. GitHub refuses a push to main from write access. It does
@@ -1940,7 +1941,7 @@ above still applies, Ship refuses a hotfix branch that is not on GitHub, and
 the dev feed is left alone. The fix also goes to main through its own pull
 request, or the next main release loses it. Once live, the hotfix's commit
 is tagged `live-<version>` and the branch deleted; the next hotfix starts
-from that tag (`git checkout -b hotfix/<name> live-1.1.94` today).
+from that tag (`git checkout -b hotfix/<name> live-<version>`).
 
 Everything else, and which one each change needs, is the list under "After a
 pull request is merged" below: `Deploy-Server.ps1` pushes a server
