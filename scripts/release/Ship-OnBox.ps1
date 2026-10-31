@@ -73,6 +73,36 @@ if ($Channel -eq 'main') {
     if ($LASTEXITCODE -ne 0) { Die ('the checkout could not be put on main at origin/main: ' + ($o -join ' ') + ' Nothing was published.') }
 }
 
+# MAIN'S HISTORY AND THE RELEASE TAGS (#5133). The gate's checkout is one
+# commit of main with no tags (GateBroker.ps1, Update-Checkout), and Ship
+# reads history in two places: the dev feed's DEV marks (Dev-News.ps1) prove
+# a note's commit is in main's release through git and the release/dev tags,
+# and with neither every note keeps its mark (31 Oct 2026: after main
+# 20261031-144725 all 16 dev notes stayed DEV, the journal crash fix main
+# carried among them); and Close-ShippedIssues.ps1 stops on a shallow
+# checkout. So the Ship deepens the checkout to the whole of main and its
+# tags first. The gate's next fetch makes it one commit deep again, so every
+# Ship asks. origin/main is put back where the gate checked it, so a merge
+# landing meanwhile is not taken: the Ship is of the commit the gate read.
+$was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+$head = (@(& git -C $repo rev-parse HEAD 2>&1 | ForEach-Object { "$_" }) -join '').Trim()
+$shallow = (@(& git -C $repo rev-parse --is-shallow-repository 2>&1 | ForEach-Object { "$_" }) -join '').Trim()
+$o = @()
+$deep = 0
+if ($head -notmatch '^[0-9a-f]{40}$') { $deep = 1; $o = @('HEAD did not read as a commit: ' + $head) }
+else {
+    $words = @('-C', $repo, 'fetch', '--quiet', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main')
+    if ($shallow -eq 'true') { $words = @('-C', $repo, 'fetch', '--quiet', '--unshallow', '--tags', 'origin', '+refs/heads/main:refs/remotes/origin/main') }
+    $o = @(& git @words 2>&1 | ForEach-Object { "$_" })
+    $deep = $LASTEXITCODE
+    if ($deep -eq 0) {
+        $o = @(& git -C $repo update-ref refs/remotes/origin/main $head 2>&1 | ForEach-Object { "$_" })
+        $deep = $LASTEXITCODE
+    }
+}
+$ErrorActionPreference = $was
+if ($deep -ne 0) { Die ('main''s history and the release tags could not be fetched, and without them the DEV marks and the shipped issues cannot be worked out: ' + ($o -join ' ') + ' Nothing was published.') }
+
 . (Join-Path $repo 'scripts\vps\admin\ShipAccess.ps1')
 try { $token = Get-ThornswoodShipAccess -Repo $repo -AdminState $AdminState }
 catch { Die ('the box admin App gave no token for the Ship: ' + $_.Exception.Message + ' Nothing was published.') }
