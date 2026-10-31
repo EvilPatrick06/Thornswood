@@ -23,6 +23,15 @@
       .\scripts\deploy\Install-AdminService.ps1 -Forget   drop the App's key, for a new App
       .\scripts\deploy\Install-AdminService.ps1 -Remove   take it off again
 
+  From a cloud thread, which has no ssh, the deploy gate runs the first and
+  -Status with main's script (scripts\vps\gate\verbs.json):
+
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Install-AdminService'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Install-AdminService -Status'
+
+  -Setup, -Forget and -Remove are not gate verbs: they change who holds the
+  App, which stays with a person at One.
+
   THE APP (once, by whoever owns the repository). -Setup writes
   state\setup.json, a state nobody can guess that lives an hour, and prints
   https://thornswood.net/github-app/setup?state=<it>. Caddy carries
