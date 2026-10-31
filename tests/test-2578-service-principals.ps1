@@ -208,7 +208,9 @@ if ($OnWindows) {
         $null = & icacls $hidden /remove:g ('*' + $me)
         try {
             $why = @(Test-ThornswoodServiceCannotReach @((Join-Path $hidden 'private')))
-            Yes ('the fail-safe refuses a path it may not look for, rather than passing it over (' + ($why -join ' | ') + ')') (
+            $saw = try { 'Test-Path says ' + (Test-Path -LiteralPath (Join-Path $hidden 'private') -ErrorAction Stop) } catch { 'Test-Path throws' }
+            $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+            Yes ('the fail-safe refuses a path it may not look for, rather than passing it over (' + ($why -join ' | ') + '; ' + $saw + ', elevated ' + $admin + ')') (
                 $why.Count -eq 1 -and $why[0] -match 'could not be checked')
         } finally { $null = & icacls $hidden /grant ('*' + $me + ':(OI)(CI)F') }
 
