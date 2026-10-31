@@ -346,6 +346,19 @@ try {
     Yes '  and against a main before its release the one with no mark gains DEV, by the tag, as with its own id' (
         $ch11['The launcher gets ready in seconds'] -eq 'dev' -and $r11.Marked -eq 6)
 
+    # The same when the commit is in the clone's object store but no branch or
+    # tag reaches it, as the gate's checkout on the box keeps the old main tips
+    # it fetched one commit deep before the rewrite: the first dev Ship with
+    # the rule above, 20261031-155402-dev, still left 13 of 18 notes marked.
+    $loose = (G commit-tree ((G rev-parse 'HEAD^{tree}')[0].Trim()) -m 'an old main tip no ref reaches')[0].Trim()
+    $dev12 = Feed
+    foreach ($n in @($dev12.news)) {
+        if ($n.title -eq 'The launcher gets ready in seconds') { $n.sourceCommit = $loose; $n.channel = 'dev' }
+    }
+    $r12 = Set-DevFeedMarks $dev12 $mainFeed $git
+    Yes ("  and one the clone holds that no branch or tag reaches is judged by the tag too, and clears ({0} marked)" -f $r12.Marked) (
+        @($r12.Cleared) -contains 'The launcher gets ready in seconds' -and $r12.Marked -eq 4)
+
     # A clone with no tags proves nothing about the old notes: they keep their marks.
     $made = G tag -l 'release/dev/*'
     [void](G tag -d @made)
