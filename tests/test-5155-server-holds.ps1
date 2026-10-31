@@ -225,6 +225,23 @@ try {
     foreach ($n in 'Thornswood Server', 'Thornswood Dev Server', 'Thornswood Voice', 'Thornswood Dev Voice', 'Thornswood Docs', 'Thornswood Web', 'Thornswood Bridge', 'ThornswoodBot') {
         Yes "  and $n is one the watchdog checks by that name" ($wt -match ("(Task|Svc) = '" + [regex]::Escape($n) + "'"))
     }
+    # ---- from the cloud, through the gate ----------------------------------------
+    # Nothing goes to One (Patrick, 31 Oct): the watcher's install and a hold by
+    # hand run as gate verbs, Box-Run.ps1 -Line 'Watch-Services -Install' and
+    # -Line 'Hold-Server -Service dev -Why ...', from main as it is on GitHub.
+    $verbs = (Text (P 'scripts', 'vps', 'gate', 'verbs.json') | ConvertFrom-Json).verbs
+    $wv = $verbs.'Watch-Services'; $hv = $verbs.'Hold-Server'
+    Yes 'the gate has a Watch-Services verb: the report, or -Install, and nothing else' (
+        $wv -and $wv.script -eq 'scripts/vps/Watch-Services.ps1' -and @($wv.fixed) -contains '-NoPause' -and
+        @($wv.params.PSObject.Properties.Name) -join ',' -eq 'Install' -and $wv.params.Install -eq 'switch')
+    $set = [regex]::Match($hs, "ValidateSet\(([^)]*)\)").Groups[1].Value
+    $names = @([regex]::Matches($set, "'([a-z]+)'") | ForEach-Object { $_.Groups[1].Value })
+    Yes ('the gate has a Hold-Server verb whose servers are exactly Hold-Server''s (' + ($names -join ', ') + ')') (
+        $hv -and $hv.script -eq 'scripts/vps/Hold-Server.ps1' -and @($hv.fixed) -contains '-NoPause' -and $names.Count -eq 10 -and
+        $hv.params.Service -eq ('^(' + ($names -join '|') + ')$') -and $hv.params.Why -eq 'text' -and
+        $hv.params.Clear -eq 'switch' -and $hv.params.List -eq 'switch' -and $hv.params.Minutes -eq '^[0-9]{1,3}$')
+    $wsText = Text $watchPath
+    Yes '  and an install through the gate that fails exits 1, so Box-Run says so' ($wsText.Contains("if (`"`$l`" -match '^FAILED') { `$c = 'Red'; `$failed = `$true }") -and $wsText.Contains('if ($failed) { exit 1 }'))
 }
 catch {
     Yes ('the harness ran to the end: ' + $_.Exception.Message + ' at ' + $_.InvocationInfo.PositionMessage) $false

@@ -9,6 +9,8 @@
       pwsh scripts/vps/Box-Run.ps1 -Line 'Get-Logs -Dev -Lines 2000'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Rebuild-ContentTables -Server dev'
       pwsh scripts/vps/Box-Run.ps1 -Line 'Deploy-Server -GamemodeOnly -Build <main's full commit>'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Watch-Services -Install'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -Service dev -Why "swapping the ledger" -Minutes 45'
       pwsh scripts/vps/Box-Run.ps1 -Line 'ping'
       pwsh scripts/vps/Box-Run.ps1 -Run 1234567890     read an earlier run again
 

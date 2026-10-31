@@ -1227,9 +1227,12 @@ if (Test-Path '$Root\alerts-webhook.txt') {
 } else { 'webhook   none yet. Messages wait for the bot until -SetWebhook is run' }
 "@
 
+  # A FAILED line, or nothing back, is exit 1, so a run through the gate
+  # (Box-Run.ps1 -Line 'Watch-Services -Install') says it did not work (#5155).
+  $failed = -not @($out).Count
   foreach ($l in $out) {
     $c = 'Gray'
-    if ("$l" -match '^FAILED') { $c = 'Red' }
+    if ("$l" -match '^FAILED') { $c = 'Red'; $failed = $true }
     if ("$l" -match '^(wrote|made)') { $c = 'Green' }
     Say "  $l" $c
   }
@@ -1241,6 +1244,7 @@ if (Test-Path '$Root\alerts-webhook.txt') {
   Say '  Run this script with no switches to see what it has been doing.' 'DarkGray'
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  if ($failed) { exit 1 }
   exit 0
 }
 

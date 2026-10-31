@@ -13,6 +13,14 @@
   Reset-Character, Wipe-Saves) write and take away their own hold; this is
   the same hold, ServerHold.ps1, for everything else.
 
+  From a cloud thread, which has no key to the box, the same through the
+  deploy gate (it runs this script of main on the box; the why is held to the
+  gate's text rule, so letters, digits and . , : ; ' ( ) ! ? _ + - only):
+
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -Service game -Why "swapping the merchant ledger"'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -Service game -Clear'
+      pwsh scripts/vps/Box-Run.ps1 -Line 'Hold-Server -List'
+
   A hold says who, why and until when: 30 minutes unless -Minutes says, 2
   hours at most. While it runs the watchdog (Watch-Services.ps1, every five
   minutes) neither starts that server nor tells anybody it is down. When it
