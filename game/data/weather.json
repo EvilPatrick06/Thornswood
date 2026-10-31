@@ -1,7 +1,7 @@
 {
   "builtBy": "scripts\\dev\\Build-WeatherTable.js",
-  "builtAt": "2026-10-30T20:48:06.864Z",
-  "source": "the WTHR records of 103 plugins in load order",
+  "builtAt": "2026-10-31T02:18:46.438Z",
+  "source": "the WTHR records of 106 plugins in load order",
   "readFrom": "DATA byte 0 for the wind speed, DATA byte 11 for the classification flags, and s for a rainy or snowy weather whose editor id names it a storm",
   "note": "what a wind is WORTH is balance and lives in NEEDS.weather in gamemode.js",
   "canary": "SkyrimStormSnow at 150",

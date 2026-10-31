@@ -14,7 +14,7 @@ An item in this file is not found in the world and not made at a public bench. T
 | embassy | Not found in Skyrim. The embassy roll may craft it. |
 | thalmor | Not found. Someone on the Thalmor remnant roll may craft it. |
 
-Counts in this file: cut 3319, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 595.
+Counts in this file: cut 3417, embassy 19, thalmor 10. Rows this pass left in the open book, or on a lock that is not a cut: 595.
 
 The rules below sorted the recipe table once, before anything was cut. The recipe build (`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.
 
@@ -74,12 +74,15 @@ Race locked, and company wares. Not cut.
 
 Not found on a body, in a chest, or at a public forge. The embassy roll is who may make them.
 
-15 references.
+19 references.
 
 | Item | Id | Half | Why |
 | --- | --- | --- | --- |
+| Imperial Armor | `14e:cheddars_mashups.esl` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
+| Imperial Battlelord Hood | `14f:cheddars_mashups.esl` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Boots | `dc9f5:Skyrim.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Bracers | `dc9f7:Skyrim.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
+| Imperial Cleric Armor | `e:cheddars_mashups.esl` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Heavy Shield | `dc9f9:Skyrim.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Helmet | `dc9f8:Skyrim.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Knight Cape | `6aa09:Hothtrooper44_ArmorCompilation.esp` | Liverywright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
@@ -88,6 +91,7 @@ Not found on a body, in a chest, or at a public forge. The embassy roll is who m
 | Imperial Light Bracers | `9d1:Update.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Light Helmet | `9d2:Update.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Light Shield | `9d3:Update.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
+| Imperial Priest Armor | `6f:cheddars_mashups.esl` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Imperial Soldier's Armor | `dc9f6:Skyrim.esm` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Penitus Oculatus Armor | `8d1:MoreCraftableEquipment.esp` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
 | Penitus Oculatus Boots | `8d0:MoreCraftableEquipment.esp` | Platewright | Empire gear. Not found in Skyrim. Only the embassy roll may craft it. |
@@ -98,7 +102,7 @@ Not found on a body, in a chest, or at a public forge. The embassy roll is who m
 
 Not found. A person on the remnant roll may make them. Wearing them is still the hostile marker.
 
-9 references.
+10 references.
 
 | Item | Id | Half | Why |
 | --- | --- | --- | --- |
@@ -110,16 +114,18 @@ Not found. A person on the remnant roll may make them. Wearing them is still the
 | Thalmor Boots | `9ca:MoreCraftableEquipment.esp` | Haberdasher | Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it. |
 | Thalmor Gloves | `9cb:MoreCraftableEquipment.esp` | Haberdasher | Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it. |
 | Thalmor Hood | `9cc:MoreCraftableEquipment.esp` | Haberdasher | Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it. |
+| Thalmor Plate | `bd:cheddars_mashups.esl` | Haberdasher | Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it. |
 | Thalmor Robes | `9cd:MoreCraftableEquipment.esp` | Liverywright | Thalmor or Justiciar. Not found in the world. Only someone on the remnant roll may craft it. |
 
 ## Cut
 
 Not found and not made. Held here so the reference can come back.
 
-3319 references.
+3417 references.
 
 | Item | Id | Half | Why |
 | --- | --- | --- | --- |
+| Wamsu Bone Armor | `8a:cheddars_mashups.esl` | Platewright | Asks for Dragon Bone, which this file cuts, so nobody could make it. Not found and not made. The reference stays here so it can come back for an event. |
 | Dragon Bone | `2731d:Immersive Weapons.esp` |  | Dragon or Daedric material. Not smelted. Not found and not made. |
 | Dragon Bone | `2731e:Immersive Weapons.esp` |  | Dragon or Daedric material. Not smelted. Not found and not made. |
 | Dragon Bone | `2731f:Immersive Weapons.esp` |  | Dragon or Daedric material. Not smelted. Not found and not made. |
@@ -1647,20 +1653,24 @@ Not found and not made. Held here so the reference can come back.
 | Alik'r Crown Scimitar | `940d85:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Alik'r Hat | `813:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Alik'r Hat(No Hood) | `85e:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Alik'r Knight | `bf:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Alik'r Nomad Robes | `947:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Alik'r Nomad Turban | `949:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Alik'r Red Nomad Robes | `948:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Alik'r Red Nomad Turban | `94a:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Alik'r Warrior Garb | `54:cheddars_mashups.esl` | Haberdasher | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Alinor Saber | `942332:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | An-Xileel War Bow | `d65:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Falmer Boots | `11cda:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Falmer Cuirass | `11cdc:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Falmer Gauntlets | `11f0f:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Ancient Falmer Robes | `c6:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Armor | `1731c:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Battleaxe | `1082c5:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Boots | `1731b:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Bow | `108cff:Skyrim.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Gauntlets | `1731d:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Ancient Nord Gauntlets | `be:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Greatsword | `1082c7:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Helmet | `1731e:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ancient Nord Sword | `1082c9:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -1690,6 +1700,9 @@ Not found and not made. Held here so the reference can come back.
 | Armored Fur Mantle | `48e1:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Armored Fur Mantle - Black | `48e2:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Armored Fur Mantle - White | `48e3:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Armored Noble | `12:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Armored Noble | `b4:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Armored Telvanni Robes | `19b:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Armsman's Sword | `285c:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Arrow-Scale Armor | `93a:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Askia Armor | `879:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -1697,6 +1710,7 @@ Not found and not made. Held here so the reference can come back.
 | Askia Boots | `876:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Askia Greatsaber | `877:YokuWeapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Askia Helmet | `878:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Aspiring Adventurer Garb | `15:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Assassin Sword | `216d3:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Asuma Trench Knife | `216d5:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Auriel's Bow | `17e9f:Dawnguard.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -1742,6 +1756,8 @@ Not found and not made. Held here so the reference can come back.
 | Blades Boots | `10faff:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Blades Gauntlets | `10fb01:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Blades Helmet | `10fb02:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Blades Priest Armor | `58:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Blades Remnant Armor | `b:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Blades Shield | `10fb03:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Blades Sword | `173bb:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Bloodscythe | `3aa99:Dragonborn.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -1857,10 +1873,13 @@ Not found and not made. Held here so the reference can come back.
 | Dawnbreaker | `108ffc:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnbreaker | `16ab2:ZIA_Complete Pack.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnbreaker | `478da:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Alik'r Armor | `45:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Armor | `17eb7:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Armor | `17eb8:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Armor | `17eb9:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Boots | `17eba:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Casual Armor | `198:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Executioner Armor | `17:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Full Helmet | `13e02:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Gauntlets | `17ebb:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Heavy Armor | `17eb5:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -1868,9 +1887,18 @@ Not found and not made. Held here so the reference can come back.
 | Dawnguard Heavy Boots | `14cc9:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Heavy Gauntlets | `14cc8:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Helmet | `13e03:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Hooded Helmet | `b8:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Hooded Helmet | `b9:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Hooded Helmet | `ba:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Hooded Helmet | `bb:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Horned Helmet | `1a6:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Hunter Armor | `1a2:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Priest Hood | `162:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Priest Robe | `82:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Rune Axe | `17eb3:Dawnguard.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Rune Hammer | `17eb4:Dawnguard.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Rune Shield | `17ec1:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Dawnguard Scholar Armor | `18:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Shield | `17ebc:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard War Axe | `17eb1:Dawnguard.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Dawnguard Warhammer | `17eb2:Dawnguard.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2101,8 +2129,12 @@ Not found and not made. Held here so the reference can come back.
 | Falkreath Guard's Helmet | `10fb10:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Falkreath Guard's Shield | `10fb19:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Falkreath Helmet | `dd3:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Falkreath Ranger Helmet | `135:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Falkreath Shield | `dd4:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Falkreath Warhammer | `e00:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Fallen Companion Armor | `4d:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Fallen Companion Boots | `4c:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Fallen Companion Gauntlets | `4e:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Falmer Armor | `1730e:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Falmer Boots | `172e7:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Falmer Bow | `108d03:Skyrim.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2126,7 +2158,9 @@ Not found and not made. Held here so the reference can come back.
 | Forebears' Saber | `816:YokuWeapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Fork of Horripilation | `88182d:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Forsworn Armor | `10948c:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Forsworn Armor | `a:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Forsworn Axe | `109489:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Forsworn Bonemold | `6c:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Forsworn Boots | `10948d:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Forsworn Bow | `10948a:Skyrim.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Forsworn Gauntlets | `10948e:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2190,6 +2224,7 @@ Not found and not made. Held here so the reference can come back.
 | Glass Sword | `f46b5:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Glass War Axe | `f46b6:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Glass Warhammer | `f46b7:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Gloved Hide Bracers | `15f:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Gloves of the Pugilist | `10a06e:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Goldbrand | `6bf2:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Gray-Scale Armor | `92d:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2417,6 +2452,7 @@ Not found and not made. Held here so the reference can come back.
 | Highwayman Mail | `23282:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Hjaalmarch Guard's Armor | `10fb09:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Hjaalmarch Guard's Helmet | `10fb12:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Hjaalmarch Guard's Helmet | `133:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Hjaalmarch Guard's Shield | `10fb1a:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Hlardfen | `f21c:ZIA_Complete Pack.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Hollow Blade | `216e2:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2433,6 +2469,8 @@ Not found and not made. Held here so the reference can come back.
 | Honed Silver War Axe | `b74719:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Honed Steel Nordic Spear | `3abce:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Honorblade of Whiterun | `40ea1:SkyrimSewers.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Hooded Steel Helmet | `12b:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Hooded Steel Helmet | `12d:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Horksbane | `3a9e3:Dragonborn.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Hot Blood | `22c8c:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Housecarl's Greatsword | `216e9:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2442,6 +2480,8 @@ Not found and not made. Held here so the reference can come back.
 | Hunting Bow | `10e448:Skyrim.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ice Blade of the Monarch | `272f5:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Icebreaker | `947c:ZIA_Complete Pack.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Imperial Armor | `150:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Imperial Battlelord Hood | `151:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Boots | `eb7ec:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Bow | `108d05:Skyrim.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Bracer | `5938:DIS_Heavy_Legion.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2450,6 +2490,7 @@ Not found and not made. Held here so the reference can come back.
 | Imperial Captain's Helmet | `10e86f:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Chainmail | `186f:DIS_Heavy_Legion.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Chainmail | `908:MoreCraftableEquipment.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Imperial Cleric Armor | `d:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Ebony Sword | `b7470b:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial General's  Bracers | `1879:DIS_Heavy_Legion.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial General's Armor | `1878:DIS_Heavy_Legion.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2470,6 +2511,7 @@ Not found and not made. Held here so the reference can come back.
 | Imperial Light Bracers | `10e872:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Light Helmet | `10e873:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Light Shield | `10e874:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Imperial Priest Armor | `6e:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Soldier's Armor | `eb7ee:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Imperial Sword | `1082c4:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Improved Bonemold Armor | `3ab2e:Dragonborn.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2485,6 +2527,7 @@ Not found and not made. Held here so the reference can come back.
 | Iron Cutlass | `b7472c:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Iron Dagger | `adb7e:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Iron Double Axe | `44101f:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Iron Fur Gauntlets | `86:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Iron Gauntlets | `adb92:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Iron Greatsword | `adb7f:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Iron Helmet | `adb93:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2727,6 +2770,7 @@ Not found and not made. Held here so the reference can come back.
 | Markarth Guard's Armor | `10fb0a:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Markarth Guard's Helmet | `10fb14:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Markarth Guard's Shield | `10fb1b:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Markarth Ranger Helmet | `134:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Masque of Clavicus Vile | `30fde:ZIA_Complete Pack.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Masque of Clavicus Vile | `335a7:ZIA_Complete Pack.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Masque of Clavicus Vile | `37655:ZIA_Complete Pack.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2792,11 +2836,13 @@ Not found and not made. Held here so the reference can come back.
 | Noble Claymore | `96101e:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Noble Sword | `96101f:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Heavy Spectacle Helmet | `3ee0:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Nord Hero Armor | `193:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Hero Axestaff | `394e:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Hero Battleaxe | `e49:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Hero Bow | `e4a:Skyrim.esm` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Hero Double Axe | `441027:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Hero Greatsword | `e4b:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Nord Hero Helmet | `192:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Hero Sword | `e4c:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Hero War Axe | `e4d:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Nord Light Spectacle Helmet | `3ee2:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2850,6 +2896,10 @@ Not found and not made. Held here so the reference can come back.
 | Orcish Buckler | `21488:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Orcish Crippler Spear | `2858:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Orcish Dagger | `f46a4:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Orcish Executor Armor | `1ad:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Orcish Executor Boots | `1ae:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Orcish Executor Gloves | `1ac:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Orcish Executor Helmet | `c1:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Orcish Gauntlets | `eb7fb:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Orcish Greatsword | `f46a5:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Orcish Helmet | `eb800:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2923,6 +2973,7 @@ Not found and not made. Held here so the reference can come back.
 | Pale Guard's Armor | `10fb0d:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Pale Guard's Helmet | `10fb13:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Pale Guard's Shield | `10fb1c:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Pale Ranger Helmet | `136:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | PenUmbra | `977d65:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Penitus Oculatus Armor | `10fb05:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Penitus Oculatus Boots | `10fb04:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -2931,6 +2982,7 @@ Not found and not made. Held here so the reference can come back.
 | Penitus Oculatus Shield | `1872:DIS_Heavy_Legion.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Penitus Oculatus Sword | `12fe:DIS_Heavy_Legion.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Phoenix Ninjato | `79d65:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Plated Jarl Robe | `b5:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Poacher's Axe | `109418:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Pokeblade | `216ef:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Predator's Grace | `1090f0:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3067,6 +3119,7 @@ Not found and not made. Held here so the reference can come back.
 | Riften Guard's Armor | `10fb0b:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Riften Guard's Helmet | `10fb15:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Riften Guard's Shield | `10fb1d:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Riften Ranger Helmet | `132:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ringmail Armor | `2333b:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ringmail Boots | `2333a:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ringmail Bracers | `2333c:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3077,6 +3130,33 @@ Not found and not made. Held here so the reference can come back.
 | Ritual Helm of Boethiah | `21f9b:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Robed Iron Armor | `33b7:CommonClothes.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Robed Iron Armor | `33b8:CommonClothes.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `c7:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d1:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d2:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d3:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d4:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d5:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d6:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d7:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Iron Armor | `d8:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `187:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `188:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `189:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `18a:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `18b:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `18c:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `18d:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `18e:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Plate Armor | `18f:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `b0:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `c9:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `ca:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `cb:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `cc:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `cd:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `ce:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `cf:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Robed Steel Armor | `d0:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Ruby Gemstone Bow | `2acf:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Rueful Axe | `478eb:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Sapphire Gemstone Bow | `2acd:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3085,6 +3165,9 @@ Not found and not made. Held here so the reference can come back.
 | Scaled Boots | `eb836:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Scaled Bracers | `eb84c:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Scaled Helmet | `eb851:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Scaled Iron | `b2:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Scholar of Stendarr | `14:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Scholar of Stendarr Gauntlets | `2f:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Scimitar | `10fdf6:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Seadog Armor | `286e:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Seadog Boots | `286f:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3152,7 +3235,11 @@ Not found and not made. Held here so the reference can come back.
 | Soldier's Broadsword | `48bd:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Solitude Guard's Armor | `10fb0c:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Solitude Guard's Helmet | `10fb11:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Solitude Guard's Helmet | `131:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Solitude Guard's Shield | `10fb1e:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Son of Skyrim Curiass | `69:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Son of Skyrim boots | `65:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Son of Skyrim gauntlets | `64:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Sorrow Daito | `1d9b:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Sorrow Katana | `6bf5:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Sorrow Tanto | `4363:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3187,6 +3274,7 @@ Not found and not made. Held here so the reference can come back.
 | Stalhrim Sword | `3a9ca:Dragonborn.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Stalhrim War Axe | `3a9cb:Dragonborn.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Stalhrim Warhammer | `3a9cc:Dragonborn.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Stalker Armor | `25:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Armor | `14c08:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Armor | `eb853:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Armor | `f6f2b:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3197,6 +3285,8 @@ Not found and not made. Held here so the reference can come back.
 | Steel Cuffed Boots | `eb852:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Cutlass | `b74724:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Dagger | `f46ab:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Steel Fur Gauntlets | `155:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Steel Fur Gloves | `154:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Greatsword | `f46ac:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Helmet | `eb855:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Horned Helmet | `f6f2f:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3221,6 +3311,8 @@ Not found and not made. Held here so the reference can come back.
 | Steel War Axe | `f46af:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel War Pick | `216ed:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Steel Warhammer | `f46b0:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Steeled Vigilant | `62:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Steeled Vigilant Hood | `6b:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Stone Mace | `83d:YokuWeapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Stone Raid Shield | `83c:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Stormcloak Cuirass | `10e87a:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3245,6 +3337,7 @@ Not found and not made. Held here so the reference can come back.
 | Targe of the Blooded | `109415:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Tawagiz Armor | `8d5:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Tawagiz Helmet | `8d4:YokuWeapons.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Thalmor Plate | `bc:cheddars_mashups.esl` | Haberdasher | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | The Longhammer | `109416:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | The Pale Blade | `1090e9:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | The Pale Blade | `1090ea:Skyrim.esm` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3354,9 +3447,14 @@ Not found and not made. Held here so the reference can come back.
 | Vampire Armor | `e8f1:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vampire Armor | `e8f2:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vampire Armor | `e8f3:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Vampire Battlelord | `15d:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Vampire Battlemaster | `c:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Vampire Battlemaster Boots | `26:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vampire Boots | `11cf9:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vampire Gauntlets | `e8f5:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Vampire Plate Gauntlets | `157:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vampire Royal Armor | `e8f4:Dawnguard.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Vampire Stalker | `3c:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vanguard Plate Armor | `df0:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vanguard Plate Boots | `def:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Vanguard Plate Gauntlets | `df1:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3376,6 +3474,7 @@ Not found and not made. Held here so the reference can come back.
 | Vvardenfell Glass Shield | `23347:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Wabba Jackhammer | `3951:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Wabba Jaxe | `3952:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Wamsu Bone Armor | `8b:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief Heavy Battlecrown | `df4:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief Heavy Bulwark | `df6:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief Heavy Grips | `dfa:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3387,10 +3486,13 @@ Not found and not made. Held here so the reference can come back.
 | Warchief Light Headdress | `dfd:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief Light Stompers | `dff:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Warchief's Might | `3954:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Werewolf's Bane | `36:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Werewolf's Bane Gloves | `34:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | White Mammoth Recurve Bow | `4e8c:Immersive Weapons.esp` | Woodwright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Whiterun Guard's Armor | `10fb0e:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Whiterun Guard's Helmet | `10fb16:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Whiterun Guard's Shield | `10fb1f:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Whiterun Ranger Helmet | `130:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Wicked Dagger | `60d6d:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Wicked Scimitar | `216bb:Immersive Weapons.esp` | Edgewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Wild Hunt Heavy Boots | `2392d:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
@@ -3408,6 +3510,7 @@ Not found and not made. Held here so the reference can come back.
 | Winterhold Guard's Armor | `10fb0f:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Winterhold Guard's Helmet | `10fb17:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Winterhold Guard's Shield | `10fb20:Skyrim.esm` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
+| Winterhold Ranger Helmet | `12f:cheddars_mashups.esl` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Witchplate Cuirass | `c699:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Witchplate Gauntlets | `c69b:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |
 | Witchplate Greaves | `c69a:Hothtrooper44_ArmorCompilation.esp` | Platewright | Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event. |

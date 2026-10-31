@@ -4,8 +4,8 @@
  "issue": 2468,
  "plugin": {
   "name": "Thornswood-Last.esp",
-  "size": 12901082,
-  "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11"
+  "size": 12998852,
+  "sha256": "95d85507c11962b592dacf1ace067677f5309b75d0cd7d9caadf1e502909cca0"
  },
  "loadOrder": [
   "Skyrim.esm",
@@ -14,17 +14,17 @@
   "HearthFires.esm",
   "Dragonborn.esm",
   "_ResourcePack.esl",
+  "cheddars_mashups.esl",
   "Water for ENB.esm",
   "Embers XD.esm",
   "Expressive Facegen Morphs.esl",
+  "RaceCompatibility.esm",
   "AHZmoreHUDInventory.esl",
   "TrueHUD.esl",
-  "RaceCompatibility.esm",
-  "SkyUI_SE.esp",
   "LSFX-SSE-Audiosettings.esp",
+  "SkyUI_SE.esp",
   "I4IconAddon.esp",
   "Immersive Sounds - Compendium.esp",
-  "FNIS.esp",
   "IcePenguinWorldMap.esp",
   "JKs Skyrim.esp",
   "JK's Castle Volkihar.esp",
@@ -42,7 +42,6 @@
   "Guard Dialogue Overhaul.esp",
   "Gourmet.esp",
   "MoreCraftableEquipment.esp",
-  "HIMBO.esp",
   "AnotherOakwood.esp",
   "aaaGraniteHill.esp",
   "Skyrim Unbound Addon - Orc Strongholds.esp",
@@ -50,7 +49,9 @@
   "Triumvirate - Mage Archetypes.esp",
   "Apocalypse - Magic of Skyrim.esp",
   "RaceMenu.esp",
+  "CBBE.esp",
   "RaceMenuPlugin.esp",
+  "RaceMenuMorphsCBBE.esp",
   "CommonClothes.esp",
   "Cloaks&Capes.esp",
   "XPMSE.esp",
@@ -60,6 +61,13 @@
   "Cathedral Weathers.esp",
   "FishingInSkyrim.esp",
   "Thornswood-Content.esp",
+  "FNIS.esp",
+  "3BBB.esp",
+  "AwBaldandShavedHair.esp",
+  "HIMBO.esp",
+  "RaceMenuMorphsHIMBO.esp",
+  "BeardMaskFix.esp",
+  "BetterThirdPersonSelection.esp",
   "Populated Cities Towns Villages Legendary.esp",
   "SkyrimSewers.esp",
   "Solitude Arena.esp",
@@ -71,45 +79,40 @@
   "OarsRest.esp",
   "North Keep.esp",
   "Immersive Patrols II.esp",
-  "AHZmoreHUD.esp",
-  "HappyLittleTrees.esp",
-  "BetterContainerControls.esp",
-  "GourmetTables.esp",
-  "Embers XD - Fire Magick Add-On.esp",
-  "Embers XD - Patch - Capital Windhelm Expansion.esp",
-  "Embers XD - Patch - Gourmet Tables.esp",
-  "MoreCraftableEquipment_CloaksandCapes.esp",
-  "MCMHelper.esp",
-  "SkyHUD.esp",
-  "PlayFluteLuteDrum.esp",
-  "Skyrim Unbound Addon - Blackreach Laboratory.esp",
   "CFTO-JK-Patch.esp",
   "YokuWeapons.esp",
   "CFTO-Lanterns.esp",
   "CFTO-CoveredCarriages.esp",
-  "Skyrim Unbound Addon - Meeko's Shack.esp",
-  "AwBaldandShavedHair.esp",
-  "BetterThirdPersonSelection.esp",
+  "AHZmoreHUD.esp",
+  "HappyLittleTrees.esp",
+  "BetterContainerControls.esp",
+  "Embers XD - Fire Magick Add-On.esp",
+  "Embers XD - Patch - Capital Windhelm Expansion.esp",
+  "GourmetTables.esp",
+  "Embers XD - Patch - Gourmet Tables.esp",
   "HammerHair.esp",
-  "McmRecorder.esp",
-  "RaceMenuMorphsHIMBO.esp",
-  "QuickLootIE.esp",
-  "KhisartinBeards.esp",
-  "IA CBBE Patch.esp",
-  "Hothtrooper44_Armor_Ecksstra.esp",
-  "TrueDirectionalMovement.esp",
   "AZ_IADistribution.esp",
+  "Hothtrooper44_Armor_Ecksstra.esp",
+  "IA CBBE Patch.esp",
+  "KhisartinBeards.esp",
+  "McmRecorder.esp",
+  "MCMHelper.esp",
+  "MoreCraftableEquipment_CloaksandCapes.esp",
   "Precision.esp",
-  "BeardMaskFix.esp",
-  "3BBB.esp",
+  "QuickLootIE.esp",
+  "SkyHUD.esp",
+  "PlayFluteLuteDrum.esp",
+  "Skyrim Unbound Addon - Blackreach Laboratory.esp",
+  "Skyrim Unbound Addon - Meeko's Shack.esp",
+  "TrueDirectionalMovement.esp",
   "Skyrim Unbound.esp",
   "Skyrim Unbound - Capital Windhelm Expansion Patch.esp",
   "Skyrim Unbound - GDO Patch.esp",
   "Skyrim Unbound Addon - Thalmor.esp",
-  "atlas map markers.esp",
   "Water for ENB (Shades of Skyrim).esp",
-  "Water for ENB - Patch - Generic Landscape Patch.esp",
-  "Playable Rieklings.esp"
+  "Playable Rieklings.esp",
+  "KS_Hairdo's_Lite_NoNPCs.esp",
+  "Water for ENB - Patch - Generic Landscape Patch.esp"
  ],
  "builtAgainst": [
   {
@@ -143,6 +146,11 @@
    "sha256": "d231915a4bbfe6e89536dfb0a46c5adc8e4d2d23ce95d248dc24943776eb76fb"
   },
   {
+   "name": "cheddars_mashups.esl",
+   "size": 143395,
+   "sha256": "c802d3d5548430778fd3e25720b664c206e5f7b9e2f177fb00fcd51f2f27f5c1"
+  },
+  {
    "name": "Water for ENB.esm",
    "size": 437882,
    "sha256": "e043a0ab6136b861fa0117aef69a78a1ffbaf183c4862e196575977439601830"
@@ -158,6 +166,11 @@
    "sha256": "59240f0ead8e723dc2ed8d1e93e23ba4d8ecd962e11c615cb2b47bc8e53e1470"
   },
   {
+   "name": "RaceCompatibility.esm",
+   "size": 61105,
+   "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2"
+  },
+  {
    "name": "AHZmoreHUDInventory.esl",
    "size": 217,
    "sha256": "ea9ce96cf1a8d174f8f2cfe22d938703dfdfcb3c3c572ee87e61427f51ec9aeb"
@@ -168,19 +181,14 @@
    "sha256": "f799336b2b849f816a522631898ff54dc8c39bbccaccfe8a7023390be4e1d813"
   },
   {
-   "name": "RaceCompatibility.esm",
-   "size": 61105,
-   "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2"
+   "name": "LSFX-SSE-Audiosettings.esp",
+   "size": 761,
+   "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7"
   },
   {
    "name": "SkyUI_SE.esp",
    "size": 2433,
    "sha256": "61eb77164ed3632344ac2ccac4c8a4e69c62397999e7d8d558c162fd205616cf"
-  },
-  {
-   "name": "LSFX-SSE-Audiosettings.esp",
-   "size": 761,
-   "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7"
   },
   {
    "name": "I4IconAddon.esp",
@@ -191,11 +199,6 @@
    "name": "Immersive Sounds - Compendium.esp",
    "size": 1048415,
    "sha256": "5a1b36a7961d767c0937957767055dcf1bcb53b79b574003a40a66d382d3350e"
-  },
-  {
-   "name": "FNIS.esp",
-   "size": 180,
-   "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03"
   },
   {
    "name": "IcePenguinWorldMap.esp",
@@ -283,11 +286,6 @@
    "sha256": "552fec4651e3b2a13c22c51e04268e5df1686fda5a539bbb949206479f087b19"
   },
   {
-   "name": "HIMBO.esp",
-   "size": 3432,
-   "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a"
-  },
-  {
    "name": "AnotherOakwood.esp",
    "size": 844208,
    "sha256": "e29668024dc76c1dfb8e3724448522ae1b8853815cc221c5f0024e433d2b2264"
@@ -323,9 +321,19 @@
    "sha256": "e949d05f1a0bbef5fe090ff85e276afab021276980cb49fc75926e17822aed37"
   },
   {
+   "name": "CBBE.esp",
+   "size": 10512,
+   "sha256": "4243b94779ebbd46a15b003d677f8d7fc12a5b9ddd55943a4d429b94c31f3f7c"
+  },
+  {
    "name": "RaceMenuPlugin.esp",
    "size": 328,
    "sha256": "d36cd31e2472c1278d4ae9b7f2de89a305a4704b0838a0c89328431e739457de"
+  },
+  {
+   "name": "RaceMenuMorphsCBBE.esp",
+   "size": 697,
+   "sha256": "c7d062bd13f08271ad052ce307077ac090daea8c4e116c54a6bc4d57c6dd099b"
   },
   {
    "name": "CommonClothes.esp",
@@ -371,6 +379,41 @@
    "name": "Thornswood-Content.esp",
    "size": 276675,
    "sha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535"
+  },
+  {
+   "name": "FNIS.esp",
+   "size": 180,
+   "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03"
+  },
+  {
+   "name": "3BBB.esp",
+   "size": 20257,
+   "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549"
+  },
+  {
+   "name": "AwBaldandShavedHair.esp",
+   "size": 2701,
+   "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a"
+  },
+  {
+   "name": "HIMBO.esp",
+   "size": 3432,
+   "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a"
+  },
+  {
+   "name": "RaceMenuMorphsHIMBO.esp",
+   "size": 375,
+   "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b"
+  },
+  {
+   "name": "BeardMaskFix.esp",
+   "size": 3853,
+   "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db"
+  },
+  {
+   "name": "BetterThirdPersonSelection.esp",
+   "size": 413,
+   "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e"
   },
   {
    "name": "Populated Cities Towns Villages Legendary.esp",
@@ -428,66 +471,6 @@
    "sha256": "3b4758ed23fd0c195b9426f6e226ea66866da51c7f8edecab6af8b6007ff5e16"
   },
   {
-   "name": "AHZmoreHUD.esp",
-   "size": 6116,
-   "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd"
-  },
-  {
-   "name": "HappyLittleTrees.esp",
-   "size": 15513,
-   "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f"
-  },
-  {
-   "name": "BetterContainerControls.esp",
-   "size": 322,
-   "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3"
-  },
-  {
-   "name": "GourmetTables.esp",
-   "size": 17849,
-   "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f"
-  },
-  {
-   "name": "Embers XD - Fire Magick Add-On.esp",
-   "size": 8632,
-   "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092"
-  },
-  {
-   "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
-   "size": 6999,
-   "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6"
-  },
-  {
-   "name": "Embers XD - Patch - Gourmet Tables.esp",
-   "size": 6000,
-   "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a"
-  },
-  {
-   "name": "MoreCraftableEquipment_CloaksandCapes.esp",
-   "size": 9103,
-   "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363"
-  },
-  {
-   "name": "MCMHelper.esp",
-   "size": 100,
-   "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc"
-  },
-  {
-   "name": "SkyHUD.esp",
-   "size": 333,
-   "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca"
-  },
-  {
-   "name": "PlayFluteLuteDrum.esp",
-   "size": 17808,
-   "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00"
-  },
-  {
-   "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
-   "size": 1325,
-   "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0"
-  },
-  {
    "name": "CFTO-JK-Patch.esp",
    "size": 53631,
    "sha256": "b3e710c0e575bd0e406157ed3d9ff8e6afe08ba29221e16623efd08cb22c7031"
@@ -508,19 +491,39 @@
    "sha256": "79f4d5667ccd3cdae309b72f549ad9fdeb6a10adcf748b4d24f9fdaf64376bd8"
   },
   {
-   "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
-   "size": 48202,
-   "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c"
+   "name": "AHZmoreHUD.esp",
+   "size": 6116,
+   "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd"
   },
   {
-   "name": "AwBaldandShavedHair.esp",
-   "size": 2701,
-   "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a"
+   "name": "HappyLittleTrees.esp",
+   "size": 15513,
+   "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f"
   },
   {
-   "name": "BetterThirdPersonSelection.esp",
-   "size": 413,
-   "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e"
+   "name": "BetterContainerControls.esp",
+   "size": 322,
+   "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3"
+  },
+  {
+   "name": "Embers XD - Fire Magick Add-On.esp",
+   "size": 8632,
+   "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092"
+  },
+  {
+   "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
+   "size": 6999,
+   "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6"
+  },
+  {
+   "name": "GourmetTables.esp",
+   "size": 17849,
+   "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f"
+  },
+  {
+   "name": "Embers XD - Patch - Gourmet Tables.esp",
+   "size": 6000,
+   "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a"
   },
   {
    "name": "HammerHair.esp",
@@ -528,29 +531,9 @@
    "sha256": "cb9ee383388dcbf147a87c9f6d132f29ac94dfe723a3ff5f4eeeac076c0e21bf"
   },
   {
-   "name": "McmRecorder.esp",
-   "size": 1903,
-   "sha256": "c6f0249c6dfb9e550901529786dcdde4f03b856bedea03ec8b17df0cb3089cf9"
-  },
-  {
-   "name": "RaceMenuMorphsHIMBO.esp",
-   "size": 375,
-   "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b"
-  },
-  {
-   "name": "QuickLootIE.esp",
-   "size": 527,
-   "sha256": "2675d895dbe0a76b0da9c4c2748fb83972410eec50c73a75c1dc1faeaa8a89e4"
-  },
-  {
-   "name": "KhisartinBeards.esp",
-   "size": 29846,
-   "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9"
-  },
-  {
-   "name": "IA CBBE Patch.esp",
-   "size": 66938,
-   "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919"
+   "name": "AZ_IADistribution.esp",
+   "size": 43802,
+   "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c"
   },
   {
    "name": "Hothtrooper44_Armor_Ecksstra.esp",
@@ -558,14 +541,29 @@
    "sha256": "db0d748fad5258686aa65d2f598a9545c26ea80aac3a11cab68d891bd3c30637"
   },
   {
-   "name": "TrueDirectionalMovement.esp",
-   "size": 1248,
-   "sha256": "deb6707f859ef41f37ab2c4e124143ffe9cb0416a175d604be683f99386acccf"
+   "name": "IA CBBE Patch.esp",
+   "size": 66938,
+   "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919"
   },
   {
-   "name": "AZ_IADistribution.esp",
-   "size": 43802,
-   "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c"
+   "name": "KhisartinBeards.esp",
+   "size": 29846,
+   "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9"
+  },
+  {
+   "name": "McmRecorder.esp",
+   "size": 1903,
+   "sha256": "c6f0249c6dfb9e550901529786dcdde4f03b856bedea03ec8b17df0cb3089cf9"
+  },
+  {
+   "name": "MCMHelper.esp",
+   "size": 100,
+   "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc"
+  },
+  {
+   "name": "MoreCraftableEquipment_CloaksandCapes.esp",
+   "size": 9103,
+   "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363"
   },
   {
    "name": "Precision.esp",
@@ -573,14 +571,34 @@
    "sha256": "48bea576dadadb93f3af3701baf634e870fc4e0ce6c6ee94fa5f2072d2520790"
   },
   {
-   "name": "BeardMaskFix.esp",
-   "size": 3853,
-   "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db"
+   "name": "QuickLootIE.esp",
+   "size": 527,
+   "sha256": "2675d895dbe0a76b0da9c4c2748fb83972410eec50c73a75c1dc1faeaa8a89e4"
   },
   {
-   "name": "3BBB.esp",
-   "size": 20257,
-   "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549"
+   "name": "SkyHUD.esp",
+   "size": 333,
+   "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca"
+  },
+  {
+   "name": "PlayFluteLuteDrum.esp",
+   "size": 17808,
+   "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00"
+  },
+  {
+   "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
+   "size": 1325,
+   "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0"
+  },
+  {
+   "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
+   "size": 48202,
+   "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c"
+  },
+  {
+   "name": "TrueDirectionalMovement.esp",
+   "size": 1248,
+   "sha256": "deb6707f859ef41f37ab2c4e124143ffe9cb0416a175d604be683f99386acccf"
   },
   {
    "name": "Skyrim Unbound.esp",
@@ -603,24 +621,24 @@
    "sha256": "5a1d24a702316d887e48f2a0f6ed33ceda3c581ea94d56a906abc291a1367d04"
   },
   {
-   "name": "atlas map markers.esp",
-   "size": 305094,
-   "sha256": "e93c675baa5ed7d0825afc697209616d769d480d324d24e6e2d362ee8c6d4361"
-  },
-  {
    "name": "Water for ENB (Shades of Skyrim).esp",
    "size": 372774,
    "sha256": "63e0893556515f8ebbf36b4199ebee1a441c9b8ed092a06551e315e6cc284204"
   },
   {
-   "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
-   "size": 133302,
-   "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e"
-  },
-  {
    "name": "Playable Rieklings.esp",
    "size": 468573,
    "sha256": "f550ebbc44bb4b39f27cea379da2254bc31b06ddcaea1133877e2b0b86135ee1"
+  },
+  {
+   "name": "KS_Hairdo's_Lite_NoNPCs.esp",
+   "size": 13800,
+   "sha256": "3dc7ac33b2e1dbbb150e0ae080177ba4858609c0677a779fe65b9e0fe0580787"
+  },
+  {
+   "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
+   "size": 133302,
+   "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e"
   }
  ],
  "masters": [
@@ -629,6 +647,7 @@
   "Dawnguard.esm",
   "HearthFires.esm",
   "Dragonborn.esm",
+  "cheddars_mashups.esl",
   "RaceCompatibility.esm",
   "JKs Skyrim.esp",
   "JK's Castle Volkihar.esp",
@@ -657,9 +676,9 @@
   "OarsRest.esp",
   "North Keep.esp",
   "Immersive Patrols II.esp",
-  "PlayFluteLuteDrum.esp",
   "YokuWeapons.esp",
   "McmRecorder.esp",
+  "PlayFluteLuteDrum.esp",
   "Skyrim Unbound.esp",
   "Water for ENB (Shades of Skyrim).esp",
   "Playable Rieklings.esp"
@@ -674,8 +693,8 @@
   "gatesUnlocked": 3,
   "placeLocations": 8,
   "placeRooms": 3,
-  "recipesRecosted": 43,
-  "recipesMoved": 12,
+  "recipesRecosted": 48,
+  "recipesMoved": 15,
   "recipesMovedInGame": 48,
   "questScriptProperties": 1,
   "floorItemsOff": 91416
@@ -24201,13 +24220,46 @@
    ]
   },
   {
+   "recipe": "bfe65:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingForswornCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6a:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingForswornBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     4
+    ]
+   ]
+  },
+  {
    "recipe": "bfe6b:Playable Rieklings.esp",
    "editorId": "RecipeArmor1RieklingBanditKilt",
    "inputs": [
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6c:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditFurCloak",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     4
     ]
    ]
   },
@@ -24218,7 +24270,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24229,7 +24281,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24240,7 +24292,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24251,7 +24303,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24262,7 +24314,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24273,7 +24325,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24284,7 +24336,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24295,7 +24347,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24306,7 +24358,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24317,12 +24369,12 @@
     [
      "5ad93:Skyrim.esm",
      2,
-     5
+     4
     ],
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     4
     ]
    ]
   },
@@ -24333,12 +24385,12 @@
     [
      "5ad93:Skyrim.esm",
      2,
-     5
+     4
     ],
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     4
     ]
    ]
   },
@@ -24349,7 +24401,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24360,7 +24412,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24371,7 +24423,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24409,7 +24461,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24432,6 +24484,17 @@
      "800e4:Skyrim.esm",
      2,
      5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfec4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorShortSleeve",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     6
     ]
    ]
   },
@@ -24485,7 +24548,7 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
     ]
    ]
   },
@@ -24496,7 +24559,18 @@
     [
      "800e4:Skyrim.esm",
      2,
-     5
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "bff38:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     4
     ]
    ]
   },
@@ -24523,6 +24597,24 @@
   }
  ],
  "benchMoves": [
+  {
+   "recipe": "3e:cheddars_mashups.esl",
+   "editorId": "RecipeArmorCultistMask",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm"
+  },
+  {
+   "recipe": "53:cheddars_mashups.esl",
+   "editorId": "RecipeArmorRedguardWarrior",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm"
+  },
+  {
+   "recipe": "bd:cheddars_mashups.esl",
+   "editorId": "RecipeArmorThalmorPlate",
+   "from": "88105:Skyrim.esm",
+   "to": "6ce000:Update.esm"
+  },
   {
    "recipe": "490d86:Immersive Weapons.esp",
    "editorId": "IWRecipeAmmoJusticiarArrow",
@@ -26519,6 +26611,7 @@
    "Embers XD.esp": 26,
    "FishingInSkyrim.esp": 3,
    "HearthFires.esm": 12,
+   "Immersive Patrols II.esp": 1,
    "JK's Castle Volkihar.esp": 2,
    "JK's Markarth Outskirts.esp": 1,
    "JK's Whiterun's Outskirts.esp": 4,
@@ -26537,23 +26630,22 @@
    "Solitude Arena.esp": 2,
    "The Great City of Solitude.esp": 3,
    "Thornswood-Content.esp": 4,
-   "Update.esm": 158,
+   "Update.esm": 160,
    "Water for ENB (Shades of Skyrim).esp": 89,
    "Water for ENB - Patch - Generic Landscape Patch.esp": 1,
    "Water for ENB.esm": 8,
    "WindhelmSSE.esp": 15,
-   "ZIA_Complete Pack.esp": 1,
-   "atlas map markers.esp": 3
+   "ZIA_Complete Pack.esp": 1
   }
  },
  "recipe": {
   "name": "last-plugin.recipe",
-  "size": 4123579,
-  "sha256": "43822461a4ee8fc957cfa5cad46e9701226a8c2f65e0b7946e1bd6cd90cca3fa",
+  "size": 4124171,
+  "sha256": "14653ca82af1d457619f094e5ccc7b7f50238820c6a2a7550d5fd8022a29cb9c",
   "sources": 68,
-  "records": 102784,
-  "ownBytes": 2725282,
-  "ownBytesInRecords": 136099,
+  "records": 102792,
+  "ownBytes": 2725596,
+  "ownBytesInRecords": 136180,
   "addedSubrecords": {
    "CTDA": 2242,
    "PNAM": 1,

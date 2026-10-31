@@ -1,8 +1,8 @@
 # Tailor/Haberdasher
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 170 recipes, 170 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 171 recipes, 171 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 117, advanced 26, expert 10, master 17.
+By rank: novice 118, advanced 26, expert 10, master 17.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -50,6 +50,7 @@ By rank: novice 117, advanced 26, expert 10, master 17.
 | Girl's Yellow Dress | 1 | novice | Other goods | MCE_CraftingLoom | 2 Thread |  | yes | `9fe:MoreCraftableEquipment.esp` |
 | Sewing Kit | 1 | novice | Other goods | TanningRack | 1 Tundra Cotton, 1 Leather Strips |  | yes | `154b5:Thornswood-Content.esp` |
 | Thread | 1 | novice | Other goods | MCE_CraftingLoom | 2 Tundra Cotton |  | yes | `84a:MoreCraftableEquipment.esp` |
+| Alik'r Warrior Garb | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Leather, 3 Leather Strips | redguard | yes | `53:cheddars_mashups.esl` |
 | Belted Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `96f:MoreCraftableEquipment.esp` |
 | Blacksmith's Apron | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 3 Thread |  | yes | `925:MoreCraftableEquipment.esp` |
 | Blacksmith's Apron | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 3 Thread |  | yes | `927:MoreCraftableEquipment.esp` |

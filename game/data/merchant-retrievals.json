@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "loadOrderSha256": "9c4e3d7191783dc8a79f2c1affde95427c4bf24c68b4a1ff93d03451fbd4baf5",
+  "loadOrderSha256": "17597555b8c439898714ebf725435a36a7102aa84d9ccbfba7a1796b6f6148b5",
   "contentSha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535",
   "sources": [
     {
@@ -56,7 +56,7 @@
       "gold": 30,
       "hours": 6,
       "provenance": {
-        "fileIndex": 51,
+        "fileIndex": 52,
         "plugin": "Thornswood-Content.esp",
         "pluginSha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535",
         "recordSha256": "c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a",
