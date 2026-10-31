@@ -101,7 +101,8 @@ BENCH = ('thornswood-content.esp', 0x154e2)
 BENCH_KEYWORD = ('thornswood-content.esp', 0x154e1)
 FORGE_KEYWORD_EDID = 'CraftingSmithingForge'
 # The repository's own plugins, read from game\content rather than the game folder
-# (own_plugins.py reads every file there that way, #2923).
+# (own_plugins.py reads every file there that way, #2923), and the one made in
+# the Data folder from its recipe since #2791, read from there.
 OURS = ['Thornswood-Content.esp']
 AFTER = ['Thornswood-Last.esp']
 
@@ -722,8 +723,8 @@ def main():
         'bench': world.desc(BENCH),
         'benchEdid': bench[1],
         'keyword': world.desc(BENCH_KEYWORD),
-        'readFrom': 'game/data/last-plugin.json loadOrder, then %s; %s from game/content'
-                    % (', '.join(AFTER), ', '.join(OURS + AFTER)),
+        'readFrom': 'game/data/last-plugin.json loadOrder, then %s; %s from game/content, %s made in the Data folder from its recipe'
+                    % (', '.join(AFTER), ', '.join(OURS), ', '.join(AFTER)),
         'rule': ('Each bench stands beside a forge, at offset (x to the smith\'s right, y the way the smith faces) '
                  'and turn from the forge\'s winning record. Its outline (x %g to %g, y %g to %g) and its user\'s '
                  'place (x %g to %g, y %g to %g) lie on the navmesh, on ground flat to %g units and within %g of the '

@@ -837,7 +837,8 @@ def main():
     # a station and stands where it always stood, so no spot changes.
     gates = set(lo_doc.get('gatesUnlocked') or [])
     for n in OURS_AFTER:
-        pl = wb.Plugin(os.path.join(ROOT, 'game', 'content', n), n)
+        # Made in the Data folder from its recipe since #2791 (own_plugins.py).
+        pl = wb.Plugin(own_plugins.plugin_path(args.data, n), n)
         placed = []
         pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append(fid) if tag == b'REFR' else None,
                 tops={b'WRLD', b'CELL'})
