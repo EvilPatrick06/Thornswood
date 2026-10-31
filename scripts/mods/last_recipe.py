@@ -33,7 +33,8 @@ byte of theirs comes out of the machine's own copy of their plugin, which the
 recipe names by its sha256. A copy that differs makes nothing.
 
 make() writes a recipe from what Build-LastPlugin.py built, and apply() makes
-the plugin from a recipe. The builder runs both on every build and stops when
+the plugin from a recipe; make_from() is apply() over folders of plugins and
+string tables (Make-LastPlugin.py, the box and the builders, #2791). The builder runs both on every build and stops when
 apply() does not give back the plugin it built, byte for byte, so a recipe
 that is written always makes its plugin.
 
@@ -69,6 +70,7 @@ first, then each archive of Data in name order that holds strings\\<name>.
 
 import difflib
 import hashlib
+import os
 import struct
 import zlib
 
@@ -518,3 +520,64 @@ def apply(recipe, read_plugin, read_table):
     if len(out) != size or hashlib.sha256(bytes(out)).digest() != sha:
         raise RecipeError('the recipe did not make the plugin it names')
     return bytes(out)
+
+
+# ------------------------------------------------------------ from folders
+
+class Folders(object):
+    """What a recipe names, read out of folders the way Make-LastPlugin.py
+    says: a plugin from the first of datas that holds it; a string table
+    loose under Strings in each of tables and then datas, then out of every
+    archive (*.bsa) of them all in name order, as if they were one Data
+    folder, the way the game and Build-LastPlugin.py's string_table find it."""
+
+    def __init__(self, datas, tables=()):
+        self.datas = [d for d in datas if d]
+        self.tables = [d for d in tables if d] + self.datas
+        self._archives = None
+        self._read = {}
+
+    def plugin(self, name):
+        for d in self.datas:
+            p = os.path.join(d, name)
+            if os.path.isfile(p):
+                with open(p, 'rb') as f:
+                    return f.read()
+        return None
+
+    def archives(self):
+        if self._archives is None:
+            seen = {}
+            for d in self.tables:
+                if not os.path.isdir(d):
+                    continue
+                for n in os.listdir(d):
+                    if n.lower().endswith('.bsa') and n not in seen:
+                        seen[n] = os.path.join(d, n)
+            self._archives = [seen[n] for n in sorted(seen)]
+        return self._archives
+
+    def table(self, name):
+        for d in self.tables:
+            p = os.path.join(d, 'Strings', name)
+            if os.path.isfile(p):
+                with open(p, 'rb') as f:
+                    return f.read()
+        import bsa  # scripts/dev, which the caller puts on sys.path
+        want = 'strings/' + name.lower()
+        for a in self.archives():
+            if a not in self._read:
+                try:
+                    self._read[a] = bsa.read(a, 'strings')
+                except (ValueError, struct.error, zlib.error, IndexError, OSError):
+                    self._read[a] = {}
+            if want in self._read[a]:
+                return self._read[a][want]
+        return None
+
+
+def make_from(recipe, datas, tables=()):
+    """The plugin a recipe makes out of these folders (Folders above).
+    Raises RecipeError naming what is missing or differs."""
+    f = Folders(datas, tables)
+    return apply(recipe, f.plugin, f.table)

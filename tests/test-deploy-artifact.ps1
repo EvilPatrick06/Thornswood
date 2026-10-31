@@ -474,8 +474,8 @@ foreach ($w in $wiring) {
 # The other repository files each sends, beside its artifact, are checked too.
 $also = @(
     @{ File = 'scripts\deploy\Install-Voice.ps1';      Want = @('scripts/vps/Server-Log.js') },
-    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'records/server-build.json', 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp') },
-    @{ File = 'scripts\deploy\Deploy-Server.ps1';      Want = @('game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp', 'records/server-build.json') }
+    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'records/server-build.json', 'game/content/Thornswood-Content.esp', 'game/data/last-plugin.recipe', 'game/data/last-plugin.json') },
+    @{ File = 'scripts\deploy\Deploy-Server.ps1';      Want = @('game/content/Thornswood-Content.esp', 'game/data/last-plugin.recipe', 'game/data/last-plugin.json', 'records/server-build.json') }
 )
 foreach ($w in $also) {
     $t = Get-Content -LiteralPath (Join-Path $Repo $w.File) -Raw
@@ -484,9 +484,14 @@ foreach ($w in $also) {
         $missing.Count -eq 0 -and $t -match '-AlsoSends')
 }
 . (Join-Path $Repo 'scripts\release\RepoPlugins.ps1')
+. (Join-Path $Repo 'scripts\deploy\LastPluginRecipe.ps1')
+# Every plugin of ours but Thornswood-Last.esp, which the box makes from the
+# recipe the deploy sends in its place (#2791).
 foreach ($w in $also | Where-Object { $_.File -like '*Deploy-*' }) {
     $plug = @($w.Want | Where-Object { $_ -like 'game/content/*' } | ForEach-Object { $_.Substring(13) } | Sort-Object)
-    Yes ((Split-Path -Leaf $w.File) + ' sends every plugin RepoPlugins.ps1 calls ours, no more (#2486)') (($plug -join '|') -eq ((@($ThornswoodRepoPlugins) | Sort-Object) -join '|'))
+    $sent = @($ThornswoodRepoPlugins | Where-Object { $_ -ine $ThornswoodLastPlugin } | Sort-Object)
+    Yes ((Split-Path -Leaf $w.File) + ' sends every plugin RepoPlugins.ps1 calls ours, no more, and Thornswood-Last.esp as its recipe (#2486, #2791)') (
+        ($plug -join '|') -eq ($sent -join '|') -and @($w.Want) -contains 'game/data/last-plugin.recipe')
 }
 $iv = Read-Ast 'scripts\deploy\Install-Voice.ps1'
 if ($iv) {

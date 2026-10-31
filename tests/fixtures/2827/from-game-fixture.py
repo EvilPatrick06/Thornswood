@@ -197,7 +197,10 @@ def archive(path, files, compressed=False, embed=False, toggle=(), frames=None):
             size = len(stored) | (0x40000000 if key in toggle else 0)
             entries.append((size, data_at + len(body)))
             body += stored
-    at = head + recs
+    # A folder record's offset is where its block starts plus the length of
+    # the file name block, the way the game's own archives write it (the
+    # repository's bsa.py reads it that way; the launcher walks the blocks).
+    at = head + recs + len(names)
     k = 0
     for i, (folder, l) in enumerate(folders):
         out += struct.pack('<QIIQ', 0x1000 + i, len(l), 0, at)
