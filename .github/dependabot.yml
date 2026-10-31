@@ -1,7 +1,7 @@
 # What this repository depends on, watched rather than remembered.
 #
-# TWO ECOSYSTEMS, because two manifests exist here, and the engine submodule
-# is watched another way (below).
+# THREE ECOSYSTEMS, because three manifests exist here, and the engine
+# submodule is watched another way (below).
 #
 # github-actions: every workflow pins actions by full length commit SHA (see
 # build.yml), and a pinned action still goes stale quietly when the tag it
@@ -13,13 +13,18 @@
 # file into a per-run venv; Install-Bot.ps1 installs the same file on the VPS.
 # Watching /bot keeps those versions from going stale without a hand check.
 #
-# NOT npm here, because there is no package.json anywhere in this
-# repository. The site and the voice service are deliberately written against
-# node's own library and depend on nothing. Pointing dependabot at a folder
-# with no manifest gives an error on the Dependabot tab that reads like a
-# fault and watches nothing, which is worse than not configuring it. The npm
-# lockfiles that ship are the engine's (skymp5-server, skymp5-client and
-# skymp5-front), and they are watched in the fork, where they live: its
+# npm: only the Electron prototype of the launcher stack study (#3209,
+# docs/studies/launcher-stack/prototypes/electron). It never ships; it is
+# built by hand on a Windows machine to measure Electron against the other
+# stacks. It is watched anyway, so a security fix for Electron reaches it
+# the same way as for anything else, and its updates come as one grouped
+# pull request a week. The site and the voice service are deliberately
+# written against node's own library and depend on nothing, so they have no
+# package.json and no entry: pointing dependabot at a folder with no
+# manifest gives an error on the Dependabot tab that reads like a fault and
+# watches nothing, which is worse than not configuring it. The npm lockfiles
+# that ship are the engine's (skymp5-server, skymp5-client and skymp5-front),
+# and they are watched in the fork, where they live: its
 # .github/dependabot.yml on main targets thornswood/engine-changes (#2759,
 # #3683). A bump there reaches this repository through the usual pin move.
 #
@@ -39,7 +44,8 @@
 # no package manager at all, by design: WebView2 is vendored in launcher/lib
 # and referenced by path (#498), so there is no manifest here for dependabot
 # to read. WebView2 is watched by the nightly instead (#3683, Patrick's
-# answer on 26 Oct): tests\test-3683-webview2-advisories.js asks osv.dev for
+# answer on 26 Oct): tests\test-3683-webview2-advisories.js asks GitHub's
+# advisory database (osv.dev when GitHub gives no answer, #4092) for
 # advisories on the version THIRD-PARTY.md records, and a red night opens the
 # board issue. Moving it means taking the fixed package from nuget.org and
 # rewriting that section, files, sha256 and version together.
@@ -70,3 +76,15 @@ updates:
       prefix: "bot"
     labels:
       - "area: Discord"
+
+  - package-ecosystem: npm
+    directory: /docs/studies/launcher-stack/prototypes/electron
+    schedule:
+      interval: weekly
+    groups:
+      launcher-stack-electron:
+        patterns: ["*"]
+    commit-message:
+      prefix: "study"
+    labels:
+      - "area: Launcher"

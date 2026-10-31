@@ -122,7 +122,7 @@ try {
         Write-Host 'NOT RUN  the Windows PowerShell 5.1 parse, which only Windows has'
     }
 
-    $layerNames = @('Get-ThornswoodBoxRefusal', 'Get-InboundRules', 'Disable-Rule', 'Test-RuleEnabled', 'Get-RuleEvents', 'Get-WinRm', 'Get-Ipv6Addresses', 'Get-WideListeners')
+    $layerNames = @('Get-ThornswoodBoxRefusal', 'Sync-ThornswoodFirewall', 'Get-InboundRules', 'Disable-Rule', 'Test-RuleEnabled', 'Get-RuleEvents', 'Get-WinRm', 'Get-Ipv6Addresses', 'Get-WideListeners')
     $defined = @($ast.FindAll({ param($n) $n -is $FnAst }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $touchers = 'Get-NetFirewallRule', 'Set-NetFirewallRule', 'New-NetFirewallRule', 'Remove-NetFirewallRule', 'Enable-NetFirewallRule', 'Disable-NetFirewallRule',
@@ -137,12 +137,15 @@ try {
         if (-not $p -or $layerNames -notcontains $p.Name) { $loose += ('{0} at line {1}' -f $name, $c.Extent.StartLineNumber) }
     }
     Yes ('every command in it that touches Windows is inside a layer function' + $(if ($loose.Count) { ': ' + ($loose -join ', ') } else { '' })) ($loose.Count -eq 0)
-    Yes 'it turns rules off and never deletes one' ($boxText -notmatch 'Remove-NetFirewallRule' -and (Fn $Box 'Disable-Rule') -match 'Disable-NetFirewallRule -Name \$Name')
+    $dis = Fn $Box 'Disable-Rule'
+    Yes 'it turns rules off and never deletes one' ($boxText -notmatch 'Remove-NetFirewallRule' -and $dis -match 'Disable-NetFirewallRule -PolicyStore localhost -Name \$Name; Sync-ThornswoodFirewall' -and $dis -match 'Disable-NetFirewallRule -PolicyStore PersistentStore -Name \$Name')
+    Yes '  in the store the firewall took the rule from (#3896), reading what it takes' ($dis -match "\`$Store -eq 'GroupPolicy'" -and (Fn $Box 'Get-InboundRules') -match 'Get-NetFirewallRule -PolicyStore ActiveStore' -and (Fn $Box 'Test-RuleEnabled') -match '-PolicyStore ActiveStore')
 
     $layerText = @'
 function Get-ThornswoodBoxRefusal { return '' }
+function Sync-ThornswoodFirewall { $global:Fake.log.Add('Sync') }
 function Get-InboundRules { return @($global:Fake.rules) }
-function Disable-Rule([string]$Name) {
+function Disable-Rule([string]$Name, [string]$Store) {
     $global:Fake.log.Add('Disable ' + $Name)
     if (-not $global:Fake.sticks) { return }
     foreach ($r in $global:Fake.rules) { if ($r.Name -eq $Name) { $r.Enabled = $false } }
@@ -218,7 +221,7 @@ function Get-WideListeners { return @([pscustomobject]@{ Proto = 'TCP'; Port = 4
     $r = Invoke-BoxHere ("-Apply -List '" + $keepArg + "'")
     $off = @($global:Fake.log | ForEach-Object { $_ -replace '^Disable ', '' } | Sort-Object)
     Yes '-Apply: exit 0, turns off WinRM, the old copy, the Windows default and the Store app''s rule' ($r.Code -eq 0 -and ($off -join ',') -eq (@('{old}', '{start}', '{winrm}', 'DeliveryOptimization-TCP-In') | Sort-Object) -join ',')
-    Yes '  and says each' (@($r.Lines | Where-Object { $_ -match '^CHANGED turned off ' }).Count -eq 4 -and (Has $r.Lines "^CHANGED turned off 'Allow WinRM HTTPS' \(\{winrm\}\)$") -and (Has $r.Lines '^DONE 4 change\(s\) made\.$'))
+    Yes '  and says each' (@($r.Lines | Where-Object { $_ -match '^CHANGED turned off ' }).Count -eq 4 -and (Has $r.Lines "^CHANGED turned off 'Allow WinRM HTTPS' \(\{winrm\}\), a local rule$") -and (Has $r.Lines '^DONE 4 change\(s\) made\.$'))
     Yes '  and leaves every listed rule on' (@($global:Fake.rules | Where-Object { $_.Name -in '{g1}', '{w1}', 'OpenSSH-Server-In-TCP' -and -not $_.Enabled }).Count -eq 0)
 
     New-Fake

@@ -55,10 +55,21 @@
                              piece kept, and come back with it if the wipe is
                              undone. The staff list is in that copy too, for
                              staff to confirm again on the fresh world.
+    private\trade-carts.json the trade carts' register (#3158), the same
+                             shape for the carts, their cart stops and
+                             roads, and who drives each cart on the road.
+                             It goes aside with the ships' for the same
+                             reason.
     private\furniture.json   the furniture set down in held buildings (#2679).
                              The pieces are references in the world, so the
                              register goes aside with it, or a fresh world
                              would stand last world's furniture again.
+    private\market-stalls.json the market stalls (#3160): who keeps each
+                             stall and what is laid out on it. The goods came
+                             out of packs in the world set aside, so they go
+                             aside with it, every piece kept; left, the
+                             release list would end those stalls and put last
+                             world's goods in the fresh world's drop boxes.
 
   The first two were here from the start. property.json and farm-claims.json
   were added on 21 September: without them a fresh world would have come up
@@ -81,7 +92,7 @@
   writes) naming every character in the world it set aside, by form id only,
   since a profile keeps its id through a wipe and is never named. The parts
   whose registers were just set aside ($WipeDone: farms, property, embassy,
-  dungeon, cargo, books) are marked done in it. 'saves', server-log.js's
+  dungeon, cargo, stalls, carts, books) are marked done in it. 'saves', server-log.js's
   part, is not among them, because mod-settings.json stays; it takes only
   what a profile holds, so Release-List marks it done when the list names
   no profile, which is so unless a deletion still waiting was carried over.
@@ -96,9 +107,11 @@
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
-  The old storage sits beside the new one until you decide it can go, which
-  means a wipe you regret at midnight is a rename away from being undone
-  instead of gone.
+  The old storage sits beside the new one for 30 days, which means a wipe you
+  regret at midnight is a rename away from being undone instead of gone. Then
+  the game server's server-log.js deletes it, by the date in its name, and
+  says so in server.log (#3620, Patrick's B: the privacy page says a
+  character is kept until a wipe, and the copy is a character too).
 
   Why a wipe is on the table at all: taking a plugin out of the middle of the
   load order shifts the index of every plugin below it, and SkyMP turns a form
@@ -175,7 +188,8 @@ $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 # What a wipe moves aside, in each server folder: the header says why each one.
 $Moves = @('world', 'private\characters.json', 'private\property.json', 'private\furniture.json', 'private\farm-claims.json',
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json',
+           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\market-stalls.json',
+           'private\trade-carts.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
            'private\deleted-characters.json')
 # The release parts (game\gamemode.js PARTS) whose registers are all in
@@ -183,7 +197,7 @@ $Moves = @('world', 'private\characters.json', 'private\property.json', 'private
 # list marks them done and only 'merchants', the ledger a wipe keeps, waits.
 # Not 'saves': mod-settings.json stays (Release-List.ps1 marks it done for a
 # list that names no profile, the only thing that part acts on).
-$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'books')
+$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'stalls', 'carts', 'books')
 # Both lists go across as literals. A single quote inside either would end the
 # string early on the far side, so it is doubled first.
 function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }
@@ -437,6 +451,7 @@ foreach ($l in $out) { Say "  $l" 'DarkGray' }
 
 Head 'Done'
 Say '  The old storage is beside the new one with today''s date on it.' 'Green'
-Say '  Leave it a week. Clean-Everything.ps1 will offer it once you are sure.' 'DarkGray'
+Say '  The game server deletes it 30 days from today and says so in server.log;' 'DarkGray'
+Say '  until then it can be put back, as RESTORING.md in the ops repo says.' 'DarkGray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

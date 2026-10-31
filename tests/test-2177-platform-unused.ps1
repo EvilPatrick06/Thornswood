@@ -25,8 +25,9 @@
        game folder, its front build, client bundle and Modules do not either.
     2. Ship-Rules: each is not ours (no pack or installer carries it), is on
        the list every pack deletes, and is not a runtime path or one machine's
-       file. Tavern, DIN-Pro-bold and Futura in the same folder still ship,
-       and so would any other picture in Images.
+       file. Tavern and Barlow-SemiBold in the same folder still ship, and so
+       would any other picture in Images. DIN-Pro-bold and Futura go too, by
+       their own list (#1317, tests\test-1317-fonts.ps1).
     3. Publish-Update.ps1's scan, diff, collection filter and always list,
        lifted by text the way test-chargen-gone.ps1 lifts them, name all five
        in delete.txt whether or not the last pack carried them, and leave a
@@ -69,8 +70,8 @@ $five = @(
 $stay = @(
     'Data\Platform\Fonts\Tavern.ttf',
     'Data\Platform\Fonts\Tavern.spritefont',
-    'Data\Platform\Fonts\DIN-Pro-bold.spritefont',
-    'Data\Platform\Fonts\Futura.spritefont',
+    'Data\Platform\Fonts\Barlow-SemiBold.spritefont',
+    'Data\Platform\Fonts\Barlow-SemiBold-OFL.txt',
     'Data\Platform\Images\other.png'
 )
 # As whole names: clock.png or a padlock.png is somebody else's.
@@ -135,19 +136,17 @@ foreach ($r in $stay) {
 $pub = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Publish-Update.ps1'))
 $tm   = [regex]::Match($pub, '(?m)^function Test-Machine\(.*$')
 $fc   = [regex]::Match($pub, '(?ms)^function Test-FromCollection\(.*?^\}\r?$')
-$sgf  = [regex]::Match($pub, '(?m)^\$shipGeneratedFiles = Get-ShipGeneratedFiles \$ProfileDir\r?$')
 $diff = [regex]::Match($pub, '(?ms)^\$changed = @\(\); \$removed = @\(\)\r?$.*?^\$removed\s+= @\(\$removed \| Where-Object \{[^\r\n]*Test-Machine[^\r\n]*\r?$')
 $coll = [regex]::Match($pub, '(?ms)^\$collectionRemovals = .*?^\}\r?$')
 $alw  = [regex]::Match($pub, '(?ms)^\$alwaysGone = @\(Get-ShipDeleteAlways\)\r?\nforeach \(\$d in \$alwaysGone\) \{.*?^\}\r?$')
 Yes 'Publish-Update.ps1 still has Test-Machine, Test-FromCollection, the diff, the collection filter and the always list to lift' (
-    $tm.Success -and $fc.Success -and $sgf.Success -and $diff.Success -and $coll.Success -and $alw.Success)
+    $tm.Success -and $fc.Success -and $diff.Success -and $coll.Success -and $alw.Success)
 Yes 'and its scan still leaves out what Test-Machine claims' ($pub -match 'if \(Test-Machine \$rel\) \{ continue \}')
-if (-not ($tm.Success -and $fc.Success -and $sgf.Success -and $diff.Success -and $coll.Success -and $alw.Success)) { Done }
+if (-not ($tm.Success -and $fc.Success -and $diff.Success -and $coll.Success -and $alw.Success)) { Done }
 . ([scriptblock]::Create($tm.Value))
 . ([scriptblock]::Create($fc.Value))
 # A profile with no generated record: nothing generated, so the list is empty.
 $ProfileDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-2177-profile-' + [Guid]::NewGuid().ToString('N'))
-. ([scriptblock]::Create($sgf.Value))
 
 $Dev = $true
 $vortexFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)

@@ -2,7 +2,7 @@
   "builtFrom": "game/data/recipes.json",
   "note": "References held out of the open craft book. recipes.json is not edited by the script that writes this file.",
   "counts": {
-    "cut": 3321,
+    "cut": 3319,
     "embassy": 15,
     "thalmor": 9,
     "kept": 595
@@ -1829,18 +1829,6 @@
       "owner": "Tailor",
       "family": "Robes and body wear",
       "rank": "novice",
-      "fires": true,
-      "disposition": "cut",
-      "why": "Dragon, Daedric, or Aetherium. Not found and not made. The reference stays here so it can come back for an event."
-    },
-    {
-      "id": "8a:cheddars_mashups.esl",
-      "name": "Wamsu Bone Armor",
-      "plugin": "cheddars_mashups.esl",
-      "half": "Platewright",
-      "owner": "Smith",
-      "family": "Body armour",
-      "rank": "master",
       "fires": true,
       "disposition": "cut",
       "why": "Dragon, Daedric, or Aetherium. Not found and not made. The reference stays here so it can come back for an event."
@@ -39100,18 +39088,6 @@
       "half": "Woodwright",
       "owner": "Woodworker",
       "family": "Battleaxes",
-      "rank": "master",
-      "fires": false,
-      "disposition": "cut",
-      "why": "Temper on the grindstone or the armour table. Repair is a kit. Not found and not made. The reference stays here so it can come back for an event."
-    },
-    {
-      "id": "8b:cheddars_mashups.esl",
-      "name": "Wamsu Bone Armor",
-      "plugin": "cheddars_mashups.esl",
-      "half": "Platewright",
-      "owner": "Smith",
-      "family": "Body armour",
       "rank": "master",
       "fires": false,
       "disposition": "cut",

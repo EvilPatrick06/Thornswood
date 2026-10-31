@@ -26,6 +26,7 @@ else does.
 | `/auth/discord` | GET | the launcher's link button, through the browser; Discord sends the browser back to `/auth/discord/callback` (`launcher\app\Discord.cs`) |
 | `/api/allowed`, `/dev/api/allowed` | GET | each game server's door, every five minutes, with the bot's key; the dev server's `door.json` names the site with `/dev` on the end (`game\gamemode.js`) |
 | `/api/roster` | POST | the game server, with the bot's key, when its book of characters changes (`game\gamemode.js`) |
+| `/api/economy`, `/dev/api/economy` | POST | each game server, with the bot's key, every five minutes: what each hold gathered, crafted and traded, by the day, for the hub's Hold economy page (#3164, the hold economy block in `game\gamemode.js`) |
 | `/api/office`, `/dev/api/office` | POST | each game server, with the bot's key in a header, when a Jarl names or removes their hold's Court, Steward or Guard on the Office page of K; the site checks the Jarl's role again and sets the Discord role with the bot's token, and the game reads it back through `/api/allowed` (#2551, `game\gamemode.js`) |
 | `/api/play/owns` | POST | the voice service, before it keeps a character creation choice (`voice\voice-server.js`) |
 | `/api/payload` | GET | the installer, which then downloads the zip it names from `/file/` (`installer\setup\Bootstrap.cs`) |
@@ -33,6 +34,13 @@ else does.
 | `/api/public` | GET | the front page and the launchers, for the news and the files; the Discord bot, for the open switch and the hints and lore lines it shows as its status, from `data\site\lines.md` (#3147, `bot\bot.py`) |
 | `/api/report/game`, `/dev/api/report/game` | POST | each game server, with the bot's key in a header, when somebody types /helpme or /report; the row goes into the inbox and the bot says it in the staff channel (`game\gamemode.js`, the asking staff block) |
 | `/api/play/who` | POST | nothing in the repo asks it now. It says who a ticket belongs to and writes nothing, which makes it the one to try by hand |
+
+The downloads under `/file/` are only what `files\files.json` publishes: a
+name it lists and does not mark hidden, the payload zip it lists (hidden
+because `/api/payload` hands it to the setup program), and `files.json`
+itself, which Ship's installer gate reads (`Read-SiteDownloads` in
+`scripts\release\Feed-Store.ps1`). Anything else put in that folder answers
+404 and is not on the Downloads page (#3798).
 
 Every request that is not a GET has to come from this site (#1367). A
 browser names the page that sent it in `Origin`, or in `Referer` when an old

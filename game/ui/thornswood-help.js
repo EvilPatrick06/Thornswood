@@ -6,9 +6,10 @@
   and staff commands; everything else takes buttons and GUI". The help was
   /help typed into the chat: a menu and six topics, each written as commands
   to type. It is this panel now, opened without the chat: the help key
-  (HelpKey in Thornswood.ini, F7 unless it was moved on the launcher's
-  Controls page), or Help on the K, P and J panels, which call open() here
-  and close themselves (Patrick's answer on #1633). Nothing tells anybody to
+  (HelpKey in Thornswood.ini, F7 unless it was moved on the Settings panel),
+  or Help on the K, P and J panels, which call open() here and close
+  themselves (Patrick's answer on #1633). Settings at its foot opens the
+  Settings panel, where every key is changed (#3126), and puts this down. Nothing tells anybody to
   type /help. The server still answers it, typed out of habit, with where
   this panel is.
 
@@ -85,8 +86,8 @@
     { id: 'living', title: 'Living', text: function (k) {
       return [
         'The four bars are food, water, rest and how warm you are, and the Body page on ' +
-          k.skills + ' says why. Eat or drink from your pack. With the bars hidden in the ' +
-          'launcher\'s Settings, /needs in the chat says all four as a line of text.',
+          k.skills + ' says why. Eat or drink from your pack. With the bars hidden on ' +
+          'Settings, /needs in the chat says all four as a line of text.',
         'Sit or lie down to rest: on a seat, on the ground with Sit on the emote wheel (' +
           k.wheel + '), or in a bed. By a fire is better, an inn or temple bed is better ' +
           'than the road, and your own bed is best. ' +
@@ -96,6 +97,9 @@
           'and nothing runs down while you are away, and you come back rested. Anywhere else ' +
           'the bars fall at half the pace while you are gone, and never below 25. The Body ' +
           'page says what logging out where you are now would do.',
+        'Change character, at the foot of ' + k.skills + ', goes back to the character menu ' +
+          'without closing the game. Stay still and out of a fight for the ten seconds it ' +
+          'counts; moving, a fight or getting hurt stops it, and pressing it again stops it too.',
         'Fires warm you and standing in one burns you. Fur is the warmest to wear, metal the worst.',
         'In your inventory, while you have a wound to tend, ' + k.trade + ' opens the panel ' +
           'that tends it. Looking at somebody hurt, ' + k.lock + ' tends theirs when the ' +
@@ -162,7 +166,7 @@
   function lead(k) {
     return k.skills + ' is your profession and skills, ' + k.party + ' your friends and party, ' +
       k.journal + ' your journals and every town\'s notice board. ' + k.chat + ' opens the ' +
-      'chat, and ' + k.talk + ' held talks out loud. Every key is on the launcher\'s Controls page.';
+      'chat, and ' + k.talk + ' held talks out loud. Settings, below, changes every key.';
   }
 
   function tell(what) {
@@ -219,10 +223,17 @@
       '<div class="nav" id="' + ID + '-nav"></div>' +
       '<div class="body" id="' + ID + '-body"></div>' +
       '<div class="foot"><span id="' + ID + '-foot"></span><span style="flex:1"></span>' +
+      '<button id="' + ID + '-settings">Settings</button>' +
       '<button id="' + ID + '-close">Close</button></div>' +
       '</div>';
     document.body.appendChild(root);
     root.querySelector('#' + ID + '-close').onclick = close;
+    // Settings (#3126): the Settings panel, and this one put down; it opens
+    // first, so the keyboard is never let go between the two.
+    root.querySelector('#' + ID + '-settings').onclick = function () {
+      try { if (window.thornswoodSettings) { window.thornswoodSettings.open(); } } catch (e) { }
+      close();
+    };
 
     /*
       Escape and the help key close it, and the page has to hear them itself:

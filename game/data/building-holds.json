@@ -12607,11 +12607,6 @@
    "size": 78418
   },
   {
-   "name": "cheddars_mashups.esl",
-   "sha256": "c802d3d5548430778fd3e25720b664c206e5f7b9e2f177fb00fcd51f2f27f5c1",
-   "size": 143395
-  },
-  {
    "name": "Water for ENB.esm",
    "sha256": "e043a0ab6136b861fa0117aef69a78a1ffbaf183c4862e196575977439601830",
    "size": 437882
@@ -12627,11 +12622,6 @@
    "size": 132
   },
   {
-   "name": "RaceCompatibility.esm",
-   "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2",
-   "size": 61105
-  },
-  {
    "name": "AHZmoreHUDInventory.esl",
    "sha256": "ea9ce96cf1a8d174f8f2cfe22d938703dfdfcb3c3c572ee87e61427f51ec9aeb",
    "size": 217
@@ -12642,14 +12632,19 @@
    "size": 582
   },
   {
-   "name": "LSFX-SSE-Audiosettings.esp",
-   "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7",
-   "size": 761
+   "name": "RaceCompatibility.esm",
+   "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2",
+   "size": 61105
   },
   {
    "name": "SkyUI_SE.esp",
    "sha256": "61eb77164ed3632344ac2ccac4c8a4e69c62397999e7d8d558c162fd205616cf",
    "size": 2433
+  },
+  {
+   "name": "LSFX-SSE-Audiosettings.esp",
+   "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7",
+   "size": 761
   },
   {
    "name": "I4IconAddon.esp",
@@ -12660,6 +12655,11 @@
    "name": "Immersive Sounds - Compendium.esp",
    "sha256": "5a1b36a7961d767c0937957767055dcf1bcb53b79b574003a40a66d382d3350e",
    "size": 1048415
+  },
+  {
+   "name": "FNIS.esp",
+   "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03",
+   "size": 180
   },
   {
    "name": "IcePenguinWorldMap.esp",
@@ -12747,6 +12747,11 @@
    "size": 199987
   },
   {
+   "name": "HIMBO.esp",
+   "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a",
+   "size": 3432
+  },
+  {
    "name": "AnotherOakwood.esp",
    "sha256": "e29668024dc76c1dfb8e3724448522ae1b8853815cc221c5f0024e433d2b2264",
    "size": 844208
@@ -12782,19 +12787,9 @@
    "size": 578
   },
   {
-   "name": "CBBE.esp",
-   "sha256": "4243b94779ebbd46a15b003d677f8d7fc12a5b9ddd55943a4d429b94c31f3f7c",
-   "size": 10512
-  },
-  {
    "name": "RaceMenuPlugin.esp",
    "sha256": "d36cd31e2472c1278d4ae9b7f2de89a305a4704b0838a0c89328431e739457de",
    "size": 328
-  },
-  {
-   "name": "RaceMenuMorphsCBBE.esp",
-   "sha256": "c7d062bd13f08271ad052ce307077ac090daea8c4e116c54a6bc4d57c6dd099b",
-   "size": 697
   },
   {
    "name": "CommonClothes.esp",
@@ -12838,43 +12833,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "sha256": "8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66",
-   "size": 271624
-  },
-  {
-   "name": "FNIS.esp",
-   "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03",
-   "size": 180
-  },
-  {
-   "name": "3BBB.esp",
-   "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549",
-   "size": 20257
-  },
-  {
-   "name": "AwBaldandShavedHair.esp",
-   "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a",
-   "size": 2701
-  },
-  {
-   "name": "HIMBO.esp",
-   "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a",
-   "size": 3432
-  },
-  {
-   "name": "RaceMenuMorphsHIMBO.esp",
-   "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b",
-   "size": 375
-  },
-  {
-   "name": "BeardMaskFix.esp",
-   "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db",
-   "size": 3853
-  },
-  {
-   "name": "BetterThirdPersonSelection.esp",
-   "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e",
-   "size": 413
+   "sha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535",
+   "size": 276675
   },
   {
    "name": "Populated Cities Towns Villages Legendary.esp",
@@ -12932,6 +12892,66 @@
    "size": 151863
   },
   {
+   "name": "AHZmoreHUD.esp",
+   "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd",
+   "size": 6116
+  },
+  {
+   "name": "HappyLittleTrees.esp",
+   "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f",
+   "size": 15513
+  },
+  {
+   "name": "BetterContainerControls.esp",
+   "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3",
+   "size": 322
+  },
+  {
+   "name": "GourmetTables.esp",
+   "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f",
+   "size": 17849
+  },
+  {
+   "name": "Embers XD - Fire Magick Add-On.esp",
+   "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092",
+   "size": 8632
+  },
+  {
+   "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
+   "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6",
+   "size": 6999
+  },
+  {
+   "name": "Embers XD - Patch - Gourmet Tables.esp",
+   "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a",
+   "size": 6000
+  },
+  {
+   "name": "MoreCraftableEquipment_CloaksandCapes.esp",
+   "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363",
+   "size": 9103
+  },
+  {
+   "name": "MCMHelper.esp",
+   "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc",
+   "size": 100
+  },
+  {
+   "name": "SkyHUD.esp",
+   "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca",
+   "size": 333
+  },
+  {
+   "name": "PlayFluteLuteDrum.esp",
+   "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00",
+   "size": 17808
+  },
+  {
+   "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
+   "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0",
+   "size": 1325
+  },
+  {
    "name": "CFTO-JK-Patch.esp",
    "sha256": "b3e710c0e575bd0e406157ed3d9ff8e6afe08ba29221e16623efd08cb22c7031",
    "size": 53631
@@ -12952,39 +12972,19 @@
    "size": 52462
   },
   {
-   "name": "AHZmoreHUD.esp",
-   "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd",
-   "size": 6116
+   "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
+   "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c",
+   "size": 48202
   },
   {
-   "name": "HappyLittleTrees.esp",
-   "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f",
-   "size": 15513
+   "name": "AwBaldandShavedHair.esp",
+   "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a",
+   "size": 2701
   },
   {
-   "name": "BetterContainerControls.esp",
-   "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3",
-   "size": 322
-  },
-  {
-   "name": "Embers XD - Fire Magick Add-On.esp",
-   "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092",
-   "size": 8632
-  },
-  {
-   "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
-   "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6",
-   "size": 6999
-  },
-  {
-   "name": "GourmetTables.esp",
-   "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f",
-   "size": 17849
-  },
-  {
-   "name": "Embers XD - Patch - Gourmet Tables.esp",
-   "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a",
-   "size": 6000
+   "name": "BetterThirdPersonSelection.esp",
+   "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e",
+   "size": 413
   },
   {
    "name": "HammerHair.esp",
@@ -12992,44 +12992,14 @@
    "size": 62849
   },
   {
-   "name": "AZ_IADistribution.esp",
-   "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c",
-   "size": 43802
-  },
-  {
-   "name": "Hothtrooper44_Armor_Ecksstra.esp",
-   "sha256": "db0d748fad5258686aa65d2f598a9545c26ea80aac3a11cab68d891bd3c30637",
-   "size": 171
-  },
-  {
-   "name": "IA CBBE Patch.esp",
-   "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919",
-   "size": 66938
-  },
-  {
-   "name": "KhisartinBeards.esp",
-   "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9",
-   "size": 29846
-  },
-  {
    "name": "McmRecorder.esp",
    "sha256": "c6f0249c6dfb9e550901529786dcdde4f03b856bedea03ec8b17df0cb3089cf9",
    "size": 1903
   },
   {
-   "name": "MCMHelper.esp",
-   "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc",
-   "size": 100
-  },
-  {
-   "name": "MoreCraftableEquipment_CloaksandCapes.esp",
-   "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363",
-   "size": 9103
-  },
-  {
-   "name": "Precision.esp",
-   "sha256": "48bea576dadadb93f3af3701baf634e870fc4e0ce6c6ee94fa5f2072d2520790",
-   "size": 783
+   "name": "RaceMenuMorphsHIMBO.esp",
+   "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b",
+   "size": 375
   },
   {
    "name": "QuickLootIE.esp",
@@ -13037,29 +13007,44 @@
    "size": 527
   },
   {
-   "name": "SkyHUD.esp",
-   "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca",
-   "size": 333
+   "name": "KhisartinBeards.esp",
+   "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9",
+   "size": 29846
   },
   {
-   "name": "PlayFluteLuteDrum.esp",
-   "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00",
-   "size": 17808
+   "name": "IA CBBE Patch.esp",
+   "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919",
+   "size": 66938
   },
   {
-   "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
-   "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0",
-   "size": 1325
-  },
-  {
-   "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
-   "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c",
-   "size": 48202
+   "name": "Hothtrooper44_Armor_Ecksstra.esp",
+   "sha256": "db0d748fad5258686aa65d2f598a9545c26ea80aac3a11cab68d891bd3c30637",
+   "size": 171
   },
   {
    "name": "TrueDirectionalMovement.esp",
    "sha256": "deb6707f859ef41f37ab2c4e124143ffe9cb0416a175d604be683f99386acccf",
    "size": 1248
+  },
+  {
+   "name": "AZ_IADistribution.esp",
+   "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c",
+   "size": 43802
+  },
+  {
+   "name": "Precision.esp",
+   "sha256": "48bea576dadadb93f3af3701baf634e870fc4e0ce6c6ee94fa5f2072d2520790",
+   "size": 783
+  },
+  {
+   "name": "BeardMaskFix.esp",
+   "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db",
+   "size": 3853
+  },
+  {
+   "name": "3BBB.esp",
+   "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549",
+   "size": 20257
   },
   {
    "name": "Skyrim Unbound.esp",
@@ -13092,29 +13077,19 @@
    "size": 372774
   },
   {
-   "name": "Playable Rieklings.esp",
-   "sha256": "f550ebbc44bb4b39f27cea379da2254bc31b06ddcaea1133877e2b0b86135ee1",
-   "size": 468573
-  },
-  {
-   "name": "KS_Hairdo's_Lite_NoNPCs.esp",
-   "sha256": "3dc7ac33b2e1dbbb150e0ae080177ba4858609c0677a779fe65b9e0fe0580787",
-   "size": 13800
-  },
-  {
    "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
    "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e",
    "size": 133302
   },
   {
-   "name": "Thornswood-Last.esp",
-   "sha256": "c1701fb60b0fb5a5dd0ca05b5751fc32abcfe82a40170ac45e5207cc8567fd0a",
-   "size": 12900115
+   "name": "Playable Rieklings.esp",
+   "sha256": "f550ebbc44bb4b39f27cea379da2254bc31b06ddcaea1133877e2b0b86135ee1",
+   "size": 468573
   },
   {
-   "name": "Thornswood-WoodworkerTrail.esp",
-   "sha256": "d12bcd2e54d874c5005303082b5ac40ad01af3d5d8bfb5c75a4795b39d988482",
-   "size": 9628
+   "name": "Thornswood-Last.esp",
+   "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
+   "size": 12901082
   }
  ],
  "builtBy": "scripts/dev/Build-BuildingHolds.py",
@@ -13176,7 +13151,7 @@
   }
  },
  "issue": 2551,
- "readFrom": "game/data/doors.json for the buildings and their doors; game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp, last plugin wins; Thornswood-Content.esp, Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp from game/content",
+ "readFrom": "game/data/doors.json for the buildings and their doors; game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, last plugin wins; Thornswood-Content.esp, Thornswood-Last.esp from game/content",
  "refused": {
   "10a8b:Dawnguard.esm": {
    "name": "Forgotten Vale Cave",

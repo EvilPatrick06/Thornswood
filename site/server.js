@@ -580,9 +580,10 @@ const BOARDS = {
    The page now matches the doors behind it. The linked accounts are 'staff'
    since #1010, because that page is where staff ban, PK and write notes, and
    every staff role may. The other two stay 'admin': the play sessions and
-   the report inbox. */
+   the report inbox. The hold economy is 'staff' (#3164, Patrick, 22 Oct:
+   staff's hold economy view is a staff page on the hub). */
 const LEVEL = {
-  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin', economy: 'staff'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -1502,7 +1503,8 @@ const PAGES = {
   '/uploads':     'uploads',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/inbox':       'inbox'
+  '/inbox':       'inbox',
+  '/economy':     'economy'
 };
 
 /*
@@ -2089,6 +2091,30 @@ setInterval(() => loginPrune(Date.now()), 10 * 60 * 1000).unref?.();
 // ==== end thornswood login limits ====
 
 // ------------------------------------------------------------- downloads --
+// The payload zip the two file setup program fetches through /api/payload:
+// the stable name Publish-Installer sends, or a stamped one an older publish
+// left.
+function payloadZip(name) {
+  return /^Thornswood-Setup(?:-\d{8}-\d{4})?\.zip$/i.test(name);
+}
+
+// What /file/ serves, which is also all the Downloads list may show (#3798).
+// files.json is the list of what is published, so a name is served only when
+// it is listed there and not hidden, or is a listed payload zip, which is
+// hidden from people because the setup program fetches it itself. files.json
+// is served too: Ship's installer gate reads it at /file/files.json
+// (Read-SiteDownloads). Anything else in the folder is not published, and
+// answers 404. Until this the route served whatever sat in the folder, and a
+// read only diagnostic put there by hand on the box (a script naming a
+// staff member and the game server's address) went to anyone who asked for it
+// by name, while the Downloads page only hid it.
+function downloadServed(name, meta) {
+  if (name === 'files.json') return true;
+  const m = Object.prototype.hasOwnProperty.call(meta, name) ? meta[name] : null;
+  if (!m || typeof m !== 'object') return false;
+  return !m.hidden || payloadZip(name);
+}
+
 function listFiles() {
   const meta = jsonFile(path.join(FILES, 'files.json'), {});
   const out = [];
@@ -2101,30 +2127,25 @@ function listFiles() {
     catch (e) { console.error('[thornswood-docs] could not list the downloads in ' + FILES + ' (' + (e.code || e.message) + ')'); }
   }
   for (const name of names) {
-    if (name === 'files.json') continue;
+    // Only what /file/ serves, so the page never offers a name that answers
+    // 404, and nothing files.json does not publish is listed at all.
+    if (name === 'files.json' || !downloadServed(name, meta)) continue;
     let st;
     try { st = fs.statSync(path.join(FILES, name)); } catch (e) { continue; }
     if (!st.isFile()) continue;
-    const m = meta[name] || {};
+    const m = meta[name];
     // hidden has to survive the trip. The payload zip is marked hidden by
     // Publish-Installer because the setup program fetches it itself, and the
     // page hides it on that flag. Dropping it here put the old two file
     // instructions back on the downloads page and a 527 MB button next to
     // them that does nothing on its own.
-    //
-    // A script is never something a visitor is offered. A read only
-    // diagnostic for one machine once sat in this folder and so on the
-    // Downloads page as a file to take, naming a staff member and the game
-    // server's address. Anything with a script extension is hidden whatever
-    // files.json says about it.
-    const script = /[.](ps1|psm1|cmd|bat|py|sh)$/i.test(name);
     // The installer's SHA-256, which Publish-Installer writes, so the Downloads
     // page can print it beside the size and date (To Do entry 176). Only a well
     // formed hash goes out, in lower case because Get-FileHash writes upper and
     // the page builds an address from it.
     const sha256 = String(m.sha256 || '').toLowerCase();
     const hash = /^[0-9a-f]{64}$/.test(sha256) ? sha256 : '';
-    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden || script,
+    out.push({ name, size: st.size, at: st.mtimeMs, hidden: !!m.hidden,
       label: m.label || name, version: m.version || '', note: m.note || '',
       sha256: hash });
   }
@@ -4301,6 +4322,73 @@ const ROSTER = path.join(DATA, 'roster.json');
 // passed on (#955). It is sent every five minutes; an hour covers a restart.
 const ROSTER_HELD_FRESH_MS = 60 * 60 * 1000;
 
+/*
+  WHAT EACH HOLD GATHERS, MAKES AND TRADES (#3164), for the hub's Hold economy
+  page. Each game server counts it (the hold economy block in
+  game\gamemode.js) and sends the whole of what it keeps every five minutes,
+  POST /api/economy with the door key; the dev server's door names the site
+  with /dev, so its count lands on /dev/api/economy. Kept per server and
+  replaced whole on each push, so this file holds what the game server holds
+  and never more, and days past ECONOMY_KEEP_DAYS go on every write and read.
+  A row is a day, a hold, a kind, an item and a count: nothing about anybody.
+*/
+const ECONOMY = path.join(DATA, 'economy.json');
+const ECONOMY_KINDS = ['gathered', 'crafted', 'bought', 'sold', 'hauled'];
+const ECONOMY_HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                       'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock', 'elsewhere'];
+const ECONOMY_KEEP_DAYS = 30;
+const ECONOMY_MOST = 1000000000;
+/* The box's own date, the day the game server counts a row on (same box). */
+function economyDay(t) {
+  const d = new Date(t);
+  const two = (n) => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate());
+}
+/* One server's count held to its shape: anything else is left out. */
+function cleanEconomy(o, now) {
+  const out = { at: 0, today: '', keepDays: ECONOMY_KEEP_DAYS, days: {}, names: {} };
+  if (!o || typeof o !== 'object') return out;
+  out.at = Number(o.at) > 0 ? Number(o.at) : 0;
+  out.today = /^\d{4}-\d{2}-\d{2}$/.test(String(o.today || '')) ? String(o.today) : '';
+  const cut = economyDay((Number(now) || Date.now()) - (ECONOMY_KEEP_DAYS - 1) * 86400000);
+  const days = (o.days && typeof o.days === 'object') ? o.days : {};
+  const names = (o.names && typeof o.names === 'object') ? o.names : {};
+  const has = (x, k) => Object.prototype.hasOwnProperty.call(x, k);
+  for (const day of Object.keys(days)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < cut) continue;
+    const holds = days[day];
+    if (!holds || typeof holds !== 'object') continue;
+    for (const hold of Object.keys(holds)) {
+      if (ECONOMY_HOLDS.indexOf(hold) < 0) continue;
+      const kinds = holds[hold];
+      if (!kinds || typeof kinds !== 'object') continue;
+      for (const kind of ECONOMY_KINDS) {
+        const items = kinds[kind];
+        if (!items || typeof items !== 'object') continue;
+        for (const key of Object.keys(items)) {
+          const n = items[key];
+          if (!key || key.length > 120 || key === '__proto__' || !Number.isSafeInteger(n) || n <= 0) continue;
+          const row = ((out.days[day] = out.days[day] || {})[hold] = out.days[day][hold] || {});
+          (row[kind] = row[kind] || {})[key] = Math.min(n, ECONOMY_MOST);
+          const nm = has(names, key) && typeof names[key] === 'string' ? names[key].slice(0, 120) : '';
+          out.names[key] = nm || key;
+        }
+      }
+    }
+  }
+  return out;
+}
+/* Every server's count as kept now, aged on the way out as well as in. */
+function economyNow(now) {
+  const store = jsonFile(ECONOMY, { servers: {} });
+  const servers = (store && store.servers && typeof store.servers === 'object') ? store.servers : {};
+  const out = {};
+  for (const srv of ['main', 'dev']) {
+    if (servers[srv]) out[srv] = cleanEconomy(servers[srv], now);
+  }
+  return out;
+}
+
 /* How many character slots this person gets at the game's main menu. */
 function slotsFor(st) {
   if (!st) return 2;
@@ -4593,10 +4681,15 @@ const SLOG_DAYS = 365;
    crash log from that session, if it crashed, and it goes second because it
    is the one that settles a crash with no message (entry 105).
    skyrim-platform.log is the tail of Skyrim Platform's own log, and it goes
-   last because it is the biggest and the noisiest. */
+   last because it is the biggest and the noisiest.
+
+   Every name here is named on the privacy page, with what it can hold, and
+   tests\test-session-logs.js fails when one is not (#3627). The retired
+   dresser's log is not taken: nothing writes it, so a copy left on a PC was
+   an old session's sent as this one's. */
 const SLOG_NAMES = [
   'launcher.log', 'crash.log', 'thornswood-front.log', 'thornswood-voice.log',
-  'thornswood-emotes.log', 'thornswood-input.log', 'thornswood-dress.log',
+  'thornswood-emotes.log', 'thornswood-input.log',
   'thornswood-loadorder.txt', 'thornswood-plugins-light.txt',
   'skyrim-platform.log'
 ];
@@ -5077,6 +5170,51 @@ function copyKeptChats(now) {
   return out;
 }
 
+/* A restore (scripts\vps\vps-restore-services.ps1) moves the data folder,
+   the uploads and config.json it replaces to <name>-before-restore-<stamp>
+   beside them, <stamp> the box's local yyyyMMdd-HHmmss, with -2, -3 for a
+   second restore in the same second. Nothing deleted them (#3620). Decided
+   by Patrick on 26 Oct (B): a set-aside copy is kept 30 days, so a restore
+   can be undone, then deleted. By the time in its name, never a file's own
+   times, which a move keeps from the original. A link is left as it is and
+   said. The feed's copies are not the site's to delete (it is denied writing
+   there, #913) and hold no person. Delete-Person.ps1 reads a data copy for a
+   deletion request while it is here. */
+const RESTORE_ASIDE_DAYS = 30;
+const RESTORE_ASIDE = /^(data|uploads|config\.json)-before-restore-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})(?:-\d+)?$/;
+function sweepRestoreCopies(now, root) {
+  root = root || ROOT;
+  const out = { deleted: 0, failed: [] };
+  let names;
+  try { names = fs.readdirSync(root); }
+  catch (e) {
+    out.error = (e && e.code) || 'unknown';
+    retentionSay('restore-copy', { event: 'list-failed', code: out.error });
+    return out;
+  }
+  const cut = now - RESTORE_ASIDE_DAYS * 86400000;
+  for (const n of names.sort()) {
+    const m = RESTORE_ASIDE.exec(n);
+    if (!m) continue;
+    const at = new Date(+m[2], +m[3] - 1, +m[4], +m[5], +m[6], +m[7]).getTime();
+    if (!(at < cut)) continue;
+    const p = path.join(root, n);
+    let st;
+    try { st = fs.lstatSync(p); } catch (e) { continue; }
+    if (st.isSymbolicLink()) { retentionSay('restore-copy', { event: 'left-link', name: n }); continue; }
+    if (st.isDirectory() !== (m[1] !== 'config.json')) continue;
+    try {
+      fs.rmSync(p, { recursive: true });
+      out.deleted++;
+      retentionSay('restore-copy', { event: 'deleted', name: n, days: RESTORE_ASIDE_DAYS });
+    } catch (e) {
+      out.failed.push(n);
+      retentionSay('restore-copy', { event: 'delete-failed', name: n, code: (e && e.code) || 'unknown' });
+    }
+  }
+  return out;
+}
+
 function retentionSweep() {
   const now = Date.now();
   const sessions = sweepSessions(now);
@@ -5091,7 +5229,8 @@ function retentionSweep() {
            removedUploads: pruneRemovedUploads(now),
            signIns: sweepSignIns(now), inbox: sweepInbox(now),
            staff: sweepStaffRecords(now), moderationLog: sweepModLog(now),
-           galleryReports: sweepGalleryReports(now) };
+           galleryReports: sweepGalleryReports(now),
+           restoreCopies: sweepRestoreCopies(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 
@@ -6941,6 +7080,8 @@ async function handle(req, res) {
       galleryNext: gallery.next,
       launcher: feed.launcher || '',
       collection: feed.collection || '',
+      // The revision that link opens, the one the server was built against (#4115).
+      collectionRevision: Number(feed.collectionRevision) > 0 ? Number(feed.collectionRevision) : 0,
       files: listFiles(),
       news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title })),
       // The hints and lore lines (#3147): the Discord bot's status lines.
@@ -6971,10 +7112,14 @@ async function handle(req, res) {
        answered 500. No folder is still no zip, tested for; a zip deleted by a
        publish between the listing and the look at it is left out. */
     let best = null;
+    // Only a zip files.json lists, since that is all /file/ serves (#3798): an
+    // unlisted one is a publish that never finished writing its list, and
+    // naming it would send the setup program to a 404.
+    const meta = jsonFile(path.join(FILES, 'files.json'), {});
     try {
       const names = fs.existsSync(FILES) ? fs.readdirSync(FILES) : [];
       for (const name of names) {
-        if (!/^Thornswood-Setup(?:-\d{8}-\d{4})?\.zip$/i.test(name)) continue;
+        if (!payloadZip(name) || !downloadServed(name, meta)) continue;
         let st;
         try { st = fs.statSync(path.join(FILES, name)); }
         catch (e) { if (e.code === 'ENOENT') continue; throw e; }
@@ -6995,9 +7140,7 @@ async function handle(req, res) {
     // else would make every install delete a good download. An empty value is
     // what an installer from before this sees when the field is missing; an
     // installer from #1365 on stops on it rather than fetching half a
-    // gigabyte it has no way to measure, so a publish without files.json
-    // beside the zip is an install nobody can run.
-    const meta = jsonFile(path.join(FILES, 'files.json'), {});
+    // gigabyte it has no way to measure.
     const sha = String((meta[best.name] || {}).sha256 || '');
     return sendJson(res, 200, {
       name: best.name,
@@ -7346,7 +7489,10 @@ async function handle(req, res) {
     // without it. html is the one to show; md is kept for anything reading it.
     // sha256 is what the installer stores. changed is the day that wording last changed,
     // or null when the list has no row for this text.
-    const md = pageMarkdown(pg[1]);
+    // Only the pages the site shows (#3656): every .md in data\site was
+    // served here, lines.md's notes for the team included, though no page
+    // shows them.
+    const md = MD_PAGES.indexOf('/' + pg[1]) >= 0 ? pageMarkdown(pg[1]) : null;
     if (md === null) return sendJson(res, 404, { error: 'no such page' });
     const sha = pageSha256(md);
     const ver = findPageVersion(sha);
@@ -7463,14 +7609,16 @@ async function handle(req, res) {
   const dl = p.match(/^\/file\/([A-Za-z0-9._ -]+)$/);
   if (dl && req.method === 'GET') {
     const file = path.join(FILES, dl[1]);
-    if (!file.startsWith(FILES + path.sep) || !fs.existsSync(file)) {
+    // Only what files.json publishes (downloadServed, #3798).
+    const meta = jsonFile(path.join(FILES, 'files.json'), {});
+    if (!file.startsWith(FILES + path.sep) || !downloadServed(dl[1], meta) ||
+        !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
     // The installer from the main release's GitHub Release, once it holds
     // this very file publicly (release copies, #3686).
     if (dl[1] === 'Thornswood-Setup.exe') {
-      const meta = jsonFile(path.join(FILES, 'files.json'), {});
       const copy = releaseInstallerCopy(String((meta[dl[1]] || {}).sha256 || '').toLowerCase(), st.size);
       if (copy) {
         res.writeHead(302, { location: copy, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' });
@@ -8641,6 +8789,29 @@ async function handle(req, res) {
     return sendJson(res, 200, { ok: true, merged: n, total: Object.keys(store.who).length });
   }
 
+  /*
+    A game server's hold economy count (#3164), whole, with the door key, the
+    roster's way: the dev server's door names the site with /dev, so its count
+    comes in on /dev/api/economy and is kept apart from main's.
+  */
+  if ((route === '/api/economy' || route === '/dev/api/economy') && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    let o = {};
+    try { o = JSON.parse(await body(req, 4 * 1024 * 1024)) || {}; } catch (e) { passBodyFailure(e); }
+    if (!sameSecret(String(o.key || ''), String(cfg.botKey))) return sendJson(res, 401, { error: 'no' });
+    const srv = (String(o.server || '') === 'dev' || route.indexOf('/dev/') === 0) ? 'dev' : 'main';
+    const now = Date.now();
+    const kept = cleanEconomy(Object.assign({}, o, { at: now }), now);
+    const store = jsonFile(ECONOMY, { servers: {} });
+    const servers = (store && store.servers && typeof store.servers === 'object') ? store.servers : {};
+    servers[srv] = kept;
+    for (const other of Object.keys(servers)) {
+      if (other !== srv) servers[other] = cleanEconomy(servers[other], now);
+    }
+    if (!putJson(ECONOMY, { servers })) return sendJson(res, 500, { error: 'could not save' });
+    return sendJson(res, 200, { ok: true, server: srv, days: Object.keys(kept.days).length });
+  }
+
   if (p === '/api/play/roster' && req.method === 'POST') {
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
@@ -9119,6 +9290,12 @@ async function handle(req, res) {
         sessions: w.admin ? sessionRows() : [],
         inbox: w.admin ? trimInbox(jsonFile(INBOX, []), Date.now()) : []
       });
+    }
+
+    /* The hub's Hold economy page (#3164): staff, the same as the page. */
+    if (p === '/api/economy' && req.method === 'GET') {
+      if (!w.dev) return sendJson(res, 403, { error: 'staff only' });
+      return sendJson(res, 200, { keepDays: ECONOMY_KEEP_DAYS, servers: economyNow(Date.now()) });
     }
 
     if (p === '/api/results' && req.method === 'PUT') {

@@ -69,12 +69,15 @@ function liftThrough(from, anchor, to) {
   return c < 0 ? null : src.slice(a, c + to.length);
 }
 
-// The thirteen events with a fixed name: eleven read out of
+// The fifteen events with a fixed name: eleven read out of
 // skymp5-server/cpp/server_guest_lib/gamemode_events on 24 September,
-// onSpellCast, which skymp #86 added for Overcharge (#2848), and onDying,
-// which skymp #101 added to ask before a death (#1626).
-const EVENTS = ['onActivate', 'onCraft', 'onDeath', 'onDropItem', 'onDying', 'onEatItem',
-                'onPutItem', 'onReadBook', 'onRespawn', 'onSpellCast', 'onTakeItem',
+// onSpellCast, which skymp #86 added for Overcharge (#2848), onDying,
+// which skymp #101 added to ask before a death (#1626), onCraftWork, which
+// fork #115 added for the time a craft takes (#3161), and
+// onEquipItemAttempt, which the fork added to ask before an item goes on
+// (#2262). The last two came with the pin at 20bb0b88 (#4896).
+const EVENTS = ['onActivate', 'onCraft', 'onCraftWork', 'onDeath', 'onDropItem', 'onDying', 'onEatItem',
+                'onEquipItemAttempt', 'onPutItem', 'onReadBook', 'onRespawn', 'onSpellCast', 'onTakeItem',
                 'onUpdateAppearanceAttempt', 'onUpdateEquipmentAttempt'];
 // The Papyrus family: the engine calls mp['onPapyrusEvent:' + name] for each
 // of these. They are the server half of the fork's event list,
@@ -177,7 +180,7 @@ if (handlersSrc !== null) {
 // ---------------------------------------------------------------- the list --
 
 if (listSrc !== null) {
-  yes('the list names all thirteen events with a fixed name',
+  yes('the list names all fifteen events with a fixed name',
       EVENTS.every(function (e) { return listSrc.indexOf(e) !== -1; }));
   yes('the list names the Papyrus family by the name the engine looks up',
       listSrc.indexOf("mp['" + PAPYRUS_PREFIX + "<Name>']") !== -1);
@@ -309,7 +312,7 @@ if (getNames === null) {
     if (lit) { literal.push(lit[1]); } else { runtime.push(g); }
   });
   literal.sort();
-  yes('the thirteen fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
+  yes('the fifteen fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
       JSON.stringify(literal) === JSON.stringify(EVENTS.slice().sort()));
 
   // The two families whose name is built when they fire, each checked by what

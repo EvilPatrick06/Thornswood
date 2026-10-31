@@ -3,7 +3,7 @@
   "about": "The asset provenance register (#2177): every picture, video, sound, font, mesh, texture, interface file and plugin Thornswood hands to people or shows them, with where it came from, who made it, the licence or permission it goes out under, the credit it asks for, who approved it and when, its sha256, and where it is published. Operator only: it lives in this private repository, no Ship, pack, installer or site deploy carries it, and tests\\test-asset-provenance.js holds it to the files. A permission itself (an email, a message, a signed note) is never written here or in an issue: an entry says where it is kept. Program code and its licences are THIRD-PARTY.md's. Nothing here infers a right from a file's name, its history or its being online (#2177 Traps): what is not recorded says not recorded, and its ask names who can answer. Built 12 Oct 2026 from THIRD-PARTY.md, the ops repo's WEBSITE-OPERATIONS.md, site\\data\\site\\credits.md, records\\ui-gone.json, scripts\\release\\Ship-Rules.ps1 and issues #1317, #1318, #1333, #1679 and #2298.",
   "statuses": {
     "cleared": "The licence is named by the file itself or its publisher and the evidence is cited, or the file holds nothing that could need one. Nothing to ask.",
-    "ours": "Thornswood's own work: made for Thornswood by a team member under the contributor terms in LICENSE (#1331), or built here by a script in this repository from nothing but its own numbers. Who made it and who decided it are recorded. Nothing to ask.",
+    "ours": "Thornswood's own work: made for Thornswood by a team member under the contributor terms in LICENSING.md (#1331), or built here by a script in this repository from nothing but its own numbers. Who made it and who decided it are recorded. Nothing to ask.",
     "derived": "Built by a script in this repository from another entry (from). It goes out on that entry's terms, so it is settled when that one is.",
     "unconfirmed": "Made for Thornswood by this repository's own account, but who made it, on what terms, and who approved it are not recorded. Ships today. Its ask says what is missing and who can answer.",
     "agreed-not-written": "Patrick has said it may go out, but the terms with its maker are not written down anywhere. Ships today.",
@@ -12,6 +12,7 @@
     "withheld": "Never ships: packs and the installer leave it out and delete it from installs.",
     "made-from-game": "Bethesda's own file, edited, or put together from Bethesda's: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own game archives (#2827), so nobody is handed the game's files. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
     "made-from-mods": "One of the collection's mods' own files, edited: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own copy of the mod, out of its archive (#3113), so nobody is handed the mod's file. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
+    "built-on-each-computer": "Built by the launcher on each computer, in Thornswood's own game folder, with the collection's own Pandora and BodySlide from the game's and the collection's mods' own files (#3715): it never ships and is never listed as removed, so nobody is handed it. Its record is the Ship-Rules.ps1 list that names it. It is still somebody else's work: its licence and attribution say whose, for the credits. Nothing to ask.",
     "not-published": "In this private repository only; nobody outside the team receives it."
   },
   "assets": [
@@ -22,10 +23,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence: original source and rights to any underlying artwork remain unconfirmed (#1679).",
       "status": "ours"
     },
     {
@@ -35,10 +36,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -48,10 +49,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -61,10 +62,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -74,10 +75,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -87,10 +88,10 @@
       "published": "thornswood.net, to every visitor",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -184,10 +185,10 @@
       "published": "thornswood.net, and every site that shows a link to it",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: the ops repo's WEBSITE-OPERATIONS.md, Asset permission evidence (#1679).",
       "status": "ours"
     },
     {
@@ -197,10 +198,10 @@
       "published": "thornswood.net, and Discord profiles of people running the launcher",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Not named in the ops repo's WEBSITE-OPERATIONS.md's table; found by this register.",
       "status": "ours"
     },
     {
@@ -210,10 +211,10 @@
       "published": "thornswood.net, to anybody who asks for it by name",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: site\\public\\home.css.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: site\\public\\home.css.",
       "status": "ours"
     },
     {
@@ -301,10 +302,10 @@
       "published": "The launcher, through the update feed and the installer",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people (Thornswood's own); Build-Launcher.ps1 embeds it.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people (Thornswood's own); Build-Launcher.ps1 embeds it.",
       "status": "ours"
     },
     {
@@ -314,10 +315,10 @@
       "published": "The dev launcher, to staff",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
       "status": "ours"
     },
     {
@@ -327,10 +328,10 @@
       "published": "The setup program on thornswood.net",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it in the stub.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it in the stub.",
       "status": "ours"
     },
     {
@@ -340,10 +341,10 @@
       "published": "The launcher, through the update feed and the installer",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
       "status": "ours"
     },
     {
@@ -353,10 +354,10 @@
       "published": "The launcher, through the update feed and the installer",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people; Build-Launcher.ps1 embeds it.",
       "status": "ours"
     },
     {
@@ -366,10 +367,10 @@
       "published": "The launcher and its shortcuts",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
       "status": "ours"
     },
     {
@@ -379,10 +380,10 @@
       "published": "The dev launcher and its shortcuts, to staff",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: THIRD-PARTY.md, How it reaches people.",
       "status": "ours"
     },
     {
@@ -392,10 +393,10 @@
       "published": "In the game's main menu, through game/menu/Mainmenuwallpaper.dds",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: launcher\\art\\BACKDROP-SPEC.md; launcher\\art\\ART-PROMPT.md.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: launcher\\art\\BACKDROP-SPEC.md; launcher\\art\\ART-PROMPT.md.",
       "status": "ours"
     },
     {
@@ -403,14 +404,13 @@
       "sha256": "fcdc3c7a715c158dfced39431ad55d41aa751d56c5e412eae7cc110c380e6a64",
       "what": "The Thornswood theme, 1 min 56 s. Plays in the launcher, the game's main menu and loading screen. No title, artist or copyright tag in the file.",
       "published": "Every pack and the installer (Data\\Platform\\UI\\thornswood-theme.mp3)",
-      "source": "Made for Thornswood by an artist this repository does not name",
-      "creator": "Not named here (the artist's name goes in only if they agree)",
-      "licence": "A verbal agreement between Patrick and the artist; terms not written down",
-      "attribution": "As the artist wants, not yet recorded",
-      "approved": "Patrick, 22 Sep 2026, for main (commit ec8d113); held to dev before that because the artist had not signed it off",
-      "evidence": "THIRD-PARTY.md, Made for Thornswood by somebody else; #1333. The written licence, once there is one, is kept privately by Patrick, never in this repository or an issue; this entry then says where.",
-      "status": "agreed-not-written",
-      "ask": "Djinn (assigned by Patrick, 12 Oct, option A on #1333): a short written licence by email from the artist covering the launcher, the game's menus and loading screen, the installer and the update downloads, its duration and fee, and how they want to be credited."
+      "source": "Made for Thornswood by a composer this repository does not name",
+      "creator": "Not named here (the composer's name goes in only if they agree)",
+      "licence": "All rights reserved by its composer. Licensed to Thornswood only, in writing on 28 Oct 2026: Thornswood may use, change and earn from it, with no fee. Not under Thornswood's art licence; nobody else may copy, change, share or use it",
+      "attribution": "None asked: the composer asks for nothing in return",
+      "approved": "Patrick, 22 Sep 2026, for main (commit ec8d113); the label, Patrick on 29 Oct 2026 (#1333): all rights reserved, kept in the repository",
+      "evidence": "The composer's written grant, 28 Oct 2026, relayed by Djinn in Discord, quoted word for word on #1333 without their name; THIRD-PARTY.md, Made for Thornswood by somebody else.",
+      "status": "cleared"
     },
     {
       "path": "game/ui/thornswood-scroll.webp",
@@ -419,10 +419,10 @@
       "published": "Packs (Data\\Platform\\UI), travelling with thornswood-select.js",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
       "status": "ours"
     },
     {
@@ -432,10 +432,10 @@
       "published": "Packs (Data\\Platform\\UI), travelling with thornswood-select.js",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\release\\Ship-Rules.ps1 $ShipTravelsWith.",
       "status": "ours"
     },
     {
@@ -459,7 +459,7 @@
       "published": "Every pack and the installer",
       "source": "Built by scripts\\dev\\Build-Backdrop.py --logo from the numbers in that script (#2177)",
       "creator": "Thornswood, built here by a script",
-      "licence": "Thornswood's own (LICENSE)",
+      "licence": "Thornswood's own: CC BY-NC-SA 4.0, like the rest of the art Thornswood owns (Patrick, 26 Oct 2026, #3688; LICENSING.md)",
       "attribution": "None",
       "approved": "Patrick, 15 Oct 2026 (#2177, option B): rebuild it as Thornswood's own",
       "evidence": "scripts\\dev\\Build-Backdrop.py; tests\\test-menu-backdrop.js holds it to the script byte for byte; launcher\\art\\BACKDROP-SPEC.md.",
@@ -532,36 +532,74 @@
       "status": "cleared"
     },
     {
+      "path": "game/ours/Data/Platform/Fonts/Barlow-SemiBold.spritefont",
+      "sha256": "065a8c29c35cc5611f0d30f5b3a3cdf13c35dd83a252ff54f3d1bd23296f224d",
+      "what": "Barlow SemiBold as a Skyrim Platform sprite font: printable ASCII, Latin-1, dashes, curly quotes, the bullet and the ellipsis at 30 pixels. The overhead voice mark draws its dot in it (#1317).",
+      "published": "Every pack and the installer (Data\\Platform\\Fonts)",
+      "source": "Drawn by scripts\\mods\\Build-SpriteFont.py from the fork's skymp5-front\\src\\fonts\\Barlow-SemiBold.ttf (sha256 86577cb3, the Data\\Platform\\UI\\dc3cbd21104d40477da6.ttf entry), with Pillow 12.3.0 and FreeType 2.14.3",
+      "creator": "The face: Jeremy Tribby (Tribby Type) and the Barlow Project Authors, https://github.com/jpt/barlow. The sprite font: Thornswood's script",
+      "licence": "OFL-1.1, as the font it is drawn from; Barlow names no Reserved Font Name. Its full text goes out beside it as Barlow-SemiBold-OFL.txt",
+      "attribution": "Barlow-SemiBold-OFL.txt beside it carries the copyright notice and the licence; named on the public credits page",
+      "approved": "Not needed: an open licence",
+      "evidence": "The font's name table and the fork's skymp5-front\\src\\fonts\\OFL.txt; scripts\\mods\\Build-SpriteFont.py; tests\\test-1317-fonts.ps1.",
+      "status": "cleared"
+    },
+    {
+      "path": "game/ours/Data/Platform/Fonts/Barlow-SemiBold-OFL.txt",
+      "sha256": "186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f",
+      "what": "The SIL Open Font License 1.1 with Barlow's copyright line, the licence Barlow-SemiBold.spritefont goes out under.",
+      "published": "Every pack and the installer (Data\\Platform\\Fonts)",
+      "source": "The fork's skymp5-front\\src\\fonts\\OFL.txt, byte for byte",
+      "creator": "SIL International (the licence) and the Barlow Project Authors (the copyright line)",
+      "licence": "The OFL's own text, which the OFL asks every copy of the font to carry",
+      "attribution": "None",
+      "approved": "Not needed: a licence text",
+      "evidence": "The fork's skymp5-front\\src\\fonts\\OFL.txt.",
+      "status": "cleared"
+    },
+    {
+      "path": "game/ours/Data/SKSE/Plugins/CraftingCategories/Thornswood-Content.json",
+      "sha256": "975ff49aecd246172497d90facb353ba455688c5787dd69a67a8b3640ab89d06",
+      "what": "Thornswood's config for the collection's crafting menu, Constructible Object Custom Keyword System (#3133): three headers by item type, weapons, armour and arrows and bolts, each with its material groups inside, made of keyword names and Thornswood's own label keys. Named for Thornswood-Content.esp, so the menu reads it after the collection's own configs and it moves weapons, armour and arrows out of the one shared WEAPONS & ARMOR header. Hash as git stores it, with LF line endings.",
+      "published": "Every pack and the installer (Data\\SKSE\\Plugins\\CraftingCategories)",
+      "source": "Written for Thornswood on 26 Oct 2026. The keyword names are the records' own: Skyrim's and its add-ons', and the ones Immersive Armors and More Craftable Equipment add to the load order, read from the collection's revision 4 plugins; the layout follows the mod's own schema",
+      "creator": "Thornswood",
+      "licence": "Thornswood's own",
+      "attribution": "None asked",
+      "approved": "Patrick, 22 Oct 2026, A on #3133: crafting tables sorted by item type, with material groups inside",
+      "evidence": "#3133; tests/test-3133-crafting-categories.js; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
+      "status": "ours"
+    },
+    {
+      "path": "game/ours/Data/Interface/Translations/Thornswood-Content_ENGLISH.txt",
+      "sha256": "19219e063f7687da8bc23c48180777154d9c126519685c66a32e21f0bfa54a66",
+      "what": "The English names of the crafting menu's headers and material groups that Thornswood-Content.json defines (#3133), one tab separated line per label key, in the UTF-16 with a byte order mark that Skyrim reads a translation file in. The game reads it because it is named for Thornswood-Content.esp.",
+      "published": "Every pack and the installer (Data\\Interface\\Translations)",
+      "source": "Written for Thornswood on 26 Oct 2026",
+      "creator": "Thornswood",
+      "licence": "Thornswood's own",
+      "attribution": "None asked",
+      "approved": "Patrick, 22 Oct 2026, A on #3133: crafting tables sorted by item type, with material groups inside",
+      "evidence": "#3133; tests/test-3133-crafting-categories.js; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
+      "status": "ours"
+    },
+    {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "8370ae32c94d68906cec45524ae36252b384e47f16be7805cce1bdf12ab49a66",
-      "what": "Thornswood's own plugin, 271,624 bytes on 22 Oct (#3349, the ten passage books' words, plain town lines written by the tool; #2993, its header's description built from the records it holds; #1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
+      "sha256": "20c5479f925d2aab75171a9190a68b2535e085c6414907af959447c79cb8b535",
+      "what": "Thornswood's own plugin, 276,675 bytes on 30 Oct (#3163, the Spoiled Food record a piece of food becomes when its days run out, and its effect, written from its own numbers in the burnt meal's look; #3152, the four festival feasts, a fine record of each wearing the same vanilla dish's look, the four festival brews in the tea's cup, their eight cooking pot and oven recipes, and the feast and brew effects; #3349, the ten passage books' words, plain town lines written by the tool; #2993, its header's description built from the records it holds; #1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
       "published": "Every pack and the installer on both channels. Not on Nexus Mods yet: Thornswood Content 1.2 carries the plugin from before #2553, registered as its own entry, until the next Thornswood Content file carries this one (#2793)",
       "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records; the other server's placements, its 57 of Thornswood's stations included (Patrick, 16 Oct, A on #2553), and its changes to Skyrim's own placements are gone.",
       "creator": "Thornswood (scripts/mods/Add-ContentRecords.py and scripts/dev/Build-StationSites.py)",
-      "licence": "Thornswood's own; the Bethesda records it overrides are the game's, as in any plugin with Skyrim's masters",
+      "licence": "Thornswood's own, under CC BY-NC-SA 4.0 (Patrick, 26 Oct 2026, q-3688-esp-licence option 4; LICENSING.md); the Bethesda records it overrides are the game's, as in any plugin with Skyrim's masters",
       "attribution": "None asked",
       "approved": "Patrick publishes it as Thornswood Content on Nexus Mods (EvilPatrick06); Patrick, 15 Oct, #2177 B: remade as Thornswood's own; Patrick, 16 Oct, #2553 A: its stations at Thornswood's own spots",
       "evidence": "THIRD-PARTY.md, Thornswood Content; scripts/mods/content-salvaged.json; tests/test-2553-salvaged-gone.js; tests/test-2553-station-sites.js.",
       "status": "ours"
     },
     {
-      "path": "game/content/Thornswood-WoodworkerTrail.esp",
-      "sha256": "d12bcd2e54d874c5005303082b5ac40ad01af3d5d8bfb5c75a4795b39d988482",
-      "what": "The light plugin for the woodworker trail (#516): 53 late-load COBJ overrides that move bow, arrow, bolt and wooden-item recipes to the woodworking bench. 9,628 bytes. On 15 Oct no release carries it: it is not in the load order yet.",
-      "published": "not yet: it ships once it is put at the end of the collection load order",
-      "source": "Built by scripts\\\\mods\\\\Build-WoodworkerTrailOverrides.py from the load order's own plugins, as overrides of their recipes",
-      "creator": "Built here; the recipes it overrides are those plugins' authors'",
-      "licence": "not recorded: the permissions of the plugins whose recipes it overrides were not read",
-      "attribution": "not recorded",
-      "approved": "not recorded",
-      "evidence": "PR #2529 (#516); scripts\\\\mods\\\\Build-WoodworkerTrailOverrides.py.",
-      "status": "not-published",
-      "ask": "Whoever puts it in the load order: read the overridden plugins' permissions for redistributing overrides, before the first release that carries it."
-    },
-    {
       "path": "game/content/Thornswood-Last.esp",
-      "sha256": "c1701fb60b0fb5a5dd0ca05b5751fc32abcfe82a40170ac45e5207cc8567fd0a",
-      "what": "The light plugin that loads last (#2468): 6,939 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped, and 8 location records and 3 rooms copied from the plugins that win them with a hold given (#2551), the three town gates Bethesda ships locked (1b1f1, 42284, 42286) overridden without their lock or script (#2484), and 91,416 floor items and coin purses overridden initially disabled, keeping only their base and place, with 806 more cells copied for them (#3077), the 32 smith recipes that asked far more or far less than their peers re-costed (#613), and the gold coins taken out of the 11 other forge recipes that charged them (#3115); and Skyrim Unbound's start quest SkyrimUnboundInventory copied with its script set to give a new character no random weapon and no spells (#3101); nothing of Immersive Armors (#2454): the 656 floor items and 7 cut actors it places or stands over are held off by the server instead (HELD_BY_SERVER, Patrick 22 Oct, q-613-ia-recipes). 12,899,542 bytes on 22 Oct; the six-trade alpha roster removes189 extra guild traders (#1373).",
+      "sha256": "9d2fe9d6c00fdf03e279f348c295b052039425bb31c4a21a4b0f75b96b8a4a11",
+      "what": "The light plugin that loads last (#2468): 6,939 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped, and 8 location records and 3 rooms copied from the plugins that win them with a hold given (#2551), the three town gates Bethesda ships locked (1b1f1, 42284, 42286) overridden without their lock or script (#2484), and 91,416 floor items and coin purses overridden initially disabled, keeping only their base and place, with 806 more cells copied for them (#3077), the 32 smith recipes that asked far more or far less than their peers re-costed (#613), and the gold coins taken out of the 11 other forge recipes that charged them (#3115), and the recipes of a trade that sat at a bench it does not work at (Tailor clothes at the forge, Woodwright bows and arrows at the forge, among them the live rows the never-shipped Thornswood-WoodworkerTrail.esp was built for) copied from the plugins that win them with their bench pointed at the trade's own (#3120); and Skyrim Unbound's start quest SkyrimUnboundInventory copied with its script set to give a new character no random weapon and no spells (#3101); nothing of Immersive Armors (#2454): the 656 floor items and 7 cut actors it places or stands over are held off by the server instead (HELD_BY_SERVER, Patrick 22 Oct, q-613-ia-recipes). 12,899,542 bytes on 22 Oct; the six-trade alpha roster removes189 extra guild traders (#1373).",
       "published": "Every pack and the installer on both channels, and handed out by both game servers, since #2486 (Patrick, 12 Oct: it ships from the repository like the content plugin)",
       "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
       "creator": "Built here; the records it overrides and copies are those plugins' authors'",
@@ -579,10 +617,10 @@
       "published": "Discord, wherever the bot appears",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Developer-Guide.md, After a pull request is merged (the avatar row).",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Developer-Guide.md, After a pull request is merged (the avatar row).",
       "status": "ours"
     },
     {
@@ -592,10 +630,10 @@
       "published": "Discord, wherever the bot appears",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Developer-Guide.md, After a pull request is merged.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Developer-Guide.md, After a pull request is merged.",
       "status": "ours"
     },
     {
@@ -605,10 +643,10 @@
       "published": "Discord, if set as the server's icon",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Its name only.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Its name only.",
       "status": "ours"
     },
     {
@@ -618,10 +656,10 @@
       "published": "Discord, if set as the server's banner",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
       "status": "ours"
     },
     {
@@ -631,10 +669,10 @@
       "published": "Discord, if set as the server's banner",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: Its name only.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: Its name only.",
       "status": "ours"
     },
     {
@@ -644,10 +682,10 @@
       "published": "Discord invite pages, if set; and every join card through bot/assets/join-card.png",
       "source": "Made for Thornswood by Djinn",
       "creator": "Djinn, for Thornswood",
-      "licence": "Thornswood's, under the contributor terms in LICENSE (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
       "attribution": "None asked; the contributor terms ask for none",
       "approved": "Patrick, 15 Oct 2026 (#2177): Djinn made all the art with no recorded maker",
-      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSE, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
+      "evidence": "Patrick's decision on #2177, 15 Oct 2026; LICENSING.md, Contributor terms. Before: scripts\\oneoff\\make-join-card.py.",
       "status": "ours"
     },
     {
@@ -669,67 +707,71 @@
       "sha256": "fcf51dc085b68383d0db6719e45f1909be2926b791b6de2b0414dc53427894f0",
       "what": "A screenshot of the launcher's Play page for Developer-Guide.md.",
       "published": "nowhere: the guide is in this private repository",
-      "source": "A screenshot of Thornswood's own launcher",
-      "creator": "not recorded",
-      "licence": "not needed while it stays in the repository",
-      "attribution": "None",
-      "approved": "not recorded",
+      "source": "A screenshot of Thornswood's own launcher, taken for Thornswood by Djinn",
+      "creator": "Djinn, for Thornswood",
+      "licence": "Thornswood's, under the contributor terms in LICENSING.md (#1331): Djinn keeps the copyright and gives the owner of Thornswood a permanent, worldwide, free licence to use, copy, change, publish and distribute it",
+      "attribution": "None asked; the contributor terms ask for none",
+      "approved": "Patrick, 27 Oct 2026, on the report page (q-3688-unrecorded-art, A): Djinn made it",
       "evidence": "Developer-Guide.md, H. Dev Build.",
-      "status": "not-published"
+      "status": "ours"
     }
   ],
   "notInRepo": [
     {
       "path": "Data\\Platform\\UI\\6f802bf60c545304b09e.ttf",
-      "what": "Futura PT Cond Book, in the skymp5-front build (build.js).",
-      "published": "Every pack and the installer",
+      "what": "Futura PT Cond Book, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream SkyMP's skymp5-front\\src\\fonts, byte for byte; build.js came from local\\thornswood-front.zip with no recorded source commit",
       "creator": "ParaType Ltd",
       "licence": "ParaType's end user licence (http://www.paratype.com/eula); nothing found gives SkyMP or Thornswood the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\00e4a2200c3e5ae71d67.ttf",
-      "what": "Futura PT Cond Medium, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "Futura PT Cond Medium, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "ParaType Ltd",
       "licence": "ParaType's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\268a0df3f0e2c23d1ea6.ttf",
-      "what": "DIN Pro Regular, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "DIN Pro Regular, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "FSI FontShop International GmbH",
       "licence": "FontFont's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\fdf086661e1600f95a34.ttf",
-      "what": "DIN Pro Condensed Bold Italic, in the skymp5-front build.",
-      "published": "Every pack and the installer",
+      "what": "DIN Pro Condensed Bold Italic, in main's skymp5-front build until 20 Oct 2026 (build.js named it by hash). The front built from the fork since then names none of the four.",
+      "published": "Never again: every pack deletes it from installs (#1317). Main's releases up to 20261017-205912 carried it",
       "source": "Upstream skymp5-front\\src\\fonts, byte for byte",
       "creator": "FSI FontShop International GmbH",
       "licence": "FontFont's end user licence; nothing found gives the right to hand it on",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it",
+      "evidence": "records\\ui-gone.json unused, read by Ship-Rules.ps1 and OwnGame.Foreign; tests\\test-1317-fonts.ps1; THIRD-PARTY.md, From upstream SkyMP.",
+      "status": "withheld",
+      "issue": 1317,
+      "record": "records/ui-gone.json#unused"
     },
     {
       "path": "Data\\Platform\\UI\\855bfaf67c57745958d3.ttf",
@@ -795,29 +837,35 @@
     },
     {
       "path": "Data\\Platform\\Fonts\\DIN-Pro-bold.spritefont",
-      "what": "A sprite font whose name says DIN Pro Bold. Nothing in skymp5-client or Thornswood asks for it by name.",
-      "published": "Every pack and the installer",
+      "what": "A sprite font of FSI FontShop's DIN Pro Bold. Until #1317 the overhead voice mark drew its dot in it.",
+      "published": "Never again: every pack deletes it from installs (#1317)",
       "source": "Upstream SkyMP client-deps, byte for byte",
       "creator": "DIN Pro is FSI FontShop's typeface",
       "licence": "None found",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP; #1317 option 1.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it; the voice mark draws in Barlow-SemiBold.spritefont instead",
+      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipCommercialFonts and OwnGame.Foreign; tests\\test-1317-fonts.ps1.",
+      "status": "withheld",
+      "record": "scripts/release/Ship-Rules.ps1#ShipCommercialFonts",
+      "paths": [
+        "Data\\Platform\\Fonts\\DIN-Pro-bold.spritefont"
+      ]
     },
     {
       "path": "Data\\Platform\\Fonts\\Futura.spritefont",
-      "what": "A sprite font dated 14 Sep. Skyrim Platform loads every sprite font in the folder, but nothing asks for this one by name.",
-      "published": "Every pack and the installer",
+      "what": "A sprite font dated 14 Sep whose name says Futura, ParaType's Futura PT. Skyrim Platform loads every sprite font in the folder, but nothing asked for this one by name.",
+      "published": "Never again: every pack deletes it from installs (#1317)",
       "source": "not recorded: not in the fork",
       "creator": "not recorded",
       "licence": "None found",
       "attribution": "not applicable",
-      "approved": "Patrick, 5 Oct: leave #1317 open, no action",
-      "evidence": "THIRD-PARTY.md, Shipped today with no licence this file can name; #1317 names Futura.spritefont.",
-      "status": "no-licence-found",
-      "issue": 1317
+      "approved": "#1317: it stops shipping and every install deletes it; the voice mark draws in Barlow-SemiBold.spritefont instead",
+      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipCommercialFonts and OwnGame.Foreign; tests\\test-1317-fonts.ps1.",
+      "status": "withheld",
+      "record": "scripts/release/Ship-Rules.ps1#ShipCommercialFonts",
+      "paths": [
+        "Data\\Platform\\Fonts\\Futura.spritefont"
+      ]
     },
     {
       "path": "Data\\Platform\\Fonts\\ChainLink.spritefont, NoticeIcon.spritefont, VoiceIcon.spritefont",
@@ -1065,6 +1113,98 @@
         "Data\\Interface\\exported\\AHZHudInfo.swf"
       ],
       "issue": 3113
+    },
+    {
+      "path": "Data\\Interface\\quest_journal.swf",
+      "what": "SkyUI's journal with no Quick Save, Save, Load, Help, Creations or Installed Content on its System page (#3127): Settings, Mod Configuration, Controls and Quit stay (314,065 bytes, sha256 e1dbd80f11b83d4ee346dc6f02f4eafefc280831cc74b3d622a3b69827c77ed8).",
+      "published": "Never: the launcher makes it before every Play from the person's own SkyUI_SE.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
+      "source": "SkyUI's interface\\quest_journal.swf (SkyUI_SE.bsa, Nexus Mods mod 12604, file 749043), the file collection 7essxf installs, edited. What the repository holds is the edits, as the bytes that change, pinned to the sha256 of SkyUI's own file (launcher\\app\\FromGameModMenus.cs, written by scripts\\mods\\Build-ModMenus.py), not the file",
+      "creator": "SkyUI's authors; edited for Thornswood on 26 Oct 2026 by scripts\\mods\\Build-ModMenus.py",
+      "licence": "SkyUI's own terms on its Nexus Mods page, which do not let Thornswood hand the file on, edited or not, so it is made on each machine from the person's own copy",
+      "attribution": "The site's credits page says Thornswood ships none of SkyUI's files and makes this one from the person's own copy (#3127)",
+      "approved": "Patrick, 21 Oct 2026, #3127: remove the vanilla Skyrim menus and pieces Thornswood does not use, such as the vanilla help",
+      "evidence": "The measurement on #3127, 26 Oct 2026; launcher\\app\\FromGame.cs, FromGameModMenus.cs and MadeFromGame.cs; scripts\\mods\\Build-ModMenus.py; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromMods; tests\\test-2827-from-game.ps1; THIRD-PARTY.md, The collection's menus, with no gold values.",
+      "status": "made-from-mods",
+      "record": "scripts/release/Ship-Rules.ps1#ShipMadeFromMods",
+      "paths": [
+        "Data\\Interface\\quest_journal.swf"
+      ],
+      "issue": 3127
+    },
+    {
+      "path": "The behavior, character and animation data files the launcher makes with Pandora (Data\\meshes\\actors\\character\\behaviors\\, _1stperson\\behaviors\\, characters\\defaultmale.hkx, characters female\\defaultfemale.hkx, animationdatasinglefile.txt and animationsetdatasinglefile.txt)",
+      "what": "Skyrim's own animation graphs with the four patches records\\generated.json names merged in, so Precision's and True Directional Movement's animations and events reach the game: 35 behavior files (18 third person, 17 first person), the two character files and the two animation data files, 39 files and 10,543,930 bytes in the installer read on 27 Oct 2026. Data\\Scripts\\FNIS.pex is allowed by the same Ship-Rules.ps1 pattern and was not in that installer.",
+      "published": "Every pack and the installer, both channels, from #1247 until #3715 (27 Oct 2026); since then nowhere: the launcher builds them on each computer",
+      "source": "Built on each computer by the launcher (launcher\\app\\GeneratedBuild.cs, which scripts\\mods\\Build-Generated.ps1 also runs) with Pandora Behaviour Engine+ 5.0.0-beta (Nexus SE 133232) from the game's own behavior graphs, character files and animation data, with the patch colis from Precision 2.0.6 (Nexus SE 72347) and tdmh, tdmlen and tdmv from True Directional Movement 2.3.1 (Nexus SE 51614), the versions the collection deploys. Pandora writes each graph whole: the file is the game's graph with the patches' nodes added, not the patches alone",
+      "creator": "Bethesda Game Studios (the graphs, the character files and the animation data); Ersh (Precision's and True Directional Movement's patches); merged by Pandora Behaviour Engine+, by the Pandora Behaviour Engine Team (Monitor221hz)",
+      "licence": "None that lets Thornswood hand them on, and none needed since #3715: they are built on each computer and never shipped. Bethesda's part: the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, read 19 Oct 2026 for #2792) grants no right to hand on ZeniMax's own files, edited or not. Ersh's part, read 27 Oct 2026 on One from the mod pages' Permissions and credits sections (#3715, issue comment 6431881440): Precision (72347) and True Directional Movement (51614) set the same lines: assets may be used without permission with credit, never in anything sold; no upload to other sites; modifying the files to improve them needs Ersh's permission. Pandora Behaviour Engine+ (133232) is under the GNU GPL v3 (copyright 2023-2025 the Pandora Behaviour Engine contributors, source at github.com/Monitor221hz/Pandora-Behaviour-Engine-Plus), which covers the program, run from the collection, not the files it writes",
+      "attribution": "Bethesda Game Studios, Ersh for Precision and True Directional Movement, and Pandora Behaviour Engine+ on the public credits page (#3715)",
+      "approved": "Patrick, 29 Sep 2026 (#1247): build them in Thornswood's own folder before a Ship. Patrick, 27 Oct 2026 (#3715, option A on the report page): \"The launcher makes all 45 files on each computer\"; no release carries them since",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; launcher\\app\\GeneratedBuild.cs and GeneratedHere.cs; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies. Bethesda's terms: THIRD-PARTY.md, Bethesda's own files, made on each machine.",
+      "status": "built-on-each-computer",
+      "issue": 3715,
+      "paths": [
+        "Data\\meshes\\animationdatasinglefile.txt",
+        "Data\\meshes\\animationsetdatasinglefile.txt",
+        "Data\\meshes\\actors\\*\\behaviors\\*.hkx",
+        "Data\\meshes\\actors\\*\\characters\\*.hkx",
+        "Data\\meshes\\actors\\*\\characters female\\*.hkx",
+        "Data\\Scripts\\FNIS.pex"
+      ],
+      "record": "scripts/release/Ship-Rules.ps1#ShipGeneratedPatterns"
+    },
+    {
+      "path": "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif and femalebody_1.nif",
+      "what": "The women's body, CBBE 3BA built in BodySlide from the set CBBE 3BBB Amazing NeverNude at its own slider defaults, with underwear and nothing that shapes the breasts, the seat, the genitals or the nipples moved (#1004, #405). 3,840,722 bytes in the installer read on 27 Oct 2026.",
+      "published": "Every pack and the installer, both channels, from #1247 until #3715 (27 Oct 2026); since then nowhere: the launcher builds them on each computer",
+      "source": "CBBE 3BA (3BBB) 2.48 (Nexus SE 30174), its slider set file SliderSets\\SE 3BBB Amazing NeverNude.osp, as the collection deploys it; 3BA is built on CBBE (Nexus SE 198). Built on each computer by the launcher (launcher\\app\\GeneratedBuild.cs, which scripts\\mods\\Build-Generated.ps1 also runs) with BodySlide",
+      "creator": "Acro (CBBE 3BA), on CBBE by Ousnius, Caliente and Jeir; built by BodySlide",
+      "licence": "None needed since #3715: built on each computer and never shipped. CBBE 3BA (30174), read 27 Oct 2026 on One from the mod pages' Permissions and credits sections (#3715, issue comment 6431881440): assets may be used without permission with credit to Acro, never in anything sold; no upload of the file to other sites; some assets belong to other authors; the author's notes ask for the author's OK for a body mesh edited so its vertex order or count changes (a BodySlide build at slider defaults changes neither). CBBE (198), the same day: no Nexus permission lines; the author's instructions let the body be used for outfits with credit and a link back, and say distribution by parties not expressly given permission is disallowed, so handing the built body on would have needed Ousnius' permission",
+      "attribution": "CBBE 3BA by Acro and CBBE by Ousnius, Caliente and Jeir on the public credits page (#3715)",
+      "approved": "Patrick, 29 Sep 2026 (#1247): build the covered bodies in Thornswood's own folder before a Ship. Patrick, 27 Oct 2026 (#3715, option A on the report page): \"The launcher makes all 45 files on each computer\"; no release carries them since",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; launcher\\app\\GeneratedBuild.cs and GeneratedHere.cs; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies.",
+      "status": "built-on-each-computer",
+      "issue": 3715,
+      "paths": [
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\femalebody_1.nif"
+      ],
+      "record": "scripts/release/Ship-Rules.ps1#ShipGeneratedBodyFiles"
+    },
+    {
+      "path": "Data\\meshes\\actors\\character\\character assets\\femalebodyastrid_0.nif and femalebodyastrid_1.nif",
+      "what": "Astrid's burned body, built in BodySlide from the set CBBE Vanilla - Body - Astrid at its own slider defaults, so the old mesh with genital shapes is not used (#1004). 2,555,688 bytes in the installer read on 27 Oct 2026.",
+      "published": "Every pack and the installer, both channels, from #1247 until #3715 (27 Oct 2026); since then nowhere: the launcher builds them on each computer",
+      "source": "CBBE 2.0.3 (Nexus SE 198), one of its vanilla outfit slider sets (by its name SliderSets\\CBBE Vanilla.osp, the file the collection deploys from 198; the file itself was not opened here). Built on each computer by the launcher (launcher\\app\\GeneratedBuild.cs, which scripts\\mods\\Build-Generated.ps1 also runs) with BodySlide. The collection's own prebuilt copy at the same path is CBBE 3BA Vanilla Outfits Redone's (Nexus SE 109194), which the release's file takes the place of",
+      "creator": "Ousnius, Caliente and Jeir (CBBE), over Bethesda's Astrid outfit; built by BodySlide",
+      "licence": "None needed since #3715: built on each computer and never shipped. CBBE (198), read 27 Oct 2026 on One from the mod pages' Permissions and credits sections (#3715, issue comment 6431881440): no Nexus permission lines; the author's instructions let the body be used for outfits and NPCs with credit and a link back, and say distribution by, or sub-licensing to, parties not expressly given permission is disallowed, and a body mesh modified beyond sliders needs permission. Handing the built body on would have needed Ousnius' permission",
+      "attribution": "CBBE by Ousnius, Caliente and Jeir on the public credits page (#3715)",
+      "approved": "Patrick, 29 Sep 2026 (#1247): build the covered bodies in Thornswood's own folder before a Ship. Patrick, 27 Oct 2026 (#3715, option A on the report page): \"The launcher makes all 45 files on each computer\"; no release carries them since",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; launcher\\app\\GeneratedBuild.cs and GeneratedHere.cs; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies.",
+      "status": "built-on-each-computer",
+      "issue": 3715,
+      "paths": [
+        "Data\\meshes\\actors\\character\\character assets\\femalebodyastrid_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\femalebodyastrid_1.nif"
+      ],
+      "record": "scripts/release/Ship-Rules.ps1#ShipGeneratedBodyFiles"
+    },
+    {
+      "path": "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif and malebody_1.nif",
+      "what": "The men's body, HIMBO built in BodySlide from the set HIMBO Body - Vanilla Nevernude at its own slider defaults, with underwear (#1004, #405). 1,988,322 bytes in the installer read on 27 Oct 2026.",
+      "published": "Every pack and the installer, both channels, from #1247 until #3715 (27 Oct 2026); since then nowhere: the launcher builds them on each computer",
+      "source": "Highly Improved Male Body Overhaul (HIMBO) 5.8 (Nexus SE 46311), its file HIMBO V5 - Core (Nevernude Body), slider set file SliderSets\\HIMBO.osp, as the collection deploys it. Built on each computer by the launcher (launcher\\app\\GeneratedBuild.cs, which scripts\\mods\\Build-Generated.ps1 also runs) with BodySlide",
+      "creator": "Kreiste and Novelyst (HIMBO), which credits Better Males Remesh (Nexus SE 3672) by FavoredSoul, Chris57, Ratrace and Honkman and High Poly Hands (Nexus SE 37485) by zzjay; built by BodySlide",
+      "licence": "CC BY-SA 4.0, named by the author in the mod's description under Permission (read through the Nexus API, 27 Oct 2026): \"The main body mesh along with the undies meshes are licensed CC-BY-SA-4.0.\" and \"You are allowed to make refits and/or original armors/clothings using HIMBO body as long as you credit me and your files are available for free and not behind any kind of paywalls.\" A body built from it is an adaptation: it goes out under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/), free, with credit and a note that it was changed. Nexus answers a cloud session with a Cloudflare 403 and its API carries no permissions field, so the mod page's Permissions and credits section was not read, so whether it says more than the description is not known",
+      "attribution": "HIMBO by Kreiste and Novelyst, CC BY-SA 4.0, built in BodySlide for Thornswood, on the public credits page (#3715)",
+      "approved": "Not needed while it shipped: an open licence, kept by crediting it and handing it on free under the same licence. Patrick, 27 Oct 2026 (#3715, option A on the report page): \"The launcher makes all 45 files on each computer\"; no release carries them since",
+      "evidence": "Read 27 Oct 2026 (#3715): the installer on thornswood.net (76,735,000 bytes, sha256 eefa15c5, payload manifest builtAt 2026-10-26 18:24:12Z) carries these files, their sha256 in tests\\fixtures\\3715-generated.txt; which mod deploys each slider set, patch and Pandora is collection 7essxf's Vortex deployment record of 21 Oct 2026 (the #2969 thread's copy); records\\generated.json; launcher\\app\\GeneratedBuild.cs and GeneratedHere.cs; scripts\\release\\Ship-Rules.ps1 $ShipGeneratedBodyFiles and $ShipGeneratedPatterns; THIRD-PARTY.md, Built here from other people's work: behaviors and bodies. HIMBO's description, Permission, through the Nexus API (legacyMods, gameId 1704, modId 46311).",
+      "status": "built-on-each-computer",
+      "paths": [
+        "Data\\meshes\\actors\\character\\character assets\\malebody_0.nif",
+        "Data\\meshes\\actors\\character\\character assets\\malebody_1.nif"
+      ],
+      "record": "scripts/release/Ship-Rules.ps1#ShipGeneratedBodyFiles"
     }
   ],
   "dispositions": [

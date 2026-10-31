@@ -43,11 +43,14 @@
     ssh here: ssh to the box the way every script here goes (One, a
         developer's PC set up by Setup-SshKey.ps1). -From is then who the
         notice is from: one lower case word, claude, codex, djinn.
-    no ssh here, gh here (a cloud thread; #3045): it starts
-        .github/workflows/staff-notice.yml on main with the notice, waits for
-        the run to end, and prints the run's answer. The workflow runs this
-        script with -OnTheBox on a VPS runner, with the notices key named
-        claude out of the "notices" environment, which only main may use. So
+    no ssh here, gh here (a cloud thread; #3045): it starts the private
+        ops repository's staff-notice.yml (EvilPatrick06/Thornswood-Ops,
+        where the VPS runners are registered, #4013) on its main with the
+        notice, waits for the run to end, and prints the run's answer. The
+        workflow checks out this repository's main and runs this script with
+        -OnTheBox on a VPS runner, with the notices key named claude out of
+        that repository's "notices" environment, which only main may use. gh
+        needs that repository: a cloud thread has it attached. So
         the notice says [claude], and -From, if given, has to be claude.
         Nothing secret is in the container or crosses it: the text and the
         answer do. A run that has not ended in -WaitMinutes still posts when
@@ -92,7 +95,8 @@ param(
     # The staff-notice workflow's half: this runs on the box itself.
     [switch]$OnTheBox,
     [int]$WaitMinutes = 15,
-    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
+    # Where staff-notice.yml and the VPS runners are (#4013).
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood-Ops',
     [string]$VpsHost = '',
     [string]$VpsUser = ''
 )
@@ -128,7 +132,7 @@ $withNoticeKey = [bool]($noticeKey -and $noticeToken)
 # ------------------------------------------------------------- the way -----
 $route = ''
 if ($OnTheBox) {
-    if (-not $noticeKey) { Die 'THORNSWOOD_NOTICE_KEY_B64 is not set, so there is no key to post with. In the staff-notice workflow it is the NOTICE_KEY_B64 secret of the "notices" environment, which .\scripts\vps\Grant-BoxAccess.ps1 -Name claude -MakeKey -NoticesOnly -ToEnvironment notices puts there from One. Nothing was posted.' }
+    if (-not $noticeKey) { Die 'THORNSWOOD_NOTICE_KEY_B64 is not set, so there is no key to post with. In the ops repository''s staff-notice workflow it is the NOTICE_KEY_B64 secret of the "notices" environment, which .\scripts\vps\Grant-BoxAccess.ps1 -Name claude -MakeKey -NoticesOnly -ToEnvironment notices puts there from One. Nothing was posted.' }
     $route = 'box'
 } elseif ($noticeKey -or $noticeToken) {
     if (-not $withNoticeKey) { Die 'only one of THORNSWOOD_NOTICE_KEY_B64 and THORNSWOOD_NOTICE_TOKEN is set; a notices key needs both. Grant-BoxAccess.ps1 -NoticesOnly -MakeKey on One makes the pair. Nothing was posted.' }
@@ -313,7 +317,7 @@ if ($route -eq 'github') {
 
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         $out = @(Invoke-ThornswoodNative { @($line) | & ssh @sshArgs $target $remote } 2>&1 | ForEach-Object { "$_".Trim() } |
-                 Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+                 Where-Object { $_ })
         $code = $LASTEXITCODE
         $ErrorActionPreference = $old
     }

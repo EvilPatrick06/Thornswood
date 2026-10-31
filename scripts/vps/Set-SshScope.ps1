@@ -61,7 +61,10 @@
   To put the rules back as they were before the last change instead:
       Get-ChildItem C:\ProgramData\ssh\ssh-scope-before-*.json
       $s = Get-Content -Raw <the newest of those> | ConvertFrom-Json
-      foreach ($r in $s.rules) { Set-NetFirewallRule -Name $r.name -RemoteAddress @($r.remote) }
+      foreach ($r in $s.rules) { if ($r.store -eq 'Local') { Set-NetFirewallRule -PolicyStore PersistentStore -Name $r.name -RemoteAddress @($r.remote) } else { Set-NetFirewallRule -PolicyStore localhost -Name $r.name -RemoteAddress @($r.remote) } }
+      gpupdate /target:computer /force
+  (the rules live in the box's own policy store, scripts\vps\BoxFirewall.ps1, #3896;
+  a file from before that has no store and goes to the policy store)
 
 .PARAMETER From
   The addresses that may reach port 22, comma separated: 203.0.113.7,
@@ -119,7 +122,7 @@ function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Done 1 }
 
 function Clean($lines) {
-    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+    @($lines | ForEach-Object { [string]$_ } | Where-Object { $_ })
 }
 
 # A new connection with the key and nothing else.
@@ -215,7 +218,7 @@ Say "  CHANGED the put back task is cancelled, so the change stays" 'Green'
 
 Head '5. Port 22 on the box now'
 $read = Invoke-Encoded @'
-foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
+foreach ($r in @(Get-NetFirewallRule -PolicyStore ActiveStore -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
   $pf = $r | Get-NetFirewallPortFilter
   if (@($pf.LocalPort) -notcontains '22') { continue }
   $af = $r | Get-NetFirewallAddressFilter

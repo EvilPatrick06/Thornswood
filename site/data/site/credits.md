@@ -21,6 +21,19 @@ the collection on Nexus, linked from the [Downloads](/downloads) page, and each
 mod in it links to its own page and its author. Go and endorse the ones you
 like.
 
+## Thornswood's own work
+
+Thornswood's own code (the launcher, the installer, the overlays, the
+gamemode, the code behind this site, the bot and the voice service) is under
+the MIT licence. Its own lore, art, music and game content are under
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/):
+share and adapt them, not for money, crediting Thornswood and keeping the same
+licence. The Thornswood name and logo are under neither, and stay
+Thornswood's with all rights reserved. The theme music is its composer's,
+with all rights reserved: it is licensed to Thornswood alone and is not under
+that licence. What other people made keeps its own licence, as the rest of
+this page says.
+
 <a id='source'></a>
 
 ## Source code
@@ -37,10 +50,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`2b015d26`](https://github.com/EvilPatrick06/skymp/tree/2b015d2679c5efae6920e90b81ba188ec290a539).
+[`09a4b398`](https://github.com/EvilPatrick06/skymp/tree/09a4b398f2660742d4029a733892fd958fb4274e).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...2b015d26)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...09a4b398)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -144,6 +157,24 @@ board and drop box meshes are put together from pieces of Skyrim's own meshes
 with the game's own textures. Thornswood ships none of the three: the launcher
 makes them on your computer from your own copy of the game.
 
+**The animation files** in `Data\meshes\actors\character` (its `behaviors`
+and `characters` folders) and `Data\meshes\animationdatasinglefile.txt` and
+`animationsetdatasinglefile.txt` are Skyrim's own, with the animation patches
+of Precision and True Directional Movement, both by Ersh, merged in by Pandora
+Behaviour Engine+, by the Pandora Behaviour Engine Team. The launcher runs the
+collection's Pandora on your computer to make them; Thornswood wrote none of
+them, and they never come with Thornswood.
+
+**The bodies** are built on your computer by the launcher, in the
+collection's BodySlide, each with underwear, at its own slider defaults, and
+never come with Thornswood. The women's is CBBE 3BA, by Acro, and Astrid's is
+CBBE's, both on CBBE by Ousnius, Caliente and Jeir. The men's,
+`malebody_0.nif` and `malebody_1.nif`, is Highly Improved Male Body Overhaul
+(HIMBO), by Kreiste and Novelyst, changed only by that build. HIMBO's body is
+under the
+[Creative Commons Attribution-ShareAlike 4.0 licence](https://creativecommons.org/licenses/by-sa/4.0/),
+and so are these two files.
+
 **SkyHUD's settings**, `Data\Interface\skyhud\skyhud.txt`, are Thornswood's
 preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection
 installs. SkyHUD's author lets anybody share a preset that says which version
@@ -156,9 +187,12 @@ the GPL-3.0-or-later, and so is this file.
 
 **SkyUI's item lists and item card, SkyHUD's line under an item and moreHUD's
 value to weight** show no gold value on Thornswood, because an item here has
-no gold price. They are the work of the SkyUI Team, the SkyHUD Team and
-Ahzaab, moreHUD's author. Thornswood ships none of those files: the launcher
-makes them on your computer from your own copy of each mod.
+no gold price. **SkyUI's journal** has no saving, loading, Skyrim help or
+Creation Club on its System page, because Thornswood keeps your character on
+the server and has its own help. They are the work of the SkyUI Team, the
+SkyHUD Team and Ahzaab, moreHUD's author. Thornswood ships none of those
+files: the launcher makes them on your computer from your own copy of each
+mod.
 
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
@@ -170,7 +204,9 @@ that interface draws the dots of a hidden password with, was made with
 IcoMoon. Both come with SkyMP, in its `skymp5-front`. **Barlow SemiBold**, the
 font that interface draws the rest of its text in since 20 October 2026, is by
 Jeremy Tribby and the Barlow Project Authors, under the SIL Open Font License,
-version 1.1.
+version 1.1. Thornswood also draws the dot over somebody who is speaking in
+Barlow SemiBold, made into a Skyrim Platform font, and its licence goes with
+it into your game folder.
 
 **This site** is set in Cinzel, by the Cinzel Project Authors, and Spectral,
 by the Spectral Project Authors, both under the SIL Open Font License. It

@@ -363,7 +363,7 @@ try {
                    'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
                    'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1', 'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-OnGitHub.ps1', 'scripts\release\Assert-PublishSigned.ps1', 'scripts\release\ShippedBytes.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
-                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json',
+                   'scripts\release\Where.ps1', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences', 'records\ui-gone.json', 'records\shipped-not-ours.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json') {
         $to = Join-Path $fake $f
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
@@ -387,9 +387,6 @@ try {
     Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'plugin'
     Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "# This fixture enables no additional plugins.`r`n"
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') ''
-    # The covered bodies a publish needs since d2519bb, as a build leaves them.
-    . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-    New-GeneratedBodies $inst $fake
     . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
     Install-UiFrontFixture (Join-Path $inst 'Game')
     $rel6 = Join-Path $inst 'rel'

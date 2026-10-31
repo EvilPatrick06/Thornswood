@@ -43,7 +43,7 @@ jobs:
   launcher-vps:
     name: Launcher builds (VPS fallback)
     needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ !cancelled() && github.event.repository.private && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}
     # thornswood-build (#2994): only the runners records/build-runners.json
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
@@ -586,7 +586,7 @@ jobs:
   # fallback above runs instead.
   launcher:
     name: Launcher builds
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ (!github.event.repository.private || (vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps')) }}
     runs-on: windows-latest
     # As the fallback's: the gate step reads the map main's build handed on.
     permissions:
@@ -596,3 +596,23 @@ jobs:
     # eighteen minutes on it, so it gets an hour.
     timeout-minutes: 60
     steps: *checks
+
+  # The one check main's ruleset requires (#3683): passes only when one of
+  # the two builds above succeeded. Written by Build-PrWorkflow.js, which
+  # says why it is on GitHub's runner and only once the repository is public.
+  result:
+    name: Build check result
+    needs: [launcher-vps, launcher]
+    if: ${{ !cancelled() && github.event.repository.private == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: One of the two builds passed
+        env:
+          HOSTED: ${{ needs.launcher.result }}
+          VPS: ${{ needs.launcher-vps.result }}
+        run: |
+          echo "Launcher builds: $HOSTED; Launcher builds (VPS fallback): $VPS"
+          if [ "$HOSTED" = success ] || [ "$VPS" = success ]; then exit 0; fi
+          echo "::error::neither build passed, so this pull request may not merge"
+          exit 1

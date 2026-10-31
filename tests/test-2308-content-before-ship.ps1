@@ -161,7 +161,7 @@ try {
     $fake = Join-Path $Scratch 'repo'
     New-Item -ItemType Directory -Force -Path $fake | Out-Null
     Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences') {
+    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\shipped-not-ours.json', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences') {
         $from = Join-Path $repo $f
         if (Test-Path -LiteralPath $from) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
@@ -197,8 +197,6 @@ try {
         [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
     }
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
-    . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-    New-GeneratedBodies $inst $fake
     . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
     Install-UiFrontFixture (Join-Path $inst 'Game')
     $node = Get-Command node -ErrorAction SilentlyContinue

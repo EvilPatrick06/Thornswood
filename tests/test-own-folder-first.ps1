@@ -544,7 +544,6 @@ namespace Thornswood
             Action<string> say = delegate(string m) { Say(s, m); };
             Say(s, Leaks.Clean(s.Cfg));
             Say(s, ThornIni.Ensure());
-            Say(s, ThornIni.UndoShippedFov());
             Keep.TakeNote();
             Keep.Unpark();
             Keep.Seed();

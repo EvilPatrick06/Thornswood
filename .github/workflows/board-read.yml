@@ -50,7 +50,7 @@ permissions: {}
 jobs:
   read:
     name: Read every card
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "Windows", "thornswood-vps"]') || 'windows-latest' }}
     environment: board
     # A dozen calls to GitHub. Past this it is stuck, not slow.
     timeout-minutes: 5

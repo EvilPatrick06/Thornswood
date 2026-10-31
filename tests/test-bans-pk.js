@@ -885,7 +885,7 @@ async function adminRoleOnly() {
     yes('a dead character is never picked', /if \(r != null && r\.Slot == DeadSlot\) return;/.test(chose));
     const forget = lift(charsCs, 'public static void Forget(int profileId)') || '';
     yes('and can be forgotten with the bin', /r\.Slot != DeadSlot/.test(forget));
-    const write = lift(charsCs, 'static void WriteCharacters(Config cfg, List<Row> rows, int last, int spare, int slots)') || '';
+    const write = lift(charsCs, 'static string CharactersJson(List<Row> rows, int last, int spare, int slots)') || '';
     yes('the menu list carries the dead with "pk":true in slot 0, and a banned character with "banned":true',
         /all\.AddRange\(DeadRows\(rows\)\)/.test(write) && /,\\"pk\\":true/.test(write) &&
         /,\\"banned\\":true/.test(write) && /isDead \? 0 : r\.Slot/.test(write));

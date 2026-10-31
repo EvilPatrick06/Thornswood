@@ -179,19 +179,21 @@ function key(r, parts, pressed) {
   const gave = [];
   const near = { far: 120 };
   const pieces = new Function('mp', 'BENCH_BY_BASE', 'FORGE', 'MOLD_REACH', 'DOOR_MEMORY_MS',
-    'BENCH_PROPERTY', 'DOOR_PROPERTY', 'distanceTo',
+    'BENCH_PROPERTY', 'DOOR_PROPERTY', 'distanceTo', 'nameBenchStock',
     FORGE_HERE_SRC + AT_FORGE_SRC + TOUCHED_SRC + '\nreturn { forgeHere: forgeHere, touchedBench: touchedBench };')(
     r.mp, BENCH_BY_BASE, FORGE, MOLD_REACH, DOOR_MEMORY_MS, 'thornswoodBench', 'thornswoodDoor',
-    function () { return near.far; });
+    // The bench's chests (#3159) are tests/test-3159-bench-stock.js's.
+    function () { return near.far; }, function () { });
   if (pressed) { pieces.touchedBench(ME, pressed.base, pressed.ref); }
   const run = new Function('g', 'isSmith', 'forgeHere', 'moldInHand', 'heldBy', 'here', 'takeItem',
-    'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'plog', 'unfitToMake',
+    'giveNamed', 'addItem', 'KEY_INGOT', 'KEY', 'keyLabel', 'nameOf', 'placeOf', 'plog', 'unfitToMake',
     KEY_SRC + '\nreturn cutKey;')(
     r.G, function () { return true; }, pieces.forgeHere,
     function () { return 'home:Skyrim.esm'; }, function () { return []; }, function () { return ''; },
     function (id, item, n) { took.push(n); return true; },
     function () { gave.push(1); return true; }, function () { },
     'ingot', 'key', function () { return 'Key to Honeyside'; }, function () { return 'Honeyside'; },
+    function () { return 'Honeyside'; },
     function () { }, r.gate);
   run(ME, 202, function (pid, m) { told.push(m); }, parts);
   return { said: told, made: gave.length > 0, took: took.length };
