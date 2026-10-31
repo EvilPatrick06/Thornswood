@@ -10,8 +10,9 @@
 
   What it checks:
     1. installer.yml: started by hand only, on nothing a pull request can
-       reach; the signing identity only on a v tag, through the "release"
-       environment, for the build job alone; both jobs on GitHub's hosted
+       reach; the signing identity only in a run of main's own workflow
+       (started by hand on main, as release.yml is since #3930), through the
+       "release" environment, for the build job alone; both jobs on GitHub's hosted
        runner and none on the box (#4013: no VPS runner serves this
        repository once it is public); the check on a second machine with no
        id-token; no secret, and no ${{ }} inside a script; Package run with
@@ -85,8 +86,8 @@ Yes 'no secret is read anywhere' ($wf -notmatch 'secrets\.')
 $jobs = Get-Jobs $wf
 Yes ('two jobs: installer, verify (' + (@($jobs.Keys) -join ', ') + ')') ((@($jobs.Keys) -join ',') -eq 'installer,verify')
 if (@($jobs.Keys).Count -ne 2) { Done }
-$envLine = "environment: `${{ startsWith(github.ref, 'refs/tags/v') && 'release' || '' }}"
-Yes 'the build has the release environment only on a v tag' ($jobs['installer'].Contains($envLine))
+$envLine = "environment: `${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && 'release' || '' }}"
+Yes 'the build has the release environment only in a run of main''s own workflow, as release.yml (#3930)' ($jobs['installer'].Contains($envLine) -and -not $wf.Contains("startsWith(github.ref, 'refs/tags/v')"))
 Yes '  and asks for id-token: write' ($jobs['installer'] -match '(?m)^      id-token: write\s*$')
 Yes 'both jobs run on GitHub''s hosted windows-latest, none on the box (#4013)' (
     @($jobs.Values | Where-Object { $_ -match '(?m)^    runs-on: windows-latest\s*$' }).Count -eq 2 -and $wf -cnotmatch 'self-hosted|thornswood-(vps|sign|check|build)')
@@ -97,7 +98,7 @@ Yes '  with no signing identity' ($v -notmatch 'id-token' -and $v -notmatch 'env
 Yes '  and holds the draft to Get-InstallerDraftRefusal' ($v.Contains('Get-InstallerDraftRefusal'))
 
 $build = $jobs['installer']
-Yes 'the run has to be on a v tag on main' ($build.Contains("if (`$env:GITHUB_REF -notlike 'refs/tags/v*')") -and $build.Contains('Resolve-ThornswoodReleaseTag -Tag $env:GITHUB_REF_NAME -RepoDir . -MainRef origin/main'))
+Yes 'the run has to be main''s own, started by hand' ($build.Contains("if (`$env:GITHUB_EVENT_NAME -ne 'workflow_dispatch' -or `$env:GITHUB_REF -ne 'refs/heads/main')"))
 Yes '  and main is what is built' ($build.Contains('git checkout --force --detach origin/main'))
 Yes 'Package is run from the feed, one file, and never publishes' ($build -match 'Package-Thornswood\.ps1 -FromFeed -OneFile -NoPublish -NoPause ')
 Yes 'the signed installer is read back Valid with a timestamp' ($build.Contains("`$sig.Status -ne 'Valid'") -and $build.Contains('TimeStamperCertificate'))
@@ -215,7 +216,7 @@ try {
     Yes '  one that is not what SHA256SUMS names is refused' ($why -match 'is not the one its SHA256SUMS names')
     $gh.Releases = @()
     $why = ''; try { $null = Save-InstallerStub $api $repoName 'v1.2.8' $into } catch { $why = $_.Exception.Message }
-    Yes '  a tag with no release says how to build it' ($why -match 'gh workflow run release\.yml --ref v1\.2\.8')
+    Yes '  a tag with no release says how to build it, on main' ($why -match 'gh workflow run release\.yml --ref main -f tag=v1\.2\.8')
     $gh.Releases = @((New-Rel 7 'v1.2.8' $true @{}), (New-Rel 8 'v1.2.8' $true @{}))
     $why = ''; try { $null = Save-InstallerStub $api $repoName 'v1.2.8' $into } catch { $why = $_.Exception.Message }
     Yes '  a tag with two releases is refused, naming both' ($why -match 'has 2 releases \(7, 8\)')

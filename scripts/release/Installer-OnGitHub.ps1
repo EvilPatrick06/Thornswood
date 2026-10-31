@@ -116,7 +116,7 @@ function Get-InstallerSha256([string]$Path) {
 # SHA256SUMS beside it the way Ship.ps1 Get-ReleaseStub holds it. Its path.
 function Save-InstallerStub($Api, [string]$Repo, [string]$Tag, [string]$Into) {
     $rel = Find-InstallerRelease $Api $Repo $Tag
-    if ($null -eq $rel) { throw "there is no release for $Tag, so there is no setup program to build the installer around. Build it: gh workflow run release.yml --ref $Tag -f tag=$Tag" }
+    if ($null -eq $rel) { throw "there is no release for $Tag, so there is no setup program to build the installer around. Build it on main, the only ref that signs (#3930): gh workflow run release.yml --ref main -f tag=$Tag" }
     $null = New-Item -ItemType Directory -Force -Path $Into
     $stub = Save-InstallerAsset $Api $Repo $rel 'setup-stub.exe' $Into
     $sums = Save-InstallerAsset $Api $Repo $rel 'SHA256SUMS' $Into
@@ -181,54 +181,38 @@ function Get-InstallerDraftRefusal($Api, [string]$Repo, [string]$ReleaseId, [str
 # These go through gh, the way Sign-OnGitHub.ps1 does (dot-source it first):
 # a cloud session has gh and no token of its own. -Gh stands in for it.
 
-# '' when installer.yml is on $Tag, so a run can be started there, else why.
-# A tag made before installer.yml merged does not have it, and GitHub runs a
-# workflow from the ref it is started on.
-function Get-InstallerWorkflowRefusal([string]$Repo, [string]$Tag, [scriptblock]$Gh = { Invoke-SignOnGitHubGh $args }) {
-    $ask = @('api', ('repos/' + $Repo + '/contents/.github/workflows/installer.yml?ref=' + $Tag))
-    try { [void](& $Gh @ask) }
-    catch {
-        if ($_.Exception.Message -match '404|Not Found') {
-            return ("$Tag was made before installer.yml merged, so the installer for a release on it cannot be built on GitHub (#3412). " +
-                    'Ship this one with -Package from One; the next launcher tag carries installer.yml.')
-        }
-        return ("whether installer.yml is on $Tag could not be read: " + $_.Exception.Message)
-    }
-    return ''
-}
-
-# Starts installer.yml on $Tag and waits for its run: GitHub's runner builds
+# Starts installer.yml on main and waits for its run: GitHub's runner builds
 # and signs the installer from main's feed, and a second one holds it to the
-# publish gate on the draft. '' once that run is green, else why.
-# -WaitSeconds bounds the whole wait.
+# publish gate on the draft. '' once that run is green, else why. On main,
+# not a v tag, since only a run of main's own workflow gets the signing
+# identity (installer.yml, HOW TO START IT); main always has installer.yml,
+# so there is nothing to ask first. -WaitSeconds bounds the whole wait.
 function Invoke-InstallerOnGitHub {
     param(
         [Parameter(Mandatory = $true)][string]$Repo,
-        [Parameter(Mandatory = $true)][string]$Tag,
         [scriptblock]$Gh = { Invoke-SignOnGitHubGh $args },
         [int]$WaitSeconds = 3600,
         [int]$Poll = 20
     )
-    if ($Tag -notmatch '^v\d+\.\d+\.\d+(\.\d+)?$') { return "$Tag is not a release tag" }
     $asked = (Get-Date).ToUniversalTime().AddSeconds(-30)
-    $ask = @('workflow', 'run', 'installer.yml', '-R', $Repo, '--ref', $Tag)
+    $ask = @('workflow', 'run', 'installer.yml', '-R', $Repo, '--ref', 'main')
     try { [void](& $Gh @ask) }
-    catch { return ('installer.yml could not be started on ' + $Tag + ': ' + $_.Exception.Message) }
-    Write-Host ("  asked {0} to build and sign the installer from main's feed (installer.yml on {1})" -f $Repo, $Tag) -ForegroundColor DarkGray
+    catch { return ('installer.yml could not be started on main: ' + $_.Exception.Message) }
+    Write-Host ("  asked {0} to build and sign the installer from main's feed (installer.yml on main)" -f $Repo) -ForegroundColor DarkGray
     $until = (Get-Date).AddSeconds($WaitSeconds)
     $run = $null
     while ($true) {
-        try { $run = Find-ReleaseRun $Gh $Repo 'installer.yml' $asked { param($r) [string]$r.headBranch -ceq $Tag } }
+        try { $run = Find-ReleaseRun $Gh $Repo 'installer.yml' $asked { param($r) [string]$r.headBranch -ceq 'main' } }
         catch { return ('the installer.yml runs could not be read: ' + $_.Exception.Message) }
         if ($null -ne $run -and [string]$run.status -eq 'completed') { break }
         if ((Get-Date) -gt $until) {
-            if ($null -eq $run) { return "no installer.yml run started on $Tag in $WaitSeconds seconds" }
-            return ("the installer.yml run on $Tag is still " + [string]$run.status + " after $WaitSeconds seconds: " + [string]$run.url)
+            if ($null -eq $run) { return "no installer.yml run started on main in $WaitSeconds seconds" }
+            return ("the installer.yml run on main is still " + [string]$run.status + " after $WaitSeconds seconds: " + [string]$run.url)
         }
         Start-Sleep -Seconds $Poll
     }
     if ([string]$run.conclusion -ne 'success') {
-        return ("the installer.yml run on $Tag ended " + [string]$run.conclusion + ', so there is no checked, signed installer: ' + [string]$run.url)
+        return ("the installer.yml run on main ended " + [string]$run.conclusion + ', so there is no checked, signed installer: ' + [string]$run.url)
     }
     Write-Host ('  built, signed and checked on GitHub: ' + [string]$run.url) -ForegroundColor DarkGray
     return ''

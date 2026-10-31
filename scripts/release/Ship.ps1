@@ -1782,18 +1782,10 @@ if ($Package -and -not $Dev -and -not $DryRun) {
     }
     $ciStub = Join-Path $stubDir 'setup-stub.exe'
     Say ("  verified against SHA256SUMS, {0:n0} KB" -f ((Get-Item -LiteralPath $ciStub).Length / 1KB)) 'Green'
-    # From the feed the installer is built on GitHub, by installer.yml started
-    # on this tag (#3412), which a tag made before it merged does not have.
-    # Asked now, before anything is published, not after the release is out.
-    if ($FromFeed) {
-        . (Join-Path $Here 'Installer-OnGitHub.ps1')
-        $why = Get-InstallerWorkflowRefusal (Get-SourceRepo $RepoDir) ('v' + $target)
-        if ($why) {
-            Unbump 'the installer cannot be built on GitHub for this tag'
-            Die ($why + ' Nothing was published.')
-        }
-        Say ('  installer.yml is on v' + $target + ', so the installer is built and signed on GitHub after the release') 'Green'
-    }
+    # From the feed the installer is built on GitHub after the release, by
+    # installer.yml started on main (#3412; on main since 31 Oct, the header
+    # of installer.yml), which main always has.
+    if ($FromFeed) { Say '  the installer is built and signed on GitHub after the release (installer.yml on main)' 'Green' }
 }
 
 # ------------------------------------------------------------ animation and body files
@@ -2657,7 +2649,7 @@ elseif ($Package -and $FromFeed) {
     # publishes it. Not stopping the release when it fails, for the reason the
     # One path below gives.
     Head 'Rebuilding the installer on GitHub'
-    $pubArgs = @{ OutDir = $DistDir; Tag = ('v' + $target) }
+    $pubArgs = @{ OutDir = $DistDir }
     if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
     try { & (Join-Path $Here 'Publish-InstallerFromGitHub.ps1') @pubArgs }
     catch {
